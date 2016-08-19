@@ -1188,6 +1188,8 @@ sub GUEST_StartInternalTimers($$) {
 
 =pod
 =item helper
+=item summary Provides a special virtual device to represent a guest of your home
+=item summary_DE Stellt ein spezielles virtuelles Device bereit, welches einen Gast zu Hause repr&auml;sentiert
 =begin html
 
     <a name="GUEST" id="GUEST"></a>
@@ -1495,10 +1497,10 @@ sub GUEST_StartInternalTimers($$) {
       <ul>
         <code>define &lt;rg_FirstName&gt; GUEST [&lt;Device Name(n) der Bewohnergruppe(n)&gt;]</code><br>
         <br>
-        Stellt ein spezielles virtuelles Device bereit, welches einen Gast repräsentiert.<br>
-        Basierend auf dem aktuellen Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
+        Stellt ein spezielles virtuelles Device bereit, welches einen Gast zu Hause repr&auml;sentiert.<br>
+        Basierend auf dem aktuellen Status und anderen Readings k&ouml;nnen andere Aktionen innerhalb von FHEM angestoßen werden.<br>
         <br>
-        Wird vom übergeordneten Modul <a href="#RESIDENTS">RESIDENTS</a> verwendet, kann aber auch einzeln benutzt werden.<br>
+        Wird vom &uuml;bergeordneten Modul <a href="#RESIDENTS">RESIDENTS</a> verwendet, kann aber auch einzeln benutzt werden.<br>
         <br />
         Bei Mitgliedschaft mehrerer Bewohnergruppen werden diese durch Komma getrennt angegeben (siehe Beispiel unten).<br />
         <br>
@@ -1515,7 +1517,7 @@ sub GUEST_StartInternalTimers($$) {
         </ul>
       </ul><br>
       <ul>
-        Bitte beachten, dass das RESIDENTS Gruppen Device zunächst angelegt werden muss, bevor ein GUEST Objekt dort Mitglied werden kann.
+        Bitte beachten, dass das RESIDENTS Gruppen Device zun&auml;chst angelegt werden muss, bevor ein GUEST Objekt dort Mitglied werden kann.
       </ul><br>
       <br>
       <br>
@@ -1547,7 +1549,7 @@ sub GUEST_StartInternalTimers($$) {
       </ul><br>
       <br>
       <ul>
-        <u>Mögliche Status und ihre Bedeutung</u><br>
+        <u>M&ouml;gliche Status und ihre Bedeutung</u><br>
         <br>
         <ul>
           Dieses Modul unterscheidet 6 verschiedene Status:<br>
@@ -1560,13 +1562,13 @@ sub GUEST_StartInternalTimers($$) {
               <b>gotosleep</b> - Mitbewohner ist auf dem Weg ins Bett
             </li>
             <li>
-              <b>asleep</b> - Mitbewohner schläft
+              <b>asleep</b> - Mitbewohner schl&auml;ft
             </li>
             <li>
               <b>awoken</b> - Mitbewohner ist gerade aufgewacht
             </li>
             <li>
-              <b>absent</b> - Mitbewohner ist momentan nicht zu Hause, wird aber bald zurück sein
+              <b>absent</b> - Mitbewohner ist momentan nicht zu Hause, wird aber bald zur&uuml;ck sein
             </li>
             <li>
               <b>none</b> - Gast Device ist deaktiviert
@@ -1579,7 +1581,7 @@ sub GUEST_StartInternalTimers($$) {
         <u>Zusammenhang zwischen Anwesenheit/Presence und Aufenthaltsort/Location</u><br>
         <br>
         <ul>
-          Unter bestimmten Umständen führt der Wechsel des Status auch zu einer Änderung des Readings 'location'.<br>
+          Unter bestimmten Umst&auml;nden f&uuml;hrt der Wechsel des Status auch zu einer Änderung des Readings 'location'.<br>
           <br>
           Wannimmer die Anwesenheit (bzw. das Reading 'presence') von 'absent' auf 'present' wechselt, wird 'location' auf 'home' gesetzt. Sofern das Attribut rg_locationHome gesetzt ist, wird die erste Lokation daraus anstelle von 'home' verwendet.<br>
           <br>
@@ -1591,10 +1593,10 @@ sub GUEST_StartInternalTimers($$) {
         <u>Auto-Status 'gone'</u><br>
         <br>
         <ul>
-          Immer wenn ein Mitbewohner auf 'absent' gesetzt wird, wird ein Zähler gestartet, der nach einer bestimmten Zeit den Status automatisch auf 'gone' setzt.<br>
+          Immer wenn ein Mitbewohner auf 'absent' gesetzt wird, wird ein Z&auml;hler gestartet, der nach einer bestimmten Zeit den Status automatisch auf 'gone' setzt.<br>
           Der Standard ist nach 16 Stunden.<br>
           <br>
-          Dieses Verhalten kann über das Attribut rg_autoGoneAfter angepasst werden.
+          Dieses Verhalten kann &uuml;ber das Attribut rg_autoGoneAfter angepasst werden.
         </ul>
       </ul><br>
       <br>
@@ -1602,8 +1604,8 @@ sub GUEST_StartInternalTimers($$) {
         <u>Anwesenheit mit anderen GUEST oder ROOMMATE Devices synchronisieren</u><br>
         <br>
         <ul>
-          Wenn Sie immer zusammen mit anderen Mitbewohnern oder Gästen das Haus verlassen oder erreichen, können Sie ihren Status ganz einfach auf andere Mitbewohner übertragen.<br>
-          Durch das Setzen des Attributs rg_PassPresenceTo folgen die dort aufgeführten Mitbewohner ihren eigenen Statusänderungen nach 'home', 'absent' oder 'gone'.<br>
+          Wenn Sie immer zusammen mit anderen Mitbewohnern oder G&auml;sten das Haus verlassen oder erreichen, k&ouml;nnen Sie ihren Status ganz einfach auf andere Mitbewohner &uuml;bertragen.<br>
+          Durch das Setzen des Attributs rg_PassPresenceTo folgen die dort aufgef&uuml;hrten Mitbewohner ihren eigenen Status&auml;nderungen nach 'home', 'absent' oder 'gone'.<br>
           <br>
           Bitte beachten, dass Mitbewohner mit dem aktuellen Status 'none' oder 'gone' (im Falle von ROOMMATE Devices) nicht beachtet werden.
         </ul>
@@ -1613,20 +1615,20 @@ sub GUEST_StartInternalTimers($$) {
         <u>Zusammenhang zwischen Aufenthaltsort/Location und Anwesenheit/Presence</u><br>
         <br>
         <ul>
-          Unter bestimmten Umständen hat der Wechsel des Readings 'location' auch einen Einfluss auf den tatsächlichen Status.<br>
+          Unter bestimmten Umst&auml;nden hat der Wechsel des Readings 'location' auch einen Einfluss auf den tats&auml;chlichen Status.<br>
           <br>
-          Immer wenn eine Lokation mit dem Namen 'home' gesetzt wird, wird auch der Status auf 'home' gesetzt, sofern die Anwesenheit bis dahin noch auf 'absent' stand. Sofern das Attribut rg_locationHome gesetzt wurde, so lösen alle dort angegebenen Lokationen einen Statuswechsel nach 'home' aus.<br>
+          Immer wenn eine Lokation mit dem Namen 'home' gesetzt wird, wird auch der Status auf 'home' gesetzt, sofern die Anwesenheit bis dahin noch auf 'absent' stand. Sofern das Attribut rg_locationHome gesetzt wurde, so l&ouml;sen alle dort angegebenen Lokationen einen Statuswechsel nach 'home' aus.<br>
           <br>
-          Immer wenn eine Lokation mit dem Namen 'underway' gesetzt wird, wird auch der Status auf 'absent' gesetzt, sofern die Anwesenheit bis dahin noch auf 'present' stand. Sofern das Attribut rg_locationUnderway gesetzt wurde, so lösen alle dort angegebenen Lokationen einen Statuswechsel nach 'underway' aus. Diese Lokationen werden auch nicht in das Reading 'lastLocation' übertragen.<br>
+          Immer wenn eine Lokation mit dem Namen 'underway' gesetzt wird, wird auch der Status auf 'absent' gesetzt, sofern die Anwesenheit bis dahin noch auf 'present' stand. Sofern das Attribut rg_locationUnderway gesetzt wurde, so l&ouml;sen alle dort angegebenen Lokationen einen Statuswechsel nach 'underway' aus. Diese Lokationen werden auch nicht in das Reading 'lastLocation' &uuml;bertragen.<br>
           <br>
-          Immer wenn eine Lokation mit dem Namen 'wayhome' gesetzt wird, wird das Reading 'wayhome' auf '1' gesetzt, sofern die Anwesenheit zu diesem Zeitpunkt 'absent' ist. Sofern das Attribut rg_locationWayhome gesetzt wurde, so führt das VERLASSEN einer dort aufgeführten Lokation ebenfalls dazu, dass das Reading 'wayhome' auf '1' gesetzt wird. Es gibt also 2 Möglichkeiten den Nach-Hause-Weg-Indikator zu beeinflussen (implizit und explizit).<br>
-          Die Ankunft zu Hause setzt den Wert von 'wayhome' zurück auf '0'.<br>
+          Immer wenn eine Lokation mit dem Namen 'wayhome' gesetzt wird, wird das Reading 'wayhome' auf '1' gesetzt, sofern die Anwesenheit zu diesem Zeitpunkt 'absent' ist. Sofern das Attribut rg_locationWayhome gesetzt wurde, so f&uuml;hrt das VERLASSEN einer dort aufgef&uuml;hrten Lokation ebenfalls dazu, dass das Reading 'wayhome' auf '1' gesetzt wird. Es gibt also 2 M&ouml;glichkeiten den Nach-Hause-Weg-Indikator zu beeinflussen (implizit und explizit).<br>
+          Die Ankunft zu Hause setzt den Wert von 'wayhome' zur&uuml;ck auf '0'.<br>
           <br>
-          Wenn Sie auch das <a href="#GEOFANCY">GEOFANCY</a> Modul verwenden, können Sie das Reading 'location' ganz einfach über GEOFANCY Ereignisse aktualisieren lassen. Definieren Sie dazu einen NOTIFY-Trigger wie diesen:<br>
+          Wenn Sie auch das <a href="#GEOFANCY">GEOFANCY</a> Modul verwenden, k&ouml;nnen Sie das Reading 'location' ganz einfach &uuml;ber GEOFANCY Ereignisse aktualisieren lassen. Definieren Sie dazu einen NOTIFY-Trigger wie diesen:<br>
           <br>
           <code>define n_rg_Manfred.location notify geofancy:currLoc_Manfred.* set rg_Manfred:FILTER=location!=$EVTPART1 location $EVTPART1</code><br>
           <br>
-          Durch das Anlegen von Geofencing-Zonen mit den Namen 'home' und 'wayhome' in der iOS App werden zukünftig automatisch alle Statusänderungen wie oben beschrieben durchgeführt.
+          Durch das Anlegen von Geofencing-Zonen mit den Namen 'home' und 'wayhome' in der iOS App werden zuk&uuml;nftig automatisch alle Status&auml;nderungen wie oben beschrieben durchgef&uuml;hrt.
         </ul>
       </ul><br>
       <br>
@@ -1634,22 +1636,22 @@ sub GUEST_StartInternalTimers($$) {
       <ul>
         <ul>
           <li>
-            <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuellen Status 'absent' ist; Standard ist 36 Stunden
+            <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' &auml;ndert, wenn der aktuellen Status 'absent' ist; Standard ist 36 Stunden
           </li>
           <li>
-            <b>rg_geofenceUUIDs</b> - Mit Komma getrennte Liste von Ger&auml;te UUIDs, die ihren Standort &uuml;ber <a href="#GEOFANCY">GEOFANCY</a> aktualisieren. Vermeidet zus&auml;tzliche notify/DOIF/watchdog Ger&auml;te und kann als Ersatz für das GEOFANCY attribute <i>devAlias</i> dienen. (hier ehr als eine UUID/Device zu hinterlegen ist eher keine gute Idee da die Lokation dann wom&ouml;glich anfängt zu springen)
+            <b>rg_geofenceUUIDs</b> - Mit Komma getrennte Liste von Ger&auml;te UUIDs, die ihren Standort &uuml;ber <a href="#GEOFANCY">GEOFANCY</a> aktualisieren. Vermeidet zus&auml;tzliche notify/DOIF/watchdog Ger&auml;te und kann als Ersatz f&uuml;r das GEOFANCY attribute <i>devAlias</i> dienen. (hier ehr als eine UUID/Device zu hinterlegen ist eher keine gute Idee da die Lokation dann wom&ouml;glich anf&auml;ngt zu springen)
           </li>
           <li>
-            <b>rg_locationHome</b> - hiermit übereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'home'
+            <b>rg_locationHome</b> - hiermit &uuml;bereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird f&uuml;r das Zusammenspiel bei Status&auml;nderungen benutzt; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist 'home'
           </li>
           <li>
-            <b>rg_locationUnderway</b> - hiermit übereinstimmende Lokationen werden als unterwegs gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'underway'
+            <b>rg_locationUnderway</b> - hiermit &uuml;bereinstimmende Lokationen werden als unterwegs gewertet; der erste Eintrag wird f&uuml;r das Zusammenspiel bei Status&auml;nderungen benutzt; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist 'underway'
           </li>
           <li>
-            <b>rg_locationWayhome</b> - das Verlassen einer Lokation, die hier aufgeführt ist, lässt das Reading 'wayhome' auf '1' setzen; mehrere Einträge durch Leerzeichen trennen; Standard ist "wayhome"
+            <b>rg_locationWayhome</b> - das Verlassen einer Lokation, die hier aufgef&uuml;hrt ist, l&auml;sst das Reading 'wayhome' auf '1' setzen; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist "wayhome"
           </li>
           <li>
-            <b>rg_locations</b> - Liste der in FHEMWEB anzuzeigenden Lokationsauswahlliste in FHEMWEB; mehrere Einträge nur durch Komma trennen und KEINE Leerzeichen verwenden
+            <b>rg_locations</b> - Liste der in FHEMWEB anzuzeigenden Lokationsauswahlliste in FHEMWEB; mehrere Eintr&auml;ge nur durch Komma trennen und KEINE Leerzeichen verwenden
           </li>
           <li>
             <b>rg_moodDefault</b> - die Stimmung, die nach Ankunft zu Hause oder nach dem Statuswechsel von 'awoken' auf 'home' gesetzt werden soll
@@ -1658,7 +1660,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_moodSleepy</b> - die Stimmung, die nach Statuswechsel zu 'gotosleep' oder 'awoken' gesetzt werden soll
           </li>
           <li>
-            <b>rg_moods</b> - Liste von Stimmungen, wie sie in FHEMWEB angezeigt werden sollen; mehrere Einträge nur durch Komma trennen und KEINE Leerzeichen verwenden
+            <b>rg_moods</b> - Liste von Stimmungen, wie sie in FHEMWEB angezeigt werden sollen; mehrere Eintr&auml;ge nur durch Komma trennen und KEINE Leerzeichen verwenden
           </li>
           <li>
             <b>rg_noDuration</b> - deaktiviert die Berechnung der Zeitspannen (siehe Readings durTimer*)
@@ -1667,13 +1669,13 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen GUEST oder ROOMMATE Devices; mehrere Devices durch Leerzeichen trennen
           </li>
           <li>
-            <b>rg_realname</b> - wo immer GUEST den richtigen Namen verwenden möchte nutzt es den Wert des Attributs alias oder group; Standard ist group
+            <b>rg_realname</b> - wo immer GUEST den richtigen Namen verwenden m&ouml;chte nutzt es den Wert des Attributs alias oder group; Standard ist group
           </li>
           <li>
-            <b>rg_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
+            <b>rg_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0
           </li>
           <li>
-            <b>rg_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Status führen zu Fehlern
+            <b>rg_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterst&uuml;tzte Status f&uuml;hren zu Fehlern
           </li>
           <li>
             <b>rg_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
@@ -1761,7 +1763,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>nextWakeupDev</b> - Device Name des als n&auml;chstes ausgef&auml;hrten Wake-up Timer
           </li>
           <li>
-            <b>presence</b> - gibt den zu Hause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
+            <b>presence</b> - gibt den zu Hause Status in Abh&auml;ngigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
           </li>
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
@@ -1770,7 +1772,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>wakeup</b> - hat den Wert '1' w&auml;hrend ein Weckprogramm dieses Bewohners ausgef&uuml;hrt wird
           </li>
           <li>
-            <b>wayhome</b> - abhängig vom aktullen Aufenthaltsort, kann der Wert '1' werden, wenn die Person auf dem weg zurück nach Hause ist
+            <b>wayhome</b> - abh&auml;ngig vom aktullen Aufenthaltsort, kann der Wert '1' werden, wenn die Person auf dem weg zur&uuml;ck nach Hause ist
           </li>
           <li>
             <br>

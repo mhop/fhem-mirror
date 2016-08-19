@@ -159,6 +159,7 @@ sub ENIGMA2_Get($@) {
               . "&device=etc";
         }
     }
+
     else {
         return
 "Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg nextTitle:noArg providername:noArg servicevideosize:noArg streamUrl:,mobile ";
@@ -218,7 +219,7 @@ sub ENIGMA2_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText channel:"
+      . ", choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText downmix:on,off channel:"
       . $channels;
     $usage .= " mute:-,on,off"
       if ( ReadingsVal( $name, "mute", "-" ) eq "-" );
@@ -363,6 +364,35 @@ sub ENIGMA2_Set($@) {
         }
         else {
             return "Device needs to be reachable to be set to standby mode.";
+        }
+    }
+
+    # downmix
+    elsif ( lc( $a[1] ) eq "downmix" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" || $ignoreState ne "0" ) {
+            if (   lc( $a[2] ) eq "true"
+                || lc( $a[2] ) eq "1"
+                || lc( $a[2] ) eq "on" )
+            {
+                $cmd = "enable=true";
+            }
+            elsif (lc( $a[2] ) eq "false"
+                || lc( $a[2] ) eq "0"
+                || lc( $a[2] ) eq "off" )
+            {
+                $cmd = "enable=false";
+            }
+            else {
+                return "Argument needs to be one of true,1,on,false,0,off";
+            }
+            $result = ENIGMA2_SendCommand( $hash, "downmix", $cmd );
+        }
+        else {
+            return "Device needs to be ON to change downmix.";
         }
     }
 
@@ -2849,6 +2879,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 
 =pod
 =item device
+=item summary This module controls ENIGMA2 based devices like Dreambox or VUplus receiver via network connection
+=item summary_DE Dieses Modul steuert ENIGMA2 basierte Ger&auml;te wie einen Dreambox oder einen VUplus Receiver &uuml;ber das Netzwerk
 =begin html
 
     <p>
@@ -2862,7 +2894,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
       <ul>
         <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [[[[&lt;port&gt;] [&lt;poll-interval&gt;]] [&lt;http-user&gt;]] [&lt;http-password&gt;]]</code><br>
         <br>
-        This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br>
+        This module controls ENIGMA2 based devices like Dreambox or VUplus receiver via network connection.<br>
         <br>
         Defining an ENIGMA2 device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
         <br>

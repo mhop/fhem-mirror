@@ -1583,6 +1583,8 @@ sub RESIDENTS_UpdateReadings (@) {
 
 =pod
 =item helper
+=item summary Provides a special virtual device to represent a group of individuals living at your home
+=item summary_de Stellt ein spezielles virtuelles Device bereit, um eine Gruppe von Personen zu repr&auml;sentieren, die zusammen wohnen
 =begin html
 
     <p>
@@ -1596,7 +1598,7 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
         <br>
-        Provides a special dummy device to represent a group of individuals living at your home.<br>
+        Provides a special virtual device to represent a group of individuals living at your home.<br>
         It locically combines individual states of <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices and allows state changes for all members.<br>
         Based on the current state and other readings, you may trigger other actions within FHEM.<br>
         <br>
@@ -1966,8 +1968,8 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
         <br>
-        Stellt ein spezielles Dummy-Device bereit, um eine Gruppe von Personen zu repräsentieren, die zusammen wohnen.<br>
-        Es kombiniert dabei logisch die individuellen Status von <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Devices und erlaubt den Status für alle Mitglieder zeitgleich zu ändern. Basierend auf dem aktuellen Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
+        Stellt ein spezielles virtuelles Device bereit, um eine Gruppe von Personen zu repr&auml;sentieren, die zusammen wohnen.<br>
+        Es kombiniert dabei logisch die individuellen Status von <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Devices und erlaubt den Status f&uuml;r alle Mitglieder zeitgleich zu &auml;ndern. Basierend auf dem aktuellen Status und anderen Readings k&ouml;nnen andere Aktionen innerhalb von FHEM angestoßen werden.<br>
         <br>
         Beispiele:<br>
         <ul>
@@ -1983,19 +1985,19 @@ sub RESIDENTS_UpdateReadings (@) {
         Momentan sind die folgenden Kommandos definiert.<br>
         <ul>
           <li>
-            <b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und fügt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Platzhalternamen eingeben und das wars.
+            <b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und f&uuml;gt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Platzhalternamen eingeben und das wars.
           </li>
           <li>
-            <b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues ROOMMATE Device und fügt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Vornamen eingeben und das wars.
+            <b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues ROOMMATE Device und f&uuml;gt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Vornamen eingeben und das wars.
           </li>
           <li>
-            <b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ GUEST an und ermöglicht ein einfaches löschen des dazugehörigen Dummy Devices.
+            <b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ GUEST an und erm&ouml;glicht ein einfaches l&ouml;schen des dazugeh&ouml;rigen Dummy Devices.
           </li>
           <li>
-            <b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ ROOMMATE an und ermöglicht ein einfaches löschen des dazugehörigen Dummy Devices.
+            <b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ ROOMMATE an und erm&ouml;glicht ein einfaches l&ouml;schen des dazugeh&ouml;rigen Dummy Devices.
           </li>
           <li>
-            <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status für alle Gruppenmitglieder gleichzeitig; siehe Attribut rgr_states, um die angezeigte Liste in FHEMWEB abzuändern
+            <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status f&uuml;r alle Gruppenmitglieder gleichzeitig; siehe Attribut rgr_states, um die angezeigte Liste in FHEMWEB abzu&auml;ndern
           </li>
           <li>
             <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; f&uuml;gt diverse Vorkonfigurationen auf Basis von RESIDENTS Toolkit hinzu. Siehe separate Sektion.
@@ -2008,14 +2010,14 @@ sub RESIDENTS_UpdateReadings (@) {
       </ul><br>
       <br>
       <ul>
-        <u>Mögliche Status und ihre Bedeutung</u><br>
+        <u>M&ouml;gliche Status und ihre Bedeutung</u><br>
         <br>
         <ul>
           Dieses Modul unterscheidet 7 verschiedene Status:<br>
           <br>
           <ul>
             <li>
-              <b>home</b> - Bewohner sind zu Hause und mindestens einer schläft nicht
+              <b>home</b> - Bewohner sind zu Hause und mindestens einer schl&auml;ft nicht
             </li>
             <li>
               <b>gotosleep</b> - alle anwesenden Bewohner sind auf dem Weg ins Bett (wenn sie nicht schon schlafen)
@@ -2027,10 +2029,10 @@ sub RESIDENTS_UpdateReadings (@) {
               <b>awoken</b> - mindestens einer der anwesenden Bewohner ist gerade aufgewacht
             </li>
             <li>
-              <b>absent</b> - keiner der Bewohner ist momentan zu Hause; mindestens einer ist aber in Kürze zurück
+              <b>absent</b> - keiner der Bewohner ist momentan zu Hause; mindestens einer ist aber in K&uuml;rze zur&uuml;ck
             </li>
             <li>
-              <b>gone</b> - alle Bewohner sind für längere Zeit verreist
+              <b>gone</b> - alle Bewohner sind f&uuml;r l&auml;ngere Zeit verreist
             </li>
             <li>
               <b>none</b> - kein Mitglied aktiv
@@ -2045,10 +2047,10 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
-            <b>rgr_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
+            <b>rgr_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0
           </li>
           <li>
-            <b>rgr_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Status führen zu Fehlern
+            <b>rgr_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterst&uuml;tzte Status f&uuml;hren zu Fehlern
           </li>
           <li>
             <b>rgr_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
@@ -2064,7 +2066,7 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>lastActivity</b> - der letzte Status Wechsel eines Gruppenmitglieds
           </li>
           <li>
-            <b>lastActivityBy</b> - der Name des Gruppenmitglieds, dessen Status zuletzt geändert wurde
+            <b>lastActivityBy</b> - der Name des Gruppenmitglieds, dessen Status zuletzt ge&auml;ndert wurde
           </li>
           <li>
             <b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause
@@ -2112,94 +2114,94 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>nextWakeupDev</b> - Device Name des als n&auml;chstes ausgef&auml;hrten Wake-up Timer
           </li>
           <li>
-            <b>presence</b> - gibt den zu Hause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
+            <b>presence</b> - gibt den zu Hause Status in Abh&auml;ngigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
           </li>
           <li>
             <b>residentsAbsent</b> - Anzahl der Bewohner mit Status 'absent'
           </li>
           <li>
-            <b>residentsAbsentDevs</b> - Gerätename der Bewohner mit Status 'absent'
+            <b>residentsAbsentDevs</b> - Ger&auml;tename der Bewohner mit Status 'absent'
           </li>
           <li>
-            <b>residentsAbsentNames</b> - Gerätealias der Bewohner mit Status 'absent'
+            <b>residentsAbsentNames</b> - Ger&auml;tealias der Bewohner mit Status 'absent'
           </li>
           <li>
             <b>residentsAsleep</b> - Anzahl der Bewohner mit Status 'asleep'
           </li>
           <li>
-            <b>residentsAsleepDevs</b> - Gerätename der Bewohner mit Status 'asleep'
+            <b>residentsAsleepDevs</b> - Ger&auml;tename der Bewohner mit Status 'asleep'
           </li>
           <li>
-            <b>residentsAsleepNames</b> - Gerätealias der Bewohner mit Status 'asleep'
+            <b>residentsAsleepNames</b> - Ger&auml;tealias der Bewohner mit Status 'asleep'
           </li>
           <li>
             <b>residentsAwoken</b> - Anzahl der Bewohner mit Status 'awoken'
           </li>
           <li>
-            <b>residentsAwokenDevs</b> - Gerätename der Bewohner mit Status 'awoken'
+            <b>residentsAwokenDevs</b> - Ger&auml;tename der Bewohner mit Status 'awoken'
           </li>
           <li>
-            <b>residentsAwokenNames</b> - Gerätealias der Bewohner mit Status 'awoken'
+            <b>residentsAwokenNames</b> - Ger&auml;tealias der Bewohner mit Status 'awoken'
           </li>
           <li>
             <b>residentsGone</b> - Anzahl der Bewohner mit Status 'gone'
           </li>
           <li>
-            <b>residentsGoneDevs</b> - Gerätename der Bewohner mit Status 'gone'
+            <b>residentsGoneDevs</b> - Ger&auml;tename der Bewohner mit Status 'gone'
           </li>
           <li>
-            <b>residentsGoneNames</b> - Gerätealias der Bewohner mit Status 'gone'
+            <b>residentsGoneNames</b> - Ger&auml;tealias der Bewohner mit Status 'gone'
           </li>
           <li>
             <b>residentsGotosleep</b> - Anzahl der Bewohner mit Status 'gotosleep'
           </li>
           <li>
-            <b>residentsGotosleepDevs</b> - Gerätename der Bewohner mit Status 'gotosleep'
+            <b>residentsGotosleepDevs</b> - Ger&auml;tename der Bewohner mit Status 'gotosleep'
           </li>
           <li>
-            <b>residentsGotosleepNames</b> - Gerätealias der Bewohner mit Status 'gotosleep'
+            <b>residentsGotosleepNames</b> - Ger&auml;tealias der Bewohner mit Status 'gotosleep'
           </li>
           <li>
             <b>residentsHome</b> - Anzahl der Bewohner mit Status 'home'
           </li>
           <li>
-            <b>residentsHomeDevs</b> - Gerätename der Bewohner mit Status 'home'
+            <b>residentsHomeDevs</b> - Ger&auml;tename der Bewohner mit Status 'home'
           </li>
           <li>
-            <b>residentsHomeNames</b> - Gerätealias der Bewohner mit Status 'home'
+            <b>residentsHomeNames</b> - Ger&auml;tealias der Bewohner mit Status 'home'
           </li>
           <li>
-            <b>residentsTotal</b> - Summe aller aktiven Bewohner unabhängig von ihrem aktuellen Status
+            <b>residentsTotal</b> - Summe aller aktiven Bewohner unabh&auml;ngig von ihrem aktuellen Status
           </li>
           <li>
             <b>residentsTotalAbsent</b> - Summe aller aktiven Bewohner, die unterwegs sind
           </li>
           <li>
-            <b>residentsTotalAbsentDevs</b> - Gerätename aller aktiven Bewohner, die unterwegs sind
+            <b>residentsTotalAbsentDevs</b> - Ger&auml;tename aller aktiven Bewohner, die unterwegs sind
           </li>
           <li>
-            <b>residentsTotalAbsentNames</b> - Gerätealias aller aktiven Bewohner, die unterwegs sind
+            <b>residentsTotalAbsentNames</b> - Ger&auml;tealias aller aktiven Bewohner, die unterwegs sind
           </li>
           <li>
-            <b>residentsTotalGuests</b> - Anzahl der aktiven Gäste, welche momentan du den Bewohnern dazugezählt werden
+            <b>residentsTotalGuests</b> - Anzahl der aktiven G&auml;ste, welche momentan du den Bewohnern dazugez&auml;hlt werden
           </li>
           <li>
-            <b>residentsTotalGuestsAbsent</b> - Anzahl der aktiven Gäste, die momentan unterwegs sind
+            <b>residentsTotalGuestsAbsent</b> - Anzahl der aktiven G&auml;ste, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalGuestsAbsentDevs</b> - Gerätename der aktiven Gäste, die momentan unterwegs sind
+            <b>residentsTotalGuestsAbsentDevs</b> - Ger&auml;tename der aktiven G&auml;ste, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalGuestsAbsentNames</b> - Gerätealias der aktiven Gäste, die momentan unterwegs sind
+            <b>residentsTotalGuestsAbsentNames</b> - Ger&auml;tealias der aktiven G&auml;ste, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalGuestsPresent</b> - Anzahl der aktiven Gäste, die momentan zu Hause sind
+            <b>residentsTotalGuestsPresent</b> - Anzahl der aktiven G&auml;ste, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalGuestsPresentDevs</b> - Gerätename der aktiven Gäste, die momentan zu Hause sind
+            <b>residentsTotalGuestsPresentDevs</b> - Ger&auml;tename der aktiven G&auml;ste, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalGuestsPresentNames</b> - Gerätealias der aktiven Gäste, die momentan zu Hause sind
+            <b>residentsTotalGuestsPresentNames</b> - Ger&auml;tealias der aktiven G&auml;ste, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalRoommates</b> - Anzahl der Bewohner, die als permanente Bewohner behandelt werden
@@ -2208,55 +2210,55 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsTotalRoommatesAbsent</b> - Anzahl der Besitzer, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalRoommatesAbsentDevs</b> - Gerätename der Besitzer, die momentan unterwegs sind
+            <b>residentsTotalRoommatesAbsentDevs</b> - Ger&auml;tename der Besitzer, die momentan unterwegs sind
           </li>
           <li>
-            <b>residentsTotalRoommatesAbsentNames</b> - Gerätealias der Besitzer, die momentan unterwegs sind
+            <b>residentsTotalRoommatesAbsentNames</b> - Ger&auml;tealias der Besitzer, die momentan unterwegs sind
           </li>
           <li>
             <b>residentsTotalRoommatesPresent</b> - Anzahl der Besitzer, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalRoommatesPresentDevs</b> - Gerätename der Besitzer, die momentan zu Hause sind
+            <b>residentsTotalRoommatesPresentDevs</b> - Ger&auml;tename der Besitzer, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalRoommatesPresentNames</b> - Gerätealias der Besitzer, die momentan zu Hause sind
+            <b>residentsTotalRoommatesPresentNames</b> - Ger&auml;tealias der Besitzer, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalPresentDevs</b> - Gerätename aller aktiven Bewohner, die momentan zu Hause sind
+            <b>residentsTotalPresentDevs</b> - Ger&auml;tename aller aktiven Bewohner, die momentan zu Hause sind
           </li>
           <li>
-            <b>residentsTotalPresentNames</b> - Gerätealias aller aktiven Bewohner, die momentan zu Hause sind
+            <b>residentsTotalPresentNames</b> - Ger&auml;tealias aller aktiven Bewohner, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalWakeup</b> - Summe aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
           </li>
           <li>
-            <b>residentsTotalWakeupDevs</b> - Gerätename aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
+            <b>residentsTotalWakeupDevs</b> - Ger&auml;tename aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
           </li>
           <li>
-            <b>residentsTotalWakeupNames</b> - Gerätealias aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
+            <b>residentsTotalWakeupNames</b> - Ger&auml;tealias aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
           </li>
           <li>
-            <b>residentsTotalWayhome</b> - Summe aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
+            <b>residentsTotalWayhome</b> - Summe aller aktiven Bewohner, die momentan auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
-            <b>residentsTotalWayhomeDevs</b> - Gerätename aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
+            <b>residentsTotalWayhomeDevs</b> - Ger&auml;tename aller aktiven Bewohner, die momentan auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
-            <b>residentsTotalWayhomeNames</b> - Gerätealias aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
+            <b>residentsTotalWayhomeNames</b> - Ger&auml;tealias aller aktiven Bewohner, die momentan auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
             <b>residentsTotalWayhomeDelayed</b> - Summe aller Bewohner, die momentan mit Versp&auml;tung auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
-            <b>residentsTotalWayhomeDelayedDevs</b> - Gerätename aller Bewohner, die momentan versp&auml;tet auf dem Weg zurück nach Hause sind
+            <b>residentsTotalWayhomeDelayedDevs</b> - Ger&auml;tename aller Bewohner, die momentan versp&auml;tet auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
-            <b>residentsTotalWayhomeDelayedNames</b> - Gerätealias aller Bewohner, die momentan versp&auml;tet auf dem Weg zurück nach Hause sind
+            <b>residentsTotalWayhomeDelayedNames</b> - Ger&auml;tealias aller Bewohner, die momentan versp&auml;tet auf dem Weg zur&uuml;ck nach Hause sind
           </li>
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
@@ -2294,7 +2296,7 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupEnforced</i> - Forciertes wecken (optional; 0=nein, 1=ja, 2=wenn Weckzeit ungleich wakeupDefaultTime)
 							</li>
 							<li>
-								<i>wakeupHolidays</i> - Makro u.U. an Feiertagen oder Nicht-Feiertagen ausführen (optional; andHoliday=an Feiertagen ggf. zusammen mit wakeupDays, orHoliday=an Feiertagen unabhängig von wakeupDays, andNoHoliday=an Nicht-Feiertagen ggf. zusammen mit wakeupDays, orNoHoliday=an Nicht-Feiertagen unabhängig von wakeupDays)
+								<i>wakeupHolidays</i> - Makro u.U. an Feiertagen oder Nicht-Feiertagen ausf&uuml;hren (optional; andHoliday=an Feiertagen ggf. zusammen mit wakeupDays, orHoliday=an Feiertagen unabh&auml;ngig von wakeupDays, andNoHoliday=an Nicht-Feiertagen ggf. zusammen mit wakeupDays, orNoHoliday=an Nicht-Feiertagen unabh&auml;ngig von wakeupDays)
 							</li>
 							<li>
 								<i>wakeupMacro</i> - Name des notify Makro Ger&auml;tes (notwendig)
@@ -2312,7 +2314,7 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
 							</li>
 							<li>
-								<i>wakeupWaitPeriod</i> - Schwelle der Wartezeit in Minuten bis das Weckprogramm erneut ausgeführt werden kann, z.B. wenn manuell eine frühere Weckzeit gesetzt wurde als normal während wakeupDefaultTime verwendet wird. Greift nicht, wenn die Weckzeit während dieser Zeit geändert wurde; Standard ist 360 Minuten / 6h (optional)
+								<i>wakeupWaitPeriod</i> - Schwelle der Wartezeit in Minuten bis das Weckprogramm erneut ausgef&uuml;hrt werden kann, z.B. wenn manuell eine fr&uuml;here Weckzeit gesetzt wurde als normal w&auml;hrend wakeupDefaultTime verwendet wird. Greift nicht, wenn die Weckzeit w&auml;hrend dieser Zeit ge&auml;ndert wurde; Standard ist 360 Minuten / 6h (optional)
 							</li>
 						</ul>
 					</li>

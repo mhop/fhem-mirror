@@ -614,6 +614,8 @@ sub msgConfig_Get($@) {
 
 =pod
 =item helper
+=item summary Provides global settings and tools for FHEM command <a href="#MSG">msg</a>
+=item summary_DE Stellt globale Einstellungen und Tools f&uml;r das FHEM Kommando <a href="#MSG">msg</a> bereit
 =begin html
 
     <p>
@@ -669,7 +671,7 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
       msgConfig
     </h3>
     <ul>
-      Stellt globale Einstellungen und Tools für das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
+      Stellt globale Einstellungen und Tools f&uuml;r das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
       Ein Device mit dem Namen globalMsg wird automatisch bei der ersten Benutzung des msg Kommandos angelegt, sofern kein msgConfig Device gefunden wurde.<br>
       Der Device Name kann anschlie&szlig;end beliebig umbenannt und umkonfiguriert werden.<br>
       <br>
