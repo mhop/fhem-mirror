@@ -304,6 +304,8 @@ sub _cfgDB_readConfig() {
 
 =pod
 =item command
+=item summary    frontend command for configDB configuration
+=item summary_DE Befehl zur Konfiguration der configDB
 =begin html
 
 <a name="configdb"></a>

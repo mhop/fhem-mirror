@@ -1458,6 +1458,8 @@ sub btIP_getURL {
 
 =pod
 =item helper
+=item summary    create a simple status display
+=item summary_DE erzeugt ein einfaches Statusdisplay
 =begin html
 
 <a name="InfoPanel"></a>

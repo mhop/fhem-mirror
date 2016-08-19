@@ -1109,6 +1109,8 @@ sub _cfgDB_Filelist(;$) {
 
 =pod
 =item helper
+=item summary    configDB backend
+=item summary_DE configDB backend
 =begin html
 
 <a name="configDB"></a>
