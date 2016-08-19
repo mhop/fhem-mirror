@@ -1177,6 +1177,8 @@ sub FB_CALLLIST_returnTableHeader($)
 
 =pod
 =item helper
+=item summary    creates a call history list, based on a FB_CALLMONITOR definition
+=item summary_DE erzeugt eine Anrufliste basierend auf einer FB_CALLMONITOR-Definition
 =begin html
 
 <a name="FB_CALLLIST"></a>

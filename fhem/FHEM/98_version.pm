@@ -118,6 +118,8 @@ sub version_getRevFromControls(;$)
 
 =pod
 =item command
+=item summary    shows the version of FHEM and all loaded modules.
+=item summary_DE zeigt die Version von FHEM und allen geladenen Modulen an
 =begin html
 
 <a name="version"></a>
