@@ -283,7 +283,9 @@ doUpdate($$$$)
   }
 
   my $canJoin;
-  my $cj = "$root/contrib/commandref_join.pl";
+  my $cmod = AttrVal('global', 'commandref', 'full');
+  my $cj = "$root/contrib/commandref_".
+                ($cmod eq "full" ? "join":"modular").".pl";
   if(-f $cj &&
      -f "$root/docs/commandref_frame.html" &&
      -w "$root/docs/commandref.html" &&
@@ -394,8 +396,9 @@ doUpdate($$$$)
 
   if($canJoin && $upd_needJoin && $curr == $max) {
     chdir($root);
-    uLog(1, "Calling $^X $cj -noWarnings, this may take a while");
-    my $ret = `$^X $cj -noWarnings`;
+    $cj .= " -noWarnings" if($cmod eq "full");
+    uLog(1, "Calling $^X $cj, this may take a while");
+    my $ret = `$^X $cj`;
     foreach my $l (split(/[\r\n]+/, $ret)) {
       uLog(1, $l);
     }
@@ -621,6 +624,8 @@ upd_initRestoreDirs($)
 
 =pod
 =item command
+=item summary    update FHEM program files from the central repository
+=item summary_DE FHEM Programmdateien aktualisieren
 =begin html
 
 <a name="update"></a>

@@ -211,6 +211,8 @@ allowed_Attr(@)
 
 =pod
 =item helper
+=item summary    authorize command execution based on frontend
+=item summary_DE authorisiert Befehlsausf&uuml;hrung basierend auf dem Frontend
 =begin html
 
 <a name="allowed"></a>

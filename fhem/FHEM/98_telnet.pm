@@ -423,6 +423,8 @@ telnet_ActivateInform($)
 
 =pod
 =item helper
+=item summary    telnet server for FHEM
+=item summary_DE FHEM telnet Server
 =begin html
 
 <a name="telnet"></a>

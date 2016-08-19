@@ -218,6 +218,8 @@ eventTypes_Get($@)
 
 =pod
 =item helper
+=item summary    collects FHEM Events to be used in frontends
+=item summary_DE Sammelt FHEM Events f&uuml; die Frontends.
 =begin html
 
 <a name="eventTypes"></a>

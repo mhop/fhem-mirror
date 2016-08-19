@@ -273,6 +273,7 @@ my @globalAttrList = qw(
   backupdir
   backupsymlink
   blockingCallMax
+  commandref:modular,full
   configfile
   dnsServer
   dupTimeout
@@ -2451,6 +2452,14 @@ GlobalAttr($$$$)
     return "$val is not in the form N.N" if($val !~ m/^\d\.\d$/);
     $featurelevel = $val;
     
+  }
+  elsif($name eq "commandref" && $init_done) {
+    my $root = $attr{global}{modpath};
+    if($val eq "full") {
+      return `$^X $root/contrib/commandref_join.pl -noWarnings`;
+    } else {
+      return `$^X $root/contrib/commandref_modular.pl`;
+    }
   }
 
   return undef;

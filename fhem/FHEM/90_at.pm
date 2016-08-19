@@ -383,6 +383,8 @@ EOF
 1;
 
 =pod
+=item summary    start an FHEM command at a later time
+=item summary_DE FHEM Befehl zu einem sp&auml;teren Zeitpunkt starten
 =item helper
 =begin html
 

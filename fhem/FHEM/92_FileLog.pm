@@ -1065,6 +1065,8 @@ FileLog_regexpFn($$)
 
 =pod
 =item helper
+=item summary    log events to a file
+=item summary_DE schreibt Events in eine Logdatei
 =begin html
 
 <a name="FileLog"></a>

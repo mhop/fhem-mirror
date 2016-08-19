@@ -952,6 +952,8 @@ ZWDongle_Ready($)
 1;
 
 =pod
+=item summary    connection to standard ZWave controller
+=item summary_DE Anbindung von standard ZWave Controller
 =begin html
 
 <a name="ZWDongle"></a>

@@ -100,6 +100,8 @@ CommandCmdAlias($$$)
 
 =pod
 =item command
+=item summary    create new commands or replace internal ones.
+=item summary_DE neue FHEM Befehle definieren oder existierende &auml;ndern
 =begin html
 
 <a name="cmdalias"></a>

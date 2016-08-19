@@ -97,6 +97,8 @@ CommandCULflash($$)
 
 =pod
 =item command
+=item summary    flash (USB-)CUL device with culfw
+=item summary_DE USB-CUL Ger&auml;te mit Firmware versorgen (flashen)
 =begin html
 
 <a name="CULflash"></a>

@@ -142,6 +142,8 @@ CUL_TX_Parse($$)
 
 
 =pod
+=item summary    Some Lacrosse sensors (TX-3TH, etc)
+=item summary_DE Einige Lacrosse Sensoren (TX-3TH, usw.) 
 =begin html
 
 <a name="CUL_TX"></a>

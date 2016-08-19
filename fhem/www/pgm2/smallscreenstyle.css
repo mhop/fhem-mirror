@@ -9,6 +9,7 @@ textarea { font-family:Arial, sans-serif; font-size:16px;}
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
+#right   { position:absolute; top:30px; left: 0px; right: 0px; }
 #errmsg  { left:0px; }
 
 .devType { font-size:12px;}

@@ -1143,6 +1143,8 @@ CUL_prefix($$$)
 1;
 
 =pod
+=item summary    connect devices with the culfw Firmware, e.g. Busware CUL
+=item summary_DE Anbindung von Geraeten mit dem culfw Firmware, z.Bsp. Busware CUL
 =begin html
 
 <a name="CUL"></a>

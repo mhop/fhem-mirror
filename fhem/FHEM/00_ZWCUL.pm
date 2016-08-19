@@ -658,6 +658,8 @@ ZWCUL_Ready($)
 1;
 
 =pod
+=item summary    connection to a culfw Device in ZWave mode (e.g. CUL)
+=item summary_DE Anbindung eines culfw Ger&auml;tes in ZWave Modus (z.Bsp. CUL)
 =begin html
 
 <a name="ZWCUL"></a>

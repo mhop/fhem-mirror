@@ -185,6 +185,8 @@ EMWZ_Define($$)
 1;
 
 =pod
+=item summary    EM1000WZ devices communicating over the EM1010PC
+=item summary_DE EM1000WZ Ger&auml;te angebunden &uuml;ber ein EM1010PC
 =begin html
 
 <a name="EMWZ"></a>

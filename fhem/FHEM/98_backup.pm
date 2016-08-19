@@ -227,6 +227,8 @@ createArchiv($$)
 
 =pod
 =item command
+=item summary    create a backup of the FHEM installation
+=item summary_DE erzeugt eine Sicherungsdatei der FHEM Installation
 =begin html
 
 <a name="backup"></a>

@@ -364,6 +364,8 @@ CUL_WS_Attr(@)
 1;
 
 =pod
+=item summary    devices communicating via the ELV WS protocol (S300TH, etc)
+=item summary_DE Anbindung von ELV Ger&auml;ten mit dem WS Protokoll (S300TH, usw.)
 =begin html
 
 <a name="CUL_WS"></a>

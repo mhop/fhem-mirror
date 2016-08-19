@@ -322,6 +322,8 @@ FHEM2FHEM_Set($@)
 
 =pod
 =item helper
+=item summary    connect two FHEM instances
+=item summary_DE verbindet zwei FHEM Installationen
 =begin html
 
 <a name="FHEM2FHEM"></a>

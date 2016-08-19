@@ -477,6 +477,8 @@ FBDECT_Undef($$)
 1;
 
 =pod
+=item summary    DECT devices connected via the Fritz!OS AHA Server
+=item summary_DE &uuml;ber den Fritz!OS AHA Server angebundene DECT Ger&auml;te
 =begin html
 
 <a name="FBDECT"></a>

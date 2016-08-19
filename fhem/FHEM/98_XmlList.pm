@@ -108,6 +108,8 @@ CommandXmlList($$)
 
 =pod
 =item command
+=item summary    show device data in XML format
+=item summary_DE zeigt Ger&auml;tedaten in XML Format an
 =begin html
 
 <a name="XmlList"></a>

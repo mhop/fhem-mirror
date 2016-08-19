@@ -322,6 +322,8 @@ KS300_windIndex($)
 1;
 
 =pod
+=item summary    module for the ELV KS300 weather station
+=item summary_DE Anbindung der ELV KS300 Wetterstation
 =begin html
 
 <a name="KS300"></a>

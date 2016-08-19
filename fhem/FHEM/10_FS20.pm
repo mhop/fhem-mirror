@@ -455,6 +455,8 @@ four2hex($$)
 1;
 
 =pod
+=item summary    devices communicating via the ELV FS20 protocol
+=item summary_DE Anbindung von FS20 Ger&auml;ten
 =begin html
 
 <a name="FS20"></a>

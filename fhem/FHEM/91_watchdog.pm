@@ -207,6 +207,8 @@ watchdog_Attr(@)
 
 =pod
 =item helper
+=item summary    execute a command, if no event is received within timeout
+=item summary_DE f&uuml;hrt Befehl aus, falls innerhalb des Timeouts kein Event empfangen wurde
 =begin html
 
 <a name="watchdog"></a>

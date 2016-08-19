@@ -269,6 +269,8 @@ notify_fhemwebFn($$$$)
 
 =pod
 =item helper
+=item summary    execute a command upon receiving an event
+=item summary_DE f&uuml;hrt bei Events Anweisungen aus
 =begin html
 
 <a name="notify"></a>

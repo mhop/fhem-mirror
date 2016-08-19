@@ -191,6 +191,8 @@ average_Notify($$)
 
 =pod
 =item helper
+=item summary    add avarage Readings to arbitrary devices
+=item summary_DE berechnet Durchschnittswerte (als Readings)
 =begin html
 
 <a name="average"></a>

@@ -510,6 +510,8 @@ structure_Attr($@)
 
 =pod
 =item helper
+=item summary    organize/structure multiple devices
+=item summary_DE mehrere Ger&auml;te zu einem zusammenfassen
 =begin html
 
 <a name="structure"></a>

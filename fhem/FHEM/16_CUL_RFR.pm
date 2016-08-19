@@ -149,6 +149,8 @@ CUL_RFR_AddPrefix($$)
 
 
 =pod
+=item summary    devices communicating over culfw RFR (SlowRF repeater)
+=item summary_DE Anbindung von Ger&auml;ten &uuml;ber ein culfw RFR (SlowRF repeater)
 =begin html
 
 <a name="CUL_RFR"></a>

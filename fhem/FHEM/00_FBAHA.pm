@@ -395,6 +395,8 @@ FBAHA_Ready($)
 1;
 
 =pod
+=item summary    (deprecated) connection to the Fritz!OS AHA Server
+=item summary_DE Anbindung des (veralteten) Fritz!OS AHA Servers
 =begin html
 
 <a name="FBAHA"></a>

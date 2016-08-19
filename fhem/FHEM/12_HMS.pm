@@ -240,6 +240,8 @@ HMS_Parse($$)
 1;
 
 =pod
+=item summary    devices communicating via the ELV HMS protocol
+=item summary_DE Anbindung von ELV HMS Ger&auml;ten
 =begin html
 
 <a name="HMS"></a>
