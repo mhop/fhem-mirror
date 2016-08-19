@@ -76,7 +76,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-# $hash->{SetFn} = "OBIS_Set";
+  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -125,7 +125,7 @@ sub OBIS_Define($$)
 	if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
 	$baudrate = $1 if(defined($1));
 	}
-	my %bd=("300"=>"0","600"=>"1","1200"=>"2","2400"=>"3","4800"=>"4","9600"=>"5");
+	my %bd=("300"=>"0","600"=>"1","1200"=>"2","2400"=>"3","4800"=>"4","9600"=>"5","18200"=>"6","36400"=>"7","57600"=>"8","115200"=>"9");
 	$hash->{helper}{SPEED}=$bd{$baudrate};
   }
   else {$baudrate=9600; $hash->{helper}{SPEED}="5";}
@@ -156,6 +156,33 @@ sub OBIS_Define($$)
   	  return DevIo_OpenDev($hash, 0, "OBIS_Init");
 }
 
+sub OBIS_Set($@)
+{
+	my ( $hash, @a ) = @_;
+	my $name = shift @a;
+	my $opt = shift @a;
+	my $value = join("", @a);
+	my $teststr="";
+	my %bd=("300"=>"0","600"=>"1","1200"=>"2","2400"=>"3","4800"=>"4","9600"=>"5","18200"=>"6","36400"=>"7","57600"=>"8","115200"=>"9");
+	
+	if ($opt eq "setSpeed") {
+		if ($bd{$value} ne $hash->{helper}{SPEED}) {
+			$hash->{helper}{BUFFER}="";
+			
+			$hash->{helper}{SPEED}=$bd{$value};
+			print "old Helper: $hash->{helper}{DEVICES}[2] \r\n";
+			$hash->{helper}{DEVICES}[2]=$hash->{helper}{DEVICES}[2] eq "" ? "" : chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10);
+			print "new Helper: $hash->{helper}{DEVICES}[2] \r\n";
+			
+			$hash->{helper}{SpeedChange}=$value;
+			DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+			print "Wrote $hash->{helper}{DEVICES}[0]\r\n";
+		}		
+		
+	}
+	return;
+}
+
 # Update-Routine
 sub GetUpdate($)
 {
@@ -168,6 +195,7 @@ sub GetUpdate($)
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
 	if( $init_done ) {
 		DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+		Log3 $hash,4,"Wrote $hash->{helper}{DEVICES}[0]";
 	}
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
@@ -176,6 +204,7 @@ sub GetUpdate($)
 
 sub OBIS_Init($)
 {
+	Log 3,"Init done";
   return undef;
 }
 #####################################
@@ -195,7 +224,52 @@ sub OBIS_Read($)
 		my $name = $hash->{NAME};
 	
     	my $buf = DevIo_SimpleRead($hash);
-    	OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
+    	my $b=$buf;
+    	$b =~ s/(.)/sprintf("%X",ord($1))/eg;
+    	if ($hash->{helper}{SpeedChange} eq "")
+    	{
+    		OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
+    		Log3 $hash,4, "parsing....\r\n";
+    	} else
+    	{
+			if ($hash->{helper}{SpeedChange2} eq "")
+			{
+				Log3 $hash,4,"Part 1";
+#				$hash->{helper}{SPEED}=$bd{$value};
+				DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) ;
+				Log3 $hash,4,"Writing ".$hash->{helper}{DEVICES}[2];
+				$hash->{helper}{SpeedChange2}="1";
+			} elsif ($hash->{helper}{SpeedChange2} eq "1")
+			{	
+				if ($buf ne hex(15)) {
+					Log3 $hash,4,"Part 2";
+			    	my $sp=$hash->{helper}{SPEED};
+					my $d=$hash->{DeviceName};
+					my $repl=$sp;
+					Log3 $hash,4,"Old Dev: $d";
+					$d=~/(.*@)(\d*)(.*)/;
+					my $d2=$1.$hash->{helper}{SpeedChange}.$3;
+			#		$d=~s/(.*@)(\d*)(.*)/$repl$2/ee;
+					
+					Log3 $hash,4, "Replaced dev: $d2";
+					RemoveInternalTimer($hash);  
+					DevIo_CloseDev($hash) if $hash->{DeviceName} ne "none";
+					$hash->{DeviceName} = $d2; 
+					$hash->{helper}{EoM}=-1;
+				  	Log3 $hash,5,"OBIS ($name) - Opening device...";
+					my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
+			    	Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+					InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+				  	DevIo_OpenDev($hash, 1, "OBIS_Init");
+				} else
+				{	
+					Log3 $hash,4,"Recieved NAK from Meter"; 	
+				}	
+				$hash->{helper}{SpeedChange2}="";
+				$hash->{helper}{SpeedChange}="";    	
+				Log3 $hash,4, "Cleared helper\r\n";			    	
+			}
+    	}
 	}
     return(undef);
 }
@@ -681,6 +755,8 @@ sub OBIS_decodeTL($){
 
 =pod
 =item device
+=item summary    Collects data from Smartmeters that report in OBIS-Standard
+=item summary_DE Wertet Smartmeter aus, welche ihre Daten im OBIS-Standard senden
 =begin html
 
 <a name="OBIS"></a>
