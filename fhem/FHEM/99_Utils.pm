@@ -248,6 +248,8 @@ round($$)
 
 =pod
 =item helper
+=item summary    FHEM utility functions
+=item summary_DE FHEM Hilfsfunktionen
 =begin html
 
 <a name="Utils"></a>

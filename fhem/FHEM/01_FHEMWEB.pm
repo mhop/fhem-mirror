@@ -628,6 +628,8 @@ FW_answerCall($)
     my $static = ($ext =~ m/(css|js|png|jpg)/i || $dir =~ m/^pgm2/);
     my $fname = ($ext ? "$file.$ext" : $file);
     if(-r "$ldir/$fname" || $static) {  # no return for FLOORPLAN
+      $FW_RET .= "var csrfToken='$FW_CSRF';\n"    # Hack?
+        if($FW_CSRF && $fname eq "fhemdoc_modular.js");
       return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1);
     }
     $arg = "/$dir/$ofile";
@@ -1272,7 +1274,9 @@ FW_doDetail($)
   FW_pH "cmd=style showDSI $d", "Extend devStateIcon", undef, "detLink showDSI";
   FW_pH "cmd=delete $d", "Delete this device ($d)",    undef, "detLink delDev"
          if($d ne "global");
-  FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help", 
+  my $sfx = AttrVal("global", "language", "EN");
+  $sfx = ($sfx eq "EN" ? "" : "_$sfx");
+  FW_pH "$FW_ME/docs/commandref${sfx}.html#${t}", "Device specific help", 
          undef, "detLink devSpecHelp";
   FW_pO "<br><br>";
   FW_pO "</div>";
@@ -1391,10 +1395,12 @@ FW_roomOverview($)
     push @list1, $lr;
     push @list2, "$FW_ME?room=".urlEncode($r);
   }
+  my $sfx = AttrVal("global", "language", "EN");
+  $sfx = ($sfx eq "EN" ? "" : "_$sfx");
   my @list = (
      "Everything",    "$FW_ME?room=all",
      "",              "",
-     "Commandref",    "$FW_ME/docs/commandref.html",
+     "Commandref",    "$FW_ME/docs/commandref${sfx}.html",
      "Remote doc",    "http://fhem.de/fhem.html#Documentation",
      "Edit files",    "$FW_ME?cmd=style%20list",
      "Select style",  "$FW_ME?cmd=style%20select",
@@ -2989,6 +2995,8 @@ FW_widgetOverride($$)
 
 =pod
 =item helper
+=item summary    HTTP Server and FHEM Frontend
+=item summary_DE HTTP Server und FHEM Frontend
 =begin html
 
 <a name="FHEMWEB"></a>

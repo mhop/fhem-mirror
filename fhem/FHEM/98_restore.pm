@@ -91,6 +91,8 @@ restoreDir($$)
 
 =pod
 =item command
+=item summary    restore program files modified by the update command
+=item summary_DE durch das update Befehl ge&auml;nderte Programmdateien wiederherstellen
 =begin html
 
 <a name="restore"></a>

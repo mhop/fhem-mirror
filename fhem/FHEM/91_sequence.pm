@@ -131,6 +131,8 @@ sequence_Undef($$)
 
 =pod
 =item helper
+=item summary    generate an event upon reception of a defined sequence of events
+=item summary_DE generiert Event nach Empfang einer definierten Event-Sequenz
 =begin html
 
 <a name="sequence"></a>

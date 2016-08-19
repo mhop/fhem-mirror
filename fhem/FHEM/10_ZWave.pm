@@ -4548,6 +4548,8 @@ s2Hex($)
 1;
 
 =pod
+=item summary    devices communicating via the ZWave protocol
+=item summary_DE Anbindung von ZWave Ger&auml;ten
 =begin html
 
 <a name="ZWave"></a>

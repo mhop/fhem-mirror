@@ -821,6 +821,8 @@ FHZ_Read($)
 1;
 
 =pod
+=item summary    connection to the ELV FHZ1000/FHZ1300 USB devices
+=item summary_DE Anbindung der ELV FHZ1000/FHZ1300 USB Ger&auml;te
 =begin html
 
 <a name="FHZ"></a>

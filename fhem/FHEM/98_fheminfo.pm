@@ -235,6 +235,8 @@ _myDiv($$)
 
 =pod
 =item command
+=item summary    display information about the system and FHEM definitions
+=item summary_DE zeigt Systeminformationen an
 =begin html
 
 <a name="fheminfo"></a>

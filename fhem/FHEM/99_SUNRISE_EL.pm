@@ -401,6 +401,8 @@ sub sunset_abs_dat (@) {
 
 =pod
 =item helper
+=item summary    perl functions to compute the sun position
+=item summary_DE perl Funktionen f&uuml;r die Sonnenstandsberechnung
 =begin html
 
 <a name="SUNRISE_EL"></a>

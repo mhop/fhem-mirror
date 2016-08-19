@@ -277,6 +277,8 @@ CUL_EM_Parse($$)
 
 
 =pod
+=item summary    devices communicating via the ELV EM protocol (EM1000WZ, etc)
+=item summary_DE Anbindung von ELV Ger&auml;ten mit dem EM Protokoll (EM1000WZ, usw.)
 =begin html
 
 <a name="CUL_EM"></a>

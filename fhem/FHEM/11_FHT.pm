@@ -723,6 +723,8 @@ FHT_State($$$$)
 1;
 
 =pod
+=item summary    devices communicating via the ELV FHT protocol (FHT80b)
+=item summary_DE Anbindung von ELV FHT Ger&auml;ten (FHT80b)
 =begin html
 
 <a name="FHT"></a>

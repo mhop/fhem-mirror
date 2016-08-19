@@ -115,6 +115,8 @@ LIRC_Ready($)
 1;
 
 =pod
+=item summary    connection to the Linux Infrared Server (lirc)
+=item summary_DE Anbindung der Linux Infrared (lirc) Servers
 =begin html
 
 <a name="LIRC"></a>

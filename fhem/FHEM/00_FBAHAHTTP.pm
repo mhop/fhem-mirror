@@ -228,6 +228,8 @@ FBAHAHTTP_Write($$$)
 1;
 
 =pod
+=item summary    connection to the Fritz!OS AHA Server via HTTP
+=item summary_DE Anbindung des Fritz!OS AHA Servers &uuml;ber HTTP
 =begin html
 
 <a name="FBAHAHTTP"></a>

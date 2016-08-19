@@ -425,6 +425,8 @@ EmGetDevData($)
 1;
 
 =pod
+=item summary    basis module for the ELV EM1010PC
+=item summary_DE Anbindung der ELV EM1010PC
 =begin html
 
 <a name="EM"></a>

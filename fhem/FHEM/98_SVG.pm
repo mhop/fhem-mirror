@@ -2319,6 +2319,8 @@ plotAsPng(@)
 
 =pod
 =item helper
+=item summary    draw an SVG-Plot based on FileLog or DbLog data
+=item summary_DE malt ein SVG-Plot aus FileLog oder DbLog Daten
 =begin html
 
 <a name="SVG"></a>

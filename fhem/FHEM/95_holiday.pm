@@ -268,6 +268,8 @@ western_easter($)
 
 =pod
 =item helper
+=item summary    define holidays in a local file
+=item summary_DE Urlaubs-/Feiertagskalender aus einer lokalen Datei
 =begin html
 
 <a name="holiday"></a>

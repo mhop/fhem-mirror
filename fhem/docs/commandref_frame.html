@@ -19,11 +19,21 @@
     <div id="menu">
       <h3>fhem.pl reference</h3>
       Version: <b>EN</b>&nbsp;<a href="commandref_DE.html">DE</a>
+      <br><br>
+      <a href="#doctop">Scroll to top</a>
+      <br><br>
+      <a style="display:none" href="#" name="loadAll">Load complete doc</a>
+      <br><br>
+      <a id="otherLang" style="display:none" href="#" name="otherLang">
+        Load <span style="display:none" lang="DE">german</span> 
+             <span style="display:none" lang="EN">english</span>
+        doc for <span class="mod"></span>
+      </a>
     </div>
   </div>
 
   <div id="right">
-
+<a name="doctop"></a>
 <h3>Contents</h3>
 <ul>
   <a href="#intro">Introduction</a><br>
@@ -35,38 +45,36 @@
   <b>Fhem commands</b>
   <ul>
       <!-- header:command -->
-      <a href="#apptime">apptime</a> &nbsp;
-      <a href="#attr">attr</a> &nbsp;
-      <a href="#cancel">cancel</a> &nbsp;
-      <a href="#createlog">createlog</a> &nbsp;
-      <a href="#define">define</a> &nbsp;
-      <a href="#defmod">defmod</a> &nbsp;
-      <a href="#delete">delete</a> &nbsp;
-      <a href="#deleteattr">deleteattr</a> &nbsp;
-      <a href="#deletereading">deletereading</a> &nbsp;
-      <a href="#displayattr">displayattr</a> &nbsp;
-      <a href="#fheminfo">fheminfo</a> &nbsp;
-      <a href="#get">get</a> &nbsp;
-      <a href="#getstate">getstate</a> &nbsp;
-      <a href="#IF">IF</a> &nbsp;
-      <a href="#include">include</a> &nbsp;
-      <a href="#inform">inform</a> &nbsp;
-      <a href="#list">list</a> &nbsp;
-      <a href="#modify">modify</a> &nbsp;
-      <a href="#notice">notice</a> &nbsp;
-      <a href="#quit">quit</a> &nbsp;
-      <a href="#reload">reload</a> &nbsp;
-      <a href="#rename">rename</a> &nbsp;
-      <a href="#rereadcfg">rereadcfg</a> &nbsp;
-      <a href="#save">save</a> &nbsp;
-      <a href="#set">set</a> &nbsp;
-      <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
-      <a href="#setreading">setreading</a> &nbsp;
-      <a href="#setstate">setstate</a> &nbsp;
-      <a href="#shutdown">shutdown</a> &nbsp;
-      <a href="#sleep">sleep</a> &nbsp;
-      <a href="#trigger">trigger</a> &nbsp;
-      <a href="#usb">usb</a> &nbsp;
+      <a href="#apptime">apptime</a> &nbsp; <!-- provides information about execution times -->
+      <a href="#attr">attr</a> &nbsp;       <!-- set an attribute for a FHEM device -->
+      <a href="#cancel">cancel</a> &nbsp;   <!-- cancel sleep -->
+      <a href="#createlog">createlog</a> &nbsp; <!-- add a FileLog and an SVG to an existing device -->
+      <a href="#define">define</a> &nbsp;   <!-- define/create a FHEM device -->
+      <a href="#defmod">defmod</a> &nbsp;   <!-- define or modify a FHEM device -->
+      <a href="#delete">delete</a> &nbsp;   <!-- delete a FHEM device -->
+      <a href="#deleteattr">deleteattr</a> &nbsp; <!-- delete an attribute -->
+      <a href="#deletereading">deletereading</a> &nbsp; <!-- delete a reading -->
+      <a href="#displayattr">displayattr</a> &nbsp;  <!-- show attributes -->
+      <a href="#get">get</a> &nbsp;         <!-- retrieve a value from a FHEM device -->
+      <a href="#IF">IF</a> &nbsp;           <!-- conditionally execute FHEM commands -->
+      <a href="#include">include</a> &nbsp; <!-- read in a file with FHEM commands -->
+      <a href="#inform">inform</a> &nbsp;   <!-- show events in a telnet connection -->
+      <a href="#list">list</a> &nbsp;       <!-- display definition,readings and attributes of a FHEM device -->
+      <a href="#modify">modify</a> &nbsp;   <!-- change the definition of a FHEM device -->
+      <a href="#notice">notice</a> &nbsp;   <!-- view and confirm of system messages -->
+      <a href="#quit">quit</a> &nbsp;       <!-- end a telnet connection to FHEM -->
+      <a href="#reload">reload</a> &nbsp;   <!-- reload a FHEM module (program definition) -->
+      <a href="#rename">rename</a> &nbsp;   <!-- rename a FHEM device -->
+      <a href="#rereadcfg">rereadcfg</a> &nbsp; <!-- reread the FHEM configuration -->
+      <a href="#save">save</a> &nbsp;       <!-- save the FHEM configuration -->
+      <a href="#set">set</a> &nbsp;         <!-- set a value in a FHEM device -->
+      <a href="#setdefaultattr">setdefaultattr</a> &nbsp; <!-- define a default attribute -->
+      <a href="#setreading">setreading</a> &nbsp; <!-- set a reading for a FHEM device -->
+      <a href="#setstate">setstate</a> &nbsp; <!-- set the main state of a FHEM device -->
+      <a href="#shutdown">shutdown</a> &nbsp; <!-- shut down (terminate) FHEM -->
+      <a href="#sleep">sleep</a> &nbsp;     <!-- sleep (delay execution) for a while -->
+      <a href="#trigger">trigger</a> &nbsp; <!-- generate a FHEM event -->
+      <a href="#usb">usb</a> &nbsp;         <!-- discover USB devices -->
 
   </ul>
 
@@ -685,34 +693,6 @@ The following local attributes are used by a wider range of devices:
   </ul>
 </ul>
 
-<a name="setdefaultattr"></a>
-<h3>setdefaultattr</h3>
-<ul>
-  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
-
-  <br>Add a default attribute. Each device defined from now on will receive
-  this attribute.<br> If no attrname is specified, then the default attribute
-  list will be deleted.
-  <br><br>
-
-  Example to set the attribute "room kitchen" and "loglevel 4" to
-  each of the lamps:
-  <ul>
-    <code>setdefaultattr room kitchen</code><br>
-    <code>setdefaultattr loglevel 4</code><br>
-    <code>define lamp1 FS20 1234 11</code><br>
-    <code>define lamp2 FS20 1234 12</code><br>
-    <code>define lamp3 FS20 1234 13</code><br>
-    <code>setdefaultattr</code><br>
-  </ul>
-  <br>
-
-  Notes:<br>
-  <ul>
-    <li>There is no way to delete a single default-attribute from the list</li>
-  </ul>
-</ul>
-
 <a name="cancel"></a>
 <h3>cancel</h3>
 <ul>
@@ -871,26 +851,6 @@ The following local attributes are used by a wider range of devices:
 
 </ul>
 
-<a name="getstate"></a>
-<h3>getstate</h3>
-<ul>
-  <code>getstate &lt;devspec&gt;</code>
-  <br><br>
-  Output a short space seperated status for &lt;devspec&gt;. It is useful for
-  monitoring the device in e.g. Cacti.<br>
-  Examples:
-  <ul><code>
-  getstate lamp<br>
-  state:1<br>
-  <br>
-  getstate fl<br>
-  ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
-  </code></ul>
-  Note: to use this command copy the file contrib/getstate/99_getstate.pm into
-  your FHEM directory.
-  <br>
-
-</ul>
 
 <a name="include"></a>
 <h3>include</h3>
@@ -1171,6 +1131,34 @@ The following local attributes are used by a wider range of devices:
   </ul>
 </ul>
 
+<a name="setdefaultattr"></a>
+<h3>setdefaultattr</h3>
+<ul>
+  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
+
+  <br>Add a default attribute. Each device defined from now on will receive
+  this attribute.<br> If no attrname is specified, then the default attribute
+  list will be deleted.
+  <br><br>
+
+  Example to set the attribute "room kitchen" and "loglevel 4" to
+  each of the lamps:
+  <ul>
+    <code>setdefaultattr room kitchen</code><br>
+    <code>setdefaultattr loglevel 4</code><br>
+    <code>define lamp1 FS20 1234 11</code><br>
+    <code>define lamp2 FS20 1234 12</code><br>
+    <code>define lamp3 FS20 1234 13</code><br>
+    <code>setdefaultattr</code><br>
+  </ul>
+  <br>
+
+  Notes:<br>
+  <ul>
+    <li>There is no way to delete a single default-attribute from the list</li>
+  </ul>
+</ul>
+
 <a name="setreading"></a>
 <h3>setreading</h3>
 <ul>
@@ -1226,22 +1214,6 @@ The following local attributes are used by a wider range of devices:
   </ul>
 </ul>
 
-<a name="trigger"></a>
-<h3>trigger</h3>
-<ul>
-  <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
-  <br><br>
-  Trigger a <a href="#notify">notify</a> definition.
-  See the <a href="#devspec">Device specification</a> section for details on
-  &lt;devspec&gt;.
-
-  <br><br>
-  Example:
-  <ul>
-    <code>trigger btn3 on</code>
-  </ul>
-</ul>
-
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
@@ -1269,6 +1241,22 @@ The following local attributes are used by a wider range of devices:
   Note: a sleep not followed by any command will block FHEM, is deprecated, and
   it issues a WARNING in the FHEM log.
   <br>
+</ul>
+
+<a name="trigger"></a>
+<h3>trigger</h3>
+<ul>
+  <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
+  <br><br>
+  Trigger a <a href="#notify">notify</a> definition.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
+
+  <br><br>
+  Example:
+  <ul>
+    <code>trigger btn3 on</code>
+  </ul>
 </ul>
 
 <!-- commands end - diese Zeile nicht entfernen! -->
@@ -1759,5 +1747,6 @@ The .gnuplot file consists of 3 parts:
 </ul>
 </li>
 
+</div> <!-- right -->
 </body>
 </html>

@@ -70,6 +70,8 @@ dummy_Define($$)
 
 =pod
 =item helper
+=item summary    dummy device
+=item summary_DE dummy Ger&auml;t
 =begin html
 
 <a name="dummy"></a>

@@ -138,6 +138,8 @@ weblink_FwFn($$$$)
 
 =pod
 =item helper
+=item summary    define a HTTP link for the FHEMWEB frontend
+=item summary_DE HTTP Link fuer das FHEMWEB Frontend
 =begin html
 
 <a name="weblink"></a>

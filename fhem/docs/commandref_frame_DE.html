@@ -19,10 +19,21 @@
     <div id="menu">
       <h3>fhem.pl Referenz</h3>
       Version: <a href="commandref.html">EN</a>&nbsp;<b>DE</b>
+      <br><br>
+      <a href="#doctop">Zum Anfang</a>
+      <br><br>
+      <a style="display:none" href="#" name="loadAll">Komplette Doku laden</a>
+      <br><br>
+      <a id="otherLang" style="display:none" href="#" name="otherLang">
+        <span style="display:none" lang="DE">Deutsche</span> 
+        <span style="display:none" lang="EN">Englische</span>
+        Doku f&uuml;r <span class="mod"></span> laden
+      </a>
     </div>
   </div>
 
   <div id="right">
+<a name="doctop"></a>
 
 <h3>Inhalt</h3>
 <ul>
@@ -35,6 +46,36 @@
   <b>FHEM-Befehle</b>
   <ul>
       <!-- header:command -->
+      <a href="#apptime">apptime</a> &nbsp; <!-- liefert Daten &uuml;ber Ausf&uuml;hrungszeiten -->
+      <a href="#attr">attr</a> &nbsp;       <!-- setzt ein Attribut f&uuml;r ein FHEM Ger&auml;t -->
+      <a href="#cancel">cancel</a> &nbsp;   <!-- bricht ein sleep ab -->
+      <a href="#createlog">createlog</a> &nbsp; <!-- f&uuml;gt ein FileLog und ein SVG an einem existierenden FHEM Ger&auml;t -->
+      <a href="#define">define</a> &nbsp;   <!-- definiert ein FHEM Ger&auml;t -->
+      <a href="#defmod">defmod</a> &nbsp;   <!-- definiert oder modifiziert ein FHEM Ger&auml;t -->
+      <a href="#delete">delete</a> &nbsp;   <!-- entfernt ein FHEM Ger&auml;t -->
+      <a href="#deleteattr">deleteattr</a> &nbsp; <!-- entfernt ein Attribut -->
+      <a href="#deletereading">deletereading</a> &nbsp; <!-- entfernt ein Reading -->
+      <a href="#displayattr">displayattr</a> &nbsp;  <!-- zeigt Attribute eines FHEM Ger&auml;tes -->
+      <a href="#get">get</a> &nbsp;         <!-- holt ein Wert von einem FHEM Ger&auml;t -->
+      <a href="#IF">IF</a> &nbsp;           <!-- bedingte Ausf&uuml;hrung von FHEM Befehlen -->
+      <a href="#include">include</a> &nbsp; <!-- liest eine Datei mit FHEM Befehlen ein -->
+      <a href="#inform">inform</a> &nbsp;   <!-- zeigt Events in einer telnet Verbindung -->
+      <a href="#list">list</a> &nbsp;       <!-- zeigt Definition,Readings und Attribute eines FHEM Ger&auml;tes -->
+      <a href="#modify">modify</a> &nbsp;   <!-- &auml;ndert die Definition eines FHEM Ger&auml;tes -->
+      <a href="#notice">notice</a> &nbsp;   <!-- zeigt und best&auml;tigt Systemmeldungen -->
+      <a href="#quit">quit</a> &nbsp;       <!-- endet eine telnet Verbindung zu FHEM -->
+      <a href="#reload">reload</a> &nbsp;   <!-- l&auml;dt ein FHEM Modul (Programmdefinition) -->
+      <a href="#rename">rename</a> &nbsp;   <!-- benennt ein FHEM Ger&auml;t um -->
+      <a href="#rereadcfg">rereadcfg</a> &nbsp; <!-- l&auml;dt die FHEM Konfiguration neu -->
+      <a href="#save">save</a> &nbsp;       <!-- speichert die FHEM Konfiguration -->
+      <a href="#set">set</a> &nbsp;         <!-- setzt ein Wert in einem FHEM Ger&auml;t -->
+      <a href="#setdefaultattr">setdefaultattr</a> &nbsp; <!-- definiert ein "default" Attribut -->
+      <a href="#setreading">setreading</a> &nbsp; <!-- setzt ein Reading f&uuml;r ein FHEM Ger&auml;t -->
+      <a href="#setstate">setstate</a> &nbsp; <!-- setzt den Status eines  FHEM Ger&aumles -->
+      <a href="#shutdown">shutdown</a> &nbsp; <!-- beendet FHEM -->
+      <a href="#sleep">sleep</a> &nbsp;     <!-- verz&ouml;gerte Ausf&uuml;hrung -->
+      <a href="#trigger">trigger</a> &nbsp; <!-- generiert ein FHEM Event -->
+      <a href="#usb">usb</a> &nbsp;         <!-- sucht nach USB Ger&auml;ten -->
 
   </ul>
 
@@ -662,36 +703,6 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   </ul>
 </ul>
 
-<a name="setdefaultattr"></a>
-<h3>setdefaultattr</h3>
-<ul>
-  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
-
-  <br>
-  F&uuml;gt Sie ein Standardattribut hinzu. Jedem nach dieser Zuweisung definierte 
-  Ger&auml;t wird dieses Attribut zugewiesen. Wenn kein "attrname" angegeben wird, 
-  dann wird die Liste der Standardattribute gel&ouml;scht.
-  <br><br>
-
-  Beispiel, um das Attribut "room kitchen" und "loglevel 4" allen Lampen 
-  zuzuweisen:
-  <ul>
-    <code>setdefaultattr room kitchen</code><br>
-    <code>setdefaultattr loglevel 4</code><br>
-    <code>define lamp1 FS20 1234 11</code><br>
-    <code>define lamp2 FS20 1234 12</code><br>
-    <code>define lamp3 FS20 1234 13</code><br>
-    <code>setdefaultattr</code><br>
-  </ul>
-  <br>
-
-  Anmerkungen:<br>
-  <ul>
-    <li>es gibt keine M&ouml;glichkeit, ein einzelnes Standardattribut aus der Liste 
-    tu l&ouml;schen.</li>
-  </ul>
-</ul>
-
 <a name="cancel"></a>                        
 <h3>cancel</h3>                              
 <ul>                                         
@@ -1187,6 +1198,36 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         set switch intervals 08:00-12:00 13:00-18:00<br>
       </code>
     </ul>
+  </ul>
+</ul>
+
+<a name="setdefaultattr"></a>
+<h3>setdefaultattr</h3>
+<ul>
+  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
+
+  <br>
+  F&uuml;gt Sie ein Standardattribut hinzu. Jedem nach dieser Zuweisung definierte 
+  Ger&auml;t wird dieses Attribut zugewiesen. Wenn kein "attrname" angegeben wird, 
+  dann wird die Liste der Standardattribute gel&ouml;scht.
+  <br><br>
+
+  Beispiel, um das Attribut "room kitchen" und "loglevel 4" allen Lampen 
+  zuzuweisen:
+  <ul>
+    <code>setdefaultattr room kitchen</code><br>
+    <code>setdefaultattr loglevel 4</code><br>
+    <code>define lamp1 FS20 1234 11</code><br>
+    <code>define lamp2 FS20 1234 12</code><br>
+    <code>define lamp3 FS20 1234 13</code><br>
+    <code>setdefaultattr</code><br>
+  </ul>
+  <br>
+
+  Anmerkungen:<br>
+  <ul>
+    <li>es gibt keine M&ouml;glichkeit, ein einzelnes Standardattribut aus der Liste 
+    tu l&ouml;schen.</li>
   </ul>
 </ul>
 
@@ -1840,7 +1881,6 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       </ul>
 </li></ul>
 
-
-
-
-</div></body></html>
+</div> <!-- right -->
+</body>
+</html>

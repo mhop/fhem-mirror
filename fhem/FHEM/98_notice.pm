@@ -587,6 +587,8 @@ notice_Read($$$)
 
 =pod
 =item command
+=item summary    read and confirm system messages
+=item summary_DE Systemnachrichten anzeigen und best&auml;tigen
 =begin html
 
 <a name="notice"></a>

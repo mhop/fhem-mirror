@@ -150,6 +150,8 @@ STACKABLE_CC_Undef($$)
 
 
 =pod
+=item summary    Busware Stackable CC (SCC) base module
+=item summary_DE Busware Stackabble CC (SCC) basis Modul
 =begin html
 
 <a name="STACKABLE_CC"></a>

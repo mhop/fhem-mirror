@@ -122,6 +122,8 @@ FHT8V_Get($@)
 1;
 
 =pod
+=item summary    module for the FHT8v controlled directly by a culfw device
+=item summary_DE Anbindung von FHT8v Ventilen &uuml;ber ein culfw Ger&auml;t
 =begin html
 
 <a name="FHT8V"></a>

@@ -61,6 +61,8 @@ CUL_HOERMANN_Parse($$)
 1;
 
 =pod
+=item summary    Hoermann Garage door opener (read-only)
+=item summary_DE Hoermann Garagenfernbedienung (nur lesen)
 =begin html
 
 <a name="CUL_HOERMANN"></a>
