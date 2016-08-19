@@ -1353,6 +1353,8 @@ sub _pulsecorrection {
 
 =pod
 =item device
+=item summary    Module for controling Plugwise-Devices
+=item summary_DE Modul für das Plugwise-System
 =begin html
 
 <a name="Plugwise"></a>
