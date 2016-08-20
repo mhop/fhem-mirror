@@ -1188,8 +1188,8 @@ sub Pushover_CGI() {
 
 =pod
 =item device
-=item summary Provides text message push functionality and connectivity for the Pushover smartphone app
-=item summary_DE Stellt Push Funktionalit&auml;t f&uuml;r Textnachrichten und Verbindung f&uuml;r die Pushover Smartphone App bereit
+=item summary text message push functionality using the Pushover smartphone app
+=item summary_DE Push Funktion f&uuml;r Textnachrichten &uuml;ber die Pushover Smartphone App
 =begin html
 
 <a name="Pushover"></a>

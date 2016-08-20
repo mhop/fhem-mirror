@@ -1170,8 +1170,8 @@ sub ROOMMATE_StartInternalTimers($$) {
 
 =pod
 =item helper
-=item summary Provides a special virtual device to represent a resident of your home
-=item summary_DE Stellt ein spezielles virtuelles Device bereit, welches einen Mitbewohner repr&auml;sentiert
+=item summary special virtual device to represent a resident of your home
+=item summary_DE spezielles virtuelles Device, welches einen Mitbewohner repr&auml;sentiert
 =begin html
 
     <a name="ROOMMATE" id="ROOMMATE"></a>
