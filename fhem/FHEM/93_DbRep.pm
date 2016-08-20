@@ -37,6 +37,10 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.5.1        20.08.2016       commandref continued
+# 3.5          18.08.2016       new attribute timeOlderThan
+# 3.4.4        12.08.2016       current_year_begin, previous_year_begin, current_year_end, previous_year_end
+#                               added as possible values for timestmp attribute
 # 3.4.3        09.08.2016       fields for input using "insert" changed to "date,time,value,unit". Attributes
 #                               device, reading will be used to complete dataset,
 #                               now more informations available about faulty datasets in arithmetic operations
@@ -125,6 +129,7 @@ sub DbRep_Initialize($) {
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
+                       "timeOlderThan ".
                        "timeout ".
                        $readingFnAttributes;
          
@@ -134,7 +139,7 @@ return undef;
 ###################################################################################
 # DbRep_Define
 ###################################################################################
-sub DbRep_Define {
+sub DbRep_Define($@) {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
   # define <name> DbRep <DbLog-Device> 
@@ -163,7 +168,7 @@ return undef;
 ###################################################################################
 # DbRep_Set
 ###################################################################################
-sub DbRep_Set {
+sub DbRep_Set($@) {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -228,7 +233,7 @@ sub DbRep_Set {
     
           my ($i_date, $i_time, $i_value, $i_unit) = split(",",$prop);
                     
-          if (!$i_date || !$i_time || !$i_value) {return "At least data for Date, Time and Value are needed to insert. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Value(32)>,<Unit(32)>' ";}
+          if (!$i_date || !$i_time || !$i_value) {return "At least data for \"Date\", \"Time\" and \"Value\" is needed to insert. \"Unit\" is optional. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Value(32)>,<Unit(32)>' ";}
 
           unless ($i_date =~ /(\d{4})-(\d{2})-(\d{2})/) {return "Input for date is not valid. Use format YYYY-MM-DD !";}
           unless ($i_time =~ /(\d{2}):(\d{2}):(\d{2})/) {return "Input for time is not valid. Use format HH:MM:SS !";}
@@ -260,7 +265,7 @@ sub DbRep_Set {
           $hash->{helper}{I_EVENT}     = my $i_event = "manual";          
           
       } else {
-          return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,Unit'. Spaces are not allowed !";
+          return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. \"Unit\" is optional. Spaces are not allowed !";
       }
       
       sqlexec($hash,"insert");
@@ -275,7 +280,7 @@ return undef;
 ###################################################################################
 # DbRep_Attr
 ###################################################################################
-sub DbRep_Attr {
+sub DbRep_Attr($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my $do;
@@ -305,27 +310,44 @@ sub DbRep_Attr {
                          
     if ($cmd eq "set") {
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
-           unless ($aVal =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9])|1[1-9]|2[0-3]:([0-5][0-9]):([0-5][0-9])/) {return " The Value for $aName is not valid. Use format YYYY-MM-DD HH:MM:SS !";}
-           my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+          
+            if ($aVal eq "current_year_begin" || $aVal eq "previous_year_begin" || $aVal eq "current_year_end" || $aVal eq "previous_year_end") {
+                delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+                delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+                return undef;
+            }
            
-           eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+            unless ($aVal =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9])|1[1-9]|2[0-3]:([0-5][0-9]):([0-5][0-9])/) 
+                {return " The Value for $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of \"current_year_begin\",\"current_year_end\", \"previous_year_begin\", \"previous_year_end\" !";}
            
-           if ($@) {
-               my @l = split (/at/, $@);
-               return " The Value of $aName is out of range - $l[0]";
-           }
-           delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+            my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+           
+            eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+           
+            if ($@) {
+                my @l = split (/at/, $@);
+                return " The Value of $aName is out of range - $l[0]";
+            }
+            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         }
         if ($aName eq "timeout") {
-           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+            unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         } 
         if ($aName eq "readingNameMap") {
-           unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) { return " Unsupported character in $aName found. Use only A-Z a-z _ . -";}
+            unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) { return " Unsupported character in $aName found. Use only A-Z a-z _ . -";}
         }
         if ($aName eq "timeDiffToNow") {
-           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (seconds) before now for start selection. Refer to commandref !";}
-           delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-           delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
+            unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as start of selection. Refer to commandref !";}
+            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
+            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+        } 
+        if ($aName eq "timeOlderThan") {
+            unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as end of selection. Refer to commandref !";}
+            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
+            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
         } 
     }
 return undef;
@@ -336,7 +358,7 @@ return undef;
 # DbRep_Notify Eventverarbeitung
 ###################################################################################
 
-sub DbRep_Notify {
+sub DbRep_Notify($$) {
  my ($dbrep, $dev) = @_;
  my $myName  = $dbrep->{NAME}; # Name des eigenen Devices
  my $devName = $dev->{NAME}; # Name des Devices welches Events erzeugt hat
@@ -365,7 +387,7 @@ sub DbRep_Notify {
 ###################################################################################
 # DbRep_Undef
 ###################################################################################
-sub DbRep_Undef {
+sub DbRep_Undef($$) {
  my ($hash, $arg) = @_;
  
  RemoveInternalTimer($hash);
@@ -382,7 +404,7 @@ return undef;
 ###################################################################################
 # First Init DB Connect 
 ###################################################################################
-sub DbRep_firstconnect {
+sub DbRep_firstconnect($) {
   my ($hash)= @_;
   my $name           = $hash->{NAME};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
@@ -403,7 +425,7 @@ return;
 ###################################################################################
 # DB Connect
 ###################################################################################
-sub DbRep_Connect {
+sub DbRep_Connect($) {
   my ($hash)= @_;
   my $name       = $hash->{NAME};
   my $dbloghash  = $hash->{dbloghash};
@@ -441,7 +463,7 @@ sub DbRep_Connect {
 #  Hauptroutine
 ################################################################################################################
 
-sub sqlexec {
+sub sqlexec($$) {
  my ($hash,$opt) = @_;
  my $name        = $hash->{NAME}; 
  my $to          = AttrVal($name, "timeout", "60");
@@ -477,30 +499,52 @@ sub sqlexec {
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation"); 
         
- # timestamp in SQL format YYYY-MM-DD hh:mm:ss
  # Auswertungszeit Beginn (String)
- my $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "");  
+ # dynamische Berechnung von Startdatum/zeit aus current_year_begin / previous_year_begin 
+ # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+ my $cy = strftime "%Y", localtime;      # aktuelles Jahr
+ my $tsbegin;
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_year_begin") {
+     $tsbegin = $cy."-01-01 00:00:00";
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin") {
+     $tsbegin = ($cy-1)."-01-01 00:00:00";
+ } else {
+     $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "");  
+ }
+ 
+ # Auswertungszeit Ende (String)
+ # dynamische Berechnung von Endedatum/zeit aus current_year_begin / previous_year_begin 
+ # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+ my $tsend;
+ if (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_year_end") {
+     $tsend = $cy."-12-31 23:59:59";
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
+     $tsend = ($cy-1)."-12-31 23:59:59";
+ } else {
+     $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time)); 
+ }
         
- # extrahieren der Einzelwerte von Datum/Zeit
+ # extrahieren der Einzelwerte von Datum/Zeit Beginn
  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($tsbegin =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
         
- # Umwandeln in Epochesekunden bzw. setzen Differenz zur akt. Zeit wenn attr "timeDiffToNow" gesetzt
+ # Umwandeln in Epochesekunden bzw. setzen Differenz zur akt. Zeit wenn attr "timeDiffToNow" gesetzt Beginn
  my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  $epoch_seconds_begin = AttrVal($hash->{NAME}, "timeDiffToNow", undef) ? (time() - AttrVal($hash->{NAME}, "timeDiffToNow", undef)) : $epoch_seconds_begin;
- Log3 ($name, 4, "DbRep $name - Time difference to current time to calculate Timestamp begin: ".AttrVal($hash->{NAME}, "timeDiffToNow", undef)." sec") if(AttrVal($hash->{NAME}, "timeDiffToNow", undef)); 
+ Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: ".AttrVal($hash->{NAME}, "timeDiffToNow", undef)." sec") if(AttrVal($hash->{NAME}, "timeDiffToNow", undef)); 
  
  Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin"); 
  my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
  Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string"); 
-       
- # Auswertungszeit Ende (String)
- my $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
-        
- # extrahieren der Einzelwerte von Datum/Zeit
+
+ 
+ # extrahieren der Einzelwerte von Datum/Zeit Ende bzw. Selektionsende dynamisch auf <aktuelle Zeit>-timeOlderThan setzen
  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
         
- # Umwandeln in Epochesekunden
+ # Umwandeln in Epochesekunden Endezeit
  my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+ $epoch_seconds_end = AttrVal($hash->{NAME}, "timeOlderThan", undef) ? (time() - AttrVal($hash->{NAME}, "timeOlderThan", undef)) : $epoch_seconds_end;
+ Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: ".AttrVal($hash->{NAME}, "timeOlderThan", undef)." sec") if(AttrVal($hash->{NAME}, "timeOlderThan", undef)); 
+ 
  Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end"); 
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
  Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string"); 
@@ -615,7 +659,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
-sub averval_DoParse {
+sub averval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -657,12 +701,12 @@ sub averval_DoParse {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT AVG(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME}, "timestamp_begin", "") ne "" || AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) ne undef || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -705,7 +749,7 @@ sub averval_DoParse {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage averageValue
 ####################################################################################################
-sub averval_ParseDone {
+sub averval_ParseDone($) {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -765,7 +809,7 @@ return;
 # nichtblockierende DB-Abfrage count
 ####################################################################################################
 
-sub count_DoParse {
+sub count_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash        = $defs{$name};
@@ -807,12 +851,12 @@ sub count_DoParse {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT COUNT(*) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME}, "timestamp_begin", "") ne "" || AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) ne undef || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -855,7 +899,7 @@ sub count_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage count
 ####################################################################################################
 
-sub count_ParseDone {
+sub count_ParseDone($) {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -916,7 +960,7 @@ return;
 # nichtblockierende DB-Abfrage maxValue
 ####################################################################################################
 
-sub maxval_DoParse {
+sub maxval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash         = $defs{$name};
@@ -1017,7 +1061,7 @@ sub maxval_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage maxValue
 ####################################################################################################
 
-sub maxval_ParseDone {
+sub maxval_ParseDone($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
@@ -1129,7 +1173,7 @@ return;
 # nichtblockierende DB-Abfrage diffValue
 ####################################################################################################
 
-sub diffval_DoParse {
+sub diffval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash         = $defs{$name};
@@ -1229,7 +1273,7 @@ sub diffval_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
 ####################################################################################################
 
-sub diffval_ParseDone {
+sub diffval_ParseDone($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
@@ -1354,7 +1398,7 @@ return;
 # nichtblockierende DB-Abfrage sumValue
 ####################################################################################################
 
-sub sumval_DoParse {
+sub sumval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -1395,12 +1439,12 @@ sub sumval_DoParse {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT SUM(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME}, "timestamp_begin", "") ne "" || AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) ne undef || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME}, "timestamp_begin", undef) ne undef || AttrVal($hash->{NAME}, "timestamp_end", undef) || AttrVal($hash->{NAME}, "timeDiffToNow", undef) ne undef);
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -1443,7 +1487,7 @@ sub sumval_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sumValue
 ####################################################################################################
 
-sub sumval_ParseDone {
+sub sumval_ParseDone($) {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -1502,7 +1546,7 @@ return;
 # nichtblockierendes DB delete
 ####################################################################################################
 
-sub del_DoParse {
+sub del_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $runtime_string_first, $runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -1569,7 +1613,7 @@ sub del_DoParse {
 # Auswertungsroutine DB delete
 ####################################################################################################
 
-sub del_ParseDone {
+sub del_ParseDone($) {
   my ($string) = @_;
   my @a     = split("\\|",$string);
   my $hash  = $defs{$a[0]};
@@ -1618,7 +1662,7 @@ return;
 # nichtblockierendes DB insert
 ####################################################################################################
 
-sub insert_Push {
+sub insert_Push($) {
  my ($name)     = @_;
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
@@ -1683,7 +1727,7 @@ sub insert_Push {
 # Auswertungsroutine DB insert
 ####################################################################################################
 
-sub insert_Done {
+sub insert_Done($) {
   my ($string) = @_;
   my @a     = split("\\|",$string);
   my $hash  = $defs{$a[0]};
@@ -1729,7 +1773,7 @@ return;
 # nichtblockierende DB-Abfrage fetchrows
 ####################################################################################################
 
-sub fetchrows_DoParse {
+sub fetchrows_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $runtime_string_first, $runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -1800,7 +1844,7 @@ sub fetchrows_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage fetchrows
 ####################################################################################################
 
-sub fetchrows_ParseDone {
+sub fetchrows_ParseDone($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash     = $defs{$a[0]};
@@ -1859,7 +1903,7 @@ return;
 ####################################################################################################
 # Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub ParseAborted {
+sub ParseAborted($) {
 my ($hash) = @_;
 my $name = $hash->{NAME};
 
@@ -1874,7 +1918,7 @@ my $name = $hash->{NAME};
 #  Zusammenstellung Aggregationszeiträume
 ################################################################################################################
 
-sub collaggstr {
+sub collaggstr($$$$) {
  my ($hash,$runtime,$i,$runtime_string_next) = @_;
  
  my $name = $hash->{NAME};
@@ -2051,12 +2095,22 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <ul>
   <br>
   The purpose of this module is browsing of DbLog-databases. The searchresults can be evaluated concerning to various aggregations and the appropriate 
-  Readings will be filled.
-  Also a function to deletion of datasets and manual insert of data is provided. The dataselection considering is done by declaration of device, reading and the time settings of
-  selection-begin and selection-end.  <br><br>
+  Readings will be filled. The data selection will been done by declaration of device, reading and the time settings of selection-begin and selection-end.  <br><br>
   
   All database operations are implemented nonblocking. Optional the execution time of SQL-statements in background can also be determined and provided as reading.
   (refer to <a href="#DbRepattr">attributes</a>). <br><br>
+  
+  Currently the following functions are provided: <br><br>
+  
+     <ul><ul>
+     <li> Selection of all datasets within adjustable time limits. </li>
+     <li> Exposure of datasets of a Device/Reading-combination within adjustable time limits. </li>
+     <li> Selecions of datasets by usage of dynamically calclated time limits at execution time. </li>
+     <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
+     <li> The calculation of summary- , difference- , maximal- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
+     <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
+     </ul></ul>
+     <br>
   
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">neues Modul 93_DbRep - Auswertungen und Reporting von Datenbankinhalten (DbLog)</a>.<br><br>
@@ -2065,6 +2119,15 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. (currently tested with MySQL and SQLite). <br>
   Only the content of table "history" will be included. <br><br>
+  
+  Overview which other Perl-modules DbRep is using: <br><br>
+    
+  POSIX           <br>
+  Time::HiRes     <br>
+  Time::Local     <br>
+  Scalar::Util    <br>
+  DBI             <br>
+  Blocking        (FHEM-module) <br><br>
   
   Due to performance reason the following index should be created in addition: <br>
   <code>
@@ -2098,9 +2161,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading".  </li> <br>
-    <li><b> countEntries </b> -  provides the number of DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end".(if set) or "timeDiffToNow". If timestamp-attributes are not set all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
-    <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". A possibly set aggregation attribute will <b>not</b> considered.  </li> <br>
+    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. The reading to evaluate must be defined using attribute "reading".  </li> <br>
+    <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
+    <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a>. An aggregation which would possibly be set attribute will <b>not</b> considered.  </li> <br>
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
                                  <ul>
@@ -2158,19 +2221,29 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
-  <li><b>timestamp_begin </b> - begin of data selection   </li> <br>
-  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used.   </li> <br>
-  <li><b>timeDiffToNow </b>   - if set, the begin of data selection will be set to the value "current time - timeDiffToNow" (in seconds). Thereby always the last &lt;timeDiffToNow&gt;-seconds will be considered (e.g. 86400 if always the last 24 hours should assumed).    </li> <br>  
+  <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
+  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*)  </li> <br>
+  <li><b>timeDiffToNow </b>   - the begin of data selection will be set to the timestamp "&lt;current time&gt; - &lt;timeDiffToNow&gt;" dynamically (in seconds). Thereby always the last  &lt;timeDiffToNow&gt;-seconds will be considered (e.g. if set to 86400, always the last 24 hours should assumed). The Timestamp calculation will be done dynamically at execution time.     </li> <br>  
+  <li><b>timeOlderThan </b>   - the end of data selection will be set to the timestamp "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" dynamically (in seconds). Always the datasets up to timestamp "&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 86400, all datasets older than one day will be considered). The Timestamp calculation will be done dynamically at execution time. </li> <br> 
+
   <li><b>timeout </b>         - sets the timeout-value for Blocking-Call Routines in background (default 60 seconds)  </li> <br>
   </ul></ul>
   <br>
   
-  The format of timestamp is as used in DbLog: YYYY-MM-DD HH:MM:SS. <br><br>
+  (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" you can also use one of: <br><br>
+                              <ul>
+                              <b>current_year_begin</b>     : set the timestamp-attribute to "&lt;current year&gt;-01-01 00:00:00" dynamically <br>
+                              <b>current_year_end</b>       : set the timestamp-attribute to "&lt;current year&gt;-12-31 23:59:59" dynamically <br>
+                              <b>previous_year_begin</b>    : set the timestamp-attribute to "&lt;previous year&gt;-01-01 00:00:00" dynamically  <br>
+                              <b>previous_year_end</b>      : set the timestamp-attribute to "&lt;previous year&gt;-12-31 23:59:59" dynamically  <br>
+                              </ul><br>
+  
+  Make sure that timestamp_begin < timestamp_end is fulfilled. <br><br>
   
   <b>Note </b> <br>
   
-  If the attribute &lt;timeDiffToNow&gt; will be set, the possibly set attributes &lt;timestamp_begin&gt; respectively &lt;timestamp_end&gt; will deleted.
-  The setting of &lt;timestamp_begin&gt; respectively &lt;timestamp_end&gt; causes the deletion of attribute &lt;timeDiffToNow&gt;, if set.
+  If the attribute "timeDiffToNow" will be set, the attributes "timestamp_begin" respectively "timestamp_end" will be deleted if they were set before.
+  The setting of "timestamp_begin" respectively "timestamp_end" causes the deletion of attribute "timeDiffToNow" if it was set before as well.
   <br><br>
 
 </ul>
@@ -2184,12 +2257,23 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <ul>
   <br>
   Zweck des Moduls ist es, den Inhalt von DbLog-Datenbanken nach bestimmten Kriterien zu durchsuchen und das Ergebnis hinsichtlich verschiedener 
-  Aggregationen auszuwerten und als Readings darzustellen. Daneben wird eine Löschfunktionen für Datenbankinhalte sowie die Möglichkeit zur manuellen Eingabe von Datensätzen
-  zur Verfügung gestellt. Die Daten können aggregiert werden. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
+  Aggregationen auszuwerten und als Readings darzustellen. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
   Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der SQL-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
   werden (siehe <a href="#DbRepattr">Attribute</a>). <br><br>
+  
+  Zur Zeit werden folgende Operationen unterstützt: <br><br>
+  
+     <ul><ul>
+     <li> Selektion aller Datensätze innerhalb einstellbarer Zeitgrenzen. </li>
+     <li> Darstellung der Datensätze einer Device/Reading-Kombination innerhalb einstellbarer Zeitgrenzen. </li>
+     <li> Die Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
+     <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
+     <li> Die Berechnung von Summen- , Differenz- , Maximal- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
+     <li> Die Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
+     </ul></ul>
+     <br>
   
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">neues Modul 93_DbRep - Auswertungen und Reporting von Datenbankinhalten (DbLog)</a>.<br><br>
@@ -2198,6 +2282,15 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   Das Modul setzt den Einsatz einer DBLog-Instanz voraus. Es werden die Zugangsdaten dieser Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
   Es werden nur Inhalte der Tabelle "history" berücksichtigt. <br><br>
+  
+  Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
+    
+  POSIX           <br>
+  Time::HiRes     <br>
+  Time::Local     <br>
+  Scalar::Util    <br>
+  DBI             <br>
+  Blocking        (FHEM-Modul) <br><br>
   
   Aus Performancegründen sollten zusätzlich folgender Index erstellt werden: <br>
   <code>
@@ -2231,9 +2324,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muß das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
-    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" (wenn gesetzt) bzw. "timeDiffToNow". Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
-    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
+    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
+    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
                                  
                                  <ul>
@@ -2290,19 +2383,28 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
-  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion    </li> <br>
-  <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt.   </li> <br>
-  <li><b>timeDiffToNow </b>   - wenn gesetzt, wird der Selektionsbeginn auf den Zeitpunkt "aktuelle Zeit - timeDiffToNow" gesetzt (in Sekunden). Dadurch werden immer die letzten &lt;timeDiffToNow&gt;-Sekunden berücksichtigt (z.b. 86400 wenn immer die letzten 24 Stunden in die Selektion eingehen sollen).    </li> <br>  
+  <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
+  <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
+  <li><b>timeDiffToNow </b>   - der Selektionsbeginn wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;" gesetzt (in Sekunden). Es werden immer die letzten &lt;timeDiffToNow&gt;-Sekunden berücksichtigt (z.b. 86400 wenn immer die letzten 24 Stunden in die Selektion eingehen sollen). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>  
+  <li><b>timeOlderThan </b>   - das Selektionsende wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" gesetzt (in Sekunden). Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt werden alle Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. </li> <br> 
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 60) in Sekunden  </li> <br>
   </ul></ul>
   <br>
   
-  Das Format von Timestamp ist wie in DbLog YYYY-MM-DD HH:MM:SS. <br><br>
+  (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" kann ebenso eine der folgenden Eingaben verwendet werden: <br><br>
+                              <ul>
+                              <b>current_year_begin</b>     : belegt das timestamp-Attribut dynamisch mit "&lt;aktuelles Jahr&gt;-01-01 00:00:00" <br>
+                              <b>current_year_end</b>       : belegt das timestamp-Attribut dynamisch mit "&lt;aktuelles Jahr&gt;-12-31 23:59:59" <br>
+                              <b>previous_year_begin</b>    : belegt das timestamp-Attribut dynamisch mit "&lt;voriges Jahr&gt;-01-01 00:00:00"   <br>
+                              <b>previous_year_end</b>      : belegt das timestamp-Attribut dynamisch mit "&lt;voriges Jahr&gt;-12-31 23:59:59"   <br>
+                              </ul><br>
+  
+  Natürlich sollte man immer darauf achten dass timestamp_begin < timestamp_end ist.  <br><br>
   
   <b>Hinweis </b> <br>
   
-  Wird das Attribut &lt;timeDiffToNow&gt; gesetzt, werden die evtentuell gesetzten Attribute &lt;timestamp_begin&gt; bzw. &lt;timestamp_end&gt; gelöscht.
-  Das Setzen von &lt;timestamp_begin&gt; bzw. &lt;timestamp_end&gt; bedingt die Löschung von Attribut &lt;timeDiffToNow&gt;, wenn gesetzt.
+  Wird das Attribut "timeDiffToNow" gesetzt, werden die evtentuell gesetzten Attribute "timestamp_begin" bzw. "timestamp_end" gelöscht.
+  Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von Attribut "timeDiffToNow" wenn es vorher gesetzt war.
   <br><br>
 
 </ul>
