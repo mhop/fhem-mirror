@@ -88,11 +88,19 @@ foreach my $row (split("\n", $fList)) {
     my $line = 0;
     my $docCount = 0;
     my $hasLink = 0;
+    my $hasSummary = 0;
+
     while(my $l = <MOD>) {
       $line++;
 
       err $fName, "DOS line encoding is not supported."
         if($l =~ m/^=begin html$suffix.*\r/);
+
+      if($l =~ m/^=item summary$suffix\s+(.+?)\s*$/) {
+        err $fName, "$lang: summary is longer than 80 chars on line $line"
+          if(length($1) > 80);
+        $hasSummary = 1;
+      }
 
       if($l =~ m/^=begin html$suffix$/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
@@ -120,6 +128,9 @@ foreach my $row (split("\n", $fList)) {
       if(!$suffix && !$docCount);
     err $fName, "$lang: No <a name=\"$modName\"> link"
       if(!$suffix && $docCount && !$hasLink);
+    err $fName, "$lang: No summary description found"
+      if(!$suffix && $docCount && !$hasSummary);
+
     foreach $tag (TAGS) {
       err $fName, "$lang: Unbalanced $tag ($tagcount{$tag}, last line ok: $llwct{$tag})"
         if($tagcount{$tag});
