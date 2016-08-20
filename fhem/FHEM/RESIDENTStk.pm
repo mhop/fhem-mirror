@@ -870,9 +870,20 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     my $wakeupOffset      = AttrVal( $NAME, "wakeupOffset",      0 );
     my $wakeupTime;
 
-    if ($atDeviceName) {
-        Log3 $NAME, 4,
-"RESIDENTStk $NAME: RESIDENTStk_wakeupGetBegin() run by at-device $atDeviceName";
+    if ($wakeupAtdevice) {
+
+        # let at-device recalculate after global:INITIALIZED event
+        # as $nextRun can only be undef at that stage
+        if ( !$init_done ) {
+            Log3 $NAME, 4, "RESIDENTStk $NAME: Waiting for FHEM initialization to recalculate Wakeuptime";
+            InternalTimer( 1, RESIDENTStk_wakeupGetBegin,
+                ( $NAME, $wakeupAtdevice ), 0 );
+            return "05:00";
+        }
+        else {
+            Log3 $NAME, 4,
+"RESIDENTStk $NAME: Wakeuptime recalculation triggered by at-device $wakeupAtdevice";
+        }
     }
 
     # just give any valuable return to at-device
