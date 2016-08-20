@@ -1447,8 +1447,8 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
 
 =pod
 =item device
-=item summary This is a supplement module for <a href="#ONKYO_AVR">ONKYO_AVR</a> representing zones
-=item summary_DE Dies ist ein erg&auml;nzendes Modul f&uuml;r <a href="#ONKYO_AVR">ONKYO_AVR</a>, um Zonen zu repr&auml;sentieren
+=item summary supplement module for <a href="#ONKYO_AVR">ONKYO_AVR</a> representing zones
+=item summary_DE erg&auml;nzendes Modul f&uuml;r <a href="#ONKYO_AVR">ONKYO_AVR</a>, um Zonen zu repr&auml;sentieren
 =begin html
 
     <p>

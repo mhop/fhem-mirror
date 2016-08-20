@@ -3628,8 +3628,8 @@ sub PHTV_min {
 
 =pod
 =item device
-=item summary This module controls Philips TV devices and their Ambilight via network connection
-=item summary_DE Dieses Modul steuert Philips TV Ger&auml;te &uuml;ber das Netzwerk
+=item summary control for Philips TV devices and their Ambilight via network connection
+=item summary_DE Steuerung von Philips TV Ger&auml;ten und Ambilight &uuml;ber das Netzwerk
 =begin html
 
 <a name="PHTV"></a>

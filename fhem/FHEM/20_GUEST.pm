@@ -1188,8 +1188,8 @@ sub GUEST_StartInternalTimers($$) {
 
 =pod
 =item helper
-=item summary Provides a special virtual device to represent a guest of your home
-=item summary_DE Stellt ein spezielles virtuelles Device bereit, welches einen Gast zu Hause repr&auml;sentiert
+=item summary special virtual device to represent a guest of your home
+=item summary_DE spezielles virtuelles Device, welches einen Gast zu Hause repr&auml;sentiert
 =begin html
 
     <a name="GUEST" id="GUEST"></a>

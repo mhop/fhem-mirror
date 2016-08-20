@@ -2369,8 +2369,8 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 
 =pod
 =item command
-=item summary Provides dynamic routing of messages to FHEM devices and modules either via push, e-mail, screen or audio
-=item summary_DE Erm&ouml;glicht dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module via Push, E-Mail, Bildschirmanzeige und Audio
+=item summary dynamic routing of messages to FHEM devices and modules (push, e-mail, screen, audio)
+=item summary_DE dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module (Push, E-Mail, Bildschirm, Audio)
 =begin html
 
 <a name="MSG"></a>

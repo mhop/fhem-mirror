@@ -443,8 +443,8 @@ sub HP1000_ReturnWU($$$) {
 
 =pod
 =item device
-=item summary Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI)
-=item summary_DE Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI)
+=item summary support for Wifi-based weather stations HP1000 and WH2600
+=item summary_DE Unterst&uuml;tzung f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstationen
 =begin html
 
     <p>

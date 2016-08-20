@@ -643,8 +643,8 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
 
 =pod
 =item helper
-=item summary Provides a webhook receiver for geofencing using specific iOS, Android or Windows 10 smartphone apps
-=item summary_DE Stellt einen Webook Empf&auml;nger f&uuml;r Geofencing mit speziellen iOS, Android und Windows 10 Smartphone Apps bereit
+=item summary Geofencing for specific iOS, Android or Windows 10 apps
+=item summary_DE Geofencing f&uuml;r spezielle iOS, Android und Windows 10 Apps
 =begin html
 
     <p>

@@ -2879,8 +2879,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 
 =pod
 =item device
-=item summary This module controls ENIGMA2 based devices like Dreambox or VUplus receiver via network connection
-=item summary_DE Dieses Modul steuert ENIGMA2 basierte Ger&auml;te wie einen Dreambox oder einen VUplus Receiver &uuml;ber das Netzwerk
+=item summary control for ENIGMA2 based receivers via network connection
+=item summary_DE Steuerung von ENIGMA2 basierte Receiver &uuml;ber das Netzwerk
 =begin html
 
     <p>

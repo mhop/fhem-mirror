@@ -614,8 +614,8 @@ sub msgConfig_Get($@) {
 
 =pod
 =item helper
-=item summary Provides global settings and tools for FHEM command <a href="#MSG">msg</a>
-=item summary_DE Stellt globale Einstellungen und Tools f&uml;r das FHEM Kommando <a href="#MSG">msg</a> bereit
+=item summary global settings and tools for FHEM command <a href="#MSG">msg</a>
+=item summary_DE globale Einstellungen und Tools f&uml;r das FHEM Kommando <a href="#MSG">msg</a>
 =begin html
 
     <p>

@@ -1583,8 +1583,8 @@ sub RESIDENTS_UpdateReadings (@) {
 
 =pod
 =item helper
-=item summary Provides a special virtual device to represent a group of individuals living at your home
-=item summary_de Stellt ein spezielles virtuelles Device bereit, um eine Gruppe von Personen zu repr&auml;sentieren, die zusammen wohnen
+=item summary combines <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices to a residential community
+=item summary_de fasst <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Ger&auml;te zu einer Wohngemeinschaft zusammen
 =begin html
 
     <p>
