@@ -15734,6 +15734,8 @@ EnOcean_Delete($$)
 1;
 
 =pod
+=item summary    <a href="http://www.enocean-alliance.org/en/enocean_standard/">EnOcean</a> Gateway and Actor
+=item summary_DE <a href="http://www.enocean-alliance.org/de/enocean_standard/">EnOcean</a> Gateway und Aktor
 =begin html
 
 <a name="EnOcean"></a>
