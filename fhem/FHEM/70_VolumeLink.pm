@@ -294,9 +294,9 @@ sub VolumeLink_ReceiveCommand($) {
 1;
 
 =pod
-=item device
-=item summary    VolumeLink links the volume-level & mute-state from a physical device (e.g. a TV) with the volume & mute control of a fhem device. 
-=item summary_DE VolumeLink verbindet den Lautstaerke-Pegel & Mute-Zustand von einem physischen Geraet (zum Beispiel einem TV), mit der Lautstaerke und Stummschaltung eines FHEM Geraets.
+=item device 
+=item summary    Bind volume of a physical device to a fhem device.
+=item summary_DE Verbindet die Lautstaerke eines physischen Geraets mit einem Fhem Geraet.
 =begin html
 
 <a name="VolumeLink"></a>
