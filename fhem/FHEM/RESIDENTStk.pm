@@ -868,22 +868,13 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     my $nextRun = ReadingsVal( $NAME, "nextRun", 0 );
     my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", 0 );
     my $wakeupOffset      = AttrVal( $NAME, "wakeupOffset",      0 );
+    my $wakeupInitTime    = ( $wakeupDefaultTime
+          && lc($wakeupDefaultTime) ne "off" ? $wakeupDefaultTime : "05:00" );
     my $wakeupTime;
 
     if ($wakeupAtdevice) {
-
-        # let at-device recalculate after global:INITIALIZED event
-        # as $nextRun can only be undef at that stage
-        if ( !$init_done ) {
-            Log3 $NAME, 4, "RESIDENTStk $NAME: Waiting for FHEM initialization to recalculate Wakeuptime";
-            InternalTimer( 1, RESIDENTStk_wakeupGetBegin,
-                ( $NAME, $wakeupAtdevice ), 0 );
-            return "05:00";
-        }
-        else {
-            Log3 $NAME, 4,
+        Log3 $NAME, 4,
 "RESIDENTStk $NAME: Wakeuptime recalculation triggered by at-device $wakeupAtdevice";
-        }
     }
 
     # just give any valuable return to at-device
@@ -913,7 +904,7 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
 "RESIDENTStk $NAME: Could not automatically clean up at-device, please perform manual cleanup.";
         }
 
-        return "05:00";
+        return $wakeupInitTime;
     }
 
     # use nextRun value if not OFF
@@ -931,7 +922,7 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
 
     # Use a default value to ensure auto-reset at least once a day
     else {
-        $wakeupTime = "05:00";
+        $wakeupTime = $wakeupInitTime;
         Log3 $NAME, 4, "RESIDENTStk $NAME: wakeupGetBegin source: defaultValue";
     }
 
