@@ -397,6 +397,8 @@ PIFACE_Watchdog($) {
 1;
 
 =pod
+=item summary    <a href=http://www.raspberrypi.org/>Raspberry Pi</a> <a href=http://www.piface.org.uk/products/piface_digital/>PiFace Digital</a> Interface
+=item summary_DE <a href=http://www.raspberrypi.org/>Raspberry Pi</a> <a href=http://www.piface.org.uk/products/piface_digital/>PiFace Digital</a> Interface
 =begin html
 
 <a name="PIFACE"></a>
