@@ -1287,7 +1287,7 @@ sub HMUARTLGW_Parse($$$$)
 				#!BIDI
 				$wait = 0.090;
 			} else {
-				$wait = 0;
+				$wait = 0.300;
 			}
 			$wait -= $hash->{Helper}{RoundTrip}{Delay} if (defined($hash->{Helper}{RoundTrip}{Delay}));
 
@@ -2117,6 +2117,8 @@ sub HMUARTLGW_getVerbLvl($$$$) {
 1;
 
 =pod
+=item summary    support for the HomeMatic UART module (RPi) and Wireless LAN Gateway
+=item summary_DE Anbindung von HomeMatic UART Modul (RPi) und Wireless LAN Gateway
 =begin html
 
 <a name="HMUARTLGW"></a>
