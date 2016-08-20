@@ -286,6 +286,8 @@ sub allergy_utf8clean($) {
 1;
 
 =pod
+=item device
+=item summary Allergy forecast data for Germany
 =begin html
 
 <a name="allergy"></a>
