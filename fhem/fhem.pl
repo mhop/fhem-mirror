@@ -2455,10 +2455,12 @@ GlobalAttr($$$$)
   }
   elsif($name eq "commandref" && $init_done) {
     my $root = $attr{global}{modpath};
+    my $out = "";
+    $out = ">> $currlogfile 2>&1" if($currlogfile ne "-" && $^O ne "MSWin32");
     if($val eq "full") {
-      return `$^X $root/contrib/commandref_join.pl -noWarnings`;
+      system("$^X $root/contrib/commandref_join.pl -noWarnings $out")
     } else {
-      return `$^X $root/contrib/commandref_modular.pl`;
+      system("$^X $root/contrib/commandref_modular.pl $out");
     }
   }
 
