@@ -312,11 +312,12 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
  ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3:1p.2p'    ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
- ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
+ ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'02:50' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
  ,"0101" => {name=>"HM-LC-Sw2PBU-FM"         ,alias=>"HM-LC-Sw2-FM-2"}
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
  ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw4-SM-2" }
+ ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim1_V:2:3"}
 
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
@@ -615,46 +616,50 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   waterUppThr     =>{a=>  6.0,s=>1  ,l=>1,min=>0    ,max=>256   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water upper threshold"},
   waterlowThr     =>{a=>  7.0,s=>1  ,l=>1,min=>0    ,max=>256   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water lower threshold"},
     # change 90 to 91 due to log: reg 90 not available but 91 available...
-  caseDesign      =>{a=> 91.0,s=>1  ,l=>1,min=>1    ,max=>3     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"                          ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
-  caseHigh        =>{a=> 94.0,s=>2  ,l=>1,min=>100  ,max=>10000 ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case hight"},
-  fillLevel       =>{a=> 98.0,s=>2  ,l=>1,min=>100  ,max=>300   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"fill level"},
-  caseWidth       =>{a=>102.0,s=>2  ,l=>1,min=>100  ,max=>10000 ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case width"},
-  caseLength      =>{a=>106.0,s=>2  ,l=>1,min=>100  ,max=>10000 ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case length"},
-  meaLength       =>{a=>108.0,s=>2  ,l=>1,min=>110  ,max=>310   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>""},
-  useCustom       =>{a=>110.0,s=>1  ,l=>1,min=>110  ,max=>310   ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"use custom"                           ,lit=>{off=>0,on=>200}},
+  caseDesign      =>{a=> 91.0,s=>1  ,l=>1,min=>1    ,max=>3      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"                          ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
+  caseHigh        =>{a=> 94.0,s=>2  ,l=>1,min=>100  ,max=>10000  ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case hight"},
+  fillLevel       =>{a=> 98.0,s=>2  ,l=>1,min=>100  ,max=>300    ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"fill level"},
+  caseWidth       =>{a=>102.0,s=>2  ,l=>1,min=>100  ,max=>10000  ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case width"},
+  caseLength      =>{a=>106.0,s=>2  ,l=>1,min=>100  ,max=>10000  ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case length"},
+  meaLength       =>{a=>108.0,s=>2  ,l=>1,min=>110  ,max=>310    ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>""},
+  useCustom       =>{a=>110.0,s=>1  ,l=>1,min=>110  ,max=>310    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"use custom"                           ,lit=>{off=>0,on=>200}},
 
-  averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16    ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
-  txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16    ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
-  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.00 ,max=>3680  ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"                      ,lit=>{unused=>0}},
-  txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>0    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"                    ,lit=>{unused=>0}},
-  txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.0  ,max=>230   ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"                    ,lit=>{unused=>0}},
-  txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.00 ,max=>2.55  ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"                  ,lit=>{unused=>0}},
-
-  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                            ,lit=>{off=>0,on=>1}},
-  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                             ,lit=>{off=>0,on=>1}},
-  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
-  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
-  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
-  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycBelow"},
-
-  txThrHiPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
-  txThrLoPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
-  txThrHiCur      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold low current"},
-  txThrLoCur      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold high current"},
-  txThrHiVlt      =>{a=>135.0,s=>4  ,l=>1,min=>115  ,max=>255   ,c=>''         ,f=>'10'    ,u=>'V'   ,d=>1,t=>"threshold low voltage"},
-  txThrLoVlt      =>{a=>139.0,s=>4  ,l=>1,min=>115  ,max=>255   ,c=>''         ,f=>'10'    ,u=>'V'   ,d=>1,t=>"threshold high voltage"},
-  txThrHiFrq      =>{a=>135.0,s=>4  ,l=>1,min=>48.72,max=>51.27 ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold low frequency"},
-  txThrLoFrq      =>{a=>139.0,s=>4  ,l=>1,min=>48.72,max=>51.27 ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold high frequency"},
-
-  evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5  ,max=>7.5   ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
-  evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1    ,max=>15    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read each n-th puls"},
-  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0    ,max=>4     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"interval in sec"                                         ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
-  captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture motion in interval, send result in next trigger" ,lit=>{off=>0,on=>1}},
-  brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0    ,max=>7     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"7: filter fast changes to 0: no filter of light changes"},
-  eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0    ,max=>7620  ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>1,t=>"filters short events, causes reporting delay"},
-  ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0    ,max=>1.275 ,c=>''         ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
-  eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0    ,max=>7620  ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
-  eventFilterTimeB=>{a=> 35  ,s=>1  ,l=>1,min=>5    ,max=>7620  ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+  averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
+  txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
+  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.00 ,max=>3680   ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"                      ,lit=>{unused=>0}},
+  txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>0    ,max=>16000  ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"                    ,lit=>{unused=>0}},
+  txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.0  ,max=>230    ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"                    ,lit=>{unused=>0}},
+  txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.00 ,max=>2.55   ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"                  ,lit=>{unused=>0}},
+                                                                 
+  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                            ,lit=>{off=>0,on=>1}},
+  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                             ,lit=>{off=>0,on=>1}},
+  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
+  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
+  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
+  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycBelow"},
+                                                                 
+  txThrHiPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680   ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
+  txThrLoPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680   ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
+  txThrHiCur      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>16000  ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold low current"},
+  txThrLoCur      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>16000  ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold high current"},
+  txThrHiVlt      =>{a=>135.0,s=>4  ,l=>1,min=>115  ,max=>255    ,c=>''         ,f=>'10'    ,u=>'V'   ,d=>1,t=>"threshold low voltage"},
+  txThrLoVlt      =>{a=>139.0,s=>4  ,l=>1,min=>115  ,max=>255    ,c=>''         ,f=>'10'    ,u=>'V'   ,d=>1,t=>"threshold high voltage"},
+  txThrHiFrq      =>{a=>135.0,s=>4  ,l=>1,min=>48.72,max=>51.27  ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold low frequency"},
+  txThrLoFrq      =>{a=>139.0,s=>4  ,l=>1,min=>48.72,max=>51.27  ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold high frequency"},
+                                                                 
+  voltage_0       =>{a=>173.0,s=>1  ,l=>1,min=>0    ,max=>0.2    ,c=>''         ,f=>'200'   ,u=>'%'   ,d=>1,t=>"lower Voltage"},
+  voltage_100     =>{a=>174.0,s=>1  ,l=>1,min=>0.3  ,max=>1.0    ,c=>''         ,f=>'200'   ,u=>'%'   ,d=>1,t=>"higher Voltage"},
+  relayDelay      =>{a=>175.0,s=>1  ,l=>1,min=>0    ,max=>111600 ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>1,t=>"relay off delay time"},
+                                                                 
+  evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5  ,max=>7.5    ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
+  evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1    ,max=>15     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read each n-th puls"},
+  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0    ,max=>4      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"interval in sec"                                         ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
+  captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture motion in interval, send result in next trigger" ,lit=>{off=>0,on=>1}},
+  brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0    ,max=>7      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"7: filter fast changes to 0: no filter of light changes"},
+  eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0    ,max=>7620   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>1,t=>"filters short events, causes reporting delay"},
+  ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0    ,max=>1.275  ,c=>''         ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
+  eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0    ,max=>7620   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+  eventFilterTimeB=>{a=> 35  ,s=>1  ,l=>1,min=>5    ,max=>7620   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 # - different range
   evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600  ,max=>1200   ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
                                                     
@@ -1084,6 +1089,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,peerNeedsBurst  =>1
                         }
  ,"HM-SEC-SD-2"       =>{ devRepeatCntMax =>1}
+ ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
+
 );
 
 #clones - - - - - - - - - - - - - - -

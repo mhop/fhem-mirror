@@ -153,10 +153,6 @@ sub CUL_HM_Initialize($) {
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "
-#General                       ."hmDstDly:slider,104,4,136 "                       # CUL destination answer delay 
-#General                       ."hmPairAddDly:slider,-16,8,440 "                   # CUL additional destination delay for pair request
-#General                       ."SndThrRep:0,1 "                                   # CUL force expectation of send through repeater
-#General                       ."RepBstAddDly:slider,0,8,600 "                     # CUL additional first answer delay for burst devices using repeater to device, 552 is a good value for HM-LC-SW1-BA-PCB
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesKey:5,4,3,2,1,0  "
                        ;
@@ -3014,9 +3010,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
 
   elsif($mhp->{mTp} eq "00"){######################################
-    Log 1,"General  --------- start me";
-    if (InternalVal($mhp->{devN},"lastMsg",undef) =~ m/t:00/){# repeated
-      Log 1,"General  --------- stop me###########";
+    if (InternalVal($mhp->{devN},"lastMsg","") =~ m/t:00/){# repeated
       return "done";  # suppress handling of a repeated pair request
     }
     my $paired = 0; #internal flag
@@ -3309,8 +3303,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($mhp->{mFlgH} & 2 # dst can be garbage - but not if answer request
-          && (   !$mhp->{dstH} 
-              || $mhp->{dstH}{NAME} ne InternalVal($mhp->{devN},"IODev",""))
+          && (  !$mhp->{dstH} 
+              || $mhp->{dst} ne CUL_HM_IoId($mhp->{dstH}))
           ){
       my $pName = CUL_HM_id2Name($mhp->{dst});
       push @evtEt,[$mhp->{cHash},1,"trigDst_$pName:noConfig"];
@@ -4916,7 +4910,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     );
     # msg: 'text,icon;text,icon;text,icon'
     my ($msg, $sound, $rep, $pause, $sig) = @a[2..$#a];
-    
+
     # set defaults
     $msg   = ''    if (!defined ($msg));
     $sound = 'off' if (!defined ($sound) || !exists ($disp_sounds{$sound}));
