@@ -113,7 +113,7 @@ my %zwave_class = (
     get   => { sbStatus    => "02"        },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",
-               "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } }, #liefert 00=idle und ff=detected; umstellen?
+               "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } },
   SENSOR_MULTILEVEL        => { id => '31',
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
