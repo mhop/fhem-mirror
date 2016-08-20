@@ -4387,6 +4387,8 @@ sub netatmo_weatherIcon()
 1;
 
 =pod
+=item device
+=item summary Netatmo weather stations, thermostats and cameras connected via the official API
 =begin html
 
 <a name="netatmo"></a>
