@@ -203,8 +203,41 @@ sub GUEST_Notify($$) {
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
 
+    # process global:INITIALIZED
+    if ( $dev->{NAME} eq "global"
+        && grep( m/^INITIALIZED$/, @{ $dev->{CHANGED} } ) )
+    {
+
+        my @registeredWakeupdevs =
+          split( /,/, AttrVal( $hashName, "rg_wakeupDevice", 0 ) );
+
+        # if we have registered wakeup devices
+        if (@registeredWakeupdevs) {
+
+            # look for at devices for each wakeup device
+            foreach my $wakeupDev (@registeredWakeupdevs) {
+                my $wakeupAtdevice = AttrVal( $wakeupDev, "wakeupAtdevice", 0 );
+
+                # as a replacement for missing NotifyFn in 90_at.pm:
+                # trigger recalculation of at device internal timer
+                if ( defined( $defs{$wakeupAtdevice} )
+                    && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+                {
+                    Log3 $wakeupDev, 4,
+"$wakeupDev: Triggered recalculation via Perl function after reboot";
+                    my $command;
+                    ( $command, undef ) =
+                      split( "[ \t]+", $defs{$wakeupAtdevice}{DEF}, 2 );
+                    $command =~ s/^[*+]//;
+                    return at_Set( $defs{$wakeupAtdevice},
+                        ( $wakeupAtdevice, "modifyTimeSpec", $command ) );
+                }
+            }
+        }
+    }
+
     # process child notifies
-    if ( $devName ne $hashName ) {
+    elsif ( $devName ne $hashName ) {
         my @registeredWakeupdevs =
           split( /,/, $attr{$hashName}{rg_wakeupDevice} )
           if ( defined( $attr{$hashName}{rg_wakeupDevice} )

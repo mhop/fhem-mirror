@@ -170,6 +170,18 @@ sub ROOMMATE_Define($$) {
           . "). Some attribute based functions like auto-creations will not be available.";
     }
 
+# Injecting NotifyFn for use with RESIDENTS Toolkit
+#    if ( !defined( $modules{at}{NotifyFn} ) ) {
+#        Log3 $name, 1, "RESIDENTStk $name: DEBUG - INJECTED AT";
+#        $modules{at}{NotifyFn} = "RESIDENTStk_NotifyFnAt";
+#    }
+#    elsif ( $modules{at}{NotifyFn} ne "RESIDENTStk_NotifyFnAt" ) {
+#        Log3 $name, 4,
+#"RESIDENTStk $name: concurrent NotifyFn already defined for at module ("
+#          . $modules{at}{NotifyFn}
+#          . "). This might lead to issues for restoring wakeuptimer after FHEM reboot!";
+#    }
+
     return undef;
 }
 
@@ -208,8 +220,41 @@ sub ROOMMATE_Notify($$) {
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
 
+    # process global:INITIALIZED
+    if ( $dev->{NAME} eq "global"
+        && grep( m/^INITIALIZED$/, @{ $dev->{CHANGED} } ) )
+    {
+
+        my @registeredWakeupdevs =
+          split( /,/, AttrVal( $hashName, "rr_wakeupDevice", 0 ) );
+
+        # if we have registered wakeup devices
+        if (@registeredWakeupdevs) {
+
+            # look for at devices for each wakeup device
+            foreach my $wakeupDev (@registeredWakeupdevs) {
+                my $wakeupAtdevice = AttrVal( $wakeupDev, "wakeupAtdevice", 0 );
+
+                # as a replacement for missing NotifyFn in 90_at.pm:
+                # trigger recalculation of at device internal timer
+                if ( defined( $defs{$wakeupAtdevice} )
+                    && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+                {
+                    Log3 $wakeupDev, 4,
+"$wakeupDev: Triggered recalculation via Perl function after reboot";
+                    my $command;
+                    ( $command, undef ) =
+                      split( "[ \t]+", $defs{$wakeupAtdevice}{DEF}, 2 );
+                    $command =~ s/^[*+]//;
+                    return at_Set( $defs{$wakeupAtdevice},
+                        ( $wakeupAtdevice, "modifyTimeSpec", $command ) );
+                }
+            }
+        }
+    }
+
     # process child notifies
-    if ( $devName ne $hashName ) {
+    elsif ( $devName ne $hashName ) {
         my @registeredWakeupdevs =
           split( /,/, $attr{$hashName}{rr_wakeupDevice} )
           if ( defined( $attr{$hashName}{rr_wakeupDevice} )
@@ -464,7 +509,7 @@ sub ROOMMATE_Set($@) {
 
             # stop any running wakeup-timers in case state changed
             my $wakeupState = ReadingsVal( $name, "wakeup", 0 );
-            if ($wakeupState > 0) {
+            if ( $wakeupState > 0 ) {
                 my $wakeupDeviceList = AttrVal( $name, "rr_wakeupDevice", 0 );
 
                 for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
@@ -475,11 +520,13 @@ sub ROOMMATE_Set($@) {
                     {
                         # forced-stop only if resident is not present anymore
                         if ( $newpresence eq "present" ) {
-                            Log3 $name, 4, "ROOMMATE $name: ending wakeup-timer $wakeupDevice";
+                            Log3 $name, 4,
+"ROOMMATE $name: ending wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 end";
                         }
                         else {
-                            Log3 $name, 4, "ROOMMATE $name: stopping wakeup-timer $wakeupDevice";
+                            Log3 $name, 4,
+"ROOMMATE $name: stopping wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 stop";
                         }
                     }
