@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  93_DbRep: current_year_begin, previous_year_begin, 
+                       current_year_end, previous_year_end added as possible 
+                       values for timestmp attribute,
+                       new attribute timeOlderThan, commandref continued
   - feature: attr global commandref modular, Forum #39854
   - bugfix:  49_SSCam: empty event LastSnapId corrected
   - change:  49_SSCam: Logging of verbose 4 changed
