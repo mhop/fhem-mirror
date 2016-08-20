@@ -1095,6 +1095,8 @@ TCM_Undef($$)
 1;
 
 =pod
+=item summary    <a href="http://www.enocean.com/esp">EnOcean Serial Protocol</a> Inferface (ESP2/ESP3)
+=item summary_DE <a href="http://www.enocean.com/esp">EnOcean Serial Protocol</a> Interface (ESP2/ESP3)
 =begin html
 
 <a name="TCM"></a>
