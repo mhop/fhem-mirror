@@ -155,6 +155,7 @@ my %EnO_manuf = (
   "03F" => "Sensortec",
   "040" => "Jaeger Direkt",
   "041" => "Air System Components Inc",
+  "043" => "SODA GmbH",
   "045" => "Holter",
   "046" => "ID-RF",
   "049" => "Micropelt GmbH",
@@ -310,6 +311,8 @@ my %EnO_eepConfig = (
   "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.12" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.13" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.14" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
@@ -5146,14 +5149,14 @@ sub EnOcean_Set($@)
         if (defined $a[1]) {
           if ($a[1] =~ m/^contact$/) {
             $rorg = "D5";
-            $data = '00';
+            $data = '08';
             ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefW", "biDir");
             readingsSingleUpdate($hash, "teachSlave", '1BS teach-in sent', 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
           } elsif ($a[1] =~ m/^windowHandleOpen$/) {
             $rorg = "F6";
-            $data = 'C0';
+            $data = 'E0';
             $status = '20';
             ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefH", "biDir");
             readingsSingleUpdate($hash, "teachSlave", 'RPS teach-in sent', 1);
@@ -9213,6 +9216,32 @@ sub EnOcean_Parse($$)
         push @event, "3:sunWest:" . sprintf "%d", 1 + $db[3] * 149999 / 255;
         push @event, "3:sunSouth:" . sprintf "%d", 1 + $db[2] * 149999 / 255;
         push @event, "3:sunEast:" . sprintf "%d", 1 + $db[1] * 149999 / 255;
+      } elsif ($identifier == 3) {
+        # Date exchange (EEP A5-13-03)
+        push @event, "3:date:" .  ($db[1] + 2000) . '-' . $db[2] . '-' . $db[3];
+      } elsif ($identifier == 4) {
+        # Time und Day exchange (EEP A5-13-04)
+        my @day = ('', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+        my $day = ($db[3] & 0xF0) >> 4;        
+        push @event, "3:weekday:" . $day[$day];
+        if ($db[0] & 4) {
+          # 12 h time format
+          push @event, "3:time:" . ($db[3] & 0x0F) . ':' . $db[2] . ':' . $db[1] . ' ' . ($db[1] & 2 ? 'PM' : 'AM');
+        } else {
+          push @event, "3:time:" . ($db[3] & 0x0F) . ':' . $db[2] . ':' . $db[1];        
+        }
+        push @event, "3:timeSource:" . ($db[0] & 1 ? 'GPS' : 'RTC');
+        
+      } elsif ($identifier == 5) {
+        # Direction exchange (EEP A5-13-05)
+        push @event, "3:elevation:" . ($db[3] - 90);
+        push @event, "3:azimuth:" . hex(substr($data, 2, 4));        
+        
+      } elsif ($identifier == 6) {
+        # Geographic Position exchange (EEP A5-13-06)
+        push @event, "3:latitude:" . sprintf("%0.3f", hex(substr($data, 0, 1) . substr($data, 2, 2)) / 22.75 - 90);
+        push @event, "3:longitude:" . sprintf("%0.3f", hex(substr($data, 1, 1) . substr($data, 4, 2)) / 13.375 - 180);        
+        
       } elsif ($identifier == 7) {
         # Sun Position and Radiation (EEP A5-13-10)
         # $db[3]_bit_7 ... $db[3]_bit_1 is Sun Elevation where 0 = 0 ° ... 90 = 90 °
@@ -9242,7 +9271,7 @@ sub EnOcean_Parse($$)
       push @event, "3:state:" . $db[2] / 1.275;      
     
     } elsif ($st eq "rainSensor.01") {
-      # Wind Sensor (EEP A5-13-08)
+      # Rain Sensor (EEP A5-13-08)
       my $ras = ($db[3] & 0x40) >> 6;
       my $rfa = ($db[3] & 0x3F) / 10;
       my $rfc = hex(substr($data, 2, 4));
@@ -10150,8 +10179,8 @@ sub EnOcean_Parse($$)
         my %handleRPS = (
           1 => 'D0',
           2 => 'F0',
-          3 => 'C0',
-          4 => 'C0'
+          3 => 'E0',
+          4 => 'E0'
         );
         my $handlePosition = $db[7] >> 4;
         if (exists $handlePosition{$handlePosition}) {
@@ -10268,13 +10297,13 @@ sub EnOcean_Parse($$)
         my $brightness = hex(substr($data, 14, 4));
         if ($brightness <= 60000) {
           push @event, "3:brightness:$brightness";
-        } elsif ($brightness <= 60001) {
+        } elsif ($brightness == 60001) {
           $brightness = '-';
           push @event, "3:brightness:over_range";
-        } elsif ($brightness <= 65534) {
+        } elsif ($brightness == 65534) {
           $brightness = '-';
           push @event, "3:brightness:invalid";
-        } elsif ($brightness <= 65535) {
+        } elsif ($brightness == 65535) {
           $brightness = '-';
           push @event, "3:brightness:not_supported";
         } else {
@@ -10298,7 +10327,7 @@ sub EnOcean_Parse($$)
           push @event, "3:energyStorage:unknown";
         }
 
-        push @event, "3:state:T: $temperature H: $humidity E: $brightness M: $motion";
+        push @event, "3:state:T: $temperature H: $humidity E: $brightness M: $onOffTrigger{$motion}";
 
       } elsif ($msgType == 0x10) {
         # configuration report
@@ -18112,21 +18141,19 @@ EnOcean_Delete($$)
       If [subDefI] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefH">subDefH</a> &lt;EnOcean SenderID&gt;,
+    <li><a name="EnOcean_subDefH">subDefH</a> &lt;EnOcean SenderID&gt;,
       [subDefH] = undef is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
       Used with subType "multisensor.00". If the attribute subDefH is set, the position of the window handle as EEP F6-10-00
       (windowHandle) telegram is forwarded.<br>
-      If [subDefH] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
-      displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
+      If [subDefH] = getNextID FHEM can assign a free SenderID alternatively.
     </li>
-    <li><a name="subDefW">subDefW</a> &lt;EnOcean SenderID&gt;,
+    <li><a name="EnOcean_subDefW">subDefW</a> &lt;EnOcean SenderID&gt;,
       [subDefW] = undef is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
       Used with subType "multisensor.00". If the attribute subDefW is set, the window state as EEP D5-00-01
       (contact) telegram is forwarded.<br>
-      If [subDefW] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
-      displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
+      If [subDefW] = getNextID FHEM can assign a free SenderID alternatively.
     </li>
     <li><a href="#subType">subType</a></li>
     <li><a name="subTypeSet">subTypeSet</a> &lt;type of device&gt;, [subTypeSet] = [subType] is default.<br>
@@ -19162,7 +19189,22 @@ EnOcean_Delete($$)
      <br><br>
 
      <li>Environmental Applications<br>
-         EEP A5-13-03 ... EEP A5-13-06 are not implemented.
+         Data Exchange (EEP A5-13-03)<br>
+         Time and Day Exchange (EEP A5-13-04)<br>
+         Direction Exchange (EEP A5-13-05)<br>
+         Geographic Exchange (EEP A5-13-06)<br>         
+     <ul>
+       <li>azimuth: &alpha;/&deg; (Sensor Range: &alpha; = 0 &deg; ... 359 &deg;)</li>
+       <li>date: JJJJ-MM-DD</li>
+       <li>elevation: &beta;/&deg; (Sensor Range: &beta; = -90 &deg; ... 90 &deg;)</li>
+       <li>latitude: &phi;/&deg; (Sensor Range: &phi; = -90 &deg; ... 90 &deg;)</li>
+       <li>longitude: &lambda;/&deg; (Sensor Range: &lambda; = -180 &deg; ... 180 &deg;)</li>
+       <li>time: hh:mm:ss [AM|PM]</li>
+       <li>timeSource: GPS|RTC</li>
+       <li>weekday: Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday</li>
+     </ul><br>
+        The attr subType must be environmentApp. This is done if the device was created by
+        autocreate.
      </li>
      <br><br>
 
