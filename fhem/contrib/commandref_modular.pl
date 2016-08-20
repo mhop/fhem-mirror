@@ -88,7 +88,7 @@ EOF
       }
       print OUT "<table class='block summary class_$type'>\n";
       my $rc = "odd";
-      for my $m (sort keys %modData) {
+      for my $m (sort {uc($a) cmp uc($b)} keys %modData) {
         next if(!$modData{$m}{type} || $modData{$m}{type} ne $type);
         my $d = $modData{$m}{"summary$sfx"};
         if(!$d) {
