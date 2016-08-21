@@ -1036,6 +1036,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
             readingsBulkUpdate( $hash, "presence", $presence )
               if ( ReadingsVal( $name, "presence", "" ) ne $presence );
         }
+
     }
 
     # data received
@@ -2187,6 +2188,11 @@ sub ENIGMA2_ReceiveCommand($$$) {
     readingsBulkUpdate( $hash, "state", $state )
       if ( ReadingsVal( $name, "state", "" ) ne $state );
 
+    # Set reading for stateAV
+    my $stateAV = ENIGMA2_GetStateAV($hash);
+    readingsBulkUpdate( $hash, "stateAV", $stateAV )
+      if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
     # Set ENIGMA2 online-only readings to "-" in case box is in
     # offline or in standby mode
     if (   $state eq "off"
@@ -2254,6 +2260,28 @@ sub ENIGMA2_Undefine($$) {
     RemoveInternalTimer($hash);
 
     return;
+}
+
+###################################
+sub ENIGMA2_GetStateAV($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    if ( ReadingsVal( $name, "presence", "absent" ) eq "absent" ) {
+        return "absent";
+    }
+    elsif ( ReadingsVal( $name, "power", "off" ) eq "off" ) {
+        return "off";
+    }
+    elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
+        return "muted";
+    }
+    elsif ( ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" ) {
+        return ReadingsVal( $name, "playStatus", "stopped" );
+    }
+    else {
+        return ReadingsVal( $name, "power", "off" );
+    }
 }
 
 ###################################
