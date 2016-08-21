@@ -19,7 +19,7 @@ at_Initialize($)
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
-                        "skip_next:0,1 alignTime";
+                        "skip_next:0,1 alignTime computeAfterInit";
   $hash->{FW_detailFn} = "at_fhemwebFn";
 }
 
@@ -285,6 +285,17 @@ at_Attr(@)
 
   my $hash = $defs{$name};
 
+  if($cmd eq "set" && $attrName eq "computeAfterInit" &&
+     $attrVal && !$init_done) {
+    InternalTimer(1, sub(){
+Log 1, "IT";
+      $hash->{OLDDEF} = $hash->{DEF};
+      at_Define($hash, "$name at $hash->{DEF}");
+      delete($hash->{OLDDEF});
+    }, $name, 0);
+    return undef;
+  }
+
   if($cmd eq "set" && $attrName eq "alignTime") {
     return "alignTime needs a list of timespec parameters" if(!$attrVal);
     my $ret = at_adjustAlign($hash, $attrVal);
@@ -509,6 +520,28 @@ EOF
   <a name="atattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="alignTime"></a>
+    <li>alignTime<br>
+        Applies only to relative at definitions: adjust the time of the next
+        command execution so, that it will also be executed at the desired
+        alignTime. The argument is a timespec, see above for the
+        definition.<br>
+        Example:<br>
+        <ul>
+        # Make sure that it chimes when the new hour begins<br>
+        define at2 at +*01:00 set Chime on-for-timer 1<br>
+        attr at2 alignTime 00:00<br>
+        </ul>
+        </li><br>
+
+    <a name="computeAfterInit"></a>
+    <li>computeAfterInit<br>
+        If perlfunc() in the timespec relies on some other/dummy readings, then
+        it will return a wrong time upon FHEM start, as the at define is
+        processed before the readings are known. If computeAfterInit is set,
+        FHEM will recompute timespec after the initialization is finished.
+        </li><br>
+
     <a name="disable"></a>
     <li>disable<br>
         Can be applied to at/watchdog/notify/FileLog devices.<br>
@@ -531,20 +564,6 @@ EOF
     <li>skip_next<br>
         Used for at commands: skip the execution of the command the next
         time.</li><br>
-
-    <a name="alignTime"></a>
-    <li>alignTime<br>
-        Applies only to relative at definitions: adjust the time of the next
-        command execution so, that it will also be executed at the desired
-        alignTime. The argument is a timespec, see above for the
-        definition.<br>
-        Example:<br>
-        <ul>
-        # Make sure that it chimes when the new hour begins<br>
-        define at2 at +*01:00 set Chime on-for-timer 1<br>
-        attr at2 alignTime 00:00<br>
-        </ul>
-        </li><br>
 
     <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
 
@@ -683,6 +702,30 @@ EOF
   <a name="atattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="alignTime"></a>
+    <li>alignTime<br>
+        Nur f&uuml;r relative Definitionen: Stellt den Zeitpunkt der
+        Ausf&uuml;hrung des Befehls so, dass er auch zur alignTime
+        ausgef&uuml;hrt wird.  Dieses Argument ist ein timespec. Siehe oben
+        f&uuml; die Definition<br>
+
+        Beispiel:<br>
+        <ul>
+        # Stelle sicher das es gongt wenn eine neue Stunde beginnt.<br>
+        define at2 at +*01:00 set Chime on-for-timer 1<br>
+        attr at2 alignTime 00:00<br>
+        </ul>
+        </li><br>
+
+    <a name="computeAfterInit"></a>
+    <li>computeAfterInit<br>
+        Falls perlfunc() im timespec Readings or Statusinformationen
+        ben&ouml;gt, dann wird sie eine falsche Zeit beim FHEM-Start
+        zurueckliefern, da zu diesem Zeitpunkt die Readings noch nicht aktiv
+        sind. Mit gesetztem computeAfterInit wird perlfunc nach Setzen aller
+        Readings erneut ausgefuehrt. (Siehe Forum #56706)
+        </li><br>
+
     <a name="disable"></a>
     <li>disable<br>
         Deaktiviert das entsprechende Ger&auml;t.<br>
@@ -707,21 +750,6 @@ EOF
     <li>skip_next<br>
         Wird bei at Befehlen verwendet um die n&auml;chste Ausf&uuml;hrung zu
         &uuml;berspringen</li><br>
-
-    <a name="alignTime"></a>
-    <li>alignTime<br>
-        Nur f&uuml;r relative Definitionen: Stellt den Zeitpunkt der
-        Ausf&uuml;hrung des Befehls so, dass er auch zur alignTime
-        ausgef&uuml;hrt wird.  Dieses Argument ist ein timespec. Siehe oben
-        f&uuml; die Definition<br>
-
-        Beispiel:<br>
-        <ul>
-        # Stelle sicher das es gongt wenn eine neue Stunde beginnt.<br>
-        define at2 at +*01:00 set Chime on-for-timer 1<br>
-        attr at2 alignTime 00:00<br>
-        </ul>
-        </li><br>
 
     <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
 
