@@ -1733,6 +1733,7 @@ sub PHTV_ReceiveCommand($$$) {
                   . "' not supported by device.";
             }
         }
+
     }
 
     # data received
@@ -3082,6 +3083,11 @@ sub PHTV_ReceiveCommand($$$) {
         readingsBulkUpdate( $hash, "state", $newstate );
     }
 
+    # Set reading for stateAV
+    my $stateAV = PHTV_GetStateAV($hash);
+    readingsBulkUpdate( $hash, "stateAV", $stateAV )
+      if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
     # Set PHTV online-only readings to "-" in case box is in
     # offline or in standby mode
     if (   $newstate eq "off"
@@ -3212,6 +3218,29 @@ sub PHTV_Undefine($$) {
     RemoveInternalTimer($hash);
 
     return;
+}
+
+###################################
+sub PHTV_GetStateAV($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    if ( ReadingsVal( $name, "presence", "absent" ) eq "absent" ) {
+        return "absent";
+    }
+    elsif ( ReadingsVal( $name, "power", "off" ) eq "off" ) {
+        return "off";
+    }
+    elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
+        return "muted";
+    }
+    elsif ( ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
+    {
+        return ReadingsVal( $name, "playStatus", "stopped" );
+    }
+    else {
+        return ReadingsVal( $name, "power", "off" );
+    }
 }
 
 ###################################
