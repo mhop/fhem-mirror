@@ -67,6 +67,7 @@
 #       0005    23.01.2016  mike3436            KM273_Set,KM273_Get             implement t15 timeformat to get/set PUMP_DHW_PROGRAM's START and STOP TIME
 #       0006    24.01.2016  mike3436            KM273_gets,KM273_elements       change weekdays _FRI -> _5FRI to correct the sort order
 #       0007    01.02.2016  mike3436            KM273_Get,KM273_GetNextValue    KM273_Get corrected, KM273_GetNextValue do nothing if attr doNotPoll=1
+#       0008    01.02.2016  mike3436            KM273_ReadElementList           complete element list is read from heatpump, default list is only used for deliver the 'read' flag
 
 package main;
 use strict;
@@ -184,7 +185,8 @@ my %KM273_getsAdd = (
 #
 #
 
-my %KM273_elements = (
+my %KM273_elements_default = 
+(
     '0C003FE0' => { 'rtr' => '04003FE0' , 'idx' =>    0 , 'extid' => '814A53C66A0802' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'ACCESSORIES_CONNECTED_BITMASK' },
     '0C007FE0' => { 'rtr' => '04007FE0' , 'idx' =>    1 , 'extid' => '61E1E1FC660023' , 'max' =>        5 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'ACCESS_LEVEL' },
     '0C00BFE0' => { 'rtr' => '0400BFE0' , 'idx' =>    2 , 'extid' => 'A1137CB3EB0B26' , 'max' =>      240 , 'min' =>        1 , 'format' => 'int' , 'read' => 0 , 'text' => 'ACCESS_LEVEL_TIMEOUT_DELAY_TIME' },
@@ -1990,15 +1992,191 @@ my %KM273_format = (
     'dp2' => { factor => 1      , unit => ''    , 'select' => [ '0:Automatic', '1:Always_On', '2:Always_Off' ] },
 );
 
+
 my %KM273_history = ();
 my @KM273_readingsRTR = ();
 my %KM273_writingsTXD = ();
+my %KM273_elements = ();
+
+my %KM273_ReadElementListStatus = ( done => 0, wait => 0, readCounter => 0, readIndex => 0, writeIndex => 0, KM200active => 0, KM200wait => 0, readData => "");
+my %KM273_ReadElementListElements = ();
+sub KM273_ReadElementList($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME} . ": KM273_ReadElementList";
+  Log 3, "$name entry readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
+  
+  if (($KM273_ReadElementListStatus{readCounter} == 0) && ($KM273_ReadElementListStatus{KM200wait} == 0))
+  {
+    Log 3, "$name send R01FD7FE00";
+    CAN_Write($hash,"R01FD7FE00");
+    $KM273_ReadElementListStatus{KM200wait} = 20;
+  }
+  elsif ($KM273_ReadElementListStatus{KM200wait} > 0)
+  {
+    $KM273_ReadElementListStatus{KM200wait} -= 1 if ($KM273_ReadElementListStatus{KM200wait} > 0);
+    if ($KM273_ReadElementListStatus{KM200wait} <= 0)
+    {
+      $KM273_ReadElementListStatus{KM200active} = 0;
+      $KM273_ReadElementListStatus{readIndex} = 0;
+      $KM273_ReadElementListStatus{writeIndex} = 0;
+      $KM273_ReadElementListStatus{readData} = "";
+    }
+    Log 3, "$name KM200active=$KM273_ReadElementListStatus{KM200active} KM200wait=$KM273_ReadElementListStatus{KM200wait} readIndex=$KM273_ReadElementListStatus{readIndex}";
+  }
+  elsif ($KM273_ReadElementListStatus{writeIndex} <= $KM273_ReadElementListStatus{readIndex})
+  {
+    my $sendTel = sprintf("T01FD3FE08%08x%08x",4096,$KM273_ReadElementListStatus{writeIndex});
+    $KM273_ReadElementListStatus{writeIndex} += 4096;
+    $KM273_ReadElementListStatus{wait} = 20;
+    Log 3, "$name send $sendTel";
+    CAN_Write($hash,$sendTel);
+    Log 3, "$name send R01FDBFE00";
+    CAN_Write($hash,"R01FDBFE00");
+  }
+  elsif (--$KM273_ReadElementListStatus{wait} <= 0)
+  {
+    $KM273_ReadElementListStatus{readIndex} = 0;
+    $KM273_ReadElementListStatus{writeIndex} = 0;
+    $KM273_ReadElementListStatus{readData} = "";
+  }
+
+  my $count = 1;
+  while ($count > 0)
+  {
+    CAN_ReadBuffer($hash);
+    $count = 0;
+    
+    my ($dir,$canId,$len1,$value1);
+    $dir = 'R';
+    while (($dir eq 'T') || ($dir eq 'R'))
+    {
+      ($dir,$canId,$len1,$value1) = CAN_Read($hash);
+      $dir = '_' if (!defined($dir));
+      if ($dir eq 'T')
+      {
+        if (hex $canId == 0x09FDBFE0)
+        {
+          if ($len1 <= 8)
+          {
+            $KM273_ReadElementListStatus{readIndex} += $len1;
+            $value1 <<= 4*(8-$len1) if ($len1 < 8);
+            $KM273_ReadElementListStatus{readData} .= pack("NN",$value1>>32,$value1&0xffffffff);
+          }
+          
+          if (($KM273_ReadElementListStatus{readCounter} > 0) && ($KM273_ReadElementListStatus{readIndex} >= $KM273_ReadElementListStatus{readCounter}))
+          {
+            $KM273_ReadElementListStatus{done} = 1;
+            Log 3, "$name done, readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
+
+            %KM273_ReadElementListElements = ();
+            my $i1 = 0;
+            my $imax = $KM273_ReadElementListStatus{readIndex};
+            my $idLast = -1;
+            while ($i1<$imax)
+            {
+              if ($imax-$i1 > 18)
+              {
+                my ($idx,$extid,$max2,$min2,$len2) = unpack("nh14NNc",substr($KM273_ReadElementListStatus{readData},$i1,18));
+                if (($idx > $idLast) && ($len2 > 1) && ($len2 < 100))
+                {
+                  my $element2 = substr($KM273_ReadElementListStatus{readData},$i1+18,$len2-1);
+                  $i1 += 18+$len2;
+                  $KM273_ReadElementListElements{$element2} = {'idx' => $idx, 'extid' => $extid, 'max' => $max2, 'min' => $min2 };
+                  Log 3, "$name done, idx=$idx extid=$extid max=$max2 min=$min2 element=$element2";
+                }
+                else
+                {
+                  Log 3, "$name error, idx=$idx extid=$extid max=$max2 min=$min2 len=$len2";
+                  $KM273_ReadElementListStatus{done} = 0;
+                  $KM273_ReadElementListStatus{KM200active} = 1;
+                  $KM273_ReadElementListStatus{KM200wait} = 20;
+                  $imax = 0;
+                }
+              }
+              else {$i1+=18;}
+            }
+          }
+          $count++;
+        }
+        elsif (hex $canId == 0x09FD7FE0)
+        {
+          my $readCounter = $value1 >> 24;
+          $KM273_ReadElementListStatus{readCounter} = $readCounter;
+          Log 3, "$name read T09FD7FE0 len=$len1 value=$value1 readCounter=$readCounter";
+        }
+        elsif (hex $canId == 0x01FD3FE0)
+        {
+          my $dataLen = $value1 >> 32;
+          my $dataStart = $value1 & 0xffffffff;
+          Log 3, "$name KM200 read canId=$canId len=$len1 dataStart=$dataStart dataLen=$dataLen";
+          $KM273_ReadElementListStatus{KM200active} = 1;
+          $KM273_ReadElementListStatus{KM200wait} = 20;
+        }
+      }
+      elsif ($dir eq 'R')
+      {
+        if ((hex $canId == 0x01FD7FE0) || (hex $canId == 0x01FDBFE0))
+        {
+          Log 3, "$name KM200 read canId=$canId";
+          $KM273_ReadElementListStatus{KM200active} = 1;
+          $KM273_ReadElementListStatus{KM200wait} = 20;
+        }
+      }
+    }
+  }
+  
+  return undef;
+}
+
+sub KM273_UpdateElements($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME} . ": KM273_UpdateElements";
+    Log 3, "$name";
+
+    foreach my $element (keys %KM273_elements_default)
+    {
+        my $text = $KM273_elements_default{$element}{text};
+        my $read = $KM273_elements_default{$element}{read};
+        my $elem1 = $KM273_ReadElementListElements{$text};
+        if ((!defined $elem1) && ($read != 0))
+        {
+          my @days = ("1MON","2TUE","3WED","4THU","5FRI","6SAT","7SUN");
+          foreach my $day (@days)
+          {
+            my $pos = index $text, $day;
+            if ($pos > 0)
+            {
+              my $text1 = (substr $text, 0, $pos) . (substr $text, $pos+1);
+              $elem1 = $KM273_ReadElementListElements{$text1};
+              Log 3, "$name change $text to $text1";
+              last;
+            }
+            
+          }
+        }
+        if (defined $elem1)
+        {
+          my $idx = $elem1->{idx};
+          my $rtr = sprintf("%08X",0x04003FE0 | ($idx << 14));
+          my $txd = sprintf("%08X",0x0C003FE0 | ($idx << 14));
+          my $format = $KM273_elements_default{$element}{format};
+          $KM273_elements{$txd} = { 'rtr' => $rtr, 'idx' => $idx, 'extid' => $elem1->{extid}, 'max' => $elem1->{max}, 'min' => $elem1->{min}, 'format' => $format, 'read' => $read, 'text' => $text};
+        }
+        else
+        {
+          Log 3, "$name $text not found" if ($read != 0)
+        }
+    }
+    return undef;
+}
 
 sub KM273_CreatePollingList($)
 {
     my ($hash) = @_;
-    my $name = $hash->{NAME};
-    Log 3, "$name: KM273_CreatePollingList";
+    my $name = $hash->{NAME} . ": KM273_CreatePollingList";
+    Log 3, "$name";
 
     foreach my $element (keys %KM273_elements)
     {
@@ -2006,7 +2184,7 @@ sub KM273_CreatePollingList($)
     }
     foreach my $val (@KM273_readingsRTR)
     {
-        Log 3, "$name: KM273_CreatePollingList rtr $val";
+        Log 3, "$name rtr $val";
     }
     $hash->{pollingIndex} = 0;
 
@@ -2019,7 +2197,7 @@ sub KM273_CreatePollingList($)
     }
     foreach my $val (keys %KM273_writingsTXD)
     {
-        Log 3, "$name: KM273_CreatePollingList txd $val $KM273_writingsTXD{$val}{rtr}";
+        Log 3, "$name txd $val $KM273_writingsTXD{$val}{rtr}";
     }
 
     return undef;
@@ -2052,8 +2230,8 @@ sub KM273_Initialize($)
 sub KM273_Define($$)
 {
     my ($hash, $def) = @_;
-    my $name = $hash->{NAME};
-    Log 5, "$name: KM273_Define";
+    my $name = $hash->{NAME} . ": KM273_Define";
+    Log 5, "$name";
 
     my @param = split('[ \t]+', $def);
 
@@ -2069,8 +2247,8 @@ sub KM273_Define($$)
     return undef;
     }
 
-    KM273_CreatePollingList($hash);
-    InternalTimer(gettimeofday()+10, "KM273_GetReadings", $hash, 0);
+    #KM273_CreatePollingList($hash);
+    #InternalTimer(gettimeofday()+10, "KM273_GetReadings", $hash, 0);
 
     $hash->{DeviceName} = $dev;
     my $ret = DevIo_OpenDev($hash, 0, "CAN_DoInit");
@@ -2232,13 +2410,27 @@ sub KM273_Read($)
     my $name = $hash->{NAME};
     Log 5, "$name: KM273_Read";
 
-    CAN_ReadBuffer($hash);
+    if (!$KM273_ReadElementListStatus{done})
+    {
+      KM273_ReadElementList($hash);
+      if ($KM273_ReadElementListStatus{done})
+      {
+        KM273_UpdateElements($hash);
+        KM273_CreatePollingList($hash);
+        InternalTimer(gettimeofday()+10, "KM273_GetReadings", $hash, 0);
+      }
+      
+      return undef;
+    }
 
-    my ($dir,$canId,$len1,$value1);
+    CAN_ReadBuffer($hash);
+    
+    my ($dir,$canId,$len1,$value1,$value);
     $dir = 'R';
     while (($dir eq 'T') || ($dir eq 'R'))
     {
         ($dir,$canId,$len1,$value1) = CAN_Read($hash);
+        $dir = '0' if (!defined($dir));
         if ($dir eq 'T')
         {
             my $time = time();
