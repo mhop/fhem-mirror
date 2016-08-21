@@ -1193,13 +1193,13 @@ CommandInclude($$)
     return "Can't open $arg: $!";
   }
   Log 1, "Including $arg";
-  if(!$init_done &&
-     $arg ne AttrVal("global", "statefile", "") &&
-     $arg ne AttrVal("global", "configfile", "")) {
+  my @t = localtime();
+  my $gcfg = ResolveDateWildcards(AttrVal("global", "configfile", ""), @t);
+  my $stf  = ResolveDateWildcards(AttrVal("global", "statefile",  ""), @t);
+  if(!$init_done && $arg ne $stf && $arg ne $gcfg) {
     my $nr =  $devcount++;
     $comments{$nr}{TEXT} = "include $arg";
-    $comments{$nr}{CFGFN} = $currcfgfile
-          if($currcfgfile ne AttrVal("global", "configfile", ""));
+    $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
   }
   $oldcfgfile  = $currcfgfile;
   $currcfgfile = $arg;
