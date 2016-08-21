@@ -72,10 +72,7 @@ for my $lang (@lang) {
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
       delete($modData{$mName}{modLinks});
       open(FH, "$modDir/$fName") || die("Cant open $modDir/$fName: $!\n");
-      my $ishtml;
       while(my $l = <FH>) {
-        $ishtml = 1 if($l =~ m/^=begin\s+html/);
-        next if(!$ishtml);
         $modData{$mName}{type}=$1 if($l =~ m/^=item\s+(helper|command|device)/);
         $modData{$mName}{$1}  =$2 if($l =~ m/^=item\s+(summary[^ ]*)\s(.*)$/);
         $modData{$mName}{modLinks}{$1} = 1
