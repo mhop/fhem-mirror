@@ -70,6 +70,7 @@
 #       0008    30.05.2016  mike3436            KM273_ReadElementList           complete element list is read from heatpump, default list is only used for deliver the 'read' flag
 #       0009    31.05.2016  mike3436            KM273_ReadElementList           if expected readCounter isn't reached on second read, and read data has identical length, try to analyse
 #       0010    31.05.2016  mike3436            KM273_ReadElementList           bugfix if expected readCounter isn't reached by read data; delete lists on module reload
+#       0011    01.06.2016  mike3436            KM273_ReadElementList           negative min values corrected: value interpretation has to be as signed int64, XDHW_TIME+XDHW_STOP_TEMP added to KM273_gets
 
 package main;
 use strict;
@@ -77,10 +78,12 @@ use warnings;
 use Time::HiRes qw( time sleep );
 
 my %KM273_gets = (
-    'DHW_CALCULATED_SETPOINT_TEMP'  => '',
-    'DHW_TIMEPROGRAM'   => '',
-    'ROOM_TIMEPROGRAM'  => '',
-    'ROOM_PROGRAM_MODE'  => '',
+    'XDHW_STOP_TEMP' => '',
+    'XDHW_TIME' => '',
+    'DHW_CALCULATED_SETPOINT_TEMP' => '',
+    'DHW_TIMEPROGRAM' => '',
+    'ROOM_TIMEPROGRAM' => '',
+    'ROOM_PROGRAM_MODE' => '',
     'ROOM_PROGRAM_1_5FRI' => '',
     'ROOM_PROGRAM_1_1MON' => '',
     'ROOM_PROGRAM_1_6SAT' => '',
@@ -2102,6 +2105,8 @@ sub KM273_ReadElementList($)
               if ($imax-$i1 > 18)
               {
                 my ($idx,$extid,$max2,$min2,$len2) = unpack("nh14NNc",substr($KM273_ReadElementListStatus{readData},$i1,18));
+                $min2 = unpack 'l*', pack 'L*', $min2; # unsigned long to signed long
+                $max2 = unpack 'l*', pack 'L*', $max2;
                 if (($idx > $idLast) && ($len2 > 1) && ($len2 < 100))
                 {
                   my $element2 = substr($KM273_ReadElementListStatus{readData},$i1+18,$len2-1);
@@ -2174,7 +2179,7 @@ sub KM273_UpdateElements($)
             {
               my $text1 = (substr $text, 0, $pos) . (substr $text, $pos+1);
               $elem1 = $KM273_ReadElementListElements{$text1};
-              Log 3, "$name change $text1 to $text";
+              Log 3, "$name change $text1 to $text" if (defined $elem1);
               last;
             }
             
