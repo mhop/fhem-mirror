@@ -685,3 +685,6 @@
 
 - Sun Aug 21 2016 (mike3436)
   - added new module 26_KM273 for buderus logatherm heat pump
+
+- Mon Aug 22 2016 (loredo)
+  - added new command exportdevice

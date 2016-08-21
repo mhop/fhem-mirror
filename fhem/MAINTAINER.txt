@@ -112,7 +112,7 @@ FHEM/21_OWSWITCH.pm          pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (deprecated)
 FHEM/21_OWTHERM.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           http://forum.fhem.de Multimedia
-FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
+FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_KOSTALPIKO.pm        john                 http://forum.fhem.de CodeSchnipsel
 FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges (link als PM an tupol)
@@ -355,6 +355,7 @@ FHEM/98_count.pm             betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_exportdevice.pm      loredo               http://forum.fhem.de Sonstiges
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
