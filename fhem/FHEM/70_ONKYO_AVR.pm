@@ -497,7 +497,9 @@ sub ONKYO_AVR_Read($) {
 
                 # return as decimal
                 elsif ($value_raw =~ m/^[0-9A-Fa-f][0-9A-Fa-f]$/
-                    && $cmd_raw =~ /^(MVL|ZVL|VL3|VL4|SLP|PRS|PRZ|PR3|PR4|PRM|PTS|NPR|NPZ|NP3|NP4)$/ )
+                    && $cmd_raw =~
+/^(MVL|ZVL|VL3|VL4|SLP|PRS|PRZ|PR3|PR4|PRM|PTS|NPR|NPZ|NP3|NP4)$/
+                  )
                 {
                     $value = ONKYO_AVR_hex2dec($value_raw);
                     Log3 $name, 5,
@@ -1972,6 +1974,14 @@ sub ONKYO_AVR_Set($$$) {
         && lc( @$a[1] ) ne "help" );
 
     readingsBeginUpdate($hash);
+
+    # create inputList reading for frontends
+    readingsBulkUpdate( $hash, "inputList", $inputs_txt )
+      if ( ReadingsVal( $name, "inputList", "-" ) ne $inputs_txt );
+
+    # create channelList reading for frontends
+    readingsBulkUpdate( $hash, "channelList", $channels_txt )
+      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels_txt );
 
     # channel
     if ( lc( @$a[1] ) eq "channel" ) {

@@ -328,6 +328,14 @@ sub PHTV_Set($@) {
     }
     chop($channels) if ( $channels ne "" );
 
+    # create inputList reading for frontends
+    readingsSingleUpdate( $hash, "inputList", $inputs_txt, 1 )
+      if ( ReadingsVal( $name, "inputList", "-" ) ne $inputs_txt );
+
+    # create channelList reading for frontends
+    readingsSingleUpdate( $hash, "channelList", $channels, 1 )
+      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels );
+
     my $usage =
         "Unknown argument "
       . $a[1]
@@ -942,7 +950,8 @@ sub PHTV_Set($@) {
                     Log3 $name, 4,
                         "PHTV $name hue - old: "
                       . $hash->{READINGS}{rgb}{VAL}
-                      . " new: $hex(h=".$a[2]." s="
+                      . " new: $hex(h="
+                      . $a[2] . " s="
                       . $hsb->{s} . " b="
                       . $hsb->{b};
 
@@ -1001,8 +1010,8 @@ sub PHTV_Set($@) {
                         "PHTV $name sat - old: "
                       . $hash->{READINGS}{rgb}{VAL}
                       . " new: $hex(h="
-                      . $hsb->{h}
-                      . " s=".$a[2]." b="
+                      . $hsb->{h} . " s="
+                      . $a[2] . " b="
                       . $hsb->{b};
 
                     return PHTV_Set( $hash, $name, "rgb", $hex );
@@ -1061,8 +1070,8 @@ sub PHTV_Set($@) {
                       . $hash->{READINGS}{rgb}{VAL}
                       . " new: $hex(h="
                       . $hsb->{h} . " s="
-                      . $hsb->{s}
-                      . " b=".$a[2].")";
+                      . $hsb->{s} . " b="
+                      . $a[2] . ")";
 
                     return PHTV_Set( $hash, $name, "rgb", $hex );
                 }
@@ -1114,7 +1123,7 @@ sub PHTV_Set($@) {
                 my $hex;
                 if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
-                    $bri = PHTV_pct2bri($a[2]);
+                    $bri = PHTV_pct2bri( $a[2] );
                     $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $bri );
 
                     Log3 $name, 4,
@@ -1185,7 +1194,7 @@ sub PHTV_Set($@) {
 
         my $vol;
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( $a[2] =~  m/^\d+$/
+            if (   $a[2] =~ m/^\d+$/
                 && $a[2] >= $hash->{helper}{audio}{min}
                 && $a[2] <= $hash->{helper}{audio}{max} )
             {
@@ -1349,15 +1358,22 @@ sub PHTV_Set($@) {
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             my $channelName = $a[2];
-            if ( defined( $hash->{helper}{device}{channelID}{$channelName}{id} ) ) {
+            if (
+                defined( $hash->{helper}{device}{channelID}{$channelName}{id} )
+              )
+            {
                 $cmd = $hash->{helper}{device}{channelID}{$channelName}{id};
 
                 if ( $hash->{READINGS}{channel}{VAL} ne $channelName ) {
                     readingsSingleUpdate( $hash, "channel", $channelName, 1 );
                 }
             }
-            elsif ( $channelName =~ /^(\d+):(.*):$/
-                && defined( $hash->{helper}{device}{channelPreset}{$channelName}{id} ) )
+            elsif (
+                $channelName =~ /^(\d+):(.*):$/
+                && defined(
+                    $hash->{helper}{device}{channelPreset}{$channelName}{id}
+                )
+              )
             {
                 $cmd = $hash->{helper}{device}{channelPreset}{$channelName}{id};
             }
@@ -2074,7 +2090,7 @@ sub PHTV_ReceiveCommand($$$) {
                     $channel_name =~ s/\s+$//;
                     $channel_name =~ s/\s/_/g;
                     $channel_name =~ s/,/./g;
-                  	$channel_name =~ s///g;
+                    $channel_name =~ s///g;
                     if ( $channel_name ne "" ) {
                         $hash->{helper}{device}{channelName}{$channel}{name} =
                           $channel_name;
