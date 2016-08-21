@@ -10,7 +10,7 @@ sub CommandExportdevice($$);
 sub exportdevice_Initialize($$) {
     my %hash = (
         Fn  => "CommandExportdevice",
-        Hlp => "<device>",
+        Hlp => "[devspec] [quote]",
     );
     $cmds{exportdevice} = \%hash;
 }
