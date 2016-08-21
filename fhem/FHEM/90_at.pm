@@ -288,7 +288,6 @@ at_Attr(@)
   if($cmd eq "set" && $attrName eq "computeAfterInit" &&
      $attrVal && !$init_done) {
     InternalTimer(1, sub(){
-Log 1, "IT";
       $hash->{OLDDEF} = $hash->{DEF};
       at_Define($hash, "$name at $hash->{DEF}");
       delete($hash->{OLDDEF});
