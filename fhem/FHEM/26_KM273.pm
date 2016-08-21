@@ -71,6 +71,7 @@
 #       0009    31.05.2016  mike3436            KM273_ReadElementList           if expected readCounter isn't reached on second read, and read data has identical length, try to analyse
 #       0010    31.05.2016  mike3436            KM273_ReadElementList           bugfix if expected readCounter isn't reached by read data; delete lists on module reload
 #       0011    01.06.2016  mike3436            KM273_ReadElementList           negative min values corrected: value interpretation has to be as signed int64, XDHW_TIME+XDHW_STOP_TEMP added to KM273_gets
+#       0012    02.06.2016  mike3436            KM273_ReadElementList           byte nibbles in extid turned
 
 package main;
 use strict;
@@ -2081,7 +2082,7 @@ sub KM273_ReadElementList($)
           if ($len1 <= 8)
           {
             $KM273_ReadElementListStatus{readIndex} += $len1;
-            $value1 <<= 4*(8-$len1) if ($len1 < 8);
+            $value1 <<= 8*(8-$len1) if ($len1 < 8);
             $KM273_ReadElementListStatus{readData} .= pack("NN",$value1>>32,$value1&0xffffffff);
           }
           
@@ -2104,7 +2105,7 @@ sub KM273_ReadElementList($)
             {
               if ($imax-$i1 > 18)
               {
-                my ($idx,$extid,$max2,$min2,$len2) = unpack("nh14NNc",substr($KM273_ReadElementListStatus{readData},$i1,18));
+                my ($idx,$extid,$max2,$min2,$len2) = unpack("nH14NNc",substr($KM273_ReadElementListStatus{readData},$i1,18));
                 $min2 = unpack 'l*', pack 'L*', $min2; # unsigned long to signed long
                 $max2 = unpack 'l*', pack 'L*', $max2;
                 if (($idx > $idLast) && ($len2 > 1) && ($len2 < 100))
