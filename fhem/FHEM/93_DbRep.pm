@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.5.2        21.08.2016       fit to new commandref style
 # 3.5.1        20.08.2016       commandref continued
 # 3.5          18.08.2016       new attribute timeOlderThan
 # 3.4.4        12.08.2016       current_year_begin, previous_year_begin, current_year_end, previous_year_end
@@ -2088,6 +2089,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 
 =pod
 =item helper
+=item summary    browsing / managing content of DbLog-databases. Content is depicted as readings
+=item summary_DE durchsuchen / bearbeiten von DbLog-DB Content. Darstellung als Readings
 =begin html
 
 <a name="DbRep"></a>
