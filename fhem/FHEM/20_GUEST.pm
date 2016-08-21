@@ -218,13 +218,17 @@ sub GUEST_Notify($$) {
             foreach my $wakeupDev (@registeredWakeupdevs) {
                 my $wakeupAtdevice = AttrVal( $wakeupDev, "wakeupAtdevice", 0 );
 
-                # as a replacement for missing NotifyFn in 90_at.pm:
-                # trigger recalculation of at device internal timer
-                if ( defined( $defs{$wakeupAtdevice} )
-                    && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+                # make sure computeAfterInit is set at at-device
+                # and re-calculate on our own this time
+                if (   defined( $defs{$wakeupAtdevice} )
+                    && $defs{$wakeupAtdevice}{TYPE} eq "at"
+                    && AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne
+                    "1" )
                 {
-                    Log3 $wakeupDev, 4,
-"$wakeupDev: Triggered recalculation via Perl function after reboot";
+                    Log3 $wakeupDev, 3,
+"RESIDENTStk $wakeupDev: Correcting '$wakeupAtdevice' attribute computeAfterInit required for correct recalculation after reboot";
+                    fhem "attr $wakeupAtdevice computeAfterInit 1";
+
                     my $command;
                     ( $command, undef ) =
                       split( "[ \t]+", $defs{$wakeupAtdevice}{DEF}, 2 );
@@ -495,7 +499,7 @@ sub GUEST_Set($@) {
 
             # stop any running wakeup-timers in case state changed
             my $wakeupState = ReadingsVal( $name, "wakeup", 0 );
-            if ($wakeupState > 0) {
+            if ( $wakeupState > 0 ) {
                 my $wakeupDeviceList = AttrVal( $name, "rg_wakeupDevice", 0 );
 
                 for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
@@ -506,11 +510,13 @@ sub GUEST_Set($@) {
                     {
                         # forced-stop only if resident is not present anymore
                         if ( $newpresence eq "present" ) {
-                            Log3 $name, 4, "ROOMMATE $name: ending wakeup-timer $wakeupDevice";
+                            Log3 $name, 4,
+"ROOMMATE $name: ending wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 end";
                         }
                         else {
-                            Log3 $name, 4, "ROOMMATE $name: stopping wakeup-timer $wakeupDevice";
+                            Log3 $name, 4,
+"ROOMMATE $name: stopping wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 stop";
                         }
                     }
