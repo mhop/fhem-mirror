@@ -254,6 +254,7 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wakeupAtdevice at *{RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")} set $NAME trigger";
         fhem
 "attr $wakeupAtdevice comment Auto-created by RESIDENTS Toolkit: trigger wake-up timer at specific time";
+        fhem "attr $wakeupAtdevice computeAfterInit 1";
         fhem "attr $wakeupAtdevice room $room"
           if ($room);
 
@@ -683,6 +684,11 @@ if (\$EVTPART0 eq \"stop\") {\
     elsif ( $defs{$wakeupAtdevice}{TYPE} ne "at" ) {
         Log3 $NAME, 3,
 "RESIDENTStk $NAME: WARNING - defined at-device '$wakeupAtdevice' is not an at-device!";
+    }
+    elsif ( AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne "1" ) {
+        Log3 $NAME, 3,
+"RESIDENTStk $NAME: Correcting '$wakeupAtdevice' attribute computeAfterInit required for correct recalculation after reboot";
+        fhem "attr $wakeupAtdevice computeAfterInit 1";
     }
 
     # verify holiday2we attribute

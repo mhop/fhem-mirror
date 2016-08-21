@@ -170,18 +170,6 @@ sub ROOMMATE_Define($$) {
           . "). Some attribute based functions like auto-creations will not be available.";
     }
 
-# Injecting NotifyFn for use with RESIDENTS Toolkit
-#    if ( !defined( $modules{at}{NotifyFn} ) ) {
-#        Log3 $name, 1, "RESIDENTStk $name: DEBUG - INJECTED AT";
-#        $modules{at}{NotifyFn} = "RESIDENTStk_NotifyFnAt";
-#    }
-#    elsif ( $modules{at}{NotifyFn} ne "RESIDENTStk_NotifyFnAt" ) {
-#        Log3 $name, 4,
-#"RESIDENTStk $name: concurrent NotifyFn already defined for at module ("
-#          . $modules{at}{NotifyFn}
-#          . "). This might lead to issues for restoring wakeuptimer after FHEM reboot!";
-#    }
-
     return undef;
 }
 
@@ -235,13 +223,17 @@ sub ROOMMATE_Notify($$) {
             foreach my $wakeupDev (@registeredWakeupdevs) {
                 my $wakeupAtdevice = AttrVal( $wakeupDev, "wakeupAtdevice", 0 );
 
-                # as a replacement for missing NotifyFn in 90_at.pm:
-                # trigger recalculation of at device internal timer
-                if ( defined( $defs{$wakeupAtdevice} )
-                    && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+                # make sure computeAfterInit is set at at-device
+                # and re-calculate on our own this time
+                if (   defined( $defs{$wakeupAtdevice} )
+                    && $defs{$wakeupAtdevice}{TYPE} eq "at"
+                    && AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne
+                    "1" )
                 {
-                    Log3 $wakeupDev, 4,
-"$wakeupDev: Triggered recalculation via Perl function after reboot";
+                    Log3 $wakeupDev, 3,
+"RESIDENTStk $wakeupDev: Correcting '$wakeupAtdevice' attribute computeAfterInit required for correct recalculation after reboot";
+                    fhem "attr $wakeupAtdevice computeAfterInit 1";
+
                     my $command;
                     ( $command, undef ) =
                       split( "[ \t]+", $defs{$wakeupAtdevice}{DEF}, 2 );
