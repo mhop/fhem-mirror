@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 90_at: computeAfterInit attribute (Forum #56706)
   - change:  93_DbRep: fit to new commandref style
   - bugfix:  20_ROOMMATE,20_GUEST: Fixed wakeuptimer <> at-device sync
   - feature  93_DbRep: current_year_begin, previous_year_begin, 
