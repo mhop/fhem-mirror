@@ -524,13 +524,16 @@ OWServer_Set($@)
 
 
 =pod
+=item device
+=item summary controls a One-Wire (1Wire) server instance
+=item summary_DE steuert eine Ausgabe eines One-Wire (1Wire) Servers
 =begin html
 
 <a name="OWServer"></a>
 <h3>OWServer</h3>
 <ul>
   <br>
-  <a name="OWDevicedefine"></a>
+  <a name="OWServerdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; OWServer &lt;protocol&gt;</code>
@@ -541,10 +544,25 @@ OWServer_Set($@)
     for any 1-wire devices on a host. &lt;protocol&gt; has
     format &lt;hostname&gt;:&lt;port&gt;. For details see
     <a href="http://owfs.org/index.php?page=owserver_protocol">owserver documentation</a>.
-    <br><br>
+    <p>
     You need <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm from owfs.org</a>, which is normally deployed with FHEM. As at 2012-12-23 the OWNet module
     on CPAN has an issue which renders it useless for remote connections.
-    <br><br>
+    <p>
+    The ow* version 2.9 packages provided with Debian Jessie have issues. For Debian Jessie please unzip 
+    <a href="http://forum.fhem.de/index.php?action=dlattach;topic=12219.0;attach=2463">owfs_2.8p17-1_all.zip</a> and install
+    owserver, dependencies and what else you require with <code>dpkg -i &lt;package&gt;.deb</code>.
+    <p>
+    A typical working configuration file <code>/etc/owfs.conf</code> looks as follows:<p>
+    <code>
+    ! server: server = localhost:4304<br>
+    #server: FAKE = DS18S20,DS2405<br>
+    # USB device: DS9490<br>
+    server: usb = all<br>
+    http: port = 2121<br>
+    ftp: port = 2120<br>
+    server: port = localhost:4304<br>
+    </code>
+    <p>
     The actual 1-wire devices are defined as <a href="#OWDevice">OWDevice</a> devices.
     If <a href="#autocreate">autocreate</a> is enabled, all the devices found are created at
     start of FHEM automatically.
@@ -657,7 +675,7 @@ OWServer_Set($@)
 <h3>OWServer</h3>
 <ul>
   <br>
-  <a name="OWDevicedefine"></a>
+  <a name="OWServerdefine"></a>
   <b>Definition</b>
   <ul>
     <code>define &lt;name&gt; OWServer &lt;protocol&gt;</code>
@@ -672,6 +690,21 @@ OWServer_Set($@)
         Das auf CPAN erhältliche OWNet- Modul beinhaltet seit dem 23.12.2012 einen Fehler, der es für Fernzugriffe unbrauchbar macht.<p>
         Auf dem Computer, an dem der 1-Wire- Bus angeschlossen ist, muss die Software "owserver" installiert sein. Zusätzlich sollte auf diesem Rechner die Konfigurationsdatei "owfs.conf" eingesehen bzw. angepasst werden. <a href="http://www.fhemwiki.de/wiki/OWServer_%26_OWDevice#Tipps_und_Tricks"> Einen WIKI- Artikel dazu gibt es hier.</a>
     <br><br>
+    Die ow*-Pakete in der Version 2.9 von Debian Jessie haben Probleme. Bitte entpacke f&uuml;r Debian Jessie 
+    <a href="http://forum.fhem.de/index.php?action=dlattach;topic=12219.0;attach=2463">owfs_2.8p17-1_all.zip</a> und installiere
+    owserver, Abh&auml;ngigkeiten und was Du sonst noch brauchst mit <code>dpkg -i &lt;package&gt;.deb</code>.
+    <p>
+    Eine typische funktionierende Konfigurationsdatei <code>/etc/owfs.conf</code> sieht so aus:<p>
+    <code>
+    ! server: server = localhost:4304<br>
+    #server: FAKE = DS18S20,DS2405<br>
+    # USB device: DS9490<br>
+    server: usb = all<br>
+    http: port = 2121<br>
+    ftp: port = 2120<br>
+    server: port = localhost:4304<br>
+    </code>
+    <p>
     Die vorhandenen 1-Wire- Busteilnehmer werden als <a href="#OWDevice">OWDevice</a> -Geräte definiert.
     Wenn <a href="#autocreate">autocreate</a> aktiviert ist, werden beim Start von FHEM alle Geräte automatisch erkannt und eingerichtet.
     <br><br>

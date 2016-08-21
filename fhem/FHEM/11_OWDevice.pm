@@ -743,6 +743,9 @@ OWDevice_InitValues($)
 
 ###################################
 =pod
+=item device
+=item summary controls a One-Wire (1Wire) device
+=item summary_DE steuert ein One-Wire- (1Wire-) Gerät
 =begin html
 
 <a name="OWDevice"></a>
@@ -780,6 +783,7 @@ OWDevice_InitValues($)
       <li>DS2423 - 4kbit 1-Wire RAM with Counter</li>
       <li>DS2450 - Quad A/D Converter</li>
       <li>DS1822 - Econo 1-Wire Digital Thermometer</li>
+      <li>DS2433 - 4kbit 1-Wire RAM</li>
       <li>DS2415 - 1-Wire Time Chip</li>
       <li>DS1904 - RTC iButton</li>
       <li>DS2438 - Smart Battery Monitor</li>
@@ -936,6 +940,7 @@ OWDevice_InitValues($)
       <li>DS2423 - Dual-Zählerbaustein mit Speicherfunktion</li>
       <li>DS2450 - Vierfach-A/D Umsetzer</li>
       <li>DS1822 - Econo-Thermosensor</li>
+      <li>DS2433 - 4kbit 1-Wire RAM</li>
       <li>DS2415 - Zeitgeber- Schaltkreis </li>
       <li>DS1904 - iButton-Echtzeituhr</li>
       <li>DS2438 - Smart-Batterie-Monitor</li>
