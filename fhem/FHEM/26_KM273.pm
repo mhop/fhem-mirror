@@ -67,7 +67,8 @@
 #       0005    23.01.2016  mike3436            KM273_Set,KM273_Get             implement t15 timeformat to get/set PUMP_DHW_PROGRAM's START and STOP TIME
 #       0006    24.01.2016  mike3436            KM273_gets,KM273_elements       change weekdays _FRI -> _5FRI to correct the sort order
 #       0007    01.02.2016  mike3436            KM273_Get,KM273_GetNextValue    KM273_Get corrected, KM273_GetNextValue do nothing if attr doNotPoll=1
-#       0008    01.02.2016  mike3436            KM273_ReadElementList           complete element list is read from heatpump, default list is only used for deliver the 'read' flag
+#       0008    30.05.2016  mike3436            KM273_ReadElementList           complete element list is read from heatpump, default list is only used for deliver the 'read' flag
+#       0009    31.05.2016  mike3436            KM273_ReadElementList           if expected readCounter isn't reached on second read, and read data has identical length, try to analyse
 
 package main;
 use strict;
@@ -1998,7 +1999,7 @@ my @KM273_readingsRTR = ();
 my %KM273_writingsTXD = ();
 my %KM273_elements = ();
 
-my %KM273_ReadElementListStatus = ( done => 0, wait => 0, readCounter => 0, readIndex => 0, writeIndex => 0, KM200active => 0, KM200wait => 0, readData => "");
+my %KM273_ReadElementListStatus = ( done => 0, wait => 0, readCounter => 0, readIndex => 0, readIndexLast => 0, writeIndex => 0, KM200active => 0, KM200wait => 0, readData => "");
 my %KM273_ReadElementListElements = ();
 sub KM273_ReadElementList($)
 {
@@ -2036,9 +2037,18 @@ sub KM273_ReadElementList($)
   }
   elsif (--$KM273_ReadElementListStatus{wait} <= 0)
   {
-    $KM273_ReadElementListStatus{readIndex} = 0;
-    $KM273_ReadElementListStatus{writeIndex} = 0;
-    $KM273_ReadElementListStatus{readData} = "";
+    if (($KM273_ReadElementListStatus{readIndexLast} > 0) && ($KM273_ReadElementListStatus{readIndexLast} == $KM273_ReadElementListStatus{readIndex}))
+    {
+      #wenn readCounter auch beim 2. Lesen nicht erreicht wird, und gelesene Datenmenge gleich ist, dann readCounter = readIndex
+      $KM273_ReadElementListStatus{readCounter} = $KM273_ReadElementListStatus{readIndex};
+    }
+    else
+    {
+      $KM273_ReadElementListStatus{readIndexLast} = $KM273_ReadElementListStatus{readIndex};
+      $KM273_ReadElementListStatus{readIndex} = 0;
+      $KM273_ReadElementListStatus{writeIndex} = 0;
+      $KM273_ReadElementListStatus{readData} = "";
+    }
   }
 
   my $count = 1;
