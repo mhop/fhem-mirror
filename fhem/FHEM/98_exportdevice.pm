@@ -39,7 +39,7 @@ sub CommandExportdevice($$) {
         if ( $mname ne $defs{$dev}{TYPE} ) {
             $mname = $defs{$dev}{TYPE};
             my $ver = fhem "version $defs{$dev}{TYPE}";
-            $ver =~ s/\n\n+/\n# /g;
+            $ver =~ s/\n+/\n# /g;
             $ver =~ s/^/# /g;
             $str .= "\n\n# TYPE: $defs{$dev}{TYPE}\n$ver\n\n";
         }
@@ -92,7 +92,7 @@ sub CommandExportdevice($$) {
     return
         $return
       . AttrVal( "global", "version", "fhem.pl:?/?" )
-      . "\n# on "
+      . "\n# at "
       . TimeNow() . "\n#"
       . $str
       if ( $str ne "" );
