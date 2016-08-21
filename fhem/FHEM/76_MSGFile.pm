@@ -195,6 +195,8 @@ sub MSGFile_Set($@)
 1;
 
 =pod
+=item device
+=item summary write text to a file on the filesystem
 =begin html
 
 <a name="MSGFile"></a>

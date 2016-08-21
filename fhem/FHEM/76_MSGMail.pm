@@ -407,6 +407,8 @@ sub MSGMail_conn($)
 1;
 
 =pod
+=item device
+=item summary sends mail through a SMTP server, optionally with SSL encryption
 =begin html
 
 <a name="MSGMail"></a>
