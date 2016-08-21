@@ -207,7 +207,7 @@ sub HMUARTLGW_DoInit($)
 		DevIo_CloseDev($keepAlive);
 		my ($ip, $port) = split(/:/, $hash->{DeviceName});
 		$keepAlive->{DeviceName} = "${ip}:" . ($port + 1);
-		DevIo_OpenDev($keepAlive, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
+		DevIo_OpenDev($keepAlive, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 		$hash->{keepAlive} = $keepAlive;
 	}
 
@@ -255,7 +255,7 @@ sub HMUARTLGW_Define($$)
 
 	$hash->{DeviceName} = $dev;
 
-	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
+	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 }
 
 sub HMUARTLGW_Undefine($$;$)
@@ -284,11 +284,11 @@ sub HMUARTLGW_Reopen($;$)
 	$hash = $hash->{lgwHash} if ($hash->{lgwHash});
 	my $name = $hash->{NAME};
 
-	Log3($hash, 1, "HMUARTLGW ${name} Reopen");
+	Log3($hash, 4, "HMUARTLGW ${name} Reopen");
 
 	HMUARTLGW_Undefine($hash, $name, $noclose);
 
-	return DevIo_OpenDev($hash, 1, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
+	return DevIo_OpenDev($hash, 1, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 }
 
 sub HMUARTLGW_Ready($)
@@ -472,7 +472,8 @@ sub HMUARTLGW_SendPendingCmd($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-	if ($hash->{XmitOpen} == 2) {
+	if (defined($hash->{XmitOpen}) &&
+	    $hash->{XmitOpen} == 2) {
 		if ($hash->{Helper}{PendingCMD}) {
 			my $qLen = AttrVal($name, "qLen", 20);
 			if (scalar(@{$hash->{Helper}{PendingCMD}}) < $qLen) {
@@ -585,6 +586,9 @@ sub HMUARTLGW_SendPendingTimer($)
 sub HMUARTLGW_SendCmd($$)
 {
 	my ($hash, $cmd) = @_;
+
+	#Drop commands when device is not active
+	return if ($hash->{DevState} == HMUARTLGW_STATE_NONE);
 
 	push @{$hash->{Helper}{PendingCMD}}, { cmd => $cmd };
 	return HMUARTLGW_SendPendingCmd($hash);
@@ -1670,7 +1674,7 @@ sub HMUARTLGW_Set($@)
 		readingsSingleUpdate($hash, "state", "closed", 1);
 		$hash->{XmitOpen} = 0;
 	} elsif($cmd eq "open") {
-		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
+		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 	} elsif($cmd eq "restart") {
 		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 	}
