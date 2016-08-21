@@ -671,7 +671,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
       </li>
       <li>
         <p>
-          Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
+          Note: GEOFANCY is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
         </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
         <ul>
           <code>define &lt;name&gt; GEOFANCY &lt;infix&gt;</code><br>
