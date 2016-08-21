@@ -5,6 +5,7 @@
 use strict;
 use warnings;
 
+my $protVersion=1;
 my @lang = ("EN", "DE");
 my $modDir = "FHEM";
 my $now = time();
@@ -16,6 +17,7 @@ for my $lang (@lang) {
 
   open(FH, $cmdref) || die("Cant open $cmdref: $!\n");
   my $type = "";
+  my $fileVersion = 0;
   while(my $l = <FH>) {
     if($l =~ m/<!-- header:(.*) -->/) {
       $type = $1; next;
@@ -36,11 +38,23 @@ for my $lang (@lang) {
     my $type = "device";
     while(my $l = <FH>) {
       $type = $1 if($l =~ m,<!-- header:(.*) -->,);
+      $fileVersion = $1 if($type && $l =~ m/<table.*protVersion='(.*)'>/);
+
       if($l =~ m,<td class='modname'><a href='#'>(.*)</a></td><td>(.*)</td>, &&
-         !$modData{$1}) {     # commandref_frame has prio
+         !$modData{$1}{type}) {     # commandref_frame has prio
         $modData{$1}{type} = $type;
         $modData{$1}{"summary$sfx"} = $2;
         $modData{$1}{ts} = $cmptime;
+      }
+
+      if($l =~ m,<div id='modLinks'[^>]*> ([^<]+)</div>,) {
+        for my $ml (split(" ", $1)) {
+          my @kv=split(/[:,]/,$ml);
+          my $n = shift(@kv);
+          for my $v (@kv) {
+            $modData{$n}{modLinks}{$v} = 1;
+          }
+        }
       }
     }
     close(FH);
@@ -51,14 +65,21 @@ for my $lang (@lang) {
     next if($fName !~ m/^\d\d_(.*)\.pm$/);
     my $mName = $1;
     my $ts = (stat("$modDir/$fName"))[9];
-    if(!$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
+    if($protVersion != $fileVersion ||
+       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
       print "Checking $fName for $lang short description\n";
 
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
+      delete($modData{$mName}{modLinks});
       open(FH, "$modDir/$fName") || die("Cant open $modDir/$fName: $!\n");
+      my $ishtml;
       while(my $l = <FH>) {
+        $ishtml = 1 if($l =~ m/^=begin\s+html/);
+        next if(!$ishtml);
         $modData{$mName}{type}=$1 if($l =~ m/^=item\s+(helper|command|device)/);
         $modData{$mName}{$1}  =$2 if($l =~ m/^=item\s+(summary[^ ]*)\s(.*)$/);
+        $modData{$mName}{modLinks}{$1} = 1
+                   if($l =~ m/<a\s+name=['"]([^'"]+)['"]>/ && $1 !~ m/^$mName/);
       }
       close(FH);
     }
@@ -71,6 +92,7 @@ for my $lang (@lang) {
   $cmdref = ">docs/commandref${sfx}.html";
   open(OUT, $cmdref) || die("Cant open $cmdref: $!\n");
   
+  my $linkDumped = 0;
   while(my $l = <IN>) {
 
     print OUT $l;
@@ -82,13 +104,24 @@ EOF
     }
 
     if($l =~ m,<!-- header:(.*) -->,) {
+      my @mList = sort {uc($a) cmp uc($b)} keys %modData;
+      if(!$linkDumped) {
+        my $ml = "";
+        for my $m (@mList) {
+          next if(!$modData{$m}{modLinks});
+          $ml .= " $m:".join(",", keys(%{$modData{$m}{modLinks}}));
+        }
+        print OUT "<div id='modLinks' style='display:none'>$ml</div>\n";
+        $linkDumped = 1;
+      }
       my $type = $1;
       while(my $l = <IN>) {
         last if($l !~ m/<a href="/);
       }
-      print OUT "<table class='block summary class_$type'>\n";
+      print OUT "<table class='block summary class_$type' ".
+                "protVersion='$protVersion'>\n";
       my $rc = "odd";
-      for my $m (sort {uc($a) cmp uc($b)} keys %modData) {
+      for my $m (@mList) {
         next if(!$modData{$m}{type} || $modData{$m}{type} ne $type);
         my $d = $modData{$m}{"summary$sfx"};
         if(!$d) {
@@ -107,4 +140,6 @@ EOF
     }
 
   }
+  close(OUT);
+  close(IN);
 }
