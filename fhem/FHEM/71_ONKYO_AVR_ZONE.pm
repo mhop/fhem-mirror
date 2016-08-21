@@ -705,6 +705,14 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
     readingsBeginUpdate($hash);
 
+    # create inputList reading for frontends
+    readingsBulkUpdate( $hash, "inputList", $inputs_txt )
+      if ( ReadingsVal( $name, "inputList", "-" ) ne $inputs_txt );
+
+    # create channelList reading for frontends
+    readingsBulkUpdate( $hash, "channelList", $channels_txt )
+      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels_txt );
+
     # channel
     if ( lc( @$a[1] ) eq "channel" ) {
         if ( !defined( @$a[2] ) ) {
@@ -1447,8 +1455,8 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
 
 =pod
 =item device
-=item summary supplement module for <a href="#ONKYO_AVR">ONKYO_AVR</a> representing zones
-=item summary_DE erg&auml;nzendes Modul f&uuml;r <a href="#ONKYO_AVR">ONKYO_AVR</a>, um Zonen zu repr&auml;sentieren
+=item summary supplement module for ONKYO_AVR representing zones
+=item summary_DE erg&auml;nzendes Modul f&uuml;r ONKYO_AVR, um Zonen zu repr&auml;sentieren
 =begin html
 
     <p>

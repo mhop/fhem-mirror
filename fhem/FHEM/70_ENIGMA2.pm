@@ -216,6 +216,14 @@ sub ENIGMA2_Set($@) {
         $channels .= join( ',', @{ $hash->{helper}{channels}{$input} } );
     }
 
+    # create inputList reading for frontends
+    readingsSingleUpdate( $hash, "inputList", "tv,radio", 1 )
+      if ( ReadingsVal( $name, "inputList", "-" ) ne "tv,radio" );
+
+    # create channelList reading for frontends
+    readingsSingleUpdate( $hash, "channelList", $channels, 1 )
+      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels );
+
     my $usage =
         "Unknown argument "
       . $a[1]
