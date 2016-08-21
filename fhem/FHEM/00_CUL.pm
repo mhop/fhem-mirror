@@ -1333,7 +1333,7 @@ CUL_prefix($$$)
         and RAWMSG for the CUL family and RAWMSG for the FHZ.
         </li><br>
 
-    <li><a name="#connectCommand">connectCommand</a><br>
+    <li><a name="connectCommand">connectCommand</a><br>
       raw culfw command sent to the CUL after a (re-)connect of the USB device,
       and sending the usual initialization needed for the configured rfmode.
       </li>
@@ -1643,7 +1643,7 @@ CUL_prefix($$$)
         RSSI und RAWMSG f&uuml;r die CUL Familie und RAWMSG f&uuml;r FHZ.
         </li><br>
 
-    <li><a name="#connectCommand">connectCommand</a><br>
+    <li><a name="connectCommand">connectCommand</a><br>
       culfw Befehl, was nach dem Verbindungsaufbau mit dem USB-Ger&auml;t, nach
       Senden der zum Initialisieren der konfigurierten rfmode ben&ouml;tigten
       Befehle gesendet wird.

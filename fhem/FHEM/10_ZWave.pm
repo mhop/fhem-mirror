@@ -5487,7 +5487,7 @@ s2Hex($)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#dummy">dummy</a></li>
-    <li><a name="#eventForRaw">eventForRaw</a><br>
+    <li><a name="eventForRaw">eventForRaw</a><br>
       Generate an an additional event for the RAW message.  Can be used if
       someone fears that critical notifies wont work, if FHEM changes the event
       text after an update.  </li>

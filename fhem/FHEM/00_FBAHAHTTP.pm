@@ -287,7 +287,7 @@ FBAHAHTTP_Write($$$)
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#fritzbox-user">fritzbox-user</a></li>
-    <li><a name="#polltime">polltime</a><br>
+    <li><a name="polltime">polltime</a><br>
       measured in seconds, default is 300 i.e. 5 minutes
       </li>
 
