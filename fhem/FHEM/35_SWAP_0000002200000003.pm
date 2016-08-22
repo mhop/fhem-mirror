@@ -437,6 +437,8 @@ SWAP_0000002200000003_Get($@)
 1;
 
 =pod
+=item summary    specialized module for SWAP based rgb(w) led drivers
+=item summary_DE spezialisiertes Modul für SWAP basierte RGB(W) LED Driver
 =begin html
 
 <a name="SWAP_0000002200000003"></a>

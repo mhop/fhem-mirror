@@ -583,6 +583,8 @@ yowsup_Attr($$$)
 1;
 
 =pod
+=item summary    interface to the yowsup librbary (for whatsapp)
+=item summary_DE Interface zur yowsup Bibliothek (f&uuml;r WhatsApp)
 =begin html
 
 <a name="yowsup"></a>

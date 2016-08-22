@@ -1213,6 +1213,8 @@ logProxy_Get($@)
 
 =pod
 =item helper
+=item summary    manipulate the date to be plotted in an SVG device
+=item summary_DE manipulation von mit SVG zu plottenden SVG Daten
 =begin html
 
 <a name="logProxy"></a>

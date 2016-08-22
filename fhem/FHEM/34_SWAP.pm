@@ -1258,6 +1258,8 @@ SWAP_Attr(@)
 1;
 
 =pod
+=item summary    generic module for SWAP devices
+=item summary_DE generisches Modul für SWAP Ger&auml;te
 =begin html
 
 <a name="SWAP"></a>

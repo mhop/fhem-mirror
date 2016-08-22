@@ -950,6 +950,8 @@ LIGHTIFY_Read($)
 1;
 
 =pod
+=item summary    module for the osram lightify gateway
+=item summary_DE Modul f&uuml;r das Osram LIGHTFY Gateway
 =begin html
 
 <a name="LIGHTIFY"></a>

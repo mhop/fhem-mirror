@@ -763,6 +763,8 @@ Log 1, "!!!!!!!!!!";
 1;
 
 =pod
+=item summary    roku remote control protocol server
+=item summary_DE Roku Remote Control Protokoll Server
 =begin html
 
 <a name="fakeRoku"></a>

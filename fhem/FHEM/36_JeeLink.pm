@@ -1021,6 +1021,8 @@ sub JeeLink_getIndexOfArray($@) {
 1;
 
 =pod
+=item summary    connect JeeLink/Arduino based RF devices
+=item summary_DE Anbindung von JeeLink/Arduino basierten RF Ger&auml;ten
 =begin html
 
 <a name="JeeLink"></a>
