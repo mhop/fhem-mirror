@@ -399,11 +399,15 @@ FB_CALLMONITOR_Read($)
             }
         }
 
-        if($array[1] eq "CALL")
+        if($array[1] =~ /^CALL|RING$/)
         {
             $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
             $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
             $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
+        }
+        
+        if($array[1] eq "CALL")
+        {
             $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[6];
             $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
             $hash->{helper}{TEMP}{$array[2]}{direction} = "outgoing";
@@ -411,9 +415,6 @@ FB_CALLMONITOR_Read($)
        
         if($array[1] eq "RING")
         {
-            $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
-            $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
-            $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
             $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[5];
             $hash->{helper}{TEMP}{$array[2]}{direction} = "incoming";
         }
@@ -1781,7 +1782,7 @@ sub FB_CALLMONITOR_encrypt($$)
 =pod
 =item helper
 =item summary    provides realtime telephone events of a AVM FRITZ!Box via LAN connection
-=item summary_DE stellt Telefonereignisse einer AVM FRITZ!Box via LAN-Verbindung zur Verf&uuml;gung
+=item summary_DE stellt Telefonereignisse einer AVM FRITZ!Box via LAN zur Verf&uuml;gung
 =begin html
 
 <a name="FB_CALLMONITOR"></a>
