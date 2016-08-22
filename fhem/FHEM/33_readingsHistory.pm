@@ -713,6 +713,8 @@ readingsHistory_Attr($$$)
 
 =pod
 =item helper
+=item summary    display a history of readings from on or more devices
+=item summary_DE Anzeige der Historie von Readings eines oder mehrerer Ger&auml;te
 =begin html
 
 <a name="readingsHistory"></a>

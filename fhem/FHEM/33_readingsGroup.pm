@@ -1542,6 +1542,8 @@ readingsGroup_Attr($$$;$)
 
 =pod
 =item helper
+=item summary    display a formated collection of readings from devices
+=item summary_DE Stellt eine formatierte Readings von Ger&auml;te dar
 =begin html
 
 <a name="readingsGroup"></a>

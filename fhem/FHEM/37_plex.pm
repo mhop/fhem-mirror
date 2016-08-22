@@ -4057,6 +4057,8 @@ plex_publishToSonos(;$$$)
 1;
 
 =pod
+=item summary    control and receive events from PLEX players
+=item summary_DE Steuern und &uuml;berwachen von PLEX Playern
 =begin html
 
 <a name="plex"></a>

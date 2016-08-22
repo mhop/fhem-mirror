@@ -1456,6 +1456,8 @@ HUEBridge_Attr($$$)
 1;
 
 =pod
+=item summary    module for the phillips hue bridge
+=item summary_DE Modul f&uuml;r die Philips HUE Bridge
 =begin html
 
 <a name="HUEBridge"></a>

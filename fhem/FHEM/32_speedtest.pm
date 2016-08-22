@@ -185,6 +185,8 @@ speedtest_SpeedtestAborted($)
 
 =pod
 =item device
+=item summary    internet speedtest data
+=item summary_DE Internet Speedtest &uuml;berwachung
 =begin html
 
 <a name="speedtest"></a>

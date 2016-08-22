@@ -52,7 +52,7 @@ my %hueModels = (
                                                                                    icon => 'hue_filled_go', },
   LST001 => {name => 'Hue LightStrips'          ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_lightstrip', },
-  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Color light'            ,subType => 'colordimmer',
+  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Extended color light'   ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_lightstrip', },
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',
                                                                                    icon => 'hue_filled_living_whites', },
@@ -1306,6 +1306,8 @@ HUEDevice_Attr($$$;$)
 1;
 
 =pod
+=item summary    devices connected to a phillips hue bridge or a osram lightify gateway
+=item summary_DE Geräte an einer Philips HUE Bridge oder einem Osram LIGHTIFY Gateway 
 =begin html
 
 <a name="HUEDevice"></a>

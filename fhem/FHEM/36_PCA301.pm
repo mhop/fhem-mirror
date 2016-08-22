@@ -283,6 +283,8 @@ PCA301_Attr(@)
 1;
 
 =pod
+=item summary    PCA301 devices
+=item summary_DE PCA301 Ger&auml;te
 =begin html
 
 <a name="PCA301"></a>

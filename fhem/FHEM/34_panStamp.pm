@@ -537,6 +537,8 @@ panStamp_Attr(@)
 1;
 
 =pod
+=item summary    interface to a panStamp based SWAP network
+=item summary_DE Anbindung von panStamp basierten SWAP Netwerken
 =begin html
 
 <a name="panStamp"></a>

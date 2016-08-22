@@ -324,6 +324,8 @@ readingsProxy_Attr($$$;$)
 
 =pod
 =item helper
+=item summary    make (a subset of) a reading from one device available as a new device
+=item summary_DE Reading eines Ger&auml;tes (oder einen Teil daraus) als eigenes Ger&auml;t
 =begin html
 
 <a name="readingsProxy"></a>

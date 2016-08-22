@@ -485,6 +485,8 @@ mailcheck_Read($)
 
 =pod
 =item device
+=item summary    watches an mailbox
+=item summary_DE &uuml;berwacht eine Mailbox
 =begin html
 
 <a name="mailcheck"></a>
