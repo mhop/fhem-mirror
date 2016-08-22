@@ -493,7 +493,7 @@ my %zwave_class = (
   SENSOR_ALARM             => { id => '9c',
     get   => { alarm       => "01%02x" },
     parse => { "..9c02(..)(..)(..)(....)" =>
-            '"alarm_type_$2:level $3 node ".hex($1)." seconds ".hex($4)'} },
+      '"alarm_type_$2:level ".hex($3)." node ".hex($1)." seconds ".hex($4)'} },
   SILENCE_ALARM            => { id => '9d' },
   SENSOR_CONFIGURATION     => { id => '9e' },
   MARK                     => { id => 'ef' },
@@ -2931,6 +2931,7 @@ ZWave_plusInfoParse($$$$$)
 }
 
 my %zwave_sensorBinaryTypeV2 = (
+  "00"=>"off",
   "01"=>"generalPurpose",
   "02"=>"smoke",
   "03"=>"CO",
@@ -2943,7 +2944,8 @@ my %zwave_sensorBinaryTypeV2 = (
   "0a"=>"doorWindow",
   "0b"=>"tilt",
   "0c"=>"motion",
-  "0d"=>"glassBreak"
+  "0d"=>"glassBreak",
+  "ff"=>"on"
 );
 
 sub
