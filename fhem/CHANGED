@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  10_ZWave.pm: change numbers in events (hex -> dec, Forum #56682)
   - added:   98_exportdevice: new command to export device definitions
   - feature: 90_at: computeAfterInit attribute (Forum #56706)
   - change:  93_DbRep: fit to new commandref style
