@@ -1170,7 +1170,7 @@ harmony_disconnect($)
 
   RemoveInternalTimer($hash);
   $hash->{ConnectionState} = "Disconnected";
-  readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($hash->{NAME},"state", "" ) );
+  readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
 
   return if( !$hash->{CD} );
   Log3 $name, 2, "$name: disconnect";
@@ -1204,7 +1204,7 @@ harmony_connect($)
     if( $conn ) {
       Log3 $name, 3, "$name: connected";
       $hash->{ConnectionState} = "Connected";
-      readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($hash->{NAME},"state", "" ) );
+      readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($name, "state", "" ) );
       $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
 
       $hash->{FD}    = $conn->fileno();
@@ -1760,6 +1760,8 @@ harmony_decrypt($)
 1;
 
 =pod
+=item summary    module for logitech harmony hub based remots
+=item summary_DE Modul für Logitech Harmony Hub basierte Fernbedienungen
 =begin html
 
 <a name="harmony"></a>

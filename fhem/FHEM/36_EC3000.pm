@@ -179,12 +179,14 @@ EC3000_Attr(@)
 1;
 
 =pod
+=item summary    Energy Count 3000 (EC3000) devices
+=item summary_DE Energy Count 3000 (EC3000) Ger&auml;te
 =begin html
 
 <a name="EC3000"></a>
 <h3>EC3000</h3>
 <ul>
-  The Energy Count C3000 is a AC mains plug with integrated power meter functionality from CONRAD.<br><br>
+  The Energy Count 3000 is a AC mains plug with integrated power meter functionality from CONRAD.<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
 
