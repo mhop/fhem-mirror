@@ -2931,7 +2931,6 @@ ZWave_plusInfoParse($$$$$)
 }
 
 my %zwave_sensorBinaryTypeV2 = (
-  "00"=>"off",
   "01"=>"generalPurpose",
   "02"=>"smoke",
   "03"=>"CO",
@@ -2944,8 +2943,7 @@ my %zwave_sensorBinaryTypeV2 = (
   "0a"=>"doorWindow",
   "0b"=>"tilt",
   "0c"=>"motion",
-  "0d"=>"glassBreak",
-  "ff"=>"on"
+  "0d"=>"glassBreak"
 );
 
 sub
@@ -2954,7 +2952,7 @@ ZWave_sensorbinaryV2Parse($$)
   my ($value, $sensorType) = @_;
   return ($zwave_sensorBinaryTypeV2{"$sensorType"} ?
           $zwave_sensorBinaryTypeV2{"$sensorType"} :"unknown") .
-          ":".$value;
+          ":".($value eq "00" ? "off" : ($value eq "ff" ? "on" : hex($value)));
 }
 
 sub
