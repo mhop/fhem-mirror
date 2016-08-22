@@ -4,13 +4,15 @@ package main;
 use strict;
 use warnings;
 
+no if $] >= 5.017011, warnings => 'experimental';
+
 sub CommandExportdevice($$);
 
 ########################################
 sub exportdevice_Initialize($$) {
     my %hash = (
         Fn  => "CommandExportdevice",
-        Hlp => "[devspec] [quote]",
+        Hlp => "[devspec] [quote] [dependent]",
     );
     $cmds{exportdevice} = \%hash;
 }
@@ -18,69 +20,75 @@ sub exportdevice_Initialize($$) {
 ########################################
 sub CommandExportdevice($$) {
     my ( $cl, $param ) = @_;
-    my @a     = split( "[ \t][ \t]*", $param );
-    my $quote = 0;
-    my $str   = "";
+    my @a         = split( "[ \t][ \t]*", $param );
+    my $quote     = 0;
+    my $dependent = 0;
+    my $str       = "";
 
-    return "Usage: exportdevice [devspec] [quote]"
+    return "Usage: exportdevice [devspec] [quote] [dependent]"
       if ( $a[0] eq "?" );
 
+    $dependent = 1
+      if ( $a[0] eq "dependent"
+        || $a[1] eq "dependent"
+        || $a[1] eq "dependent" );
+
     $quote = 1
-      if ( $a[0] eq "quote" || $a[1] eq "quote" );
+      if ( $a[0] eq "quote" || $a[1] eq "quote" || $a[2] eq "quote" );
 
     $a[0] = ".*"
-      if ( int(@a) < 1 || $a[0] eq "quote" );
+      if ( int(@a) < 1
+        || $a[0] eq "quote"
+        || $a[0] eq "dependent" );
 
     my $mname = "";
-    foreach my $dev ( devspec2array( $a[0], $cl ) ) {
-        next if ( !$defs{$dev} );
+    my @objects;
+    foreach my $d ( devspec2array( $a[0], $cl ) ) {
+        next if ( !$defs{$d} || $d ~~ @objects );
 
-        # module header (only once)
-        if ( $mname ne $defs{$dev}{TYPE} ) {
-            $mname = $defs{$dev}{TYPE};
-            my $ver = fhem "version $defs{$dev}{TYPE}";
-            $ver =~ s/\n+/\n# /g;
-            $ver =~ s/^/# /g;
-            $str .= "\n\n# TYPE: $defs{$dev}{TYPE}\n$ver\n\n";
+        push( @objects, $d );
+
+        # w/ module header
+        if ( $mname ne $defs{$d}{TYPE} ) {
+            $mname = $defs{$d}{TYPE};
+            $str .= CommandExportdeviceGetBlock( $d, $quote, 1 );
         }
 
-        # device definition
-        if ( $dev ne "global" ) {
-            my $def = $defs{$dev}{DEF};
-            if ( defined($def) ) {
-                if ($quote) {
-                    $def =~ s/;/;;/g;
-                    $def =~ s/\n/\\\n/g;
+        # w/o module header
+        else {
+            $str .= CommandExportdeviceGetBlock( $d, $quote );
+        }
+
+        if ($dependent) {
+
+            # dependent objects
+            my $dc = 0;
+            foreach my $do ( CommandExportdeviceGetDependentObjects($d) ) {
+                next if ( !$do || $do eq $d || $do ~~ @objects );
+
+                push( @objects, $do );
+                $dc++;
+
+                $str .= "#+++ Dependent objects"
+                  if $dc == 1;
+
+                # w/ module header
+                if ( $mname ne $defs{$do}{TYPE} ) {
+                    $mname = $defs{$do}{TYPE};
+                    my $s = CommandExportdeviceGetBlock( $do, $quote, 1 );
+                    $s =~ s/\n/\n    /g;
+                    $str .= $s;
                 }
-                $str .= "define $dev $defs{$dev}{TYPE} $def\n";
-            }
-            else {
-                $str .= "define $dev $defs{$dev}{TYPE}\n";
+
+                # w/o module header
+                else {
+                    my $s = CommandExportdeviceGetBlock( $do, $quote );
+                    $s =~ s/\n/\n    /g;
+                    $str .= $s;
+                }
             }
         }
 
-        # device attributes
-        foreach my $a (
-            sort {
-                return -1
-                  if ( $a eq "userattr" );    # userattr must be first
-                return 1 if ( $b eq "userattr" );
-                return $a cmp $b;
-            } keys %{ $attr{$dev} }
-          )
-        {
-            next
-              if ( $dev eq "global"
-                && ( $a eq "configfile" || $a eq "version" ) );
-            my $val = $attr{$dev}{$a};
-            if ($quote) {
-                $val =~ s/;/;;/g;
-                $val =~ s/\n/\\\n/g;
-            }
-            $str .= "attr $dev $a $val\n";
-        }
-
-        $str .= "\n";
     }
 
     my $return;
@@ -94,9 +102,80 @@ sub CommandExportdevice($$) {
       . AttrVal( "global", "version", "fhem.pl:?/?" )
       . "\n# at "
       . TimeNow() . "\n#"
-      . $str
+      . $str . "\n\n"
       if ( $str ne "" );
     return "No device found: $a[0]";
+}
+
+sub CommandExportdeviceGetBlock($$;$) {
+    my ( $d, $quote, $h ) = @_;
+    my $str = "";
+    return if ( !$defs{$d} );
+
+    # module header (only once)
+    if ($h) {
+        my $ver = fhem( "version " . $defs{$d}{TYPE}, 1 );
+        $ver =~ s/\n+/\n# /g;
+        $ver =~ s/^/# /g;
+        $str .= "\n\n### TYPE: $defs{$d}{TYPE}\n$ver\n\n";
+    }
+
+    # device definition
+    if ( $d ne "global" ) {
+        my $def = $defs{$d}{DEF};
+        if ( defined($def) ) {
+            if ($quote) {
+                $def =~ s/;/;;/g;
+                $def =~ s/\n/\\\n/g;
+            }
+            $str .= "define $d $defs{$d}{TYPE} $def\n";
+        }
+        else {
+            $str .= "define $d $defs{$d}{TYPE}\n";
+        }
+    }
+
+    # device attributes
+    foreach my $a (
+        sort {
+            return -1
+              if ( $a eq "userattr" );    # userattr must be first
+            return 1 if ( $b eq "userattr" );
+            return $a cmp $b;
+        } keys %{ $attr{$d} }
+      )
+    {
+        next
+          if ( $d eq "global"
+            && ( $a eq "configfile" || $a eq "version" ) );
+        my $val = $attr{$d}{$a};
+        if ($quote) {
+            $val =~ s/;/;;/g;
+            $val =~ s/\n/\\\n/g;
+        }
+        $str .= "attr $d $a $val\n";
+    }
+
+    $str .= "\n";
+
+    return $str;
+}
+
+sub CommandExportdeviceGetDependentObjects($) {
+    my ($d) = @_;
+    my @dob;
+
+    foreach my $dn ( sort keys %defs ) {
+        next if ( !$dn || $dn eq $d );
+        my $dh = $defs{$dn};
+        if (   ( $dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/ )
+            || ( $defs{$d}{DEF} && $defs{$d}{DEF} =~ m/\b$dn\b/ ) )
+        {
+            push( @dob, $dn );
+        }
+    }
+
+    return @dob;
 }
 
 1;
@@ -110,7 +189,7 @@ sub CommandExportdevice($$) {
 <a name="exportdevice"></a>
 <h3>exportdevice</h3>
 <ul>
-  <code>exportdevice [devspec] [quote]</code>
+  <code>exportdevice [devspec] [quote] [dependent]</code>
   <br><br>
   Output a complete device and attribute definition of FHEM devices. This is
   one of the few commands which return a string in a normal case.<br>
@@ -130,7 +209,7 @@ sub CommandExportdevice($$) {
 # 
 
 
-# TYPE: FS20 
+### TYPE: FS20 
 # File       Rev   Last Change 
 # 10_FS20.pm 11984 2016-08-19 12:47:50Z rudolfkoenig 
 
@@ -152,7 +231,7 @@ attr Office room Light
 <a name="exportdevice"></a>
 <h3>exportdevice</h3>
 <ul>
-  <code>exportdevice [devspec] [quote]</code>
+  <code>exportdevice [devspec] [quote] [dependent]</code>
   <br><br>
   Gibt die komplette Definition und Attribute eines FHEM Ger&auml;tes aus. Dies
   ist eines der wenigen Befehle, die im Normalfall eine Zeichenkette ausgeben.<br>
@@ -173,7 +252,7 @@ attr Office room Light
 # 
 
 
-# TYPE: FS20 
+### TYPE: FS20 
 # File       Rev   Last Change 
 # 10_FS20.pm 11984 2016-08-19 12:47:50Z rudolfkoenig 
 
