@@ -286,6 +286,9 @@ sub I2C_EEPROM_BytefromReading($@) {
 1;
 
 =pod
+=item device
+=item summary reads the content from an via I2C connected EEPROM
+=item summary_DE lesen des Inhals eines &uuml;ber I2C angeschlossenen EEPROM
 =begin html
 
 <a name="I2C_EEPROM"></a>

@@ -90,22 +90,26 @@ sub I2C_MCP342x_Init($$) {
 	my ( $hash, $args ) = @_;
 	
 	my $name = $hash->{NAME};
-	Log3 $hash, 1, "$hash->{NAME}: Init Argumente1: $args";
-	if (defined $args && int(@$args) < 1) {
-		Log3 $hash, 0, "Define: Wrong syntax. Usage:\n" .
-				"define <name> MCP342x [<i2caddress>] [<type>]";
+
+	 if (defined $args && int(@$args) > 1)
+ 	{
+  	return "Define: Wrong syntax. Usage:\n" .
+         	"define <name> MCP342x [<i2caddress>] [<type>]";
  	}
-	if (defined (my $address = shift @$args)) {
-		$hash->{I2C_Address} = $address =~ /^0x.*$/ ? oct($address) : $address; 
-		Log3 $hash, 0, "$name: I2C Address not valid" unless ($hash->{I2C_Address} < 128 && $hash->{I2C_Address} > 3);
-	} else {
+	 
+ 	if (defined (my $address = shift @$args)) {
+   	$hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address;
+   	return "$name I2C Address not valid" unless ($address < 128 && $address > 3);
+ 	} else {
 		$hash->{I2C_Address} = hex(MCP3422_I2C_ADDRESS);
 	}
+	
 	if (defined (my $channels = shift @$args)) {
-		$hash->{channels} = ($channels == 4 ? 4 : 2);
+		$hash->{channels} = $channels if $channels == 2 || $channels == 4;
 	} else {
 		$hash->{channels} = 2;
 	}
+
 
 	my $msg = '';
 	# create default attributes
@@ -330,6 +334,9 @@ sub I2C_MCP342x_readvoltage($@) {
 1;
 
 =pod
+=item device
+=item summary reads the analog inputs from an via I2C connected MCP342x
+=item summary_DE lesen der Analogeing&aumlnge eines &uuml;ber I2C angeschlossenen MCP342x
 =begin html
 
 <a name="I2C_MCP342x"></a>

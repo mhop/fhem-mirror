@@ -16,10 +16,8 @@ I2C_PC.*
 I2C_MCP.*
 I2C_BME280
 I2C_BMP180
-I2C_BH1750
-I2C_SHT.*
+I2C_SHT21
 I2C_TSL2561
-I2C_K30
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
@@ -535,6 +533,9 @@ sub RPII2C_HWACCESS_ioctl($$) {
 
 
 =pod
+=item device
+=item summary accesses I2C interface via sysfs on linux
+=item summary_DE Zugriff auf das I2C-Interface &uuml;ber sysfs auf Linux Systemen
 =begin html
 
 <a name="RPII2C"></a>

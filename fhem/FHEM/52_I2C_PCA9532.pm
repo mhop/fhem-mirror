@@ -24,6 +24,7 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 #use POSIX;
 use Scalar::Util qw(looks_like_number);
 
@@ -440,6 +441,9 @@ sub I2C_PCA9532_UpdReadings($$$) {
 1;
 
 =pod
+=item device
+=item summary controls PWM outputs from an via I2C connected PCA9532
+=item summary_DE steuern der PWM Ausg&aumlnge eines &uuml;ber I2C angeschlossenen PCA9532
 =begin html
 
 <a name="I2C_PCA9532"></a>

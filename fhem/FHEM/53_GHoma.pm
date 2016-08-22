@@ -166,7 +166,7 @@ sub GHoma_Define($$$) {				#
 	#my $name = $a[0];
   # my $addr = $a[2];
 	#$hash->{Id} = pack('C*', ( hex(substr($pport,0,2)), hex(substr($pport,2,2)), hex(substr($pport,4,2)) ) );
-	$hash->{Id} = lc $pport;
+	$hash->{Id} = $pport;
     return;
   }
   
@@ -420,6 +420,9 @@ sub GHoma_Undef($$) {				#
 1;
 
 =pod
+=item device
+=item summary controls an G-Homa wlan adapter plug
+=item summary_DE Steuerung einer G-Homa Wlan Steckdose
 =begin html
 
 <a name="GHoma"></a>
@@ -428,6 +431,10 @@ sub GHoma_Undef($$) {				#
 <ul>
   <ul>
   Connects fhem to an G-Homa adapter plug<br><br>
+  <b>ATTENTION!:</b><br>
+  With an actual firmware and after firmware update, http access will be disabled.<br>
+  Network parameters cannot changed anymore. 
+  The only way to use the plug again with FHEM is to change route DNS requests from G-Homa plug to plug.g-homa.com to your FHEM server.<br>
   <b>preliminary:</b><br>
     <li>Configure WLAN settings:<br>
       bring device in AP mode (press button for more than 3s, repeat this step until the LED is permanently on)<br>
@@ -509,6 +516,10 @@ sub GHoma_Undef($$) {				#
 <ul>
   <ul>
   Verbindet fhem mit einem G-Homa Zwischenstecker<br><br>
+  <b>Achtung!:</b><br>
+  Mit aktueller Firmware und nach einem Firmware Update ist der integrierte Webserver nicht mehr erreichbar.<br>
+  Dadurch lassen sich keine Einstellungen mehr anpassen. 
+  Die einzige Möglichkeit ist, die DNS anfragen der G-Homa Dose an plug.g-homa.com zum FHEM server umzuleiten.<br>
   <b>Vorbereitung:</b><br>
     <li>WLAN konfigurieren:<br>
       Ger&auml;t in den AP modus bringen (Knopf f&uuml;r mehr als 3s dr&uuml;cken, diesen Schritt wiederholen bis die LED permanent leuchtet)<br>

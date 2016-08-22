@@ -290,6 +290,9 @@ sub Netzer_disconn($$) {
 1;
 
 =pod
+=item device
+=item summary controls/reads GPIO pins on an Netzer
+=item summary_DE steuern/lesen der GPIO Pins eines Netzer
 =begin html
 
 <a name="Netzer"></a>
