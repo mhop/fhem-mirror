@@ -67,7 +67,7 @@ for my $lang (@lang) {
     my $ts = (stat("$modDir/$fName"))[9];
     if($protVersion != $fileVersion ||
        !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
-      print "Checking $fName for $lang short description\n";
+      #print "Checking $fName for $lang short description\n";
 
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
       delete($modData{$mName}{modLinks});
