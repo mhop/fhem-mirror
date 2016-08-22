@@ -38,7 +38,7 @@ use warnings;
 use Time::HiRes qw(time);
 use Data::Dumper;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 sub CommandMsg($$;$$);
 
@@ -2369,8 +2369,8 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 
 =pod
 =item command
-=item summary dynamic routing of messages to FHEM devices and modules (push, e-mail, screen, audio)
-=item summary_DE dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module (Push, E-Mail, Bildschirm, Audio)
+=item summary dynamic routing of messages to FHEM devices and modules
+=item summary_DE dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module
 =begin html
 
 <a name="MSG"></a>

@@ -35,7 +35,7 @@ use IO::Socket;
 use HttpUtils;
 use Encode;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 no warnings "all";
 
@@ -546,12 +546,12 @@ sub ENIGMA2_Set($@) {
 
             my $commandKeys = join(
                 " ",
-                sort keys %{
+                keys %{
                     ENIGMA2_GetRemotecontrolCommand("GetRemotecontrolCommands")
                 }
             );
             if ( !defined( $a[2] ) ) {
-                return "No argument given, choose one of" . $commandKeys;
+                return "No argument given, choose one of " . $commandKeys;
             }
 
             my $request = ENIGMA2_GetRemotecontrolCommand( uc( $a[2] ) );
@@ -575,7 +575,7 @@ sub ENIGMA2_Set($@) {
                 return
                     "Unknown argument "
                   . $a[2]
-                  . ", choose one of"
+                  . ", choose one of "
                   . $commandKeys;
             }
 

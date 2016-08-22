@@ -35,8 +35,6 @@ use HttpUtils;
 use Time::Local;
 use Data::Dumper;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 sub GEOFANCY_Set($@);
 sub GEOFANCY_Define($$);
 sub GEOFANCY_Undefine($$);
