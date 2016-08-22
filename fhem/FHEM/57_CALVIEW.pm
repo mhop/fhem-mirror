@@ -77,6 +77,7 @@ sub CALVIEW_GetUpdate($){
 	#cleanup readings
 	delete ($hash->{READINGS});
 	# new timer
+	RemoveInternalTimer($hash); 
 	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CALVIEW_GetUpdate", $hash, 1);
 	readingsBeginUpdate($hash); #start update
 	my @termine =  getsummery($hash);
@@ -257,6 +258,8 @@ sub CALVIEW_Notify($$)
 
 1;
 =pod
+=item device
+=item summary provides calendar events in a readable form
 =begin html
 
 <a name="CALVIEW"></a>
