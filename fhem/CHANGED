@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: function get stmUrlPath added, fit to new commandref 
+                       style, attribute showStmInfoFull added
   - change:  57_CALVIEW: fixed internal timer error
   - change:  38_netatmo: error state, enabled debug logging for verbose 5
   - change:  10_ZWave.pm: change numbers in events (hex -> dec, Forum #56682)
