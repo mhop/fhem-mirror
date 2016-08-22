@@ -968,6 +968,8 @@ LightScene_editTable($) {
 
 =pod
 =item helper
+=item summary   create scenes from multiple fhem devices
+=item summary_DE verwaltet Szenen aus mehreren FHEM Ger&auml;ten
 =begin html
 
 <a name="LightScene"></a>
