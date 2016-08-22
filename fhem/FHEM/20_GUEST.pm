@@ -32,7 +32,7 @@ use Time::Local;
 use Data::Dumper;
 require RESIDENTStk;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 sub GUEST_Set($@);
 sub GUEST_Define($$);

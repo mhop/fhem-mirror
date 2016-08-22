@@ -34,8 +34,6 @@ use Time::Local;
 use Data::Dumper;
 use FHEM::98_dewpoint;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
 

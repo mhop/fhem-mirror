@@ -57,7 +57,7 @@ use HttpUtils;
 use SetExtensions;
 use Encode;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 my %sets = ( "msg" => 1 );
 

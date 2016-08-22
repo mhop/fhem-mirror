@@ -37,8 +37,6 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 sub msgConfig_Set($@);
 sub msgConfig_Get($@);
 sub msgConfig_Define($$);

@@ -32,7 +32,7 @@ use Time::Local;
 use Data::Dumper;
 require RESIDENTStk;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 sub RESIDENTS_Set($@);
 sub RESIDENTS_Define($$);
@@ -1583,8 +1583,8 @@ sub RESIDENTS_UpdateReadings (@) {
 
 =pod
 =item helper
-=item summary combines <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices to a residential community
-=item summary_de fasst <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Ger&auml;te zu einer Wohngemeinschaft zusammen
+=item summary combines ROOMMATE and GUEST devices to a residential community
+=item summary_de fasst ROOMMATE und GUEST Ger&auml;te zu einer Wohngemeinschaft zusammen
 =begin html
 
     <p>

@@ -34,8 +34,6 @@ use Data::Dumper;
 
 $Data::Dumper::Sortkeys = 1;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 sub ONKYO_AVR_ZONE_Set($$$);
 sub ONKYO_AVR_ZONE_Get($$$);
 sub ONKYO_AVR_ZONE_Define($$$);
