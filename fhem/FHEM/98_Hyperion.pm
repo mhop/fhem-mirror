@@ -17,6 +17,8 @@ use Color;
 use JSON;
 use SetExtensions;
 
+sub Hyperion_Call($$$){};
+
 my %Hyperion_sets =
 (
   "adjustRed"         => "textField",
@@ -806,10 +808,12 @@ sub Hyperion_devStateIcon($;$)
   return undef if (!$hash);
   my $name = $hash->{NAME};
   my $rgb = ReadingsVal($name,"rgb","");
+  my $dim = ReadingsVal($name,"dim",10);
+  my $ico = (int($dim / 10) * 10 < 10) ? 10 : int($dim / 10) * 10;
   return ".*:off:toggle" if (Value($name) eq "off");
   return ".*:light_exclamation" if (Value($name) eq "ERROR");
   return ".*:light_question" if (Value($name) eq "Initialized");
-  return ".*:on@#".$rgb.":toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
+  return ".*:light_light_dim_$ico@#".$rgb.":toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
   return ".*:light_led_stripe_rgb@#FFFF00:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
   return ".*:it_television@#0000FF:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
 }
