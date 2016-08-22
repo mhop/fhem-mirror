@@ -1640,7 +1640,8 @@ netatmo_dispatch($$$)
 
     $data =~ s/\n//g;
     if( $data !~ m/^{.*}$/ ) {
-      Log3 $name, 2, "$name: invalid json detected: >>$data<<";
+      Log3 $name, 2, "$name: invalid json detected: \n$data";
+      $hash->{status} = "error";
       return undef;
     }
 
@@ -2207,6 +2208,10 @@ netatmo_parseReadings($$;$)
       }
     }
   }
+  else
+  {
+    $hash->{status} = "error";
+  }
 }
 
 
@@ -2431,6 +2436,10 @@ netatmo_parseGlobal($$)
 
     }#ok
   }#json
+  else
+  {
+    $hash->{status} = "error";
+  }
 
 return undef;
 
@@ -2447,7 +2456,7 @@ netatmo_parseForecast($$)
 
   if( $json )
   {
-    Log3 $name, 6, "$name: parseforecastdata".Dumper($json);
+    Log3 $name, 5, "$name: parseforecastdata".Dumper($json);
 
     $hash->{status} = $json->{status};
     $hash->{status} = $json->{error}{message} if( $json->{error} );
@@ -2653,6 +2662,10 @@ netatmo_parseForecast($$)
 
     }#ok
   }#json
+  else
+  {
+    $hash->{status} = "error";
+  }
 
 return undef;
 
@@ -2677,6 +2690,7 @@ netatmo_parseHomeReadings($$;$)
     if( $hash->{status} eq "ok" )
     {
       #$hash->{STATE} = "Connected";
+      return undef if(!defined($json->{body}{homes}));
       foreach my $homedata ( @{$json->{body}{homes}})
       {
         next if($homedata->{id} ne $hash->{Home});
@@ -3051,6 +3065,10 @@ netatmo_parseHomeReadings($$;$)
       $hash->{STATE} = "Error";
     }
   }
+  else
+  {
+    $hash->{status} = "error";
+  }
 
 
 }
@@ -3070,6 +3088,10 @@ netatmo_parseCameraPing($$;$)
 
     readingsSingleUpdate($hash, "local_url", $json->{local_url}, 1) if(defined($json->{local_url}));
 
+  }
+  else
+  {
+    $hash->{status} = "error";
   }
 }
 
@@ -3105,6 +3127,10 @@ netatmo_parseTagStatus($$;$)
     $hash->{status} = $json->{error}{message} if( $json->{error} );
     readingsSingleUpdate($hash, "status", "calibrating", 1);
   }
+  else
+  {
+    $hash->{status} = "error";
+  }
 }
 
 
@@ -3124,6 +3150,10 @@ netatmo_parseCameraVideo($$;$)
 
     readingsSingleUpdate($hash, "local_url", $json->{local_url}, 1) if(defined($json->{local_url}));
 
+  }
+  else
+  {
+    $hash->{status} = "error";
   }
 }
 
@@ -3237,6 +3267,10 @@ netatmo_parsePersonReadings($$;$)
       {
         $hash->{STATE} = "Error";
       }
+    }
+    else
+    {
+      $hash->{status} = "error";
     }
 
 
@@ -3415,6 +3449,10 @@ netatmo_parseThermostatReadings($$;$)
       $hash->{STATE} = "Error";
     }
   }
+  else
+  {
+    $hash->{status} = "error";
+  }
 
 
 }
@@ -3445,7 +3483,7 @@ netatmo_parsePublic($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 6, "$name: parsepublic ".Dumper($json);
+  Log3 $name, 5, "$name: parsepublic ".Dumper($json);
 
   if( $json ) {
     $hash->{status} = $json->{status};
@@ -3720,6 +3758,10 @@ netatmo_parsePublic($$)
     } else {
       return $hash->{status};
     }
+  }
+  else
+  {
+    $hash->{status} = "error";
   }
 }
 
@@ -4312,7 +4354,7 @@ sub netatmo_DbLog_splitFn($)
   }
   elsif($event =~ m/temp/ || $event =~ m/dewpoint/)
   {
-    $unit = "°C";
+    $unit = "ËšC";
   }
   elsif($event =~ m/humidity/)
   {
@@ -4336,7 +4378,7 @@ sub netatmo_DbLog_splitFn($)
   }
   elsif($event =~ m/angle/ || $event =~ m/direction/)
   {
-    $unit = "°";
+    $unit = "deg";
   }
   elsif($event =~ m/strength/ || $event =~ m/gust/)
   {
@@ -4356,7 +4398,7 @@ sub netatmo_DbLog_splitFn($)
   }
   elsif($event =~ m/air_/)
   {
-    $unit = "µg/m³";
+    $unit = "ug/m3";
   }
   else
   {
