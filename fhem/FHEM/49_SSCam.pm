@@ -27,7 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
-# 1.32.1 18.08.2016    empty event LastSnapId corrected
+# 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull
+#                      added
+# 1.32.1 18.08.2016    empty event LastSnapId fixed
 # 1.32   17.08.2016    Logging of verbose 4 changed
 # 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
 #                      in some SVS/DS-combinations
@@ -214,6 +216,7 @@ sub SSCam_Initialize($) {
          "noQuotesForSID:1,0 ".
          "session:SurveillanceStation,DSM ".
          "showPassInLog:1,0 ".
+         "showStmInfoFull:1,0 ".
          "simu_SVSversion:7.2 ".
          "webCmd ".
          $readingFnAttributes;   
@@ -267,11 +270,10 @@ sub SSCam_Define {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"Availability", "???");                                                # Verfügbarkeit ist unbekannt
   readingsBulkUpdate($hash,"PollState","Inactive");                                               # es ist keine Gerätepolling aktiv
-  readingsBulkUpdate($hash,"LiveStreamUrl", "");                                                  # LiveStream URL zurücksetzen
   readingsBulkUpdate($hash,"state", "off");                                                       # Init für "state" , Problemlösung für setstate, Forum #308
   readingsEndUpdate($hash,1);                                          
   
-  getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
+  getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)      
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "initonboot");
@@ -320,6 +322,19 @@ sub SSCam_Attr {
         readingsSingleUpdate($hash, "PollState", "Inactive", 1) if($do == 1);
         readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1);
     }
+    
+    if ($aName eq "showStmInfoFull") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+
+        if ($do == 0) {
+            delete($defs{$name}{READINGS}{StmKeymjpegHttp}) if ($defs{$name}{READINGS}{StmKeymjpegHttp});
+            delete($defs{$name}{READINGS}{StmKeyUnicst}) if ($defs{$name}{READINGS}{StmKeyUnicst});
+            delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});         
+        }
+    }    
     
     if ($aName eq "simu_SVSversion") {
         getsvsinfo($hash);
@@ -576,6 +591,7 @@ sub SSCam_Get {
                      svsinfo       => "svsinfo",
                      snapfileinfo  => "snapfileinfo",
                      eventlist     => "eventlist",
+                     stmUrlPath => "stmUrlPath",
                      );
     my @cList;
         
@@ -596,21 +612,19 @@ sub SSCam_Get {
             {
                 # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
                 &getcaminfoall($hash,1);
-            }
-            elsif ($opt eq "svsinfo") 
-            {
+                
+            } elsif ($opt eq "svsinfo") {
                 &getsvsinfo($hash);
-            }
-            elsif ($opt eq "snapfileinfo") 
-            {
-                if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                
+            } elsif ($opt eq "snapfileinfo") {
                 if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
                 getsnapfilename($hash);
-            } 
-            elsif ($opt eq "eventlist") 
-            {
-                if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                
+            } elsif ($opt eq "eventlist") {
                 geteventlist ($hash);
+                
+            } elsif ($opt eq "stmUrlPath") {
+                getStmUrlPath ($hash);
             }  
         }
 return undef;
@@ -663,6 +677,8 @@ sub initonboot ($) {
   if ($init_done == 1) {
      
      RemoveInternalTimer($hash);                                                                     # alle Timer löschen
+     
+     delete($defs{$name}{READINGS}{LiveStreamUrl}) if($defs{$name}{READINGS}{LiveStreamUrl});        # LiveStream URL zurücksetzen
      
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
@@ -1256,8 +1272,9 @@ sub stopliveview ($) {
         delete $hash->{HELPER}{SID_STRM};
         delete $hash->{HELPER}{LINK};
         
-        readingsSingleUpdate($hash,"LiveStreamUrl", "", 1);
-        
+        # Reading LiveStreamUrl löschen
+        delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
+                
         if (ReadingsVal("$name", "Record", "") eq "Start") {
             readingsSingleUpdate( $hash,"state", "on", 1); 
             }
@@ -1559,9 +1576,13 @@ sub getcaminfoall {
     getcapabilities($hash);
     getptzlistpreset($hash);
     getptzlistpatrol($hash);
+    getStmUrlPath($hash);
     
     # wenn gesetzt = manuelle Abfrage,
-    if ($mode) {return;}
+    if ($mode) {
+        getsvsinfo($hash);
+        return;
+    }
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         # Pollen wenn pollcaminfo > 10, sonst kein Polling
@@ -1646,6 +1667,37 @@ sub getcaminfo ($) {
     {
         RemoveInternalTimer($hash, "getcaminfo");
         InternalTimer(gettimeofday()+1, "getcaminfo", $hash, 0);
+    }
+    
+}
+
+################################################################################
+###   Kamera Stream Urls abrufen (Get), Aufruf aus getcaminfoall
+
+sub getStmUrlPath ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # Stream-Urls abrufen
+        Log3($name, 4, "$name - Retrieval Stream-URLs of $camname starts now");
+                        
+        $hash->{OPMODE} = "getStmUrlPath";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        getapisites_nonbl($hash);
+    }
+    else
+    {
+        RemoveInternalTimer($hash, "getStmUrlPath");
+        InternalTimer(gettimeofday()+1, "getStmUrlPath", $hash, 0);
     }
     
 }
@@ -2574,6 +2626,10 @@ sub camop_nonbl ($) {
    {
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
    }
+   elsif ($OpMode eq "getStmUrlPath")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
+   }
    elsif ($OpMode eq "geteventlist")
    {
       # Abruf der Events einer Kamera
@@ -2696,7 +2752,7 @@ sub camop_nonbl ($) {
           # interne URL
           $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
       
-          readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1);
+          readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1) if(AttrVal($name, "showStmInfoFull", undef));
       }
       else
       {
@@ -2713,8 +2769,8 @@ sub camop_nonbl ($) {
       if ($hash->{HELPER}{OPENWINDOW}) {
           $winname = $name."_view";
           $attr = AttrVal($name, "htmlattr", "");
-          # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
           
+          # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
           if ($hash->{HELPER}{VIEWOPENROOM}) {
               $room = $hash->{HELPER}{VIEWOPENROOM};
               map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
@@ -3162,6 +3218,53 @@ sub camret_nonbl ($) {
                      
                 # Logausgabe
                 Log3($name, 3, "$name - Informations related to Surveillance Station retrieved successfully");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
+            }
+            elsif ($OpMode eq "getStmUrlPath") 
+            {
+                # Parse SVS-Infos
+                my $camforcemcast   = $data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'};
+                my $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
+                my $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
+                my $mxpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mxpegHttpPath'};
+                my $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
+                my $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
+                
+                # Rewrite Url's falls livestreamprefix ist gesetzt
+                if (AttrVal($name, "livestreamprefix", undef)) {
+                    my @mjh = split(/\//, $mjpegHttp, 4);
+                    $mjpegHttp = AttrVal($name, "livestreamprefix", undef)."/".$mjh[3];
+                    my @mxh = split(/\//, $mxpegHttp, 4);
+                    $mxpegHttp = AttrVal($name, "livestreamprefix", undef)."/".$mxh[3];
+                    my @ucp = split(/[@\|:]/, $unicastPath);
+                    my @lspf = split(/[\/\/\|:]/, AttrVal($name, "livestreamprefix", undef));
+                    $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
+                }
+                
+                # StmKey extrahieren
+                my @sk = split(/&StmKey=/, $mjpegHttp);
+                my $stmkey = $sk[1];
+                $stmkey =~ tr/"//d;
+                
+                # Readings löschen falls sie nicht angezeigt werden sollen (showStmInfoFull)
+                if (!AttrVal($name, "showStmInfoFull", undef)) {
+                    delete($defs{$name}{READINGS}{StmKeymjpegHttp}) if ($defs{$name}{READINGS}{StmKeymjpegHttp});
+                    delete($defs{$name}{READINGS}{StmKeyUnicst}) if ($defs{$name}{READINGS}{StmKeyUnicst});
+                }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"CamForceEnableMulticast",$camforcemcast);
+                readingsBulkUpdate($hash,"StmKey",$stmkey);
+                readingsBulkUpdate($hash,"StmKeymjpegHttp",$mjpegHttp)  if (AttrVal($name, "showStmInfoFull", undef));
+                # readingsBulkUpdate($hash,"StmKeymxpegHttp",$mxpegHttp);
+                readingsBulkUpdate($hash,"StmKeyUnicst",$unicastPath) if (AttrVal($name, "showStmInfoFull", undef));
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                     
+                # Logausgabe
+                Log3($name, 4, "$name - Stream-URLs of $camname retrieved successfully");
                 Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getcaminfo") 
@@ -3823,12 +3926,14 @@ sub experror {
 1;
 
 =pod
+=item summary    operate surveillance cameras which are defined in Synology Surveillance Station
+=item summary_DE steuert Kameras welche in der Synology Surveillance Station definiert sind
 =begin html
 
 <a name="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
-  Using this Module you are able to operate with cameras which are defined in Synology Surveillance Station (SVS). <br>
+  Using this Module you are able to operate cameras which are defined in Synology Surveillance Station (SVS). <br>
   At present the following functions are available: <br><br>
    <ul>
     <ul>
@@ -3847,6 +3952,7 @@ sub experror {
        <li>continuous moving of PTZ-camera lense   </li>
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
        <li>start and stop of camera livestreams  </li>
+       <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
        <li>playback of last recording  </li><br>
     </ul>
    </ul>
@@ -3971,6 +4077,7 @@ sub experror {
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - observer    </li></td></tr>      
       </table>
     </ul>
       <br><br>
@@ -4269,7 +4376,7 @@ sub experror {
   <b> set &lt;name&gt; runView [ image | lastrec | lastrec_open | link | link_open &lt;room&gt; ] </b> <br><br>
   
   With "image, link, link_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image or as a generated link.
-  The access to the last recording of a camera can be done using "lastrec" respectively "lastrec_open". 
+  Access to the last recording of a camera can be done using "lastrec" respectively "lastrec_open". 
   The behavior of livestream in FHEMWEB can be affected by statements in <a href="#SSCamattr">attribute</a> "htmlattr". <br><br>
   
   <b>Examples:</b><br>
@@ -4284,8 +4391,9 @@ sub experror {
   The command <b>"set &lt;name&gt; runView link_open"</b> starts the stream immediately in a new browser window (longpoll=1 must be set for WEB). 
   A browser window will be initiated to open for every FHEM session which is active. If you want to change this, 
   you can use command <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b> what initiates to open a browser window in that FHEM session that has just opend the room &lt;room&gt;.
-  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrite the data for protocol, servername and port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
-  With it the LivestreamURL can be modified and used for distribution and external access to SVS livestream. <br><br>
+  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrites the data for protocol, servername and port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
+  By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) can be modified and used for distribution and external 
+  access to SVS livestream. <br><br>
   
   <b>Example:</b><br>
   <pre>
@@ -4317,6 +4425,7 @@ sub experror {
   <pre>
       get &lt;name&gt; caminfoall
       get &lt;name&gt; eventlist
+      get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
   </pre>
@@ -4334,7 +4443,31 @@ sub experror {
   The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
   Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
   <br><br>
-
+  
+  <b> get &lt;name&gt; stmUrlPath </b> <br><br>
+  
+  This command is to fetch the streamkey information and streamurl using that streamkey. The reading "StmKey" will be filled when this command will be executed and can be used 
+  to send it and run by your own application like a browser (see example).
+  If the <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set, additional stream readings like "StmKeyUnicst", "StmKeymjpegHttp" will be shown and can be used to run the 
+  appropriate livestream without session id. Is the attribute "livestreamprefix" (usage: "http(s)://&lt;hostname&gt;&lt;port&gt;) used, the servername / port will be replaced if necessary.
+  The strUrlPath function will be included automatically if polling is used.
+  <br><br>
+  
+  Example to create an http-call to a livestream using the StmKey: <br>
+  
+  <pre>
+     http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
+  </pre>
+  
+  cameraId (INTERNAL), StmKey has to be replaced by valid values. <br><br>
+  
+  <b>Hint:</b> <br>
+  
+  If you use the stream-call from external and replace hostname / port with valid values and open your router ip ports, please make shure that no
+  unauthorized person could get this sensible data !  <br><br> 
+  
+  
+  
   <b>Polling of Camera-Properties:</b><br><br>
 
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
@@ -4402,6 +4535,7 @@ sub experror {
     <tr><td><li>CamEventNum</li>        </td><td>- delivers the total number of in SVS registered events of the camera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
+    <tr><td><li>CamForceEnableMulticast</li>  </td><td>- Is the camera forced to enable multicast.  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
     <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
@@ -4432,11 +4566,14 @@ sub experror {
     <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
     <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr> 
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started  </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr> 
+    <tr><td><li>StmKey</li>             </td><td>- current streamkey. it can be used to open livestreams without session id    </td></tr> 
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast stream path of the camera. (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg stream path(over http) of the camera (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
     <tr><td><li>SVScustomPortHttp</li>  </td><td>- Customized port of Surveillance Station (HTTP) (to get with "svsinfo")  </td></tr> 
     <tr><td><li>SVScustomPortHttps</li> </td><td>- Customized port of Surveillance Station (HTTPS) (to get with "svsinfo")  </td></tr>
     <tr><td><li>SVSlicenseNumber</li>   </td><td>- The total number of installed licenses (to get with "svsinfo")  </td></tr>
@@ -4465,7 +4602,7 @@ sub experror {
   
   <li><b>htmlattr</b> - additional specifications to livestream-Url to manipulate the behavior of stream, e.g. size of the image </li>
   
-  <li><b>livestreamprefix</b> - overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. as an link for external use  </li>
+  <li><b>livestreamprefix</b> - overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li>
   
   <li><b>noQuotesForSID</b> - this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login possible.  </li>
   
@@ -4477,11 +4614,13 @@ sub experror {
   
   <li><b>recextend</b> - "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be extended </li>
   
-  <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li><br>
+  <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li>
   
-  <li><b>simu_SVSversion</b>  - simulate another SVS version. ONLY FOR DEBUGGING, don't use it in normal operation ! </li><br>
+  <li><b>simu_SVSversion</b>  - simulate another SVS version. ONLY FOR DEBUGGING, don't use it in normal operation ! </li>
   
-  <li><b>showPassInLog</b>  - if set the used password will be shown in logfile with verbose 4. (default = 0) </li><br>
+  <li><b>showStmInfoFull</b>  - additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li>
+  
+  <li><b>showPassInLog</b>  - if set the used password will be shown in logfile with verbose 4. (default = 0) </li>
   
   <li><b>videofolderMap</b> - replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original (SVS) </li>
   
@@ -4537,6 +4676,7 @@ sub experror {
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
       <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
       <li>starten und beenden von Kamera-Livestreams  </li>
+      <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
       <li>abspielen der letzten Aufnahme  </li><br>
      </ul> 
     </ul>
@@ -4550,7 +4690,7 @@ sub experror {
     <a href="http://www.fhemwiki.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station">SSCAM - Steuerung von Kameras in Synology Surveillance Station</a>.<br><br>
     
     
-<b>Vorbereitung </b> <br><br>
+    <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
     Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
     Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem angelegten Gerät zugewiesen. <br>
@@ -4615,7 +4755,7 @@ sub experror {
     Nach dem Definieren des Gerätes müssen zuerst die Zugangsparameter gespeichert werden. Das geschieht mit dem Befehl:
    
     <pre> 
-     set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
+     set &lt;name&gt; credentials &lt;Username&gt; &lt;Passwort&gt;
     </pre>
     
     Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance Station einrichten. <br>
@@ -4661,6 +4801,7 @@ sub experror {
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
     </ul>
       <br><br>
@@ -5004,6 +5145,7 @@ sub experror {
   <pre>
       get &lt;name&gt; caminfoall
       get &lt;name&gt; eventlist
+      get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
   </pre>
@@ -5030,6 +5172,30 @@ sub experror {
   Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
   Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
   <br><br>
+  
+  <b> get &lt;name&gt; stmUrlPath </b> <br><br>
+  
+  Mit diesem Kommando wird der aktuelle Streamkey der Kamera abgerufen und das Reading mit dem Key-Wert gefüllt. 
+  Dieser Streamkey kann verwendet werden um eigene Aufrufe eines Livestreams aufzubauen (siehe Beispiel).
+  Wenn das <a href="#SSCamattr">Attribut</a> "showStmInfoFull" gesetzt ist, werden zusaätzliche Stream-Informationen wie "StmKeyUnicst", "StmKeymjpegHttp" ausgegeben.
+  Diese Readings enthalten die gültigen Stream-Pfade zu einem Livestream und können z.B. versendet und von einer entsprechenden Anwendung ohne session Id geöffnet werden. 
+  Wenn das Attribut "livestreamprefix" (Format: "http(s)://&lt;hostname&gt;&lt;port&gt;) gesetzt ist, wird der Servername und Port überschrieben soweit es sinnvoll ist.
+  Wird Polling der Kameraeigenschaften genutzt, wird die stmUrlPath-Funktion automatisch mit ausgeführt.
+  <br><br>
+  
+  Beispiel für den Aufbau eines Http-Calls zu einem Livestream mit StmKey: 
+  
+  <pre>
+    http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
+  </pre>
+  
+  cameraId (INTERNAL), StmKey müssen durch gültige Werte ersetzt werden. <br><br>
+  
+  <b>Hinweis:</b> <br>
+  
+  Falls der Stream-Aufruf versendet und von extern genutzt wird sowie hostname / port durch gültige Werte ersetzt und die Routerports entsprechend geöffnet
+  werden, ist darauf zu achten dass diese sensiblen Daten nicht durch unauthorisierte Personen für den Zugriff genutzt werden können !  <br><br><br>
+  
 
   <b>Polling der Kameraeigenschaften:</b><br><br>
 
@@ -5100,6 +5266,7 @@ sub experror {
     <tr><td><li>CamEventNum</li>        </td><td>- liefert die Gesamtanzahl der in SVS registrierten Events der Kamera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
+    <tr><td><li>CamForceEnableMulticast</li> </td><td>- sagt aus ob die Kamera verpflichet ist Multicast einzuschalten.  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
@@ -5130,11 +5297,14 @@ sub experror {
     <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr> 
+    <tr><td><li>StmKey</li>             </td><td>- aktueller StreamKey. Kann zum öffnen eines Livestreams ohne Session Id genutzt werden.    </td></tr> 
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast Stream Pfad der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr> 
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg Stream Pfad (über http) der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr>
     <tr><td><li>SVScustomPortHttp</li>  </td><td>- benutzerdefinierter Port der Surveillance Station (HTTP) im DSM-Anwendungsportal (get mit "svsinfo")  </td></tr> 
     <tr><td><li>SVScustomPortHttps</li> </td><td>- benutzerdefinierter Port der Surveillance Station (HTTPS) im DSM-Anwendungsportal (get mit "svsinfo") </td></tr>
     <tr><td><li>SVSlicenseNumber</li>   </td><td>- die Anzahl der installierten Kameralizenzen (get mit "svsinfo") </td></tr>
@@ -5163,9 +5333,9 @@ sub experror {
   
   <li><b>htmlattr</b> - ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen  </li>
   
-  <li><b>livestreamprefix</b> - überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der Livestreamadresse als z.B. externer Link   </li>
+  <li><b>livestreamprefix</b> - überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der Livestreamadresse als z.B. externer Link. Anzugeben in der Form "http(s)://&lt;servername&gt;:&lt;port&gt;"   </li>
   
-  <li><b>noQuotesForSID</b> - dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" vermeiden und ein login ermöglichen.  </li>
+  <li><b>noQuotesForSID</b> - dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" vermeiden und ein login ermöglichen.  </li>                           
   
   <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
 
@@ -5175,11 +5345,13 @@ sub experror {
   
   <li><b>recextend</b> - "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die Aufnahemzeit einer laufenden Aufnahme </li>
   
-  <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
+  <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li>
   
-  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. NUR FÜR DEBUGGING, nicht im normalen Betrieb zu nutzen ! </li><br>
+  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. NUR FÜR DEBUGGING, nicht im normalen Betrieb zu nutzen ! </li>
   
-  <li><b>showPassInLog</b>  - wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. (default = 0) </li><br>
+  <li><b>showStmInfoFull</b>  - zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden ausgegeben</li>
+  
+  <li><b>showPassInLog</b>  - wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. (default = 0) </li>
   
   <li><b>videofolderMap</b> - ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten Verzeichnissen </li>
   
