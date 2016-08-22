@@ -336,6 +336,9 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 1;
 
 =pod
+=item device
+=item summary controls/reads GPIOs from an via I2C connected PCF8574 port extender
+=item summary_DE steuern/lesen der GPIOs eines &uuml;ber I2C angeschlossenen PCF8574
 =begin html
 
 <a name="I2C_PCF8574"></a>

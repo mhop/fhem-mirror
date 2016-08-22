@@ -26,10 +26,8 @@ I2C_PC.*
 I2C_MCP.*
 I2C_BME280
 I2C_BMP180
-I2C_BH1750
-I2C_SHT.*
+I2C_SHT21
 I2C_TSL2561
-I2C_K30
 );
 
 sub NetzerI2C_Initialize($) {
@@ -501,6 +499,9 @@ sub NetzerI2C_RemoveInternalTimer($$) {
 1;
 
 =pod
+=item device
+=item summary accesses I2C interface on an Netzer
+=item summary_DE Zugriff auf das I2C-Interface einer Netzer
 =begin html
 
 <a name="NetzerI2C"></a>

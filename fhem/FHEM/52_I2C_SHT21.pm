@@ -293,7 +293,7 @@ sub I2C_SHT21_CheckCrc(@) {
 			$crc = ($crc & 0x80 ? $poly : 0 ) ^ ($crc << 1);
 		}
 	}
-	return ($crc == $data[2] ? undef : $crc);
+	return ($crc = $data[2] ? undef : $crc);
 }
 
 sub I2C_SHT21_DbLog_splitFn($) {
@@ -312,6 +312,9 @@ sub I2C_SHT21_DbLog_splitFn($) {
 1;
 
 =pod
+=item device
+=item summary reads humidity and temperature from an via I2C connected SHT2x
+=item summary_DE lese Feuchte und Temperatur eines &uuml;ber I2C angeschlossenen SHT2x
 =begin html
 
 <a name="I2C_SHT21"></a>

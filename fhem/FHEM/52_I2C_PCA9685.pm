@@ -215,7 +215,7 @@ sub I2C_PCA9685_Attr(@) {													# wird beim setzen eines Attributes ausgef
 		$val = $defaultreg{'PRESCALE'} unless (defined($val)); 						#beim loeschen wieder auf Standard setzen
 		return "wrong value: $val for \"set $name $attr\" use 0-255"
 			unless($val =~ m/^(\d+)$/ && $val >= 0 && $val < 256);
-		Log3 $hash, 5, $hash->{NAME} . ": $attr alter Wert: ".$hash->{confregs}{PRESCALE}." neuer Wert: ".$val;
+		Log3 $hash, 5, $hash->{NAME} . ": $attr alter Wert: ".(defined($hash->{confregs}{PRESCALE})?$hash->{confregs}{PRESCALE}:"empty")." neuer Wert: ".$val;
 		if ($main::init_done && $val != $hash->{confregs}{PRESCALE}) {
 			my $modereg1 = defined $hash->{confregs}{$confregs{0}} ? $hash->{confregs}{$confregs{0}} : $defaultreg{'modereg1'};
 			my $modereg1mod = ( $modereg1 & 0x7F ) | $mr1{ "SLEEP" };
@@ -481,7 +481,6 @@ sub I2C_PCA9685_i2cwrite($$$) {												# Schreibbefehl an Hardware absetzen
 				I2C_PCA9685_i2cread($hash, 6 + $n * $reg, $reg - ($reg * ($n+1) - 64)) if (($n+1) * $reg) > 64;
 			}
 		}
-		return undef;
 	} else {
 		if (AttrVal($hash->{NAME}, "dummy", 0) == 1) {
 			I2C_PCA9685_UpdReadings($hash, $reg, $data);		# Zeile zum testen (Werte werden direkt zu I2CRec umgeleitet)
@@ -598,6 +597,9 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 1;
 
 =pod
+=item device
+=item summary controls PWM outputs from an via I2C connected PCA9685
+=item summary_DE steuern der PWM Ausg&aumlnge eines &uuml;ber I2C angeschlossenen PCA9685
 =begin html
 
 <a name="I2C_PCA9685"></a>

@@ -546,6 +546,9 @@ sub I2C_BMP180_DbLog_splitFn($) {
 1;
 
 =pod
+=item device
+=item summary reads pressure and temperature from an via I2C connected BMP180/BMP085
+=item summary_DE lese Druck und Temperatur eines &uuml;ber I2C angeschlossenen BMP180/BMP085
 =begin html
 
 <a name="I2C_BMP180"></a>

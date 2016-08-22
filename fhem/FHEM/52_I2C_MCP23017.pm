@@ -11,6 +11,7 @@ use strict;
 use warnings;
 use SetExtensions;
 use Scalar::Util qw(looks_like_number);
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 my %Registers = (
 	'IODIRA'   => 0x00,		#1 = input; 0 = output (default 1)
@@ -490,6 +491,9 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 1;
 
 =pod
+=item device
+=item summary controls/reads GPIOs from an via I2C connected MCP23017 port extender
+=item summary_DE steuern/lesen der GPIOs eines &uuml;ber I2C angeschlossenen MCP23017
 =begin html
 
 <a name="I2C_MCP23017"></a>

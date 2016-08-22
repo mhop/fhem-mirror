@@ -489,6 +489,9 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 1;
 
 =pod
+=item device
+=item summary controls/reads GPIOs from an via I2C connected MCP23008 port extender
+=item summary_DE steuern/lesen der GPIOs eines &uuml;ber I2C angeschlossenen MCP23008
 =begin html
 
 <a name="I2C_MCP23008"></a>
