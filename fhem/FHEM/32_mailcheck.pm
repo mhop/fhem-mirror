@@ -240,7 +240,7 @@ mailcheck_Set($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "active:noArgs inactive:noArgs";
+  my $list = "active:noArg inactive:noArg";
 
   if( $cmd eq 'active' ) {
     mailcheck_Disconnect($hash);
