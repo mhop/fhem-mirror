@@ -365,9 +365,9 @@ FB_CALLMONITOR_Read($)
                 $external_number =~ s/^(107\d\d|108\d\d)//g if($country_code eq "0041");
             }
             
-            if(not $external_number =~ /^0/ and $area_code ne "")
+            if($external_number !~ /^0/ and $area_code ne "")
             {
-                if($area_code =~ /^0[1-9]\d+$/ and $external_number =~ /^[1-9]\d+$/)
+                if($area_code =~ /^0[1-9]\d+$/ and $external_number =~ /^[1-9].+$/)
                 {
                     $external_number = $area_code.$external_number;
                 }
@@ -376,7 +376,7 @@ FB_CALLMONITOR_Read($)
                     Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
                 }
             }
-
+            
             # Remove trailing hash sign and everything afterwards
             $external_number =~ s/#.*$//;
       
