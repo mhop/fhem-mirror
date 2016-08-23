@@ -762,7 +762,7 @@ sub FB_CALLMONITOR_html2txt($)
     $string =~ s/(\xd6|&Ouml;|\\u00d6|\\u00D6)/Ö/g;
     $string =~ s/(\xfc|&uuml;|\\u00fc|\\u00FC)/ü/g;
     $string =~ s/(\xdc|&Uuml;|\\u00dc|\\u00DC)/Ü/g;
-    $string =~ s/(\xdf|&szlig;)/ß/g;
+    $string =~ s/(\xdf|&szlig;|\\u00df|\\u00DF)/ß/g;
     $string =~ s/<[^>]+>//g;
     $string =~ s/&lt;/</g;
     $string =~ s/&gt;/>/g;
