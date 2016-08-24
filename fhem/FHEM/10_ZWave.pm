@@ -4847,13 +4847,13 @@ s2Hex($)
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>sceneConfig<br>
     activate settings for a specific scene.
-    Parameters are: sceneId, dimmingDuration (00..ff)
+    Parameters are: sceneId, dimmingDuration (0..255)
     </li>
 
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>sceneConfig<br>
     set configuration for a specific scene.
-    Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
+    Parameters are: sceneId, dimmingDuration, finalValue (0..255)
     </li>
 
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
@@ -5356,7 +5356,7 @@ s2Hex($)
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
-    01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
+    01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, 255 = returns the
     nodes first supported alarm type.
     </li>
 
@@ -5607,12 +5607,12 @@ s2Hex($)
   <li>assocGroupCmdList_X:AABBCCDD...</li>
 
   <br><br><b>Class BASIC</b>
-  <li>basicReport:XY</li>
-  <li>state:basicGet</li>
-  <li>state:basicSet XY</li>
+  <li>basicReport:X</li>
+  <li>basicGet:request</li>
+  <li>basicSet:X</li>
 
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
-  <li>covering:[open:close:stop]</li>
+  <li>covering:[open|close|stop]</li>
 
   <br><br><b>Class BATTERY</b>
   <li>battery:chargelevel %</li>
@@ -5768,20 +5768,20 @@ s2Hex($)
   <li>state:open</li>
   <li>state:closed</li>
   <li>SENSORY_BINARY V2:</li>
-  <li>unknown:[00|ff]</li>
-  <li>generalPurpose:[00|ff]</li>
-  <li>smoke:[00|ff]</li>
-  <li>CO:[00|ff]</li>
-  <li>CO2:[00|ff]</li>
-  <li>heat:[00|ff]</li>
-  <li>water:[00|ff]</li>
-  <li>freeze:[00|ff]</li>
-  <li>tamper:[00|ff]</li>
-  <li>aux:[00|ff]</li>
-  <li>doorWindow:[00|ff]</li>
-  <li>tilt:[00|ff]</li>
-  <li>motion:[00|ff]</li>
-  <li>glassBreak:[00|ff]</li>
+  <li>unknown:[off|on]</li>
+  <li>generalPurpose:[off|on]</li>
+  <li>smoke:[off|on]</li>
+  <li>CO:[off|on]</li>
+  <li>CO2:[off|on]</li>
+  <li>heat:[off|on]</li>
+  <li>water:[off|on]</li>
+  <li>freeze:[off|on]</li>
+  <li>tamper:[off|on]</li>
+  <li>aux:[off|on]</li>
+  <li>doorWindow:[off|on]</li>
+  <li>tilt:[off|on]</li>
+  <li>motion:[off|on]</li>
+  <li>glassBreak:[off|on]</li>
 
   <br><br><b>Class SENSOR_MULTILEVEL</b>
   <li>temperature $val [C|F]</li>
