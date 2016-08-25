@@ -213,14 +213,20 @@ sub Hyperion_Read($)
   my %Hyperion_sets_local = %Hyperion_sets;
   if ($1 =~ /^\{"success":true\}$/)
   {
-    fhem ("sleep 0.1; get $name statusRequest") if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
+    fhem "sleep 1; get $name statusRequest" if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
     return undef;
   }
   elsif ($1 =~ /^.+"success":true\}$/)
   {
-    my $obj = eval { from_json($result) };
+    ######################
+    # delete old reading #
+    fhem "deletereading $name previous_mode" if (defined(ReadingsVal($name,"previous_mode",undef)));
+    ######################
+    my $obj = eval {from_json($result)};
     my $data = $obj->{info};
-    my $prio        = ($data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : undef;
+    my $prio        = (defined($data->{priorities}->[0]->{priority})) ? $data->{priorities}->[0]->{priority} : undef;
+    my $duration    = (defined($data->{priorities}->[0]->{duration_ms}) && $data->{priorities}->[0]->{duration_ms} > 999) ? int($data->{priorities}->[0]->{duration_ms} / 1000) : 0;
+    $duration       = ($duration) >= 1 ? $duration : "infinite";
     my $adj         = $data->{adjustment}->[0];
     my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0];
     my $configs     = ReadingsVal($name,".configs",undef);
@@ -274,21 +280,18 @@ sub Hyperion_Read($)
     Hyperion_readingsBulkUpdateIfChanged($hash,"adjustGreen",$adjG);
     Hyperion_readingsBulkUpdateIfChanged($hash,"adjustBlue",$adjB);
     Hyperion_readingsBulkUpdateIfChanged($hash,"blacklevel",$blkL);
-    readingsBulkUpdate($hash,"dim",0) if (!defined(ReadingsVal($name,"dim",undef)));
-    readingsBulkUpdate($hash,"configFile","") if (!defined(ReadingsVal($name,"configFile",undef)));
     Hyperion_readingsBulkUpdateIfChanged($hash,"colorTemperature",$temP);
     Hyperion_readingsBulkUpdateIfChanged($hash,"correction",$corS);
-    readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0]) if (!defined(ReadingsVal($name,"effect",undef)));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0]) if (!defined(ReadingsVal($name,"effect",undef)));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0]) if (!defined(ReadingsVal($name,"effect",undef)));
     Hyperion_readingsBulkUpdateIfChanged($hash,".effects", $effectList) if ($effectList);
-    readingsBulkUpdate($hash,"duration","infinite") if (!defined(ReadingsVal($name,"duration",undef)));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"duration",$duration);
     Hyperion_readingsBulkUpdateIfChanged($hash,"gamma",$gamM);
     Hyperion_readingsBulkUpdateIfChanged($hash,"id",$id);
-    readingsBulkUpdate($hash,"lastError","") if (!defined(ReadingsVal($name,"lastError",undef)));
     Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceGain",$lumG);
     Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceMinimum",$lumM) if ($lumM);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"priority",$prio) if ($prio);
-    readingsBulkUpdate($hash,"priority",0) if (!defined(ReadingsVal($name,"priority",undef)));
-    readingsBulkUpdate($hash,"rgb","ff0d0d") if (!defined(ReadingsVal($name,"rgb",undef)));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"priority",$prio) if (defined($prio));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"rgb","ff0d0d") if (!defined(ReadingsVal($name,"rgb",undef)));
     Hyperion_readingsBulkUpdateIfChanged($hash,"saturationGain",$satG);
     Hyperion_readingsBulkUpdateIfChanged($hash,"saturationLGain",$satL) if ($satL);
     Hyperion_readingsBulkUpdateIfChanged($hash,"threshold",$thrE);
@@ -312,7 +315,7 @@ sub Hyperion_Read($)
             Hyperion_readingsBulkUpdateIfChanged($hash,"effect",$en);
             Hyperion_readingsBulkUpdateIfChanged($hash,"mode","effect");
             Hyperion_readingsBulkUpdateIfChanged($hash,"state","effect $en");
-            Hyperion_readingsBulkUpdateIfChanged($hash,"previous_mode","effect");
+            Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","effect");
             Log3 $name,4,"$name: effect $en";
           }
         }
@@ -320,7 +323,7 @@ sub Hyperion_Read($)
     }
     elsif ($col)
     {
-      my $rgb = lc ((split ('x',$col))[1]);
+      my $rgb = lc((split('x',$col))[1]);
       $rgb =~ m/^(..)(..)(..)/;
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
@@ -328,7 +331,7 @@ sub Hyperion_Read($)
       Hyperion_readingsBulkUpdateIfChanged($hash,"rgb",$rgb);
       Hyperion_readingsBulkUpdateIfChanged($hash,"dim",$dim);
       Hyperion_readingsBulkUpdateIfChanged($hash,"mode","rgb");
-      Hyperion_readingsBulkUpdateIfChanged($hash,"previous_mode","rgb");
+      Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","rgb");
       Hyperion_readingsBulkUpdateIfChanged($hash,"state","rgb $rgb");
       Log3 $name,4,"$name: rgb $rgb";
     }
@@ -336,9 +339,8 @@ sub Hyperion_Read($)
     {
       if ($prio)
       {
-        Log3 $name,4,"$name Hyperion_ParseHttpResponse clearall priority: $prio";
         Hyperion_readingsBulkUpdateIfChanged($hash,"mode","clearall");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"previous_mode","clearall");
+        Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","clearall");
         Hyperion_readingsBulkUpdateIfChanged($hash,"state","clearall");
         Log3 $name,4,"$name: clearall";
       }
@@ -567,21 +569,21 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "on")
   {
     return "$cmd need no additional value of $value" if (defined($value));
-    my $rmode     = ReadingsVal($name,"previous_mode","rgb");
+    my $rmode     = ReadingsVal($name,"mode_before_off","rgb");
     my $rrgb      = ReadingsVal($name,"rgb","");
     my $reffect   = ReadingsVal($name,"effect","");
     my ($r,$g,$b) = Color::hex2rgb($rrgb);
     if ($rmode eq "rgb")
     {
-      fhem ("set ".$name." $rmode $rrgb");
+      fhem "set ".$name." $rmode $rrgb";
     }
     elsif ($rmode eq "effect")
     {
-      fhem ("set ".$name." $rmode $reffect");
+      fhem "set ".$name." $rmode $reffect";
     }
     elsif ($rmode eq "clearall")
     {
-      fhem ("set ".$name." clearall");
+      fhem "set ".$name." clearall";
     }
     return undef;
   }
@@ -591,11 +593,11 @@ sub Hyperion_Set($@)
     my $rstate = Value($name);
     if ($rstate ne "off")
     {
-      fhem ("set ".$name." off");
+      fhem "set ".$name." off";
     }
     else
     {
-      fhem ("set ".$name." on");
+      fhem "set ".$name." on";
     }
     return undef;
   }
@@ -609,19 +611,19 @@ sub Hyperion_Set($@)
     my ($r,$g,$b) = Color::hex2rgb($rrgb);
     if ($rmode eq "rgb")
     {
-      fhem ("set ".$name." $rmode $rrgb");
+      fhem "set ".$name." $rmode $rrgb";
     }
     elsif ($rmode eq "effect")
     {
-      fhem ("set ".$name." $rmode $reffect");
+      fhem "set ".$name." $rmode $reffect";
     }
     elsif ($rmode eq "clearall")
     {
-      fhem ("set ".$name." clearall");
+      fhem "set ".$name." clearall";
     }
     elsif ($rmode eq "off")
     {
-      fhem ("set ".$name." $rmode");
+      fhem "set ".$name." $rmode";
     }
     return undef;
   }
@@ -638,13 +640,13 @@ sub Hyperion_Set($@)
     $obj{command}   = "transform";
     $obj{transform} = \%tr;
   }
-  elsif ($cmd eq "blacklevel" ||
+  elsif ( $cmd eq "blacklevel" ||
           $cmd eq "gamma" ||
           $cmd eq "threshold" ||
           $cmd eq "whitelevel"
  )
   {
-    return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001" if ($value !~ /^(\d)(\.\d)?(\d{1,2})?$/ || int $1 > 9);
+    return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001" if ($value !~ /^((\d)\.(\d){1,3}),((\d)\.(\d){1,3}),((\d)\.(\d){1,3})$/ || int $1 > 9 || int $4 > 9 || int $7 > 9);
     my $arr = Hyperion_list2array($value,"%.3f");
     my %ar = ($cmd => $arr);
     $obj{command} = "transform";
@@ -1080,7 +1082,7 @@ sub Hyperion_readingsBulkUpdateIfChanged($$$) {
       current mode
     </li>
     <li>
-      <i>previous_mode</i><br>
+      <i>mode_before_off</i><br>
       previous mode before off
     </li>
     <li>
