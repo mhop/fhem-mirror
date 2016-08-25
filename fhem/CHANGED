@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Version 2.6.2 CommandRef Update, new set command for
+                      media control
   - change:  98_Hyperion: non-blocking server connection
   - feature: 49_SSCam: function get stmUrlPath added, fit to new commandref 
                        style, attribute showStmInfoFull added
