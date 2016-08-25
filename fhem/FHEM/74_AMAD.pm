@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.6.1";
-my $flowsetversion = "2.6.1";
+my $modulversion = "2.6.2";
+my $flowsetversion = "2.6.2";
 
 
 
@@ -502,10 +502,10 @@ sub AMAD_Set($$@) {
 	$list .= "screenMsg ";
 	$list .= "ttsMsg ";
 	$list .= "volume:slider,0,1,15 ";
-	$list .= "googleMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-	$list .= "amazonMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-	$list .= "spotifyMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-	$list .= "tuneinRadio:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+	$list .= "mediaGoogleMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+	$list .= "mediaAmazonMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+	$list .= "mediaSpotifyMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+	$list .= "mediaTuneinRadio:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
 	$list .= "screenBrightness:slider,0,1,255 ";
 	$list .= "screen:on,off,lock,unlock ";
 	$list .= "screenOrientation:auto,landscape,portrait " if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
@@ -532,10 +532,10 @@ sub AMAD_Set($$@) {
 	if( lc $cmd eq 'screenmsg'
 	    || lc $cmd eq 'ttsmsg'
 	    || lc $cmd eq 'volume'
-	    || lc $cmd eq 'googlemusic'
-	    || lc $cmd eq 'amazonmusic'
-	    || lc $cmd eq 'spotifymusic'
-	    || lc $cmd eq 'tuneinradio'
+	    || lc $cmd eq 'mediagooglemusic'
+	    || lc $cmd eq 'mediaamazonmusic'
+	    || lc $cmd eq 'mediaspotifymusic'
+	    || lc $cmd eq 'mediatuneinradio'
 	    || lc $cmd eq 'screenbrightness'
 	    || lc $cmd eq 'screenorientation'
 	    || lc $cmd eq 'screenfullscreen'
@@ -660,11 +660,11 @@ sub AMAD_SelectSetCmd($$@) {
 	return AMAD_HTTP_POST( $hash, $url );
     }
     
-    elsif( lc $cmd eq 'googlemusic' or lc $cmd eq 'amazonmusic' or lc $cmd eq 'spotifymusic' or lc $cmd eq 'tuneinradio' ) {
+    elsif( lc $cmd eq 'mediagooglemusic' or lc $cmd eq 'mediaamazonmusic' or lc $cmd eq 'mediaspotifymusic' or lc $cmd eq 'mediatuneinradio' ) {
     
 	my $btn = join( " ", @data );
 
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/multimediaControl?mplayer=".$cmd."&button=".$btn;
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/multimediaControl?mplayer=".$cmd."&button=".$btn;
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -1342,6 +1342,11 @@ sub AMAD_decrypt($) {
 1;
 
 =pod
+
+=item device
+=item summary    Integrates Android devices into FHEM and displays several settings.
+=item summary_DE Integriert Android-Geräte in FHEM und zeigt verschiedene Einstellungen an.
+
 =begin html
 
 <a name="AMAD"></a>
@@ -1402,7 +1407,7 @@ sub AMAD_decrypt($) {
     <li>connectedBTdevices - list of all devices connected via bluetooth</li>
     <li>connectedBTdevicesMAC - list of MAC addresses of all devices connected via bluetooth</li>
     <li>currentMusicAlbum - currently playing album of mediaplayer</li>
-    <li>currentMusicApp - currently playing player app</li>
+    <li>currentMusicApp - currently playing player app (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music)</li>
     <li>currentMusicArtist - currently playing artist of mediaplayer</li>
     <li>currentMusicIcon - cover of currently play album<b>Noch nicht fertig implementiert</b></li>
     <li>currentMusicState - state of currently/last used mediaplayer</li>
@@ -1444,19 +1449,19 @@ sub AMAD_decrypt($) {
   <b>Set</b>
   <ul>
     <li>activateVoiceInput - start voice input on Android device</li>
-    <li>amazonMusic - play/stop/next/back , controlling the amazon music media player</li>
     <li>bluetooth - on/off, switch bluetooth on/off</li>
     <li>clearNotificationBar - All/Automagic, deletes all or only Automagic notifications in status bar</li>
     <li>currentFlowsetUpdate - start flowset update on Android device</li>
-    <li>googleMusic - play/stop/next/back , controlling the google play music media player</li>
     <li>installFlowSource - install a Automagic flow on device, <u>XML file must be stored in /tmp/ with extension xml</u>. <b>Example:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
     <li>doNotDisturb - sets the do not Disturb Mode, always Disturb, never Disturb, alarmClockOnly alarm Clock only, onlyImportant only important Disturbs</li>
+    <li>mediaAmazonMusic - play/stop/next/back , controlling the amazon music media player</li>
+    <li>mediaGoogleMusic - play/stop/next/back , controlling the google play music media player</li>
+    <li>mediaSpotifyMusic - play/stop/next/back , controlling the spotify media player</li>
     <li>nextAlarmTime - sets the alarm time. Only valid for the next 24 hours.</li>
     <li>notifySndFile - plays a media-file <b>which by default needs to be stored in the folder "/storage/emulated/0/Notifications/" of the Android device. You may use the attribute setNotifySndFilePath for defining a different folder.</b></li>
     <li>screenBrightness - 0-255, set screen brighness</li>
     <li>screenMsg - display message on screen of Android device</li>
     <li>sendintent - send intent string <u>Example:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, first parameter contains the action, second parameter contains the extra. At most two extras can be used.</li>
-    <li>spotifyMusic - play/stop/next/back , controlling the spotify media player</li>
     <li>statusRequest - Get a new status report of Android device. Not all readings can be updated using a statusRequest as some readings are only updated if the value of the reading changes.</li>
     <li>timer - set a countdown timer in the "Clock" stock app. Only seconds are allowed as parameter.</li>
     <li>ttsMsg - send a message which will be played as voice message</li>
@@ -1562,7 +1567,7 @@ sub AMAD_decrypt($) {
     <li>connectedBTdevices - eine Liste der verbundenen Ger&auml;t</li>
     <li>connectedBTdevicesMAC - eine Liste der MAC Adressen aller verbundender BT Ger&auml;te</li>
     <li>currentMusicAlbum - aktuell abgespieltes Musikalbum des verwendeten Mediaplayers</li>
-    <li>currentMusicApp - aktuell verwendeter Mediaplayers</li>
+    <li>currentMusicApp - aktuell verwendeter Mediaplayer (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music)</li>
     <li>currentMusicArtist - aktuell abgespielter Musikinterpret des verwendeten Mediaplayers</li>
     <li>currentMusicIcon - Cover vom aktuell abgespielten Album <b>Noch nicht fertig implementiert</b></li>
     <li>currentMusicState - Status des aktuellen/zuletzt verwendeten Mediaplayers</li>
@@ -1604,18 +1609,18 @@ sub AMAD_decrypt($) {
   <b>Set</b>
   <ul>
     <li>activateVoiceInput - aktiviert die Spracheingabe</li>
-    <li>amazonMusic - play, stop, next, back  ,steuert den Amazon Musik Mediaplayer</li>
     <li>bluetooth - on/off, aktiviert/deaktiviert Bluetooth</li>
     <li>clearNotificationBar - All,Automagic, l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
     <li>currentFlowsetUpdate - f&uuml;rt ein Flowsetupdate auf dem Device durch</li>
     <li>doNotDisturb - schaltet den nicht st&ouml;ren Modus, always immer st&ouml;ren, never niemals st&ouml;ren, alarmClockOnly nur Wecker darf st&ouml;ren, onlyImportant nur wichtige St&ouml;rungen</li>
-    <li>googleMusic - play, stop, next, back  ,steuert den Google Play Musik Mediaplayer</li>
     <li>installFlowSource - installiert einen Flow auf dem Device, <u>das XML File muss unter /tmp/ liegen und die Endung xml haben</u>. <b>Bsp:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
+    <li>mediaAmazonMusic - play, stop, next, back  ,steuert den Amazon Musik Mediaplayer</li>
+    <li>mediaGoogleMusic - play, stop, next, back  ,steuert den Google Play Musik Mediaplayer</li>
+    <li>mediaSpotifyMusic - play, stop, next, back  ,steuert den Spotify Mediaplayer</li>
     <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
     <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255.</li>
     <li>screenMsg - versendet eine Bildschirmnachricht</li>
     <li>sendintent - sendet einen Intentstring <u>Bsp:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, der erste Befehl ist die Aktion und der zweite das Extra. Es k&ouml;nnen immer zwei Extras mitgegeben werden.</li>
-    <li>spotifyMusic - play, stop, next, back  ,steuert den Spotify Mediaplayer</li>
     <li>statusRequest - Fordert einen neuen Statusreport beim Device an. Es k&ouml;nnen nicht von allen Readings per statusRequest die Daten geholt werden. Einige wenige geben nur bei Status&auml;nderung ihren Status wieder.</li>
     <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Sekunden angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird</li>
