@@ -789,6 +789,8 @@ sub GasCalculator_Notify($$)
 =pod
 
 =item helper
+=item summary    Calculates the gas energy consumption and costs
+=item summary_DE Berechnet den Gas-Energieverbrauch und verbundene Kosten
 
 =begin html
 
@@ -836,17 +838,6 @@ sub GasCalculator_Notify($$)
 	</td></tr>
 </table>
 
-<!-- 
-<table><tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;service&gt;</code> : </td><td>BlaBlaBla<BR></td></tr>
-		<tr><td><code>&lt;value&gt;</code> : </td><td>A valid value for this .<BR></td></tr>
-	</table>
-</ul></ul>
--->
-
 <BR>
 
 <table>
@@ -857,30 +848,6 @@ sub GasCalculator_Notify($$)
 		</ul>
 	</td></tr>
 </table>
-<!-- 
-<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;service&gt;</code> : </td><td>BlaBlaBla<BR>
-														&nbsp;&nbsp;It returns only the value<BR>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;option&gt;</code> : </td><td>The optional Argument <BR>
-														 &nbsp;&nbsp;The following options are available:<BR>
-														 &nbsp;&nbsp;BVlaBlaBla.
-			</td>
-		</tr>
-	</table>
-</ul></ul>
--->
 
 <BR>
 
