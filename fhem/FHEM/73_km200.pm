@@ -2779,6 +2779,11 @@ sub km200_ParseHttpResponseDyn($)
 
 ###START###### Description for fhem commandref ################################################################START####
 =pod
+=item device
+=item summary    Connects fhem to Buderus KM300, KM200, KM100, KM50
+=item summary_DE Verbindet fhem mit Buderus KM300, KM200, KM100, KM50
+
+
 =begin html
 
 <a name="km200"></a>
