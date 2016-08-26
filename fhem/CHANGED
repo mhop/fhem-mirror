@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     73_ElectrcityCalculator: Calculates electric energy costs
   - bugfix:  98_Hyperion: refresh of readings duration and priority
                           regex for set blacklevel,gamma,threshold,whitelevel
   - change:  98_Hyperion: renamed reading previous_mode to mode_before_off
