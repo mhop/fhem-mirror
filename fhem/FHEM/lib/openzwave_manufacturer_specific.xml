@@ -638,6 +638,7 @@
 		<Product type="0100" id="0201" name="Smoke Detector and Siren" config="popp/smoke-detector.xml" />
 		<Product type="0001" id="0000" name="ZW EDAN 300 Flush Mounted Dimmer" />
 		<Product type="1000" id="0002" name="Flush Mounted Switch"/>
+                <Product type="1000" id="0009" name="ZME_05433 Wall Flush-Mountable Dimmer" config="popp/ZME_05433.xml"/>
 		<Product type="1001" id="0000" name="Plugin Dimmer" />
 		<Product type="2001" id="0000" name="ZW ES 1000 Flush Mounted Switch" config="duwi/ZWES1000.xml" />
 		<Product type="3001" id="0000" name="ZW ZS 3500 Plugin Switch" />
