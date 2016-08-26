@@ -9,7 +9,7 @@
 #
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
-#     Fhem Forum                 : Not yet implemented
+#     Fhem Forum                 : https://forum.fhem.de/index.php/topic,57106.msg485195.html
 #     Fhem Wiki                  : Not yet implemented
 #
 #     This file is part of fhem.
