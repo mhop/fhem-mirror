@@ -219,8 +219,13 @@ sub Hyperion_Read($)
   elsif ($1 =~ /^.+\},"success":true\}$/)
   {
     ######################
-    # delete old reading #
-    fhem "deletereading $name previous_mode" if (defined(ReadingsVal($name,"previous_mode",undef)));
+    if (defined(ReadingsVal($name,"previous_mode",undef)))
+    {
+      # set new reading to former value
+      fhem "setreading $name mode_before_off ".ReadingsVal($name,"previous_mode","");
+      # delete old reading
+      fhem "deletereading $name previous_mode";
+    }
     ######################
     my $obj         = eval {from_json($result)};
     my $data        = $obj->{info};
