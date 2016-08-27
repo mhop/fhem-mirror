@@ -815,7 +815,8 @@ KM271_Ready($)
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status if($po);
   return ($InBytes>0);
 }
 
@@ -985,6 +986,9 @@ KM271_SetReading($$$$)
 1;
 
 =pod
+=item helper
+=item summary Interface for Buderus Logamatic 2105/2107 heating controller
+=item summary_DE Anbindung für Buderus Logamatic 2105/2107 Heizungssteuerung
 =begin html
 
 <a name="KM271"></a>
