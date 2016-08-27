@@ -68,7 +68,7 @@ sub HP1000_Initialize($) {
     $hash->{DefFn}   = "HP1000_Define";
     $hash->{UndefFn} = "HP1000_Undefine";
     $hash->{AttrList} =
-      "wu_push:1,0 wu_id wu_password wu_realtime:0,1 " . $readingFnAttributes;
+      "wu_push:1,0 wu_id wu_password wu_realtime:1,0 " . $readingFnAttributes;
 }
 
 ###################################
@@ -202,7 +202,9 @@ sub HP1000_CGI() {
           if ( $v eq ""
             || $p eq "dateutc"
             || $p eq "action"
-            || $p eq "softwaretype" );
+            || $p eq "softwaretype"
+            || $p eq "realtime"
+            || $p eq "rtfreq" );
 
         # name translation
         $p = "humidityIndoor"    if ( $p eq "inhumi" );
@@ -252,46 +254,56 @@ sub HP1000_CGI() {
         readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
     }
 
-    # averages/windSpeed_2m
+    # averages/windSpeed_avg2m
     if ( defined( $webArgs->{windspeed} ) ) {
         my $v =
           HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
 
-        readingsBulkUpdate( $hash, "windSpeed_2m", $v );
-        $webArgs->{windspd_avg2m} = $v;
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windSpeed_avg2m", $v );
+            $webArgs->{windspd_avg2m} = $v;
+        }
     }
     elsif ( defined( $webArgs->{windspeedmph} ) ) {
         my $v =
           HP1000_GetAvg( $hash, "windspeedmph", 2 * 60,
             $webArgs->{windspeedmph} );
 
-        readingsBulkUpdate( $hash, "windSpeed_2m", $v );
-        $webArgs->{windspdmph_avg2m} = $v;
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windSpeed_avg2m", $v );
+            $webArgs->{windspdmph_avg2m} = $v;
+        }
     }
 
-    # averages/windDir_2m
+    # averages/windDir_avg2m
     if ( defined( $webArgs->{winddir} ) ) {
         my $v = HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} );
 
-        readingsBulkUpdate( $hash, "windDir_2m", $v );
-        $webArgs->{winddir_avg2m} = $v;
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windDir_avg2m", $v );
+            $webArgs->{winddir_avg2m} = $v;
+        }
     }
 
-    # averages/windGust_10m
+    # averages/windGust_sum10m
     if ( defined( $webArgs->{windgust} ) ) {
         my $v =
           HP1000_GetSum( $hash, "windgust", 10 * 60, $webArgs->{windgust} );
 
-        readingsBulkUpdate( $hash, "windGust_10m", $v );
-        $webArgs->{windgust_10m} = $v;
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windGust_sum10m", $v );
+            $webArgs->{windgust_10m} = $v;
+        }
     }
     elsif ( defined( $webArgs->{windgustmph} ) ) {
         my $v =
           HP1000_GetSum( $hash, "windgustmph", 10 * 60,
             $webArgs->{windgustmph} );
 
-        readingsBulkUpdate( $hash, "windGust_10m", $v );
-        $webArgs->{windgustmph_10m} = $v;
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windGust_sum10m", $v );
+            $webArgs->{windgustmph_10m} = $v;
+        }
     }
 
     # from WU API:
@@ -359,21 +371,21 @@ sub HP1000_GetSum($$$$;$) {
     my $max = int( $s / $hash->{INTERVAL} );
     my $return;
 
-    unshift @{ $hash->{helper}{history}{$t} }, $v;
-    splice @{ $hash->{helper}{history}{$t} }, $max;
+    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v;
+    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max;
 
     Log3 $name, 5, "HP1000 $name: Updated history for $t:"
       . Dumper( $hash->{helper}{history}{$t} );
 
     if ($avg) {
-        $return = printf( "%.1f",
+        $return = sprintf( "%.1f",
             sum( @{ $hash->{helper}{history}{$t} } ) /
               @{ $hash->{helper}{history}{$t} } );
 
         Log3 $name, 5, "HP1000 $name: Average for $t: $return";
     }
     else {
-        $return = printf( "%.1f", sum( @{ $hash->{helper}{history}{$t} } ) );
+        $return = sprintf( "%.1f", sum( @{ $hash->{helper}{history}{$t} } ) );
         Log3 $name, 5, "HP1000 $name: Sum for $t: $return";
     }
 
@@ -393,11 +405,6 @@ sub HP1000_PushWU($$) {
     my $http_noshutdown = AttrVal( $name, "http-noshutdown", "1" );
     my $wu_user         = AttrVal( $name, "wu_id", "" );
     my $wu_pass         = AttrVal( $name, "wu_password", "" );
-    my $wu_url          = (
-        Attr( $name, "wu_realtime", 0 )
-        ? "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php?realtime=1&"
-        : "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?"
-    );
 
     Log3 $name, 5, "HP1000 $name: called function HP1000_PushWU()";
 
@@ -411,6 +418,26 @@ sub HP1000_PushWU($$) {
           if ( ReadingsVal( $name, "wu_state", "" ) ne $return );
         return;
     }
+
+    if ( AttrVal( $name, "wu_realtime", "1" ) eq "0" ) {
+        Log3 $name, 5, "HP1000 $name: Explicitly turning off realtime";
+        delete $webArgs->{realtime};
+        delete $webArgs->{rtfreq};
+    }
+    elsif ( AttrVal( $name, "wu_realtime", "0" ) eq "1" ) {
+        Log3 $name, 5, "HP1000 $name: Explicitly turning on realtime";
+        $webArgs->{realtime} = 1;
+    }
+
+    $webArgs->{rtfreq} = 5
+      if ( defined( $webArgs->{realtime} ) && !defined( $webArgs->{rtfreq} ) );
+
+    my $wu_url = (
+        defined( $webArgs->{realtime} )
+          && $webArgs->{realtime} eq "1"
+        ? "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php?"
+        : "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?"
+    );
 
     $webArgs->{ID}       = $wu_user;
     $webArgs->{PASSWORD} = $wu_pass;
@@ -604,7 +631,7 @@ sub HP1000_ReturnWU($$$) {
         Enable or disable to push data forward to Weather Underground (defaults to 0=no)
 
       <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
-        Send the data to the WU realtime server instead of using the standard server (defaults to 0=no)
+        Send the data to the WU realtime server instead of using the standard server (defaults to 1=yes)
     </ul>
     </div>
 
@@ -658,7 +685,7 @@ sub HP1000_ReturnWU($$$) {
         Pushen der Daten zu Weather Underground aktivieren oder deaktivieren (Standard ist 0=aus)
 
       <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
-        Sendet die Daten an den WU Echtzeitserver statt an den Standard Server (Standard ist 0=aus)
+        Sendet die Daten an den WU Echtzeitserver statt an den Standard Server (Standard ist 1=an)
     </ul>
     </div>
 
