@@ -32,6 +32,7 @@ use vars qw(%data);
 use HttpUtils;
 use Time::Local;
 use Data::Dumper;
+use List::Util qw(sum);
 use FHEM::98_dewpoint;
 
 sub HP1000_Define($$);
@@ -64,9 +65,10 @@ sub HP1000_Initialize($) {
 
     Log3 $hash, 5, "HP1000_Initialize: Entering";
 
-    $hash->{DefFn}    = "HP1000_Define";
-    $hash->{UndefFn}  = "HP1000_Undefine";
-    $hash->{AttrList} = "wu_push:1,0 wu_id wu_password " . $readingFnAttributes;
+    $hash->{DefFn}   = "HP1000_Define";
+    $hash->{UndefFn} = "HP1000_Undefine";
+    $hash->{AttrList} =
+      "wu_push:1,0 wu_id wu_password wu_realtime:0,1 " . $readingFnAttributes;
 }
 
 ###################################
@@ -164,7 +166,13 @@ sub HP1000_CGI() {
 
     $hash = $defs{$name};
 
-    $hash->{SWVERSION}      = $webArgs->{softwaretype};
+    $hash->{SWVERSION} = $webArgs->{softwaretype};
+    $hash->{INTERVAL}  = (
+        $hash->{SYSTEMTIME_UTC}
+        ? time_str2num( $webArgs->{dateutc} ) -
+          time_str2num( $hash->{SYSTEMTIME_UTC} )
+        : 0
+    );
     $hash->{SYSTEMTIME_UTC} = $webArgs->{dateutc};
 
     if (
@@ -180,14 +188,8 @@ sub HP1000_CGI() {
     else {
         Log3 $name, 5, "HP1000: received data:\n" . Dumper($webArgs);
 
-        HP1000_PushWU( $hash, $webArgs )
-          if AttrVal( $name, "wu_push", 0 ) eq "1";
-
         delete $webArgs->{ID};
         delete $webArgs->{PASSWORD};
-        delete $webArgs->{dateutc};
-        delete $webArgs->{action};
-        delete $webArgs->{softwaretype};
     }
 
     readingsBeginUpdate($hash);
@@ -196,7 +198,11 @@ sub HP1000_CGI() {
     while ( ( my $p, my $v ) = each %$webArgs ) {
 
         # ignore those values
-        next if ( $v eq "" );
+        next
+          if ( $v eq ""
+            || $p eq "dateutc"
+            || $p eq "action"
+            || $p eq "softwaretype" );
 
         # name translation
         $p = "humidityIndoor"    if ( $p eq "inhumi" );
@@ -246,6 +252,56 @@ sub HP1000_CGI() {
         readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
     }
 
+    # averages/windSpeed_2m
+    if ( defined( $webArgs->{windspeed} ) ) {
+        my $v =
+          HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
+
+        readingsBulkUpdate( $hash, "windSpeed_2m", $v );
+        $webArgs->{windspd_avg2m} = $v;
+    }
+    elsif ( defined( $webArgs->{windspeedmph} ) ) {
+        my $v =
+          HP1000_GetAvg( $hash, "windspeedmph", 2 * 60,
+            $webArgs->{windspeedmph} );
+
+        readingsBulkUpdate( $hash, "windSpeed_2m", $v );
+        $webArgs->{windspdmph_avg2m} = $v;
+    }
+
+    # averages/windDir_2m
+    if ( defined( $webArgs->{winddir} ) ) {
+        my $v = HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} );
+
+        readingsBulkUpdate( $hash, "windDir_2m", $v );
+        $webArgs->{winddir_avg2m} = $v;
+    }
+
+    # averages/windGust_10m
+    if ( defined( $webArgs->{windgust} ) ) {
+        my $v =
+          HP1000_GetSum( $hash, "windgust", 10 * 60, $webArgs->{windgust} );
+
+        readingsBulkUpdate( $hash, "windGust_10m", $v );
+        $webArgs->{windgust_10m} = $v;
+    }
+    elsif ( defined( $webArgs->{windgustmph} ) ) {
+        my $v =
+          HP1000_GetSum( $hash, "windgustmph", 10 * 60,
+            $webArgs->{windgustmph} );
+
+        readingsBulkUpdate( $hash, "windGust_10m", $v );
+        $webArgs->{windgustmph_10m} = $v;
+    }
+
+    # from WU API:
+    # weather - [text] -- metar style (+RA)
+    # clouds - [text] -- SKC, FEW, SCT, BKN, OVC
+    # soiltempf - [F soil temperature]
+    # soilmoisture - [%]
+    # leafwetness  - [%]
+    # visibility - [nm visibility]
+
     # condition_forecast (based on pressure trendency)
 
     # day/night
@@ -281,7 +337,47 @@ sub HP1000_CGI() {
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
 
+    HP1000_PushWU( $hash, $webArgs )
+      if AttrVal( $name, "wu_push", 0 ) eq "1";
+
     return ( "text/plain; charset=utf-8", "success" );
+}
+
+###################################
+sub HP1000_GetAvg($$$$) {
+    my ( $hash, $t, $s, $v, $avg ) = @_;
+    return HP1000_GetSum( $hash, $t, $s, $v, 1 );
+}
+
+sub HP1000_GetSum($$$$;$) {
+    my ( $hash, $t, $s, $v, $avg ) = @_;
+    my $name = $hash->{NAME};
+
+    return $v if ( $avg && $hash->{INTERVAL} < 1 );
+    return "0" if ( $hash->{INTERVAL} < 1 );
+
+    my $max = int( $s / $hash->{INTERVAL} );
+    my $return;
+
+    unshift @{ $hash->{helper}{history}{$t} }, $v;
+    splice @{ $hash->{helper}{history}{$t} }, $max;
+
+    Log3 $name, 5, "HP1000 $name: Updated history for $t:"
+      . Dumper( $hash->{helper}{history}{$t} );
+
+    if ($avg) {
+        $return = printf( "%.1f",
+            sum( @{ $hash->{helper}{history}{$t} } ) /
+              @{ $hash->{helper}{history}{$t} } );
+
+        Log3 $name, 5, "HP1000 $name: Average for $t: $return";
+    }
+    else {
+        $return = printf( "%.1f", sum( @{ $hash->{helper}{history}{$t} } ) );
+        Log3 $name, 5, "HP1000 $name: Sum for $t: $return";
+    }
+
+    return $return;
 }
 
 ###################################
@@ -297,6 +393,11 @@ sub HP1000_PushWU($$) {
     my $http_noshutdown = AttrVal( $name, "http-noshutdown", "1" );
     my $wu_user         = AttrVal( $name, "wu_id", "" );
     my $wu_pass         = AttrVal( $name, "wu_password", "" );
+    my $wu_url          = (
+        Attr( $name, "wu_realtime", 0 )
+        ? "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php?realtime=1&"
+        : "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?"
+    );
 
     Log3 $name, 5, "HP1000 $name: called function HP1000_PushWU()";
 
@@ -305,6 +406,7 @@ sub HP1000_PushWU($$) {
 "HP1000 $name: missing attributes for Weather Underground transfer: wu_user and wu_password";
 
         my $return = "error: missing attributes wu_user and wu_password";
+
         readingsSingleUpdate( $hash, "wu_state", $return, 1 )
           if ( ReadingsVal( $name, "wu_state", "" ) ne $return );
         return;
@@ -316,68 +418,80 @@ sub HP1000_PushWU($$) {
     my $cmd;
 
     while ( my ( $key, $value ) = each %{$webArgs} ) {
-        $value = urlEncode($value)
-          if ( $key eq "softwaretype" || $key eq "dateutc" );
+        if ( $key eq "softwaretype" || $key eq "dateutc" ) {
+            $value = urlEncode($value);
+        }
 
-        if ( $key eq "windspeed" ) {
+        elsif ( $key eq "windspeed" ) {
             $key   = "windspeedmph";
-            $value = $value / 1.609344; # convert from kph to mph
+            $value = $value / 1.609344;    # convert from kph to mph
         }
 
-        if ( $key eq "windgust" ) {
+        elsif ( $key eq "windspd_avg2m" ) {
+            $key   = "windspdmph_avg2m";
+            $value = $value / 1.609344;    # convert from kph to mph
+        }
+
+        elsif ( $key eq "windgust" ) {
             $key   = "windgustmph";
-            $value = $value / 1.609344; # convert from kph to mph
+            $value = $value / 1.609344;    # convert from kph to mph
         }
 
-        if ( $key eq "inhumi" ) {
+        elsif ( $key eq "windgust_10m" ) {
+            $key   = "windgustmph_10m";
+            $value = $value / 1.609344;    # convert from kph to mph
+        }
+
+        elsif ( $key eq "inhumi" ) {
             $key = "indoorhumidity";
         }
 
-        if ( $key eq "intemp" ) {
+        elsif ( $key eq "intemp" ) {
             $key   = "indoortempf";
-            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
+            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
         }
 
-        if ( $key eq "intempf" ) {
+        elsif ( $key eq "intempf" ) {
             $key = "indoortempf";
         }
 
-        if ( $key eq "outhumi" ) {
+        elsif ( $key eq "outhumi" ) {
             $key = "humidity";
         }
 
-        if ( $key eq "outtemp" ) {
+        elsif ( $key eq "outtemp" ) {
             $key   = "tempf";
-            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
+            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
         }
 
-        if ( $key eq "outtempf" ) {
+        elsif ( $key eq "outtempf" ) {
             $key = "tempf";
         }
 
-        if ( $key eq "rain" ) {
+        elsif ( $key eq "rain" ) {
             $key   = "rainin";
-            $value = $value / 25.4; # convert from mm to inch
+            $value = $value / 25.4;         # convert from mm to inch
         }
 
-        if ( $key eq "dailyrain" ) {
+        elsif ( $key eq "dailyrain" ) {
             $key   = "dailyrainin";
-            $value = $value / 25.4; # convert from mm to inch
+            $value = $value / 25.4;         # convert from mm to inch
         }
 
-        if ( $key eq "dewpoint" ) {
+        elsif ( $key eq "dewpoint" ) {
             $key   = "dewptf";
-            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
+            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
         }
 
-        if ( $key eq "relbaro" ) {
+        elsif ( $key eq "relbaro" ) {
             $key   = "baromin";
-            $value = $value * 100 * 0.000295299830714; # convert from hPa to Inches of Mercury
+            $value = $value * 100 *
+              0.000295299830714;    # convert from hPa to Inches of Mercury
         }
 
-        if ( $key eq "light" ) {
+        elsif ( $key eq "light" ) {
             $key   = "solarradiation";
-            $value = $value * 0.01; # convert from uW/cm2 to W/m2
+            $value = $value * 0.01;      # convert from uW/cm2 to W/m2
         }
 
         $cmd .= "$key=" . $value . "&";
@@ -387,9 +501,7 @@ sub HP1000_PushWU($$) {
 
     HttpUtils_NonblockingGet(
         {
-            url =>
-"http://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?"
-              . $cmd,
+            url        => $wu_url . $cmd,
             timeout    => $timeout,
             noshutdown => $http_noshutdown,
             data       => undef,
@@ -490,6 +602,9 @@ sub HP1000_ReturnWU($$$) {
 
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Enable or disable to push data forward to Weather Underground (defaults to 0=no)
+
+      <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
+        Send the data to the WU realtime server instead of using the standard server (defaults to 0=no)
     </ul>
     </div>
 
@@ -541,6 +656,9 @@ sub HP1000_ReturnWU($$$) {
 
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Pushen der Daten zu Weather Underground aktivieren oder deaktivieren (Standard ist 0=aus)
+
+      <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
+        Sendet die Daten an den WU Echtzeitserver statt an den Standard Server (Standard ist 0=aus)
     </ul>
     </div>
 
