@@ -216,14 +216,14 @@ sub Hyperion_Read($)
     fhem "sleep 1; get $name statusRequest" if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
     return undef;
   }
-  elsif ($1 =~ /^.+"success":true\}$/)
+  elsif ($1 =~ /^.+\},"success":true\}$/)
   {
     ######################
     # delete old reading #
     fhem "deletereading $name previous_mode" if (defined(ReadingsVal($name,"previous_mode",undef)));
     ######################
-    my $obj = eval {from_json($result)};
-    my $data = $obj->{info};
+    my $obj         = eval {from_json($result)};
+    my $data        = $obj->{info};
     my $prio        = (defined($data->{priorities}->[0]->{priority})) ? $data->{priorities}->[0]->{priority} : undef;
     my $duration    = (defined($data->{priorities}->[0]->{duration_ms}) && $data->{priorities}->[0]->{duration_ms} > 999) ? int($data->{priorities}->[0]->{duration_ms} / 1000) : 0;
     $duration       = ($duration) >= 1 ? $duration : "infinite";
