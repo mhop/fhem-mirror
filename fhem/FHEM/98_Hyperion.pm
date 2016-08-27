@@ -207,16 +207,16 @@ sub Hyperion_Read($)
   return undef if (!$buf);
   my $result = ($hash->{PARTIAL}) ? $hash->{PARTIAL}.$buf : $buf;
   $hash->{PARTIAL} = $result;
-  Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned buf: $buf";
   return undef if ($buf !~ /(^.+"success":(true|false)\}$)/ );
+  Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned result: $result";
   delete $hash->{PARTIAL};
   my %Hyperion_sets_local = %Hyperion_sets;
-  if ($1 =~ /^\{"success":true\}$/)
+  if ($result=~ /^\{"success":true\}$/)
   {
     fhem "sleep 1; get $name statusRequest" if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
     return undef;
   }
-  elsif ($1 =~ /^.+\},"success":true\}$/)
+  elsif ($result =~ /^\{"info":\{.+\},"success":true\}$/)
   {
     ######################
     if (defined(ReadingsVal($name,"previous_mode",undef)))
