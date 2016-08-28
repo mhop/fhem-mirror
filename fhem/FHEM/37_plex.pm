@@ -47,7 +47,7 @@ plex_Initialize($)
   $hash->{AttrList} = "disable:1,0"
                       . " httpPort ignoredClients ignoredServers"
                       . " removeUnusedReadings:1,0 responder:1,0"
-                      . " user password"
+                      . " user password "
                       . $readingFnAttributes;
 }
 
