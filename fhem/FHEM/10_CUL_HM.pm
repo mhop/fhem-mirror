@@ -631,7 +631,7 @@ sub CUL_HM_Attr(@) {#################################
     my $md  = CUL_HM_Get($hash,$name,"param","model");
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $chn = substr(CUL_HM_hash2Id($hash),6,2);
-    if ($md eq "HM-Sen-RD-O" && $chn eq "02"){
+    if    ($md eq "HM-Sen-RD-O"    && $chn eq "02"){
       delete $hash->{helper}{param};
       my @param = split ",",$attrVal;
       foreach (@param){
@@ -673,10 +673,18 @@ sub CUL_HM_Attr(@) {#################################
         delete $hash->{helper}{vd}{msgRed};
       }
     }
-#    elsif ($st eq "blindActuator"){
     else{
       if ($cmd eq "set"){
-        if ($attrVal =~ m/(levelInverse|ponRestore)/){# no action
+        if    ($attrVal =~ m/(levelInverse|ponRestore)/){# no action
+        }
+        elsif ($attrVal =~ m/(showTimed)/){# no action
+          #we could check for those subtypes
+          #sensRain
+          #siren
+          #powerMeter
+          #switch
+          #dimmer
+          #rgb
         }
         else{
           return "attribut param $attrVal not valid for $name";
@@ -686,9 +694,6 @@ sub CUL_HM_Attr(@) {#################################
         delete $hash->{helper}{vd}{msgRed};
       }
     }
-#    else{
-#      return "attribut param not valid for $name";
-#    }
   }
   elsif($attrName eq "peerIDs"){
     if ($cmd eq "set"){
@@ -1852,7 +1857,12 @@ sub CUL_HM_Parse($$) {#########################################################
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
 
-      push @evtEt,[$mh{shash},1,"timedOn:".(($err&0x40 && $chn eq "02")?"running":"off")];
+      my ($timedOn,$stateExt)=("off","");
+      if($err&0x40 && $chn eq "02"){
+        $timedOn = "running";
+        $stateExt = "-till" if(AttrVal($mh{cName},"param","") =~ m/showTimed/ );
+      }     
+      push @evtEt,[$mh{cHash},1,"timedOn:$timedOn"];
 
       my $mdCh = $mh{md}.$chn;
       if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
@@ -1861,7 +1871,7 @@ sub CUL_HM_Parse($$) {#########################################################
       else{
         $val = hex($val)/2;
       }
-      push @evtEt,[$mh{shash},1,"state:$val"];
+      push @evtEt,[$mh{shash},1,"state:$val$stateExt"];
 
       if ($val eq "rain"){#--- handle lastRain---
         $mh{shash}->{helper}{lastRain} = $tn;
@@ -1972,20 +1982,22 @@ sub CUL_HM_Parse($$) {#########################################################
                      :($val==100 ? "on"
                                  :($pVal==0 ? "off"
                                             : "$val")); # user string...
+      
+      #--    if timed on is set possibly show this in a state --
+      my ($timedOn,$stateExt)=("off","");
+      if($err&0x40){
+        $timedOn = "running";
+        $stateExt = "-till" if(AttrVal($mh{cName},"param","") =~ m/showTimed/ );
+      }
       push @evtEt,[$mh{cHash},1,"level:$val"];
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
-      push @evtEt,[$mh{cHash},1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs)];
-      my $eventName = "unknown"; # different names for events
-      if   ($mh{st} eq "switch")           {$eventName = "switch";}  
-      elsif($mh{st} eq "blindActuator")    {$eventName = "motor" ;}  
-      elsif($mh{st} =~ m /^(dimmer|rgb)$/) {$eventName = "dim"   ;}
-      
-      my $action; #determine action
-      push @evtEt,[$mh{cHash},1,"timedOn:".(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{cHash},1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs.$stateExt)];      
+      push @evtEt,[$mh{cHash},1,"timedOn:$timedOn"];
+
       if ($mh{cHash}->{helper}{dlvl} && defined $err){#are we waiting?
         if ($mI[2] ne $mh{cHash}->{helper}{dlvl} #level not met?
-            && !($err&0x70)){                #and already stopped not timedOn
+            && !($err&0x70)){                    #and already stopped not timedOn
           #level not met, repeat
           Log3 $mh{cName},3,"CUL_HM $mh{cName} repeat, level $mI[2] instead of $mh{cHash}->{helper}{dlvl}";
           if ($mh{cHash}->{helper}{dlvlCmd}){# first try
@@ -2003,6 +2015,9 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       if ($mh{st} ne "switch"){
+        my $eventName = "unknown"; # different names for events
+        if   ($mh{st} eq "blindActuator")    {$eventName = "motor" ;}  
+        elsif($mh{st} =~ m /^(dimmer|rgb)$/) {$eventName = "dim"   ;}
         my $dir = ($err >> 4) & 3;
         my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
         push @evtEt,[$mh{cHash},1,"$eventName:$dirName{$dir}:$vs"  ];
@@ -2182,6 +2197,13 @@ sub CUL_HM_Parse($$) {#########################################################
 
       my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       my $vs = $val == 0 ? "off" : "on";
+      
+      #--    if timed on is set possibly show this in a state --
+      my ($timedOn,$stateExt)=("off","");
+      if($err&0x40){
+        $timedOn = "running";
+        $stateExt = "-till" if(AttrVal($mh{cName},"param","") =~ m/showTimed/ );
+      }
       if ($chn == 4){
         my %lvlSet = ("00"=>"disarmed","32"=>"armExtSens","C8"=>"armAll","FF"=>"armBlocked");
         $vs = defined $lvlSet{$val}?$lvlSet{$val}:$val;
@@ -2189,8 +2211,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"level:$val"];
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
-      push @evtEt,[$mh{cHash},1,"state:$vs"];
-      push @evtEt,[$mh{cHash},1,"timedOn:"      .(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{cHash},1,"state:$vs$stateExt"];
+      push @evtEt,[$mh{cHash},1,"timedOn:$timedOn"];
       push @evtEt,[$mh{devH} ,1,"powerOn:$tn",]                            if ($chn == 0) ;
       push @evtEt,[$mh{devH} ,1,"sabotageError:".(($err&0x04)?"on" :"off")];
       push @evtEt,[$mh{devH} ,1,"battery:"      .(($err&0x80)?"low":"ok" )];
@@ -2338,11 +2360,17 @@ sub CUL_HM_Parse($$) {#########################################################
         $mh{devH}->{helper}{PONtest} = 0;
       }
 
+      #--    if timed on is set possibly show this in a state --
+      my ($timedOn,$stateExt)=("off","");
+      if($err&0x40){
+        $timedOn = "running";
+        $stateExt = "-till" if(AttrVal($mh{shash}->{NAME},"param","") =~ m/showTimed/ );
+      }
       push @evtEt,[$mh{shash},1,"level:$val"];
       push @evtEt,[$mh{shash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{shash},1,"deviceMsg:$vs$target"] if($chn ne "00");
-      push @evtEt,[$mh{shash},1,"state:$vs"];
-      push @evtEt,[$mh{shash},1,"timedOn:".(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{shash},1,"state:$vs$stateExt"];
+      push @evtEt,[$mh{shash},1,"timedOn:$timedOn"];
     }
     elsif ($mh{mTp} eq "5E" ||$mh{mTp} eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."02"}
@@ -4213,7 +4241,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($cmd eq "regBulk"){
       $list = $a[2];
       $list =~ s/[\.]?RegL_//;
-      ($list,$peerID) = split(":",$list);
+      ($list,$peerID) = split('\.',$list);
 #      return "unknown list Number:".$list if(hex($list)>6);
     }
     elsif ($cmd eq "getRegRaw"){
@@ -4222,7 +4250,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $list ='0'.$1;
     }
     # as of now only hex value allowed check range and convert
-
     $peerID  = CUL_HM_peerChId(($peerID?$peerID:"00000000"),$dst);
     my $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");# have to split chan and id
     $peerID = substr($peerID,0,6);
@@ -4252,7 +4279,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my @adIn = @a;
       shift @adIn;shift @adIn;shift @adIn;
       my $adList;
-      foreach my $ad (sort @adIn){
+      foreach my $ad ( @adIn){
         last if($ad =~ m/^#/);
         ($addr,$data) = split(":",$ad);
         $adList .= sprintf("%02X%02X",hex($addr),hex($data)) if ($addr ne "00");
@@ -9106,6 +9133,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 1;
 
 =pod
+=item device
+=item summary    controls wireless homematic devices
+=item summary_DE steuert HomeMatic devices auf Funk Basis
 =begin html
 
   <a name="CUL_HM"></a><h3>CUL_HM</h3>
@@ -10284,6 +10314,15 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         NOTE: This will apply to readings and set commands. <B>It does not apply to any register. </B><br>
         <B>ponRestoreSmart</B> upon powerup of the device the Blind will drive to expected closest endposition followed by driving to the pre-PON level<br>
         <B>ponRestoreForce</B> upon powerup of the device the Blind will drive to level 0, then to level 100 followed by driving to the pre-PON level<br>
+      </li>
+      <li><B>sensRain</B><br>
+          <B>siren</B><br>
+          <B>powerMeter</B><br>
+          <B>switch</B><br>
+          <B>dimmer</B><br>
+          <B>rgb</B><br>
+        <B>showTimed</B> if timmed is running -till will be added to state. 
+                         This results eventually in state on-till which allowes better icon handling.<br>
       </li>
     </ul><br>
     <a name="CUL_HMevents"><b>Generated events:</b></a>
@@ -11629,6 +11668,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         ACHTUNG: Die Anpassung betrifft nur Readings und Kommandos. <B>Register sind nicht betroffen.</B><br>
         <B>ponRestoreSmart</B> bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
         <B>ponRestoreForce</B> bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+      </li>
+      <li><B>sensRain</B><br>
+          <B>siren</B><br>
+          <B>powerMeter</B><br>
+          <B>switch</B><br>
+          <B>dimmer</B><br>
+          <B>rgb</B><br>
+        <B>showTimed</B> wenn timedOn running ist wird -till an state gehängt. Dies führt dazu, dass ggf. on-till im State steht was das stateIcon handling verbessert.<br>
       </li>
     </ul><br>
     <a name="CUL_HMevents"><b>Erzeugte Events:</b></a>

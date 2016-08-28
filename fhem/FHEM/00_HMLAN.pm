@@ -1138,6 +1138,9 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 1;
 
 =pod
+=item device
+=item summary    IO device for wireless homematic
+=item summary_DE IO device für funkgesteuerte Homematic Devices
 =begin html
 
 <a name="HMLAN"></a>

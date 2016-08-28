@@ -35,6 +35,7 @@ use vars qw(@culHmCmdFlags);
 use vars qw(%culHmTpl);
 use vars qw($K_actDetID);
 
+
 # ----------------modul globals-----------------------
 my $K_actDetID = '000000'; # id of actionDetector
 

@@ -288,7 +288,7 @@ sub HMinfo_status($){##########################################################
   my @updates;
   foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
     my $d;
-    $d .= "$_:$sum{$read}{$_},"foreach(keys %{$sum{$read}});
+    $d .= "$_:$sum{$read}{$_},"foreach(sort keys %{$sum{$read}});
     push @updates,"I_sum_$read:".$d;
   }
   foreach my $read(keys %errFlt) {
@@ -2654,6 +2654,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 
 1;
 =pod
+=item command
+=item summary    support and control instance for wireless homematic devices and IOs
+=item summary_DE Unterstützung und Ueberwachung von Homematic funk devices und IOs 
+
 =begin html
 
 
