@@ -298,7 +298,7 @@ my %zwave_class = (
                                  '(hex($1)&0x80 ? ", dynamic":"").'.
                                  '(hex($1)&0x40 ? ", identical":", different")',
                "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' },
-    init  => { ORDER=>49, CMD => '"set $NAME -silent mcCreateAll"' } },
+    init  => { ORDER=>49, CMD => '"set $NAME mcCreateAll"' } },
   ZIP_PORTAL               => { id => '61' },
   DOOR_LOCK                => { id => '62', # V2
     set   => { doorLockOperation   => 'ZWave_DoorLockOperationSet($hash, "%s")',
@@ -353,7 +353,7 @@ my %zwave_class = (
                           => 'ZWave_mfsParse($hash,$1,$2,$3,1)',
                "0[8a]7205(....)(.{4})(.{4})(.*)"
                           => 'ZWave_mfsParse($hash,$1,$2,$3,2)' },
-    init  => { ORDER=>49, CMD => '"get $NAME -silent model"' } },
+    init  => { ORDER=>49, CMD => '"get $NAME model"' } },
   POWERLEVEL               => { id => '73',
     set   => { powerlevel     => "01%02x%02x",
                powerlevelTest => "04%02x%02x%04x" },
@@ -411,8 +411,7 @@ my %zwave_class = (
                "..840a(......)(......)(......)(......)" =>
                         '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
                         '" max ".hex($2)." default ".hex($3)." step ".hex($4)'},
-    init  => { ORDER=>11,
-                CMD => '"set $NAME -silent wakeupInterval 86400 $CTRLID"' } },
+    init  => { ORDER=>11, CMD => '"set $NAME wakeupInterval 86400 $CTRLID"' } },
   ASSOCIATION              => { id => '85',
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*" },
@@ -421,8 +420,7 @@ my %zwave_class = (
                associationAll       => 'ZWave_associationAllGet($hash,"")' },
     parse => { "..8503(..)(..)..(.*)" => 'ZWave_assocGroup($homeId,$1,$2,$3)',
                "..8506(..)"           => '"assocGroups:".hex($1)' },
-    init  => { ORDER=>10,
-                CMD => '"set $NAME -silent associationAdd 1 $CTRLID"'} },
+    init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
     get   => { version      => "11",
                versionClass => 'ZWave_versionClassGet($hash, "%s")',
@@ -437,7 +435,7 @@ my %zwave_class = (
                  '%d.%02d App %d.%d HW %d FWCounter %d FW %d.%d",'.
                  'unpack("C*",pack("H*","$1")))',
                "048614(..)(..)"     => '"versionClass_".hex($1).":".hex($2)' },
-   init  => { ORDER=>1, CMD => '"get $NAME versionClassAll"' } },
+   init  => { ORDER=> 1, CMD => '"get $NAME versionClassAll"' } },
   INDICATOR                => { id => '87',
     set   => { indicatorOff    => "0100",
                indicatorOn     => "01FF",
@@ -560,7 +558,7 @@ our %zwave_deviceSpecial;
    ZME_KFOB => {
      ZWAVEPLUS_INFO => {
       # Example only. ORDER must be >= 50
-      init => { ORDER=>50, CMD => '"get $NAME -silent zwavePlusInfo"' } } }
+      init => { ORDER=>50, CMD => '"get $NAME zwavePlusInfo"' } } }
 );
 
 my $zwave_cryptRijndael = 0;
@@ -719,6 +717,7 @@ ZWave_execInits($$;$)
     next if($seen{$cl});
     $seen{$cl} = 1;
     my $ptr = ZWave_getHash($hash, $cl, "init");
+    $ptr->{CC} = $cl if($ptr);
     push @initList, $ptr if($ptr && $ptr->{ORDER} >= $min);
   }
 
@@ -729,7 +728,8 @@ ZWave_execInits($$;$)
 
   my @cmd;
   foreach my $i (sort { $a->{ORDER}<=>$b->{ORDER} } @initList) {
-    push @cmd, eval $i->{CMD};
+    my $version = $hash->{".vclasses"}{$i->{CC}};
+    push @cmd, eval $i->{CMD} if(!defined($version) || $version > 0);
   }
 
   push @cmd, ZWave_initFromModelfile($hash->{NAME}, $CTRLID, $cfg)
@@ -772,7 +772,6 @@ ZWave_Cmd($$@)
   my ($type, $hash, @a) = @_;
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
-  my $silent = shift(@a) if($a[0] eq "-silent");
   my $cmd  = shift(@a);
 
   # Collect the commands from the distinct classes
@@ -815,8 +814,6 @@ ZWave_Cmd($$@)
   }
 
   if(!$cmdList{$cmd}) {
-    return "" if($silent);
-
     my @list;
     my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
     foreach my $lcmd (sort keys %cmdList) {
