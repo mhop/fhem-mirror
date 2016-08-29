@@ -490,11 +490,11 @@ sub Twilight_getWeatherHorizon(@)
   } 
 
   my $mod = "[".$hash->{NAME} ."] ";
-  my @faktor_cond_code = (25,25,25,25,20,10,10,10,10,10,
-                          10, 7, 7, 7, 5,10,10, 6, 6, 6,
-                          10, 6 ,6, 6, 6, 6, 3, 5, 5, 3,
-                           3, 0, 0, 0, 0, 7, 0,15,15,15,
-                           9,15, 8, 5,12, 6, 8, 8, 0, 0,
+  my @faktor_cond_code = (10,10,10,10, 9, 7, 7, 7, 7, 7,
+                           7, 5, 5, 5, 5, 7, 7, 5, 5, 5,
+                           7, 5, 5, 5, 5, 5, 2, 4, 4, 2,
+                           2, 0, 0, 0, 0, 5, 0, 8, 8, 8,
+                           6, 8, 6, 5, 2, 5, 6, 6, 0, 0,
                            0);
 
   # condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
@@ -733,6 +733,9 @@ sub twilight($$$$) {
 1;
 
 =pod
+=item device
+=item summary    delivers twilight and other sun related events for use in notify
+=item summary_DE liefert Dämmerungs Sonnen basierte Ereignisse, für notify
 =begin html
 
 <a name="Twilight"></a>
