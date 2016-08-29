@@ -473,7 +473,7 @@ rgCalc($$$$)
     foreach my $col (eval "($cols)") {
       foreach my $row (eval "($rows)") {
         my $value = $hash->{helper}{values}{orig}[$col][$row];
-        if( defined($value) ) {
+        if( defined($value) && $value ne '-' ) {
           #$value =~ s/[^-\.\d]//g;
           push @values, $value;
         }
