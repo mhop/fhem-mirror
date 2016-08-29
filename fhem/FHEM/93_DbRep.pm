@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.6          29.08.2016       plausibility checks of database column character length
 # 3.5.2        21.08.2016       fit to new commandref style
 # 3.5.1        20.08.2016       commandref continued
 # 3.5          18.08.2016       new attribute timeOlderThan
@@ -108,7 +109,22 @@ use Blocking;
 use Time::Local;
 no if $] >= 5.017011, warnings => 'experimental';  
 
+my %dbrep_col_postgre = ("DEVICE"  => 64,
+                         "TYPE"    => 64,
+                         "EVENT"   => 512,
+                         "READING" => 64,
+                         "VALUE"   => 128,
+                         "UNIT"    => 32
+                          );
 
+my %dbrep_col_mysql = ("DEVICE"  => 32,
+                       "TYPE"    => 64,
+                       "EVENT"   => 512,
+                       "READING" => 32,
+                       "VALUE"   => 32,
+                       "UNIT"    => 32
+                       );
+                           
 ###################################################################################
 # DbRep_Initialize
 ###################################################################################
@@ -176,6 +192,9 @@ sub DbRep_Set($@) {
   my $opt     = $a[1];
   my $prop    = $a[2];
   my $dbh     = $hash->{DBH};
+  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
+  $hash->{dbloghash} = $defs{$dblogdevice};
+  my $dbmodel = $hash->{dbloghash}{DBMODEL};
   my $setlist; 
   
   $setlist = "Unknown argument $opt, choose one of ".
@@ -251,11 +270,20 @@ sub DbRep_Set($@) {
           my $i_device  = AttrVal($hash->{NAME}, "device", "");
           my $i_reading = AttrVal($hash->{NAME}, "reading", "");
           
-          # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden
-          $i_device   = substr($i_device,0, 32);
-          $i_reading  = substr($i_reading,0, 32);
-          $i_value    = substr($i_value,0, 32);
-          $i_unit     = substr($i_unit,0, 32) if($i_unit);
+          # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
+          if ($dbmodel ne 'SQLITE') {
+              if ($dbmodel eq 'POSTGRESQL') {
+                  $i_device   = substr($i_device,0, $dbrep_col_postgre{DEVICE});
+                  $i_reading  = substr($i_reading,0, $dbrep_col_postgre{READING});
+                  $i_value    = substr($i_value,0, $dbrep_col_postgre{VALUE});
+                  $i_unit     = substr($i_unit,0, $dbrep_col_postgre{UNIT}) if($i_unit);
+              } elsif ($dbmodel eq 'MYSQL') {
+                  $i_device   = substr($i_device,0, $dbrep_col_mysql{DEVICE});
+                  $i_reading  = substr($i_reading,0, $dbrep_col_mysql{READING});
+                  $i_value    = substr($i_value,0, $dbrep_col_mysql{VALUE});
+                  $i_unit     = substr($i_unit,0, $dbrep_col_mysql{UNIT}) if($i_unit);
+              }
+          }
           
           $hash->{helper}{I_TIMESTAMP} = $i_timestamp;
           $hash->{helper}{I_DEVICE}    = $i_device;
@@ -282,9 +310,12 @@ return undef;
 # DbRep_Attr
 ###################################################################################
 sub DbRep_Attr($$$$) {
-    my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
-    my $do;
+  my ($cmd,$name,$aName,$aVal) = @_;
+  my $hash = $defs{$name};
+  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
+  $hash->{dbloghash} = $defs{$dblogdevice};
+  my $dbmodel = $hash->{dbloghash}{DBMODEL};
+  my $do;
       
     # $cmd can be "del" or "set"
     # $name is device name
@@ -339,17 +370,26 @@ sub DbRep_Attr($$$$) {
             unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) { return " Unsupported character in $aName found. Use only A-Z a-z _ . -";}
         }
         if ($aName eq "timeDiffToNow") {
-            unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as start of selection. Refer to commandref !";}
+            unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as start of selection. Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         } 
         if ($aName eq "timeOlderThan") {
-            unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as end of selection. Refer to commandref !";}
+            unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places. It's the time (in seconds) before current time used as end of selection. Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
-        } 
+        }
+        if ($aName eq "reading" || $aName eq "device") {
+            if ($dbmodel ne 'SQLITE') {
+                if ($dbmodel eq 'POSTGRESQL') {
+                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col_postgre{READING}" if(length($aVal) > $dbrep_col_postgre{READING});
+                } elsif ($dbmodel eq 'MYSQL') {
+                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col_mysql{READING}" if(length($aVal) > $dbrep_col_mysql{READING});
+                }
+            }
+        }
     }
 return undef;
 }
@@ -468,9 +508,9 @@ sub sqlexec($$) {
  my ($hash,$opt) = @_;
  my $name        = $hash->{NAME}; 
  my $to          = AttrVal($name, "timeout", "60");
- my $reading     = AttrVal($hash->{NAME}, "reading", undef);
- my $aggregation = AttrVal($hash->{NAME}, "aggregation", "no");   # wichtig !! aggregation niemals "undef"
- my $device      = AttrVal($hash->{NAME}, "device", undef);
+ my $reading     = AttrVal($name, "reading", undef);
+ my $aggregation = AttrVal($name, "aggregation", "no");   # wichtig !! aggregation niemals "undef"
+ my $device      = AttrVal($name, "device", undef);
  my $aggsec;
  
  # Test-Aufbau DB-Connection
@@ -2174,7 +2214,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  # Unit is optional, attributes of device, reading must be set ! <br><br>
                                  
                                  <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # field lenth is maximum 32 characters, NO spaces are allowed in fieldvalues ! <br>
+                                 # field lenth is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
                                  </li> <br>
                                  </ul>
                                  
@@ -2337,7 +2377,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br><br>
                                  
                                  <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # die Feldlänge ist maximal 32 Zeichen lang, es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
+                                 # die Feldlänge ist maximal 32 (MySQL) bzw. 64 (POSTGRESQL) Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
                                  </li> <br>
                                  </ul>
                                  
@@ -2381,7 +2421,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <ul><ul>
   <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tages,Kalenderwochen,Kalendermonaten oder "no". Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summation von Differenzwerten eines Readings (sumValue), usw. Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum sondern die Ausgabe ergibt alle Werte eines Device/Readings zwischen den definierten Zeiträumen.  </li> <br>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
-  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device   </li> <br>
+  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
