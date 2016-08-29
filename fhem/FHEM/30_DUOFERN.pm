@@ -1217,40 +1217,46 @@ DUOFERN_Parse($$)
     }
     
     my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
+    my @chans;
     if ($sensorMsg{$id}{chan} == 5) {
       for(my $x=0; $x<5; $x++)  {
         if((0x01<<$x) & hex($chan)) {
-          $chan = $x+1;
-          last;
+          push(@chans, $x+1);
         }  
       }
+    } else {
+      push(@chans, $chan);
     }
     
-    if($id =~ m/..(1A|18|19|01|02|03)/) {
-        if(($id =~ m/..1A/) || ($id =~ m/0E../) || ($code =~ m/^(A0|A2)..../)) {
-            readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}.".".$chan, 1);
-        } else {
-            readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
-        }
-        readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
-    } else {
-      if($code =~ m/^69.*/) {
-        $def01 = $modules{DUOFERN}{defptr}{$code."00"};
-        if(!$def01) {
-          DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+    foreach (@chans) {
+      $chan = $_;
+      if($id =~ m/..(1A|18|19|01|02|03)/) {
+          if(($id =~ m/..1A/) || ($id =~ m/0E../) || ($code =~ m/^(A0|A2)..../)) {
+              readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}.".".$chan, 1);
+          } else {
+              readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+          }
+          readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
+      } else {
+        if($code =~ m/^69.*/) {
           $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+          if(!$def01) {
+            DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+            $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+          }
+          $hash = $def01;
+        } 
+        if(($code !~ m/^69.*/) || ($id =~ m/..(11|12)/)) {
+          $chan="";
         }
-        $hash = $def01;
-      } 
-      if(($code !~ m/^69.*/) || ($id =~ m/..(11|12)/)) {
-        $chan="";
-      }
-      if($code =~ m/^(A5|AA|AB)..../) {
-        readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
-      }
-      readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
-      DoTrigger($hash->{NAME},$sensorMsg{$id}{name}.$chan);
-    }        
+        if($code =~ m/^(A5|AA|AB)..../) {
+          readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+        }
+        
+        readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
+        DoTrigger($hash->{NAME},$sensorMsg{$id}{name}.$chan);
+      }        
+    }
   
   #Umweltsensor Wetter
   } elsif ($msg =~ m/0F011322.{36}/) {  
@@ -1497,6 +1503,8 @@ DUOFERN_StatusTimeout($)
 1;
 
 =pod
+=item summary    controls Rademacher DuoFern devices
+=item summary_DE steuert Rademacher DuoFern Ger&auml;te
 =begin html
 
 <a name="DUOFERN"></a>
