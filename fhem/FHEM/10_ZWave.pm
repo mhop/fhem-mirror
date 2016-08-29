@@ -40,13 +40,16 @@ my %zwave_class = (
                "..010801"  => '"zwaveTransferPresentation"',
                "..010c(.*)"=> '"zwaveAssignRoute:$1"'
                }},
-  BASIC                    => { id => '20',
-    set   => { basicValue  => "01%02x",
-               basicSet    => "01%02x"  }, # Alias, Forum #38200
-    get   => { basicStatus => "02",     },
+  BASIC                    => { id => '20', # V1, V2
+    set   => { basicValue  => "01%02x",     # V1, V2
+               basicSet    => "01%02x"  },  # Alias, Forum #38200
+    get   => { basicStatus => "02",     },  # V1, V2
     parse => { "..2001(.*)"=> '"basicSet:".hex($1)', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
-               "..2003(.*)"=> '"basicReport:".hex($1)' }},
+               "032003(..)"=> '"basicReport:".hex($1)', # V1
+               "052003(..)(..)(..)"=> '"basicReport:".hex($1).
+                              " target: ".hex($2)." duration: ".hex($3)' }, # V2
+               },
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
     parse => { "..2201(..)(..)" =>
@@ -4653,7 +4656,7 @@ s2Hex($)
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
   <li>basicValue value<br>
     Alias for basicValue, to make mapping from the incoming events easier.
-    </li><br>
+    </li>
 
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
@@ -5137,10 +5140,12 @@ s2Hex($)
     devices in this group<br>
     </li>
 
-  <br><b>Class BASIC</b>
+  <br><br><b>Class BASIC</b>
   <li>basicStatus<br>
     return the status of the node as basicReport:XY. The value (XY) depends on
     the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+    Devices with version 2 (or greater) can return two additional values, the
+    'target value' and 'duration'.
     </li>
 
   <br><br><b>Class BATTERY</b>
@@ -5609,7 +5614,8 @@ s2Hex($)
   <li>assocGroupCmdList_X:AABBCCDD...</li>
 
   <br><br><b>Class BASIC</b>
-  <li>basicReport:X</li>
+  <li>basicReport:X (for version 1), basicReport:X target y duration z 
+    (for version 2 or greater)</li>
   <li>basicGet:request</li>
   <li>basicSet:X</li>
 
