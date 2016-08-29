@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: plausibility checks of database column character length
   - bugfix:  98_Hyperion: final fix for crash bug
   - bugfix:  74_AMAD: fix usb-ethernet condition in the "Send Data to
                       AMADCommBridge= Flow
