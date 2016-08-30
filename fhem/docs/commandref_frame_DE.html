@@ -1134,8 +1134,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     device, als auch Reading existiert, und nicht leer ist.</li>
   <li>[device:reading:d] wie ohne :d, aber alles nicht-numerische wird
     entfernt, siehe ReadingsNum</li>
-  <li>{(perlExpression)} mit dem Ergebnis der perlExpression, falls der Ausdruck
-    keinen Fehler generiert.</li>
+  <li>{(perlExpression)} mit dem Ergebnis der perlExpression.
+    Falls dieser Konstrukt innerhalb einer notify oder cmdalias verwendet wird,
+    dann wird zus&auml;tzlich $DEV mit dem Namen des vom set betroffenen
+    Ger&auml;tes ersetzt.
+    </li>
   </ul>
   <br><br>
 
