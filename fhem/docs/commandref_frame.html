@@ -1066,14 +1066,16 @@ The following local attributes are used by a wider range of devices:
   Each device has different set parameters, see the corresponding device
   section for details.<br>
   <br><br>
-  From featurelevel 5.7 on the set (and setreading) command replaces:
+  From featurelevel 5.7 on the set and setreading command replaces:
   <ul>
   <li>[device:reading] with the corresponding reading of device, if both device
     and reading exists.</li>
   <li>[device:reading:d] same as above, but only the number is retrieved, see
      ReadingsNum </li>
-  <li>{(perlExpression)} with the result of perlExpression, if the expression
-    does not generates an error.</li>
+  <li>{(perlExpression)} with the result of perlExpression.
+    If this construct is used inside of a notify or cmdalias, the $DEV variable
+    is additionally available, designating the set device name.
+    </li>
   </ul>
   <br><br>
 
