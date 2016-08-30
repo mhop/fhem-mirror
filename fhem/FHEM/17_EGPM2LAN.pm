@@ -44,27 +44,27 @@ sub
 EGPM2LAN_Get($@)
 {
     my ($hash, @a) = @_;
-    my $what;
+    my $getcommand;
 
     return "argument is missing" if(int(@a) != 2);
     
-    $what = $a[1];
+    $getcommand = $a[1];
     
-    if($what =~ /^(state|lastcommand)$/)
+    if($getcommand eq "state")
     {
-      if(defined($hash->{READINGS}{$what}))
-      {
-			   return $hash->{READINGS}{$what}{VAL};
-		  }
-      else
-		  {
-			   return "reading not found: $what";
-		  }
+      if(defined($hash->{STATE})) {
+          return $hash->{STATE}; }
+    } 
+    elsif($getcommand eq "lastcommand")
+    {
+      if(defined($hash->{READINGS}{lastcommand}{VAL})) { 
+          return $hash->{READINGS}{lastcommand}{VAL}; }
     }
     else
     {
-		  return "Unknown argument $what, choose one of state:noArg lastcommand:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
+         return "Unknown argument $getcommand, choose one of state:noArg lastcommand:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
     }
+    return "";
 }
 
 ################################### 
@@ -78,7 +78,7 @@ EGPM2LAN_Set($@)
 
   my $name = shift @a; 
   my $setcommand = shift @a; 
-  my $params = join(" ", @a); 
+  my $params = join(" ", @a);
   my $logLevel = GetLogLevel($name,4); 
   Log $logLevel, "EGPM2LAN set $name (". $hash->{IP}. ") $setcommand $params";
  
@@ -163,7 +163,7 @@ sub EGPM2LAN_Login($$) {
   Log $logLevel,"EGPM2LAN try to Login @".$hash->{IP};
 
   eval{
-      GetFileFromURL("http://".$hash->{IP}."/login.html", 5,"pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""),0 ,$logLevel);
+      GetFileFromURLQuiet("http://".$hash->{IP}."/login.html", 5,"pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""),0 ,$logLevel);
   }; 
   if ($@){ 
       ### catch block 
@@ -215,7 +215,6 @@ sub EGPM2LAN_Statusrequest($$$) {
   my $name = $hash->{NAME}; 
   
   my $response = GetFileFromURL("http://".$hash->{IP}."/", 5,"" , 0 ,$logLevel);
-  #CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, "", 0, $logLevel); 
   #Log 1,$response;
 	if(defined($response) && $response =~ /.,.,.,./) 
         { 
@@ -255,8 +254,8 @@ sub EGPM2LAN_Statusrequest($$$) {
 		   }
 		   else
 		   {
-			 Log 2, "EGPM2LAN: Autocreate disabled in globals section";
-       $attr{$name}{autocreate} = "off"; 
+			Log 2, "EGPM2LAN: Autocreate disabled in globals section";
+                        $attr{$name}{autocreate} = "off"; 
 		   }
 		}
 
@@ -306,19 +305,19 @@ EGPM2LAN_Define($$)
 { 
   my ($hash, $def) = @_; 
   my @a = split("[ \t][ \t]*", $def); 
-
+  
   my $u = "wrong syntax: define <name> EGPM2LAN IP Password"; 
   return $u if(int(@a) < 2); 
     
-  $hash->{IP} = $a[2]; 
+  $hash->{IP} = $a[2];
   if(int(@a) == 4) 
   { 
     $hash->{PASSWORD} = $a[3];  
-  } 
+    }
   else 
   { 
     $hash->{PASSWORD} = "";
-  }
+  } 
   my $result = EGPM2LAN_Login($hash, 3);
   if($result == 1)
   { 
@@ -333,6 +332,9 @@ EGPM2LAN_Define($$)
 1;
 
 =pod
+=item device
+=item summary    controls a LAN-Socket device from Gembird
+=item summary_DE steuert eine LAN-Steckdosenleiste von Gembird
 =begin html
 
 <a name="EGPM2LAN"></a>
