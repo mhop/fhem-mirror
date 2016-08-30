@@ -1566,7 +1566,7 @@ ReplaceSetMagic($$@)       # Forum #38276
     $x eq "" ? "[$1:$2$3]" : $x
   }/egi;
 
-  $evalSpecials->{'%DEV'} = $hash->{NAME} if($evalSpecials);
+  $evalSpecials->{'%DEV'} = $hash->{NAME};
   $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
 
   return (undef, @_) if($oa eq $a);
