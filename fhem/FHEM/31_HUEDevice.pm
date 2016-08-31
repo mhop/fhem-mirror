@@ -646,7 +646,10 @@ HUEDevice_Set($@)
       }
     }
 
-    return SetExtensions($hash, $list, $name, @aa);
+    $hash->{InSetExtensions} = 1;
+    my $ret = SetExtensions($hash, $list, $name, @aa);
+    delete $hash->{InSetExtensions};
+    return $ret;
   }
 
   if( $cmd eq 'rename' ) {
@@ -716,7 +719,7 @@ HUEDevice_Set($@)
       $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/state",\%obj);
     }
 
-    SetExtensionsCancel($hash);
+    SetExtensionsCancel($hash) if( !$hash->{InSetExtensions} );
 
     if( defined($result) && $result->{'error'} ) {
       $hash->{STATE} = $result->{'error'}->{'description'};
@@ -755,7 +758,11 @@ HUEDevice_Set($@)
   $list .= " savescene deletescene scene" if( $hash->{helper}->{devtype} eq 'G' );
   $list .= " rename";
 
-  return SetExtensions($hash, $list, $name, @aa);
+  $hash->{InSetExtensions} = 1;
+  my $ret = SetExtensions($hash, $list, $name, @aa);
+  delete $hash->{InSetExtensions};
+
+  return $ret;
 }
 
 sub
