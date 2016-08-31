@@ -102,6 +102,7 @@ use constant {
 	HMUARTLGW_STATE_SEND               => 100,
 	HMUARTLGW_STATE_SEND_NOACK         => 101,
 	HMUARTLGW_STATE_SEND_TIMED         => 102,
+	HMUARTLGW_STATE_UPDATE_COPRO       => 200,
 
 	HMUARTLGW_CMD_TIMEOUT              => 10,
 	HMUARTLGW_SEND_TIMEOUT             => 10,
@@ -114,6 +115,7 @@ my %sets = (
 	"open"         => "",
 	"close"        => "",
 	"restart"      => "",
+	"updateCoPro"  => "",
 );
 
 my %gets = (
@@ -162,6 +164,8 @@ sub HMUARTLGW_crc16($;$);
 sub HMUARTLGW_encrypt($$);
 sub HMUARTLGW_decrypt($$);
 sub HMUARTLGW_getVerbLvl($$$$);
+sub HMUARTLGW_firmwareGetBlock($$$);
+sub HMUARTLGW_updateCoPro($$);
 
 sub HMUARTLGW_DoInit($)
 {
@@ -1134,12 +1138,18 @@ sub HMUARTLGW_Parse($$$$)
 					Log3($hash, 1, "HMUARTLGW ${name} failed to enter App!");
 				}
 			} elsif ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP) {
-				Log3($hash, 1, "HMUARTLGW ${name} unexpected info about ${running} received (module crashed?), reopening");
+				Log3($hash, 1, "HMUARTLGW ${name} unexpected info about ${running} received (module crashed?), reopening")
+				    if (!defined($hash->{FirmwareFile}));
 				HMUARTLGW_Reopen($hash);
 				return;
 			}
 		} elsif ($msg =~ m/^04(..)/) {
 			my $ack = $1;
+
+			if ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_COPRO) {
+				HMUARTLGW_updateCoPro($hash, $msg);
+				return;
+			}
 
 			if ($ack eq HMUARTLGW_ACK_INFO && $hash->{DevState} == HMUARTLGW_STATE_QUERY_APP) {
 				my $running = pack("H*", substr($msg, 4));
@@ -1151,6 +1161,15 @@ sub HMUARTLGW_Parse($$$$)
 					RemoveInternalTimer($hash);
 					InternalTimer(gettimeofday()+1, "HMUARTLGW_GetSetParameters", $hash, 0);
 				} else {
+					if (defined($hash->{FirmwareFile}) && $hash->{FirmwareFile} ne "") {
+						Log3($hash, 1, "HMUARTLGW ${name} starting firmware upgrade");
+
+						$hash->{FirmwareBlock} = 0;
+						$hash->{DevState} = HMUARTLGW_STATE_UPDATE_COPRO;
+						HMUARTLGW_updateCondition($hash);
+						HMUARTLGW_updateCoPro($hash, $msg);
+						return;
+					}
 					$hash->{DevState} = HMUARTLGW_STATE_ENTER_APP;
 					HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 					RemoveInternalTimer($hash);
@@ -1669,13 +1688,23 @@ sub HMUARTLGW_Set($@)
 		InternalTimer(gettimeofday()+20, "HMUARTLGW_RemoveHMPair", "hmPairForSec:".$name, 1);
 	} elsif ($cmd eq "reopen") {
 		HMUARTLGW_Reopen($hash);
-	} elsif($cmd eq "close") {
+	} elsif ($cmd eq "close") {
 		HMUARTLGW_Undefine($hash, $name);
 		readingsSingleUpdate($hash, "state", "closed", 1);
 		$hash->{XmitOpen} = 0;
-	} elsif($cmd eq "open") {
+	} elsif ($cmd eq "open") {
 		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
-	} elsif($cmd eq "restart") {
+	} elsif ($cmd eq "restart") {
+		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
+	} elsif ($cmd eq "updateCoPro") {
+		return "Usage: set $name updateCoPro </path/to/firmware.eq3>"
+		    if(!$arg);
+		
+		my $block = HMUARTLGW_firmwareGetBlock($hash, $arg, 0);
+		return "${arg} is not a valid firmware file!"
+		    if (!defined($block) || $block eq "");
+
+		$hash->{FirmwareFile} = $arg;
 		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 	}
 
@@ -1857,6 +1886,9 @@ sub HMUARTLGW_updateCondition($)
 
 	if ($hash->{DevState} == HMUARTLGW_STATE_NONE) {
 		$cond = "disconnected";
+		$loadLvl = "suspended";
+	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_COPRO) {
+		$cond = "fwupdate";
 		$loadLvl = "suspended";
 	}
 
@@ -2107,6 +2139,96 @@ sub HMUARTLGW_decrypt($$)
 	$plaintext;
 }
 
+sub HMUARTLGW_firmwareGetBlock($$$) {
+	my ($hash, $file, $id) = @_;
+	my $name = $hash->{NAME};
+	my $block = "";
+
+	my $ret = open(my $fd, "<", $file);
+	if (!$ret) {
+		Log3($hash, 1, "HMUARTLGW ${name} can't open firmware file ${file}: $!");
+		return undef;
+	}
+
+	my $fw = "";
+	while(<$fd>) {
+		$fw .= $_;
+	}
+
+	close($fd);
+
+	my $n = 0;
+	while(length($fw)) {
+		my $len = unpack('n', pack('H4', $fw));
+		if ($n eq $id) {
+			$block = substr($fw, 4, $len * 2);
+			last;
+		}
+		$fw = substr($fw, 4 + ($len * 2));
+		$n++;
+	}
+
+	if ($n != $id) {
+		Log3($hash, 1, "HMUARTLGW ${name} invalid block ${id} requested");
+		return undef;
+	}
+
+	$block;
+}
+
+sub HMUARTLGW_updateCoPro($$) {
+	my ($hash, $msg) = @_;
+	my $name = $hash->{NAME};
+
+	RemoveInternalTimer($hash);
+
+	if (($hash->{FirmwareBlock} > 0) && ($msg !~ /^0401$/)) {
+		Log3($hash, 1, "HMUARTLGW ${name} firmware flash failed on block " . ($hash->{FirmwareBlock} - 1));
+		delete($hash->{FirmwareFile});
+		delete($hash->{FirmwareBlock});
+
+		$hash->{DevState} = HMUARTLGW_STATE_QUERY_APP;
+		HMUARTLGW_send($hash, HMUARTLGW_OS_GET_APP, HMUARTLGW_DST_OS);
+
+		InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+
+		return;
+	}
+
+	my $block = HMUARTLGW_firmwareGetBlock($hash, $hash->{FirmwareFile}, $hash->{FirmwareBlock});
+	if (!defined($block)) {
+		Log3($hash, 1, "HMUARTLGW ${name} firmware update aborted");
+		delete($hash->{FirmwareFile});
+		delete($hash->{FirmwareBlock});
+
+		$hash->{DevState} = HMUARTLGW_STATE_QUERY_APP;
+		HMUARTLGW_send($hash, HMUARTLGW_OS_GET_APP, HMUARTLGW_DST_OS);
+
+		InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+
+		return;
+	} elsif ($block eq "") {
+		Log3($hash, 1, "HMUARTLGW ${name} firmware update successfull");
+		delete($hash->{FirmwareFile});
+		delete($hash->{FirmwareBlock});
+
+		$hash->{DevState} = HMUARTLGW_STATE_QUERY_APP;
+		HMUARTLGW_send($hash, HMUARTLGW_OS_GET_APP, HMUARTLGW_DST_OS);
+
+		InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+
+		return;
+	}
+
+	#strip CRC from block
+	$block = substr($block, 0, -4);
+
+	HMUARTLGW_send($hash, HMUARTLGW_OS_UPDATE_FIRMWARE . ${block}, HMUARTLGW_DST_OS);
+	$hash->{FirmwareBlock}++;
+
+	InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+}
+
 sub HMUARTLGW_getVerbLvl($$$$) {
 	my ($hash, $src, $dst, $def) = @_;
 
@@ -2180,6 +2302,19 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         </li>
     <li>restart<br>
         Reboots the device.
+        </li>
+    <li>updateCoPro &lt;/path/to/firmware.eq3&gt;<br>
+        Update the coprocessor-firmware (reading D-firmware) from the
+        supplied file. Source for firmware-images (version 1.4.1, official
+        eQ-3 repository):<br>
+        <ul>
+            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a></li>
+            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a><br>
+            Please also make sure that D-LANfirmware is at least at version
+            1.1.5. To update to this version, use the eQ-3 CLI tools (see wiki)
+            or use the eQ-3 netfinder with this firmware image: <a href="https://github.com/eq-3/occu/raw/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/hm-lgw-o-tw-w-eu_update.eq3">hm-lgw-o-tw-w-eu_update.eq3</a><br>
+            <b>Do not flash hm-lgw-o-tw-w-eu_update.eq3 with updateCoPro!</b></li>
+        </ul>
         </li>
   </ul>
   <br>
