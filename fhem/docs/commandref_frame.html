@@ -1509,8 +1509,25 @@ The following local attributes are used by a wider range of devices:
     <li>restartDelay<br>
         set the delay for shutdown restart, default is 2 (seconds).
     </li><br>
-
   </ul>
+
+  <br>
+  <b>Events:</b>
+  <ul>
+    <li>INITIALIZED<br>after initialization is finished.</li>
+    <li>REREADCFG<br>after the configuration is reread.</li>
+    <li>SAVE<br>before the configuration is saved.</li>
+    <li>SHUTDOWN<br>before FHEM is shut down.</li>
+    <li>DEFINED &lt;devname&gt;<br>after a device is defined.</li>
+    <li>DELETED &lt;devname&gt;<br>after a device was deleted.</li>
+    <li>RENAMED &lt;old&gt; &lt;new&gt;<br>after a device was renamed.</li>
+    <li>UNDEFINED &lt;defspec&gt;<br>upon reception of a message for an
+    undefined device.</li>
+    <li>MODIFIED &lt;defspec&gt;</br> after a device modification.</li>
+    <li>UPDATE</br> after an update is completed.</li>
+  </ul>
+
+
 </ul>
 <!-- global end - do not remove this line! -->
 

@@ -1615,8 +1615,29 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         wurde. Die Voreinstellung ist 1 (wahr), man kann es ausschalten, indem
         man den Wert auf 0 setzt.
     </li>
-
   </ul>
+
+  <br><br>
+  <b>Events</b>
+  <ul>
+    <li>INITIALIZED<br>sobald die Initialization vollst&auml;ndig ist.</li>
+    <li>REREADCFG<br>nachdem die Konfiguration erneut eingelesen wurde.</li>
+    <li>SAVE<br>bevor die Konfiguration gespeichert wird.</li>
+    <li>SHUTDOWN<br>bevor FHEM heruntergefahren wird.</li>
+    <li>DEFINED &lt;devname&gt;<br>nach dem Definieren eines
+    Ger&auml;tes.</li>
+    <li>DELETED &lt;devname&gt;<br>nach dem L&ouml;schen eines
+    Ger&auml;tes.</li>
+    <li>RENAMED &lt;old&gt; &lt;new&gt;<br>nach dem Umbenennen eines
+    Ger&auml;tes.</li>
+    <li>UNDEFINED &lt;defspec&gt;<br>beim Auftreten einer Nachricht f&uuml;r
+    ein undefiniertes Ger&auml;t.</li>
+    <li>MODIFIED &lt;defspec&gt;<br>nach &Auml;nderung einer
+    Ger&auml;tedefinition.</li>
+    <li>UPDATE<br>nach Abschluss eines Updates.</li>
+  </ul>
+
+
 </ul>
 <!-- global end - diese Zeile nicht entfernen! -->
 
