@@ -435,8 +435,8 @@ sub GasCalculator_Notify($$)
 		}
 		
 		### Restore previous Counter and if not available define it with "undef"
-		my $GasCountReadingTimestampPrevious = ReadingsTimestamp($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PrevRead", undef);
-		my $GasCountReadingValuePrevious     =       ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PrevRead", undef);
+		my $GasCountReadingTimestampPrevious = ReadingsTimestamp($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
+		my $GasCountReadingValuePrevious     =       ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
 
 		### Create Log entries for debugging
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValuePrevious             : " . $GasCountReadingValuePrevious;
@@ -446,7 +446,7 @@ sub GasCalculator_Notify($$)
 		if(defined($GasCountReadingValuePrevious))
 		{
 			### Write current Volume as previous Voulume for future use in the GasCalc-Device
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value found. Continuing with calculations";
@@ -455,7 +455,7 @@ sub GasCalculator_Notify($$)
 		else
 		{
 			### Write current Volume as previous Voulume for future use in the GasCalc-Device
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value NOT found. Skipping Loop";
@@ -469,12 +469,12 @@ sub GasCalculator_Notify($$)
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stDay", undef)))
 		{
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMax",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMax",   0, 1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - Reading for the first daily value was not available and therfore reading and statistics have been written";
@@ -539,12 +539,12 @@ sub GasCalculator_Notify($$)
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyDayLast", (sprintf('%.3f', ($GasCalcEnergyDayLast))), 1);
 			
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMax",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMax",   0, 1);
 			
 			### Check whether the current value is the first one after change of month
 			if ($GasCountReadingTimestampCurrentMday < $GasCountReadingTimestampPreviousMday)
@@ -626,8 +626,8 @@ sub GasCalculator_Notify($$)
 			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600;
 			
 			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
-			my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
-			my $GasCalcPowerDayCount   = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDayCount", "0") + 1;
+			my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
+			my $GasCalcPowerDayCount   = ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PowerDayCount", "0") + 1;
 			my $GasCalcPowerDayAverage = $GasCalcPowerDaySum / $GasCalcPowerDayCount;
 			
 			### Calculate consumed Energy of current  day   W = (Vcurrent[cubic] - V1stReadDay[cubic])   * GaszValue * GasNominalHeatingValue[kWh/cubic]
@@ -695,10 +695,10 @@ sub GasCalculator_Notify($$)
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Meter",            sprintf('%.3f', ($GasCountReadingValueCurrent)));
 
 			### Write consumed volume (DV) since last measurement
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDV",           sprintf('%.3f', ($GasCountReadingValueDelta)));
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_LastDV",     sprintf('%.3f', ($GasCountReadingValueDelta)));
 
 			### Write timelap (Dt) since last measurement
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDt",           sprintf('%.0f', ($GasCountReadingTimestampDelta)));
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_LastDt",     sprintf('%.0f', ($GasCountReadingTimestampDelta)));
 		
 			### Write current Power = average Power over last measurement period
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerCurrent",     sprintf('%.3f', ($GasCalcPowerCurrent)));
@@ -707,10 +707,10 @@ sub GasCalculator_Notify($$)
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayAver",     sprintf('%.3f', ($GasCalcPowerDayAverage)));
 			
 			### Write Power measurement sum    since midnight for average calculation
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",      sprintf('%.3f', ($GasCalcPowerDaySum)));
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDaySum",      sprintf('%.3f', ($GasCalcPowerDaySum)));
 			
 			### Write Power measurement counts since midnight for average calculation
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount",    sprintf('%.0f', ($GasCalcPowerDayCount)));
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDayCount",    sprintf('%.0f', ($GasCalcPowerDayCount)));
 			
 			### Detect new daily minimum power value and write to reading
 			if (ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMin", 0) > $GasCalcPowerCurrent)
@@ -1207,28 +1207,6 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDV</code> : </li></td><td>Difference of chosen Volume between current and previous reading (&Delta;V).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDt</code> : </li></td><td>Difference of time in seconds between current and previous reading (&Delta;t).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter</code> : </li></td><td>Current indicated total volume consumption on mechanical gas meter. Correct Offset-attribute if not identical.<BR>
 			</td></tr>
 			</td>
@@ -1262,28 +1240,6 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayCount</code> : </li></td><td>Number of power measurements since midnight. (Required for average calculations)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDaySum</code> : </li></td><td>Sum of power measurements since midnight. (Required for average calculations)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximum power peak since midnight.<BR>
 			</td></tr>
 			</td>
@@ -1296,17 +1252,6 @@ sub GasCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimum power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PrevRead</code> : </li></td><td>Reading of previous volume measurement. (Required for &Delta;V and &Delta;t calculation)<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1856,28 +1801,6 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDV</code> : </li></td><td>Volumenunterschied in der gew&auml;hlten Volumeneinheit zwischen den augenblicklichen und vorherigen Messwert (&Delta;V).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDt</code> : </li></td><td>Zeitunterschied in Sekunden zwischen den augenblicklichen und vorherigen Messwert (&Delta;t).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter</code> : </li></td><td>Z&auml;hlerstand am Gasz&auml;hler. Bei Differenzen muss das Offset-Attribut korrigiert werden.<BR>
 			</td></tr>
 			</td>
@@ -1911,28 +1834,6 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayCount</code> : </li></td><td>Anzahl der Leistungsmessungen seit Mittenacht. (Wird für Errechnung des t&aumlglichen Mittelwert ben&ouml;tigt)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDaySum</code> : </li></td><td>Summe aller Leistungsmessungen seit Mitternacht. (Wird für Errechnung des t&aumlglichen Mittelwert ben&ouml;tigt)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximale Leistungsaufnahme seit Mitternacht.<BR>
 			</td></tr>
 			</td>
@@ -1945,17 +1846,6 @@ sub GasCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimale Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PrevRead</code> : </li></td><td>Reading der vorherigen Messung (Wird für die Berechnung des &Delta;V und &Delta;t ben&ouml;tigt)<BR>
 			</td></tr>
 			</td>
 		</tr>
