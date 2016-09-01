@@ -48,7 +48,7 @@ my %hueModels = (
                                                                                    icon => 'hue_filled_storylight', },
   LLC014 => {name => 'Living Colors Aura'       ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_aura', },
-  LLC020 => {name => 'Hue Go'                   ,type => 'Color light'            ,subType => 'colordimmer',
+  LLC020 => {name => 'Hue Go'                   ,type => 'Color light'            ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_go', },
   LST001 => {name => 'Hue LightStrips'          ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_lightstrip', },
