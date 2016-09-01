@@ -195,7 +195,7 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 		Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - Power-Reading detected         : " . $argument[0];
 		
 		### Get values being changed from hash
-		$reading = $argument[0];
+ 		$reading = $argument[0];
 		$value   = $argument[1];
 		$unit    = $attr{$hash}{SiPrefixPower};
 	}
@@ -253,12 +253,12 @@ sub ElectricityCalculator_Get($@)
 	
 	if ( $reading ne "?")
 	{
-		### Create Log entries for debugging
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - get " . $reading . " with value: " . $value;
-		
 		### Write current value
 		$value = ReadingsVal($ElectricityCalcName,  $reading, undef);
 		
+		### Create Log entries for debugging
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - get " . $reading . " with value: " . $value;
+
 		### Create ReturnMessage
 		$ReturnMessage = $value;
 	}
@@ -502,8 +502,8 @@ sub ElectricityCalculator_Notify($$)
 		}
 		
 		### Restore previous Counter and if not available define it with "undef"
-		my $ElectricityCountReadingTimestampPrevious = ReadingsTimestamp($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_PrevRead", undef);
-		my $ElectricityCountReadingValuePrevious     =       ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_PrevRead", undef);
+		my $ElectricityCountReadingTimestampPrevious = ReadingsTimestamp($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
+		my $ElectricityCountReadingValuePrevious     =       ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
 
 		### Create Log entries for debugging
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValuePrevious             : " . $ElectricityCountReadingValuePrevious;
@@ -513,7 +513,7 @@ sub ElectricityCalculator_Notify($$)
 		if(defined($ElectricityCountReadingValuePrevious))
 		{
 			### Write current electric Energy as previous Electric Energy for future use in the ElectricityCalc-Device
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous value found. Continuing with calculations";
@@ -522,7 +522,7 @@ sub ElectricityCalculator_Notify($$)
 		else
 		{
 			### Write current electric Energy as previous Voulume for future use in the ElectricityCalc-Device
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous value NOT found. Skipping Loop";
@@ -536,12 +536,12 @@ sub ElectricityCalculator_Notify($$)
 		if(!defined(ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_CounterDay1st", undef)))
 		{
 			### Save current electric Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDay1st",  $ElectricityCountReadingValueCurrent,  1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDayLast", $ElectricityCountReadingValuePrevious, 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDaySum",   0, 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayCount", 0, 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMin",   0, 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMax",   0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDay1st",  $ElectricityCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDayLast", $ElectricityCountReadingValuePrevious, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",   0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDayCount", 0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_PowerDayMin",   0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_PowerDayMax",   0, 1);
 
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator - Reading for the first daily value was not available and therfore reading and statistics have been written";
@@ -688,8 +688,8 @@ sub ElectricityCalculator_Notify($$)
 			my $ElectricityCalcPowerCurrent    = ($ElectricityCountReadingValueDelta / $ElectricityCountReadingTimestampDelta) * 3600 * 1000 * $ElectricityCalcDev->{system}{SiPrefixPowerFactor};
 			
 			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
-			my $ElectricityCalcPowerDaySum     = ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_PowerDaySum",   "0") + $ElectricityCalcPowerCurrent;
-			my $ElectricityCalcPowerDayCount   = ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_PowerDayCount", "0") + 1;
+			my $ElectricityCalcPowerDaySum     = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",   "0") + $ElectricityCalcPowerCurrent;
+			my $ElectricityCalcPowerDayCount   = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "." . $ElectricityCalcReadingPrefix . "_PowerDayCount", "0") + 1;
 			my $ElectricityCalcPowerDayAverage = $ElectricityCalcPowerDaySum / $ElectricityCalcPowerDayCount;
 			
 			### Calculate consumed Energy of current  day   W = (Wcurrent[kWh] - W1stReadDay[kWh])   
@@ -748,19 +748,16 @@ sub ElectricityCalculator_Notify($$)
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayMin                       : " . ReadingsVal( $ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMin", 0) . " kW";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayAverage                   : " . sprintf('%.3f', ($ElectricityCalcPowerDayAverage)) . " kW";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayMax                       : " . ReadingsVal( $ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMax", 0) . " kW";
-			
+
 			###### Write readings to ElectricityCalc device
 			### Initialize Bulkupdate
 			readingsBeginUpdate($ElectricityCalcReadingDestinationDevice);
 
-			### Write current mechanic meter reading
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_Meter",             sprintf('%.3f', ($ElectricityCountReadingValueCurrent)));
-
 			### Write consumed electric Energy (DV) since last measurement
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_LastDV",            sprintf('%.3f', ($ElectricityCountReadingValueDelta)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastDV",      sprintf('%.3f', ($ElectricityCountReadingValueDelta)));
 
 			### Write timelap (Dt) since last measurement
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_LastDt",            sprintf('%.0f', ($ElectricityCountReadingTimestampDelta)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastDt",            sprintf('%.0f', ($ElectricityCountReadingTimestampDelta)));
 		
 			### Write current Power = average Power over last measurement period
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerCurrent",      sprintf('%.3f', ($ElectricityCalcPowerCurrent)));
@@ -769,10 +766,10 @@ sub ElectricityCalculator_Notify($$)
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayAver",      sprintf('%.3f', ($ElectricityCalcPowerDayAverage)));
 			
 			### Write Power measurement sum    since midnight for average calculation
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDaySum",       sprintf('%.3f', ($ElectricityCalcPowerDaySum)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",       sprintf('%.3f', ($ElectricityCalcPowerDaySum)));
 			
 			### Write Power measurement counts since midnight for average calculation
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayCount",     sprintf('%.0f', ($ElectricityCalcPowerDayCount)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDayCount",     sprintf('%.0f', ($ElectricityCalcPowerDayCount)));
 			
 			### Detect new daily minimum power value and write to reading
 			if (ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMin", 0) > $ElectricityCalcPowerCurrent)
@@ -1354,28 +1351,6 @@ sub ElectricityCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDV</code> : </li></td><td>Difference of chosen electric energy between current and previous reading (&Delta;V).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDt</code> : </li></td><td>Difference of time in seconds between current and previous reading (&Delta;t).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Current electric Power. (Average Power between current and previous measurement.)<BR>
 			</td></tr>
 			</td>
@@ -1398,28 +1373,6 @@ sub ElectricityCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayCount</code> : </li></td><td>Number of Power measurements since midnight. (Required for average calculations)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDaySum</code> : </li></td><td>Sum of Power measurements since midnight. (Required for average calculations)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximum Power peak since midnight.<BR>
 			</td></tr>
 			</td>
@@ -1432,17 +1385,6 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimum Power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PrevRead</code> : </li></td><td>Reading of previous electric energy measurement. (Required for &Delta;V and &Delta;t calculation)<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1949,28 +1891,6 @@ sub ElectricityCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDV</code> : </li></td><td>Energienunterschied in kWh zwischen den augenblicklichen und vorherigen Messwert (&Delta;W).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_LastDt</code> : </li></td><td>Zeitunterschied in Sekunden zwischen den augenblicklichen und vorherigen Messwert (&Delta;t).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Aktuelle elektrische Leistung. (Mittelwert zwischen aktueller und letzter Messung)<BR>
 			</td></tr>
 			</td>
@@ -1993,28 +1913,6 @@ sub ElectricityCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayCount</code> : </li></td><td>Anzahl der Leistungsmessungen seit Mittenacht. (Wird für Errechnung des t&aumlglichen Mittelwert ben&ouml;tigt)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDaySum</code> : </li></td><td>Summe aller Leistungsmessungen seit Mitternacht. (Wird für Errechnung des t&aumlglichen Mittelwert ben&ouml;tigt)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximale elektrische Leistungsaufnahme seit Mitternacht.<BR>
 			</td></tr>
 			</td>
@@ -2027,17 +1925,6 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimale elektrische Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PrevRead</code> : </li></td><td>Reading der vorherigen Messung (Wird für die Berechnung des &Delta;W und &Delta;t ben&ouml;tigt)<BR>
 			</td></tr>
 			</td>
 		</tr>
