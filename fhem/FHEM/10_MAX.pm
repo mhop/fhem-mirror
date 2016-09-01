@@ -903,6 +903,9 @@ MAX_DbLog_splitFn($)
 1;
 
 =pod
+=item device
+=item summary controls an MAX! device
+=item summary_DE Steuerung eines MAX! Geräts
 =begin html
 
 <a name="MAX"></a>
