@@ -37,6 +37,9 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
+#                               diffValue changed to fix wrong timestamp if error occur
+# 3.7          30.08.2016       exportToFile added
 # 3.6          29.08.2016       plausibility checks of database column character length
 # 3.5.2        21.08.2016       fit to new commandref style
 # 3.5.1        20.08.2016       commandref continued
@@ -141,6 +144,7 @@ sub DbRep_Initialize($) {
                        "allowDeletion:1,0 ".
                        "readingNameMap ".
                        "device ".
+                       "expimpfile ".
                        "aggregation:hour,day,week,month,no ".
                        "showproctime:1,0 ".
                        "timestamp_begin ".
@@ -201,6 +205,7 @@ sub DbRep_Set($@) {
              "sumValue:noArg ".
              "averageValue:noArg ".
              "delEntries:noArg ".
+             "exportToFile:noArg ".
              "maxValue:noArg ".
              "fetchrows:noArg ".
              "diffValue:noArg ".
@@ -298,6 +303,13 @@ sub DbRep_Set($@) {
       }
       
       sqlexec($hash,"insert");
+      
+  } elsif ($opt eq "exportToFile") {
+      if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
+          return " The attribute \"expimpfile\" (path and filename) has to be set for export !";
+      }
+      sqlexec($hash,"exportToFile");
+      
   }
   else  
   {
@@ -677,6 +689,12 @@ $hash->{HELPER}{CV} = \%cv;
              
      $hash->{helper}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
     
+ } elsif ($opt eq "exportToFile") {
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             
+     $hash->{helper}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
+    
  } elsif ($opt eq "max") {        
      $hash->{helper}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
@@ -704,12 +722,12 @@ sub averval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- 
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_DoParse");
 
@@ -717,9 +735,10 @@ sub averval_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-     return "$name|''|$device|$reading|''|1";
+     return "$name|''|$device|$reading|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -758,10 +777,11 @@ sub averval_DoParse($) {
      eval {$line = $dbh->selectrow_array($sql);};
      
      if ($@) {
+         $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-         return "$name|''|$device|$reading|''|1";
+         return "$name|''|$device|$reading|''|$err";
      } else {
          Log3 ($name, 5, "DbRep $name - SQL result: $line") if($line);
          if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -799,12 +819,13 @@ sub averval_ParseDone($) {
   my $device     = $a[2];
   my $reading    = $a[3];
   my $rt         = $a[4];
-  my $dberr      = $a[5];
+  my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_ParseDone");
   
-  if ($dberr) {
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
@@ -854,12 +875,12 @@ sub count_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash        = $defs{$name};
- 
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_DoParse");
  
@@ -867,9 +888,10 @@ sub count_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
-     return "$name|''|$device|$reading|''|1";
+     return "$name|''|$device|$reading|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -907,10 +929,11 @@ sub count_DoParse($) {
      eval {$line = $dbh->selectrow_array($sql);};
      
      if ($@) {
+         $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
-         return "$name|''|$device|$reading|''|1";
+         return "$name|''|$device|$reading|''|$err";
      } else {
          Log3 ($name, 5, "DbRep $name - SQL result: $line") if($line);      
          if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -949,12 +972,13 @@ sub count_ParseDone($) {
   my $device     = $a[2];
   my $reading    = $a[3];
   my $rt         = $a[4];
-  my $dberr      = $a[5];
+  my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_ParseDone");
   
-  if ($dberr) {
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
@@ -1004,13 +1028,13 @@ return;
 sub maxval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
- my $hash         = $defs{$name};
- 
+ my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_DoParse");
   
@@ -1018,9 +1042,10 @@ sub maxval_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-     return "$name|''|$device|$reading|''|1";
+     return "$name|''|$device|$reading|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -1061,10 +1086,11 @@ sub maxval_DoParse($) {
      eval {$sth->execute($runtime_string_first, $runtime_string_next);};
      
      if ($@) {
+         $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-         return "$name|''|$device|$reading|''|1";
+         return "$name|''|$device|$reading|''|$err";
      } else {
          my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
          
@@ -1112,12 +1138,13 @@ sub maxval_ParseDone($) {
   my $device     = $a[2];
   my $reading    = $a[3];
   my $rt         = $a[4];
-  my $dberr      = $a[5];
+  my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_ParseDone");
   
-  if ($dberr) {
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
@@ -1217,13 +1244,13 @@ return;
 sub diffval_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
- my $hash         = $defs{$name};
- 
+ my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_DoParse");
   
@@ -1231,9 +1258,10 @@ sub diffval_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-     return "$name|''|$device|$reading|''|1";
+     return "$name|''|$device|$reading|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -1255,13 +1283,13 @@ sub diffval_DoParse($) {
      my $runtime_string_next   = $a[2];   
      
      # SQL zusammenstellen für DB-Operation
-     my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     my $sql = "SELECT TIMESTAMP,VALUE FROM `history` where ";
      $sql .= "`DEVICE` = '$device' AND " if($device);
      $sql .= "`READING` = '$reading' AND " if($reading); 
      $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
-     my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     my $sql1 = "SELECT TIMESTAMP,VALUE FROM `history` where ";
      $sql1 .= "`DEVICE` = '$device' AND " if($device);
      $sql1 .= "`READING` = '$reading' AND " if($reading); 
      $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
@@ -1274,10 +1302,11 @@ sub diffval_DoParse($) {
      eval {$sth->execute($runtime_string_first, $runtime_string_next);};
      
      if ($@) {
+         $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-         return "$name|''|$device|$reading|''|1";
+         return "$name|''|$device|$reading|''|$err";
      } else {
          my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
          
@@ -1324,12 +1353,13 @@ sub diffval_ParseDone($) {
   my $device     = $a[2];
   my $reading    = $a[3];
   my $rt         = $a[4];
-  my $dberr      = $a[5];
+  my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
   
-  if ($dberr) {
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
@@ -1349,27 +1379,29 @@ sub diffval_ParseDone($) {
   my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
 
   foreach my $row (@row_array) {
-      my @a = split("[ \t][ \t]*", $row);
+      my @a = split("[ \t][ \t]*", $row, 4);
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       
-      my $value          = $a[1];      
+      my $value          = $a[3];  
       
-      # Test auf $value = "numeric"
-      if (!looks_like_number($value)) {
-          readingsSingleUpdate($hash, "state", "error", 1);
-          delete($hash->{helper}{RUNNING_PID});
-          $a[3] =~ s/\s+$//g;
-          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $a[2] $a[3], DEVICE: $device, READING: $reading, VALUE: $value. \nLeaving ...");
-          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
-          return;
-      }
-      
-      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
-      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      $a[3]              =~ s/:/-/g if($a[2]);          # substituieren unsopported characters -> siehe fhem.pl
+      my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
+      
+      # Test auf $value = "numeric"
+      if (!looks_like_number($value)) {
+          $a[3] =~ s/\s+$//g;
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
+          $err = "Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value";
+          readingsSingleUpdate($hash, "errortext", $err, 1);
+          readingsSingleUpdate($hash, "state", "error", 1);
+          delete($hash->{helper}{RUNNING_PID});
+          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+          return;
+      }
       
       Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
              
@@ -1448,6 +1480,7 @@ sub sumval_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_DoParse");
  
@@ -1455,9 +1488,10 @@ sub sumval_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-     return "$name|''|$device|$reading|''|1";
+     return "$name|''|$device|$reading|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -1495,10 +1529,11 @@ sub sumval_DoParse($) {
      eval {$line = $dbh->selectrow_array($sql);};
      
      if ($@) {
+         $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-         return "$name|''|$device|$reading|''|1";
+         return "$name|''|$device|$reading|''|$err";
      } else {
          Log3($name, 5, "DbRep $name - SQL result: $line") if($line);      
          if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -1537,12 +1572,13 @@ sub sumval_ParseDone($) {
   my $device     = $a[2];
   my $reading    = $a[3];
   my $rt         = $a[4];
-  my $dberr      = $a[5];
+  my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_ParseDone");
   
-  if ($dberr) {
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
@@ -1596,6 +1632,7 @@ sub del_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_DoParse");
  
@@ -1603,9 +1640,10 @@ sub del_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  }
  
  # SQL zusammenstellen für DB-Operation
@@ -1631,10 +1669,11 @@ sub del_DoParse($) {
  
  my $rows;
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  } else {
      $rows = $sth->rows;
      $dbh->commit() if(!$dbh->{AutoCommit});
@@ -1661,11 +1700,12 @@ sub del_ParseDone($) {
   my $name  = $hash->{NAME};
   my $rows  = $a[1];
   my $rt    = $a[2];
-  my $dberr = $a[3];
+  my $err   = $a[3]?decode_base64($a[3]):undef;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
   
-  if ($dberr) {
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
@@ -1711,6 +1751,7 @@ sub insert_Push($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Push");
  
@@ -1718,9 +1759,10 @@ sub insert_Push($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  }
  
  my $i_timestamp = $hash->{helper}{I_TIMESTAMP};
@@ -1745,11 +1787,12 @@ sub insert_Push($) {
  
  my $irow;
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
      $dbh->rollback();
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  } else {
      $dbh->commit();
      $irow = $sth->rows;
@@ -1775,7 +1818,7 @@ sub insert_Done($) {
   my $name  = $hash->{NAME};
   my $irow  = $a[1];
   my $rt    = $a[2];
-  my $dberr = $a[3];
+  my $err   = $a[3]?decode_base64($a[3]):undef;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Done");
   
@@ -1787,7 +1830,8 @@ sub insert_Done($) {
   my $i_value     = delete $hash->{helper}{I_VALUE};
   my $i_unit      = delete $hash->{helper}{I_UNIT}; 
   
-  if ($dberr) {
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
@@ -1823,6 +1867,7 @@ sub fetchrows_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_DoParse");
 
@@ -1830,9 +1875,10 @@ sub fetchrows_DoParse($) {
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  }
  
  # SQL zusammenstellen
@@ -1858,13 +1904,14 @@ sub fetchrows_DoParse($) {
  
  my $rowlist;
  if ($@) {
+     $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
-     return "$name|''|''|1";
+     return "$name|''|''|$err";
  } else {
-     my @row_array = map { $_ -> [0]." ".$_ -> [1]." ".$_ -> [2]." ".$_ -> [3]."\n" } @{ $sth->fetchall_arrayref() };     
-     $rowlist = join('|', @row_array); 
+     my @row_array = map { $_ -> [0]." ".$_ -> [1]." ".$_ -> [2]." ".$_ -> [3]."\n" } @{$sth->fetchall_arrayref()};     
+     $rowlist = join('|', @row_array);
      Log3 ($name, 5, "DbRep $name -> row_array:  @row_array");
  } 
  
@@ -1891,7 +1938,7 @@ sub fetchrows_ParseDone($) {
   my $hash     = $defs{$a[0]};
   my $rowlist  = decode_base64($a[1]);
   my $rt       = $a[2];
-  my $dberr    = $a[3];
+  my $err      = $a[3]?decode_base64($a[3]):undef;
   my $name     = $hash->{NAME};
   my $reading  = AttrVal($name, "reading", undef);
   my @i;
@@ -1900,7 +1947,8 @@ sub fetchrows_ParseDone($) {
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_ParseDone");
   
-  if ($dberr) {
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{helper}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
@@ -1937,6 +1985,142 @@ sub fetchrows_ParseDone($) {
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
+  
+return;
+}
+
+####################################################################################################
+# nichtblockierende DB-Funktion expfile
+####################################################################################################
+
+sub expfile_DoParse($) {
+ my ($string) = @_;
+ my ($name, $device, $reading, $runtime_string_first, $runtime_string_next) = split("\\|", $string);
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err=0;
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_DoParse");
+
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
+     return "$name|''|''|$err";
+ }
+ 
+ my $outfile = AttrVal($name, "expimpfile", undef);
+ if (open(FH, ">$outfile")) {
+     binmode (FH);
+ } else {
+     $err = encode_base64("could not open ".$outfile.": ".$!,"");
+     return "$name|''|''|$err";
+ }
+ 
+ 
+ # SQL zusammenstellen
+ my $sql = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM history where ";
+ $sql .= "DEVICE = '$device' AND " if($device);
+ $sql .= "READING = '$reading' AND " if($reading); 
+ $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP;";   
+         
+ # SQL zusammenstellen für Logfileausgabe
+ my $sql1 = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM FROM history where ";
+ $sql1 .= "DEVICE = '$device' AND " if($device);
+ $sql1 .= "READING = '$reading' AND " if($reading); 
+ $sql1 .= "TIMESTAMP BETWEEN $runtime_string_first AND $runtime_string_next ORDER BY TIMESTAMP;"; 
+     
+ Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");    
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ my $sth = $dbh->prepare($sql);
+ 
+ eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+ 
+ my $nrows = 0;
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     $dbh->disconnect;
+     Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
+     return "$name|''|''|$err";
+ } else {
+     while (my $row = $sth->fetchrow_arrayref) {
+        print FH join(',', map { s{"}{""}g; "\"$_\""; } @$row), "\n";
+        Log3 ($name, 5, "DbRep $name -> write row:  @$row");
+        # Anzahl der Datensätze
+        $nrows++;
+     }
+     close(FH);
+ } 
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+
+ $sth->finish;
+ $dbh->disconnect;
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
+ 
+ return "$name|$nrows|$rt|$err";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Funktion expfile
+####################################################################################################
+
+sub expfile_ParseDone($) {
+  my ($string) = @_;
+  my @a = split("\\|",$string);
+  my $hash     = $defs{$a[0]};
+  my $nrows    = $a[1];
+  my $rt       = $a[2];
+  my $err      = $a[3]?decode_base64($a[3]):undef;
+  my $name     = $hash->{NAME};
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_ParseDone");
+  
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{helper}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
+      return;
+  } 
+  
+  my $reading = AttrVal($hash->{NAME}, "reading", undef);
+  my $device  = AttrVal($hash->{NAME}, "device", undef);
+ 
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  my $ds   = $device." -- " if ($device);
+  my $rds  = $reading." -- " if ($reading);
+  my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, $export_string, $nrows);
+         
+  my $rows = $ds.$rds.$nrows;
+  
+  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{dbloghash}{NAME} to file ".AttrVal($name, "expimpfile", undef).": $rows");  
+    
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done"); 
+  readingsEndUpdate($hash, 1);
+
+
+  delete($hash->{helper}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
   
 return;
 }
@@ -2137,7 +2321,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <h3>DbRep</h3>
 <ul>
   <br>
-  The purpose of this module is browsing of DbLog-databases. The searchresults can be evaluated concerning to various aggregations and the appropriate 
+  The purpose of this module is browsing and managing the content of DbLog-databases. The searchresults can be evaluated concerning to various aggregations and the appropriate 
   Readings will be filled. The data selection will been done by declaration of device, reading and the time settings of selection-begin and selection-end.  <br><br>
   
   All database operations are implemented nonblocking. Optional the execution time of SQL-statements in background can also be determined and provided as reading.
@@ -2152,6 +2336,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
      <li> The calculation of summary- , difference- , maximal- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
+     <li> export of datasets in CSV-format. </li>
      </ul></ul>
      <br>
   
@@ -2206,6 +2391,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <ul><ul>
     <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. The reading to evaluate must be defined using attribute "reading".  </li> <br>
     <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
+    <li><b> exportToFile </b> -  exports DB-entries in CSV-format between period given by timestamp. Limitations for selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading.  </li> <br>
     <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a>. An aggregation which would possibly be set attribute will <b>not</b> considered.  </li> <br>
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
@@ -2238,19 +2424,19 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   <b>For all evaluation variants applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
-  If the attributes "timestamp_begin" and "timestamp_end" are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.. 
+  If the attributes "timestamp_begin" and "timestamp_end" are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.
   <br><br>
   
   <b>Note </b> <br>
   
-  All database action will excuted in background ! It could be necessary to refresh the browser to see the answer of operation if you are in detail view once the "state = done" is shown. 
+  All database action will excuted in background. It could be necessary to refresh the browser to see the result of operation if you are in detail view once the "state = done" is shown. 
   <br><br>
 
 </ul>  
 
 
 <a name="DbRepattr"></a>
-<b>Attribute</b>
+<b>Attributes</b>
 
 <br>
 <ul>
@@ -2261,6 +2447,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
   <li><b>device </b>          - selection of a particular device   </li> <br>
   <li><b>disable </b>         - deactivates the module  </li> <br>
+  <li><b>expimpfile </b>      - Path/filename for data export </li> <br>
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
@@ -2291,6 +2478,24 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 
 </ul>
 
+<a name="DbRepReadings"></a>
+<b>Readings</b>
+
+<br>
+<ul>
+  Regarding to the selected operation the reasults will be shown as readings. At the beginning of a new operation all old readings will be deleted to avoid 
+  that unsuitable or invalid readings would remain.<br><br>
+  
+  In addition the following readings will be created: <br><br>
+  
+  <ul><ul>
+  <li><b>errortext           </b>     - description about the reason of an error state </li> <br>
+  <li><b>sql_processing_time </b>     - the processing time wasted for all sql-statements used for operation (approximately time in forked operation) </li> <br>
+  </ul></ul>
+  <br><br>
+
+</ul>
+
 
 =end html
 =begin html_DE
@@ -2299,7 +2504,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <h3>DbRep</h3>
 <ul>
   <br>
-  Zweck des Moduls ist es, den Inhalt von DbLog-Datenbanken nach bestimmten Kriterien zu durchsuchen und das Ergebnis hinsichtlich verschiedener 
+  Zweck des Moduls ist es, den Inhalt von DbLog-Datenbanken nach bestimmten Kriterien zu durchsuchen, zu managen, das Ergebnis hinsichtlich verschiedener 
   Aggregationen auszuwerten und als Readings darzustellen. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
@@ -2314,7 +2519,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Die Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Die Berechnung von Summen- , Differenz- , Maximal- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
-     <li> Die Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
+     <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
+     <li> Export von Datensätzen im CSV-Format. </li>
      </ul></ul>
      <br>
   
@@ -2323,7 +2529,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  
   <b>Voraussetzungen </b> <br><br>
   
-  Das Modul setzt den Einsatz einer DBLog-Instanz voraus. Es werden die Zugangsdaten dieser Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
+  Das Modul setzt den Einsatz einer oder mehrerer DBLog-Instanzen voraus. Es werden die Zugangsdaten dieser Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
   Es werden nur Inhalte der Tabelle "history" berücksichtigt. <br><br>
   
   Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
@@ -2369,6 +2575,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <ul><ul>
     <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
     <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
     <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
                                  
@@ -2423,6 +2630,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
+  <li><b>expimpfile </b>      - Pfad/Dateiname für Datenexport  </li> <br>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
@@ -2448,6 +2656,24 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   Wird das Attribut "timeDiffToNow" gesetzt, werden die evtentuell gesetzten Attribute "timestamp_begin" bzw. "timestamp_end" gelöscht.
   Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von Attribut "timeDiffToNow" wenn es vorher gesetzt war.
+  <br><br>
+
+</ul>
+
+<a name="DbRepReadings"></a>
+<b>Readings</b>
+
+<br>
+<ul>
+  Abhängig von der ausgeführten DB-Operation werden die Ergebnisse in entsrechnden Readings dargestellt. Zu Beginn einer neuen Operation werden alle alten Readings
+  einer vorangegangenen Operation gelöscht um den Verbleib unpassender bzw. ungültiger Readings zu vermeiden.  <br><br>
+  
+  Zusätzlich werden folgende Readings erzeugt: <br><br>
+  
+  <ul><ul>
+  <li><b>errortext           </b>  - Grund eines Fehlerstatus </li> <br>
+  <li><b>sql_processing_time </b>  - die Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird (entspricht ungefähr der verbrauchten Zeit im Fork-Prozess) </li> <br>
+  </ul></ul>
   <br><br>
 
 </ul>
