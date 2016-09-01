@@ -721,6 +721,9 @@ MAX_Parse($$)
       if(defined($null2) and ($null1 != 0 or $null2 != 0)) {
         $untilStr = MAX_ParseDateTime($null1,$heaterTemperature,$null2)->{str};
         $heaterTemperature = "";
+        $shash->{until} = "$untilStr";
+      } else {
+        delete($shash->{until});
       }
       $heaterTemperature = "" if(!defined($heaterTemperature));
 
