@@ -1892,15 +1892,18 @@ sub HMUARTLGW_updateCondition($)
 		$loadLvl = "suspended";
 	}
 
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "cond", $cond)
-	    if (defined($cond) && $cond ne ReadingsVal($name, "cond", ""));
-	readingsBulkUpdate($hash, "loadLvl", $loadLvl)
-	    if (defined($loadLvl) && $loadLvl ne ReadingsVal($name, "loadLvl", ""));
-	readingsEndUpdate($hash, 1);
+	if ((defined($cond) && $cond ne ReadingsVal($name, "cond", "")) ||
+	    (defined($loadLvl) && $loadLvl ne ReadingsVal($name, "loadLvl", ""))) {
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash, "cond", $cond)
+			if (defined($cond) && $cond ne ReadingsVal($name, "cond", ""));
+		readingsBulkUpdate($hash, "loadLvl", $loadLvl)
+			if (defined($loadLvl) && $loadLvl ne ReadingsVal($name, "loadLvl", ""));
+		readingsEndUpdate($hash, 1);
 
-	my $ccu = InternalVal($name,"owner_CCU","");
-	CUL_HM_UpdtCentralState($ccu) if ($ccu);
+		my $ccu = InternalVal($name,"owner_CCU","");
+		CUL_HM_UpdtCentralState($ccu) if ($ccu);
+	}
 }
 
 sub HMUARTLGW_updateMsgLoad($$) {
