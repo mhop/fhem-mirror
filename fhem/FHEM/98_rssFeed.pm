@@ -644,6 +644,8 @@ return;
 #======================================================================
 =pod
 =item device
+=item summary    fetch data from RSS-Feeds
+=item summary_DE Stellt Daten eines RSS-Feed bereit
 =begin html
 
 <a name="rssFeed"></a>
