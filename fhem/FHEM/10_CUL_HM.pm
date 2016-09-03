@@ -9083,9 +9083,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         @exec = ();
         foreach my $eN(@el){
           if ($action eq "verify"){
-            $val = join(" ",split(" ",$val));
+            $val = join(" ",map{(my $foo = $_) =~ s/^(.\.)/0$1/;$foo} split(" ",$val));
             my $nv = ReadingsVal($eN,$tln,"empty");
-            $nv = join(" ",split(" ",$nv));
+            $nv = join(" ",map{(my $foo = $_) =~ s/^(.\.)/0$1/;$foo} split(" ",$nv));
             push @entryFail,$eN." :".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
           }
           elsif($action eq "restore"){
