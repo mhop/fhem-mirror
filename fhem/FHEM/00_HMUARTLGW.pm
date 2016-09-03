@@ -145,7 +145,7 @@ sub HMUARTLGW_Initialize($)
 	                   "lgwPw " .
 	                   "hmKey hmKey2 hmKey3 " .
 	                   "dutyCycle:1,0 " .
-	                   "csmaCa:1,0 " .
+	                   "csmaCa:0,1 " .
 	                   "qLen " .
 	                   "logIDs ".
 	                   $readingFnAttributes;
@@ -757,7 +757,7 @@ sub HMUARTLGW_GetSetParameterReq($) {
 		HMUARTLGW_send($hash, HMUARTLGW_OS_NORMAL_MODE, HMUARTLGW_DST_OS);
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_ENABLE_CSMACA) {
-		my $csma_ca = AttrVal($name, "csmaCa", 1);
+		my $csma_ca = AttrVal($name, "csmaCa", 0);
 
 		HMUARTLGW_send($hash, HMUARTLGW_OS_ENABLE_CSMACA . sprintf("%02x", $csma_ca), HMUARTLGW_DST_OS);
 
@@ -2328,10 +2328,8 @@ sub HMUARTLGW_getVerbLvl($$$$) {
   <ul>
     <li>csmaCa<br>
         Enable or disable CSMA/CA (Carrier sense multiple access with collision
-        avoidance), also known as listen-before-talk.
-        Disabling this might be illegal in your country, please check with local
-        regulations!<br>
-        Default: 1 (enabled)
+        avoidance), also known as listen-before-talk.<br>
+        Default: 0 (disabled)
         </li>
     <li>dutyCycle<br>
         Enable or disable the duty-cycle check (1% rule) performed by the
