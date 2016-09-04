@@ -106,6 +106,9 @@ use constant {
 
 	HMUARTLGW_CMD_TIMEOUT              => 10,
 	HMUARTLGW_SEND_TIMEOUT             => 10,
+	HMUARTLGW_RETRY_SECONDS            => 3,
+	HMUARTLGW_BUSY_RETRY_MS            => 50,
+	HMUARTLGW_CSMACA_RETRY_MS          => 200,
 };
 
 my %sets = (
@@ -536,14 +539,15 @@ sub HMUARTLGW_SendPendingCmd($)
 			HMUARTLGW_GetSetParameterReq($hash);
 			shift(@{$hash->{Helper}{PendingCMD}}); #retry will be handled by GetSetParameter
 		} else {
-			#try for 3s, packet was not sent wirelessly yet!
-			if (defined($cmd->{RetryCnt}) && $cmd->{RetryCnt} >= 15) {
+			#try for HMUARTLGW_RETRY_SECONDS, packet was not sent wirelessly yet!
+			if (defined($cmd->{RetryStart}) &&
+			    $cmd->{RetryStart} + HMUARTLGW_RETRY_SECONDS <= gettimeofday()) {
 				my $oldmsg = shift(@{$hash->{Helper}{PendingCMD}});
 				Log3($hash, 1, "HMUARTLGW ${name} resend failed too often, dropping packet: 01 $oldmsg->{cmd}");
 				#try next command
 				return HMUARTLGW_SendPendingCmd($hash);
-			} elsif ($cmd->{RetryCnt}) {
-				Log3($hash, 5, "HMUARTLGW ${name} Retry: ".$cmd->{RetryCnt});
+			} elsif ($cmd->{RetryStart}) {
+				Log3($hash, 5, "HMUARTLGW ${name} Retry, initial retry initiated at: ".$cmd->{RetryStart});
 			}
 
 			RemoveInternalTimer($hash);
@@ -1221,11 +1225,11 @@ sub HMUARTLGW_Parse($$$$)
 				     "HMUARTLGW ${name} IO currently busy, trying again in a bit");
 
 				if ($hash->{DevState} == HMUARTLGW_STATE_RUNNING) {
-					$oldMsg->{RetryCnt}++;
+					$oldMsg->{RetryStart} = gettimeofday() if (!defined($oldMsg->{RetryStart}));
 					RemoveInternalTimer($hash);
 					unshift @{$hash->{Helper}{PendingCMD}}, $oldMsg;
 					$hash->{DevState} = HMUARTLGW_STATE_SEND_TIMED;
-					InternalTimer(gettimeofday()+0.2, "HMUARTLGW_SendPendingTimer", $hash, 0);
+					InternalTimer(gettimeofday()+(HMUARTLGW_BUSY_RETRY_MS / 1000), "HMUARTLGW_SendPendingTimer", $hash, 0);
 				}
 				return;
 			} elsif ($ack eq HMUARTLGW_ACK_ENOCREDITS) {
@@ -1237,11 +1241,11 @@ sub HMUARTLGW_Parse($$$$)
 				     "HMUARTLGW ${name} can't send due to CSMA/CA, trying again in a bit");
 
 				if ($hash->{DevState} == HMUARTLGW_STATE_RUNNING) {
-					$oldMsg->{RetryCnt}++;
+					$oldMsg->{RetryStart} = gettimeofday() if (!defined($oldMsg->{RetryStart}));
 					RemoveInternalTimer($hash);
 					unshift @{$hash->{Helper}{PendingCMD}}, $oldMsg;
 					$hash->{DevState} = HMUARTLGW_STATE_SEND_TIMED;
-					InternalTimer(gettimeofday()+0.2, "HMUARTLGW_SendPendingTimer", $hash, 0);
+					InternalTimer(gettimeofday()+(HMUARTLGW_CSMACA_RETRY_MS / 1000), "HMUARTLGW_SendPendingTimer", $hash, 0);
 				}
 				return;
 			} elsif ($ack eq HMUARTLGW_ACK_EUNKNOWN && $oldMsg) {
@@ -1620,7 +1624,8 @@ sub HMUARTLGW_CheckCmdResp($)
 	}
 
 	if ($hash->{DevState} == HMUARTLGW_STATE_SEND) {
-		$hash->{Helper}{PendingCMD}->[0]->{RetryCnt} += 5;
+		$hash->{Helper}{PendingCMD}->[0]->{RetryStart} = gettimeofday()
+		    if (!defined($hash->{Helper}{PendingCMD}->[0]->{RetryStart}));
 		$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 		return HMUARTLGW_SendPendingCmd($hash);
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_SEND_NOACK) {
