@@ -1119,6 +1119,12 @@ sub btIP_evalLayout {
           $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
         }
         
+        when("movecalculated") {
+          my ($tox,$toy)= split('[ \t]+', $def, 2);
+          $params{xx} = AnalyzePerlCommand(undef,$tox);
+          $params{yy} = AnalyzePerlCommand(undef,$toy);
+        }
+
         when("moveby") {
           my ($byx,$byy) = split('[ \t]+', $def, 2);
           my ($x,$y)= btIP_xy($byx,$byy,%params);
@@ -1722,6 +1728,11 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
        <li><code>moveby &lt;x&gt; &lt;y&gt;</code><br/>
            <br/>
            <ul>move most recently x- and y-coordinates by given steps<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>movecalculated &lt;{perlSpecial x}&gt; &lt;{perlSpecial y}&gt;</code><br/>
+           <br/>
+           <ul>calculate x- and y-coordinates by perlSpecials<br/>
            </ul></li><br/>
        <br/>
        <li><code>moveto &lt;x&gt; &lt;y&gt;</code><br/>
