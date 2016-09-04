@@ -55,6 +55,7 @@
 # 2015-03-29 - 8334 - changed: commandref updated
 # 2015-09-25 -      - changed: support ReadingsVal() in ticker
 #                              with \n in text
+# 2016-09-04 - 12114 - added:   movecalculated
 #
 ##############################################
 # $Id$
