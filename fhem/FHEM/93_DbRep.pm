@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.7.2        04.09.2016       problem in diffValue fixed if if no value was selected
 # 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
 #                               diffValue changed to fix wrong timestamp if error occur
 # 3.7          30.08.2016       exportToFile added
@@ -1383,7 +1384,7 @@ sub diffval_ParseDone($) {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       
-      my $value          = $a[3];  
+      my $value          = $a[3]?$a[3]:0;  
       
       $a[3]              =~ s/:/-/g if($a[2]);          # substituieren unsopported characters -> siehe fhem.pl
       my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
