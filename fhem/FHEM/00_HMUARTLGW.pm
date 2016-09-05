@@ -9,7 +9,6 @@
 # TODO:
 # - Filter out "A112" from CUL_HM and synthesize response
 # - Hide crypto state from list so it can be binary
-# - resolve names in logIDs
 
 package main;
 
@@ -192,7 +191,8 @@ sub HMUARTLGW_DoInit($)
 
 	$hash->{LGW_Init} = 1 if ($hash->{DevType} =~ m/^LGW/);
 
-	$hash->{Helper}{log} = [ split(/,/, AttrVal($name, "logIDs", "")) ];
+	$hash->{Helper}{Log}{IDs} = [ split(/,/, AttrVal($name, "logIDs", "")) ];
+	$hash->{Helper}{Log}{Resolve} = 1;
 
 	RemoveInternalTimer($hash);
 
@@ -1800,14 +1800,12 @@ sub HMUARTLGW_Attr(@)
 		if ($cmd eq "set") {
 			my @ids = split(/,/, $aVal);
 
-			return "wrong syntax: logIDs can only contain hmIDs, \"sys\" and \"all\""
-			    if (grep(!/^([\dabcdef]{6}|sys|all)$/i, @ids));
-
-			$hash->{Helper}{log} = \@ids;
+			$hash->{Helper}{Log}{IDs} = \@ids;
+			$hash->{Helper}{Log}{Resolve} = 1;
 			$attr{$name}{$aName} = $aVal;
 		} else {
 			delete $attr{$name}{$aName};
-			delete $hash->{Helper}{log};
+			delete $hash->{Helper}{Log};
 		}
 	}
 
@@ -2242,10 +2240,23 @@ sub HMUARTLGW_getVerbLvl($$$$) {
 
 	$hash = $hash->{lgwHash} if (defined($hash->{lgwHash}));
 
-	return (grep /^sys$/i, @{$hash->{Helper}{log}}) ? 0 : $def
+	#Lookup IDs on change
+	if (defined($hash->{Helper}{Log}{Resolve}) && $init_done) {
+		foreach my $id (@{$hash->{Helper}{Log}{IDs}}) {
+			next if ($id =~ /^([\da-f]{6}|sys|all)$/i);
+
+			my $newId = substr(CUL_HM_name2Id($id),0,6);
+			next if ($newId !~ /^[\da-f]{6}$/i);
+
+			$id = $newId;
+		}
+		delete($hash->{Helper}{Log}{Resolve});
+	}
+
+	return (grep /^sys$/i, @{$hash->{Helper}{Log}{IDs}}) ? 0 : $def
 	    if ((!defined($src)) || (!defined($dst)));
 
-	return (grep /^($src|$dst|all)$/i, @{$hash->{Helper}{log}}) ? 0 : $def;
+	return (grep /^($src|$dst|all)$/i, @{$hash->{Helper}{Log}{IDs}}) ? 0 : $def;
 }
 
 1;
@@ -2357,8 +2368,7 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         </li>
     <li>logIDs<br>
         Enables selective logging of HMUARTLGW messages. A list of comma separated
-        HMIds can be entered which shall be logged. The attribute only allows
-        device-IDs, not channel IDs.<br>
+        HMIds or HM device names/channel names can be entered which shall be logged.<br>
         <ul>
             <li><i>all</i>: will log raw messages for all HMIds</li>
             <li><i>sys</i>: will log system related messages like keep-alive</li>
