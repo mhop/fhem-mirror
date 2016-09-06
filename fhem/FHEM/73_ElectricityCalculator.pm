@@ -831,15 +831,35 @@ sub ElectricityCalculator_Notify($$)
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator End_________________________________________________________________________________________________________________________________";
 	}
 	
-	### If readings exist already, update list of available readings
-	if($ElectricityCalcDev->{READINGS}) 
-	{
-		### Copy readings in list of available "gets" and "sets"
-		%ElectricityCalculator_gets = %{$ElectricityCalcDev->{READINGS}};
-		%ElectricityCalculator_sets = %{$ElectricityCalcDev->{READINGS}};
+	
+	if ($attr{$ElectricityCalcName}{ReadingDestination} eq "CalculatorDevice")
+	{	
+		### If readings exist, update list of available readings
+		if($ElectricityCalcDev->{READINGS}) 
+		{
+			### Copy readings in list of available "gets" and "sets"
+			%ElectricityCalculator_gets = %{$ElectricityCalcDev->{READINGS}};
+			%ElectricityCalculator_sets = %{$ElectricityCalcDev->{READINGS}};
 
-		### Create Log entries for debugging
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
+			### Create Log entries for debugging
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
+		}
+	}
+	elsif ($attr{$ElectricityCalcName}{ReadingDestination} eq "CounterDevice")
+	{
+		### If readings exist, update list of available readings
+		if($ElectricityCountDev->{READINGS}) 
+		{
+			### Copy readings in list of available "gets" and "sets"
+			%ElectricityCalculator_gets = %{$ElectricityCountDev->{READINGS}};
+			%ElectricityCalculator_sets = %{$ElectricityCountDev->{READINGS}};
+
+			### Create Log entries for debugging
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
+		}
+	}
+	else
+	{
 	}
 	
 	return undef;
