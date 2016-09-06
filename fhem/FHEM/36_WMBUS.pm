@@ -400,6 +400,9 @@ WMBUS_Attr(@)
 1;
 
 =pod
+=item device
+=item summary Reception of Wireless M-Bus messages from e.g. electicity meters
+=item summary_DE Empfang von Wireless M-Bus Nachrichten z. B. von Stromzählern
 =begin html
 
 <a name="WMBUS"></a>
@@ -582,7 +585,7 @@ WMBUS_Attr(@)
     <a href="#ignore">ignore</a>
   </li><br>
   <li>rawmsg_as_reading<br>
-     If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
+     Wenn auf 1 gesetzt so werden empfangene Nachrichten im Reading rawmsg gespeichert. Das kann verwendet werden um Rohnachrichten zu loggen und beim Debugging zu helfen.
   </li>
   </ul>
 	<br>
