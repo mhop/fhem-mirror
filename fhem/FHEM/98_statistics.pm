@@ -72,6 +72,7 @@ sub statistics_UpdateDevReading($$$$);
    ,"humidity" => 1
    ,"lightsensor" => 3 
    ,"lock" => 3 
+   ,"luminosity" => 1 
    ,"motion" => 3 
    ,"power" => 1 
    ,"pressure" => 4 
@@ -189,7 +190,8 @@ sub statistics_Set($$@)
   my $resultStr = "";
   
    if ($cmd eq 'resetStatistics') {
-      if ($val ne "") {
+     if ($val ne "") {
+         Log3 $name, 3, "statistics: set $name $cmd $val";
          my $regExp;
          if ($val eq "all") { $regExp = ""; } 
          else { $regExp = $val.":.*"; } 
@@ -210,6 +212,7 @@ sub statistics_Set($$@)
       return $resultStr;
    
    } elsif ($cmd eq 'doStatistics') {
+      Log3 $name, 3, "statistics: set $name $cmd";
       statistics_DoStatisticsAll($hash,0);
       return undef;
    }
@@ -542,7 +545,8 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$)
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 1;
       $stat[1] = $value; $stat[3] = $value; $stat[5] = $value;
       $stat[7] = strftime ("%Y-%m-%d_%H:%M:%S",localtime()  );
-   } else {
+   } 
+   else {
   # Do calculations if hidden reading exists
       @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
       @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
@@ -1141,6 +1145,10 @@ sub statistics_UpdateDevReading($$$$)
 =pod
 =begin html
 
+=item helper
+=item summary Calculates for statistical values and adds them to the devices.
+=item summary_DE Berechnet statistische Werte und f&uuml;gt sie dem Ger&auml;t hinzu.
+
 <a name="statistics"></a>
 <h3>statistics</h3>
 (en | <a href="http://fhem.de/commandref_DE.html#statistics">de</a>)
@@ -1157,7 +1165,7 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          over a period of day, month and year:
          <br>
-         <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         <i>brightness, current, energy_current, humidity, luminosity, temperature, voltage</i>
          <br>
          over a period of hour, day, month and year:
          <br>
@@ -1325,7 +1333,7 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          &uuml;ber den Zeitraum Tag, Monat und Jahr:
          <br>
-         <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         <i>brightness, current, energy_current, humidity, luminosity, temperature, voltage</i>
          <br>
          &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr:
          <br>
