@@ -110,6 +110,7 @@ sub gcmsend_sendPayload($%) {
     my $data =
         "{".
             "\"registration_ids\":".gcmsend_array_to_json(@registrationIds).",".
+	    "\"priority\": \"high\"" . "," .
             "\"data\": $jsonPayload".
             "}";
 
