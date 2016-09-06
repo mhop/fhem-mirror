@@ -357,6 +357,8 @@ FRAMEBUFFER_returnPNG($) {
 
 
 =pod
+=item device
+=item summary Graphical display on a Linux framebuffer
 =begin html
 
 <a name="FRAMEBUFFER"></a>
