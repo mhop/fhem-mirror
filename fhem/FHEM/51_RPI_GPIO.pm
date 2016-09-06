@@ -62,6 +62,7 @@ sub RPI_GPIO_Initialize($) {
 						" interrupt:none,falling,rising,both" .
 						" toggletostate:no,yes active_low:no,yes" .
 						" debounce_in_ms restoreOnStartup:no,yes,on,off,last" .
+						" dblclicklevel:0,1 dblclicktime" .
 						" unexportpin:no,yes longpressinterval" .
 						" $readingFnAttributes";
 }
@@ -507,9 +508,11 @@ sub RPI_GPIO_Except($) {	#called from main if an interrupt occured
 			Log3 $hash, 5, "Zaehler ist jetzt $valcnt";
 		}
 		#Doppelklick (noch im Teststatus)
-		my $testtt = (gettimeofday() - $hash->{lasttrg} );
+		if (defined($hash->{lasttrg})) {
+			my $testtt = (gettimeofday() - $hash->{lasttrg} );
+			readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < 2;
+		}
 		$hash->{lasttrg} = gettimeofday();
-		readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < 2;
 	#langer Testendruck
 	} elsif ($eval eq "both") {
 		if ( $val == 1 ) {
@@ -521,9 +524,11 @@ sub RPI_GPIO_Except($) {	#called from main if an interrupt occured
 		}
 		#Doppelklick (noch im Teststatus)
 		if ( $val == AttrVal($hash->{NAME}, "dblclicklevel", "1") ) {
-			my $testtt = (gettimeofday() - $hash->{lasttrg} );
+			if (defined $hash->{lasttrg}) {
+				my $testtt = (gettimeofday() - $hash->{lasttrg} );
+				readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < int(AttrVal($hash->{NAME}, "dblclicktime", 2));
+			}
 			$hash->{lasttrg} = gettimeofday();
-			readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < 2;
 		} else {
 			readingsSingleUpdate($hash, 'Dblclick', "off", 1);
 		}
