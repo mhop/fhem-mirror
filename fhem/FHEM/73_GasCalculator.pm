@@ -769,15 +769,34 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator End_________________________________________________________________________________________________________________________________";
 	}
 	
-	### If readings exist already, update list of available readings
-	if($GasCalcDev->{READINGS}) 
-	{
-		### Copy readings in list of available "gets" and "sets"
-		%GasCalculator_gets = %{$GasCalcDev->{READINGS}};
-		%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
+	if ($attr{$GasCalcName}{ReadingDestination} eq "CalculatorDevice")
+	{	
+		### If readings exist, update list of available readings
+		if($GasCalcDev->{READINGS}) 
+		{
+			### Copy readings in list of available "gets" and "sets"
+			%GasCalculator_gets = %{$GasCalcDev->{READINGS}};
+			%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
 
-		### Create Log entries for debugging
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
+			### Create Log entries for debugging
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
+		}
+	}
+	elsif ($attr{$GasCalcName}{ReadingDestination} eq "CounterDevice")
+	{
+		### If readings exist, update list of available readings
+		if($GasCountDev->{READINGS}) 
+		{
+			### Copy readings in list of available "gets" and "sets"
+			%GasCalculator_gets = %{$GasCountDev->{READINGS}};
+			%GasCalculator_sets = %{$GasCountDev->{READINGS}};
+
+			### Create Log entries for debugging
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
+		}
+	}
+	else
+	{
 	}
 	
 	return undef;
