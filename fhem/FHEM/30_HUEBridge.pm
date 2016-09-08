@@ -511,7 +511,7 @@ HUEBridge_Set($@)
   } elsif($cmd eq 'createsensor') {
     return "usage: createsensor <name> <type> <uniqueid> <swversion> <modelid>" if( @args < 5 );
 
-    return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( $args[@args-4] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|GenericFlag|GenericStatus/ );
+    return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( $args[@args-4] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|Lightlevel|GenericFlag|GenericStatus/ );
 
     my $obj = { 'name' => join( ' ', @args[0..@args-5]),
                 'type' => "CLIP$args[@args-4]",
