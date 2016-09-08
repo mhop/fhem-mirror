@@ -226,7 +226,7 @@ sub OBIS_Read($)
     	my $buf = DevIo_SimpleRead($hash);
     	my $b=$buf;
     	$b =~ s/(.)/sprintf("%X",ord($1))/eg;
-    	if ($hash->{helper}{SpeedChange} eq "")
+    	if (defined $hash->{helper}{SpeedChange} && $hash->{helper}{SpeedChange} eq "")
     	{
     		OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
     		Log3 $hash,4, "parsing....\r\n";
@@ -488,7 +488,11 @@ sub OBIS_Parse($$)
 		    										$data=$SML_specialities{"TIME"}[1]->($1)
 		    									}
 		    									my $chan=$code//$OBIS_channels{$channel} //$channel;
-		    									$chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
+		    									if ($#+ > 0) {
+		    										$chan=$hash->{helper}{Channels}{$channel} // $hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
+		    									} else {
+		    										$chan=$hash->{helper}{Channels}{$channel} //$channel;
+		    									}
 		    									
 												if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
 												readingsBulkUpdate($hash, $chan  ,$data); }
