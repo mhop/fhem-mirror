@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "async_delay followDevices:1,2 switchingOrder ". $readingFnAttributes;
+  $hash->{AttrList} = "async_delay followDevices:1,2 lightSceneRestoreOnlyIfChanged:1,0 switchingOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
