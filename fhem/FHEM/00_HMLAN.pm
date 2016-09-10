@@ -117,12 +117,12 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
-  $hash->{helper}{q}{scnt}     = 0;
-  $hash->{helper}{q}{loadNo}   = 0;
-  $hash->{helper}{q}{loadLast} = 0;    
-  $hash->{msgLoadHistory}      = (60/$HMmlSlice)."min steps: "
-                                .join("/",("-") x $HMmlSlice);
-  $hash->{msgLoadCurrent}      = 0;
+  $hash->{helper}{q}{scnt}        = 0;
+  $hash->{helper}{q}{loadNo}      = 0;
+  $hash->{helper}{q}{loadLastMax} = 0;   # max load in last slice
+  my @ald = ("0") x $HMmlSlice;
+  $hash->{helper}{q}{ald}         = \@ald;  # array of load events  
+  $hash->{msgLoadCurrent}         = 0;
   
   $defs{$name}{helper}{log}{all} = 0;# selective log support
   $defs{$name}{helper}{log}{sys} = 0;
@@ -352,18 +352,24 @@ sub HMLAN_Attr(@) {############################################################
 sub HMLAN_UpdtMsgLoad($$) {####################################################
   my($name,$val) = @_;
   my $hash = $defs{$name};
+  my $hashQ = $defs{$name}{helper}{q};
 
-  my $t = int(gettimeofday()/(3600/$HMmlSlice))%$HMmlSlice;
+  $hash->{msgLoadCurrent} = $val;
+  my ($r) = grep { $_ <= $val } @{$hash->{helper}{loadLvl}{a}};
+  readingsSingleUpdate($hash,"loadLvl",$hash->{helper}{loadLvl}{h}{$r},1);
   
-  if ($hash->{helper}{q}{loadNo} != $t){
-    $hash->{helper}{q}{loadNo} = $t;    
-    my (undef,@a) = split(": ",$hash->{msgLoadHistory});
-    @a = ( ($hash->{msgLoadCurrent} - $hash->{helper}{q}{loadLast})
-          ,split("/",$a[0]));
-    $hash->{helper}{q}{loadLast} = $hash->{msgLoadCurrent};    
+  $hashQ->{loadLastMax} = $val if ($hashQ->{loadLastMax} < $val);
+  my $t = int(gettimeofday()/(3600/$HMmlSlice))%$HMmlSlice;
+  if ($hashQ->{loadNo} != $t){
+    $hashQ->{loadNo} = $t;    
+
+    unshift @{$hashQ->{ald}},$hashQ->{loadLastMax};
+    #relative history my @a = map{$hashQ->{ald}[$_] - 
+    #relative history             $hashQ->{ald}[$_ + 1]} (0..($HMmlSlice-1));
+    #relative history $hash->{msgLoadHistory}    = (60/$HMmlSlice)."min steps: ".join("/",@a);
+    pop @{$hashQ->{ald}};
     
-    $hash->{msgLoadHistory} = (60/$HMmlSlice)."min steps: "
-                             .join("/",@a[0...($HMmlSlice-1)]);
+    $hash->{msgLoadHistoryAbs} = (60/$HMmlSlice)."min steps: ".join("/",@{$hashQ->{ald}});
        # try to release high-load condition with a dummy message
        # one a while
     if (ReadingsVal($name,"cond","") =~ m /(Warning-HighLoad|ERROR-Overload)/){
@@ -372,11 +378,8 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
                          .AttrVal($name,"hmId","999999")
                          ."000000");
     }
+    $hashQ->{loadLastMax} = 0;
   }  
-  $hash->{msgLoadCurrent} = $val;
-
-  my ($r) = grep { $_ <= $val } @{$hash->{helper}{loadLvl}{a}};
-  readingsSingleUpdate($hash,"loadLvl",$hash->{helper}{loadLvl}{h}{$r},1);
   return;
 }
 
@@ -1262,8 +1265,8 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           Current transmit load of HMLAN. When capacity reaches 100% HMLAN stops sending and waits for 
           reduction. See also:
           <a href="#HMLANloadLevel">loadLevel</a><br></li>
-      <li><B>msgLoadHistory</B><br>
-          Historical transmition load of HMLAN.</li>
+      <li><B>msgLoadHistoryAbs</B><br>
+          Historical transmition load of IO.</li>
       <li><B>msgParseDly</B><br>
           calculates the delay of messages in ms from send in HMLAN until processing in FHEM.
           It therefore gives an indication about FHEM system performance.
@@ -1412,8 +1415,8 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           Aktuelle Funklast des HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t je Stunde hat 
           Telegramme abzusetzen stellt es bei 100% das Senden ein. Siehe auch
           <a href="#loadLevel">loadLevel</a><br></li>
-      <li><B>msgLoadHistory</B><br>
-          Funklast vergangener Zeitabschnitte.</li>
+      <li><B>msgLoadHistoryAbs</B><br>
+          IO Funkbelastung vergangener Zeitabschnitte.</li>
       <li><B>msgParseDly</B><br>
           Kalkuliert die Verz&ouml;gerungen einer Meldung vom Zeitpunkt des Abschickens im HMLAN 
           bis zu Verarbeitung in FHEM. Deshalb ist dies ein Indikator f&uuml;r die Leistungsf&auml;higkeit 

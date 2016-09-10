@@ -2553,7 +2553,7 @@ sub CUL_HM_Parse($$) {#########################################################
     #Info Level: mTp=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
     #Event:      mTp=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
-    if ($mh{mTp} eq "10" && $mh{p} =~ m/^06..(..)(..)/) {
+    if    ($mh{mTp} eq "10" && $mh{p} =~ m/^06..(..)(..)/) {
        # m:A0 A010 233FCE 1743BF 0601 01  00 31
       my ($state,$err) = (hex($1),hex($2));
       
@@ -3444,26 +3444,25 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
 sub CUL_HM_parseSDteam_2(@){#handle SD team events
   my ($mTp,$sId,$dId,$p) = @_;
   
-  my @entities;
   my $dHash = CUL_HM_id2Hash($dId);
   my $dName = CUL_HM_id2Name($dId);
   my $sHash = CUL_HM_id2Hash($sId);
   my $sName = CUL_HM_hash2Name($sHash);
-  if (AttrVal($sName,"subType","") eq "virtual"){
+  
+  if (AttrVal($sName,"subType","") eq "virtual"){#search for the team lead channel
     foreach my $cId (CUL_HM_getAssChnIds($sName)){
       my $cHash = CUL_HM_id2Hash($cId);
       next if (!$cHash->{sdTeam} || $cHash->{sdTeam} ne "sdLead");
-      my $cName = CUL_HM_id2Name($cId);
       $sHash = $cHash;
-      $sName = CUL_HM_id2Name($cId);
+      $sName = CUL_HM_hash2Name($sHash);
       last;
     }
   }
-  return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead");
+  return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead"
+              ||!$dHash);
 
   my ($chn,$No,$state,$null,$aesKNo,$aesStr) = unpack 'A2A2A2A4A2A8',$p;
-  if(($dHash) && # update source(ID reported in $dst)
-     (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
+  if(!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No){
     $dHash->{helper}{alarmNo} = $No;
   }
   else{
@@ -3499,8 +3498,9 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
   }
   push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
   push @evtEt,[$sHash,1,"eventNo:".$No];
+  Log3 $sHash,5,"CUL_HM $sName sdTeam: no:$No state:$state aesNo:$aesKNo aesStr:$aesStr";
   
-  return @entities;
+  return;
 }
 sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
   # update team status if virtual team lead
@@ -5348,21 +5348,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
                                     # device. It can cause trouble with 
                                     # subsequent alarming 
-    if ($fkt ne "sdLead2"){# $md eq "HM-CC-SCD")
-      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-      $hash->{TESTNR} = $testnr;
-      my $tstNo = sprintf("%02X",$testnr);
+
+    $hash->{TESTNR} = ($a[2] ? $a[2] : ($hash->{TESTNR} + 1))%255;
+    if ($fkt eq "sdLead1"){# ($md eq "HM-CC-SCD")
+      my $tstNo = sprintf("%02X",$hash->{TESTNR});
       CUL_HM_PushCmdStack($hash, "++9440".$dst.$sId."00".$tstNo);
       CUL_HM_parseSDteam("40",$dst,$sId,"00".$tstNo);
     }
-    else {#if ($md eq "HM-SEC-SD-2"){
-      #1441 44E347 44E347 0102 960000 039190BDC8
-      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-      $testnr = $a[2]if ($a[2]);
-      $hash->{TESTNR} = $testnr;
-                           # 96 switch on- others unknown
+    else {#($md eq "HM-SEC-SD-2"){
+           # 96 switch on- others unknown
       my $msg = CUL_HM_generateCBCsignature($hash, 
-                                sprintf("++1441$dst${sId}01%02X9600",$testnr));
+                                sprintf("++1441$dst${sId}01%02X9600",$hash->{TESTNR}));
       CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
       CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
     }
@@ -5373,19 +5369,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
                                     # device. It can cause trouble with 
                                     # subsequent alarming 
-    if ($fkt ne "sdLead2"){
+    if ($fkt eq "sdLead1"){# ($md eq "HM-CC-SCD")
       my $p = (($1 eq "On")?"0BC8":"0C01");
       my $msg = "++9441".$dst.$sId."01".$p;
       CUL_HM_PushCmdStack($hash, $msg) foreach (1..3);# 3 reps fpr non-ack msg 
       CUL_HM_parseSDteam("41",$dst,$sId,"01".$p);
     }
-    else{
+    else{#($md eq "HM-SEC-SD-2"){
       my $p = (($1 eq "On")?"C6":"00");
-      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-      $hash->{TESTNR} = $testnr;
+      $hash->{TESTNR} = ($hash->{TESTNR} + 1)%255;
  
       my $msg = CUL_HM_generateCBCsignature($hash, 
-                              sprintf("++1441$dst${sId}01%02X${p}00",$testnr));
+                              sprintf("++1441$dst${sId}01%02X${p}00",$hash->{TESTNR}));
       
       CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
       CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
@@ -7002,8 +6997,6 @@ sub CUL_HM_ID2PeerList ($$$) {
       #if any of the peers is an SD we are team master
       my ($tMstr,$tcSim,$thSim) = (0,0,0);
       foreach (split(",",$peerNames)){
-#        $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");        
-        
         if(AttrVal($_,"subType","") eq "smokeDetector"){#have smoke detector
           $tMstr = AttrVal($_,"model","") eq "HM-SEC-SD-2"? 2:1;#differentiate SD and SD2
         }
@@ -7013,8 +7006,9 @@ sub CUL_HM_ID2PeerList ($$$) {
         $thSim = 1 if(AttrVal($_,"model","")   =~ m /HM-CC-RT-DN/ && $pch eq "01");
       }
       if   ($tMstr){
-        $hash->{helper}{fkt}="sdLead".$tMstr;
-        $hash->{sdTeam}="sdLead";
+        $hash->{helper}{fkt} = "sdLead".$tMstr;
+        $hash->{sdTeam}      = "sdLead";
+        $hash->{TESTNR}      = 1 if(!exists $hash->{TESTNR});#must be defined for all sdLead
         CUL_HM_updtSDTeam($name);
       }
       elsif($tcSim){
@@ -7030,8 +7024,9 @@ sub CUL_HM_ID2PeerList ($$$) {
       foreach (split(",",$peerNames)){
         my $tn = ($_ =~ m/self/)?$name:$_;
         next if (!$defs{$tn});
-        $defs{$tn}{sdTeam} = "sdLead" ;
         $defs{$tn}{helper}{fkt} = "sdLead".(AttrVal($name,"model","") eq "HM-SEC-SD-2"? 2:1);
+        $defs{$tn}{sdTeam}      = "sdLead" ;
+        $defs{$tn}{TESTNR}      = 1 if(!exists $defs{$tn}{TESTNR});#must be defined for all sdLead
       }
       if($peerNames !~ m/self/){
         delete $hash->{sdTeam};
@@ -7184,7 +7179,7 @@ sub CUL_HM_generateCBCsignature($$) { #in: device-hash,msg out: signed message
   my ($hash,$msg) = @_;
   my $oldcounter = ReadingsVal($hash->{NAME},"aesCBCCounter","000000");
   my $counter = substr($oldcounter, 0, 4);
-  my $msgNo = substr($msg, 0, 2);
+  my ($mNo,$mFlg,$mTg,$mSnd,$mPay) = unpack 'A2A2A2A12A*',$msg;
   my $devH = CUL_HM_getDeviceHash($hash);
   
   if ($cryptFunc != 1) {
@@ -7199,44 +7194,45 @@ sub CUL_HM_generateCBCsignature($$) { #in: device-hash,msg out: signed message
   }
 
   #generate message number
-  if($msgNo eq "++") {
-    $msgNo = ($devH->{helper}{HM_CMDNR} + 1) & 0xff;
+  if($mNo eq "++") {
+    $mNo = ($devH->{helper}{HM_CMDNR} + 1) & 0xff;
     my $oldNo = hex(substr($oldcounter, 4, 2));
-    if ($msgNo <= $oldNo && (($oldNo + 1) & 0xff) > $oldNo) {
-      $msgNo = ($oldNo + 1) & 0xff;
+    if ($mNo <= $oldNo && (($oldNo + 1) & 0xff) > $oldNo) {
+      $mNo = ($oldNo + 1) & 0xff;
     }
-    $devH->{helper}{HM_CMDNR} = $msgNo;
-    $msgNo = sprintf("%02X", $msgNo);
+    $devH->{helper}{HM_CMDNR} = $mNo;
+    $mNo = sprintf("%02X", $mNo);
   }
 
-  if (hex($counter.$msgNo) <= hex($oldcounter)) {
+  if (hex($counter.$mNo) <= hex($oldcounter)) {
     $counter = sprintf("%04X", (hex($counter) + 1) & 0xffff);
   }
 
-  push @evtEt,[$hash,1,"aesCBCCounter:".$counter.$msgNo];
+  push @evtEt,[$hash,1,"aesCBCCounter:".$counter.$mNo];
   CUL_HM_pushEvnts();
 
   my $cipher = Crypt::Rijndael->new($keys{$kNo}, Crypt::Rijndael::MODE_ECB());
 
   my $iv = "49" 
-          .substr($msg, 6, 12)  #sender receiver
-          .$counter  #generation counter
-          .$msgNo 
+          .$mSnd                #sender receiver
+          .$counter             #generation counter
+          .$mNo 
           ."000000000005";
 
-  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC IV: " . $iv;
-  $iv = $cipher->encrypt(pack("H32", $iv));
-  my $d = $msgNo 
-         .substr($msg, 2, 2)#Flags
-         .substr($msg, 18); #payload
+  my $ivC = $cipher->encrypt(pack("H32", $iv));
+  my $d = $mNo 
+         .$mFlg             #Flags
+         .$mPay;            #payload
 
   $d .= "00" x ((32 - length($d)) / 2) if (length($d) < 32);
 
-  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC D: " . $d;
-  my $cbc = $cipher->encrypt(pack("H32", $d) ^ $iv);
-  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC E: " . unpack("H*", $cbc);
-  return uc(  $msgNo 
-            . substr($msg, 2) 
+  my $cbc = $cipher->encrypt(pack("H32", $d) ^ $ivC);
+  #2016.09.04 06:52:54.227 3: CUL_HM
+  Log3 $hash,5,     "CUL_HM $hash->{NAME} CBC IV: " . $iv
+            ."\n".(" "x30)."$hash->{NAME} CBC D:  " . $d
+            ."\n".(" "x30)."$hash->{NAME} CBC E:  " . unpack("H*", $cbc);
+  return uc(  $mNo 
+            . $mFlg.$mTg.$mSnd.$mPay
             . $counter 
             . unpack("H8", substr($cbc, 12, 4)));
 }
@@ -7951,6 +7947,8 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
   my %idxN = (7=>"P1_",8=>"P2_",9=>"P3_");
   $idxN{7} = "" if($md =~ m/CC-RT/);# not prefix for RT
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+  delete $hash->{READINGS}{hyst2pointWrite};
+  
   foreach my $lst (@list){
     my @r1;
     $lst +=0;
@@ -8694,7 +8692,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         else{
            CUL_HM_Set($defs{$eN},$eN,"statusRequest");
            CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
-           InternalTimer(gettimeofday()+5,"CUL_HM_readStateTo","sUpdt:$eN",0);
+           InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
         }
       }
       last; # execute only one!
