@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.7.3        11.09.2016       changed format of diffValue-reading if no value was selected
 # 3.7.2        04.09.2016       problem in diffValue fixed if if no value was selected
 # 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
 #                               diffValue changed to fix wrong timestamp if error occur
@@ -1314,10 +1315,10 @@ sub diffval_DoParse($) {
          if(!@array) {
              if(AttrVal($name, "aggregation", "") eq "hour") {
                  my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-                 @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+                 @array = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
              } else {
                  my @rsf = split(" ",$runtime_string_first);
-                 @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+                 @array = ($runtime_string." ".$rsf[0]."\n");
              }
          }
          push(@row_array, @array);
@@ -1386,7 +1387,7 @@ sub diffval_ParseDone($) {
       
       my $value          = $a[3]?$a[3]:0;  
       
-      $a[3]              =~ s/:/-/g if($a[2]);          # substituieren unsopported characters -> siehe fhem.pl
+      $a[2]              =~ s/:/-/g if($a[2]);          # substituieren unsupported characters -> siehe fhem.pl
       my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
       
       # Leerzeichen am Ende $timestamp entfernen
