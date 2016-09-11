@@ -109,6 +109,9 @@ readingsGroup_updateDevices($;$)
           push @devices, [$d,$regex];
         }
 
+      } elsif($device[0] =~ m/^<.*>$/) {
+        push @devices, [$device[0]];
+
       } elsif($device[0] =~ m/(.*)=(.*)/) {
         my ($lattr,$re) = ($1, $2);
         foreach my $d (sort keys %defs) {
@@ -129,9 +132,6 @@ readingsGroup_updateDevices($;$)
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
         }
-
-      } elsif($device[0] =~ m/^<.*>$/) {
-        push @devices, [$device[0]];
 
       } elsif( defined($defs{$device[0]}) ) {
         $list{$device[0]} = 1;
