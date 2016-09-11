@@ -80,7 +80,7 @@ sub HMLAN_Initialize($) {
                      "loadLevel ".
                      "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
                      "wdTimer:5,10,15,20,25 ".
-                     "logIDs ".
+                     "logIDs:multiple,sys,all ".
                      $readingFnAttributes;
 }
 sub HMLAN_Define($$) {#########################################################
@@ -250,6 +250,7 @@ sub HMLAN_Attr(@) {############################################################
     }
   }
   elsif($aName eq "logIDs"){
+    HMLAN_UpdtLogId();
     if ($cmd eq "set"){
       if ($init_done){
         if ($aVal){
@@ -348,6 +349,15 @@ sub HMLAN_Attr(@) {############################################################
   }
   return;
 }
+
+sub HMLAN_UpdtLogId() {####################################################
+  $modules{HMLAN}{AttrList} =~ s/logIDs:.*? //;
+  $modules{HMLAN}{AttrList} =~ s/logIDs:.*?$//;
+  $modules{HMLAN}{AttrList} .= " logIDs:multiple,sys,all,"
+                               .join(",",(devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")));
+  return;
+}
+
 
 sub HMLAN_UpdtMsgLoad($$) {####################################################
   my($name,$val) = @_;
@@ -949,7 +959,6 @@ sub HMLAN_assignIDs($){
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
   return if (!$name || !$defs{$name} || $defs{$name}{TYPE} ne "HMLAN");
-#  return if (!$init_done); General: need to wait for init done and then redo
   my %keys = ();
   my $vccu = InternalVal($name,"owner_CCU",$name);
   $vccu = $name if(!AttrVal($vccu,"hmKey",""));

@@ -4786,7 +4786,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "playTone") { #################################################
     my $msg;
-    if ($a[2] eq 'replay'){
+    if (!defined $a[2]){
+      return "please enter parameter";
+    }
+    elsif ($a[2] eq 'replay'){
       $msg = ReadingsVal($chnHash->{NAME},".lastTone","");
     }
     else{
@@ -6267,6 +6270,9 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     next if (!$change);#no changes
     $change =~ s/00:00//;
     $change =~ s/(\ |:)//g;
+    if ($nrRd){
+      $chnhash->{READINGS}{$regPre.$nrn}{VAL} =~ s/00:00// #mark incomplete as wego for a change;
+    }
     my $pN;
     $changed = 1;# yes, we did
     ($list,$pN) = ($1,$2) if($nrn =~ m/RegL_(..)\.(.*)/);
@@ -6293,7 +6299,10 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     }
     #########
   }
-  CUL_HM_qAutoRead($hash->{NAME},3) if ($changed);
+  if ($changed){
+    CUL_HM_complConfig($hash->{NAME},1);
+    CUL_HM_qAutoRead($hash->{NAME},3) ;
+  }
 }
 sub CUL_HM_PushCmdStack($$) {
   my ($chnhash, $cmd) = @_;

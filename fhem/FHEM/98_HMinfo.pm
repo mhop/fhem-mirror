@@ -426,7 +426,6 @@ sub HMinfo_regCheck(@) { ######################################################
 
     foreach my $rNm (@lsNo){# check non-peer lists
       next if (!$rNm || $rNm eq "");
-      
       if (   !$ehash->{READINGS}{$rNm}
           || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
@@ -1578,7 +1577,18 @@ sub HMinfo_SetFn($@) {#########################################################
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
           if ($fn !~ m/\//);
-    $ret = HMinfo_verifyConfig($filter,$fn); 
+
+    if ($hash->{CL}){
+      my $id = ++$hash->{nb}{cnt};
+      my $bl = BlockingCall("HMinfo_verifyConfig", join(",",("$name;$id;$hash->{CL}{NAME}",$fn)), 
+                            "HMinfo_bpPost", 30, 
+                            "HMinfo_bpAbort", "$name:$id");
+      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+      $ret = "";
+    }
+    else{
+      $ret = HMinfo_verifyConfig("$name;0;none,$fn"); 
+    }
   }
   elsif($cmd eq "purgeConfig"){##action: purgeConfig---------------------------
     my $id = ++$hash->{nb}{cnt};
@@ -1709,28 +1719,28 @@ sub HMInfo_help(){ ############################################################
            ;
 }
 
-sub HMinfo_verifyConfig($@) {##################################################
-  my ($filter,$fName)=@_;
-  $filter = "." if (!$filter);
-  my $ret;
-
+sub HMinfo_verifyConfig($) {##################################################
+  my ($param) = @_;
+  my ($id,$fName) = split ",",$param;
+  HMinfo_purgeConfig($param);
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my @elPeer = ();
   my @elReg = ();
   my @entryNF = ();
   my @elOk = ();
+  my %nh;
   while(<aSave>){
     chomp;
     my $line = $_;
     $line =~ s/\r//g;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/);
+    $line =~ s/#.*//;
     my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
-    next if ($eN !~ m/$filter/);
     if (!$eN || !$defs{$eN}){
       push @entryNF,"$eN deleted";
       next;
     }
-    
+    $nh{$eN} = 1 if (!defined $nh{$eN});#
     if($cmd eq "peerBulk"){
       my $ePeer = AttrVal($eN,"peerIDs","");
       if ($param ne $ePeer){
@@ -1742,6 +1752,7 @@ sub HMinfo_verifyConfig($@) {##################################################
         my @onlyEnt  = grep { !$ep{$_} } @ePeers; 
         push @elPeer,"$eN peer deleted: $_" foreach(@onlyFile);
         push @elPeer,"$eN peer added  : $_" foreach(@onlyEnt);
+        $nh{$eN} = 0 if(scalar@onlyFile || scalar @onlyEnt);
       }
     }
     elsif($cmd eq "regBulk"){
@@ -1788,22 +1799,24 @@ sub HMinfo_verifyConfig($@) {##################################################
           push @elReg,"$eN "
                       .($peer?": peer:$peer ":"")
                       ."addr:$a changed from $r{$a}{f} to $r{$a}{c} - effected RegName:$rgN";
+          $nh{$eN} = 0;
         }
         
       }
-      push @elOk,"   $eN" if (  !scalar @elPeer 
-                              &&!scalar @elReg);
     }
   }
   close(aSave);
   @elReg = HMinfo_noDup(@elReg);
-  @elOk = HMinfo_noDup(@elOk);
-  $ret .= "\nverified:\n   "        .join("\n   ",sort(@elOk))    if (scalar @elOk);
+  foreach (sort keys(%nh)){
+    push @elOk,"$_" if($nh{$_});
+  }
+  my $ret;
   $ret .= "\npeer mismatch:\n   "   .join("\n   ",sort(@elPeer))  if (scalar @elPeer);
   $ret .= "\nreg mismatch:\n   "    .join("\n   ",sort(@elReg ))  if (scalar @elReg);
   $ret .= "\nmissing devices:\n   " .join("\n   ",sort(@entryNF)) if (scalar @entryNF);
-
-  return $ret;
+#  $ret .= "\nverified:\n   "        .join("\n   ",sort(@elOk))    if (scalar @elOk);
+  $ret =~ s/\n/-ret-/g;
+  return "$id;$ret";
 }
 sub HMinfo_loadConfig($@) {####################################################
   my ($filter,$fName)=@_;
@@ -1944,6 +1957,12 @@ sub HMinfo_purgeConfig($) {####################################################
     chomp;
     my $line = $_;
     $line =~ s/\r//g;
+    if($line =~ m/entity:/){#remove an old entry. Last entry is the final.
+      my $name = $line;
+      $name =~ s/.*entity://;
+      $name =~ s/ .*//;
+      delete  $purgeH{$name};
+    }
     next if (   $line !~ m/set (.*) (peerBulk|regBulk) (.*)/
              && $line !~ m/(setreading) .*/);
     my ($command,$timeStamp) = split("#",$line,2);
