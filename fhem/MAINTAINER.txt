@@ -158,6 +158,7 @@ FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige 
 FHEM/36_KeyValueProtocol.pm  HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_LaCrosse.pm          HCS                  http://forum.fhem.de Sonstige Systeme
+FHEM/36_LaCrosseGateway.pm   HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_EMT7110.pm           HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_Level.pm             HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_WMBUS.pm             kaihs                http://forum.fhem.de Sonstige Systeme
