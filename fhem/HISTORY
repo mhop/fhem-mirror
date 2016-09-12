@@ -688,3 +688,7 @@
 
 - Mon Aug 22 2016 (loredo)
   - added new command exportdevice
+
+- Mon Sep 12 2016 (zap)
+  - added modules 88_HMCCU, 88_HMCCUCHN, 88_HMCCUDEV HMCCUConf for interface FHEM - Homematic CCU2
+
