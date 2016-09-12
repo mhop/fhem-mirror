@@ -378,7 +378,7 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   my $location = $hash->{WEATHER};
   my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
   
-  my $URL => "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
+  my $URL = "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
   my $url = sprintf($URL, $location, "json");
   Log3 $hash, 4, "[$hash->{NAME}] url=$url";
   
