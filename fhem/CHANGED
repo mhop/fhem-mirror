@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   HMCCUConf: Interface between FHEM and Homematic CCU2
   - added:   88_HMCCU: Interface between FHEM and Homematic CCU2
   - added:   88_HMCCUCHN: Interface between FHEM and Homematic CCU2
   - added:   88_HMCCUDEV: Interface between FHEM and Homematic CCU2
