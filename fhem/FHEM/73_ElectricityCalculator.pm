@@ -830,36 +830,16 @@ sub ElectricityCalculator_Notify($$)
 		### Create Log entries for debugging
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator End_________________________________________________________________________________________________________________________________";
 	}
-	
-	
-	if ($attr{$ElectricityCalcName}{ReadingDestination} eq "CalculatorDevice")
-	{	
-		### If readings exist, update list of available readings
-		if($ElectricityCalcDev->{READINGS}) 
-		{
-			### Copy readings in list of available "gets" and "sets"
-			%ElectricityCalculator_gets = %{$ElectricityCalcDev->{READINGS}};
-			%ElectricityCalculator_sets = %{$ElectricityCalcDev->{READINGS}};
-
-			### Create Log entries for debugging
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
-		}
-	}
-	elsif ($attr{$ElectricityCalcName}{ReadingDestination} eq "CounterDevice")
+		
+	### If readings exist, update list of available readings
+	if($ElectricityCalcDev->{READINGS}) 
 	{
-		### If readings exist, update list of available readings
-		if($ElectricityCountDev->{READINGS}) 
-		{
-			### Copy readings in list of available "gets" and "sets"
-			%ElectricityCalculator_gets = %{$ElectricityCountDev->{READINGS}};
-			%ElectricityCalculator_sets = %{$ElectricityCountDev->{READINGS}};
+		### Copy readings in list of available "gets" and "sets"
+		%ElectricityCalculator_gets = %{$ElectricityCalcDev->{READINGS}};
+		%ElectricityCalculator_sets = %{$ElectricityCalcDev->{READINGS}};
 
-			### Create Log entries for debugging
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
-		}
-	}
-	else
-	{
+		### Create Log entries for debugging
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
 	}
 	
 	return undef;
@@ -922,6 +902,8 @@ sub ElectricityCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				The set - function sets individual values for example to correct values after power loss etc.<BR>
+				The set - function works only for readings which have been stored in the CalculatorDevice.<BR>
+				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -933,7 +915,9 @@ sub ElectricityCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				The get - function just returns the individual value of the reading.<BR>
-		</ul>
+				The get - function works only for readings which have been stored in the CalculatorDevice.<BR>
+				The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR>
+	</ul>
 	</td></tr>
 </table>
 
@@ -1464,6 +1448,8 @@ sub ElectricityCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
+				Die set - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
+				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1475,6 +1461,9 @@ sub ElectricityCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
+				Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
+				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR>
+
 		</ul>
 	</td></tr>
 </table>
