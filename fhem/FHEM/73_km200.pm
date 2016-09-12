@@ -1579,9 +1579,9 @@ sub km200_GetSingleService($)
 				my $JsonType       = $json->{type};
 
 				### Log entries for debugging purposes
-				Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - value found for      : " .$Service;
-				Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - id                   : " .$JsonId;
-				Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - type                 : " .$JsonType;
+				Log3 $name, 4, $name. " : km200_GetSingleService  - value found for          : " .$Service;
+				Log3 $name, 5, $name. " : km200_GetSingleService  - id                       : " .$JsonId;
+				Log3 $name, 5, $name. " : km200_GetSingleService  - type                     : " .$JsonType;
 				
 				### Set up variables
 				my $TempReturnVal = "";
@@ -1831,6 +1831,59 @@ sub km200_GetSingleService($)
 				
 				return $json;
 			}		
+			### Check whether the type is a systeminfo
+			elsif ($json -> {type} eq "systeminfo")
+			{
+				my $JsonId         = $json->{id};
+				my $JsonType       = $json->{type};
+				my @JsonValues     = $json->{values};
+
+				### Log entries for debugging purposes
+				Log3 $name, 4, $name. " : km200_GetSingleService  - value found for          : " .$Service;
+				Log3 $name, 5, $name. " : km200_GetSingleService  - id                       : " .$JsonId;
+				Log3 $name, 5, $name. " : km200_GetSingleService  - type                     : " .$JsonType;
+
+				### Initialise Return Message
+				my $ReturnMessage = "";
+								
+				### Initialise ArrayCounter 
+				my $ArrayCounter = 0;
+				
+				foreach my $ArrayItem (@{ $json->{values} })
+				{
+					### Incrementation of ArrayCounter
+					$ArrayCounter++;
+
+					### Get array from scalar
+					my %ArrayHash = %{$ArrayItem};
+					
+					while( my( $SystemInfoHashKey, $SystemInfoHashValue ) = each %ArrayHash )
+					{
+						### Create new Service and write reading for fhem
+						my $TempJsonId = $JsonId . "/" . sprintf ('%02d', $ArrayCounter) . "/" . $SystemInfoHashKey;
+						readingsSingleUpdate( $hash, $TempJsonId, $SystemInfoHashValue, 1);
+
+						### If it is the first item in the list
+						if ($ReturnMessage eq "")
+						{				
+							$ReturnMessage = $TempJsonId . " = " . $SystemInfoHashValue;
+						}
+						### If it is not the first item in the list
+						else
+						{
+							$ReturnMessage = $ReturnMessage . "\n" . $TempJsonId . " = " . $SystemInfoHashValue;
+						}
+					}
+				}
+
+				### Return list of available directories
+				$json->{value} = $ReturnMessage;
+				
+				### Save raw Json string
+				$hash->{temp}{JsonRaw} = $decodedContent;
+				
+				return $json;
+			}
 			### If the type is unknown
 			else
 			{
