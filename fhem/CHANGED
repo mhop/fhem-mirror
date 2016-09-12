@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   88_HMCCU: Interface between FHEM and Homematic CCU2
+  - added:   88_HMCCUCHN: Interface between FHEM and Homematic CCU2
+  - added:   88_HMCCUDEV: Interface between FHEM and Homematic CCU2
   - change:  93_DbRep: changed format of diffValue-reading if no value was 
                        selected
   - new:     24_TPLinkHS110: Support for TPLink HS100/110 wifi power outlet
