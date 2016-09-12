@@ -769,34 +769,15 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator End_________________________________________________________________________________________________________________________________";
 	}
 	
-	if ($attr{$GasCalcName}{ReadingDestination} eq "CalculatorDevice")
-	{	
-		### If readings exist, update list of available readings
-		if($GasCalcDev->{READINGS}) 
-		{
-			### Copy readings in list of available "gets" and "sets"
-			%GasCalculator_gets = %{$GasCalcDev->{READINGS}};
-			%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
-
-			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
-		}
-	}
-	elsif ($attr{$GasCalcName}{ReadingDestination} eq "CounterDevice")
+	### If readings exist, update list of available readings
+	if($GasCalcDev->{READINGS}) 
 	{
-		### If readings exist, update list of available readings
-		if($GasCountDev->{READINGS}) 
-		{
-			### Copy readings in list of available "gets" and "sets"
-			%GasCalculator_gets = %{$GasCountDev->{READINGS}};
-			%GasCalculator_sets = %{$GasCountDev->{READINGS}};
+		### Copy readings in list of available "gets" and "sets"
+		%GasCalculator_gets = %{$GasCalcDev->{READINGS}};
+		%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
 
-			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
-		}
-	}
-	else
-	{
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
 	}
 	
 	return undef;
@@ -853,6 +834,8 @@ sub GasCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				The set - function sets individual values for example to correct values after power loss etc.<BR>
+				The set - function works only for readings which have been stored in the CalculatorDevice.<BR>
+				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -864,6 +847,8 @@ sub GasCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				The get - function just returns the individual value of the reading.<BR>
+				The get - function works only for readings which have been stored in the CalculatorDevice.<BR>
+				The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1413,20 +1398,11 @@ sub GasCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
+				Die set - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
+				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
 		</ul>
 	</td></tr>
 </table>
-
-<!-- 
-<table><tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;service&gt;</code> : </td><td>BlaBlaBla<BR></td></tr>
-		<tr><td><code>&lt;value&gt;</code> : </td><td>A valid value for this .<BR></td></tr>
-	</table>
-</ul></ul>
--->
 
 <BR>
 
@@ -1435,33 +1411,11 @@ sub GasCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
+				Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
+				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR>
 		</ul>
 	</td></tr>
 </table>
-<!-- 
-<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;service&gt;</code> : </td><td>BlaBlaBla<BR>
-														&nbsp;&nbsp;It returns only the value<BR>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;option&gt;</code> : </td><td>The optional Argument <BR>
-														 &nbsp;&nbsp;The following options are available:<BR>
-														 &nbsp;&nbsp;BlaBlaBla
-			</td>
-		</tr>
-	</table>
-</ul></ul>
--->
 
 <BR>
 
