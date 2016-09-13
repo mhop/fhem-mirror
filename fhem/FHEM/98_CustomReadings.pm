@@ -150,6 +150,8 @@ sub CustomReadings_GetHTML ($) {
 1;
 
 =pod
+=item summary    Allows to define own readings.
+=item summary_DE Ermöglicht eingen readings.
 =begin html
 
 <a name="CustomReadings"></a>
