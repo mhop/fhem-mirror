@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_DLNARenderer: fix pauseToggle/next/prev (thx@MattG)
   - bugfix:  73_GasCalculator:         get/set list deleted for CounterDevice
   - bugfix:  73_ElectricityCalculator: get/set list deleted for CounterDevice
   - bugfix:  73_km200: Bugfix for double entries in RespondingServices. 
