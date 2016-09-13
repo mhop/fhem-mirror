@@ -2,6 +2,10 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.2 - 20160913
+# - BUGFIX: fixed pauseToggle (thx@MattG)
+# - BUGFIX: fixed next/previous (thx@MattG)
+#
 # v2.0.1 - 20160725
 # - FEATURE: support DIDL-Lite in channel_X attribute (thx@Weissbrotgrill)
 # - FEATURE: automatically generate DIDL-Lite based on URI (thx@Weissbrotgrill)
@@ -171,7 +175,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.1";
+    my $VERSION = "v2.0.2";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -488,7 +492,7 @@ sub DLNARenderer_setMultiRoomVolume {
 
 sub DLNARenderer_pauseToggle {
   my ($hash) = @_;
-  if($hash->{READINGS}{state} eq "paused") {
+  if($hash->{READINGS}{state}{VAL} eq "paused") {
       DLNARenderer_play($hash);
   } else {
       DLNARenderer_upnpPause($hash);
@@ -500,7 +504,7 @@ sub DLNARenderer_play {
   
   #start play
   if($hash->{helper}{caskeid}) {
-    DLNARenderer_upnpSyncPlay($hash);
+    DLNARenderer_upnpPlay($hash);
   } else {
     DLNARenderer_upnpPlay($hash);
   }
@@ -808,12 +812,12 @@ sub DLNARenderer_upnpSeek {
 
 sub DLNARenderer_upnpNext {
   my ($hash) = @_;
-  return DLNARenderer_upnpCallAVTrasnport($hash, "Next", 0);
+  return DLNARenderer_upnpCallAVTransport($hash, "Next", 0);
 }
 
 sub DLNARenderer_upnpPrevious {
   my ($hash) = @_;
-  return DLNARenderer_upnpCallAVTrasnport($hash, "Previous", 0);
+  return DLNARenderer_upnpCallAVTransport($hash, "Previous", 0);
 }
 
 sub DLNARenderer_upnpPlay {
@@ -1553,6 +1557,9 @@ sub DLNARenderer_addSocketsToMainloop {
 1;
 
 =pod
+=item device
+=item summary Autodiscover and control your DLNA renderer devices easily
+=item summary_DE Autodiscover und einfache Steuerung deiner DLNA Renderer Geräte
 =begin html
 
 <a name="DLNARenderer"></a>
