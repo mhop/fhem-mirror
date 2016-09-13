@@ -200,6 +200,8 @@ Level_Attr(@)
 1;
 
 =pod
+=item summary    IO-Device for the Levelsender.
+=item summary_DE IO-Device für den Levelsender.
 =begin html
 
 <a name="Level"></a>

@@ -224,6 +224,8 @@ EMT7110_Attr(@)
 1;
 
 =pod
+=item summary    EMT7110 is a plug with integrated power meter functionality.
+=item summary_DE EMT7110 ist ein Zwischenstecker für die Energiemessung.
 =begin html
 
 <a name="EMT7110"></a>

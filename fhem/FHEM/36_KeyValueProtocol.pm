@@ -193,6 +193,8 @@ sub KeyValueProtocol_Parse($$) {
 1;
 
 =pod
+=item summary    A generic module to receive key-value-pairs from an IO-Device like JeeLink.
+=item summary_DE Empfängt key-value-pairs von einem IO-Device wie z.B. JeeLink.
 =begin html
 
 <a name="KeyValueProtocol"></a>

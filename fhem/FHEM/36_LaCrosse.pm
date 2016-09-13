@@ -539,6 +539,8 @@ sub LaCrosse_Parse($$) {
 1;
 
 =pod
+=item summary    LaCrosse Temperature and Humidity sensors
+=item summary_DE LaCrosse Temperature und Luftfeuchtigkeitssensoren
 =begin html
 
 <a name="LaCrosse"></a>

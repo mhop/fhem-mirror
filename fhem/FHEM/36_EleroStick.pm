@@ -465,6 +465,9 @@ sub EleroStick_Attr(@) {
 1;
 
 =pod
+=item summary    IO-Device for 36_EleroDrive. Communicates with the Elero-Stick.
+=item summary_DE IO-Device für 36_EleroDrive. Kommuniziert mit dem Elero-Stick.
+
 =begin html
 
 <a name="EleroStick"></a>

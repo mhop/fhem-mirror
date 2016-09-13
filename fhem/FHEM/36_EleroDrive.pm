@@ -320,6 +320,8 @@ sub EleroDrive_OnRefreshTimer($$) {
 1;
 
 =pod
+=item summary    Represents on elero drive
+=item summary_DE Repräsentiert ein elero drive
 =begin html
 
 <a name="EleroDrive"></a>
