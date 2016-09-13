@@ -76,7 +76,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-  $hash->{SetFn} = "OBIS_Set";
+#  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
