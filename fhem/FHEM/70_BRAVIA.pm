@@ -229,7 +229,7 @@ sub BRAVIA_Set($@) {
     elsif ( $a[1] eq "on" ) {
         Log3 $name, 2, "BRAVIA set $name " . $a[1];
 
-        if ( $presence eq "absent" ) {
+        if ( $power eq "off" ) {
             readingsSingleUpdate($hash, "state", "set_on", 1);
             my $macAddr = AttrVal( $name, "macaddr", "" );
             $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
@@ -240,10 +240,6 @@ sub BRAVIA_Set($@) {
                 $cmd = "POWER";
                 BRAVIA_SendCommand( $hash, "ircc", $cmd );
             }
-        } elsif ($power eq "off") {
-            readingsSingleUpdate($hash, "state", "set_on", 1);
-            $cmd = "POWER";
-            BRAVIA_SendCommand( $hash, "ircc", $cmd );
         }
     }
 
@@ -1876,6 +1872,7 @@ sub BRAVIA_GetNormalizedName($) {
 
 1;
 =pod
+=item summary controls a Sony TV device of series starting from 2011 via LAN
 =begin html
 
 <a name="BRAVIA"></a>
@@ -1981,6 +1978,7 @@ sub BRAVIA_GetNormalizedName($) {
 </ul>
 
 =end html
+=item summary_DE steuert Sony TVs der BRAVIA-Serien ab dem Modelljahr 2011, via LAN-Verbindung
 =begin html_DE
 
 <a name="BRAVIA"></a>
