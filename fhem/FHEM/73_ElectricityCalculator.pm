@@ -44,8 +44,6 @@
 package main;
 use strict;
 use warnings;
-my %ElectricityCalculator_gets;
-my %ElectricityCalculator_sets;
 
 ###START###### Initialize module ##############################################################################START####
 sub ElectricityCalculator_Initialize($)
@@ -98,12 +96,19 @@ sub ElectricityCalculator_Define($$$)
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
     
-	if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
-	elsif ($attr{$hash}{SiPrefixPower} eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
-	elsif ($attr{$hash}{SiPrefixPower} eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
-	elsif ($attr{$hash}{SiPrefixPower} eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
-	else                                        {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
-	
+	if(defined($attr{$hash}{SiPrefixPower}))
+	{
+		if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
+		else                                        {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+	}
+	else
+	{
+                                                     $hash->{system}{SiPrefixPowerFactor} = 1;
+	}
+		
 	### Writing log entry
 	Log3 $name, 5, $name. " : ElectricityCalculator - Starting to define module";
 
@@ -226,7 +231,7 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 ####END####### Provide units for DbLog database via DbLog_splitFn ##############################################END#####
 
 
-###START###### Manipulate reading after "set" command by fhem #################################################START####
+###START###### Manipulate reading after "get" command by fhem #################################################START####
 sub ElectricityCalculator_Get($@)
 {
 	my ( $hash, @a ) = @_;
@@ -242,9 +247,9 @@ sub ElectricityCalculator_Get($@)
 	my $value; 
 	my $ReturnMessage;
 
-	if(!defined($ElectricityCalculator_gets{$reading})) 
+	if(!defined(%{$hash->{helper}{gets}{$reading}})) 
 	{
-		my @cList = keys %ElectricityCalculator_sets;
+		my @cList = keys %{$hash->{helper}{gets}};
 		return "Unknown argument $reading, choose one of " . join(" ", @cList);
 
 		### Create Log entries for debugging
@@ -265,7 +270,7 @@ sub ElectricityCalculator_Get($@)
 	
 	return($ReturnMessage);
 }
-####END####### Manipulate reading after "set" command by fhem ##################################################END#####
+####END####### Manipulate reading after "get" command by fhem ##################################################END#####
 
 ###START###### Manipulate reading after "set" command by fhem #################################################START####
 sub ElectricityCalculator_Set($@)
@@ -283,9 +288,9 @@ sub ElectricityCalculator_Set($@)
 	my $value = join(" ", @a);
 	my $ReturnMessage;
 
-	if(!defined($ElectricityCalculator_sets{$reading})) 
+	if(!defined(%{$hash->{helper}{sets}{$reading}})) 
 	{
-		my @cList = keys %ElectricityCalculator_sets;
+		my @cList = keys %{$hash->{helper}{sets}};
 		return "Unknown argument $reading, choose one of " . join(" ", @cList);
 
 		### Create Log entries for debugging
@@ -835,11 +840,11 @@ sub ElectricityCalculator_Notify($$)
 	if($ElectricityCalcDev->{READINGS}) 
 	{
 		### Copy readings in list of available "gets" and "sets"
-		%ElectricityCalculator_gets = %{$ElectricityCalcDev->{READINGS}};
-		%ElectricityCalculator_sets = %{$ElectricityCalcDev->{READINGS}};
+		%{$ElectricityCalcDev->{helper}{gets}} = %{$ElectricityCalcDev->{READINGS}};
+		%{$ElectricityCalcDev->{helper}{sets}} = %{$ElectricityCalcDev->{READINGS}};
 
 		### Create Log entries for debugging
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %ElectricityCalculator_sets));
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - notify x_sets list: " . join(" ", (keys %{$ElectricityCalcDev->{helper}{sets}}));
 	}
 	
 	return undef;
