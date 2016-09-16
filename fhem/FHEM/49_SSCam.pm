@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
+#                      for SVS 7.2
 # 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull
 #                      added
 # 1.32.1 18.08.2016    empty event LastSnapId fixed
@@ -155,9 +157,10 @@ my %SSCam_errauthlist = (
   102 => "API does not exist",
   400 => "Invalid user or password",
   401 => "Guest or disabled account",
-  402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started",
+  402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
+  407 => "Permission denied - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
 );
 
 my %SSCam_errlist = (
@@ -217,7 +220,7 @@ sub SSCam_Initialize($) {
          "session:SurveillanceStation,DSM ".
          "showPassInLog:1,0 ".
          "showStmInfoFull:1,0 ".
-         "simu_SVSversion:7.2 ".
+         "simu_SVSversion:7.2-xxxx,7.1-xxxx ".
          "webCmd ".
          $readingFnAttributes;   
          
@@ -1995,14 +1998,6 @@ sub login_nonbl ($) {
         Log3($name, 4, "$name - JSON returned: ". Dumper $data);
    
         $success = $data->{'success'};
-        
-        # aktuelle SVS-Version für Fallentscheidung setzen
-        no warnings 'uninitialized'; 
-        my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
-        my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
-        my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
-        my $actvs = $major.$minor.$build;
-        use warnings; 
     
                 if ($success) 
                      {
@@ -2139,19 +2134,61 @@ sub login_nonbl ($) {
                         Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
-       
-       
+
+        
+                     # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
+                        no warnings 'uninitialized'; 
+                        my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
+                        my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+                        my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
+                        my $actvs = $major.$minor.$build;
+                        Log3($name, 4, "$name - saved SVS version is: $actvs");
+                        use warnings; 
+                        
+                        if(!$actvs and AttrVal($name, "simu_SVSversion", undef)) {
+                            my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
+                            $actvs = $vl[0];
+                            $actvs .= $vl[1];
+                            $actvs .= $vl[2]."-simu" if($vl[2]);
+                        }
+                        
+                     # Simulation anderer SVS-Versionen
+                        Log3($name, 4, "$name - ------- Begin of simulation section -------");
+                        if (AttrVal($name, "simu_SVSversion", undef)) {
+                            Log3($name, 4, "$name - SVS version $actvs will be simulated");
+                            if ($actvs =~ /^71/) {
+                                $apiauthmaxver = 4;
+                                Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
+                                $apiextrecmaxver = 2;
+                                Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
+                                $apiptzmaxver    = 4;
+                                Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+                            } elsif ($actvs =~ /^72/) {
+                                $apiauthmaxver = 6;
+                                Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
+                                $apiextrecmaxver = 3;
+                                Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
+                                $apiptzmaxver    = 5;
+                                Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                            }
+                        } else {
+                            Log3($name, 4, "$name - no simulations done !");
+                        } 
+                        Log3($name, 4, "$name - ------- End of simulation section -------");  
+                        
                      # Workarounds für bestimmte SVS-Versionen
                         Log3($name, 4, "$name - ------- Begin of adaption section -------");
-                        if ($actvs =~ m/^72/g) {
-                            Log3($name, 4, "$name - adapted SVS version is: $actvs");
-                            $apiextrecmaxver = 2;
-                            Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
+                        if ($actvs =~ /^72/) {
+                            Log3($name, 4, "$name - SVS version $actvs will be adapted to 71xxxx");
+                        #    $apiauthmaxver = 4;
+                        #    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
+                        #    $apiextrecmaxver = 2;
+                        #    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
                             $apiptzmaxver    = 4;
                             Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
                         } else {
                             Log3($name, 4, "$name - no adaptions done !");
-                        }
+                        } 
                         Log3($name, 4, "$name - ------- End of adaption section -------");
        
                         # ermittelte Werte in $hash einfügen
@@ -2495,7 +2532,7 @@ sub camop_nonbl ($) {
    
         $success = $data->{'success'};
                 
-        if ($success)                                                                       # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
+        if ($success)                                # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
         {             
              $camcount = $data->{'data'}->{'total'};
              $i = 0;
@@ -2566,11 +2603,17 @@ sub camop_nonbl ($) {
    
    if ($OpMode eq "Start") 
    {
-      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\""; 
+      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\"";
+      if($apiextrecmaxver >= 3) {
+          $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=start&_sid=\"$sid\"";
+      }
    } 
    elsif ($OpMode eq "Stop")
    {
       $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
+      if($apiextrecmaxver >= 3) {
+          $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
+      }   
    }
    elsif ($OpMode eq "Snap")
    {
@@ -3188,10 +3231,11 @@ sub camret_nonbl ($) {
                 
                 # simulieren einer anderen SVS-Version
                 if (AttrVal($name, "simu_SVSversion", undef)) {
+                    Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
                     my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
                     $version {"MAJOR"} = $vl[0];
                     $version {"MINOR"} = $vl[1];
-                    $version {"BUILD"} = $vl[2] if($vl[2]);
+                    $version {"BUILD"} = $vl[2]."-simu" if($vl[2]);
                 }
                 
                 # Werte in $hash zur späteren Auswertung einfügen 
@@ -3211,7 +3255,8 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"SVScustomPortHttps",$data->{'data'}{'customizedPortHttps'});
                 readingsBulkUpdate($hash,"SVSlicenseNumber",$data->{'data'}{'liscenseNumber'});
                 readingsBulkUpdate($hash,"SVSuserPriv",$userPriv);
-                readingsBulkUpdate($hash,"SVSversion",$data->{'data'}{'version'}{'major'}.".".$data->{'data'}{'version'}{'minor'}."-".$data->{'data'}{'version'}{'build'});
+                # readingsBulkUpdate($hash,"SVSversion",$data->{'data'}{'version'}{'major'}.".".$data->{'data'}{'version'}{'minor'}."-".$data->{'data'}{'version'}{'build'});
+                readingsBulkUpdate($hash,"SVSversion",$version {"MAJOR"}.".".$version {"MINOR"}."-".$version {"BUILD"});
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -3898,7 +3943,7 @@ sub experrorauth {
   my $errorcode = shift @errorcode;
   my $error;
   
-  unless (exists($SSCam_errauthlist{"$errorcode"})) {$error = "Message for Errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errauthlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
   $error = $SSCam_errauthlist{"$errorcode"};
@@ -3915,7 +3960,7 @@ sub experror {
   my $errorcode = shift @errorcode;
   my $error;
   
-  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message for Errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message of errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSCam_errlist{"$errorcode"};
@@ -4616,7 +4661,7 @@ sub experror {
   
   <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li>
   
-  <li><b>simu_SVSversion</b>  - simulate another SVS version. ONLY FOR DEBUGGING, don't use it in normal operation ! </li>
+  <li><b>simu_SVSversion</b>  - simulates another SVS version. (only a lower version than the installed one is possible !)  </li>
   
   <li><b>showStmInfoFull</b>  - additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li>
   
@@ -5347,7 +5392,7 @@ sub experror {
   
   <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li>
   
-  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. NUR FÜR DEBUGGING, nicht im normalen Betrieb zu nutzen ! </li>
+  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS Version möglich !) </li>
   
   <li><b>showStmInfoFull</b>  - zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden ausgegeben</li>
   
