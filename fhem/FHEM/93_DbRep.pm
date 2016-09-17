@@ -37,6 +37,8 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.8          16.09.2016       new attr readingPreventFromDel to prevent readings from deletion
+#                               when a new operation starts
 # 3.7.3        11.09.2016       changed format of diffValue-reading if no value was selected
 # 3.7.2        04.09.2016       problem in diffValue fixed if if no value was selected
 # 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
@@ -145,6 +147,7 @@ sub DbRep_Initialize($) {
                        "reading ".
                        "allowDeletion:1,0 ".
                        "readingNameMap ".
+                       "readingPreventFromDel ".
                        "device ".
                        "expimpfile ".
                        "aggregation:hour,day,week,month,no ".
@@ -292,13 +295,13 @@ sub DbRep_Set($@) {
               }
           }
           
-          $hash->{helper}{I_TIMESTAMP} = $i_timestamp;
-          $hash->{helper}{I_DEVICE}    = $i_device;
-          $hash->{helper}{I_READING}   = $i_reading;
-          $hash->{helper}{I_VALUE}     = $i_value;
-          $hash->{helper}{I_UNIT}      = $i_unit;
-          $hash->{helper}{I_TYPE}      = my $i_type = "manual";
-          $hash->{helper}{I_EVENT}     = my $i_event = "manual";          
+          $hash->{HELPER}{I_TIMESTAMP} = $i_timestamp;
+          $hash->{HELPER}{I_DEVICE}    = $i_device;
+          $hash->{HELPER}{I_READING}   = $i_reading;
+          $hash->{HELPER}{I_VALUE}     = $i_value;
+          $hash->{HELPER}{I_UNIT}      = $i_unit;
+          $hash->{HELPER}{I_TYPE}      = my $i_type = "manual";
+          $hash->{HELPER}{I_EVENT}     = my $i_event = "manual";          
           
       } else {
           return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. \"Unit\" is optional. Spaces are not allowed !";
@@ -352,6 +355,15 @@ sub DbRep_Attr($$$$) {
             $dbh->disconnect() if($dbh);
         }
         
+    }
+    
+    if ($aName eq "readingPreventFromDel") {
+        if($cmd eq "set") {
+            if($aVal =~ / /) {return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";}
+            $hash->{HELPER}{RDPFDEL} = $aVal;
+        } else {
+            delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
+        }
     }
                          
     if ($cmd eq "set") {
@@ -450,7 +462,7 @@ sub DbRep_Undef($$) {
  my $dbh = $hash->{DBH}; 
  $dbh->disconnect() if(defined($dbh));
  
- BlockingKill($hash->{helper}{RUNNING_PID}) if (exists($hash->{helper}{RUNNING_PID}));
+ BlockingKill($hash->{HELPER}{RUNNING_PID}) if (exists($hash->{HELPER}{RUNNING_PID}));
     
 return undef;
 }
@@ -537,13 +549,30 @@ sub sqlexec($$) {
  #    $dbh->disconnect;
  #}
  
- if (exists($hash->{helper}{RUNNING_PID})) {
-     Log3 ($name, 3, "DbRep $name - Warning: old process $hash->{helper}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
-     BlockingKill($hash->{helper}{RUNNING_PID});
+ if (exists($hash->{HELPER}{RUNNING_PID})) {
+     Log3 ($name, 3, "DbRep $name - Warning: old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
+     BlockingKill($hash->{HELPER}{RUNNING_PID});
  }
  
- # alte Readings löschen
- delete $defs{$name}{READINGS};
+ # alte Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+ my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
+ if (@rdpfdel) {
+     my @allrds = keys($defs{$name}{READINGS});
+     foreach my $key(@allrds) {
+         # Log3 ($name, 3, "DbRep $name - Reading Schlüssel: $key");
+         my $dodel = 1;
+         foreach my $rdpfdel(@rdpfdel) {
+             if($key =~ /$rdpfdel/) {
+                 $dodel = 0;
+             }
+         }
+         if($dodel) {
+             delete($defs{$name}{READINGS}{$key});
+         }
+     }
+ } else {
+     delete $defs{$name}{READINGS};
+ }
  
  readingsSingleUpdate($hash, "state", "running", 1);
  
@@ -677,40 +706,40 @@ $hash->{HELPER}{CV} = \%cv;
     } 
 
  if ($opt eq "sum") {
-     $hash->{helper}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
      
  } elsif ($opt eq "count") {
-     $hash->{helper}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 
  } elsif ($opt eq "average") {      
-     $hash->{helper}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
     
  } elsif ($opt eq "fetchrows") {
      $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              
-     $hash->{helper}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "exportToFile") {
      $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              
-     $hash->{helper}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "max") {        
-     $hash->{helper}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "del") {
      $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
-     $hash->{helper}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
  }  elsif ($opt eq "diff") {        
-     $hash->{helper}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
          
  }  elsif ($opt eq "insert") { 
-     $hash->{helper}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
  }
 
@@ -829,7 +858,7 @@ sub averval_ParseDone($) {
   if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
       return;
   }
@@ -863,7 +892,7 @@ sub averval_ParseDone($) {
   
   readingsEndUpdate($hash, 1);
   
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
   
 return;
@@ -982,7 +1011,7 @@ sub count_ParseDone($) {
    if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
       return;
   }
@@ -1017,7 +1046,7 @@ sub count_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
   
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
   
 return;
@@ -1148,7 +1177,7 @@ sub maxval_ParseDone($) {
    if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
       return;
   }
@@ -1172,7 +1201,7 @@ sub maxval_ParseDone($) {
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
           readingsSingleUpdate($hash, "state", "error", 1);
-          delete($hash->{helper}{RUNNING_PID});
+          delete($hash->{HELPER}{RUNNING_PID});
           $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $a[2] $a[3], DEVICE: $device, READING: $reading, VALUE: $value. \nLeaving ...");
           Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
@@ -1233,7 +1262,7 @@ sub maxval_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
   
 return;
@@ -1363,7 +1392,7 @@ sub diffval_ParseDone($) {
    if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
       return;
   }
@@ -1400,7 +1429,7 @@ sub diffval_ParseDone($) {
           $err = "Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value";
           readingsSingleUpdate($hash, "errortext", $err, 1);
           readingsSingleUpdate($hash, "state", "error", 1);
-          delete($hash->{helper}{RUNNING_PID});
+          delete($hash->{HELPER}{RUNNING_PID});
           Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
           return;
       }
@@ -1463,7 +1492,7 @@ sub diffval_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
   
 return;
@@ -1582,7 +1611,7 @@ sub sumval_ParseDone($) {
    if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
       return;
   }
@@ -1615,7 +1644,7 @@ sub sumval_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
   
-  delete($hash->{helper}{RUNNING_PID});  
+  delete($hash->{HELPER}{RUNNING_PID});  
   Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
   
 return;
@@ -1709,7 +1738,7 @@ sub del_ParseDone($) {
    if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
       return;
   }
@@ -1735,7 +1764,7 @@ sub del_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
   
 return;
@@ -1767,13 +1796,13 @@ sub insert_Push($) {
      return "$name|''|''|$err";
  }
  
- my $i_timestamp = $hash->{helper}{I_TIMESTAMP};
- my $i_device    = $hash->{helper}{I_DEVICE};
- my $i_type      = $hash->{helper}{I_TYPE};
- my $i_event     = $hash->{helper}{I_EVENT};
- my $i_reading   = $hash->{helper}{I_READING};
- my $i_value     = $hash->{helper}{I_VALUE};
- my $i_unit      = $hash->{helper}{I_UNIT} ? $hash->{helper}{I_UNIT} : " "; 
+ my $i_timestamp = $hash->{HELPER}{I_TIMESTAMP};
+ my $i_device    = $hash->{HELPER}{I_DEVICE};
+ my $i_type      = $hash->{HELPER}{I_TYPE};
+ my $i_event     = $hash->{HELPER}{I_EVENT};
+ my $i_reading   = $hash->{HELPER}{I_READING};
+ my $i_value     = $hash->{HELPER}{I_VALUE};
+ my $i_unit      = $hash->{HELPER}{I_UNIT} ? $hash->{HELPER}{I_UNIT} : " "; 
  
  # SQL zusammenstellen für DB-Operation
     
@@ -1824,18 +1853,18 @@ sub insert_Done($) {
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Done");
   
-  my $i_timestamp = delete $hash->{helper}{I_TIMESTAMP};
-  my $i_device    = delete $hash->{helper}{I_DEVICE};
-  my $i_type      = delete $hash->{helper}{I_TYPE};
-  my $i_event     = delete $hash->{helper}{I_EVENT};
-  my $i_reading   = delete $hash->{helper}{I_READING};
-  my $i_value     = delete $hash->{helper}{I_VALUE};
-  my $i_unit      = delete $hash->{helper}{I_UNIT}; 
+  my $i_timestamp = delete $hash->{HELPER}{I_TIMESTAMP};
+  my $i_device    = delete $hash->{HELPER}{I_DEVICE};
+  my $i_type      = delete $hash->{HELPER}{I_TYPE};
+  my $i_event     = delete $hash->{HELPER}{I_EVENT};
+  my $i_reading   = delete $hash->{HELPER}{I_READING};
+  my $i_value     = delete $hash->{HELPER}{I_VALUE};
+  my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
   
   if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
       return;
   } 
@@ -1849,7 +1878,7 @@ sub insert_Done($) {
   
   Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{dbloghash}{NAME} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
   
 return;
@@ -1952,7 +1981,7 @@ sub fetchrows_ParseDone($) {
   if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
       return;
   } 
@@ -1985,7 +2014,7 @@ sub fetchrows_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
   
 return;
@@ -2094,7 +2123,7 @@ sub expfile_ParseDone($) {
   if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{helper}{RUNNING_PID});
+      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
       return;
   } 
@@ -2121,7 +2150,7 @@ sub expfile_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
 
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
   
 return;
@@ -2134,9 +2163,9 @@ sub ParseAborted($) {
 my ($hash) = @_;
 my $name = $hash->{NAME};
 
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{helper}{RUNNING_PID}{fn} timed out");
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
   readingsSingleUpdate($hash, "state", "timeout", 1);
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{HELPER}{RUNNING_PID});
 }
 
 
@@ -2171,7 +2200,7 @@ sub collaggstr($$$$) {
 
          # keine Aggregation (all between timestamps)
          if ($aggregation eq "no") {
-             $runtime_string       = "all between timestamps";                                         # für Readingname
+             $runtime_string       = "all_between_timestamps";                                         # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
              $ll = 1;
@@ -2327,7 +2356,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   Readings will be filled. The data selection will been done by declaration of device, reading and the time settings of selection-begin and selection-end.  <br><br>
   
   All database operations are implemented nonblocking. Optional the execution time of SQL-statements in background can also be determined and provided as reading.
-  (refer to <a href="#DbRepattr">attributes</a>). <br><br>
+  (refer to <a href="#DbRepattr">attributes</a>). <br>
+  All existing readings will be deleted when a new operation starts. By attribute "readingPreventFromDel" a comma separated list of readings which are should prevent
+  from deletion can be provided. <br><br>
   
   Currently the following functions are provided: <br><br>
   
@@ -2452,6 +2483,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>expimpfile </b>      - Path/filename for data export </li> <br>
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
+  <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a new operation starts  </li> <br>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
   <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*)  </li> <br>
@@ -2511,7 +2543,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
   Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der SQL-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
-  werden (siehe <a href="#DbRepattr">Attribute</a>). <br><br>
+  werden (siehe <a href="#DbRepattr">Attribute</a>). <br>
+  Alle vorhandenen Readings werden vor einer neuen Operation gelöscht. Durch das Attribut "readingPreventFromDel" kann eine Komma separierte Liste von Readings 
+  angegeben werden die nicht gelöscht werden sollen. <br><br>
   
   Zur Zeit werden folgende Operationen unterstützt: <br><br>
   
@@ -2635,6 +2669,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>expimpfile </b>      - Pfad/Dateiname für Datenexport  </li> <br>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
+  <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
