@@ -1315,6 +1315,7 @@ sub FRITZBOX_Readout_Run_Web($)
 
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
    
+   # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
    if (defined $result->{Error}) {
       FRITZBOX_Log $hash, 2, "Error: ".$result->{Error};
       my $returnStr = "Error|" . $result->{Error};
@@ -1322,6 +1323,7 @@ sub FRITZBOX_Readout_Run_Web($)
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
    }
+   
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
    
@@ -4480,6 +4482,7 @@ sub FRITZBOX_Web_Query($$@)
 
    if ($response->is_error) {
       my %retHash = ("Error" => $response->status_line);
+      FRITZBOX_Log $hash, 5, "Error: ".$response->status_line;
       return \%retHash;
    }
 
@@ -4500,7 +4503,8 @@ sub FRITZBOX_Web_Query($$@)
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
       $jsonResult = JSON->new->utf8->decode( $jsonText );
-   } else {
+   } 
+   else {
       $jsonResult = JSON->new->latin1->decode( $jsonText );
    }
    $jsonResult->{sid} = $sid;
