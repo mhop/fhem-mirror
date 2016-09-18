@@ -720,6 +720,8 @@ my $ONKYO_values_hr = {
             'tp-xx-xx-xx-xx-xx-xx' => 'tp{xx}{xx}{xx}{xx}{xx}{xx}',
             'off'                  => 'DIS',
             'on'                   => 'ENA',
+            'bmp'                  => 'BMP',
+            'link'                 => 'LINK',
             'up'                   => 'UP',
             'query'                => 'QSTN',
         },
@@ -4728,6 +4730,18 @@ ii-> Service icon
                 {
                     'description' => 'sets Jacket Art enable',
                     'name'        => 'on'
+                },
+
+                'BMP',
+                {
+                    'description' => 'sets Jacket Art enable and type BMP',
+                    'name'        => 'bmp'
+                },
+
+                'LINK',
+                {
+                    'description' => 'sets Jacket Art enable and type LINK',
+                    'name'        => 'link'
                 },
 
                 'UP',
