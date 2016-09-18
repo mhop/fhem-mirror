@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  10_ZWAVE: TRANSMIT_NO_ACK is reading only (Forum #57781)
   - feature: 93_DbRep: new attr readingPreventFromDel to prevent readings from
                        deletion when a new operation starts
   - change:  49_SSCam: attr simu_SVSversion changed, added 407 errorcode msg, 

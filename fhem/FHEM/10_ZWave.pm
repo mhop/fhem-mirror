@@ -4156,7 +4156,7 @@ ZWave_Parse($$@)
 
     } else { # Wait for the retry timer to remove this cmd from the stack.
       return "" if(!$hash);
-      readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1);
+      #readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1); #Forum #57781
       readingsSingleUpdate($hash, "transmit", $lmsg, 1);
       return $hash->{NAME};
     }
