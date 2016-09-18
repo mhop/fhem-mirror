@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.35   17.09.2016    internal timer of start-routines optimized
 # 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
 #                      for SVS 7.2
 # 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull
@@ -953,7 +954,7 @@ sub camstartrec ($) {
     else
     {
         RemoveInternalTimer($hash, "camstartrec");
-        InternalTimer(gettimeofday()+1, "camstartrec", $hash);
+        InternalTimer(gettimeofday()+0.3, "camstartrec", $hash);
     }
 }
 
@@ -1012,7 +1013,7 @@ sub camstoprec ($) {
     else
     {
         RemoveInternalTimer($hash, "camstoprec");
-        InternalTimer(gettimeofday()+1, "camstoprec", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "camstoprec", $hash, 0);
     }
 }
 
@@ -1066,7 +1067,7 @@ sub camexpmode ($) {
     else
     {
     RemoveInternalTimer($hash, "camexpmode");
-    InternalTimer(gettimeofday()+1, "camexpmode", $hash, 0);
+    InternalTimer(gettimeofday()+0.5, "camexpmode", $hash, 0);
     }
 }
 
@@ -1121,7 +1122,7 @@ sub cammotdetsc ($) {
     else
     {
         RemoveInternalTimer($hash, "cammotdetsc");
-        InternalTimer(gettimeofday()+1, "cammotdetsc", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "cammotdetsc", $hash, 0);
     }
 }
 
@@ -1177,7 +1178,7 @@ sub camsnap ($) {
     else
     {
         RemoveInternalTimer($hash, "camsnap");
-        InternalTimer(gettimeofday()+1, "camsnap", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "camsnap", $hash, 0);
     }    
 }
 
@@ -1235,7 +1236,7 @@ sub runliveview ($) {
     else
     {
         RemoveInternalTimer($hash, "runliveview");
-        InternalTimer(gettimeofday()+1, "runliveview", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "runliveview", $hash, 0);
     }    
 }
 
@@ -1291,7 +1292,7 @@ sub stopliveview ($) {
     else
     {
         RemoveInternalTimer($hash, "stopliveview");
-        InternalTimer(gettimeofday()+1, "stopliveview", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "stopliveview", $hash, 0);
     }    
 }
 
@@ -1322,7 +1323,7 @@ sub getsnapfilename ($) {
     else
     {
         RemoveInternalTimer($hash, "getsnapfilename");
-        InternalTimer(gettimeofday()+1, "getsnapfilename", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "getsnapfilename", $hash, 0);
     }    
 }
 
@@ -1353,7 +1354,7 @@ sub extevent ($) {
     else
     {
         RemoveInternalTimer($hash, "extevent");
-        InternalTimer(gettimeofday()+1, "extevent", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "extevent", $hash, 0);
     }    
 }
 
@@ -1465,7 +1466,7 @@ sub doptzaction ($) {
     else
     {
         RemoveInternalTimer($hash, "doptzaction");
-        InternalTimer(gettimeofday()+1, "doptzaction", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "doptzaction", $hash, 0);
     }    
 }
 
@@ -1494,7 +1495,7 @@ sub movestop ($) {
     else
     {
         RemoveInternalTimer($hash, "movestop");
-        InternalTimer(gettimeofday()+1, "movestop", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "movestop", $hash, 0);
     }    
 }
 
@@ -1526,7 +1527,7 @@ sub camenable ($) {
     else
     {
         RemoveInternalTimer($hash, "camenable");
-        InternalTimer(gettimeofday()+1, "camenable", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "camenable", $hash, 0);
     }    
 }
 
@@ -1558,7 +1559,7 @@ sub camdisable ($) {
     else
     {
         RemoveInternalTimer($hash, "camdisable");
-        InternalTimer(gettimeofday()+1, "camdisable", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "camdisable", $hash, 0);
     }    
 }
 
@@ -1574,12 +1575,18 @@ sub getcaminfoall {
     return if(IsDisabled($name));
     
     geteventlist($hash);
-    getcaminfo($hash);
-    getmotionenum($hash);
-    getcapabilities($hash);
-    getptzlistpreset($hash);
-    getptzlistpatrol($hash);
-    getStmUrlPath($hash);
+    RemoveInternalTimer($hash, "getcaminfo");
+    InternalTimer(gettimeofday()+0.5, "getcaminfo", $hash, 0);
+    RemoveInternalTimer($hash, "getmotionenum");
+    InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
+    RemoveInternalTimer($hash, "getcapabilities");
+    InternalTimer(gettimeofday()+1.3, "getcapabilities", $hash, 0);
+    RemoveInternalTimer($hash, "getptzlistpreset");
+    InternalTimer(gettimeofday()+1.6, "getptzlistpreset", $hash, 0);
+    RemoveInternalTimer($hash, "getptzlistpatrol");
+    InternalTimer(gettimeofday()+1.9, "getptzlistpatrol", $hash, 0);
+    RemoveInternalTimer($hash, "getStmUrlPath");
+    InternalTimer(gettimeofday()+2.1, "getStmUrlPath", $hash, 0);
     
     # wenn gesetzt = manuelle Abfrage,
     if ($mode) {
@@ -1669,7 +1676,7 @@ sub getcaminfo ($) {
     else
     {
         RemoveInternalTimer($hash, "getcaminfo");
-        InternalTimer(gettimeofday()+1, "getcaminfo", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getcaminfo", $hash, 0);
     }
     
 }
@@ -1700,7 +1707,7 @@ sub getStmUrlPath ($) {
     else
     {
         RemoveInternalTimer($hash, "getStmUrlPath");
-        InternalTimer(gettimeofday()+1, "getStmUrlPath", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getStmUrlPath", $hash, 0);
     }
     
 }
@@ -1732,7 +1739,7 @@ sub geteventlist ($) {
     else
     {
         RemoveInternalTimer($hash, "geteventlist");
-        InternalTimer(gettimeofday()+1, "geteventlist", $hash, 0);
+        InternalTimer(gettimeofday()+2, "geteventlist", $hash, 0);
     }
     
 }
@@ -1762,7 +1769,7 @@ sub getmotionenum ($) {
     else
     {
         RemoveInternalTimer($hash, "getmotionenum");
-        InternalTimer(gettimeofday()+1, "getmotionenum", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getmotionenum", $hash, 0);
     }
     
 }
@@ -1793,7 +1800,7 @@ sub getcapabilities ($) {
     else
     {
         RemoveInternalTimer($hash, "getcapabilities");
-        InternalTimer(gettimeofday()+1, "getcapabilities", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getcapabilities", $hash, 0);
     }
     
 }
@@ -1829,7 +1836,7 @@ sub getptzlistpreset ($) {
     else
     {
         RemoveInternalTimer($hash, "getptzlistpreset");
-        InternalTimer(gettimeofday()+1, "getptzlistpreset", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getptzlistpreset", $hash, 0);
     }
     
 }
@@ -1866,7 +1873,7 @@ sub getptzlistpatrol ($) {
     else
     {
         RemoveInternalTimer($hash, "getptzlistpatrol");
-        InternalTimer(gettimeofday()+1, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+2, "getptzlistpatrol", $hash, 0);
     }
     
 }
