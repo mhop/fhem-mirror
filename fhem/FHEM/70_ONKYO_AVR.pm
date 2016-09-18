@@ -91,10 +91,40 @@ sub ONKYO_AVR_Initialize($) {
     $data{RC_makenotify}{ONKYO_AVR} = "ONKYO_AVR_RCmakenotify";
 }
 
+sub ONKYO_AVR_addExtension($$$) {
+    my ( $name, $func, $link ) = @_;
+
+    my $url = "?/$link";
+
+    return 0
+      if ( defined( $data{FWEXT}{$url} )
+        && $data{FWEXT}{$url}{deviceName} ne $name );
+
+    Log3 $name, 2,
+      "ONKYO_AVR $name: Registering ONKYO_AVR for webhook URI $url ...";
+    $data{FWEXT}{$url}{deviceName} = $name;
+    $data{FWEXT}{$url}{FUNC}       = $func;
+    $data{FWEXT}{$url}{LINK}       = $link;
+
+    return 1;
+}
+
+###################################
+sub ONKYO_AVR_removeExtension($) {
+    my ($link) = @_;
+
+    my $url  = "?/$link";
+    my $name = $data{FWEXT}{$url}{deviceName};
+    Log3 $name, 2,
+      "ONKYO_AVR $name: Unregistering ONKYO_AVR for webhook URL $url...";
+    delete $data{FWEXT}{$url};
+}
+
 ###################################
 sub ONKYO_AVR_Define($$$) {
     my ( $hash, $a, $h ) = @_;
-    my $name = $hash->{NAME};
+    my $name  = $hash->{NAME};
+    my $infix = "ONKYO_AVR";
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Define()";
 
@@ -157,6 +187,10 @@ sub ONKYO_AVR_Define($$$) {
 
     $hash->{DeviceName} = @$a[2];
 
+    if ( ONKYO_AVR_addExtension( $name, "ONKYO_AVR_CGI", $infix ) ) {
+        $hash->{fhem}{infix} = $infix;
+    }
+
     # connect using serial connection (old blocking style)
     if (   $hash->{DeviceName} =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/
         || $hash->{DeviceName} =~ m/^FHEM:DEVIO:(.*)(:(.*))/ )
@@ -193,6 +227,40 @@ sub ONKYO_AVR_DevInit($) {
     else {
         DoTrigger( $name, "DISCONNECTED" );
     }
+}
+
+#------------------------------------------------------------------------------
+sub ONKYO_AVR_CGI() {
+    my ($request) = @_;
+
+    # data received
+    if ( $request =~ m,^\?\/ONKYO_AVR\/cover\/(.+)\.(.+)$, ) {
+
+        Log3 undef, 5, "ONKYO_AVR: sending cover $1.$2";
+
+        if ( $1 eq "empty" && $2 eq "jpg" ) {
+            FW_serveSpecial( 'sonos_empty', 'jpg',
+                AttrVal( "global", "modpath", "." ) . '/FHEM/lib/UPnP', 1 );
+        }
+        else {
+            FW_serveSpecial(
+                $1,
+                $2,
+                AttrVal( "global", "modpath", "." )
+                  . '/www/images/default/ONKYO_AVR',
+                1
+            );
+        }
+
+        return ( undef, undef );
+    }
+
+    # no data received
+    else {
+        Log3 undef, 5, "ONKYO_AVR: received malformed request\n$request";
+    }
+
+    return ( "text/plain; charset=utf-8", "Call failure: " . $request );
 }
 
 #####################################
@@ -337,6 +405,10 @@ sub ONKYO_AVR_Undefine($$) {
     my ( $hash, $name ) = @_;
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Undefine()";
+
+    if ( defined( $hash->{fhem}{infix} ) ) {
+        ONKYO_AVR_removeExtension( $hash->{fhem}{infix} );
+    }
 
     RemoveInternalTimer($hash);
 
@@ -912,10 +984,14 @@ sub ONKYO_AVR_Read($) {
         }
     }
 
-    elsif ( $cmd eq "net-usb-jacket-art" ) {
-        if ( $value =~ /^([0|1])([0|1|2])(.*)$/ ) {
+    elsif ($cmd eq "net-usb-jacket-art"
+        && $value ne "on"
+        && $value ne "off" )
+    {
+        if ( $value =~ /^([012])([012])(.*)$/ ) {
             my $type = "bmp";
-            $type = "jpg" if ( $1 eq "1" );
+            $type = "jpg"  if ( $1 eq "1" );
+            $type = "link" if ( $1 eq "2" );
 
             $hash->{helper}{cover}{$type}{parts} = "1" if ( $2 eq "0" );
             $hash->{helper}{cover}{$type}{parts}++ if ( $2 ne "0" );
@@ -927,11 +1003,25 @@ sub ONKYO_AVR_Read($) {
               . $hash->{helper}{cover}{$type}{parts};
 
             # complete album art received
-            if ( $2 eq "2" && $hash->{helper}{cover}{$type}{data} ne "" ) {
+            if (   $2 eq "2"
+                && $type eq "link"
+                && $hash->{helper}{cover}{$type}{data} ne "" )
+            {
+                $hash->{helper}{currentCover} =
+                  $hash->{helper}{cover}{$type}{data};
+
+                readingsBulkUpdate( $hash, "currentAlbumArtURI", "" );
+                readingsBulkUpdate( $hash, "currentAlbumArtURL",
+                    $hash->{helper}{currentCover} );
+            }
+            elsif ($2 eq "2"
+                && $type ne "link"
+                && $hash->{helper}{cover}{$type}{data} ne "" )
+            {
                 my $AlbumArtName = $name . "_CurrentAlbumArt." . $type;
                 my $AlbumArtURI = AttrVal( "global", "modpath", "." )
                   . "/www/images/default/ONKYO_AVR/$AlbumArtName";
-                my $AlbumArtURL = "/fhem/ONKYO_AVR/cover/$AlbumArtName";
+                my $AlbumArtURL = "?/ONKYO_AVR/cover/$AlbumArtName";
 
                 mkpath( AttrVal( "global", "modpath", "." )
                       . '/www/images/default/ONKYO_AVR/' );
@@ -944,8 +1034,17 @@ sub ONKYO_AVR_Read($) {
                   . $hash->{helper}{cover}{$type}{parts}
                   . " parts. Saved to $AlbumArtURI";
 
-                $hash->{helper}{cover}{$type}{data} = "SAVED to $AlbumArtURI";
+                delete $hash->{helper}{cover}{$type}{data};
+                $hash->{helper}{currentCover} = $AlbumArtURI;
+
+                readingsBulkUpdate( $hash, "currentAlbumArtURI", $AlbumArtURI );
+                readingsBulkUpdate( $hash, "currentAlbumArtURL", $AlbumArtURL );
             }
+        }
+        else {
+            Log3 $name, 4,
+              "ONKYO_AVR $name: received cover art tile could not be decoded: "
+              . $value;
         }
     }
 
@@ -1032,9 +1131,21 @@ sub ONKYO_AVR_Read($) {
             }
 
             if ( ReadingsVal( $name, "channel", "-" ) ne $channelname ) {
+                my $currentAlbumArtURI = AttrVal( "global", "modpath", "." )
+                  . "/FHEM/lib/UPnP/sonos_empty.jpg";
+                my $currentAlbumArtURL = "?/ONKYO_AVR/cover/empty.jpg";
+
                 readingsBulkUpdate( $hash, "channel",      $channelname );
                 readingsBulkUpdate( $hash, "currentAlbum", "" )
                   if ( ReadingsVal( $name, "currentAlbum", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentAlbumArtURI",
+                    $currentAlbumArtURI )
+                  if ( ReadingsVal( $name, "currentAlbumArtURI", "-" ) ne
+                    $currentAlbumArtURI );
+                readingsBulkUpdate( $hash, "currentAlbumArtURL",
+                    $currentAlbumArtURL )
+                  if ( ReadingsVal( $name, "currentAlbumArtURL", "-" ) ne
+                    $currentAlbumArtURL );
                 readingsBulkUpdate( $hash, "currentArtist", "" )
                   if ( ReadingsVal( $name, "currentArtist", "-" ) ne "" );
                 readingsBulkUpdate( $hash, "currentTitle", "" )
@@ -1049,6 +1160,8 @@ sub ONKYO_AVR_Read($) {
                 $zoneDispatch->{CHANNEL_RAW}          = $hash->{CHANNEL};
                 $zoneDispatch->{channel}              = $channelname;
                 $zoneDispatch->{currentAlbum}         = "";
+                $zoneDispatch->{currentAlbumURI}      = $currentAlbumArtURI;
+                $zoneDispatch->{currentAlbumURL}      = $currentAlbumArtURL;
                 $zoneDispatch->{currentArtist}        = "";
                 $zoneDispatch->{currentTitle}         = "";
                 $zoneDispatch->{currentTrackPosition} = "--:--";
@@ -1355,8 +1468,21 @@ sub ONKYO_AVR_Read($) {
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
             if ( $status eq "stopped" ) {
+
+                my $currentAlbumArtURI = AttrVal( "global", "modpath", "." )
+                  . "/FHEM/lib/UPnP/sonos_empty.jpg";
+                my $currentAlbumArtURL = "?/ONKYO_AVR/cover/empty.jpg";
+
                 readingsBulkUpdate( $hash, "currentAlbum", "" )
                   if ( ReadingsVal( $name, "currentAlbum", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentAlbumArtURI",
+                    $currentAlbumArtURI )
+                  if ( ReadingsVal( $name, "currentAlbumArtURI", "-" ) ne
+                    $currentAlbumArtURI );
+                readingsBulkUpdate( $hash, "currentAlbumArtURL",
+                    $currentAlbumArtURL )
+                  if ( ReadingsVal( $name, "currentAlbumArtURL", "-" ) ne
+                    $currentAlbumArtURL );
                 readingsBulkUpdate( $hash, "currentArtist", "" )
                   if ( ReadingsVal( $name, "currentArtist", "-" ) ne "" );
                 readingsBulkUpdate( $hash, "currentTitle", "" )
@@ -1369,10 +1495,13 @@ sub ONKYO_AVR_Read($) {
                     "--:--" );
 
                 $zoneDispatch->{currentAlbum}         = "";
+                $zoneDispatch->{currentAlbumURI}      = $currentAlbumArtURI;
+                $zoneDispatch->{currentAlbumURL}      = $currentAlbumArtURL;
                 $zoneDispatch->{currentArtist}        = "";
                 $zoneDispatch->{currentTitle}         = "";
                 $zoneDispatch->{currentTrackPosition} = "--:--";
                 $zoneDispatch->{currentTrackDuration} = "--:--";
+
             }
 
             # repeat
@@ -1408,7 +1537,7 @@ sub ONKYO_AVR_Read($) {
         }
     }
 
-    elsif ( $cmd =~ /^net-usb/ ) {
+    elsif ( $cmd =~ /^net-usb/ && $value ne "on" && $value ne "off" ) {
     }
 
     elsif ( $cmd eq "net-popup-message" ) {
@@ -2119,7 +2248,8 @@ sub ONKYO_AVR_Set($$$) {
             }
             elsif ( lc( @$a[2] ) eq "down" ) {
                 Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-                $return = ONKYO_AVR_SendCommand( $hash, lc( @$a[1] ), "DOWN" );
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc( @$a[1] ), "DOWN" );
             }
             elsif ( @$a[2] =~ /^\d*$/ ) {
                 Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
