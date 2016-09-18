@@ -2,6 +2,9 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.3 - 20160918
+# - BUGFIX: fixed SyncPlay for CaskeId players
+#
 # v2.0.2 - 20160913
 # - BUGFIX: fixed pauseToggle (thx@MattG)
 # - BUGFIX: fixed next/previous (thx@MattG)
@@ -175,7 +178,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.2";
+    my $VERSION = "v2.0.3";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -504,7 +507,10 @@ sub DLNARenderer_play {
   
   #start play
   if($hash->{helper}{caskeid}) {
-    DLNARenderer_upnpPlay($hash);
+    if($hash->{READINGS}{sessionId}{VAL} eq "") {
+      DLNARenderer_createSession($hash);
+    }
+    DLNARenderer_upnpSyncPlay($hash);
   } else {
     DLNARenderer_upnpPlay($hash);
   }
@@ -827,7 +833,7 @@ sub DLNARenderer_upnpPlay {
 
 sub DLNARenderer_upnpSyncPlay {
   my ($hash) = @_;
-  return DLNARenderer_upnpCallAVTransport($hash, "SyncPlay", 0, 1, "REL_TIME", "", "", "", "DeviceClockId");
+  return DLNARenderer_upnpCallAVTransport($hash, "SyncPlay", 0, 1, "REL_TIME", "", "", "", "PUREDEVICECLOCK1");
 }
 
 sub DLNARenderer_upnpCallAVTransport {
