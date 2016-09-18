@@ -530,9 +530,20 @@ sub LaCrosseGateway_Attr(@) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; LaCrosseGateway &lt;device&gt;</code> <br>
-    &lt;device&gt; specifies the serial port to communicate with the LaCrosseGateway.
-    The name of the serial-device depends on your distribution, under
-    linux it is something like /dev/ttyACM0 or /dev/ttyUSB0.<br><br>
+    <br>
+    USB-connected devices:<br><ul>
+      &lt;device&gt; specifies the serial port to communicate with the LaCrosseGateway.
+      The name of the serial-device depends on your distribution, under
+      linux it is something like /dev/ttyACM0 or /dev/ttyUSB0.<br><br>
+    </ul>
+    Network-connected devices:<br><ul>
+      &lt;device&gt; specifies the network device<br>
+      Normally this is the IP-address and the port in the form ip:port<br>
+      Example: 192.168.1.100:81<br>
+      You must define the port number on the setup page of the LaCrosseGateway and use the same number here.<br>
+      The default is 81
+      <br><br>
+    </ul>
     <br>
   </ul>
 
@@ -540,7 +551,7 @@ sub LaCrosseGateway_Attr(@) {
   <b>Set</b>
   <ul>
     <li>raw &lt;data&gt;<br>
-        send &lt;data&gt; to the LaCrosseGateway. The possible commands can be found in the wiki.
+        send &lt;data&gt; to the LaCrosseGateway. The possible command can be found in the wiki.
     </li><br>
 
     <li>connect<br>
