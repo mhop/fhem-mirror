@@ -374,7 +374,7 @@ sub HMCCUDEV_Set ($@)
 		my $tstates = $hash->{statevals};
 		$tstates =~ s/devstate\|//;
 		my @states = split /\|/, $tstates;
-		my $sc = scalar (@states);
+		my $stc = scalar (@states);
 
 		my $objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.'.$sd;
 		
@@ -384,9 +384,9 @@ sub HMCCUDEV_Set ($@)
 
 		my $objvalue = '';
 		my $st = 0;
-		while ($st < $sc) {
+		while ($st < $stc) {
 			if ($states[$st] eq $result) {
-				$objvalue = ($st == $sc-1) ? $states[0] : $states[$st+1];
+				$objvalue = ($st == $stc-1) ? $states[0] : $states[$st+1];
 				last;
 			}
 			else {
