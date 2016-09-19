@@ -310,7 +310,6 @@ IT_Set($@)
 	}
   }
 	
-  my $v = $name ." ". join(" ", @a);
   if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
     if( AttrVal($name, "model", "") eq "itdimmer" ) {
       my @itvalues = split(' ', $v);
