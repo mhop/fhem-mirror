@@ -211,6 +211,7 @@ sub HMUARTLGW_DoInit($)
 		};
 
 		$attr{$keepAlive->{NAME}}{room} = "hidden";
+		$attr{$keepAlive->{NAME}}{verbose} = AttrVal($name, "verbose", undef);
 		$defs{$keepAlive->{NAME}} = $keepAlive;
 
 		DevIo_CloseDev($keepAlive);
@@ -1817,6 +1818,14 @@ sub HMUARTLGW_Attr(@)
 			delete $attr{$name}{$aName};
 			delete $hash->{Helper}{Log};
 		}
+	} elsif ($aName eq "verbose") {
+		if ($hash->{keepAlive}) {
+			if ($cmd eq "set") {
+				$attr{$hash->{keepAlive}->{NAME}}{$aName} = $aVal;
+			} else {
+				delete $attr{$hash->{keepAlive}->{NAME}}{$aName};
+			}
+		}
 	}
 
 	return $retVal;
@@ -2068,7 +2077,7 @@ sub HMUARTLGW_sendAscii($$)
 
 	$hash->{CNT} = ($hash->{CNT} + 1) & 0xff;
 
-	DevIo_SimpleWrite($hash, $msg, 2);
+	DevIo_SimpleWrite($hash, $msg, ($hash->{crypto} && !($msg =~ m/^V/))? 0 : 2);
 }
 
 sub HMUARTLGW_crc16($;$)
