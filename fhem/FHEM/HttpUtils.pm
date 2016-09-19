@@ -10,6 +10,7 @@ use Digest::MD5 qw(md5_hex);
 use vars qw($SSL_ERROR);
 
 my %ext2MIMEType= qw{
+  bmp   image/bmp
   css   text/css
   gif   image/gif
   html  text/html
