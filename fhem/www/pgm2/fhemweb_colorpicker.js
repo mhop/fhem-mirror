@@ -119,7 +119,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       bri.style.display='none';
     }
 
-    newEl.setValueFn = function(arg){
+    newEl.setValueFn = function(arg) {
       if( hidden )
         hidden.attr("value", arg);
 
@@ -208,6 +208,40 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
   } else if( mode == 'HUE' ) {
     var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, undefined, params, cmd);
     $(newEl).addClass("colorpicker_hue");
+    return newEl;
+
+  } else if( mode == 'BRI' ) {
+    var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, undefined, params, cmd);
+    $(newEl).addClass("colorpicker_bri");
+
+    var grad = 'background-image: -webkit-linear-gradient(left, #c1#, #c2# );'
+               +  'background-image: -moz-linear-gradient(left, #c1#, #c2# );'
+               +   'background-image: -ms-linear-gradient(left, #c1#, #c2# );'
+               +    'background-image: -o-linear-gradient(left, #c1#, #c2# );'
+               +       'background-image: linear-gradient(left, #c1#, #c2# );';
+
+    var slider = $(newEl).find('.slider').get(0);
+    var v = grad.replace(/#c1#/g, 'rgb(  0,  0  ,0)')
+                .replace(/#c2#/g, 'rgb(255,255,255)')
+    slider.setAttribute('style', v );
+
+    var setValueFn = newEl.setValueFn;
+    newEl.setValueFn = function(arg) {
+      setValueFn( arg );
+
+      var v = arg/(vArr[4]-vArr[2]);
+
+      if( v > 0.75 )
+        $(slider).find('.handle').get(0).style.color = '#000000';
+      else
+        $(slider).find('.handle').get(0).style.color = '#FFFFFF';
+    }
+
+    if( currVal ) {
+      newEl.setValueFn(currVal);
+      $(document).ready(function(arg) { newEl.setValueFn(currVal) });
+    }
+
     return newEl;
 
   }
