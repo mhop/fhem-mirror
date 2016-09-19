@@ -23,6 +23,8 @@
 #  get <name> configdesc {<device>|<channel>}
 #  get <name> deviceinfo <device>
 #  get <name> devicelist [dump]
+#  get <name> devicelist create <devexp> [s=<suffix>] [p=<prefix>] [f=<format>]
+#                               [<attr>=<val> [...]]}]
 #  get <name> dump {devtypes|datapoints} [<filter>]
 #  get <name> parfile [<parfile>]
 #  get <name> rpcevents
@@ -337,11 +339,11 @@ sub HMCCU_SetDefaults ($)
 		return 0 if (!exists ($HMCCU_DEV_DEFAULTS->{$ccutype}));
 	
 		foreach my $a (keys %{$HMCCU_DEV_DEFAULTS->{$ccutype}}) {
-			$attr{$name}{$a} = $HMCCU_DEV_DEFAULTS->{$ccutype}{$a};
+			CommandAttr (undef, "$name, $a ".$HMCCU_DEV_DEFAULTS->{$ccutype}{$a});
 		}
 		
 		# Set standard attributes
-		$attr{$name}{'event-on-change-reading'} = '.*';
+		CommandAttr (undef, "$name event-on-change-reading .*");
 	
 		return 1;
 	}
@@ -736,20 +738,76 @@ sub HMCCU_Get ($@)
 		return "RPC process not running";
 	}
 	elsif ($opt eq 'devicelist') {
-		my $dumplist = shift @a;
-
 		$hash->{DevCount} = HMCCU_GetDeviceList ($hash);
 		return HMCCU_SetError ($hash, -2) if ($hash->{DevCount} < 0);
 		return HMCCU_SetError ($hash, "No devices received from CCU") if ($hash->{DevCount} == 0);
-		HMCCU_SetState ($hash, "OK");
+		$result = "Read ".$hash->{DevCount}." devices/channels from CCU";
 
-		if (defined ($dumplist) && $dumplist eq 'dump') {
-			foreach my $add (sort keys %HMCCU_Devices) {
-				$result .= $HMCCU_Devices{$add}{name}."\n";
+		my $optcmd = shift @a;
+		if (defined ($optcmd)) {
+			if ($optcmd eq 'dump') {
+				foreach my $add (sort keys %HMCCU_Devices) {
+					$result .= $HMCCU_Devices{$add}{name}."\n";
+				}
+				return $result;
 			}
-			return $result;
+			elsif ($optcmd eq 'create') {
+				my $devprefix = '';
+				my $devsuffix = '';
+				my $devformat = '%n';
+				my $newcount = 0;
+				my @devattr;
+				
+				my $devspec = shift @a;
+				return "Please specify expression for CCU device or channel names"
+					if (!defined ($devspec));
+
+				foreach my $defopt (@a) {
+					if ($defopt =~ /^s=(.+)$/) {
+						$devsuffix = $1;
+					}
+					elsif ($defopt =~ /^p=(.+)$/) {
+						$devprefix = $1;
+					}
+					elsif ($defopt =~ /^f=(.+)$/) {
+						$devformat = $1;
+					}
+					else {
+						push (@devattr, $defopt);
+					}
+				}
+				
+				foreach my $add (sort keys %HMCCU_Devices) {
+					my $defmod = $HMCCU_Devices{$add}{addtype} eq 'dev' ? 'HMCCUDEV' : 'HMCCUCHN';
+					my $ccuname = $HMCCU_Devices{$add}{name};	
+					my $ccudevname = HMCCU_GetDeviceName ($add, $ccuname);				
+					next if ($ccuname !~ /$devspec/);
+					my $devname = $devformat;
+					$devname = $devprefix.$devname.$devsuffix;
+					$devname =~ s/%n/$ccuname/g;
+					$devname =~ s/%d/$ccudevname/g;
+					$devname =~ s/%a/$add/g;
+					$devname =~ s/[^A-Za-z\d_\.]+/_/g;
+					my $ret = CommandDefine (undef, $devname." $defmod ".$ccuname);
+					if ($ret) {
+						Log3 $name, 2, "HMCCU: Define command failed $devname $defmod $ccuname";
+						Log3 $name, 2, "$defmod: $ret";
+						next;
+					}
+					foreach my $da (@devattr) {
+						my ($at, $vl) = split ('=', $da);
+						CommandAttr (undef, "$devname $at $vl") if (defined ($vl));
+					}
+					Log3 $name, 2, "$defmod: Created device $devname";
+					$newcount++;
+				}
+				
+				$result .= ", created $newcount client devices";
+			}
 		}
-		return "Read ".$hash->{DevCount}." devices/channels from CCU";
+
+		HMCCU_SetState ($hash, "OK");
+		return $result;
 	}
 	elsif ($opt eq 'configdesc') {
 		my $ccuobj = shift @a;
@@ -1016,7 +1074,8 @@ sub HMCCU_GetReadingName ($$$$$$$)
 }
 
 ##################################################################
-# Format reading value depending attribute stripnumber
+# Format reading value depending on attribute stripnumber. Integer
+# values are ignored.
 # 0 = Preserve all digits
 # 1 = Preserve 1 digit
 # 2 = Remove trailing zeroes
@@ -1028,13 +1087,13 @@ sub HMCCU_FormatReadingValue ($$)
 	my ($hash, $value) = @_;
 
 	my $stripnumber = AttrVal ($hash->{NAME}, 'stripnumber', '0');
+	return $value if ($stripnumber eq '0' || $value !~ /\.[0-9]+$/);
 
 	if ($stripnumber eq '1') {
-		$value =~ s/(\.[0-9])[0-9]+/$1/;
+		return sprintf ("%.1f", $value);
 	}
 	elsif ($stripnumber eq '2') {
-		$value =~ s/[0]+$//;
-		$value =~ s/\.$//;
+		return sprintf ("%g", $value);
 	}
 	elsif ($stripnumber =~ /^-([0-9])$/) {
 		my $fmt = '%.'.$1.'f';
@@ -4491,13 +4550,22 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
          queried directly. Otherwise device information from CCU is listed.
       </li><br/>
       <li><b>get &lt;name&gt; devicelist [dump]</b><br/>
+      	<b>get &lt;name&gt; devicelist create &lt;devexp&gt: [p=&lt;prefix&gt;] [s=&lt;suffix&gt;] 
+      	[f=&lt;format&gt;] [&lt;attr&gt;=&lt;value&gt; [...]]</b><br/>
          Read list of devices and channels from CCU. This command is executed automatically
-         after device the definition of an I/O device. It must be executed manually after
+         after the definition of an I/O device. It must be executed manually after
          module HMCCU is reloaded or after devices have changed in CCU (added, removed or
-         renamed). With option dump devices are displayed in browser window. If a RPC
+         renamed). With option 'dump' devices are displayed in browser window. If a RPC
          server is running HMCCU will raise events "<i>count</i> devices added in CCU" or
          "<i>count</i> devices deleted in CCU". It's recommended to set up a notification
-         which reacts with execution of command 'get devicelist' on these events.
+         which reacts with execution of command 'get devicelist' on these events.<br/>
+         With option 'create' HMCCU will automatically create client devices for all CCU devices
+         and channels matching specified regular expression. Optionally a <i>prefix</i> and/or a
+         <i>suffix</i> for the FHEM device name can pe specified. The parameter <i>format</i>
+         defines a template for the FHEM device names. Prefix, suffix and format can contain
+         format identifiers which are substituted by corresponding values of the CCU device or
+         channel: %n = CCU object name (channel or device), %d = CCU device name, %a = CCU address.
+         In addition a list of default attributes for the created client devices can be specified.
       </li><br/>
       <li><b>get &lt;name&gt; parfile [&lt;parfile&gt;]</b><br/>
          Get values of all channels / datapoints specified in <i>parfile</i>. The parameter
