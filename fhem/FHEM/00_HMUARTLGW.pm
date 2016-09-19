@@ -108,15 +108,17 @@ use constant {
 	HMUARTLGW_RETRY_SECONDS            => 3,
 	HMUARTLGW_BUSY_RETRY_MS            => 50,
 	HMUARTLGW_CSMACA_RETRY_MS          => 200,
+	HMUARTLGW_KEEPALIVE_SECONDS        => 10,
+	HMUARTLGW_KEEPALIVE_WARN_LATE_S    => 4,
 };
 
 my %sets = (
-	"hmPairForSec" => "HomeMatic",
-	"hmPairSerial" => "HomeMatic",
-	"reopen"       => "",
-	"open"         => "",
-	"close"        => "",
-	"restart"      => "",
+	"hmPairForSec" => "",
+	"hmPairSerial" => "",
+	"reopen"       => "noArg",
+	"open"         => "noArg",
+	"close"        => "noArg",
+	"restart"      => "noArg",
 	"updateCoPro"  => "",
 );
 
@@ -422,8 +424,9 @@ sub HMUARTLGW_LGW_HandleKeepAlive($)
 			RemoveInternalTimer($hash);
 			$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 
-			my $wdTimer = 10; #now we have 15s
-			InternalTimer(gettimeofday()+$wdTimer, "HMUARTLGW_SendKeepAlive", $hash, 0);
+			#now we have 15s
+			$hash->{Helper}{NextKeepAlive} = gettimeofday() + HMUARTLGW_KEEPALIVE_SECONDS;
+			InternalTimer($hash->{Helper}{NextKeepAlive}, "HMUARTLGW_SendKeepAlive", $hash, 0);
 		}
 
 		HMUARTLGW_sendAscii($hash, $msg) if ($msg);
@@ -443,6 +446,12 @@ sub HMUARTLGW_SendKeepAlive($)
 
 	$hash->{DevState} = HMUARTLGW_STATE_KEEPALIVE_SENT;
 	HMUARTLGW_sendAscii($hash, "K%02x\r\n");
+
+	my $diff = gettimeofday() - $hash->{Helper}{NextKeepAlive};
+	Log3($hash, 1, "HMUARTLGW ${name} KeepAlive sent " .
+		sprintf("%.3f", $diff) .
+		"s too late, this might cause a disconnect!")
+			if ($diff > HMUARTLGW_KEEPALIVE_WARN_LATE_S);
 
 	InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 
@@ -943,7 +952,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 			delete($hash->{Helper}{RoundTrip}{Calc});
 			my $delay = $recvtime - $hash->{Helper}{AckPending}{$hash->{DEVCNT}}->{time};
 			$hash->{Helper}{RoundTrip}{Delay} = $delay if ($delay < 0.2);
-			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5), "HMUARTLGW ${name} roundtrip delay: ${delay}");
+			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5), "HMUARTLGW ${name} roundtrip delay: " . sprintf("%.4f", ${delay}));
 		}
 		if ($ack eq HMUARTLGW_ACK_INFO) {
 			HMUARTLGW_updateMsgLoad($hash, hex(substr($msg, 4)));
@@ -1669,8 +1678,6 @@ sub HMUARTLGW_Set($@)
 	my $arg = join(" ", @a);
 
 	return "\"set\" needs at least one parameter" if (!$cmd);
-	return "Unknown argument ${cmd}, choose one of " . join(" ", sort keys %sets)
-	    if(!defined($sets{$cmd}));
 
 	if ($cmd eq "hmPairForSec") {
 		$arg = 60 if(!$arg || $arg !~ m/^\d+$/);
@@ -1711,6 +1718,9 @@ sub HMUARTLGW_Set($@)
 
 		$hash->{FirmwareFile} = $arg;
 		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
+	} else {
+		return "Unknown argument ${cmd}, choose one of " .
+		    join(" ",map {"$_" . ($sets{$_} ? ":$sets{$_}" : "")} keys %sets);
 	}
 
 	return undef;
