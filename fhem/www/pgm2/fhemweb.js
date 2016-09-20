@@ -125,7 +125,8 @@ FW_jqueryReadyFn()
     e.preventDefault();
     var cmd = "", el=this;
     $(el).parent().find("input,[name]").each(function() {
-      cmd += (cmd?"&":"")+$(this).attr("name")+"="+$(this).val();
+      cmd += (cmd?"&":"")+encodeURIComponent($(this).attr("name"))+
+                      "="+encodeURIComponent($(this).val());
     });
     FW_cmd(FW_root+"?"+cmd+"&XHR=1&addLinks=1", function(data) {
       if(!data.match(/^[\r\n]*$/)) // ignore empty answers
