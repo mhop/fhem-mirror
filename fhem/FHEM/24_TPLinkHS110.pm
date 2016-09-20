@@ -148,7 +148,7 @@ sub TPLinkHS110_Get($$)
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 		$socket->send($c);
 		my $data;
-		$socket->recv($data,1024);
+		$socket->recv($data,8192);
 		$socket->close();
 		$data = decrypt(substr($data,4));
 		eval {
