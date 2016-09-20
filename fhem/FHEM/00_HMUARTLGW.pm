@@ -1011,7 +1011,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 				$hash->{Helper}{UpdatePeer}{aes} = substr($msg, 12);
 			}
 		} else {
-			if ($hash->{Helper}{UpdatePeer}{operation} == "+") {
+			if ($hash->{Helper}{UpdatePeer}{operation} eq "+") {
 				Log3($hash, 1, "Adding peer $hash->{Helper}{UpdatePeer}{id} failed! " .
 				               "You have probably forced an unknown aesKey for this device.");
 			} else {
