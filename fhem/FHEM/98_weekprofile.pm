@@ -302,7 +302,7 @@ sub weekprofile_refreshSendDevList($)
   my ($hash) = @_;
   my $me = $hash->{NAME};
   
-  splice($hash->{SNDDEVLIST});
+  delete $hash->{SNDDEVLIST};
   
   foreach my $d (keys %defs)   
   {
@@ -853,7 +853,7 @@ sub weekprofile_Notify($$)
       my ($what,$who) = split(' ',$s);
       
       if ($what =~ m/INITIALIZED/ || $what =~ m/REREADCFG/) {
-        splice($own->{PROFILES});
+        delete $own->{PROFILES};
         weekprofile_refreshSendDevList($own);
         weekprofile_assignDev($own);
         weekprofile_readProfilesFromFile($own);
@@ -1160,8 +1160,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
 1;
 
 =pod
-=item helper
+=item summary    administration of weekprofiles
+=item summary_DE Verwaltung von Wochenprofilen
 
+=item helper
 =begin html
 
 <a name="weekprofile"></a>
