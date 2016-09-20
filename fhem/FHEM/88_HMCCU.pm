@@ -2057,7 +2057,7 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 		if ($hmdata[0] eq 'D') {
 			# 1=Interface 2=Device-Address 3=Device-Name 4=Device-Type 5=Channel-Count
 			$HMCCU_Devices{$hmdata[2]}{name} = $hmdata[3];
-			$HMCCU_Devices{$hmdata[2]}{type} = $hmdata[4];
+			$HMCCU_Devices{$hmdata[2]}{type} = ($hmdata[2] =~ /^CUX/) ? "CUX-".$hmdata[4] : $hmdata[4];
 			$HMCCU_Devices{$hmdata[2]}{interface} = $hmdata[1];
 			$HMCCU_Devices{$hmdata[2]}{channels} = $hmdata[5];
 			$HMCCU_Devices{$hmdata[2]}{addtype} = 'dev';
@@ -2130,8 +2130,9 @@ sub HMCCU_GetDatapointList ($)
 	my %alltypes;
 	my @devunique;
 	foreach my $add (sort keys %HMCCU_Devices) {
-		next if ($HMCCU_Devices{$add}{addtype} ne 'dev' ||
-		   $HMCCU_Devices{$add}{interface} eq 'CUxD');
+		next if ($HMCCU_Devices{$add}{addtype} ne 'dev');
+#		next if ($HMCCU_Devices{$add}{addtype} ne 'dev' ||
+#		   $HMCCU_Devices{$add}{interface} eq 'CUxD');
 		my $dt = $HMCCU_Devices{$add}{type};
 		if ($dt ne '' && !exists ($alltypes{$dt})) {
 			$alltypes{$dt} = 1;
@@ -2158,7 +2159,7 @@ foreach (sDevice, sDevList.Split(",")) {
           object oDP = dom.GetObject(sDPId);
           if (oDP) {
             string sDPName = oDP.Name().StrValueByIndex(".",2);
-            WriteLine (sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
+            WriteLine (sAddr # ";" # sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
           }
         }
       }
@@ -2169,19 +2170,11 @@ foreach (sDevice, sDevList.Split(",")) {
 
 	my $response = HMCCU_HMScript ($hash, $script);
 	return 0 if ($response eq '');
-	
-# 	my $c = 0;
-# 	foreach my $dpspec (split /\n/,$response) {
-# 		my ($devt, $devc, $dptn, $dptt, $dpto) = split (";", $dpspec);
-# 		$hash->{hmccu}{$devt}{ontime} = $devc.".".$dptn if ($dptn eq "ON_TIME");
-# 		$hash->{hmccu}{dp}{$devt}{ch}{$devc}{$dptn}{type} = $dptt;
-# 		$hash->{hmccu}{dp}{$devt}{ch}{$devc}{$dptn}{oper} = $dpto;
-# 		$c++;
-# 	}
 
 	my $c = 0;	
 	foreach my $dpspec (split /\n/,$response) {
-		my ($devt, $devc, $dptn, $dptt, $dpto) = split (";", $dpspec);
+		my ($chna, $devt, $devc, $dptn, $dptt, $dpto) = split (";", $dpspec);
+		$devt = "CUX-".$devt if ($chna =~ /^CUX/);
 		$hash->{hmccu}{dp}{$devt}{spc}{ontime} = $devc.".".$dptn if ($dptn eq "ON_TIME");
 		$hash->{hmccu}{dp}{$devt}{spc}{ramptime} = $devc.".".$dptn if ($dptn eq "RAMP_TIME");
 		$hash->{hmccu}{dp}{$devt}{spc}{submit} = $devc.".".$dptn if ($dptn eq "SUBMIT");
