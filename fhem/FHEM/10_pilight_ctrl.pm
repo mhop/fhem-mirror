@@ -43,6 +43,7 @@
 # V 1.16 2016-06-02 - NEW: protocol oregon_21 (temp)
 # V 1.17 2016-06-28 - FIX: Experimental splice on scalar is now forbidden - use explizit array notation
 # V 1.18 2016-06-28 - NEW: support smoke sensors (protocol: secudo_smoke_sensor)
+# V 1.19 2016-09-20 - FIX: PERL WARNING: Subroutine from Blocking.pm redefined
 ############################################## 
 package main;
 
@@ -51,6 +52,9 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;    #libjson-perl
 use Switch;  #libswitch-perl
+
+require 'DevIo.pm';
+require 'Blocking.pm';
 
 sub pilight_ctrl_Parse($$);
 sub pilight_ctrl_Read($);
@@ -84,9 +88,6 @@ sub isDigit($)
 sub pilight_ctrl_Initialize($)
 {
   my ($hash) = @_;
-  
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
-  require "$attr{global}{modpath}/FHEM/Blocking.pm";
   
   $hash->{ReadFn}  = "pilight_ctrl_Read";
   $hash->{WriteFn} = "pilight_ctrl_Write";
@@ -932,6 +933,8 @@ sub pilight_ctrl_SimpleWrite(@)
 1;
 
 =pod
+=item summary    base module to comunicate with pilight
+=item summary_DE Basismodul zur Kommunikation mit pilight
 =begin html
 
 <a name="pilight_ctrl"></a>
