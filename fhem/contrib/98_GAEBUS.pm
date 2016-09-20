@@ -28,6 +28,9 @@
 # 14.12.2015 : A.Goebel : add read possible commmands for ebusd using "find -f" instead of reading the ".csv" files directly ("get ebusd_find")
 # 25.01.2016 : A.Goebel : fix duplicate log entries for readings
 # 05.02.2016 : A.Goebel : add valueFormat attribute
+# 18.08.2016 : A.Goebel : fix workarround for perl warning with keys of hash reference
+# 30.08.2016 : A.Goebel : add reading "state_ebus" containing output from "state" of ebusd
+# 16.09.2016 : A.Goebel : add reset "state_ebus" if ebus is not connected
 
 package main;
 
@@ -53,7 +56,7 @@ sub GAEBUS_GetUpdatesDoit($);
 sub GAEBUS_GetUpdatesDone($);
 sub GAEBUS_GetUpdatesAborted($);
 
-sub GAEBUS_state($);
+sub GAEBUS_State($);
 
 my %gets = (    # Name, Data to send to the GAEBUS, Regexp for the answer
 );
@@ -476,6 +479,7 @@ GAEBUS_CloseDev($)
   #delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
   $hash->{STATE} = "closed";
+  readingsSingleUpdate ($hash,  "state_ebus", "unknown", 1);
 }
 
 ########################
@@ -636,7 +640,7 @@ GAEBUS_Attr(@)
         }
         $hash->{helper}{$attrname} = $attrVal;
 
-        foreach my $key (keys $hash->{helper}{$attrname}) {
+        foreach my $key (keys %{ $hash->{helper}{$attrname} }) {
           Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
         }
         #return "set HERE??";
@@ -693,40 +697,38 @@ GAEBUS_Attr(@)
 }
 
 sub 
-GAEBUS_state($)
+GAEBUS_State($)
 {
   my $hash           = shift;
   my $name           = $hash->{NAME};
-  my $answer         = ""; 
+  my $state          = ""; 
   my $actMessage     = "";
 
-  if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
+  if (($hash->{STATE} eq "Connected") and ($hash->{TCPDev}->connected()) )
   {
-    return "";
-  }
 
-  my $timeout = 10;
+    my $timeout = 10;
 	
-  syswrite ($hash->{TCPDev}, "state\n");
-  if ($hash->{SELECTOR}->can_read($timeout))
-  {
-    sysread ($hash->{TCPDev}, $actMessage, 4096);
-    if ($actMessage =~ /^signal acquired/) {
-      $answer = "ok";
-      return "$answer";
-    } else {
-      chomp ($actMessage);
-      $answer = $actMessage;
-    }
+    syswrite ($hash->{TCPDev}, "state\n");
+    if ($hash->{SELECTOR}->can_read($timeout))
+    {
+      sysread ($hash->{TCPDev}, $actMessage, 4096);
+      $actMessage =~ s/\n$/ /g;
+      $actMessage =~ s/ {1,}$//;
+      if ($actMessage =~ /^signal acquired/) {
+        $state = "ok";
+      }
         
-  }
-  else
-  {
-      $answer = "no answer";
+    }
+    else
+    {
+      $state = "no answer";
+      Log3 ($name, 2, "$name state $state ($actMessage)");
+    }
+
   }
 
-  Log3 ($name, 2, "$name state $answer");
-  return "$answer";
+  return ($state, $actMessage);
 }
 
 sub 
@@ -996,11 +998,14 @@ GAEBUS_GetUpdatesDoit($)
 
   # syncronize with ebusd
 
-  my $state = GAEBUS_state($hash);
-  unless ($state eq "ok") {
-    Log3 ($name, 2, "$name: ebusd no signal ($state)");
+  my ($state, $actMessage) = GAEBUS_State($hash);
+  if ($state ne "ok") {
+    Log3 ($name, 2, "$name: ebusd no connection or signal state($state)");
     return "$name";
   }
+  Log3 ($name, 5, "$name: ebusd state($actMessage)");
+  $actMessage =~ s/,.*//;
+  $readingsToUpdate .= "|state_ebus|".$actMessage;
 
   foreach my $oneattr (keys %{$attr{$name}})
   {
