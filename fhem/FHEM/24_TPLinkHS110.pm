@@ -151,17 +151,22 @@ sub TPLinkHS110_Get($$)
 		$socket->recv($data,1024);
 		$socket->close();
 		$data = decrypt(substr($data,4));
-		my $json = decode_json($data);
-		my $total=0;
-		foreach my $key (sort keys @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}}) {
-			foreach my $key2 ($json->{'emeter'}->{'get_daystat'}->{'day_list'}[$key]) {
-				$total = $total+ $key2->{'energy'};
+		eval {
+			my $json = decode_json($data);
+			my $total=0;
+			foreach my $key (sort keys @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}}) {
+				foreach my $key2 ($json->{'emeter'}->{'get_daystat'}->{'day_list'}[$key]) {
+					$total = $total+ $key2->{'energy'};
+				}
 			}
-		}
-		my $count=1;
-		$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
-		readingsBulkUpdate($hash, "monthly_total", $total);
-		readingsBulkUpdate($hash, "daily_average", $total/$count);
+			my $count=1;
+			$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
+			readingsBulkUpdate($hash, "monthly_total", $total);
+			readingsBulkUpdate($hash, "daily_average", $total/$count);
+			1;
+		} or do {
+			Log3 $hash, 3, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+		};
 	}
 	readingsEndUpdate($hash, 1);
 	Log3 $hash, 3, "TPLinkHS110: $name Get end";
