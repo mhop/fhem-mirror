@@ -1012,10 +1012,10 @@ sub HMUARTLGW_GetSetParameters($;$$)
 			}
 		} else {
 			if ($hash->{Helper}{UpdatePeer}{operation} eq "+") {
-				Log3($hash, 1, "Adding peer $hash->{Helper}{UpdatePeer}{id} failed! " .
+				Log3($hash, 1, "HMUARTLGW ${name} Adding peer $hash->{Helper}{UpdatePeer}{id} failed! " .
 				               "You have probably forced an unknown aesKey for this device.");
 			} else {
-				Log3($hash, 1, "Removing peer $hash->{Helper}{UpdatePeer}{id} failed!");
+				Log3($hash, 1, "HMUARTLGW ${name} Removing peer $hash->{Helper}{UpdatePeer}{id} failed!");
 			}
 			$hash->{Helper}{UpdatePeer}{operation} = "";
 		}
