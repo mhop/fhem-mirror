@@ -233,8 +233,10 @@ use vars qw(@structChangeHist); # Contains the last 10 structural changes
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
 
-my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
-                "eventMap userReadings:textField-long";
+my $AttrList = "alias comment:textField-long eventMap group room ".
+               "suppressReading userReadings:textField-long ".
+               "verbose:0,1,2,3,4,5";
+
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
 my $duplidx=0;                  # helper for the above pool
@@ -2568,6 +2570,12 @@ CommandAttr($$)
       }
     }
 
+    if($attrName eq "suppressReading") {
+      return "Argument must be a valid regexp" if(!$a[2] || $a[2] =~ /^\*/);
+      eval { "Hallo" =~ m/^$a[2]$/ };
+      return "Bad regexp: $@" if($@);
+    }
+
     $a[0] = $sdev;
     my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
     $ret = CallFn($sdev, "AttrFn", "set", @a);
@@ -4052,6 +4060,9 @@ readingsBulkUpdate($$$@)
                 "readingsBeginUpdate first.";
     return;
   }
+
+  my $sp = AttrVal($name, "suppressReading", undef);
+  return if($sp && $reading =~ m/^$sp$/);
   
   # shorthand
   my $readings = $hash->{READINGS}{$reading};

@@ -338,66 +338,17 @@ Ger&auml;t dokumentiert.
 <h4>Globale Attribute f&uuml;r alle Ger&auml;te</h4>
  
 <ul>
-    <a name="verbose"></a>
-    <li>verbose<br>
-      Setzt den Schwellwert f&uuml;r die Logfile-Meldungen.
-      M&ouml;gliche Werte sind:
-      <ul>
-        <li>0 - Server start/stop
-        </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
-        </li><li>2 - bedeutende Ereigbisse/Alarme.
-        </li><li>3 - ausgesendete Kommandos werden gelogged.
-        </li><li>4 - von den einzelnen Ger&auml;ten empfangene Daten.
-        </li><li>5 - Fehlersuche.</li>
-      </ul>
-      Der f&uuml;r die <a href="#global">global</a> Instanz gesetzte Wert gilt
-      als Voreinstellung f&uuml;r die Instanzen, die dieses Attribut nicht
-      gesetzt haben.
-    </li>
+    <a name="alias"></a>
+    <li>alias<br>
+       Wird in FHEMWEB benutzt, um ein en anderen Namen f&uuml;r ein Ger&auml;t
+       anzuzeigen z.B. wenn Sonderzeichen/Leerzeichen nicht in der
+       Ger&auml;tedefinition verwendet werden k&ouml;nnen.
+       </li><br>
 
     <a name="comment"></a>
     <li>comment<br>
         F&uuml;gt einen beliebigen Kommentar hinzu.
-
-    <a name="alias"></a>
-    </li><li>alias<br>
-       Wird in FHEMWEB benutzt, um ein en anderen Namen f&uuml;r ein Ger&auml;t
-       anzuzeigen z.B. wenn Sonderzeichen/Leerzeichen nicht in der
-       Ger&auml;tedefinition verwendet werden k&ouml;nnen.
-
-    <a name="room"></a>
-    </li><li>room<br>
-       Filtert/gruppiert Ger&auml;te.
-       Ein Ger&auml;t kann zu mehr als einem Raum zugeordnet werden. In diesem
-       Fall m&uuml;ssen die Raumzuordnungen durch Kommata getrennt
-       angegeben werden.<br>
-       Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet
-       werden, erscheinen nicht auf der Webseite.
-
-    <a name="genericDisplayType"></a>
-    <li>genericDisplayType<br>
-        Wird von bestimmten Frontends (aber nicht FHEMWEB) verwendet, um
-        f&uuml;r das Ger&auml;t passende Voreinstellungen (Bild/Befehle/etc)
-        anzubieten. Z.Zt werden folgende Werte unterst&uuml;tzt:
-        switch,outlet,light,blind,speaker,thermostat
-        </li>
-
-    <a name="group"></a>
-    <li>group<br>
-       Ger&auml;tegruppen. FHEMWEB zeigt Ger&auml;te die in die gleiche Gruppe
-       geh&ouml;ren auch in einer gemeinsamen Box an.  Ein Ger&auml;t kann zu
-       mehr als einer Gruppe geh&ouml;ren. In diesem Fall m&uuml;ssen die
-       entsprechenden Gruppen durch Kommata getrennt eingetragen werden. Wenn
-       dieses Attribut nicht gesetzt ist, wird der in der Ger&auml;tegruppe
-       gesetzte Ger&auml;tetyp verwendet.
-      </li>
-
-    <a name="showtime"></a>
-    <li>showtime<br>
-      Wird im FHEMWEB verwendet, um die Zeit der letzten Aktivit&auml;t
-      anstelle des Status in der Gesamtansicht anzuzeigen.  N&uuml;tzlich z.B.
-      f&uuml;r FS20 PIRI Ger&auml;te.
-    </li>
+        </li><br>
 
     <a name="eventMap"></a>
     <li>eventMap<br>
@@ -432,6 +383,65 @@ Ger&auml;t dokumentiert.
       muss man den fw Teil mit dem exakt gleichen Schl&uuml;sseln
       ausf&uuml;llen, damit FHEMWEB in der Detail-Ansicht den set-Auswahl
       richtig anzeigen kann.
+      </li><br>
+
+    <a name="genericDisplayType"></a>
+    <li>genericDisplayType<br>
+        Wird von bestimmten Frontends (aber nicht FHEMWEB) verwendet, um
+        f&uuml;r das Ger&auml;t passende Voreinstellungen (Bild/Befehle/etc)
+        anzubieten. Z.Zt werden folgende Werte unterst&uuml;tzt:
+        switch,outlet,light,blind,speaker,thermostat
+        </li><br>
+
+    <a name="group"></a>
+    <li>group<br>
+       Ger&auml;tegruppen. FHEMWEB zeigt Ger&auml;te die in die gleiche Gruppe
+       geh&ouml;ren auch in einer gemeinsamen Box an.  Ein Ger&auml;t kann zu
+       mehr als einer Gruppe geh&ouml;ren. In diesem Fall m&uuml;ssen die
+       entsprechenden Gruppen durch Kommata getrennt eingetragen werden. Wenn
+       dieses Attribut nicht gesetzt ist, wird der in der Ger&auml;tegruppe
+       gesetzte Ger&auml;tetyp verwendet.
+      </li><br>
+
+    <a name="room"></a>
+    <li>room<br>
+       Filtert/gruppiert Ger&auml;te.
+       Ein Ger&auml;t kann zu mehr als einem Raum zugeordnet werden. In diesem
+       Fall m&uuml;ssen die Raumzuordnungen durch Kommata getrennt
+       angegeben werden.<br>
+       Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet
+       werden, erscheinen nicht auf der Webseite.
+       </li><br>
+
+    <a name="showtime"></a>
+    <li>showtime<br>
+      Wird im FHEMWEB verwendet, um die Zeit der letzten Aktivit&auml;t
+      anstelle des Status in der Gesamtansicht anzuzeigen.  N&uuml;tzlich z.B.
+      f&uuml;r FS20 PIRI Ger&auml;te.
+      </li></br>
+
+    <a name="suppressReading"></a>
+    <li>suppressReading<br>
+        Wird verwendet, um nicht gewollte Readings zu entfernen. Der Wert ist
+        ein Regular Expression, erg&auml;nzt mit ^ und $. Wird nur in
+        Ausnahmef&auml;llen ben&ouml;tigt.
+        </li><br>
+    
+    <a name="verbose"></a>
+    <li>verbose<br>
+      Setzt den Schwellwert f&uuml;r die Logfile-Meldungen.
+      M&ouml;gliche Werte sind:
+      <ul>
+        <li>0 - Server start/stop</li>
+        <li>1 - Fehlermeldungen oder unbekannte Pakete</li>
+        <li>2 - bedeutende Ereigbisse/Alarme.</li>
+        <li>3 - ausgesendete Kommandos werden gelogged.</li>
+        <li>4 - von den einzelnen Ger&auml;ten empfangene Daten.</li>
+        <li>5 - Fehlersuche.</li>
+      </ul>
+      Der f&uuml;r die <a href="#global">global</a> Instanz gesetzte Wert gilt
+      als Voreinstellung f&uuml;r die Instanzen, die dieses Attribut nicht
+      gesetzt haben.
       </li><br>
 
 </ul>
