@@ -269,19 +269,21 @@ FHEM/71_YAMAHA_NP.pm         ra666ack             http://forum.fhem.de Multimedi
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/72_FB_CALLLIST.pm       markusbloch          http://forum.fhem.de Frontends
 FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX (link als PM an tupol)
-FHEM/73_km200.pm             sailor               http://forum.fhem.de Heizungssteuerung/Raumklima
+FHEM/73_ElectricityCalculator.pm Sailor           http://forum.fhem.de/index.php/topic,57106.0.html
+FHEM/73_GasCalculator        Sailor               http://forum.fhem.de/index.php/topic,47909.0.html
+FHEM/73_km200.pm             Sailor               http://forum.fhem.de/index.php/topic,25540.0.html
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/74_AMAD.pm              CoolTux              http://forum.fhem.de Unterstuetzende Dienste
-FHEM/74_HOMBOT.pm	     CoolTux              http://forum.fhem.de Unterstuetzende Dienste
+FHEM/74_HOMBOT.pm	         CoolTux              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/74_Unifi.pm             rapster              http://forum.fhem.de Automatisierung
 FHEM/75_MSG.pm               loredo               http://forum.fhem.de Automatisierung
 FHEM/75_msgConfig.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/77_UWZ.pm               CoolTux              http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
-FHEM/77_SMAEM.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
-FHEM/77_SMASTP.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
+FHEM/77_SMAEM.pm	         VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
+FHEM/77_SMASTP.pm	         VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
 FHEM/79_BDKM.pm              arnoaugustin         http://forum.fhem.de Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/80_xxLG7000.pm          markusbloch          http://forum.fhem.de Multimedia
