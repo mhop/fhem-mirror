@@ -339,65 +339,17 @@ Device specific attributes are documented in the corresponding device section.
  
 <ul>
 
-    <a name="verbose"></a>
-    <li>verbose<br>
-        Set the verbosity level. Possible values:
-        <ul>
-          <li>0 - server start/stop
-          <li>1 - error messages or unknown packets
-          <li>2 - major events/alarms.
-          <li>3 - commands sent out will be logged.
-          <li>4 - you'll see whats received by the different devices.
-          <li>5 - debugging.</li>
-        </ul>
-        The value for the <a href="#global">global</a> device is a default for
-        other devices without own verbose attribute set.
-    </li>
-
-    <a name="comment"></a>
-    <li>comment<br>
-        Add an arbitrary comment.
-        
     <a name="alias"></a>
     <li>alias<br>
         Used by FHEMWEB to display a device with another name e.g. when using
         special characters/spaces not accepted by device definition.
+        </li><br>
         
-    <a name="room"></a>
-    <li>room<br>
-        Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
-        can appear in more than one room, in this case the rooms have to be
-        specified comma-separated.<br>
-        Devices in the room hidden will not appear in the web output, or set
-        the <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
-        rooms for certain FHEMWEB instances.
-        </li>
-
-    <a name="genericDisplayType"></a>
-    <li>genericDisplayType<br>
-        used by some frontends (but not FHEMWEB) to offer a default image or
-        appropriate commands for this device. Currently the following values
-        are supported: switch,outlet,light,blind,speaker,thermostat
-        </li>
-
-    <a name="group"></a>
-    <li>group<br>
-        Group devices. Recognized by web-pgm2 (module <a href="#FHEMWEB">FHEMWEB</a>), it makes
-        devices in the same group appear in the same box).
-        This is used to further group
-        devices together. A device can appear in more than one group, in this
-        case the groups have to be specified comma-separated.<br>
-        If this attribute is not set then the device type is used as the
-        grouping attribute.
-        </li>
-
-    <a name="showtime"></a>
-    <li>showtime<br>
-        Used in the webfrontend pgm2 to show the time of last activity
-        instead of the state in the summary view. Useful e.g. for FS20 PIRI
-        devices.
-    </li>
-    
+    <a name="comment"></a>
+    <li>comment<br>
+        Add an arbitrary comment.
+        </li><br>
+        
     <a name="eventMap"></a>
     <li>eventMap<br>
         Replace event names and set arguments. The value of this attribute
@@ -427,10 +379,64 @@ Device specific attributes are documented in the corresponding device section.
         part with wildcards, the fw part must be filled with the exact same
         keys to enable a correct display in the FHEMWEB set dropdown list in
         the detail view.
-
         </li><br>
     
+    <a name="genericDisplayType"></a>
+    <li>genericDisplayType<br>
+        used by some frontends (but not FHEMWEB) to offer a default image or
+        appropriate commands for this device. Currently the following values
+        are supported: switch,outlet,light,blind,speaker,thermostat
+        </li><br>
 
+    <a name="group"></a>
+    <li>group<br>
+        Group devices. Recognized by web-pgm2 (module <a
+        href="#FHEMWEB">FHEMWEB</a>), it makes
+        devices in the same group appear in the same box).
+        This is used to further group
+        devices together. A device can appear in more than one group, in this
+        case the groups have to be specified comma-separated.<br>
+        If this attribute is not set then the device type is used as the
+        grouping attribute.
+        </li><br>
+
+    <a name="room"></a>
+    <li>room<br>
+        Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
+        can appear in more than one room, in this case the rooms have to be
+        specified comma-separated.<br>
+        Devices in the room hidden will not appear in the web output, or set
+        the <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
+        rooms for certain FHEMWEB instances.
+        </li><br>
+
+    <a name="suppressReading"></a>
+    <li>suppressReading<br>
+        Used to eliminate unwanted readings. The value is a regular expression,
+        with ^ and $ added. Only necessary in exceptional cases.
+        </li><br>
+    
+    <a name="showtime"></a>
+    <li>showtime<br>
+        Used in the webfrontend pgm2 to show the time of last activity
+        instead of the state in the summary view. Useful e.g. for FS20 PIRI
+        devices.
+        </li><br>
+    
+    <a name="verbose"></a>
+    <li>verbose<br>
+        Set the verbosity level. Possible values:
+        <ul>
+          <li>0 - server start/stop</li>
+          <li>1 - error messages or unknown packets</li>
+          <li>2 - major events/alarms.</li>
+          <li>3 - commands sent out will be logged.</li>
+          <li>4 - you'll see whats received by the different devices.</li>
+          <li>5 - debugging.</li>
+        </ul>
+        The value for the <a href="#global">global</a> device is a default for
+        other devices without own verbose attribute set.
+        </li></br>
 </ul>
 
 <a name="readingFnAttributes"></a>
