@@ -4383,7 +4383,8 @@ createNtfyHash()
   foreach my $d (@ntfyList) {
     if($defs{$d}{NOTIFYDEV}) {
       foreach my $nd (split(",",$defs{$d}{NOTIFYDEV})) {
-        push @{$ntfyHash{$nd}}, $d;
+        my $arr = $ntfyHash{$nd};
+        push @{$arr}, $d if(!grep /^$d$/, @{$arr});
       }
     } else {
       foreach my $nd (keys %ntfyHash) {
