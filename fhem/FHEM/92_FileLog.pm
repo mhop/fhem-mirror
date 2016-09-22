@@ -49,6 +49,7 @@ FileLog_Initialize($)
     disabledForIntervals
     eventOnThreshold
     logtype
+    mseclog:1,0
     nrarchive
     reformatFn 
   );
@@ -181,6 +182,10 @@ FileLog_Log($$)
   my $re = $log->{REGEXP};
   my $max = int(@{$events});
   my $tn = $dev->{NTFY_TRIGGERTIME};
+  if($log->{mseclog}) {
+    my ($seconds, $microseconds) = gettimeofday();
+    $tn .= sprintf(".%03d", $microseconds/1000);
+  }
   my $ct = $dev->{CHANGETIME};
   my $fh;
   my $switched;
@@ -226,6 +231,11 @@ FileLog_Attr(@)
 {
   my @a = @_;
   my $do = 0;
+
+  if($a[2] eq "mseclog") {
+    $defs{$a[1]}{mseclog} = ($a[0] eq "set" && (!defined($a[3]) || $a[3]) );
+    return;
+  }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
     $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
@@ -1321,14 +1331,18 @@ FileLog_regexpFn($$)
           </li>
         </ul>
         Example:<br>
-           attr ks300log1 logtype temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
+           attr ks300log1 logtype
+                temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
     </li><br>
+
+    <li><a href="#mseclog">mseclog</a></li><br>
 
     <a name="reformatFn"></a>
     <li>reformatFn<br>
-      used to convert "foreign" logfiles for the SVG Module, contains the name(!)
-      of a function, which will be called with a "raw" line from the original
-      file, and has to return a line in "FileLog" format.<br>
+      used to convert "foreign" logfiles for the SVG Module, contains the
+      name(!) of a function, which will be called with a "raw" line from the
+      original file, and has to return a line in "FileLog" format.<br>
+
       E.g. to visualize the NTP loopstats, set reformatFn to ntpLoopstats, and
       copy the following into your 99_myUtils.pm:
       <pre><code>
@@ -1637,6 +1651,8 @@ FileLog_regexpFn($$)
         Beispiel:<br> attr ks300log1 logtype
         temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
     </li><br>
+
+    <li><a href="#mseclog">mseclog</a></li><br>
 
     <a name="reformatFn"></a>
     <li>reformatFn<br>
