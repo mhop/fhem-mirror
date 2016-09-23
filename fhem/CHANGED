@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new optional arguments for device creation in  copy command
   - bugfix:  49_SSCam: bugfix of get presets, get patrols of zoom-cams 
                        without pan/tilt
   - updated: 74_AMAD: New Version 2.6.3 new Reading userFlowState,
