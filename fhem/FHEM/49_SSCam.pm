@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.36   18.09.2016    bugfix of get presets, get patrols of zoom-cams without pan/tilt
 # 1.35   17.09.2016    internal timer of start-routines optimized
 # 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
 #                      for SVS 7.2
@@ -385,8 +386,8 @@ sub SSCam_Set {
                    "runView:image,lastrec,lastrec_open,link,link_open ".
                    "stopView:noArg ".
                    "extevent:1,2,3,4,5,6,7,8,9,10 ".
-                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                   ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
                    ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
            
@@ -615,10 +616,10 @@ sub SSCam_Get {
             if ($opt eq "caminfoall") 
             {
                 # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-                &getcaminfoall($hash,1);
+                getcaminfoall($hash,1);
                 
             } elsif ($opt eq "svsinfo") {
-                &getsvsinfo($hash);
+                getsvsinfo($hash);
                 
             } elsif ($opt eq "snapfileinfo") {
                 if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
@@ -949,7 +950,7 @@ sub camstartrec ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1008,7 +1009,7 @@ sub camstoprec ($) {
 
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }  
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1062,7 +1063,7 @@ sub camexpmode ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1117,7 +1118,7 @@ sub cammotdetsc ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1173,7 +1174,7 @@ sub camsnap ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1231,7 +1232,7 @@ sub runliveview ($) {
         
         readingsSingleUpdate($hash,"state","startview",1); 
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1460,7 +1461,7 @@ sub doptzaction ($) {
         $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
         $hash->{HELPER}{ACTIVE} = "on";
  
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
  
     }
     else
@@ -1490,7 +1491,7 @@ sub movestop ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1522,7 +1523,7 @@ sub camenable ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1554,7 +1555,7 @@ sub camdisable ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1640,7 +1641,7 @@ sub getsvsinfo ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
       }
     else
     {
@@ -1795,7 +1796,7 @@ sub getcapabilities ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1815,11 +1816,14 @@ sub getptzlistpreset ($) {
     
     return if(IsDisabled($name));
     
-    if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
+    if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
-        }
-
+    }
+    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | ReadingsVal("$name", "CapPTZPan", "") eq "false") {
+        Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname has no capability to tilt/pan");
+        return;
+    }
         if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
         Log3($name, 4, "$name - Retrieval PTZ-ListPresets of $camname starts now");
@@ -1831,7 +1835,7 @@ sub getptzlistpreset ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
@@ -1852,10 +1856,14 @@ sub getptzlistpatrol ($) {
     
     return if(IsDisabled($name));
     
-    if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
-        Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
+    if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+        Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
-        }
+    }
+    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | ReadingsVal("$name", "CapPTZPan", "") eq "false") {
+        Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname has no capability to tilt/pan");
+        return;
+    }
 
     if ($hash->{HELPER}{ACTIVE} ne "on") {
         # PTZ-ListPatrols abrufen
@@ -1868,7 +1876,7 @@ sub getptzlistpatrol ($) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
-        &getapisites_nonbl($hash);
+        getapisites_nonbl($hash);
     }
     else
     {
