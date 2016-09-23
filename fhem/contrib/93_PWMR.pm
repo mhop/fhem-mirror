@@ -5,7 +5,7 @@
 # e-mail: ag at goebel-it dot de
 #
 ##############################################
-# $Id: 
+# $Id: $
 # 29.07.15 GA change set <name> manualTempDuration <minutes>
 # 21.09.15 GA update, use Log3 and readingsSingleUpdate
 # 07.10.15 GA initial version published
