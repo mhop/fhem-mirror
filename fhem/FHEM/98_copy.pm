@@ -11,7 +11,7 @@ sub
 copy_Initialize($)
 {
   my %lhash = ( Fn=>"CommandCopy",
-                Hlp=>"<orig name> <copy name>" );
+                Hlp=>"<orig name> <copy name> [<type dependent arguments>]" );
   $cmds{copy} = \%lhash;
 }
 
@@ -22,13 +22,18 @@ CommandCopy($$)
 
   my @args = split(/ +/,$param);
 
-  return "Usage: copy <orig name> <copy name>" if (@args != 2);
+  return "Usage: copy <orig name> <copy name> [<type dependent arguments>]" if (@args < 2);
 
   my $d = $defs{$args[0]};
   return "$args[0] not defined" if( !$d );
 
   my $cmd = "$args[1] $d->{TYPE}";
-  $cmd .= " $d->{DEF}" if( $d->{DEF} );
+  if( $args[2] ) {
+    $cmd .= ' '. join( ' ', @args[2..@args-1]);
+  } else {
+    $cmd .= " $d->{DEF}" if( $d->{DEF} );
+  }
+
   my $ret = CommandDefine($hash, $cmd );
   return $ret if( $ret );
 
@@ -56,9 +61,10 @@ CommandCopy($$)
 <a name="copy"></a>
 <h3>copy</h3>
 <ul>
-  <code>copy &lt;orig name&gt; &lt;copy name&gt;</code><br>
+  <code>copy &lt;orig name&gt; &lt;copy name&gt; [&lt;type dependent arguments&gt;]</code><br>
   <br>
-    Create a copy of device &lt;orig name&gt; with the name &lt;copy name&gt;.
+    Create a copy of device &lt;orig name&gt; with the name &lt;copy name&gt;.<br>
+    If &lt;type dependent arguments&gt; are given they will replace the DEF of &lt;orig name&gt; for the creation of &lt;copy name&gt;.
 </ul>
 
 =end html
@@ -68,9 +74,10 @@ CommandCopy($$)
 <a name="copy"></a>
 <h3>copy</h3>
 <ul>
-  <code>copy &lt;orig name&gt; &lt;copy name&gt;</code><br>
+  <code>copy &lt;orig name&gt; &lt;copy name&gt; [&lt;type dependent arguments&gt;]</code><br>
   <br>
-    Erzeugt eine Kopie des Device &lt;orig name&gt; mit dem namen &lt;copy name&gt;.
+    Erzeugt eine Kopie des Device &lt;orig name&gt; mit dem namen &lt;copy name&gt;.<br>
+    Wenn &lt;type dependent arguments&gt; angegeben sind ersetzen die die DEF von &lt;orig name&gt; beim anlegen von &lt;copy name&gt;.
 </ul>
 
 =end html_DE
