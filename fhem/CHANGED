@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Version 2.6.3 new Reading userFlowState,
+                      new set Command userFlowState, checkAndroidVersion
+                      on doNotDisturb Reading
   - change:  suppressReading attribute added for all devices (Forum #57841)
   - bugfix:  88_HMCCU: Fixed CUxD device datapoint handling
   - change:  10_IT: create events during readings update. 
