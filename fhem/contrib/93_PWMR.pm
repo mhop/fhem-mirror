@@ -1390,6 +1390,7 @@ PWMR_valueFormat(@)
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="PWMR"></a>
