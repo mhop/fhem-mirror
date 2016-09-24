@@ -247,7 +247,7 @@ sub ElectricityCalculator_Get($@)
 	my $value; 
 	my $ReturnMessage;
 
-	if(!defined(%{$hash->{helper}{gets}{$reading}})) 
+	if(!defined($hash->{helper}{gets}{$reading}))
 	{
 		my @cList = keys %{$hash->{helper}{gets}};
 		return "Unknown argument $reading, choose one of " . join(" ", @cList);
@@ -288,7 +288,7 @@ sub ElectricityCalculator_Set($@)
 	my $value = join(" ", @a);
 	my $ReturnMessage;
 
-	if(!defined(%{$hash->{helper}{sets}{$reading}})) 
+	if(!defined($hash->{helper}{gets}{$reading})) 
 	{
 		my @cList = keys %{$hash->{helper}{sets}};
 		return "Unknown argument $reading, choose one of " . join(" ", @cList);
