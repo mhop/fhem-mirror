@@ -154,6 +154,7 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrFn}   = "HUEDevice_Attr";
   $hash->{AttrList} = "IODev ".
+                      "createActionReadings:1,0 ".
                       "delayedUpdate:1 ".
                       "ignoreReachable:1,0 ".
                       "realtimePicker:1,0 ".
@@ -1069,19 +1070,80 @@ HUEDevice_Parse($$)
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{STATE} = 'Initialized';
-    $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
+    if( $result->{lights} ) {
+      $hash->{lights} = join( ",", @{$result->{lights}} );
+    } else {
+      $hash->{lights} = '';
+    }
 
     if( ref($result->{state}) eq 'HASH' ) {
-      my $all_on = $result->{state}{all_on};
-      my $any_on = $result->{state}{any_on};
+      my %readings;
+
+      if( $result->{state} ) {
+        $readings{all_on} = $result->{state}{all_on};
+        $readings{any_on} = $result->{state}{any_on};
+      }
+      if( AttrVal($name, 'createActionReadings', 0) ) {
+      if( my $state = $result->{action} ) {
+        $readings{ct} = $state->{ct}; $readings{ct} .= " (".int(1000000/$readings{ct})."K)" if( $readings{ct} );
+        $readings{hue} = $state->{hue};
+        $readings{sat} = $state->{sat};
+        $readings{bri} = $state->{bri}; $readings{bri} = $hash->{helper}{bri} if( !defined($readings{bri}) );
+        $readings{xy} = $state->{'xy'}->[0] .",". $state->{'xy'}->[1] if( defined($state->{'xy'}) );
+        $readings{colormode} = $state->{colormode};
+
+        $readings{alert} = $state->{alert};
+        $readings{effect} = $state->{effect};
+
+        $readings{reachable} = $state->{reachable}?1:0 if( defined($state->{reachable}) );
+
+        my $s = '';
+        my $percent = -1;
+        my $on = $state->{on}; $readings{on} = $hash->{helper}{onoff} if( !defined($on) );
+        if( $on )
+          {
+            $s = 'on';
+            $readings{onoff} = 1;
+
+            if( !defined($readings{bri}) || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
+                $percent = 100;
+
+            } else {
+              $percent = int($readings{bri} * 99 / 254 + 1);
+              if( $percent > 0
+                  && $percent < 100  ) {
+                $s = $dim_values{int($percent/7)};
+              }
+              $s = 'off' if( $percent == 0 );
+
+            }
+          }
+        else
+          {
+            $on = 0;
+            $s = 'off';
+            $percent = 0;
+
+            $readings{onoff} = 0;
+          }
+
+        $readings{percent} = $percent;
+
+        $s = 'unreachable' if( defined($readings{reachable}) && !$readings{reachable} );
+        #$readings{state} = $s;
+
+      }
 
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "all_on", $all_on) if( defined($all_on) && $all_on != $hash->{helper}{all_on} );
-      readingsBulkUpdate($hash, "any_on", $any_on) if( defined($any_on) && $any_on != $hash->{helper}{any_on} );
+      foreach my $key ( keys %readings ) {
+        if( defined($readings{$key}) ) {
+          readingsBulkUpdate($hash, $key, $readings{$key}, 1) if( !defined($hash->{helper}{$key}) || $hash->{helper}{$key} ne $readings{$key} );
+          $hash->{helper}{$key} = $readings{$key};
+        }
+      }
       readingsEndUpdate($hash,1);
 
-      $hash->{helper}{all_on} = $all_on if( defined($all_on) );
-      $hash->{helper}{any_on} = $any_on if( defined($any_on) );
+    }
     }
 
     if( defined($hash->{helper}->{update}) ) {
@@ -1341,7 +1403,7 @@ HUEDevice_Attr($$$;$)
 
 =pod
 =item summary    devices connected to a phillips hue bridge or a osram lightify gateway
-=item summary_DE Geräte an einer Philips HUE Bridge oder einem Osram LIGHTIFY Gateway 
+=item summary_DE Geräte an einer Philips HUE Bridge oder einem Osram LIGHTIFY Gateway
 =begin html
 
 <a name="HUEDevice"></a>
@@ -1480,6 +1542,8 @@ HUEDevice_Attr($$$;$)
     <li>color-icon<br>
       1 -> use lamp color as icon color and 100% shape as icon shape<br>
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
+    <li>createActionReadings<br>
+      create readings for the last action in group devices</li>
     <li>ignoreReachable<br>
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
     <li>setList<br>
