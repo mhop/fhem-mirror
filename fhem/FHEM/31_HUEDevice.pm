@@ -192,9 +192,9 @@ HUEDevice_devStateIcon($)
 
   return ".*:off:toggle" if( ReadingsVal($name,"state","off") eq "off" );
 
-  my $percent = ReadingsVal($name,"pct","100");
-  my $s = $dim_values{int($percent/7)};
-  $s="on" if( $percent eq "100" );
+  my $pct = ReadingsVal($name,"pct","100");
+  my $s = $dim_values{int($pct/7)};
+  $s="on" if( $pct eq "100" );
 
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
   return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "dimmer" );
@@ -204,7 +204,7 @@ HUEDevice_devStateIcon($)
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB004" );
 
 
-  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
@@ -297,7 +297,7 @@ sub HUEDevice_Define($$)
     $hash->{helper}{alert} = '';
     $hash->{helper}{effect} = '';
 
-    $hash->{helper}{percent} = -1;
+    $hash->{helper}{pct} = -1;
     $hash->{helper}{rgb} = "";
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
@@ -1098,7 +1098,7 @@ HUEDevice_Parse($$)
         $readings{reachable} = $state->{reachable}?1:0 if( defined($state->{reachable}) );
 
         my $s = '';
-        my $percent = -1;
+        my $pct = -1;
         my $on = $state->{on}; $readings{on} = $hash->{helper}{onoff} if( !defined($on) );
         if( $on )
           {
@@ -1106,15 +1106,15 @@ HUEDevice_Parse($$)
             $readings{onoff} = 1;
 
             if( !defined($readings{bri}) || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
-                $percent = 100;
+                $pct = 100;
 
             } else {
-              $percent = int($readings{bri} * 99 / 254 + 1);
-              if( $percent > 0
-                  && $percent < 100  ) {
-                $s = $dim_values{int($percent/7)};
+              $pct = int($readings{bri} * 99 / 254 + 1);
+              if( $pct > 0
+                  && $pct < 100  ) {
+                $s = $dim_values{int($pct/7)};
               }
-              $s = 'off' if( $percent == 0 );
+              $s = 'off' if( $pct == 0 );
 
             }
           }
@@ -1122,12 +1122,12 @@ HUEDevice_Parse($$)
           {
             $on = 0;
             $s = 'off';
-            $percent = 0;
+            $pct = 0;
 
             $readings{onoff} = 0;
           }
 
-        $readings{percent} = $percent;
+        $readings{pct} = $pct;
 
         $s = 'unreachable' if( defined($readings{reachable}) && !$readings{reachable} );
         #$readings{state} = $s;
@@ -1309,22 +1309,22 @@ HUEDevice_Parse($$)
   if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
   my $s = '';
-  my $percent = -1;
+  my $pct = -1;
   if( $on )
     {
       $s = 'on';
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
       if( $bri < 0 || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
-          $percent = 100;
+          $pct = 100;
 
       } else {
-        $percent = int($bri * 99 / 254 + 1);
-        if( $percent > 0
-            && $percent < 100  ) {
-          $s = $dim_values{int($percent/7)};
+        $pct = int($bri * 99 / 254 + 1);
+        if( $pct > 0
+            && $pct < 100  ) {
+          $s = $dim_values{int($pct/7)};
         }
-        $s = 'off' if( $percent == 0 );
+        $s = 'off' if( $pct == 0 );
 
       }
     }
@@ -1332,12 +1332,12 @@ HUEDevice_Parse($$)
     {
       $on = 0;
       $s = 'off';
-      $percent = 0;
+      $pct = 0;
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
-  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
-  #if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
+  if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"pct", $pct);}
+  #if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"level", $pct . ' %');}
 
   $s = 'unreachable' if( !$reachable );
 
@@ -1352,7 +1352,7 @@ HUEDevice_Parse($$)
   $hash->{helper}{alert} = $alert if( defined($alert) );
   $hash->{helper}{effect} = $effect if( defined($effect) );
 
-  $hash->{helper}{percent} = $percent;
+  $hash->{helper}{pct} = $pct;
 
   my $changed = $hash->{CHANGED}?1:0;
 
@@ -1444,7 +1444,7 @@ HUEDevice_Attr($$$;$)
     the colortemperature in mireds and kelvin</li>
     <li>hue<br>
     the current hue</li>
-    <li>level<br>
+    <li>pct<br>
     the current brightness in percent</li>
     <li>onoff<br>
     the current on/off state as 0 or 1</li>
