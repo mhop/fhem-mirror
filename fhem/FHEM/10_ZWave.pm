@@ -3842,6 +3842,18 @@ ZWave_processSendStack($$;$)
   }
   #Log 1, "pSS: $hash->{NAME}, $ackType $ss->[0]".($omsg ? "  omsg:$omsg" : "");
 
+  if ($ackType eq "next") {
+    if($ss->[0] =~ m/^sent(.*?):13....98(.*)$/) { # only for security commands
+      my $secMsg = $hash->{secMsg};
+      if ($secMsg && @{$secMsg}) {
+        Log3 $hash->{NAME}, 1, "$hash->{NAME}: NO_ACK received during secured "
+          ."command: $secMsg->[0], command will be removed from security stack";
+        shift(@{$secMsg});
+        ZWave_secEnd($hash);
+      }
+    }
+  }
+
   if($ackType eq "retry") {
     $ss->[0] =~ m/^(.*)(set|get):(.*)$/;
     $ss->[0] = "$2:$3";
