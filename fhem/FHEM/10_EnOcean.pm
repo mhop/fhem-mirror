@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-# 2016-09-07
 
 package main;
 
@@ -1467,13 +1466,20 @@ sub EnOcean_Get($@)
       $rorg = "D2";
       shift(@a);
       $updateState = 2;
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", undef);
+      if (defined $waitingCmds) {
+        # check presence state
+        $waitingCmds = ReadingsVal($name, "presence", "present") eq "absent" ? $waitingCmds & 0xDF | 32 : $waitingCmds & 0xDF;
+      } else {
+        $waitingCmds = ReadingsVal($name, "presence", "present") eq "absent" ? 32 : 0;
+      }
       if ($cmd eq "config") {
         # query config
-        readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) | 0x80, 0);
+        readingsSingleUpdate($hash, "waitingCmds", $waitingCmds | 0x80, 0);
         Log3 $name, 3, "EnOcean get $name $cmd";
       } elsif ($cmd eq "log") {
         # query log
-        readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) | 0x40, 0);
+        readingsSingleUpdate($hash, "waitingCmds", $waitingCmds | 0x40, 0);
         Log3 $name, 3, "EnOcean get $name $cmd";
       } else {
         $cmdList .= "config:noArg log:noArg";
@@ -5180,6 +5186,13 @@ sub EnOcean_Set($@)
       # (D2-06-01)
       $rorg = "D2";
       $updateState = 2;
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", undef);
+      if (defined $waitingCmds) {
+        # check presence state
+        $waitingCmds = ReadingsVal($name, "presence", "present") eq "absent" ? $waitingCmds & 0xDF | 32 : $waitingCmds & 0xDF;
+      } else {
+        $waitingCmds = ReadingsVal($name, "presence", "present") eq "absent" ? 32 : 0;
+      }
       if ($cmd eq "presence") {
         # set presence
         if (defined $a[1]) {
@@ -5187,12 +5200,12 @@ sub EnOcean_Set($@)
             readingsSingleUpdate($hash, "presence", $a[1], 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xDF, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xDF | 32, 0);
           } elsif ($a[1] =~ m/^present$/) {
             readingsSingleUpdate($hash, "presence", $a[1], 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xDF | 32, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xDF, 0);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
           }
@@ -5204,12 +5217,12 @@ sub EnOcean_Set($@)
             readingsSingleUpdate($hash, "handleClosedClick", $a[1] . 'd', 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xE7 | 8, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xE7 | 8, 0);
           } elsif ($a[1] =~ m/^enable$/) {
             readingsSingleUpdate($hash, "handleClosedClick", $a[1] . 'd', 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xE7 | 16, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xE7 | 16, 0);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
           }
@@ -5221,12 +5234,12 @@ sub EnOcean_Set($@)
             readingsSingleUpdate($hash, "batteryLowClick", $a[1] . 'd', 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xF9 | 2, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xF9 | 2, 0);
           } elsif ($a[1] =~ m/^enable$/) {
             readingsSingleUpdate($hash, "batteryLowClick", $a[1] . 'd', 1);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) & 0xF9 | 4, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds & 0xF9 | 4, 0);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
           }
@@ -5239,7 +5252,7 @@ sub EnOcean_Set($@)
             readingsSingleUpdate($hash, "updateIntervalSet", $a[1], 0);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) | 1, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds | 1, 0);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
           }
@@ -5252,7 +5265,7 @@ sub EnOcean_Set($@)
             readingsSingleUpdate($hash, "blinkIntervalSet", $a[1], 0);
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             shift(@a);
-            readingsSingleUpdate($hash, "waitingCmds", ReadingsVal($name, "waitingCmds", 0) | 1, 0);
+            readingsSingleUpdate($hash, "waitingCmds", $waitingCmds | 1, 0);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
           }
@@ -10267,6 +10280,7 @@ sub EnOcean_Parse($$)
       my $msgType = hex(substr($data, 0, 2));
       my $blinkInterval = 0;
       my $updateInterval = 0;
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", undef);
       if ($msgType == 0) {
         # sensor values
         my %onOffTrigger = (
@@ -10451,8 +10465,10 @@ sub EnOcean_Parse($$)
 
       } elsif ($msgType == 0x10) {
         # configuration report
-
-        push @event, "3:presence:" . ($db[3] & 0x80 ? 'present' : 'absent');
+        if (defined $waitingCmds) {
+           $waitingCmds = $db[3] & 0x80 ? $waitingCmds & 0xDF | 32 : $waitingCmds & 0xDF;
+        }
+        push @event, "3:presence:" . ($db[3] & 0x80 ? 'absent' : 'present');
         push @event, "3:handleClosedClick:" . ($db[3] & 0x40 ? 'enabled' : 'disabled');
         push @event, "3:batteryLowClick:" . ($db[3] & 0x20 ? 'enabled' : 'disabled');
         $updateInterval = hex(substr($data, 4, 4));
@@ -10494,7 +10510,6 @@ sub EnOcean_Parse($$)
 
       }
 
-      my $waitingCmds = ReadingsVal($name, "waitingCmds", undef);
       if (defined $waitingCmds) {
         $updateInterval = 0;
         $blinkInterval = 0;
@@ -17378,10 +17393,7 @@ EnOcean_Delete($$)
         <li><a href="#EnOcean_subDefW">subDefW</a></li>
       </ul>
       The attr subType must be multisensor.01. This is done if the device was
-      created by autocreate. To control the device, it must be bidirectional paired,
-      see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. In
-      this case preset the communication method of the actuator manualy to biDir,
-      see <a href="#TCM_comModeUTE">comModeUTE</a>.
+      created by autocreate.
     </li>
     <br><br>
 
@@ -17773,10 +17785,7 @@ EnOcean_Delete($$)
         <li><a href="#EnOcean_subDefW">subDefW</a></li>
       </ul>
       The attr subType must be multisensor.01. This is done if the device was
-      created by autocreate. To control the device, it must be bidirectional paired,
-      see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. In
-      this case preset the communication method of the actuator manualy to biDir,
-      see <a href="#TCM_comModeUTE">comModeUTE</a>.
+      created by autocreate.
     </li>
     <br><br>
 
