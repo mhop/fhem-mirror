@@ -37,13 +37,14 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.9          26.09.2016       new function importFromFile to import data from file (CSV format)
 # 3.8          16.09.2016       new attr readingPreventFromDel to prevent readings from deletion
 #                               when a new operation starts
 # 3.7.3        11.09.2016       changed format of diffValue-reading if no value was selected
 # 3.7.2        04.09.2016       problem in diffValue fixed if if no value was selected
 # 3.7.1        31.08.2016       Reading "errortext" added, commandref continued, exportToFile changed,
 #                               diffValue changed to fix wrong timestamp if error occur
-# 3.7          30.08.2016       exportToFile added
+# 3.7          30.08.2016       exportToFile added (exports data to file (CSV format)
 # 3.6          29.08.2016       plausibility checks of database column character length
 # 3.5.2        21.08.2016       fit to new commandref style
 # 3.5.1        20.08.2016       commandref continued
@@ -211,6 +212,7 @@ sub DbRep_Set($@) {
              "averageValue:noArg ".
              "delEntries:noArg ".
              "exportToFile:noArg ".
+             "importFromFile:noArg ".
              "maxValue:noArg ".
              "fetchrows:noArg ".
              "diffValue:noArg ".
@@ -311,9 +313,15 @@ sub DbRep_Set($@) {
       
   } elsif ($opt eq "exportToFile") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
-          return " The attribute \"expimpfile\" (path and filename) has to be set for export !";
+          return " The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
       }
       sqlexec($hash,"exportToFile");
+      
+  } elsif ($opt eq "importFromFile") {
+      if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
+          return " The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
+      }
+      sqlexec($hash,"importFromFile");
       
   }
   else  
@@ -593,7 +601,7 @@ sub sqlexec($$) {
  } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin") {
      $tsbegin = ($cy-1)."-01-01 00:00:00";
  } else {
-     $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "");  
+     $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");  
  }
  
  # Auswertungszeit Ende (String)
@@ -610,19 +618,22 @@ sub sqlexec($$) {
         
  # extrahieren der Einzelwerte von Datum/Zeit Beginn
  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($tsbegin =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-        
- # Umwandeln in Epochesekunden bzw. setzen Differenz zur akt. Zeit wenn attr "timeDiffToNow" gesetzt Beginn
- my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
- $epoch_seconds_begin = AttrVal($hash->{NAME}, "timeDiffToNow", undef) ? (time() - AttrVal($hash->{NAME}, "timeDiffToNow", undef)) : $epoch_seconds_begin;
- Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: ".AttrVal($hash->{NAME}, "timeDiffToNow", undef)." sec") if(AttrVal($hash->{NAME}, "timeDiffToNow", undef)); 
- 
- Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin"); 
- my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
- Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string"); 
-
- 
- # extrahieren der Einzelwerte von Datum/Zeit Ende bzw. Selektionsende dynamisch auf <aktuelle Zeit>-timeOlderThan setzen
+ # extrahieren der Einzelwerte von Datum/Zeit Ende 
  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+        
+ # Umwandeln in Epochesekunden bzw. Zeitgrenzen setzen wenn attr "timeDiffToNow" gesetzt Beginn
+ my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
+ 
+ if(AttrVal($hash->{NAME}, "timeDiffToNow", undef)) {
+     $epoch_seconds_begin = time() - AttrVal($hash->{NAME}, "timeDiffToNow", undef);
+     Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: ".AttrVal($hash->{NAME}, "timeDiffToNow", undef)." sec"); 
+ } elsif (AttrVal($hash->{NAME}, "timeOlderThan", undef)) {
+     $epoch_seconds_begin = timelocal(00, 00, 01, 01, 01-1, 1970-1900);
+ }
+ 
+ my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
+ Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin");   
+ Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string"); 
         
  # Umwandeln in Epochesekunden Endezeit
  my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
@@ -726,11 +737,14 @@ $hash->{HELPER}{CV} = \%cv;
              
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
     
+ } elsif ($opt eq "importFromFile") {             
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
+    
  } elsif ($opt eq "max") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "del") {
-     $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
@@ -792,12 +806,12 @@ sub averval_DoParse($) {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT AVG(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
+     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -905,7 +919,7 @@ return;
 sub count_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $ts) = split("\\§", $string);
- my $hash        = $defs{$name};
+ my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
@@ -945,12 +959,12 @@ sub count_DoParse($) {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT COUNT(*) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
+     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -1545,12 +1559,12 @@ sub sumval_DoParse($) {
      
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT SUM(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
+     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
      $sql .= "DEVICE = '$device' " if($device);
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timestamp_begin",undef) || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
+     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -2085,6 +2099,8 @@ sub expfile_DoParse($) {
      Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
      return "$name|''|''|$err";
  } else {
+     # only for this block because of warnings of uninitialized values
+     no warnings 'uninitialized'; 
      while (my $row = $sth->fetchrow_arrayref) {
         print FH join(',', map { s{"}{""}g; "\"$_\""; } @$row), "\n";
         Log3 ($name, 5, "DbRep $name -> write row:  @$row");
@@ -2139,19 +2155,196 @@ sub expfile_ParseDone($) {
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, $export_string, $nrows);
-         
-  my $rows = $ds.$rds.$nrows;
-  
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{dbloghash}{NAME} to file ".AttrVal($name, "expimpfile", undef).": $rows");  
-    
+  readingsBulkUpdate($hash, $export_string, $nrows); 
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
+  
+  my $rows = $ds.$rds.$nrows;
+  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{dbloghash}{NAME} to file ".AttrVal($name, "expimpfile", undef).": $rows");
 
 
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
+  
+return;
+}
+
+####################################################################################################
+# nichtblockierende DB-Funktion impfile
+####################################################################################################
+
+sub impfile_Push($) {
+ my ($name) = @_;
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbmodel    = $hash->{dbloghash}{DBMODEL};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err=0;
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_Push");
+
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+     return "$name|''|''|$err";
+ }
+ 
+ my $infile = AttrVal($name, "expimpfile", undef);
+ if (open(FH, "$infile")) {
+     binmode (FH);
+ } else {
+     $err = encode_base64("could not open ".$infile.": ".$!,"");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+     return "$name|''|''|$err";
+ }
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ # only for this block because of warnings if details inline is not set
+ no warnings 'uninitialized'; 
+ 
+ my $al;
+ # Datei zeilenweise einlesen und verarbeiten !
+ # Beispiel Inline:  
+ # "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""
+ 
+ $dbh->begin_work();
+ my $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+ $dbh->{AutoCommit} = 0;
+ my $irowdone = 0;
+ my $irowcount = 0;
+ my $warn = 0;
+ while (<FH>) {
+     $al = $_;
+     chomp $al; 
+     my @alarr = split("\",\"", $al);
+     # $al =~ tr/"//d;
+     my $i_timestamp = $alarr[0];
+     $i_timestamp =~ tr/"//d;
+     my $i_device    = $alarr[1];
+     my $i_type      = $alarr[2];
+     my $i_event     = $alarr[3];
+     my $i_reading   = $alarr[4];
+     my $i_value     = $alarr[5];
+     my $i_unit      = $alarr[6] ? $alarr[6]: " ";
+     $i_unit =~ tr/"//d;
+     $irowcount++;
+     next if(!$i_timestamp);  #leerer Datensatz
+     
+     # check ob TIMESTAMP Format ok ?
+     my ($i_date, $i_time) = split(" ",$i_timestamp);
+     if ($i_date !~ /(\d{4})-(\d{2})-(\d{2})/ || $i_time !~ /(\d{2}):(\d{2}):(\d{2})/) {
+         $err = encode_base64("Format of date/time is not valid in row $irowcount of $infile. Must be format \"YYYY-MM-DD HH:MM:SS\" !","");
+         Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets of file $infile was NOT done. Invalid date/time field format in row $irowcount !");    
+         close(FH);
+         $dbh->rollback;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+         return "$name|''|''|$err";
+     }
+     
+     # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
+     if ($dbmodel ne 'SQLITE') {
+         if ($dbmodel eq 'POSTGRESQL') {
+             $i_device   = substr($i_device,0, $dbrep_col_postgre{DEVICE});
+             $i_reading  = substr($i_reading,0, $dbrep_col_postgre{READING});
+             $i_value    = substr($i_value,0, $dbrep_col_postgre{VALUE});
+             $i_unit     = substr($i_unit,0, $dbrep_col_postgre{UNIT}) if($i_unit);
+         } elsif ($dbmodel eq 'MYSQL') {
+             $i_device   = substr($i_device,0, $dbrep_col_mysql{DEVICE});
+             $i_reading  = substr($i_reading,0, $dbrep_col_mysql{READING});
+             $i_value    = substr($i_value,0, $dbrep_col_mysql{VALUE});
+             $i_unit     = substr($i_unit,0, $dbrep_col_mysql{UNIT}) if($i_unit);
+         }
+     }     
+     
+     Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
+     
+     if($i_timestamp && $i_device && $i_reading) {
+         
+         eval {$sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);};
+ 
+         if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
+             close(FH);
+             $dbh->rollback;
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+             return "$name|''|''|$err";
+         } else {
+             $irowdone++
+         }
+       
+     } else {
+         $err = encode_base64("format error in in row $irowcount of $infile.","");
+         Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets of file $infile was NOT done. Formaterror in row $irowcount !");     
+         close(FH);
+         $dbh->rollback;
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+         return "$name|''|''|$err";
+     }   
+ }
+ 
+ $dbh->commit;
+ $dbh->disconnect;
+ close(FH);
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+ 
+ return "$name|$irowdone|$rt|$err";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Funktion impfile
+####################################################################################################
+
+sub impfile_PushDone($) {
+  my ($string) = @_;
+  my @a = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $irowdone   = $a[1];
+  my $rt         = $a[2];
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $name       = $hash->{NAME};
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_PushDone");
+  
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
+      return;
+  } 
+ 
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+
+  my $import_string = " -- ROWS IMPORTED FROM FILE -- ";
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, $import_string, $irowdone); 
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done"); 
+  readingsEndUpdate($hash, 1);
+
+  Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{dbloghash}{NAME} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
+
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
   
 return;
 }
@@ -2344,8 +2537,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 
 =pod
 =item helper
-=item summary    browsing / managing content of DbLog-databases. Content is depicted as readings
-=item summary_DE durchsuchen / bearbeiten von DbLog-DB Content. Darstellung als Readings
+=item summary    Reporting & Management content of DbLog-DB's. Content is depicted as readings
+=item summary_DE Reporting & Management von DbLog-DB Content. Darstellung als Readings
 =begin html
 
 <a name="DbRep"></a>
@@ -2369,7 +2562,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
      <li> The calculation of summary- , difference- , maximal- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
-     <li> export of datasets in CSV-format. </li>
+     <li> export of datasets to file (CSV-format). </li>
+     <li> import of datasets from file (CSV-Format). </li>
      </ul></ul>
      <br>
   
@@ -2424,7 +2618,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <ul><ul>
     <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. The reading to evaluate must be defined using attribute "reading".  </li> <br>
     <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
-    <li><b> exportToFile </b> -  exports DB-entries in CSV-format between period given by timestamp. Limitations for selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading.  </li> <br>
+    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. Limitations for selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile" . </li> <br>
     <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a>. An aggregation which would possibly be set attribute will <b>not</b> considered.  </li> <br>
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
@@ -2437,7 +2631,20 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  </li> <br>
                                  </ul>
                                  
-
+    <li><b> importFromFile </b> - imports datasets in CSV format from file into database. The filename will be set by <a href="#DbRepattr">attribute</a> "expimpfile". <br><br>
+                                 
+                                 <ul>
+                                 <b>dataset format: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
+                                 # The fields "TIMESTAMP","DEVICE", "READING" have to be set. All other fields are optional.
+                                 The file content will be imported transactional. That means all of the content will be imported or, in case of error, nothing of it. 
+                                 If an extensive file will be used, DON'T set verbose = 5 because of a lot of datas would be written to the logfile in this case. 
+                                 It could lead to blocking or overload FHEM ! <br><br>
+                                 
+                                 <b>Example: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
+                                 <br>
+                                 </li> <br>
+                                 </ul>    
+    
     <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
     <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
     <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. </li> <br>
@@ -2480,7 +2687,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
   <li><b>device </b>          - selection of a particular device   </li> <br>
   <li><b>disable </b>         - deactivates the module  </li> <br>
-  <li><b>expimpfile </b>      - Path/filename for data export </li> <br>
+  <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a new operation starts  </li> <br>
@@ -2556,7 +2763,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Die Berechnung von Summen- , Differenz- , Maximal- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
-     <li> Export von Datensätzen im CSV-Format. </li>
+     <li> Export von Datensätzen in ein File im CSV-Format. </li>
+     <li> Import von Datensätzen aus File im CSV-Format. </li>
      </ul></ul>
      <br>
   
@@ -2611,7 +2819,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <ul><ul>
     <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
     <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
-    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li> <br>
     <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
                                  
@@ -2623,7 +2831,21 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  # die Feldlänge ist maximal 32 (MySQL) bzw. 64 (POSTGRESQL) Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
                                  </li> <br>
                                  </ul>
+    
+    <li><b> importFromFile </b> - importiert Datensätze im CSV-Format aus einem File in die Datenbank. Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br><br>
                                  
+                                 <ul>
+                                 <b>Datensatzformat: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
+                                 # Die Felder "TIMESTAMP","DEVICE", "READING" müssen gesetzt sein. Alle anderen Felder sind optional.
+                                 Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
+                                 Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
+                                 das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte! <br><br>
+                                 
+                                 <b>Beispiel: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
+                                 <br>
+                                 </li> <br>
+                                 </ul>    
+    
     <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
     <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
     <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. </li> <br>
@@ -2666,7 +2888,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
-  <li><b>expimpfile </b>      - Pfad/Dateiname für Datenexport  </li> <br>
+  <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
