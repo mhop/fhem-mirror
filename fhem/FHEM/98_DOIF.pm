@@ -1333,9 +1333,9 @@ DOIF_TimerTrigger ($)
 }
 
 sub
-DOIF_DetTime($)
+DOIF_DetTime($$)
 {
-  my ($timeStr) = @_;
+  my ($hash, $timeStr) = @_;
   my $rel=0;
   my $align;
   my $hr=0;
@@ -1359,11 +1359,8 @@ DOIF_DetTime($)
   } elsif ($timeStr =~ m/^(\-?([0-9]+))$/) {
     $s=$1;
   } else {
-    if ($timeStr =~ m/^\$hms$/) {
-      $timeStr = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
-    } elsif ($timeStr =~ m/^\$hm$/) {
-      $timeStr = sprintf("%02d:%02d", $hour, $min);  
-    } 
+    ($timeStr,$err)=ReplaceAllReadingsDoIf($hash,$timeStr,-3,1);
+     return ($err) if ($err);
     ($err, $h, $m, $s, $fn) = GetTimeSpec($timeStr);
     return $err if ($err);
   }
@@ -1416,14 +1413,13 @@ DOIF_CalcTime($$)
   my $pos;
   my $ret;
   if ($block=~ m/^\+\[([0-9]+)\]:([0-5][0-9])$/) {
-    ($err,$rel,$block)=DOIF_DetTime($block);
+    ($err,$rel,$block)=DOIF_DetTime($hash,$block);
     return ($block,$err,$rel);
   } elsif ($block =~ /^\+\(/ or $block =~ /^\+\[/) {
     $relGlobal=1;
     #$pos=pos($block);
     $block=substr($block,1);
   } 
-
   if ($block =~ /^\(/) {
     ($beginning,$tailBlock,$err,$tailBlock)=GetBlockDoIf($block,'[\(\)]');
     return ($tailBlock,$err) if ($err);
@@ -1434,11 +1430,25 @@ DOIF_CalcTime($$)
       ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($hash,$block,1);
       return ($block,$err) if ($err);
     }
-    ($err,$rel,$block)=DOIF_DetTime($block);
+    ($err,$rel,$block)=DOIF_DetTime($hash, $block);
     $rel=1 if ($relGlobal);
     return ($block,$err,$rel);
   }
   $tailBlock=$block;
+  while ($tailBlock ne "") {
+    ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
+    return ($block,$err) if ($err);
+    if ($block ne "") {
+ #      $ret = eval $block;
+ #      return($block." ",$@) if ($@);
+ #      $block=$ret;
+       ($err,$rel,$block)=DOIF_DetTime($hash,"{".$block."}");
+       return ($block,$err) if ($err);
+    }
+    $cmd.=$beginning.$block;
+  }
+  $tailBlock=$cmd;
+  $cmd="";
   while ($tailBlock ne "") {
     ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\[\]]');
     return ($block,$err) if ($err);
@@ -1447,23 +1457,8 @@ DOIF_CalcTime($$)
         ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($hash,$block,1);
         return ($block,$err) if ($err);
       }
-      ($err,$rel,$block)=DOIF_DetTime($block);
+      ($err,$rel,$block)=DOIF_DetTime($hash,$block);
       return ($block,$err) if ($err);
-
-    }
-    $cmd.=$beginning.$block;
-  }
-  $tailBlock=$cmd;
-  $cmd="";
-  while ($tailBlock ne "") {
-    ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
-    return ($block,$err) if ($err);
-    if ($block ne "") {
-       $ret = eval $block;
-       return($block." ",$@) if ($@);
-       $block=$ret;
-       ($err,$rel,$block)=DOIF_DetTime($block);
-       return ($block,$err) if ($err);
     }
     $cmd.=$beginning.$block;
   }
@@ -1826,13 +1821,14 @@ DOIF_Set($@)
   my $arg = $a[1];
   my $value = (defined $a[2]) ? $a[2] : "";
   my $ret="";
-  if ($arg eq "disable" or  $arg eq "initialize") {
+  if ($arg eq "disable" or  $arg eq "initialize" or  $arg eq "enable") {
     if (AttrVal($hash->{NAME},"disable","")) {
       return ("modul ist deactivated by disable attribut, delete disable attribut first");
     }
   }
   if ($arg eq "disable") {
       readingsBeginUpdate  ($hash);
+      readingsBulkUpdate($hash,"last_cmd",ReadingsVal($pn,"state",""));
       readingsBulkUpdate($hash, "state", "disabled");
       readingsBulkUpdate($hash, "mode", "disabled");
       readingsEndUpdate    ($hash, 1);
@@ -1841,8 +1837,13 @@ DOIF_Set($@)
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
       readingsSingleUpdate($hash, "state","initialize",1);
+  } elsif ($arg eq "enable" ) {
+      #delete ($defs{$hash->{NAME}}{READINGS}{mode});
+      readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
+      delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
+      readingsSingleUpdate ($hash,"mode","enable",1)
   } else {
-    return "$pn: unknown argument $a[1], choose one of disable initialize"
+    return "$pn: unknown argument $a[1], choose one of disable initialize enable"
   } 
   return $ret;
 }
@@ -1851,6 +1852,9 @@ DOIF_Set($@)
 1;
 
 =pod
+=item helper
+=item summary    universal module, it works event- and time-controlled   
+=item summary_DE universelles Modul, welches ereignis- und zeitgesteuert Anweisungen ausführt
 =begin html
 
 <a name="DOIF"></a>
@@ -2065,7 +2069,8 @@ Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein
 Ausgewertet wird hier der Zustand des Statuses von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
 Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Die nächste mögliche Ausführung ist "set garage off", wenn Fernbedienung "off" liefert.
 <a name="DOIF_do_always"></a>
-Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat, weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird und dann muss man das per "do always"-Attribut angeben:<br>
+Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat, 
+weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
 <br>
 
 <code>attr di_garage do always</code><br>
@@ -2322,9 +2327,14 @@ Statt fester Zeitangaben können Stati, Readings oder Internals angegeben werden
 <br>
 <code>define time dummy<br>
 set time 08:00<br>
-define di_time DOIF ([[time]])(set lamp on)</code><br>
+define di_time DOIF ([[time]])(set lamp on)<br>
+attr di_time do always</code><br>
 <br>
-Ebenfalls kann das Dummy mit einer Sekundenzahl belegt werden, oder als indirekte Zeit angegeben werden, hier z. B. schalten alle 300 Sekunden:<br>
+Die indirekte Angabe kann ebenfalls mit einer Zeitfunktion belegt werden. Z. B. <br>
+<br>
+<code>set time {sunset()}</code><br>
+<br>
+Das Dummy kann auch mit einer Sekundenzahl belegt werden, oder als relative Zeit angegeben werden, hier z. B. schalten alle 300 Sekunden:<br>
 <br>
 <code>define time dummy<br>
 set time 300<br>
@@ -2340,12 +2350,18 @@ set end 10:00<br>
 <br>
 define di_time DOIF ([[begin]-[end]]) (set radio on) DOELSE (set radio off)</code><br>
 <br>
+Indirekte Zeitangaben können auch als Übergabeparameter für Zeitfunktionen, wie z. B. sunset oder sunrise übergeben werden:<br>
+<br>
+<code>define di_time DOIF ([{sunrise(0,"[begin]","09:00")-{sunset(0,"18:00","[end]")]) (set lamp off) DOELSE (set lamp on) </code><br>
+<br>
 Bei einer Änderung des angebenen Status oder Readings wird die geänderte Zeit sofort im Modul aktualisiert.<br>
 <br>
 Angabe eines Readings als Zeitangabe. Beispiel: Schalten anhand eines Twilight-Readings:<br> 
 <br>
 <code>define di_time DOIF ([[myTwilight:ss_weather]])(set lamp on)</code><br>
 <br>
+
+
 Dynamische Änderung einer Zeitangabe.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Die Endzeit soll abhängig von der Beginnzeit mit Hilfe einer eigenen Perl-Funktion, hier: <code>OffTime()</code>, bestimmt werden. <code>begin</code> und <code>end</code> sind Dummys, wie oben definiert:<br>
@@ -2710,7 +2726,7 @@ Das ist insb. dann interessant, wenn ein Modul verschiedene Readings zu untersch
 <br>
 <u>Beispiele</u>:<br>
 <br>
-<code>define di_lamp ([mytwilight:light] < 3) (set lamp on) DOELSEIF ([mytwilight:light] > 3) (set lamp off)<br>
+<code>define di_lamp DOIF ([mytwilight:light] < 3) (set lamp on) DOELSEIF ([mytwilight:light] > 3) (set lamp off)<br>
 attr di_lamp checkReadingEvent 1</code><br>
 <br>
 Ebenso gilt die Einschränkung für indirekte Timer:<br>
@@ -2964,7 +2980,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>verwendete Timer mit Angabe des n&auml;chsten Zeitpunktes</dd>
 </br>
         <dt>wait_timer</dt>
-                <dd>Angabe des aktueller Wait-Timers</dd>
+                <dd>Angabe des aktuellen Wait-Timers</dd>
 </dl>
 </br>
 </ul>
@@ -2997,8 +3013,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>$SELF</dt>
                 <dd>f&uuml;r den Ger&auml;tenamen des DOIF</dd>
 </br>
-        <dt>&lt;globale Variable&gt;</dt>
-                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, siehe auch <a href="#perl">PERL Besonderheiten</a></dd>
+        <dt>&lt;Perl-Funktionen&gt;</dt>
+                <dd>vorhandene und selbsterstellte Perl-Funktionen</dd>
 </dl>
 </br>
 </ul>
@@ -3007,7 +3023,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <ul>
 <dl>
         <dt><a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Events</a> <code><b>[</b>&lt;devicename&gt;<b>:"</b>&lt;regex f&uuml;r Events&gt;"<b>]</b></code> oder <code><b>["</b>&lt;regex f&uuml;r Devices&gt;<b>:</b>&lt;regex f&uuml;r Events&gt;<b>"]</b></code></dt>
-                <dd>f&uuml;r <code>&lt;regex&gt;</code> gilt: <code><b>^</b>&lt;ist eindeutig&gt;<b>$</b></code>, <code><b>^</b>&lt;beginnt mit&gt;</code>, <code>&lt;endet mit&gt;<b>$</b></code>, <code><b>""</b></code> entspricht <code><b>".*"</b></code>, siehe auch <a target=blank href="https://wiki.selfhtml.org/wiki/Perl/Regul%C3%A4re_Ausdr%C3%BCcke">Regul&auml;re Ausdr&uuml;cke</a>
+                <dd>f&uuml;r <code>&lt;regex&gt;</code> gilt: <code><b>^</b>&lt;ist eindeutig&gt;<b>$</b></code>, <code><b>^</b>&lt;beginnt mit&gt;</code>, <code>&lt;endet mit&gt;<b>$</b></code>, <code><b>""</b></code> entspricht <code><b>".*"</b></code>, siehe auch <a target=blank href="https://wiki.selfhtml.org/wiki/Perl/Regul%C3%A4re_Ausdr%C3%BCcke">Regul&auml;re Ausdr&uuml;cke</a> und Events des Ger&auml;tes <a target=blank href="#global">global</a>
                 </dd>
 </br>
         <dt><a href="#DOIF_Zeitsteuerung">Zeitpunkte</a> <code><b>[</b>&lt;time&gt;<b>]</b> </code></dt>
@@ -3046,8 +3062,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>$cmd</dt>
                 <dd>Perl-Variablen mit der Bedeutung [$SELF:cmd]</dd>
 </br>
-        <dt>&lt;Perl-Funktionen&gt;</dt>
-                <dd>vorhandene und selbsterstellte Perl-Funktionen</dd>
+        <dt>&lt;globale Variable&gt;</dt>
+                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, siehe auch <a href="#perl">PERL Besonderheiten</a></dd>
 </dl>
 </br>
 </ul>
@@ -3059,6 +3075,9 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </br>
         <dt><a href="#DOIF_initialize">initialize</a> <code><b> set </b>&lt;name&gt;<b> initialize</b></code></dt>
                 <dd>initialisiert das DOIF und aktiviert die Befehlsausf&uuml;hrung</dd>
+</br>
+        <dt><a href="#DOIF_initialize">enable</a> <code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
+                <dd>aktiviert die Befehlsausf&uuml;hrung, im Gegensatz zur obigen Initialisierung bleibt der letzte Zustand des Moduls erhalten</dd>
 </dl>
 </br>
 </ul>
