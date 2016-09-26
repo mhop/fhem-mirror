@@ -47,14 +47,14 @@ my %zwave_class = (
     parse => { "..2001(.*)"=> '"basicSet:".hex($1)', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
                "032003(..)"=> '"basicReport:".hex($1)', # V1
-               "052003(..)(..)(..)"=> '"basicReport:".hex($1).
-                              " target: ".hex($2)." duration: ".hex($3)' }, # V2
-               },
+               "052003(..)(..)(..)" => 'ZWave_BASIC_V2_report($1,$2,$3)',
+               }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
     parse => { "..2201(..)(..)" =>
-                  'ZWave_applicationStatusBusyParse($hash, $1, $2)',
-               "03220200" => "applicationStatus:cmdRejected" } },
+                  'ZWave_APPLICATION_STATUS_01_Report($hash, $1, $2)',  # V1
+               "03220200" => "applicationStatus:cmdRejected",           # V1
+               }},
   ZIP_SERVICES             => { id => '23' },
   ZIP_SERVER               => { id => '24' },
   SWITCH_BINARY            => { id => '25',
@@ -1653,7 +1653,7 @@ ZWave_versionClassGet($$)
 {
   my ($hash, $class) = @_;
 
-  delete $zwave_parseHook{"$hash->{nodeIdHex}:..8614"};
+  delete $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} if ($hash->{CL});
   return("", sprintf('13%02x', $class))
         if($class =~ m/^\d+$/);
   return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
@@ -1762,20 +1762,6 @@ ZWave_multilevelParse($$$)
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
   return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
        int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
-}
-
-sub
-ZWave_applicationStatusBusyParse($$$)
-{
-  my ($hash, $st, $wTime) = @_;
-  my $name = $hash->{NAME};
-
-  my $status = hex($st);
-  my $rt .= $status==0 ? "tryAgainLater " :
-            $status==1 ? "tryAgainInWaitTimeSeconds " :
-            $status==2 ? "RequestQueued " : "unknownStatusCode ";
-  $rt .= sprintf("waitTime: %d", hex($wTime));
-  return ("applicationBusy:$rt");
 }
 
 sub
@@ -2479,6 +2465,50 @@ ZWave_configCheckParam($$$$@)
   return ("", sprintf("04%02x%02x%0*x", $h->{index}, $len/2, $len, $arg[0]));
 }
 
+##############################################
+### START: 0x20 BASIC
+sub
+ZWave_BASIC_V3_report ($$$)
+{ # 0x2003 BASIC_REPORT V2
+  my ($value, $target, $duration) = @_;;
+  my $time = hex($duration);
+
+  if (($time > 0x7F) && ($time <= 0xFD)) {
+    $time = (hex($duration) - 0x7F) * 60;
+  };
+  $time .=  " seconds";
+  $time  =  "unknown duration"      if (hex($duration) == 0xFE);
+  $time  =  "255 (reserved value)"  if (hex($duration) == 0xFF);
+  
+  my $rt = "basicReport:".hex($value)
+          ." target: ".hex($target)
+          ." duration: ".$time;
+          
+  return $rt;
+}
+
+##############################################
+### START: 0x21 APPLICATION_STATUS
+sub
+ZWave_APPLICATION_STATUS_01_Report($$$)
+{ # 0x2101 ApplicationStatus ApplicationBusyReport >= V1
+  my ($hash, $st, $wTime) = @_;
+  my $name = $hash->{NAME};
+
+  my $status = hex($st);
+  my $rt .= $status==0 ? "tryAgainLater " :
+            $status==1 ? "tryAgainInWaitTimeSeconds " :
+            $status==2 ? "RequestQueued " : "unknownStatusCode ";
+  $rt .= sprintf("waitTime: %d", hex($wTime));
+  return ("applicationBusy:$rt");
+}
+
+##############################################
+### START: 0x71 ALARM (NOTIFICATION)
+### Renamed from ALARM to NOTIFICATION in V3 specification,
+### for backward compatibility the name ALARM will be used
+### regardless of the version of the class.
+
 my %zwave_alarmType = (
   "01"=>"Smoke",
   "02"=>"CO",
@@ -2614,13 +2644,6 @@ my %zwave_alarmEvent = ( # no comma allowed in strings
   "0d05"=>"Sitting on edge of bed",
   "0d06"=>"Volatile Organic Compound level"
 );
-
-##############################################
-### START: 0x71 ALARM (NOTIFICATION)
-
-### Renamed from ALARM to NOTIFICATION in V3 specification,
-### for backward compatibility the name ALARM will be used
-### regardless of the version of the class.
 
 sub
 ZWave_ALARM_01_Get($) {
@@ -5157,7 +5180,9 @@ s2Hex($)
     return the status of the node as basicReport:XY. The value (XY) depends on
     the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
     Devices with version 2 (or greater) can return two additional values, the
-    'target value' and 'duration'.
+    'target value' and 'duration'. The 'duration' is reported in seconds, 
+    as "unknown duration" (value 0xFE = 253) or as "255 (reserved value)" 
+    (value 0xFF = 255).
     </li>
 
   <br><br><b>Class BATTERY</b>
