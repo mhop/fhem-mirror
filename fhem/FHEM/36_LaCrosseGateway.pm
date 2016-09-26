@@ -216,11 +216,11 @@ sub LaCrosseGateway_DoInit($) {
 }
 
 #=======================================================================================
-
 sub LaCrosseGateway_Ready($) {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-  return LaCrosseGateway_Connect($hash) if($hash->{STATE} eq "disconnected");
+  LaCrosseGateway_Connect($hash, 1);
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
@@ -414,13 +414,14 @@ sub LaCrosseGateway_SimpleWrite(@) {
 }
 
 #=======================================================================================
-sub LaCrosseGateway_Connect($) {
-  my ($hash) = @_;
+sub LaCrosseGateway_Connect($;$) {
+  my ($hash, $mode) = @_;
   my $name = $hash->{NAME};
-
+  
+  $mode = 0 if!($mode);
   my $enabled = AttrVal($name, "disable", "0") != "1";
   if($enabled) {
-    my $ret = DevIo_OpenDev($hash, 0, "LaCrosseGateway_DoInit");
+    my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit");
     return $ret;
   }
   
@@ -431,11 +432,12 @@ sub LaCrosseGateway_Connect($) {
 sub LaCrosseGateway_OnConnectTimer($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  
+  RemoveInternalTimer($hash, "LaCrosseGateway_OnConnectTimer");
 
   my $attrVal = AttrVal($name, "timeout", undef);
   if(defined($attrVal)) {
     my ($timeout, $interval) = split(',', $attrVal);
-    InternalTimer(gettimeofday() + $interval, "LaCrosseGateway_OnConnectTimer", $hash, 0);
     my $LaCrosseGatewayTime = InternalVal($name, "${name}_TIME", "2000-01-01 00:00:00");
     my ($date, $time, $year, $month, $day, $hour, $min, $sec, $timestamp);
     ($date, $time) = split( ' ', $LaCrosseGatewayTime);
@@ -444,8 +446,10 @@ sub LaCrosseGateway_OnConnectTimer($) {
     $month -= 01;
     $timestamp = timelocal($sec, $min, $hour, $day, $month, $year);
 
+    InternalTimer(gettimeofday() + $interval, "LaCrosseGateway_OnConnectTimer", $hash, 0);
+    
     if (gettimeofday() - $timestamp > $timeout) {
-      return LaCrosseGateway_Connect($hash);
+      return LaCrosseGateway_Connect($hash, 1);
     }
   }
 }
