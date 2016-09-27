@@ -74,7 +74,6 @@ LUXTRONIK2_Initialize($)
 
   $hash->{DefFn}    = "LUXTRONIK2_Define";
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
-  $hash->{NotifyFn} = "LUXTRONIK2_Notify";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
   $hash->{AttrFn}   = "LUXTRONIK2_Attr";
   $hash->{AttrList} = "disable:0,1 ".
@@ -151,56 +150,6 @@ LUXTRONIK2_Undefine($$)
 
   return undef;
 }
-
-sub ########################################
-LUXTRONIK2_Notify(@) {
-  my ($hash,$dev) = @_;
-  my $name = $hash->{NAME};
-  
-  # if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
-    # housekeeping
-      # my %cleanUp = ( 
-            # delayDeviceTime => "delayDeviceTimeCalc",
-            # deviceTimeStartReadings => "deviceTimeCalc",
-            # heatingSummerMode => "heatingLimit",
-            # thresholdTemperatureSummerMode => "thresholdHeatingLimit",
-            # lastDeviceClockSynch => "deviceTimeLastSync",
-            # operatingHoursHeatPump => "counterHoursHeatPump",
-            # operatingHoursSecondHeatSource1 => "counterHours2ndHeatSource1",
-            # operatingHoursSecondHeatSource2 => "counterHours2ndHeatSource2",
-            # operatingHoursSecondHeatSource3 => "counterHours2ndHeatSource3",
-            # operatingHoursHeating => "counterHoursHeating",
-            # operatingHoursHotWater => "counterHoursHotWater",
-            # heatQuantityHeating => "counterHeatQHeating",
-            # heatQuantityHotWater => "counterHeatQHotWater",
-            # heatQuantityTotal => "counterHeatQTotal", 
-            # currentOperatingStatus1 => "opStateHeatPump1",
-            # currentOperatingState1 => "opStateHeatPump1",
-            # currentOperatingStatus2 => "opStateHeatPump3",
-            # currentOperatingState2 => "opStateHeatPump2",
-            # currentOperatingState3 => "opStateHeatPump3",
-            # heatingOperatingMode => "opModeHeating",
-            # heatingOperatingState => "opStateHeating",
-            # hotWaterOperatingMode => "opModeHotWater",
-            # hotWaterStatus => "opStateHotWater",
-            # hotWaterState => "opStateHotWater",
-            # heatingSystemCirculationPump => "heatingSystemCircPump",
-            # hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern",
-            # currentThermalOutput => "thermalPower",
-            # returnTemperaturSetBack => "returnTemperatureSetBack",
-            # statGradientBoilerTempLoss => "statBoilerGradientHeatUp' and 'statBoilerGradientCoolDown" ); 
-      # my $oldReading;
-      # my $newReading;
-      # while (($oldReading, $newReading) = each(%cleanUp)) {
-         # if ( exists( $hash->{READINGS}{$oldReading} ) ) {
-            # delete($hash->{READINGS}{$oldReading});
-            # LUXTRONIK2_Log $name,2,"!!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
-         # }
-      # }
-   # }
-   return;
-}
-
 
 sub ########################################
 LUXTRONIK2_Attr(@)
@@ -1123,11 +1072,15 @@ LUXTRONIK2_CalcTemp($)
   return $temp;
 }
 
-sub ########################################
-LUXTRONIK2_FormatDuration($)
+########################################
+sub LUXTRONIK2_FormatDuration($)
 {
   my ($value) = @_;
-  my $returnstr = sprintf "%02d:", int($value/3600);
+  my $returnstr;
+  $returnstr = sprintf "%01dd ", int($value/86400)
+      if $value >= 86400;
+  $value %= 86400;
+  $returnstr .= sprintf "%02d:", int($value/3600);
   $value %= 3600;
   $returnstr .= sprintf "%02d:", int($value/60);
   $value %= 60;
@@ -1845,6 +1798,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 1;
 
 =pod
+=item device
+=item summary Controls a Luxtronik 2.0 controller for heat pumps
+=item summary_DE Steuert eine Luxtronik 2.0 Heizungssteuerung für W&auml;rmepumpen.
+
 =begin html
 
 <a name="LUXTRONIK2"></a>
