@@ -958,6 +958,9 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    my $name=$hash->{NAME};
    my $devName = $dev->{NAME};
    $state =~ s/ /_/g;
+   $state = "on" if $state =~ /set_on/;
+   $state = "off" if $state =~ /set_off/;
+   
    
    my $statReadingName = $hash->{PREFIX};
    $statReadingName .= ucfirst($readingName).$period;
