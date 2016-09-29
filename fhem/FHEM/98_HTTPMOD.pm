@@ -75,12 +75,15 @@
 #   2016-01-21  added documentation
 #               added RegOpt (still needs more testing), Replacement mode delete
 #   2016-01-23  changed MATCHED_READINGS to contain automatically created subreadings (-num)
-#               added AutoNumLen for automatic sub-reading names (multiple matches) so the number has leading zeros and a fixed length
+#               added AutoNumLen for automatic sub-reading names (multiple matches) 
+#               so the number has leading zeros and a fixed length
 #               added new attribute upgrading mechanism (e.g. for sidIDRegex to sidIdRegex)
-#   2016-01-25  modified the way attributes are added to userattr - now includes :hints for fhemweb and old entries are replaced
+#   2016-01-25  modified the way attributes are added to userattr - now includes :hints for fhemweb
+#               and old entries are replaced
 #   2016-02-02  added more checks to JsonFlatter (if defined ...), fixed auth to be added in the front of the queue, 
 #               added clearSIdBeforeAuth, authRetries
-#   2016-02-04  added a feature to name a reading "unnamed-XX" if Name attribute is missing instead of ignoring everything related
+#   2016-02-04  added a feature to name a reading "unnamed-XX" if Name attribute is missing 
+#               instead of ignoring everything related
 #   2016-02-05  fixed a warning caused by missing initialisation of .setList internal
 #   2016-02-07  allowed more regular expression modifiers in RegOpt, added IMap / OMap / IExpr / OExpr
 #   2016-02-13  enable sslVersion attribute für HttpUtils and httpVersion
@@ -89,7 +92,8 @@
 #   2016-02-15  added replacement type key and set storeKeyValue
 #   2016-02-20  set $XML::XPath::SafeMode = 1 to avoid memory leak in XML parser lib
 #   2016-03-25  started fixing array handling in json flatter
-#   2016-03-28  during extractAllJSON reading definitions will not be used to format readings. Instead after the ExtractAllJSION loop 
+#   2016-03-28  during extractAllJSON reading definitions will not be used to format readings. 
+#               Instead after the ExtractAllJSION loop 
 #               individual readings will be extracted (checkAll) and recombined if necessary
 #               Fixed cookie handling to add cookies in HandleSendQueue inmstead of PrepareRequest
 #   2016-04-08  fixed usage of "keys" on reference in 1555 and 1557
@@ -118,10 +122,16 @@
 #   2016-06-02  switched from "each" to foreach in JsonFlatter when used on an array to support older Perl
 #               fixed a warning in Getupdate when calculating with pollDelay
 #               fixed double LAST_REQUEST
-#               allowd control_sets if disabled
+#               allow control_sets if disabled
 #               fixed a bug in updateRequestHash (wrong request setting)
 #   2016-06-05  added code to recover if HttpUtils does not call back _read in timeout
-# 
+#   2016-06-28  added remark about dnsServer to documentation
+#   2016-07-03  fixed typos
+#   2016-07-18  make $now and $timeDiff available to OExpr
+#   2016-08-31  only fixed typos
+#   2016-09-20  fixed bugs where extractAllJSON filled requestReadings hash with wrong key and 
+#               requestReadings structure was filled with wrong data in updateRequestHash
+#               optimized deletion of readings with their metadata, check $buffer before jsonflatter
 #
 #   Todo:       
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
@@ -139,6 +149,25 @@
 #               extend devio for non blocking connect like httputils?
 #
 #
+#
+
+# verwendung von defptr:
+# $hash->{defptr}{readingBase}{$reading} gibt zu einem Reading-Namen den Ursprung an, z.B. get oder reading
+#                 readingNum                                die zugehörige Nummer, z.B. 01
+#                 readingSubNum                             ggf. eine Unternummer (bei reading01-001)
+#   wird von MaxAge verwendet um schnell zu einem Reading die zugehörige MaxAge Definition finden zu können
+#
+# $hash->{defptr}{requestReadings}{$reqType}{$baseReading}
+#   wird von DeleteOnError und DeleteIfUnmatched verwendet. 
+#       $reqType ist update, get01, set01 etc.
+#       $baseReading ist der Reading Basisname wie im Attribute ...Name definiert, 
+#       aber ohne eventuelle Extension bei mehreren Matches.
+#   Liefert "$context $num", also z.B. get 1 - dort wird nach DeleteOn.. gesucht
+#   wichtig um z.B. von reqType "get01" baseReading "Temperatur" auf reading 02 zu kommen 
+#       falls get01 keine eigenen parsing definitions enthält
+#   DeleteOn... wird dann beim reading 02 etc. spezifiziert.
+#
+
                     
 package main;
 
@@ -160,16 +189,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.3.0 - 19.6.2016';
-
-#
-# verwendung von defptr:
-# $hash->{defptr}{readingBase}{$reading} gibt zu einem Reading-Namen den Ursprung an, z.B. get oder reading
-#                 readingNum                                die zugehörige Nummer, z.B. 01
-#                 readingSubNum                             ggf. eine Unternummer (bei reading01-001)
-#   wird von MaxAge verwendet um schnell zu einem Reading die zugehörige MaxAge Definition finden zu können
-#
-
+my $HTTPMOD_Version = '3.3.5 - 29.9.2016';
 
 #
 # FHEM module intitialisation
@@ -190,7 +210,7 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]*(-[0-9]+)?Expr " .
       "(reading|get|set)[0-9]*(-[0-9]+)?Map " . 
       "(reading|get|set)[0-9]*(-[0-9]+)?OExpr " .
-      "(reading|get|set)[0-9]*(-[0-9]+)?OMap " . 
+      "(reading|get|set)[0-9]*(-[0-9]+)?OMap " .
       "(get|set)[0-9]*(-[0-9]+)?IExpr " .
       "(get|set)[0-9]*(-[0-9]+)?IMap " . 
 
@@ -458,7 +478,8 @@ sub HTTPMOD_Attr(@)
                 return "$name: illegal RegOpt in attr $name $aName $aVal";
             }
         } elsif ($aName =~ /Expr/) { # validate all Expressions
-            my $val = 0;
+            my $val = 0; my $old = 0;
+            my $timeDiff = 0;
             my @matchlist = ();
             no warnings qw(uninitialized);
             eval $aVal;
@@ -917,7 +938,7 @@ sub HTTPMOD_Replace($$$)
     
     if ($type =~ /(auth|set|get)(.*)/) {
         $context = $1;                      # context is type without num
-        # for type update there is no num so no individual replacement - only one for the whiole update request
+        # for type update there is no num so no individual replacement - only one for the whole update request
     }
 
     #Log3 $name, 4, "$name: Replace called for request type $type";
@@ -930,6 +951,7 @@ sub HTTPMOD_Replace($$$)
         my $mode  = AttrVal($name, "replacement${rNum}Mode", "text");
         next if (!$regex);
         
+        # value can be specific for a get / set / auth step 
         my $value = "";
         if ($context && defined ($attr{$name}{"${type}Replacement${rNum}Value"})) {
             # get / set / auth mit individuellem Replacement für z.B. get01
@@ -1143,8 +1165,9 @@ sub HTTPMOD_UpdateHintList($)
 
 # update hashes to point back from reading name 
 # to attr defining its name and properties
-###############################################
-# todo: fertig machen
+# called after Fhem restart or attribute changes
+# to handle existing readings 
+########################################################
 
 sub HTTPMOD_UpdateRequestHash($)
 {
@@ -1161,18 +1184,21 @@ sub HTTPMOD_UpdateRequestHash($)
         my $context = $1;
         my $num     = $2;
         my $nSubNum = ($3 ? $3 : "");       # named SubReading?    
-        my $request = ($context eq 'reading' ? 'update' : $context . $num);
+        my $reqType = ($context eq 'reading' ? 'update' : $context . $num);
         
         my $baseReading = $attr{$name}{$aName};   # base reading Name or explicitely named subreading
-        Log3 $name, 5, "$name: UpdateRequestHash looks at $baseReading, request $request, context $context, num $num, nSubNum $nSubNum";
         
-        $hash->{defptr}{readingBase}{$baseReading}   = $context;
-        $hash->{defptr}{readingNum}{$baseReading}    = $num;
-        $hash->{defptr}{readingSubNum}{$baseReading} = $nSubNum if ($nSubNum);
-        $hash->{defptr}{requestReadings}{$request}{$baseReading} = "$context ${num}" .
-            ($nSubNum ? "-$nSubNum" : "");
-        
-        # go through the potential subreadings
+        if ($defs{$name}{READINGS}{$baseReading}) {
+            # reading exists
+            Log3 $name, 5, "$name: UpdateRequestHash looks at $baseReading, request $reqType, context $context, num $num, nSubNum $nSubNum";
+            
+            $hash->{defptr}{readingBase}{$baseReading}   = $context;
+            $hash->{defptr}{readingNum}{$baseReading}    = $num;
+            $hash->{defptr}{readingSubNum}{$baseReading} = $nSubNum if ($nSubNum);
+            $hash->{defptr}{requestReadings}{$reqType}{$baseReading} = "$context ${num}" .
+                ($nSubNum ? "-$nSubNum" : "");
+        }
+        # go through the potential subreadings derived from this ..Name attribute with added -Num
         if (!$nSubNum) {
             foreach my $reading (@readingList) {
                 next if ($reading !~ /^${baseReading}(-[0-9]+)$/);
@@ -1181,7 +1207,8 @@ sub HTTPMOD_UpdateRequestHash($)
                 $hash->{defptr}{readingBase}{$reading}   = $context;
                 $hash->{defptr}{readingNum}{$reading}    = $num;
                 $hash->{defptr}{readingSubNum}{$reading} = $subNum;
-                $hash->{defptr}{requestReadings}{$request}{$reading} = "$context ${num}${subNum}";
+                $hash->{defptr}{requestReadings}{$reqType}{$reading} = "$context ${num}${subNum}";
+                # deleteOn ... will later check for e.g. reading02-001DeleteOnError but also for reading02-DeleteOnError (without subNum)
             }
         }
         # special Handling for get / set with CheckAllReadings
@@ -1190,15 +1217,25 @@ sub HTTPMOD_UpdateRequestHash($)
             foreach my $raName (@attrList) {
                 next if ($aName !~ /^(reading)([0-9]+)(-[0-9]+)?Name$/);
                 my $rbaseReading = $attr{$name}{$raName};   # common base reading Name   
-                my $rnSubNum = ($3 ? $3 : "");      # named SubReading?    
-                $hash->{defptr}{requestReadings}{$request}{$rbaseReading} = "$context ${num}" .
-                    ($rnSubNum ? "-$rnSubNum" : "");
+                my $rNum     = $2;
+                my $rnSubNum = ($3 ? $3 : "");              # named SubReading?    
                 
-                # go through the potential subreadings
+                if ($defs{$name}{READINGS}{$rbaseReading}) {
+                    # reading exists
+                    #$hash->{defptr}{requestReadings}{$reqType}{$rbaseReading} = "$context ${num}" .
+                    #    ($rnSubNum ? "-$rnSubNum" : "");
+                    # point from reqType get/set and reading Name like "Temp" to the definition in readingXX
+                    $hash->{defptr}{requestReadings}{$reqType}{$rbaseReading} = "reading $rNum" .
+                        ($rnSubNum ? "-$rnSubNum" : "");
+                }
+                
+                # go through the potential subreadings - the Name attribute was for a base Reading without explicit subNum
                 if (!$rnSubNum) {
                     foreach my $reading (@readingList) {
                         next if ($reading !~ /^${rbaseReading}(-[0-9]+)$/);
-                        $hash->{defptr}{requestReadings}{$request}{$reading} = "$context ${num}$1";
+                        #$hash->{defptr}{requestReadings}{$reqType}{$reading} = "$context ${num}$1";
+                        # point from reqType get/set and reading Name like "Temp-001" to the definition in readingXX or even potential readingXX-YYDeleteOnError
+                        $hash->{defptr}{requestReadings}{$reqType}{$reading} = "reading ${rNum}$1";
                     }
                 }
             }
@@ -1586,9 +1623,10 @@ sub HTTPMOD_FlattenJSON($$)
 
 # format a reading value
 ###################################
-sub HTTPMOD_FormatReading($$$$)
+sub HTTPMOD_FormatReading($$$$$)
 {
-    my ($name, $context, $num, $val) = @_;                                                
+    my ($hash, $context, $num, $val, $reading) = @_;                                                
+    my $name = $hash->{NAME};
     my ($format, $decode, $encode);
     my $expr = "";
     my $map  = "";
@@ -1609,7 +1647,13 @@ sub HTTPMOD_FormatReading($$$$)
     $val = encode($encode, $val) if ($encode);
     
     if ($expr) {
-        my $old = $val;
+        my $old = $val;     # save for later logging
+        my $now = ($hash->{".updateTime"} ? $hash->{".updateTime"} : gettimeofday());
+        my $timeDiff = 0;
+
+        my $timeStr = ReadingsTimestamp($name, $reading, 0);
+        $timeDiff = ($now - time_str2num($timeStr)) if ($timeStr);
+        
         $val = eval $expr;
         if ($@) {
             Log3 $name, 3, "$name: FormatReading error, context $context, expression $expr: $@";
@@ -1643,7 +1687,8 @@ sub HTTPMOD_FormatReading($$$$)
 ###################################
 sub HTTPMOD_ExtractReading($$$$$)
 {
-    my ($hash, $buffer, $context, $num, $request) = @_;
+    my ($hash, $buffer, $context, $num, $reqType) = @_;
+    # for get / set which use reading.* definitions for parsing reqType might be "get01" and context might be "reading"
     my $name = $hash->{NAME};
     my ($val, $reading, $regex) = ("", "", "");
     my ($json, $xpath, $xpathst, $recomb, $regopt, $sublen, $alwaysn);
@@ -1771,14 +1816,16 @@ sub HTTPMOD_ExtractReading($$$$$)
                 }
             }
             push @subrlist, $subReading;
-            $val = HTTPMOD_FormatReading($name, $context, $eNum, $val);
+            $val = HTTPMOD_FormatReading($hash, $context, $eNum, $val, $subReading);
+                        
             Log3 $name, 4, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
             readingsBulkUpdate( $hash, $subReading, $val );
             # point from reading name back to the parsing definition as reading01 or get02 ...
             $hash->{defptr}{readingBase}{$subReading}   = $context;
             $hash->{defptr}{readingNum}{$subReading}    = $num;
             $hash->{defptr}{readingSubNum}{$subReading} = $subNum if ($subNum);
-            $hash->{defptr}{requestReadings}{$request}{$subReading} = "$context $eNum";
+            $hash->{defptr}{requestReadings}{$reqType}{$subReading} = "$context $eNum";
+            # might be                       get01      Temp-02         reading  5 (where its parsing / naming was defined)
             delete $hash->{defptr}{readingOutdated}{$subReading};
             $group++;
         }
@@ -1830,6 +1877,26 @@ sub HTTPMOD_PullToFile($$$$)
         Log3 $name, 5, "$name: Read is done with pull, no more lines matched";
     }
     return (1, 1, $reading);
+}
+
+
+
+# delete a reading and its metadata
+###################################
+sub HTTPMOD_DeleteReading($$)
+{
+    my ($hash, $reading) = @_;
+    my $name = $hash->{NAME};
+    delete($defs{$name}{READINGS}{$reading});
+    delete $hash->{defptr}{readingOutdated}{$reading};
+    delete $hash->{defptr}{readingBase}{$reading};
+    delete $hash->{defptr}{readingNum}{$reading};
+    delete $hash->{defptr}{readingSubNum}{$reading};
+    
+    foreach my $rt (keys %{$hash->{defptr}{requestReadings}}) {
+        delete $hash->{defptr}{requestReadings}{$rt}{$reading};
+    }
+    
 }
 
 
@@ -1921,10 +1988,9 @@ sub HTTPMOD_DoMaxAge($)
                     
                 } elsif ($mode eq "delete") {
                     Log3 $name, 4, "$name: MaxAge: reading $reading too old - delete it";
-                    delete($defs{$name}{READINGS}{$reading});
-                    delete $hash->{defptr}{readingOutdated}{$reading};
+                    HTTPMOD_DeleteReading($hash, $reading);
                 }
-                $hash->{defptr}{readingOutdated}{$reading} = 1;
+                $hash->{defptr}{readingOutdated}{$reading} = 1 if ($mode ne "delete");
             }
         } else {
             Log3 $name, 5, "$name: MaxAge: No MaxAge attr for $base, $num, $sub";
@@ -1936,29 +2002,30 @@ sub HTTPMOD_DoMaxAge($)
 
 
 # check delete option on error
-###################################
+# for readings that were created in the last reqType
+# e.g. get04 but maybe defined in reading02Regex
+######################################################
 sub HTTPMOD_DoDeleteOnError($$)
 {
-    my ($hash, $request) = @_;
+    my ($hash, $reqType) = @_;
     my $name = $hash->{NAME};
     
     return if (!$hash->{READINGS}); 
     HTTPMOD_UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
     
-    if (!$hash->{defptr}{requestReadings} || !$hash->{defptr}{requestReadings}{$request}) {
+    if (!$hash->{defptr}{requestReadings} || !$hash->{defptr}{requestReadings}{$reqType}) {
         Log3 $name, 5, "$name: DoDeleteOnError: no defptr pointing from request to readings - returning";
         return;
     }
-    my $reqReadings = $hash->{defptr}{requestReadings}{$request};
+    # readings that were created during last request type reqType (e.g. get03)
+    my $reqReadings = $hash->{defptr}{requestReadings}{$reqType};
     foreach my $reading (sort keys %{$reqReadings}) {
         Log3 $name, 5, "$name: DoDeleteOnError: check reading $reading";
-                    
+        # get parsing / handling definition of this reading (e.g. reading02... or Get04...)            
         my ($context, $eNum) = split (" ", $reqReadings->{$reading});
         if (HTTPMOD_GetFAttr($name, $context, $eNum, "DeleteOnError")) {
-            Log3 $name, 4, "$name: DoDeleteOnError: delete reading $reading created by $request ($context, $eNum)";
-            delete($defs{$name}{READINGS}{$reading});
-            delete $hash->{defptr}{readingOutdated}{$reading};
-            delete $hash->{defptr}{requestReadings}{$request}{$reading};    
+            Log3 $name, 4, "$name: DoDeleteOnError: delete reading $reading created by $reqType ($context, $eNum)";
+            HTTPMOD_DeleteReading($hash, $reading);
         }
     }
 }
@@ -1968,10 +2035,10 @@ sub HTTPMOD_DoDeleteOnError($$)
 ###################################
 sub HTTPMOD_DoDeleteIfUnmatched($$@)
 {
-    my ($hash, $request, @matched) = @_;
+    my ($hash, $reqType, @matched) = @_;
     my $name = $hash->{NAME};
     
-    Log3 $name, 5, "$name: DoDeleteIfUnmatched called with request $request";
+    Log3 $name, 5, "$name: DoDeleteIfUnmatched called with request $reqType";
     return if (!$hash->{READINGS}); 
     HTTPMOD_UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
     
@@ -1985,9 +2052,9 @@ sub HTTPMOD_DoDeleteIfUnmatched($$@)
         $matched{$m} = 1;
     }
                       
-    my $reqReadings = $hash->{defptr}{requestReadings}{$request};  
+    my $reqReadings = $hash->{defptr}{requestReadings}{$reqType};  
     my @rList = sort keys %{$reqReadings};
-    Log3 $name, 5, "$name: DoDeleteIfUnmatched: List is @rList";
+    Log3 $name, 5, "$name: DoDeleteIfUnmatched: List from requestReadings is @rList";
     foreach my $reading (@rList) {
         
         Log3 $name, 5, "$name: DoDeleteIfUnmatched: check reading $reading" 
@@ -1997,10 +2064,8 @@ sub HTTPMOD_DoDeleteIfUnmatched($$@)
         my ($context, $eNum) = split (" ", $reqReadings->{$reading});
         Log3 $name, 5, "$name: DoDeleteIfUnmatched: check attr for reading $reading ($context, $eNum)";
         if (HTTPMOD_GetFAttr($name, $context, $eNum, "DeleteIfUnmatched")) {
-            Log3 $name, 4, "$name: DoDeleteIfUnmatched: delete reading $reading created by $request ($context, $eNum)";
-            delete($defs{$name}{READINGS}{$reading});
-            delete $hash->{defptr}{readingOutdated}{$reading};
-            delete $hash->{defptr}{requestReadings}{$request}{$reading};    
+            Log3 $name, 4, "$name: DoDeleteIfUnmatched: delete reading $reading created by $reqType ($context, $eNum)";
+            HTTPMOD_DeleteReading($hash, $reading);
         } else {
             Log3 $name, 5, "$name: DoDeleteIfUnmatched: no DeleteIfUnmatched for reading $reading ($context, $eNum)";
         }
@@ -2041,7 +2106,7 @@ sub HTTPMOD_InitParsers($$)
     my $name    = $hash->{NAME};
 
     # initialize parsers
-    if ($hash->{JSONEnabled}) {
+    if ($hash->{JSONEnabled} && $body) {
         HTTPMOD_FlattenJSON($hash, $body);
     }
     if ($hash->{XPathEnabled} && $body) {
@@ -2311,14 +2376,14 @@ sub HTTPMOD_Read($$$)
     my ($checkAll, $tried, $match, $reading); 
     my @unmatched = (); my @matched   = ();
     
+    my $file = HTTPMOD_GetFAttr($name, $context, $num, "PullToFile");
+    if ($context eq "get" && $file) {
+        ($tried, $match, $reading) = HTTPMOD_PullToFile($hash, $buffer, $num, $file);
+        return undef;
+    }
+
     if ($context =~ "get|set") {
-        my $file = HTTPMOD_GetFAttr($name, $context, $num, "PullToFile");
-        if ($file) {
-            ($tried, $match, $reading) = HTTPMOD_PullToFile($hash, $buffer, $num, $file);
-            @subrlist = ($reading); 
-        } else {
-            ($tried, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, $context, $num, $type);
-        }
+        ($tried, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, $context, $num, $type);
         if ($tried) {
             if($match) {
                 push @matched, @subrlist;
@@ -2338,14 +2403,14 @@ sub HTTPMOD_Read($$$)
             foreach my $object (keys %{$hash->{ParserData}{JSON}}) {
                 my $value = $hash->{ParserData}{JSON}{$object};
                 Log3 $name, 5, "$name: Read set JSON $object as reading $object to value " . $value;
-                $value = HTTPMOD_FormatReading($name, $context, $num, $value);
+                $value = HTTPMOD_FormatReading($hash, $context, $num, $value, $object);
                 readingsBulkUpdate($hash, $object, $value);
                 push @matched, $object;     # unmatched is not filled for "ExtractAllJSON"
                 delete $hash->{defptr}{readingOutdated}{$object};
                 
                 $hash->{defptr}{readingBase}{$object}   = $context;
                 $hash->{defptr}{readingNum}{$object}    = $num;
-                $hash->{defptr}{requestReadings}{$request}{$object} = "$context $num";
+                $hash->{defptr}{requestReadings}{$type}{$object} = "$context $num";
             }
         } else {
             Log3 $name, 3, "$name: no parsed JSON structure available";
@@ -2566,6 +2631,9 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
 
 1;
 =pod
+=item device
+=item summary retrieves readings from devices with an HTTP Interface
+=item summary_DE fragt Readings von Geräten mit HTTP-Interface ab
 =begin html
 
 <a name="HTTPMOD"></a>
@@ -2583,6 +2651,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li>
             This Module uses the non blocking HTTP function HttpUtils_NonblockingGet provided by FHEM's HttpUtils in a new Version published in December 2013.<br>
             If not already installed in your environment, please update FHEM or install it manually using appropriate commands from your environment.<br>
+            Please also note that Fhem HttpUtils need the global attribute dnsServer to be set in order to work really non blocking even when dns requests can not be answered.
         </li>
         
     </ul>
@@ -3353,7 +3422,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <br>
 
         <li><b>get|reading[0-9]*DeleteIfUnmatched</b></li>
-            If set to 1 this attribute causes certain readings to be deleted when the parsing of the website does not match the specified reading. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation does not parse this reading again. This is especially useful for parsing that creates several matches / readings and ths number of matches can vary from request to request. For example if reading01Regex creates 4 readings in one update cycle and in the next cycle it only matches two times the the readings containing the remaining values from the last round will be deleted.<br>
+            If set to 1 this attribute causes certain readings to be deleted when the parsing of the website does not match the specified reading. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation does not parse this reading again. This is especially useful for parsing that creates several matches / readings and this number of matches can vary from request to request. For example if reading01Regex creates 4 readings in one update cycle and in the next cycle it only matches two times then the readings containing the remaining values from the last round will be deleted.<br>
             Please note that this mechanism will not work in all cases after a restart. Especially when a get definition does not contain its own parsing definition but ExtractAllJSON or relies on HTTPMOD to use all defined reading.* attributes to parse the responsee to a get command, old readings might not be deleted after a restart of fhem.
         <li><b>get|reading[0-9]*DeleteOnError</b></li>
             If set to 1 this attribute causes certain readings to be deleted when the website can not be reached and the HTTP request returns an error. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation returns an error. <br>
@@ -3372,7 +3441,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             pass the noshutdown flag to HTTPUtils for webservers that need it (some embedded webservers only deliver empty pages otherwise)
             
         <li><b>disable</b></li>
-            stop doing automatic HTTP requests while this attribute is set to 1
+            stop communication with the Web_Server with HTTP requests while this attribute is set to 1
         <li><b>enableControlSet</b></li>
             enables the built in set commands interval, stop, start, reread, upgradeAttributes, storeKeyValue.
         <li><b>enableCookies</b></li>
