@@ -330,12 +330,13 @@ JSONMETER_Get($@)
       }
       return $message;
       
-  } elsif ($cmd eq "jsonAnalysis") {
+  } 
+  elsif ($cmd eq "jsonAnalysis") {
       my $time = gettimeofday();
       $hash->{fhem}{jsonInterpreter} = "";
       $result = JSONMETER_GetJsonFile $name;
       my @a = split /\|/, $result;
-      if ($a[1]==0) { return $a[2]; }
+      return $a[2]   if $a[1]==0; 
       
       $result = JSONMETER_ParseJsonFile $result;
       # my @a = split /\|/, $result;
@@ -386,7 +387,7 @@ sub JSONMETER_GetJsonFile ($)
 {
     my ($name) = @_;
     my $returnStr;
-     my $hash = $defs{$name};
+    my $hash = $defs{$name};
     my $type = $hash->{deviceType};
     my $ip = "";
     $ip = $hash->{HOST} if defined $hash->{HOST};
@@ -485,12 +486,15 @@ JSONMETER_ReadFromUrl($)
 } # end JSONMETER_ReadFromUrl
 
 
-sub ###########################
-JSONMETER_ParseJsonFile($)
+###########################
+sub JSONMETER_ParseJsonFile($)
 {
   my ($string) = @_;
   return unless(defined($string));
+  
   my (@a) = split("\\|", $string);
+  return unless (defined $defs{$a[0]});
+  
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
   my $value;
@@ -911,6 +915,10 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 =pod
 =begin html
+
+=item device
+=item summary reads OBIS data from measurement units
+=item summary_DE liest OBIS Daten von Messger&auml;ten
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
