@@ -4475,14 +4475,14 @@ sub FRITZBOX_Web_Query($$@)
    my $url = 'http://' . $host . '/query.lua?sid=' . $sid . $queryStr;
    # FRITZBOX_Log $hash, 5, "URL: $url";
    
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 180);
    my $response = $agent->get ( $url );
 
-   FRITZBOX_Log $hash, 5, "Response: ".$response->content;
+   FRITZBOX_Log $hash, 5, "Response: ".$response->status_line."\n".$response->content;
 
-   if ($response->is_error) {
+   unless ($response->is_success) {
       my %retHash = ("Error" => $response->status_line);
-      FRITZBOX_Log $hash, 5, "Error: ".$response->status_line;
+      FRITZBOX_Log $hash, 3, "Error: ".$response->status_line;
       return \%retHash;
    }
 
@@ -4498,8 +4498,9 @@ sub FRITZBOX_Web_Query($$@)
    my $jsonText = $response->content;
    # Remove illegal escape sequences
    $jsonText =~ s/\\'/'/g; #Hochkomma
-   $jsonText =~ s/\\x\{[0-9a-f]\}//g; #steuerzeichen (als Hex nummer) löschen 
+   $jsonText =~ s/\\x\{[0-9a-f]\}//g; #delete control codes (as hex numbers)
    
+   FRITZBOX_Log $hash, 5, "Decode JSON string.";
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
       $jsonResult = JSON->new->utf8->decode( $jsonText );
