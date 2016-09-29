@@ -37,6 +37,10 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.10.1       28.09.2016       sub impFile -> changed $dbh->{AutoCommit} = 0 to $dbh->begin_work
+# 3.10         27.09.2016       diffValue calculation moved to background to reduce FHEM-load,
+#                               new reading background_processing_time
+# 3.9.1        27.09.2016       Internal "LASTCMD" added
 # 3.9          26.09.2016       new function importFromFile to import data from file (CSV format)
 # 3.8          16.09.2016       new attr readingPreventFromDel to prevent readings from deletion
 #                               when a new operation starts
@@ -180,7 +184,8 @@ sub DbRep_Define($@) {
   if(int(@a) < 2) {
         return "You need to specify more parameters.\n". "Format: define <name> DbRep <DbLog-Device> <Reading> <Timestamp-Begin> <Timestamp-Ende>";
         }
-        
+  
+  $hash->{LASTCMD} = " ";
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   
   RemoveInternalTimer($hash);
@@ -328,6 +333,7 @@ sub DbRep_Set($@) {
   {
       return "$setlist";
   }  
+$hash->{LASTCMD} = "$opt";
 return undef;
 }
 
@@ -621,7 +627,7 @@ sub sqlexec($$) {
  # extrahieren der Einzelwerte von Datum/Zeit Ende 
  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
         
- # Umwandeln in Epochesekunden bzw. Zeitgrenzen setzen wenn attr "timeDiffToNow" gesetzt Beginn
+ # Umwandeln in Epochesekunden Beginn
  my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  
  if(AttrVal($hash->{NAME}, "timeDiffToNow", undef)) {
@@ -640,8 +646,8 @@ sub sqlexec($$) {
  $epoch_seconds_end = AttrVal($hash->{NAME}, "timeOlderThan", undef) ? (time() - AttrVal($hash->{NAME}, "timeOlderThan", undef)) : $epoch_seconds_end;
  Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: ".AttrVal($hash->{NAME}, "timeOlderThan", undef)." sec") if(AttrVal($hash->{NAME}, "timeOlderThan", undef)); 
  
- Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end"); 
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+ Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end"); 
  Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string"); 
 
  
@@ -774,6 +780,9 @@ sub averval_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_DoParse");
 
  my $dbh;
@@ -849,6 +858,11 @@ sub averval_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$arrstr|$device|$reading|$rt|0";
 }
 
@@ -863,7 +877,8 @@ sub averval_ParseDone($) {
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
   my $reading    = $a[3];
-  my $rt         = $a[4];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
@@ -901,6 +916,7 @@ sub averval_ParseDone($) {
      readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
 
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   
@@ -927,6 +943,9 @@ sub count_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_DoParse");
  
  my $dbh;
@@ -1001,6 +1020,11 @@ sub count_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$arrstr|$device|$reading|$rt|0";
 }
 
@@ -1016,7 +1040,8 @@ sub count_ParseDone($) {
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
   my $reading    = $a[3];
-  my $rt         = $a[4];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
@@ -1055,7 +1080,8 @@ sub count_ParseDone($) {
          
      readingsBulkUpdate($hash, $reading_runtime_string, $c?$c:"-");
   }
-
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
@@ -1080,6 +1106,9 @@ sub maxval_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
+
+ # Background-Startzeit
+ my $bst = [gettimeofday];
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_DoParse");
   
@@ -1166,6 +1195,11 @@ sub maxval_DoParse($) {
   
  Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$rowlist|$device|$reading|$rt|0";
 }
 
@@ -1178,11 +1212,11 @@ sub maxval_ParseDone($) {
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
-  
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
   my $reading    = $a[3];
-  my $rt         = $a[4];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
@@ -1271,7 +1305,8 @@ sub maxval_ParseDone($) {
       readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
     
   }
-             
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));              
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
@@ -1297,6 +1332,9 @@ sub diffval_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_DoParse");
   
  my $dbh;
@@ -1373,49 +1411,9 @@ sub diffval_DoParse($) {
 
  $dbh->disconnect;
   
- my $rowlist = join('|', @row_array); 
- Log3 ($name, 5, "DbRep $name -> row_array: @row_array");
-     
- # Daten müssen als Einzeiler zurückgegeben werden
- $rowlist = encode_base64($rowlist,"");
-  
- Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+ Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
  
- return "$name|$rowlist|$device|$reading|$rt|0";
-}
-
-####################################################################################################
-# Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
-####################################################################################################
-
-sub diffval_ParseDone($) {
-  my ($string) = @_;
-  my @a = split("\\|",$string);
-  my $hash = $defs{$a[0]};
-  my $name = $hash->{NAME};
-  
-  my $rowlist    = decode_base64($a[1]);
-  my $device     = $a[2];
-  my $reading    = $a[3];
-  my $rt         = $a[4];
-  my $err        = $a[5]?decode_base64($a[5]):undef;
-  my $reading_runtime_string;
-  
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
-  
-   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
-      return;
-  }
-  
-  my @row_array = split("\\|", $rowlist);
-  
-  Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
-  
- 
+  # ----- Berechnung diffValue aus Ergebnishash -------
   my %rh = ();
   my $lastruntimestring;
   my $i = 1;
@@ -1423,6 +1421,8 @@ sub diffval_ParseDone($) {
   my $le;                         # letztes Element Value
   my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
 
+  Log3 ($name, 5, "DbRep $name - data of row_array result assigned to fields:\n");
+  
   foreach my $row (@row_array) {
       my @a = split("[ \t][ \t]*", $row, 4);
       my $runtime_string = decode_base64($a[0]);
@@ -1440,14 +1440,11 @@ sub diffval_ParseDone($) {
       if (!looks_like_number($value)) {
           $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
-          $err = "Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value";
-          readingsSingleUpdate($hash, "errortext", $err, 1);
-          readingsSingleUpdate($hash, "state", "error", 1);
-          delete($hash->{HELPER}{RUNNING_PID});
-          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
-          return;
+          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+          return "$name|''|$device|$reading|''|$err";
       }
-      
+
       Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
              
       if ($runtime_string eq $lastruntimestring) {
@@ -1478,6 +1475,60 @@ sub diffval_ParseDone($) {
       }
       $i++;
   }
+  # ------------------------------------------------------------------------------
+  
+ Log3 ($name, 5, "DbRep $name - result of diffValue calculation before encoding:");
+ foreach my $key (sort(keys(%rh))) {
+     Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
+ }
+     
+ # Ergebnishash als Einzeiler zurückgeben
+ my $rows = join('§', %rh); 
+ my $rowlist = encode_base64($rows,"");
+  
+ Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+ 
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$rowlist|$device|$reading|$rt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
+####################################################################################################
+
+sub diffval_ParseDone($) {
+  my ($string) = @_;
+  my @a = split("\\|",$string);
+  my $hash = $defs{$a[0]};
+  my $name = $hash->{NAME};
+  my $rowlist    = decode_base64($a[1]);
+  my $device     = $a[2];
+  my $reading    = $a[3];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $reading_runtime_string;
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
+  
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+      return;
+  }
+ 
+ my %rh = split("§", $rowlist);
+ 
+ Log3 ($name, 5, "DbRep $name - result of diffValue calculation after decoding:");
+ foreach my $key (sort(keys(%rh))) {
+     Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
+ }
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
@@ -1486,7 +1537,6 @@ sub diffval_ParseDone($) {
   no warnings 'uninitialized'; 
  
   foreach my $key (sort(keys(%rh))) {
-      Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
       my @k    = split("\\|",$rh{$key});
       my $rsf  = $k[2]."__";
   
@@ -1501,7 +1551,7 @@ sub diffval_ParseDone($) {
       readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
     
   }
-             
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));           
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
@@ -1527,6 +1577,9 @@ sub sumval_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_DoParse");
  
  my $dbh;
@@ -1601,6 +1654,11 @@ sub sumval_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$arrstr|$device|$reading|$rt|0";
 }
 
@@ -1616,7 +1674,8 @@ sub sumval_ParseDone($) {
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
   my $reading    = $a[3];
-  my $rt         = $a[4];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
   my $reading_runtime_string;
   
@@ -1654,6 +1713,7 @@ sub sumval_ParseDone($) {
       readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
   
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
@@ -1678,6 +1738,9 @@ sub del_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_DoParse");
  
@@ -1731,6 +1794,11 @@ sub del_DoParse($) {
  Log3 ($name, 5, "DbRep $name -> Number of deleted rows: $rows");
  Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$rows|$rt|0";
 }
 
@@ -1740,12 +1808,13 @@ sub del_DoParse($) {
 
 sub del_ParseDone($) {
   my ($string) = @_;
-  my @a     = split("\\|",$string);
-  my $hash  = $defs{$a[0]};
-  my $name  = $hash->{NAME};
-  my $rows  = $a[1];
-  my $rt    = $a[2];
-  my $err   = $a[3]?decode_base64($a[3]):undef;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $rows       = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
   
@@ -1773,7 +1842,8 @@ sub del_ParseDone($) {
   $rows = $ds.$rds.$rows;
   
   Log3 ($name, 3, "DbRep $name - Entries of database $hash->{dbloghash}{NAME} deleted: $rows");  
-    
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
@@ -1798,6 +1868,9 @@ sub insert_Push($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
  
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Push");
  
  my $dbh;
@@ -1849,6 +1922,11 @@ sub insert_Push($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$irow|$rt|0";
 }
 
@@ -1858,12 +1936,13 @@ sub insert_Push($) {
 
 sub insert_Done($) {
   my ($string) = @_;
-  my @a     = split("\\|",$string);
-  my $hash  = $defs{$a[0]};
-  my $name  = $hash->{NAME};
-  my $irow  = $a[1];
-  my $rt    = $a[2];
-  my $err   = $a[3]?decode_base64($a[3]):undef;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $irow       = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Done");
   
@@ -1885,7 +1964,8 @@ sub insert_Done($) {
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "number_lines_inserted", $irow);    
-  readingsBulkUpdate($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);   
+  readingsBulkUpdate($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
@@ -1913,6 +1993,9 @@ sub fetchrows_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err;
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_DoParse");
 
@@ -1970,6 +2053,11 @@ sub fetchrows_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$rowlist|$rt|0";
 }
 
@@ -1979,13 +2067,14 @@ sub fetchrows_DoParse($) {
 
 sub fetchrows_ParseDone($) {
   my ($string) = @_;
-  my @a = split("\\|",$string);
-  my $hash     = $defs{$a[0]};
-  my $rowlist  = decode_base64($a[1]);
-  my $rt       = $a[2];
-  my $err      = $a[3]?decode_base64($a[3]):undef;
-  my $name     = $hash->{NAME};
-  my $reading  = AttrVal($name, "reading", undef);
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $rowlist    = decode_base64($a[1]);
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $name       = $hash->{NAME};
+  my $reading    = AttrVal($name, "reading", undef);
   my @i;
   my @row;
   my $reading_runtime_string;
@@ -2023,7 +2112,8 @@ sub fetchrows_ParseDone($) {
              
              readingsBulkUpdate($hash, $reading_runtime_string, $val);
   }
-             
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));          
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
@@ -2049,6 +2139,9 @@ sub expfile_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err=0;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_DoParse");
 
  my $dbh;
@@ -2118,6 +2211,11 @@ sub expfile_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$nrows|$rt|$err";
 }
 
@@ -2127,12 +2225,13 @@ sub expfile_DoParse($) {
 
 sub expfile_ParseDone($) {
   my ($string) = @_;
-  my @a = split("\\|",$string);
-  my $hash     = $defs{$a[0]};
-  my $nrows    = $a[1];
-  my $rt       = $a[2];
-  my $err      = $a[3]?decode_base64($a[3]):undef;
-  my $name     = $hash->{NAME};
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $nrows      = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $name       = $hash->{NAME};
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_ParseDone");
   
@@ -2156,6 +2255,7 @@ sub expfile_ParseDone($) {
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, $export_string, $nrows); 
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
@@ -2185,6 +2285,9 @@ sub impfile_Push($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err=0;
 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_Push");
 
  my $dbh;
@@ -2206,11 +2309,11 @@ sub impfile_Push($) {
      return "$name|''|''|$err";
  }
  
- # SQL-Startzeit
- my $st = [gettimeofday];
- 
  # only for this block because of warnings if details inline is not set
  no warnings 'uninitialized'; 
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
  
  my $al;
  # Datei zeilenweise einlesen und verarbeiten !
@@ -2219,7 +2322,6 @@ sub impfile_Push($) {
  
  $dbh->begin_work();
  my $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
- $dbh->{AutoCommit} = 0;
  my $irowdone = 0;
  my $irowcount = 0;
  my $warn = 0;
@@ -2227,7 +2329,6 @@ sub impfile_Push($) {
      $al = $_;
      chomp $al; 
      my @alarr = split("\",\"", $al);
-     # $al =~ tr/"//d;
      my $i_timestamp = $alarr[0];
      $i_timestamp =~ tr/"//d;
      my $i_device    = $alarr[1];
@@ -2304,6 +2405,11 @@ sub impfile_Push($) {
  
  Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
  
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
  return "$name|$irowdone|$rt|$err";
 }
 
@@ -2312,11 +2418,12 @@ sub impfile_Push($) {
 ####################################################################################################
 
 sub impfile_PushDone($) {
-  my ($string) = @_;
-  my @a = split("\\|",$string);
+  my ($string)   = @_;
+  my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
   my $irowdone   = $a[1];
-  my $rt         = $a[2];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $name       = $hash->{NAME};
   
@@ -2337,6 +2444,7 @@ sub impfile_PushDone($) {
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, $import_string, $irowdone); 
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
@@ -2730,8 +2838,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   In addition the following readings will be created: <br><br>
   
   <ul><ul>
-  <li><b>errortext           </b>     - description about the reason of an error state </li> <br>
-  <li><b>sql_processing_time </b>     - the processing time wasted for all sql-statements used for operation (approximately time in forked operation) </li> <br>
+  <li><b>errortext                  </b>     - description about the reason of an error state </li> <br>
+  <li><b>background_processing_time </b>     - the processing time spent for operations in background/forked operation </li> <br>
+  <li><b>sql_processing_time        </b>     - the processing time wasted for all sql-statements used for an operation </li> <br>
   </ul></ul>
   <br><br>
 
@@ -2930,8 +3039,9 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   Zusätzlich werden folgende Readings erzeugt: <br><br>
   
   <ul><ul>
-  <li><b>errortext           </b>  - Grund eines Fehlerstatus </li> <br>
-  <li><b>sql_processing_time </b>  - die Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird (entspricht ungefähr der verbrauchten Zeit im Fork-Prozess) </li> <br>
+  <li><b>errortext                  </b>  - Grund eines Fehlerstatus </li> <br>
+  <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
+  <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
   </ul></ul>
   <br><br>
 
