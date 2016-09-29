@@ -635,7 +635,7 @@ yowsup_Attr($$$)
     <li>nickname<br>
       nickname that will be send as sender</li>
 
-    <li>accept_from<br>
+    <li>acceptFrom<br>
       comma separated list of contacts (numbers) from which messages will be accepted</li>
 
     <li>commandPrefix<br>
