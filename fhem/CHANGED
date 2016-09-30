@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: include day before and next in calculation if Timestamp
+                       is exactly 'YYYY-MM-DD 00:00:00'
   - feature: 93_DbRep: Internal "LASTCMD" added,
                        new reading background_processing_time,
                        diffValue calculation moved to backgrd to reduce load
