@@ -36,7 +36,8 @@
 #
 ###########################################################################################################
 #  Versions History:
-#
+# 3.11.1       30.09.2016       bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00"
+# 3.11         29.09.2016       maxValue calculation moved to background to reduce FHEM-load
 # 3.10.1       28.09.2016       sub impFile -> changed $dbh->{AutoCommit} = 0 to $dbh->begin_work
 # 3.10         27.09.2016       diffValue calculation moved to background to reduce FHEM-load,
 #                               new reading background_processing_time
@@ -820,7 +821,7 @@ sub averval_DoParse($) {
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -983,7 +984,7 @@ sub count_DoParse($) {
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -1144,13 +1145,13 @@ sub maxval_DoParse($) {
      my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
      $sql .= "`DEVICE` = '$device' AND " if($device);
      $sql .= "`READING` = '$reading' AND " if($reading); 
-     $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;"; 
+     $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
      $sql1 .= "`DEVICE` = '$device' AND " if($device);
      $sql1 .= "`READING` = '$reading' AND " if($reading); 
-     $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
+     $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
      
@@ -1187,11 +1188,66 @@ sub maxval_DoParse($) {
 
  $dbh->disconnect;
   
- my $rowlist = join('|', @row_array); 
- Log3 ($name, 5, "DbRep $name -> row_array: @row_array");
+ Log3 ($name, 5, "DbRep $name -> raw data of row_array result:\n @row_array");
+ 
+  #---------- Berechnung Ergebnishash maxValue ------------------------ 
+  my $i = 1;
+  my %rh = ();
+  my $lastruntimestring;
+  my $row_max_time; 
+  my $max_value = 0;
+  
+  foreach my $row (@row_array) {
+      my @a = split("[ \t][ \t]*", $row);
+      my $runtime_string = decode_base64($a[0]);
+      $lastruntimestring = $runtime_string if ($i == 1);
+      my $value          = $a[1];
+      
+      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
+      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      
+      # Leerzeichen am Ende $timestamp entfernen
+      $timestamp         =~ s/\s+$//g;
+      
+      # Test auf $value = "numeric"
+      if (!looks_like_number($value)) {
+          $a[3] =~ s/\s+$//g;
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
+          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
+          return "$name|''|$device|$reading|''|$err";
+      }
+      
+      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
+             
+      if ($runtime_string eq $lastruntimestring) {
+          if ($value >= $max_value) {
+              $max_value    = $value;
+              $row_max_time = $timestamp;
+              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time;            
+          }
+      } else {
+          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
+          $lastruntimestring = $runtime_string;
+          $max_value         = 0;
+          if ($value >= $max_value) {
+              $max_value    = $value;
+              $row_max_time = $timestamp;
+              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time; 
+          }
+      }
+      $i++;
+  }
+  #---------------------------------------------------------------------------------------------
      
- # Daten müssen als Einzeiler zurückgegeben werden
- $rowlist = encode_base64($rowlist,"");
+ Log3 ($name, 5, "DbRep $name - result of maxValue calculation before encoding:");
+ foreach my $key (sort(keys(%rh))) {
+     Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
+ }
+     
+ # Ergebnishash als Einzeiler zurückgeben
+ my $rows = join('§', %rh); 
+ my $rowlist = encode_base64($rows,"");
   
  Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
  
@@ -1222,7 +1278,7 @@ sub maxval_ParseDone($) {
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_ParseDone");
   
-   if ($err) {
+  if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
       readingsSingleUpdate($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
@@ -1230,57 +1286,11 @@ sub maxval_ParseDone($) {
       return;
   }
   
-  my @row_array = split("\\|", $rowlist);
-  
-  Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
-  
-  my $i = 1;
-  my %rh = ();
-  my $lastruntimestring;
-  my $row_max_time; 
-  my $max_value = 0;
-  
-  foreach my $row (@row_array) {
-      my @a = split("[ \t][ \t]*", $row);
-      my $runtime_string = decode_base64($a[0]);
-      $lastruntimestring = $runtime_string if ($i == 1);
-      my $value          = $a[1];
-      
-      # Test auf $value = "numeric"
-      if (!looks_like_number($value)) {
-          readingsSingleUpdate($hash, "state", "error", 1);
-          delete($hash->{HELPER}{RUNNING_PID});
-          $a[3] =~ s/\s+$//g;
-          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $a[2] $a[3], DEVICE: $device, READING: $reading, VALUE: $value. \nLeaving ...");
-          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
-          return;
-      }
-      
-      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
-      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
-      
-      # Leerzeichen am Ende $timestamp entfernen
-      $timestamp         =~ s/\s+$//g;
-      
-      Log3 ($name, 4, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
-             
-      if ($runtime_string eq $lastruntimestring) {
-          if ($value >= $max_value) {
-              $max_value    = $value;
-              $row_max_time = $timestamp;
-              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time;            
-          }
-      } else {
-          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
-          $lastruntimestring = $runtime_string;
-          $max_value         = 0;
-          if ($value >= $max_value) {
-              $max_value    = $value;
-              $row_max_time = $timestamp;
-              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time; 
-          }
-      }
-      $i++;
+  my %rh = split("§", $rowlist);
+ 
+  Log3 ($name, 5, "DbRep $name - result of maxValue calculation after decoding:");
+  foreach my $key (sort(keys(%rh))) {
+      Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
   }
   
   # Readingaufbereitung
@@ -1290,7 +1300,6 @@ sub maxval_ParseDone($) {
   no warnings 'uninitialized'; 
  
   foreach my $key (sort(keys(%rh))) {
-      Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
       my @k = split("\\|",$rh{$key});
       my $rsf  = $k[2]."__" if($k[2]);
       
@@ -1303,7 +1312,6 @@ sub maxval_ParseDone($) {
       }
       my $rv = $k[1];
       readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
-    
   }
   
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));              
@@ -1369,13 +1377,13 @@ sub diffval_DoParse($) {
      my $sql = "SELECT TIMESTAMP,VALUE FROM `history` where ";
      $sql .= "`DEVICE` = '$device' AND " if($device);
      $sql .= "`READING` = '$reading' AND " if($reading); 
-     $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;"; 
+     $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = "SELECT TIMESTAMP,VALUE FROM `history` where ";
      $sql1 .= "`DEVICE` = '$device' AND " if($device);
      $sql1 .= "`READING` = '$reading' AND " if($reading); 
-     $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
+     $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
      
@@ -1435,6 +1443,7 @@ sub diffval_DoParse($) {
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
+      
       
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
@@ -1617,7 +1626,7 @@ sub sumval_DoParse($) {
      $sql .= "AND " if($device && $reading);
      $sql .= "READING = '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
      Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
@@ -1758,13 +1767,13 @@ sub del_DoParse($) {
  my $sql = "DELETE FROM history where ";
  $sql .= "DEVICE = '$device' AND " if($device);
  $sql .= "READING = '$reading' AND " if($reading); 
- $sql .= "TIMESTAMP BETWEEN ? AND ?;";
+ $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
  
  # SQL zusammenstellen für Logausgabe
  my $sql1 = "DELETE FROM history where ";
  $sql1 .= "DEVICE = '$device' AND " if($device);
  $sql1 .= "READING = '$reading' AND " if($reading); 
- $sql1 .= "TIMESTAMP BETWEEN $runtime_string_first AND $runtime_string_next;"; 
+ $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next';"; 
     
  Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");        
  
@@ -2013,13 +2022,13 @@ sub fetchrows_DoParse($) {
  my $sql = "SELECT DEVICE,READING,TIMESTAMP,VALUE FROM history where ";
  $sql .= "DEVICE = '$device' AND " if($device);
  $sql .= "READING = '$reading' AND " if($reading); 
- $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP;";   
+ $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";  
          
  # SQL zusammenstellen für Logfileausgabe
  my $sql1 = "SELECT DEVICE,READING,TIMESTAMP,VALUE FROM history where ";
  $sql1 .= "DEVICE = '$device' AND " if($device);
  $sql1 .= "READING = '$reading' AND " if($reading); 
- $sql1 .= "TIMESTAMP BETWEEN $runtime_string_first AND $runtime_string_next ORDER BY TIMESTAMP;"; 
+ $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
  Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");    
 
@@ -2167,13 +2176,13 @@ sub expfile_DoParse($) {
  my $sql = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM history where ";
  $sql .= "DEVICE = '$device' AND " if($device);
  $sql .= "READING = '$reading' AND " if($reading); 
- $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP;";   
+ $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";   
          
  # SQL zusammenstellen für Logfileausgabe
  my $sql1 = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM FROM history where ";
  $sql1 .= "DEVICE = '$device' AND " if($device);
  $sql1 .= "READING = '$reading' AND " if($reading); 
- $sql1 .= "TIMESTAMP BETWEEN $runtime_string_first AND $runtime_string_next ORDER BY TIMESTAMP;"; 
+ $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
  Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");    
 
@@ -2732,7 +2741,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  
                                  <ul>
                                  <b>input format: </b>   Date,Time,Value,[Unit]    <br>
-                                 # Unit is optional, attributes of device, reading must be set ! <br><br>
+                                 # Unit is optional, attributes of device, reading must be set ! <br>
+                                 # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br><br>
                                  
                                  <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
                                  # field lenth is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
@@ -2753,10 +2763,13 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  </li> <br>
                                  </ul>    
     
-    <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
-    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
-    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. </li> <br>
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow". <br><br>
+    <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
+    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
+    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". 
+                                 This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
+                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the specified time linits/aggregation. </li> <br>
+                                 
+    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
                                  
                                  <ul>
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
@@ -2772,10 +2785,10 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   <b>For all evaluation variants applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
-  If the attributes "timestamp_begin" and "timestamp_end" are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.
+  If the time limit attributes are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.
   <br><br>
   
-  <b>Note </b> <br>
+  <b>Note: </b> <br>
   
   All database action will excuted in background. It could be necessary to refresh the browser to see the result of operation if you are in detail view once the "state = done" is shown. 
   <br><br>
@@ -2934,7 +2947,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  
                                  <ul>
                                  <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br><br>
+                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br>
+                                 # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
                                  <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
                                  # die Feldlänge ist maximal 32 (MySQL) bzw. 64 (POSTGRESQL) Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
@@ -2948,16 +2962,20 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  # Die Felder "TIMESTAMP","DEVICE", "READING" müssen gesetzt sein. Alle anderen Felder sind optional.
                                  Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
                                  Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
-                                 das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte! <br><br>
+                                 das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte. <br><br>
                                  
                                  <b>Beispiel: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
                                  <br>
                                  </li> <br>
                                  </ul>    
     
-    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
-    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
-    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. </li> <br>
+    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
+    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
+    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. 
+                                 Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. 
+                                 Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
+                                 Zeitgrenzen/Aggregation gebildet. </li> <br>
+    
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt folgendermaßen: <br><br>
                                  
                                  <ul>
@@ -2974,10 +2992,10 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   <b>Für alle Auswertungsvarianten gilt: </b> <br>
   Zusätzlich zu dem auszuwertenden Reading kann das Device mit angegeben werden um das Reporting nach diesen Kriterien einzuschränken. 
-  Sind die <a href="#DbRepattr">Attribute</a> "timestamp_begin", "timestamp_end" nicht angegeben, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als Zeitgrenze genutzt. 
+  Sind keine Zeitgrenzen-Attribute angegeben, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als Zeitgrenze genutzt. 
   <br><br>
   
-  <b>Hinweis </b> <br>
+  <b>Hinweis: </b> <br>
   
   Da alle DB-Operationen im Hintergrund ausgeführt werden, kann in der Detailansicht ein Browserrefresh nötig sein um die Operationsergebnisse zu sehen sobald "state = done" angezeigt wird. 
   <br><br>
