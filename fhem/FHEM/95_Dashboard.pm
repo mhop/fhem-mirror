@@ -596,9 +596,9 @@ sub BuildDashboardTab($$)
 		if (@index > 0) {
 			for (my $j=0; $j<@index;$j++) {
 				my $groupname = @groups[$index[$j]];
-				$groupname .= ':' . 'group=' . $groupname;
+				$groupname .= '$$$' . 'group=' . $groupname;
 				if (@stabgroup > 1) {
-					$groupname .= ':' . $stabgroup[1];
+					$groupname .= '$$$' . $stabgroup[1];
 				}
 				push(@tabdevicegroups,$groupname);
 			}
@@ -609,7 +609,7 @@ sub BuildDashboardTab($$)
 
         # add sortings for groups not already having a defined sorting
         for (my $i=0;$i<@tabdevicegroups;$i++) {
-		my @stabgroup = split(":", trim($tabdevicegroups[$i]));		
+		my @stabgroup = split(/\$\$\$/, trim($tabdevicegroups[$i]));		
 		my $matchGroup = "," . quotemeta(trim($stabgroup[0])) . ",";
 
 		if ($tabsortings !~ m/$matchGroup/) {
@@ -717,7 +717,7 @@ sub BuildGroupWidgets($$$$$) {
         foreach my $singlegroup (@devicegroups) {
           # make sure that splitting with colon is not destroying the devspec that might
 	  # also contain a colon followed by a filter
-          my ($groupname, $groupdevices, $groupicon) = split(/:(?!FILTER=)/, $singlegroup);
+          my ($groupname, $groupdevices, $groupicon) = split(/\$\$\$/, $singlegroup);
 
           my @values = ($groupdevices, $groupicon);
           $groups{$groupname} = \@values;
@@ -989,6 +989,8 @@ GetActiveTab ($)
 1;
 
 =pod
+=item summary    Dashboard for showing multiple devices sorted in tabs
+=item summary_DE Dashboard zur Anzeige mehrerer Geräte in verschiedenen Tabs
 =begin html
 
 <a name="Dashboard"></a>
