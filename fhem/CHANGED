@@ -1,5 +1,19 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  14_SD_WS09.pm WH1080 CRC-Berechung angepaßt--> automatische Modelauswahl
+  - feature: 00_SIGNALduino: nonblocking communication, improved init 
+               and keepalive, fixed manchester related stuff, Supports
+               Somfy RTS Protocol. Decoding manchester encoded messages 
+               longer than buffer is now possible.
+               new function sendMSG. 
+               Firwmware updated to 3.3.0, please flash
+               supports send command from IT Module. 
+               Serval new protocols implemented.
+  - bufgix:  14_SD_WS09.pm 
+                WH1080 CRC corrected --> model is selectet per default  
+  - feature: 98_Dooya: Deatures shutters and blinds with dooya protocol
+  - feature: 14_SD_WS_Maverick: Supports Maverick bbq thermometer
+  - feature: 14_SD_WS: Multi purpose Module to support various weather sensors.
   - feature: 01_FHEMWEB/Reading: accept Readings in <html> (Forum #58320)
   - bugfix:  95_Dashboard: fixes an issue causing devices with interal attribute
                            group to not appear in the dashboard.
