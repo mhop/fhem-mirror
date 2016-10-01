@@ -75,8 +75,12 @@ foreach my $row (split("\n", $fList)) {
       unless($props =~ /Id/);
   }
 
-  next if($fName !~ m+FHEM/\d\d_(.*).pm$+);
-  my $modName = $1;
+  next if($fName !~ m+FHEM/(\d\d)_(.*).pm$+);
+  my ($modNum, $modName) = ($1, $2);
+  my %ninetyniners = ("SUNRISE_EL"=>1, "Utils"=>1);
+  err $fName, "99 is a reserved prefix, not allowed for $modName"
+    if($modNum eq "99" && !$ninetyniners{$modName});
+
   foreach my $lang (@lang) {
     my $suffix = ($lang eq "EN" ? "" : "_$lang");
     my $tag;
