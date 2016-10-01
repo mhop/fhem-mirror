@@ -382,6 +382,8 @@ SIGNALduino_un_binflip($)
 1;
 
 =pod
+=item summary    Helper module for SIGNALduino
+=item summary_DE Unterst&uumltzungsmodul f&uumlr SIGNALduino
 =begin html
 
 <a name="SIGNALduino_un"></a>
@@ -426,7 +428,7 @@ SIGNALduino_un_binflip($)
 <h3>SIGNALduino_un</h3>
 <ul>
   Das SIGNALduino_un module ist ein Hilfsmodul um unbekannte Nachrichten debuggen und analysieren zu koennen.
-  Das Modul legt keinerlei Geraete oder aehnliches an.
+  Das Modul legt keinerlei Ger&aumlte oder &aumlhnliches an.
   <br><br>
 
   <a name="SIGNALduino_undefine"></a>
@@ -437,7 +439,7 @@ SIGNALduino_un_binflip($)
     Es ist moeglich ein Geraet manuell zu definieren, aber damit passiert ueberhaupt nichts.
     Autocreate wird auch keinerlei Geraete aus diesem Modul anlegen.
     <br>
-    Die einzgeste Funktion dieses Modules ist, ab Verbose 4 Logmeldungen ueber die Empfangene Nachricht ins Log zu schreiben. Dabei kann man sich leider nicht darauf verlassen, dass die Nachricht korrekt dekodiert wurde.<br>
+    Die einzgeste Funktion dieses Modules ist, ab Verbose 4 Logmeldungen &uumlber die Empfangene Nachricht ins Log zu schreiben. Dabei kann man sich leider nicht darauf verlassen, dass die Nachricht korrekt dekodiert wurde.<br>
     Dieses Modul wird alle Nachrichten verarbeiten, welche von anderen Modulen nicht verarbeitet wurden.
   <a name="SIGNALduino_unset"></a>
   <b>Set</b> <ul>N/A</ul><br>
