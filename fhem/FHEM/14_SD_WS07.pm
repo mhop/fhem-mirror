@@ -115,11 +115,11 @@ SD_WS07_Parse($$)
     }
     
     if ($hum > 100) {
-      return undef;  # Eigentlich muesste sowas wie ein skip rein, damit ggf. spaeter noch weitre Sensoren dekodiert werden koennen.
+      return '';  # Eigentlich muesste sowas wie ein skip rein, damit ggf. spaeter noch weitre Sensoren dekodiert werden koennen.
     }
     
     if ($temp > 700 && $temp < 3840) {
-      return undef;
+      return '';
     } elsif ($temp >= 3840) {        # negative Temperaturen, muss noch ueberprueft und optimiert werden 
       $temp -= 4095;
     }  
@@ -201,6 +201,8 @@ sub SD_WS07_Attr(@)
 
 
 =pod
+=item summary    Supports weather sensors protocl 7 from SIGNALduino
+=item summary_DE Unterst&uumltzt Wettersensoren mit Protokol 7 vom SIGNALduino
 =begin html
 
 <a name="SD_WS07"></a>
@@ -261,7 +263,7 @@ sub SD_WS07_Attr(@)
 <ul>
   Das SD_WS07 Module verarbeitet von einem IO Geraet (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur-Sensoren.<br>
   <br>
-  <b>Unterstuetze Modelle:</b>
+  <b>Unterst&uumltzte Modelle:</b>
   <ul>
     <li>Eurochon EAS800z</li>
     <li>Technoline WS6750/TX70DTH</li>
