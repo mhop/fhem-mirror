@@ -84,6 +84,8 @@ FHEM/15_CUL_EM.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_STACKABLE_CC.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
+FHEM/14_SD_WS.pm             Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
+FHEM/14_SD_WS_Maverick.pm    Sidey79/Cruizer      http://forum.fhem.de Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         http://forum.fhem.de Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
@@ -306,7 +308,7 @@ FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/89_HEATRONIC.pm         heikoranft           http://forum.fhem.de Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/14_SIGNALduino_un.pm    Side		  http://forum.fhem.de Sonstige Systeme
+FHEM/14_SIGNALduino_un.pm    Sidey79			  http://forum.fhem.de Sonstige Systeme
 FHEM/91_eventTypes.pm        rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
 FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/91_sequence.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
@@ -361,6 +363,7 @@ FHEM/98_copy.pm              justme1968           http://forum.fhem.de Sonstiges
 FHEM/98_count.pm             betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
+FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        http://forum.fhem.de Sonstige Systeme   
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_exportdevice.pm      loredo               http://forum.fhem.de Sonstiges
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
