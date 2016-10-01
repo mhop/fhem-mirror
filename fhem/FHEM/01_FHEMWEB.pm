@@ -1080,7 +1080,12 @@ FW_makeTable($$$@)
 
       if(ref($val)) { #handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
-        $v = FW_htmlEscape($v);
+        if($v =~ m,^<html>(.*)</html>$,) {
+          $v = $1;
+        } else {
+          $v = FW_htmlEscape($v);
+        }
+
         if($FW_ss) {
           $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
