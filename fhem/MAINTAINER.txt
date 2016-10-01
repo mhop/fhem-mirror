@@ -384,6 +384,7 @@ FHME/98_weekprofile.pm       risiko               http://forum.fhem.de Frontends
 FHEM/98_STOCKQUOTES.pm       vbs                  http://forum.fhem.de Unterstuetzende Dienste
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/99_Venetian.pm          Christian.Kühnel     http://forum.fhem.de Automatisierung
 FHEM/Blocking.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/DevIo.pm                rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/Color.pm                justme1968           http://forum.fhem.de Sonstiges
