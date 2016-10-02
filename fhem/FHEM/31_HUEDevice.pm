@@ -378,7 +378,9 @@ HUEDevice_SetParam($$@)
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
-    $obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch'  );
+    # temporary disablea for everything. hast do be disabled for groups.
+    # see https://forum.fhem.de/index.php/topic,11020.msg497825.html#msg497825
+    #$obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch'  );
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq 'off') {
