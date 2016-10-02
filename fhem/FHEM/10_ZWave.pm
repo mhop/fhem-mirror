@@ -48,7 +48,7 @@ my %zwave_class = (
     parse => { "..2001(.*)"=> '"basicSet:".hex($1)', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
                "032003(..)"=> '"basicReport:".hex($1)', # V1
-               "052003(..)(..)(..)" => 'ZWave_BASIC_V2_report($1,$2,$3)',
+               "052003(..)(..)(..)" => 'ZWave_BASIC_03_report($1,$2,$3)',
                }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
@@ -2506,7 +2506,7 @@ ZWave_configCheckParam($$$$@)
 ##############################################
 ### START: 0x20 BASIC
 sub
-ZWave_BASIC_V3_report ($$$)
+ZWave_BASIC_03_report ($$$)
 { # 0x2003 BASIC_REPORT V2
   my ($value, $target, $duration) = @_;;
   my $time = hex($duration);
@@ -2515,8 +2515,8 @@ ZWave_BASIC_V3_report ($$$)
     $time = (hex($duration) - 0x7F) * 60;
   };
   $time .=  " seconds";
-  $time  =  "unknown duration"      if (hex($duration) == 0xFE);
-  $time  =  "255 (reserved value)"  if (hex($duration) == 0xFF);
+  $time  =  "unknown" if (hex($duration) == 0xFE);
+  $time  =  "255"     if (hex($duration) == 0xFF);
   
   my $rt = "basicReport:".hex($value)
           ." target: ".hex($target)
