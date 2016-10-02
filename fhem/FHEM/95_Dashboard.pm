@@ -596,7 +596,7 @@ sub BuildDashboardTab($$)
 		if (@index > 0) {
 			for (my $j=0; $j<@index;$j++) {
 				my $groupname = @groups[$index[$j]];
-				$groupname .= '$$$' . 'group=' . $groupname;
+				$groupname .= '$$$' . 'a:group=' . $groupname;
 				if (@stabgroup > 1) {
 					$groupname .= '$$$' . $stabgroup[1];
 				}
