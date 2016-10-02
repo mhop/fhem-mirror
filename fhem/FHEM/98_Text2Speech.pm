@@ -802,6 +802,8 @@ sub Text2Speech_DoIt($) {
       }
       if(-e $Mp3WrapFile) {
         $cmd = Text2Speech_BuildMplayerCmdString($hash, $Mp3WrapFile);
+        $cmd .= " >/dev/null" if($verbose < 5);
+
         Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
         system($cmd);
         #Text2Speech_WriteStats($hash, 1, $Mp3WrapFile, join(" ", @Mp3WrapText));
@@ -841,6 +843,8 @@ sub Text2Speech_DoIt($) {
 
   if(-e $file) { # Datei existiert jetzt
     $cmd = Text2Speech_BuildMplayerCmdString($hash, $file);
+    $cmd .= " >/dev/null" if($verbose < 5);
+
     Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
     system($cmd);
   }
@@ -931,6 +935,8 @@ sub Text2Speech_WriteStats($$$$){
 
 =pod
 =item helper
+=item summary    speaks given text via loudspeaker
+=item summary_DE wandelt uebergebenen Text um fuer Ausgabe auf Lautsprecher
 =begin html
 
 <a name="Text2Speech"></a>
