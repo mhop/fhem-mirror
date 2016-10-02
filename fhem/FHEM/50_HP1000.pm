@@ -341,7 +341,8 @@ sub HP1000_CGI() {
 
     # averages/windDir_avg2m
     if ( defined( $webArgs->{winddir} ) ) {
-        my $v = HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} );
+        my $v = sprintf( '%0.0f',
+            HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} ) );
 
         if ( $hash->{INTERVAL} > 0 ) {
             readingsBulkUpdate( $hash, "windDir_avg2m", $v );
