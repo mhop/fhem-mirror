@@ -80,7 +80,10 @@ CommandCmdAlias($$$)
   return "Unknown command $a, internal error" if(!$a);
   foreach my $n (sort keys %{$a->{Alias}}) {
     my $h = $a->{Alias}{$n};
-    next if($h->{InExec});
+    if($h->{InExec}) {
+      Log3 $n, 3, "cmdalias $n called recursively, skipping execution";
+      next;
+    }
     if($param =~ m/^$h->{PARAM}$/) {
       my %specials= ("%EVENT" => $param);
       my $exec = EvalSpecials($h->{NEWCMD}, %specials);
