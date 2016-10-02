@@ -90,10 +90,18 @@ FBAHA_Set($@)
     if(!defined($sets{$type}));
 
   if($type eq "createDevs") {
+
+    my %ex;
+    foreach my $sdev (devspec2array("TYPE=FBDECT")) {
+      my @dl = split(" ", $defs{$sdev}{DEF});
+      $ex{$dl[0]} = 1;
+    }
+
     my @arg = FBAHA_getDevList($hash,0);
     foreach my $arg (@arg) {
       if($arg =~ m/ID:(\d+).*PROP:(.*)/) {
         my ($i,$p) = ($1,$2,$3);
+        next if($ex{"$name:$i"});
         my $msg = "UNDEFINED FBDECT_$i FBDECT $name:$i $p";
         DoTrigger("global", $msg, 1);
         Log3 $name, 3, "$msg, please define it";
