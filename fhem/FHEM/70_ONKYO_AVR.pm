@@ -995,11 +995,11 @@ sub ONKYO_AVR_Read($) {
             $type = "jpg"  if ( $1 eq "1" );
             $type = "link" if ( $1 eq "2" );
 
-            $hash->{helper}{cover}{$type}{parts} = "1" if ( $2 eq "0" );
-            $hash->{helper}{cover}{$type}{parts}++ if ( $2 ne "0" );
-            $hash->{helper}{cover}{$type}{data} = "" if ( $2 eq "0" );
-            $hash->{helper}{cover}{$type}{data} .= $3
-              if ( $2 eq "0" || $hash->{helper}{cover}{$type}{data} ne "" );
+            $hash->{helper}{cover}{$type}{parts} = "1" if ( "$2" eq "0" );
+            $hash->{helper}{cover}{$type}{parts}++ if ( "$2" ne "0" );
+            $hash->{helper}{cover}{$type}{data} = "" if ( "$2" eq "0" );
+            $hash->{helper}{cover}{$type}{data} .= "$3"
+              if ( "$2" eq "0" || $hash->{helper}{cover}{$type}{data} ne "" );
 
             Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) in progress, part "
               . $hash->{helper}{cover}{$type}{parts};
