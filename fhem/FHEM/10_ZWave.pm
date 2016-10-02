@@ -21,6 +21,7 @@ sub ZWave_secStart($);
 sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
 sub ZWave_callbackId($);
+sub ZWave_setEndpoints($);
 
 our ($FW_ME,$FW_tp,$FW_ss);
 our %zwave_id2class;
@@ -650,6 +651,8 @@ ZWave_Initialize($)
 
 
 #############################
+my $zw_init_ordered;
+
 sub
 ZWave_Define($$)
 {
@@ -688,7 +691,42 @@ ZWave_Define($$)
     asyncOutput($hash->{IODev}{addCL}, "created $name") if($hash->{IODev});
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
   }
+
+  if($init_done) {
+    ZWave_setEndpoints($hash);
+  } else {
+   if(!$zw_init_ordered) {
+     $zw_init_ordered = 1;
+     InternalTimer(1, "ZWave_setEndpoints", $hash, 0);
+   }
+  }
+
   return undef;
+}
+
+sub
+ZWave_setEndpoints($)
+{
+  my $mp = $modules{ZWave}{defptr};
+  for my $k (sort keys %{$mp}) {
+    my $h = $mp->{$k};
+    delete($h->{endpointRoot});
+    delete($h->{endpointChildren});
+  }
+  for my $k (sort keys %{$mp}) {
+    my $h = $mp->{$k};
+    next if($h->{nodeIdHex} !~ m/(..)(..)/);
+    my ($root, $lid) = ($1, $2);
+    my $rd = $mp->{$h->{homeId}." ".$root};
+    $h->{endpointRoot} = ($rd ? $rd->{NAME} : "unknown");
+    if($rd) {
+      if($rd->{endpointChildren}) {
+        $rd->{endpointChildren} .= " ".$h->{NAME};
+      } else {
+        $rd->{endpointChildren} = $h->{NAME};
+      }
+    }
+  }
 }
 
 sub
