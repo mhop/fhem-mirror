@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: readingsGroup: allow grouping of similar readings from one device
   14_SD_WS09.pm WH1080 CRC-Berechung angepaßt--> automatische Modelauswahl
   - feature: 00_SIGNALduino: nonblocking communication, improved init 
                and keepalive, fixed manchester related stuff, Supports
