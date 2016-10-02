@@ -129,8 +129,9 @@ sub HP1000_CGI() {
     my $webArgs;
 
     # data received
-    if ( $request =~ /^\/updateweatherstation\.\w{3}\?(.+=.+)/ ) {
-        $URI = $1;
+    if ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
+        $hash->{SERVER_TYPE} = lc($1);
+        $URI = $2;
 
         # get device name
         $name = $data{FWEXT}{"/updateweatherstation"}{deviceName}
@@ -233,24 +234,34 @@ sub HP1000_CGI() {
 
     # dewpointIndoor
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
-        my $v = int(
-            dewpoint_dewpoint( $webArgs->{intemp}, $webArgs->{inhumi} ) + 0.5 );
+        my $h = (
+            webArgs->{inhumi} > 110
+            ? 110
+            : ( webArgs->{inhumi} <= 0 ? 0.01 : webArgs->{inhumi} )
+        );
+        my $v = int( dewpoint_dewpoint( $webArgs->{intemp}, $h ) + 0.5 );
         readingsBulkUpdate( $hash, "dewpointIndoor", $v );
     }
 
     # humidityAbs
     if ( defined( $webArgs->{outtemp} ) && defined( $webArgs->{outhumi} ) ) {
-        my $v =
-          int( dewpoint_absFeuchte( $webArgs->{outtemp}, $webArgs->{outhumi} ) +
-              0.5 );
+        my $h = (
+            webArgs->{outhumi} > 110
+            ? 110
+            : ( webArgs->{outhumi} <= 0 ? 0.01 : webArgs->{outhumi} )
+        );
+        my $v = int( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ) + 0.5 );
         readingsBulkUpdate( $hash, "humidityAbs", $v );
     }
 
     # humidityIndoorAbs
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
-        my $v =
-          int( dewpoint_absFeuchte( $webArgs->{intemp}, $webArgs->{inhumi} ) +
-              0.5 );
+        my $h = (
+            webArgs->{inhumi} > 110
+            ? 110
+            : ( webArgs->{inhumi} <= 0 ? 0.01 : webArgs->{inhumi} )
+        );
+        my $v = int( dewpoint_absFeuchte( $webArgs->{intemp}, $h ) + 0.5 );
         readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
     }
 
@@ -328,7 +339,8 @@ sub HP1000_CGI() {
         my $wavelength = $webArgs->{UV};
     }
 
-    $result = "T: " . $webArgs->{outtemp} if ( defined( $webArgs->{outtemp} ) );
+    $result = "T: " . $webArgs->{outtemp}
+      if ( defined( $webArgs->{outtemp} ) );
     $result .= " H: " . $webArgs->{outhumi}
       if ( defined( $webArgs->{outhumi} ) );
     $result .= " Ti: " . $webArgs->{intemp}
@@ -337,14 +349,34 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{inhumi} ) );
     $result .= " W: " . $webArgs->{windspeed}
       if ( defined( $webArgs->{windspeed} ) );
+    $result .= " W: " . $webArgs->{windspeedmph}
+      if ( defined( $webArgs->{windspeedmph} ) );
+    $result .= " WC: " . $webArgs->{windchill}
+      if ( defined( $webArgs->{windchill} ) );
+    $result .= " WG: " . $webArgs->{windgust}
+      if ( defined( $webArgs->{windgust} ) );
+    $result .= " WG: " . $webArgs->{windgustmph}
+      if ( defined( $webArgs->{windgustmph} ) );
     $result .= " R: " . $webArgs->{rainrate}
       if ( defined( $webArgs->{rainrate} ) );
+    $result .= " RD: " . $webArgs->{dailyrain}
+      if ( defined( $webArgs->{dailyrain} ) );
+    $result .= " RW: " . $webArgs->{weeklyrain}
+      if ( defined( $webArgs->{weeklyrain} ) );
+    $result .= " RM: " . $webArgs->{monthlyrain}
+      if ( defined( $webArgs->{monthlyrain} ) );
+    $result .= " RY: " . $webArgs->{yearlyrain}
+      if ( defined( $webArgs->{yearlyrain} ) );
     $result .= " WD: " . $webArgs->{winddir}
       if ( defined( $webArgs->{winddir} ) );
     $result .= " D: " . $webArgs->{dewpoint}
       if ( defined( $webArgs->{dewpoint} ) );
     $result .= " P: " . $webArgs->{relbaro}
       if ( defined( $webArgs->{relbaro} ) );
+    $result .= " UV: " . $webArgs->{UV}
+      if ( defined( $webArgs->{UV} ) );
+    $result .= " L: " . $webArgs->{light}
+      if ( defined( $webArgs->{light} ) );
 
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
@@ -371,8 +403,8 @@ sub HP1000_GetSum($$$$;$) {
     my $max = int( $s / $hash->{INTERVAL} );
     my $return;
 
-    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v;
-    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max;
+    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, "$v";
+    my $v3 = splice @{ $hash->{helper}{history}{$t} }, "$max";
 
     Log3 $name, 5, "HP1000 $name: Updated history for $t:"
       . Dumper( $hash->{helper}{history}{$t} );
