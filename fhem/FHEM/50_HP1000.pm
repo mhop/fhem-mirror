@@ -34,6 +34,7 @@ use Time::Local;
 use Data::Dumper;
 use List::Util qw(sum);
 use FHEM::98_dewpoint;
+use FHEM::59_Twilight;
 
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
@@ -235,20 +236,20 @@ sub HP1000_CGI() {
     # dewpointIndoor
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
         my $h = (
-            webArgs->{inhumi} > 110
+            $webArgs->{inhumi} > 110
             ? 110
-            : ( webArgs->{inhumi} <= 0 ? 0.01 : webArgs->{inhumi} )
+            : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
-        my $v = int( dewpoint_dewpoint( $webArgs->{intemp}, $h ) + 0.5 );
+        my $v = sprintf( '%0.1f', dewpoint_dewpoint( $webArgs->{intemp}, $h ) );
         readingsBulkUpdate( $hash, "dewpointIndoor", $v );
     }
 
     # humidityAbs
     if ( defined( $webArgs->{outtemp} ) && defined( $webArgs->{outhumi} ) ) {
         my $h = (
-            webArgs->{outhumi} > 110
+            $webArgs->{outhumi} > 110
             ? 110
-            : ( webArgs->{outhumi} <= 0 ? 0.01 : webArgs->{outhumi} )
+            : ( $webArgs->{outhumi} <= 0 ? 0.01 : $webArgs->{outhumi} )
         );
         my $v = int( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ) + 0.5 );
         readingsBulkUpdate( $hash, "humidityAbs", $v );
@@ -257,12 +258,49 @@ sub HP1000_CGI() {
     # humidityIndoorAbs
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
         my $h = (
-            webArgs->{inhumi} > 110
+            $webArgs->{inhumi} > 110
             ? 110
-            : ( webArgs->{inhumi} <= 0 ? 0.01 : webArgs->{inhumi} )
+            : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
         my $v = int( dewpoint_absFeuchte( $webArgs->{intemp}, $h ) + 0.5 );
         readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
+    }
+
+    # windCompasspoint
+    if ( defined( $webArgs->{winddir} ) ) {
+        my $v = Twilight_CompassPoint( $webArgs->{winddir} );
+        readingsBulkUpdate( $hash, "windCompasspoint", $v );
+        $webArgs->{windCompasspoint} = $v;
+    }
+
+    # windSpeedForce in Beaufort
+    if ( defined( $webArgs->{windspeed} ) ) {
+        my $v = HP1000_windForce( $webArgs->{windspeed} );
+        readingsBulkUpdate( $hash, "windSpeedForce", $v );
+        $webArgs->{windSpeedForce} = $v;
+    }
+
+    # windGustForce in Beaufort
+    if ( defined( $webArgs->{windgust} ) ) {
+        my $v = HP1000_windForce( $webArgs->{windgust} );
+        readingsBulkUpdate( $hash, "windGustForce", $v );
+        $webArgs->{windGustForce} = $v;
+    }
+
+    # windSpeedMps in m/s
+    if ( defined( $webArgs->{windspeed} ) ) {
+        my $v = HP1000_windKmh2Mps( $webArgs->{windspeed} );
+        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedMps", $v );
+        $webArgs->{windSpeedMps} = $v;
+    }
+
+    # windGustMps in m/s
+    if ( defined( $webArgs->{windgust} ) ) {
+        my $v = HP1000_windKmh2Mps( $webArgs->{windgust} );
+        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
+        readingsBulkUpdate( $hash, "windGustMps", $v );
+        $webArgs->{windgust} = $v;
     }
 
     # averages/windSpeed_avg2m
@@ -286,6 +324,21 @@ sub HP1000_CGI() {
         }
     }
 
+    # averages/windSpeedForce_avg2m in Beaufort
+    if ( defined( $webArgs->{windspd_avg2m} ) ) {
+        my $v = HP1000_windForce( $webArgs->{windspd_avg2m} );
+        readingsBulkUpdate( $hash, "windSpeedForce_avg2m", $v );
+        $webArgs->{windSpeedForce_avg2m} = $v;
+    }
+
+    # averages/windSpeedMps_avg2m in m/s
+    if ( defined( $webArgs->{windspd_avg2m} ) ) {
+        my $v = HP1000_windKmh2Mps( $webArgs->{windspd_avg2m} );
+        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedMps_avg2m", $v );
+        $webArgs->{windspdmps_avg2m} = $v;
+    }
+
     # averages/windDir_avg2m
     if ( defined( $webArgs->{winddir} ) ) {
         my $v = HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} );
@@ -294,6 +347,13 @@ sub HP1000_CGI() {
             readingsBulkUpdate( $hash, "windDir_avg2m", $v );
             $webArgs->{winddir_avg2m} = $v;
         }
+    }
+
+    # averages/windCompasspoint_avg2m
+    if ( defined( $webArgs->{winddir_avg2m} ) ) {
+        my $v = Twilight_CompassPoint( $webArgs->{winddir_avg2m} );
+        readingsBulkUpdate( $hash, "windCompasspoint_avg2m", $v );
+        $webArgs->{windCompasspoint_avg2m} = $v;
     }
 
     # averages/windGust_sum10m
@@ -606,6 +666,59 @@ sub HP1000_ReturnWU($$$) {
     }
 
     return;
+}
+
+###################################
+sub HP1000_windForce($) {
+    my ($data) = @_;
+    my $v = "0";
+
+    if ( $data >= 118 ) {
+        $v = "12";
+    }
+    elsif ( $data >= 103 ) {
+        $v = "11";
+    }
+    elsif ( $data >= 89 ) {
+        $v = "10";
+    }
+    elsif ( $data >= 75 ) {
+        $v = "9";
+    }
+    elsif ( $data >= 62 ) {
+        $v = "8";
+    }
+    elsif ( $data >= 50 ) {
+        $v = "7";
+    }
+    elsif ( $data >= 39 ) {
+        $v = "6";
+    }
+    elsif ( $data >= 29 ) {
+        $v = "5";
+    }
+    elsif ( $data >= 20 ) {
+        $v = "4";
+    }
+    elsif ( $data >= 12 ) {
+        $v = "3";
+    }
+    elsif ( $data >= 6 ) {
+        $v = "2";
+    }
+    elsif ( $data >= 1 ) {
+        $v = "1";
+    }
+
+    return $v;
+}
+
+###################################
+sub HP1000_windKmh2Mps($) {
+    my ($data) = @_;
+
+    # convert km/h to m/s
+    return $data / 3.6;
 }
 
 1;
