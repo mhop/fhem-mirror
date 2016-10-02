@@ -262,7 +262,7 @@ CUL_FHTTK_Parse($$)
       if($defs{$name}{PREV}{TIMESTAMP} > time()-5) {
          if(defined($defs{$name}{PREV}{STATE})) {
              if($defs{$name}{PREV}{STATE} eq $state) {
-                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%d) secs ago", $defs{$name}{PREV}{STATE}, time()-$defs{$name}{PREV}{TIMESTAMP});
+                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%s) secs ago", $defs{$name}{PREV}{STATE}, time()-$defs{$name}{PREV}{TIMESTAMP});
                  return "";
              }
          }
@@ -333,6 +333,8 @@ CUL_FHTTK_Parse($$)
 1;
 
 =pod
+=item summary    support for the window sensor fht80tf and fht80tf-2
+=item summary_DE Einbindung des fht80tf und fht80tf-2 Fensterkontaktes
 =begin html
 
 <a name="CUL_FHTTK"></a>
