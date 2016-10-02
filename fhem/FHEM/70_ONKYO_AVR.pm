@@ -321,14 +321,15 @@ sub ONKYO_AVR_Notify($$) {
     foreach my $change ( @{ $dev->{CHANGED} } ) {
 
         # DISCONNECTED
-        if ( $change eq "DISCONNECTED" && $presence ne "absent" ) {
+        if ( $change eq "DISCONNECTED" ) {
             Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
 
             # disable connectionCheck and wait
             # until DevIo reopened the connection
             RemoveInternalTimer($hash);
 
-            readingsBulkUpdate( $hash, "presence", "absent" );
+            readingsBulkUpdate( $hash, "presence", "absent" )
+              if ( $presence ne "absent" );
 
             readingsBulkUpdate( $hash, "power", "off" )
               if ( ReadingsVal( $name, "power", "on" ) ne "off" );
@@ -354,10 +355,11 @@ sub ONKYO_AVR_Notify($$) {
         }
 
         # CONNECTED
-        elsif ( $change eq "CONNECTED" && $presence ne "present" ) {
+        elsif ( $change eq "CONNECTED" ) {
             Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
 
-            readingsBulkUpdate( $hash, "presence", "present" );
+            readingsBulkUpdate( $hash, "presence", "present" )
+              if ( $presence ne "present" );
 
             # stateAV
             my $stateAV = ONKYO_AVR_GetStateAV($hash);
@@ -1976,6 +1978,9 @@ sub ONKYO_AVR_Set($$$) {
 
         $channels_txt =~ s/\s/_/g;
         $channels_txt = substr( $channels_txt, 0, -1 );
+    }
+    else {
+        $channels_txt = ReadingsVal( $name, "channelList", "" );
     }
 
     # for each reading, check if there is a known command for it
