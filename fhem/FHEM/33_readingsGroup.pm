@@ -42,7 +42,7 @@ sub readingsGroup_Initialize($)
   $hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 firstCalcRow:1,2,3,4 alwaysTrigger:1,2 sortDevices:1 visibility:hidden,hideable,collapsed,collapsible setList setFn:textField-long";
+  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 firstCalcRow:1,2,3,4 alwaysTrigger:1,2 sortDevices:1 sortFn visibility:hidden,hideable,collapsed,collapsible setList setFn:textField-long";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -175,11 +175,11 @@ readingsGroup_updateDevices($;$)
       if( $regex =~ m/^<.*>$/ ) {
       } elsif( $regex !~ m/^\$/ && $regex =~ m/(.*)@(.*)/ ) {
         $regex = $1;
+        my $name = $2;
 
         next if( $regex && $regex =~ m/^\+(.*)/ );
         next if( $regex && $regex =~ m/^\?(.*)/ );
 
-        my $name = $2;
         if( $name =~ m/^{(.*)}$/s ) {
           my $DEVICE = $device->[0];
           $name = eval $name;
@@ -751,6 +751,52 @@ readingsGroup_2html($;$)
 
     my @list = (undef);
     @list = split(",",$regex) if( $regex );
+
+    delete $hash->{groupedList};
+    if( @list && $list[0] =~ m/^@(.*)/ ) {
+      my $index = $1;
+      my $regex = $list[$index];
+
+      my @l;
+      foreach my $n (keys %{$h->{READINGS}}) {
+        eval { $n =~ m/^$regex$/ };
+        if( $@ ) {
+          Log3 $name, 3, $name .": ". $regex .": ". $@;
+          last;
+        }
+        next if( $n !~ m/^$regex$/);
+        push @l, [$n, $1, $2, $3, $4];
+      }
+
+      if( my $sortFn = AttrVal($d, "sortFn", '') ) {
+        sub rgSortIP {
+          return inet_aton(@{$a}[1]) cmp inet_aton(@{$b}[1]);
+        };
+        @l = eval "sort { $sortFn } \@l";
+        if( $@ ) {
+          $txt = "<ERROR>";
+          Log3 $d, 3, $d .": ". $regex .": ". $@;
+          next;
+        }
+      } else {
+        sub rgSort {
+          return @{$a}[1] cmp @{$b}[1];
+        };
+        @l = sort rgSort @l;
+	  }
+
+      $hash->{groupedList} = ();
+      foreach my $n (@l) {
+        my $cg1 = @{$n}[1]; my $cg2 = @{$n}[2]; my $cg3 = @{$n}[3]; my $cg4 = @{$n}[4];
+        my @l = @list[1..@list-1];
+        $l[$index-1] = @{$n}[0];
+        s/#1/$cg1/ for @l; s/#2/$cg2/ for @l; s/#3/$cg3/ for @l; s/#4/$cg4/ for @l;
+        push @{$hash->{groupedList}}, '<br2>' if( $hash->{groupedList} );
+        push @{$hash->{groupedList}}, @l;
+      }
+      @list = @{$hash->{groupedList}};
+    }
+
     my $first = 1;
     my $multi = @list;
     my $cell_column = 1;
@@ -801,9 +847,10 @@ readingsGroup_2html($;$)
           }
         }
 
-        if( $txt eq 'br' ) {
+        $row++ if( $txt eq 'br2' );
+        if( $txt eq 'br' || $txt eq 'br2' ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row-1&1)?"odd":"even");
-          $ret .= "<td $value_columns><div $cell_style $name_style class=\"dname\"></div></td>";
+          $ret .= "<td $value_columns><div $cell_style $name_style class=\"dname\"></div></td>" if( $show_names );
           $first = 0;
           ++$cell_row;
           $cell_column = 1;
@@ -1034,8 +1081,8 @@ readingsGroup_2html($;$)
             }
 
             $txt = "<div $cell_style0>$txt</div>" if( !$show_links );
-            $txt = "<a $cell_style0 href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( $show_links );
-            $ret .= "<td $value_columns><div $name_style class=\"dname\">$txt</div></td>";
+            $txt = "<a $cell_style0 href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( defined($txt) && $show_links );
+            $ret .= "<td $value_columns><div $name_style class=\"dname\">$txt</div></td>" if( defined($txt) );
           }
         }
 
@@ -1181,6 +1228,11 @@ readingsGroup_Notify($$)
         my $regex = @{$device}[1];
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
+
+        if( $hash->{groupedList} ) {
+          @list = @{$hash->{groupedList}};
+        }
+
         for( my $i = 0; $i <= $#list; ++$i ) {
           my $regex = $list[$i];
           while ($regex
@@ -1582,6 +1634,10 @@ readingsGroup_Attr($$$;$)
               <li>if STRING is of the form %ICON[%CMD] ICON will be used as the name of an icon instead of a text and CMD
                   as the command to be executed if the icon is clicked. also see the commands attribute.</li></ul>
           if readings is given the perl expression will be reevaluated during longpoll updates.</li>
+      <li>If the first regex is '@&lt;index&gt;' it gives the index of the following regex by which the readings
+          are to be grouped. if capture groups are used they can be refferenced by #&lt;number&gt;. eg:<br><ul>
+          <code>&lt;IP-Adress&gt;&lt;Hostname&gt;&lt;MAC&gt;&lt;Vendor&gt;<br>
+          nmap:@2,<#1>,(.*)_hostname,#1_macAddress,#1_macVendor</code></ul></li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
       <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
           in 99_myUtils.pm instead of having a compex expression in the define.</li>
@@ -1780,7 +1836,8 @@ readingsGroup_Attr($$$;$)
       the font-... and background attributes do work.<br><br>
 
       Calculation: to be written...<br>
-      eg: <code>define rg readingsGroup .*:temperature rg:$avg</code>
+      eg: <code>define rg readingsGroup .*:temperature rg:$avg</code><br>
+      please see a description <a href="http://www.fhemwiki.de/wiki/ReadingsGroup#Berechnungen">in the wiki</a>
 </ul>
 
 =end html
