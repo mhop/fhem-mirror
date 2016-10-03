@@ -758,10 +758,26 @@ my $ONKYO_values_hr = {
             'prs'   => 'prs',
             'query' => 'QSTN'
         },
-
-        #        'NSV' => {
-        #            '' => ''
-        #        },
+        'NSV' => {
+            'DLNA'                    => '00',
+            'My_Favorites'            => '01',
+            'vTuner'                  => '02',
+            'SiriusXM_Internet_Radio' => '03',
+            'Pandora_Internet_Radio'  => '04',
+            'Rhapsody'                => '05',
+            'Last.fm_Internet_Radio'  => '06',
+            'Napster'                 => '07',
+            'Slacker_Personal_Radio'  => '08',
+            'Mediafly'                => '09',
+            'Spotify'                 => '0A',
+            'AUPEO!_PERSONAL_RADIO'   => '0B',
+            'radiko.jp'               => '0C',
+            'e-onkyo_music'           => '0D',
+            'TuneIn'                  => '0E',
+            'MP3tunes'                => '0F',
+            'simfy'                   => '10',
+            'Home_Media'              => '11',
+        },
         'NRI' => {
             'query' => 'QSTN'
         },
@@ -4785,12 +4801,96 @@ ii-> Service icon
             'description' => 'NET Service{for Network Control Only}',
             'name'        => 'net-service',
             'values'      => {
-                'ssiaaaa\u2026aaaabbbb\u2026bbbb',
+                '00',
                 {
-                    'description' =>
-'select Network Service directly\nss -> Network Serveice\n 00:Media Server {DLNA}\n 01:Favorite\n 02:vTuner\n 03:SIRIUS\n 04:Pandora\n 05:Rhapsody\n 06:Last.fm\n 07:Napster\n 08:Slacker\n 09:Mediafly\n 0A:Spotify\n 0B:AUPEO!\n 0C:Radiko\n 0D:e-onkyo\n\ni-> Acount Info\n 0: No\n 1: Yes\n"aaaa...aaaa": User Name { 128 Unicode letters [UTF-8 encoded] max }\n"bbbb...bbbb": Password { 128 Unicode letters [UTF-8 encoded] max }',
-                    'name' => 'None'
-                }
+                    'description' => 'Music Server (DLNA)',
+                    'name'        => 'DLNA'
+                },
+                '01',
+                {
+                    'description' => 'My Favorites',
+                    'name'        => [ 'My_Favorites', 'Favorite' ]
+                },
+                '02',
+                {
+                    'description' => 'vTuner',
+                    'name'        => 'vTuner'
+                },
+                '03',
+                {
+                    'description' => 'SiriusXM Internet Radio',
+                    'name'        => [ 'SiriusXM_Internet_Radio', 'SIRIUS' ]
+                },
+                '04',
+                {
+                    'description' => 'Pandora Internet Radio',
+                    'name'        => [ 'Pandora_Internet_Radio', 'Pandora' ]
+                },
+                '05',
+                {
+                    'description' => 'Rhapsody',
+                    'name'        => 'Rhapsody'
+                },
+                '06',
+                {
+                    'description' => 'Last.fm Internet Radio',
+                    'name'        => [ 'Last.fm_Internet_Radio', 'Last.fm' ]
+                },
+                '07',
+                {
+                    'description' => 'Napster',
+                    'name'        => 'Napster'
+                },
+                '08',
+                {
+                    'description' => 'Slacker Personal Radio',
+                    'name'        => [ 'Slacker_Personal_Radio', 'Slacker' ]
+                },
+                '09',
+                {
+                    'description' => 'Mediafly',
+                    'name'        => 'Mediafly'
+                },
+                '0A',
+                {
+                    'description' => 'Spotify',
+                    'name'        => 'Spotify'
+                },
+                '0B',
+                {
+                    'description' => 'AUPEO! PERSONAL RADIO',
+                    'name'        => [ 'AUPEO!_PERSONAL_RADIO', 'AUPEO!' ]
+                },
+                '0C',
+                {
+                    'description' => 'radiko.jp',
+                    'name'        => [ 'radiko.jp', 'radiko' ]
+                },
+                '0D',
+                {
+                    'description' => 'e-onkyo music',
+                    'name'        => [ 'e-onkyo_music', 'e-onkyo' ]
+                },
+                '0E',
+                {
+                    'description' => 'TuneIn',
+                    'name'        => 'TuneIn'
+                },
+                '0F',
+                {
+                    'description' => 'MP3tunes',
+                    'name'        => 'MP3tunes'
+                },
+                '10',
+                {
+                    'description' => 'simfy',
+                    'name'        => 'simfy'
+                },
+                '11',
+                {
+                    'description' => 'Home Media',
+                    'name'        => 'Home_Media'
+                },
             }
         },
         'NKY',
