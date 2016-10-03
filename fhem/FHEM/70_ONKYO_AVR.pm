@@ -1015,6 +1015,10 @@ sub ONKYO_AVR_Read($) {
                 readingsBulkUpdate( $hash, "currentAlbumArtURI", "" );
                 readingsBulkUpdate( $hash, "currentAlbumArtURL",
                     $hash->{helper}{currentCover} );
+
+                $zoneDispatch->{currentAlbumArtURI} = "";
+                $zoneDispatch->{currentAlbumArtURL} =
+                  $hash->{helper}{currentCover};
             }
             elsif ($2 eq "2"
                 && $type ne "link"
@@ -1041,6 +1045,9 @@ sub ONKYO_AVR_Read($) {
 
                 readingsBulkUpdate( $hash, "currentAlbumArtURI", $AlbumArtURI );
                 readingsBulkUpdate( $hash, "currentAlbumArtURL", $AlbumArtURL );
+
+                $zoneDispatch->{currentAlbumArtURI} = $AlbumArtURI;
+                $zoneDispatch->{currentAlbumArtURL} = $AlbumArtURL;
             }
         }
         else {
@@ -1105,12 +1112,21 @@ sub ONKYO_AVR_Read($) {
 
             # channel
             my $channel = $1 || "00";
+            my $channelUc = uc($channel);
             $hash->{CHANNEL} = $channel;
             $channel = lc($channel);
             my $channelname = "";
 
+            # Get all details for command
+            my $command_details =
+              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( "1",
+                ONKYOdb::ONKYO_GetRemotecontrolCommand( "1", "net-service" ) );
+
+            # we know the channel name from receiver info
             if (
-                defined(
+                   defined( $hash->{helper}{receiver} )
+                && ref( $hash->{helper}{receiver} ) eq "HASH"
+                && defined(
                     $hash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$channel}{name}
                 )
@@ -1121,15 +1137,34 @@ sub ONKYO_AVR_Read($) {
                   {netservice}{$channel}{name};
                 $channelname =~ s/\s/_/g;
             }
+
+            # we know the channel name from ONKYOdb
+            elsif ( defined( $command_details->{values}{$channelUc} ) ) {
+                if (
+                    ref( $command_details->{values}{$channelUc}{name} ) eq
+                    "ARRAY" )
+                {
+                    $channelname =
+                      $command_details->{values}{$channelUc}{name}[0];
+                }
+                else {
+                    $channelname = $command_details->{values}{$channelUc}{name};
+                }
+            }
+
+            # some specials for net-usb-list-title-info
             elsif ( $channel =~ /^f./ ) {
                 $channelname = "USB_Front"      if $channel eq "f0";
                 $channelname = "USB_Rear"       if $channel eq "f1";
                 $channelname = "Internet_Radio" if $channel eq "f2";
                 $channelname = ""               if $channel eq "f3";
             }
+
+            # we don't know the channel name, sorry
             else {
                 Log3 $name, 4,
 "ONKYO_AVR $name: net-usb-list-title-info: received unknown channel ID $channel";
+                $channelname = $channel;
             }
 
             if ( ReadingsVal( $name, "channel", "-" ) ne $channelname ) {
@@ -1162,8 +1197,8 @@ sub ONKYO_AVR_Read($) {
                 $zoneDispatch->{CHANNEL_RAW}          = $hash->{CHANNEL};
                 $zoneDispatch->{channel}              = $channelname;
                 $zoneDispatch->{currentAlbum}         = "";
-                $zoneDispatch->{currentAlbumURI}      = $currentAlbumArtURI;
-                $zoneDispatch->{currentAlbumURL}      = $currentAlbumArtURL;
+                $zoneDispatch->{currentAlbumArtURI}   = $currentAlbumArtURI;
+                $zoneDispatch->{currentAlbumArtURL}   = $currentAlbumArtURL;
                 $zoneDispatch->{currentArtist}        = "";
                 $zoneDispatch->{currentTitle}         = "";
                 $zoneDispatch->{currentTrackPosition} = "--:--";
@@ -1497,8 +1532,8 @@ sub ONKYO_AVR_Read($) {
                     "--:--" );
 
                 $zoneDispatch->{currentAlbum}         = "";
-                $zoneDispatch->{currentAlbumURI}      = $currentAlbumArtURI;
-                $zoneDispatch->{currentAlbumURL}      = $currentAlbumArtURL;
+                $zoneDispatch->{currentAlbumArtURI}   = $currentAlbumArtURI;
+                $zoneDispatch->{currentAlbumArtURL}   = $currentAlbumArtURL;
                 $zoneDispatch->{currentArtist}        = "";
                 $zoneDispatch->{currentTitle}         = "";
                 $zoneDispatch->{currentTrackPosition} = "--:--";
@@ -1542,7 +1577,40 @@ sub ONKYO_AVR_Read($) {
     elsif ( $cmd =~ /^net-usb/ && $value ne "on" && $value ne "off" ) {
     }
 
+    elsif ( $cmd =~ /^net-keyboard/ ) {
+    }
+
+    # net-popup-*
     elsif ( $cmd eq "net-popup-message" ) {
+        if ( $value =~
+            /^(B|T|L)(.*[a-z])([A-Z].*[a-z.!?])(0|1|2)([A-Z].*[a-z])$/ )
+        {
+            readingsBulkUpdate( $hash, "net-popup-type", "top" )
+              if ( $1 eq "T" );
+            readingsBulkUpdate( $hash, "net-popup-type", "bottom" )
+              if ( $1 eq "B" );
+            readingsBulkUpdate( $hash, "net-popup-type", "list" )
+              if ( $1 eq "L" );
+            readingsBulkUpdate( $hash, "net-popup-title",           $2 );
+            readingsBulkUpdate( $hash, "net-popup-text",            $3 );
+            readingsBulkUpdate( $hash, "net-popup-button-position", "hidden" )
+              if ( $4 eq "0" || $4 eq "" );
+            readingsBulkUpdate( $hash, "net-popup-button-position", $4 )
+              if ( $4 ne "0" && $4 ne "" );
+            readingsBulkUpdate( $hash, "net-popup-button1-text", $5 );
+
+            $zoneDispatch->{"net-popup-type"} =
+              ReadingsVal( $name, "net-popup-type", "" );
+            $zoneDispatch->{"net-popup-title"} = $2;
+            $zoneDispatch->{"net-popup-text"}  = $3;
+            $zoneDispatch->{"net-popup-button-position"} =
+              ReadingsVal( $name, "net-popup-button-position", "" );
+            $zoneDispatch->{"net-popup-button1-text"} = $5;
+        }
+        else {
+            Log3 $name, 4,
+              "ONKYO_AVR $name: Could not decompile net-popup-message: $value";
+        }
     }
 
     # tone-*
@@ -1621,7 +1689,7 @@ sub ONKYO_AVR_Read($) {
 
                     $presetName =~ s/\s/_/g;
 
-                    if ( $id eq ONKYO_AVR_dec2hex($value) ) {
+                    if ( $id eq $value ) {
                         $value = $presetName;
                         last;
                     }
@@ -1950,6 +2018,7 @@ sub ONKYO_AVR_Set($$$) {
     }
 
     # list of network channels/services
+    my $channels_src = "internal";
     if (   defined( $hash->{helper}{receiver} )
         && ref( $hash->{helper}{receiver} ) eq "HASH"
         && defined( $hash->{helper}{receiver}{device}{netservicelist}{count} )
@@ -1978,9 +2047,21 @@ sub ONKYO_AVR_Set($$$) {
 
         $channels_txt =~ s/\s/_/g;
         $channels_txt = substr( $channels_txt, 0, -1 );
+        $channels_src = "receiver";
     }
+
+    # use general list of possible channels
     else {
-        $channels_txt = ReadingsVal( $name, "channelList", "" );
+        # Find out valid channels
+        my $channels =
+          ONKYOdb::ONKYO_GetRemotecontrolValue( "1",
+            ONKYOdb::ONKYO_GetRemotecontrolCommand( "1", "net-service" ) );
+
+        foreach my $channel ( sort keys %{$channels} ) {
+            $channels_txt .= $channel . ","
+              if ( !( $channel =~ /^(up|down|query)$/ ) );
+        }
+        $channels_txt = substr( $channels_txt, 0, -1 );
     }
 
     # for each reading, check if there is a known command for it
@@ -2113,7 +2194,14 @@ sub ONKYO_AVR_Set($$$) {
 
     # create channelList reading for frontends
     readingsBulkUpdate( $hash, "channelList", $channels_txt )
-      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels_txt );
+      if (
+        (
+            $channels_src eq "internal"
+            && ReadingsVal( $name, "channelList", "-" ) eq "-"
+        )
+        || ( $channels_src eq "receiver"
+            && ReadingsVal( $name, "channelList", "-" ) ne $channels_txt )
+      );
 
     # channel
     if ( lc( @$a[1] ) eq "channel" ) {
@@ -2129,54 +2217,73 @@ sub ONKYO_AVR_Set($$$) {
                 $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
                 $return .= fhem "sleep 1;set $name channel " . @$a[2];
             }
-            elsif (
-                ReadingsVal( $name, "channel", "" ) ne @$a[2]
-                && defined(
-                    $hash->{helper}{receiver}{device}{netservicelist}
-                      {netservice}
-                )
-              )
+            elsif ( ReadingsVal( $name, "channel", "" ) ne @$a[2]
+                || ( defined( @$a[3] ) && defined( @$a[4] ) ) )
             {
 
                 my $servicename = "";
                 my $channelname = @$a[2];
-                $channelname =~ s/_/ /g;
 
-                foreach my $id (
-                    sort keys %{
-                        $hash->{helper}{receiver}{device}{netservicelist}
-                          {netservice}
-                    }
+                if (
+                       defined( $hash->{helper}{receiver} )
+                    && ref( $hash->{helper}{receiver} ) eq "HASH"
+                    && defined(
+                        $hash->{helper}{receiver}{device}{netservicelist}{count}
+                    )
+                    && $hash->{helper}{receiver}{device}{netservicelist}{count}
+                    > 0
                   )
                 {
-                    if (
-                        defined(
-                            $hash->{helper}{receiver}{device}
-                              {netservicelist}{netservice}{$id}{value}
-                        )
-                        && $hash->{helper}{receiver}{device}
-                        {netservicelist}{netservice}{$id}{value} eq "1"
-                        && $hash->{helper}{receiver}{device}
-                        {netservicelist}{netservice}{$id}{name} eq $channelname
+
+                    $channelname =~ s/_/ /g;
+
+                    foreach my $id (
+                        sort keys %{
+                            $hash->{helper}{receiver}{device}{netservicelist}
+                              {netservice}
+                        }
                       )
                     {
-                        $servicename .= uc($id);
-                        $servicename .= "0" if ( !defined( @$a[3] ) );
-                        $servicename .= @$a[3] if ( defined( @$a[3] ) );
-                        $servicename .= @$a[4] if ( defined( @$a[4] ) );
-
-                        last;
+                        if (
+                            defined(
+                                $hash->{helper}{receiver}{device}
+                                  {netservicelist}{netservice}{$id}{value}
+                            )
+                            && $hash->{helper}{receiver}{device}
+                            {netservicelist}{netservice}{$id}{value} eq "1"
+                            && $hash->{helper}{receiver}{device}
+                            {netservicelist}{netservice}{$id}{name} eq
+                            $channelname
+                          )
+                        {
+                            $servicename .= uc($id);
+                            last;
+                        }
                     }
                 }
+                else {
+                    my $channels = ONKYOdb::ONKYO_GetRemotecontrolValue(
+                        "1",
+                        ONKYOdb::ONKYO_GetRemotecontrolCommand(
+                            "1", "net-service"
+                        )
+                    );
 
-                $return = "Unknown network service name " . @$a[2]
-                  if ( $servicename eq "" );
+                    $servicename = $channels->{$channelname}
+                      if ( defined( $channels->{$channelname} ) );
+                }
 
                 Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
+                $servicename = uc($channelname)
+                  if ( $servicename eq "" );
+
+                $servicename .= "0"          if ( !defined( @$a[3] ) );
+                $servicename .= "1" . @$a[3] if ( defined( @$a[3] ) );
+                $servicename .= @$a[4]       if ( defined( @$a[4] ) );
+
                 $return =
-                  ONKYO_AVR_SendCommand( $hash, "net-service", $servicename )
-                  if ( $servicename ne "" );
+                  ONKYO_AVR_SendCommand( $hash, "net-service", $servicename );
             }
         }
     }
