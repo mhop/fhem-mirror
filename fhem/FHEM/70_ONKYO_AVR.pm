@@ -3246,6 +3246,7 @@ sub ONKYO_AVR_RClayout() {
         <code>define &lt;name&gt; ONKYO_AVR &lt;devicename[@baudrate]&gt; [&lt;protocol-version&gt;]</code><br>
         <br>
         This module controls ONKYO A/V receivers in real-time via network connection.<br>
+        Some newer Pioneer A/V models seem to run ONKYO's ISCP protocol as well and therefore should be fully supported by this module.<br>
         Use <a href="#ONKYO_AVR_ZONE">ONKYO_AVR_ZONE</a> to control slave zones.<br>
         <br>
         Instead of IP address or hostname you may set a serial connection format for direct connectivity.<br>
