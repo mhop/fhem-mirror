@@ -570,7 +570,7 @@ sub BuildDashboardTab($$)
           my @groupparts = split(':', $devicegroup);
 
           if (@groupparts == 1) {
-            my @devices = map { $_ . ':' . $_ } devspec2array($groupparts[0]);
+            my @devices = map { $_ . '$$$' . $_ } devspec2array($groupparts[0]);
             push(@tabdevicegroups, @devices);
           }
           else {
