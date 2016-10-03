@@ -36,7 +36,8 @@
 #
 ###########################################################################################################
 #  Versions History:
-# 3.11.1       30.09.2016       bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00"
+# 3.12         02.10.2016       function minValue added
+# 3.11.1       30.09.2016       bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00'
 # 3.11         29.09.2016       maxValue calculation moved to background to reduce FHEM-load
 # 3.10.1       28.09.2016       sub impFile -> changed $dbh->{AutoCommit} = 0 to $dbh->begin_work
 # 3.10         27.09.2016       diffValue calculation moved to background to reduce FHEM-load,
@@ -211,62 +212,44 @@ sub DbRep_Set($@) {
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbmodel = $hash->{dbloghash}{DBMODEL};
-  my $setlist; 
   
-  $setlist = "Unknown argument $opt, choose one of ".
-             "sumValue:noArg ".
-             "averageValue:noArg ".
-             "delEntries:noArg ".
-             "exportToFile:noArg ".
-             "importFromFile:noArg ".
-             "maxValue:noArg ".
-             "fetchrows:noArg ".
-             "diffValue:noArg ".
-             "insert ".
-             "countEntries:noArg ";
+  my $setlist = "Unknown argument $opt, choose one of ".
+                "sumValue:noArg ".
+                "averageValue:noArg ".
+                "delEntries:noArg ".
+                "exportToFile:noArg ".
+                "importFromFile:noArg ".
+                "maxValue:noArg ".
+                "minValue:noArg ".
+                "fetchrows:noArg ".
+                "diffValue:noArg ".
+                "insert ".
+                "countEntries:noArg ";
   
   return if(IsDisabled($name));
   
-  if ($opt eq "sumValue") {
-      if (!AttrVal($hash->{NAME}, "reading", "")) {
-          return " The attribute reading for analyze is not set !";
-      }
-      sqlexec($hash,"sum");
-      
-  } elsif ($opt eq "countEntries") {
-      sqlexec($hash,"count"); 
-      
-  } elsif ($opt eq "averageValue") {  
-      if (!AttrVal($hash->{NAME}, "reading", "")) {
-          return " The attribute reading for analyze is not set !";
-      }
-      sqlexec($hash,"average");
+  if ($opt eq "countEntries") {
+      sqlexec($hash,$opt);
       
   } elsif ($opt eq "fetchrows") {
-      sqlexec($hash,"fetchrows");
+      sqlexec($hash,$opt);
       
-  } elsif ($opt eq "maxValue") {   
+  } elsif ($opt eq "maxValue" || $opt eq "minValue" || $opt eq "sumValue" || $opt eq "averageValue" || $opt eq "diffValue") {   
       if (!AttrVal($hash->{NAME}, "reading", "")) {
-          return " The attribute reading for analyze is not set !";
+          return " The attribute reading to analyze is not set !";
       }
-      sqlexec($hash,"max");
+      sqlexec($hash,$opt);
       
   } elsif ($opt eq "delEntries") {
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }        
-      sqlexec($hash,"del");
+      sqlexec($hash,$opt);
       
-  } elsif ($opt eq "diffValue") {   
-      if (!AttrVal($hash->{NAME}, "reading", "")) {
-          return " The attribute reading for analyze is not set !";
-      }
-      sqlexec($hash,"diff");
-  
   } elsif ($opt eq "insert") { 
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
-              return " The attribute \"device\" and/or \"reading\" is not set. It's mandatory to complete dataset for manual insert !";
+              return " One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
           }
     
           my ($i_date, $i_time, $i_value, $i_unit) = split(",",$prop);
@@ -315,19 +298,19 @@ sub DbRep_Set($@) {
           return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. \"Unit\" is optional. Spaces are not allowed !";
       }
       
-      sqlexec($hash,"insert");
+      sqlexec($hash,$opt);
       
   } elsif ($opt eq "exportToFile") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return " The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
       }
-      sqlexec($hash,"exportToFile");
+      sqlexec($hash,$opt);
       
   } elsif ($opt eq "importFromFile") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return " The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
       }
-      sqlexec($hash,"importFromFile");
+      sqlexec($hash,$opt);
       
   }
   else  
@@ -597,6 +580,7 @@ sub sqlexec($$) {
  # Ausgaben und Zeitmanipulationen
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation"); 
+ Log3 ($name, 4, "DbRep $name - Command: $opt"); 
         
  # Auswertungszeit Beginn (String)
  # dynamische Berechnung von Startdatum/zeit aus current_year_begin / previous_year_begin 
@@ -723,13 +707,13 @@ $hash->{HELPER}{CV} = \%cv;
         $i++;
     } 
 
- if ($opt eq "sum") {
+ if ($opt eq "sumValue") {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
      
- } elsif ($opt eq "count") {
+ } elsif ($opt eq "countEntries") {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 
- } elsif ($opt eq "average") {      
+ } elsif ($opt eq "averageValue") {      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
     
  } elsif ($opt eq "fetchrows") {
@@ -747,16 +731,19 @@ $hash->{HELPER}{CV} = \%cv;
  } elsif ($opt eq "importFromFile") {             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
     
- } elsif ($opt eq "max") {        
+ } elsif ($opt eq "maxValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "del") {
+ } elsif ($opt eq "minValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "delEntries") {
      $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
- }  elsif ($opt eq "diff") {        
+ }  elsif ($opt eq "diffValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
          
  }  elsif ($opt eq "insert") { 
@@ -1177,8 +1164,7 @@ sub maxval_DoParse($) {
                  my @rsf = split(" ",$runtime_string_first);
                  @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
              }
-         }
-         
+         } 
          push(@row_array, @array);
      }    
  }
@@ -1321,6 +1307,237 @@ sub maxval_ParseDone($) {
 
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
+  
+return;
+}
+
+####################################################################################################
+# nichtblockierende DB-Abfrage minValue
+####################################################################################################
+
+sub minval_DoParse($) {
+ my ($string) = @_;
+ my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
+
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_DoParse");
+  
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
+     return "$name|''|$device|$reading|''|$err";
+ }
+     
+ # only for this block because of warnings if details of readings are not set
+ no warnings 'uninitialized'; 
+  
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ # DB-Abfrage zeilenweise für jeden Array-Eintrag
+ my @row_array;
+ foreach my $row (@ts) {
+
+     my @a                     = split("#", $row);
+     my $runtime_string        = $a[0];
+     my $runtime_string_first  = $a[1];
+     my $runtime_string_next   = $a[2];   
+     
+     # SQL zusammenstellen für DB-Operation
+     my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     $sql .= "`DEVICE` = '$device' AND " if($device);
+     $sql .= "`READING` = '$reading' AND " if($reading); 
+     $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
+     
+     # SQL zusammenstellen für Logausgabe
+     my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     $sql1 .= "`DEVICE` = '$device' AND " if($device);
+     $sql1 .= "`READING` = '$reading' AND " if($reading); 
+     $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
+     
+     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
+     
+     $runtime_string = encode_base64($runtime_string,"");
+     my $sth = $dbh->prepare($sql);   
+     
+     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
+         return "$name|''|$device|$reading|''|$err";
+     } else {
+         my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+         
+         if(!@array) {
+             if(AttrVal($name, "aggregation", "") eq "hour") {
+                 my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+             } else {
+                 my @rsf = split(" ",$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+             }
+         }      
+         push(@row_array, @array);
+     }    
+ }
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+
+ $dbh->disconnect;
+  
+ Log3 ($name, 5, "DbRep $name -> raw data of row_array result:\n @row_array");
+ 
+  #---------- Berechnung Ergebnishash minValue ------------------------ 
+  my $i = 1;
+  my %rh = ();
+  my $lastruntimestring;
+  my $row_min_time; 
+  my ($min_value,$value);
+  
+  foreach my $row (@row_array) {
+      my @a = split("[ \t][ \t]*", $row);
+      my $runtime_string = decode_base64($a[0]);
+      $lastruntimestring = $runtime_string if ($i == 1);
+      $value             = $a[1];
+      $min_value         = $a[1] if ($i == 1);
+      
+      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
+      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      
+      # Leerzeichen am Ende $timestamp entfernen
+      $timestamp         =~ s/\s+$//g;
+      
+      # Test auf $value = "numeric"
+      if (!looks_like_number($value)) {
+          $a[3] =~ s/\s+$//g;
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
+          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
+          return "$name|''|$device|$reading|''|$err";
+      }
+      
+      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
+      
+      $rh{$runtime_string} = $runtime_string."|".$min_value."|".$timestamp if ($i == 1);  # minValue des ersten SQL-Statements in hash einfügen
+      
+      if ($runtime_string eq $lastruntimestring) {
+          if ($value < $min_value) {
+              $min_value    = $value;
+              $row_min_time = $timestamp;
+              $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time;            
+          }
+      } else {
+          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
+          $lastruntimestring = $runtime_string;
+          $min_value         = $value;
+          $row_min_time      = $timestamp;
+          $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time; 
+      }
+      $i++;
+  }
+  #---------------------------------------------------------------------------------------------
+     
+ Log3 ($name, 5, "DbRep $name - result of minValue calculation before encoding:");
+ foreach my $key (sort(keys(%rh))) {
+     Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
+ }
+     
+ # Ergebnishash als Einzeiler zurückgeben
+ my $rows = join('§', %rh); 
+ my $rowlist = encode_base64($rows,"");
+  
+ Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$rowlist|$device|$reading|$rt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Abfrage minValue
+####################################################################################################
+
+sub minval_ParseDone($) {
+  my ($string) = @_;
+  my @a = split("\\|",$string);
+  my $hash = $defs{$a[0]};
+  my $name = $hash->{NAME};
+  my $rowlist    = decode_base64($a[1]);
+  my $device     = $a[2];
+  my $reading    = $a[3];
+  my $bt         = $a[4];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $reading_runtime_string;
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_ParseDone");
+  
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall minval_ParseDone finished");
+      return;
+  }
+  
+  my %rh = split("§", $rowlist);
+ 
+  Log3 ($name, 5, "DbRep $name - result of minValue calculation after decoding:");
+  foreach my $key (sort(keys(%rh))) {
+      Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
+  }
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+ 
+  foreach my $key (sort(keys(%rh))) {
+      my @k = split("\\|",$rh{$key});
+      my $rsf  = $k[2]."__" if($k[2]);
+      
+      if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
+      } else {
+          my $ds   = $device."__" if ($device);
+          my $rds  = $reading."__" if ($reading);
+          $reading_runtime_string = $rsf.$ds.$rds."MIN__".$k[0];
+      }
+      my $rv = $k[1];
+      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
+  }
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));              
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
+
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall minval_ParseDone finished");
   
 return;
 }
@@ -1970,6 +2187,9 @@ sub insert_Done($) {
       Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
       return;
   } 
+
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "number_lines_inserted", $irow);    
@@ -2677,7 +2897,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Exposure of datasets of a Device/Reading-combination within adjustable time limits. </li>
      <li> Selecions of datasets by usage of dynamically calclated time limits at execution time. </li>
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
-     <li> The calculation of summary- , difference- , maximal- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
+     <li> The calculation of summary- , difference- , maximum- , minimum- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
      <li> export of datasets to file (CSV-format). </li>
      <li> import of datasets from file (CSV-Format). </li>
@@ -2764,8 +2984,17 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  </ul>    
     
     <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
-    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
-    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". 
+    
+    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+                                 The reading to evaluate must be defined using attribute "reading". 
+                                 The evaluation contains the timestamp of the <b>last</b> appearing of the identified maximum value within the given period.  </li> <br>
+                                 
+    <li><b> minValue </b>     -  calculates the miniimum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+                                 The reading to evaluate must be defined using attribute "reading". 
+                                 The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum value within the given period.  </li> <br>    
+    
+    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+                                 The reading to evaluate must be defined using attribute "reading". 
                                  This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
                                  The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the specified time linits/aggregation. </li> <br>
                                  
@@ -2883,7 +3112,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <li> Darstellung der Datensätze einer Device/Reading-Kombination innerhalb einstellbarer Zeitgrenzen. </li>
      <li> Die Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
-     <li> Die Berechnung von Summen- , Differenz- , Maximal- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
+     <li> Die Berechnung von Summen- , Differenz- , Maximum- , Minimum- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
      <li> Export von Datensätzen in ein File im CSV-Format. </li>
      <li> Import von Datensätzen aus File im CSV-Format. </li>
@@ -2969,9 +3198,22 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  </li> <br>
                                  </ul>    
     
-    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
-    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
-    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. 
+    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
+                                 Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
+    
+    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
+                                 Die Auswertung enthält den Zeitstempel des ermittelten Maximumwertes innerhalb der Aggregation bzw. Zeitgrenzen.  
+                                 Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+                                 
+    <li><b> minValue </b>     -  berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
+                                 Die Auswertung enthält den Zeitstempel des ermittelten Minimumwertes innerhalb der Aggregation bzw. Zeitgrenzen.  
+                                 Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+                                 
+    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
                                  Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. 
                                  Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
                                  Zeitgrenzen/Aggregation gebildet. </li> <br>
