@@ -88,7 +88,6 @@ use constant {
 	HMUARTLGW_STATE_SET_CURRENT_KEY    => 14,
 	HMUARTLGW_STATE_SET_PREVIOUS_KEY   => 15,
 	HMUARTLGW_STATE_SET_TEMP_KEY       => 16,
-	HMUARTLGW_STATE_GET_PEERS          => 17,
 	HMUARTLGW_STATE_UPDATE_PEER        => 90,
 	HMUARTLGW_STATE_UPDATE_PEER_AES1   => 91,
 	HMUARTLGW_STATE_UPDATE_PEER_AES2   => 92,
@@ -637,6 +636,8 @@ sub HMUARTLGW_UpdatePeerReq($;$) {
 			$msg = HMUARTLGW_APP_REMOVE_PEER . $peer->{id};
 		}
 
+		$hash->{Helper}{UpdatePeer}{msg} = $msg;
+
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_AES1) {
 		my $offset = 0;
 		foreach my $c (reverse(unpack "(A2)*", $hash->{Helper}{UpdatePeer}{aes})) {
@@ -679,9 +680,7 @@ sub HMUARTLGW_UpdatePeerReq($;$) {
 		}
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_CFG) {
-		$hash->{AssignedPeerCnt} = 0;
-		%{$hash->{Helper}{AssignedPeers}} = ();
-		$msg = HMUARTLGW_APP_GET_PEERS;
+		$msg = $hash->{Helper}{UpdatePeer}{msg};
 	}
 
 	if ($msg) {
@@ -713,19 +712,21 @@ sub HMUARTLGW_UpdateQueuedPeer($) {
 	}
 }
 
-sub HMUARTLGW_ParsePeers($$) {
+sub HMUARTLGW_ParsePeer($$) {
 	my ($hash, $msg) = @_;
 
-	my $peers = substr($msg, 8);
-	while($peers) {
-		my $id = substr($peers, 0, 6, '');
-		my $aesChannels = substr($peers, 0, 16, '');
-		my $flags = hex(substr($peers, 0, 2, ''));
+	#040701010002fffffffffffffff9
+	$hash->{AssignedPeerCnt} = hex(substr($msg, 8, 4));
+	if (length($msg) > 12) {
+		$hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}} = substr($msg, 12);
+		$hash->{Helper}{UpdatePeer}{aes} = $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}};
 		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
-		     "HMUARTLGW $hash->{NAME} known peer: ${id}, aesChannels: ${aesChannels}, flags: ${flags}");
-
-		$hash->{Helper}{AssignedPeers}{$id} = "$aesChannels (flags: ${flags})";
-		$hash->{AssignedPeerCnt}++;
+			"HMUARTLGW $hash->{NAME} added peer: " . $hash->{Helper}{UpdatePeer}->{id} .
+			", aesChannels: " . $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
+	} else {
+		delete($hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
+		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
+			"HMUARTLGW $hash->{NAME} remove peer: ". $hash->{Helper}{UpdatePeer}->{id});
 	}
 }
 
@@ -799,11 +800,6 @@ sub HMUARTLGW_GetSetParameterReq($) {
 		my $key = shift(@{$hash->{Helper}{AESKeyQueue}});
 		delete($hash->{Helper}{AESKeyQueue});
 		HMUARTLGW_send($hash, HMUARTLGW_APP_SET_TEMP_KEY . ($key?$key:"00"x17), HMUARTLGW_DST_APP);
-
-	} elsif ($hash->{DevState} == HMUARTLGW_STATE_GET_PEERS) {
-		$hash->{AssignedPeerCnt} = 0;
-		%{$hash->{Helper}{AssignedPeers}} = ();
-		HMUARTLGW_send($hash, HMUARTLGW_APP_GET_PEERS, HMUARTLGW_DST_APP);
 
 	} elsif ($hash->{DevState} >= HMUARTLGW_STATE_UPDATE_PEER &&
 	         $hash->{DevState} <= HMUARTLGW_STATE_UPDATE_PEER_CFG) {
@@ -919,31 +915,6 @@ sub HMUARTLGW_GetSetParameters($;$$)
 		$hash->{DevState} = HMUARTLGW_STATE_SET_TEMP_KEY;
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_SET_TEMP_KEY) {
-		$hash->{DevState} = HMUARTLGW_STATE_GET_PEERS;
-
-	} elsif ($hash->{DevState} == HMUARTLGW_STATE_GET_PEERS) {
-		if ($ack eq HMUARTLGW_ACK_WITH_MULTIPART_DATA) {
-			#04070207...
-			HMUARTLGW_ParsePeers($hash, $msg);
-
-			#more parts in multipart message?
-			if (hex(substr($msg, 4, 2)) < hex(substr($msg, 6, 2))) {
-				#there will be more answer messages
-				$hash->{DevState} = HMUARTLGW_STATE_GET_PEERS;
-				RemoveInternalTimer($hash);
-				InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
-				return;
-			}
-		}
-
-		if (defined($hash->{Helper}{AssignedPeers}) &&
-		    %{$hash->{Helper}{AssignedPeers}}) {
-
-			foreach my $p (keys(%{$hash->{Helper}{AssignedPeers}})) {
-				unshift @{$hash->{Helper}{PeerQueue}}, { id => $p, operation => "-" };
-			}
-		}
-
 		$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_GET_CREDITS) {
@@ -970,6 +941,9 @@ sub HMUARTLGW_GetSetParameters($;$$)
 	    $oldState != HMUARTLGW_STATE_RUNNING &&
 	    (!$hash->{Helper}{OneParameterOnly})) {
 		#Init sequence over, add known peers
+		$hash->{AssignedPeerCnt} = 0;
+		%{$hash->{Helper}{AssignedPeers}} = ();
+
 		foreach my $peer (keys(%{$hash->{Peers}})) {
 			if ($modules{CUL_HM}{defptr}{$peer} &&
 			    $modules{CUL_HM}{defptr}{$peer}{helper}{io}{newChn}) {
@@ -1002,14 +976,8 @@ sub HMUARTLGW_GetSetParameters($;$$)
 	}
 
 	if ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER) {
-		$hash->{AssignedPeerCnt} = 0;
 		if ($ack eq HMUARTLGW_ACK_WITH_MULTIPART_DATA) {
-			#040701010002fffffffffffffff9
-			$hash->{AssignedPeerCnt} = hex(substr($msg, 8, 4));
-			if (length($msg) > 12) {
-				$hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}} = substr($msg, 12);
-				$hash->{Helper}{UpdatePeer}{aes} = substr($msg, 12);
-			}
+			HMUARTLGW_ParsePeer($hash, $msg);
 		} else {
 			if ($hash->{Helper}{UpdatePeer}{operation} eq "+") {
 				Log3($hash, 1, "HMUARTLGW ${name} Adding peer $hash->{Helper}{UpdatePeer}{id} failed! " .
@@ -1023,13 +991,8 @@ sub HMUARTLGW_GetSetParameters($;$$)
 		if ($hash->{Helper}{UpdatePeer}{operation} eq "+") {
 			$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_AES1;
 		} else {
-			if (defined($hash->{Helper}{PeerQueue}) && @{$hash->{Helper}{PeerQueue}}) {
-				#Still peers in queue, get current assigned peers
-				#only when queue is empty
-				$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
-			} else {
-				$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_CFG;
-			}
+			delete($hash->{Helper}{UpdatePeer});
+			$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 		}
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_AES1) {
@@ -1038,30 +1001,16 @@ sub HMUARTLGW_GetSetParameters($;$$)
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_AES2) {
 		if ($hash->{Helper}{UpdatePeer}->{operation} eq "+") {
 			$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = "assigned";
+			$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_CFG;
 		} else {
 			delete($hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}});
-		}
-
-		if (defined($hash->{Helper}{PeerQueue}) && @{$hash->{Helper}{PeerQueue}}) {
-			#Still peers in queue, get current assigned peers
-			#only when queue is empty
+			delete($hash->{Helper}{UpdatePeer});
 			$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
-		} else {
-			$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_CFG;
 		}
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_CFG) {
 		if ($ack eq HMUARTLGW_ACK_WITH_MULTIPART_DATA) {
-			HMUARTLGW_ParsePeers($hash, $msg);
-
-			#more parts in multipart message?
-			if (hex(substr($msg, 4, 2)) < hex(substr($msg, 6, 2))) {
-				#there will be more messages
-				$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_CFG;
-				RemoveInternalTimer($hash);
-				InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
-				return;
-			}
+			HMUARTLGW_ParsePeer($hash, $msg);
 		}
 
 		delete($hash->{Helper}{UpdatePeer});
@@ -1141,7 +1090,7 @@ sub HMUARTLGW_Parse($$$$)
 		if ($msg =~ m/^00(..)/) {
 			my $running = pack("H*", substr($msg, 2));
 
-			if ($hash->{DevState} == HMUARTLGW_STATE_ENTER_APP) {
+			if ($hash->{DevState} <= HMUARTLGW_STATE_ENTER_APP) {
 				Log3($hash, 3, "HMUARTLGW ${name} currently running ${running}");
 
 				if ($running eq "Co_CPU_App") {
@@ -1149,7 +1098,14 @@ sub HMUARTLGW_Parse($$$$)
 					RemoveInternalTimer($hash);
 					InternalTimer(gettimeofday()+1, "HMUARTLGW_GetSetParameters", $hash, 0);
 				} else {
-					Log3($hash, 1, "HMUARTLGW ${name} failed to enter App!");
+					if ($hash->{DevState} == HMUARTLGW_STATE_QUERY_APP) {
+						$hash->{DevState} = HMUARTLGW_STATE_ENTER_APP;
+						HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
+						RemoveInternalTimer($hash);
+						InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+					} else {
+						Log3($hash, 1, "HMUARTLGW ${name} failed to enter App!");
+					}
 				}
 			} elsif ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP) {
 				Log3($hash, 1, "HMUARTLGW ${name} unexpected info about ${running} received (module crashed?), reopening")
@@ -1171,9 +1127,10 @@ sub HMUARTLGW_Parse($$$$)
 				Log3($hash, 3, "HMUARTLGW ${name} currently running ${running}");
 
 				if ($running eq "Co_CPU_App") {
-					$hash->{DevState} = HMUARTLGW_STATE_GETSET_PARAMETERS;
+					#Reset module
+					HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 					RemoveInternalTimer($hash);
-					InternalTimer(gettimeofday()+1, "HMUARTLGW_GetSetParameters", $hash, 0);
+					InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 				} else {
 					if (defined($hash->{FirmwareFile}) && $hash->{FirmwareFile} ne "") {
 						Log3($hash, 1, "HMUARTLGW ${name} starting firmware upgrade");
@@ -1322,7 +1279,7 @@ sub HMUARTLGW_Parse($$$$)
 			my $wait = 0;
 			if (!(hex($flags) & (1 << 5))) {
 				#!BIDI
-				$wait = 0.090;
+				$wait = 0.100;
 			} else {
 				$wait = 0.300;
 			}
