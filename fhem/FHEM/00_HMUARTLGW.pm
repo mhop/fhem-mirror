@@ -718,12 +718,14 @@ sub HMUARTLGW_ParsePeer($$) {
 	#040701010002fffffffffffffff9
 	$hash->{AssignedPeerCnt} = hex(substr($msg, 8, 4));
 	if (length($msg) > 12) {
+		$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = "assigned";
 		$hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}} = substr($msg, 12);
 		$hash->{Helper}{UpdatePeer}{aes} = $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}};
 		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
 			"HMUARTLGW $hash->{NAME} added peer: " . $hash->{Helper}{UpdatePeer}->{id} .
 			", aesChannels: " . $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
 	} else {
+		delete($hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}});
 		delete($hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
 		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
 			"HMUARTLGW $hash->{NAME} remove peer: ". $hash->{Helper}{UpdatePeer}->{id});
@@ -1000,10 +1002,8 @@ sub HMUARTLGW_GetSetParameters($;$$)
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_AES2) {
 		if ($hash->{Helper}{UpdatePeer}->{operation} eq "+") {
-			$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = "assigned";
 			$hash->{DevState} = HMUARTLGW_STATE_UPDATE_PEER_CFG;
 		} else {
-			delete($hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}});
 			delete($hash->{Helper}{UpdatePeer});
 			$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 		}
