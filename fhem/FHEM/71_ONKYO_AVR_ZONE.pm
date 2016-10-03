@@ -582,25 +582,26 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     my $channels_src = "internal";
     if (   defined( $hash->{helper}{receiver} )
         && ref( $hash->{helper}{receiver} ) eq "HASH"
-        && defined( $hash->{helper}{receiver}{device}{netservicelist}{count} )
-        && $hash->{helper}{receiver}{device}{netservicelist}{count} > 0 )
+        && defined( $IOhash->{helper}{receiver}{device}{netservicelist}{count} )
+        && $IOhash->{helper}{receiver}{device}{netservicelist}{count} > 0 )
     {
 
         foreach my $id (
             sort keys
-            %{ $hash->{helper}{receiver}{device}{netservicelist}{netservice} } )
+            %{ $IOhash->{helper}{receiver}{device}{netservicelist}{netservice} }
+          )
         {
             if (
                 defined(
-                    $hash->{helper}{receiver}{device}{netservicelist}
+                    $IOhash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$id}{value}
                 )
-                && $hash->{helper}{receiver}{device}{netservicelist}
+                && $IOhash->{helper}{receiver}{device}{netservicelist}
                 {netservice}{$id}{value} eq "1"
               )
             {
                 $channels_txt .=
-                  trim( $hash->{helper}{receiver}{device}{netservicelist}
+                  trim( $IOhash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$id}{name} )
                   . ",";
             }
@@ -780,10 +781,11 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                        defined( $hash->{helper}{receiver} )
                     && ref( $hash->{helper}{receiver} ) eq "HASH"
                     && defined(
-                        $hash->{helper}{receiver}{device}{netservicelist}{count}
+                        $IOhash->{helper}{receiver}{device}{netservicelist}
+                          {count}
                     )
-                    && $hash->{helper}{receiver}{device}{netservicelist}{count}
-                    > 0
+                    && $IOhash->{helper}{receiver}{device}{netservicelist}
+                    {count} > 0
                   )
                 {
 
@@ -791,19 +793,19 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
                     foreach my $id (
                         sort keys %{
-                            $hash->{helper}{receiver}{device}{netservicelist}
+                            $IOhash->{helper}{receiver}{device}{netservicelist}
                               {netservice}
                         }
                       )
                     {
                         if (
                             defined(
-                                $hash->{helper}{receiver}{device}
+                                $IOhash->{helper}{receiver}{device}
                                   {netservicelist}{netservice}{$id}{value}
                             )
-                            && $hash->{helper}{receiver}{device}
+                            && $IOhash->{helper}{receiver}{device}
                             {netservicelist}{netservice}{$id}{value} eq "1"
-                            && $hash->{helper}{receiver}{device}
+                            && $IOhash->{helper}{receiver}{device}
                             {netservicelist}{netservice}{$id}{name} eq
                             $channelname
                           )
