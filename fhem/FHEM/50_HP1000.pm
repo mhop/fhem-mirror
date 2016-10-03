@@ -461,11 +461,12 @@ sub HP1000_GetSum($$$$;$) {
     return $v if ( $avg && $hash->{INTERVAL} < 1 );
     return "0" if ( $hash->{INTERVAL} < 1 );
 
-    my $max = int( $s / $hash->{INTERVAL} );
+    my $max = sprintf( "%.0f", $s / $hash->{INTERVAL} );
+    $max = "1" if ( $max < 1 );
     my $return;
 
-    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, "$v";
-    my $v3 = splice @{ $hash->{helper}{history}{$t} }, "$max";
+    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v;
+    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max;
 
     Log3 $name, 5, "HP1000 $name: Updated history for $t:"
       . Dumper( $hash->{helper}{history}{$t} );
