@@ -710,7 +710,7 @@ ZWave_setEndpoints($)
   my $mp = $modules{ZWave}{defptr};
   for my $k (sort keys %{$mp}) {
     my $h = $mp->{$k};
-    delete($h->{endpointRoot});
+    delete($h->{endpointParent});
     delete($h->{endpointChildren});
   }
   for my $k (sort keys %{$mp}) {
@@ -718,10 +718,10 @@ ZWave_setEndpoints($)
     next if($h->{nodeIdHex} !~ m/(..)(..)/);
     my ($root, $lid) = ($1, $2);
     my $rd = $mp->{$h->{homeId}." ".$root};
-    $h->{endpointRoot} = ($rd ? $rd->{NAME} : "unknown");
+    $h->{endpointParent} = ($rd ? $rd->{NAME} : "unknown");
     if($rd) {
       if($rd->{endpointChildren}) {
-        $rd->{endpointChildren} .= " ".$h->{NAME};
+        $rd->{endpointChildren} .= ",".$h->{NAME};
       } else {
         $rd->{endpointChildren} = $h->{NAME};
       }
