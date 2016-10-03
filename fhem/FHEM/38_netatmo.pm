@@ -2551,6 +2551,8 @@ netatmo_parseForecast($$)
         foreach my $forecastdata ( @{$json->{body}{forecastDays}})
         {
 
+          next if(ref($forecastdata) ne "HASH");
+
           if(defined($forecastdata->{rain}))
           {
             readingsBeginUpdate($hash);
