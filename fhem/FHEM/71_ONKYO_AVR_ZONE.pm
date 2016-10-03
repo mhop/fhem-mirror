@@ -335,7 +335,8 @@ sub ONKYO_AVR_ZONE_Parse($$) {
                 # all other commands
                 else {
                     readingsBulkUpdate( $hash, $cmd, $value )
-                      if ( ReadingsVal( $name, $cmd, "-" ) ne $value );
+                      if ( ReadingsVal( $name, $cmd, "-" ) ne $value
+                        || $cmd =~ /^currentAlbumArt.*/ );
                 }
             }
 
@@ -1436,15 +1437,17 @@ sub ONKYO_AVR_ZONE_SendCommand($$$) {
         $value =~ s/_/ /g;
         if (
             defined(
-                $hash->{helper}{receiver}{device}{selectorlist}{selector}
+                $IOhash->{helper}{receiver}{device}{selectorlist}{selector}
             )
-            && ref( $hash->{helper}{receiver}{device}{selectorlist}{selector} )
+            && ref(
+                $IOhash->{helper}{receiver}{device}{selectorlist}{selector} )
             eq "ARRAY"
           )
         {
 
             foreach my $input (
-                @{ $hash->{helper}{receiver}{device}{selectorlist}{selector} } )
+                @{ $IOhash->{helper}{receiver}{device}{selectorlist}{selector} }
+              )
             {
                 if (   $input->{value} eq "1"
                     && $input->{zone} ne "00"
