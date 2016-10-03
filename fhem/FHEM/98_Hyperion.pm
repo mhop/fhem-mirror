@@ -529,7 +529,7 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd eq "rgb")
   {
-    return "Value of $cmd has to be in RGB hex format like ffffff or 3f7d90" if ($value !~ /^(\d|[a-f]){6}$/);
+    return "Value of $cmd has to be in rgb hex format like ffffff or 3f7d90" if ($value !~ /^(\d|[a-f]){6}$/);
     my ($r,$g,$b) = Color::hex2rgb($value);
     $obj{color} = [$r,$g,$b];
     $obj{command} = "color";
@@ -952,8 +952,8 @@ sub Hyperion_readingsBulkUpdateIfChanged($$$) {
       set the light on and restore previous state
     </li>
     <li>
-      <i>rgb &lt;RRGGBB&gt; [duration] [priority]</i><br>
-      set color in RGB Hex format with optional duration in seconds and priority
+      <i>rgb &lt;rrggbb&gt; [duration] [priority]</i><br>
+      set color in rgb hex format with optional duration in seconds and priority
     </li>
     <li>
       <i>saturationGain &lt;1.100&gt;</i><br>
