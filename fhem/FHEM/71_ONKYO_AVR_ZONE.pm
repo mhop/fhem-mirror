@@ -153,6 +153,26 @@ sub ONKYO_AVR_ZONE_Define($$$) {
             && AttrVal( $IOname, "group", "" ) ne "" );
     }
 
+    # Input alias handling
+    #
+    if ( defined( $attr{$name}{inputs} ) ) {
+        my @inputs = split( ':', $attr{$name}{inputs} );
+
+        if (@inputs) {
+            foreach (@inputs) {
+                if (m/[^,\s]+(,[^,\s]+)+/) {
+                    my @input_names = split( ',', $_ );
+
+                    $input_names[1] =~ s/\s/_/g;
+                    $hash->{helper}{receiver}{input_aliases}{ $input_names[0] }
+                      = $input_names[1];
+                    $hash->{helper}{receiver}{input_names}{ $input_names[1] } =
+                      $input_names[0];
+                }
+            }
+        }
+    }
+
     ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
     ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
     ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
@@ -236,12 +256,13 @@ sub ONKYO_AVR_ZONE_Parse($$) {
                       )
                     {
                         Log3 $name, 4,
-                            "ONKYO_AVR $name: Input aliasing '$value' to '"
+                            "ONKYO_AVR_AVR $name: Input aliasing '$value' to '"
                           . $hash->{helper}{receiver}{input_aliases}{$value}
                           . "'";
                         $value =
                           $hash->{helper}{receiver}{input_aliases}{$value};
                     }
+
                 }
 
                 # power
@@ -503,10 +524,10 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                     my @input_names = split( ',', $_ );
                     $inputs_txt .= $input_names[1] . ",";
                     $input_names[1] =~ s/\s/_/g;
-                    $IOhash->{helper}{receiver}{input_aliases}
-                      { $input_names[0] } = $input_names[1];
-                    $IOhash->{helper}{receiver}{input_names}{ $input_names[1] }
-                      = $input_names[0];
+                    $hash->{helper}{receiver}{input_aliases}{ $input_names[0] }
+                      = $input_names[1];
+                    $hash->{helper}{receiver}{input_names}{ $input_names[1] } =
+                      $input_names[0];
                 }
                 else {
                     $inputs_txt .= $_ . ",";
@@ -557,34 +578,49 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     }
 
     # list of network channels/services
-    if (   defined( $IOhash->{helper}{receiver} )
-        && ref( $IOhash->{helper}{receiver} ) eq "HASH"
-        && defined( $IOhash->{helper}{receiver}{device}{netservicelist}{count} )
-        && $IOhash->{helper}{receiver}{device}{netservicelist}{count} > 0 )
+    my $channels_src = "internal";
+    if (   defined( $hash->{helper}{receiver} )
+        && ref( $hash->{helper}{receiver} ) eq "HASH"
+        && defined( $hash->{helper}{receiver}{device}{netservicelist}{count} )
+        && $hash->{helper}{receiver}{device}{netservicelist}{count} > 0 )
     {
 
         foreach my $id (
             sort keys
-            %{ $IOhash->{helper}{receiver}{device}{netservicelist}{netservice} }
-          )
+            %{ $hash->{helper}{receiver}{device}{netservicelist}{netservice} } )
         {
             if (
                 defined(
-                    $IOhash->{helper}{receiver}{device}{netservicelist}
+                    $hash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$id}{value}
                 )
-                && $IOhash->{helper}{receiver}{device}{netservicelist}
+                && $hash->{helper}{receiver}{device}{netservicelist}
                 {netservice}{$id}{value} eq "1"
               )
             {
                 $channels_txt .=
-                  trim( $IOhash->{helper}{receiver}{device}{netservicelist}
+                  trim( $hash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$id}{name} )
                   . ",";
             }
         }
 
         $channels_txt =~ s/\s/_/g;
+        $channels_txt = substr( $channels_txt, 0, -1 );
+        $channels_src = "receiver";
+    }
+
+    # use general list of possible channels
+    else {
+        # Find out valid channels
+        my $channels =
+          ONKYOdb::ONKYO_GetRemotecontrolValue( "1",
+            ONKYOdb::ONKYO_GetRemotecontrolCommand( "1", "net-service" ) );
+
+        foreach my $channel ( sort keys %{$channels} ) {
+            $channels_txt .= $channel . ","
+              if ( !( $channel =~ /^(up|down|query)$/ ) );
+        }
         $channels_txt = substr( $channels_txt, 0, -1 );
     }
 
@@ -709,7 +745,14 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
     # create channelList reading for frontends
     readingsBulkUpdate( $hash, "channelList", $channels_txt )
-      if ( ReadingsVal( $name, "channelList", "-" ) ne $channels_txt );
+      if (
+        (
+            $channels_src eq "internal"
+            && ReadingsVal( $name, "channelList", "-" ) eq "-"
+        )
+        || ( $channels_src eq "receiver"
+            && ReadingsVal( $name, "channelList", "-" ) ne $channels_txt )
+      );
 
     # channel
     if ( lc( @$a[1] ) eq "channel" ) {
@@ -725,55 +768,75 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
                 $return .= fhem "sleep 1;set $name channel " . @$a[2];
             }
-            elsif (
-                ReadingsVal( $name, "channel", "" ) ne @$a[2]
-                && defined(
-                    $IOhash->{helper}{receiver}{device}{netservicelist}
-                      {netservice}
-                )
-              )
+            elsif ( ReadingsVal( $name, "channel", "" ) ne @$a[2]
+                || ( defined( @$a[3] ) && defined( @$a[4] ) ) )
             {
 
                 my $servicename = "";
                 my $channelname = @$a[2];
-                $channelname =~ s/_/ /g;
 
-                foreach my $id (
-                    sort keys %{
-                        $IOhash->{helper}{receiver}{device}{netservicelist}
-                          {netservice}
-                    }
+                if (
+                       defined( $hash->{helper}{receiver} )
+                    && ref( $hash->{helper}{receiver} ) eq "HASH"
+                    && defined(
+                        $hash->{helper}{receiver}{device}{netservicelist}{count}
+                    )
+                    && $hash->{helper}{receiver}{device}{netservicelist}{count}
+                    > 0
                   )
                 {
-                    if (
-                        defined(
-                            $IOhash->{helper}{receiver}{device}
-                              {netservicelist}{netservice}{$id}{value}
-                        )
-                        && $IOhash->{helper}{receiver}{device}
-                        {netservicelist}{netservice}{$id}{value} eq "1"
-                        && $IOhash->{helper}{receiver}{device}
-                        {netservicelist}{netservice}{$id}{name} eq $channelname
+
+                    $channelname =~ s/_/ /g;
+
+                    foreach my $id (
+                        sort keys %{
+                            $hash->{helper}{receiver}{device}{netservicelist}
+                              {netservice}
+                        }
                       )
                     {
-                        $servicename .= uc($id);
-                        $servicename .= "0" if ( !defined( @$a[3] ) );
-                        $servicename .= @$a[3] if ( defined( @$a[3] ) );
-                        $servicename .= @$a[4] if ( defined( @$a[4] ) );
-
-                        last;
+                        if (
+                            defined(
+                                $hash->{helper}{receiver}{device}
+                                  {netservicelist}{netservice}{$id}{value}
+                            )
+                            && $hash->{helper}{receiver}{device}
+                            {netservicelist}{netservice}{$id}{value} eq "1"
+                            && $hash->{helper}{receiver}{device}
+                            {netservicelist}{netservice}{$id}{name} eq
+                            $channelname
+                          )
+                        {
+                            $servicename .= uc($id);
+                            last;
+                        }
                     }
                 }
+                else {
+                    my $channels = ONKYOdb::ONKYO_GetRemotecontrolValue(
+                        "1",
+                        ONKYOdb::ONKYO_GetRemotecontrolCommand(
+                            "1", "net-service"
+                        )
+                    );
 
-                $return = "Unknown network service name " . @$a[2]
-                  if ( $servicename eq "" );
+                    $servicename = $channels->{$channelname}
+                      if ( defined( $channels->{$channelname} ) );
+                }
 
                 Log3 $name, 3,
                   "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
+                $servicename = uc($channelname)
+                  if ( $servicename eq "" );
+
+                $servicename .= "0"          if ( !defined( @$a[3] ) );
+                $servicename .= "1" . @$a[3] if ( defined( @$a[3] ) );
+                $servicename .= @$a[4]       if ( defined( @$a[4] ) );
+
                 $return =
-                  ONKYO_AVR_SendCommand( $IOhash, "net-service", $servicename )
-                  if ( $servicename ne "" );
+                  ONKYO_AVR_ZONE_SendCommand( $hash, "net-service",
+                    $servicename );
             }
         }
     }
@@ -1373,17 +1436,15 @@ sub ONKYO_AVR_ZONE_SendCommand($$$) {
         $value =~ s/_/ /g;
         if (
             defined(
-                $IOhash->{helper}{receiver}{device}{selectorlist}{selector}
+                $hash->{helper}{receiver}{device}{selectorlist}{selector}
             )
-            && ref(
-                $IOhash->{helper}{receiver}{device}{selectorlist}{selector} )
+            && ref( $hash->{helper}{receiver}{device}{selectorlist}{selector} )
             eq "ARRAY"
           )
         {
 
             foreach my $input (
-                @{ $IOhash->{helper}{receiver}{device}{selectorlist}{selector} }
-              )
+                @{ $hash->{helper}{receiver}{device}{selectorlist}{selector} } )
             {
                 if (   $input->{value} eq "1"
                     && $input->{zone} ne "00"
