@@ -62,8 +62,10 @@ my %zwave_class = (
     set   => { off         => "0100",
                on          => "01FF" },
     get   => { swbStatus   => "02",       },
-    parse => { "03250300"  => "state:off",
-               "032503ff"  => "state:on",
+    parse => { "..250300"  => "state:off",
+               "..2503ff"  => "state:on",
+               "052503(..)(..)(..)" => 'sprintf("swbStatus:%s target %s '.
+                          'duration %s", hex($1), hex($2), ZWave_duration($3))',
                "03250100"  => "state:setOff",
                "032501ff"  => "state:setOn"  } } ,
   SWITCH_MULTILEVEL        => { id => '26',
@@ -4521,6 +4523,14 @@ ZWave_Attr(@)
   return undef;
 }
 
+sub
+ZWave_duration($)
+{
+  my ($duration) = @_;
+  my $time = hex($duration);
+  $time = ($time - 0x7f) * 60 if($time>0x7f && $time<=0xfd);
+  return (lc($duration) eq "fe" ? "unknown" : "$time seconds");
+}
 
 #####################################
 # Show the help from the device.xml, if the correct entry is selected
