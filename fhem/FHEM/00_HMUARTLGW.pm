@@ -102,9 +102,11 @@ use constant {
 	HMUARTLGW_STATE_SEND_TIMED         => 102,
 	HMUARTLGW_STATE_UPDATE_COPRO       => 200,
 
-	HMUARTLGW_CMD_TIMEOUT              => 10,
+	HMUARTLGW_CMD_TIMEOUT              => 3,
+	HMUARTLGW_CMD_RETRY_CNT            => 3,
+	HMUARTLGW_FIRMWARE_TIMEOUT         => 10,
 	HMUARTLGW_SEND_TIMEOUT             => 10,
-	HMUARTLGW_RETRY_SECONDS            => 3,
+	HMUARTLGW_SEND_RETRY_SECONDS       => 3,
 	HMUARTLGW_BUSY_RETRY_MS            => 50,
 	HMUARTLGW_CSMACA_RETRY_MS          => 200,
 	HMUARTLGW_KEEPALIVE_SECONDS        => 10,
@@ -548,9 +550,9 @@ sub HMUARTLGW_SendPendingCmd($)
 			HMUARTLGW_GetSetParameterReq($hash);
 			shift(@{$hash->{Helper}{PendingCMD}}); #retry will be handled by GetSetParameter
 		} else {
-			#try for HMUARTLGW_RETRY_SECONDS, packet was not sent wirelessly yet!
+			#try for HMUARTLGW_SEND_RETRY_SECONDS, packet was not sent wirelessly yet!
 			if (defined($cmd->{RetryStart}) &&
-			    $cmd->{RetryStart} + HMUARTLGW_RETRY_SECONDS <= gettimeofday()) {
+			    $cmd->{RetryStart} + HMUARTLGW_SEND_RETRY_SECONDS <= gettimeofday()) {
 				my $oldmsg = shift(@{$hash->{Helper}{PendingCMD}});
 				Log3($hash, 1, "HMUARTLGW ${name} resend failed too often, dropping packet: 01 $oldmsg->{cmd}");
 				#try next command
@@ -1607,8 +1609,16 @@ sub HMUARTLGW_CheckCmdResp($)
 		RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
 		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 1);
 	} elsif ($hash->{DevState} != HMUARTLGW_STATE_RUNNING) {
-		Log3($hash, 1, "HMUARTLGW ${name} did not respond, reopening");
-		HMUARTLGW_Reopen($hash);
+		if ((!defined($hash->{Helper}{LastSendFrame})) ||
+		    (defined($hash->{Helper}{Resend}) &&
+		     $hash->{Helper}{Resend} >= HMUARTLGW_CMD_RETRY_CNT)) {
+			Log3($hash, 1, "HMUARTLGW ${name} did not respond after all, reopening");
+			HMUARTLGW_Reopen($hash);
+		} else {
+			$hash->{Helper}{Resend}++;
+			Log3($hash, 1, "HMUARTLGW ${name} did not respond for the " . $hash->{Helper}{Resend} . ". time, resending");
+			HMUARTLGW_send_frame($hash, $hash->{Helper}{LastSendFrame});
+		}
 	}
 
 	return;
@@ -1995,6 +2005,8 @@ sub HMUARTLGW_send($$$)
 
 	push @{$hash->{Helper}{LastSendLen}}, (length($hash->{Helper}{AckPending}{$hash->{CNT}}->{cmd}) / 2) + 2;
 	shift @{$hash->{Helper}{LastSendLen}} if (scalar(@{$hash->{Helper}{LastSendLen}}) > 2);
+	$hash->{Helper}{LastSendFrame} = unpack("H*", $frame);
+	delete($hash->{Helper}{Resend});
 
 	return $hash->{CNT};
 }
@@ -2212,7 +2224,7 @@ sub HMUARTLGW_updateCoPro($$) {
 	HMUARTLGW_send($hash, HMUARTLGW_OS_UPDATE_FIRMWARE . ${block}, HMUARTLGW_DST_OS);
 	$hash->{FirmwareBlock}++;
 
-	InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
+	InternalTimer(gettimeofday()+HMUARTLGW_FIRMWARE_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 }
 
 sub HMUARTLGW_getVerbLvl($$$$) {
