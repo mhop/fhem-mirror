@@ -2518,14 +2518,15 @@ FW_makeEdit($$$)
 }
 
 
-my %jsTab = ( 92=>'\\\\', 34=>'\\"', 9=>'\\t', 13=>'\\r', 10=>'\\n' );
 sub
 FW_longpollInfo($@)
 {
   my $fmt = shift;
   if($fmt && $fmt eq "JSON") {
     my @a;
-    map { my $x=$_; $x=~s/([\\"\t\r\n])/$jsTab{ord($1)}/ge; push @a,$x; } @_;
+    map { my $x = $_;
+          $x =~ s/([^\x20-\x7e]|[\x22\x5c])/sprintf '\u%04x', ord($1)/ge;
+          push @a,$x; } @_;
     return '["'.join('","', @a).'"]';
   } else {
     return join('<<', @_);
