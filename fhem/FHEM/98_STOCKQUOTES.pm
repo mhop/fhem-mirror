@@ -410,15 +410,18 @@ sub STOCKQUOTES_QueryQuotesFinished($)
     readingsBulkUpdate($hash, $i . "_d_buy_quote", ($stockCount == 0) ? 0 : sprintf("%.2f", $stockBuyPrice / $stockCount));
     # end
     
-    if (defined($stockValue) && defined($stockValuePrev))
+    if (defined($stockValue))
     {
-        readingsBulkUpdate($hash, $i . "_d_cur_value_total", sprintf("%.2f", $stockValue)) if defined $stockValue;
-        readingsBulkUpdate($hash, $i . "_d_prev_value_total", sprintf("%.2f", $stockValuePrev)) if defined $stockValuePrev;
-        readingsBulkUpdate($hash, $i . "_d_value_diff_total", sprintf("%.2f", $stockValue - $stockBuyPrice)) if defined $stockValue;
-        readingsBulkUpdate($hash, $i . "_d_p_change_total", ($stockBuyPrice == 0) ? 0 : sprintf("%.2f", 100.0 * (($stockValue / $stockBuyPrice) - 1 ))) if defined $stockValue;
+        readingsBulkUpdate($hash, $i . "_d_cur_value_total", sprintf("%.2f", $stockValue));
+        readingsBulkUpdate($hash, $i . "_d_value_diff_total", sprintf("%.2f", $stockValue - $stockBuyPrice));
+        readingsBulkUpdate($hash, $i . "_d_p_change_total", ($stockBuyPrice == 0) ? 0 : sprintf("%.2f", 100.0 * (($stockValue / $stockBuyPrice) - 1 )));
         
         my $valueDiff = (defined $previous and defined $last) ? $stockCount * ($last - $previous) : undef;
         readingsBulkUpdate($hash, $i . "_d_value_diff", sprintf("%.2f", $valueDiff)) if defined $valueDiff;
+    }
+    if (defined($stockValuePrev))
+    {
+        readingsBulkUpdate($hash, $i . "_d_prev_value_total", sprintf("%.2f", $stockValuePrev));
     }   
   }
   
@@ -465,6 +468,9 @@ sub STOCKQUOTES_QueryQuotesFinished($)
 1;
 
 =pod
+=item device
+=item summary fetches stock quotes from data sources
+=item summary_DE Kursdaten von Wertpapieren
 =begin html
 
 <a name="STOCKQUOTES"></a>
