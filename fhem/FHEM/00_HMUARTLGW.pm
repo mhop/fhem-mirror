@@ -1609,15 +1609,17 @@ sub HMUARTLGW_CheckCmdResp($)
 		RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
 		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 1);
 	} elsif ($hash->{DevState} != HMUARTLGW_STATE_RUNNING) {
-		if ((!defined($hash->{Helper}{LastSendFrame})) ||
-		    (defined($hash->{Helper}{Resend}) &&
-		     $hash->{Helper}{Resend} >= HMUARTLGW_CMD_RETRY_CNT)) {
+		if ((!defined($hash->{Helper}{AckPending}{$hash->{CNT}}{frame})) ||
+		    (defined($hash->{Helper}{AckPending}{$hash->{CNT}}{resend}) &&
+		     $hash->{Helper}{AckPending}{$hash->{CNT}}{resend} >= HMUARTLGW_CMD_RETRY_CNT)) {
 			Log3($hash, 1, "HMUARTLGW ${name} did not respond after all, reopening");
 			HMUARTLGW_Reopen($hash);
 		} else {
-			$hash->{Helper}{Resend}++;
-			Log3($hash, 1, "HMUARTLGW ${name} did not respond for the " . $hash->{Helper}{Resend} . ". time, resending");
-			HMUARTLGW_send_frame($hash, pack("H*", $hash->{Helper}{LastSendFrame}));
+			$hash->{Helper}{AckPending}{$hash->{CNT}}{resend}++;
+			Log3($hash, 1, "HMUARTLGW ${name} did not respond for the " .
+			     $hash->{Helper}{AckPending}{$hash->{CNT}}{resend} .
+			     ". time, resending");
+			HMUARTLGW_send_frame($hash, pack("H*", $hash->{Helper}{AckPending}{$hash->{CNT}}{frame}));
 			InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 		}
 	}
@@ -2000,13 +2002,13 @@ sub HMUARTLGW_send($$$)
 	}
 	$hash->{Helper}{AckPending}{$hash->{CNT}} = {
 		cmd => uc($msg),
+		frame => uc(unpack("H*", $frame)),
 		dst => $dst,
 		time => $sendtime,
 	};
 
 	push @{$hash->{Helper}{LastSendLen}}, (length($hash->{Helper}{AckPending}{$hash->{CNT}}->{cmd}) / 2) + 2;
 	shift @{$hash->{Helper}{LastSendLen}} if (scalar(@{$hash->{Helper}{LastSendLen}}) > 2);
-	$hash->{Helper}{LastSendFrame} = unpack("H*", $frame);
 	delete($hash->{Helper}{Resend});
 
 	return $hash->{CNT};
