@@ -1617,7 +1617,8 @@ sub HMUARTLGW_CheckCmdResp($)
 		} else {
 			$hash->{Helper}{Resend}++;
 			Log3($hash, 1, "HMUARTLGW ${name} did not respond for the " . $hash->{Helper}{Resend} . ". time, resending");
-			HMUARTLGW_send_frame($hash, $hash->{Helper}{LastSendFrame});
+			HMUARTLGW_send_frame($hash, pack("H*", $hash->{Helper}{LastSendFrame}));
+			InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 		}
 	}
 
