@@ -55,7 +55,17 @@ JsonEscape($)
 {
   my $a = shift;
   return "null" if(!$a);
-  $a=~ s/([^\x20-\x7e]|[\x22\x5c])/sprintf '\u%04x', ord($1)/ge;
+  my %esc = ( 
+    "\n" => '\n',
+    "\r" => '\r',
+    "\t" => '\t',
+    "\f" => '\f',
+    "\b" => '\b', 
+    "\"" => '\"',
+    "\\" => '\\\\',
+    "\'" => '\\\'',
+  );
+  $a =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
   return $a;
 }
 
