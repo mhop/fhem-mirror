@@ -100,7 +100,8 @@ my %fhttfk_c2b;	# command->button hash
 my %canset = (
   "01" => "Open",
   "02" => "Closed",
-  "0c" => "Syncing");
+  "0c" => "Syncing",
+  "ff" => "ReSync");
 
 # -wusel, 2009-11-06
 #
@@ -184,6 +185,11 @@ CUL_FHTTK_Set($@)
     # window state switch to closed through cul FW implementation
     $opt = "Closed";
 
+  } elsif($opt eq "ReSync" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) resyncing with FHT80b.";
+
+    IOWrite($hash, "", sprintf("T%s%s", $hash->{CODE}, $fhttfk_c2b{$opt})); # 0xff - ReSync
+    
   } else {
     return "Unknown argument $a[1], choose one of Syncing Open Closed"
   }
@@ -383,6 +389,8 @@ CUL_FHTTK_Parse($$)
       Syncing     # start the sync with FHT80B (activate FHT80B sync mode before) - state after syncing is Closed<br>
       Closed      # set window state to Closed<br>
       Open        # set window state to Open<br>
+      ReSync      # resync virtual sensor with FHT80b after a reset of CUL device. In other words, perform a virtual
+                    battery exchange to synchronize the sensor with FHT80b device again.<br>
     </code></ul>
     </ul>
     <br>
@@ -456,6 +464,8 @@ CUL_FHTTK_Parse($$)
       Syncing     # startet die Synchronisation mit dem FHT80B (FHT80B muss sich im Sync mode befinden) - danach wird der state auf "Closed" gesetzt<br>
       Closed      # setzt den Fensterstatus zu Closed<br>
       Open        # setzt den Fensterstatus zu Open<br>
+      ReSync      # neu synchronisieren des virtuellen Sensor mit dem FHT80b Module. Damit wird ein virtueller Batteriewechsel symuliert und der angelernte
+                    Sensor wieder aufsynchronisiert.<br>
     </code></ul>
     </ul>
     <br>
