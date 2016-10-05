@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+
+  - feature: 73_ElectricityCalculator: header and readingFnAttributes added
+  - feature: 73_GasCalculator: header and readingFnAttributes added
+  - feature: 73_km200: header and readingFnAttributes added 
   - feature: 93_DbRep: function minValue added
   - bugfix:  38_netatmo: fix for invalid forecast data crashing FHEM
   - feature: 98_Hyperion: version check for hyperion server
