@@ -40,7 +40,7 @@ sub HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 noshutdown:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
 }
 
 sub
@@ -183,6 +183,8 @@ sub HUEBridge_fillBridgeInfo($$)
     $attr{$name}{icon} = 'hue_filled_bridge_v1' if( $hash->{modelid} && $hash->{modelid} eq 'BSB001' );
     $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} && $hash->{modelid} eq 'BSB002' );
   }
+
+  $hash->{noshutdown} = AttrVal($name,'noshutdown', $hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0;
 }
 
 sub
@@ -1068,7 +1070,7 @@ HUEBridge_HTTP_Call($$$;$)
   }
   #Log3 $name, 3, "Url: " . $uri;
   Log3 $name, 4, "using HUEBridge_HTTP_Request: $method ". ($path?$path:'');
-  my $ret = HUEBridge_HTTP_Request(0,$uri,$method,undef,$obj,undef);
+  my $ret = HUEBridge_HTTP_Request(0,$uri,$method,undef,$obj,$hash->{noshutdown});
   #Log3 $name, 3, Dumper $ret;
   if( !defined($ret) ) {
     return undef;
@@ -1140,7 +1142,7 @@ HUEBridge_HTTP_Call2($$$$;$)
       url => $url,
       timeout => 4,
       method => $method,
-      noshutdown => 1,
+      noshutdown => $hash->{noshutdown},
       header => "Content-Type: application/json",
       data => $obj,
     });
@@ -1170,7 +1172,7 @@ HUEBridge_HTTP_Call2($$$$;$)
       url => $url,
       timeout => 10,
       method => $method,
-      noshutdown => 1,
+      noshutdown => $hash->{noshutdown},
       header => "Content-Type: application/json",
       data => $obj,
       hash => $hash,
@@ -1376,7 +1378,7 @@ HUEBridge_HTTP_Request($$$@)
   $hdr .= "\r\n\r\n";
   syswrite $conn, $hdr;
   syswrite $conn, $data if(defined($data));
-  #shutdown $conn, 1 if(!$noshutdown);
+  shutdown $conn, 1 if(!$noshutdown);
 
   my ($buf, $ret) = ("", "");
   $conn->timeout($timeout);
@@ -1441,6 +1443,15 @@ HUEBridge_Attr($$$)
 
     readingsSingleUpdate($hash, 'state', IsDisabled($name)?'disabled':'active', 1 );
     HUEBridge_OpenDev($hash) if( !IsDisabled($name) );
+  } elsif( $attrName eq "noshutdown" ) {
+    my $hash = $defs{$name};
+
+    if( $cmd eq 'set' ) {
+      $hash->{noshutdown} = $attrVal;
+    } else {
+      $hash->{noshutdown} = ($hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0;
+    }
+
   }
 
   if( $cmd eq 'set' ) {
@@ -1576,6 +1587,16 @@ HUEBridge_Attr($$$)
       the bridge will poll all devices instead of each device itself. default is 1.</li>
     <li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
+    <li>noshutdown<br>
+      Some bridge devcies require a different type of connection handling. raspbee/deconz only works if the connection
+      is not immediately closed, the phillips hue bridge works better if the connection is immediately closed. This module
+      tries to autodetect the bridge device type. the type of connection handling can be seen in the noshutdown internal
+      and can be overwritten with the noshutdown attribute.  </li>
+  </ul><br>
+</ul><br>
+
+=end html
+=cut
   </ul><br>
 </ul><br>
 
