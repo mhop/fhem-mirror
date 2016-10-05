@@ -1217,6 +1217,8 @@ DUOFERN_Parse($$)
     }
     
     my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
+    $chan = "01" if ($code =~ m/^(61|70|71)..../);
+    
     my @chans;
     if ($sensorMsg{$id}{chan} == 5) {
       for(my $x=0; $x<5; $x++)  {
