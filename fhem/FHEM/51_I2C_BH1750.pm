@@ -110,7 +110,7 @@ sub I2C_BH1750_Initialize($)
     $hash->{AttrFn}   = "I2C_BH1750_Attr";
     $hash->{SetFn}    = "I2C_BH1750_Set";
     $hash->{I2CRecFn} = 'I2C_BH1750_I2CRec';
-    $hash->{AttrList} = "poll_interval:0.2,0.5,1,2,5,10,20,30,60 IODev percentdelta correction ". 
+    $hash->{AttrList} = "poll_interval:0.1,0.2,0.5,1,2,5,10,20,30,60 IODev percentdelta correction ". 
         $readingFnAttributes;
     $hash->{VERSION}  = '$Id$';
 }
@@ -209,8 +209,8 @@ sub I2C_BH1750_Attr (@)
             $hash->{BASEINTERVAL} = 0;   
             $hash->{PollState}    = BH1750_POLLSTATE_IDLE; 
         } else {
-            if($val !~ /^\d+$/ or $val < 1) {
-                return $error."needs interger value";
+            if($val !~ /^\d+/) {
+                return $error."needs numeric value";
             } else {
                 $hash->{BASEINTERVAL} = 60*$val;   
                 I2C_BH1750_Restart_Measure($hash,$hash->{RESTARTDELAY});
@@ -510,6 +510,9 @@ sub I2C_BH1750_sleep
 1;
 
 =pod
+=item device
+=item summary support for the BH1750 I2C light sensor
+=item summary_DE Unterst&uuml;tzung f&uuml;r den BH1750 I2C Lichtsensor
 =begin html
 
 <a name="I2C_BH1750"></a>
@@ -602,7 +605,7 @@ sub I2C_BH1750_sleep
       <li>poll_interval<br>
         Set the polling interval in minutes to query the sensor for new measured  values.
         By changing this attribute a new illumination measurement will be triggered.<br>
-        valid values: 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60<br>
+        valid values: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60<br>
       </li>
       <li>percentdelta<br>
         If set a luminosity reading is only generated if 
