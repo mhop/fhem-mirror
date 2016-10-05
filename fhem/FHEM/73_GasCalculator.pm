@@ -62,6 +62,7 @@ sub GasCalculator_Initialize($)
 	$hash->{NotifyOrderPrefix}	= "10-";   					# Want to be called before the rest
 
 	$hash->{AttrList}       	= "disable:0,1 " .
+								  "header " .
 								  "GasCounterOffset " .
 								  "GasCubicPerCounts " .
 								  "GaszValue " .
@@ -72,7 +73,8 @@ sub GasCalculator_Initialize($)
 								  "MonthOfAnnualReading " .
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
 								  "Volume:m&#179;,ft&#179; " .
-								  "Currency:&#8364;,&#163;,&#36; ";
+								  "Currency:&#8364;,&#163;,&#36; " .
+								   $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
 
