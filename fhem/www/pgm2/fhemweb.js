@@ -635,7 +635,15 @@ FW_doUpdate()
         } else {
           if(d[2].match(/\n/))
             d[2] = '<pre>'+d[2]+'</pre>';
-          $(this).html(d[2]);     // Readings-Value
+          
+          var ma = /^<html>(.*)<\/html>$/.exec(d[2]);
+          if(!d[0].match("-")) // not a reading
+            $(this).html(d[2]);
+          else if(ma)
+            $(this).html(ma[1]);
+          else
+            $(this).text(d[2]);
+
           if(d[0].match(/-ts$/))  // timestamps
             $(this).addClass('changed');
           $(this).find("a").each(function() { FW_replaceLink(this) });
