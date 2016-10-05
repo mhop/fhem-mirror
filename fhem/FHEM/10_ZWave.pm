@@ -721,6 +721,7 @@ ZWave_setEndpoints($)
     my ($root, $lid) = ($1, $2);
     my $rd = $mp->{$h->{homeId}." ".$root};
     $h->{endpointParent} = ($rd ? $rd->{NAME} : "unknown");
+    $h->{".vclasses"} = ($rd ? $rd->{".vclasses"} : {} );
     if($rd) {
       if($rd->{endpointChildren}) {
         $rd->{endpointChildren} .= ",".$h->{NAME};
