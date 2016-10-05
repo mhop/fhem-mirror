@@ -25,17 +25,7 @@ JsonList2_Escape($)
 {
   my $a = shift;
   return "null" if(!defined($a));
-  my %esc = ( 
-    "\n" => '\n',
-    "\r" => '\r',
-    "\t" => '\t',
-    "\f" => '\f',
-    "\b" => '\b', 
-    "\"" => '\"',
-    "\\" => '\\\\',
-    "\'" => '\\\'',
-  );
-  $a =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
+  $a=~ s/([\x00-\x19\x22\x5c])/sprintf '\u%04x', ord($1)/ge; # Forum 57377
   my $b = "x$a";
   $a = "<BINARY>" if(!utf8::decode($b)); # Forum #55318
   return $a;
