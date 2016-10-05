@@ -61,6 +61,7 @@ sub ElectricityCalculator_Initialize($)
 	$hash->{NotifyOrderPrefix}	= "10-";   							# Want to be called before the rest
 
 	$hash->{AttrList}       	= "disable:0,1 " .
+								  "header " .
 								  "ElectricityCounterOffset " .
 								  "ElectricityKwhPerCounts " .
 								  "BasicPricePerAnnum " .
@@ -69,7 +70,8 @@ sub ElectricityCalculator_Initialize($)
 								  "MonthOfAnnualReading " .
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
 								  "SiPrefixPower:W,kW,MW,GW " .
-								  "Currency:&#8364;,&#163;,&#36; ";
+								  "Currency:&#8364;,&#163;,&#36; " .
+								  $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -1054,6 +1056,19 @@ sub ElectricityCalculator_Notify($$)
 	</table>
 </ul></ul>
 
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        One value of the pre-defined list: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
+																			It defines which SI-prefix for the power value shall be used. The power value will be divided accordingly by multiples of 1000.
+																			The default value is W (Watt).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
 <BR>
 
 <table>
@@ -1595,6 +1610,19 @@ sub ElectricityCalculator_Notify($$)
 																			Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>
 																			Das CounterDevice    ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>
 																			Der Standard-Wert ist CalculatorDevice.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        Ein Wert der vorgegebenen Auswahlliste: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
+																			Es definiert welcher SI-Prefix verwendet werden soll und teilt die Leistung entsprechend durch ein Vielfaches von 1000.
+																			Der Standard-Wert ist W (Watt).<BR>
 			</td></tr>
 			</td>
 		</tr>
