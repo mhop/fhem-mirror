@@ -80,6 +80,7 @@ sub km200_Initialize($)
 	$hash->{DbLog_splitFn}   = "km200_DbLog_splitFn";
 
     $hash->{AttrList}        = "do_not_notify:1,0 " .
+							   "header " .
 							   "disable:1,0 " .
 						       "loglevel:0,1,2,3,4,5,6 " .
 						       "IntervalDynVal " .
