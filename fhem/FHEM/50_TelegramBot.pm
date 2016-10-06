@@ -145,21 +145,30 @@
 #   Add \t for messages texts - will be a single space in the message
 # 1.8 2016-05-05 UNicode / Umlaute handling changed, \t added 
 
-#   
+#   Add unescaping of filenames for send - this allows also spaces (%20)
+#   Attribut filenameUrlEscape allows switching on urlescaping for filenames
+#   Caption also for documents
+#   Location and venue received as message type
+#   sendLocation command
+#   add attribute for timeout on do execution (similar to polling) --> cmdTimeout - timeout in do_params / Forum msg480844
+#   fix for timeout on sent and addtl log - forum msg497239
+#   change log levels for deep encoding
+#   add summary for fhem commandref
+# 1.9 2016-10-06 urlescaped filenames / location send-receive / timeout for send 
+
+#
 #   
 ##############################################################################
 # TASKS 
 #   
-#   allow literals in msges: U+27F2 - \xe2\x9f\xb2 / Forum msg458794
-#   
-#   Look for solution on space at beginning of line --> checked that data is sent correctly to telegram but does not end up in the message
-#
 #   allow keyboards in the device api
 #   
-#   dialog function
-#   
+#   Wait: Look for solution on space at beginning of line --> checked that data is sent correctly to telegram but does not end up in the message
+#
 ##############################################################################
 # Ideas / Future
+#   
+#   Idea: allow literals in msges: U+27F2 - \xe2\x9f\xb2 / Forum msg458794
 #
 ##############################################################################
 
@@ -177,6 +186,8 @@ use Encode;
 use JSON; 
 
 use File::Basename;
+
+use URI::Escape;
 
 use Scalar::Util qw(reftype looks_like_number);
 
@@ -210,6 +221,8 @@ my %sets = (
   "sendDocument" => "textField",
   "sendMedia" => "textField",
   "sendVoice" => "textField",
+
+  "sendLocation" => "textField",
 
   "replaceContacts" => "textField",
   "reset" => undef,
@@ -276,8 +289,9 @@ sub TelegramBot_Initialize($) {
   $hash->{GetFn}      = "TelegramBot_Get";
   $hash->{SetFn}      = "TelegramBot_Set";
   $hash->{AttrFn}     = "TelegramBot_Attr";
-  $hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 pollingTimeout cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer ". "cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None ".
-  "allowUnknownContacts:1,0 textResponseConfirm:textField textResponseCommands:textField allowedCommands ". 
+  $hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer ". "cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None ".
+  "cmdTimeout pollingTimeout ".
+  "allowUnknownContacts:1,0 textResponseConfirm:textField textResponseCommands:textField allowedCommands filenameUrlEscape:1,0 ". 
   "textResponseFavorites:textField textResponseResult:textField textResponseUnauthorized:textField ".
   " maxRetries:0,1,2,3,4,5 ".$readingFnAttributes;           
 }
@@ -451,12 +465,25 @@ sub TelegramBot_Set($@)
       $sendType = 2;
     } elsif ( ($cmd eq 'sendDocument') || ($cmd eq 'sendMedia') ) {
       $sendType = 3;
+    } elsif ($cmd eq 'sendLocation')  {
+      $sendType = 10;
     }
 
     my $msg;
     my $addPar;
     
-    if ( $sendType > 0 ) {
+    if ( $sendType >= 10 ) {
+      # location
+      
+      return "TelegramBot_Set: Command $cmd, 2 parameters latitude / longitude need to be specified" if ( int(@args) != 2 );      
+
+      # first latitude
+      $msg = shift @args;
+
+      # first latitude
+      $addPar = shift @args;
+      
+    } elsif ( $sendType > 0 ) {
       # should return undef if succesful
       $msg = shift @args;
       $msg = $1 if ( $msg =~ /^\"(.*)\"$/ );
@@ -1191,7 +1218,7 @@ sub TelegramBot_DoUrlCommand($$)
 
 #####################################
 # INTERNAL: Function to send a photo (and text message) to a peer and handle result
-# addPar is caption for images / keyboard for text
+# addPar is caption for images / keyboard for text / longituted for location (isMedia 10)
 sub TelegramBot_SendIt($$$$$;$$)
 {
   my ( $hash, @args) = @_;
@@ -1255,6 +1282,11 @@ sub TelegramBot_SendIt($$$$$;$$)
   $TelegramBot_hu_do_params{header} = $TelegramBot_header;
   delete( $TelegramBot_hu_do_params{args} );
   delete( $TelegramBot_hu_do_params{boundary} );
+
+  
+  my $timeout =   AttrVal($name,'cmdTimeout',30);
+  $TelegramBot_hu_do_params{timeout} = $timeout;
+
   # only for test / debug               
 #  $TelegramBot_hu_do_params{loglevel} = 3;
 
@@ -1285,6 +1317,18 @@ sub TelegramBot_SendIt($$$$$;$$)
   
       # add msg (no file)
       $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
+      
+    } elsif ( $isMedia == 10 ) {
+      # Location send    
+      $hash->{sentMsgText} = "Location: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
+          (( defined( $addPar ) )?" - ".$addPar:"");
+
+      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendLocation";
+
+      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "latitude", undef, $msg, 0 ) if ( ! defined( $ret ) );
+
+      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "longitude", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+      $addPar = undef;
       
     } elsif ( abs($isMedia) == 1 ) {
       # Photo send    
@@ -1352,6 +1396,7 @@ sub TelegramBot_SendIt($$$$$;$$)
 #    $TelegramBot_hu_do_params{data} = encode_utf8(decode_utf8($TelegramBot_hu_do_params{data}));
 # Debug "send b command  :".$TelegramBot_hu_do_params{data}.":";
     
+    Log3 $name, 4, "TelegramBot_SendIt $name: timeout for sent :".$TelegramBot_hu_do_params{timeout}.": ";
     HttpUtils_NonblockingGet( \%TelegramBot_hu_do_params);
 
   }
@@ -1394,6 +1439,9 @@ sub TelegramBot_AddMultipart($$$$$$)
   if ( defined( $parname ) ) {
     $params->{data} .= "--".$params->{boundary}."\r\n";
     if ( $isMedia > 0) {
+      # url decode filename
+      $parcontent = uri_unescape($parcontent) if ( AttrVal($name,'filenameUrlEscape',0) );
+
       my $baseFilename =  basename($parcontent);
       $parheader = "Content-Disposition: form-data; name=\"".$parname."\"; filename=\"".$baseFilename."\"\r\n".$parheader."\r\n";
 
@@ -1561,13 +1609,13 @@ sub TelegramBot_Deepencode
     for (@_) {
         my $reftype= ref $_;
         if( $reftype eq "ARRAY" ) {
-            Log3 $name, 4, "TelegramBot_Deepencode $name: found an ARRAY";
+            Log3 $name, 5, "TelegramBot_Deepencode $name: found an ARRAY";
             push @result, [ TelegramBot_Deepencode($name, @$_) ];
         }
         elsif( $reftype eq "HASH" ) {
             my %h;
             @h{keys %$_}= TelegramBot_Deepencode($name, values %$_);
-            Log3 $name, 4, "TelegramBot_Deepencode $name: found a HASH";
+            Log3 $name, 5, "TelegramBot_Deepencode $name: found a HASH";
             push @result, \%h;
         }
         else {
@@ -1575,7 +1623,7 @@ sub TelegramBot_Deepencode
             if ( utf8::is_utf8($us) ) {
               $us = encode_utf8( $_ );
             }
-            Log3 $name, 4, "TelegramBot_Deepencode $name: encoded a String from :".$_.": to :".$us.":";
+            Log3 $name, 5, "TelegramBot_Deepencode $name: encoded a String from :".$_.": to :".$us.":";
             push @result, $us;
         }
     }
@@ -1846,6 +1894,7 @@ sub TelegramBot_ParseMsg($$$)
 
     $mfileid = $subtype->{file_id};
 
+    $mtext .= " # Caption: ".$message->{caption} if ( defined( $message->{caption} ) );
     $mtext .= " # Name: ".$subtype->{file_name} if ( defined( $subtype->{file_name} ) );
     $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
     $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
@@ -1890,6 +1939,30 @@ sub TelegramBot_ParseMsg($$$)
       $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
       Log3 $name, 4, "TelegramBot_ParseMsg $name: photo fileid: $mfileid";
     }
+  } elsif ( defined( $message->{venue} ) ) {
+    # handle location type message
+    my $ven = $message->{venue};
+    my $loc = $ven->{location};
+    
+    $mtext = "received venue ";
+
+    $mtext .= " # latitude: ".$loc->{latitude}." # longitude: ".$loc->{longitude};
+    $mtext .= " # title: ".$ven->{title}." # address: ".$ven->{address};
+    
+# urls will be discarded in fhemweb    $mtext .= "\n# url: <a href=\"http://maps.google.com/?q=loc:".$loc->{latitude}.",".$loc->{longitude}."\">maplink</a>";
+    
+    Log3 $name, 4, "TelegramBot_ParseMsg $name: location received: latitude: ".$loc->{latitude}." longitude: ".$loc->{longitude};;
+  } elsif ( defined( $message->{location} ) ) {
+    # handle location type message
+    my $loc = $message->{location};
+    
+    $mtext = "received location ";
+
+    $mtext .= " # latitude: ".$loc->{latitude}." # longitude: ".$loc->{longitude};
+    
+# urls will be discarded in fhemweb    $mtext .= "\n# url: <a href=\"http://maps.google.com/?q=loc:".$loc->{latitude}.",".$loc->{longitude}."\">maplink</a>";
+    
+    Log3 $name, 4, "TelegramBot_ParseMsg $name: location received: latitude: ".$loc->{latitude}." longitude: ".$loc->{longitude};;
   }
 
 
@@ -2535,6 +2608,8 @@ sub TelegramBot_BinaryFileWrite($$$) {
 1;
 
 =pod
+=item summary    send and receive of messages through telegram instant messaging
+=item summary_DE senden und empfangen von Nachrichten durch telegram IM
 =begin html
 
 <a name="TelegramBot"></a>
@@ -2566,7 +2641,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
   </ul>   
   <br><br>
 
-  The TelegramBot module allows receiving of (text) messages from any peer (telegram user) and can send text messages to known users.
+  The TelegramBot module allows receiving of messages from any peer (telegram user) and can send messages to known users.
   The contacts/peers, that are known to the bot are stored in a reading (named <code>Contacts</code>) and also internally in the module in a hashed list to allow the usage 
   of contact ids and also full names and usernames. Contact ids are made up from only digits, user names are prefixed with a @, group names are prefixed with a #. 
   All other names will be considered as full names of contacts. Here any spaces in the name need to be replaced by underscores (_).
@@ -2577,6 +2652,8 @@ sub TelegramBot_BinaryFileWrite($$$) {
   <br><br>
   Updates and messages are received via long poll of the GetUpdates message. This message currently supports a maximum of 20 sec long poll. 
   In case of failures delays are taken between new calls of GetUpdates. In this case there might be increasing delays between sending and receiving messages! 
+  <br>
+  Beside pure text messages also media messages can be sent and received. This includes audio, video, images, documents, locations and venues.
   <br><br>
   <a name="TelegramBotdefine"></a>
   <b>Define</b>
@@ -2626,6 +2703,12 @@ sub TelegramBot_BinaryFileWrite($$$) {
     </li>
     <li><code>sendVoice [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt;</code><br>Sends a voice message for playing directly in the browser to the given peer(s) or if ommitted to the default peer. Handling for files and peers is as specified above.
     </li>
+
+  <br>
+    <li><code>sendLocation [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;latitude&gt; &lt;longitude&gt;</code><br>Sends a location as pair of coordinates latitude and longitude as floating point numbers 
+    <br>Example: <code>set aTelegramBotDevice sendLocation @@someusername 51.163375 10.447683</code> will send the coordinates of the geographical center of Germany as location.
+    </li>
+
   <br>
     <li><code>replaceContacts &lt;text&gt;</code><br>Set the contacts newly from a string. Multiple contacts can be separated by a space. 
     Each contact needs to be specified as a triple of contact id, full name and user name as explained above. </li>
@@ -2719,8 +2802,15 @@ sub TelegramBot_BinaryFileWrite($$$) {
     <li><code>pollingVerbose &lt;0_None 1_Digest 2_Log&gt;</code><br>Used to limit the amount of logging for errors of the polling connection. These errors are happening regularly and usually are not consider critical, since the polling restarts automatically and pauses in case of excess errors. With the default setting "1_Digest" once a day the number of errors on the last day is logged (log level 3). With "2_Log" every error is logged with log level 2. With the setting "0_None" no errors are logged. In any case the count of errors during the last day and the last error is stored in the readings <code>PollingErrCount</code> and <code>PollingLastError</code> </li> 
     
   <br>
+    <li><code>cmdTimeout &lt;number&gt;</code><br>Used to specify the timeout for sending commands. The default is a value of 30 seconds, which should be normally fine for most environments. In the case of slow or on-demand connections to the internet this parameter can be used to specify a longer time until a connection failure is considered.
+    </li> 
+
+  <br>
     <li><code>maxFileSize &lt;number of bytes&gt;</code><br>Maximum file size in bytes for transfer of files (images). If not set the internal limit is specified as 10MB (10485760B).
     </li> 
+    <li><code>filenameUrlEscape &lt;0 or 1&gt;</code><br>Specify if filenames can be specified using url escaping, so that special chanarcters as in URLs. This specifically allows to specify spaces in filenames as <code>%20</code>. Default is off (0).
+    </li> 
+
     <li><code>maxReturnSize &lt;number of chars&gt;</code><br>Maximum size of command result returned as a text message including header (Default is unlimited). The internal shown on the device is limited to 1000 chars.
     </li> 
     <li><code>maxRetries &lt;0,1,2,3,4,5&gt;</code><br>Specify the number of retries for sending a message in case of a failure. The first retry is sent after 10sec, the second after 100, then after 1000s (~16min), then after 10000s (~2.5h), then after approximately a day. Setting the value to 0 (default) will result in no retries.
@@ -2752,7 +2842,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
     For secret chats a value of -1 will be given, since the msgIds of secret messages are not part of the consecutive numbering</li> 
     <li>msgPeer &lt;text&gt;<br>The sender name of the last received message (either full name or if not available @username)</li> 
     <li>msgPeerId &lt;text&gt;<br>The sender id of the last received message</li> 
-    <li>msgText &lt;text&gt;<br>The last received message text is stored in this reading.</li> 
+    <li>msgText &lt;text&gt;<br>The last received message text is stored in this reading. Information about special messages like documents, audio, video, locations or venues will be also stored in this reading</li> 
     <li>msgFileId &lt;fileid&gt;<br>The last received message file_id (Audio, Photo, Video, Voice or other Document) is stored in this reading.</li> 
   <br>
     <li>prevMsgId &lt;text&gt;<br>The id of the SECOND last received message is stored in this reading</li> 
