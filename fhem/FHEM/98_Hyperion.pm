@@ -84,7 +84,8 @@ sub Hyperion_Define($$)
 {
   my ($hash,$def) = @_;
   my @args = split("[ \t]+",$def);
-  return "Usage: define <name> Hyperion <IP> <PORT> [<INTERVAL>]" if (@args < 4);
+  return "Usage: define <name> Hyperion <IP> <PORT> [<INTERVAL>]"
+    if (@args < 4);
   my ($name,$type,$host,$port,$interval) = @args;
   if ($interval)
   {
@@ -127,7 +128,7 @@ sub Hyperion_Notify($$)
   my $name  = $hash->{NAME};
   return if ($dev->{NAME} ne "global");
   return if (!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-  return undef if( AttrVal($name, "disable", 0) );
+  return undef if (AttrVal($name,"disable",0));
   Hyperion_OpenDev($hash);
   return undef;
 }
@@ -136,11 +137,14 @@ sub Hyperion_OpenDev($)
 {
   my ($hash) = @_;
   DevIo_CloseDev($hash);
-  $hash->{STATE} = DevIo_OpenDev($hash,0,"Hyperion_DoInit",sub($$$) {
+  $hash->{STATE} = DevIo_OpenDev($hash,0,"Hyperion_DoInit",sub($$$)
+  {
     my ($h,$err) = @_;
-    readingsSingleUpdate($hash,"lastError",$err,1) if($err);
+    readingsSingleUpdate($hash,"lastError",$err,1)
+      if ($err);
     readingsSingleUpdate($hash,"serverResponse","ERROR",1);
-    readingsSingleUpdate($hash,"state","ERROR",1) if (Value($hash->{NAME}) ne "ERROR");
+    readingsSingleUpdate($hash,"state","ERROR",1)
+      if (Value($hash->{NAME}) ne "ERROR");
     return $err ? "Error: $err" : $hash->{DeviceName}." connected";
   });
   return undef;
@@ -177,8 +181,8 @@ sub Hyperion_Get($@)
 {
   my ($hash,$name,$cmd) = @_;
   my $params = "configFiles:noArg devStateIcon:noArg statusRequest:noArg";
-  return "get $name needs one parameter: $params" if (!$cmd);
-  
+  return "get $name needs one parameter: $params"
+    if (!$cmd);
   if ($cmd eq "configFiles")
   {
     Hyperion_GetConfigs($hash);
@@ -211,7 +215,8 @@ sub Hyperion_Read($)
   my %Hyperion_sets_local = %Hyperion_sets;
   if ($result=~ /^\{"success":true\}$/)
   {
-    fhem "sleep 1; get $name statusRequest" if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
+    fhem "sleep 1; get $name statusRequest"
+      if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
     return undef;
   }
   elsif ($result =~ /^\{"info":\{.+\},"success":true\}$/)
@@ -230,14 +235,16 @@ sub Hyperion_Read($)
     if (AttrVal($name,"hyperionVersionCheck",1) == 1)
     {
       my $error;
-      $error          = "Can't detect your version of hyperion!" if (!$data->{hyperion_build}->[0]->{version});
+      $error = "Can't detect your version of hyperion!"
+        if (!$data->{hyperion_build}->[0]->{version});
       if (!$error)
       {
         my $ver       = (split("V",(split(" ",$data->{hyperion_build}->[0]->{version}))[0]))[1];
         $ver          =~ s/\.//g;
         my $rver      = $Hyperion_requiredVersion;
         $rver         =~ s/\.//g;
-        $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!" if ($ver<$rver);
+        $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!"
+          if ($ver<$rver);
       }
       if ($error)
       {
@@ -280,29 +287,47 @@ sub Hyperion_Read($)
     my $satG        = sprintf("%.3f",$trans->{saturationGain});
     my $satL        = (defined $trans->{saturationLGain}) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
     my $valG        = sprintf("%.3f",$trans->{valueGain});
-    $Hyperion_sets_local{effect} = $effectList if (length $effectList > 0);
+    $Hyperion_sets_local{effect} = $effectList
+      if (length $effectList > 0);
     if ($configs)
     {
       $Hyperion_sets_local{configFile} = $configs;
-      $attr{$name}{webCmd} = $Hyperion_webCmd_config if (!$attr{$name}{webCmd} || AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+      $attr{$name}{webCmd} = $Hyperion_webCmd_config
+        if (!$attr{$name}{webCmd} || AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
     }
-    $attr{$name}{alias}                   = "Ambilight" if (!$attr{$name}{alias});
-    $attr{$name}{devStateIcon}            = '{(Hyperion_devStateIcon($name),"toggle")}' if (!$attr{$name}{devStateIcon});
-    $attr{$name}{group}                   = "colordimmer" if (!$attr{$name}{group});
-    $attr{$name}{homebridgeMapping}       = $Hyperion_homebridgeMapping if (!$attr{$name}{homebridgeMapping});
-    $attr{$name}{icon}                    = "light_led_stripe_rgb" if (!$attr{$name}{icon});
-    $attr{$name}{lightSceneParamsToSave}  = "state" if (!$attr{$name}{lightSceneParamsToSave});
-    $attr{$name}{room}                    = "Hyperion" if (!$attr{$name}{room});
-    $attr{$name}{userattr}                = "lightSceneParamsToSave" if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
-    $attr{$name}{userattr}                = "lightSceneParamsToSave ".$attr{$name}{userattr} if ($attr{$name}{userattr} && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
-    $attr{$name}{userattr}                = "homebridgeMapping" if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
-    $attr{$name}{userattr}                = "homebridgeMapping ".$attr{$name}{userattr} if ($attr{$name}{userattr} && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
-    $attr{$name}{webCmd}                  = $Hyperion_webCmd if (!$attr{$name}{webCmd} || ($attr{$name}{webCmd} && !$Hyperion_sets_local{configFile}));
-    $attr{$name}{webCmd}                  = $Hyperion_webCmd_config if ($attr{$name}{webCmd} && $Hyperion_sets_local{configFile} && $attr{$name}{webCmd} eq $Hyperion_webCmd);
-    $hash->{helper}{sets}   = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
-    $hash->{hostname}       = $data->{hostname} if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
-    $hash->{build_version}  = $vers if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
-    $hash->{build_time}     = $data->{hyperion_build}->[0]->{time} if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
+    $attr{$name}{alias} = "Ambilight"
+      if (!$attr{$name}{alias});
+    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}'
+      if (!$attr{$name}{devStateIcon});
+    $attr{$name}{group} = "colordimmer"
+      if (!$attr{$name}{group});
+    $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping
+      if (!$attr{$name}{homebridgeMapping});
+    $attr{$name}{icon} = "light_led_stripe_rgb"
+      if (!$attr{$name}{icon});
+    $attr{$name}{lightSceneParamsToSave} = "state"
+      if (!$attr{$name}{lightSceneParamsToSave});
+    $attr{$name}{room} = "Hyperion"
+      if (!$attr{$name}{room});
+    $attr{$name}{userattr} = "lightSceneParamsToSave"
+      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr} = "lightSceneParamsToSave ".$attr{$name}{userattr}
+      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr} = "homebridgeMapping"
+      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+    $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
+      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+    $attr{$name}{webCmd} = $Hyperion_webCmd
+      if (!$attr{$name}{webCmd} || ($attr{$name}{webCmd} && !$Hyperion_sets_local{configFile}));
+    $attr{$name}{webCmd} = $Hyperion_webCmd_config
+      if ($attr{$name}{webCmd} && $Hyperion_sets_local{configFile} && $attr{$name}{webCmd} eq $Hyperion_webCmd);
+    $hash->{helper}{sets} = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
+    $hash->{hostname} = $data->{hostname}
+      if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
+    $hash->{build_version} = $vers
+      if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
+    $hash->{build_time} = $data->{hyperion_build}->[0]->{time}
+      if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
     readingsBeginUpdate($hash);
     Hyperion_readingsBulkUpdateIfChanged($hash,"adjustRed",$adjR);
     Hyperion_readingsBulkUpdateIfChanged($hash,"adjustGreen",$adjG);
@@ -310,18 +335,25 @@ sub Hyperion_Read($)
     Hyperion_readingsBulkUpdateIfChanged($hash,"blacklevel",$blkL);
     Hyperion_readingsBulkUpdateIfChanged($hash,"colorTemperature",$temP);
     Hyperion_readingsBulkUpdateIfChanged($hash,"correction",$corS);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0]) if (!defined ReadingsVal($name,"effect",undef));
-    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0]) if (!defined ReadingsVal($name,"effect",undef));
-    Hyperion_readingsBulkUpdateIfChanged($hash,".effects", $effectList) if ($effectList);
+    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0])
+      if (!defined ReadingsVal($name,"effect",undef));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0])
+      if (!defined ReadingsVal($name,"effect",undef));
+    Hyperion_readingsBulkUpdateIfChanged($hash,".effects", $effectList)
+      if ($effectList);
     Hyperion_readingsBulkUpdateIfChanged($hash,"duration",$duration);
     Hyperion_readingsBulkUpdateIfChanged($hash,"gamma",$gamM);
     Hyperion_readingsBulkUpdateIfChanged($hash,"id",$id);
     Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceGain",$lumG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceMinimum",$lumM) if ($lumM);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"priority",$prio) if (defined $prio);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"rgb","ff0d0d") if (!defined ReadingsVal($name,"rgb",undef));
+    Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceMinimum",$lumM)
+      if ($lumM);
+    Hyperion_readingsBulkUpdateIfChanged($hash,"priority",$prio)
+      if (defined $prio);
+    Hyperion_readingsBulkUpdateIfChanged($hash,"rgb","ff0d0d")
+      if (!defined ReadingsVal($name,"rgb",undef));
     Hyperion_readingsBulkUpdateIfChanged($hash,"saturationGain",$satG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"saturationLGain",$satL) if ($satL);
+    Hyperion_readingsBulkUpdateIfChanged($hash,"saturationLGain",$satL)
+      if ($satL);
     Hyperion_readingsBulkUpdateIfChanged($hash,"threshold",$thrE);
     Hyperion_readingsBulkUpdateIfChanged($hash,"valueGain",$valG);
     Hyperion_readingsBulkUpdateIfChanged($hash,"whitelevel",$whiL);
@@ -388,7 +420,8 @@ sub Hyperion_Read($)
     readingsBeginUpdate($hash);
     Hyperion_readingsBulkUpdateIfChanged($hash,"lastError","error while requesting ".$hash->{DeviceName});
     readingsBulkUpdate($hash,"serverResponse","ERROR");
-    Hyperion_readingsBulkUpdateIfChanged($hash,"state","ERROR") if (Value($name) ne "ERROR");
+    Hyperion_readingsBulkUpdateIfChanged($hash,"state","ERROR")
+      if (Value($name) ne "ERROR");
   }
   return undef;
 }
@@ -413,20 +446,28 @@ sub Hyperion_GetConfigs($)
     $cmd .= " $user\@$ip $com";
     @files = Hyperion_listFilesInDir($hash,$cmd);
   }
-  return "No files found on server $ip in directory $dir. Maybe the wrong directory? If SSH is used, has the user ".AttrVal($name,"hyperionSshUser","pi")." been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?" if (scalar(@files) == 0);
-  if (scalar @files > 0)
+  return "No files found on server $ip in directory $dir. Maybe the wrong directory? If SSH is used, has the user ".AttrVal($name,"hyperionSshUser","pi")." been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?"
+    if (scalar @files == 0);
+  if (scalar @files > 1)
   {
     my $configs = join(",",@files);
-    readingsSingleUpdate($hash,".configs",$configs,1) if (ReadingsVal($name,".configs","") ne $configs);
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+    readingsSingleUpdate($hash,".configs",$configs,1)
+      if (ReadingsVal($name,".configs","") ne $configs);
+    $attr{$name}{webCmd} = $Hyperion_webCmd_config
+      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
   }
   else
   {
-    fhem "deletereading $name .configs" if (defined ReadingsVal($name,".configs",undef));
-    $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
+    fhem "deletereading $name .configs"
+      if (defined ReadingsVal($name,".configs",undef));
+    $attr{$name}{webCmd} = $Hyperion_webCmd
+      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
+    return "Found just one config file. Please add at least one more config file to properly use this function."
+      if (scalar @files == 1);
+    return "No config files found!";
   }
   Hyperion_GetUpdate($hash);
-  return "Found at least one config file. Please refresh this page to see the result.";
+  return "Found at least two config files. Please refresh this page to see the result.";
 }
 
 sub Hyperion_listFilesInDir($$)
@@ -472,7 +513,8 @@ sub Hyperion_Set($@)
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
   my $value = (defined($args[0])) ? $args[0] : undef;
-  return "\"set $name\" needs at least one argument and maximum five arguments" if (scalar @aa < 1 || scalar @aa > 4);
+  return "\"set $name\" needs at least one argument and maximum five arguments"
+    if (scalar @aa < 1 || scalar @aa > 4);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
   my $sets = $hash->{helper}{sets};
@@ -523,81 +565,97 @@ sub Hyperion_Set($@)
       Log3 $name,4,"$name: NOT restarted Hyperion with $binpath $confdir$value, status: $status";
       readingsSingleUpdate($hash,"lastError",$status,1);
       readingsSingleUpdate($hash,"serverResponse","ERROR",1);
-      readingsSingleUpdate($hash,"state","ERROR",1) if (Value($name) ne "ERROR");
+      readingsSingleUpdate($hash,"state","ERROR",1)
+        if (Value($name) ne "ERROR");
       return "$name NOT restarted Hyperion with $binpath $confdir$value, status: $status";
     }
   }
   elsif ($cmd eq "rgb")
   {
-    return "Value of $cmd has to be in RGB hex format like ffffff or 3F7D90" if ($value !~ /^(\d|[a-f|A-F]){6}$/);
+    return "Value of $cmd has to be in RGB hex format like ffffff or 3F7D90"
+      if ($value !~ /^(\d|[a-f|A-F]){6}$/);
     $value = lc($value);
     my ($r,$g,$b) = Color::hex2rgb($value);
     $obj{color} = [$r,$g,$b];
     $obj{command} = "color";
     $obj{priority} = $priority * 1;
-    $obj{duration} = $duration * 1000 if ($duration > 0);
+    $obj{duration} = $duration * 1000
+      if ($duration > 0);
   }
   elsif ($cmd eq "dim")
   {
-    return "Value of $cmd has to be between 1 and 100" if ($value !~ /^(\d+)$/ || int($1) > 100 || int($1) < 1);
+    return "Value of $cmd has to be between 1 and 100"
+      if ($value !~ /^(\d+)$/ || int($1) > 100 || int($1) < 1);
     my $rgb = ReadingsVal($name,"rgb","ffffff");
-    $value = $value + 1 if ($cmd eq "dim" && $value < 100);
+    $value = $value + 1
+      if ($cmd eq "dim" && $value < 100);
     $value = $value / 100;
     my ($r,$g,$b) = Color::hex2rgb($rgb);
     my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
     my ($rn,$gn,$bn);
-    ($rn,$gn,$bn) = Color::hsv2rgb($h,$s,$value) if ($cmd eq "dim");
+    ($rn,$gn,$bn) = Color::hsv2rgb($h,$s,$value)
+      if ($cmd eq "dim");
     $rn = int($rn * 255);
     $gn = int($gn * 255);
     $bn = int($bn * 255);
     $obj{color} = [$rn,$gn,$bn];
     $obj{command} = "color";
     $obj{priority} = $priority * 1;
-    $obj{duration} = $duration * 1000 if ($duration > 0);
+    $obj{duration} = $duration * 1000
+      if ($duration > 0);
   }
   elsif ($cmd eq "dimUp" || $cmd eq "dimDown")
   {
-    return "Value of $cmd has to be between 1 and 99" if (defined($value) && $value =~ /°(\d+)$/ && int($1) < 1 && int($1) > 99);
+    return "Value of $cmd has to be between 1 and 99"
+      if (defined($value) && $value =~ /°(\d+)$/ && int($1) < 1 && int($1) > 99);
     my $dim = int ReadingsVal($name,"dim",100);
     my $dimStep = (defined $value) ? int $value : int AttrVal($name,"hyperionDimStep",5);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
     my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 0;
-    fhem "set $name dim $dimUp" if ($cmd eq "dimUp");
-    fhem "set $name dim $dimDown" if ($cmd eq "dimDown");
+    fhem "set $name dim $dimUp"
+      if ($cmd eq "dimUp");
+    fhem "set $name dim $dimDown"
+      if ($cmd eq "dimDown");
     return undef;
   }
   elsif ($cmd eq "effect")
   {
-    return "Effect $value is not available in the effect list of $name!" if ($value !~ /^(\w+)?((_)\w+){0,}$/ || index(ReadingsVal($name,".effects",""),$value) == -1);
+    return "Effect $value is not available in the effect list of $name!"
+      if ($value !~ /^(\w+)?((_)\w+){0,}$/ || index(ReadingsVal($name,".effects",""),$value) == -1);
     $value =~ s/_/ /g;
     my %ef = ("name" => $value);
     $obj{effect} = \%ef;
     $obj{command} = "effect";
     $obj{priority} = $priority * 1;
-    $obj{duration} = $duration * 1000 if ($duration > 0);
+    $obj{duration} = $duration * 1000
+      if ($duration > 0);
   }
   elsif ($cmd eq "clearall")
   {
-    return "$cmd need no additional value of $value" if (defined $value);
+    return "$cmd need no additional value of $value"
+      if (defined $value);
     $obj{command} = $cmd;
   }
   elsif ($cmd eq "clear")
   {
-    return "Value of $cmd has to be between 0 and 65536 in steps of 1" if ($value !~ /^(\d+)$/ || int $1 < 0 || int $1 > 65536);
+    return "Value of $cmd has to be between 0 and 65536 in steps of 1"
+      if ($value !~ /^(\d+)$/ || int $1 < 0 || int $1 > 65536);
     $value = int $value;
     $obj{command} = $cmd;
     $obj{priority} = $value * 1;
   }
   elsif ($cmd eq "off")
   {
-    return "$cmd need no additional value of $value" if (defined $value);
+    return "$cmd need no additional value of $value"
+      if (defined $value);
     $obj{command} = "color";
     $obj{color} = [0,0,0];
     $obj{priority} = 0;
   }
   elsif ($cmd eq "on")
   {
-    return "$cmd need no additional value of $value" if (defined $value);
+    return "$cmd need no additional value of $value"
+      if (defined $value);
     my $rmode     = ReadingsVal($name,"mode_before_off","rgb");
     my $rrgb      = ReadingsVal($name,"rgb","");
     my $reffect   = ReadingsVal($name,"effect","");
@@ -618,21 +676,16 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd eq "toggle")
   {
-    return "$cmd need no additional value of $value" if (defined $value);
+    return "$cmd need no additional value of $value"
+      if (defined $value);
     my $rstate = Value($name);
-    if ($rstate ne "off")
-    {
-      fhem "set ".$name." off";
-    }
-    else
-    {
-      fhem "set ".$name." on";
-    }
+    ($rstate ne "off") ? fhem "set ".$name." off" : fhem "set ".$name." on";
     return undef;
   }
   elsif ($cmd eq "mode")
   {
-    return "The value of mode has to be rgb,effect,clearall,off" if ($value !~ /^(off|clearall|rgb|effect)$/);
+    return "The value of mode has to be rgb,effect,clearall,off"
+      if ($value !~ /^(off|clearall|rgb|effect)$/);
     Log3 $name,4,"$name: cmd: $cmd, value: $value";
     my $rmode     = $value;
     my $rrgb      = ReadingsVal($name,"rgb","");
@@ -663,7 +716,8 @@ sub Hyperion_Set($@)
           $cmd eq "valueGain"
         )
   {
-    return "The value of $cmd has to be between 0.000 an 1.999 in steps of 0.001." if ($value !~ /^(\d)(\.\d)?(\d{1,2})?$/ || int $1 > 1);
+    return "The value of $cmd has to be between 0.000 an 1.999 in steps of 0.001."
+      if ($value !~ /^(\d)(\.\d)?(\d{1,2})?$/ || int $1 > 1);
     $value          = sprintf("%.3f",$value) * 1;
     my %tr          = ($cmd => $value);
     $obj{command}   = "transform";
@@ -675,7 +729,8 @@ sub Hyperion_Set($@)
           $cmd eq "whitelevel"
  )
   {
-    return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001" if ($value !~ /^((\d)\.(\d){1,3}),((\d)\.(\d){1,3}),((\d)\.(\d){1,3})$/ || int $1 > 9 || int $4 > 9 || int $7 > 9);
+    return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001"
+      if ($value !~ /^((\d)\.(\d){1,3}),((\d)\.(\d){1,3}),((\d)\.(\d){1,3})$/ || int $1 > 9 || int $4 > 9 || int $7 > 9);
     my $arr = Hyperion_list2array($value,"%.3f");
     my %ar = ($cmd => $arr);
     $obj{command} = "transform";
@@ -684,7 +739,8 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "correction" || $cmd eq "colorTemperature")
   {
     $cmd = "temperature" if ($cmd eq "colorTemperature");
-    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1" if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
+    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
+      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
     my $arr = Hyperion_list2array($value,"%d");
     my %ar = ("correctionValues" => $arr);
     $obj{command} = $cmd;
@@ -695,7 +751,8 @@ sub Hyperion_Set($@)
           $cmd eq "adjustBlue"
         )
   {
-    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1" if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
+    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
+      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
     $cmd              = "redAdjust" if ($cmd eq "adjustRed");
     $cmd              = "greenAdjust" if ($cmd eq "adjustGreen");
     $cmd              = "blueAdjust" if ($cmd eq "adjustBlue");
@@ -753,15 +810,18 @@ sub Hyperion_Attr(@)
     }
     elsif ($attr_name eq "hyperionDefaultPriority" || $attr_name eq "hyperionDefaultDuration")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536." if ($attr_value !~ /^(\d+)$/ || $1 < 0 || $1 > 65536);
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536."
+        if ($attr_value !~ /^(\d+)$/ || $1 < 0 || $1 > 65536);
     }
     elsif ($attr_name eq "hyperionDimStep")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5." if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5."
+        if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
     }
     elsif ($attr_name eq "hyperionNoSudo")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1." if ($attr_value !~ /^1$/);
+      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1."
+        if ($attr_value !~ /^1$/);
     }
     elsif ($attr_name eq "hyperionSshUser")
     {
@@ -777,7 +837,8 @@ sub Hyperion_Attr(@)
     }
     elsif ($attr_name eq "hyperionVersionCheck")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0." if ($attr_value !~ /^0$/);
+      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0."
+        if ($attr_value !~ /^0$/);
     }
     elsif ($attr_name eq "queryAfterSet")
     {
@@ -821,17 +882,24 @@ sub Hyperion_devStateIcon($;$)
   my $rgb = ReadingsVal($name,"rgb","");
   my $dim = ReadingsVal($name,"dim",10);
   my $ico = (int($dim / 10) * 10 < 10) ? 10 : int($dim / 10) * 10;
-  return ".*:off:toggle" if (Value($name) eq "off");
-  return ".*:light_exclamation" if (Value($name) eq "ERROR");
-  return ".*:light_question" if (Value($name) eq "Initialized");
-  return ".*:light_light_dim_$ico@#".$rgb.":toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
-  return ".*:light_led_stripe_rgb@#FFFF00:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
-  return ".*:it_television@#0000FF:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
+  return ".*:off:toggle"
+    if (Value($name) eq "off");
+  return ".*:light_exclamation"
+    if (Value($name) eq "ERROR");
+  return ".*:light_question"
+    if (Value($name) eq "Initialized");
+  return ".*:light_light_dim_$ico@#".$rgb.":toggle"
+    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
+  return ".*:light_led_stripe_rgb@#FFFF00:toggle"
+    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
+  return ".*:it_television@#0000FF:toggle"
+    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
 }
 
 sub Hyperion_readingsBulkUpdateIfChanged($$$) {
   my ($hash,$read,$value) = @_;
-  readingsBulkUpdate($hash,$read,$value) if ReadingsVal($hash->{NAME},$read,"SomeThingTotallyCrazy") ne $value;
+  readingsBulkUpdate($hash,$read,$value)
+    if ReadingsVal($hash->{NAME},$read,"SomeThingTotallyCrazy") ne $value;
 }
 
 1;
@@ -987,7 +1055,8 @@ sub Hyperion_readingsBulkUpdateIfChanged($$$) {
   <ul>
     <li>
       <i>configFiles</i><br>
-      get the available config files in directory from attribute hyperionConfigDir
+      get the available config files in directory from attribute hyperionConfigDir<br>
+      will only work properly if at least two config files are found
     </li>
     <li>
       <i>devStateIcon</i><br>
