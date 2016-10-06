@@ -1597,8 +1597,3 @@ HUEBridge_Attr($$$)
 
 =end html
 =cut
-  </ul><br>
-</ul><br>
-
-=end html
-=cut
