@@ -974,7 +974,8 @@ sub Hyperion_readingsBulkUpdateIfChanged($$$) {
     <li>
       <i>configFile &lt;filename&gt;</i><br>
       restart the Hyperion server with the given configuration file (files will be listed automatically from the given directory in attribute hyperionConfigDir)<br>
-      please omit the double extension of the file name (.config.json)
+      please omit the double extension of the file name (.config.json)<br>
+      only available after successful "get &lt;name&gt; configFiles"
     </li>
     <li>
       <i>correction &lt;255,255,255&gt;</i><br>
