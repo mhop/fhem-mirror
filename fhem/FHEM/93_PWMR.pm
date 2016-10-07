@@ -33,6 +33,8 @@
 # 29.06.16 GA add "set frostProtect on|off"
 # 16.08.16 GA add event-min-interval
 # 23.09.16 GA fix changes on commandref based on suggestions from user "sledge"
+# 28.09.16 GA add readings for tempRules (single reading for Mo to So)
+# 04.10.16 GA fix adjust readings for tempRules if temperature changes
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -1070,9 +1072,112 @@ PWMR_normTime ($)
 }
 
 sub 
+PWMR_NormalizeRules(@)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $rule;
+  my @week = ();
+
+  Log3 ($hash, 2, "PWMR_NormalizeRules");
+
+  if ($hash->{c_autoCalcTemp} == 0 or $hash->{c_desiredTempFrom} ne "")
+  {
+    Log3 ($hash, 2, "PWMR_NormalizeRules delete readings timer._..");
+    delete ($hash->{READINGS}{timer1_Mo}) if (defined ($hash->{READINGS}{timer1_Mo}));
+    delete ($hash->{READINGS}{timer2_Di}) if (defined ($hash->{READINGS}{timer2_Di}));
+    delete ($hash->{READINGS}{timer3_Mi}) if (defined ($hash->{READINGS}{timer3_Mi}));
+    delete ($hash->{READINGS}{timer4_Do}) if (defined ($hash->{READINGS}{timer4_Do}));
+    delete ($hash->{READINGS}{timer5_Fr}) if (defined ($hash->{READINGS}{timer5_Fr}));
+    delete ($hash->{READINGS}{timer6_Sa}) if (defined ($hash->{READINGS}{timer6_Sa}));
+    delete ($hash->{READINGS}{timer7_So}) if (defined ($hash->{READINGS}{timer7_So}));
+
+    return;
+  }
+
+  foreach my $var ("c_tempRule1", "c_tempRule2", "c_tempRule3", "c_tempRule4", "c_tempRule5")
+  {
+    $rule = $hash->{$var};
+    if ($rule ne "") {              # valid rule is 1-5 0600,D 1800,C 2200,N
+    Log3 ($hash, 5, "PWMR_NormalizeRules from $var: $rule");
+ 
+      my ($day, @points) = split (" ", $rule);
+      my ($dayFromNo, $dayToNo) = split ("-", $day);
+
+      $dayFromNo = 7 if ($dayFromNo == 0);
+      $dayToNo   = 7 if ($dayToNo   == 0);
+
+      my $lastTime   = "";
+      my $lastTempId = ""; 
+      my $lastTemp   = ""; 
+      my $ruleLong   = "";
+
+      foreach my $step (@points) {
+   
+        $step =~ /^(..)(..),(.)$/;
+  
+        my ($actTime, $actTempId) = ($1.":".$2, $3);
+   
+        if ($lastTime ne "") {
+          $ruleLong .= sprintf ("%s-%s,%s,%s ", $lastTime, $actTime, $lastTempId, $lastTemp);
+        }
+        $lastTime   = $actTime;
+        $lastTempId = $actTempId;
+
+        if ($actTempId eq "D") {
+          $lastTemp   = $hash->{c_tempD};
+        } elsif ($actTempId eq "E") {
+          $lastTemp   = $hash->{c_tempE};
+        } elsif ($actTempId eq "C") {
+          $lastTemp   = $hash->{c_tempC};
+        } else {
+          $lastTemp   = $hash->{c_tempN};
+        }
+
+      }
+
+      if (uc($lastTempId) ne "N") {
+        $ruleLong .=  sprintf "%s-%s,%s,%s ", $lastTime, "23:59", $lastTempId, $lastTemp;
+      }
+      Log3 ($hash, 5, "PWMR_NormalizeRules to   $var: $dayFromNo-$dayToNo $ruleLong");
+
+      for (my $i=1; $i<=7; $i++)
+      {
+        # only first rule matches
+
+        if ($dayFromNo <= $dayToNo) {
+          # rule 1 .. 5
+          if ($i >= $dayFromNo and $i <= $dayToNo) {
+            $week[$i] = $ruleLong if (!defined($week[$i]));
+          }
+        } else {
+          # rule 7 .. 1
+          if ($i >= $dayFromNo or $i <= $dayToNo) {
+            $week[$i] = $ruleLong if (!defined($week[$i]));
+          }
+        }
+      }
+    }
+
+  }
+
+  # update Readings
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate ($hash,  "timer1_Mo", (defined($week[1]) ? $week[1] : ""));
+  readingsBulkUpdate ($hash,  "timer2_Di", (defined($week[2]) ? $week[2] : ""));
+  readingsBulkUpdate ($hash,  "timer3_Mi", (defined($week[3]) ? $week[3] : ""));
+  readingsBulkUpdate ($hash,  "timer4_Do", (defined($week[4]) ? $week[4] : ""));
+  readingsBulkUpdate ($hash,  "timer5_Fr", (defined($week[5]) ? $week[5] : ""));
+  readingsBulkUpdate ($hash,  "timer6_Sa", (defined($week[6]) ? $week[6] : ""));
+  readingsBulkUpdate ($hash,  "timer7_So", (defined($week[7]) ? $week[7] : ""));
+  readingsEndUpdate($hash, 0);
+}
+
+sub 
 PWMR_CheckTempRule(@)
 {
-  my ($hash, $var, $vals) = @_;
+  my ($hash, $attrname, $var, $vals) = @_;
 
   my $name = $hash->{NAME};
   my $valid  = "";
@@ -1083,8 +1188,7 @@ PWMR_CheckTempRule(@)
   
   Log3 ($hash, 4, "PWMR_CheckTempRule: $hash->{NAME} $var <$vals>");
 
-  my @points = split (" ", $vals);
-  my $day = $points[0];
+  my ($day, @points) = split (" ", $vals);
 
   unless ( $day =~ /-/ ) {                   # normalise Mo to  Mo-Mo
     $day = "$day-$day";
@@ -1102,8 +1206,6 @@ PWMR_CheckTempRule(@)
   }
 
   Log3 ($hash, 4, "PWMR_CheckTempRule: $name day valid: $valid");
-
-  shift @points;
 
   foreach my $point (@points) {
     #Log3 ($hash, 4, "loop: $point");
@@ -1127,6 +1229,8 @@ PWMR_CheckTempRule(@)
   Log3 ($hash, 4, "PWMR_CheckTempRule: $name $var <$valid>");
 
   $hash->{$var} = $valid;
+ 
+  PWMR_NormalizeRules($hash);
 
   return undef
 } 
@@ -1150,86 +1254,102 @@ PWMR_CheckTemp(@)
     return "$error";
   }
 
- $hash->{$var} = $vals;
- return undef;
+  $hash->{$var} = $vals;
+
+  PWMR_NormalizeRules($hash);
+
+  return undef;
 
 }
 
 sub 
 PWMR_Attr(@)
 {
-  my @a = @_;
+  #my @a = @_;
+  my ($action, $name, $attrname, $attrval) = @_;
 
-  my $name = $a[1];
+  #my $name = $a[1];
+  #my $attr = $a[2];
+  #my $val  = defined ($a[3]) ? $a[3] : "";
+  #my $val  = $a[3];
+
   my $hash = $defs{$name};
-  my $attr = $a[2];
-  my $val  = $a[3];
+  $attrval = "" unless defined ($attrval);
+
+  #Log3 ($hash, 2, "Attr cmd: $action, Attr $attrname value <$attrval> attr <$attr{$name}{$attrname}>");
   
-  if ($a[0] eq "del") {
+  if ($action eq "del") {
+
+    Log3 ($hash, 4, "PWMR_Attr: $name, delete $attrname");
   
-    if ($attr eq "tempRule1") {
+    if ($attrname eq "tempRule1") {
       $hash->{c_tempRule1} = "";
-    } elsif ($attr eq "tempRule2") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "tempRule2") {
       $hash->{c_tempRule2} = "";
-    } elsif ($attr eq "tempRule3") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "tempRule3") {
       $hash->{c_tempRule3} = "";
-    } elsif ($attr eq "tempRule4") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "tempRule4") {
       $hash->{c_tempRule4} = "";
-    } elsif ($attr eq "tempRule5") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "tempRule5") {
       $hash->{c_tempRule5} = "";
-    } elsif ($attr eq "frostProtect") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "frostProtect") {
       $hash->{c_frostProtect} = 0;
-    } elsif ($attr eq "desiredTempFrom") {
+    } elsif ($attrname eq "desiredTempFrom") {
       $hash->{c_desiredTempFrom} = "";
       delete($hash->{d_name});
       delete($hash->{d_reading});
       delete($hash->{d_regexpTemp});
-    } elsif ($attr eq "autoCalcTemp") {
+      PWMR_NormalizeRules($hash);
+    } elsif ($attrname eq "autoCalcTemp") {
       $hash->{c_autoCalcTemp} = 1;
       $hash->{STATE}     = "Calculating";
+      PWMR_NormalizeRules($hash);
     } 
 
-    if ($attr eq "valueFormat" and defined ($hash->{helper}{$attr})) {
-      delete ($hash->{helper}{$attr});
+    if ($attrname eq "valueFormat" and defined ($hash->{helper}{$attrname})) {
+      delete ($hash->{helper}{$attrname});
     }
 
+    PWMR_NormalizeRules($hash);
+    return undef;
   
   }
 
-  if (!defined($val)) {
-    Log3 ($hash, 4, "PWMR_Attr: $name, delete $attr ($val)");
-    return undef;
-  } else {
-    Log3 ($hash, 4, "PWMR_Attr: $name, $attr, $val");
-  }
+  Log3 ($hash, 4, "PWMR_Attr: $name, $attrname, $attrval");
 
-  if ($attr eq "frostProtect") {                            # frostProtect  0/1
-    if ($val eq 0 or $val eq 1) {
-      $hash->{c_frostProtect} = $val;
-    } elsif ($val eq "") {
+  if ($attrname eq "frostProtect") {                            # frostProtect  0/1
+    if ($attrval eq 0 or $attrval eq 1) {
+      $hash->{c_frostProtect} = $attrval;
+    } elsif ($attrval eq "") {
       $hash->{c_frostProtect} = 0;
     } else {
       return "valid values are 0 or 1";
     }
 
-  } elsif ($attr eq "autoCalcTemp") {                       # autoCalcTemp 0/1
-    if ($val eq 0) {
+  } elsif ($attrname eq "autoCalcTemp") {                       # autoCalcTemp 0/1
+    if ($attrval eq 0) {
       $hash->{c_autoCalcTemp} = 0;
       $hash->{STATE}     = "Manual";
-    } elsif ( $val eq 1) {
+    } elsif ( $attrval eq 1) {
       $hash->{c_autoCalcTemp} = 1;
       $hash->{STATE}     = "Calculating";
-    } elsif ($val eq "") {
+    } elsif ($attrval eq "") {
       $hash->{c_autoCalcTemp} = 1;
       $hash->{STATE}     = "Calculating";
     } else {
       return "valid values are 0 or 1";
     }
+    PWMR_NormalizeRules($hash);
 
-  } elsif ($attr eq "desiredTempFrom") {                   # desiredTempFrom
-    $hash->{c_desiredTempFrom} = $val;
+  } elsif ($attrname eq "desiredTempFrom") {                   # desiredTempFrom
+    $hash->{c_desiredTempFrom} = $attrval;
 
-    my ( $d_name, $d_reading, $d_regexpTemp) = split (":", $val, 3);
+    my ( $d_name, $d_reading, $d_regexpTemp) = split (":", $attrval, 3);
 
     # set defaults
 
@@ -1241,56 +1361,57 @@ PWMR_Attr(@)
     unless (defined($defs{$hash->{d_name}})) {
       return "error: $hash->{d_name} does not exist.";
     }
+    PWMR_NormalizeRules($hash);
 
-  } elsif ($attr eq "tempDay") {                           # tempDay
-    return PWMR_CheckTemp($hash, "c_tempD", $val);
+  } elsif ($attrname eq "tempDay") {                           # tempDay
+    return PWMR_CheckTemp($hash, "c_tempD", $attrval);
 
-  } elsif ($attr eq "tempNight") {                         # tempNight
-    return PWMR_CheckTemp($hash, "c_tempN", $val);
+  } elsif ($attrname eq "tempNight") {                         # tempNight
+    return PWMR_CheckTemp($hash, "c_tempN", $attrval);
 
-  } elsif ($attr eq "tempCosy") {                          # tempCosy
-    return PWMR_CheckTemp($hash, "c_tempC", $val);
+  } elsif ($attrname eq "tempCosy") {                          # tempCosy
+    return PWMR_CheckTemp($hash, "c_tempC", $attrval);
 
-  } elsif ($attr eq "tempEnergy") {                        # tempEnergy
-    return PWMR_CheckTemp($hash, "c_tempE", $val);
+  } elsif ($attrname eq "tempEnergy") {                        # tempEnergy
+    return PWMR_CheckTemp($hash, "c_tempE", $attrval);
 
-  } elsif ($attr eq "tempRule1") {                         # tempRule1
-    return PWMR_CheckTempRule($hash, "c_tempRule1", $val);
+  } elsif ($attrname eq "tempRule1") {                         # tempRule1
+    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule1", $attrval);
 
-  } elsif ($attr eq "tempRule2") {                         # tempRule2
-    return PWMR_CheckTempRule($hash, "c_tempRule2", $val);
+  } elsif ($attrname eq "tempRule2") {                         # tempRule2
+    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule2", $attrval);
 
-  } elsif ($attr eq "tempRule3") {                         # tempRule3
-    return PWMR_CheckTempRule($hash, "c_tempRule3", $val);
+  } elsif ($attrname eq "tempRule3") {                         # tempRule3
+    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule3", $attrval);
 
-  } elsif ($attr eq "tempRule4") {                         # tempRule4
-    return PWMR_CheckTempRule($hash, "c_tempRule4", $val);
+  } elsif ($attrname eq "tempRule4") {                         # tempRule4
+    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule4", $attrval);
 
-  } elsif ($attr eq "tempRule5") {                         # tempRule5
-    return PWMR_CheckTempRule($hash, "c_tempRule5", $val);
+  } elsif ($attrname eq "tempRule5") {                         # tempRule5
+    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule5", $attrval);
 
   }
 
-  if ($attr eq "valueFormat") {
-    my $attrVal = $val;
-    if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
-      my $av = eval $attrVal;
+  if ($attrname eq "valueFormat") {
+    my $attrValTmp = $attrval;
+    if( $attrValTmp =~ m/^{.*}$/s && $attrValTmp =~ m/=>/ && $attrValTmp !~ m/\$/ ) {
+      my $av = eval $attrValTmp;
       if( $@ ) {
-        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $attr: ". $@);
+        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $attrname: ". $@);
       } else {
-        $attrVal = $av if( ref($av) eq "HASH" );
+        $attrValTmp = $av if( ref($av) eq "HASH" );
       }
-      $hash->{helper}{$attr} = $attrVal;
+      $hash->{helper}{$attrname} = $attrValTmp;
 
-      foreach my $key (keys %{$hash->{helper}{$attr}}) {
-        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attr}{$key});
+      foreach my $key (keys %{$hash->{helper}{$attrname}}) {
+        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
       }
 
-      #return "$attr set to $attrVal";
+      #return "$attrname set to $attrValTmp";
 
     } else {
       # if valueFormat is not verified sucessfully ... the helper is deleted (=not used)
-      delete $hash->{helper}{$attr};
+      delete $hash->{helper}{$attrname};
     }
     return undef;
   }
