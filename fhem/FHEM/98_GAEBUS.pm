@@ -31,6 +31,7 @@
 # 18.08.2016 : A.Goebel : fix workarround for perl warning with keys of hash reference
 # 30.08.2016 : A.Goebel : add reading "state_ebus" containing output from "state" of ebusd
 # 16.09.2016 : A.Goebel : add reset "state_ebus" if ebus is not connected
+# 06.10.2016 : A.Goebel : add valueFormat can now be used to access all values returned from one read
 
 package main;
 
@@ -901,12 +902,21 @@ GAEBUS_doEbusCmd($$$$$$$)
   {
     $actMessage = "";
 
-    for (my $i=0; $i <= $#targetreading; $i++)
-    {
-      next if ($targetreading[$i] eq "dummy");
-      my $v = defined($values[$i]) ? $values[$i] : "";
+#    for (my $i=0; $i <= $#targetreading; $i++)
+#    {
+#      next if ($targetreading[$i] eq "dummy");
+#      my $v = defined($values[$i]) ? $values[$i] : "";
+#
+#      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
+#      $actMessage .= $targetreading[$i]."|".$v."|";
+#    }
 
-      $actMessage .= $targetreading[$i]."|".$v."|";
+    foreach my $r (@targetreading)
+    {
+      next if ($r eq "dummy");
+      my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+      shift @values;
+      $actMessage .= $r."|".$v."|";
     }
 
     $actMessage =~ s/\|$//;
@@ -918,15 +928,24 @@ GAEBUS_doEbusCmd($$$$$$$)
   if ($action eq "r")
   {
     readingsBeginUpdate ($hash);
-    for (my $i=0; $i <= $#targetreading; $i++)
+#    for (my $i=0; $i <= $#targetreading; $i++)
+#    {
+#      next if ($targetreading[$i] eq "dummy");
+#      my $v = defined($values[$i]) ? $values[$i] : "";
+#
+#      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
+#
+#      readingsBulkUpdate ($hash, $targetreading[$i], $v);
+#    }
+
+    foreach my $r (@targetreading)
     {
-      next if ($targetreading[$i] eq "dummy");
-      my $v = defined($values[$i]) ? $values[$i] : "";
-
-      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
-
-      readingsBulkUpdate ($hash, $targetreading[$i], $v);
+      next if ($r eq "dummy");
+      my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+      shift @values;
+      readingsBulkUpdate ($hash, $r, $v);
     }
+
     readingsEndUpdate($hash, 1);
   }
 
@@ -1068,9 +1087,9 @@ GAEBUS_GetUpdatesDone($)
   readingsBeginUpdate ($hash);
   for (my $i = 1; $i < $#a; $i = $i + 2) 
   {
-    my $v = GAEBUS_valueFormat ($hash, $$a[$i], $a[$i+1]);
-    #readingsBulkUpdate ($hash, $a[$i], $a[$i+1]);
-    readingsBulkUpdate ($hash, $a[$i], $v);
+    #my $v = GAEBUS_valueFormat ($hash, $$a[$i], $a[$i+1]);
+    #readingsBulkUpdate ($hash, $a[$i], $v);
+    readingsBulkUpdate ($hash, $a[$i], $a[$i+1]);
   }
   readingsEndUpdate($hash, 1);
   
@@ -1095,21 +1114,19 @@ GAEBUS_GetUpdatesAborted($)
 sub
 GAEBUS_valueFormat(@)
 {
-  my ($hash, $reading, $value) = @_;
+  my ($hash, $reading, $values_ref) = @_;
 
-  return $value unless (defined ($reading));
-
-  if (ref($hash->{helper}{valueFormat}) eq 'HASH')
+  if (ref($hash->{helper}{valueFormat}) eq 'HASH' and defined ($reading))
   {
 
     if (exists($hash->{helper}{valueFormat}->{$reading})) {
 
       my $vf = $hash->{helper}{valueFormat}->{$reading};
-      return sprintf ("$vf", $value);
+      return sprintf ("$vf", @{$values_ref});
     }
   }
 
-  return $value;
+  return (defined(${$values_ref}[0]) ? ${$values_ref}[0] : "");
 
 }
 
@@ -1231,8 +1248,9 @@ GAEBUS_valueFormat(@)
     <li>valueFormat<br>
         Defines a map to format values within GAEBUS.<br>
         All readings can be formated using syntax of sprinf.
+        Values returned from ebusd are spearated by ";" and split before valueFormat is processed. This means more than one of the return values can be assigned to one reading.
         <br>
-        Example: { "temperature" => "%0.2f" }
+        Example: { "temperature" => "%0.2f"; "from-to" => "%s-%s" }<br>
         </li><br>
 
   </ul>
