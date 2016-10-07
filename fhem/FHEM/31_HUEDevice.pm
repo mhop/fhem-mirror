@@ -1165,46 +1165,57 @@ HUEDevice_Parse($$)
   $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
 
   if( $hash->{helper}->{devtype} eq 'S' ) {
+    my %readings;
+
     if( my $config = $result->{config} ) {
       $hash->{on} = $config->{on}?1:0 if( defined($config->{on}) );
+      $hash->{reachable} = $config->{reachable}?1:0 if( defined($config->{reachable}) );
+
       $hash->{url} = $config->{url} if( defined($config->{url}) );
-      $hash->{battery} = $config->{battery} if( defined($config->{battery}) );
-      $hash->{reachable} = $config->{reachable} if( defined($config->{reachable}) );
 
       $hash->{lat} = $config->{lat} if( defined($config->{lat}) );
       $hash->{long} = $config->{long} if( defined($config->{long}) );
       $hash->{sunriseoffset} = $config->{sunriseoffset} if( defined($config->{sunriseoffset}) );
       $hash->{sunsetoffset} = $config->{sunsetoffset} if( defined($config->{sunsetoffset}) );
+
+      $readings{battery} = $config->{battery} if( defined($config->{battery}) );
+      $readings{reachable} = $config->{reachable} if( defined($config->{reachable}) );
     }
 
+    my $lastupdated;
     if( my $state = $result->{state} ) {
       return undef if( $state->{lastupdated} eq 'none' );
 
-      substr( $state->{lastupdated}, 10, 1, ' ' );
-      return undef if( ReadingsTimestamp($name,'state','') eq $state->{lastupdated} );
+      $lastupdated = $state->{lastupdated};
+      substr( $lastupdated, 10, 1, ' ' );
+      return undef if( ReadingsTimestamp($name,'state','') eq $lastupdated );
 
-      my %readings;
-
-      $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
+      $readings{state} = $state->{status} if( defined($state->{status}) );
+      $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
-      $readings{state} = $state->{presence}?'present':'absent' if( defined($state->{presence}) );
-      $readings{temperature} = $state->{temperature} if( defined($state->{temperature}) );
+      $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) );
+      $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
+      $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
+
+      $readings{dark} = $state->{dark}?'1':'0' if( defined($state->{dark}) );
       $readings{humidity} = $state->{humidity} if( defined($state->{humidity}) );
       $readings{daylight} = $state->{daylight}?'1':'0' if( defined($state->{daylight}) );
-      $readings{flag} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
-      $readings{status} = $state->{status} if( defined($state->{status}) );
-
-      if( scalar keys %readings ) {
-        readingsBeginUpdate($hash);
-        $hash->{'.updateTimestamp'} = $state->{lastupdated};
-        $hash->{CHANGETIME}[0] = $state->{lastupdated};
-        foreach my $key ( keys %readings ) {
-          readingsBulkUpdate($hash, $key, $readings{$key}, 1) if( defined($readings{$key}) );
-        }
-        readingsEndUpdate($hash,1);
-        delete $hash->{CHANGETIME};
-      }
+      $readings{temperature} = $state->{temperature} if( defined($state->{temperature}) );
     }
+
+    if( scalar keys %readings ) {
+       readingsBeginUpdate($hash);
+       if( $lastupdated ) {
+         $hash->{'.updateTimestamp'} = $lastupdated;
+         $hash->{CHANGETIME}[0] = $lastupdated;
+       }
+
+       foreach my $key ( keys %readings ) {
+         readingsBulkUpdate($hash, $key, $readings{$key}, 1) if( defined($readings{$key}) );
+       }
+       readingsEndUpdate($hash,1);
+       delete $hash->{CHANGETIME};
+     }
 
     return undef;
 
