@@ -1285,7 +1285,7 @@ readingsGroup_Notify($$)
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              DoTrigger( $name, "item:$cell_row:$item: $txt" );
+              DoTrigger( $name, "item:$cell_row:$item: <html>$txt</html>" );
             }
 
             next;
@@ -1344,7 +1344,7 @@ readingsGroup_Notify($$)
                 }
               }
 
-              DoTrigger( $name, "$n.$reading: $devStateIcon" );
+              DoTrigger( $name, "$n.$reading: <html>$devStateIcon</html>" );
               next;
             }
           }
@@ -1352,9 +1352,9 @@ readingsGroup_Notify($$)
           $cmd = lookup2($hash->{helper}{commands},$n,$reading,$value);
           if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
             if( $reading eq "state" ) {
-              DoTrigger( $name, "$n: $value" );
+              DoTrigger( $name, "$n: <html>$value</html>" );
             } else {
-              DoTrigger( $name, "$n.$reading: $value" );
+              DoTrigger( $name, "$n.$reading: <html>$value</html>" );
             }
             next;
           }
@@ -1397,7 +1397,7 @@ readingsGroup_Notify($$)
 
   readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
   foreach my $trigger (keys %triggers) {
-    DoTrigger( $name, "$trigger: $triggers{$trigger}" );
+    DoTrigger( $name, "$trigger: <html>$triggers{$trigger}</html>" );
 
     our $count = 0;
     sub updateRefs($$);
@@ -1426,7 +1426,7 @@ readingsGroup_Notify($$)
         $v = "" if( !defined($v) );
 
         #FIXME: use FW_directNotify
-        DoTrigger( $name, "calc:$row:$col: $v" ) if( $hash->{mayBeVisible} );
+        DoTrigger( $name, "calc:$row:$col: <html>$v</html>" ) if( $hash->{mayBeVisible} );
 
         if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
           #DoTrigger( $name, "$func: $hash->{helper}{values}{formated}[$col][$row]" );
