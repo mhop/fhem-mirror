@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 
+  - new: 98_TRAFFIC: provide traffic details with Google Distance API
   - feature: 98_Hyperion: set configFile only available if at least two files
                           are found while get configFiles
                           minor code improvements
