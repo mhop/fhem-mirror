@@ -18,6 +18,7 @@
 # 29.06.16 GA add attribute valveProtectIdlePeriod
 # 16.08.16 GA add event-min-interval
 # 23.09.16 GA fix set default for maxPulse to 1 (from 0.85)
+# 28.09.16 GA add "get timers" to collect a maximum of all timers from the rooms attached
 
 ##############################################
 # $Id$
@@ -72,6 +73,7 @@ PWM_Initialize($)
   $hash->{AttrFn}    = "PWM_Attr";
 
   $hash->{AttrList}  = "event-on-change-reading event-min-interval valveProtectIdlePeriod";
+  #$hash->{GetList}   = "status timers";
 
 }
 
@@ -693,17 +695,76 @@ sub
 PWM_Get($@)
 {
   my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
 
   return "argument is missing" if(int(@a) != 2);
 
   my $msg;
 
-  if($a[1] ne "status") {
-    return "Unknown argument $a[1], choose one of status";
+  if ($a[1] eq "status") {
+    return $hash->{STATE};
+
+  } elsif ($a[1] eq "timers") {
+Log3 ($hash, 1, "in get timers");
+
+    my $cnt = 0;
+    my %tmpTimersFrom = ();
+    my %tmpTimersTo   = ();
+
+    foreach my $d (sort keys %defs) {
+      if ( (defined ($defs{$d}{TYPE})) && $defs{$d}{TYPE} eq "PWMR" ) {      # all PWMR objects
+        if (!defined ($attr{$d}{disable}) or $attr{$d}{disable} == 0) {     # not disabled
+          if ($name eq $defs{$d}{IODev}->{NAME}) {                          # referencing to this fb
+            my $room = $defs{$d};
+Log3 ($hash, 1, "PWM_Get $name collect $room->{NAME}");
+
+            foreach my $reading ("timer1_Mo", "timer2_Di", "timer3_Mi", "timer4_Do", "timer5_Fr", "timer6_Sa", "timer7_So") {
+              if (defined ($room->{READINGS}{$reading}) and $room->{READINGS}{$reading} ne "") {
+
+                $cnt++;
+
+Log3 ($hash, 1, "PWM_Get $name collect $room->{NAME} $reading");
+                my (@timers) = split / /, $room->{READINGS}{$reading}{VAL}; 
+                
+                my ($mintime, $minTempId, $minTemp ) = split /,/, $timers[0];
+                my ($maxtime, $maxTempId, $maxTemp ) = split /,/, $timers[$#timers];
+
+                my ($minfrom, $minto) = split /-/, $mintime;
+                my ($maxfrom, $maxto) = split /-/, $maxtime;
+
+		$tmpTimersFrom{$reading} = $minfrom unless defined($tmpTimersFrom{$reading});
+                $tmpTimersTo{$reading}   = $maxto   unless defined($tmpTimersTo{$reading});
+
+		$tmpTimersFrom{$reading} = $minfrom if ($tmpTimersFrom{$reading} > $minfrom);
+                $tmpTimersTo{$reading}   = $maxto   if ($tmpTimersTo{$reading}   < $maxto);
+
+              }
+            }
+          }
+        }
+      }
+    }
+    if ($cnt == 0) {
+      foreach my $reading ("timer1_Mo", "timer2_Di", "timer3_Mi", "timer4_Do", "timer5_Fr", "timer6_Sa", "timer7_So") {
+        delete ($hash->{READINGS}{$reading});
+      }
+    } else {
+      readingsBeginUpdate ($hash);
+      foreach my $reading ("timer1_Mo", "timer2_Di", "timer3_Mi", "timer4_Do", "timer5_Fr", "timer6_Sa", "timer7_So") {
+        readingsBulkUpdate ($hash,  "$reading", $tmpTimersFrom{$reading}."-".$tmpTimersTo{$reading});
+      }
+      readingsEndUpdate($hash, 1);
+      }
+
+    #return "$reading from $minfrom to $maxto";
+    return "";
+  
+  } else {
+    return "Unknown argument $a[1], choose one of status timers";
   }
   
   #return $hash->{READINGS}{STATE}{VAL};
-  return $hash->{STATE};
+  #return $hash->{STATE};
 }
 
 #############################
@@ -1013,6 +1074,11 @@ PWM_Attr(@)
   <ul>
     <li>status<br>
         Retrieve content of variable <i>STATE</i>.
+        </li><br>
+    <li>timers<br>
+        Retrieve values from the readings "timer?_??" from the attached rooms..<br>
+        The readings define start and end times for different room temperatures.<br>
+        This funktion will retrieve the first start and the last end time. <i>STATE</i>.
         </li><br>
 
   </ul>
