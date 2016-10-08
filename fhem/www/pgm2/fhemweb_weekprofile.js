@@ -525,7 +525,7 @@ function FW_weekprofileEditDay(widget,day)
   $(div).append(html);
   
   var table = $("<table>").get(0);
-  $(table).attr('id',"weekprofile."+widget.DEVICE+"."+shortDays[day]);
+  $(table).attr('id',"weekprofile."+widget.DEVICE).attr("data-day", shortDays[day]);
   $(table).attr('class',"block wide weekprofile");
   
   html = '';
@@ -621,8 +621,7 @@ function FW_weekprofilePrepAndSendProf(devName)
       return;
     }
     
-    var id = $(tableDay[i]).attr('id').split('.');
-    var day = id[id.length-1];
+    var day = $(tableDay[i]).data("day");
     
     prf[day] = new Object();
     prf[day]['time'] = new Array();
