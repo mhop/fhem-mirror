@@ -509,7 +509,7 @@ readingsHistory_Notify($$)
           }
           unshift( @{$hash->{fhem}{history}}, $entry );
 
-          DoTrigger( "$name", "history: $msg" ) if( $hash->{mayBeVisible} );
+          DoTrigger( "$name", "history: <html>$msg</html>" ) if( $hash->{mayBeVisible} );
         }
       }
     }
@@ -638,7 +638,7 @@ readingsHistory_Set($@)
     }
     unshift( @{$hash->{fhem}{history}}, $entry );
 
-    DoTrigger( "$name", "history: $msg" ) if( $hash->{mayBeVisible} );
+    DoTrigger( "$name", "history: <html>$msg</html>" ) if( $hash->{mayBeVisible} );
     return undef;
   }
 
