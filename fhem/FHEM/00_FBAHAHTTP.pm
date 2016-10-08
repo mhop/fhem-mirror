@@ -53,15 +53,12 @@ FBAHAHTTP_Define($$)
   return undef;
 }
 
-#####################################
 sub
-FBAHAHTTP_Poll($)
+FBAHAHTTP_connect($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $dev = $hash->{DEF};
-
-  return if(IsDisabled($name));
 
   my $dr = sub {
     $hash->{STATE} = $_[0];
@@ -69,27 +66,40 @@ FBAHAHTTP_Poll($)
     return $hash->{STATE};
   };
 
-  if(!$hash->{".SID"}) {
-    my $fb_user = AttrVal($name, "fritzbox-user", '');
-    return $dr->("MISSING: attr $name fritzbox-user") if(!$fb_user);
+  my $fb_user = AttrVal($name, "fritzbox-user", '');
+  return $dr->("MISSING: attr $name fritzbox-user") if(!$fb_user);
 
-    my ($err, $fb_pw) = getKeyValue("FBAHAHTTP_PASSWORD_$name");
-    return $dr->("ERROR: $err") if($err);
-    return $dr->("MISSING: set $name password") if(!$fb_pw);
+  my ($err, $fb_pw) = getKeyValue("FBAHAHTTP_PASSWORD_$name");
+  return $dr->("ERROR: $err") if($err);
+  return $dr->("MISSING: set $name password") if(!$fb_pw);
 
-    my $sid = FB_doCheckPW($hash->{DEF}, $fb_user, $fb_pw);
-    if(!$sid) {
-      $hash->{NEXT_OPEN} = time()+60;
-      $readyfnlist{"$name.$dev"} = $hash;
-      return $dr->("$name error: cannot get SID, ".
-                        "check connection/hostname/fritzbox-user/password")
-    }
-
-    delete($readyfnlist{"$name.$dev"});
-    $hash->{".SID"} = $sid;
-    $hash->{STATE} = "connected";
+  my $sid = FB_doCheckPW($hash->{DEF}, $fb_user, $fb_pw);
+  if(!$sid) {
+    $hash->{NEXT_OPEN} = time()+60;
+    $readyfnlist{"$name.$dev"} = $hash;
+    return $dr->("$name error: cannot get SID, ".
+                      "check connection/hostname/fritzbox-user/password")
   }
 
+  delete($readyfnlist{"$name.$dev"});
+  $hash->{".SID"} = $sid;
+  $hash->{STATE} = "connected";
+  return undef;
+}
+
+#####################################
+sub
+FBAHAHTTP_Poll($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return if(IsDisabled($name));
+
+  if(!$hash->{".SID"}) {
+    my $ret = FBAHAHTTP_connect($hash);
+    return $ret if($ret);
+  }
   my $sid = $hash->{".SID"};
 
   HttpUtils_NonblockingGet({
@@ -193,8 +203,20 @@ FBAHAHTTP_ProcessStack($)
         $hash->{CmdStack} = ();
         return;
       }
-      chomp $_[2];
+      
       Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $_[2]";
+      if(!defined($_[2]) || $_[2] eq "") {
+        if($hash->{INRETRY}) {
+          Log3 $name, 1, "No sensible respone after reconnect, giving up";
+          return;
+        }
+        $hash->{INRETRY} = 1;
+        return if(FBAHAHTTP_connect($hash));
+        FBAHAHTTP_ProcessStack($hash);
+        delete($hash->{INRETRY});
+        return;
+      }
+
       shift @{$hash->{CmdStack}};
       if(@{$hash->{CmdStack}} > 0) {
         my $ad = AttrVal($name, "async_delay", 0);
@@ -217,8 +239,9 @@ FBAHAHTTP_Write($$$)
 
   my $sid = $hash->{".SID"};
   if(!$sid) {
-    Log 1, "$name: Not connected, wont execute $msg";
-    return;
+    my $ret = FBAHAHTTP_connect($hash);      # try to reconnect
+    return $ret if($ret);
+    $sid = $hash->{".SID"};
   }
   push(@{$hash->{CmdStack}}, "sid=$sid&ain=$fn&switchcmd=$msg");
   FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} == 1);
