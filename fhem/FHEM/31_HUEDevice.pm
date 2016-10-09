@@ -1198,9 +1198,9 @@ HUEDevice_Parse($$)
       $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
 
       $readings{dark} = $state->{dark}?'1':'0' if( defined($state->{dark}) );
-      $readings{humidity} = $state->{humidity} if( defined($state->{humidity}) );
+      $readings{humidity} = $state->{humidity} * 0.01 if( defined($state->{humidity}) );
       $readings{daylight} = $state->{daylight}?'1':'0' if( defined($state->{daylight}) );
-      $readings{temperature} = $state->{temperature} if( defined($state->{temperature}) );
+      $readings{temperature} = $state->{temperature} * 0.01 if( defined($state->{temperature}) );
     }
 
     if( scalar keys %readings ) {
