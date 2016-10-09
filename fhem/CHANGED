@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-
+  - feature: 93_DbRep: deviceRename added, new Internal DATABASE, 
+                      Internal/Attribute ROLE added for Autorename-function
+  - bugfix: 93_DbRep: delEntries not running on SQLite
   - added: 74_THINKINGCLEANER: new module to support remote control of
                                Roomba cleaning robots
   - feature: 02_FTUISRV: if and loop constructs added
