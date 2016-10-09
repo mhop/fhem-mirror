@@ -331,6 +331,7 @@ ZWDongle_Set($@)
 
   if($type eq "removeFailedNode" ||
      $type eq "replaceFailedNode" ||
+     $type eq "createNode" ||
      $type eq "sendNIF") {
 
     $a[0] =~ s/^UNKNOWN_//;
