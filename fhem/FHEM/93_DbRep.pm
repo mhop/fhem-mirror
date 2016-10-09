@@ -22,7 +22,7 @@
 #       GNU General Public License for more details.
 #
 #       You should have received a copy of the GNU General Public License
-#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.# 
+#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.#  
 #
 ###########################################################################################################
 #
@@ -36,6 +36,15 @@
 #
 ###########################################################################################################
 #  Versions History:
+# 4.1.3        09.10.2016       bugfix delEntries running on SQLite
+# 4.1.2        08.10.2016       old device in DEF of connected DbLog device will substitute by renamed device if 
+#                               it is present in DEF 
+# 4.1.1        06.10.2016       NotifyFn is getting events from global AND own device, set is reduced if
+#                               ROLE=Agent, english commandref enhanced
+# 4.1          05.10.2016       DbRep_Attr changed 
+# 4.0          04.10.2016       Internal/Attribute ROLE added, sub DbRep_firstconnect changed 
+#                               NotifyFN activated to start deviceRename if ROLE=Agent
+# 3.13         03.10.2016       added deviceRename to rename devices in database, new Internal DATABASE
 # 3.12         02.10.2016       function minValue added
 # 3.11.1       30.09.2016       bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00'
 # 3.11         29.09.2016       maxValue calculation moved to background to reduce FHEM-load
@@ -146,18 +155,19 @@ sub DbRep_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
  $hash->{UndefFn}      = "DbRep_Undef"; 
- # $hash->{NotifyFn}     = "DbRep_Notify";
+ $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
  $hash->{AttrFn}       = "DbRep_Attr";
  
  $hash->{AttrList} =   "disable:1,0 ".
-                       "reading ".
+                       "reading ".                       
                        "allowDeletion:1,0 ".
                        "readingNameMap ".
                        "readingPreventFromDel ".
                        "device ".
                        "expimpfile ".
                        "aggregation:hour,day,week,month,no ".
+                       "role:Client,Agent ".
                        "showproctime:1,0 ".
                        "timestamp_begin ".
                        "timestamp_end ".
@@ -165,7 +175,7 @@ sub DbRep_Initialize($) {
                        "timeOlderThan ".
                        "timeout ".
                        $readingFnAttributes;
-         
+  
 return undef;   
 }
 
@@ -188,12 +198,18 @@ sub DbRep_Define($@) {
         }
   
   $hash->{LASTCMD} = " ";
+  $hash->{ROLE}    = AttrVal($name, "role", "Client");
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
+  
+  $hash->{NOTIFYDEV} = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
+  
+  my $dbconn         = $defs{$a[2]}{dbconn};
+  $hash->{DATABASE} = (split(/;|=/, $dbconn))[1];
   
   RemoveInternalTimer($hash);
   InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
   
-  Log3 ($name, 3, "DbRep $name - initialized");
+  Log3 ($name, 4, "DbRep $name - initialized");
   readingsSingleUpdate($hash, 'state', 'initialized', 1);
    
 return undef;
@@ -214,39 +230,47 @@ sub DbRep_Set($@) {
   my $dbmodel = $hash->{dbloghash}{DBMODEL};
   
   my $setlist = "Unknown argument $opt, choose one of ".
-                "sumValue:noArg ".
-                "averageValue:noArg ".
-                "delEntries:noArg ".
-                "exportToFile:noArg ".
-                "importFromFile:noArg ".
-                "maxValue:noArg ".
-                "minValue:noArg ".
-                "fetchrows:noArg ".
-                "diffValue:noArg ".
-                "insert ".
-                "countEntries:noArg ";
+                (($hash->{ROLE} ne "Agent")?"sumValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"averageValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
+                "deviceRename ".
+                (($hash->{ROLE} ne "Agent")?"exportToFile:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"importFromFile:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"maxValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"minValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"fetchrows:noArg ":"").  
+                (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
+                (($hash->{ROLE} ne "Agent")?"insert ":"").                 
+                (($hash->{ROLE} ne "Agent")?"countEntries:noArg ":"");
   
   return if(IsDisabled($name));
   
-  if ($opt eq "countEntries") {
+  if ($opt eq "countEntries" && $hash->{ROLE} ne "Agent") {
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "fetchrows") {
+  } elsif ($opt eq "fetchrows" && $hash->{ROLE} ne "Agent") {
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "maxValue" || $opt eq "minValue" || $opt eq "sumValue" || $opt eq "averageValue" || $opt eq "diffValue") {   
+  } elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "delEntries") {
+  } elsif ($opt eq "delEntries" && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }        
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "insert") { 
+  } elsif ($opt eq "deviceRename") {
+      my ($olddev, $newdev) = split(",",$prop);
+      if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set ... deviceRename olddevname,newdevname\" ";}
+      $hash->{HELPER}{OLDDEV} = $olddev;
+      $hash->{HELPER}{NEWDEV} = $newdev;
+      sqlexec($hash,$opt);
+      
+  } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") { 
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
               return " One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
@@ -300,13 +324,13 @@ sub DbRep_Set($@) {
       
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "exportToFile") {
+  } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return " The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
       }
       sqlexec($hash,$opt);
       
-  } elsif ($opt eq "importFromFile") {
+  } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return " The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
       }
@@ -327,14 +351,27 @@ return undef;
 sub DbRep_Attr($$$$) {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
-  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  $hash->{dbloghash} = $defs{$dblogdevice};
+  $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel = $hash->{dbloghash}{DBMODEL};
   my $do;
       
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
+    
+    # nicht erlaubte / zu löschende Attribute wenn role = Agent
+    my @agentnoattr = qw(aggregation
+                         allowDeletion
+                         reading
+                         readingNameMap
+                         readingPreventFromDel
+                         device
+                         expimpfile
+                         timestamp_begin
+                         timestamp_end
+                         timeDiffToNow
+                         timeOlderThan
+                         );
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
@@ -355,6 +392,12 @@ sub DbRep_Attr($$$$) {
         
     }
     
+    if ($cmd eq "set" && $hash->{ROLE} eq "Agent") {
+        foreach (@agentnoattr) {
+           return ("Attribute $aName is not usable due to role of $name is \"$hash->{ROLE}\"  ") if ($_ eq $aName);
+        }
+    }
+    
     if ($aName eq "readingPreventFromDel") {
         if($cmd eq "set") {
             if($aVal =~ / /) {return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";}
@@ -362,6 +405,32 @@ sub DbRep_Attr($$$$) {
         } else {
             delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
         }
+    }
+    
+    if ($aName eq "role") {
+        if($cmd eq "set") {
+            if ($aVal eq "Agent") {
+                # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
+                foreach(devspec2array("TYPE=DbRep")) {
+                    my $devname = $_;
+                    next if($devname eq $name);
+                    my $devrole = $defs{$_}{ROLE};
+                    my $devdb = $defs{$_}{DATABASE};
+                    if ($devrole eq "Agent" && $devdb eq $hash->{DATABASE}) { return "There is already an Agent device: $devname defined for database $hash->{DATABASE} !"; }
+                }
+                # nicht erlaubte Attribute löschen falls gesetzt
+                foreach (@agentnoattr) {
+                    delete($attr{$name}{$_});
+                }
+                
+                $attr{$name}{icon} = "security";
+            }
+            $do = $aVal;
+        } else {
+            $do = "Client";
+        }
+        $hash->{ROLE} = $do;
+        delete($attr{$name}{icon}) if($do eq "Client");
     }
                          
     if ($cmd eq "set") {
@@ -406,7 +475,7 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
         }
         if ($aName eq "reading" || $aName eq "device") {
-            if ($dbmodel ne 'SQLITE') {
+            if ($dbmodel && $dbmodel ne 'SQLITE') {
                 if ($dbmodel eq 'POSTGRESQL') {
                     return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col_postgre{READING}" if(length($aVal) > $dbrep_col_postgre{READING});
                 } elsif ($dbmodel eq 'MYSQL') {
@@ -414,7 +483,7 @@ sub DbRep_Attr($$$$) {
                 }
             }
         }
-    }
+    }  
 return undef;
 }
 
@@ -424,27 +493,68 @@ return undef;
 ###################################################################################
 
 sub DbRep_Notify($$) {
- my ($dbrep, $dev) = @_;
- my $myName  = $dbrep->{NAME}; # Name des eigenen Devices
- my $devName = $dev->{NAME}; # Name des Devices welches Events erzeugt hat
+ # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
+ # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
+ # Beispiele:
+ # $hash->{NOTIFYDEV} = "global";
+ # $hash->{NOTIFYDEV} = "global,Definition_A,Definition_B";
  
- return if(IsDisabled($myName)); # Return if the module is disabled
+ my ($own_hash, $dev_hash) = @_;
+ my $myName  = $own_hash->{NAME};   # Name des eigenen Devices
+ my $devName = $dev_hash->{NAME};   # Device welches Events erzeugt hat
+ 
+ return if(IsDisabled($myName));    # Return if the module is disabled
+ 
+ my $events = deviceEvents($dev_hash,0);  
+ return if(!$events);
 
- my $max = int(@{$dev->{CHANGED}}); # number of events / changes
-
- for (my $i = 0; $i < $max; $i++) {
-     my $s = $dev->{CHANGED}[$i];
-     next if(!defined($s));
-     my ($evName, $val) = split(" ", $s, 2); # resets $1
-     next if($devName !~ m/^$myName$/);
+ foreach my $event (@{$events}) {
+     $event = "" if(!defined($event));
+     my @evl = split("[ \t][ \t]*", $event);
      
-     if ($evName =~ m/done/) {
-         # Log3 ($myName, 3, "DbRep $myName - Event received - device: $myName Event: $evName");
-         # fhem ("trigger WEB JS:location.reload('false')");
-         # FW_directNotify("#FHEMWEB:WEB", "location.reload('false')", "");
-         # map {FW_directNotify("#FHEMWEB:$_", "location.reload('false')", "")} devspec2array("WEB.*");
+#    if ($devName = $myName && $evl[0] =~ /done/) {
+#      InternalTimer(time+1, "browser_refresh", $own_hash, 0);
+#    }
+     
+     # wenn Rolle "Agent" Verbeitung von RENAMED Events
+     if ($own_hash->{ROLE} eq "Agent") {
+         next if ($event !~ /RENAMED/);
+         
+         my $strucChanged;
+         # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
+         my $dblog_name = $own_hash->{dbloghash}{NAME};            # Name des an den DbRep-Agenten angeschlossenen DbLog-Dev
+         my $dblog_hash = $defs{$dblog_name};
+         
+         if ( $dblog_hash->{DEF} =~ m/( |\(|\|)$evl[1]( |\)|\||:)/ ) {
+             $dblog_hash->{DEF} =~ s/$evl[1]/$evl[2]/;
+             $dblog_hash->{REGEXP} =~ s/$evl[1]/$evl[2]/;
+             # Definitionsänderung wurde vorgenommen
+             $strucChanged = 1;
+             Log3 ($myName, 3, "DbRep Agent $myName - $dblog_name substituted in DEF, old: \"$evl[1]\", new: \"$evl[2]\" "); 
+         }  
+         
+         # DEVICE innerhalb angeschlossener Datenbank umbenennen
+         Log3 ($myName, 4, "DbRep Agent $myName - Evt RENAMED rec - old device: $evl[1], new device: $evl[2] -> start deviceRename in DB: $own_hash->{DATABASE} ");
+         $own_hash->{HELPER}{OLDDEV} = $evl[1];
+         $own_hash->{HELPER}{NEWDEV} = $evl[2];
+         sqlexec($own_hash,"deviceRename");
+         
+         # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
+         foreach(devspec2array("TYPE=DbRep")) {
+             my $repname = $_;
+             next if($_ eq $myName);
+             my $repattrdevice = $attr{$_}{device};
+             next if(!$repattrdevice);
+             my $repdb         = $defs{$_}{DATABASE};
+             if ($repattrdevice eq $evl[1] && $repdb eq $own_hash->{DATABASE}) { 
+                 $attr{$_}{device} = $evl[2];
+                 # Definitionsänderung wurde vorgenommen
+                 $strucChanged = 1;
+                 Log3 ($myName, 3, "DbRep Agent $myName - $_ attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" "); 
+             }
+         }
+     # if ($strucChanged) {CommandSave("","")};
      }
-
  }
 
 }
@@ -475,15 +585,24 @@ sub DbRep_firstconnect($) {
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
+
+if ($init_done == 1) {
+  
+  $hash->{ROLE} = AttrVal($name, "role", "Client");   # Rolle der DbRep-Instanz setzen
   
   if ( !DbRep_Connect($hash) ) {
-      Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of $hash->{dbloghash}{NAME} are valid and database reachable ?");
+      Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
       readingsSingleUpdate($hash, "state", "disconnected", 1);
   } else {
-      Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn was successful");
+      Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful");
       my $dbh = $hash->{DBH}; 
       $dbh->disconnect();
   }
+} else {
+     RemoveInternalTimer($hash, "DbRep_firstconnect");
+     InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
+}
+
 return;
 }
 
@@ -512,7 +631,7 @@ sub DbRep_Connect($) {
     
     InternalTimer(time+5, 'DbRep_Connect', $hash, 0);
     
-    Log3 ($name, 3, "DbRep $name - Waiting for database connection to test");
+    Log3 ($name, 3, "DbRep $name - Waiting for database connection");
     
     return 0;
   }
@@ -520,6 +639,7 @@ sub DbRep_Connect($) {
   $hash->{DBH} = $dbh;
 
   readingsSingleUpdate($hash, "state", "connected", 1);
+  Log3 ($name, 3, "DbRep $name - connected");
   
   return 1;
 }
@@ -547,8 +667,8 @@ sub sqlexec($$) {
  #    $dbh->disconnect;
  #}
  
- if (exists($hash->{HELPER}{RUNNING_PID})) {
-     Log3 ($name, 3, "DbRep $name - Warning: old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
+ if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
+     Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
  }
  
@@ -743,11 +863,14 @@ $hash->{HELPER}{CV} = \%cv;
          
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
- }  elsif ($opt eq "diffValue") {        
+ } elsif ($opt eq "diffValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
          
- }  elsif ($opt eq "insert") { 
+ } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "deviceRename") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
          
  }
 
@@ -1984,7 +2107,7 @@ sub del_DoParse($) {
  my $sql = "DELETE FROM history where ";
  $sql .= "DEVICE = '$device' AND " if($device);
  $sql .= "READING = '$reading' AND " if($reading); 
- $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
+ $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ;"; 
  
  # SQL zusammenstellen für Logausgabe
  my $sql1 = "DELETE FROM history where ";
@@ -2067,7 +2190,7 @@ sub del_ParseDone($) {
          
   $rows = $ds.$rds.$rows;
   
-  Log3 ($name, 3, "DbRep $name - Entries of database $hash->{dbloghash}{NAME} deleted: $rows");  
+  Log3 ($name, 3, "DbRep $name - Entries of database $hash->{DATABASE} deleted: $rows");  
   
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
@@ -2199,10 +2322,132 @@ sub insert_Done($) {
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
   
-  Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{dbloghash}{NAME} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
+  Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{DATABASE} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
 
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
+  
+return;
+}
+
+####################################################################################################
+# nichtblockierendes DB deviceRename
+####################################################################################################
+
+sub devren_Push($) {
+ my ($name)     = @_;
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $err;
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall devren_Push");
+ 
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+     return "$name|''|''|$err";
+ }
+ 
+ my $olddev = delete $hash->{HELPER}{OLDDEV};
+ my $newdev = delete $hash->{HELPER}{NEWDEV};
+      
+ # SQL zusammenstellen für DB-Operation
+    
+ Log3 ($name, 5, "DbRep $name -> Rename old device name \"$olddev\" to new device name \"$newdev\" in database $dblogname ");     
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ $dbh->begin_work();
+ my $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE=? WHERE DEVICE=? ") ;
+ eval {$sth->execute($newdev, $olddev);};
+ 
+ my $urow;
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - Failed to rename old device name \"$olddev\" to new device name \"$newdev\": $@");
+     $dbh->rollback();
+     $dbh->disconnect();
+     Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+     return "$name|''|''|$err";
+ } else {
+     $dbh->commit();
+     $urow = $sth->rows;
+     $dbh->disconnect();
+ } 
+
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$urow|$rt|0|$olddev|$newdev";
+}
+
+####################################################################################################
+# Auswertungsroutine DB deviceRename
+####################################################################################################
+
+sub devren_Done($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $urow       = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $olddev     = $a[4];
+  my $newdev     = $a[5]; 
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall devren_Done");
+  
+   
+  
+  if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Done finished");
+      return;
+  } 
+
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "number_lines_updated", $urow);    
+  readingsBulkUpdate($hash, "device_renamed", "old: ".$olddev." to new: ".$newdev) if ($urow != 0); 
+  readingsBulkUpdate($hash, "device_not_renamed", "WARNING - old: ".$olddev." not found, not renamed to new: ".$newdev) if ($urow == 0); 
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done"); 
+  readingsEndUpdate($hash, 1);
+  
+  if ($urow != 0) {
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$olddev\", new: \"$newdev\", amount: $urow "); 
+  } else {
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old device \"$olddev\" was not found in database \"$hash->{DATABASE}\" "); 
+  }
+
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Done finished");
   
 return;
 }
@@ -2490,7 +2735,7 @@ sub expfile_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   my $rows = $ds.$rds.$nrows;
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{dbloghash}{NAME} to file ".AttrVal($name, "expimpfile", undef).": $rows");
+  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file ".AttrVal($name, "expimpfile", undef).": $rows");
 
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2678,7 +2923,7 @@ sub impfile_PushDone($) {
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
 
-  Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{dbloghash}{NAME} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
+  Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
 
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
@@ -2698,6 +2943,18 @@ my $name = $hash->{NAME};
   delete($hash->{HELPER}{RUNNING_PID});
 }
 
+####################################################################################################
+# Browser Refresh nach DB-Abfrage
+####################################################################################################
+sub browser_refresh($) { 
+  return;
+  
+  my ($hash) = @_;                                                                     
+  RemoveInternalTimer($hash, "browser_refresh");
+  # FW_directNotify("#FHEMWEB:$name", "location.reload(true);","" );
+  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
+return;
+}
 
 
 ################################################################################################################
@@ -2895,18 +3152,25 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <ul><ul>
      <li> Selection of all datasets within adjustable time limits. </li>
      <li> Exposure of datasets of a Device/Reading-combination within adjustable time limits. </li>
-     <li> Selecions of datasets by usage of dynamically calclated time limits at execution time. </li>
+     <li> Selecion of datasets by usage of dynamically calclated time limits at execution time. </li>
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
      <li> The calculation of summary- , difference- , maximum- , minimum- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
      <li> export of datasets to file (CSV-format). </li>
      <li> import of datasets from file (CSV-Format). </li>
+     <li> rename of device names in datasets </li>
+     <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
      </ul></ul>
      <br>
+     
+  To activate the function "Autorename" the attribute "role" has to be assigned to a defined DbRep-device. The standard role after DbRep definition is "Client.
+  Please read more in section <a href="#DbRepAutoRename">DbRep-Agent</a> . <br><br>
   
   FHEM-Forum: <br>
-  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">neues Modul 93_DbRep - Auswertungen und Reporting von Datenbankinhalten (DbLog)</a>.<br><br>
+  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting and Management of database content (DbLog)</a>.<br><br>
  
+  <br>
+   
   <b>Preparations </b> <br><br>
   
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. (currently tested with MySQL and SQLite). <br>
@@ -2953,10 +3217,32 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. The reading to evaluate must be defined using attribute "reading".  </li> <br>
-    <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
-    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. Limitations for selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile" . </li> <br>
-    <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a>. An aggregation which would possibly be set attribute will <b>not</b> considered.  </li> <br>
+    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. 
+                                 The reading to evaluate must be defined using attribute "reading".  </li> <br>
+                                 
+    <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. 
+                                 If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
+    
+    <li><b> deviceRename </b> -  renames the device name of a device inside the connected database (Internal DATABASE).
+                                 The devicename will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
+                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
+                                 
+                                 <ul>
+                                 <b>input format: </b>  set &lt;name&gt; deviceRename &lt;old device name&gt;,&lt;new device name&gt;  <br>               
+                                 # The amount of renamed device names (datasets) will be displayed in reading "device_renamed". <br>
+                                 # If the device name to be renamed was not found in the database, a WARNUNG would appear in reading "device_not_renamed". <br>
+                                 # Appropriate entries will be written to Logfile with verbose=3.
+                                 <br><br>
+                                 </li> <br>
+                                 </ul>                        
+    
+    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
+                                 Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
+                                 The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile" . </li> <br>
+                                 
+    <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a>. 
+                                 An aggregation which would possibly be set attribute will <b>not</b> considered.  </li> <br>
+                                 
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
                                  <ul>
@@ -3003,14 +3289,14 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  <ul>
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
                                  "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br>
+                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br><br>
+                                 
+                                 Due to security reasons the attribute "allowDeletion" needs to be set to unlock the delete-function. <br>
                                  </li>
                                  </ul>
                                  
   <br>
   </ul></ul>
-  
-  Due to security reasons the attribute "allowDeletion" needs to be set to unlock the delete-function. <br><br>
   
   <b>For all evaluation variants applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
@@ -3019,7 +3305,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   <b>Note: </b> <br>
   
-  All database action will excuted in background. It could be necessary to refresh the browser to see the result of operation if you are in detail view once the "state = done" is shown. 
+  If you are in detail view it could be necessary to refresh the browser to see the result of operation as soon in DeviceOverview section "state = done" will be shown.
+  
   <br><br>
 
 </ul>  
@@ -3040,6 +3327,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
+  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". The role "Agent" is described in section <a href="#DbRepAutoRename">DbRep-Agent</a>. </li> <br>    
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a new operation starts  </li> <br>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
@@ -3088,6 +3376,61 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 
 </ul>
 
+<a name="DbRepAutoRename"></a>
+<b>DbRep Agent - automatic change of device names in databases and DbRep-definitions after FHEM "rename" command</b>
+
+<br>
+<ul>
+  By the attribute "role" the role of DbRep-device will be configured. The standard role is "Client". If the role has changed to "Agent", the DbRep device 
+  react automatically on renaming devices in your FHEM installation. The DbRep device is now called DbRep-Agent. <br><br>
+  
+  By the DbRep-Agent the following features are activated when a FHEM-device has being renamed: <br><br>
+  
+  <ul><ul>
+  <li> in the database connected to the DbRep-Agent (Internal Database) dataset containing the old device name will be searched and renamed to the 
+       to the new device name in <b>all</b> affected datasets. </li> <br>
+       
+  <li> in the DbLog-Device assigned to the DbRep-Agent the definition will be changed to substitute the old device name by the new one. Thereby the logging of 
+       the renamed device will be going on in the database. </li> <br>
+  
+  <li> in other existing DbRep-definitions with Type "Client" a possibly set attribute "device = old device name" will be changed to "device = new device name". 
+       Because of that, reporting definitions will be kept consistent automatically if devices are renamed in FHEM. </li> <br>
+
+  </ul></ul>
+  
+  The following restrictions take place if a DbRep device was changed to an Agent by setting attribute "role" to "Agent". These conditions will be activated 
+  and checked: <br><br>
+  
+  <ul><ul>
+  <li> within a FHEM installation only one DbRep-Agent can be configured for every defined DbLog-database. That means, if more than one DbLog-database is present, 
+  you could define same numbers of DbRep-Agents as well as DbLog-devices are defined.  </li> <br>
+  
+  <li> after changing to DbRep-Agent role only the set-command "renameDevice" will be available and as well as a reduced set of module specific attributes will be  
+       permitted. If a DbRep-device of privious type "Client" has changed an Agent, furthermore not permitted attributes will be deleted if set.  </li> <br>
+
+  </ul></ul>
+  
+  All activities like database changes and changes of other DbRep-definitions will be logged in FHEM Logfile with verbose=3. In order that the renameDevice 
+  function don't running to timeout set the timeout attribute to an appropriate value, especially if there are databases with huge datasets to evaluate. 
+  As well as all the other database operations of this module, the autorename operation will be executed nonblocking. <br><br>
+  
+        <ul>
+        <b>Example </b> of definition of a DbRep-device as an Agent:  <br><br>             
+        <code>
+        define Rep.Agent DbRep LogDB  <br>
+        attr Rep.Agent devStateIcon connected:10px-kreis-gelb .*disconnect:10px-kreis-rot .*done:10px-kreis-gruen <br>
+        attr Rep.Agent icon security      <br>
+        attr Rep.Agent role Agent         <br>
+        attr Rep.Agent room DbLog         <br>
+        attr Rep.Agent showproctime 1     <br>
+        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent timeout 3600       <br>
+        </code>
+        <br>
+        </ul>
+  
+  
+</ul>
 
 =end html
 =begin html_DE
@@ -3100,7 +3443,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   Aggregationen auszuwerten und als Readings darzustellen. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
-  Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der SQL-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
+  Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der (SQL)-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
   werden (siehe <a href="#DbRepattr">Attribute</a>). <br>
   Alle vorhandenen Readings werden vor einer neuen Operation gelöscht. Durch das Attribut "readingPreventFromDel" kann eine Komma separierte Liste von Readings 
   angegeben werden die nicht gelöscht werden sollen. <br><br>
@@ -3110,17 +3453,22 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
      <ul><ul>
      <li> Selektion aller Datensätze innerhalb einstellbarer Zeitgrenzen. </li>
      <li> Darstellung der Datensätze einer Device/Reading-Kombination innerhalb einstellbarer Zeitgrenzen. </li>
-     <li> Die Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
+     <li> Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Die Berechnung von Summen- , Differenz- , Maximum- , Minimum- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
      <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
-     <li> Export von Datensätzen in ein File im CSV-Format. </li>
-     <li> Import von Datensätzen aus File im CSV-Format. </li>
+     <li> Export von Datensätzen in ein File im CSV-Format </li>
+     <li> Import von Datensätzen aus File im CSV-Format </li>
+     <li> Umbenennen von Device-Namen in Datenbanksätzen </li>
+     <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
      </ul></ul>
      <br>
+     
+  Zur Aktivierung der Funktion "Autorename" wird dem definierten DbRep-Device mit dem Attribut "role" die Rolle "Agent" zugewiesen. Die Standardrolle nach Definition
+  ist "Client". Mehr ist dazu im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben. <br><br>
   
   FHEM-Forum: <br>
-  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">neues Modul 93_DbRep - Auswertungen und Reporting von Datenbankinhalten (DbLog)</a>.<br><br>
+  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting und Management von Datenbankinhalten (DbLog)</a>.<br><br>
  
   <b>Voraussetzungen </b> <br><br>
   
@@ -3153,7 +3501,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   </code>
   
   <br><br>
-  (&lt;Name der DbLog-instanz&gt; - es wird der Name der auszuwertenden DBLog-Datenbankdefinition angegeben)
+  (&lt;Name der DbLog-instanz&gt; - es wird der Name der auszuwertenden DBLog-Datenbankdefinition angegeben <b>nicht</b> der Datenbankname selbst)
 
 </ul>
 
@@ -3164,15 +3512,39 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <ul>
 
  Zur Zeit gibt es folgende Set-Kommandos. Über sie werden die Auswertungen angestoßen und definieren selbst die Auswertungsvariante. 
- Nach welchen Kriterien die Datenbankinhalte durchsucht werden und die Aggregation erfolgt, wird durch <a href="#DbRepattr">Attribute</a> gesteuert. 
+ Nach welchen Kriterien die Datenbankinhalte durchsucht werden und die Aggregation erfolgt wird durch <a href="#DbRepattr">Attribute</a> gesteuert. 
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
-    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
-    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li> <br>
-    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
-    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
+    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
+                                 
+    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. 
+                                 Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+
+    <li><b> deviceRename </b> -  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal DATABASE) um.
+                                 Der Gerätename wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte Zeitgrenzen oder Beschränkungen 
+                                 durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading werden nicht berücksichtigt.  <br><br>
+                                 
+                                 <ul>
+                                 <b>Eingabeformat: </b>  set &lt;name&gt; deviceRename &lt;alter Devicename&gt;,&lt;neuer Devicename&gt;  <br>               
+                                 # Die Anzahl der umbenannten Device-Datensätze wird im Reading "device_renamed" ausgegeben. <br>
+                                 # Wird der umzubenennende Gerätename in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "device_not_renamed" ausgegeben. <br>
+                                 # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3
+                                 <br><br>
+                                 </li> <br>
+                                 </ul>                                                       
+                                 
+    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
+                                 Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
+                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li> <br>
+                                 
+    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
+                                 
+    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
+                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
                                  
                                  <ul>
                                  <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
@@ -3224,13 +3596,14 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
                                  "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
                                  "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
                                  beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
+                                 
+                                 <br>
+                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein um die Löschfunktion freizuschalten. <br>
                                  </li>
                                  </ul>
                                  
   <br>
   </ul></ul>
-  
-  Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein um die Löschfunktion freizuschalten. <br><br>
   
   <b>Für alle Auswertungsvarianten gilt: </b> <br>
   Zusätzlich zu dem auszuwertenden Reading kann das Device mit angegeben werden um das Reporting nach diesen Kriterien einzuschränken. 
@@ -3239,7 +3612,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   
   <b>Hinweis: </b> <br>
   
-  Da alle DB-Operationen im Hintergrund ausgeführt werden, kann in der Detailansicht ein Browserrefresh nötig sein um die Operationsergebnisse zu sehen sobald "state = done" angezeigt wird. 
+  In der Detailansicht kann ein Browserrefresh nötig sein um die Operationsergebnisse zu sehen sobald im DeviceOverview "state = done" angezeigt wird. 
   <br><br>
 
 </ul>  
@@ -3261,6 +3634,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
+  <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>  
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
@@ -3303,8 +3677,64 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
   <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
   </ul></ul>
-  <br><br>
+  <br>
 
+</ul>
+
+<a name="DbRepAutoRename"></a>
+<b>DbRep Agent - automatisches Ändern von Device-Namen in Datenbanken und DbRep-Definitionen nach FHEM "rename" Kommando</b>
+
+<br>
+<ul>
+  Mit dem Attribut "role" wird die Rolle des DbRep-Device festgelegt. Die Standardrolle ist "Client". Mit der Änderung der Rolle in "Agent" wird das Device 
+  veranlasst auf Umbenennungen von Geräten in der FHEM Installation zu reagieren. <br><br>
+  
+  Durch den DbRep-Agenten werden folgende Features aktiviert wenn ein Gerät in FHEM mit "rename" umbenannt wird: <br><br>
+  
+  <ul><ul>
+  <li> in der dem DbRep-Agenten zugeordneten Datenbank (Internal Database) wird nach Datensätzen mit dem alten Gerätenamen gesucht und dieser Gerätename in
+       <b>allen</b> betroffenen Datensätzen in den neuen Namen geändert. </li> <br>
+       
+  <li> in dem DbRep-Agenten zugeordneten DbLog-Device wird in der Definition das alte durch das umbenannte Device ersetzt. Dadurch erfolgt ein weiteres Logging
+       des umbenannten Device in der Datenbank. </li> <br>
+  
+  <li> in den existierenden DbRep-Definitionen vom Typ "Client" wird ein evtl. gesetztes Attribut "device = alter Devicename" in "device = neuer Devicename" 
+       geändert. Dadurch werden Auswertungsdefinitionen bei Geräteumbenennungen automatisch konstistent gehalten. </li> <br>
+
+  </ul></ul>
+  
+  Mit der Änderung in einen Agenten sind folgende Restriktionen verbunden die mit dem Setzen des Attributes "role = Agent" eingeschaltet 
+  und geprüft werden: <br><br>
+  
+  <ul><ul>
+  <li> es kann nur einen Agenten pro Datenbank in der FHEM-Installation geben. Ist mehr als eine Datenbank mit DbLog definiert, können
+       ebenso viele DbRep-Agenten eingerichtet werden </li> <br>
+  
+  <li> mit der Umwandlung in einen Agenten wird nur noch das Set-Komando "renameDevice" verfügbar sein sowie nur ein eingeschränkter Satz von DbRep-spezifischen 
+       Attributen zugelassen. Wird ein DbRep-Device vom bisherigen Typ "Client" in einen Agenten geändert, werden evtl. gesetzte und nun nicht mehr zugelassene 
+       Attribute glöscht.  </li> <br>
+
+  </ul></ul>
+  
+  Die Aktivitäten wie Datenbankänderungen bzw. Änderungen an anderen DbRep-Definitionen werden im Logfile mit verbose=3 protokolliert. Damit die renameDevice-Funktion
+  bei großen Datenbanken nicht in ein timeout läuft, sollte das Attribut "timeout" entsprechend dimensioniert werden. Wie alle Datenbankoperationen des Moduls 
+  wird auch das Autorename nonblocking ausgeführt. <br><br>
+  
+        <ul>
+        <b>Beispiel </b> für die Definition eines DbRep-Device als Agent:  <br><br>             
+        <code>
+        define Rep.Agent DbRep LogDB  <br>
+        attr Rep.Agent devStateIcon connected:10px-kreis-gelb .*disconnect:10px-kreis-rot .*done:10px-kreis-gruen <br>
+        attr Rep.Agent icon security      <br>
+        attr Rep.Agent role Agent         <br>
+        attr Rep.Agent room DbLog         <br>
+        attr Rep.Agent showproctime 1     <br>
+        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent timeout 3600       <br>
+        </code>
+        <br>
+        </ul>
+  
 </ul>
 
 =end html_DE
