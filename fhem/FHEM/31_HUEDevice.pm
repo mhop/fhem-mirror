@@ -1188,6 +1188,16 @@ HUEDevice_Parse($$)
 
       $lastupdated = $state->{lastupdated};
       substr( $lastupdated, 10, 1, ' ' );
+
+      my $offset = 0;
+      if( my $iohash = $hash->{IODev} ) {
+        substr( $lastupdated, 10, 1, '_' );
+        my $sec = SVG_time_to_sec($lastupdated);
+        $sec += $iohash->{helper}{offsetUTC};
+        
+        $lastupdated = FmtDateTime($sec);
+      }
+
       return undef if( ReadingsTimestamp($name,'state','') eq $lastupdated );
 
       $readings{state} = $state->{status} if( defined($state->{status}) );

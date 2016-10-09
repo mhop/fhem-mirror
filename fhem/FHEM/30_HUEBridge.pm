@@ -167,18 +167,18 @@ sub HUEBridge_Undefine($$)
 
 sub HUEBridge_fillBridgeInfo($$)
 {
-  my ($hash,$result) = @_;
+  my ($hash,$config) = @_;
   my $name = $hash->{NAME};
 
-  $hash->{name} = $result->{name};
-  $hash->{modelid} = $result->{modelid};
-  $hash->{swversion} = $result->{swversion};
-  $hash->{apiversion} = $result->{apiversion};
+  $hash->{name} = $config->{name};
+  $hash->{modelid} = $config->{modelid};
+  $hash->{swversion} = $config->{swversion};
+  $hash->{apiversion} = $config->{apiversion};
 
-  my @l = split( '\.', $result->{apiversion} );
+  my @l = split( '\.', $config->{apiversion} );
   $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
 
-  if( !defined($result->{'linkbutton'})
+  if( !defined($config->{'linkbutton'})
       && !defined($attr{$name}{icon}) ) {
     $attr{$name}{icon} = 'hue_filled_bridge_v1' if( $hash->{modelid} && $hash->{modelid} eq 'BSB001' );
     $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} && $hash->{modelid} eq 'BSB002' );
@@ -793,34 +793,42 @@ HUEBridge_GetUpdate($)
 sub
 HUEBridge_Parse($$)
 {
-  my($hash,$result) = @_;
+  my($hash,$config) = @_;
   my $name = $hash->{NAME};
 
   Log3 $name, 4, "parse status message for $name";
-  #Log3 $name, 5, Dumper $result;
+  #Log3 $name, 5, Dumper $config;
 
-  #Log 3, Dumper $result;
-  $result = $result->{config} if( defined($result->{config}) );
+  #Log 3, Dumper $config;
+  $config = $config->{config} if( defined($config->{config}) );
 
-  HUEBridge_fillBridgeInfo($hash, $result);
+  HUEBridge_fillBridgeInfo($hash, $config);
 
-  $hash->{zigbeechannel} = $result->{zigbeechannel};
+  $hash->{zigbeechannel} = $config->{zigbeechannel};
 
-  if( defined( $result->{swupdate} ) ) {
-    my $txt = $result->{swupdate}->{text};
+  if( my $utc = $config->{UTC} ) {
+    substr( $utc, 10, 1, '_' );
+    my $sec = SVG_time_to_sec($utc);
+    my $offset = time()-$sec;
+
+    $hash->{helper}{offsetUTC} = $offset;
+  }
+
+  if( defined( $config->{swupdate} ) ) {
+    my $txt = $config->{swupdate}->{text};
     readingsSingleUpdate($hash, "swupdate", $txt, 1) if( $txt && $txt ne ReadingsVal($name,"swupdate","") );
     if( defined($hash->{updatestate}) ){
-      readingsSingleUpdate($hash, 'state', 'update done', 1 ) if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{helper}{updatestate} >= 2 );
-      readingsSingleUpdate($hash, 'state', 'update failed', 1 ) if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{helper}{updatestate} == 3 );
+      readingsSingleUpdate($hash, 'state', 'update done', 1 ) if( $config->{swupdate}->{updatestate} == 0 &&  $hash->{helper}{updatestate} >= 2 );
+      readingsSingleUpdate($hash, 'state', 'update failed', 1 ) if( $config->{swupdate}->{updatestate} == 2 &&  $hash->{helper}{updatestate} == 3 );
     }
 
-    $hash->{updatestate} = $result->{swupdate}->{updatestate};
+    $hash->{updatestate} = $config->{swupdate}->{updatestate};
     $hash->{helper}{updatestate} = $hash->{updatestate};
-    if( $result->{swupdate}->{devicetypes} ) {
+    if( $config->{swupdate}->{devicetypes} ) {
       my $devicetypes;
-      $devicetypes .= 'bridge' if( $result->{swupdate}->{devicetypes}->{bridge} );
-      $devicetypes .= ',' if( $devicetypes && scalar(@{$result->{swupdate}->{devicetypes}->{lights}}) );
-      $devicetypes .= join( ",", @{$result->{swupdate}->{devicetypes}->{lights}} ) if( $result->{swupdate}->{devicetypes}->{lights} );
+      $devicetypes .= 'bridge' if( $config->{swupdate}->{devicetypes}->{bridge} );
+      $devicetypes .= ',' if( $devicetypes && scalar(@{$config->{swupdate}->{devicetypes}->{lights}}) );
+      $devicetypes .= join( ",", @{$config->{swupdate}->{devicetypes}->{lights}} ) if( $config->{swupdate}->{devicetypes}->{lights} );
 
       $hash->{updatestate} .= " [$devicetypes]" if( $devicetypes );
     }
