@@ -1551,8 +1551,8 @@ sub THINKINGCLEANER_sec2time($) {
 
 =pod
 =item device
-=item summary control for THINKINGCLEANER based receivers via network connection
-=item summary_DE Steuerung von THINKINGCLEANER basierte Receiver &uuml;ber das Netzwerk
+=item summary control for Roomba cleaning robots using ThinkingCleaner add-on
+=item summary_DE Steuerung von Roomba Staubsauger Robotern mit ThinkingCleaner add-on
 =begin html
 
 <a name="THINKINGCLEANER" id="THINKINGCLEANER"></a>
