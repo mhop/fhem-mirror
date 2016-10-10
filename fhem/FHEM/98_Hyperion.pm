@@ -221,15 +221,6 @@ sub Hyperion_Read($)
   }
   elsif ($result =~ /^\{"info":\{.+\},"success":true\}$/)
   {
-    ######################
-    if (defined ReadingsVal($name,"previous_mode",undef))
-    {
-      # set new reading to former value
-      fhem "setreading $name mode_before_off ".ReadingsVal($name,"previous_mode","");
-      # delete old reading
-      fhem "deletereading $name previous_mode";
-    }
-    ######################
     my $obj         = eval {from_json($result)};
     my $data        = $obj->{info};
     if (AttrVal($name,"hyperionVersionCheck",1) == 1)
@@ -865,7 +856,6 @@ sub Hyperion_Call($;$)
   return undef if (IsDisabled($name) > 0);
   if (!$hash->{FD})
   {
-    # DevIo_CloseDev($hash);
     Hyperion_OpenDev($hash);
     return undef;
   }
@@ -885,7 +875,7 @@ sub Hyperion_devStateIcon($;$)
   return ".*:off:toggle"
     if (Value($name) eq "off");
   return ".*:light_exclamation"
-    if (Value($name) eq "ERROR");
+    if (Value($name) =~ /^(ERROR|disconnected)$/);
   return ".*:light_question"
     if (Value($name) eq "Initialized");
   return ".*:light_light_dim_$ico@#".$rgb.":toggle"
