@@ -159,6 +159,7 @@ FHEMWEB_Initialize($)
     longpoll:0,1
     longpollSVG:1,0
     menuEntries
+    mainInputLength
     nameDisplay
     ploteditor:always,onClick,never
     plotfork:1,0
@@ -1501,7 +1502,8 @@ FW_roomOverview($)
   FW_pO FW_hidden("fw_id", $FW_id) if($FW_id);
   FW_pO FW_hidden("room", $FW_room) if($FW_room);
   FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
-  FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
+  FW_pO FW_textfield("cmd", 
+        AttrVal($FW_wname, "mainInputLength", $FW_ss ? 25 : 40), "maininput");
   FW_pO "</form>";
   FW_pO "</td></tr></table>";
   FW_pO "</div>";
@@ -3341,14 +3343,22 @@ FW_widgetOverride($$)
         <br>
 
 
+    <a name="mainInputLength"></a>
+    <li>mainInputLength<br>
+        length of the maininput text widget in characters (decimal number).
+        </li>
+        <br>
+
     <a name="menuEntries"></a>
     <li>menuEntries<br>
         Comma separated list of name,html-link pairs to display in the
         left-side list.  Example:<br>
         attr WEB menuEntries fhem.de,http://fhem.de,culfw.de,http://culfw.de<br>
-        attr WEB menuEntries AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
+        attr WEB menuEntries
+                AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
         </li>
         <br>
+
 
     <a name="nameDisplay"></a>
     <li>nameDisplay<br>
@@ -4040,6 +4050,12 @@ FW_widgetOverride($$)
         <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu geladen.
         Die Voreinstellung ist aus.
         </li><br>
+
+    <a name="mainInputLength"></a>
+    <li>mainInputLength<br>
+        L&auml;nge des maininput Eingabefeldes (Anzahl der Buchstaben,
+        Ganzzahl).
+        </li> <br>
 
     <a name="menuEntries"></a>
     <li>menuEntries<br>
