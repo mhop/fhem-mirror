@@ -111,6 +111,7 @@ TCM_InitSerialCom($)
   my $setCmdVal = "";
   my @setCmd = ("set", "reset", $setCmdVal);
   # read and discard receive buffer, modem reset
+  $hash->{PARTIAL} = '';
   if ($hash->{MODEL} eq "ESP2") {
     if ($comType eq "TCM") {
       TCM_ReadAnswer($hash, "set reset");
