@@ -129,28 +129,19 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} = $hash;
 
     # set default settings on first define
-    if ($init_done) {
-        fhem 'attr ' . $name . ' stateFormat stateAV'
-          if ( !AttrVal( $name, "stateFormat", 0 ) );
-        fhem 'attr '
-          . $name
-          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT'
-          if ( !AttrVal( $name, "cmdIcon", 0 ) );
-        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next'
-          if ( !AttrVal( $name, "webCmd", 0 ) );
-        fhem 'attr '
-          . $name
-          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play'
-          if ( !AttrVal( $name, "devStateIcon", 0 ) );
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' stateFormat stateAV';
+        fhem 'attr ' . $name
+          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
+        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next';
+        fhem 'attr ' . $name
+          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
         fhem 'attr ' . $name . ' inputs ' . AttrVal( $IOname, "inputs", "" )
-          if (!AttrVal( $name, "inputs", 0 )
-            && AttrVal( $IOname, "inputs", "" ) ne "" );
+          if ( AttrVal( $IOname, "inputs", "" ) ne "" );
         fhem 'attr ' . $name . ' room ' . AttrVal( $IOname, "room", "" )
-          if (!AttrVal( $name, "room", 0 )
-            && AttrVal( $IOname, "room", "" ) ne "" );
+          if ( AttrVal( $IOname, "room", "" ) ne "" );
         fhem 'attr ' . $name . ' group ' . AttrVal( $IOname, "group", "" )
-          if (!AttrVal( $name, "group", 0 )
-            && AttrVal( $IOname, "group", "" ) ne "" );
+          if ( AttrVal( $IOname, "group", "" ) ne "" );
     }
 
     # Input alias handling

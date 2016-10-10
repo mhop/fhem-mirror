@@ -815,7 +815,7 @@ sub ENIGMA2_Define($$) {
     $hash->{helper}{PASSWORD} = $http_passwd if $http_passwd;
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
 
         # use http-method POST for FritzBox environment as GET does not seem to
         # work properly. Might restrict use to newer

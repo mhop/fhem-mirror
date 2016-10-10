@@ -127,7 +127,7 @@ sub ROOMMATE_Define($$) {
     readingsBeginUpdate($hash);
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         my $groupname = $name;
         $groupname =~ s/^rr_//;
         $attr{$name}{group} = $groupname;

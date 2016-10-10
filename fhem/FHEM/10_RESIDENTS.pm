@@ -65,7 +65,7 @@ sub RESIDENTS_Define($$) {
     $hash->{TYPE} = "RESIDENTS";
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         $attr{$name}{alias} = "Residents";
         $attr{$name}{devStateIcon} =
 '.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home .*:user_unknown:home';

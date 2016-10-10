@@ -167,19 +167,13 @@ sub ONKYO_AVR_Define($$$) {
     }
 
     # set default settings on first define
-    if ($init_done) {
-        fhem 'attr ' . $name . ' stateFormat stateAV'
-          if ( !AttrVal( $name, "stateFormat", 0 ) );
-        fhem 'attr '
-          . $name
-          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT'
-          if ( !AttrVal( $name, "cmdIcon", 0 ) );
-        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next'
-          if ( !AttrVal( $name, "webCmd", 0 ) );
-        fhem 'attr '
-          . $name
-          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play'
-          if ( !AttrVal( $name, "devStateIcon", 0 ) );
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' stateFormat stateAV';
+        fhem 'attr ' . $name
+          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
+        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next';
+        fhem 'attr ' . $name
+          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
     }
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{name}  = "Main";
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{value} = "1";
