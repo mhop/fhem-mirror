@@ -67,6 +67,7 @@ sub Hyperion_Initialize($)
   $hash->{SetFn}      = "Hyperion_Set";
   $hash->{UndefFn}    = "Hyperion_Undef";
   $hash->{AttrList}   = "disable:1 ".
+                        "hyperionAttrRestore:0 ".
                         "hyperionBin ".
                         "hyperionConfigDir ".
                         "hyperionDefaultDuration ".
@@ -278,40 +279,41 @@ sub Hyperion_Read($)
     my $satG        = sprintf("%.3f",$trans->{saturationGain});
     my $satL        = (defined $trans->{saturationLGain}) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
     my $valG        = sprintf("%.3f",$trans->{valueGain});
+    my $attrRestore = AttrVal($name,"hyperionAttrRestore",1);
     $Hyperion_sets_local{effect} = $effectList
       if (length $effectList > 0);
     if ($configs)
     {
       $Hyperion_sets_local{configFile} = $configs;
       $attr{$name}{webCmd} = $Hyperion_webCmd_config
-        if (!$attr{$name}{webCmd} || AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+        if ((!$attr{$name}{webCmd} || AttrVal($name,"webCmd","") eq $Hyperion_webCmd) && $attrRestore);
     }
     $attr{$name}{alias} = "Ambilight"
-      if (!$attr{$name}{alias});
+      if (!$attr{$name}{alias} && $attrRestore);
     $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}'
-      if (!$attr{$name}{devStateIcon});
+      if (!$attr{$name}{devStateIcon} && $attrRestore);
     $attr{$name}{group} = "colordimmer"
-      if (!$attr{$name}{group});
+      if (!$attr{$name}{group} && $attrRestore);
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping
-      if (!$attr{$name}{homebridgeMapping});
+      if (!$attr{$name}{homebridgeMapping} && $attrRestore);
     $attr{$name}{icon} = "light_led_stripe_rgb"
-      if (!$attr{$name}{icon});
+      if (!$attr{$name}{icon} && $attrRestore);
     $attr{$name}{lightSceneParamsToSave} = "state"
-      if (!$attr{$name}{lightSceneParamsToSave});
+      if (!$attr{$name}{lightSceneParamsToSave} && $attrRestore);
     $attr{$name}{room} = "Hyperion"
-      if (!$attr{$name}{room});
+      if (!$attr{$name}{room} && $attrRestore);
     $attr{$name}{userattr} = "lightSceneParamsToSave"
-      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1 && $attrRestore);
     $attr{$name}{userattr} = "lightSceneParamsToSave ".$attr{$name}{userattr}
-      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1 && $attrRestore);
     $attr{$name}{userattr} = "homebridgeMapping"
-      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && $attrRestore);
     $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
-      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && $attrRestore);
     $attr{$name}{webCmd} = $Hyperion_webCmd
-      if (!$attr{$name}{webCmd} || ($attr{$name}{webCmd} && !$Hyperion_sets_local{configFile}));
+      if ((!$attr{$name}{webCmd} || ($attr{$name}{webCmd} && !$Hyperion_sets_local{configFile})) && $attrRestore);
     $attr{$name}{webCmd} = $Hyperion_webCmd_config
-      if ($attr{$name}{webCmd} && $Hyperion_sets_local{configFile} && $attr{$name}{webCmd} eq $Hyperion_webCmd);
+      if ($attr{$name}{webCmd} && $Hyperion_sets_local{configFile} && $attr{$name}{webCmd} eq $Hyperion_webCmd && $attrRestore);
     $hash->{helper}{sets} = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
     $hash->{hostname} = $data->{hostname}
       if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
@@ -435,9 +437,10 @@ sub Hyperion_GetConfigs($)
     $cmd .= " $user\@$ip $com";
     @files = Hyperion_listFilesInDir($hash,$cmd);
   }
+  my $count = scalar @files;
   return "No files found on server $ip in directory $dir. Maybe the wrong directory? If SSH is used, has the user ".AttrVal($name,"hyperionSshUser","pi")." been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?"
-    if (scalar @files == 0);
-  if (scalar @files > 1)
+    if ($count == 0);
+  if ($count > 1)
   {
     my $configs = join(",",@files);
     readingsSingleUpdate($hash,".configs",$configs,1)
@@ -452,11 +455,11 @@ sub Hyperion_GetConfigs($)
     $attr{$name}{webCmd} = $Hyperion_webCmd
       if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
     return "Found just one config file. Please add at least one more config file to properly use this function."
-      if (scalar @files == 1);
+      if ($count == 1);
     return "No config files found!";
   }
   Hyperion_GetUpdate($hash);
-  return "Found at least two config files. Please refresh this page to see the result.";
+  return "Found $count config files. Please refresh this page to see the result.";
 }
 
 sub Hyperion_listFilesInDir($$)
@@ -727,7 +730,7 @@ sub Hyperion_Set($@)
     $obj{command} = $cmd;
     $obj{$cmd} = \%ar;
   }
-  elsif ( $cmd =~ /^(adjustRed|adjustGreen|adjustBlue)$/)
+  elsif ($cmd =~ /^(adjustRed|adjustGreen|adjustBlue)$/)
   {
     return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
       if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
@@ -795,6 +798,11 @@ sub Hyperion_Attr(@)
     {
       $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5."
         if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
+    }
+    elsif ($attr_name eq "hyperionAttrRestore")
+    {
+      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0."
+        if ($attr_value !~ /^0$/);
     }
     elsif ($attr_name eq "hyperionNoSudo")
     {
@@ -1045,6 +1053,11 @@ sub Hyperion_devStateIcon($;$)
   <p><b>Attributes</b></p>
   <ul>
     <li>
+      <i>hyperionAttrRestore</i><br>
+      restore default attributes if deleted manually<br>
+      default: 1
+    </li>
+    <li>
       <i>hyperionBin</i><br>
       path to the hyperion executable<br>
       default: /usr/bin/hyperiond
@@ -1060,11 +1073,6 @@ sub Hyperion_devStateIcon($;$)
       default: infinity
     </li>
     <li>
-      <i>hyperionNoSudo</i><br>
-      disable sudo for non-root users<br>
-      default: 0
-    </li>
-    <li>
       <i>hyperionDefaultPriority</i><br>
       default priority<br>
       default: 0
@@ -1073,6 +1081,11 @@ sub Hyperion_devStateIcon($;$)
       <i>hyperionDimStep</i><br>
       dim step for dimDown/dimUp<br>
       default: 5 (percent)
+    </li>
+    <li>
+      <i>hyperionNoSudo</i><br>
+      disable sudo for non-root users<br>
+      default: 0
     </li>
     <li>
       <i>hyperionSshUser</i><br>
