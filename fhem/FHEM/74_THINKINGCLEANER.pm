@@ -648,7 +648,8 @@ sub THINKINGCLEANER_Define($$$) {
 'on-max:text_max on-spot:refresh on-delayed:time_timer dock:measure_battery_50 locate:rc_SEARCH';
         $attr{$name}{devStateIcon} =
 'on-delayed:rc_STOP@green:off on-max:rc_BLUE@green:off on-spot:rc_GREEN@red:off on.*:rc_GREEN@green:off dock:rc_GREEN@orange:off off:rc_STOP:on standby|remote:rc_YELLOW:on locate:rc_YELLOW .*:rc_RED';
-        $attr{$name}{icon} = 'scene_cleaning';
+        $attr{$name}{icon}   = 'scene_cleaning';
+        $attr{$name}{webCmd} = 'on-max:on-spot:on-delayed:dock:locate';
     }
 
     if ( THINKINGCLEANER_addExtension( $name, "THINKINGCLEANER_CGI", $infix ) )
