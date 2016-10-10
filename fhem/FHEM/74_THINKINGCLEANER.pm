@@ -57,7 +57,7 @@ sub THINKINGCLEANER_Initialize($) {
     $hash->{parseParams} = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance "
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg"
       . $readingFnAttributes;
 
     return;
@@ -68,7 +68,9 @@ sub THINKINGCLEANER_GetStatus($;$) {
     my ( $hash, $delay ) = @_;
     my $name = $hash->{NAME};
     $hash->{INTERVAL_MULTIPLIER} = (
-          ReadingsVal( $name, "state", "off" ) ne "off"
+        ReadingsVal( $name, "state", "off" ) ne "off"
+          && ReadingsVal( $name, "state", "absent" ) ne "absent"
+          && ReadingsVal( $name, "state", "standby" ) ne "standby"
         ? AttrVal( $name, "pollMultiplierCleaning", "0.5" )
         : (
             $hash->{WEBHOOK_REGISTER} eq "success"
@@ -117,7 +119,7 @@ sub THINKINGCLEANER_Set($$$) {
     my $usage =
         "Unknown argument "
       . @$a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg on-spot:noArg on-max:noArg off:noArg power:off,on dock:noArg undock:noArg vacuumDrive:off,on locate:noArg on-delayed:noArg cleaningDelay damageProtection:off,on remoteControl:forward,backward,left,left-spin,right,right-spin,stop,drive scheduleAdd";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg on-spot:noArg on-max:noArg off:noArg power:off,on dock:noArg undock:noArg locate:noArg on-delayed:noArg cleaningDelay  remoteControl:forward,backward,left,left-spin,right,right-spin,stop,drive scheduleAdd name damageProtection:off,on reboot:noArg autoUpdate:on,off vacuumDrive:off,on restartAC:on,off alwaysMAX:on,off autoDock:on,off keepAwakeOnDock:on,off songSubmit songReset:noArg dockAt stopAt";
 
     my $cmd = '';
     my $result;
@@ -390,6 +392,211 @@ sub THINKINGCLEANER_Set($$$) {
         }
     }
 
+    # dockAt
+    elsif ( lc( @$a[1] ) eq "dockat" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value: percent"
+              if ( !defined( @$a[2] ) );
+
+            return
+              "Invalid value for minutes: needs to be between 10 and 50 percent"
+              if ( @$a[2] !~ /^\d+/ || @$a[2] < 10 || @$a[2] > 50 );
+
+            $cmd = "DockAt" . @$a[2];
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "dockAt" );
+        }
+        else {
+            return "Device needs to be reachable to be controlled.";
+        }
+    }
+
+    # stopAt
+    elsif ( lc( @$a[1] ) eq "stopat" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value: percent"
+              if ( !defined( @$a[2] ) );
+
+            return
+              "Invalid value for minutes: needs to be between 6 and 50 percent"
+              if ( @$a[2] !~ /^\d+/ || @$a[2] < 6 || @$a[2] > 50 );
+
+            $cmd = "StopAt" . @$a[2];
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "stopAt" );
+        }
+        else {
+            return "Device needs to be reachable to be controlled.";
+        }
+    }
+
+    # autoUpdate
+    elsif ( lc( @$a[1] ) eq "autoupdate" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = "UpdateOFF";
+            $cmd = "UpdateON" if ( @$a[2] eq "on" );
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "autoUpdate" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # songSubmit
+    elsif ( lc( @$a[1] ) eq "songsubmit" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = @$a[2];
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "newsong.json", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # songReset
+    elsif ( lc( @$a[1] ) eq "songreset" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1];
+
+            $cmd = "resetSongCommand";
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # restartAC
+    elsif ( lc( @$a[1] ) eq "restartac" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = "MAXOFF";
+            $cmd = "MAXON" if ( @$a[2] eq "on" );
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "restartAC" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # alwaysMAX
+    elsif ( lc( @$a[1] ) eq "alwaysmax" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = "MAXOFF";
+            $cmd = "MAXON" if ( @$a[2] eq "on" );
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "alwaysMAX" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # autoDock
+    elsif ( lc( @$a[1] ) eq "autodock" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = "AutoDockOFF";
+            $cmd = "AutoDockON" if ( @$a[2] eq "on" );
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "autoDock" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # keepAwakeOnDock
+    elsif ( lc( @$a[1] ) eq "keepawakeondock" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value"
+              if ( !defined( @$a[2] ) );
+
+            $cmd = "keepAwakeOnDockOFF";
+            $cmd = "keepAwakeOnDockON" if ( @$a[2] eq "on" );
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "keepAwakeOnDock" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # name
+    elsif ( lc( @$a[1] ) eq "name" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1] . " " . @$a[2];
+
+            return "Missing value: name"
+              if ( !defined( @$a[2] ) );
+
+            return "Wrong format for name"
+              if ( @$a[2] !~ /^\w+$/ );
+
+            $cmd = "rename_device&name=" . @$a[2];
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
+                "name" );
+        }
+        else {
+            return "Device needs to be reachable to set " . @$a[1];
+        }
+    }
+
+    # reboot
+    elsif ( lc( @$a[1] ) eq "reboot" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1];
+
+            $cmd = "crash";
+            $result =
+              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to be rebooted.";
+        }
+    }
+
     # locate
     elsif ( lc( @$a[1] ) eq "locate" ) {
         if ( $state ne "absent" ) {
@@ -411,8 +618,7 @@ sub THINKINGCLEANER_Set($$$) {
             Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1];
 
             $cmd = "dock";
-            $result =
-              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd, "dock" )
+            $result = THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd )
               if ( $deviceStatus !~ /^(base.*|plug.*)$/ );
         }
         else {
@@ -426,9 +632,7 @@ sub THINKINGCLEANER_Set($$$) {
             Log3 $name, 3, "THINKINGCLEANER set $name " . @$a[1];
 
             $cmd = "leavehomebase";
-            $result =
-              THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd,
-                "undock" )
+            $result = THINKINGCLEANER_SendCommand( $hash, "command.json", $cmd )
               if ( $deviceStatus =~ /^(base.*)$/ );
         }
         else {
@@ -451,7 +655,7 @@ sub THINKINGCLEANER_Set($$$) {
                 "damageProtection" );
         }
         else {
-            return "Device needs to be reachable to set damageProtection.";
+            return "Device needs to be reachable to set " . @$a[1];
         }
     }
 
@@ -643,7 +847,7 @@ sub THINKINGCLEANER_Define($$$) {
     $modules{THINKINGCLEANER}{defptr}{$name} = \$hash;
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         $attr{$name}{cmdIcon} =
 'on-max:text_max on-spot:refresh on-delayed:time_timer dock:measure_battery_50 locate:rc_SEARCH';
         $attr{$name}{devStateIcon} =
@@ -820,7 +1024,8 @@ sub THINKINGCLEANER_SendCommand($$;$$) {
     my $response;
     my $return;
 
-    $http_method = "POST" if ( $service eq "register_webhook.json" );
+    $http_method = "POST"
+      if ( $service eq "register_webhook.json" || $service eq "newsong.json" );
 
     if ( !defined($cmd) || $cmd eq "" ) {
         Log3 $name, 4, "THINKINGCLEANER $name: REQ $service";
@@ -1184,10 +1389,22 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
                                 readingsBulkUpdate( $hash, "cleaningTimeLast",
                                     ReadingsVal( $name, "cleaningTime", "0" ) );
                             }
-                            elsif ( $r2 eq "vacuum_drive" ) {
-                                $readingName = "vacuumDrive";
+                            elsif ($r2 eq "auto_update"
+                                || $r2 eq "vacuum_drive"
+                                || $r2 eq "restart_AC"
+                                || $r2 eq "always_MAX"
+                                || $r2 eq "auto_dock"
+                                || $r2 eq "keepAwakeOnDock"
+                                || $r2 eq "webview_advanced" )
+                            {
+                                $readingName = $r2;
                                 $v           = "off";
                                 $v = "on" if ( $return->{$r}{$r2} eq "1" );
+                            }
+                            elsif ( $r2 eq "bin_status" ) {
+                                $readingName = $r2;
+                                $v           = "ok";
+                                $v = "full" if ( $return->{$r}{$r2} eq "1" );
                             }
                             elsif ( $r2 eq "tc-roomba-conn" ) {
                                 $readingName = "roombaConnection";
