@@ -151,7 +151,7 @@ sub msgConfig_Define($$) {
     $modules{msgConfig}{defptr} = $hash;
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         my $group   = AttrVal( "global", "group",   "Global" );
         my $room    = AttrVal( "global", "room",    "" );
         my $verbose = AttrVal( "global", "verbose", 3 );

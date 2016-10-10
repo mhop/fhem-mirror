@@ -1544,7 +1544,7 @@ sub PHTV_Define($$) {
       if ( defined( $hash->{READINGS}{softwareversion}{VAL} ) );
 
     # set default settings on first define
-    if ($init_done) {
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         $attr{$name}{webCmd} = 'volume:input:rgb';
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
@@ -3234,8 +3234,7 @@ sub PHTV_GetStateAV($) {
     elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
         return "muted";
     }
-    elsif ( ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
-    {
+    elsif ( ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" ) {
         return ReadingsVal( $name, "playStatus", "stopped" );
     }
     else {
