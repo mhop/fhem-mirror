@@ -86,14 +86,17 @@ sub HP1000_Define($$) {
     $hash->{PASSWORD} = $a[3] if ( defined( $a[3] ) );
 
     return "Device already defined: " . $modules{HP1000}{defptr}{NAME}
-      if ( defined( $modules{HP1000}{defptr} ) );
+      if ( defined( $modules{HP1000}{defptr} ) && !defined( $hash->{OLDDEF} ) );
 
-    $hash->{fhem}{infix} = "updateweatherstation";
+    if ( HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" ) ) {
+        $hash->{fhem}{infix} = "updateweatherstation";
+    }
+    else {
+        return "Error registering FHEMWEB infix";
+    }
 
     # create global unique device definition
     $modules{HP1000}{defptr} = $hash;
-
-    HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" );
 
     return undef;
 }
@@ -232,6 +235,20 @@ sub HP1000_CGI() {
 
     # calculated readings
     #
+
+    # uvIndex
+    # Forum https://forum.fhem.de/index.php/topic,44403.msg501704.html#msg501704
+    if ( defined( $webArgs->{UV} ) ) {
+        my $v = floor( ( $webArgs->{UV} - 100 ) / 450 + 1 );
+        readingsBulkUpdate( $hash, "uvIndex", $v );
+    }
+
+#    # luminosity2
+#    # Forum https://forum.fhem.de/index.php/topic,44403.msg501704.html#msg501704
+#    if ( defined( $webArgs->{light} ) ) {
+#        my $v = round( $webArgs->{light} / 126.7 * 10 ) / 10;
+#        readingsBulkUpdate( $hash, "luminosity2", $v );
+#    }
 
     # dewpointIndoor
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
@@ -613,6 +630,15 @@ sub HP1000_PushWU($$) {
         elsif ( $key eq "light" ) {
             $key   = "solarradiation";
             $value = $value * 0.01;      # convert from uW/cm2 to W/m2
+        }
+
+        elsif ( $key eq "uvIndex" ) {
+            $key   = "UV";
+            $value = $value;
+        }
+
+        elsif ( $key eq "UV" ) {
+            next;
         }
 
         $cmd .= "$key=" . $value . "&";
