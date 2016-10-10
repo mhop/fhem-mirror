@@ -243,8 +243,8 @@ sub Hyperion_Read($)
         Log3 $name, 1, $error;
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"serverResponse","ERROR");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"state","ERROR");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"lastError",$error);
+        readingsBulkUpdate($hash,"state","ERROR");
+        readingsBulkUpdate($hash,"lastError",$error);
         readingsEndUpdate($hash,1);
         return undef;
       }
@@ -320,34 +320,32 @@ sub Hyperion_Read($)
     $hash->{build_time} = $data->{hyperion_build}->[0]->{time}
       if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
     readingsBeginUpdate($hash);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"adjustRed",$adjR);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"adjustGreen",$adjG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"adjustBlue",$adjB);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"blacklevel",$blkL);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"colorTemperature",$temP);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"correction",$corS);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0])
+    readingsBulkUpdate($hash,"adjustRed",$adjR);
+    readingsBulkUpdate($hash,"adjustGreen",$adjG);
+    readingsBulkUpdate($hash,"adjustBlue",$adjB);
+    readingsBulkUpdate($hash,"blacklevel",$blkL);
+    readingsBulkUpdate($hash,"colorTemperature",$temP);
+    readingsBulkUpdate($hash,"correction",$corS);
+    readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0])
       if (!defined ReadingsVal($name,"effect",undef));
-    Hyperion_readingsBulkUpdateIfChanged($hash,"effect",(split(",",$effectList))[0])
-      if (!defined ReadingsVal($name,"effect",undef));
-    Hyperion_readingsBulkUpdateIfChanged($hash,".effects", $effectList)
+    readingsBulkUpdate($hash,".effects", $effectList)
       if ($effectList);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"duration",$duration);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"gamma",$gamM);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"id",$id);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceGain",$lumG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"luminanceMinimum",$lumM)
+    readingsBulkUpdate($hash,"duration",$duration);
+    readingsBulkUpdate($hash,"gamma",$gamM);
+    readingsBulkUpdate($hash,"id",$id);
+    readingsBulkUpdate($hash,"luminanceGain",$lumG);
+    readingsBulkUpdate($hash,"luminanceMinimum",$lumM)
       if ($lumM);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"priority",$prio)
+    readingsBulkUpdate($hash,"priority",$prio)
       if (defined $prio);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"rgb","ff0d0d")
+    readingsBulkUpdate($hash,"rgb","ff0d0d")
       if (!defined ReadingsVal($name,"rgb",undef));
-    Hyperion_readingsBulkUpdateIfChanged($hash,"saturationGain",$satG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"saturationLGain",$satL)
+    readingsBulkUpdate($hash,"saturationGain",$satG);
+    readingsBulkUpdate($hash,"saturationLGain",$satL)
       if ($satL);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"threshold",$thrE);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"valueGain",$valG);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"whitelevel",$whiL);
+    readingsBulkUpdate($hash,"threshold",$thrE);
+    readingsBulkUpdate($hash,"valueGain",$valG);
+    readingsBulkUpdate($hash,"whitelevel",$whiL);
     if ($script)
     {
       my $args = $data->{activeEffects}->[0]->{args};
@@ -363,10 +361,10 @@ sub Hyperion_Read($)
           {
             my $en = $e->{name};
             $en =~ s/ /_/g;
-            Hyperion_readingsBulkUpdateIfChanged($hash,"effect",$en);
-            Hyperion_readingsBulkUpdateIfChanged($hash,"mode","effect");
-            Hyperion_readingsBulkUpdateIfChanged($hash,"state","effect $en");
-            Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","effect");
+            readingsBulkUpdate($hash,"effect",$en);
+            readingsBulkUpdate($hash,"mode","effect");
+            readingsBulkUpdate($hash,"state","effect $en");
+            readingsBulkUpdate($hash,"mode_before_off","effect");
             Log3 $name,4,"$name: effect $en";
           }
         }
@@ -379,26 +377,26 @@ sub Hyperion_Read($)
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
       my $dim = int($v * 100);
-      Hyperion_readingsBulkUpdateIfChanged($hash,"rgb",$rgb);
-      Hyperion_readingsBulkUpdateIfChanged($hash,"dim",$dim);
-      Hyperion_readingsBulkUpdateIfChanged($hash,"mode","rgb");
-      Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","rgb");
-      Hyperion_readingsBulkUpdateIfChanged($hash,"state","rgb $rgb");
+      readingsBulkUpdate($hash,"rgb",$rgb);
+      readingsBulkUpdate($hash,"dim",$dim);
+      readingsBulkUpdate($hash,"mode","rgb");
+      readingsBulkUpdate($hash,"mode_before_off","rgb");
+      readingsBulkUpdate($hash,"state","rgb $rgb");
       Log3 $name,4,"$name: rgb $rgb";
     }
     else
     {
       if ($prio)
       {
-        Hyperion_readingsBulkUpdateIfChanged($hash,"mode","clearall");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"mode_before_off","clearall");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"state","clearall");
+        readingsBulkUpdate($hash,"mode","clearall");
+        readingsBulkUpdate($hash,"mode_before_off","clearall");
+        readingsBulkUpdate($hash,"state","clearall");
         Log3 $name,4,"$name: clearall";
       }
       else
       {
-        Hyperion_readingsBulkUpdateIfChanged($hash,"mode","off");
-        Hyperion_readingsBulkUpdateIfChanged($hash,"state","off");
+        readingsBulkUpdate($hash,"mode","off");
+        readingsBulkUpdate($hash,"state","off");
         Log3 $name,4,"$name: off";
       }
     }
@@ -409,9 +407,9 @@ sub Hyperion_Read($)
   {
     Log3 $name,4,"$name: error while requesting ".$hash->{DeviceName}." - $result";
     readingsBeginUpdate($hash);
-    Hyperion_readingsBulkUpdateIfChanged($hash,"lastError","error while requesting ".$hash->{DeviceName});
+    readingsBulkUpdate($hash,"lastError","error while requesting ".$hash->{DeviceName});
     readingsBulkUpdate($hash,"serverResponse","ERROR");
-    Hyperion_readingsBulkUpdateIfChanged($hash,"state","ERROR")
+    readingsBulkUpdate($hash,"state","ERROR")
       if (Value($name) ne "ERROR");
   }
   return undef;
@@ -595,10 +593,10 @@ sub Hyperion_Set($@)
     $obj{duration} = $duration * 1000
       if ($duration > 0);
   }
-  elsif ($cmd eq "dimUp" || $cmd eq "dimDown")
+  elsif ($cmd =~ /^(dimUp|dimDown)$/)
   {
     return "Value of $cmd has to be between 1 and 99"
-      if (defined($value) && $value =~ /°(\d+)$/ && int($1) < 1 && int($1) > 99);
+      if (defined($value) && $value =~ /^(\d+)$/ && int($1) < 1 && int($1) > 99);
     my $dim = int ReadingsVal($name,"dim",100);
     my $dimStep = (defined $value) ? int $value : int AttrVal($name,"hyperionDimStep",5);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
@@ -700,12 +698,7 @@ sub Hyperion_Set($@)
     }
     return undef;
   }
-  elsif ( $cmd eq "luminanceGain" ||
-          $cmd eq "luminanceMinimum" ||
-          $cmd eq "saturationGain" ||
-          $cmd eq "saturationLGain" ||
-          $cmd eq "valueGain"
-        )
+  elsif ($cmd =~ /^(luminanceGain|luminanceMinimum|saturationGain|saturationLGain|valueGain)$/)
   {
     return "The value of $cmd has to be between 0.000 an 1.999 in steps of 0.001."
       if ($value !~ /^(\d)(\.\d)?(\d{1,2})?$/ || int $1 > 1);
@@ -714,11 +707,7 @@ sub Hyperion_Set($@)
     $obj{command}   = "transform";
     $obj{transform} = \%tr;
   }
-  elsif ( $cmd eq "blacklevel" ||
-          $cmd eq "gamma" ||
-          $cmd eq "threshold" ||
-          $cmd eq "whitelevel"
- )
+  elsif ($cmd =~ /^(blacklevel|gamma|threshold|whitelevel)$/)
   {
     return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001"
       if ($value !~ /^((\d)\.(\d){1,3}),((\d)\.(\d){1,3}),((\d)\.(\d){1,3})$/ || int $1 > 9 || int $4 > 9 || int $7 > 9);
@@ -727,9 +716,10 @@ sub Hyperion_Set($@)
     $obj{command} = "transform";
     $obj{transform} = \%ar;
   }
-  elsif ($cmd eq "correction" || $cmd eq "colorTemperature")
+  elsif ($cmd =~ /^(correction|colorTemperature)$/)
   {
-    $cmd = "temperature" if ($cmd eq "colorTemperature");
+    $cmd = "temperature"
+      if ($cmd eq "colorTemperature");
     return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
       if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
     my $arr = Hyperion_list2array($value,"%d");
@@ -737,10 +727,7 @@ sub Hyperion_Set($@)
     $obj{command} = $cmd;
     $obj{$cmd} = \%ar;
   }
-  elsif ( $cmd eq "adjustRed" ||
-          $cmd eq "adjustGreen" ||
-          $cmd eq "adjustBlue"
-        )
+  elsif ( $cmd =~ /^(adjustRed|adjustGreen|adjustBlue)$/)
   {
     return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
       if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
@@ -884,12 +871,6 @@ sub Hyperion_devStateIcon($;$)
     if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
   return ".*:it_television@#0000FF:toggle"
     if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
-}
-
-sub Hyperion_readingsBulkUpdateIfChanged($$$) {
-  my ($hash,$read,$value) = @_;
-  readingsBulkUpdate($hash,$read,$value)
-    if ReadingsVal($hash->{NAME},$read,"SomeThingTotallyCrazy") ne $value;
 }
 
 1;
