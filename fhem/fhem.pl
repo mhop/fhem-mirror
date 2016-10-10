@@ -4044,9 +4044,19 @@ readingsEndUpdate($$)
   return undef;
 }
 
-#
+sub
+readingsBulkUpdateIfChanged($$$@) # Forum #58797
+{
+  my ($hash,$reading,$value,$changed)= @_;
+  return undef if($value eq ReadingsVal($hash->{NAME},$reading,""));
+  return readingsBulkUpdate($hash,$reading,$value,$changed);
+}
+
 # Call readingsBulkUpdate to update the reading.
 # Example: readingsUpdate($hash,"temperature",$value);
+# Optional parameter $changed: if defined, and is 0, do not trigger events. If
+# 1, trigger. If not defined, the name of the reading decides (starting with .
+# is 0, else 1). The event-on-* filtering is done additionally.
 #
 sub
 readingsBulkUpdate($$$@)
