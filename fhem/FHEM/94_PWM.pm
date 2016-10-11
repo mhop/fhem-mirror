@@ -19,6 +19,7 @@
 # 16.08.16 GA add event-min-interval
 # 23.09.16 GA fix set default for maxPulse to 1 (from 0.85)
 # 28.09.16 GA add "get timers" to collect a maximum of all timers from the rooms attached
+# 11.10.16 GA add new delayTimeOn can now suspend switching of OverallHeadtingSwitch from "off" to "on"
 
 ##############################################
 # $Id$
@@ -489,6 +490,7 @@ PWM_Calculate($)
         $newstateOHS = ($cntRoomsOn > 0) ? "on" : "off";
 
       }
+
  
       my $actor       = $hash->{OverallHeatingSwitch};
       my $actstateOHS = ($defs{$actor}{STATE} =~ $hash->{OverallHeatingSwitch_regexp_on}) ? "on" : "off";
@@ -497,22 +499,43 @@ PWM_Calculate($)
 
         if ($actstateOHS eq "on" and $newstateOHS eq "off") {
 
-          if ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}{VAL} eq "") {
+          if ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} eq "") {
             $newstateOHS = "on";
             Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
-            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntil", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
+            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
 
-          } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}{VAL} ge TimeNow()) {
+          } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} ge TimeNow()) {
             $newstateOHS = "on";
             Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
           } else {
-            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntil", "");
+            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
           }
 
         } else {
-          readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntil", "");
+          readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
         }
       }
+      if ($hash->{OverallHeatingSwitch_delayTimeOn} > 0) {
+
+        if ($actstateOHS eq "off" and $newstateOHS eq "on") {
+
+          if ($hash->{READINGS}{OverallHeatingSwitchWaitBeforeOn}{VAL} eq "") {
+            $newstateOHS = "off";
+            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on (init timestamp)");
+            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", FmtDateTime(time() + $hash->{OverallHeatingSwitch_delayTimeOn}));
+
+          } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitBeforeOn}{VAL} ge TimeNow()) {
+            $newstateOHS = "off";
+            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on");
+          } else {
+            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "");
+          }
+
+        } else {
+          readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "");
+        }
+      }
+
 
       if ($newstateOHS ne $actstateOHS or $hash->{READINGS}{OverallHeatingSwitch}{VAL} ne $actstateOHS) {
 
@@ -808,7 +831,7 @@ PWM_Define($$)
   my $name = $hash->{NAME};
 
   return "syntax: define <name> PWM [<interval>] [<cycletime>] [<minonofftime>] [<maxPulse>] [<maxSwitchOnPerCycle>,<maxSwitchOffPerCycle>] [<roomStayOn>,<roomStayOff>,<stayOnThreshold>]".
-    " [<overallHeatingSwitch>[,<pulseMaxThreshold>[,<followUpTime>[,<h_regexp_on>]]]"
+    " [<overallHeatingSwitch>[,<pulseMaxThreshold>[,<followUpTime>[,<h_regexp_on>[,<delayTimeOn>]]]]"
     if(int(@a) < 2 || int(@a) > 9);
 
   my $interval     = ((int(@a) > 2) ? $a[2] : 60);
@@ -871,10 +894,11 @@ PWM_Define($$)
   # [<overallHeatingSwitch>]
 
   if (int(@a) > 8) {
-    my ($hactor, $h_threshold, $h_followUpTime, $h_regexp_on) = split (",", $a[8], 4);
+    my ($hactor, $h_threshold, $h_followUpTime, $h_regexp_on, $h_delayTimeOn) = split (",", $a[8], 5);
     $h_followUpTime  = 0    unless ($h_followUpTime);
     $h_threshold     = 0    unless ($h_threshold);
     $h_regexp_on     = "on" unless ($h_regexp_on);
+    $h_delayTimeOn   = 0    unless ($h_delayTimeOn);
 
     if (!$defs{$hactor} && $hactor ne "dummy")
     {
@@ -888,16 +912,26 @@ PWM_Define($$)
     $hash->{OverallHeatingSwitch_regexp_on} = $h_regexp_on;
     $hash->{OverallHeatingSwitch_roomBased} = ($h_threshold > 0) ? "off" : "on";
     $hash->{OverallHeatingSwitch_followUpTime}  = $h_followUpTime;
-    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntil", "", 0);
+    $hash->{OverallHeatingSwitch_delayTimeOn} = $h_delayTimeOn;
+    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "", 0);
+    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitch", "", 0);
+
+    delete ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitUntil});
+    delete ($hash->{READINGS}{OverallHeatingSwitchWaitBefore}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitBefore});
   } else {
     $hash->{OverallHeatingSwitch}           = "";
     $hash->{OverallHeatingSwitch_threshold} = "";
     $hash->{OverallHeatingSwitch_regexp_on} = "";
     $hash->{OverallHeatingSwitch_roomBased} = "";
     $hash->{OverallHeatingSwitch_followUpTime}  = "";
-    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntil", "", 0);
+    $hash->{OverallHeatingSwitch_delayTimeOn} = "";
+    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "", 0);
+    readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitch", "", 0);
+
+    delete ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitUntil});
+    delete ($hash->{READINGS}{OverallHeatingSwitchWaitBefore}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitBefore});
   }
 
   #AssignIoPort($hash);
@@ -981,7 +1015,7 @@ PWM_Attr(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWM [&lt;interval&gt;] [&lt;cycletime&gt;] [&lt;minonofftime&gt;] [&lt;maxPulse&gt;] [&lt;maxSwitchOnPerCycle&gt;,&lt;maxSwitchOffPerCycle&gt;] [&lt;roomStayOn&gt;,&lt;roomStayOff&gt;,&lt;stayOnThreshold&gt;] [&lt;overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt[,&lt;h_regexp_on&gt]]]]<br></code>
+    <code>define &lt;name&gt; PWM [&lt;interval&gt;] [&lt;cycletime&gt;] [&lt;minonofftime&gt;] [&lt;maxPulse&gt;] [&lt;maxSwitchOnPerCycle&gt;,&lt;maxSwitchOffPerCycle&gt;] [&lt;roomStayOn&gt;,&lt;roomStayOff&gt;,&lt;stayOnThreshold&gt;] [&lt;overallHeatingSwitch&gt;[,&lt;pulseMaxThreshold&gt;[,&lt;followUpTime&gt;[,&lt;h_regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]]<br></code>
     <br>
     eg. define fb PWM 60 900 120 1 99,99 0,0,0 pumpactor<br>
     <br>
@@ -1029,12 +1063,13 @@ PWM_Attr(@)
       <br>
     </li>
 
-    <li>&lt;overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt]]]<br>
+    <li>&lt;overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]<br>
       Universal switch to controll eg. pumps or the heater itself. It will be set to "off" if no heating is required and otherwise "on".<br>
       <i>pulseMaxThreshold</i> defines a threshold which is applied to reading <i>maxPulse</i> of the PWM object to decide if heating is required. If (calculated maxPulse > threshold) then actor is set to "on", otherwise "off".<br>
       If <i>pulseMaxThreshold</i> is set to 0 (or is not defined) then the decision is based on <i>roomsOn</i>. If (roomsOn > 0) then actor is set to "on", otherwise "off".<br>
       <i>followUpTime</i> defines a number of seconds which is used to delay the status change from "on" to "off". This can be used to prevent a toggling switch.<br>
       <i>regexp_on</i> defines a regular expression to be applied to the state of the actor. Default is "on". If state matches the regular expression it is handled as "on", otherwise "off".<br>
+      <i>delayTimeOn</i> defines a number of seconds which is used to delay the status change from "off" to "on". This can be used to give the valves time to open before switching..<br>
       <br>
     </li>
 
