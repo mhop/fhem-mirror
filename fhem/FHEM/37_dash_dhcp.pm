@@ -262,6 +262,7 @@ dash_dhcp_Attr($$$)
 or
 <ul><code>iptables -I PREROUTING -t nat -i eth0 -p udp --src 0.0.0.0 --dport 67 -j DNAT --to 0.0.0.0:6767</code></ul>
 and use the port attribute to configure the redirected port.</li>
+    <li>to make iptables rules permanent see for example: https://www.thomas-krenn.com/de/wiki/Iptables_Firewall_Regeln_dauerhaft_speichern</li>
   </ul>
 
   <a name="dash_dhcp_Attr"></a>
