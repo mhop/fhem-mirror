@@ -430,7 +430,8 @@ sub Hyperion_GetConfigs($)
     my $configs = join(",",@files);
     readingsSingleUpdate($hash,".configs",$configs,1)
       if (ReadingsVal($name,".configs","") ne $configs);
-    $attr{$name}{webCmd "webCmd","") eq $Hyperion_webCmd);
+    $attr{$name}{webCmd} = $Hyperion_webCmd_config
+      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
   }
   else
   {
