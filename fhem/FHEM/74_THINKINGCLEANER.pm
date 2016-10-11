@@ -57,7 +57,7 @@ sub THINKINGCLEANER_Initialize($) {
     $hash->{parseParams} = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg"
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg "
       . $readingFnAttributes;
 
     return;
