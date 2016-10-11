@@ -1,15 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   73_NUKIBridge,74_NUKIDevice: New Modules to control Nuki Smartlocks
   - feature: 98_Hyperion: new attribute hyperionAttrRestore
                           readings will always be refreshed now
   - feature: 93_DbRep: deviceRename added, new Internal DATABASE, 
-                      Internal/Attribute ROLE added for Autorename-function
-  - bugfix: 93_DbRep: delEntries not running on SQLite
-  - added: 74_THINKINGCLEANER: new module to support remote control of
+                       Internal/Attribute ROLE added for Autorename-function
+  - bugfix:  93_DbRep: delEntries not running on SQLite
+  - added:   74_THINKINGCLEANER: new module to support remote control of
                                Roomba cleaning robots
   - feature: 02_FTUISRV: if and loop constructs added
-  - bugfix: 74_AMAD: fix FHEM crash when use AMAD and apptime togehter
-  - new: 98_TRAFFIC: provide traffic details with Google Distance API
+  - bugfix:  74_AMAD: fix FHEM crash when use AMAD and apptime togehter
+  - new:     98_TRAFFIC: provide traffic details with Google Distance API
   - feature: 98_Hyperion: set configFile only available if at least two files
                           are found while get configFiles
                           minor code improvements
@@ -27,7 +28,8 @@
                more.
   - bugfix:  95_Dashboard: fix for yesterdays commit.
   - feature: readingsGroup: allow grouping of similar readings from one device
-  14_SD_WS09.pm WH1080 CRC-Berechung angepaßt--> automatische Modelauswahl
+  - feature  14_SD_WS09: WH1080 CRC-Berechung angepaßt--> automatische
+                         Modelauswahl
   - feature: 00_SIGNALduino: nonblocking communication, improved init 
                and keepalive, fixed manchester related stuff, Supports
                Somfy RTS Protocol. Decoding manchester encoded messages 
