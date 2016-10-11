@@ -32,8 +32,9 @@
 # 30.08.2016 : A.Goebel : add reading "state_ebus" containing output from "state" of ebusd
 # 16.09.2016 : A.Goebel : add reset "state_ebus" if ebus is not connected
 # 06.10.2016 : A.Goebel : add valueFormat can now be used to access all values returned from one read
-# 11.10.2016 : A.Goebel : add implement hex read from ebusctl
+# 11.10.2016 : A.Goebel : add implement hex write from ebusctl
 # 11.10.2016 : A.Goebel : add set initial reading name after "set" to "class~variable"
+# 11.10.2016 : A.Goebel : fix "set hex" is only available if ebusWritesEnabled is '1'
 
 package main;
 
@@ -95,9 +96,9 @@ GAEBUS_Initialize($)
   $hash->{ShutdownFn} = "GAEBUS_Shutdown";
 
 
-  %sets = ( "reopen" => [], "hex" => [] );
+  %sets = ( "reopen" => [] );
   %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
-  %setsForWriting = ( );
+  %setsForWriting = ( "hex" => [] );
   
   GAEBUS_initParams($hash);
 
@@ -878,9 +879,9 @@ GAEBUS_doEbusCmd($$$$$$$)
   if ($action eq "f")
   {
 
-    %sets = ( "reopen" => [], "hex" => [] );
+    %sets = ( "reopen" => [] );
     %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
-    %setsForWriting = ( );
+    %setsForWriting = ( "hex" => [] );
 
     my $cnt = 0;
     foreach my $line (split /\n/, $actMessage) {
@@ -1204,6 +1205,7 @@ GAEBUS_valueFormat(@)
   <ul>
     <li>hex<br>
         Will pass the input value to the "write" command of ebusd. See "ebusctl help write" for valid parameters.<br>
+        This command is only available if "ebusWritesEnabled" is set to '1'.<br>
         </li><br>
     <li>reopen<br>
         Will close and open the socket connection.
