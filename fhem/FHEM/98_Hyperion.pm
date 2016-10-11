@@ -67,7 +67,6 @@ sub Hyperion_Initialize($)
   $hash->{SetFn}      = "Hyperion_Set";
   $hash->{UndefFn}    = "Hyperion_Undef";
   $hash->{AttrList}   = "disable:1 ".
-                        "hyperionAttrRestore:0 ".
                         "hyperionBin ".
                         "hyperionConfigDir ".
                         "hyperionDefaultDuration ".
@@ -104,15 +103,28 @@ sub Hyperion_Define($$)
   $interval       = 5 if ($interval && $interval < 5);
   RemoveInternalTimer($hash);
   Hyperion_OpenDev($hash);
-  if ($init_done)
+  if ($init_done && !defined $hash->{OLDDEF})
   {
+    $attr{$name}{alias} = "Ambilight";
+    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
+    $attr{$name}{group} = "colordimmer";
+    $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
+    $attr{$name}{icon} = "light_led_stripe_rgb";
+    $attr{$name}{lightSceneParamsToSave} = "state";
+    $attr{$name}{room} = "Hyperion";
+    $attr{$name}{userattr} = "lightSceneParamsToSave"
+      if (index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr} = "homebridgeMapping"
+      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+    $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
+      if ($attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && index($attr{$name}{userattr},"homebridgeMapping") == -1);
+    $attr{$name}{webCmd} = $Hyperion_webCmd;
     Hyperion_GetUpdate($hash);
   }
   else
   {
     InternalTimer(gettimeofday() + $interval,"Hyperion_GetUpdate",$hash,0);
   }
-  $attr{$name}{room} = "Hyperion" if (!$attr{$name}{room});
   return undef;
 }
 
@@ -279,41 +291,14 @@ sub Hyperion_Read($)
     my $satG        = sprintf("%.3f",$trans->{saturationGain});
     my $satL        = (defined $trans->{saturationLGain}) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
     my $valG        = sprintf("%.3f",$trans->{valueGain});
-    my $attrRestore = AttrVal($name,"hyperionAttrRestore",1);
     $Hyperion_sets_local{effect} = $effectList
       if (length $effectList > 0);
     if ($configs)
     {
       $Hyperion_sets_local{configFile} = $configs;
       $attr{$name}{webCmd} = $Hyperion_webCmd_config
-        if ((!$attr{$name}{webCmd} || AttrVal($name,"webCmd","") eq $Hyperion_webCmd) && $attrRestore);
+        if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
     }
-    $attr{$name}{alias} = "Ambilight"
-      if (!$attr{$name}{alias} && $attrRestore);
-    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}'
-      if (!$attr{$name}{devStateIcon} && $attrRestore);
-    $attr{$name}{group} = "colordimmer"
-      if (!$attr{$name}{group} && $attrRestore);
-    $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping
-      if (!$attr{$name}{homebridgeMapping} && $attrRestore);
-    $attr{$name}{icon} = "light_led_stripe_rgb"
-      if (!$attr{$name}{icon} && $attrRestore);
-    $attr{$name}{lightSceneParamsToSave} = "state"
-      if (!$attr{$name}{lightSceneParamsToSave} && $attrRestore);
-    $attr{$name}{room} = "Hyperion"
-      if (!$attr{$name}{room} && $attrRestore);
-    $attr{$name}{userattr} = "lightSceneParamsToSave"
-      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1 && $attrRestore);
-    $attr{$name}{userattr} = "lightSceneParamsToSave ".$attr{$name}{userattr}
-      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1 && $attrRestore);
-    $attr{$name}{userattr} = "homebridgeMapping"
-      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && $attrRestore);
-    $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
-      if ($attr{$name}{userattr} && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && $attrRestore);
-    $attr{$name}{webCmd} = $Hyperion_webCmd
-      if ((!$attr{$name}{webCmd} || ($attr{$name}{webCmd} && !$Hyperion_sets_local{configFile})) && $attrRestore);
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config
-      if ($attr{$name}{webCmd} && $Hyperion_sets_local{configFile} && $attr{$name}{webCmd} eq $Hyperion_webCmd && $attrRestore);
     $hash->{helper}{sets} = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
     $hash->{hostname} = $data->{hostname}
       if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
@@ -445,8 +430,7 @@ sub Hyperion_GetConfigs($)
     my $configs = join(",",@files);
     readingsSingleUpdate($hash,".configs",$configs,1)
       if (ReadingsVal($name,".configs","") ne $configs);
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config
-      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+    $attr{$name}{webCmd "webCmd","") eq $Hyperion_webCmd);
   }
   else
   {
@@ -799,11 +783,6 @@ sub Hyperion_Attr(@)
       $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5."
         if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
     }
-    elsif ($attr_name eq "hyperionAttrRestore")
-    {
-      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0."
-        if ($attr_value !~ /^0$/);
-    }
     elsif ($attr_name eq "hyperionNoSudo")
     {
       $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1."
@@ -1052,11 +1031,6 @@ sub Hyperion_devStateIcon($;$)
   <a name="Hyperion_attr"></a>
   <p><b>Attributes</b></p>
   <ul>
-    <li>
-      <i>hyperionAttrRestore</i><br>
-      restore default attributes if deleted manually<br>
-      default: 1
-    </li>
     <li>
       <i>hyperionBin</i><br>
       path to the hyperion executable<br>
