@@ -32,6 +32,8 @@
 # 30.08.2016 : A.Goebel : add reading "state_ebus" containing output from "state" of ebusd
 # 16.09.2016 : A.Goebel : add reset "state_ebus" if ebus is not connected
 # 06.10.2016 : A.Goebel : add valueFormat can now be used to access all values returned from one read
+# 11.10.2016 : A.Goebel : add implement hex read from ebusctl
+# 11.10.2016 : A.Goebel : add set initial reading name after "set" to "class~variable"
 
 package main;
 
@@ -93,7 +95,7 @@ GAEBUS_Initialize($)
   $hash->{ShutdownFn} = "GAEBUS_Shutdown";
 
 
-  %sets = ( "reopen" => [] );
+  %sets = ( "reopen" => [], "hex" => [] );
   %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
   %setsForWriting = ( );
   
@@ -221,7 +223,7 @@ GAEBUS_Set($@)
 
   my $name = shift @a;
   my $type = shift @a;
-  my $arg = join("", @a);
+  my $arg = join(" ", @a);
 
   #return "No $a[1] for dummies" if(IsDummy($name));
 
@@ -234,6 +236,15 @@ GAEBUS_Set($@)
     GAEBUS_CloseDev($hash);
     GAEBUS_OpenDev($hash,0);
     return undef;
+  }
+
+  if ($type eq "hex")
+  {
+    Log3 ($hash, 4, "$name Set $type $arg");
+
+    my $answer = GAEBUS_doEbusCmd ($hash, "h", "", "", "$arg", "", 0);
+
+    return $answer;
   }
 
   # handle commands defined in %sets
@@ -250,10 +261,12 @@ GAEBUS_Set($@)
 
 	Log3 ($hash, 3, "$name: set $attrname");
         addToDevAttrList($name, $attrname);
-	$attr{$name}{$attrname} = "" unless (defined $attr{$name}{$attrname});
+        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+	$attr{$name}{$attrname} = $class.$delimiter.$var unless (defined $attr{$name}{$attrname});
 
         return undef;
   }
+
 
   #
   # extend possible parameters by the readings defined for writing in attributes
@@ -427,7 +440,7 @@ GAEBUS_Get($@)
 
   # other read commands
 
-  if ($a[1] =~ /^[rh]$delimiter/) 
+  if ($a[1] =~ /^[r]$delimiter/) 
   {
     my $readingname = "";
     my $readingcmdname = $a[1].$delimiter.$a[2];
@@ -736,7 +749,9 @@ sub
 GAEBUS_doEbusCmd($$$$$$$)
 {
   my $hash           = shift;
-  my $action         = shift; # "r" = get reading, "v" = verbose mode, "w" = write to ebus, "f" = execute find to read in config, "i" = execute info 
+  my $action         = shift; # "r" = get reading, "v" = verbose mode, 
+                              # "w" = write to ebus, "f" = execute find to read in config, "i" = execute info 
+                              # "h" = read with command specified in hex
   my $readingname    = shift;
   my $readingcmdname = shift;
   my $writeValues    = shift;
@@ -780,21 +795,37 @@ GAEBUS_doEbusCmd($$$$$$$)
     $cmd .= "$writeValues";
 
   } elsif ($action eq "f") {
+
     $cmd = "find -f -r -w";
 
   } elsif ($action eq "i") {
+
     $cmd = "info";
 
-  } else {
+  } elsif ($action eq "r") {
 
     $cmd = "$io ";
     $cmd .= " -f " if ($io ne "h");
-    $cmd .= "-v " if ($action eq "v");
     $cmd .= "-c $class $var";
-    $cmd .= " $cmdaddon" if ($action eq "r");
+    $cmd .= " $cmdaddon";
 
-    $cmd =~ s/^h /r /;
+    #$cmd =~ s/^h /r /; #obsolete
+
+  } elsif ($action eq "v") {
+
+    $cmd = "$io ";
+    $cmd .= " -f " if ($io ne "h");
+    $cmd .= "-v ";
+    $cmd .= "-c $class $var";
+
+    #$cmd =~ s/^h /r /; # obsolete
+
+  } elsif ($action eq "h") {
+
+    #HERE
+    $cmd = "w $writeValues";
   }
+  
 
   Log3 ($name, 3, "$name execute $cmd");
 
@@ -847,7 +878,7 @@ GAEBUS_doEbusCmd($$$$$$$)
   if ($action eq "f")
   {
 
-    %sets = ( "reopen" => [] );
+    %sets = ( "reopen" => [], "hex" => [] );
     %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
     %setsForWriting = ( );
 
@@ -885,7 +916,7 @@ GAEBUS_doEbusCmd($$$$$$$)
     return "$cnt definitions processed";
 
   }
-  if ($action eq "i")
+  if ($action eq "i" or $action eq "h")
   {
     #Log3 ($name, 3, "$name info done.");
     return "$actMessage";
@@ -1171,6 +1202,9 @@ GAEBUS_valueFormat(@)
   <a name="GAEBUS"></a>
   <b>Set </b>
   <ul>
+    <li>hex<br>
+        Will pass the input value to the "write" command of ebusd. See "ebusctl help write" for valid parameters.<br>
+        </li><br>
     <li>reopen<br>
         Will close and open the socket connection.
         </li><br>
@@ -1228,7 +1262,7 @@ GAEBUS_valueFormat(@)
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[r|h]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt;</code><br>
+        <code>[r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
