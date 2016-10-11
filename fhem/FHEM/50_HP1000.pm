@@ -34,7 +34,6 @@ use Time::Local;
 use Data::Dumper;
 use List::Util qw(sum);
 use FHEM::98_dewpoint;
-use FHEM::59_Twilight;
 
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
@@ -69,7 +68,8 @@ sub HP1000_Initialize($) {
     $hash->{DefFn}   = "HP1000_Define";
     $hash->{UndefFn} = "HP1000_Undefine";
     $hash->{AttrList} =
-      "wu_push:1,0 wu_id wu_password wu_realtime:1,0 " . $readingFnAttributes;
+      "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url "
+      . $readingFnAttributes;
 }
 
 ###################################
@@ -216,7 +216,6 @@ sub HP1000_CGI() {
         $p = "temperatureIndoor" if ( $p eq "intemp" );
         $p = "humidity"          if ( $p eq "outhumi" );
         $p = "temperature"       if ( $p eq "outtemp" );
-        $p = "luminosity"        if ( $p eq "light" );
         $p = "pressure"          if ( $p eq "relbaro" );
         $p = "pressureAbs"       if ( $p eq "absbaro" );
         $p = "rain"              if ( $p eq "rainrate" );
@@ -229,6 +228,7 @@ sub HP1000_CGI() {
         $p = "windDir"           if ( $p eq "winddir" );
         $p = "windGust"          if ( $p eq "windgust" );
         $p = "windSpeed"         if ( $p eq "windspeed" );
+        $p = "luminosity"        if ( $p eq "light" );
 
         readingsBulkUpdate( $hash, $p, $v );
     }
@@ -236,19 +236,20 @@ sub HP1000_CGI() {
     # calculated readings
     #
 
-    # uvIndex
-    # Forum https://forum.fhem.de/index.php/topic,44403.msg501704.html#msg501704
+    # UVindex (convert from uW/cm2)
+    # Forum topic,44403.msg501704.html#msg501704
     if ( defined( $webArgs->{UV} ) ) {
-        my $v = floor( ( $webArgs->{UV} - 100 ) / 450 + 1 );
-        readingsBulkUpdate( $hash, "uvIndex", $v );
+        $webArgs->{UVindex} = floor( ( $webArgs->{UV} - 100 ) / 450 + 1 );
+        readingsBulkUpdate( $hash, "uvIndex", $webArgs->{UVindex} );
     }
 
-#    # luminosity2
-#    # Forum https://forum.fhem.de/index.php/topic,44403.msg501704.html#msg501704
-#    if ( defined( $webArgs->{light} ) ) {
-#        my $v = round( $webArgs->{light} / 126.7 * 10 ) / 10;
-#        readingsBulkUpdate( $hash, "luminosity2", $v );
-#    }
+    # solarradiation in w/m2 (convert from lux)
+    # Forum topic,44403.msg501704.html#msg501704
+    if ( defined( $webArgs->{light} ) ) {
+        $webArgs->{solarradiation} = round( $webArgs->{light} / 126.7, 1 );
+        readingsBulkUpdate( $hash, "solarradiation",
+            $webArgs->{solarradiation} );
+    }
 
     # dewpointIndoor
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
@@ -257,8 +258,9 @@ sub HP1000_CGI() {
             ? 110
             : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
-        my $v = sprintf( '%0.1f', dewpoint_dewpoint( $webArgs->{intemp}, $h ) );
-        readingsBulkUpdate( $hash, "dewpointIndoor", $v );
+        $webArgs->{dewpointin} =
+          round( dewpoint_dewpoint( $webArgs->{intemp}, $h ), 1 );
+        readingsBulkUpdate( $hash, "dewpointIndoor", $webArgs->{dewpointin} );
     }
 
     # humidityAbs
@@ -268,8 +270,9 @@ sub HP1000_CGI() {
             ? 110
             : ( $webArgs->{outhumi} <= 0 ? 0.01 : $webArgs->{outhumi} )
         );
-        my $v = int( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ) + 0.5 );
-        readingsBulkUpdate( $hash, "humidityAbs", $v );
+        $webArgs->{outhumiabs} =
+          round( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ), 1 );
+        readingsBulkUpdate( $hash, "humidityAbs", $webArgs->{outhumiabs} );
     }
 
     # humidityIndoorAbs
@@ -279,45 +282,44 @@ sub HP1000_CGI() {
             ? 110
             : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
-        my $v = int( dewpoint_absFeuchte( $webArgs->{intemp}, $h ) + 0.5 );
-        readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
+        $webArgs->{inhumiabs} =
+          round( dewpoint_absFeuchte( $webArgs->{intemp}, $h ), 1 );
+        readingsBulkUpdate( $hash, "humidityIndoorAbs", $webArgs->{inhumiabs} );
     }
 
     # windCompasspoint
     if ( defined( $webArgs->{winddir} ) ) {
-        my $v = Twilight_CompassPoint( $webArgs->{winddir} );
-        readingsBulkUpdate( $hash, "windCompasspoint", $v );
-        $webArgs->{windCompasspoint} = $v;
+        $webArgs->{windcompasspoint} =
+          HP1000_CompassPoint( $webArgs->{winddir} );
+        readingsBulkUpdate( $hash, "windCompasspoint",
+            $webArgs->{windcompasspoint} );
     }
 
     # windSpeedForce in Beaufort
     if ( defined( $webArgs->{windspeed} ) ) {
-        my $v = HP1000_windForce( $webArgs->{windspeed} );
-        readingsBulkUpdate( $hash, "windSpeedForce", $v );
-        $webArgs->{windSpeedForce} = $v;
+        $webArgs->{windspeedforce} = HP1000_windForce( $webArgs->{windspeed} );
+        readingsBulkUpdate( $hash, "windSpeedForce",
+            $webArgs->{windspeedforce} );
     }
 
     # windGustForce in Beaufort
     if ( defined( $webArgs->{windgust} ) ) {
-        my $v = HP1000_windForce( $webArgs->{windgust} );
-        readingsBulkUpdate( $hash, "windGustForce", $v );
-        $webArgs->{windGustForce} = $v;
+        $webArgs->{windfustforce} = HP1000_windForce( $webArgs->{windgust} );
+        readingsBulkUpdate( $hash, "windGustForce", $webArgs->{windfustforce} );
     }
 
     # windSpeedMps in m/s
     if ( defined( $webArgs->{windspeed} ) ) {
         my $v = HP1000_windKmh2Mps( $webArgs->{windspeed} );
-        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
-        readingsBulkUpdate( $hash, "windSpeedMps", $v );
-        $webArgs->{windSpeedMps} = $v;
+        $webArgs->{windspeedmps} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedMps", $webArgs->{windspeedmps} );
     }
 
     # windGustMps in m/s
     if ( defined( $webArgs->{windgust} ) ) {
         my $v = HP1000_windKmh2Mps( $webArgs->{windgust} );
-        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
-        readingsBulkUpdate( $hash, "windGustMps", $v );
-        $webArgs->{windgust} = $v;
+        $webArgs->{windgustmps} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windGustMps", $webArgs->{windgustmps} );
     }
 
     # averages/windSpeed_avg2m
@@ -343,17 +345,19 @@ sub HP1000_CGI() {
 
     # averages/windSpeedForce_avg2m in Beaufort
     if ( defined( $webArgs->{windspd_avg2m} ) ) {
-        my $v = HP1000_windForce( $webArgs->{windspd_avg2m} );
-        readingsBulkUpdate( $hash, "windSpeedForce_avg2m", $v );
-        $webArgs->{windSpeedForce_avg2m} = $v;
+        $webArgs->{windspdforce_avg2m} =
+          HP1000_windForce( $webArgs->{windspd_avg2m} );
+        readingsBulkUpdate( $hash, "windSpeedForce_avg2m",
+            $webArgs->{windspdforce_avg2m} );
     }
 
     # averages/windSpeedMps_avg2m in m/s
     if ( defined( $webArgs->{windspd_avg2m} ) ) {
         my $v = HP1000_windKmh2Mps( $webArgs->{windspd_avg2m} );
-        $v = ( $v > 0.5 ? sprintf( '%0.1f', $v ) : "0.0" );
-        readingsBulkUpdate( $hash, "windSpeedMps_avg2m", $v );
-        $webArgs->{windspdmps_avg2m} = $v;
+        $webArgs->{windspdmps_avg2m} =
+          ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedMps_avg2m",
+            $webArgs->{windspdmps_avg2m} );
     }
 
     # averages/windDir_avg2m
@@ -369,9 +373,10 @@ sub HP1000_CGI() {
 
     # averages/windCompasspoint_avg2m
     if ( defined( $webArgs->{winddir_avg2m} ) ) {
-        my $v = Twilight_CompassPoint( $webArgs->{winddir_avg2m} );
-        readingsBulkUpdate( $hash, "windCompasspoint_avg2m", $v );
-        $webArgs->{windCompasspoint_avg2m} = $v;
+        $webArgs->{windcompasspoint_avg2m} =
+          HP1000_CompassPoint( $webArgs->{winddir_avg2m} );
+        readingsBulkUpdate( $hash, "windCompasspoint_avg2m",
+            $webArgs->{windcompasspoint_avg2m} );
     }
 
     # averages/windGust_sum10m
@@ -395,27 +400,18 @@ sub HP1000_CGI() {
         }
     }
 
-    # from WU API:
+    # from WU API - can we somehow calculate these as well?
     # weather - [text] -- metar style (+RA)
     # clouds - [text] -- SKC, FEW, SCT, BKN, OVC
     # soiltempf - [F soil temperature]
     # soilmoisture - [%]
     # leafwetness  - [%]
     # visibility - [nm visibility]
-
     # condition_forecast (based on pressure trendency)
-
     # day/night
-
     # isRaining
-    # solarRadiation
     # soilTemperature
     # brightness in % ??
-
-    # uv_index, uv_risk
-    if ( defined( $webArgs->{UV} ) ) {
-        my $wavelength = $webArgs->{UV};
-    }
 
     $result = "T: " . $webArgs->{outtemp}
       if ( defined( $webArgs->{outtemp} ) );
@@ -453,14 +449,21 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{relbaro} ) );
     $result .= " UV: " . $webArgs->{UV}
       if ( defined( $webArgs->{UV} ) );
+    $result .= " UVi: " . $webArgs->{UVindex}
+      if ( defined( $webArgs->{UVindex} ) );
     $result .= " L: " . $webArgs->{light}
       if ( defined( $webArgs->{light} ) );
+    $result .= " SR: " . $webArgs->{solarradiation}
+      if ( defined( $webArgs->{solarradiation} ) );
 
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
 
     HP1000_PushWU( $hash, $webArgs )
       if AttrVal( $name, "wu_push", 0 ) eq "1";
+
+    HP1000_PushSrv( $hash, $webArgs )
+      if AttrVal( $name, "extSrvPush_Url", undef );
 
     return ( "text/plain; charset=utf-8", "success" );
 }
@@ -501,6 +504,51 @@ sub HP1000_GetSum($$$$;$) {
     }
 
     return $return;
+}
+
+###################################
+sub HP1000_PushSrv($$) {
+    my ( $hash, $webArgs ) = @_;
+    my $name            = $hash->{NAME};
+    my $timeout         = AttrVal( $name, "timeout", 7 );
+    my $http_noshutdown = AttrVal( $name, "http-noshutdown", "1" );
+    my $srv_url         = AttrVal( $name, "extSrvPush_Url", "" );
+    my $cmd             = "";
+
+    Log3 $name, 5, "HP1000 $name: called function HP1000_PushSrv()";
+
+    if ( $srv_url !~
+/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.\:\;\'\,]*)?/
+      )
+    {
+        return;
+    }
+    elsif ( $4 !~ /\?/ ) {
+        $cmd = "?";
+    }
+    else {
+        $cmd = "&";
+    }
+
+    while ( my ( $key, $value ) = each %{$webArgs} ) {
+        $cmd .= "$key=" . $value . "&";
+    }
+
+    Log3 $name, 4,
+      "HP1000 $name: pushing data to external Server: $srv_url$cmd";
+
+    HttpUtils_NonblockingGet(
+        {
+            url        => $srv_url . $cmd,
+            timeout    => $timeout,
+            noshutdown => $http_noshutdown,
+            data       => undef,
+            hash       => $hash,
+            callback   => \&HP1000_ReturnSrv,
+        }
+    );
+
+    return;
 }
 
 ###################################
@@ -627,12 +675,7 @@ sub HP1000_PushWU($$) {
               0.000295299830714;    # convert from hPa to Inches of Mercury
         }
 
-        elsif ( $key eq "light" ) {
-            $key   = "solarradiation";
-            $value = $value * 0.01;      # convert from uW/cm2 to W/m2
-        }
-
-        elsif ( $key eq "uvIndex" ) {
+        elsif ( $key eq "UVindex" ) {
             $key   = "UV";
             $value = $value;
         }
@@ -656,6 +699,40 @@ sub HP1000_PushWU($$) {
             callback   => \&HP1000_ReturnWU,
         }
     );
+
+    return;
+}
+
+###################################
+sub HP1000_ReturnSrv($$$) {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    # device not reachable
+    if ($err) {
+        my $return = "error: connection timeout";
+        Log3 $name, 4, "HP1000 $name: EXTSRV HTTP " . $return;
+
+        readingsSingleUpdate( $hash, "extsrv_state", $return, 1 )
+          if ( ReadingsVal( $name, "extsrv_state", "" ) ne $return );
+    }
+
+    # data received
+    elsif ($data) {
+        my $logprio = 5;
+        my $return  = "ok";
+
+        if ( $param->{code} ne "200" ) {
+            $logprio = 4;
+            $return  = "error " . $param->{code} . ": $data";
+        }
+        Log3 $name, $logprio,
+          "HP1000 $name: EXTSRV HTTP return: " . $param->{code} . " - $data";
+
+        readingsSingleUpdate( $hash, "extsrv_state", $return, 1 )
+          if ( ReadingsVal( $name, "extsrv_state", "" ) ne $return );
+    }
 
     return;
 }
@@ -739,6 +816,63 @@ sub HP1000_windForce($) {
     }
 
     return $v;
+}
+
+sub HP1000_CompassPoint($) {
+    my ($azimuth) = @_;
+
+    my $compassPoint = "";
+
+    if ( $azimuth < 22.5 ) {
+        $compassPoint = "N";
+    }
+    elsif ( $azimuth < 45 ) {
+        $compassPoint = "NNE";
+    }
+    elsif ( $azimuth < 67.5 ) {
+        $compassPoint = "NE";
+    }
+    elsif ( $azimuth < 90 ) {
+        $compassPoint = "ENE";
+    }
+    elsif ( $azimuth < 112.5 ) {
+        $compassPoint = "E";
+    }
+    elsif ( $azimuth < 135 ) {
+        $compassPoint = "ESE";
+    }
+    elsif ( $azimuth < 157.5 ) {
+        $compassPoint = "SE";
+    }
+    elsif ( $azimuth < 180 ) {
+        $compassPoint = "SSE";
+    }
+    elsif ( $azimuth < 202.5 ) {
+        $compassPoint = "S";
+    }
+    elsif ( $azimuth < 225 ) {
+        $compassPoint = "SSW";
+    }
+    elsif ( $azimuth < 247.5 ) {
+        $compassPoint = "SW";
+    }
+    elsif ( $azimuth < 270 ) {
+        $compassPoint = "WSW";
+    }
+    elsif ( $azimuth < 292.5 ) {
+        $compassPoint = "W";
+    }
+    elsif ( $azimuth < 315 ) {
+        $compassPoint = "WNW";
+    }
+    elsif ( $azimuth < 337.5 ) {
+        $compassPoint = "NW";
+    }
+    elsif ( $azimuth <= 361 ) {
+        $compassPoint = "NNW";
+    }
+
+    return $compassPoint;
 }
 
 ###################################
