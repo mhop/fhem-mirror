@@ -35,6 +35,7 @@
 # 23.09.16 GA fix changes on commandref based on suggestions from user "sledge"
 # 28.09.16 GA add readings for tempRules (single reading for Mo to So)
 # 04.10.16 GA fix adjust readings for tempRules if temperature changes
+# 11.10.16 GA fix delete log entries for PWMR_NormalizeRules
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -1079,11 +1080,11 @@ PWMR_NormalizeRules(@)
   my $rule;
   my @week = ();
 
-  Log3 ($hash, 2, "PWMR_NormalizeRules");
+  #Log3 ($hash, 2, "PWMR_NormalizeRules");
 
   if ($hash->{c_autoCalcTemp} == 0 or $hash->{c_desiredTempFrom} ne "")
   {
-    Log3 ($hash, 2, "PWMR_NormalizeRules delete readings timer._..");
+    #Log3 ($hash, 2, "PWMR_NormalizeRules delete readings timer._..");
     delete ($hash->{READINGS}{timer1_Mo}) if (defined ($hash->{READINGS}{timer1_Mo}));
     delete ($hash->{READINGS}{timer2_Di}) if (defined ($hash->{READINGS}{timer2_Di}));
     delete ($hash->{READINGS}{timer3_Mi}) if (defined ($hash->{READINGS}{timer3_Mi}));
