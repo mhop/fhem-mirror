@@ -98,6 +98,9 @@ sub HP1000_Define($$) {
     # create global unique device definition
     $modules{HP1000}{defptr} = $hash;
 
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash );
+
     return undef;
 }
 
@@ -111,6 +114,8 @@ sub HP1000_Undefine($$) {
     # release global unique device definition
     delete $modules{HP1000}{defptr};
 
+    RemoveInternalTimer($hash);
+
     return undef;
 }
 
@@ -119,6 +124,26 @@ sub HP1000_Undefine($$) {
 #   Begin of helper functions
 #
 ############################################################################################################
+
+#####################################
+sub HP1000_SetAliveState($;$) {
+    my ( $hash, $alive ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "HP1000 $name: called function HP1000_SetAliveState()";
+    RemoveInternalTimer($hash);
+
+    my $activity = "dead";
+    $activity = "alive" if ($alive);
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, "Activity", $activity );
+    readingsEndUpdate( $hash, 1 );
+
+    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash );
+
+    return;
+}
 
 ###################################
 sub HP1000_CGI() {
@@ -170,6 +195,8 @@ sub HP1000_CGI() {
     }
 
     $hash = $defs{$name};
+
+    HP1000_SetAliveState( $hash, 1 );
 
     $hash->{SWVERSION} = $webArgs->{softwaretype};
     $hash->{INTERVAL}  = (
