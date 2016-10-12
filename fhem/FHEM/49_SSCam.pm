@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.37   10.10.2016    bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23)
+#                      (Forum: #msg501709)
 # 1.36   18.09.2016    bugfix of get presets, get patrols of zoom-cams without pan/tilt
 # 1.35   17.09.2016    internal timer of start-routines optimized
 # 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
@@ -150,7 +152,7 @@ use warnings;
 use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;
-no if $] >= 5.017011, warnings => 'experimental';  
+# no if $] >= 5.017011, warnings => 'experimental';  
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -2723,7 +2725,6 @@ sub camop_nonbl ($) {
    elsif ($OpMode eq "MotDetSc")  
    {
       # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
-      # "my" nicht am Anfang setzten !
       my %motdetoptions = ();    
         
       if ($hash->{HELPER}{MOTDETSC} eq "disable") {
@@ -3016,24 +3017,25 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys($hash->{HELPER}{MOTDETOPTIONS})) {
+                my $sensitivity;
+                if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
                     # Optionen für "SVS" sind gesetzt
-                    my $sensitivity = $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} ? $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} : "-";
-                    my $threshold   = $hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD} ? $hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD} : "-";
+                    $sensitivity    = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+                    my $threshold   = ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) ? ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) : "-";
                     
                     Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
                 
-                } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys($hash->{HELPER}{MOTDETOPTIONS})) {
+                } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
                     # Optionen für "camera" sind gesetzt
-                    my $sensitivity = $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} ? $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} : "-";
-                    my $objectSize  = $hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE} ? $hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE} : "-";
-                    my $percentage  = $hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE} ? $hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE} : "-";
+                    $sensitivity    = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+                    my $objectSize  = ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) : "-";
+                    my $percentage  = ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) : "-";
                     
                     Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
  
                 } else {
                     # keine Optionen Bewegungserkennung wurden gesetzt
-                    Log3($name, 3, "$name - Camera $camname motion detection source was to \"$hash->{HELPER}{MOTDETSC}\" ");
+                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" ");
                 }
                              
                 Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
