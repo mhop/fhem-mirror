@@ -156,8 +156,7 @@ readingsGroup_updateDevices($;$)
 
   foreach my $device (@devices) {
     my $regex = $device->[1];
-    my @list = (undef);
-    @list = split(",",$regex) if( $regex );
+    my @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
     for( my $i = 0; $i <= $#list; ++$i ) {
@@ -749,10 +748,9 @@ readingsGroup_2html($;$)
     my $name = $h->{NAME};  #FIXME: name/name2 confusion
     my $name2 = $h->{NAME};
 
-    my @list = (undef);
-    @list = split(",",$regex) if( $regex );
-
     delete $hash->{groupedList};
+
+    my @list = split(",",$regex) if( $regex );
     if( @list && $list[0] =~ m/^@(.*)/ ) {
       my $index = $1;
       my $regex = $list[$index];
@@ -1226,8 +1224,7 @@ readingsGroup_Notify($$)
         next if( $dev->{NAME} ne $h->{NAME} );
         my $n = $h->{NAME};
         my $regex = @{$device}[1];
-        my @list = (undef);
-        @list = split(",",$regex) if( $regex );
+        my @list = split(",",$regex) if( $regex );
 
         if( $hash->{groupedList} ) {
           @list = @{$hash->{groupedList}};
@@ -1352,9 +1349,11 @@ readingsGroup_Notify($$)
           $cmd = lookup2($hash->{helper}{commands},$n,$reading,$value);
           if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
             if( $reading eq "state" ) {
-              DoTrigger( $name, "$n: <html>$value</html>" );
+              DoTrigger( $name, "$n: $value" );
+              #DoTrigger( $name, "$n: <html>$value</html>" );
             } else {
-              DoTrigger( $name, "$n.$reading: <html>$value</html>" );
+              DoTrigger( $name, "$n.$reading: $value" );
+              #DoTrigger( $name, "$n.$reading: <html>$value</html>" );
             }
             next;
           }
