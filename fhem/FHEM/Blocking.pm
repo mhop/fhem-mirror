@@ -84,7 +84,7 @@ BlockingStart(;$)
   my ($curr) = @_;
 
   if($curr && $curr =~ m/^\d+$/) {
-    delete($BC_hash{$curr});
+    $BC_hash{$curr}{terminated} = 1;
     $curr = undef;
   }
 
@@ -99,6 +99,14 @@ BlockingStart(;$)
     my $h = $BC_hash{$bpid};
 
     if($h->{pid} !~ m/:/) {
+      if($^O =~ m/Win/) {
+        # MaxNr of concurrent forked processes @Win is 64, and must use wait as
+        # $SIG{CHLD} = 'IGNORE' does not work.
+        wait;
+      } else {
+        use POSIX ":sys_wait_h";
+        waitpid(-1, WNOHANG); # Forum #58867
+      }
       if(!kill(0, $h->{pid})) {
         $h->{pid} = "DEAD:$h->{pid}";
         delete($BC_hash{$bpid});
@@ -140,7 +148,7 @@ BlockingStart(;$)
     my $ret = &{$h->{fn}}($h->{arg});
     use strict "refs";
 
-    BlockingInformParent("BlockingStart", $h->{bc_pid}, 0) if($max);
+    BlockingInformParent("BlockingStart", $h->{bc_pid}, 0);
     BlockingExit() if(!$h->{finishFn});
 
     # Write the data back, calling the function
@@ -205,9 +213,7 @@ BlockingKill($)
 {
   my $h = shift;
 
-  # MaxNr of concurrent forked processes @Win is 64, and must use wait as
-  # $SIG{CHLD} = 'IGNORE' does not work.
-  wait if($^O =~ m/Win/);
+  return if($h->{terminated});
 
   if($^O !~ m/Win/) {
     if($h->{pid} && $h->{pid} !~ m/:/ && kill(9, $h->{pid})) {
@@ -223,6 +229,8 @@ BlockingKill($)
         use strict "refs";
 
       }
+      InternalTimer(gettimeofday()+1, "BlockingStart", \%BC_hash, 0)
+        if(kill(0, $h->{pid})); # Forum #58867
     }
   }
   BlockingStart();
