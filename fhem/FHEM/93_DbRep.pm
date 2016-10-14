@@ -36,6 +36,10 @@
 #
 ###########################################################################################################
 #  Versions History:
+#
+# 4.4          13.10.2016       get function prepared
+# 4.3          11.10.2016       Preparation of get metadata
+# 4.2          10.10.2016       allow SQL-Wildcards (% _) in attr reading & attr device
 # 4.1.3        09.10.2016       bugfix delEntries running on SQLite
 # 4.1.2        08.10.2016       old device in DEF of connected DbLog device will substitute by renamed device if 
 #                               it is present in DEF 
@@ -157,6 +161,7 @@ sub DbRep_Initialize($) {
  $hash->{UndefFn}      = "DbRep_Undef"; 
  $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
+# $hash->{GetFn}        = "DbRep_Get";
  $hash->{AttrFn}       = "DbRep_Attr";
  
  $hash->{AttrList} =   "disable:1,0 ".
@@ -169,6 +174,8 @@ sub DbRep_Initialize($) {
                        "aggregation:hour,day,week,month,no ".
                        "role:Client,Agent ".
                        "showproctime:1,0 ".
+                       "showVariables ".
+                       "showStatus ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
@@ -240,7 +247,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"minValue:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"fetchrows:noArg ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
-                (($hash->{ROLE} ne "Agent")?"insert ":"").                 
+                (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:noArg ":"");
   
   return if(IsDisabled($name));
@@ -273,9 +280,13 @@ sub DbRep_Set($@) {
   } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") { 
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
-              return " One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
+              return "One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
           }
-    
+          
+          # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
+          return "One or both of attributes \"device\", \"reading\" containing SQL wildcard \"%\". Wildcards are not allowed in function manual insert !" 
+                 if(AttrVal($hash->{NAME},"device","") =~ m/%/ || AttrVal($hash->{NAME},"reading","") =~ m/%/ );
+          
           my ($i_date, $i_time, $i_value, $i_unit) = split(",",$prop);
                     
           if (!$i_date || !$i_time || !$i_value) {return "At least data for \"Date\", \"Time\" and \"Value\" is needed to insert. \"Unit\" is optional. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Value(32)>,<Unit(32)>' ";}
@@ -326,21 +337,58 @@ sub DbRep_Set($@) {
       
   } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
-          return " The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
+          return "The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
       }
       sqlexec($hash,$opt);
       
   } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
-          return " The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
+          return "The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
       }
       sqlexec($hash,$opt);
       
-  }
+  }  
   else  
   {
       return "$setlist";
   }  
+$hash->{LASTCMD} = "$opt";
+return undef;
+}
+
+###################################################################################
+# DbRep_Get
+###################################################################################
+sub DbRep_Get($@) {
+  my ($hash, @a) = @_;
+  return "\"get X\" needs at least an argument" if ( @a < 2 );
+  my $name    = $a[0];
+  my $opt     = $a[1];
+  my $prop    = $a[2];
+  my $dbh     = $hash->{DBH};
+  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
+  $hash->{dbloghash} = $defs{$dblogdevice};
+  my $dbmodel = $hash->{dbloghash}{DBMODEL};
+  my $to = AttrVal($name, "timeout", "60");
+  
+  my $getlist = "Unknown argument $opt, choose one of ".
+                (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
+                (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
+                (($dbmodel eq "MYSQL")?"dbvars:noArg ":"") 
+                ;
+  
+  return if(IsDisabled($name));
+  
+  if ($opt eq "dbvars" || $opt eq "dbstatus" || $opt eq "tableinfo") {
+      return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
+      delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
+  } 
+  else 
+  {
+      return "$getlist";
+  } 
+  
 $hash->{LASTCMD} = "$opt";
 return undef;
 }
@@ -588,8 +636,6 @@ sub DbRep_firstconnect($) {
 
 if ($init_done == 1) {
   
-  $hash->{ROLE} = AttrVal($name, "role", "Client");   # Rolle der DbRep-Instanz setzen
-  
   if ( !DbRep_Connect($hash) ) {
       Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
       readingsSingleUpdate($hash, "state", "disconnected", 1);
@@ -645,7 +691,7 @@ sub DbRep_Connect($) {
 }
 
 ################################################################################################################
-#  Hauptroutine
+#  Hauptroutine "Set"
 ################################################################################################################
 
 sub sqlexec($$) {
@@ -657,40 +703,16 @@ sub sqlexec($$) {
  my $device      = AttrVal($name, "device", undef);
  my $aggsec;
  
- # Test-Aufbau DB-Connection
- #if ( !DbRep_Connect($hash) ) {
- #    Log3 ($name, 2, "DbRep $name - DB connect failed. Database down ? ");
- #    readingsSingleUpdate($hash, "state", "disconnected", 1);
- #    return;
- #} else {
- #    my $dbh = $hash->{DBH};
- #    $dbh->disconnect;
- #}
+ # Entkommentieren für Testroutine im Vordergrund
+ # testexit($hash);
  
  if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
      Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
  }
  
- # alte Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
- my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
- if (@rdpfdel) {
-     my @allrds = keys($defs{$name}{READINGS});
-     foreach my $key(@allrds) {
-         # Log3 ($name, 3, "DbRep $name - Reading Schlüssel: $key");
-         my $dodel = 1;
-         foreach my $rdpfdel(@rdpfdel) {
-             if($key =~ /$rdpfdel/) {
-                 $dodel = 0;
-             }
-         }
-         if($dodel) {
-             delete($defs{$name}{READINGS}{$key});
-         }
-     }
- } else {
-     delete $defs{$name}{READINGS};
- }
+ # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+ delread($hash);
  
  readingsSingleUpdate($hash, "state", "running", 1);
  
@@ -878,6 +900,34 @@ return;
 }
 
 ####################################################################################################
+#  delete Readings before new operation
+####################################################################################################
+sub delread($) {
+ # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+ my ($hash) = @_;
+ my $name   = $hash->{NAME}; 
+ my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
+ if (@rdpfdel) {
+     my @allrds = keys($defs{$name}{READINGS});
+     foreach my $key(@allrds) {
+         # Log3 ($name, 3, "DbRep $name - Reading Schlüssel: $key");
+         my $dodel = 1;
+         foreach my $rdpfdel(@rdpfdel) {
+             if($key =~ /$rdpfdel/) {
+                 $dodel = 0;
+             }
+         }
+         if($dodel) {
+             delete($defs{$name}{READINGS}{$key});
+         }
+     }
+ } else {
+     delete $defs{$name}{READINGS};
+ }
+return undef;
+}
+
+####################################################################################################
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
 sub averval_DoParse($) {
@@ -927,14 +977,14 @@ sub averval_DoParse($) {
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT AVG(VALUE) FROM `history` ";
      $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE = '$device' " if($device);
+     $sql .= "DEVICE LIKE '$device' " if($device);
      $sql .= "AND " if($device && $reading);
-     $sql .= "READING = '$reading' " if($reading);
+     $sql .= "READING LIKE '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
      $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
-     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
      my $line;
      
@@ -1090,14 +1140,14 @@ sub count_DoParse($) {
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT COUNT(*) FROM `history` ";
      $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE = '$device' " if($device);
+     $sql .= "DEVICE LIKE '$device' " if($device);
      $sql .= "AND " if($device && $reading);
-     $sql .= "READING = '$reading' " if($reading);
+     $sql .= "READING LIKE '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
      $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
-     Log3($name, 4, "DbRep $name - SQL to execute: $sql");        
+     Log3($name, 4, "DbRep $name - SQL execute: $sql");        
      
      my $line;
      # DB-Abfrage -> Ergebnis in $arrstr aufnehmen
@@ -1253,17 +1303,17 @@ sub maxval_DoParse($) {
      
      # SQL zusammenstellen für DB-Operation
      my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
-     $sql .= "`DEVICE` = '$device' AND " if($device);
-     $sql .= "`READING` = '$reading' AND " if($reading); 
+     $sql .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
-     $sql1 .= "`DEVICE` = '$device' AND " if($device);
-     $sql1 .= "`READING` = '$reading' AND " if($reading); 
+     $sql1 .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql1 .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
-     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
      
      $runtime_string = encode_base64($runtime_string,"");
      my $sth = $dbh->prepare($sql);   
@@ -1484,17 +1534,17 @@ sub minval_DoParse($) {
      
      # SQL zusammenstellen für DB-Operation
      my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
-     $sql .= "`DEVICE` = '$device' AND " if($device);
-     $sql .= "`READING` = '$reading' AND " if($reading); 
+     $sql .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
-     $sql1 .= "`DEVICE` = '$device' AND " if($device);
-     $sql1 .= "`READING` = '$reading' AND " if($reading); 
+     $sql1 .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql1 .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
-     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
      
      $runtime_string = encode_base64($runtime_string,"");
      my $sth = $dbh->prepare($sql);   
@@ -1715,17 +1765,17 @@ sub diffval_DoParse($) {
      
      # SQL zusammenstellen für DB-Operation
      my $sql = "SELECT TIMESTAMP,VALUE FROM `history` where ";
-     $sql .= "`DEVICE` = '$device' AND " if($device);
-     $sql .= "`READING` = '$reading' AND " if($reading); 
+     $sql .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = "SELECT TIMESTAMP,VALUE FROM `history` where ";
-     $sql1 .= "`DEVICE` = '$device' AND " if($device);
-     $sql1 .= "`READING` = '$reading' AND " if($reading); 
+     $sql1 .= "`DEVICE` LIKE '$device' AND " if($device);
+     $sql1 .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
-     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
      
      $runtime_string = encode_base64($runtime_string,"");
      my $sth = $dbh->prepare($sql);   
@@ -1962,14 +2012,14 @@ sub sumval_DoParse($) {
      # SQL zusammenstellen für DB-Abfrage
      my $sql = "SELECT SUM(VALUE) FROM `history` ";
      $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE = '$device' " if($device);
+     $sql .= "DEVICE LIKE '$device' " if($device);
      $sql .= "AND " if($device && $reading);
-     $sql .= "READING = '$reading' " if($reading);
+     $sql .= "READING LIKE '$reading' " if($reading);
      $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
      $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
      $sql .= ";";
      
-     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql");        
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
      my $line;
      # DB-Abfrage -> Ergebnis in $arrstr aufnehmen
@@ -2115,7 +2165,7 @@ sub del_DoParse($) {
  $sql1 .= "READING = '$reading' AND " if($reading); 
  $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next';"; 
     
- Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");        
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");        
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2485,17 +2535,17 @@ sub fetchrows_DoParse($) {
  
  # SQL zusammenstellen
  my $sql = "SELECT DEVICE,READING,TIMESTAMP,VALUE FROM history where ";
- $sql .= "DEVICE = '$device' AND " if($device);
- $sql .= "READING = '$reading' AND " if($reading); 
+ $sql .= "DEVICE LIKE '$device' AND " if($device);
+ $sql .= "READING LIKE '$reading' AND " if($reading); 
  $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";  
          
  # SQL zusammenstellen für Logfileausgabe
  my $sql1 = "SELECT DEVICE,READING,TIMESTAMP,VALUE FROM history where ";
- $sql1 .= "DEVICE = '$device' AND " if($device);
- $sql1 .= "READING = '$reading' AND " if($reading); 
+ $sql1 .= "DEVICE LIKE '$device' AND " if($device);
+ $sql1 .= "READING LIKE '$reading' AND " if($reading); 
  $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
- Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");    
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");    
 
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2639,17 +2689,17 @@ sub expfile_DoParse($) {
  
  # SQL zusammenstellen
  my $sql = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM history where ";
- $sql .= "DEVICE = '$device' AND " if($device);
- $sql .= "READING = '$reading' AND " if($reading); 
+ $sql .= "DEVICE LIKE '$device' AND " if($device);
+ $sql .= "READING LIKE '$reading' AND " if($reading); 
  $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";   
          
  # SQL zusammenstellen für Logfileausgabe
  my $sql1 = "SELECT TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT FROM FROM history where ";
- $sql1 .= "DEVICE = '$device' AND " if($device);
- $sql1 .= "READING = '$reading' AND " if($reading); 
+ $sql1 .= "DEVICE LIKE '$device' AND " if($device);
+ $sql1 .= "READING LIKE '$reading' AND " if($reading); 
  $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
- Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1");    
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");    
 
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2932,6 +2982,158 @@ return;
 }
 
 ####################################################################################################
+# nichtblockierende DB-Abfrage get db Metadaten
+####################################################################################################
+
+sub dbmeta_DoParse($) {
+ my ($string)    = @_;
+ my @a           = split("\\|",$string);
+ my $name        = $a[0];
+ my $hash        = $defs{$name};
+ my $opt         = $a[1];
+ my $dbloghash   = $hash->{dbloghash};
+ my $dbconn      = $dbloghash->{dbconn};
+ my $dbuser      = $dbloghash->{dbuser};
+ my $dblogname   = $dbloghash->{NAME};
+ my $dbpassword  = $attr{"sec$dblogname"}{secret};
+ my $err;
+
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_DoParse");
+ 
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+     return "$name|''|''|''|$err";
+ }
+ 
+ # Liste der anzuzeigenden Parameter erzeugen, sonst alle ("%"), abhängig von $opt
+ my $param = AttrVal($name, "showVariables", "%") if($opt eq "dbvars");
+ $param = AttrVal($name, "showStatus", "%") if($opt eq "dbstatus");
+ $param = "1" if($opt eq "tableinfo");        # Dummy-Eintrag für einen Schleifenabdruck
+ my @parlist = split(",",$param); 
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ my @row_array;
+ my $sth;
+ my $sql;
+ 
+ foreach my $ple (@parlist) {
+     if ($opt eq "dbvars") {
+         $sql = "show global variables like '$ple';";
+     } elsif ($opt eq "dbstatus") {
+         $sql = "show global status like '$ple';";
+     } elsif ($opt eq "tableinfo") {
+         $sql = "select table_schema,round(sum(data_length+index_length)/1024/1024,4) from information_schema.tables group by table_schema;";
+     }
+     
+     Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
+ 
+     $sth = $dbh->prepare($sql); 
+     eval {$sth->execute();};
+ 
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+         return "$name|''|''|''|$err";
+     } else {
+         while (my @line = $sth->fetchrow_array()) {
+             Log3 ($name, 5, "DbRep $name - SQL result: $line[0] : $line[1]"); 
+             push(@row_array, $line[0]." ".$line[1]);
+         }  
+     } 
+ }
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ $sth->finish;
+ $dbh->disconnect;
+ 
+ my $rowlist = join('§', @row_array);
+ Log3 ($name, 5, "DbRep $name -> row_array:  \n@row_array");
+ 
+ # Daten müssen als Einzeiler zurückgegeben werden
+ $rowlist = encode_base64($rowlist,"");
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$rowlist|$rt|$opt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Abfrage get db Metadaten
+####################################################################################################
+
+sub dbmeta_ParseDone($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $rowlist    = decode_base64($a[1]);
+  my $bt         = $a[2];
+  my $opt        = $a[3];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[4]?decode_base64($a[4]):undef;
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_ParseDone");
+  
+   if ($err) {
+      readingsSingleUpdate($hash, "errortext", $err, 1);
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
+      return;
+  }
+    
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
+  my @row_array = split("§", $rowlist);
+  Log3 ($name, 5, "DbRep $name - SQL result decoded: \n@row_array") if(@row_array);
+  
+  my $pre = "VAR_" if($opt eq "dbvars");
+  $pre    = "STAT_" if($opt eq "dbstatus");
+  $pre    = "INFO_" if($opt eq "tableinfo");
+  
+  foreach my $row (@row_array) {
+      my @a = split(" ", $row);
+      my $k = $a[0];
+         $k = $a[0]."_MB" if($opt eq "tableinfo");
+      my $v = $a[1];
+      readingsBulkUpdate($hash, $pre.$k, $v);
+  }
+  
+  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
+  
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
+  
+return;
+}
+
+####################################################################################################
 # Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
 sub ParseAborted($) {
@@ -2957,9 +3159,9 @@ return;
 }
 
 
-################################################################################################################
+####################################################################################################
 #  Zusammenstellung Aggregationszeiträume
-################################################################################################################
+####################################################################################################
 
 sub collaggstr($$$$) {
  my ($hash,$runtime,$i,$runtime_string_next) = @_;
@@ -3126,6 +3328,49 @@ sub collaggstr($$$$) {
          
 return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll);
 }
+
+
+####################################################################################################
+#                 Test-Sub zu Testzwecken
+####################################################################################################
+sub testexit ($) {
+my ($hash) = @_;
+my $name = $hash->{NAME};
+
+ if ( !DbRep_Connect($hash) ) {
+     Log3 ($name, 2, "DbRep $name - DB connect failed. Database down ? ");
+     readingsSingleUpdate($hash, "state", "disconnected", 1);
+     return;
+ } else {
+     my $dbh = $hash->{DBH};
+     my $i = 1;
+     # $dbh->table_info( $catalog, $schema, $table)
+     # my $sth = $dbh->table_info('', '', '');
+     # my $tables = $dbh->selectcol_arrayref($sth, {Columns => [3]});
+     # my $table = join ', ', @$tables;
+     # Log3 ($name, 3, "DbRep $name - SQL_TABLES : $table"); 
+     
+     Log3 ($name, 3, "DbRep $name - $i\--------------- COMMON SERVER INFO --------------"); 
+     my %InfoTypes = ( SQL_DATA_SOURCE_NAME => 2 ,
+                       SQL_SERVER_NAME => 13 ,
+                       SQL_DBMS_NAME => 17 ,
+                       SQL_DBMS_VERSION => 18 ,
+                       SQL_TRANSACTION_CAPABLE => 46 ,                          
+                     );
+     $i++;
+     while ((my $key, my $val) = each(%InfoTypes) ) {
+         my $d = $dbh->get_info( $val );
+         Log3 ($name, 3, "DbRep $name - $i\_$key : $d");
+         $i++;
+     }
+    
+     
+     # $sth->finish;
+     $dbh->disconnect;
+ }
+return;
+}
+
 
 1;
 
@@ -3318,6 +3563,15 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <br>
 <ul>
   Using the module specific attributes you are able to define the scope of evaluation and the aggregation. <br><br>
+  
+  <b>Hint to SQL-Wildcard Usage:</b> <br>
+  Within the attribute values of "device" and "reading" you may use SQL-Wildcards, "%" and "_". The character "%" stands for any some characters, but  
+  the character "_" = stands for only one.  <br>
+  This rule is valid to all functions <b>except</b> "insert", "deviceRename" and "delEntries". <br>
+  The function "insert" doesn't allow setting the mentioned attributes containing the wildcard "%", the character "_" will evaluated as a normal character.<br>
+  The deletion function "delEntries" evaluates both characters "$", "_" <b>NOT</b> as wildcards and delete device/readings only if they are entered in the 
+  attribute as exactly as they are stored in the database . 
+  <br><br>
   
   <ul><ul>
   <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". Delivers e.g. the count of database entries for a day (countEntries), Summation of difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
@@ -3625,13 +3879,22 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <ul>
   Über die modulspezifischen Attribute wird die Abgrenzung der Auswertung und die Aggregation der Werte gesteuert. <br><br>
   
+  <b>Hinweis zur SQL-Wildcard Verwendung:</b> <br>
+  Innerhalb der Attribut-Werte für "device" und "reading" können SQL-Wildcards, "%" und "_", angegeben werden. Dabei ist "%" = beliebig 
+  viele Zeichen und "_" = ein Zeichen.  <br>
+  Dies gilt für alle Funktionen <b>außer</b> "insert", "deviceRename" und "delEntries". <br>
+  Die Funktion "insert" erlaubt nicht dass die genannten Attribute das Wildcard "%" enthalten, "_" wird als normales Zeichen gewertet.<br>
+  Die Löschfunktion "delEntries" wertet die Zeichen "$", "_" <b>NICHT</b> als Wildcards und löscht nur Device/Readings die exakt wie in den Attributen angegeben 
+  in der DB gespeichert sind. 
+  <br><br>
+  
   <ul><ul>
   <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tages,Kalenderwochen,Kalendermonaten oder "no". Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summation von Differenzwerten eines Readings (sumValue), usw. Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum sondern die Ausgabe ergibt alle Werte eines Device/Readings zwischen den definierten Zeiträumen.  </li> <br>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
-  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>
+  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>              
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
   <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>  
