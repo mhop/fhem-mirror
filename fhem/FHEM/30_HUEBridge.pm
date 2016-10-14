@@ -184,7 +184,7 @@ sub HUEBridge_fillBridgeInfo($$)
     $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} && $hash->{modelid} eq 'BSB002' );
   }
 
-  $hash->{noshutdown} = AttrVal($name,'noshutdown', $hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0;
+  $hash->{noshutdown} = AttrVal($name,'noshutdown', $hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0 if( !defined($hash->{noshutdown} ) );
 }
 
 sub
@@ -207,6 +207,12 @@ HUEBridge_OpenDev($)
     Log3 $name, 5, "HUEBridge_OpenDev: got description: $ret";
     $ret =~ m/<modelName>([^<]*)/;
     $hash->{modelName} = $1;
+    $ret =~ m/<manufacturer>([^<]*)/;
+    $hash->{manufacturer} = $1;
+
+    if( $hash->{manufacturer} =~ /dresden elektronik/i ) {
+      $hash->{noshutdown} = AttrVal($name, 'noshutdown', 1)?1:0;
+    }
   }
 
   my $result = HUEBridge_Call($hash, undef, 'config', undef);
@@ -1456,8 +1462,13 @@ HUEBridge_Attr($$$)
 
     if( $cmd eq 'set' ) {
       $hash->{noshutdown} = $attrVal;
+
     } else {
-      $hash->{noshutdown} = ($hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0;
+      if( defined($hash->{manufacturer}) ) {
+        $hash->{noshutdown} = ($hash->{manufacturer} =~ /dresden elektronik/i)?1:0;
+      } else {
+        $hash->{noshutdown} = ($hash->{name} =~ /deCONZ-GW|RaspBee/i)?1:0;
+      }
     }
 
   }
@@ -1599,7 +1610,7 @@ HUEBridge_Attr($$$)
       Some bridge devcies require a different type of connection handling. raspbee/deconz only works if the connection
       is not immediately closed, the phillips hue bridge works better if the connection is immediately closed. This module
       tries to autodetect the bridge device type. the type of connection handling can be seen in the noshutdown internal
-      and can be overwritten with the noshutdown attribute.  </li>
+      and can be overwritten with the noshutdown attribute.</li>
   </ul><br>
 </ul><br>
 
