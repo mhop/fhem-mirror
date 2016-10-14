@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.5          14.10.2016       get dbstatus, dbvars, tableinfo
 # 4.4          13.10.2016       get function prepared
 # 4.3          11.10.2016       Preparation of get metadata
 # 4.2          10.10.2016       allow SQL-Wildcards (% _) in attr reading & attr device
@@ -1037,7 +1038,9 @@ sub averval_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1200,7 +1203,9 @@ sub count_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1429,7 +1434,9 @@ sub maxval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1660,7 +1667,9 @@ sub minval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1906,7 +1915,9 @@ sub diffval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -2072,7 +2083,9 @@ sub sumval_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
+     $device     =~ s/%/\//g;
   my $reading    = $a[3];
+     $reading     =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -3032,7 +3045,16 @@ sub dbmeta_DoParse($) {
      } elsif ($opt eq "dbstatus") {
          $sql = "show global status like '$ple';";
      } elsif ($opt eq "tableinfo") {
-         $sql = "select table_schema,round(sum(data_length+index_length)/1024/1024,4) from information_schema.tables group by table_schema;";
+         $sql = "select 
+                 table_schema,
+                 round(sum(data_length+index_length)/1024/1024,2),
+                 round(data_free/1024/1024,2),
+                 row_format,
+                 table_collation,
+                 engine,
+                 table_type,
+                 create_time,
+                 from information_schema.tables group by table_schema;";
      }
      
      Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
@@ -3048,8 +3070,21 @@ sub dbmeta_DoParse($) {
          return "$name|''|''|''|$err";
      } else {
          while (my @line = $sth->fetchrow_array()) {
-             Log3 ($name, 5, "DbRep $name - SQL result: $line[0] : $line[1]"); 
-             push(@row_array, $line[0]." ".$line[1]);
+             Log3 ($name, 5, "DbRep $name - SQL result: @line");
+             my $rowlist = join("§", @line);
+             $rowlist =~ s/ /_/g;
+             @line = split("§", $rowlist);
+             if ($opt eq "tableinfo") {
+                 push(@row_array, $line[0]."___data_index_lenth_MB ".$line[1]);
+                 push(@row_array, $line[0]."___data_free_MB ".$line[2]);
+                 push(@row_array, $line[0]."___row_format ".$line[3]);
+                 push(@row_array, $line[0]."___table_collation ".$line[4]);
+                 push(@row_array, $line[0]."___engine ".$line[5]);
+                 push(@row_array, $line[0]."___table_type ".$line[6]);
+                 push(@row_array, $line[0]."___create_time ".$line[7]);
+             } else {
+                 push(@row_array, $line[0]." ".$line[1]);
+             }
          }  
      } 
  }
@@ -3117,7 +3152,6 @@ sub dbmeta_ParseDone($) {
   foreach my $row (@row_array) {
       my @a = split(" ", $row);
       my $k = $a[0];
-         $k = $a[0]."_MB" if($opt eq "tableinfo");
       my $v = $a[1];
       readingsBulkUpdate($hash, $pre.$k, $v);
   }
@@ -3571,6 +3605,7 @@ return;
   The function "insert" doesn't allow setting the mentioned attributes containing the wildcard "%", the character "_" will evaluated as a normal character.<br>
   The deletion function "delEntries" evaluates both characters "$", "_" <b>NOT</b> as wildcards and delete device/readings only if they are entered in the 
   attribute as exactly as they are stored in the database . 
+  In readings the wildcard character "%" will be replaced by "/" to meet the rules of allowed characters in readings.
   <br><br>
   
   <ul><ul>
@@ -3885,7 +3920,8 @@ return;
   Dies gilt für alle Funktionen <b>außer</b> "insert", "deviceRename" und "delEntries". <br>
   Die Funktion "insert" erlaubt nicht dass die genannten Attribute das Wildcard "%" enthalten, "_" wird als normales Zeichen gewertet.<br>
   Die Löschfunktion "delEntries" wertet die Zeichen "$", "_" <b>NICHT</b> als Wildcards und löscht nur Device/Readings die exakt wie in den Attributen angegeben 
-  in der DB gespeichert sind. 
+  in der DB gespeichert sind. <br>
+  In den Readings wird das Wildcardzeichen "%" durch "/" ersetzt um die Regeln für erlaubte Zeichen in Readings einzuhalten.
   <br><br>
   
   <ul><ul>
