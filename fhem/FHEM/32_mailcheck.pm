@@ -187,6 +187,7 @@ mailcheck_Connect($)
       #}
 
       $client->Uid(0);
+      $client->Timeout(8);
       $client->select($hash->{Folder});
 
       $hash->{tag} = $client->idle;
@@ -444,7 +445,14 @@ mailcheck_Read($)
           }
 
           $entity->head->decode();
-          $subject = $entity->head->get('Subject');
+
+          if( $subject =~ /iso-8859-1/ ) {
+            $subject = $entity->head->get('Subject');
+            $subject = latin1ToUtf8( $subject );
+          } else {
+            $subject = $entity->head->get('Subject');
+          }
+
           chomp( $subject );
           Log3 $name, 4, "subject decoded: $subject";
 
