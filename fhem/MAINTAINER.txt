@@ -264,6 +264,7 @@ FHEM/70_Pushbullet.pm        fhainz               http://forum.fhem.de Unterstue
 FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushalot.pm          Talkabout            http://forum.fhem.de Unterstuetzende Dienste
+FHEM/70_Pushsafer.pm         markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/71_ONKYO_AVR_ZONE.pm    loredo               http://forum.fhem.de Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
