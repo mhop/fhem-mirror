@@ -444,7 +444,7 @@ PRESENCE_Read($)
     {
         Log3 $name, 5, "PRESENCE ($name) - received data: $line";
         
-        if($line =~ /^absence|absent$/)
+        if($line =~ /^absence|absent/)
         {
             if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "present" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
             {
@@ -453,7 +453,15 @@ PRESENCE_Read($)
                 DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
             }
         
-            PRESENCE_ProcessState($hash, "absent") unless($hash->{helper}{DISABLED});
+            unless($hash->{helper}{DISABLED})
+            {
+                PRESENCE_ProcessState($hash, "absent");
+                
+                if($line=~ /^[^;]+;(.+)$/)
+                {
+                    PRESENCE_ProcessAddonData($hash, $1);
+                }
+            }
         }
         elsif($line =~ /present;(.+?)$/)
         {
@@ -467,15 +475,23 @@ PRESENCE_Read($)
             unless($hash->{helper}{DISABLED})
             {
                 PRESENCE_ProcessState($hash, "present");
-
-                if($1 =~ /^(.*);(.+)$/)
+                my $data = $1;
+                
+                if($data =~ /\S=\S/)
                 {
-                    readingsBulkUpdate($hash, "room", $2);
-                    readingsBulkUpdate($hash, "device_name", $1);
+                    PRESENCE_ProcessAddonData($hash, $data);
                 }
                 else
                 {
-                    readingsBulkUpdate($hash, "device_name", $1);
+                    if($1 =~ /^(.*);(.+)$/)
+                    {
+                        readingsBulkUpdate($hash, "room", $2);
+                        readingsBulkUpdate($hash, "device_name", $1);
+                    }
+                    else
+                    {
+                        readingsBulkUpdate($hash, "device_name", $1);
+                    }
                 }
             }
         }
@@ -1153,6 +1169,19 @@ PRESENCE_ProcessState($$)
     }
 }
 
+sub PRESENCE_ProcessAddonData($$)
+{
+    my ($hash, $data) = @_;
+    
+    my ($a, $h) = parseParams($data, ";");
+    
+    foreach my $key (sort keys %{$h})
+    {
+         readingsBulkUpdate($hash, $key, $h->{$key}) if(defined($h->{$key}));
+    }
+    
+    return undef;
+}
 1;
 
 =pod
