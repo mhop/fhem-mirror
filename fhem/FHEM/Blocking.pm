@@ -98,7 +98,7 @@ BlockingStart(;$)
   for my $bpid (sort { $a <=> $b} keys %BC_hash) {
     my $h = $BC_hash{$bpid};
 
-    if($h->{pid} =~ m/^\d+$/) {
+    if($h->{pid} && $h->{pid} =~ m/^\d+$/) {
       if($^O =~ m/Win/) {
         # MaxNr of concurrent forked processes @Win is 64, and must use wait as
         # $SIG{CHLD} = 'IGNORE' does not work.
