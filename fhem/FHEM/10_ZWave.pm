@@ -2822,8 +2822,8 @@ ZWave_ALARM_05_Report($$$$)
     my $nst = ($ns eq "ff") ? "notificationIsOn" : "notificationIsOff";
     my $o = ($opt && ($e ne "00")) ? ", arg $prop$opt" : "";
     
-    $rt0 = "alarm:$at: $level $eventname$o";
-    $rt1 = "alarm_$at: $level $eventname$o, $nst";
+    $rt0 = "alarm:$at: $level$eventname$o";
+    $rt1 = "alarm_$at:$level$eventname$o, $nst";
   }
   
   if ($ar == 0) {
