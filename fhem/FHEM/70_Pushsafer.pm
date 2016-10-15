@@ -52,6 +52,7 @@ sub Pushsafer_Initialize($$)
   $hash->{DefFn}    = "Pushsafer_Define";
   $hash->{SetFn}    = "Pushsafer_Set";
   $hash->{AttrList} = "disable:0,1 ".
+                      "disabledForIntervals ".
                       "do_not_notify:0,1 ".
                       $readingFnAttributes;
   return undef;
@@ -77,6 +78,8 @@ sub Pushsafer_Define($$)
 
     Log3 $hash, 4, "Pushsafer ($name) - defined with private key: ".$privatekey;
 
+    $hash->{STATE} = "Initialized";
+    
     return undef;
 }
 
