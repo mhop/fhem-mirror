@@ -1173,7 +1173,7 @@ sub HP1000_DbLog_split($$) {
     my $hash = $defs{$device};
 
     if ( $event =~
-        /^(windCompasspoint.*|.*_sum10m|.*_avg2m):\s([\w\.,]+)\s*(.*)/ )
+        /^(windCompasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/ )
     {
         return undef;
     }
