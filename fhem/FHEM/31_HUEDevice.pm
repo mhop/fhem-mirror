@@ -1194,11 +1194,12 @@ HUEDevice_Parse($$)
         substr( $lastupdated, 10, 1, '_' );
         my $sec = SVG_time_to_sec($lastupdated);
         $sec += $iohash->{helper}{offsetUTC};
-        
+
         $lastupdated = FmtDateTime($sec);
       }
 
-      return undef if( ReadingsTimestamp($name,'state','') eq $lastupdated );
+      return undef if( $hash->{lastupdated} &&  $hash->{lastupdated} eq $lastupdated );
+      $hash->{lastupdated} = $lastupdated;
 
       $readings{state} = $state->{status} if( defined($state->{status}) );
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
@@ -1215,14 +1216,21 @@ HUEDevice_Parse($$)
 
     if( scalar keys %readings ) {
        readingsBeginUpdate($hash);
-       if( $lastupdated ) {
-         $hash->{'.updateTimestamp'} = $lastupdated;
-         $hash->{CHANGETIME}[0] = $lastupdated;
+
+       my $i = 0;
+       foreach my $key ( keys %readings ) {
+         if( defined($readings{$key}) ) {
+           if( $lastupdated ) {
+             $hash->{'.updateTimestamp'} = $lastupdated;
+             $hash->{CHANGETIME}[$i] = $lastupdated;
+           }
+
+           readingsBulkUpdate($hash, $key, $readings{$key}, 1);
+
+           ++$i;
+         }
        }
 
-       foreach my $key ( keys %readings ) {
-         readingsBulkUpdate($hash, $key, $readings{$key}, 1) if( defined($readings{$key}) );
-       }
        readingsEndUpdate($hash,1);
        delete $hash->{CHANGETIME};
      }
