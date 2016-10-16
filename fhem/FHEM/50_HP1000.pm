@@ -600,6 +600,26 @@ sub HP1000_CGI() {
         readingsBulkUpdate( $hash, "uvIndex", $webArgs->{UVI} );
     }
 
+    # uvCondition
+    if ( defined( $webArgs->{UVI} ) ) {
+        my $condition = "low";
+
+        if ($webArgs->{UVI} > 11) {
+            $condition = "extreme";
+        }
+        elsif ($webArgs->{UVI} > 8) {
+            $condition = "veryhigh";
+        }
+        elsif ($webArgs->{UVI} > 6) {
+            $condition = "high";
+        }
+        elsif ($webArgs->{UVI} > 3) {
+            $condition = "moderate";
+        }
+
+        readingsBulkUpdateIfChanged( $hash, "uvCondition", $condition );
+    }
+
     # solarradiation in W/m2 (convert from lux)
     if ( defined( $webArgs->{light} ) ) {
         $webArgs->{solarradiation} = HP1000_lux2wpsm( $webArgs->{light} );
