@@ -73,7 +73,7 @@ dash_dhcp_startListener($)
 
   return undef if( IsDisabled($name) > 0 );
 
-  $hash->{PORT} = (getlogin eq 'root')?67:6767;
+  $hash->{PORT} = (!defined(getlogin) || getlogin eq 'root')?67:6767;
   $hash->{PORT} = AttrVal($name, 'port', $hash->{PORT});
   Log3 $name, 4, "$name: using port $hash->{PORT}";
 
