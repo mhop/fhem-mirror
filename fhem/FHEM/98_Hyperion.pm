@@ -142,7 +142,7 @@ sub Hyperion_Notify($$)
   return if ($dev->{NAME} ne "global");
   return if (!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
   return undef if (AttrVal($name,"disable",0));
-  Hyperion_OpenDev($hash);
+  Hyperion_Read($hash);
   return undef;
 }
 
@@ -730,13 +730,21 @@ sub Hyperion_Set($@)
   if (scalar keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
-    SetExtensionsCancel($hash);
+    if (!$hash->{InSetExtensions})
+    {
+      SetExtensionsCancel($hash);
+      my $at = $name."_till";
+      CommandDelete(undef,$at)
+        if ($defs{$at});
+      Log3 $name,4,"$name SetExtensionsCancel";
+    }
     Hyperion_Call($hash,\%obj);
+    return undef;
   }
-  else
-  {
-    return SetExtensions($hash,$sets,$name,@aa) ;
-  }
+  $hash->{InSetExtensions} = 1;
+  my $ret = SetExtensions($hash,$sets,$name,@aa);
+  delete $hash->{InSetExtensions};
+  return $ret;
 }
 
 sub Hyperion_Attr(@)
