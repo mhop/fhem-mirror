@@ -2106,7 +2106,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
-  elsif($mh{st} =~ m /^(remote|pushButton|swi)$/
+  elsif($mh{st} =~ m /^(remote|pushButton|swi|display)$/
       ||$mh{md} eq "HM-SEN-EP") { #############################################
     if($mh{mTp} eq "40") { 
       my $bat   = ($mh{chnraw} & 0x80)?"low":"ok";
@@ -4953,7 +4953,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                     ($pause < 1      ?1  :
                     ($pause >160     ?160:
                                       $pause)));
-   
+
     if($msg eq 'help'){ # display command info
       return      "command options:"
                  ."\n  line1,icon1:line2,icon2:line3,icon3 sound repeat pause signal"
@@ -4965,6 +4965,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                  ."\n  signal: ".join(" ",keys(%disp_signals))
                  ."\n "
                  ."\n  check for param reWriteDisplayxx: "
+                 ."\n  translate chars: "
+                 ."\n    [ => Ä"      
+                 ."\n    # => Ö"      	
+                 ."\n    $ => Ü"      	
+                 ."\n    { => ä"      	
+                 ."\n    | => ö"      	
+                 ."\n    } => ü"      	
+                 ."\n    _ => ß"      	
+                 ."\n    ] => &"      	
+                 ."\n    ' => ="      	
+                 ."\n    @ => ∨"      	
+                 ."\n    > => ∧"      	
+                 ."\n    ; => Sandwatch"
                  ; 
     }
     my $snd = '020A';

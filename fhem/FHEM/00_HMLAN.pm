@@ -80,7 +80,7 @@ sub HMLAN_Initialize($) {
                      "loadLevel ".
                      "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
                      "wdTimer:5,10,15,20,25 ".
-                     "logIDs:multiple,sys,all ".
+                     "logIDs:multiple,sys,all,broadcast ".
                      $readingFnAttributes;
 }
 sub HMLAN_Define($$) {#########################################################
@@ -269,10 +269,12 @@ sub HMLAN_Attr(@) {############################################################
           }
           else{
             $defs{$name}{helper}{log}{all}=0;
+            for (@ids) {s/broadcast/000000/g};
             $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
             $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
             @ids = HMLAN_noDup(@ids);
             push @idName,CUL_HM_id2Name($_) foreach(@ids);
+            for (@idName) {s/000000/broadcast/g};
           }
           $attr{$name}{$aName} = join(",",@idName);
           @{$defs{$name}{helper}{log}{ids}}=grep !/^(sys|all)$/,@ids;
@@ -353,8 +355,8 @@ sub HMLAN_Attr(@) {############################################################
 sub HMLAN_UpdtLogId() {####################################################
   $modules{HMLAN}{AttrList} =~ s/logIDs:.*? //;
   $modules{HMLAN}{AttrList} =~ s/logIDs:.*?$//;
-  $modules{HMLAN}{AttrList} .= " logIDs:multiple,sys,all,"
-                               .join(",",(devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")));
+  $modules{HMLAN}{AttrList} .= " logIDs:multiple,sys,all,broadcast,"
+                               .join(",",(devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=model!=ActionDetector")));
   return;
 }
 
