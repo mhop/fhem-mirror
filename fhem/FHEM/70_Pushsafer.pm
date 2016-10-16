@@ -393,7 +393,7 @@ sub Pushsafer_Callback($$$)
     <br>
     Es ist m&ouml;glich die zu versendende Nachricht durch zus&auml;tzliche Optionen an die eigenen W&uuml;nsche anzupassen. Diese Optionen k&ouml;nnen hinter dem Nachrichtentext beliebig kombiniert werden um die Nachricht zu individualisieren. Die m&ouml;glichen Optionen sind:<br>
     <br>
-    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>t&nbsp;</code> - Typ: Text - Eine &uuml;berschrift, die &uuml;ber der Nachricht hervorgehoben angezeigt werden soll.<br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>t&nbsp;</code> - Typ: Text - Eine &Uuml;berschrift, die &uuml;ber der Nachricht hervorgehoben angezeigt werden soll.<br>
     <code><b>device</b>&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>d&nbsp;</code> - Typ: Ganzzahl - Die Ger&auml;te-ID an welche die Nachricht gezielt geschickt werden soll. Um eine Gruppen-ID direkt zu addressieren muss der ID das Pr&auml;fix "gs" vorangestellt werden (Bsp. "gs23" f&uuml;r die Gruppen-ID 23). Standardm&auml;&szlig;ig wird eine Nachricht immer an alle Ger&auml;te geschickt, die mit dem Account verkn&uuml;pft sind.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>s&nbsp;</code> - Typ: Ganzzahl - Die Nummer eines Tons, welcher beim Empfang der Nachricht auf dem Zielger&auml;t ert&ouml;nen soll (siehe <a href="https://www.pushsafer.com/de/pushapi" target="_new">pushsafer.com</a> f&uuml;r eine Liste m&ouml;glicher Werte).<br>
     <code><b>icon</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>i&nbsp;</code> - Typ: Ganzzahl - Die Nummer eines Icons, welches zusammen mit der Nachricht auf dem Zielger&auml;t angezeigt werden soll (siehe <a href="https://www.pushsafer.com/de/pushapi" target="_new">Pushsafer.com</a> f&uuml;r eine Liste m&ouml;glicher Werte).<br>
@@ -404,14 +404,14 @@ sub Pushsafer_Callback($$$)
     Beispiele:<br>
     <br>
     <ul>
-      <code>set PushsaferAccount message "Dies ist eine Nachricht mit &uuml;berschrift." title="Sehr Wichtig!!"</code><br>
+      <code>set PushsaferAccount message "Dies ist eine Nachricht mit &Uuml;berschrift." title="Sehr Wichtig!!"</code><br>
       <code>set PushsaferAccount message "Komm runter\nwir warten" title="Mittag ist fertig" device=100</code><br>
       <code>set PushsaferAccount message "Server ist nicht erreichbar" sound=25 icon=5 vibration=3</code><br>
       <code>set PushsaferAccount message "Hier sind die Urlaubsfotos" url="http://www.foo.de/fotos" urlText="Sommerurlaub"</code><br>
     <br>
     It is also possible to use the short-term versions of options:<br>
     <br>
-      <code>set PushsaferAccount message "Dies ist eine Nachricht mit &uuml;berschrift." t="Sehr Wichtig!!"</code><br>
+      <code>set PushsaferAccount message "Dies ist eine Nachricht mit &Uuml;berschrift." t="Sehr Wichtig!!"</code><br>
       <code>set PushsaferAccount message "Komm runter\nwir warten" t="Mittag ist fertig" d=100</code><br>
       <code>set PushsaferAccount message "Server ist nicht erreichbar" s=25 i5 v=3</code><br>
       <code>set PushsaferAccount message "Hier sind die Urlaubsfotos" u="http://www.foo.de/fotos" ut="Sommerurlaub"</code><br>
