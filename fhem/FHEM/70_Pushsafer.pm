@@ -75,6 +75,7 @@ sub Pushsafer_Define($$)
     return "invalid private key: ".$privatekey if ($privatekey !~ /^[a-z\d]{20}$/i);
     
     $hash->{PrivateKey} = $privatekey;
+    $hash->{helper}{URL} = "https://www.pushsafer.com/api";
 
     Log3 $hash, 4, "Pushsafer ($name) - defined with private key: ".$privatekey;
 
