@@ -274,7 +274,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",} # radio-controlled blind actuator 1-channel (flush-mount)
  ,"00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",} # radio-controlled blind actuator 1-channel (flush-mount)
  # check config modess,"00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:10",}
- ,"00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,p'          ,chn=>"Dis:1:10",}
+ ,"00D3" => {name=>"HM-Dis-WM55"             ,st=>'display'           ,cyc=>''      ,rxt=>'c'      ,lst=>'1,p'          ,chn=>"Dis:1:10",}
  ,"00D4" => {name=>"HM-RC-4-3"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00D5" => {name=>"HM-RC-Sec4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armInt:1:1,armExt:2:2,light:3:3,disarm:4:4",}
  ,"00D6" => {name=>"HM-RC-Key4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
@@ -311,7 +311,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm:4:4",}
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
- ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3:1p.2p'    ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
+ ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'display'           ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p'    ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'02:50' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
@@ -1290,14 +1290,14 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,wat1_hour       =>1,wat1_min        =>1, 
                          ,wat2_hour       =>1,wat2_min        =>1, 
                          }
- ,"HM-Dis-EP-WM5501"  =>{ transmitTryMax  =>1}
+ ,"HM-Dis-EP-WM5501"  =>{ transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1}
+ ,"HM-Dis-EP-WM5503"  =>{ transmitTryMax  =>1}
  );
  
 
 #clones - - - - - - - - - - - - - - -
 
-$culHmRegChan{"HM-Dis-EP-WM5502"}       = 
-$culHmRegChan{"HM-Dis-EP-WM5503"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
+$culHmRegChan{"HM-Dis-EP-WM5502"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
 $culHmRegChan{"HM-Sec-Sir-WM02"}        = 
 $culHmRegChan{"HM-Sec-Sir-WM03"}        = $culHmRegChan{"HM-Sec-Sir-WM01"};
                                         
@@ -1761,7 +1761,6 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,tempTmplSet    =>"[[-file-:]templateName] ..."
                                                 ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
                                                }
-                     ,"HM-TC-IT-WM-W-EU07"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
                      ,"HM-ES-PMSw1-Pl01"     =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
                                                 ,on             =>""
@@ -1774,7 +1773,8 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                      ,"HM-ES-PMSw1-Pl00"     =>{ getSerial      => ""
                                                 ,getDevInfo     => ""
                                                }
-                     ,"HM-Dis-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "}
+                     ,"HM-Dis-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "
+                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
                      ,"CCU-FHEM00"           =>{ update         =>""
                                                 ,hmPairForSec   =>"-sec- ..."
                                                 ,hmPairSerial   =>"-serial-"
@@ -1841,6 +1841,9 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 $culHmChanSets{"HM-LC-Sw1PBU-FM00"}     = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 #$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+$culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = 
+$culHmChanSets{"HM-Dis-EP-WM5501"}      = 
+$culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
 
 %culHmFunctSets = (# command depending on function
   sdLead1             =>{ alarmOn       =>""
