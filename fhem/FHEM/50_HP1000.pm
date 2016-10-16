@@ -37,6 +37,7 @@ use FHEM::98_dewpoint;
 
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
+sub HP1000_DbLog_split($$);
 
 #########################
 sub HP1000_addExtension($$$) {
@@ -65,8 +66,9 @@ sub HP1000_Initialize($) {
 
     Log3 $hash, 5, "HP1000_Initialize: Entering";
 
-    $hash->{DefFn}   = "HP1000_Define";
-    $hash->{UndefFn} = "HP1000_Undefine";
+    $hash->{DefFn}         = "HP1000_Define";
+    $hash->{UndefFn}       = "HP1000_Undefine";
+    $hash->{DbLog_splitFn} = "HP1000_DbLog_split";
     $hash->{AttrList} =
       "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url "
       . $readingFnAttributes;
@@ -99,7 +101,7 @@ sub HP1000_Define($$) {
     $modules{HP1000}{defptr} = $hash;
 
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash );
+    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash, 0 );
 
     return undef;
 }
@@ -140,7 +142,7 @@ sub HP1000_SetAliveState($;$) {
     readingsBulkUpdateIfChanged( $hash, "Activity", $activity );
     readingsEndUpdate( $hash, 1 );
 
-    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash );
+    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash, 0 );
 
     return;
 }
@@ -156,11 +158,12 @@ sub HP1000_CGI() {
     my $URI;
     my $result = "";
     my $webArgs;
+    my $servertype;
 
     # data received
     if ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
-        $hash->{SERVER_TYPE} = lc($1);
-        $URI = $2;
+        $servertype = lc($1);
+        $URI        = $2;
 
         # get device name
         $name = $data{FWEXT}{"/updateweatherstation"}{deviceName}
@@ -195,11 +198,12 @@ sub HP1000_CGI() {
     }
 
     $hash = $defs{$name};
-
     HP1000_SetAliveState( $hash, 1 );
 
-    $hash->{SWVERSION} = $webArgs->{softwaretype};
-    $hash->{INTERVAL}  = (
+    $hash->{IP}          = $defs{$FW_cname}{PEER};
+    $hash->{SERVER_TYPE} = $servertype;
+    $hash->{SWVERSION}   = $webArgs->{softwaretype};
+    $hash->{INTERVAL}    = (
         $hash->{SYSTEMTIME_UTC}
         ? time_str2num( $webArgs->{dateutc} ) -
           time_str2num( $hash->{SYSTEMTIME_UTC} )
@@ -214,83 +218,437 @@ sub HP1000_CGI() {
             || $hash->{PASSWORD} ne $webArgs->{PASSWORD} )
       )
     {
-        Log3 $name, 4, "HP1000: received data containing wrong credentials:";
+        Log3 $name, 4, "HP1000: received data containing wrong credentials:\n"
+          . Dumper($webArgs);
         return ( "text/plain; charset=utf-8", "Wrong credentials" );
     }
-    else {
-        Log3 $name, 5, "HP1000: received data:\n" . Dumper($webArgs);
 
-        delete $webArgs->{ID};
-        delete $webArgs->{PASSWORD};
+    Log3 $name, 5, "HP1000: received data:\n" . Dumper($webArgs);
+    delete $webArgs->{ID}       if ( defined( $webArgs->{ID} ) );
+    delete $webArgs->{PASSWORD} if ( defined( $webArgs->{PASSWORD} ) );
+
+    # calculate readings for Metric standard from Angloamerican standard
+    #
+
+    # humidity (special case here!)
+    $webArgs->{inhumi} = $webArgs->{indoorhumidity}
+      if ( defined( $webArgs->{indoorhumidity} )
+        && !defined( $webArgs->{inhumi} ) );
+
+    # dewpoint in Celsius (convert from dewptf)
+    if (   defined( $webArgs->{dewptf} )
+        && $webArgs->{dewptf} ne ""
+        && !defined( $webArgs->{dewpoint} ) )
+    {
+        $webArgs->{dewpoint} = HP1000_f2c( $webArgs->{dewptf} );
     }
 
-    readingsBeginUpdate($hash);
+    # relbaro in hPa (convert from baromin)
+    if (   defined( $webArgs->{baromin} )
+        && $webArgs->{baromin} ne ""
+        && !defined( $webArgs->{relbaro} ) )
+    {
+        $webArgs->{relbaro} = HP1000_inhg2hpa( $webArgs->{baromin} );
+    }
+
+    # absbaro in hPa (convert from absbaromin)
+    if (   defined( $webArgs->{absbaromin} )
+        && $webArgs->{absbaromin} ne ""
+        && !defined( $webArgs->{absbaro} ) )
+    {
+        $webArgs->{absbaro} = HP1000_inhg2hpa( $webArgs->{absbaromin} );
+    }
+
+    # rainrate in mm/h (convert from rainin)
+    if (   defined( $webArgs->{rainin} )
+        && $webArgs->{rainin} ne ""
+        && !defined( $webArgs->{rainrate} ) )
+    {
+        $webArgs->{rainrate} = HP1000_in2mm( $webArgs->{rainin} );
+    }
+
+    # dailyrain in mm (convert from dailyrainin)
+    if (   defined( $webArgs->{dailyrainin} )
+        && $webArgs->{dailyrainin} ne ""
+        && !defined( $webArgs->{dailyrain} ) )
+    {
+        $webArgs->{dailyrain} = HP1000_in2mm( $webArgs->{dailyrainin} );
+    }
+
+    # weeklyrain in mm (convert from weeklyrainin)
+    if (   defined( $webArgs->{weeklyrainin} )
+        && $webArgs->{weeklyrainin} ne ""
+        && !defined( $webArgs->{weeklyrain} ) )
+    {
+        $webArgs->{weeklyrain} = HP1000_in2mm( $webArgs->{weeklyrainin} );
+    }
+
+    # monthlyrain in mm (convert from monthlyrainin)
+    if (   defined( $webArgs->{monthlyrainin} )
+        && $webArgs->{monthlyrainin} ne ""
+        && !defined( $webArgs->{monthlyrain} ) )
+    {
+        $webArgs->{monthlyrain} = HP1000_in2mm( $webArgs->{monthlyrainin} );
+    }
+
+    # yearlyrain in mm (convert from yearlyrainin)
+    if (   defined( $webArgs->{yearlyrainin} )
+        && $webArgs->{yearlyrainin} ne ""
+        && !defined( $webArgs->{yearlyrain} ) )
+    {
+        $webArgs->{yearlyrain} = HP1000_in2mm( $webArgs->{yearlyrainin} );
+    }
+
+    # outtemp in Celsius (convert from tempf)
+    if (   defined( $webArgs->{tempf} )
+        && $webArgs->{tempf} ne ""
+        && !defined( $webArgs->{outtemp} ) )
+    {
+        $webArgs->{outtemp} = HP1000_f2c( $webArgs->{tempf} );
+    }
+
+    # intemp in Celsius (convert from indoortempf)
+    if (   defined( $webArgs->{indoortempf} )
+        && $webArgs->{indoortempf} ne ""
+        && !defined( $webArgs->{intemp} ) )
+    {
+        $webArgs->{intemp} =
+          HP1000_f2c( $webArgs->{indoortempf} );
+    }
+
+    # windchill in Celsius (convert from windchillf)
+    if (   defined( $webArgs->{windchillf} )
+        && $webArgs->{windchillf} ne ""
+        && !defined( $webArgs->{windchill} ) )
+    {
+        $webArgs->{windchill} =
+          HP1000_f2c( $webArgs->{windchillf} );
+    }
+
+    # windgust in km/h (convert from windgustmph)
+    if (   defined( $webArgs->{windgustmph} )
+        && $webArgs->{windgustmph} ne ""
+        && !defined( $webArgs->{windgust} ) )
+    {
+        $webArgs->{windgust} = HP1000_mph2kph( $webArgs->{windgustmph} );
+    }
+
+    # windspeed in km/h (convert from windspdmph)
+    if (   defined( $webArgs->{windspdmph} )
+        && $webArgs->{windspdmph} ne ""
+        && !defined( $webArgs->{windspeed} ) )
+    {
+        $webArgs->{windspeed} = HP1000_mph2kph( $webArgs->{windspdmph} );
+    }
+
+    # calculate readings for Angloamerican standard from Metric standard
+    #
+
+    # humidity (special case here!)
+    $webArgs->{indoorhumidity} = $webArgs->{inhumi}
+      if ( defined( $webArgs->{inhumi} )
+        && !defined( $webArgs->{indoorhumidity} ) );
+
+    # dewptf in Fahrenheit (convert from dewpoint)
+    if (   defined( $webArgs->{dewpoint} )
+        && $webArgs->{dewpoint} ne ""
+        && !defined( $webArgs->{dewptf} ) )
+    {
+        $webArgs->{dewptf} = HP1000_c2f( $webArgs->{dewpoint} );
+    }
+
+    # baromin in inch (convert from relbaro)
+    if (   defined( $webArgs->{relbaro} )
+        && $webArgs->{relbaro} ne ""
+        && !defined( $webArgs->{baromin} ) )
+    {
+        $webArgs->{baromin} = HP1000_hpa2inhg( $webArgs->{relbaro} );
+    }
+
+    # absbaromin in inch (convert from absbaro)
+    if (   defined( $webArgs->{absbaro} )
+        && $webArgs->{absbaro} ne ""
+        && !defined( $webArgs->{absbaromin} ) )
+    {
+        $webArgs->{absbaromin} = HP1000_hpa2inhg( $webArgs->{absbaro} );
+    }
+
+    # rainin in in/h (convert from rainrate)
+    if (   defined( $webArgs->{rainrate} )
+        && $webArgs->{rainrate} ne ""
+        && !defined( $webArgs->{rainin} ) )
+    {
+        $webArgs->{rainin} = HP1000_mm2in( $webArgs->{rainrate} );
+    }
+
+    # dailyrainin in inch (convert from dailyrain)
+    if (   defined( $webArgs->{dailyrain} )
+        && $webArgs->{dailyrain} ne ""
+        && !defined( $webArgs->{dailyrainin} ) )
+    {
+        $webArgs->{dailyrainin} = HP1000_mm2in( $webArgs->{dailyrain} );
+    }
+
+    # weeklyrainin in inch (convert from weeklyrain)
+    if (   defined( $webArgs->{weeklyrain} )
+        && $webArgs->{weeklyrain} ne ""
+        && !defined( $webArgs->{weeklyrainin} ) )
+    {
+        $webArgs->{weeklyrainin} = HP1000_mm2in( $webArgs->{weeklyrain} );
+    }
+
+    # monthlyrainin in inch (convert from monthlyrain)
+    if (   defined( $webArgs->{monthlyrain} )
+        && $webArgs->{monthlyrain} ne ""
+        && !defined( $webArgs->{monthlyrainin} ) )
+    {
+        $webArgs->{monthlyrainin} = HP1000_mm2in( $webArgs->{monthlyrain} );
+    }
+
+    # yearlyrainin in inch (convert from yearlyrain)
+    if (   defined( $webArgs->{yearlyrain} )
+        && $webArgs->{yearlyrain} ne ""
+        && !defined( $webArgs->{yearlyrainin} ) )
+    {
+        $webArgs->{yearlyrainin} = HP1000_mm2in( $webArgs->{yearlyrain} );
+    }
+
+    #  tempf in Fahrenheit (convert from outtemp)
+    if (   defined( $webArgs->{outtemp} )
+        && $webArgs->{outtemp} ne ""
+        && !defined( $webArgs->{tempf} ) )
+    {
+        $webArgs->{tempf} = HP1000_c2f( $webArgs->{outtemp} );
+    }
+
+    # indoortempf in Fahrenheit (convert from intemp)
+    if (   defined( $webArgs->{intemp} )
+        && $webArgs->{intemp} ne ""
+        && !defined( $webArgs->{indoortempf} ) )
+    {
+        $webArgs->{indoortempf} =
+          HP1000_c2f( $webArgs->{intemp} );
+    }
+
+    # windchillf in Fahrenheit (convert from windchill)
+    if (   defined( $webArgs->{windchill} )
+        && $webArgs->{windchill} ne ""
+        && !defined( $webArgs->{windchillf} ) )
+    {
+        $webArgs->{windchillf} =
+          HP1000_c2f( $webArgs->{windchill} );
+    }
+
+    # windgustmph in mph (convert from windgust)
+    if (   defined( $webArgs->{windgust} )
+        && $webArgs->{windgust} ne ""
+        && !defined( $webArgs->{windgustmph} ) )
+    {
+        $webArgs->{windgustmph} = HP1000_kph2mph( $webArgs->{windgust} );
+    }
+
+    # windspdmph in mph (convert from windspeed)
+    if (   defined( $webArgs->{windspeed} )
+        && $webArgs->{windspeed} ne ""
+        && !defined( $webArgs->{windspdmph} ) )
+    {
+        $webArgs->{windspdmph} = HP1000_kph2mph( $webArgs->{windspeed} );
+    }
 
     # write general readings
+    #
+    readingsBeginUpdate($hash);
+
     while ( ( my $p, my $v ) = each %$webArgs ) {
+
+        # delete empty values
+        if ( $v eq "" ) {
+            delete $webArgs->{$p};
+            next;
+        }
 
         # ignore those values
         next
-          if ( $v eq ""
-            || $p eq "dateutc"
+          if ( $p eq "dateutc"
             || $p eq "action"
             || $p eq "softwaretype"
             || $p eq "realtime"
             || $p eq "rtfreq" );
 
-        # name translation
-        $p = "humidityIndoor"    if ( $p eq "inhumi" );
-        $p = "temperatureIndoor" if ( $p eq "intemp" );
-        $p = "humidity"          if ( $p eq "outhumi" );
-        $p = "temperature"       if ( $p eq "outtemp" );
-        $p = "pressure"          if ( $p eq "relbaro" );
-        $p = "pressureAbs"       if ( $p eq "absbaro" );
-        $p = "rain"              if ( $p eq "rainrate" );
-        $p = "rainDay"           if ( $p eq "dailyrain" );
-        $p = "rainWeek"          if ( $p eq "weeklyrain" );
-        $p = "rainMonth"         if ( $p eq "monthlyrain" );
-        $p = "rainYear"          if ( $p eq "yearlyrain" );
-        $p = "uv"                if ( $p eq "UV" );
-        $p = "windChill"         if ( $p eq "windchill" );
-        $p = "windDir"           if ( $p eq "winddir" );
-        $p = "windGust"          if ( $p eq "windgust" );
-        $p = "windSpeed"         if ( $p eq "windspeed" );
-        $p = "luminosity"        if ( $p eq "light" );
+        $p = "_" . $p;
+
+        # name translation for general readings
+        $p = "humidity"       if ( $p eq "_outhumi" );
+        $p = "humidityIndoor" if ( $p eq "_inhumi" );
+        $p = "humidityIndoor" if ( $p eq "_indoorhumidity" );
+        $p = "luminosity"     if ( $p eq "_light" );
+        $p = "uv"             if ( $p eq "_UV" );
+        $p = "windDir"        if ( $p eq "_winddir" );
+
+        # name translation for Metric standard
+        $p = "dewpoint"          if ( $p eq "_dewpoint" );
+        $p = "pressure"          if ( $p eq "_relbaro" );
+        $p = "pressureAbs"       if ( $p eq "_absbaro" );
+        $p = "rain"              if ( $p eq "_rainrate" );
+        $p = "rainDay"           if ( $p eq "_dailyrain" );
+        $p = "rainWeek"          if ( $p eq "_weeklyrain" );
+        $p = "rainMonth"         if ( $p eq "_monthlyrain" );
+        $p = "rainYear"          if ( $p eq "_yearlyrain" );
+        $p = "temperature"       if ( $p eq "_outtemp" );
+        $p = "temperatureIndoor" if ( $p eq "_intemp" );
+        $p = "windChill"         if ( $p eq "_windchill" );
+        $p = "windGust"          if ( $p eq "_windgust" );
+        $p = "windSpeed"         if ( $p eq "_windspeed" );
+
+        # name translation for Angloamerican standard
+        $p = "dewpointF"          if ( $p eq "_dewptf" );
+        $p = "pressureIn"         if ( $p eq "_baromin" );
+        $p = "pressureAbsIn"      if ( $p eq "_absbaromin" );
+        $p = "rainIn"             if ( $p eq "_rainin" );
+        $p = "rainDayIn"          if ( $p eq "_dailyrainin" );
+        $p = "rainWeekIn"         if ( $p eq "_weeklyrainin" );
+        $p = "rainMonthIn"        if ( $p eq "_monthlyrainin" );
+        $p = "rainYearIn"         if ( $p eq "_yearlyrainin" );
+        $p = "temperatureF"       if ( $p eq "_tempf" );
+        $p = "temperatureIndoorF" if ( $p eq "_indoortempf" );
+        $p = "windChillF"         if ( $p eq "_windchillf" );
+        $p = "windGustMph"        if ( $p eq "_windgustmph" );
+        $p = "windSpeedMph"       if ( $p eq "_windspdmph" );
 
         readingsBulkUpdate( $hash, $p, $v );
     }
 
-    # calculated readings
+    # calculate additional readings
     #
 
-    # UVindex (convert from uW/cm2)
-    # Forum topic,44403.msg501704.html#msg501704
-    if ( defined( $webArgs->{UV} ) ) {
-        $webArgs->{UVindex} = floor( ( $webArgs->{UV} - 100 ) / 450 + 1 );
-        readingsBulkUpdate( $hash, "uvIndex", $webArgs->{UVindex} );
+    # israining
+    my $israining = 0;
+    $israining = 1
+      if ( defined( $webArgs->{rainrate} ) && $webArgs->{rainrate} > 0 );
+    readingsBulkUpdateIfChanged( $hash, "israining", $israining );
+
+    # daylight
+    my $daylight = 0;
+    $daylight = 1
+      if ( defined( $webArgs->{light} ) && $webArgs->{light} > 50 );
+    readingsBulkUpdateIfChanged( $hash, "daylight", $daylight );
+
+    # weatherCondition
+    if ( defined( $webArgs->{light} ) ) {
+        my $condition = "clear";
+
+        if ($israining) {
+            $condition = "rain";
+        }
+        elsif ( $webArgs->{light} > 40000 ) {
+            $condition = "sunny";
+        }
+        elsif ($daylight) {
+            $condition = "cloudy";
+        }
+
+        readingsBulkUpdateIfChanged( $hash, "weatherCondition", $condition );
     }
 
-    # solarradiation in w/m2 (convert from lux)
-    # Forum topic,44403.msg501704.html#msg501704
+    # humidityCondition
+    if ( defined( $webArgs->{outhumi} ) ) {
+        my $condition = "dry";
+
+        if ( $webArgs->{outhumi} >= 80 && $israining ) {
+            $condition = "rain";
+        }
+        elsif ( $webArgs->{outhumi} >= 80 ) {
+            $condition = "wet";
+        }
+        elsif ( $webArgs->{outhumi} >= 70 ) {
+            $condition = "high";
+        }
+        elsif ( $webArgs->{outhumi} >= 50 ) {
+            $condition = "optimal";
+        }
+        elsif ( $webArgs->{outhumi} >= 40 ) {
+            $condition = "low";
+        }
+
+        readingsBulkUpdateIfChanged( $hash, "humidityCondition", $condition );
+    }
+
+    # humidityIndoorCondition
+    if ( defined( $webArgs->{inhumi} ) ) {
+        my $condition = "dry";
+
+        if ( $webArgs->{inhumi} >= 80 ) {
+            $condition = "wet";
+        }
+        elsif ( $webArgs->{inhumi} >= 70 ) {
+            $condition = "high";
+        }
+        elsif ( $webArgs->{inhumi} >= 50 ) {
+            $condition = "optimal";
+        }
+        elsif ( $webArgs->{inhumi} >= 40 ) {
+            $condition = "low";
+        }
+
+        readingsBulkUpdateIfChanged( $hash, "humidityIndoorCondition",
+            $condition );
+    }
+
+    # UVI (convert from uW/cm2)
+    if ( defined( $webArgs->{UV} ) ) {
+        $webArgs->{UVI} = HP1000_uwpscm2uvi( $webArgs->{UV} );
+        readingsBulkUpdate( $hash, "uvIndex", $webArgs->{UVI} );
+    }
+
+    # solarradiation in W/m2 (convert from lux)
     if ( defined( $webArgs->{light} ) ) {
-        $webArgs->{solarradiation} = round( $webArgs->{light} / 126.7, 1 );
+        $webArgs->{solarradiation} = HP1000_lux2wpsm( $webArgs->{light} );
         readingsBulkUpdate( $hash, "solarradiation",
             $webArgs->{solarradiation} );
     }
 
-    # dewpointIndoor
+    # pressureMm in mmHg (convert from hpa)
+    if ( defined( $webArgs->{relbaro} ) ) {
+        $webArgs->{barommm} = HP1000_hpa2mmhg( $webArgs->{relbaro} );
+        readingsBulkUpdate( $hash, "pressureMm", $webArgs->{barommm} );
+    }
+
+    # pressureAbsMm in mmHg (convert from hpa)
+    if ( defined( $webArgs->{absbaro} ) ) {
+        $webArgs->{absbarommm} = HP1000_hpa2mmhg( $webArgs->{absbaro} );
+        readingsBulkUpdate( $hash, "pressureAbsMm", $webArgs->{absbarommm} );
+    }
+
+    # dewpointIndoor in Celsius
     if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
         my $h = (
             $webArgs->{inhumi} > 110
             ? 110
             : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
-        $webArgs->{dewpointin} =
+        $webArgs->{indewpoint} =
           round( dewpoint_dewpoint( $webArgs->{intemp}, $h ), 1 );
-        readingsBulkUpdate( $hash, "dewpointIndoor", $webArgs->{dewpointin} );
+        readingsBulkUpdate( $hash, "dewpointIndoor", $webArgs->{indewpoint} );
     }
 
-    # humidityAbs
+    # dewpointIndoor in Fahrenheit
+    if (   defined( $webArgs->{indoortempf} )
+        && defined( $webArgs->{indoorhumidity} ) )
+    {
+        my $h = (
+            $webArgs->{indoorhumidity} > 110 ? 110
+            : (
+                  $webArgs->{indoorhumidity} <= 0 ? 0.01
+                : $webArgs->{indoorhumidity}
+            )
+        );
+        $webArgs->{indoordewpointf} =
+          round( dewpoint_dewpoint( $webArgs->{indoortempf}, $h ), 1 );
+        readingsBulkUpdate( $hash, "dewpointIndoorF",
+            $webArgs->{indoordewpointf} );
+    }
+
+    # humidityAbs / humidityAbsF
     if ( defined( $webArgs->{outtemp} ) && defined( $webArgs->{outhumi} ) ) {
         my $h = (
             $webArgs->{outhumi} > 110
@@ -300,6 +658,10 @@ sub HP1000_CGI() {
         $webArgs->{outhumiabs} =
           round( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ), 1 );
         readingsBulkUpdate( $hash, "humidityAbs", $webArgs->{outhumiabs} );
+
+        $webArgs->{outhumiabsf} =
+          round( dewpoint_absFeuchte( $webArgs->{outtempf}, $h ), 1 );
+        readingsBulkUpdate( $hash, "humidityAbsF", $webArgs->{outhumiabsf} );
     }
 
     # humidityIndoorAbs
@@ -314,6 +676,23 @@ sub HP1000_CGI() {
         readingsBulkUpdate( $hash, "humidityIndoorAbs", $webArgs->{inhumiabs} );
     }
 
+    # humidityIndoorAbsF
+    if (   defined( $webArgs->{indoortempf} )
+        && defined( $webArgs->{indoorhumidity} ) )
+    {
+        my $h = (
+            $webArgs->{indoorhumidity} > 110 ? 110
+            : (
+                  $webArgs->{indoorhumidity} <= 0 ? 0.01
+                : $webArgs->{indoorhumidity}
+            )
+        );
+        $webArgs->{indoorhumidityabsf} =
+          round( dewpoint_absFeuchte( $webArgs->{indoortempf}, $h ), 1 );
+        readingsBulkUpdate( $hash, "humidityIndoorAbsF",
+            $webArgs->{indoorhumidityabsf} );
+    }
+
     # windCompasspoint
     if ( defined( $webArgs->{winddir} ) ) {
         $webArgs->{windcompasspoint} =
@@ -322,69 +701,58 @@ sub HP1000_CGI() {
             $webArgs->{windcompasspoint} );
     }
 
-    # windSpeedForce in Beaufort
+    # windSpeedBft in Beaufort (convert from km/h)
     if ( defined( $webArgs->{windspeed} ) ) {
-        $webArgs->{windspeedforce} = HP1000_windForce( $webArgs->{windspeed} );
-        readingsBulkUpdate( $hash, "windSpeedForce",
-            $webArgs->{windspeedforce} );
+        $webArgs->{windspeedbft} = HP1000_kph2bft( $webArgs->{windspeed} );
+        readingsBulkUpdate( $hash, "windSpeedBft", $webArgs->{windspeedbft} );
     }
 
-    # windGustForce in Beaufort
-    if ( defined( $webArgs->{windgust} ) ) {
-        $webArgs->{windfustforce} = HP1000_windForce( $webArgs->{windgust} );
-        readingsBulkUpdate( $hash, "windGustForce", $webArgs->{windfustforce} );
-    }
-
-    # windSpeedMps in m/s
+    # windSpeedMps in m/s (convert from km/h)
     if ( defined( $webArgs->{windspeed} ) ) {
-        my $v = HP1000_windKmh2Mps( $webArgs->{windspeed} );
+        my $v = HP1000_kph2mps( $webArgs->{windspeed} );
         $webArgs->{windspeedmps} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
         readingsBulkUpdate( $hash, "windSpeedMps", $webArgs->{windspeedmps} );
     }
 
-    # windGustMps in m/s
+    # windSpeedKn in kn (convert from km/h)
+    if ( defined( $webArgs->{windspeed} ) ) {
+        my $v = HP1000_kph2kn( $webArgs->{windspeed} );
+        $webArgs->{windspeedkn} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedKn", $webArgs->{windspeedkn} );
+    }
+
+    # windSpeedFts in ft/s (convert from mph)
+    if ( defined( $webArgs->{windspeedmph} ) ) {
+        my $v = HP1000_mph2fts( $webArgs->{windspeedmph} );
+        $webArgs->{windspeedfts} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedFts", $webArgs->{windspeedfts} );
+    }
+
+    # windGustBft in Beaufort (convert from km/h)
     if ( defined( $webArgs->{windgust} ) ) {
-        my $v = HP1000_windKmh2Mps( $webArgs->{windgust} );
+        $webArgs->{windgustbft} = HP1000_kph2bft( $webArgs->{windgust} );
+        readingsBulkUpdate( $hash, "windGustBft", $webArgs->{windgustbft} );
+    }
+
+    # windGustMps in m/s (convert from km/h)
+    if ( defined( $webArgs->{windgust} ) ) {
+        my $v = HP1000_kph2mps( $webArgs->{windgust} );
         $webArgs->{windgustmps} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
         readingsBulkUpdate( $hash, "windGustMps", $webArgs->{windgustmps} );
     }
 
-    # averages/windSpeed_avg2m
-    if ( defined( $webArgs->{windspeed} ) ) {
-        my $v =
-          HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
-
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "windSpeed_avg2m", $v );
-            $webArgs->{windspd_avg2m} = $v;
-        }
-    }
-    elsif ( defined( $webArgs->{windspeedmph} ) ) {
-        my $v =
-          HP1000_GetAvg( $hash, "windspeedmph", 2 * 60,
-            $webArgs->{windspeedmph} );
-
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "windSpeed_avg2m", $v );
-            $webArgs->{windspdmph_avg2m} = $v;
-        }
+    # windGustKn in m/s (convert from km/h)
+    if ( defined( $webArgs->{windgust} ) ) {
+        my $v = HP1000_kph2kn( $webArgs->{windgust} );
+        $webArgs->{windgustkn} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windGustKn", $webArgs->{windgustkn} );
     }
 
-    # averages/windSpeedForce_avg2m in Beaufort
-    if ( defined( $webArgs->{windspd_avg2m} ) ) {
-        $webArgs->{windspdforce_avg2m} =
-          HP1000_windForce( $webArgs->{windspd_avg2m} );
-        readingsBulkUpdate( $hash, "windSpeedForce_avg2m",
-            $webArgs->{windspdforce_avg2m} );
-    }
-
-    # averages/windSpeedMps_avg2m in m/s
-    if ( defined( $webArgs->{windspd_avg2m} ) ) {
-        my $v = HP1000_windKmh2Mps( $webArgs->{windspd_avg2m} );
-        $webArgs->{windspdmps_avg2m} =
-          ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsBulkUpdate( $hash, "windSpeedMps_avg2m",
-            $webArgs->{windspdmps_avg2m} );
+    # windGustFts ft/s (convert from mph)
+    if ( defined( $webArgs->{windgustmph} ) ) {
+        my $v = HP1000_mph2fts( $webArgs->{windgustmph} );
+        $webArgs->{windgustfts} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windGustFts", $webArgs->{windgustfts} );
     }
 
     # averages/windDir_avg2m
@@ -406,6 +774,45 @@ sub HP1000_CGI() {
             $webArgs->{windcompasspoint_avg2m} );
     }
 
+    # averages/windSpeed_avg2m in km/h
+    if ( defined( $webArgs->{windspeed} ) ) {
+        my $v =
+          HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
+
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windSpeed_avg2m", $v );
+            $webArgs->{windspeed_avg2m} = $v;
+        }
+    }
+
+    # averages/windSpeedMph_avg2m in mph
+    if ( defined( $webArgs->{windspdmph} ) ) {
+        my $v =
+          HP1000_GetAvg( $hash, "windspdmph", 2 * 60, $webArgs->{windspdmph} );
+
+        if ( $hash->{INTERVAL} > 0 ) {
+            readingsBulkUpdate( $hash, "windSpeedMph_avg2m", $v );
+            $webArgs->{windspdmph_avg2m} = $v;
+        }
+    }
+
+    # averages/windSpeedBft_avg2m in Beaufort (convert from km/h)
+    if ( defined( $webArgs->{windspeed_avg2m} ) ) {
+        $webArgs->{windspeedbft_avg2m} =
+          HP1000_kph2bft( $webArgs->{windspeed_avg2m} );
+        readingsBulkUpdate( $hash, "windSpeedBft_avg2m",
+            $webArgs->{windspeedbft_avg2m} );
+    }
+
+    # averages/windSpeedMps_avg2m in m/s
+    if ( defined( $webArgs->{windspeed_avg2m} ) ) {
+        my $v = HP1000_kph2mps( $webArgs->{windspeed_avg2m} );
+        $webArgs->{windspeedmps_avg2m} =
+          ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
+        readingsBulkUpdate( $hash, "windSpeedMps_avg2m",
+            $webArgs->{windspeedmps_avg2m} );
+    }
+
     # averages/windGust_sum10m
     if ( defined( $webArgs->{windgust} ) ) {
         my $v =
@@ -416,13 +823,15 @@ sub HP1000_CGI() {
             $webArgs->{windgust_10m} = $v;
         }
     }
-    elsif ( defined( $webArgs->{windgustmph} ) ) {
+
+    # averages/windGustMph_sum10m
+    if ( defined( $webArgs->{windgustmph} ) ) {
         my $v =
           HP1000_GetSum( $hash, "windgustmph", 10 * 60,
             $webArgs->{windgustmph} );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "windGust_sum10m", $v );
+            readingsBulkUpdate( $hash, "windGustMph_sum10m", $v );
             $webArgs->{windgustmph_10m} = $v;
         }
     }
@@ -435,8 +844,7 @@ sub HP1000_CGI() {
     # leafwetness  - [%]
     # visibility - [nm visibility]
     # condition_forecast (based on pressure trendency)
-    # day/night
-    # isRaining
+    # dayNight
     # soilTemperature
     # brightness in % ??
 
@@ -450,8 +858,8 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{inhumi} ) );
     $result .= " W: " . $webArgs->{windspeed}
       if ( defined( $webArgs->{windspeed} ) );
-    $result .= " W: " . $webArgs->{windspeedmph}
-      if ( defined( $webArgs->{windspeedmph} ) );
+    $result .= " W: " . $webArgs->{windspdmph}
+      if ( defined( $webArgs->{windspdmph} ) );
     $result .= " WC: " . $webArgs->{windchill}
       if ( defined( $webArgs->{windchill} ) );
     $result .= " WG: " . $webArgs->{windgust}
@@ -476,8 +884,8 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{relbaro} ) );
     $result .= " UV: " . $webArgs->{UV}
       if ( defined( $webArgs->{UV} ) );
-    $result .= " UVi: " . $webArgs->{UVindex}
-      if ( defined( $webArgs->{UVindex} ) );
+    $result .= " UVi: " . $webArgs->{UVI}
+      if ( defined( $webArgs->{UVI} ) );
     $result .= " L: " . $webArgs->{light}
       if ( defined( $webArgs->{light} ) );
     $result .= " SR: " . $webArgs->{solarradiation}
@@ -600,8 +1008,9 @@ sub HP1000_PushWU($$) {
 
         my $return = "error: missing attributes wu_user and wu_password";
 
-        readingsSingleUpdate( $hash, "wu_state", $return, 1 )
-          if ( ReadingsVal( $name, "wu_state", "" ) ne $return );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
         return;
     }
 
@@ -633,73 +1042,6 @@ sub HP1000_PushWU($$) {
     while ( my ( $key, $value ) = each %{$webArgs} ) {
         if ( $key eq "softwaretype" || $key eq "dateutc" ) {
             $value = urlEncode($value);
-        }
-
-        elsif ( $key eq "windspeed" ) {
-            $key   = "windspeedmph";
-            $value = $value / 1.609344;    # convert from kph to mph
-        }
-
-        elsif ( $key eq "windspd_avg2m" ) {
-            $key   = "windspdmph_avg2m";
-            $value = $value / 1.609344;    # convert from kph to mph
-        }
-
-        elsif ( $key eq "windgust" ) {
-            $key   = "windgustmph";
-            $value = $value / 1.609344;    # convert from kph to mph
-        }
-
-        elsif ( $key eq "windgust_10m" ) {
-            $key   = "windgustmph_10m";
-            $value = $value / 1.609344;    # convert from kph to mph
-        }
-
-        elsif ( $key eq "inhumi" ) {
-            $key = "indoorhumidity";
-        }
-
-        elsif ( $key eq "intemp" ) {
-            $key   = "indoortempf";
-            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
-        }
-
-        elsif ( $key eq "intempf" ) {
-            $key = "indoortempf";
-        }
-
-        elsif ( $key eq "outhumi" ) {
-            $key = "humidity";
-        }
-
-        elsif ( $key eq "outtemp" ) {
-            $key   = "tempf";
-            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
-        }
-
-        elsif ( $key eq "outtempf" ) {
-            $key = "tempf";
-        }
-
-        elsif ( $key eq "rain" ) {
-            $key   = "rainin";
-            $value = $value / 25.4;         # convert from mm to inch
-        }
-
-        elsif ( $key eq "dailyrain" ) {
-            $key   = "dailyrainin";
-            $value = $value / 25.4;         # convert from mm to inch
-        }
-
-        elsif ( $key eq "dewpoint" ) {
-            $key   = "dewptf";
-            $value = $value * 9 / 5 + 32;   # convert from Celsius to Fahrenheit
-        }
-
-        elsif ( $key eq "relbaro" ) {
-            $key   = "baromin";
-            $value = $value * 100 *
-              0.000295299830714;    # convert from hPa to Inches of Mercury
         }
 
         elsif ( $key eq "UVindex" ) {
@@ -775,8 +1117,9 @@ sub HP1000_ReturnWU($$$) {
         my $return = "error: connection timeout";
         Log3 $name, 4, "HP1000 $name: WU HTTP " . $return;
 
-        readingsSingleUpdate( $hash, "wu_state", $return, 1 )
-          if ( ReadingsVal( $name, "wu_state", "" ) ne $return );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     # data received
@@ -793,15 +1136,193 @@ sub HP1000_ReturnWU($$$) {
         Log3 $name, $logprio,
           "HP1000 $name: WU HTTP return: " . $param->{code} . " - $data";
 
-        readingsSingleUpdate( $hash, "wu_state", $return, 1 )
-          if ( ReadingsVal( $name, "wu_state", "" ) ne $return );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     return;
 }
 
 ###################################
-sub HP1000_windForce($) {
+sub HP1000_DbLog_split($$) {
+    my ( $event, $device ) = @_;
+    my ( $reading, $value, $unit ) = "";
+    my $hash = $defs{$device};
+
+    if ( $event =~
+        /^(windCompasspoint.*|.*_sum10m|.*_avg2m):\s([\w\.,]+)\s*(.*)/ )
+    {
+        return undef;
+    }
+    elsif ( $event =~
+/^(dewpoint|dewpointIndoor|temperature|temperatureIndoor|windChill):\s([\w\.,]+)\s*(.*)/
+      )
+    {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "°C";
+    }
+    elsif ( $event =~
+/^(dewpointF|dewpointIndoorF|temperatureF|temperatureIndoorF|windChillF):\s([\w\.,]+)\s*(.*)/
+      )
+    {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "°F";
+    }
+    elsif ( $event =~ /^(humidity.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "%";
+    }
+    elsif ( $event =~ /^(luminosity):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "lux";
+    }
+    elsif ( $event =~ /^(solarradiation):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "W/m2";
+    }
+    elsif ( $event =~ /^(pressure|pressureAbs):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "hPa";
+    }
+    elsif ( $event =~ /^(pressureIn|pressureAbsIn):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "inHg";
+    }
+    elsif ( $event =~ /^(pressureMm|pressureAbsMm):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "mmHg";
+    }
+    elsif ( $event =~ /^(rain):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "mm/h";
+    }
+    elsif ( $event =~ /^(rainin):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "in/h";
+    }
+    elsif (
+        $event =~ /^(rainDay|rainWeek|rainMonth|rainYear):\s([\w\.,]+)\s*(.*)/ )
+    {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "mm";
+    }
+    elsif ( $event =~
+        /^(rainDayIn|rainWeekIn|rainMonthIn|rainYearIn):\s([\w\.,]+)\s*(.*)/ )
+    {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "in";
+    }
+    elsif ( $event =~ /^(uv):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "uW/cm2";
+    }
+    elsif ( $event =~ /^(uvIndex):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "UVI";
+    }
+    elsif ( $event =~ /^(windDir.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "°";
+    }
+    elsif ( $event =~ /^(windGust|windSpeed):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "km/h";
+    }
+    elsif ( $event =~ /^(windGustBft|windSpeedBft):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "Bft";
+    }
+    elsif ( $event =~ /^(windGustMps.*|windSpeedMps.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "m/s";
+    }
+    elsif ( $event =~ /^(windGustFts.*|windSpeedFts.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "ft/s";
+    }
+    elsif ( $event =~ /^(windGustKn.*|windSpeedKn.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "kn";
+    }
+    elsif ( $event =~ /^(Activity):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $value   = "1" if ( $2 eq "alive" );
+        $value   = "0" if ( $2 eq "dead" );
+        $unit    = "";
+    }
+    elsif ( $event =~ /^(weatherCondition):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = "";
+        $value   = "0" if ( $2 eq "clear" );
+        $value   = "1" if ( $2 eq "sunny" );
+        $value   = "2" if ( $2 eq "cloudy" );
+        $value   = "3" if ( $2 eq "rain" );
+        return undef if ( $value eq "" );
+        $unit = "";
+    }
+    elsif ( $event =~ /^(humidityCondition):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = "";
+        $value   = "0" if ( $2 eq "dry" );
+        $value   = "1" if ( $2 eq "low" );
+        $value   = "2" if ( $2 eq "optimal" );
+        $value   = "3" if ( $2 eq "wet" );
+        $value   = "4" if ( $2 eq "rain" );
+        return undef if ( $value eq "" );
+        $unit = "";
+    }
+    elsif ( $event =~ /^(humidityIndoorCondition):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = "";
+        $value   = "0" if ( $2 eq "dry" );
+        $value   = "1" if ( $2 eq "low" );
+        $value   = "2" if ( $2 eq "optimal" );
+        $value   = "3" if ( $2 eq "wet" );
+        return undef if ( $value eq "" );
+        $unit = "";
+    }
+    elsif ( $event =~ /^(wu_state):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = "1" if ( $2 eq "ok" );
+        $value   = "0" if ( $2 ne "ok" );
+        $unit    = "";
+    }
+    elsif ( $event =~ /(.+):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = $3;
+    }
+
+    Log3 $device, 5,
+"HP1000 $device: Splitting event $event > reading=$reading value=$value unit=$unit";
+
+    return ( $reading, $value, $unit );
+}
+
+###################################
+sub HP1000_kph2bft($) {
     my ($data) = @_;
     my $v = "0";
 
@@ -903,11 +1424,117 @@ sub HP1000_CompassPoint($) {
 }
 
 ###################################
-sub HP1000_windKmh2Mps($) {
+sub HP1000_kph2mph($) {
+    my ($data) = @_;
+
+    # convert km/h to mph
+    return round( $data * 0.621, 1 );
+}
+
+###################################
+sub HP1000_kph2mps($) {
     my ($data) = @_;
 
     # convert km/h to m/s
-    return $data / 3.6;
+    return round( $data / 3.6, 1 );
+}
+
+###################################
+sub HP1000_kph2kn($) {
+    my ($data) = @_;
+
+    # convert km/h to knots
+    return round( $data * 0.539956803456, 1 );
+}
+
+###################################
+sub HP1000_mph2kph($) {
+    my ($data) = @_;
+
+    # convert mph to km/h
+    return round( $data * 1.609344, 1 );
+}
+
+###################################
+sub HP1000_mph2fts($) {
+    my ($data) = @_;
+
+    # convert mph to ft/s
+    return round( $data * 1.467, 1 );
+}
+
+###################################
+sub HP1000_c2f($) {
+    my ($data) = @_;
+
+    # convert Celsius to Fahrenheit
+    return round( $data * 1.8 + 32, 1 );
+}
+
+###################################
+sub HP1000_f2c($) {
+    my ($data) = @_;
+
+    # convert Fahrenheit to Celsius
+    return round( ( $data - 32 ) * 0.5556, 1 );
+}
+
+###################################
+sub HP1000_mm2in($) {
+    my ($data) = @_;
+
+    # convert mm to inch
+    return round( $data * 0.039, 1 );
+}
+
+###################################
+sub HP1000_in2mm($) {
+    my ($data) = @_;
+
+    # convert mm to inch
+    return round( $data * 25.4, 1 );
+}
+
+###################################
+sub HP1000_hpa2inhg($) {
+    my ($data) = @_;
+
+    # convert Hecto Pascal to Inches of Mercury
+    return round( $data * 0.02952998751, 1 );
+}
+
+###################################
+sub HP1000_hpa2mmhg($) {
+    my ($data) = @_;
+
+    # convert Hecto Pascal to Milimeter of Mercury
+    return round( $data * 0.00750061561303, 1 );
+}
+
+###################################
+sub HP1000_inhg2hpa($) {
+    my ($data) = @_;
+
+    # convert Inches of Mercury to Hecto Pascal
+    return round( $data * 33.8638816, 1 );
+}
+
+###################################
+# Forum topic,44403.msg501704.html#msg501704
+sub HP1000_uwpscm2uvi($) {
+    my ($data) = @_;
+
+    # convert uW/cm2 to UV-Index
+    return floor( ( $data - 100 ) / 450 + 1 );
+}
+
+###################################
+# Forum topic,44403.msg501704.html#msg501704
+sub HP1000_lux2wpsm($) {
+    my ($data) = @_;
+
+    # convert lux to W/m2
+    return round( $data / 126.7, 1 );
 }
 
 1;
