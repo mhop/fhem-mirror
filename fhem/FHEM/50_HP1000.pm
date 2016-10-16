@@ -884,7 +884,7 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{relbaro} ) );
     $result .= " UV: " . $webArgs->{UV}
       if ( defined( $webArgs->{UV} ) );
-    $result .= " UVi: " . $webArgs->{UVI}
+    $result .= " UVI: " . $webArgs->{UVI}
       if ( defined( $webArgs->{UVI} ) );
     $result .= " L: " . $webArgs->{light}
       if ( defined( $webArgs->{light} ) );
@@ -1044,7 +1044,7 @@ sub HP1000_PushWU($$) {
             $value = urlEncode($value);
         }
 
-        elsif ( $key eq "UVindex" ) {
+        elsif ( $key eq "UVI" ) {
             $key   = "UV";
             $value = $value;
         }
@@ -1083,8 +1083,9 @@ sub HP1000_ReturnSrv($$$) {
         my $return = "error: connection timeout";
         Log3 $name, 4, "HP1000 $name: EXTSRV HTTP " . $return;
 
-        readingsSingleUpdate( $hash, "extsrv_state", $return, 1 )
-          if ( ReadingsVal( $name, "extsrv_state", "" ) ne $return );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "extsrv_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     # data received
@@ -1099,8 +1100,9 @@ sub HP1000_ReturnSrv($$$) {
         Log3 $name, $logprio,
           "HP1000 $name: EXTSRV HTTP return: " . $param->{code} . " - $data";
 
-        readingsSingleUpdate( $hash, "extsrv_state", $return, 1 )
-          if ( ReadingsVal( $name, "extsrv_state", "" ) ne $return );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "extsrv_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     return;
@@ -1551,8 +1553,11 @@ sub HP1000_lux2wpsm($) {
     <h3>
       HP1000
     </h3>
+    <ul>
+
     <div>
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
+      <ul>
       <div>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
@@ -1572,6 +1577,7 @@ sub HP1000_lux2wpsm($) {
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
           IMPORTANT: In your HP1000/WH2600 hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
+      </ul>
       </div><br>
     </div>
     <br>
@@ -1596,6 +1602,7 @@ sub HP1000_lux2wpsm($) {
     </ul>
     </div>
 
+    </ul>
 =end html
 
 =begin html_DE
@@ -1606,9 +1613,12 @@ sub HP1000_lux2wpsm($) {
     <h3>
       HP1000
     </h3>
+    <ul>
+
     <div>
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
       <div>
+      <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI).<br>
@@ -1627,6 +1637,7 @@ sub HP1000_lux2wpsm($) {
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
           WICHTIG: Im HP1000/WH2600 Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+      </ul>
       </div><br>
     </div>
 
@@ -1650,6 +1661,7 @@ sub HP1000_lux2wpsm($) {
     </ul>
     </div>
 
+    </ul>
 =end html_DE
 
 =cut
