@@ -235,6 +235,18 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{indoorhumidity} )
         && !defined( $webArgs->{inhumi} ) );
 
+    $webArgs->{indoorhumidity} = $webArgs->{inhumi}
+      if ( defined( $webArgs->{inhumi} )
+        && !defined( $webArgs->{indoorhumidity} ) );
+
+    $webArgs->{outhumi} = $webArgs->{humidity}
+      if ( defined( $webArgs->{humidity} )
+        && !defined( $webArgs->{outhumi} ) );
+
+    $webArgs->{humidity} = $webArgs->{outhumi}
+      if ( defined( $webArgs->{outhumi} )
+        && !defined( $webArgs->{humidity} ) );
+
     # dewpoint in Celsius (convert from dewptf)
     if (   defined( $webArgs->{dewptf} )
         && $webArgs->{dewptf} ne ""
@@ -473,14 +485,15 @@ sub HP1000_CGI() {
             || $p eq "action"
             || $p eq "softwaretype"
             || $p eq "realtime"
-            || $p eq "rtfreq" );
+            || $p eq "rtfreq"
+            || $p eq "humidity"
+            || $p eq "indoorhumidity" );
 
         $p = "_" . $p;
 
         # name translation for general readings
         $p = "humidity"       if ( $p eq "_outhumi" );
         $p = "humidityIndoor" if ( $p eq "_inhumi" );
-        $p = "humidityIndoor" if ( $p eq "_indoorhumidity" );
         $p = "luminosity"     if ( $p eq "_light" );
         $p = "uv"             if ( $p eq "_UV" );
         $p = "windDir"        if ( $p eq "_winddir" );
@@ -604,16 +617,16 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{UVI} ) ) {
         my $condition = "low";
 
-        if ($webArgs->{UVI} > 11) {
+        if ( $webArgs->{UVI} > 11 ) {
             $condition = "extreme";
         }
-        elsif ($webArgs->{UVI} > 8) {
+        elsif ( $webArgs->{UVI} > 8 ) {
             $condition = "veryhigh";
         }
-        elsif ($webArgs->{UVI} > 6) {
+        elsif ( $webArgs->{UVI} > 6 ) {
             $condition = "high";
         }
-        elsif ($webArgs->{UVI} > 3) {
+        elsif ( $webArgs->{UVI} > 3 ) {
             $condition = "moderate";
         }
 
@@ -1173,7 +1186,8 @@ sub HP1000_DbLog_split($$) {
     my $hash = $defs{$device};
 
     if ( $event =~
-        /^(windCompasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/ )
+/^(windCompasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/
+      )
     {
         return undef;
     }
