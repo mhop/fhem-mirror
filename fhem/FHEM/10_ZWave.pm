@@ -288,7 +288,9 @@ my %zwave_class = (
     parse => { "055b03..00(..)" => '"cSceneSet:".hex($1)',
                "055b03..01(..)" => '"cSceneDimEnd:".hex($1)',
                "055b03..02(..)" => '"cSceneDim:".hex($1)',
-               "055b03..03(..)" => '"cSceneDouble:".hex($1)'}  },
+               "055b03..03(..)" => '"cSceneDouble:".hex($1)',
+               "055b03..0([4-6])(..)" => '"cSceneMultiple_".
+                                                (hex($1)-1).":".hex($1)'}  },
   IP_ASSOCIATION           => { id => '5c' },
   ANTITHEFT                => { id => '5d' },
   ZWAVEPLUS_INFO           => { id => '5e',
@@ -5716,6 +5718,7 @@ s2Hex($)
   <li>cSceneDim:X</li>
   <li>cSceneDimEnd:X</li>
   <li>cSceneDouble:X</li>
+  <li>cSceneMultiple_N:X<br>where N is 3, 4 or 5 (multiple presses)</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccsOverride:[no|temporary|permanent],
