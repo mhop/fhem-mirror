@@ -119,6 +119,9 @@ sub Hyperion_Define($$)
     $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
       if ($attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && index($attr{$name}{userattr},"homebridgeMapping") == -1);
     $attr{$name}{webCmd} = $Hyperion_webCmd;
+  }
+  if ($init_done)
+  {
     Hyperion_GetUpdate($hash);
   }
   else
@@ -153,11 +156,14 @@ sub Hyperion_OpenDev($)
   $hash->{STATE} = DevIo_OpenDev($hash,0,"Hyperion_DoInit",sub($$$)
   {
     my ($h,$err) = @_;
-    readingsSingleUpdate($hash,"lastError",$err,1)
-      if ($err);
-    readingsSingleUpdate($hash,"serverResponse","ERROR",1);
-    readingsSingleUpdate($hash,"state","ERROR",1)
-      if (Value($hash->{NAME}) ne "ERROR");
+    if ($err)
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash,"lastError",$err);
+      readingsBulkUpdate($hash,"serverResponse","ERROR");
+      readingsBulkUpdate($hash,"state","ERROR");
+      readingsEndUpdate($hash,1);
+    }
     return $err ? "Error: $err" : $hash->{DeviceName}." connected";
   });
   return undef;
@@ -256,8 +262,8 @@ sub Hyperion_Read($)
         Log3 $name, 1, $error;
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"serverResponse","ERROR");
-        readingsBulkUpdate($hash,"state","ERROR");
         readingsBulkUpdate($hash,"lastError",$error);
+        readingsBulkUpdate($hash,"state","ERROR");
         readingsEndUpdate($hash,1);
         return undef;
       }
@@ -396,8 +402,7 @@ sub Hyperion_Read($)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"lastError","error while requesting ".$hash->{DeviceName});
     readingsBulkUpdate($hash,"serverResponse","ERROR");
-    readingsBulkUpdate($hash,"state","ERROR")
-      if (Value($name) ne "ERROR");
+    readingsBulkUpdate($hash,"state","ERROR");
   }
   return undef;
 }
@@ -405,6 +410,8 @@ sub Hyperion_Read($)
 sub Hyperion_GetConfigs($)
 {
   my ($hash) = @_;
+  return "Not connected"
+    if (!$hash->{FD});
   my $name = $hash->{NAME};
   my $ip = $hash->{IP};
   my $dir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
@@ -418,7 +425,7 @@ sub Hyperion_GetConfigs($)
   {
     my $user = AttrVal($name,"hyperionSshUser","pi");
     my $cmd = qx(which ssh);
-    chomp($cmd);
+    chomp $cmd;
     $cmd .= " $user\@$ip $com";
     @files = Hyperion_listFilesInDir($hash,$cmd);
   }
@@ -542,8 +549,7 @@ sub Hyperion_Set($@)
       Log3 $name,4,"$name: NOT restarted Hyperion with $binpath $confdir$value, status: $status";
       readingsSingleUpdate($hash,"lastError",$status,1);
       readingsSingleUpdate($hash,"serverResponse","ERROR",1);
-      readingsSingleUpdate($hash,"state","ERROR",1)
-        if (Value($name) ne "ERROR");
+      readingsSingleUpdate($hash,"state","ERROR",1);
       return "$name NOT restarted Hyperion with $binpath $confdir$value, status: $status";
     }
   }
@@ -584,7 +590,7 @@ sub Hyperion_Set($@)
   elsif ($cmd =~ /^(dimUp|dimDown)$/)
   {
     return "Value of $cmd has to be between 1 and 99"
-      if (defined($value) && $value =~ /^(\d+)$/ && int($1) < 1 && int($1) > 99);
+      if (defined $value && $value =~ /^(\d+)$/ && int($1) < 1 && int($1) > 99);
     my $dim = int ReadingsVal($name,"dim",100);
     my $dimStep = (defined $value) ? int $value : int AttrVal($name,"hyperionDimStep",5);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
@@ -782,7 +788,7 @@ sub Hyperion_Attr(@)
         Hyperion_Call($hash);
       }
     }
-    elsif ($attr_name eq "hyperionDefaultPriority" || $attr_name eq "hyperionDefaultDuration")
+    elsif ($attr_name =~ /^hyperionDefault(Priority|Duration)$/)
     {
       $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536."
         if ($attr_value !~ /^(\d+)$/ || $1 < 0 || $1 > 65536);
@@ -859,14 +865,13 @@ sub Hyperion_devStateIcon($;$)
     if (Value($name) eq "off");
   return ".*:light_exclamation"
     if (Value($name) =~ /^(ERROR|disconnected)$/);
-  return ".*:light_question"
-    if (Value($name) eq "Initialized");
   return ".*:light_light_dim_$ico@#".$rgb.":toggle"
     if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
   return ".*:light_led_stripe_rgb@#FFFF00:toggle"
     if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
   return ".*:it_television@#0000FF:toggle"
     if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
+  return ".*:light_question";
 }
 
 1;
