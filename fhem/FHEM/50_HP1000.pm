@@ -1591,8 +1591,8 @@ sub HP1000_lux2wpsm($) {
 
     <div>
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
-      <ul>
       <div>
+      <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI).<br>
