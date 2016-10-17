@@ -37,7 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
-# 4.5          14.10.2016       get dbstatus, dbvars, tableinfo
+# 4.5          17.10.2016       get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend)
 # 4.4          13.10.2016       get function prepared
 # 4.3          11.10.2016       Preparation of get metadata
 # 4.2          10.10.2016       allow SQL-Wildcards (% _) in attr reading & attr device
@@ -133,9 +133,10 @@ use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
 use DBI;
+use DBI::Const::GetInfoType;
 use Blocking;
 use Time::Local;
-no if $] >= 5.017011, warnings => 'experimental';  
+# no if $] >= 5.017011, warnings => 'experimental';  
 
 my %dbrep_col_postgre = ("DEVICE"  => 64,
                          "TYPE"    => 64,
@@ -162,7 +163,7 @@ sub DbRep_Initialize($) {
  $hash->{UndefFn}      = "DbRep_Undef"; 
  $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
-# $hash->{GetFn}        = "DbRep_Get";
+ $hash->{GetFn}        = "DbRep_Get";
  $hash->{AttrFn}       = "DbRep_Attr";
  
  $hash->{AttrList} =   "disable:1,0 ".
@@ -175,8 +176,10 @@ sub DbRep_Initialize($) {
                        "aggregation:hour,day,week,month,no ".
                        "role:Client,Agent ".
                        "showproctime:1,0 ".
+                       "showSvrInfo ".
                        "showVariables ".
                        "showStatus ".
+                       "showTableInfo ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
@@ -373,6 +376,7 @@ sub DbRep_Get($@) {
   my $to = AttrVal($name, "timeout", "60");
   
   my $getlist = "Unknown argument $opt, choose one of ".
+                "svrinfo:noArg ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
                 (($dbmodel eq "MYSQL")?"dbvars:noArg ":"") 
@@ -382,9 +386,14 @@ sub DbRep_Get($@) {
   
   if ($opt eq "dbvars" || $opt eq "dbstatus" || $opt eq "tableinfo") {
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
+      readingsSingleUpdate($hash, "state", "running", 1);
       delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
-  } 
+  } elsif ($opt eq "svrinfo") {
+      delread($hash); 
+      readingsSingleUpdate($hash, "state", "running", 1);
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);      
+  }
   else 
   {
       return "$getlist";
@@ -909,7 +918,7 @@ sub delread($) {
  my $name   = $hash->{NAME}; 
  my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
  if (@rdpfdel) {
-     my @allrds = keys($defs{$name}{READINGS});
+     my @allrds = keys%{$defs{$name}{READINGS}};
      foreach my $key(@allrds) {
          # Log3 ($name, 3, "DbRep $name - Reading Schlüssel: $key");
          my $dodel = 1;
@@ -3009,6 +3018,7 @@ sub dbmeta_DoParse($) {
  my $dbuser      = $dbloghash->{dbuser};
  my $dblogname   = $dbloghash->{NAME};
  my $dbpassword  = $attr{"sec$dblogname"}{secret};
+ my $dbmodel     = $dbloghash->{DBMODEL};
  my $err;
 
  # Background-Startzeit
@@ -3026,10 +3036,14 @@ sub dbmeta_DoParse($) {
      return "$name|''|''|''|$err";
  }
  
+ # only for this block because of warnings if details of readings are not set
+ no warnings 'uninitialized'; 
+  
  # Liste der anzuzeigenden Parameter erzeugen, sonst alle ("%"), abhängig von $opt
  my $param = AttrVal($name, "showVariables", "%") if($opt eq "dbvars");
+ $param = AttrVal($name, "showSvrInfo", "[A-Z_]") if($opt eq "svrinfo");
  $param = AttrVal($name, "showStatus", "%") if($opt eq "dbstatus");
- $param = "1" if($opt eq "tableinfo");        # Dummy-Eintrag für einen Schleifenabdruck
+ $param = "1" if($opt eq "tableinfo");        # Dummy-Eintrag für einen Schleifendurchlauf
  my @parlist = split(",",$param); 
  
  # SQL-Startzeit
@@ -3039,29 +3053,70 @@ sub dbmeta_DoParse($) {
  my $sth;
  my $sql;
  
- foreach my $ple (@parlist) {
-     if ($opt eq "dbvars") {
-         $sql = "show global variables like '$ple';";
-     } elsif ($opt eq "dbstatus") {
-         $sql = "show global status like '$ple';";
-     } elsif ($opt eq "tableinfo") {
-         $sql = "select 
-                 table_schema,
-                 round(sum(data_length+index_length)/1024/1024,2),
-                 round(data_free/1024/1024,2),
-                 row_format,
-                 table_collation,
-                 engine,
-                 table_type,
-                 create_time,
-                 from information_schema.tables group by table_schema;";
-     }
+ if ($opt ne "svrinfo") {
+    foreach my $ple (@parlist) {
+         if ($opt eq "dbvars") {
+             $sql = "show global variables like '$ple';";
+         } elsif ($opt eq "dbstatus") {
+             $sql = "show global status like '$ple';";
+         } elsif ($opt eq "tableinfo") {
+             $sql = "select 
+                     table_name,
+                     table_schema,
+                     round(sum(data_length+index_length)/1024/1024,2),
+                     round(data_free/1024/1024,2),
+                     row_format,
+                     table_collation,
+                     engine,
+                     table_type,
+                     create_time
+                     from information_schema.tables group by table_name;";
+         }
      
-     Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
+         Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
  
-     $sth = $dbh->prepare($sql); 
-     eval {$sth->execute();};
+         $sth = $dbh->prepare($sql); 
+         eval {$sth->execute();};
  
+         if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+             return "$name|''|''|''|$err";
+         } else {
+             while (my @line = $sth->fetchrow_array()) {
+                 Log3 ($name, 5, "DbRep $name - SQL result: @line");
+                 my $row = join("§", @line);
+                 $row =~ s/ /_/g;
+                 @line = split("§", $row);
+                 if ($opt eq "tableinfo") {
+                     $param = AttrVal($name, "showTableInfo", "[A-Z_]");
+                     $param =~ s/,/\|/g;
+                     $param =~ tr/%//d;
+                     if($line[0] =~ m/($param)/i) {
+                         push(@row_array, $line[0].".table_schema ".$line[1]);
+                         push(@row_array, $line[0].".data_index_lenth_MB ".$line[2]);
+                         push(@row_array, $line[0].".table_name ".$line[1]);
+                         push(@row_array, $line[0].".data_free_MB ".$line[3]);
+                         push(@row_array, $line[0].".row_format ".$line[4]);
+                         push(@row_array, $line[0].".table_collation ".$line[5]);
+                         push(@row_array, $line[0].".engine ".$line[6]);
+                         push(@row_array, $line[0].".table_type ".$line[7]);
+                         push(@row_array, $line[0].".create_time ".$line[8]);
+                     }
+                 } else {
+                     push(@row_array, $line[0]." ".$line[1]);
+                 }
+             }  
+         } 
+     $sth->finish;
+     }
+ } else {
+     $param =~ s/,/\|/g;
+     $param =~ tr/%//d;
+     # Log3 ($name, 5, "DbRep $name - showDbInfo: $param");
+     my $sf = $dbh->sqlite_db_filename() if($dbmodel eq 'SQLITE');
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -3069,34 +3124,31 @@ sub dbmeta_DoParse($) {
          Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
          return "$name|''|''|''|$err";
      } else {
-         while (my @line = $sth->fetchrow_array()) {
-             Log3 ($name, 5, "DbRep $name - SQL result: @line");
-             my $rowlist = join("§", @line);
-             $rowlist =~ s/ /_/g;
-             @line = split("§", $rowlist);
-             if ($opt eq "tableinfo") {
-                 push(@row_array, $line[0]."___data_index_lenth_MB ".$line[1]);
-                 push(@row_array, $line[0]."___data_free_MB ".$line[2]);
-                 push(@row_array, $line[0]."___row_format ".$line[3]);
-                 push(@row_array, $line[0]."___table_collation ".$line[4]);
-                 push(@row_array, $line[0]."___engine ".$line[5]);
-                 push(@row_array, $line[0]."___table_type ".$line[6]);
-                 push(@row_array, $line[0]."___create_time ".$line[7]);
-             } else {
-                 push(@row_array, $line[0]." ".$line[1]);
-             }
-         }  
-     } 
+         my $key = "SQLITE_DB_FILENAME";
+         push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
+     }
+     my $info;
+     while( my ($key,$value) = each(%GetInfoType) ) {
+         eval { $info = $dbh->get_info($GetInfoType{"$key"}) };
+         if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+             return "$name|''|''|''|$err";
+         } else {
+             push(@row_array, $key." ".$info) if($key =~ m/($param)/i);
+         }
+     }
  }
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
  
- $sth->finish;
  $dbh->disconnect;
  
  my $rowlist = join('§', @row_array);
- Log3 ($name, 5, "DbRep $name -> row_array:  \n@row_array");
+ Log3 ($name, 5, "DbRep $name -> row_array: \n@row_array");
  
  # Daten müssen als Einzeiler zurückgegeben werden
  $rowlist = encode_base64($rowlist,"");
@@ -3148,6 +3200,7 @@ sub dbmeta_ParseDone($) {
   my $pre = "VAR_" if($opt eq "dbvars");
   $pre    = "STAT_" if($opt eq "dbstatus");
   $pre    = "INFO_" if($opt eq "tableinfo");
+  $pre    = "" if($opt eq "svrinfo");
   
   foreach my $row (@row_array) {
       my @a = split(" ", $row);
@@ -3161,6 +3214,7 @@ sub dbmeta_ParseDone($) {
   readingsBulkUpdate($hash, "state", "done");
   readingsEndUpdate($hash, 1);
   
+  # InternalTimer(time+0.5, "browser_refresh", $hash, 0);
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
   
@@ -3183,8 +3237,6 @@ my $name = $hash->{NAME};
 # Browser Refresh nach DB-Abfrage
 ####################################################################################################
 sub browser_refresh($) { 
-  return;
-  
   my ($hash) = @_;                                                                     
   RemoveInternalTimer($hash, "browser_refresh");
   # FW_directNotify("#FHEMWEB:$name", "location.reload(true);","" );
@@ -3377,29 +3429,37 @@ my $name = $hash->{NAME};
      return;
  } else {
      my $dbh = $hash->{DBH};
-     my $i = 1;
-     # $dbh->table_info( $catalog, $schema, $table)
-     # my $sth = $dbh->table_info('', '', '');
-     # my $tables = $dbh->selectcol_arrayref($sth, {Columns => [3]});
-     # my $table = join ', ', @$tables;
-     # Log3 ($name, 3, "DbRep $name - SQL_TABLES : $table"); 
+     Log3 ($name, 3, "DbRep $name - --------------- FILE INFO --------------"); 
+     my $sqlfile = $dbh->sqlite_db_filename();
+     Log3 ($name, 3, "DbRep $name - FILE : $sqlfile ");
+#     # $dbh->table_info( $catalog, $schema, $table)
+#     my $sth = $dbh->table_info('', '%', '%');
+#     my $tables = $dbh->selectcol_arrayref($sth, {Columns => [3]});
+#     my $table = join ', ', @$tables;
+#     Log3 ($name, 3, "DbRep $name - SQL_TABLES : $table"); 
      
-     Log3 ($name, 3, "DbRep $name - $i\--------------- COMMON SERVER INFO --------------"); 
-     my %InfoTypes = ( SQL_DATA_SOURCE_NAME => 2 ,
-                       SQL_SERVER_NAME => 13 ,
-                       SQL_DBMS_NAME => 17 ,
-                       SQL_DBMS_VERSION => 18 ,
-                       SQL_TRANSACTION_CAPABLE => 46 ,                          
-                     );
-     $i++;
-     while ((my $key, my $val) = each(%InfoTypes) ) {
-         my $d = $dbh->get_info( $val );
-         Log3 ($name, 3, "DbRep $name - $i\_$key : $d");
-         $i++;
-     }
+     Log3 ($name, 3, "DbRep $name - --------------- PRAGMA --------------"); 
+     my @InfoTypes =  ('sqlite_db_status');
+
     
+   foreach my $row (@InfoTypes) {
+       # my @linehash =  $dbh->$row;
+       
+       my $array= $dbh->$row ;
+       # push(@row_array, @array);
+       while ((my $key, my $val) = each %{$array}) {
+       Log3 ($name, 3, "DbRep $name - PRAGMA : $key : ".%{$val});
+       }
+       
+    }
      
-     # $sth->finish;
+
+      # $sth->finish;
+   
+     
+     
+     
+    
      $dbh->disconnect;
  }
 return;
@@ -3590,6 +3650,84 @@ return;
 
 </ul>  
 
+<a name="DbRepget"></a>
+<b>Get </b>
+<ul>
+
+ The get-commands of DbRep provide to retrieve some metadata of the used database instance. 
+ Those are for example adjusted server parameter, server variables, datadasestatus- and table informations. THe available get-functions depending of 
+ the used database type. So for SQLite curently only "get svrinfo" is usable. The functions nativ are delivering a lot of outpit values. 
+ They can be limited by function specific <a href="#DbRepattr">attributes</a>. The filter has to be setup by a comma separated list. 
+ SQL-Wildcards (% _) can be used to setup the list arguments. 
+ <br><br>
+ 
+ <b>Note: </b> <br>
+ After executing a get-funktion in detail view please make a browser refresh to see the results ! 
+ <br><br>
+ 
+ <ul><ul>
+    <li><b> dbstatus </b> -  lists global informations about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
+                             Initially all available informations are reported. Using the <a href="#DbRepattr">attribute</a> "showStatus" the quantity of
+                             results can be limited to show only the desired values. Further detailed informations to the meaning of the items are 
+                             explained <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>there</a>.  <br>
+                             
+                                 <br><ul>
+                                 Example:  <br>
+                                 get &lt;name&gt; dbstatus  <br>
+                                 attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
+                                 # Only readings containing "uptime" and "qcache" in name will be created
+                                 </li> 
+                                 <br><br>
+                                 </ul>                               
+                                 
+    <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path, 
+                           memory- or cache-parameter and so on. The Output reports initially all available informations. Using the 
+                           <a href="#DbRepattr">attribute</a> "showVariables" the quantity of results can be limited to show only the desired values. 
+                           Further detailed informations to the meaning of the items are explained 
+                           <a href=http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html>there</a>. <br>
+                           
+                                 <br><ul>
+                                 Example:  <br>
+                                 get &lt;name&gt; dbvars  <br>
+                                 attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
+                                 # Only readings containing "version" and "query_cache" in name will be created
+                                 </li> 
+                                 <br><br>
+                                 </ul>                               
+
+    <li><b> svrinfo </b> -  common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
+                            on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
+                            the desired values. Further detailed informations to the meaning of the items are explained                             
+                            <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>there</a>. <br>
+                                 
+                                 <br><ul>
+                                 Example:  <br>
+                                 get &lt;name&gt; svrinfo  <br>
+                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
+                                 # Only readings containing "SQL_CATALOG_TERM" and "NAME" in name will be created
+                                 </li> 
+                                 <br><br>
+                                 </ul>                                                      
+                                 
+    <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database schema. The analyzed schematics are depend on the rights of the 
+                              used  database user (default: the database schema of tables current,history). 
+                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited. Further detailed informations to the 
+                              meaning of the items are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
+                                 
+                                 <br><ul>
+                                 Example:  <br>
+                                 get &lt;name&gt; tableinfo  <br>
+                                 attr &lt;name&gt; showTableInfo current,history   <br>               
+                                 # Only informations related to tables "current" and "history" will be created
+                                 </li> 
+                                 <br><br>
+                                 </ul>                                                      
+                                                     
+  <br>
+  </ul></ul>
+  
+</ul>  
+
 
 <a name="DbRepattr"></a>
 <b>Attributes</b>
@@ -3619,6 +3757,34 @@ return;
   <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". The role "Agent" is described in section <a href="#DbRepAutoRename">DbRep-Agent</a>. </li> <br>    
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a new operation starts  </li> <br>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
+  <li><b>showStatus </b>      - limits the sample space of command "get ... dbstatus". SQL-Wildcards (% _) can be used.    </li> <br>
+
+                              <ul>
+                              Example:    attr ... showStatus %uptime%,%qcache%  <br>
+                              # Only readings with containing "uptime" and "qcache" in name will be shown <br>
+                              </ul><br>  
+  
+  <li><b>showVariables </b>   - limits the sample space of command "get ... dbvars". SQL-Wildcards (% _) can be used.   </li> <br>
+
+                              <ul>
+                              Example:    attr ... showVariables %version%,%query_cache% <br>
+                              # Only readings with containing "version" and "query_cache" in name will be shown <br>
+                              </ul><br>  
+                              
+  <li><b>showSvrInfo </b>     - limits the sample space of command "get ... svrinfo". SQL-Wildcards (% _) can be used.    </li> <br>
+
+                              <ul>
+                              Example:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                              # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
+                              </ul><br>  
+                              
+  <li><b>showTableInfo </b>   - limits the sample space of command "get ... tableinfo". SQL-Wildcards (% _) can be used.   </li> <br>
+
+                              <ul>
+                              Example:    attr ... showTableInfo current,history  <br>
+                              # Only informations about tables "current" and "history" will be shown <br>
+                              </ul><br>  
+                              
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
   <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*)  </li> <br>
   <li><b>timeDiffToNow </b>   - the begin of data selection will be set to the timestamp "&lt;current time&gt; - &lt;timeDiffToNow&gt;" dynamically (in seconds). Thereby always the last  &lt;timeDiffToNow&gt;-seconds will be considered (e.g. if set to 86400, always the last 24 hours should assumed). The Timestamp calculation will be done dynamically at execution time.     </li> <br>  
@@ -3906,6 +4072,85 @@ return;
 
 </ul>  
 
+<a name="DbRepget"></a>
+<b>Get </b>
+<ul>
+
+ Die Get-Kommandos von DbRep dienen dazu eine Reihe von Metadaten der verwendeten Datenbankinstanz abzufragen. 
+ Dies sind zum Beispiel eingestellte Serverparameter, Servervariablen, Datenbankstatus- und Tabelleninformationen. Die verfügbaren get-Funktionen 
+ sind von dem verwendeten Datenbanktyp abhängig. So ist für SQLite z.Zt. nur "svrinfo" verfügbar. Die Funktionen liefern nativ sehr viele Ausgabewerte, 
+ die über über funktionsspezifische <a href="#DbRepattr">Attribute</a> abgrenzbar sind. Der Filter ist als kommaseparierte Liste anzuwenden. 
+ Dabei können SQL-Wildcards (% _) verwendet werden. 
+ <br><br>
+ 
+ <b>Hinweis: </b> <br>
+ Nach der Ausführung einer get-Funktion in der Detailsicht einen Browserrefresh durchführen um die Ergebnisse zu sehen ! 
+ <br><br>
+ 
+ 
+ <ul><ul>
+    <li><b> dbstatus </b> -  listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ). 
+                             Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem <a href="#DbRepattr">Attribut</a> "showStatus" kann die 
+                             Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings 
+                             sind <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>hier</a> verfügbar.  <br>
+                             
+                                 <br><ul>
+                                 Bespiel:  <br>
+                                 get &lt;name&gt; dbstatus  <br>
+                                 attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
+                                 # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten 
+                                 </li> 
+                                 <br><br>
+                                 </ul>                               
+                                 
+    <li><b> dbvars </b> -  zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad, 
+                           Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem 
+                           <a href="#DbRepattr">Attribut</a> "showVariables" kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse 
+                           abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind 
+                           <a href=http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html>hier</a> verfügbar. <br>
+                           
+                                 <br><ul>
+                                 Bespiel:  <br>
+                                 get &lt;name&gt; dbvars  <br>
+                                 attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
+                                 # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
+                                 </li> 
+                                 <br><br>
+                                 </ul>                               
+
+    <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
+                            ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
+                            Weitere Erläuterungen zu den gelieferten Informationen sind 
+                            <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>hier</a> zu finden. <br>
+                                 
+                                 <br><ul>
+                                 Bespiel:  <br>
+                                 get &lt;name&gt; svrinfo  <br>
+                                 attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
+                                 # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten
+                                 </li> 
+                                 <br><br>
+                                 </ul>                                                      
+                                 
+    <li><b> tableinfo </b> -  ruft Detailinformationen der in einem MySQL-Schema angelegten Tabellen ab. Die ausgewerteten Schemata sind abhängig von den Rechten 
+                              des verwendeten Datenbankusers (default: das DB-Schema der current/history-Tabelle). 
+                              Mit dem <a href="#DbRepattr">Attribut</a> "showTableInfo" können die Ergebnisse eingeschränkt werden. Erläuterungen zu den erzeugten 
+                              Readings sind  <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>hier</a> zu finden.  <br>
+                                 
+                                 <br><ul>
+                                 Bespiel:  <br>
+                                 get &lt;name&gt; tableinfo  <br>
+                                 attr &lt;name&gt; showTableInfo current,history   <br>               
+                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt
+                                 </li> 
+                                 <br><br>
+                                 </ul>                                                      
+                                                     
+  <br>
+  </ul></ul>
+  
+</ul>  
+
 
 <a name="DbRepattr"></a>
 <b>Attribute</b>
@@ -3935,6 +4180,34 @@ return;
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
   <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>  
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
+  <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get ... dbstatus" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
+
+                              <ul>
+                              Bespiel:    attr ... showStatus %uptime%,%qcache%  <br>
+                              # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
+                              </ul><br>  
+  
+  <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get ... dbvars" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
+
+                              <ul>
+                              Bespiel:    attr ... showVariables %version%,%query_cache% <br>
+                              # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
+                              </ul><br>  
+                              
+  <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get ... svrinfo" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
+
+                              <ul>
+                              Bespiel:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                              # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
+                              </ul><br>  
+                              
+  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get ... tableinfo" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
+
+                              <ul>
+                              Bespiel:    attr ... showTableInfo current,history  <br>
+                              # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
+                              </ul><br>  
+                              
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
   <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
   <li><b>timeDiffToNow </b>   - der Selektionsbeginn wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;" gesetzt (in Sekunden). Es werden immer die letzten &lt;timeDiffToNow&gt;-Sekunden berücksichtigt (z.b. 86400 wenn immer die letzten 24 Stunden in die Selektion eingehen sollen). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>  
