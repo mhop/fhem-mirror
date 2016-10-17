@@ -153,6 +153,7 @@ sub HMUARTLGW_Initialize($)
 	                   "csmaCa:0,1 " .
 	                   "qLen " .
 	                   "logIDs ".
+	                   "dummy:1 ".
 	                   $readingFnAttributes;
 }
 
@@ -184,7 +185,6 @@ sub HMUARTLGW_DoInit($)
 	delete($hash->{Helper});
 	delete($hash->{AssignedPeerCnt});
 	delete($hash->{msgLoadCurrent});
-	delete($hash->{msgLoadCurrentRaw});
 	delete($hash->{msgLoadHistory});
 	delete($hash->{msgLoadHistoryAbs});
 	delete($hash->{owner});
@@ -266,6 +266,12 @@ sub HMUARTLGW_Define($$)
 
 	$hash->{DeviceName} = $dev;
 
+	if (defined(AttrVal($name, "dummy", undef))) {
+		readingsSingleUpdate($hash, "state", "dummy", 1);
+		HMUARTLGW_updateCondition($hash);
+		return;
+	}
+
 	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 }
 
@@ -284,7 +290,10 @@ sub HMUARTLGW_Undefine($$;$)
 		$devcount--;
 	}
 
-	DevIo_CloseDev($hash) if (!$noclose);
+	if (defined($hash->{FD}) && (!$noclose)) {
+		DevIo_CloseDev($hash);
+		Log3($hash, 3, "${name} device closed") if (!defined($hash->{FD}));
+	}
 	$hash->{DevState} = HMUARTLGW_STATE_NONE;
 	HMUARTLGW_updateCondition($hash);
 }
@@ -1796,6 +1805,20 @@ sub HMUARTLGW_Attr(@)
 				delete $attr{$hash->{keepAlive}->{NAME}}{$aName};
 			}
 		}
+	} elsif ($aName eq "dummy") {
+		if ($cmd eq "set") {
+			if (!defined($attr{$name}{$aName})) {
+				HMUARTLGW_Undefine($hash, $name);
+				readingsSingleUpdate($hash, "state", "dummy", 1);
+				HMUARTLGW_updateCondition($hash);
+				$hash->{XmitOpen} = 0;
+			}
+		} else {
+			if (defined($attr{$name}{$aName})) {
+				delete $attr{$name}{$aName};
+				DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
+			}
+		}
 	}
 
 	return $retVal;
@@ -1936,9 +1959,8 @@ sub HMUARTLGW_updateMsgLoad($$) {
 		}
 	}
 
-	if ((!defined($hash->{msgLoadCurrentRaw})) ||
-	    $hash->{msgLoadCurrentRaw} != $load) {
-		$hash->{msgLoadCurrentRaw} = $load;
+	if ((!defined($hash->{msgLoadCurrent})) ||
+	    $hash->{msgLoadCurrent} != $adjustedLoad) {
 		$hash->{msgLoadCurrent} = $adjustedLoad;
 		HMUARTLGW_updateCondition($hash);
 	}
@@ -2341,6 +2363,10 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         Enable or disable CSMA/CA (Carrier sense multiple access with collision
         avoidance), also known as listen-before-talk.<br>
         Default: 0 (disabled)
+        </li>
+    <li>dummy<br>
+        Do not interact with the device at all, only define it.<br>
+        Default: not set
         </li>
     <li>dutyCycle<br>
         Enable or disable the duty-cycle check (1% rule) performed by the
