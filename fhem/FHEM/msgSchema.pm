@@ -242,6 +242,41 @@ my $db = {
             },
         },
 
+        'Pushsafer' => {
+            'Normal' =>
+'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+            'High' =>
+'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+            'Low' =>
+'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+            'defaultValues' => {
+                'Normal' => {
+                    'RECIPIENT'           => '',
+                    'URLTITLE'            => '',
+                    'ACTION'              => '',
+                    'Pushsafer_ICON'      => '',
+                    'Pushsafer_SOUND'     => '',
+                    'Pushsafer_VIBRATION' => '',
+                },
+                'High' => {
+                    'RECIPIENT'           => '',
+                    'URLTITLE'            => '',
+                    'ACTION'              => '',
+                    'Pushsafer_ICON'      => '',
+                    'Pushsafer_SOUND'     => '',
+                    'Pushsafer_VIBRATION' => '',
+                },
+                'Low' => {
+                    'RECIPIENT'           => '',
+                    'URLTITLE'            => '',
+                    'ACTION'              => '',
+                    'Pushsafer_ICON'      => '',
+                    'Pushsafer_SOUND'     => '',
+                    'Pushsafer_VIBRATION' => '',
+                },
+            },
+        },
+
         'TelegramBot' => {
             'Normal'        => 'set %DEVICE% message %RECIPIENT% %MSG%',
             'High'          => 'set %DEVICE% message %RECIPIENT% %MSG%',
