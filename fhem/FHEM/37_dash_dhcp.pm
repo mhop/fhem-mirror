@@ -169,7 +169,7 @@ dash_dhcp_Parse($$;$)
     $chaddr = '<empty>' if( !$chaddr );
     Log3 $name, 2, "$name: invalid mac: $chaddr";
 
-  } elsif( !$allowed || ",$allowed," =~/,$chaddr,/ ) {
+  } elsif( !$allowed || ",$allowed," =~/,$chaddr,/i ) {
     Log3 $name, 4, "$name: got $chaddr";
 
     $chaddr =~ s/:/-/g;
