@@ -84,6 +84,7 @@ FBAHAHTTP_connect($)
   delete($readyfnlist{"$name.$dev"});
   $hash->{".SID"} = $sid;
   $hash->{STATE} = "connected";
+  Log3 $name, 4, "FBAHAHTTP_connect $name: got SID $sid";
   return undef;
 }
 
