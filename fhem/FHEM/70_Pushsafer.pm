@@ -40,7 +40,9 @@ my %Pushsaver_Params = (
     "vibration" => "v",
     "icon" => "i",
     "url" => "u",
-    "urlTitle" => "ut",
+    "device" => "d",
+    "key" => "k",
+    "urlText" => "ut",
     "message" => "m"
 );
 
@@ -150,7 +152,7 @@ sub Pushsafer_createBody($$)
     my @urlParts;
     my @errs;
 
-    push @urlParts, "k=".$hash->{PrivateKey};
+    push @urlParts, "k=".$hash->{PrivateKey} unless(exists($args->{k}) and exists($args->{key}));
 
     foreach my $item (keys %{$args})
     {
@@ -312,6 +314,7 @@ sub Pushsafer_Callback($$$)
     <code><b>vibration</b></code> - short: <code>v&nbsp;</code> - type: number - The number of times the device should vibrate upon reception (maximum: 3 times; iOS/Android only). If not set, the default behavior of the device is used.<br>
     <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>u&nbsp;</code> - type: text - A URL that should be included in the message. This can be regular http:// URL's but also specific app schemas. See <a href="https://www.pushsafer.com/en/url_schemes" target="_new">Pushsafer.com</a> for a complete list of supported URL schemas.<br>
     <code><b>urlText</b>&nbsp;&nbsp;</code> - short: <code>ut</code> - type: text - A text that should be used to display a URL from the "url" option.<br>
+    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>k&nbsp;</code>- type: text - Overrides the private key given in the define statement. Also an alias key can be used.<br>
     <br>
     Examples:<br>
     <br>
@@ -401,7 +404,8 @@ sub Pushsafer_Callback($$$)
     <code><b>vibration</b></code> - Kurzform: <code>v&nbsp;</code> - Typ: Ganzzahl - Die Anzahl, wie oft das Zielger&auml;t vibrieren soll beim Empfang der Nachricht (maximal 3 mal; nur f&uuml;r iOS-/Android-Ger&auml;te nutzbar). Falls nicht benutzt, wird die ger&auml;teinterne Einstellung verwendet.<br>
     <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>u&nbsp;</code> - Typ: Text - Eine URL welche der Nachricht angehangen werden soll. Dies kann eine normale http:// bzw. https:// URL sein, es sind jedoch auch weitere spezielle Schemas m&ouml;glich. Eine Liste aller m&ouml;glichen URL-Schemas gibt es unter <a href="https://www.pushsafer.com/de/url_schemes" target="_new">pushsafer.com</a> .<br>
     <code><b>urlText</b>&nbsp;&nbsp;</code> - Kurzform: <code>ut</code> - Typ: Text - Der Text, welcher zum Anzeigen der URL benutzt werden soll anstatt der Zieladresse.<br>
-    <br>
+    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>k&nbsp;</code> - Typ: Text - &Uuml;bersteuert den zu nutzenden Schl&uuml;ssel zur Identifikation aus dem define-Kommando. Es kann hierbei auch ein Email-Alias-Schl&uuml;ssel benutzt werden.<br>   
+   <br>
     Beispiele:<br>
     <br>
     <ul>
