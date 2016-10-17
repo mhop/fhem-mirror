@@ -44,6 +44,7 @@ sub ONKYO_AVR_Get($$$);
 sub ONKYO_AVR_Define($$$);
 sub ONKYO_AVR_Undefine($$);
 sub ONKYO_AVR_Notify($$);
+sub ONKYO_AVR_Shutdown($);
 
 #########################
 # Forward declaration for remotecontrol module
@@ -70,6 +71,7 @@ sub ONKYO_AVR_Initialize($) {
     $hash->{GetFn}       = "ONKYO_AVR_Get";
     $hash->{SetFn}       = "ONKYO_AVR_Set";
     $hash->{NotifyFn}    = "ONKYO_AVR_Notify";
+    $hash->{ShutdownFn}  = "ONKYO_AVR_Shutdown";
     $hash->{parseParams} = 1;
 
     no warnings 'qw';
@@ -418,6 +420,16 @@ sub ONKYO_AVR_Undefine($$) {
             delete $defs{$d}{IODev};
         }
     }
+
+    DevIo_CloseDev($hash);
+    return undef;
+}
+
+###################################
+sub ONKYO_AVR_Shutdown($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Shutdown()";
 
     DevIo_CloseDev($hash);
     return undef;
@@ -2330,6 +2342,34 @@ sub ONKYO_AVR_Set($$$) {
             else {
                 $return =
                   ONKYO_AVR_SendCommand( $hash, "net-usb-time-seek", @$a[2] );
+            }
+        }
+    }
+
+    # internet-radio-preset
+    elsif ( lc( @$a[1] ) eq "internet-radio-preset" ) {
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            if ( $state eq "off" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+            }
+            elsif ( $hash->{INPUT} ne "2B" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
+                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+            }
+            elsif ( @$a[2] =~ /^\d*$/ ) {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+                $return = ONKYO_AVR_SendCommand(
+                    $hash,
+                    lc( @$a[1] ),
+                    ONKYO_AVR_dec2hex( @$a[2] )
+                );
+            }
+            else {
+                $return = "Invalid argument format";
             }
         }
     }

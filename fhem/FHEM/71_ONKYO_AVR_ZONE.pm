@@ -887,6 +887,34 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
     }
 
+    # internet-radio-preset
+    elsif ( lc( @$a[1] ) eq "internet-radio-preset" ) {
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            if ( $state eq "off" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+            }
+            elsif ( $hash->{INPUT} ne "2B" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
+                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+            }
+            elsif ( @$a[2] =~ /^\d*$/ ) {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+                $return = ONKYO_AVR_SendCommand(
+                    $hash,
+                    lc( @$a[1] ),
+                    ONKYO_AVR_dec2hex( @$a[2] )
+                );
+            }
+            else {
+                $return = "Invalid argument format";
+            }
+        }
+    }
+
     # preset
     elsif ( lc( @$a[1] ) eq "preset" ) {
         if ( !defined( @$a[2] ) ) {
