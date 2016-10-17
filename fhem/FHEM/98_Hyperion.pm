@@ -547,9 +547,11 @@ sub Hyperion_Set($@)
     else
     {
       Log3 $name,4,"$name: NOT restarted Hyperion with $binpath $confdir$value, status: $status";
-      readingsSingleUpdate($hash,"lastError",$status,1);
-      readingsSingleUpdate($hash,"serverResponse","ERROR",1);
-      readingsSingleUpdate($hash,"state","ERROR",1);
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash,"lastError",$status);
+      readingsBulkUpdate($hash,"serverResponse","ERROR");
+      readingsBulkUpdate($hash,"state","ERROR");
+      readingsEndUpdate($hash,1);
       return "$name NOT restarted Hyperion with $binpath $confdir$value, status: $status";
     }
   }
