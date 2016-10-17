@@ -36,6 +36,7 @@
 # 28.09.16 GA add readings for tempRules (single reading for Mo to So)
 # 04.10.16 GA fix adjust readings for tempRules if temperature changes
 # 11.10.16 GA fix delete log entries for PWMR_NormalizeRules
+# 17.10.16 GA fix attribute tempFrostProtect is now evaluated
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -1300,6 +1301,8 @@ PWMR_Attr(@)
       PWMR_NormalizeRules($hash);
     } elsif ($attrname eq "frostProtect") {
       $hash->{c_frostProtect} = 0;
+    } elsif ($attrname eq "tempFrostProtect") {
+      $hash->{c_tempFrostProtect} = 6;
     } elsif ($attrname eq "desiredTempFrom") {
       $hash->{c_desiredTempFrom} = "";
       delete($hash->{d_name});
@@ -1375,6 +1378,9 @@ PWMR_Attr(@)
 
   } elsif ($attrname eq "tempEnergy") {                        # tempEnergy
     return PWMR_CheckTemp($hash, "c_tempE", $attrval);
+
+  } elsif ($attrname eq "tempFrostProtect") {                  # tempFrostProtect
+    return PWMR_CheckTemp($hash, "c_tempFrostProtect", $attrval);
 
   } elsif ($attrname eq "tempRule1") {                         # tempRule1
     return PWMR_CheckTempRule($hash, $attrname, "c_tempRule1", $attrval);
