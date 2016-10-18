@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB)
 # 4.5          17.10.2016       get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend)
 # 4.4          13.10.2016       get function prepared
 # 4.3          11.10.2016       Preparation of get metadata
@@ -3116,17 +3117,24 @@ sub dbmeta_DoParse($) {
      $param =~ s/,/\|/g;
      $param =~ tr/%//d;
      # Log3 ($name, 5, "DbRep $name - showDbInfo: $param");
-     my $sf = $dbh->sqlite_db_filename() if($dbmodel eq 'SQLITE');
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - $@");
-         $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
-         return "$name|''|''|''|$err";
-     } else {
-         my $key = "SQLITE_DB_FILENAME";
-         push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
+     
+     if($dbmodel eq 'SQLITE') {
+         my $sf = $dbh->sqlite_db_filename();
+         if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+             return "$name|''|''|''|$err";
+         } else {
+             my $key = "SQLITE_DB_FILENAME";
+             push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
+         }
+         my @a = split(' ',qx(du -m /opt/fhem/fhem.db)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+         my $key = "SQLITE_FILE_SIZE_MB";
+         push(@row_array, $key." ".$a[0]) if($key =~ m/($param)/i);
      }
+     
      my $info;
      while( my ($key,$value) = each(%GetInfoType) ) {
          eval { $info = $dbh->get_info($GetInfoType{"$key"}) };
@@ -3215,6 +3223,7 @@ sub dbmeta_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   # InternalTimer(time+0.5, "browser_refresh", $hash, 0);
+  
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
   
@@ -3239,8 +3248,8 @@ my $name = $hash->{NAME};
 sub browser_refresh($) { 
   my ($hash) = @_;                                                                     
   RemoveInternalTimer($hash, "browser_refresh");
-  # FW_directNotify("#FHEMWEB:$name", "location.reload(true);","" );
-  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
+  {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
+  #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
 return;
 }
 
@@ -3668,7 +3677,7 @@ return;
  <ul><ul>
     <li><b> dbstatus </b> -  lists global informations about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
                              Initially all available informations are reported. Using the <a href="#DbRepattr">attribute</a> "showStatus" the quantity of
-                             results can be limited to show only the desired values. Further detailed informations to the meaning of the items are 
+                             results can be limited to show only the desired values. Further detailed informations of items meaning are 
                              explained <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>there</a>.  <br>
                              
                                  <br><ul>
@@ -3683,7 +3692,7 @@ return;
     <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path, 
                            memory- or cache-parameter and so on. The Output reports initially all available informations. Using the 
                            <a href="#DbRepattr">attribute</a> "showVariables" the quantity of results can be limited to show only the desired values. 
-                           Further detailed informations to the meaning of the items are explained 
+                           Further detailed informations of items meaning are explained 
                            <a href=http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html>there</a>. <br>
                            
                                  <br><ul>
@@ -3697,7 +3706,7 @@ return;
 
     <li><b> svrinfo </b> -  common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
                             on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
-                            the desired values. Further detailed informations to the meaning of the items are explained                             
+                            the desired values. Further detailed informations of items meaning are explained                             
                             <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>there</a>. <br>
                                  
                                  <br><ul>
@@ -3711,8 +3720,8 @@ return;
                                  
     <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database schema. The analyzed schematics are depend on the rights of the 
                               used  database user (default: the database schema of tables current,history). 
-                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited. Further detailed informations to the 
-                              meaning of the items are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
+                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited. Further detailed informations  
+                              of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
                                  
                                  <br><ul>
                                  Example:  <br>
