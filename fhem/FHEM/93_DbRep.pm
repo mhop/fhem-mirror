@@ -37,7 +37,8 @@
 ###########################################################################################################
 #  Versions History:
 #
-# 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB)
+# 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB),
+#                               modified timeout routine
 # 4.5          17.10.2016       get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend)
 # 4.4          13.10.2016       get function prepared
 # 4.3          11.10.2016       Preparation of get metadata
@@ -3236,8 +3237,9 @@ return;
 sub ParseAborted($) {
 my ($hash) = @_;
 my $name = $hash->{NAME};
-
+my $dbh = $hash->{DBH}; 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
+  $dbh->disconnect() if(defined($dbh));
   readingsSingleUpdate($hash, "state", "timeout", 1);
   delete($hash->{HELPER}{RUNNING_PID});
 }
@@ -3260,7 +3262,6 @@ return;
 
 sub collaggstr($$$$) {
  my ($hash,$runtime,$i,$runtime_string_next) = @_;
- 
  my $name = $hash->{NAME};
  my $runtime_string;                                               # Datum/Zeit im SQL-Format für Readingname Teilstring
  my $runtime_string_first;                                         # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
