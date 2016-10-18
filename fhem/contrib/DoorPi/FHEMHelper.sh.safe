@@ -1,5 +1,35 @@
 # /bin/sh
-
+#
+# FHEMHelper.sh
+#
+# Script file to perform various external tasks for DoorPi
+#
+# Prof. Dr. Peter A. Henning, 2016
+# 
+#  $Id: FHEMHelper 2016-05 - pahenning $
+#
+########################################################################################
+#
+#  This programm is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#########################################################################################
+#  History
+#  no_Legend 2016-09-28: Hinzufügen von verschiedenen Variablen, sowie bedingte Ausführung
+#                        der Textausgaben auf einem TTS_Device.
+#########################################################################################
 
 checkstream() {
   streampid=`pidof mjpg_streamer`
@@ -10,41 +40,60 @@ checkstream() {
   fi
 }
 
-FHEMDP="A.Door.Pi"
-FHEMIP="192.168.xxx"
-FHEM="http://192.168xx:8083/fhem?XHR=1&cmd.$FHEMDP"
-HOME="/home/doorpi"
-default_target="722xxxx"
+FHEMDP="A.Door.Pi"              # FHEM Devicename for DoorPi
+FHEMIP="192.168.x.y"           # IP address for DoorPi
+FHEMPORT="8083"                 # Port number for DoorPi
+FHEMHTTPS="false"                # true for HTTPS, false without HTTPS
+curlprog="curl"
+curlargs=""	                    # -k to disable HTTPS certificate check, 
+                                # -u user:password for user and password 	
+HOME="/home/doorpi"             # Doorpi Standard /usr/local/etc/DoorPi/ 
+default_target="yyyyy"         # default telephone number to be called
+FHEMTTS="true"                  # true for TTS output, false without TTS
+FHEMTTSDEVICE="GalaxyTab"       # FHEM Devicename for TTS device
 
+### FHEM path ###
+if [ $FHEMHTTPS = "true" ]; then
+		FHEM="https://$FHEMIP:$FHEMPORT/fhem?XHR=1&cmd.$FHEMDP"
+	else
+		FHEM="http://$FHEMIP:$FHEMPORT/fhem?XHR=1&cmd.$FHEMDP"
+	fi
+	
+### execute commands ##
 case $1 in 
 
- init) target=`cat $HOME/calltarget`
-       curl "$FHEM=setreading%20$FHEMDP%20call_target%20$target" &
-
+init) #-- send current target to FHEM
+       target=`cat $HOME/calltarget`
+       $curlprog $curlargs "$FHEM=setreading%20$FHEMDP%20call_target%20$target" &
+       #-- send state of mjpg_streamer to FHEM
        streampid=`pidof mjpg_streamer`
        if [ -z "$streampid" ]; then
-         curl "$FHEM=setreading%20$FHEMDP%20stream%20off" &
+         $curlprog $curlargs "$FHEM=setreading%20$FHEMDP%20stream%20off" &
        else
-         curl "$FHEM=setreading%20$FHEMDP%20stream%20on" &
+         $curlprog $curlargs "$FHEM=setreading%20$FHEMDP%20stream%20on" &
        fi
        ;;
 
  doorunlockandopen) 
-       curl "$FHEM=set%20GalaxyTab%20ttsSay%20Ein%20Bewohner%20betritt%20das%20Haus" &
-       curl "$FHEM=set%20$FHEMDP%20door%20unlockandopen" &
+       if [ $FHEMTTS = "true" ]; then
+	     $curlprog $curlargs "$FHEM=set%20$FHEMTTSDEVICE%20ttsSay%20Ein%20Bewohner%20betritt%20das%20Haus" &			
+	   fi
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20unlockandopen" &
        ;;
 
  wrongid)
-       curl "$FHEM=set%20GalaxyTab%20ttsSay%20Unerlaubter%20Zutrittsversuch" &
-       curl "$FHEM=set%20$FHEMDP%20door%20wrong_id" &
+	   if [ $FHEMTTS = "true" ]; then
+		   $curlprog $curlargs "$FHEM=set%20FHEMTTSDEVICE%20ttsSay%20Unerlaubter%20Zutrittsversuch" &
+	   fi
+	   $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20wrong_id" &
        ;;
 
  softlock)
-       curl "$FHEM=set%20$FHEMDP%20door%20softlock" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20softlock" &
        ;;
 
  call) 
-       curl "$FHEM=set%20$FHEMDP%20call%20$2" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20call%20$2" &
        ;;
 
  gettarget)
@@ -56,11 +105,11 @@ case $1 in
        ;;
 
  movement)
-       curl "$FHEM=set%20$FHEMDP%20door%20movement" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20movement" &
        ;;
 
  sabotage)
-       curl "$FHEM=set%20$FHEMDP%20door%20sabotage" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20sabotage" &
        ;;
 
 esac
