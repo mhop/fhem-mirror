@@ -4372,7 +4372,7 @@ ZWave_Parse($$@)
     $id=hex($id); $baseId=hex($baseId); $ep=hex($ep);
     my $nn = "ZWave_Node_$baseId".($ep eq "0" ? "" : ".$ep");
     my $ret = "UNDEFINED $nn ZWave $homeId $id";
-    Log3 $ioName, 3, "$ret, please define it";
+    Log3 $ioName, 3, "$ret, please define it. Triggered by $msg.";
     DoTrigger("global", $ret);
     return "";
   }
