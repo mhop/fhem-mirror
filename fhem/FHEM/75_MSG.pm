@@ -299,10 +299,15 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
                     }
 
                     # sub-recipient
-                    my $subRecipient = "";
-                    if ( $device =~ s/^@?(.*):(.*)$// ) {
-                        $device       = $1;
-                        $subRecipient = $2;
+                    my $subRecipient  = "";
+                    my $termRecipient = "";
+                    if ( $device =~
+m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
+                      )
+                    {
+                        $device        = $1;
+                        $subRecipient  = $2;
+                        $termRecipient = $3;
                     }
 
                     # FATAL ERROR: device does not exist
@@ -1574,12 +1579,22 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
 
-                            if ( $gatewayDev =~ s/:(.*)// ) {
-                                $subRecipient = $1 if ( $subRecipient eq "" );
+                            if ( $gatewayDev =~
+m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
+                              )
+                            {
+                                $gatewayDev    = $1;
+                                $subRecipient  = $2 if ( $subRecipient eq "" );
+                                $termRecipient = $3 if ( $termRecipient eq "" );
                             }
 
-                            Log3 $logDevice, 5,
-"msg $device: Trying to send message via gateway $gatewayDev to recipient $subRecipient";
+                            my $logMsg =
+"msg $device: Trying to send message via gateway $gatewayDev";
+                            $logMsg .= " to recipient $subRecipient"
+                              if ( $subRecipient ne "" );
+                            $logMsg .= ", terminal device $termRecipient"
+                              if ( $termRecipient ne "" );
+                            Log3 $logDevice, 5, $logMsg;
 
                             ##############
                            # check for gateway availability and set route status
@@ -1890,6 +1905,9 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 
                             $cmd =~ s/%RECIPIENT%/$subRecipient/gi
                               if ( $subRecipient ne "" );
+
+                            $cmd =~ s/%TERMINAL%/$termRecipient/gi
+                              if ( $termRecipient ne "" );
 
                             # advanced options from message
                             if ( ref($advanced) eq "ARRAY" ) {

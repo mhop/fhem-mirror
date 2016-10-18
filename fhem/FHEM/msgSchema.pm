@@ -209,14 +209,15 @@ my $db = {
 
         'Pushover' => {
             'Normal' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
             'High' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
             'Low' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
                     'RETRY'          => '',
                     'EXPIRE'         => '',
                     'URLTITLE'       => '',
@@ -225,6 +226,7 @@ my $db = {
                 },
                 'High' => {
                     'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
                     'RETRY'          => '120',
                     'EXPIRE'         => '600',
                     'URLTITLE'       => '',
@@ -233,6 +235,7 @@ my $db = {
                 },
                 'Low' => {
                     'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
                     'RETRY'          => '',
                     'EXPIRE'         => '',
                     'URLTITLE'       => '',
@@ -244,30 +247,33 @@ my $db = {
 
         'Pushsafer' => {
             'Normal' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
             'High' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
             'Low' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" device="%RECIPIENT%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'           => '',
+                    'TERMINAL'            => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
                     'Pushsafer_SOUND'     => '',
-                    'Pushsafer_VIBRATION' => '',
+                    'Pushsafer_VIBRATION' => '1',
                 },
                 'High' => {
                     'RECIPIENT'           => '',
+                    'TERMINAL'            => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
                     'Pushsafer_SOUND'     => '',
-                    'Pushsafer_VIBRATION' => '',
+                    'Pushsafer_VIBRATION' => '2',
                 },
                 'Low' => {
                     'RECIPIENT'           => '',
+                    'TERMINAL'            => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
