@@ -820,13 +820,14 @@ sub Pushover_SetMessage {
 
     # check if we got a user or group key as device and use it as
     # user-key instead of hash->USER_KEY
-    if ( $values{device} =~ /^([A-Za-z0-9]{30})(:([A-Za-z0-9_-]+))?$/s ) {
-        $values{USER_KEY} = $1;
-        $values{device}   = $3;
+    if ( $values{device} =~ /^([A-Za-z0-9]{30})?:?([A-Za-z0-9_-]*)?$/s ) {
+        $values{USER_KEY} = $1 if ( $1 ne "" );
+        $values{device} = $2;
 
         return $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} }
-          if (
-            defined( $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} } ) );
+          if ( $values{USER_KEY}
+            && defined( $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} } )
+          );
     }
 
     # Check if all mandatory arguments are filled:
