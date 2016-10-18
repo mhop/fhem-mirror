@@ -606,9 +606,9 @@ FileLog_Get($@)
         $linf = $hash->{logfile};
         my ($Y,$m,$d) = ($1,$2,$3);
         sub expandFileWildcards($$$$) {
-           my $f=shift;
-           my ($Y,$m,$d)=@_;
-           return ResolveDateWildcards($f,localtime(time_str2num("$Y-$m-$d")));
+           my ($f,$Y,$m,$d)=@_;
+           return ResolveDateWildcards($f,
+                        localtime(time_str2num("$Y-$m-$d 00:00:00")));
         };
         $linf=expandFileWildcards($linf,$Y,$m,$d);
         if(AttrVal($name, "createGluedFile", 0)) {
