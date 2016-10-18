@@ -851,35 +851,60 @@ FHT_State($$$$)
 
       <li><code>mode</code> is one of <code>auto, manual, holiday or
           holiday_short.</code><br>
-          If the mode is holiday, then the mode switches back to either auto or
-          manual at 00:00 of the day specified by the following:
-            <ul>
-              <li>holiday1 sets the end-day of the holiday</li>
-              <li>holiday2 sets the end-month of the holiday</li>
-            </ul>
+
+          If the mode is either holiday or holiday_short, then the mode
+          switches back to auto at the specified day and time independent of
+          the current mode of the device and the desired temperature will be
+          set to the night or day temperature according to the defined weekly
+          schedule stored within the device.
+
+          In case of mode holiday
+          <ul>
+          <li>holiday1 sets the end-day of the holiday  (at 00:00)</li>
+          <li>holiday2 sets the end-month of the holiday</li>
+          </ul>
+
           For holiday_short (party mode)
           <ul>
-              <li> holiday1 sets the absolute hour to switch back from this
-              mode (in 10-minute steps, max 144)</li>
-              <li> holiday2 sets the day of month to switch back from this mode
-              (can only be today or tomorrow, since holiday1 accepts only 24
-              hours).</li>
-              Example:
-              <ul>
-                  <li>current date is 29 Jan, time is 18:05</li>
-                  <li>you want to switch to party mode until tomorrow 1:00</li>
-                  <li>set holiday1 to 6 (6 x 10min = 1hour) and holiday2 to
-                      30</li>
-
-              </ul>
+          <li>holiday1 sets the absolute hour to switch back from this mode (in
+          10-minute steps, max 144)</li>
+          <li>holiday2 sets the day of month to switch back from this mode (can only be today or tomorrow, since holiday1 accepts only 24 hours).</li>
           </ul>
-          The temperature for the holiday period is set by the desired-temperature
-          parameter. <br> Note that you cannot set holiday mode for days earlier than the
-          day after tomorrow, for this you must use holiday_short.<br>
-          Note also, you cannot set parameters seperately, you must set them in one command.
           Example:
-          <br>
-	  <code>set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14</code>
+          <ul>
+          <li>current date is 29 Jan, time is 18:05</li>
+          <li>you want to switch to party mode until tomorrow 1:00</li>
+          <li>set holiday1 to 6 (6 x 10min = 1hour) and holiday2 to 30</li>
+          </ul>
+
+          The temperature for the holiday period is set by the
+          desired-temperature parameter.<br>
+          Note that you cannot set holiday mode for days earlier than the day
+          after tomorrow, for this you must use holiday_short.<br>
+          The parameters holiday1 and holiday2 must be set in one command
+          together with mode.<br>
+          Example:
+          <ul>
+          set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14
+          </ul>
+          Please note: If the event time specified by the holiday parameters
+          has already past, then the device will immediately switch back to
+          auto mode including the selection of the corresponding day or night
+          temperature. This is valid at least for FHT80b model 2 and 3, Lifetec
+          MD12050. For those devices setting holiday_short with a holiday1
+          value of 0 and without the parameter holiday2 e.g. 
+          <ul>
+          set FHT1 mode holiday_short holiday1 0
+          </ul>
+          will immediately switch back the device to mode auto including the
+          adjustment of the desired- temp parameter.
+
+          Some elderly FHT models, however, only switch the mode to auto, if
+          the event is within the past, but don't adjust the desired
+          temperature. In this case specifying appropriate values for the
+          parameters holiday1 and holiday2 thus defining an event in the very
+          near future (e.g. 10 minutes) could be the solution to force a switch
+          back to the correct automatic mode.
           </li>
           <br>
 
