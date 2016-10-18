@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.2";
+my $version = "1.4";
 
 #-- these we may get on request
 my %gets = (
@@ -73,7 +73,7 @@ sub DoorPi_Initialize ($) {
   $hash->{InitFn}   = "DoorPi_Init";
 
   $hash->{AttrList}= "verbose ".
-                     "language:de,en ".
+                     "language:de,en ringcmd ".
                      "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
                      "snapshotbutton streambutton ".
@@ -83,7 +83,6 @@ sub DoorPi_Initialize ($) {
                      
   $hash->{FW_detailFn}  = "DoorPi_makeTable";
   $hash->{FW_summaryFn} = "DoorPi_makeShort";
-  $hash->{FW_atPageEnd} = 1;
 }
 
 ########################################################################################
@@ -274,8 +273,14 @@ sub DoorPi_Set ($@) {
     if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
 
   #-- hidden command "call" to be used by DoorPi for communicating with this module
-  if( $key eq "call" ){
-    if( $value =~ "start.*" ){
+  if( $key eq "call" ){ 
+    Log3 $name,1,"[DoorPi] call $value received";
+    #-- call init
+    if( $value eq "init" ){
+      DoorPi_GetConfig($hash);
+      InternalTimer(gettimeofday()+10, "DoorPi_GetHistory", $hash,0);
+    #-- call start
+    }elsif( $value =~ "start.*" ){
       readingsSingleUpdate($hash,"call","started",1);
       my ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime())[0,1,2,3,4,5,6]; 
       $year += 1900;
@@ -285,31 +290,31 @@ sub DoorPi_Set ($@) {
       unshift(@{ $hash->{DATA}}, ["",$timestamp,AttrVal($name, "target$value","unknown"),"active","--","xx","yy"] );
       #-- update web interface immediately
       DoorPi_inform($hash);
- 
-    }elsif( $value eq "end" ){
-      readingsSingleUpdate($hash,"call","ended",1);     
+      #-- obtain last snapshot
+      DoorPi_GetLastSnapshot($hash);       
+      #--  and finally execute FHEM command
+      fhem(AttrVal($name, "ringcmd",undef))
+         if(AttrVal($name, "ringcmd",undef));
+    #-- call end
+    }elsif( $value =~ "end.*" ){
       DoorPi_GetHistory($hash);
-      #-- update web interface in 5 seconds
       InternalTimer(gettimeofday()+5, "DoorPi_inform", $hash,0);
-      
+      readingsSingleUpdate($hash,"call","ended",1);
+      readingsSingleUpdate($hash,"call_listed",int(@{ $hash->{DATA}}),1);
+    #-- call rejected
     }elsif( $value eq "rejected" ){
+      DoorPi_GetHistory($hash);
+      InternalTimer(gettimeofday()+5, "DoorPi_inform", $hash,0);
       readingsSingleUpdate($hash,"call","rejected",1);
-      DoorPi_GetHistory($hash);
-      
+    #-- call dismissed
     }elsif( $value eq "dismissed" ){
+      DoorPi_GetHistory($hash);
+      InternalTimer(gettimeofday()+5, "DoorPi_inform", $hash,0);
       readingsSingleUpdate($hash,"call","dismissed",1);
-      DoorPi_GetHistory($hash);
-      
-    }elsif( $value eq "startup" ){
-      DoorPi_GetConfig($hash);
-      DoorPi_GetHistory($hash);
-      
-    }elsif( $value eq "snapshot" ){
-      # TODO
     }else{
-      Log 1,"[DoorPi_Set] $value";
-    }
-  #-- call target
+      Log 1,"[DoorPi] unknown command set ... call $value";
+    }   
+  #-- target for the call
   }elsif( $key eq "target" ){
     if( $value =~ /[0123]/ ){
       if(AttrVal($name, "target$value",undef)){
@@ -324,7 +329,7 @@ sub DoorPi_Set ($@) {
       return;
     }
     
-  #-- Door opening - rather complicated
+  #-- door commands
   }elsif( ($key eq "$door")||($key eq "door") ){
     my $lockstate = ReadingsVal($name,"lockstate",undef);
     
@@ -394,7 +399,7 @@ sub DoorPi_Set ($@) {
         fhem(AttrVal($name, "doorunlockcmd",undef));
         Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and executed FHEM doorunlock command";
       }else{
-        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed FHEM doorunlock command";
+        #Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed FHEM doorunlock command";
       }
       readingsSingleUpdate($hash,"lockstate","unlocked",1);
       readingsSingleUpdate($hash,$door,"unlocked",1);
@@ -408,7 +413,7 @@ sub DoorPi_Set ($@) {
         fhem(AttrVal($name, "doorlockcmd",undef));
         Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and executed extra FHEM doorlock command";
       }else{
-        Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and NOT executed extra FHEM doorlock command";
+        #Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and NOT executed extra FHEM doorlock command";
       }
       readingsSingleUpdate($hash,"lockstate","locked",1);
       readingsSingleUpdate($hash,$door,"locked",1);
@@ -418,6 +423,7 @@ sub DoorPi_Set ($@) {
   #-- snapshot
   }elsif( $key eq "$snapshot" ){
     $v=DoorPi_Cmd($hash,"snapshot");
+    InternalTimer(gettimeofday()+3, "DoorPi_GetLastSnapshot", $hash,0);
   #-- video stream
   }elsif( $key eq "$stream" ){
     if( $value eq "on" ){
@@ -673,8 +679,8 @@ sub DoorPi_GetLastSnapshot {
   #-- decode config 
   my $DoorPi   = $jhash0->{"config"}->{"DoorPi"};
   my $lastsnap = $jhash0->{"config"}->{"DoorPi"}->{"last_snapshot"};
-  
-  #push(@{ $hash->{DATA}}, ["",$state,$timestamp,$number,"started","--",$snapshot,$record] );
+  $url = "http://".$hash->{TCPIP}."/";
+  $lastsnap =~ s/\/home\/doorpi\/records\//$url/;
   
   Log 1,"[DoorPi_GetLastSnapshot] returns $lastsnap";
    
@@ -1055,20 +1061,11 @@ sub DoorPi_makeShort($$$$){
     
     my $ret = "";
     
-    if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
-    {
-        #$ret .= '<tr><td>';
-        $ret .= '<div class="col1"><a href="'.$FW_ME.$FW_subdir.'?detail='.$name.'">'.$alias.'</a>'.(IsDisabled($name) ? ' (disabled)' : '').'</div>';
-    }
-    
-    
     if(AttrVal($name, "language", "en") eq "de"){
-        $ret .= "</td><td>".int(@{ $hash->{DATA}})." Einträge";
+        $ret .= "<div class=\"col2\">".int(@{$hash->{DATA}})."\&nbsp;Einträge</div>";
     }else{
-        $ret .= "</td><td>".int(@{ $hash->{DATA}})." calls";
+        $ret .= "<div class=\"col2\">".int(@{$hash->{DATA}})."\&nbsp;calls</div>";
     }
-  
-    $ret .= "</td><td><a href=\"/fhem?cmd.$devname=set $devname door open\">open</a>";    
     
     setlocale(LC_ALL, $old_locale);
     
@@ -1101,19 +1098,28 @@ sub DoorPi_makeTable($$$$){
 sub DoorPi_inform($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
       
-  Log3 $name, 5, "[Doorpi_inform]- inform all FHEMWEB clients";
+  Log3 $name, 1, "[Doorpi_inform]- inform all FHEMWEB clients";
   my $count = 0;
         
   foreach my $line (DoorPi_list($hash,1)){
-    #Log 1,"[Doorpi_Set] - informing $name with $line";
+    #Log 1,"[Doorpi_Set] - informing $name";
     FW_directNotify($name, $line, 1);
     $count++;
   }
-        
-   # send the current row count to ensure all other rows are deleted via JS
-   #     FW_directNotify($name,"max-lines,$count", 1);
- }    
+
+  my $ret;
+  if(AttrVal($name, "language", "en") eq "de"){
+      $ret .= "</td><td><div class=\"col2\">".int(@{$hash->{DATA}})."\&nbsp;Einträge</div>";
+  }else{
+      $ret .= "</td><td><div class=\"col2\">".int(@{$hash->{DATA}})."\&nbsp;calls</div>";
+  }
+  
+  FW_directNotify($name,"",$ret);
+
+  return undef;  
+}    
 
 #######################################################################################
 #
@@ -1274,7 +1280,6 @@ sub DoorPi_list($;$){
     setlocale(LC_ALL, $old_locale);
     
     return ($to_json ? @json_output : $ret);
-    #return ($ret);
 }
 
 
@@ -1366,6 +1371,9 @@ sub DoorPi_list($;$){
             <li><a name="doorpi_target2"><code>attr &lt;DoorPi-Device&gt; target[0|1|2|3]
                         &lt;string&gt;</code></a>
                 <br />Call target numbers for different redirections. If none is set, redirection will not be offered.</li>
+            <li><a name="doorpi_ringcmd"><code>attr &lt;DoorPi-Device&gt; ringcmd
+                        &lt;string&gt;</code></a>
+                <br />FHEM command additionally executed for ringing action (no default)</li>
             <li><a name="doorpi_doorbutton"><code>attr &lt;DoorPi-Device&gt; doorbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for door action (default: door)</li>
