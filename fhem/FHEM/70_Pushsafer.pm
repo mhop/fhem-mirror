@@ -35,15 +35,16 @@ use HttpUtils;
 use utf8;
 
 my %Pushsaver_Params = (
-    "title" => "t",
-    "sound" => "s",
-    "vibration" => "v",
-    "icon" => "i",
-    "url" => "u",
-    "device" => "d",
-    "key" => "k",
-    "urlText" => "ut",
-    "message" => "m"
+    "title"     => {"short" => "t", "check" => qr/^.*$/},
+    "sound"     => {"short" => "s", "check" => qr/^\d+$/},
+    "vibration" => {"short" => "v", "check" => qr/^\d+$/},
+    "icon"      => {"short" => "i", "check" => qr/^\d+$/},
+    "url"       => {"short" => "u", "check" => qr/^[a-z]+:/},
+    "device"    => {"short" => "d", "check" => qr/^(?:gs)?\d+$/},
+    "key"       => {"short" => "k", "check" => qr/^[a-zA-Z\d]{20}$/},
+    "urlText"   => {"short" => "ut"},
+    "message"   => {"short" => "m"},
+    "ttl"       => {"short" => "l", "check" => qr/^\d+$/}
 );
 
 
@@ -158,11 +159,27 @@ sub Pushsafer_createBody($$)
     {
         if(exists($Pushsaver_Params{$item}))
         {
-            push @urlParts, $Pushsaver_Params{$item}."=".urlEncode($args->{$item});
+            if(exists($Pushsaver_Params{$item}{check}) and $args->{$item} !~ $Pushsaver_Params{$item}{check})
+            {
+                push @errs, "wrong syntax for option $item: ".$args->{$item};
+            }
+            else
+            {
+                push @urlParts, $Pushsaver_Params{$item}{short}."=".urlEncode($args->{$item});
+            }
         }
-        elsif(grep($Pushsaver_Params{$_} eq $item,  keys(%Pushsaver_Params)))
+        elsif(grep($Pushsaver_Params{$_}{short} eq $item,  keys(%Pushsaver_Params)))
         {
-            push @urlParts, $item."=".urlEncode($args->{$item});
+            my $command = join "", grep($Pushsaver_Params{$_}{short} eq $item,  keys(%Pushsaver_Params));
+
+            if(exists($Pushsaver_Params{$command}{check}) and $args->{$item} !~ $Pushsaver_Params{$command}{check})
+            {
+                push @errs, "wrong syntax for option $item: ".$args->{$item};
+            }
+            else
+            {
+                push @urlParts, $item."=".urlEncode($args->{$item});
+            }
         }
         else
         {
@@ -314,7 +331,8 @@ sub Pushsafer_Callback($$$)
     <code><b>vibration</b></code> - short: <code>v&nbsp;</code> - type: number - The number of times the device should vibrate upon reception (maximum: 3 times; iOS/Android only). If not set, the default behavior of the device is used.<br>
     <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>u&nbsp;</code> - type: text - A URL that should be included in the message. This can be regular http:// URL's but also specific app schemas. See <a href="https://www.pushsafer.com/en/url_schemes" target="_new">Pushsafer.com</a> for a complete list of supported URL schemas.<br>
     <code><b>urlText</b>&nbsp;&nbsp;</code> - short: <code>ut</code> - type: text - A text that should be used to display a URL from the "url" option.<br>
-    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>k&nbsp;</code>- type: text - Overrides the private key given in the define statement. Also an alias key can be used.<br>
+    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>k&nbsp;</code> - type: text - Overrides the private key given in the define statement. Also an alias key can be used.<br>
+    <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>l&nbsp;</code> - type: number - Defines a "time-to-live" given in minutes after the message will be deleted on the target device(s). Possible range is between 1 - 43200 minutes (30 days).<br>
     <br>
     Examples:<br>
     <br>
@@ -402,10 +420,11 @@ sub Pushsafer_Callback($$$)
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>s&nbsp;</code> - Typ: Ganzzahl - Die Nummer eines Tons, welcher beim Empfang der Nachricht auf dem Zielger&auml;t ert&ouml;nen soll (siehe <a href="https://www.pushsafer.com/de/pushapi" target="_new">pushsafer.com</a> f&uuml;r eine Liste m&ouml;glicher Werte).<br>
     <code><b>icon</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>i&nbsp;</code> - Typ: Ganzzahl - Die Nummer eines Icons, welches zusammen mit der Nachricht auf dem Zielger&auml;t angezeigt werden soll (siehe <a href="https://www.pushsafer.com/de/pushapi" target="_new">Pushsafer.com</a> f&uuml;r eine Liste m&ouml;glicher Werte).<br>
     <code><b>vibration</b></code> - Kurzform: <code>v&nbsp;</code> - Typ: Ganzzahl - Die Anzahl, wie oft das Zielger&auml;t vibrieren soll beim Empfang der Nachricht (maximal 3 mal; nur f&uuml;r iOS-/Android-Ger&auml;te nutzbar). Falls nicht benutzt, wird die ger&auml;teinterne Einstellung verwendet.<br>
-    <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>u&nbsp;</code> - Typ: Text - Eine URL welche der Nachricht angehangen werden soll. Dies kann eine normale http:// bzw. https:// URL sein, es sind jedoch auch weitere spezielle Schemas m&ouml;glich. Eine Liste aller m&ouml;glichen URL-Schemas gibt es unter <a href="https://www.pushsafer.com/de/url_schemes" target="_new">pushsafer.com</a> .<br>
+    <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>u&nbsp;</code> - Typ: Text - Eine URL, welche der Nachricht angehangen werden soll. Dies kann eine normale http:// bzw. https:// URL sein, es sind jedoch auch weitere spezielle Schemas m&ouml;glich. Eine Liste aller m&ouml;glichen URL-Schemas gibt es unter <a href="https://www.pushsafer.com/de/url_schemes" target="_new">pushsafer.com</a> .<br>
     <code><b>urlText</b>&nbsp;&nbsp;</code> - Kurzform: <code>ut</code> - Typ: Text - Der Text, welcher zum Anzeigen der URL benutzt werden soll anstatt der Zieladresse.<br>
     <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>k&nbsp;</code> - Typ: Text - &Uuml;bersteuert den zu nutzenden Schl&uuml;ssel zur Identifikation aus dem define-Kommando. Es kann hierbei auch ein Email-Alias-Schl&uuml;ssel benutzt werden.<br>   
-   <br>
+    <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>l&nbsp;</code> - Typ: Ganzzahl - Die Lebensdauer der Nachricht in Minuten. Sobald die Lebensdauer erreicht ist, wird die Nachricht selbstst&auml;ndig auf allen Ger&auml;ten gel&ouml;scht. Der m&ouml;gliche Wertebereich liegt zwischen 1 - 43200 Minuten (entspricht 30 Tagen).<br> 
+    <br>
     Beispiele:<br>
     <br>
     <ul>
