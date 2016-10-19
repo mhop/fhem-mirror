@@ -156,10 +156,22 @@
 #   add summary for fhem commandref
 # 1.9 2016-10-06 urlescaped filenames / location send-receive / timeout for send 
 
-#
+#   fix: multibot environment - localize global hashes
+#   markup - per Attribute "parseModeSend" - None / InMsg / Markdown / HTML 
+#   Log unnknown contacts and messages - msg505210
+#   replykeyboardhide - test - msg505012 - not possible to remove keyboard
+#   edit_message - msg504659 - new command msgEdit
+#   msgEdit documented
+# 2.0 2016-10-19 multibot support / markup on send text / msgEdit 
+
 #   
 ##############################################################################
 # TASKS 
+#   
+#   
+#   check inlinekeyboards for confirmation - msg505012
+#   
+#   diable command
 #   
 #   allow keyboards in the device api
 #   
@@ -208,12 +220,18 @@ sub TelegramBot_SplitFavoriteDef($$);
 sub TelegramBot_GetUTF8Back( $ );
 sub TelegramBot_PutToUTF8( $ );
 
+sub TelegramBot_AttrNum($$$);
+
+sub TelegramBot_MakeKeyboard($$$@);
+
 #########################
 # Globals
 my %sets = (
   "message" => "textField",
   "msg" => "textField",
   "send" => "textField",
+
+  "msgEdit" => "textField",
 
   "sendImage" => "textField",
   "sendPhoto" => "textField",
@@ -246,24 +264,6 @@ my %gets = (
 my $TelegramBot_header = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0\r\nAccept: application/json\r\nAccept-Charset: utf-8";
 
 
-my %TelegramBot_hu_upd_params = (
-                  url        => "",
-                  timeout    => 5,
-                  method     => "GET",
-                  header     => $TelegramBot_header,
-                  isPolling  => "update",
-                  hideurl    => 1,
-                  callback   => \&TelegramBot_Callback
-);
-
-my %TelegramBot_hu_do_params = (
-                  url        => "",
-                  timeout    => 30,
-                  method     => "GET",
-                  header     => $TelegramBot_header,
-                  hideurl    => 1,
-                  callback   => \&TelegramBot_Callback
-);
 
 
 ##############################################################################
@@ -293,6 +293,7 @@ sub TelegramBot_Initialize($) {
   "cmdTimeout pollingTimeout ".
   "allowUnknownContacts:1,0 textResponseConfirm:textField textResponseCommands:textField allowedCommands filenameUrlEscape:1,0 ". 
   "textResponseFavorites:textField textResponseResult:textField textResponseUnauthorized:textField ".
+  "parseModeSend:0_None,1_Markdown,2_HTML,3_InMsg ".
   " maxRetries:0,1,2,3,4,5 ".$readingFnAttributes;           
 }
 
@@ -336,9 +337,28 @@ sub TelegramBot_Define($$) {
   $hash->{FAILS} = 0;
   $hash->{UPDATER} = 0;
   $hash->{POLLING} = -1;
+  
+  my %hu_upd_params = (
+                  url        => "",
+                  timeout    => 5,
+                  method     => "GET",
+                  header     => $TelegramBot_header,
+                  isPolling  => "update",
+                  hideurl    => 1,
+                  callback   => \&TelegramBot_Callback
+  );
 
-  $hash->{HU_UPD_PARAMS} = \%TelegramBot_hu_upd_params;
-  $hash->{HU_DO_PARAMS} = \%TelegramBot_hu_do_params;
+  my %hu_do_params = (
+                  url        => "",
+                  timeout    => 30,
+                  method     => "GET",
+                  header     => $TelegramBot_header,
+                  hideurl    => 1,
+                  callback   => \&TelegramBot_Callback
+  );
+
+  $hash->{HU_UPD_PARAMS} = \%hu_upd_params;
+  $hash->{HU_DO_PARAMS} = \%hu_do_params;
 
   TelegramBot_Setup( $hash );
 
@@ -356,13 +376,13 @@ sub TelegramBot_Undef($$)
 
   Log3 $name, 3, "TelegramBot_Undef $name: called ";
 
-  HttpUtils_Close(\%TelegramBot_hu_upd_params); 
+  HttpUtils_Close($hash->{HU_UPD_PARAMS}); 
   
-  HttpUtils_Close(\%TelegramBot_hu_do_params); 
+  HttpUtils_Close($hash->{HU_DO_PARAMS}); 
 
   RemoveInternalTimer($hash);
 
-  RemoveInternalTimer(\%TelegramBot_hu_do_params);
+  RemoveInternalTimer($hash->{HU_DO_PARAMS});
 
   Log3 $name, 4, "TelegramBot_Undef $name: done ";
   return undef;
@@ -426,11 +446,11 @@ sub TelegramBot_Set($@)
 
   my $ret = undef;
   
-  if( ($cmd eq 'message') || ($cmd eq 'msg') || ($cmd eq 'reply') || ($cmd =~ /^send.*/ ) ) {
+  if( ($cmd eq 'message') || ($cmd eq 'msg') || ($cmd eq 'reply') || ($cmd eq 'msgEdit') || ($cmd =~ /^send.*/ ) ) {
 
     my $msgid;
     
-    if ($cmd eq 'reply') {
+    if ( ($cmd eq 'reply') || ($cmd eq 'msgEdit' ) ) {
       return "TelegramBot_Set: Command $cmd, no peer, msgid and no text/file specified" if ( $numberOfArgs < 3 );
       $msgid = shift @args; 
       $numberOfArgs--;
@@ -465,14 +485,16 @@ sub TelegramBot_Set($@)
       $sendType = 2;
     } elsif ( ($cmd eq 'sendDocument') || ($cmd eq 'sendMedia') ) {
       $sendType = 3;
-    } elsif ($cmd eq 'sendLocation')  {
+    } elsif ($cmd eq 'msgEdit')  {
       $sendType = 10;
+    } elsif ($cmd eq 'sendLocation')  {
+      $sendType = 11;
     }
 
     my $msg;
     my $addPar;
     
-    if ( $sendType >= 10 ) {
+    if ( $sendType > 10 ) {
       # location
       
       return "TelegramBot_Set: Command $cmd, 2 parameters latitude / longitude need to be specified" if ( int(@args) != 2 );      
@@ -483,7 +505,7 @@ sub TelegramBot_Set($@)
       # first latitude
       $addPar = shift @args;
       
-    } elsif ( $sendType > 0 ) {
+    } elsif ( ( $sendType > 0 ) && ( $sendType < 10 ) ) {
       # should return undef if succesful
       $msg = shift @args;
       $msg = $1 if ( $msg =~ /^\"(.*)\"$/ );
@@ -834,7 +856,7 @@ sub TelegramBot_SentFavorites($$$$) {
         my @tmparr2 = ( "Abbruch" );
         push( @keys, \@tmparr2 );
 
-        my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, @keys );
+        my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, 0, @keys );
 
         # LOCAL: External message
         $ret = encode_utf8( AttrVal( $name, 'textResponseConfirm', 'TelegramBot FHEM : $peer\n Bestätigung \n') );
@@ -870,7 +892,7 @@ sub TelegramBot_SentFavorites($$$$) {
 #      my @tmparr = ( $fcmd."0 = Abbruch" );
 #     push( @keys, \@tmparr );
 
-      my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, @keys );
+      my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, 0, @keys );
 
       Log3 $name, 5, "TelegramBot_SentFavorites keyboard:".$jsonkb.": ";
       
@@ -912,7 +934,7 @@ sub TelegramBot_SentLastCommand($$$) {
 #  my @tmparr = ( $fcmd."0 = Abbruch" );
 #  push( @keys, \@tmparr );
 
-  my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, @keys );
+  my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, 0, @keys );
 
   # LOCAL: External message
   $ret = AttrVal( $name, 'textResponseCommands', 'TelegramBot FHEM : $peer\n Letzte Befehle \n');
@@ -1219,6 +1241,7 @@ sub TelegramBot_DoUrlCommand($$)
 #####################################
 # INTERNAL: Function to send a photo (and text message) to a peer and handle result
 # addPar is caption for images / keyboard for text / longituted for location (isMedia 10)
+# isMedia - 0 (text) 
 sub TelegramBot_SendIt($$$$$;$$)
 {
   my ( $hash, @args) = @_;
@@ -1278,32 +1301,57 @@ sub TelegramBot_SendIt($$$$$;$$)
   $hash->{sentMsgPeerId} = $peer2;
   
   # init param hash
-  $TelegramBot_hu_do_params{hash} = $hash;
-  $TelegramBot_hu_do_params{header} = $TelegramBot_header;
-  delete( $TelegramBot_hu_do_params{args} );
-  delete( $TelegramBot_hu_do_params{boundary} );
+  $hash->{HU_DO_PARAMS}->{hash} = $hash;
+  $hash->{HU_DO_PARAMS}->{header} = $TelegramBot_header;
+  delete( $hash->{HU_DO_PARAMS}->{args} );
+  delete( $hash->{HU_DO_PARAMS}->{boundary} );
 
   
   my $timeout =   AttrVal($name,'cmdTimeout',30);
-  $TelegramBot_hu_do_params{timeout} = $timeout;
+  $hash->{HU_DO_PARAMS}->{timeout} = $timeout;
 
   # only for test / debug               
-#  $TelegramBot_hu_do_params{loglevel} = 3;
+#  $hash->{HU_DO_PARAMS}->{loglevel} = 3;
 
   # handle data creation only if no error so far
   if ( ! defined( $ret ) ) {
 
     # add chat / user id (no file) --> this will also do init
-    $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "chat_id", undef, $peer2, 0 );
+    $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "chat_id", undef, $peer2, 0 );
 
-    if ( ! $isMedia ) {
-      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendMessage";
+    if ( ( $isMedia == 0 ) || ( $isMedia == 10 ) ) {
+      if ( $isMedia == 0 ) {
+        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendMessage";
+      } else {
+        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."editMessageText";
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
+        $replyid = undef;
+      }
       
-#      $TelegramBot_hu_do_params{url} = "http://requestb.in";
+#      $hash->{HU_DO_PARAMS}->{url} = "http://requestb.in";
 
       ## JVI
 #      Debug "send  org msg  :".$msg.":";
   
+      my $parseMode = TelegramBot_AttrNum($name,"parseModeSend","0" );
+      if ( $parseMode == 1 ) {
+        $parseMode = "Markdown";
+      } elsif ( $parseMode == 2 ) {
+        $parseMode = "HTML";
+      } elsif ( $parseMode == 3 ) {
+        $parseMode = 0;
+        if ( $msg =~ /^markdown(.*)$/i ) {
+          $msg = $1;
+          $parseMode = "Markdown";
+        } elsif ( $msg =~ /^HTML(.*)$/i ) {
+          $msg = $1;
+          $parseMode = "HTML";
+        }
+      } else {
+        $parseMode = 0;
+      }
+      Log3 $name, 4, "TelegramBot_SendIt parseMode $parseMode";
+    
       if ( length($msg) > 1000 ) {
         $hash->{sentMsgText} = substr($msg,0, 1000)."...";
        } else {
@@ -1316,18 +1364,22 @@ sub TelegramBot_SendIt($$$$$;$$)
 #      Debug "send conv msg  :".$msg.":";
   
       # add msg (no file)
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
+
+      # add parseMode
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0 ) if ( ( ! defined( $ret ) ) && ( $parseMode ) );
+
       
-    } elsif ( $isMedia == 10 ) {
+    } elsif ( $isMedia == 11 ) {
       # Location send    
       $hash->{sentMsgText} = "Location: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
           (( defined( $addPar ) )?" - ".$addPar:"");
 
-      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendLocation";
+      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendLocation";
 
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "latitude", undef, $msg, 0 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "latitude", undef, $msg, 0 ) if ( ! defined( $ret ) );
 
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "longitude", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "longitude", undef, $addPar, 0 ) if ( ! defined( $ret ) );
       $addPar = undef;
       
     } elsif ( abs($isMedia) == 1 ) {
@@ -1335,69 +1387,69 @@ sub TelegramBot_SendIt($$$$$;$$)
       $hash->{sentMsgText} = "Image: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
           (( defined( $addPar ) )?" - ".$addPar:"");
 
-      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendPhoto";
+      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendPhoto";
 
       # add caption
       if ( defined( $addPar ) ) {
-        $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "caption", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if ( ! defined( $ret ) );
         $addPar = undef;
       }
       
       # add msg or file or stream
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for image file :".
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).":";
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "photo", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
       
     }  elsif ( $isMedia == 2 ) {
       # Voicemsg send    == 2
       $hash->{sentMsgText} = "Voice: $msg";
 
-      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendVoice";
+      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendVoice";
 
       # add msg or file or stream
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :".
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).":";
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "voice", undef, $msg, 1 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "voice", undef, $msg, 1 ) if ( ! defined( $ret ) );
     } else {
       # Media send    == 3
       $hash->{sentMsgText} = "Document: ".TelegramBot_MsgForLog($msg, ($isMedia<0) );
 
-      $TelegramBot_hu_do_params{url} = $hash->{URL}."sendDocument";
+      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendDocument";
 
       # add msg (no file)
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :$msg:";
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "document", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "document", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
     }
 
     if ( defined( $replyid ) ) {
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "reply_to_message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "reply_to_message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
     }
 
     if ( defined( $addPar ) ) {
-      $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "reply_markup", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "reply_markup", undef, $addPar, 0 ) if ( ! defined( $ret ) );
     }
 
     # finalize multipart 
-    $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, undef, undef, undef, 0 ) if ( ! defined( $ret ) );
+    $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0 ) if ( ! defined( $ret ) );
 
   }
   
   ## JVI
-#  Debug "send command  :".$TelegramBot_hu_do_params{data}.":";
+#  Debug "send command  :".$hash->{HU_DO_PARAMS}->{data}.":";
   
   if ( defined( $ret ) ) {
     Log3 $name, 3, "TelegramBot_SendIt $name: Failed with :$ret:";
-    TelegramBot_Callback( \%TelegramBot_hu_do_params, $ret, "");
+    TelegramBot_Callback( $hash->{HU_DO_PARAMS}, $ret, "");
 
   } else {
-    $TelegramBot_hu_do_params{args} = \@args;
+    $hash->{HU_DO_PARAMS}->{args} = \@args;
     # reset UTF8 flag for ensuring length in httputils is correctly handling lenght (as bytes)
-#  Debug "send a command  :".$TelegramBot_hu_do_params{data}.":";
-#    $TelegramBot_hu_do_params{data} = encode_utf8(decode_utf8($TelegramBot_hu_do_params{data}));
-# Debug "send b command  :".$TelegramBot_hu_do_params{data}.":";
+#  Debug "send a command  :".$hash->{HU_DO_PARAMS}->{data}.":";
+#    $hash->{HU_DO_PARAMS}->{data} = encode_utf8(decode_utf8($hash->{HU_DO_PARAMS}->{data}));
+# Debug "send b command  :".$hash->{HU_DO_PARAMS}->{data}.":";
     
-    Log3 $name, 4, "TelegramBot_SendIt $name: timeout for sent :".$TelegramBot_hu_do_params{timeout}.": ";
-    HttpUtils_NonblockingGet( \%TelegramBot_hu_do_params);
+    Log3 $name, 4, "TelegramBot_SendIt $name: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ";
+    HttpUtils_NonblockingGet( $hash->{HU_DO_PARAMS} );
 
   }
   
@@ -1482,18 +1534,33 @@ sub TelegramBot_AddMultipart($$$$$$)
 # Parameter
 #   hash (device hash)
 #   onetime/hide --> true means onetime / false means hide / undef means nothing
+#   inline --> true/false
 #   keys array of arrays for keyboard
 #   > returns string in case of error or undef
-sub TelegramBot_MakeKeyboard($$@)
+sub TelegramBot_MakeKeyboard($$$@)
 {
-  my ( $hash, $onetime_hide, @keys ) = @_;
+  my ( $hash, $onetime_hide, $inlinekb, @keys ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
   
   my %par;
   
-  if ( ( defined( $onetime_hide ) ) && ( ! $onetime_hide ) ) {
+  if ( ( defined( $inlinekb ) ) && ( $inlinekb ) ) {
+    # inline kb
+    my @parKeys = ( );
+    
+    foreach my $aKeyRow (  @keys ) {
+      my @parRow = ();
+      foreach my $aKey (  @$aKeyRow ) {
+        my %oneKey = ( "text" => $aKey, "switch_inline_query_current_chat" => $aKey );
+        push( @parRow, \%oneKey );
+      }
+      push( @parKeys, \@parRow );
+    }
+    %par = ( "inline_keyboard" => \@parKeys  );
+    
+  } elsif ( ( defined( $onetime_hide ) ) && ( ! $onetime_hide ) ) {
     %par = ( "hide_keyboard" => JSON::true );
   } else {
     return $ret if ( ! @keys );
@@ -1567,16 +1634,16 @@ sub TelegramBot_UpdatePoll($)
   # build url 
   my $url =  $hash->{URL}."getUpdates?offset=".$offset."&limit=5&timeout=".$timeout;
 
-  $TelegramBot_hu_upd_params{url} = $url;
-  $TelegramBot_hu_upd_params{timeout} = $timeout+$timeout+5;
-  $TelegramBot_hu_upd_params{hash} = $hash;
-  $TelegramBot_hu_upd_params{offset} = $offset;
+  $hash->{HU_UPD_PARAMS}->{url} = $url;
+  $hash->{HU_UPD_PARAMS}->{timeout} = $timeout+$timeout+5;
+  $hash->{HU_UPD_PARAMS}->{hash} = $hash;
+  $hash->{HU_UPD_PARAMS}->{offset} = $offset;
 
   $hash->{STATE} = "Polling";
 
   $hash->{POLLING} = ( ( defined( $hash->{OLD_POLLING} ) )?$hash->{OLD_POLLING}:1 );
   Log3 $name, 4, "TelegramBot_UpdatePoll $name: initiate polling with nonblockingGet with ".$timeout."s";
-  HttpUtils_NonblockingGet( \%TelegramBot_hu_upd_params); 
+  HttpUtils_NonblockingGet( $hash->{HU_UPD_PARAMS} ); 
 }
 
 
@@ -1666,7 +1733,7 @@ sub TelegramBot_Callback($$$)
     $ret = "NonBlockingGet: returned $err";
   } elsif ( $data ne "" ) {
     # assuming empty data without err means timeout
-    Log3 $name, 5, "TelegramBot_ParseUpdate $name: data returned :$data:";
+    Log3 $name, 5, "TelegramBot_Callback $name: data returned :$data:";
     my $jo;
  
 
@@ -1680,6 +1747,7 @@ sub TelegramBot_Callback($$$)
        $jo = TelegramBot_Deepencode( $name, $jo );
     };
  
+    Log3 $name, 5, "TelegramBot_Callback $name: after encoding";
 
 ###################### 
  
@@ -1702,7 +1770,10 @@ sub TelegramBot_Callback($$$)
     }
   }
 
+  
   if ( defined( $param->{isPolling} ) ) {
+    Log3 $name, 5, "TelegramBot_Callback $name: polling returned result? ".((defined($result))?scalar(@$result):"<undef>");
+  
     # Polling means result must be analyzed
     if ( defined($result) ) {
        # handle result
@@ -1769,7 +1840,7 @@ sub TelegramBot_Callback($$$)
 
   } else {
     # Non Polling means: get msgid, reset the params and set loglevel
-    $TelegramBot_hu_do_params{data} = "";
+    $hash->{HU_DO_PARAMS}->{data} = "";
     $ll = 3 if ( defined( $ret ) );
     $msgId = $result->{message_id} if ( defined($result) );
        
@@ -1841,9 +1912,12 @@ sub TelegramBot_ParseMsg($$$)
   my $mpeer = $from->{id};
 
   # ignore if unknown contacts shall be accepter
-  if ( AttrVal($name,'allowUnknownContacts',1) == 0 ) {
-#    Debug "test if known :$mpeer";
-    return $ret if ( ! TelegramBot_IsKnownContact( $hash, $mpeer ) ) ;
+  if ( ( AttrVal($name,'allowUnknownContacts',1) == 0 ) && ( ! TelegramBot_IsKnownContact( $hash, $mpeer ) ) ) {
+    my $mName = $from->{first_name};
+    $mName .= " ".$from->{last_name} if ( defined($from->{last_name}) );
+    Log3 $name, 3, "TelegramBot $name: Message from unknown Contact (id:$mpeer: name:$mName:) blocked";
+    
+    return $ret;
   }
 
   # check peers beside from only contact (shared contact) and new_chat_participant are checked
@@ -2038,8 +2112,8 @@ sub TelegramBot_ResetPolling($) {
 
   RemoveInternalTimer($hash);
 
-  HttpUtils_Close(\%TelegramBot_hu_upd_params); 
-  HttpUtils_Close(\%TelegramBot_hu_do_params); 
+  HttpUtils_Close( $hash->{HU_UPD_PARAMS} ); 
+  HttpUtils_Close( $hash->{HU_DO_PARAMS} ); 
   
   $hash->{WAIT} = 0;
   $hash->{FAILS} = 0;
@@ -2097,7 +2171,7 @@ sub TelegramBot_Setup($) {
   delete( $hash->{sentMsgResult} );
 
   # remove timer for retry
-  RemoveInternalTimer(\%TelegramBot_hu_do_params);
+  RemoveInternalTimer($hash->{HU_DO_PARAMS});
   
   $hash->{URL} = "https://api.telegram.org/bot".$hash->{Token}."/";
 
@@ -2486,6 +2560,17 @@ sub TelegramBot_checkAllowedPeer($$$) {
 
 
 #####################################
+#  INTERNAL: get only numeric part of a value (simple)
+sub TelegramBot_AttrNum($$$)
+{
+  my ($d,$n,$default) = @_;
+  my $val = AttrVal($d,$n,$default);
+  $val =~ s/[^-\.\d]//g;
+  return $val;
+} 
+
+
+#####################################
 #  INTERNAL: Convert (Mark) a scalar as UTF8 - coming from telegram
 sub TelegramBot_GetUTF8Back( $ ) {
   my ( $data ) = @_;
@@ -2690,7 +2775,10 @@ sub TelegramBot_BinaryFileWrite($$$) {
           <dd> to send the message "Bye" to a contact or chat with the id "1234567". Chat ids might be negative and need to be specified with a leading hyphen (-). <br></dd>
       <dl>
     </li>
-    <li><code>reply &lt;msgid&gt; [ @&lt;peer1&gt; ] &lt;text&gt;</code><br>Sends the given message as a reply to the msgid (number) given to the given peer or if peer is ommitted to the defined default peer user. Only a single peer can be specified. Beside the handling handling of the message as a reply to a message received earlier, the peer and message handling is otherwise identical to the msg command. 
+    <li><code>reply &lt;msgid&gt; [ @&lt;peer1&gt; ] &lt;text&gt;</code><br>Sends the given message as a reply to the msgid (number) given to the given peer or if peer is ommitted to the defined default peer user. Only a single peer can be specified. Beside the handling of the message as a reply to a message received earlier, the peer and message handling is otherwise identical to the msg command. 
+    </li>
+
+    <li><code>msgEdit &lt;msgid&gt; [ @&lt;peer1&gt; ] &lt;text&gt;</code><br>Changes the given message on the recipients clients. The msgid of the message to be changed must match a valid msgId and the peers need to match the original recipient, so only a single peer can be given or if peer is ommitted the defined default peer user is used. Beside the handling of a change of an existing message, the peer and message handling is otherwise identical to the msg command. 
     </li>
 
     <li><code>sendImage|image [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given peer(s) or if ommitted to the default peer. 
@@ -2729,6 +2817,8 @@ sub TelegramBot_BinaryFileWrite($$$) {
     <li><code>defaultPeerCopy &lt;1 (default) or 0&gt;</code><br>Copy all command results also to the defined defaultPeer. If set results are sent both to the requestor and the defaultPeer if they are different. 
     </li> 
 
+    <li><code>parseModeSend &lt;0_None or 1_Markdown or 2_HTML or 3_Inmsg &gt;</code><br>Specify the parse_mode (allowing formatting of text messages) for sent text messages. 0_None is the default where no formatting is used and plain text is sent. The different formatting options for markdown or HTML are described here <a href="https://core.telegram.org/bots/api/#formatting-options">https://core.telegram.org/bots/api/#formatting-options</a>. The option 3_Inmsg allows to specify the correct parse_mode at the beginning of the message (e.g. "Markdown*bold text*..." as message).
+    </li> 
   <br>
     <li><code>cmdKeyword &lt;keyword&gt;</code><br>Specify a specific text that needs to be sent to make the rest of the message being executed as a command. 
       So if for example cmdKeyword is set to <code>ok fhem</code> then a message starting with this string will be executed as fhem command 
