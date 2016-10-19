@@ -35,6 +35,9 @@
 # 11.10.2016 : A.Goebel : add implement hex write from ebusctl
 # 11.10.2016 : A.Goebel : add set initial reading name after "set" to "class~variable"
 # 11.10.2016 : A.Goebel : fix "set hex" is only available if ebusWritesEnabled is '1'
+# 13.10.2016 : A.Goebel : fix "set hex" referres to "ebusctl hex"
+# 13.10.2016 : A.Goebel : fix "class" is now optional for ebusctl
+# 18.10.2016 : A.Goebel : fix removed content of <comment> from attribute names for readings
 
 package main;
 
@@ -70,10 +73,12 @@ my %sets = (
 );
 
 my %setsForWriting = ();
+my %getsForWriting = ();
 
 my $allSetParams           = "";
 my $allSetParamsForWriting = "";
 my $allGetParams           = "";
+my $allGetParamsForWriting = "";
 my $delimiter              = "~";
 
 my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading event-min-interval ebusWritesEnabled:0,1 valueFormat:textField-long";
@@ -98,7 +103,8 @@ GAEBUS_Initialize($)
 
   %sets = ( "reopen" => [] );
   %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
-  %setsForWriting = ( "hex" => [] );
+  %setsForWriting = ();
+  %getsForWriting = ( "hex" => [] );
   
   GAEBUS_initParams($hash);
 
@@ -114,6 +120,7 @@ GAEBUS_initParams ($)
   #   $allSetParams
   #   $allSetParamsForWriting
   #   $allGetParams
+  #   $allGetParamsForWriting
 
   $allSetParams = "";
   foreach my $setval (sort keys %sets) 
@@ -159,6 +166,22 @@ GAEBUS_initParams ($)
 	}
 	#Log3 ($hash, 2, "GAEBUS Initialize: $getval:$allGetParams");
   }
+
+
+  $allGetParamsForWriting = "";
+  foreach my $setval (sort keys %getsForWriting) 
+  {
+	Log3 ($hash, 4, "GAEBUS Initialize params for getsForWriting: $setval");
+	if ( (@{$getsForWriting{$setval}}) > 0)
+	{
+          $allGetParamsForWriting .= $setval.":".join (",", @{$getsForWriting{$setval}})." ";
+	}
+	else
+	{
+          $allGetParamsForWriting .= $setval." ";
+	}
+	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParamsForWriting");
+  }
 }
 
 #####################################
@@ -189,6 +212,8 @@ GAEBUS_Define($$)
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "GAEBUS_GetUpdates", $hash, 0);
+
+  $hash->{helper}{longAttributesCount} = 0;
 
   return undef;
 }
@@ -239,14 +264,6 @@ GAEBUS_Set($@)
     return undef;
   }
 
-  if ($type eq "hex")
-  {
-    Log3 ($hash, 4, "$name Set $type $arg");
-
-    my $answer = GAEBUS_doEbusCmd ($hash, "h", "", "", "$arg", "", 0);
-
-    return $answer;
-  }
 
   # handle commands defined in %sets
 
@@ -259,11 +276,21 @@ GAEBUS_Set($@)
 
         my $attrname = $type.$delimiter.$arg;
         $attrname =~ s/\#install/install/;
-
-	Log3 ($hash, 3, "$name: set $attrname");
-        addToDevAttrList($name, $attrname);
         my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
-	$attr{$name}{$attrname} = $class.$delimiter.$var unless (defined $attr{$name}{$attrname});
+        my $shortAttrname = join ($delimiter, ($io, $class, $var));
+
+	#Log3 ($hash, 3, "$name: set $attrname");
+	Log3 ($hash, 3, "$name: set for reading $attrname");
+
+        addToDevAttrList($name, $shortAttrname);
+
+	if (! defined $attr{$name}{$attrname}) {
+          if ($class eq "") {
+	    $attr{$name}{$shortAttrname} = $var;
+          } else {
+	    $attr{$name}{$shortAttrname} = join ("-", ($class, $var));
+          }
+        }
 
         return undef;
   }
@@ -304,7 +331,7 @@ GAEBUS_Set($@)
       #Log3 ($name, 4, "$name Set attr cmd  $readingcmdname");
     }
     $actSetParams .= join (" ", sort keys %writings);
-  
+
 
     # handle write commands (which were defined above)
 
@@ -317,10 +344,21 @@ GAEBUS_Set($@)
 
         my $attrname = $type.$delimiter.$arg;
         $attrname =~ s/\#install/install/;
+        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+        my $shortAttrname = join ($delimiter, ($io, $class, $var));
 
-	Log3 ($hash, 3, "$name: set $attrname");
-        addToDevAttrList($name, $attrname);
-	$attr{$name}{$attrname} = "" unless (defined $attr{$name}{$attrname});
+	Log3 ($hash, 3, "$name: set for writing $attrname");
+        #addToDevAttrList($name, $attrname);
+
+        addToDevAttrList($name, $shortAttrname);
+
+	if (! defined $attr{$name}{$attrname}) {
+          if ($class eq "") {
+	    $attr{$name}{$shortAttrname} = $var;
+          } else {
+	    $attr{$name}{$shortAttrname} = join ("-", ($class, $var));
+          }
+        }
 
         return undef;
     }
@@ -341,7 +379,6 @@ GAEBUS_Set($@)
 
   }
 
-
   return "Unknown argument $type, choose one of " . $actSetParams
   	if(!defined($sets{$type}));
 
@@ -353,18 +390,58 @@ sub
 GAEBUS_Get($@)
 {
   my ($hash, @a) = @_;
-  my $type = $hash->{TYPE};
   my $name = $hash->{NAME};
 
   my $arg = (defined($a[2]) ? $a[2] : "");
   my $rsp;
   my $varname = $a[0];
-
+  my $type    = $a[1];
 
   my $readingname = ""; 
   my $readingcmdname  = ""; 
 
-  return "\"get $type\" needs at least one parameter" if(@a < 2);
+  return "\"get GAEBUS\" needs at least one parameter" if(@a < 2);
+
+  if ($type eq "hex")
+  {
+    Log3 ($hash, 4, "$name Set $type $arg");
+
+    my $answer = GAEBUS_doEbusCmd ($hash, "h", "", "", "$arg", "", 0);
+
+    return $answer;
+  }
+
+  if ($type eq "removeCommentFromAttributeNames")
+  {
+    Log3 ($hash, 4, "$name Get $type $arg");
+    my $answer = "shortened the follwing attribute names\n"; 
+
+    foreach my $oneattr (sort keys %{$attr{$name}})
+    {
+      if ($oneattr =~ /$delimiter/) {
+        my ($io,$class,$var,$comment) = split ($delimiter, $oneattr, 4);
+        if (defined ($comment)) {
+
+          # attribute name contains comment as 4-th part
+
+          my $newattrname = join ($delimiter, ($io, $class, $var));
+
+          $answer .= $oneattr." to ".$newattrname."\n";
+
+          $attr{$name}{userattr} =~ s/$oneattr//;
+          addToDevAttrList($name, $newattrname);
+
+          $attr{$name}{$newattrname} = $attr{$name}{$oneattr};
+          delete ($attr{$name}{$oneattr});
+
+        }
+      }
+    }
+    $hash->{helper}{longAttributesCount} = 0;
+
+    return $answer;
+  }
+
 
   # extend possible parameters by the readings defined in attributes
 
@@ -389,7 +466,7 @@ GAEBUS_Get($@)
     $readingname       =~ s/:.*//;
 
     # only for "r" commands
-    if ($oneattr =~ /^[rh].*$delimiter.*$delimiter.*$delimiter.*$/)
+    if ($oneattr =~ /^r$delimiter.*$delimiter.*$/)
     {
       $readings{$readingname} = $readingcmdname;
       $readingsCmdaddon{$readingname} = $cmdaddon;
@@ -402,6 +479,14 @@ GAEBUS_Get($@)
   }
   $actGetParams .= join (",", sort keys %readings);
 
+  if ($hash->{helper}{longAttributesCount} > 0) {
+    $actGetParams .= " removeCommentFromAttributeNames";
+  }
+  my $ebusWritesEnabled = (defined($attr{$name}{"ebusWritesEnabled"})) ? $attr{$name}{"ebusWritesEnabled"} : 0;
+
+  if ($ebusWritesEnabled) {
+    $actGetParams .= " ".join (" ", (sort keys %getsForWriting));
+  }
 
   # handle "read" parameters and update Reading
 
@@ -649,14 +734,14 @@ GAEBUS_Attr(@)
       if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
         my $av = eval $attrVal;
         if( $@ ) {
-          Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $attrname: ". $@);
+          Log3 ($hash->{NAME}, 3, $hash->{NAME} ."set $attrname: ". $@);
         } else {
           $attrVal = $av if( ref($av) eq "HASH" );
         }
         $hash->{helper}{$attrname} = $attrVal;
 
         foreach my $key (keys %{ $hash->{helper}{$attrname} }) {
-          Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
+          Log3 ($hash->{NAME}, 4, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
         }
         #return "set HERE??";
 
@@ -666,6 +751,17 @@ GAEBUS_Attr(@)
       }
       return undef;
     } 
+
+    if (!defined $attr{$name}{$attrname}) 
+    {
+      # attribute is not yet defined	
+      if ( $attrname =~ /$delimiter/ )
+      {
+        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+        $hash->{helper}{longAttributesCount}++ if (defined($comment));
+        #Log3 ($hash->{NAME}, 1, "$hash->{NAME} helper longAttributesCount set to ".$hash->{helper}{longAttributesCount});
+      }
+    }
 
     if (defined $attr{$name}{$attrname}) 
     {
@@ -792,7 +888,8 @@ GAEBUS_doEbusCmd($$$$$$$)
     $class =~ s/install/#install/;
 
     $cmd = "$io ";
-    $cmd .= "-c $class $var ";
+    $cmd .= "-c $class " if ($class ne "");
+    $cmd .= "$var ";
     $cmd .= "$writeValues";
 
   } elsif ($action eq "f") {
@@ -807,8 +904,9 @@ GAEBUS_doEbusCmd($$$$$$$)
 
     $cmd = "$io ";
     $cmd .= " -f " if ($io ne "h");
-    $cmd .= "-c $class $var";
-    $cmd .= " $cmdaddon";
+    $cmd .= "-c $class " if ($class ne "");
+    $cmd .= "$var ";
+    $cmd .= "$cmdaddon";
 
     #$cmd =~ s/^h /r /; #obsolete
 
@@ -817,14 +915,14 @@ GAEBUS_doEbusCmd($$$$$$$)
     $cmd = "$io ";
     $cmd .= " -f " if ($io ne "h");
     $cmd .= "-v ";
-    $cmd .= "-c $class $var";
+    $cmd .= "-c $class " if ($class ne "");
+    $cmd .= "$var ";
 
     #$cmd =~ s/^h /r /; # obsolete
 
   } elsif ($action eq "h") {
 
-    #HERE
-    $cmd = "w $writeValues";
+    $cmd = "hex $writeValues";
   }
   
 
@@ -881,7 +979,8 @@ GAEBUS_doEbusCmd($$$$$$$)
 
     %sets = ( "reopen" => [] );
     %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
-    %setsForWriting = ( "hex" => [] );
+    %setsForWriting = ();
+    %getsForWriting = ( "hex" => [] );
 
     my $cnt = 0;
     foreach my $line (split /\n/, $actMessage) {
@@ -890,7 +989,7 @@ GAEBUS_doEbusCmd($$$$$$$)
       $line =~ s/ /_/g; # no blanks in names and comments
       $line =~ s/$delimiter/_/g; # clean up the delimiter within the text
 
-      Log3 ($name, 3, "$name $line");
+      Log3 ($name, 4, "$name $line");
 
       #my ($io,$class,$var) = split (",", $line, 3);
       my ($io, $class, $var, $comment, @params) = split (",", $line, 5);
@@ -1061,7 +1160,7 @@ GAEBUS_GetUpdatesDoit($)
   foreach my $oneattr (keys %{$attr{$name}})
   {
     # only for "r" commands
-    if ($oneattr =~ /^[rh].*$delimiter.*$delimiter.*$delimiter.*$/)
+    if ($oneattr =~ /^r$delimiter.{1,5}$delimiter.*/)
     {
 
       my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
@@ -1125,6 +1224,8 @@ GAEBUS_GetUpdatesDone($)
   }
   readingsEndUpdate($hash, 1);
   
+#HERE
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
 
 }
@@ -1203,26 +1304,24 @@ GAEBUS_valueFormat(@)
   <a name="GAEBUS"></a>
   <b>Set </b>
   <ul>
-    <li>hex<br>
-        Will pass the input value to the "write" command of ebusd. See "ebusctl help write" for valid parameters.<br>
-        This command is only available if "ebusWritesEnabled" is set to '1'.<br>
-        </li><br>
     <li>reopen<br>
         Will close and open the socket connection.
         </li><br>
     <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt<br>
+        [r]~&lt;class&gt;~&lt;variable-name&gt;~<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used as the name for the reading which are read from ebusd in the interval specified.<br>
+        The content of &lt;comment$gt; is dropped and not added to the attribute name.<br>
         </li><br>
     <li>[w]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt<br>
+        [w]~&lt;class&gt;~&lt;variable-name&gt;<br>
         They will only appear if the attribute "ebusWritesEnabled" is set to "1"<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used for set commands to modify parameters for ebus devices<br>
         Hint: if the values for the attributes are prefixed by "set-" then all possible parameters will be listed in one block<br>
+        The content of &lt;comment$gt; is dropped and not added to the attribute name.<br>
         </li><br>
   </ul>
 
@@ -1237,6 +1336,10 @@ GAEBUS_valueFormat(@)
         Execude <i>find</i> command on ebusd. Result will be used to display supported "set" and "get" commands.
         </li><br>
 
+    <li>hex<br>
+        Will pass the input value to the "hex" command of ebusd. See "ebusctl help hex" for valid parameters.<br>
+        This command is only available if "ebusWritesEnabled" is set to '1'.<br>
+        </li><br>
 
     <li>reading &lt;reading-name&gt<br>
         Will read the actual value form ebusd and update the reading.
@@ -1245,6 +1348,12 @@ GAEBUS_valueFormat(@)
     <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will read this variable from the ebusd and show the result as a popup.<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
+        </li><br>
+
+    <li>removeCommentFromAttributeNames<br>
+        This will migrate the former used attribute names of format "[rw]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;"
+        into the format "[rw]~&lt;class&gt; &lt;variable-name&gt;".<br>
+	It is only available if such attributes are defined.<br>
         </li><br>
 
   </ul>
@@ -1264,7 +1373,7 @@ GAEBUS_valueFormat(@)
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt;</code><br>
+        <code>[r]~&lt;class&gt;~&lt;variable-name&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
@@ -1276,7 +1385,7 @@ GAEBUS_valueFormat(@)
         This can be used to request a single value if more than one is retrieved from ebus.<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
+        <code>[w]~&lt;class&gt;~&lt;variable-name&gt;</code><br>
         define parameters that can be changed on ebus devices (using the write command from ebusctl)
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name that will be used in set to change a parameter for a ebus device.<br>
