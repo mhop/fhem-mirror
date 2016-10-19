@@ -192,8 +192,7 @@ sub Hyperion_list2array($$)
 sub Hyperion_isLocal($)
 {
   my ($hash) = @_;
-  return 1 if ($hash->{IP} eq "localhost" || $hash->{IP} eq "127.0.0.1");
-  return undef;
+  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.(0{1,2})?1)$/)?1:undef;
 }
 
 sub Hyperion_Get($@)
@@ -762,7 +761,7 @@ sub Hyperion_Attr(@)
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash  = $defs{$name};
   my $err   = undef;
-  my $local = ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.(0{1,2})?1)$/)?1:undef;
+  my $local = Hyperion_isLocal($hash);
   if ($cmd eq "set")
   {
     if ($attr_name eq "hyperionBin")
@@ -771,9 +770,9 @@ sub Hyperion_Attr(@)
       {
         $err = "Invalid value $attr_value for attribute $attr_name. Must be a path like /usr/bin/hyperiond.";
       }
-      elsif (defined $local && !-e $attr_value)
+      elsif ($local && !-e $attr_value)
       {
-        $err = "The given file $attr_value is not an available file.";
+        $err = "The given file $attr_value is not available.";
       }
     }
     elsif ($attr_name eq "hyperionConfigDir")
@@ -782,9 +781,9 @@ sub Hyperion_Attr(@)
       {
         $err = "Invalid value $attr_value for attribute $attr_name. Must be a path with trailing slash like /etc/hyperion/.";
       }
-      elsif (defined $local && !-d $attr_value)
+      elsif ($local && !-d $attr_value)
       {
-        $err = "The given directory $attr_value is not an available directory.";
+        $err = "The given directory $attr_value is not available.";
       }
       else
       {
@@ -837,7 +836,7 @@ sub Hyperion_Attr(@)
     Hyperion_Call($hash);
   }
   return $err if (defined $err);
-  return;
+  return undef;
 }
 
 sub Hyperion_Call($;$)
