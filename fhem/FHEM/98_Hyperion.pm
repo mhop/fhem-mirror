@@ -762,7 +762,7 @@ sub Hyperion_Attr(@)
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash  = $defs{$name};
   my $err   = undef;
-  my $local = ($hash->{IP} =~ /^(localhost|127.0.0.1)$/)?1:undef;
+  my $local = ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.(0{1,2})?1)$/)?1:undef;
   if ($cmd eq "set")
   {
     if ($attr_name eq "hyperionBin")
