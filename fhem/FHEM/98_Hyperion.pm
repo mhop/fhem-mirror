@@ -224,11 +224,11 @@ sub Hyperion_Read($)
 {
   my ($hash)  = @_;
   my $name    = $hash->{NAME};
-  my $buf  = DevIo_SimpleRead($hash);
+  my $buf     = DevIo_SimpleRead($hash);
   return undef if (!$buf);
-  my $result = ($hash->{PARTIAL}) ? $hash->{PARTIAL}.$buf : $buf;
+  my $result  = $hash->{PARTIAL}?$hash->{PARTIAL}.$buf:$buf;
   $hash->{PARTIAL} = $result;
-  return undef if ($buf !~ /(^.+"success":(true|false)\}$)/ );
+  return undef if ($buf !~ /(^.+"success":(true|false)\}$)/);
   Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned result: $result";
   delete $hash->{PARTIAL};
   my %Hyperion_sets_local = %Hyperion_sets;
@@ -512,6 +512,8 @@ sub Hyperion_Set($@)
     my $confdir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
     my $binpath  = AttrVal($name,"hyperionBin","/usr/bin/hyperiond");
     my $bin = (split("/",$binpath))[scalar(split("/",$binpath)) - 1];
+    $bin =~ s/\.sh$//
+      if ($bin =~ /\.sh$/);
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
     my $sudo = ($user eq "root" || int AttrVal($name,"hyperionNoSudo",0) == 1) ? "" : "sudo ";
@@ -760,7 +762,7 @@ sub Hyperion_Attr(@)
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash  = $defs{$name};
   my $err   = undef;
-  my $local = ($hash->{IP} eq "localhost" || $hash->{IP} eq "127.0.0.1") ? "" : undef;
+  my $local = ($hash->{IP} =~ /^(localhost|127.0.0.1)$/)?1:undef;
   if ($cmd eq "set")
   {
     if ($attr_name eq "hyperionBin")
@@ -862,7 +864,7 @@ sub Hyperion_devStateIcon($;$)
   my $name = $hash->{NAME};
   my $rgb = ReadingsVal($name,"rgb","");
   my $dim = ReadingsVal($name,"dim",10);
-  my $ico = (int($dim / 10) * 10 < 10) ? 10 : int($dim / 10) * 10;
+  my $ico = (int($dim / 10) * 10 < 10)?10:int($dim / 10) * 10;
   return ".*:off:toggle"
     if (Value($name) eq "off");
   return ".*:light_exclamation"
@@ -1050,6 +1052,7 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>hyperionBin</i><br>
       path to the hyperion executable<br>
+      OpenELEC users may set hyperiond.sh as executable<br>
       default: /usr/bin/hyperiond
     </li>
     <li>
