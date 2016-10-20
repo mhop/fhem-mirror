@@ -4385,7 +4385,7 @@ createNtfyHash()
                  grep { $defs{$_}{NTFY_ORDER} } keys %defs;
   foreach my $d (@ntfyList) {
     if($defs{$d}{NOTIFYDEV}) {
-      foreach my $nd (split(",",$defs{$d}{NOTIFYDEV})) {
+      foreach my $nd (devspec2array($defs{$d}{NOTIFYDEV})) {
         $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
       }
     }
@@ -4393,7 +4393,7 @@ createNtfyHash()
   $ntfyHash{"*"} = [];
   foreach my $d (@ntfyList) {
     if($defs{$d}{NOTIFYDEV}) {
-      foreach my $nd (split(",",$defs{$d}{NOTIFYDEV})) {
+      foreach my $nd (devspec2array($defs{$d}{NOTIFYDEV})) {
         my $arr = $ntfyHash{$nd};
         push @{$arr}, $d if(!grep /^$d$/, @{$arr});
       }
