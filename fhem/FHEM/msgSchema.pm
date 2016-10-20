@@ -247,15 +247,16 @@ my $db = {
 
         'Pushsafer' => {
             'Normal' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'High' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'Low' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'           => '',
                     'TERMINAL'            => '',
+                    'EXPIRE'              => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
@@ -265,6 +266,7 @@ my $db = {
                 'High' => {
                     'RECIPIENT'           => '',
                     'TERMINAL'            => '',
+                    'EXPIRE'              => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
@@ -274,6 +276,7 @@ my $db = {
                 'Low' => {
                     'RECIPIENT'           => '',
                     'TERMINAL'            => '',
+                    'EXPIRE'              => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
                     'Pushsafer_ICON'      => '',
