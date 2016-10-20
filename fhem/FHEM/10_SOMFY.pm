@@ -1,13 +1,33 @@
-######################################################
-# $Id$
+##############################################################################
 #
+#     10_SOMFY.pm
+#
+#     This file is part of Fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with Fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+#
+# $Id$
+#  
 # SOMFY RTS / Simu Hz protocol module for FHEM
 # (c) Thomas Dankert <post@thomyd.de>
+# (c) Johannes Viegener / https://github.com/viegener/Telegram-fhem/tree/master/Somfy
 #
-# Needs CULFW V 1.59 or higher (support for "Y" command).
+# Discussed in FHEM Forum: https://forum.fhem.de/index.php/topic,53319.msg450080.html#msg450080
 #
-# Published under GNU GPL License, v2
-#
+##############################################################################
 # History:
 #	1.0		thomyd			initial implementation
 #
@@ -49,6 +69,22 @@
 #  2016-05-11 viegener - Handover SOMFY from thdankert/thomyd
 #  2016-05-11 viegener - Cleanup Todolist
 #  2016-05-11 viegener - Some additions to documentation (commandref)
+#  2016-05-13 habichvergessen - Extend SOMFY module to use Signalduino as iodev
+#  2016-05-13 viegener - Fix for CUL-SCC
+#  2016-05-16 habichvergessen - Fixes - on newly (autocreated entries)
+#  2016-05-16 habichvergessen - add rolling code / enckey for autocreate
+#  2016-05-16 viegener - Minor cleanup on code
+#  2016-05-16 viegener - Fix Issue#5 - autocreate preparation (code in modules pointer for address also checked for empty hash)
+#  2016-05-16 viegener - Ensure Ys message length correct before analyzing
+#  2016-05-29 viegener - Correct define for readingsval on rollingcode etc
+#  2016-05-29 viegener - Some cleanup - translations reduced
+#  2016-05-29 viegener - remove internals exact/position use only readings
+#  2016-05-29 viegener - Fix value in exact not being numeric (Forum449583)
+#  2016-10-06 viegener - add summary for fhem commandref
+#  2016-10-06 viegener - positionInverse for inverse operation 100 open 10 down 0 closed 
+#  2016-10-17 viegener - positionInverse test and fixes
+#  2016-10-18 viegener - positionInverse documentation and complettion (no change to set on/off logic)
+# 
 #  
 #  
 ###############################################################################
@@ -59,9 +95,11 @@
 ###############################################################################
 # Somfy Modul - OPEN
 ###############################################################################
+# 
+# - 
+# - Autocreate 
 # - Complete shutter / blind as different model
-# - 
-# - 
+# - Make better distinction between different IoTypes - CUL+SCC / Signalduino
 # - 
 # - 
 #
@@ -106,6 +144,13 @@ my %sendCommands = (
 	"stop" => "stop"
 );
 
+my %inverseCommands = (
+	"off" => "on",
+	"on" => "off",
+	"on-for-timer" => "off-for-timer",
+	"off-for-timer" => "on-for-timer"
+);
+
 my %somfy_c2b;
 
 my $somfy_defsymbolwidth = 1240;    # Default Somfy frame symbol width
@@ -139,18 +184,15 @@ my %positions = (
 
 my %translations = (
 	"0" => "open",  
-	"10" => "10",  
-	"20" => "20",  
-	"30" => "30",  
-	"40" => "40",  
-	"50" => "50",  
-	"60" => "60",  
-	"70" => "70",  
-	"80" => "80",  
-	"90" => "90",  
-	"100" => "100",  
 	"150" => "down",  
 	"200" => "closed" 
+);
+
+
+my %translations100To0 = (
+	"100" => "open",  
+	"10" => "down",  
+	"0" => "closed" 
 );
 
 
@@ -158,6 +200,7 @@ my %translations = (
 # Forward declarations
 #
 sub SOMFY_CalcCurrentPos($$$$);
+
 
 
 ######################################################
@@ -196,6 +239,7 @@ sub SOMFY_Initialize($) {
 	  . " drive-up-time-to-100"
 	  . " drive-up-time-to-open "
 	  . " additionalPosReading  "
+    . " positionInverse:1,0  "
 	  . " IODev"
 	  . " symbol-length"
 	  . " enc-key"
@@ -250,8 +294,6 @@ sub SOMFY_Define($$) {
 
 	$hash->{ADDRESS} = uc($address);
 
-	my $tn = TimeNow();
-
 	# check optional arguments for device definition
 	if ( int(@a) > 3 ) {
 
@@ -261,11 +303,13 @@ sub SOMFY_Define($$) {
 			  . "specify a 2 digits hex value (first nibble = A) "
 		}
 
+    # reset reading time on def to 0 seconds (1970)
+    my $tzero = FmtDateTime(0);
+
 		# store it as reading, so it is saved in the statefile
 		# only store it, if the reading does not exist yet
-		my $old_enc_key = uc(ReadingsVal($name, "enc_key", "invalid"));
-		if($old_enc_key eq "invalid") {
-			setReadingsVal($hash, "enc_key", uc($a[3]), $tn);
+    if(! defined( ReadingsVal($name, "enc_key", undef) )) {
+			setReadingsVal($hash, "enc_key", uc($a[3]), $tzero);
 		}
 
 		if ( int(@a) == 5 ) {
@@ -276,9 +320,8 @@ sub SOMFY_Define($$) {
 			}
 
 			# store it, if old reading does not exist yet
-			my $old_rolling_code = uc(ReadingsVal($name, "rolling_code", "invalid"));
-			if($old_rolling_code eq "invalid") {
-				setReadingsVal($hash, "rolling_code", uc($a[4]), $tn);
+      if(! defined( ReadingsVal($name, "rolling_code", undef) )) {
+				setReadingsVal($hash, "rolling_code", uc($a[4]), $tzero);
 			}
 		}
 	}
@@ -319,6 +362,9 @@ sub SOMFY_SendCommand($@)
 	my $name = $hash->{NAME};
 	my $numberOfArgs  = int(@args);
 
+	my $io = $hash->{IODev};
+  my $ioType = $io->{TYPE};
+
 	Log3($name,4,"SOMFY_sendCommand: $name -> cmd :$cmd: ");
 
   # custom control needs 2 digit hex code
@@ -334,43 +380,42 @@ sub SOMFY_SendCommand($@)
 		  . join( " ", sort keys %somfy_c2b );
 	}
 
-	my $io = $hash->{IODev};
-
-	## Do we need to change RFMode to SlowRF?
-	if (   defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"switch_rfmode"} ) )
-	{
-		if ( $attr{ $name }{"switch_rfmode"} eq "1" )
-		{    # do we need to change RFMode of IODev
-			my $ret =
-			  CallFn( $io->{NAME}, "AttrFn", "set",
-				( $io->{NAME}, "rfmode", "SlowRF" ) );
+	# CUL specifics
+	if ($ioType ne "SIGNALduino") {
+		## Do we need to change RFMode to SlowRF?
+		if (   defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"switch_rfmode"} ) )
+		{
+			if ( $attr{ $name }{"switch_rfmode"} eq "1" )
+			{    # do we need to change RFMode of IODev
+				my $ret =
+				  CallFn( $io->{NAME}, "AttrFn", "set",
+					( $io->{NAME}, "rfmode", "SlowRF" ) );
+			}
+		}
+	
+		## Do we need to change symbol length?
+		if (   defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"symbol-length"} ) )
+		{
+			$message = "t" . $attr{ $name }{"symbol-length"};
+			IOWrite( $hash, "Y", $message );
+			Log GetLogLevel( $name, 4 ),
+			  "SOMFY set symbol-length: $message for $io->{NAME}";
+		}
+	
+	
+		## Do we need to change frame repetition?
+		if ( defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"repetition"} ) )
+		{
+			$message = "r" . $attr{ $name }{"repetition"};
+			IOWrite( $hash, "Y", $message );
+			Log GetLogLevel( $name, 4 ),
+			  "SOMFY set repetition: $message for $io->{NAME}";
 		}
 	}
-
-	## Do we need to change symbol length?
-	if (   defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"symbol-length"} ) )
-	{
-		$message = "t" . $attr{ $name }{"symbol-length"};
-		IOWrite( $hash, "Y", $message );
-		Log GetLogLevel( $name, 4 ),
-		  "SOMFY set symbol-length: $message for $io->{NAME}";
-	}
-
-
-	## Do we need to change frame repetition?
-	if ( defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"repetition"} ) )
-	{
-		$message = "r" . $attr{ $name }{"repetition"};
-		IOWrite( $hash, "Y", $message );
-		Log GetLogLevel( $name, 4 ),
-		  "SOMFY set repetition: $message for $io->{NAME}";
-	}
-
-	my $value = $name ." ". join(" ", @args);
-
+	
 	# convert old attribute values to READINGs
 	my $timestamp = TimeNow();
 	if(defined($attr{$name}{"enc-key"} && defined($attr{$name}{"rolling-code"}))) {
@@ -401,12 +446,23 @@ sub SOMFY_SendCommand($@)
 	  . uc( $hash->{ADDRESS} );
 
 	## Log that we are going to switch Somfy
-	Log GetLogLevel( $name, 4 ), "SOMFY set $value: $message";
-	( undef, $value ) = split( " ", $value, 2 );    # Not interested in the name...
+	Log GetLogLevel( $name, 4 ), "SOMFY set $name " . join(" ", @args) . ": $message";
 
 	## Send Message to IODev using IOWrite
-	Log3($name,5,"SOMFY_sendCommand: $name -> message :$message: ");
-	IOWrite( $hash, "Y", $message );
+	if ($ioType eq "SIGNALduino") {
+		my $SignalRepeats = AttrVal($name,'repetition', '6');
+		# swap address, remove leading s
+		my $decData = substr($message, 1, 8) . substr($message, 13, 2) . substr($message, 11, 2) . substr($message, 9, 2);
+		
+		my $check = SOMFY_RTS_Check($name, $decData);
+		my $encData = SOMFY_RTS_Crypt("e", $name, substr($decData, 0, 3) . $check . substr($decData, 4));
+		$message = 'P43#' . $encData . '#R' . $SignalRepeats;
+		#Log3 $hash, 4, "$hash->{IODev}->{NAME} SOMFY_sendCommand: $name -> message :$message: ";
+		IOWrite($hash, 'sendMsg', $message);
+	} else {
+		Log3($name,5,"SOMFY_sendCommand: $name -> message :$message: ");
+		IOWrite( $hash, "Y", $message );
+	}
 
 	# increment encryption key and rolling code
 	my $enc_key_increment      = hex( $enckey );
@@ -419,38 +475,41 @@ sub SOMFY_SendCommand($@)
 	setReadingsVal($hash, "enc_key", $new_enc_key, $timestamp);
 	setReadingsVal($hash, "rolling_code", $new_rolling_code, $timestamp);
 
-	## Do we need to change symbol length back?
-	if (   defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"symbol-length"} ) )
-	{
-		$message = "t" . $somfy_defsymbolwidth;
-		IOWrite( $hash, "Y", $message );
-		Log GetLogLevel( $name, 4 ),
-		  "SOMFY set symbol-length back: $message for $io->{NAME}";
-	}
-
-	## Do we need to change repetition back?
-	if (   defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"repetition"} ) )
-	{
-		$message = "r" . $somfy_defrepetition;
-		IOWrite( $hash, "Y", $message );
-		Log GetLogLevel( $name, 4 ),
-		  "SOMFY set repetition back: $message for $io->{NAME}";
-	}
-
-	## Do we need to change RFMode back to HomeMatic??
-	if (   defined( $attr{ $name } )
-		&& defined( $attr{ $name }{"switch_rfmode"} ) )
-	{
-		if ( $attr{ $name }{"switch_rfmode"} eq "1" )
-		{    # do we need to change RFMode of IODev?
-			my $ret =
-			  CallFn( $io->{NAME}, "AttrFn", "set",
-				( $io->{NAME}, "rfmode", "HomeMatic" ) );
+	# CUL specifics
+	if ($ioType ne "SIGNALduino") {
+		## Do we need to change symbol length back?
+		if (   defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"symbol-length"} ) )
+		{
+			$message = "t" . $somfy_defsymbolwidth;
+			IOWrite( $hash, "Y", $message );
+			Log GetLogLevel( $name, 4 ),
+			  "SOMFY set symbol-length back: $message for $io->{NAME}";
+		}
+	
+		## Do we need to change repetition back?
+		if (   defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"repetition"} ) )
+		{
+			$message = "r" . $somfy_defrepetition;
+			IOWrite( $hash, "Y", $message );
+			Log GetLogLevel( $name, 4 ),
+			  "SOMFY set repetition back: $message for $io->{NAME}";
+		}
+	
+		## Do we need to change RFMode back to HomeMatic??
+		if (   defined( $attr{ $name } )
+			&& defined( $attr{ $name }{"switch_rfmode"} ) )
+		{
+			if ( $attr{ $name }{"switch_rfmode"} eq "1" )
+			{    # do we need to change RFMode of IODev?
+				my $ret =
+				  CallFn( $io->{NAME}, "AttrFn", "set",
+					( $io->{NAME}, "rfmode", "HomeMatic" ) );
+			}
 		}
 	}
-
+	
 	##########################
 	# Look for all devices with the same address, and set state, enc-key, rolling-code and timestamp
 	my $code = "$hash->{ADDRESS}";
@@ -463,6 +522,7 @@ sub SOMFY_SendCommand($@)
 		$lh->{READINGS}{rolling_code}{TIME} = $tn;
 		$lh->{READINGS}{rolling_code}{VAL}  = $new_rolling_code;
 	}
+	
 	return $ret;
 } # end sub SOMFY_SendCommand
 
@@ -489,13 +549,43 @@ sub SOMFY_Translate($) {
 	}
 
 	return $v
-} # end sub SOMFY_Runden
+} 
+
+
+###################################
+sub SOMFY_Translate100To0($) {
+	my ($v) = @_;
+
+	if(exists($translations100To0{$v})) {
+		$v = $translations100To0{$v}
+	}
+
+	return $v
+}
 
 
 #############################
 sub SOMFY_Parse($$) {
 	my ($hash, $msg) = @_;
+	my $name = $hash->{NAME};
 
+  my $ioType = $hash->{TYPE};
+#	return "IODev unsupported" if ((my $ioType = $hash->{TYPE}) !~ m/^(CUL|SIGNALduino)$/);
+
+	# preprocessing if IODev is SIGNALduino	
+	if ($ioType eq "SIGNALduino") {
+		my $encData = substr($msg, 2);
+		return "Somfy RTS message format error!" if ($encData !~ m/A[0-9A-F]{13}/);
+	
+		my $decData = SOMFY_RTS_Crypt("d", $name, $encData);
+		my $check = SOMFY_RTS_Check($name, $decData);
+		
+		return "Somfy RTS checksum error!" if ($check ne substr($decData, 3, 1));
+		
+		Log3 $name, 4, "$name: Somfy RTS preprocessing check: $check enc: $encData dec: $decData";
+		$msg = substr($msg, 0, 2) . $decData;
+	}
+	
 	# Msg format:
 	# Ys AB 2C 004B 010010
 	# address needs bytes 1 and 3 swapped
@@ -505,8 +595,12 @@ sub SOMFY_Parse($$) {
 		return $hash->{NAME};
 	}
 
-    # get address
-    my $address = uc(substr($msg, 14, 2).substr($msg, 12, 2).substr($msg, 10, 2));
+  
+  # Check for correct length
+  return "SOMFY incorrect length for command (".$msg.") / length should be 16" if ( length($msg) != 16 );
+  
+  # get address
+  my $address = uc(substr($msg, 14, 2).substr($msg, 12, 2).substr($msg, 10, 2));
 
     # get command and set new state
 	my $cmd = sprintf("%X", hex(substr($msg, 4, 2)) & 0xF0);
@@ -518,7 +612,7 @@ sub SOMFY_Parse($$) {
 
 	my $def = $modules{SOMFY}{defptr}{$address};
 
-	if($def) {
+	if ( ($def) && (keys %{ $def }) ) {   # Check also for empty hash --> issue #5
 		my @list;
 		foreach my $name (keys %{ $def }) {
       		my $lh = $def->{$name};
@@ -539,8 +633,12 @@ sub SOMFY_Parse($$) {
 		return @list;
 
 	} else {
-		Log3 $hash, 1, "SOMFY Unknown device $address, please define it";
-		return "UNDEFINED SOMFY_$address SOMFY $address";
+		# rolling code and enckey
+		my $rolling = substr($msg, 6, 4);
+		my $encKey = substr($msg, 2, 2);
+		
+		Log3 $hash, 1, "SOMFY Unknown device $address ($encKey $rolling), please define it";
+		return "UNDEFINED SOMFY_$address SOMFY $address $encKey $rolling";
 	}
 }
 ##############################
@@ -553,7 +651,48 @@ sub SOMFY_Attr(@) {
 	# $cmd can be "del" or "set"
 	# $name is device name
 	# aName and aVal are Attribute name and value
-	if ($cmd eq "set") {
+  
+  # Convert in case of change to positionINverse --> but only after init is done on restart this should not be recalculated
+  if ( ($aName eq 'positionInverse') && ( $init_done ) ) {
+    my $rounded;
+    my $stateTrans;
+    my $pos = ReadingsVal($name,'exact',undef);
+    if ( !defined($pos) ) {
+      $pos = ReadingsVal($name,'position',undef);
+    } 
+    if ($cmd eq "set") {
+      if ( ( $aVal ) && ( ! AttrVal( $name, "positionInverse", 0 ) ) ) {
+        # set to 1 and was 0 before - convert To100To10
+        # first exact then round to pos
+        $pos = SOMFY_ConvertTo100To0( $pos );
+        $rounded = SOMFY_Runden( $pos ); 
+        $stateTrans = SOMFY_Translate100To0( $rounded );
+      } elsif ( ( ! $aVal ) && ( AttrVal( $name, "positionInverse", 0 ) ) ) {
+        # set to 0 and was 1 before - convert From100To10
+        # first exact then round to pos
+        $pos = SOMFY_ConvertFrom100To0( $pos );
+        $rounded = SOMFY_Runden( $pos ); 
+        $stateTrans = SOMFY_Translate( $rounded );
+      }
+    } elsif ($cmd eq "del") {
+      if ( AttrVal( $name, "positionInverse", 0 ) ) {
+        # delete and was 1 before - convert From100To10
+        # first exact then round to pos
+        $pos = SOMFY_ConvertFrom100To0( $pos );
+        $rounded = SOMFY_Runden( $pos ); 
+        $stateTrans = SOMFY_Translate( $rounded );
+      }
+    }
+    if ( defined( $rounded ) ) {
+        readingsBeginUpdate($hash);         
+        readingsBulkUpdate($hash,"position",$rounded);         
+        readingsBulkUpdate($hash,"exact",$pos); 
+        readingsBulkUpdate($hash,"state",$stateTrans);
+        $hash->{STATE} = $stateTrans;
+        readingsEndUpdate($hash,1);  
+    }
+  
+  } elsif ($cmd eq "set") {
 		if($aName eq 'drive-up-time-to-100') {
 			return "SOMFY_attr: value must be >=0 and <= 100" if($aVal < 0 || $aVal > 100);
 		} elsif ($aName =~/drive-(down|up)-time-to.*/) {
@@ -653,6 +792,7 @@ sub SOMFY_InternalSet($@) {
 			$opts = $sets{$k};
 
       if (defined($opts)) {
+        $opts = "100,90,80,70,60,50,40,30,20,10,0" if ( $k eq "pos" );
 				push(@cList,$k . ':' . $opts);
 			} else {
 				push (@cList,$k);
@@ -677,18 +817,11 @@ sub SOMFY_InternalSet($@) {
 	
 	if($cmd eq 'pos') {
 		return "SOMFY_set: No pos specification"  if(!defined($arg1));
-		return  "SOMFY_set: $arg1 must be > 0 and < 100 for pos" if($arg1 < 0 || $arg1 > 100);
+		return  "SOMFY_set: $arg1 must be between 0 and 100 for pos" if($arg1 < 0 || $arg1 > 100);
 		return "SOMFY_set: Please set attr drive-down-time-to-100, drive-down-time-to-close, etc" 
 				if(!defined($t1downclose) || !defined($t1down100) || !defined($t1upopen) || !defined($t1up100));
 	}
 
-		### initialize locals
-	my $drivetime = 0; # timings until halt command to be sent for on/off-for-timer and pos <value> -> move by time
-	my $updatetime = 0; # timing until update of pos to be done for any unlimited move move to endpos or go-my / stop
-	my $move = $cmd;
-	my $newState;
-	my $updateState;
-	
 	# get current infos 
 	my $state = $hash->{STATE}; 
 	my $pos = ReadingsVal($name,'exact',undef);
@@ -696,12 +829,31 @@ sub SOMFY_InternalSet($@) {
 		$pos = ReadingsVal($name,'position',undef);
 	}
 
+  # do conversions
+  if ( AttrVal( $name, "positionInverse", 0 ) ) {
+    Log3($name,4,"SOMFY_set: $name Inverse before cmd:$cmd: arg1:$arg1: pos:$pos:");
+    $arg1 = SOMFY_ConvertFrom100To0( $arg1 ) if($cmd eq 'pos');
+    $pos = SOMFY_ConvertFrom100To0( $pos ); 	
+    
+    # $cmd = $inverseCommands{$cmd} if(exists($inverseCommands{$cmd}));
+    
+    Log3($name,4,"SOMFY_set: $name Inverse after  cmd:$cmd: arg1:$arg1: pos:$pos:");
+  }
+  
+  
+		### initialize locals
+	my $drivetime = 0; # timings until halt command to be sent for on/off-for-timer and pos <value> -> move by time
+	my $updatetime = 0; # timing until update of pos to be done for any unlimited move move to endpos or go-my / stop
+	my $move = $cmd;
+	my $newState;
+	my $updateState;
+	
 	# translate state info to numbers - closed = 200 , open = 0    (correct missing values)
 	if ( !defined($pos) ) {
 		if(exists($positions{$state})) {
 			$pos = $positions{$state};
 		} else {
-			$pos = $state;
+			$pos = ($state ne "???" ? $state : 0);	# fix runtime error
 		}
 		$pos = sprintf( "%d", $pos );
 	}
@@ -885,9 +1037,9 @@ sub SOMFY_InternalSet($@) {
 		## special case close is at 100 ("markisen")
 		if( ( $t1downclose == $t1down100) && ( $t1up100 == 0 ) ) {
 			if ( defined( $updateState )) {
-				$updateState = min( 100, $updateState );
+				$updateState = minNum( 100, $updateState );
 			}
-			$newState = min( 100, $posRounded );
+			$newState = minNum( 100, $posRounded );
 		}
 	}
 
@@ -962,8 +1114,75 @@ sub SOMFY_InternalSet($@) {
 ###
 ######################################################
 
+#############################
+sub SOMFY_ConvertFrom100To0($) {
+	my ($v) = @_;
+  
+  return $v if ( ! defined($v) );
+  return $v if ( length($v) == 0 );
+  
+  $v = minNum( 100, maxNum( 0, $v ) );
+  
+  return (( $v < 10 ) ? ( 200-($v*10.0) ) : ( (100-$v)*10.0/9 )); 
+} 
 
-###################################
+#############################
+sub SOMFY_ConvertTo100To0($) {
+	my ($v) = @_;
+  
+  return $v if ( ! defined($v) );
+  return $v if ( length($v) == 0 );
+  
+  $v = minNum( 200, maxNum( 0, $v ) );
+
+  return ( $v > 100 ) ? ( (200-$v)/10.0 ) : ( 100-(9*$v/10.0) ); 
+} 
+
+
+
+
+
+
+#############################
+sub SOMFY_RTS_Crypt($$$)
+{
+	my ($operation, $name, $data) = @_;
+	
+	my $res = substr($data, 0, 2);
+	my $ref = ($operation eq "e" ? \$res : \$data);
+	
+	for (my $idx=1; $idx < 7; $idx++)
+	{
+		my $high = hex(substr($data, $idx * 2, 2));
+		my $low = hex(substr(${$ref}, ($idx - 1) * 2, 2));
+		
+		my $val = $high ^ $low;
+		$res .= sprintf("%02X", $val);
+	}
+
+	return $res;	
+}
+
+#############################
+sub SOMFY_RTS_Check($$)
+{
+	my ($name, $data) = @_;
+	
+	my $checkSum = 0;
+	for (my $idx=0; $idx < 7; $idx++)
+	{
+		my $val = hex(substr($data, $idx * 2, 2));
+		$val &= 0xF0 if ($idx == 1);
+		$checkSum = $checkSum ^ $val ^ ($val >> 4);
+		##Log3 $name, 4, "$name: Somfy RTS check: " . sprintf("%02X, %02X", $val, $checkSum); 
+	}
+
+	$checkSum &= hex("0x0F");
+	
+	return sprintf("%X", $checkSum);	
+}
+
+#############################
 sub SOMFY_RoundInternal($) {
 	my ($v) = @_;
 	return sprintf("%d", ($v + ($somfy_posAccuracy/2)) / $somfy_posAccuracy) * $somfy_posAccuracy;
@@ -993,8 +1212,13 @@ sub SOMFY_TimedUpdate($) {
 	
 	# get current infos 
 	my $pos = ReadingsVal($hash->{NAME},'exact',undef);
+
+  if ( AttrVal( $hash->{NAME}, "positionInverse", 0 ) ) {
+    Log3($hash->{NAME},5,"SOMFY_TimedUpdate : pos before convert so far : $pos");
+    $pos = SOMFY_ConvertFrom100To0( $pos );
+  }
 	Log3($hash->{NAME},5,"SOMFY_TimedUpdate : pos so far : $pos");
-	
+  
 	my $dt = SOMFY_UpdateStartTime($hash);
   my $nowt = gettimeofday();
   
@@ -1024,7 +1248,7 @@ sub SOMFY_TimedUpdate($) {
 		} else {
 			Log3($hash->{NAME},4,"SOMFY_TimedUpdate: $hash->{NAME} -> update state in $hash->{runningtime} sec");
 		}
-    my $nstt = max($nowt+$utime-0.01, gettimeofday()+.1 );
+    my $nstt = maxNum($nowt+$utime-0.01, gettimeofday()+.1 );
     Log3($hash->{NAME},5,"SOMFY_TimedUpdate: $hash->{NAME} -> next time to stop: $nstt");
 		InternalTimer($nstt,"SOMFY_TimedUpdate",$hash,0);
 	}
@@ -1037,39 +1261,58 @@ sub SOMFY_TimedUpdate($) {
 #	SOMFY_UpdateState( $hash, $newState, $move, $updateState );
 sub SOMFY_UpdateState($$$$$) {
 	my ($hash, $newState, $move, $updateState, $doTrigger) = @_;
+	my $name = $hash->{NAME};
 
   my $addtlPosReading = AttrVal($hash->{NAME},'additionalPosReading',undef);
   if ( defined($addtlPosReading )) {
     $addtlPosReading = undef if ( ( $addtlPosReading eq "" ) or ( $addtlPosReading eq "state" ) or ( $addtlPosReading eq "position" ) or ( $addtlPosReading eq "exact" ) );
   }
 
+  my $newExact = $newState;
+  
 	readingsBeginUpdate($hash);
 
 	if(exists($positions{$newState})) {
 		readingsBulkUpdate($hash,"state",$newState);
 		$hash->{STATE} = $newState;
-
-		readingsBulkUpdate($hash,"position",$positions{$newState});
-		$hash->{position} = $positions{$newState};
     
-    readingsBulkUpdate($hash,$addtlPosReading,$positions{$newState}) if ( defined($addtlPosReading) );
+    $newExact = $positions{$newState};
+
+		readingsBulkUpdate($hash,"position",$newExact);
+
+    readingsBulkUpdate($hash,$addtlPosReading,$newExact) if ( defined($addtlPosReading) );
 
   } else {
-		my $rounded = SOMFY_Runden( $newState );
-		my $stateTrans = SOMFY_Translate( $rounded );
+
+    my $rounded;
+    my $stateTrans;
+  
+    Log3($name,4,"SOMFY_UpdateState: $name enter with  newState:$newState:   updatestate:$updateState:   move:$move:");
+
+    # do conversions
+    if ( AttrVal( $name, "positionInverse", 0 ) ) {
+      $newState = SOMFY_ConvertTo100To0( $newState );
+      $newExact = $newState;
+      $rounded = SOMFY_Runden( $newState );
+      $stateTrans = SOMFY_Translate100To0( $rounded );
+
+    } else {
+      $rounded = SOMFY_Runden( $newState );
+      $stateTrans = SOMFY_Translate( $rounded );
+    }
+  
+    Log3($name,4,"SOMFY_UpdateState: $name after conversions  newState:$newState:  rounded:$rounded:  stateTrans:$stateTrans:");
+
 		readingsBulkUpdate($hash,"state",$stateTrans);
 		$hash->{STATE} = $stateTrans;
 
 		readingsBulkUpdate($hash,"position",$rounded);
-		$hash->{position} = $rounded;
 
     readingsBulkUpdate($hash,$addtlPosReading,$rounded) if ( defined($addtlPosReading) );
-      
 
   }
 
-		readingsBulkUpdate($hash,"exact",$newState);
-	$hash->{exact} = $newState;
+  readingsBulkUpdate($hash,"exact",$newExact);
 
 	if ( defined( $updateState ) ) {
 		$hash->{updateState} = $updateState;
@@ -1143,9 +1386,9 @@ sub SOMFY_CalcCurrentPos($$$$) {
 
 	if(defined($t1down100) && defined($t1downclose) && defined($t1up100) && defined($t1upopen)) {
 		if( ( $t1downclose == $t1down100) && ( $t1up100 == 0 ) ) {
-			$pos = min( 100, $pos );
+			$pos = minNum( 100, $pos );
 			if($move eq 'on') {
-				$newPos = min( 100, $pos );
+				$newPos = minNum( 100, $pos );
 				if ( $pos < 100 ) {
 					# calc remaining time to 100% 
 					my $remTime = ( 100 - $pos ) * $t1down100 / 100;
@@ -1155,10 +1398,10 @@ sub SOMFY_CalcCurrentPos($$$$) {
 				}
 
 			} elsif($move eq 'off') {
-				$newPos = max( 0, $pos );
+				$newPos = maxNum( 0, $pos );
 				if ( $pos > 0 ) {
 					$newPos = $dt * 100 / ( $t1upopen );
-					$newPos = max( 0, ($pos - $newPos) );
+					$newPos = maxNum( 0, ($pos - $newPos) );
 				}
 			} else {
 				Log3($name,1,"SOMFY_CalcCurrentPos: $name move wrong $move");
@@ -1167,7 +1410,7 @@ sub SOMFY_CalcCurrentPos($$$$) {
 			if($move eq 'on') {
 				if ( $pos >= 100 ) {
 					$newPos = $dt * 100 / ( $t1downclose - $t1down100 );
-					$newPos = min( 200, $pos + $newPos );
+					$newPos = minNum( 200, $pos + $newPos );
 				} else {
 					# calc remaining time to 100% 
 					my $remTime = ( 100 - $pos ) * $t1down100 / 100;
@@ -1183,7 +1426,7 @@ sub SOMFY_CalcCurrentPos($$$$) {
 
 				if ( $pos <= 100 ) {
 					$newPos = $dt * 100 / ( $t1upopen - $t1up100 );
-					$newPos = max( 0, $pos - $newPos );
+					$newPos = maxNum( 0, $pos - $newPos );
 				} else {
 					# calc remaining time to 100% 
 					my $remTime = ( $pos - 100 ) * $t1up100 / 100;
@@ -1214,6 +1457,8 @@ sub SOMFY_CalcCurrentPos($$$$) {
 
 
 =pod
+=item summary    supporting devices using the SOMFY RTS protocol - window shades 
+=item summary_DE für Geräte, die das SOMFY RTS protocol unterstützen - Rolläden 
 =begin html
 
 <a name="SOMFY"></a>
@@ -1312,7 +1557,7 @@ sub SOMFY_CalcCurrentPos($$$$) {
 			The position is variying between 0 completely open and 100 for covering the full window.
 			The position must be between 0 and 100 and the appropriate
 			attributes drive-down-time-to-100, drive-down-time-to-close,
-			drive-up-time-to-100 and drive-up-time-to-open must be set.<br>
+			drive-up-time-to-100 and drive-up-time-to-open must be set. See also positionInverse attribute.<br>
 			</li>
 			</ul>
 
@@ -1342,6 +1587,11 @@ sub SOMFY_CalcCurrentPos($$$$) {
         for this "logical" device. An example for the physical device is a CUL.<br>
         Note: The IODev has to be set, otherwise no commands will be sent!<br>
         If you have both a CUL868 and CUL433, use the CUL433 as IODev for increased range.
+		</li><br>
+
+    <a name="positionInverse"></a>
+    <li>positionInverse<br>
+        Inverse operation for positions instead of 0 to 100-200 the positions are ranging from 100 to 10 (down) and then to 0 (closed). The pos set command will point in this case to the reversed pos values. This does NOT reverse the operation of the on/off command, meaning that on always will move the shade down and off will move it up towards the initial position.
 		</li><br>
 
     <a name="additionalPosReading"></a>
