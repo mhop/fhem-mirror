@@ -83,7 +83,7 @@ BlockingStart(;$)
 {
   my ($curr) = @_;
 
-  if($curr && $curr =~ m/^\d+$/) {
+  if($curr && $curr =~ m/^\d+$/ && $BC_hash{$curr}) {
     $BC_hash{$curr}{terminated} = 1;
     $curr = undef;
   }
