@@ -80,6 +80,7 @@ CUL_TX_Parse($$)
   my $now = time();
 
   my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   Log3 $name, 4, "CUL_TX $name $id3 ($msg)";
 
