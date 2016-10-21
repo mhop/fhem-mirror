@@ -290,7 +290,7 @@ my %zwave_class = (
                "055b03..02(..)" => '"cSceneDim:".hex($1)',
                "055b03..03(..)" => '"cSceneDouble:".hex($1)',
                "055b03..0([4-6])(..)" => '"cSceneMultiple_".
-                                                (hex($1)-1).":".hex($1)'}  },
+                                                (hex($1)-1).":".hex($2)'}  },
   IP_ASSOCIATION           => { id => '5c' },
   ANTITHEFT                => { id => '5d' },
   ZWAVEPLUS_INFO           => { id => '5e',
