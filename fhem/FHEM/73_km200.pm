@@ -892,7 +892,7 @@ sub km200_PostSingleService($)
 			{
 				my $TempSetPoint = substr($item->{id}, (rindex($item->{id}, "/") - length($item->{id}) +1));
 				
-				### Add service to the list of all known services
+				### Add service, which is one of the allowed terminologies at the same time, to the list of all known services
 				push (@TempSetpointNames, $TempSetPoint);
 			}
 			
@@ -2429,7 +2429,7 @@ sub km200_ParseHttpResponseInit($)
 
 				### Log file entry for debugging
 				Log3 $name, 5, $name . " : The ArrayItem is                                   : " .       $ArrayItem  ;
-				Log3 $name, 5, $name . " : The keys ArrayItem is                              : " . (keys $ArrayItem) ;
+				Log3 $name, 5, $name . " : The keys ArrayItem is                              : " . (keys %{$ArrayItem}) ;
 				
 				### Get array from scalar
 				my %ArrayHash = %{$ArrayItem};
