@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: Pushsafer: new option "picture", "picture2" and "picture3" for
+                        "message" set command to send pictures from local 
+                        filesystem or a IPCAM device. See commandref for details
   - change:  FB_CALLMONITOR: open TCP connection non-blocking,
                              shutdown connection when disabled
   - bugfix:  73_km200: Experimental keys on scalar is now forbidden

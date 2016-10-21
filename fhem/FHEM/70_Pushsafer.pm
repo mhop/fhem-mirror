@@ -32,6 +32,7 @@
 package main;
 
 use HttpUtils;
+use MIME::Base64 qw(encode_base64 encode_base64url);
 use utf8;
 
 my %Pushsaver_Params = (
@@ -44,7 +45,10 @@ my %Pushsaver_Params = (
     "key"       => {"short" => "k", "check" => qr/^[a-zA-Z\d]{20}$/},
     "urlText"   => {"short" => "ut"},
     "message"   => {"short" => "m"},
-    "ttl"       => {"short" => "l", "check" => qr/^\d+$/}
+    "ttl"       => {"short" => "l", "check" => qr/^\d+$/},
+    "picture"   => {"short" => "p"},
+    "picture2"  => {"short" => "p2"},
+    "picture3"  => {"short" => "p3"}
 );
 
 
@@ -149,7 +153,8 @@ sub Pushsafer_Set($$$@)
 sub Pushsafer_createBody($$)
 {
     my ($hash, $args) = @_;
-
+    my $name = $hash->{NAME};
+    
     my @urlParts;
     my @errs;
 
@@ -157,6 +162,9 @@ sub Pushsafer_createBody($$)
 
     foreach my $item (keys %{$args})
     {
+        my $key;
+        my $val;
+        
         if(exists($Pushsaver_Params{$item}))
         {
             if(exists($Pushsaver_Params{$item}{check}) and $args->{$item} !~ $Pushsaver_Params{$item}{check})
@@ -165,7 +173,8 @@ sub Pushsafer_createBody($$)
             }
             else
             {
-                push @urlParts, $Pushsaver_Params{$item}{short}."=".urlEncode($args->{$item});
+                $key = $Pushsaver_Params{$item}{short};
+                $val = $args->{$item}
             }
         }
         elsif(grep($Pushsaver_Params{$_}{short} eq $item,  keys(%Pushsaver_Params)))
@@ -178,17 +187,106 @@ sub Pushsafer_createBody($$)
             }
             else
             {
-                push @urlParts, $item."=".urlEncode($args->{$item});
+                $key = $item;
+                $val = $args->{$item}
             }
         }
         else
         {
-            push @errs, "unsupported parameter $item";
+            push @errs, "unsupported parameter: $item";
+            next;
         }
+        
+        if($key =~/^p\d?$/)
+        {
+            if(-r $val)
+            {
+                $val = Pushsafer_createDataUrl($hash, $val);
+                next unless(defined($val));
+            }
+            elsif($val =~ /^IPCAM:(\S+)$/)
+            {
+                my $ipcam = $1;
+                
+                if(!exists($defs{$ipcam}) or !exists($defs{$ipcam}{TYPE}) or $defs{$ipcam}{TYPE} ne "IPCAM")
+                {
+                    Log3 $name, 3, "Pushsafer ($name) - no such IPCAM device: $ipcam. sending message without a picture...";
+                    next;
+                }
+                
+                my $path = AttrVal($ipcam, "storage",$attr{global}{modpath}."/www/snapshots");
+                $path .= "/" unless($path =~ m,/$,);
+                $path .= ReadingsVal($ipcam, "last", "");
+                
+                $val = Pushsafer_createDataUrl($hash, $path);
+
+            }
+        }
+        
+        push @urlParts, $key."=".urlEncode($val);
     }
 
     return join("\n", @errs) if(@errs);
     return (undef, join("&", @urlParts));
+}
+
+
+#####################################
+# determine the image file format (reused from IPCAM module by Martin Fischer)
+sub Pushsafer_guessFileFormat($) 
+{
+    my ($src) = shift;
+    my $header;
+    my $srcHeader;
+
+    open(my $s, "<", $src) || return undef;
+    $src = $s;
+
+    my $reading = read($src, $srcHeader, 64);
+    return undef if(!$reading);
+
+    local($_) = $srcHeader;
+    
+    return "image/jpeg" if /^\xFF\xD8/;
+    return "image/png"  if /^\x89PNG\x0d\x0a\x1a\x0a/;
+    return "image/gif"  if /^GIF8[79]a/;
+    return undef;
+}
+#####################################
+# create a data URL schema from a image file
+sub Pushsafer_createDataUrl($$)
+{
+    my ($hash, $file) = @_;
+    my $name = $hash->{NAME};
+    
+    Log3 $name, 4, "Pushsafer ($name) - open image file: $file";
+
+    my ($err, @content) = FileRead({FileName => $file, ForceType => "file"});
+
+    if(defined($err))
+    {
+        Log3 $name, 3, "Pushsafer ($name) - unable to open image file: $file - sending message without picture...";
+    }
+    else
+    {
+        my $image = join($/, @content);
+        my $mime_type = Pushsafer_guessFileFormat(\$image);
+        
+        if(defined($mime_type))
+        {
+            Log3 $name, 5, "Pushsafer ($name) - found image of type: $mime_type";
+            
+            my $base_64 = encode_base64($image);
+            
+            return "data:$mime_type;base64,".$base_64;
+        }
+        else
+        {
+            Log3 $name, 3, "Pushsafer ($name) - unsupported image type for $file - see commandref for supported image formats";
+        }   
+    }
+    
+    return undef;
 }
 
 #############################
@@ -333,6 +431,9 @@ sub Pushsafer_Callback($$$)
     <code><b>urlText</b>&nbsp;&nbsp;</code> - short: <code>ut</code> - type: text - A text that should be used to display a URL from the "url" option.<br>
     <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>k&nbsp;</code> - type: text - Overrides the private key given in the define statement. Also an alias key can be used.<br>
     <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - short: <code>l&nbsp;</code> - type: number - Defines a "time-to-live" given in minutes after the message will be deleted on the target device(s). Possible range is between 1 - 43200 minutes (30 days).<br>
+    <code><b>picture</b>&nbsp;&nbsp;</code> - short: <code>p&nbsp;</code> - type: text - Attach a image to the message. This can be a file path located in your filesystem (e.g. <code>picture=/home/user/picture.jpg</code>) or the name of a IPCAM instance (like <code>picture=IPCAM:<i>&lt;name&gt;</i></code>) to send the last snapshot image (e.g. <code>picture=IPCAM:IpCam_Front_House</code>). The supported image formats are JPG, PNG and GIF.<br>
+    <code><b>picture2</b>&nbsp;</code> - short: <code>p2</code> - type: text - same syntax as for option <code>"picture"</code><br>
+    <code><b>picture3</b>&nbsp;</code> - short: <code>p3</code> - type: text - same syntax as for option <code>"picture"</code><br>
     <br>
     Examples:<br>
     <br>
@@ -424,6 +525,10 @@ sub Pushsafer_Callback($$$)
     <code><b>urlText</b>&nbsp;&nbsp;</code> - Kurzform: <code>ut</code> - Typ: Text - Der Text, welcher zum Anzeigen der URL benutzt werden soll anstatt der Zieladresse.<br>
     <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>k&nbsp;</code> - Typ: Text - &Uuml;bersteuert den zu nutzenden Schl&uuml;ssel zur Identifikation aus dem define-Kommando. Es kann hierbei auch ein Email-Alias-Schl&uuml;ssel benutzt werden.<br>   
     <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>l&nbsp;</code> - Typ: Ganzzahl - Die Lebensdauer der Nachricht in Minuten. Sobald die Lebensdauer erreicht ist, wird die Nachricht selbstst&auml;ndig auf allen Ger&auml;ten gel&ouml;scht. Der m&ouml;gliche Wertebereich liegt zwischen 1 - 43200 Minuten (entspricht 30 Tagen).<br> 
+    <code><b>picture</b>&nbsp;&nbsp;</code> - Kurzform: <code>p&nbsp;</code> - Typ: Text - Anh&auml;ngen eines Bildes zur Nachricht. Dies kann ein Dateipfad zu einer Bilddatei sein (z.B. <code>picture=/home/user/Bild.jpg</code>) oder der Name einer IPCAM-Instanz (im Format: <code>picture=IPCAM:<i>&lt;Name&gt;</i></code>) um die letzte Aufnahme zu senden (Bsp. <code>picture=IPCAM:IpKamera_Einganstuer</code>). Es werden die Dateiformate JPG, PNG und GIF unterst&uuml;zt.<br>
+    <code><b>picture2</b>&nbsp;</code> - Kurzform: <code>p2</code> - Typ: Text - Gleiche Syntax wie die Option <code>"picture"</code>.<br>
+    <code><b>picture3</b>&nbsp;</code> - Kurzform: <code>p3</code> - Typ: Text - Gleiche Syntax wie die Option <code>"picture"</code>.<br>
+    
     <br>
     Beispiele:<br>
     <br>
