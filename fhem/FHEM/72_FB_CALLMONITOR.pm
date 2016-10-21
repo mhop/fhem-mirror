@@ -89,15 +89,17 @@ FB_CALLMONITOR_Define($$)
         return $msg;
     }
     
+    
     DevIo_CloseDev($hash);
-
+    delete($hash->{NEXT_OPEN});
+    
     my $dev = $a[2];
 
     $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
     $hash->{DeviceName} = $dev;
 
-    return DevIo_OpenDev($hash, 0, undef);
+    return DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback)
 }
 
 
@@ -460,11 +462,26 @@ FB_CALLMONITOR_Read($)
 #####################################
 # Reconnects to FritzBox in case of disconnects
 sub
+FB_CALLMONITOR_DevIoCallback($$)
+{
+    my ($hash, $err) = @_;
+    my $name = $hash->{NAME};
+    
+    if($err)
+    {
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - unable to connect to Fritz!Box: $err";
+    }
+}
+
+
+#####################################
+# Reconnects to FritzBox in case of disconnects
+sub
 FB_CALLMONITOR_Ready($)
 {
     my ($hash) = @_;
    
-    return DevIo_OpenDev($hash, 1, undef);
+    return DevIo_OpenDev($hash, 1, undef, \&FB_CALLMONITOR_DevIoCallback);
 }
 
 #####################################
@@ -495,7 +512,13 @@ FB_CALLMONITOR_Attr($@)
             
         if($attrib eq "disable" and $value eq "1")
         {
+            DevIo_CloseDev($hash);
+            delete($hash->{NEXT_OPEN});
             $hash->{STATE} = "disabled";
+        }
+        elsif($attrib eq "disable" and $value eq "0")
+        {
+            DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback);
         }
     }
     elsif($cmd eq "del")
@@ -514,6 +537,11 @@ FB_CALLMONITOR_Attr($@)
         {
             delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
         }
+        
+        if($attrib eq "disable")
+        {
+            DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback);
+        }
     }
     
     return undef;
@@ -525,12 +553,16 @@ FB_CALLMONITOR_Attr($@)
 sub
 FB_CALLMONITOR_Notify($$)
 {
-    my ($hash,$dev) = @_;
+    my ($hash,$device) = @_;
 
-    return if($dev->{NAME} ne "global");
-    return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-  
+    my $events = deviceEvents($device, undef);
+    
+    return if($device->{NAME} ne "global");
+    return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$events}));
+    
     FB_CALLMONITOR_readPhonebook($hash);
+    
+    return undef;
 }
 
 ############################################################################################################

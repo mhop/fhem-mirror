@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  FB_CALLMONITOR: open TCP connection non-blocking,
+                             shutdown connection when disabled
   - bugfix:  73_km200: Experimental keys on scalar is now forbidden
   - feature: 10_SOMFY: positionInverse für homebridge + fixes
   - feature: 50_TelegramBot:  multibot support / markup on send text / msgEdit
