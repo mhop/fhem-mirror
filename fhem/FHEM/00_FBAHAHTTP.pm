@@ -81,6 +81,7 @@ FBAHAHTTP_connect($)
                       "check connection/hostname/fritzbox-user/password")
   }
 
+  delete($hash->{RetriedCmd});
   delete($readyfnlist{"$name.$dev"});
   $hash->{".SID"} = $sid;
   $hash->{STATE} = "connected";
@@ -207,17 +208,17 @@ FBAHAHTTP_ProcessStack($)
       
       Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $_[2]";
       if(!defined($_[2]) || $_[2] eq "") {
-        if($hash->{INRETRY}) {
+        if($hash->{RetriedCmd}) {
           Log3 $name, 1, "No sensible respone after reconnect, giving up";
           return;
         }
-        $hash->{INRETRY} = 1;
         return if(FBAHAHTTP_connect($hash));
+        $hash->{RetriedCmd} = $msg;
         FBAHAHTTP_ProcessStack($hash);
-        delete($hash->{INRETRY});
         return;
       }
 
+      delete($hash->{RetriedCmd});
       shift @{$hash->{CmdStack}};
       if(@{$hash->{CmdStack}} > 0) {
         my $ad = AttrVal($name, "async_delay", 0);
