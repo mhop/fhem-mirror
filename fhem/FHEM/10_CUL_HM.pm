@@ -834,6 +834,14 @@ sub CUL_HM_Attr(@) {#################################
       return "$attrName only usable for ActionDetector" if(CUL_HM_hash2Id($hash) ne "000000");#only for device
     }
   }
+  elsif($attrName eq "tempListTmpl" ){
+    if ($cmd eq "set"){
+      CUL_HM_UpdtReadSingle($hash,"tempTmplSet",$attrVal,0)
+    }
+    else{
+      delete $hash->{READINGS}{"tempTmplSet"};
+    }
+  }
   elsif($attrName =~ m /^hmKey/){
     my $retVal= "";
     return "use $attrName only for vccu device" 
@@ -7734,11 +7742,12 @@ sub CUL_HM_convTemp($) {########################
   return sprintf("%02X", $val*2);
 }
 sub CUL_HM_decodeTime16($) {####################
-  my $v = hex(shift);
+  my $x = shift;
+  my $v = hex($x);
   my $m = int($v>>5);
   my $e = $v & 0x1f;
   my $mul = 0.1;
-  return 2^$e*$m*0.1;
+  return (2**$e)*$m*0.1;
 }
 sub CUL_HM_secSince2000() {#####################
   # Calculate the local time in seconds from 2000.
