@@ -26,6 +26,9 @@
 
 no if $] >= 5.017011, warnings => 'experimental';
 
+sub RESIDENTStk_Initialize() {
+}
+
 #####################################
 # PRE-DEFINITION: wakeuptimer
 #------------------------------------
