@@ -42,7 +42,7 @@ my %Pushsaver_Params = (
     "icon"      => {"short" => "i", "check" => qr/^\d+$/},
     "url"       => {"short" => "u", "check" => qr/^[a-z]+:/},
     "device"    => {"short" => "d", "check" => qr/^(?:gs)?\d+$/},
-    "key"       => {"short" => "k", "check" => qr/^[a-zA-Z\d]{20}$/},
+    "key"       => {"short" => "k", "check" => qr/^(?:[a-zA-Z\d]{20}|[a-zA-Z\d]{15})$/},
     "urlText"   => {"short" => "ut"},
     "message"   => {"short" => "m"},
     "ttl"       => {"short" => "l", "check" => qr/^\d+$/},
@@ -395,7 +395,7 @@ sub Pushsafer_Callback($$$)
   <ul>
     <code>define &lt;name&gt; Pushsafer &lt;key&gt;</code><br>
     <br>
-    The parameter &lt;key&gt; must be a 20 digit alphanumeric string. This can be a regular private key from your Pushsafer account or an E-Mail alias key which needs to be setup in your account.<br>
+    The parameter &lt;key&gt; must be a alphanumeric string. This can be a regular private key (20 digits) from your Pushsafer account or an E-Mail alias key (15 digits) which needs to be setup in your account.<br>
     <br>
     Example:
     <ul>
@@ -489,7 +489,7 @@ sub Pushsafer_Callback($$$)
   <ul>
     <code>define &lt;Name&gt; Pushsafer &lt;Schl&uuml;ssel&gt;</code><br>
     <br>
-    Der Parameter &lt;Schl&uuml;ssel&gt; muss eine 20 Zeichen lange, alphanumerische Zeichenkette sein. Hierbei kann es sich um einen regul&auml;ren privaten Schl&uuml;ssel handeln oder um einen Email-Alias-Schl&uuml;ssel, welcher in einem Account entsprechend eingerichtet sein muss.<br>
+    Der Parameter &lt;Schl&uuml;ssel&gt; muss eine alphanumerische Zeichenkette sein. Hierbei kann es sich um einen regul&auml;ren privaten Schl&uuml;ssel (20 Zeichen lang) handeln oder um einen Email-Alias-Schl&uuml;ssel (15 Zeichen lang), welcher in einem Account entsprechend eingerichtet sein muss.<br>
     <br>
     Beispiel:
     <ul>
