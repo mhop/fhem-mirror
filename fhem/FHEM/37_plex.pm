@@ -824,6 +824,19 @@ plex_Set($$@)
         foreach my $entry (@{$hash->{'myPlex-servers'}{Server}}) {
           if( $entry->{localAddresses} eq $params[0] || $entry->{machineIdentifier} eq $params[0] ) {
             Log 1, Dumper $entry;
+
+            my $define = "$entry->{machineIdentifier} plex $entry->{address}";
+
+            if( my $cmdret = CommandDefine(undef,$define) ) {
+              return $cmdret;
+            }
+
+            my $chash = $defs{$entry->{machineIdentifier}};
+            $chash->{token} = $entry->{accessToken};
+
+            fhem( "setreading $entry->{machineIdentifier} .token $entry->{accessToken}" );
+
+            return undef;
           }
 
         }
@@ -838,6 +851,7 @@ plex_Set($$@)
   if( my $entry = plex_serverOf($hash, $cmd, !$hash->{machineIdentifier}) ) {
     my @params = @params;
     $cmd = shift @params if( $cmd eq $entry->{address} );
+    $cmd = shift @params if( $cmd eq $entry->{machineIdentifier} );
 
     my $ip = $entry->{address};
 
@@ -1159,11 +1173,13 @@ plex_deviceList($$)
     $ret .= "$type from myPlex:\n";
 
     if( $hash->{'myPlex-servers'}{Server} ) {
-      $ret .= sprintf( "%16s  %19s        %-23s  %s\n", 'ip', 'updatedAt', 'name', 'machineIdentifier' );
+      $ret .= sprintf( "%16s  %19s        %-23s %1s %s\n", 'ip', 'updatedAt', 'name', 'o', 'machineIdentifier' );
       foreach my $entry (@{$hash->{'myPlex-servers'}{Server}}) {
-        next if( !$entry->{owned} );
-        next if( !$entry->{localAddresses} );
-        $ret .= sprintf( "%16s  %19s        %-23s  %s\n", $entry->{localAddresses}, strftime("%Y-%m-%d %H:%M:%S", localtime($entry->{updatedAt}) ), $entry->{name}, $entry->{machineIdentifier} );
+        #next if( !$entry->{owned} );
+        $entry->{owned} = 0 if( !defined($entry->{owned}) );
+        $entry->{localAddresses} = '' if( !$entry->{localAddresses} );
+        $entry->{address} = '' if( !$entry->{address} );
+        $ret .= sprintf( "%16s  %19s        %-23s %1s %s\n", $entry->{address}, strftime("%Y-%m-%d %H:%M:%S", localtime($entry->{updatedAt}) ), $entry->{name}, $entry->{owned}, $entry->{machineIdentifier} );
       }
     }
   }
@@ -1288,7 +1304,6 @@ plex_mediaList($$$)
 {
   my ($hash, $server, $xml) = @_;
 
-
 #Log 1, Dumper $xml;
   return $xml if( ref($xml) ne 'HASH' );
 
@@ -1308,7 +1323,7 @@ plex_mediaList($$$)
   $ret .= plex_mediaList2( $hash, 'Track', $xml, $xml->{Track} ) if( $xml->{Track} );
 
   if( !$xml->{Directory} && !$xml->{Playlist} && !$xml->{Video} && !$xml->{Track} ) {
-#Log 1, Dumper $xml;
+    return $xml->{head}[0]{title}[0] if( ref $xml->{head} eq 'ARRAY' && ref $xml->{head}[0]{title} eq 'ARRAY' );
     return "unknown media type";
 
   }
@@ -1491,6 +1506,18 @@ plex_Get($$@)
   if( my $entry = plex_serverOf($hash, $cmd, !$hash->{machineIdentifier}) ) {
     my @params = @params;
     $cmd = shift @params if( $cmd eq $entry->{address} );
+    $cmd = shift @params if( $cmd eq $entry->{machineIdentifier} );
+
+    if( $cmd eq 'servers' ) {
+      return plex_deviceList($hash, 'servers' );
+
+    } elsif( $cmd eq 'clients' ) {
+      return plex_deviceList($hash, 'clients' );
+
+    } elsif( $cmd eq 'pin' ) {
+      return plex_getPinForToken($hash);
+
+    }
 
     my $ip = $entry->{address};
 
@@ -1505,13 +1532,13 @@ plex_Get($$@)
       $param = "/$param" if( $param && $param !~ '^/' );
       my $ret;
       if( $param =~ m'/playlists' ) {
-        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", 'sections', $hash->{CL} || 1 );
+        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", 'sections', $hash->{CL} || 1, $entry->{accessToken} );
 
       } elsif( $param =~ m'^/library' ) {
-        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", "sections:$param", $hash->{CL} || 1 );
+        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", "sections:$param", $hash->{CL} || 1, $entry->{accessToken} );
 
       } else {
-        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/library/sections$param", "sections:$param", $hash->{CL} || 1 );
+        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/library/sections$param", "sections:$param", $hash->{CL} || 1, $entry->{accessToken} );
       }
 
       return $ret;
@@ -1553,15 +1580,6 @@ plex_Get($$@)
 
       return $ret;
 
-    } elsif( $cmd eq 'servers' ) {
-      return plex_deviceList($hash, 'servers' );
-
-    } elsif( $cmd eq 'clients' ) {
-      return plex_deviceList($hash, 'clients' );
-
-    } elsif( $cmd eq 'pin' ) {
-      return plex_getPinForToken($hash);
-
     } elsif( $cmd eq 'm3u' || $cmd eq 'pls' ) {
       return "usage: $cmd <key>" if( !$param );
 
@@ -1588,6 +1606,7 @@ plex_Get($$@)
   if( my $entry = plex_clientOf($hash, $cmd) ) {
     my @params = @params;
     $cmd = shift @params if( $cmd eq $entry->{address} );
+    $cmd = shift @params if( $cmd eq $entry->{machineIdentifier} );
 
     my $key = ReadingsVal($name,'key', undef);
     my $server = ReadingsVal($name,'server', undef);
@@ -1849,9 +1868,10 @@ plex_getTokenOfPin($)
   return undef;
 }
 sub
-plex_sendApiCmd($$$;$)
+plex_sendApiCmd($$$;$$)
 {
-  my ($hash,$url,$key,$blocking) = @_;
+  my ($hash,$url,$key,$blocking,$token) = @_;
+  $token = $hash->{token} if( !$token && $hash->{token} );
   my $name = $hash->{NAME};
 
   if( $url =~ m/.player./ ) {
@@ -1895,7 +1915,7 @@ plex_sendApiCmd($$$;$)
                 'X-Plex-Product' => 'FHEM',
                 'X-Plex-Version' => '0.0', },
   };
-  $param->{header}{'X-Plex-Token'} = $hash->{token} if( $hash->{token} );
+  $param->{header}{'X-Plex-Token'} = $token if( $token );
   if( my $entry = plex_entryOfIP($hash, 'client', $address) ) {
     $param->{header}{'X-Plex-Target-Client-Identifier'} = $entry->{machineIdentifier} if( $entry->{machineIdentifier} );
   }
@@ -1929,9 +1949,12 @@ plex_play($$$$)
     $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
   } else { # play album or single track
     $key = "/library/metadata/$key" if( $key !~ '^/' );
-    my $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1 );
+    my $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1, $server->{accessToken} );
     #Log 1, Dumper $xml;
-    return "item not found" if( !$xml || !$xml->{librarySectionUUID} );
+    if( !$xml || !$xml->{librarySectionUUID} ) {
+      return $xml->{head}[0]{title}[0] if( ref $xml->{head} eq 'ARRAY' && ref $xml->{head}[0]{title} eq 'ARRAY' );
+      return "item not found";
+    }
     $url = "http://$server->{address}:$server->{port}/playQueues?type=&uri=". urlEncode( "library://$xml->{librarySectionUUID}/item/$key" );
     $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
   }
@@ -1974,6 +1997,7 @@ plex_play($$$$)
                 'X-Plex-Version' => '0.0', },
   };
   $param->{header}{'X-Plex-Token'} = $hash->{token} if( $hash->{token} );
+  $param->{header}{'X-Plex-Token'} = $server->{accessToken} if( $server->{accessToken} );
   if( my $entry = plex_entryOfIP($hash, 'client', $address) ) {
     $param->{header}{'X-Plex-Target-Client-Identifier'} = $entry->{machineIdentifier} if( $entry->{machineIdentifier} );
   }
@@ -2064,6 +2088,17 @@ plex_entryOfID($$$)
     return $entries->{$ip} if( $entries->{$ip}{resourceIdentifier} && $entries->{$ip}{resourceIdentifier} eq $id );
   }
 
+  if( $type eq 'server' ) {
+    if( $hash->{'myPlex-servers'}{Server} ) {
+      foreach my $entry (@{$hash->{'myPlex-servers'}{Server}}) {
+        if( $id eq  $entry->{machineIdentifier} ) {
+          $entry->{online} = 1;
+          return $entry;
+        }
+      }
+    }
+  }
+
   if( my $mhash = $modules{plex}{defptr}{MASTER} ) {
     return plex_entryOfID($mhash,$type,$id) if( $mhash != $hash );
   }
@@ -2082,6 +2117,17 @@ plex_entryOfIP($$$)
   my $entries = $hash->{$type.'s'};
   foreach my $key ( keys %{$entries} ) {
     return $entries->{$key} if( $entries->{$key}{address} eq $ip );
+  }
+
+  if( $type eq 'server' ) {
+    if( $hash->{'myPlex-servers'}{Server} ) {
+      foreach my $entry (@{$hash->{'myPlex-servers'}{Server}}) {
+        if( $ip eq  $entry->{address} ) {
+          $entry->{online} = 1;
+          return $entry;
+        }
+      }
+    }
   }
 
   if( my $mhash = $modules{plex}{defptr}{MASTER} ) {
@@ -2108,11 +2154,16 @@ plex_serverOf($$;$)
 
   $entry = plex_entryOfID($hash, 'server', $hash->{resourceIdentifier} ) if( !$entry );
 
-  if( $only ) {
+  if( !$entry && $only ) {
     if( my $mhash = $modules{plex}{defptr}{MASTER} ) {
       my @keys = keys(%{$modules{plex}{defptr}{MASTER}{servers}});
       if( @keys == 1 ) {
         $entry = $modules{plex}{defptr}{MASTER}{servers}{$keys[0]};
+      }
+    } elsif( $hash->{server} && $hash->{servers} ) {
+      my @keys = keys(%{$hash->{servers}});
+      if( @keys == 1 ) {
+        $entry = $hash->{servers}{$keys[0]};
       }
     }
   }
@@ -3633,7 +3684,20 @@ plex_parseHttpAnswer($$$)
     $hash->{'myPlex-servers'} = $xml;
 
     foreach my $server (@{$xml->{Server}}) {
-      if( my $entry = plex_entryOfID($hash, 'server', $server->{machineIdentifier} ) ) {
+      if( $hash->{server} && $server->{address} eq $hash->{server} )  {
+        my $entry = $server;
+        my $ip = $entry->{address};
+
+        $ip = $param->{address} if( !$ip );
+        $entry->{port} = $param->{port} if( !$entry->{port} );
+
+        if( my $entry = plex_serverOf($hash, $entry->{machineIdentifier}, !$hash->{machineIdentifier}) ) {
+          $entry->{address} = $server->{address};
+          $entry->{port} = $server->{port};
+        }
+
+        #plex_discovered($hash, 'server', $ip, $entry);
+      } elsif( my $entry = plex_entryOfID($hash, 'server', $server->{machineIdentifier} ) ) {
       }
 
       if( my $chash = $modules{plex}{defptr}{$server->{machineIdentifier}} ) {
@@ -4112,6 +4176,8 @@ plex_publishToSonos(;$$$)
     <li>playlistRemove [&lt;server&gt;] &lt;key&gt; &lt;keys&gt;</li>
     <li>unwatched [[&lt;server&gt;] &lt;items&gt;]</li>
     <li>watched [[&lt;server&gt;] &lt;items&gt;]</li>
+    <li>autocreate &lt;machineIdentifier&gt;<br>
+      create device for remote/shared server</li>
   </ul><br>
 
   <a name="plex_Get"></a>
