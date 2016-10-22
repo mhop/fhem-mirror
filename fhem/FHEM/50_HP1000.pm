@@ -589,7 +589,9 @@ sub HP1000_CGI() {
             || $p eq "realtime"
             || $p eq "rtfreq"
             || $p eq "humidity"
-            || $p eq "indoorhumidity" );
+            || $p eq "indoorhumidity"
+            || $p eq "ID"
+            || $p eq "PASSWORD" );
 
         $p = "_" . $p;
 
