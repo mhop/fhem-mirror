@@ -204,6 +204,7 @@ DevIo_OpenDev($$$;$)
 
   my $doCb = sub ($) {
     my ($r) = @_;
+    Log3 $name, 3, "Can't connect to $dev: $r" if(!$reopen && $r);
     $callback->($hash,$r) if($callback);
     return $r;
   };
@@ -315,7 +316,7 @@ DevIo_OpenDev($$$;$)
         $conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1) if(defined($conn));
 
       } else {
-        Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
+        Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen && $!);
         $readyfnlist{"$name.$dev"} = $hash;
         DevIo_setStates($hash, "disconnected");
         $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
