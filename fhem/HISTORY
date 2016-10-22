@@ -697,3 +697,9 @@
 
 - Fri Oct 7 2016 (jmike)
   - adding new module 98_TRAFFIC
+
+- Fri Oct 9 2016 (loredo)
+  - adding new module 74_THINKINGCLEANER
+
+- Fri Oct 22 2016 (loredo)
+  - adding new package UConv for unit conversions
