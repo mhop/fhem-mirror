@@ -105,6 +105,8 @@ FHEM/20_OWFS.pm              mfr69bs              http://forum.fhem.de 1Wire (de
 FHEM/20_X10.pm               borisneubert         http://forum.fhem.de SlowRF
 FHEM/20_ROOMMATE.pm          loredo               http://forum.fhem.de Automatisierung
 FHEM/20_GUEST.pm             loredo               http://forum.fhem.de Automatisierung
+FHEM/20_N4HBUS.pm            okoerber             http://forum.fhem.de Sonstige Systeme
+FHEM/20_N4HBUS.pm            okoerber             http://forum.fhem.de Sonstige Systeme
 FHEM/21_OWAD.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWCOUNT.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWID.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
