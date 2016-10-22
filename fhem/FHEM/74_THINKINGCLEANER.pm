@@ -29,9 +29,10 @@ package main;
 
 use strict;
 use warnings;
-use Data::Dumper;
+use vars qw(%data);
 use HttpUtils;
 use Encode;
+use Data::Dumper;
 
 no warnings "all";
 
