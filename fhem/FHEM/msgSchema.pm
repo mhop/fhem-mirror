@@ -28,6 +28,9 @@
 #
 ##############################################################################
 
+sub msgSchema_Initialize() {
+}
+
 package msgSchema;
 
 use strict;
