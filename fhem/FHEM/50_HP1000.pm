@@ -36,10 +36,6 @@ use List::Util qw(sum);
 use FHEM::98_dewpoint;
 use Data::Dumper;
 
-sub HP1000_Define($$);
-sub HP1000_Undefine($$);
-sub HP1000_DbLog_split($$);
-
 #########################
 sub HP1000_addExtension($$$) {
     my ( $name, $func, $link ) = @_;
@@ -95,34 +91,36 @@ sub HP1000_Define($$) {
       if ( defined( $modules{HP1000}{defptr} ) && !defined( $hash->{OLDDEF} ) );
 
     # check FHEMWEB instance
-    my $FWports;
-    foreach ( devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') ) {
-        $hash->{FW} = $_
-          if ( AttrVal( $_, "webname", "fhem" ) eq "weatherstation" );
-        push( @{$FWports}, $defs{$_}->{PORT} )
-          if ( defined( $defs{$_}->{PORT} ) );
-    }
-
-    if ( !defined( $hash->{FW} ) ) {
-        $hash->{FW} = "WEBweatherstation";
-        my $port = 8084;
-        until ( !grep ( /^$port$/, @{$FWports} ) ) {
-            $port++;
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        my $FWports;
+        foreach ( devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') ) {
+            $hash->{FW} = $_
+              if ( AttrVal( $_, "webname", "fhem" ) eq "weatherstation" );
+            push( @{$FWports}, $defs{$_}->{PORT} )
+              if ( defined( $defs{$_}->{PORT} ) );
         }
 
-        if ( !defined( $defs{ $hash->{FW} } ) ) {
+        if ( !defined( $hash->{FW} ) ) {
+            $hash->{FW} = "WEBweatherstation";
+            my $port = 8084;
+            until ( !grep ( /^$port$/, @{$FWports} ) ) {
+                $port++;
+            }
 
-            Log3 $name, 3,
-                "HP1000 $name: Creating new FHEMWEB instance "
-              . $hash->{FW}
-              . " with webname 'weatherstation'";
+            if ( !defined( $defs{ $hash->{FW} } ) ) {
 
-            fhem "define " . $hash->{FW} . " FHEMWEB $port global";
-            fhem "attr " . $hash->{FW} . " webname weatherstation";
+                Log3 $name, 3,
+                    "HP1000 $name: Creating new FHEMWEB instance "
+                  . $hash->{FW}
+                  . " with webname 'weatherstation'";
+
+                fhem "define " . $hash->{FW} . " FHEMWEB $port global";
+                fhem "attr " . $hash->{FW} . " webname weatherstation";
+            }
         }
-    }
 
-    $hash->{FW_PORT} = $defs{ $hash->{FW} }{PORT};
+        $hash->{FW_PORT} = $defs{ $hash->{FW} }{PORT};
+    }
 
     if ( HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" ) ) {
         $hash->{fhem}{infix} = "updateweatherstation";
@@ -194,8 +192,14 @@ sub HP1000_CGI() {
     my $webArgs;
     my $servertype;
 
+    # incorrect FHEMWEB instance used
+    if ( AttrVal( $FW_wname, "webname", "fhem" ) ne "weatherstation" ) {
+        return ( "text/plain; charset=utf-8",
+            "incorrect FHEMWEB instance to receive data" );
+    }
+
     # data received
-    if ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
+    elsif ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
         $servertype = lc($1);
         $URI        = $2;
 
@@ -218,15 +222,17 @@ sub HP1000_CGI() {
             $webArgs->{$p} = $v;
         }
 
-        Log3 $name, 5,
-          "HP1000: received insufficient data:\n" . Dumper($webArgs);
-
-        return ( "text/plain; charset=utf-8", "Insufficient data" )
-          if ( !defined( $webArgs->{softwaretype} )
+        if (   !defined( $webArgs->{softwaretype} )
             || !defined( $webArgs->{dateutc} )
             || !defined( $webArgs->{ID} )
             || !defined( $webArgs->{PASSWORD} )
-            || !defined( $webArgs->{action} ) );
+            || !defined( $webArgs->{action} ) )
+        {
+            Log3 $name, 5,
+              "HP1000: received insufficient data:\n" . Dumper($webArgs);
+
+            return ( "text/plain; charset=utf-8", "Insufficient data" );
+        }
     }
 
     # no data received
@@ -235,6 +241,7 @@ sub HP1000_CGI() {
     }
 
     $hash = $defs{$name};
+
     HP1000_SetAliveState( $hash, 1 );
 
     $hash->{IP}          = $defs{$FW_cname}{PEER};
@@ -247,6 +254,16 @@ sub HP1000_CGI() {
         : 0
     );
     $hash->{SYSTEMTIME_UTC} = $webArgs->{dateutc};
+    $hash->{FW}             = "";
+    $hash->{FW_PORT}        = "";
+
+    foreach ( devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') ) {
+        if ( AttrVal( $_, "webname", "fhem" ) eq "weatherstation" ) {
+            $hash->{FW}      = $_;
+            $hash->{FW_PORT} = $defs{$_}{PORT};
+            last;
+        }
+    }
 
     if (
            defined( $hash->{ID} )
@@ -837,7 +854,7 @@ sub HP1000_CGI() {
     # windCompasspoint
     if ( defined( $webArgs->{winddir} ) ) {
         $webArgs->{windcompasspoint} =
-          UConv::direction2compasspoint( $webArgs->{winddir} );
+          UConv::degrees2compasspoint( $webArgs->{winddir} );
         readingsBulkUpdate( $hash, "windCompasspoint",
             $webArgs->{windcompasspoint} );
     }
@@ -898,7 +915,7 @@ sub HP1000_CGI() {
     # averages/windCompasspoint_avg2m
     if ( defined( $webArgs->{winddir_avg2m} ) ) {
         $webArgs->{windcompasspoint_avg2m} =
-          UConv::direction2compasspoint( $webArgs->{winddir_avg2m} );
+          UConv::degrees2compasspoint( $webArgs->{winddir_avg2m} );
         readingsBulkUpdate( $hash, "windCompasspoint_avg2m",
             $webArgs->{windcompasspoint_avg2m} );
     }
@@ -1492,6 +1509,7 @@ sub HP1000_DbLog_split($$) {
           Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI).<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
           No other name will work as it's hardcoded in the HP1000/WH2600 device itself!<br>
+          If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br>
           <br>
           As the URI has a fixed coding as well there can only be one single HP1000/WH2600 station per FHEM installation.<br>
         <br>
@@ -1552,6 +1570,7 @@ sub HP1000_DbLog_split($$) {
           Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI).<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
           Kein anderer Name funktioniert, da dieser hard im HP1000/WH2600 Ger&auml;t hinterlegt ist!<br>
+          Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br>
           <br>
           Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000/WH2600 Station gleichzeitig verwendet werden.<br>
         <br>
