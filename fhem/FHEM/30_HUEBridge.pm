@@ -814,10 +814,11 @@ HUEBridge_Parse($$)
 
   if( my $utc = $config->{UTC} ) {
     substr( $utc, 10, 1, '_' );
-    my $sec = SVG_time_to_sec($utc);
-    my $offset = time()-$sec;
 
-    $hash->{helper}{offsetUTC} = $offset;
+    my $localtime = $config->{localtime};
+    substr( $localtime, 10, 1, '_' );
+
+    $hash->{helper}{offsetUTC} = SVG_time_to_sec($localtime) - SVG_time_to_sec($utc);
   }
 
   if( defined( $config->{swupdate} ) ) {
