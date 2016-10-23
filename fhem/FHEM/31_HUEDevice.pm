@@ -1193,12 +1193,19 @@ HUEDevice_Parse($$)
       if( my $iohash = $hash->{IODev} ) {
         substr( $lastupdated, 10, 1, '_' );
         my $sec = SVG_time_to_sec($lastupdated);
-        $sec += $iohash->{helper}{offsetUTC};
+
+        if( my $offset = $iohash->{helper}{offsetUTC} ) {
+          $sec += $offset;
+          Log3 $name, 4, "$name: offsetUTC: $offset";
+        }
 
         $lastupdated = FmtDateTime($sec);
       }
-
       return undef if( $hash->{lastupdated} &&  $hash->{lastupdated} eq $lastupdated );
+
+      Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}";
+      Log3 $name, 5, "$name: ". Dumper $result;
+
       $hash->{lastupdated} = $lastupdated;
 
       $readings{state} = $state->{status} if( defined($state->{status}) );
