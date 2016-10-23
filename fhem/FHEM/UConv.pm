@@ -11,11 +11,89 @@ sub UConv_Initialize() {
 
 package UConv;
 
-sub round($;$) {
-    my ( $v, $n ) = @_;
-    $n = 1 if ( !$n );
-    return sprintf( "%.${n}f", $v );
-}
+####################
+# Translations
+
+my $pressure_trend_sym = { 0 => "=", 1 => "+", 2 => "-" };
+
+my $pressure_trend_txt = {
+    "en" => { 0 => "steady",         1 => "rising",    2 => "falling" },
+    "de" => { 0 => "gleichbleibend", 1 => "steigend",  2 => "fallend" },
+    "nl" => { 0 => "stabiel",        1 => "stijgend",  2 => "dalend" },
+    "fr" => { 0 => "stable",         1 => "croissant", 2 => "décroissant" },
+    "pl" => { 0 => "stabilne",       1 => "rośnie",   2 => "spada" },
+};
+
+my $compasspoint_txt = {
+    "en" => (
+        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+    ),
+    "de" => (
+        'N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+    ),
+    "nl" => (
+        'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
+        'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
+    ),
+    "fr" => (
+        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
+    ),
+    "pl" => (
+        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+    ),
+};
+
+my $wdays_txt_en = {
+    "en" => {
+        'Mon' => 'Mon',
+        'Tue' => 'Tue',
+        'Wed' => 'Wed',
+        'Thu' => 'Thu',
+        'Fri' => 'Fri',
+        'Sat' => 'Sat',
+        'Sun' => 'Sun',
+    },
+    "de" => {
+        'Mon' => 'Mo',
+        'Tue' => 'Di',
+        'Wed' => 'Mi',
+        'Thu' => 'Do',
+        'Fri' => 'Fr',
+        'Sat' => 'Sa',
+        'Sun' => 'So',
+    },
+    "nl" => {
+        'Mon' => 'Maa',
+        'Tue' => 'Din',
+        'Wed' => 'Woe',
+        'Thu' => 'Don',
+        'Fri' => 'Vri',
+        'Sat' => 'Zat',
+        'Sun' => 'Zon',
+    },
+    "fr" => {
+        'Mon' => 'Lun',
+        'Tue' => 'Mar',
+        'Wed' => 'Mer',
+        'Thu' => 'Jeu',
+        'Fri' => 'Ven',
+        'Sat' => 'Sam',
+        'Sun' => 'Dim',
+    },
+    "pl" => {
+        'Mon' => 'Pon',
+        'Tue' => 'Wt',
+        'Wed' => 'Śr',
+        'Thu' => 'Czw',
+        'Fri' => 'Pt',
+        'Sat' => 'Sob',
+        'Sun' => 'Nie',
+    },
+};
 
 #################################
 ### Inner metric conversions
@@ -169,30 +247,20 @@ sub ft2m($;$) {
 ### Angular conversions
 ###
 
-# convert direction in degree to compass point short text
-sub direction2compasspoint($;$) {
-    my ( $azimuth, $ext ) = @_;
+# convert direction in degree to point of the compass
+sub degrees2compasspoint($;$) {
+    my ( $azimuth, $lang ) = @_;
 
-    my @compasspointsExt = (
-        'North', 'North-Northeast', 'North-East', 'East-Northeast',
-        'East',  'East-Southeast',  'South-East', 'South-Southeast',
-        'South', 'South-Southwest', 'South-West', 'West-Southwest',
-        'West',  'West-Northwest',  'North-West', 'North-Northwest',
-        'North'
-    );
-    return @compasspointsExt[ sprintf( '%.0f', $azimuth / 22.5 ) ] if ($ext);
+    my @directions_txt_i18n;
 
-    my @compasspoints = (
-        'N',  'NNE', 'NE', 'ENE', 'E',  'ESE', 'SE', 'SSE', 'S', 'SSW',
-        'SW', 'WSW', 'W',  'WNW', 'NW', 'NNW', 'N'
-    );
-    return @compasspoints[ sprintf( '%.0f', $azimuth / 22.5 ) ];
-}
+    if ( $lang && defined( $compasspoint_txt->{$lang} ) ) {
+        @directions_txt_i18n = $compasspoint_txt->{$lang};
+    }
+    else {
+        @directions_txt_i18n = $compasspoint_txt->{en};
+    }
 
-# convert direction in degree to compass point long text
-sub direction2compasspointLong($) {
-    my ($azimuth) = @_;
-    return ( direction2compasspoint( $azimuth, 1 ) );
+    return @directions_txt_i18n[ int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 ) ];
 }
 
 #################################
@@ -318,6 +386,15 @@ sub mph2bft($) {
     }
 
     return $v;
+}
+
+####################
+# HELPER FUNCTIONS
+
+sub round($;$) {
+    my ( $v, $n ) = @_;
+    $n = 1 if ( !$n );
+    return sprintf( "%.${n}f", $v );
 }
 
 1;
