@@ -66,7 +66,7 @@ sub Hyperion_Initialize($)
   $hash->{ReadFn}     = "Hyperion_Read";
   $hash->{SetFn}      = "Hyperion_Set";
   $hash->{UndefFn}    = "Hyperion_Undef";
-  $hash->{AttrList}   = "disable:1 ".
+  $hash->{AttrList}   = "disable:1,0 ".
                         "hyperionBin ".
                         "hyperionConfigDir ".
                         "hyperionDefaultDuration ".
