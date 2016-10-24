@@ -602,20 +602,33 @@ FW_rawDef()
           '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
           '<button>Apply changes</button>'+
         '</div></br>');
+
       FW_cmd(FW_root+"?cmd=list -r "+dev+"&XHR=1", function(data) {
         data = data.replace("define", "defmod");
         $("#rawDef textarea").val(data);
         var off = $("#rawDef").position().top-20;
         $('body, html').animate({scrollTop:off}, 500);
+        $("#rawDef button").hide();
+
+        $('#rawDef textarea').bind('input propertychange', function() {
+          var nData = $("#rawDef textarea").val();
+          if(nData != data)
+            $("#rawDef button").show();
+          else
+            $("#rawDef button").hide();
+        });
       });
+
       $("#rawDef button").click(function(){
         var data = $("#rawDef textarea").val();
         var arr = data.split("\n"), str="", i1=-1;
         function
         doNext()
         {
-          if(++i1 >= arr.length)
+          if(++i1 >= arr.length) {
+            return FW_okDialog("Applied changes, no errors found.");
             return;
+          }
           str += arr[i1];
           if(arr[i1].charAt(arr[i1].length-1) === "\\") {
             str += "\n";
