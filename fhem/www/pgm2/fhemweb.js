@@ -600,7 +600,7 @@ FW_rawDef()
 
       $("#content").append('<div id="rawDef">'+
           '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
-          '<button>Apply changes</button>'+
+          '<button>Execute commands</button>'+
         '</div></br>');
 
       FW_cmd(FW_root+"?cmd=list -r "+dev+"&XHR=1", function(data) {
@@ -626,7 +626,7 @@ FW_rawDef()
         doNext()
         {
           if(++i1 >= arr.length) {
-            return FW_okDialog("Applied changes, no errors found.");
+            return FW_okDialog("Executed everything, no errors found.");
             return;
           }
           str += arr[i1];
