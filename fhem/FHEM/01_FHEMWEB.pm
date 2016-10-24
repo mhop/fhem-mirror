@@ -1278,6 +1278,7 @@ FW_doDetail($)
 
   FW_pH "cmd=style iconFor $d", "Select icon",         undef, "detLink iconFor";
   FW_pH "cmd=style showDSI $d", "Extend devStateIcon", undef, "detLink showDSI";
+  FW_pH "cmd=rawDef $d", "Raw defintion", undef, "detLink rawDef";
   FW_pH "cmd=delete $d", "Delete this device ($d)",    undef, "detLink delDev"
          if($d ne "global");
   my $sfx = AttrVal("global", "language", "EN");

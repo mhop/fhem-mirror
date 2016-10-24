@@ -886,7 +886,9 @@ The following local attributes are used by a wider range of devices:
 <a name="list"></a>
 <h3>list</h3>
 <ul>
-  <code>list [devspec] [value]</code>
+  <code>list [devspec] [value]</code><br>
+  or<br>
+  <code>list -r devspec</code><br>
   <br><br>
   Output a list of all definitions, all notify settings and all at
   entries. This is one of the few commands which return a string in a
@@ -947,6 +949,8 @@ The following local attributes are used by a wider range of devices:
     2006-11-02 09:45:56   actuator        19%
     [...]
   </code></pre>
+  With the -r (raw) option output the device definition in a format suitable
+  for inclusion in fhem.cfg and fhem.state.
 </ul>
 
 <a name="modify"></a>
