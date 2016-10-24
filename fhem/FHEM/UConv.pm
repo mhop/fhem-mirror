@@ -1,4 +1,3 @@
-
 # $Id$
 
 package main;
@@ -14,9 +13,9 @@ package UConv;
 ####################
 # Translations
 
-my $pressure_trend_sym = { 0 => "=", 1 => "+", 2 => "-" };
+my %pressure_trend_sym = { 0 => "=", 1 => "+", 2 => "-" };
 
-my $pressure_trend_txt = {
+my %pressure_trend_txt = {
     "en" => { 0 => "steady",         1 => "rising",    2 => "falling" },
     "de" => { 0 => "gleichbleibend", 1 => "steigend",  2 => "fallend" },
     "nl" => { 0 => "stabiel",        1 => "stijgend",  2 => "dalend" },
@@ -24,30 +23,30 @@ my $pressure_trend_txt = {
     "pl" => { 0 => "stabilne",       1 => "rośnie",   2 => "spada" },
 };
 
-my $compasspoint_txt = {
-    "en" => (
+my %compasspoint_txt = (
+    "en" => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
-    ),
-    "de" => (
+    ],
+    "de" => [
         'N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
-    ),
-    "nl" => (
+    ],
+    "nl" => [
         'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
         'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
-    ),
-    "fr" => (
+    ],
+    "fr" => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
-    ),
-    "pl" => (
+    ],
+    "pl" => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
-    ),
-};
+    ],
+);
 
-my $wdays_txt_en = {
+my %wdays_txt_en = {
     "en" => {
         'Mon' => 'Mon',
         'Tue' => 'Tue',
@@ -102,31 +101,31 @@ my $wdays_txt_en = {
 # Temperature: convert Celsius to Kelvin
 sub c2k($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data + 273.15, $rnd );
+    return roundX( $data + 273.15, $rnd );
 }
 
 # Temperature: convert Kelvin to Celsius
 sub k2c($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data - 273.15, $rnd );
+    return roundX( $data - 273.15, $rnd );
 }
 
 # Speed: convert km/h (kilometer per hour) to m/s (meter per second)
 sub kph2mps($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data / 3.6, $rnd );
+    return roundX( $data / 3.6, $rnd );
 }
 
 # Speed: convert m/s (meter per second) to km/h (kilometer per hour)
 sub mps2kph($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 3.6, $rnd );
+    return roundX( $data * 3.6, $rnd );
 }
 
 # Pressure: convert hPa (hecto Pascal) to mmHg (milimeter of Mercury)
 sub hpa2mmhg($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.00750061561303, $rnd );
+    return roundX( $data * 0.00750061561303, $rnd );
 }
 
 #################################
@@ -136,49 +135,49 @@ sub hpa2mmhg($;$) {
 # Temperature: convert Celsius to Fahrenheit
 sub c2f($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 1.8 + 32, $rnd );
+    return roundX( $data * 1.8 + 32, $rnd );
 }
 
 # Temperature: convert Kelvin to Fahrenheit
 sub k2f($;$) {
     my ( $data, $rnd ) = @_;
-    return round( ( $data - 273.15 ) * 1.8 + 32, $rnd );
+    return roundX( ( $data - 273.15 ) * 1.8 + 32, $rnd );
 }
 
 # Pressure: convert hPa (hecto Pascal) to in (inches of Mercury)
 sub hpa2inhg($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.02952998751, $rnd );
+    return roundX( $data * 0.02952998751, $rnd );
 }
 
 # Pressure: convert hPa (hecto Pascal) to PSI (Pound force per square inch)
 sub hpa2psi($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 100.00014504, $rnd );
+    return roundX( $data * 100.00014504, $rnd );
 }
 
 # Speed: convert km/h (kilometer per hour) to mph (miles per hour)
 sub kph2mph($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.621, $rnd );
+    return roundX( $data * 0.621, $rnd );
 }
 
 # Length: convert mm (milimeter) to in (inch)
 sub mm2in($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.039370, $rnd );
+    return roundX( $data * 0.039370, $rnd );
 }
 
 # Length: convert cm (centimeter) to in (inch)
 sub cm2in($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.39370, $rnd );
+    return roundX( $data * 0.39370, $rnd );
 }
 
 # Length: convert m (meter) to ft (feet)
 sub m2ft($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 3.2808, $rnd );
+    return roundX( $data * 3.2808, $rnd );
 }
 
 #################################
@@ -188,7 +187,13 @@ sub m2ft($;$) {
 # Speed: convert mph (miles per hour) to ft/s (feet per second)
 sub mph2fts($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 1.467, $rnd );
+    return roundX( $data * 1.467, $rnd );
+}
+
+# Speed: convert ft/s (feet per second) to mph (miles per hour)
+sub fts2mph($;$) {
+    my ( $data, $rnd ) = @_;
+    return roundX( $data / 1.467, $rnd );
 }
 
 #################################
@@ -198,49 +203,49 @@ sub mph2fts($;$) {
 # Temperature: convert Fahrenheit to Celsius
 sub f2c($;$) {
     my ( $data, $rnd ) = @_;
-    return round( ( $data - 32 ) * 0.5556, $rnd );
+    return roundX( ( $data - 32 ) * 0.5556, $rnd );
 }
 
 # Temperature: convert Fahrenheit to Kelvin
 sub f2k($;$) {
     my ( $data, $rnd ) = @_;
-    return round( ( $data - 32 ) / 1.8 + 273.15, $rnd );
+    return roundX( ( $data - 32 ) / 1.8 + 273.15, $rnd );
 }
 
 # Pressure: convert in (inches of Mercury) to hPa (hecto Pascal)
 sub inhg2hpa($) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 33.8638816, $rnd );
+    return roundX( $data * 33.8638816, $rnd );
 }
 
 # Pressure: convert PSI (Pound force per square inch) to hPa (hecto Pascal)
 sub psi2hpa($) {
     my ( $data, $rnd ) = @_;
-    return round( $data / 100.00014504, $rnd );
+    return roundX( $data / 100.00014504, $rnd );
 }
 
 # Speed: convert mph (miles per hour) to km/h (kilometer per hour)
 sub mph2kph($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 1.609344, $rnd );
+    return roundX( $data * 1.609344, $rnd );
 }
 
 # Length: convert in (inch) to mm (milimeter)
 sub in2mm($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 25.4, $rnd );
+    return roundX( $data * 25.4, $rnd );
 }
 
 # Length: convert in (inch) to cm (centimeter)
 sub in2cm($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data / 0.39370, $rnd );
+    return roundX( $data / 0.39370, $rnd );
 }
 
 # Length: convert ft (feet) to m (meter)
 sub ft2m($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data / 3.2808, $rnd );
+    return roundX( $data / 3.2808, $rnd );
 }
 
 #################################
@@ -253,11 +258,11 @@ sub degrees2compasspoint($;$) {
 
     my @directions_txt_i18n;
 
-    if ( $lang && defined( $compasspoint_txt->{$lang} ) ) {
-        @directions_txt_i18n = $compasspoint_txt->{$lang};
+    if ( $lang && defined( $compasspoint_txt{$lang} ) ) {
+        @directions_txt_i18n = $compasspoint_txt{$lang};
     }
     else {
-        @directions_txt_i18n = $compasspoint_txt->{en};
+        @directions_txt_i18n = $compasspoint_txt{en};
     }
 
     return @directions_txt_i18n[ int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 ) ];
@@ -280,7 +285,7 @@ sub lux2wpsm($;$) {
     my ( $data, $rnd ) = @_;
 
     # Forum topic,44403.msg501704.html#msg501704
-    return round( $data / 126.7, $rnd );
+    return roundX( $data / 126.7, $rnd );
 }
 
 #################################
@@ -290,13 +295,8 @@ sub lux2wpsm($;$) {
 # Speed: convert km/h to knots
 sub kph2kn($;$) {
     my ( $data, $rnd ) = @_;
-    return round( $data * 0.539956803456, $rnd );
+    return roundX( $data * 0.539956803456, $rnd );
 }
-
-# Speed: convert mph (miles per hour) to knots
-#sub mph2kn($;$) {
-#    my ( $data, $rnd ) = @_;
-#}
 
 # Speed: convert km/h to Beaufort wind force scale
 sub kph2bft($) {
@@ -391,7 +391,7 @@ sub mph2bft($) {
 ####################
 # HELPER FUNCTIONS
 
-sub round($;$) {
+sub roundX($;$) {
     my ( $v, $n ) = @_;
     $n = 1 if ( !$n );
     return sprintf( "%.${n}f", $v );
