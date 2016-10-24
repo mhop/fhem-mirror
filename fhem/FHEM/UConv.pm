@@ -13,15 +13,15 @@ package UConv;
 ####################
 # Translations
 
-my %pressure_trend_sym = { 0 => "=", 1 => "+", 2 => "-" };
+my %pressure_trend_sym = ( 0 => "=", 1 => "+", 2 => "-" );
 
-my %pressure_trend_txt = {
+my %pressure_trend_txt = (
     "en" => { 0 => "steady",         1 => "rising",    2 => "falling" },
     "de" => { 0 => "gleichbleibend", 1 => "steigend",  2 => "fallend" },
     "nl" => { 0 => "stabiel",        1 => "stijgend",  2 => "dalend" },
     "fr" => { 0 => "stable",         1 => "croissant", 2 => "décroissant" },
     "pl" => { 0 => "stabilne",       1 => "rośnie",   2 => "spada" },
-};
+);
 
 my %compasspoint_txt = (
     "en" => [
@@ -46,7 +46,7 @@ my %compasspoint_txt = (
     ],
 );
 
-my %wdays_txt_en = {
+my %wdays_txt_en = (
     "en" => {
         'Mon' => 'Mon',
         'Tue' => 'Tue',
@@ -92,7 +92,7 @@ my %wdays_txt_en = {
         'Sat' => 'Sob',
         'Sun' => 'Nie',
     },
-};
+);
 
 #################################
 ### Inner metric conversions
@@ -256,16 +256,16 @@ sub ft2m($;$) {
 sub degrees2compasspoint($;$) {
     my ( $azimuth, $lang ) = @_;
 
-    my @directions_txt_i18n;
+    my $directions_txt_i18n;
 
     if ( $lang && defined( $compasspoint_txt{$lang} ) ) {
-        @directions_txt_i18n = $compasspoint_txt{$lang};
+        $directions_txt_i18n = $compasspoint_txt{$lang};
     }
     else {
-        @directions_txt_i18n = $compasspoint_txt{en};
+        $directions_txt_i18n = $compasspoint_txt{en};
     }
 
-    return @directions_txt_i18n[ int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 ) ];
+    return @$directions_txt_i18n[ int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 ) ];
 }
 
 #################################
