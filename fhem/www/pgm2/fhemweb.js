@@ -212,8 +212,8 @@ FW_jqueryReadyFn()
 
 
   FW_smallScreenCommands();
-
   FW_inlineModify();
+  FW_rawDef();
 }
 
 function
@@ -580,6 +580,65 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
         $("div#edit").css("display", "none");
       }
     });
+  });
+}
+
+function
+FW_rawDef()
+{
+  $("div.rawDef a").each(function(){       // Help on detail window
+    var dev = FW_getLink(this).split(" ").pop();
+    $(this).unbind("click");
+    $(this).attr("href", "#"); // Desktop: show underlined Text
+    $(this).removeAttr("onclick");
+
+    $(this).click(function(evt){
+      if($("#rawDef").length) {
+        $("#rawDef").remove();
+        return;
+      }
+
+      $("#content").append('<div id="rawDef">'+
+          '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
+          '<button>Apply changes</button>'+
+        '</div></br>');
+      FW_cmd(FW_root+"?cmd=list -r "+dev+"&XHR=1", function(data) {
+        data = data.replace("define", "defmod");
+        $("#rawDef textarea").val(data);
+        var off = $("#rawDef").position().top-20;
+        $('body, html').animate({scrollTop:off}, 500);
+      });
+      $("#rawDef button").click(function(){
+        var data = $("#rawDef textarea").val();
+        var arr = data.split("\n"), str="", i1=-1;
+        function
+        doNext()
+        {
+          if(++i1 >= arr.length)
+            return;
+          str += arr[i1];
+          if(arr[i1].charAt(arr[i1].length-1) === "\\") {
+            str += "\n";
+            return doNext();
+          }
+          if(str != "") {
+            str = str.replace(/\\\n/g, "\n")
+                     .replace(/;;/g, ";");
+            FW_cmd(FW_root+"?cmd."+dev+"="+encodeURIComponent(str)+"&XHR=1",
+            function(r){
+              if(r)
+                return FW_okDialog('<pre>'+r+'</pre>');
+              str = "";
+              doNext();
+            });
+          } else {
+            doNext();
+          }
+        }
+        doNext();
+      });
+    });
+
   });
 }
 

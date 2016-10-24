@@ -348,7 +348,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
   "list"    => { Fn=>"CommandList",
-            Hlp=>"[devspec],list definitions and status info" },
+            Hlp=>"[-r] [devspec],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
             Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
@@ -1349,6 +1349,46 @@ CommandQuit($$)
   return undef;
 }
 
+sub
+GetAllReadings($)
+{
+  my ($d) = @_;
+  my @ret;
+  my $val = $defs{$d}{STATE};
+  if(defined($val) &&
+     $val ne "unknown" &&
+     $val ne "Initialized" &&
+     $val ne "???") {
+    $val =~ s/;/;;/g;
+    $val =~ s/\n/\\\n/g;
+    push @ret, "setstate $d $val";
+  }
+
+  #############
+  # Now the detailed list
+  my $r = $defs{$d}{READINGS};
+  if($r) {
+    foreach my $c (sort keys %{$r}) {
+
+      my $rd = $r->{$c};
+      if(!defined($rd->{TIME})) {
+        Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
+        $rd->{TIME} = TimeNow();
+      }
+
+      if(!defined($rd->{VAL})) {
+        Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
+        $rd->{VAL} = 0;
+      }
+      my $val = $rd->{VAL};
+      $val =~ s/;/;;/g;
+      $val =~ s/\n/\\\n/g;
+      push @ret,"setstate $d $rd->{TIME} $c $val";
+    }
+  }
+  return @ret;
+}
+
 #####################################
 sub
 WriteStatefile()
@@ -1380,42 +1420,44 @@ WriteStatefile()
       print SFH "define $d $defs{$d}{TYPE} $def\n";
     }
 
-    my $val = $defs{$d}{STATE};
-    if(defined($val) &&
-       $val ne "unknown" &&
-       $val ne "Initialized" &&
-       $val ne "???") {
-      $val =~ s/;/;;/g;
-      $val =~ s/\n/\\\n/g;
-      print SFH "setstate $d $val\n"
-    }
-
-    #############
-    # Now the detailed list
-    my $r = $defs{$d}{READINGS};
-    if($r) {
-      foreach my $c (sort keys %{$r}) {
-
-        my $rd = $r->{$c};
-        if(!defined($rd->{TIME})) {
-          Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
-          $rd->{TIME} = TimeNow();
-        }
-
-        if(!defined($rd->{VAL})) {
-          Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
-          $rd->{VAL} = 0;
-        }
-        my $val = $rd->{VAL};
-        $val =~ s/;/;;/g;
-        $val =~ s/\n/\\\n/g;
-        print SFH "setstate $d $rd->{TIME} $c $val\n";
-      }
-    }
+    my @arr = GetAllReadings($d);
+    printf SFH join(@arr, "\n") if(@arr);
   }
 
   return "$attr{global}{statefile}: $!" if(!close(SFH));
   return "";
+}
+
+sub
+GetDefAndAttr($)
+{
+  my ($d) = @_;
+  my @ret;
+
+  if($d ne "global") {
+    my $def = $defs{$d}{DEF};
+    if(defined($def)) {
+      $def =~ s/;/;;/g;
+      $def =~ s/\n/\\\n/g;
+      push @ret,"define $d $defs{$d}{TYPE} $def";
+    } else {
+      push @ret,"define $d $defs{$d}{TYPE}";
+    }
+  }
+
+  foreach my $a (sort {
+                   return -1 if($a eq "userattr"); # userattr must be first
+                   return  1 if($b eq "userattr");
+                   return $a cmp $b;
+                 } keys %{$attr{$d}}) {
+    next if($d eq "global" &&
+            ($a eq "configfile" || $a eq "version"));
+    my $val = $attr{$d}{$a};
+    $val =~ s/;/;;/g;
+    $val =~ s/\n/\\\n/g;
+    push @ret,"attr $d $a $val";
+  }
+  return @ret;
 }
 
 #####################################
@@ -1432,7 +1474,7 @@ CommandSave($$)
   @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
 
-  my $ret =  WriteStatefile();
+  my $ret = WriteStatefile();
   return $ret if($ret);
   $ret = "";    # cfgDB_SaveState may return undef
 
@@ -1484,29 +1526,9 @@ CommandSave($$)
       next;
     }
 
-    if($d ne "global") {
-      my $def = $defs{$d}{DEF};
-      if(defined($def)) {
-        $def =~ s/;/;;/g;
-        $def =~ s/\n/\\\n/g;
-        print $fh "define $d $defs{$d}{TYPE} $def\n";
-      } else {
-        print $fh "define $d $defs{$d}{TYPE}\n";
-      }
-    }
+    my @arr = GetDefAndAttr($d);
+    print $fh join("\n", @arr)."\n" if(@arr);
 
-    foreach my $a (sort {
-                     return -1 if($a eq "userattr"); # userattr must be first
-                     return  1 if($b eq "userattr");
-                     return $a cmp $b;
-                   } keys %{$attr{$d}}) {
-      next if($d eq "global" &&
-              ($a eq "configfile" || $a eq "version"));
-      my $val = $attr{$d}{$a};
-      $val =~ s/;/;;/g;
-      $val =~ s/\n/\\\n/g;
-      print $fh "attr $d $a $val\n";
-    }
   }
 
   print SFH "include $attr{global}{lastinclude}\n"
@@ -2142,6 +2164,22 @@ CommandList($$)
 {
   my ($cl, $param) = @_;
   my $str = "";
+
+  if($param =~ m/^-r *(.*)$/) {
+    my $arg = ($1 ? $1 : ".*");
+    foreach my $d (devspec2array($arg,$cl)) {
+      if(!defined($defs{$d})) {
+        $str .= "No device named $d found";
+        last;
+      }
+      $str .= "\n" if($str);
+      my @a = GetDefAndAttr($d);
+      $str .= join("\n", @a)."\n" if(@a);
+      @a = GetAllReadings($d);
+      $str .= join("\n", @a)."\n" if(@a);
+    }
+    return $str;
+  }
 
   if(!$param) { # List of all devices
 
