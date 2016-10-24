@@ -31,7 +31,7 @@ use warnings;
 use POSIX;
 use Data::Dumper;
 
-my $n4hbus_Version = "1.0.1.0 - 22.10.2016";
+my $n4hbus_Version = "1.0.1.1 - 24.10.2016";
 
 sub N4HBUS_Read($@);
 sub N4HBUS_Write($$$$);
@@ -125,13 +125,12 @@ sub N4HBUS_Undef($@) {
 	DevIo_CloseDev($hash);         
 	
 	return undef;  	
-	
 }
 
 ##################################################################################
 sub decode_d2b (@) {
 ##################################################################################
-# Umwandeln 
+
 	my $w = sprintf("%04x\n", @_);   
 	my $ret = substr($w,2,2).substr($w,0,2);
 
@@ -353,8 +352,6 @@ sub N4HBUS_Write($$$$) {
 	if(defined($hash)) {
 		DevIo_SimpleWrite($hash, $sendmsg, 1);
 	}
-	
-
 }
 
 ##################################################################################
@@ -447,13 +444,28 @@ sub N4HBUS_Ready($) {
   <ul>
     <code>define &lt;name&gt; N4HBUS &lt;device&gt;</code>
   <br />  <br />
-  &lt;device&gt; is a combination of &lt;host&gt;:&lt;port&gt;, where
-  &lt;host&gt; is the IP address of the net4home Busconnector and &lt;port&gt; (default:3478).
+  &lt;device&gt; is a combination of &lt;host&gt;:&lt;port&gt;, where &lt;host&gt; is the IP address of the net4home Busconnector and &lt;port&gt; (default:3478).
   <br />  <br />
   Example:
   <ul>
     <code>define net4home N4HBUS 192.168.1.69:3478</code>
   </ul>
+  <br />  
+   The device can also be connected to the busconnector on the same machine. <br />
+   Default Port for communication is 3478. In case you need to change this please change also the Port in the conf of busconnector service.
+  </ul>
+  <br />
+  <a name="N4HBUS_Readings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>state - current state of the Bus connection</li>
+  </ul><br />
+  
+  <a name="N4HBUS_Attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>MI - a unique MI in the net4home environment (default:65281)</li>
+    <li>OBJADR - a unique OBJADR in the net4home environment (default:32700)</li>
   </ul>
 
 =end html
@@ -462,7 +474,7 @@ sub N4HBUS_Ready($) {
 
 <a name="N4HBUS"></a>
 <h3>N4HBUS</h3>
-  Dieses Modul verbindet fhem über IP mit dem net4home Bus.
+  Dieses Modul verbindet fhem &uuml;ber IP mit dem net4home Bus.
   <br /><br />
   Weitere technische Informationen gibt es auf der Homepage unter <a href="http://www.net4home.de">net4home.de</a>  
   <br /><br />
@@ -477,6 +489,23 @@ sub N4HBUS_Ready($) {
   <ul>
     <code>define net4home N4HBUS 192.168.1.69:3478</code>
   </ul>
+  <br />  
+  Das Device kann sich auch mit dem Busconnector auf dem selben System verbinden. 
+  Der Default-Port für die Kommunikation ist 3478. Sollte es n&ouml;tig sein den Port zu ver&auml;ndern, so muss dies ebenfalls
+  in der Konfiguration des Services durchgef&uuml;hrt werden.<br />
+  </ul>
+  <br /> 
+  
+  <a name="N4HBUS_Readings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>state - aktueller Status der Verbindung zum net4home Busconnector</li>
+  </ul><br />
+  <a name="N4HBUS_Attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>MI - die eindeutige MI in der net4home Umgebung (default:65281)</li>
+    <li>OBJADR - die eindeutige OBJADR in der net4home Umgebung (default:32700)</li>
   </ul>
 
 =end html_DE
