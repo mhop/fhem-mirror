@@ -1404,7 +1404,7 @@ WriteStatefile()
   $stateFile = ResolveDateWildcards($stateFile, @t);
 
   if(!open(SFH, ">$stateFile")) {
-    my $msg = "WriteStateFile: Cannot open $stateFile: $!";
+    my $msg = "WriteStatefile: Cannot open $stateFile: $!";
     Log 1, $msg;
     return $msg;
   }
@@ -2166,16 +2166,16 @@ CommandList($$)
   my $str = "";
 
   if($param =~ m/^-r *(.*)$/) {
-    my $arg = ($1 ? $1 : ".*");
-    foreach my $d (devspec2array($arg,$cl)) {
-      if(!defined($defs{$d})) {
-        $str .= "No device named $d found";
-        last;
-      }
+    my @list = devspec2array($1 ? $1 : ".*", $cl);
+    foreach my $d (sort @list) {
+      return "No device named $d found" if(!defined($defs{$d}));
       $str .= "\n" if($str);
       my @a = GetDefAndAttr($d);
       $str .= join("\n", @a)."\n" if(@a);
-      @a = GetAllReadings($d);
+    }
+    foreach my $d (sort @list) {
+      $str .= "\n" if($str);
+      my @a = GetAllReadings($d);
       $str .= join("\n", @a)."\n" if(@a);
     }
     return $str;
