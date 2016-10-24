@@ -604,7 +604,7 @@ FW_rawDef()
         '</div></br>');
 
       FW_cmd(FW_root+"?cmd=list -r "+dev+"&XHR=1", function(data) {
-        data = data.replace("define", "defmod");
+        data = data.replace(/^define/, "defmod");
         $("#rawDef textarea").val(data);
         var off = $("#rawDef").position().top-20;
         $('body, html').animate({scrollTop:off}, 500);
