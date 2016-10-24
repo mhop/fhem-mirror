@@ -1421,7 +1421,7 @@ WriteStatefile()
     }
 
     my @arr = GetAllReadings($d);
-    printf SFH join(@arr, "\n") if(@arr);
+    printf SFH join("\n", @arr)."\n" if(@arr);
   }
 
   return "$attr{global}{statefile}: $!" if(!close(SFH));
