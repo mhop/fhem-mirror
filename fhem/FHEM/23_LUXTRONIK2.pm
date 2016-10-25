@@ -640,6 +640,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|". ($heatpump_visibility[167]==1 ? $heatpump_parameters[684] : "no");
   # 62 - counterHeatQPool
   $return_str .= "|". ($heatpump_visibility[2]==1 ? $heatpump_values[153] : "no");
+  # 63 - returnTemperatureTargetMin
+  $return_str .= "|". ($heatpump_visibility[295]==1 ? $heatpump_parameters[979] : "no");
   return $return_str;
 }
 
@@ -776,6 +778,7 @@ LUXTRONIK2_UpdateDone($)
    my $flowTemperature = LUXTRONIK2_CalcTemp($a[15]);
    my $returnTemperature = LUXTRONIK2_CalcTemp($a[16]);
    my $returnTemperatureTarget = LUXTRONIK2_CalcTemp($a[17]);
+   my $returnTemperatureTargetMin = LUXTRONIK2_CalcTemp($a[63]);
    
    my $heatPumpPower = 0;
    my $heatRodPower = AttrVal($name, "heatRodElectricalPowerWatt", 0);
@@ -845,7 +848,8 @@ LUXTRONIK2_UpdateDone($)
      elsif ($a[40] == 1) { $prefix = "in ";}
      if ($a[40] == 2) { #Sonderbehandlung bei WP-Fehlern
        $opStateHeatPump2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
-     } else {
+     } 
+     else {
        $opStateHeatPump2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
      }
      readingsBulkUpdate($hash,"opStateHeatPump2",$opStateHeatPump2);
@@ -880,12 +884,14 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"opModeHeating",$value);
    # Heating operating state
      # Consider also heating limit
-     if ($a[10] == 0 
-           && $a[11] == 1
-          && $averageAmbientTemperature >= $thresholdHeatingLimit) {
+     if ($a[10] == 0 && $a[11] == 1
+          && $averageAmbientTemperature >= $thresholdHeatingLimit 
+          && ($returnTemperatureTarget == $returnTemperatureTargetMin || $returnTemperatureTarget == 20 && $ambientTemperature<10)
+          ) {
           if ($ambientTemperature>=10 ) {
-            $value = "Heizungsgrenze (Soll 15 C)";
-          } else {
+            $value = "Heizgrenze (Soll ".$returnTemperatureTargetMin." C)";
+          } 
+          else {
             $value = "Frostschutz (Soll 20 C)";
           }
      } else {
@@ -1935,8 +1941,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 <h3>LUXTRONIK2</h3>
 <div>
 <ul>
-  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, 
-  Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
+  Die Luxtronik 2.0 ist eine Heizungssteuerung der Firma <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, welche in W&auml;rmepumpen von Alpha Innotec, 
+  Siemens Novelan (WPR NET), Roth (ThermoAura®, ThermoTerra), Elco und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77.</i>
