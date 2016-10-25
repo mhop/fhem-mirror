@@ -1,4 +1,4 @@
-##############################################################################
+#############################################################################
 #
 # 21_N4HMODULE.pm
 #
@@ -33,8 +33,9 @@ use SetExtensions;
 
 sub N4HMODULE_Set($@);
 sub N4HMODULE_Update($@);
+sub N4HMODULE_DbLog_splitFn($);
 
-my $n4hmodule_Version = "1.0.1.0 - 22.10.2016";
+my $n4hmodule_Version = "1.0.1.2 - 25.10.2016";
 
 
 my %OT_devices = (
@@ -103,9 +104,6 @@ my %OT_devices = (
 					{ "cmd" =>  "360000", "ID" => "4", "Text" => "Zählerwert lesen (nur LCD)", "Type" => "Button"  },
 						] },
 	"999" 	=> {"name" => "Messwert,N56", "OTcanSet" => "false", "OTcanReq" 	=> "true", "fields" => [] },
-					
-						
-						
 );
 
 ##################################################################################
@@ -120,14 +118,15 @@ sub N4HMODULE_Initialize($) {
 		push @otlist,$OT_devices{$model}->{name};
 	}
 	
-	$hash->{DefFn}		= "N4HMODULE_Define";
-	$hash->{UndefFn}	= "N4HMODULE_Undefine";
-	$hash->{ParseFn}	= "N4HMODULE_Parse";
-	$hash->{SetFn}		= "N4HMODULE_Set";
-	$hash->{AttrFn}  	= "N4HMODULE_Attr";
-	$hash->{AttrList}	= "IoDev dummy:1,0 Interval sendack:on,off setList ".
-						  "$readingFnAttributes ";
-						  "OT:"  .join(",", sort @otlist);                      
+	$hash->{DefFn}	       = "N4HMODULE_Define";
+	$hash->{UndefFn}	   = "N4HMODULE_Undefine";
+	$hash->{ParseFn}	   = "N4HMODULE_Parse";
+	$hash->{SetFn}		   = "N4HMODULE_Set";
+	$hash->{AttrFn}  	   = "N4HMODULE_Attr";
+	$hash->{AttrList}	   = "IoDev dummy:1,0 Interval sendack:on,off setList ".
+						     "$readingFnAttributes ";
+						     "OT:"  .join(",", sort @otlist);                      
+    $hash->{DbLog_splitFn} = "N4HMODULE_DbLog_splitFn";
 }
 
 
@@ -177,7 +176,9 @@ sub N4HMODULE_Define($$) {
         ($ot ==  25) or #Licht
 	    ($ot ==  26) or #Luftfeuchte
 	    ($ot == 240) or #Wind
+	    ($ot == 241) or #Sonne
 		($ot == 242) or #Luftdruck
+		($ot == 246) or #Luftdruck-Tendenz
 	    ($ot == 245)) { #Regenmenge l/h
 
 		RemoveInternalTimer($hash);
@@ -188,7 +189,6 @@ sub N4HMODULE_Define($$) {
 		Log3 $hash, 3, "N4HMODULE_Define (set timer) -> $name ($ot)";
 		InternalTimer( gettimeofday() + 30 + int(rand(15)) , "N4HMODULE_Start", $hash, 0 );
 	} 
-
    return undef;
 }
 
@@ -211,7 +211,6 @@ sub N4HMODULE_Start($)
       InternalTimer(gettimeofday() + $interval, "N4HMODULE_Start", $hash, 1 );
 	  N4HMODULE_Update( $hash );
    }
-   
 }
 
 
@@ -228,8 +227,40 @@ sub N4HMODULE_Undefine($$) {
       delete($modules{N4HMODULE}{defptr}{$c}{$dname})
         if($modules{N4HMODULE}{defptr}{$c}{$dname} == $hash);
     }
-
 	return undef;
+}
+
+##################################################################################
+sub N4HMODULE_DbLog_splitFn($$) {
+##################################################################################
+	my ($event, $device) = @_;
+	my ($reading, $value, $unit) = "";
+    my $hash = $defs{$device};
+
+    my @parts = split(/ /,$event);
+    $value = $parts[1];
+	
+	if ($event =~ m/temperature/) {
+	   $reading = 'temperature';
+	   $unit = '°C';
+	} elsif ($event =~ m/humidity/) {
+	   $reading = 'humidity';
+	   $unit = '%';
+	} elsif ($event =~ m/pressure/) {
+	   $reading = 'pressure';
+	   $unit = 'hPas';
+	} elsif ($event =~ m/co2/) {
+	   $reading = 'co2';
+	   $unit = 'ppm';
+	} elsif ($event =~ m/rain/) {
+	   $reading = 'rain';
+	   $unit = 'l/h';
+	} elsif ($event =~ m/brightness/) {
+	   $reading = 'brightness';
+	   $unit = '';
+	}
+	
+  return ($reading, $value, $unit);
 }
 
 ##################################################################################
@@ -390,9 +421,7 @@ sub N4HMODULE_ParsePayload($@) {
 	}
 
 	readingsEndUpdate( $hash , 1);
-	
 	return undef;			
-
 }
 
 
@@ -402,7 +431,6 @@ sub N4HMODULE_paramToText($@) {
 
 	my ($hash, $ddata) = @_;
 	my $name = $hash->{NAME};
-
 	my $rettype = "unbekannte Formel / Parameter";
 	my $w = hex(substr($ddata,6,2))*256+hex(substr($ddata,8,2));
 	my $ret = $w;
@@ -410,7 +438,7 @@ sub N4HMODULE_paramToText($@) {
 	
 # 	+++++++++++++++++++ Licht analog - IN_HW_NR_IS_LICHT_ANALOG
 	if (hex(substr($ddata,2,2)) == 5 ){
-		$rettype = "Licht";
+		$rettype = "brightness";
 	}	
 
 # 	+++++++++++++++++++ Uhrzeit - IN_HW_NR_IS_CLOCK
@@ -505,7 +533,6 @@ sub N4HMODULE_paramToText($@) {
 		
 	}	
 	
-	
 	return ($rettype, $ret);
 }
 
@@ -573,7 +600,6 @@ sub N4HMODULE_Set($@) {
 				$ddata = sprintf ("%02x%s", (length($fieldcmd)/2), $fieldcmd);
 			}
 			
-			
 			readingsSingleUpdate($hash, "state", "$cmd", 1);
 			IOWrite($hash, $ipdst, $ddata, 0);
 			return undef;
@@ -622,7 +648,6 @@ sub N4HMODULE_Update($@) {
     my $ddata 		= "";
 	my $cs			= "";
 	my $cmd         = "";
-	
 
 	if ($ot == 24) {
 
@@ -654,6 +679,32 @@ sub N4HMODULE_Update($@) {
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
 			Log3 $hash, 5, "N4MODULE (set temperature): $name to $cmd - $ddata, $ddata1, $ipdst";
+			IOWrite($hash, 32767, $ddata, $ipdst);
+		}
+		return undef;
+	}
+	elsif ($ot == 25) { # Licht
+
+#	+++++++ 65 D0_VALUE_ACK
+#	+++++++ 05 Licht
+#   +++++++ 01 USE_FROMEL
+
+		my $ddata1 = "650506";
+
+		if (defined $value) {
+		 $cmd = $value; 
+		 readingsSingleUpdate($hash, "brightness", "$cmd", 1);
+		}
+		else {
+  		 ($cmd, undef) = split(/ /, ReadingsVal($name , "brightness","")); }
+
+		if (defined $cmd) {
+			my $cs = $cmd;
+			$ddata1 = $ddata1.sprintf ("%02X", (0x00) );	
+			$ddata1 = $ddata1.sprintf ("%02X", ( ($cs) ) );	
+			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
+
+			Log3 $hash, 5, "N4MODULE (set brightness): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -779,7 +830,6 @@ sub N4HMODULE_Update($@) {
 			return undef; 
 		}
 		
-		
 			my $n56 = N4HMODULE_CreateN56($value,0,0,0,2);
 			$ddata1 = $ddata1.$n56;
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
@@ -892,6 +942,18 @@ sub N4HMODULE_ParseN56($) {
     <ul>
       <code>define n4h_28204 N4HMODULE n4h 24 28204</code><br />
     </ul>
+
+	Currently the following values are supported:
+
+	<b>Measurement</b>
+	<ul>
+	 <li> 24 - Measurement,Temperature</li>
+	 <li> 25 - Measurement,Brightness</li>
+	 <li> 26 - Measurement,Humidity</li>
+	 <li>240 - Measurement,Wind</li>
+	 <li>242 - Measurement,Pressure</li>
+	 <li>245 - Measurement,Rain</li>
+	</ul>
   </ul><br />
 
   <a name="N4HMODULE_Readings"></a>
@@ -930,7 +992,20 @@ sub N4HMODULE_ParseN56($) {
     <ul>
       <code>define MyN4HMODULEice N4HMODULE 24 26004</code><br />
     </ul>
-  </ul><br />
+	
+	Derzeit werden folgende Typen unterst&uuml;tzt:
+
+	<b>Messwerte</b>
+	<ul>
+	 <li> 24 - Messwert,Temperatur</li>
+	 <li> 25 - Messwert,Helligkeit</li>
+	 <li> 26 - Messwert,Feuchte</li>
+	 <li>240 - Messwert,Wind</li>
+	 <li>242 - Messwert,Luftdruck</li>
+	 <li>245 - Messwert,Regenmenge</li>
+	</ul>
+
+	</ul><br />
 
   <a name="N4HMODULE_Readings"></a>
   <b>Readings</b>
