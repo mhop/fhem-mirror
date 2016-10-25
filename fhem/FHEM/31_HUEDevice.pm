@@ -1201,7 +1201,9 @@ HUEDevice_Parse($$)
 
         $lastupdated = FmtDateTime($sec);
       }
-      return undef if( $hash->{lastupdated} &&  $hash->{lastupdated} eq $lastupdated );
+
+      $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', undef ) if( !$hash->{lastupdated} );
+      return undef if( $hash->{lastupdated} && $hash->{lastupdated} eq $lastupdated );
 
       Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}";
       Log3 $name, 5, "$name: ". Dumper $result;
@@ -1236,6 +1238,12 @@ HUEDevice_Parse($$)
 
            ++$i;
          }
+       }
+
+       if( $lastupdated ) {
+         $hash->{'.updateTimestamp'} = $lastupdated;
+         $hash->{CHANGETIME}[$i] = $lastupdated;
+         readingsBulkUpdate($hash, '.lastupdated', $lastupdated, 0);
        }
 
        readingsEndUpdate($hash,1);
