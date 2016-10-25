@@ -20,30 +20,16 @@ use DevIo;
 
 my %Hyperion_sets =
 (
-  "adjustRed"         => "textField",
-  "adjustGreen"       => "textField",
-  "adjustBlue"        => "textField",
-  "blacklevel"        => "textField",
-  "colorTemperature"  => "textField",
   "dim"               => "slider,0,1,100",
   "dimDown"           => "noArg",
   "dimUp"             => "noArg",
-  "correction"        => "textField",
   "clear"             => "textField",
   "clearall"          => "noArg",
-  "gamma"             => "textField",
-  "luminanceGain"     => "slider,0,0.010,1.999,1",
-  "luminanceMinimum"  => "slider,0,0.010,1.999,1",
   "mode"              => "clearall,effect,off,rgb",
   "off"               => "noArg",
   "on"                => "noArg",
   "rgb"               => "colorpicker,RGB",
-  "saturationGain"    => "slider,0,0.010,1.999,1",
-  "saturationLGain"   => "slider,0,0.010,1.999,1",
-  "threshold"         => "textField",
-  "toggle"            => "noArg",
-  "valueGain"         => "slider,0,0.010,1.999,1",
-  "whitelevel"        => "textField"
+  "toggle"            => "noArg"
 );
 
 my $Hyperion_requiredVersion    = "1.03.2";
@@ -98,7 +84,6 @@ sub Hyperion_Define($$)
   $hash->{IP}     = $host;
   $hash->{PORT}   = $port;
   $hash->{DeviceName} = $host.":".$port;
-  $hash->{helper}{sets} = join(" ",map {"$_:$Hyperion_sets{$_}"} keys %Hyperion_sets);
   $interval       = undef unless defined $interval;
   $interval       = 5 if ($interval && $interval < 5);
   RemoveInternalTimer($hash);
@@ -106,18 +91,15 @@ sub Hyperion_Define($$)
   if ($init_done && !defined $hash->{OLDDEF})
   {
     $attr{$name}{alias} = "Ambilight";
+    $attr{$name}{"event-on-change-reading"} = ".*";
     $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
     $attr{$name}{group} = "colordimmer";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
     $attr{$name}{icon} = "light_led_stripe_rgb";
     $attr{$name}{lightSceneParamsToSave} = "state";
     $attr{$name}{room} = "Hyperion";
-    $attr{$name}{userattr} = "lightSceneParamsToSave"
-      if (index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
-    $attr{$name}{userattr} = "homebridgeMapping"
-      if (!$attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
-    $attr{$name}{userattr} = "homebridgeMapping ".$attr{$name}{userattr}
-      if ($attr{$name}{userattr} && index($attr{"global"}{userattr},"homebridgeMapping") == -1 && index($attr{$name}{userattr},"homebridgeMapping") == -1);
+    addToDevAttrList($name,"lightSceneParamsToSave") if (index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    addToDevAttrList($name,"homebridgeMapping") if (index($attr{"global"}{userattr},"homebridgeMapping") == -1);
     $attr{$name}{webCmd} = $Hyperion_webCmd;
   }
   if ($init_done)
@@ -144,7 +126,7 @@ sub Hyperion_Notify($$)
   my $name  = $hash->{NAME};
   return if ($dev->{NAME} ne "global");
   return if (!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-  return undef if (AttrVal($name,"disable",0));
+  return undef if (IsDisabled($name));
   Hyperion_Read($hash);
   return undef;
 }
@@ -152,7 +134,6 @@ sub Hyperion_Notify($$)
 sub Hyperion_OpenDev($)
 {
   my ($hash) = @_;
-  DevIo_CloseDev($hash);
   $hash->{STATE} = DevIo_OpenDev($hash,0,"Hyperion_DoInit",sub($$$)
   {
     my ($h,$err) = @_;
@@ -198,7 +179,9 @@ sub Hyperion_isLocal($)
 sub Hyperion_Get($@)
 {
   my ($hash,$name,$cmd) = @_;
-  my $params = "configFiles:noArg devStateIcon:noArg statusRequest:noArg";
+  my $params =  "devStateIcon:noArg ".
+                "statusRequest:noArg ".
+                "configFiles:noArg ";
   return "get $name needs one parameter: $params"
     if (!$cmd);
   if ($cmd eq "configFiles")
@@ -230,7 +213,7 @@ sub Hyperion_Read($)
   return undef if ($buf !~ /(^.+"success":(true|false)\}$)/);
   Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned result: $result";
   delete $hash->{PARTIAL};
-  my %Hyperion_sets_local = %Hyperion_sets;
+  $result =~ /(\s+)?\/{2,}.*|(?:[\t ]*(?:\r?\n|\r))+/gm;
   if ($result=~ /^\{"success":true\}$/)
   {
     fhem "sleep 1; get $name statusRequest"
@@ -252,8 +235,7 @@ sub Hyperion_Read($)
         $ver          =~ s/\.//g;
         my $rver      = $Hyperion_requiredVersion;
         $rver         =~ s/\.//g;
-        $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!"
-          if ($ver<$rver);
+        $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!" if ($ver<$rver);
       }
       if ($error)
       {
@@ -267,50 +249,38 @@ sub Hyperion_Read($)
         return undef;
       }
     }
-    my $vers        = $data->{hyperion_build}->[0]->{version};
-    my $prio        = (defined $data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : undef;
+    my $vers        = $data->{hyperion_build}->[0]->{version} ? $data->{hyperion_build}->[0]->{version} : "";
+    my $prio        = (defined $data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : "";
     my $duration    = (defined $data->{priorities}->[0]->{duration_ms} && $data->{priorities}->[0]->{duration_ms} > 999) ? int($data->{priorities}->[0]->{duration_ms} / 1000) : 0;
     $duration       = ($duration) >= 1 ? $duration : "infinite";
-    my $adj         = $data->{adjustment}->[0];
-    my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0];
+    my $adj         = $data->{adjustment}->[0] ? $data->{adjustment}->[0] : undef;
+    my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0] ? $data->{activeLedColor}->[0]->{'HEX Value'}->[0] : "";
     my $configs     = ReadingsVal($name,".configs",undef);
-    my $corr        = $data->{correction}->[0];
-    my $effects     = $data->{effects};
-    my $effectList  = join(",",map {"$_->{name}"} @{$effects});
+    my $corr        = $data->{correction}->[0] ? $data->{correction}->[0] : undef;
+    my $effects     = $data->{effects} ? $data->{effects} : undef;
+    my $effectList  = $effects ? join(",",map {"$_->{name}"} @{$effects}) : "";
     $effectList     =~ s/ /_/g;
-    my $script      = $data->{activeEffects}->[0]->{script};
-    my $temp        = $data->{temperature}->[0];
-    my $trans       = $data->{transform}->[0];
-    my $id          = $trans->{id};
-    my $adjR        = join(",",@{$adj->{redAdjust}});
-    my $adjG        = join(",",@{$adj->{greenAdjust}});
-    my $adjB        = join(",",@{$adj->{blueAdjust}});
-    my $corS        = join(",",@{$corr->{correctionValues}});
-    my $temP        = join(",",@{$temp->{correctionValues}});
-    my $blkL        = sprintf("%.3f",$trans->{blacklevel}->[0]).",".sprintf("%.3f",$trans->{blacklevel}->[1]).",".sprintf("%.3f",$trans->{blacklevel}->[2]);
-    my $gamM        = sprintf("%.3f",$trans->{gamma}->[0]).",".sprintf("%.3f",$trans->{gamma}->[1]).",".sprintf("%.3f",$trans->{gamma}->[2]);
-    my $thrE        = sprintf("%.3f",$trans->{threshold}->[0]).",".sprintf("%.3f",$trans->{threshold}->[1]).",".sprintf("%.3f",$trans->{threshold}->[2]);
-    my $whiL        = sprintf("%.3f",$trans->{whitelevel}->[0]).",".sprintf("%.3f",$trans->{whitelevel}->[1]).",".sprintf("%.3f",$trans->{whitelevel}->[2]);
-    my $lumG        = sprintf("%.3f",$trans->{luminanceGain});
-    my $lumM        = (defined $trans->{luminanceMinimum}) ? sprintf("%.3f",$trans->{luminanceMinimum}) : undef;
-    my $satG        = sprintf("%.3f",$trans->{saturationGain});
-    my $satL        = (defined $trans->{saturationLGain}) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
-    my $valG        = sprintf("%.3f",$trans->{valueGain});
-    $Hyperion_sets_local{effect} = $effectList
-      if (length $effectList > 0);
-    if ($configs)
-    {
-      $Hyperion_sets_local{configFile} = $configs;
-      $attr{$name}{webCmd} = $Hyperion_webCmd_config
-        if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
-    }
-    $hash->{helper}{sets} = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
-    $hash->{hostname} = $data->{hostname}
-      if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
-    $hash->{build_version} = $vers
-      if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
-    $hash->{build_time} = $data->{hyperion_build}->[0]->{time}
-      if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
+    my $script      = $data->{activeEffects}->[0]->{script} ? $data->{activeEffects}->[0]->{script} : undef;
+    my $temp        = $data->{temperature}->[0] ? $data->{temperature}->[0] : undef;
+    my $trans       = $data->{transform}->[0] ? $data->{transform}->[0] : undef;
+    my $id          = $trans->{id} ? $trans->{id} : undef;
+    my $adjR        = $adj ? join(",",@{$adj->{redAdjust}}) : undef;
+    my $adjG        = $adj ? join(",",@{$adj->{greenAdjust}}) : undef;
+    my $adjB        = $adj ? join(",",@{$adj->{blueAdjust}}) : undef;
+    my $corS        = $corr ? join(",",@{$corr->{correctionValues}}) : undef;
+    my $temP        = $temp ? join(",",@{$temp->{correctionValues}}) : undef;
+    my $blkL        = $trans->{blacklevel} ? sprintf("%.3f",$trans->{blacklevel}->[0]).",".sprintf("%.3f",$trans->{blacklevel}->[1]).",".sprintf("%.3f",$trans->{blacklevel}->[2]) : undef;
+    my $gamM        = $trans->{gamma} ? sprintf("%.3f",$trans->{gamma}->[0]).",".sprintf("%.3f",$trans->{gamma}->[1]).",".sprintf("%.3f",$trans->{gamma}->[2]) : undef;
+    my $thrE        = $trans->{threshold} ? sprintf("%.3f",$trans->{threshold}->[0]).",".sprintf("%.3f",$trans->{threshold}->[1]).",".sprintf("%.3f",$trans->{threshold}->[2]) : undef;
+    my $whiL        = $trans->{whitelevel} ? sprintf("%.3f",$trans->{whitelevel}->[0]).",".sprintf("%.3f",$trans->{whitelevel}->[1]).",".sprintf("%.3f",$trans->{whitelevel}->[2]) : undef;
+    my $lumG        = defined $trans->{luminanceGain} ? sprintf("%.3f",$trans->{luminanceGain}) : undef;
+    my $lumM        = defined $trans->{luminanceMinimum} ? sprintf("%.3f",$trans->{luminanceMinimum}) : undef;
+    my $satG        = defined $trans->{saturationGain} ? sprintf("%.3f",$trans->{saturationGain}) : undef;
+    my $satL        = defined $trans->{saturationLGain} ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
+    my $valG        = defined $trans->{valueGain} ? sprintf("%.3f",$trans->{valueGain}) : undef;
+    $hash->{hostname} = $data->{hostname} if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
+    $hash->{build_version} = $vers if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
+    $hash->{build_time} = $data->{hyperion_build}->[0]->{time} if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"adjustRed",$adjR);
     readingsBulkUpdate($hash,"adjustGreen",$adjG);
@@ -318,23 +288,17 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"blacklevel",$blkL);
     readingsBulkUpdate($hash,"colorTemperature",$temP);
     readingsBulkUpdate($hash,"correction",$corS);
-    readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0])
-      if (!defined ReadingsVal($name,"effect",undef));
-    readingsBulkUpdate($hash,".effects", $effectList)
-      if ($effectList);
+    readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0]) if (!defined ReadingsVal($name,"effect",undef));
+    readingsBulkUpdate($hash,".effects",$effectList);
     readingsBulkUpdate($hash,"duration",$duration);
     readingsBulkUpdate($hash,"gamma",$gamM);
     readingsBulkUpdate($hash,"id",$id);
     readingsBulkUpdate($hash,"luminanceGain",$lumG);
-    readingsBulkUpdate($hash,"luminanceMinimum",$lumM)
-      if ($lumM);
-    readingsBulkUpdate($hash,"priority",$prio)
-      if (defined $prio);
-    readingsBulkUpdate($hash,"rgb","ff0d0d")
-      if (!defined ReadingsVal($name,"rgb",undef));
+    readingsBulkUpdate($hash,"luminanceMinimum",$lumM);
+    readingsBulkUpdate($hash,"priority",$prio);
+    readingsBulkUpdate($hash,"rgb","ff0d0d") if (!defined ReadingsVal($name,"rgb",undef));
     readingsBulkUpdate($hash,"saturationGain",$satG);
-    readingsBulkUpdate($hash,"saturationLGain",$satL)
-      if ($satL);
+    readingsBulkUpdate($hash,"saturationLGain",$satL);
     readingsBulkUpdate($hash,"threshold",$thrE);
     readingsBulkUpdate($hash,"valueGain",$valG);
     readingsBulkUpdate($hash,"whitelevel",$whiL);
@@ -402,6 +366,7 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"lastError","error while requesting ".$hash->{DeviceName});
     readingsBulkUpdate($hash,"serverResponse","ERROR");
     readingsBulkUpdate($hash,"state","ERROR");
+    readingsEndUpdate($hash,1);
   }
   return undef;
 }
@@ -486,7 +451,7 @@ sub Hyperion_GetUpdate(@)
   {
     InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash,1);
   }
-  return undef if (IsDisabled($name) > 0);
+  return undef if (IsDisabled($hash));
   Hyperion_Call($hash);
   return undef;
 }
@@ -500,7 +465,28 @@ sub Hyperion_Set($@)
     if (scalar @aa < 1 || scalar @aa > 4);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
-  my $sets = $hash->{helper}{sets};
+  my %Hyperion_sets_local = %Hyperion_sets;
+  if (ReadingsVal($name,".configs",""))
+  {
+    $Hyperion_sets_local{configFile} = ReadingsVal($name,".configs","");
+    $attr{$name}{webCmd} = $Hyperion_webCmd_config if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+  }
+  $Hyperion_sets_local{adjustRed} = "textField" if (ReadingsVal($name,"adjustRed",""));
+  $Hyperion_sets_local{adjustGreen} = "textField" if (ReadingsVal($name,"adjustGreen",""));
+  $Hyperion_sets_local{adjustBlue} = "textField" if (ReadingsVal($name,"adjustBlue",""));
+  $Hyperion_sets_local{correction} = "textField" if (ReadingsVal($name,"correction",""));
+  $Hyperion_sets_local{effect} = ReadingsVal($name,".effects","") if (ReadingsVal($name,".effects",""));
+  $Hyperion_sets_local{colorTemperature} = "textField" if (ReadingsVal($name,"colorTemperature",""));
+  $Hyperion_sets_local{blacklevel} = "textField" if (ReadingsVal($name,"blacklevel",""));
+  $Hyperion_sets_local{gamma} = "textField" if (ReadingsVal($name,"gamma",""));
+  $Hyperion_sets_local{threshold} = "textField" if (ReadingsVal($name,"threshold",""));
+  $Hyperion_sets_local{whitelevel} = "textField" if (ReadingsVal($name,"whitelevel",""));
+  $Hyperion_sets_local{luminanceGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"luminanceGain",""));
+  $Hyperion_sets_local{luminanceMinimum} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"luminanceMinimum",""));
+  $Hyperion_sets_local{saturationGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"saturationGain",""));
+  $Hyperion_sets_local{saturationLGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"saturationLGain",""));
+  $Hyperion_sets_local{valueGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"valueGain",""));
+  my $params = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
   my %obj;
   Log3 $name,4,"$name: Hyperion_Set cmd: $cmd" if (defined $cmd);
   Log3 $name,4,"$name: Hyperion_Set value: $value" if (defined $value && $value ne "");
@@ -751,7 +737,7 @@ sub Hyperion_Set($@)
     return undef;
   }
   $hash->{InSetExtensions} = 1;
-  my $ret = SetExtensions($hash,$sets,$name,@aa);
+  my $ret = SetExtensions($hash,$params,$name,@aa);
   delete $hash->{InSetExtensions};
   return $ret;
 }
@@ -793,18 +779,15 @@ sub Hyperion_Attr(@)
     }
     elsif ($attr_name =~ /^hyperionDefault(Priority|Duration)$/)
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536."
-        if ($attr_value !~ /^(\d+)$/ || $1 < 0 || $1 > 65536);
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536." if ($attr_value !~ /^(\d+)$/ || $1 < 0 || $1 > 65536);
     }
     elsif ($attr_name eq "hyperionDimStep")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5."
-        if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5." if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50);
     }
     elsif ($attr_name eq "hyperionNoSudo")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1."
-        if ($attr_value !~ /^1$/);
+      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1." if ($attr_value !~ /^1$/);
     }
     elsif ($attr_name eq "hyperionSshUser")
     {
@@ -820,20 +803,31 @@ sub Hyperion_Attr(@)
     }
     elsif ($attr_name eq "hyperionVersionCheck")
     {
-      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0."
-        if ($attr_value !~ /^0$/);
+      $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0." if ($attr_value !~ /^0$/);
     }
     elsif ($attr_name eq "queryAfterSet")
     {
-      if ($attr_value !~ /^0$/)
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be 0 if set, default is 1." if ($attr_value !~ /^0$/);
+    }
+    elsif ($attr_name eq "disable")
+    {
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be 1 if set, default is 0." if ($attr_value !~ /^0|1$/);
+      return $err if (defined $err);
+      if ($attr_value eq "1")
       {
-        $err = "Invalid value $attr_value for attribute $attr_name. Must be 0 when set, default is 1.";
+        RemoveInternalTimer($hash);
+        DevIo_Disconnected($hash);
+        DevIo_CloseDev($hash);
+      }
+      else
+      {
+        Hyperion_GetUpdate($hash);
       }
     }
   }
   else
   {
-    Hyperion_Call($hash);
+    Hyperion_GetUpdate($hash) if (!IsDisabled($hash));
   }
   return $err if (defined $err);
   return undef;
@@ -845,9 +839,11 @@ sub Hyperion_Call($;$)
   $obj = ($obj) ? $obj : $Hyperion_serverinfo;
   my $name = $hash->{NAME};
   my $json = encode_json($obj);
-  return undef if (IsDisabled($name) > 0);
+  return undef if (IsDisabled($name));
   if (!$hash->{FD})
   {
+    DevIo_CloseDev($hash);
+    DevIo_Disconnected($hash);
     Hyperion_OpenDev($hash);
     return undef;
   }
@@ -1048,6 +1044,11 @@ sub Hyperion_devStateIcon($;$)
   <a name="Hyperion_attr"></a>
   <p><b>Attributes</b></p>
   <ul>
+    <li>
+      <i>disable</i><br>
+      stop polling and disconnect<br>
+      default: 0
+    </li>
     <li>
       <i>hyperionBin</i><br>
       path to the hyperion executable<br>
