@@ -669,7 +669,7 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{light} ) && $webArgs->{light} > 50 );
     readingsBulkUpdateIfChanged( $hash, "daylight", $daylight );
 
-    # weatherCondition
+    # condition
     if ( defined( $webArgs->{light} ) ) {
         my $condition = "clear";
 
@@ -683,7 +683,7 @@ sub HP1000_CGI() {
             $condition = "cloudy";
         }
 
-        readingsBulkUpdateIfChanged( $hash, "weatherCondition", $condition );
+        readingsBulkUpdateIfChanged( $hash, "condition", $condition );
     }
 
     # humidityCondition
@@ -1349,6 +1349,15 @@ sub HP1000_DbLog_split($$) {
         $value   = $2;
         $unit    = "W/m2";
     }
+    elsif ( $event =~ /^(pressureTrend):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = "";
+        $value   = "0" if ( $2 eq "=" );
+        $value   = "1" if ( $2 eq "+" );
+        $value   = "2" if ( $2 eq "-" );
+        return undef if ( $value eq "" );
+        $unit = "";
+    }
     elsif ( $event =~ /^(pressure|pressureAbs):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
@@ -1369,7 +1378,7 @@ sub HP1000_DbLog_split($$) {
         $value   = $2;
         $unit    = "mm/h";
     }
-    elsif ( $event =~ /^(rainin):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(rainIn):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "in/h";
@@ -1403,12 +1412,17 @@ sub HP1000_DbLog_split($$) {
         $value   = $2;
         $unit    = "°";
     }
-    elsif ( $event =~ /^(windGust|windSpeed):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(windGust.*|windSpeed.*):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "km/h";
     }
-    elsif ( $event =~ /^(windGustBft|windSpeedBft):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(windGustMph.*|windSpeedMph.*):\s([\w\.,]+)\s*(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $unit    = "mph";
+    }
+    elsif ( $event =~ /^(windGustBft.*|windSpeedBft.*):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "Bft";
@@ -1435,7 +1449,7 @@ sub HP1000_DbLog_split($$) {
         $value   = "0" if ( $2 eq "dead" );
         $unit    = "";
     }
-    elsif ( $event =~ /^(weatherCondition):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(condition):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = "";
         $value   = "0" if ( $2 eq "clear" );
