@@ -703,3 +703,6 @@
 
 - Fri Oct 22 2016 (loredo)
   - adding new package UConv for unit conversions
+
+- Wed Oct 26 2016 (loredo)
+  - adding new module 59_Wunderground
