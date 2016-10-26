@@ -305,30 +305,22 @@ sub Wunderground_Hash2Readings($$;$) {
             $cr = "" if ( $cr eq "current_observation" );
 
             # custom reading
-            $cr = "condition"         if ( $cr eq "weather" );
-            $cr = "dewpoint"          if ( $cr eq "dewpoint_c" );
-            $cr = "heatIndex"         if ( $cr eq "heat_index_c" );
-            $cr = "heatIndex_f"       if ( $cr eq "heat_index_f" );
-            $cr = "humidity"          if ( $cr eq "relative_humidity" );
-            $cr = "pressure"          if ( $cr eq "pressure_mb" );
-            $cr = "pressureTrend"     if ( $cr eq "pressure_trend" );
-            $cr = "rain"              if ( $cr eq "precip_1hr_metric" );
-            $cr = "rainDay"           if ( $cr eq "precip_today_metric" );
-            $cr = "rain_in"           if ( $cr eq "precip_1hr_in" );
-            $cr = "rainDay_in"        if ( $cr eq "precip_today_in" );
-            $cr = "temperature"       if ( $cr eq "temp_c" );
-            $cr = "temperature_f"     if ( $cr eq "temp_f" );
-            $cr = "temperatureFeel"   if ( $cr eq "feelslike_c" );
-            $cr = "temperatureFeel_f" if ( $cr eq "feelslike_f" );
-            $cr = "uvIndex"           if ( $cr eq "UV" );
-            $cr = "windDir"           if ( $cr eq "wind_degrees" );
-            $cr = "windGust"          if ( $cr eq "wind_gust_kph" );
-            $cr = "windGust_mph"      if ( $cr eq "wind_gust_mph" );
-            $cr = "windSpeed"         if ( $cr eq "wind_kph" );
-            $cr = "windSpeed_mph"     if ( $cr eq "wind_mph" );
-            $cr = "windChill"         if ( $cr eq "windchill_c" );
-            $cr = "windChill_f"       if ( $cr eq "windchill_f" );
-            $cr = "visibility"        if ( $cr eq "visibility_km" );
+            $cr = "condition"      if ( $cr eq "weather" );
+            $cr = "dewpoint"       if ( $cr eq "dewpoint_c" );
+            $cr = "humidity"       if ( $cr eq "relative_humidity" );
+            $cr = "pressure"       if ( $cr eq "pressure_mb" );
+            $cr = "rain"           if ( $cr eq "precip_1hr_metric" );
+            $cr = "rain_day"       if ( $cr eq "precip_today_metric" );
+            $cr = "rain_in"        if ( $cr eq "precip_1hr_in" );
+            $cr = "rain_day_in"    if ( $cr eq "precip_today_in" );
+            $cr = "wind_direction" if ( $cr eq "wind_degrees" );
+            $cr = "wind_gust"      if ( $cr eq "wind_gust_kph" );
+            $cr = "wind_gust_mph"  if ( $cr eq "wind_gust_mph" );
+            $cr = "wind_speed"     if ( $cr eq "wind_kph" );
+            $cr = "wind_speed_mph" if ( $cr eq "wind_mph" );
+            $cr = "wind_chill"     if ( $cr eq "windchill_c" );
+            $cr = "wind_chill_f"   if ( $cr eq "windchill_f" );
+            $cr = "visibility"     if ( $cr eq "visibility_km" );
 
             next
               if ( $cr =~ /^sun_phase(.*)$/
@@ -373,11 +365,11 @@ sub Wunderground_Hash2Readings($$;$) {
                 readingsBulkUpdate( $hash, "moonrise", $moonrise );
                 readingsBulkUpdate( $hash, "moonset",  $moonset );
 
-                readingsBulkUpdate( $hash, "moonAge",
+                readingsBulkUpdate( $hash, "moon_age",
                     $h->{moon_phase}{ageOfMoon} );
-                readingsBulkUpdate( $hash, "moonPct",
+                readingsBulkUpdate( $hash, "moon_pct",
                     $h->{moon_phase}{percentIlluminated} );
-                readingsBulkUpdate( $hash, "moonPhase",
+                readingsBulkUpdate( $hash, "moon_phase",
                     $h->{moon_phase}{phaseofMoon} );
             }
 
@@ -392,7 +384,7 @@ sub Wunderground_Hash2Readings($$;$) {
                     $h->{conditions} );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "high",
+                    $reading . "high_c",
                     $h->{high}{celsius}
                 );
                 readingsBulkUpdate(
@@ -402,16 +394,16 @@ sub Wunderground_Hash2Readings($$;$) {
                 );
                 readingsBulkUpdate( $hash, $reading . "humidity",
                     $h->{avehumidity} );
-                readingsBulkUpdate( $hash, $reading . "humidityMin",
+                readingsBulkUpdate( $hash, $reading . "humidity_min",
                     $h->{minhumidity} );
-                readingsBulkUpdate( $hash, $reading . "humidityMax",
+                readingsBulkUpdate( $hash, $reading . "humidity_max",
                     $h->{maxhumidity} );
                 readingsBulkUpdate( $hash, $reading . "icon", $h->{icon} );
                 readingsBulkUpdate( $hash, $reading . "icon_url",
                     $h->{icon_url} );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "low",
+                    $reading . "low_c",
                     $h->{low}{celsius}
                 );
                 readingsBulkUpdate(
@@ -422,72 +414,72 @@ sub Wunderground_Hash2Readings($$;$) {
                 readingsBulkUpdate( $hash, $reading . "pop", $h->{pop} );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "rainDay",
+                    $reading . "rain_day",
                     $h->{qpf_allday}{mm}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "rainDay_in",
+                    $reading . "rain_day_in",
                     $h->{qpf_allday}{in}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "rainNight",
+                    $reading . "rain_night",
                     $h->{qpf_night}{mm}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "rainNight_in",
+                    $reading . "rain_night_in",
                     $h->{qpf_night}{in}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "snowDay",
+                    $reading . "snow_day",
                     $h->{snow_allday}{cm}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "snowDay_in",
+                    $reading . "snow_day_in",
                     $h->{snow_allday}{in}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "snowNight",
+                    $reading . "snow_night",
                     $h->{snow_night}{cm}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "snowNight_in",
+                    $reading . "snow_night_in",
                     $h->{snow_night}{in}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windDir",
+                    $reading . "wind_direction",
                     $h->{avewind}{degrees}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windDirMax",
+                    $reading . "wind_direction_max",
                     $h->{maxwind}{degrees}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windSpeed",
+                    $reading . "wind_speed",
                     $h->{avewind}{kph}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windSpeed_mph",
+                    $reading . "wind_speed_mph",
                     $h->{avewind}{mph}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windSpeedMax",
+                    $reading . "wind_speed_max",
                     $h->{maxwind}{kph}
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "windSpeedMax_mph",
+                    $reading . "wind_speed_max_mph",
                     $h->{maxwind}{mph}
                 );
             }
@@ -501,7 +493,7 @@ sub Wunderground_Hash2Readings($$;$) {
                   (      $period eq "1"
                       || $period eq "3"
                       || $period eq "5"
-                      || $period eq "7" ? "N" : "" );
+                      || $period eq "7" ? "_night" : "" );
 
                 if ( $period < 2 ) {
                     $period = "0";
@@ -598,21 +590,17 @@ sub Wunderground_DbLog_split($$) {
     my $hash = $defs{$device};
 
     if ( $event =~
-/^(windCompasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/
+/^(wind_compasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/
       )
     {
         return undef;
     }
-    elsif ( $event =~
-/^(dewpoint|dewpointIndoor|temperature|temperatureIndoor|windChill):\s([\w\.,]+)\s*(.*)/
-      )
-    {
+    elsif ( $event =~ /^(dewpoint|temp_c|wind_chill):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "°C";
     }
-    elsif ( $event =~
-        /^(dewpoint_f|temperature_f|windChill_f):\s([\w\.,]+)\s*(.*)/ )
+    elsif ( $event =~ /^(dewpoint_f|temp_f|wind_chill_f):\s([\w\.,]+)\s*(.*)/ )
     {
         $reading = $1;
         $value   = $2;
@@ -628,7 +616,7 @@ sub Wunderground_DbLog_split($$) {
         $value   = $2;
         $unit    = "W/m2";
     }
-    elsif ( $event =~ /^(pressureTrend):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(pressure_trend):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = "";
         $value   = "0" if ( $2 eq "=" );
@@ -662,69 +650,62 @@ sub Wunderground_DbLog_split($$) {
         $value   = $2;
         $unit    = "in/h";
     }
-    elsif ( $event =~ /^(rain|.*rainDay|.*rainNight):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(rain|.*rain_day|.*rain_night):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "mm";
     }
-    elsif (
-        $event =~ /^(rain_in|.*rainDay_in|.*rainNight_in):\s([\w\.,]+)\s*(.*)/ )
+    elsif ( $event =~
+        /^(rain_in|.*rain_day_in|.*rain_night_in):\s([\w\.,]+)\s*(.*)/ )
     {
         $reading = $1;
         $value   = $2;
         $unit    = "in";
     }
-    elsif ( $event =~ /^(uvIndex):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(UV):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "UVI";
     }
-    elsif ( $event =~ /^(.*windDir.*):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(.*wind_direction.*):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "°";
     }
     elsif ( $event =~
-        /^(.*windGust|.*windSpeed|.*windSpeedMax):\s([\w\.,]+)\s*(.*)/ )
+        /^(.*wind_gust|.*wind_speed|.*wind_speed_max):\s([\w\.,]+)\s*(.*)/ )
     {
         $reading = $1;
         $value   = $2;
         $unit    = "km/h";
     }
     elsif ( $event =~
-/^(.*windGust_mph|.*windSpeed_mph|.*windSpeedMax_mph):\s([\w\.,]+)\s*(.*)/
+/^(.*wind_gust_mph|.*wind_speed_mph|.*wind_speed_max_mph):\s([\w\.,]+)\s*(.*)/
       )
     {
         $reading = $1;
         $value   = $2;
         $unit    = "mph";
     }
-    elsif ( $event =~ /^(windGust_bft|windSpeed_bft):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(wind_gust_bft|wind_speed_bft):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "Bft";
     }
-    elsif ( $event =~ /^(windGust_mps|windSpeed_mps):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(wind_gust_mps|wind_speed_mps):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "m/s";
     }
-    elsif ( $event =~ /^(windGust_fts|windSpeed_fts):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(wind_gust_fts|wind_speed_fts):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "ft/s";
     }
-    elsif ( $event =~ /^(windGust_kn|windSpeed_kn):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(wind_gust_kn|wind_speed_kn):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = $2;
         $unit    = "kn";
-    }
-    elsif ( $event =~ /^(Activity):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $value   = "1" if ( $2 eq "alive" );
-        $value   = "0" if ( $2 eq "dead" );
-        $unit    = "";
     }
     elsif ( $event =~ /^(.*condition):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
@@ -736,7 +717,7 @@ sub Wunderground_DbLog_split($$) {
         return undef if ( $value eq "" );
         $unit = "";
     }
-    elsif ( $event =~ /^(humidityCondition):\s([\w\.,]+)\s*(.*)/ ) {
+    elsif ( $event =~ /^(humidity_condition):\s([\w\.,]+)\s*(.*)/ ) {
         $reading = $1;
         $value   = "";
         $value   = "0" if ( $2 eq "dry" );
