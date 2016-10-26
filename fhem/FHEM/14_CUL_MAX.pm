@@ -322,7 +322,7 @@ CUL_MAX_Parse($$)
         #This is a request for TimeInformation send to us
         Log3 $hash, 5, "Got request for TimeInformation, sending it";
         CUL_MAX_SendTimeInformation($shash, $src);
-      } else {
+      } elsif(length($payload) > 0) {
         my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
         #For all fields but the month I'm quite sure
         my $year = $f1 + 2000;
