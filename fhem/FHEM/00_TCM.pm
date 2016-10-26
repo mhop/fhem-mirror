@@ -1081,7 +1081,6 @@ sub TCM_ReadAnswer($$)
             Log3 $name, 4, "TCM $name own telegram from $id blocked.";
           } else {
             #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
-            Log3 $name, 3, "TCM $name dispatch EnOcean:$packetType:$org:$d1:$id:$status:$odata";
             Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
           }
           $data = $rest;
