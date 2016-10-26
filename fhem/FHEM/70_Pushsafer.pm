@@ -129,8 +129,12 @@ sub Pushsafer_Set($$$@)
         my ($err, $data) = Pushsafer_createBody($hash, $h);
 
         return $err if(defined($err));
-
-        Log3 $name, 5, "Pushsafer ($name) - sending data: $data";
+        
+        my $data_scrambled = $data;
+        
+        $data_scrambled =~ s/k=[^&]+/k=HIDDEN/g; # remove private key from log output
+        
+        Log3 $name, 5, "Pushsafer ($name) - sending data: $data_scrambled";
 
         Pushsafer_Send($hash, $data);
 
