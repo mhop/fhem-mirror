@@ -351,7 +351,8 @@ CUL_MAX_Parse($$)
       }
 
       #If $isToMe is true, this device is already paired and just wants to be reacknowledged
-      if($shash->{pairmode} || $isToMe) {
+      #If we already have the device created but it was reseted (batteries changed?), we directly re-pair (without pairmode)
+      if($shash->{pairmode} || $isToMe || exists($modules{MAX}{defptr}{$src})) {
         Log3 $hash, 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0", {});
 
