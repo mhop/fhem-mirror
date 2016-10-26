@@ -488,7 +488,7 @@ CUL_MAX_SendQueueHandler($$)
     }
   }
   if($pktIdx == @{$hash->{sendQueue}} && !defined($responseToShutterContact)) {
-    Log3 $hash, 2, "There is a packet for ShutterContact $packetForShutterContactInQueue in queue. Please push the button on the respective ShutterContact so the packet can be send.";
+    Log3 $hash, 2, "There is a packet for ShutterContact $packetForShutterContactInQueue in queue. Please trigger a window action (open or close the window) to wake up the respective ShutterContact and let it receive the packet.";
     $timeout += 3;
     InternalTimer($timeout, "CUL_MAX_SendQueueHandler", $hash, 0);
     return undef;
@@ -513,8 +513,8 @@ CUL_MAX_SendQueueHandler($$)
       Log3 $hash, 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
       if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
         my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
-        $timeout += $waitTime;
-        Log3 $hash, 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+        $timeout += $waitTime + 1;
+        Log3 $hash, 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds. Currently " . @{$hash->{sendQueue}} . " messages are waiting to be sent.";
       } else {
         #Update TimeInformation payload. It should reflect the current time when sending,
         #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
