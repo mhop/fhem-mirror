@@ -1,3 +1,4 @@
+
 ##############################################
 # $Id$
 
@@ -14,6 +15,7 @@
 # Check BSC Temp
 # Check Stick Temp
 # Check Stick WriteRadio
+
 # Check Stick RSS
 
 package main;
@@ -111,14 +113,18 @@ TCM_InitSerialCom($)
   my $setCmdVal = "";
   my @setCmd = ("set", "reset", $setCmdVal);
   # read and discard receive buffer, modem reset
-  $hash->{PARTIAL} = '';
   if ($hash->{MODEL} eq "ESP2") {
     if ($comType eq "TCM") {
       TCM_ReadAnswer($hash, "set reset");
+      #TCM_Read($hash);
+      $hash->{PARTIAL} = '';
       TCM_Set($hash, @setCmd);
     }
   } else {
-    TCM_ReadAnswer($hash, "set reset");
+    #TCM_ReadAnswer($hash, "set reset");
+    #TCM_Read($hash);
+    #$hash->{PARTIAL} = '';
+    delete $hash->{helper}{awaitCmdResp};
     TCM_Set($hash, @setCmd);
   }
   # default attributes
@@ -135,6 +141,30 @@ TCM_InitSerialCom($)
     if(!defined $attrVal && defined $setAttrInit{$_}{$hash->{MODEL}}) {
       $attr{$name}{$_} = $setAttrInit{$_}{$hash->{MODEL}};
       Log3 $name, 2, "TCM $name Attribute $_ $setAttrInit{$_}{$hash->{MODEL}} initialized";
+    }
+  }
+  # 500 ms pause
+  usleep(500 * 1000);
+  # read transceiver IDs
+  my $baseID = AttrVal($name, "baseID", undef);
+  if (defined($baseID)) {
+    $hash->{BaseID} = $baseID;
+    $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
+  } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
+    my @getBaseID = ("get", "baseID");
+    if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
+      $hash->{BaseID} = sprintf "%08X", hex $&;
+      $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
+    } else {
+      $hash->{BaseID} = "00000000";
+      $hash->{LastID} = "00000000";
+    }
+  }
+  if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
+    # get chipID
+    my @getChipID = ('get', 'version');
+    if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
+      $hash->{ChipID} = sprintf "%08X", hex $1;
     }
   }
   # default transceiver parameter
@@ -170,27 +200,6 @@ TCM_InitSerialCom($)
       }
     }
   }
-  my $baseID = AttrVal($name, "baseID", undef);
-  if (defined($baseID)) {
-    $hash->{BaseID} = $baseID;
-    $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
-  } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
-    my @getBaseID = ("get", "baseID");
-    if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
-      $hash->{BaseID} = sprintf "%08X", hex $&;
-      $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
-    } else {
-      $hash->{BaseID} = "00000000";
-      $hash->{LastID} = "00000000";
-    }
-  }
-  if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
-    # get chipID
-    my @getChipID = ('get', 'version');
-    if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
-      $hash->{ChipID} = sprintf "%08X", hex $1;
-    }
-  }
   #CommandSave(undef, undef);
   readingsSingleUpdate($hash, "state", "initialized", 1);
   Log3 $name, 2, "TCM $name initialized";
@@ -205,10 +214,10 @@ TCM_Write($$$)
   my ($hash,$fn,$msg) = @_;
   my $name = $hash->{NAME};
 
-  return if(!defined($fn));
+  return if (!defined($fn));
 
   my $bstring;
-  if($hash->{MODEL} eq "ESP2") {
+  if ($hash->{MODEL} eq "ESP2") {
     # TCM 120 (ESP2)
     if (!$fn) {
       # command with ESP2 format
@@ -244,12 +253,23 @@ TCM_Write($$$)
       }
     }
     $bstring = "A55A" . $bstring . TCM_CSUM($bstring);
-    Log3 $name, 5, "TCM $name sending ESP2: $bstring";
   } else {
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
-    Log3 $name, 5, "TCM $name sending ESP3: $bstring";
+    if (exists($hash->{helper}{telegramSentTimeLast}) && $hash->{helper}{telegramSentTimeLast} < gettimeofday() - 6) {
+      # clear outdated response control list
+      delete $hash->{helper}{awaitCmdResp};
+    }
+    $hash->{helper}{telegramSentTimeLast} = gettimeofday();
+    if (exists $hash->{helper}{SetAwaitCmdResp}) {
+      push(@{$hash->{helper}{awaitCmdResp}}, 1);
+      delete $hash->{helper}{SetAwaitCmdResp};
+    } else {
+      push(@{$hash->{helper}{awaitCmdResp}}, 0);
+    }
+    #Log3 $name, 5, "TCM $name awaitCmdResp: " . join(' ', @{$hash->{helper}{awaitCmdResp}});
   }
+  Log3 $name, 5, "TCM $name sent ESP: $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
   usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
@@ -318,18 +338,15 @@ sub
 TCM_Read($)
 {
   my ($hash) = @_;
-
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
-
   my $name = $hash->{NAME};
   my $blockSenderID = AttrVal($name, "blockSenderID", "own");
   my $chipID = exists($hash->{ChipID}) ? hex $hash->{ChipID} : 0;
-  my $baseID = hex $hash->{BaseID};
-  my $lastID = hex $hash->{LastID};
-
+  my $baseID = exists($hash->{BaseID}) ? hex $hash->{BaseID} : 0;
+  my $lastID = exists($hash->{LastID}) ? hex $hash->{LastID} : 0;
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
-  Log3 $name, 5, "TCM $name RAW: $data";
+  Log3 $name, 5, "TCM $name received ESP: $data";
 
   if($hash->{MODEL} eq "ESP2") {
     # TCM 120
@@ -402,18 +419,15 @@ TCM_Read($)
     # TCM310 / ESP3
 
     while($data =~ m/^55(....)(..)(..)(..)/) {
-      my ($l1, $l2, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
-
-      my $tlen = 2*(7+$l1+$l2);
+      my ($ldata, $lodata, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
+      my $tlen = 2*(7+$ldata+$lodata);
+      # data telegram incomplete
       last if(length($data) < $tlen);
-
       my $rest = substr($data, $tlen);
       $data = substr($data, 0, $tlen);
-
       my $hdr = substr($data, 2, 8);
-      my $mdata = substr($data, 12, $l1*2);
-      my $odata = substr($data, 12+$l1*2, $l2*2);
-
+      my $mdata = substr($data, 12, $ldata * 2);
+      my $odata = substr($data, 12 + $ldata * 2, $lodata * 2);
       my $mycrc = TCM_CRC8($hdr);
       if($mycrc ne $crc) {
         Log3 $name, 2, "TCM $name wrong header checksum: got $crc, computed $mycrc" ;
@@ -428,7 +442,7 @@ TCM_Read($)
         next;
       }
 
-      if($packetType == 1) {
+      if ($packetType == 1) {
         # packet type RADIO
         $mdata =~ m/^(..)(.*)(........)(..)$/;
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
@@ -457,8 +471,14 @@ TCM_Read($)
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
 
-      } elsif($packetType == 2) {
+      } elsif ($packetType == 2) {
         # packet type RESPONSE
+        if (defined $hash->{helper}{awaitCmdResp}[0] && $hash->{helper}{awaitCmdResp}[0]) {
+          # do not execute if transceiver command answer is expected
+          $data .= $rest;
+          last;
+        }
+        shift(@{$hash->{helper}{awaitCmdResp}});
         $mdata =~ m/^(..)(.*)$/;
         my $rc = $1;
         my %codes = (
@@ -478,29 +498,29 @@ TCM_Read($)
         #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
         #Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);
 
-      } elsif($packetType == 3) {
+      } elsif ($packetType == 3) {
         # packet type RADIO_SUB_TEL
         Log3 $name, 2, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
 
-      } elsif($packetType == 4) {
+      } elsif ($packetType == 4) {
         # packet type EVENT
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:eventCode:MessageData
         Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
 
-      } elsif($packetType == 5) {
+      } elsif ($packetType == 5) {
         # packet type COMMON_COMMAND
         Log3 $name, 2, "TCM $name packet type COMMON_COMMAND not supported: $data";
 
-      } elsif($packetType == 6) {
+      } elsif ($packetType == 6) {
         # packet type SMART_ACK_COMMAND
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:smartAckCode:MessageData
         Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
 
-      } elsif($packetType == 7) {
+      } elsif ($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
         $mdata =~ m/^(....)(....)(.*)$/;
         my ($function, $manufID, $messageData) = ($1, $2, $3);
@@ -527,11 +547,11 @@ TCM_Read($)
           Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals);
         }
 
-      } elsif($packetType == 9) {
+      } elsif ($packetType == 9) {
         # packet type RADIO_MESSAGE
         Log3 $name, 2, "TCM: $name packet type RADIO_MESSAGE not supported: $data";
 
-      } elsif($packetType == 10) {
+      } elsif ($packetType == 10) {
         # packet type RADIO_ADVANCED
         Log3 $name, 2, "TCM $name packet type RADIO_ADVANCED not supported: $data";
 
@@ -751,6 +771,7 @@ TCM_Get($@)
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
     Log3 $name, 3, "TCM get $name $cmd";
     my $cmdHex = $cmdhash->{cmd};
+    $hash->{helper}{SetAwaitCmdResp} = 1;
     TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
@@ -890,6 +911,7 @@ sub TCM_Set($@)
       TCM_InitSerialCom($hash);
       return;
     }
+    $hash->{helper}{SetAwaitCmdResp} = 1;
     TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set $cmd");
     if(!$err) {
@@ -924,83 +946,179 @@ sub TCM_Set($@)
   return $msg;
 }
 
-# ReadAnswer
+# read command response data
 sub TCM_ReadAnswer($$)
 {
   my ($hash, $arg) = @_;
+  return ("No FD", undef) if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $name = $hash->{NAME};
-
-  return ("No FD", undef)
-        if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-
-  my ($data, $rin, $buf) = ("", "", "");
-  my $to = 3;                                         # 3 seconds timeout
-  for(;;) {
-    if($^O =~ m/Win/ && $hash->{USBDev}) {
+  my $blockSenderID = AttrVal($name, "blockSenderID", "own");
+  my $chipID = exists($hash->{ChipID}) ? hex $hash->{ChipID} : 0;
+  my $baseID = exists($hash->{BaseID}) ? hex $hash->{BaseID} : 0;
+  my $lastID = exists($hash->{LastID}) ? hex $hash->{LastID} : 0;
+  my ($data, $rin, $buf) = ($hash->{PARTIAL}, "", "");
+  # 2 seconds timeout
+  my $to = 2;
+  for (;;) {
+    if ($^O =~ m/Win/ && $hash->{USBDev}) {
       $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
       # Read anstatt input sonst funzt read_const_time nicht.
       $buf = $hash->{USBDev}->read(999);
-      return ("$name Timeout reading answer for $arg", undef)
-        if(length($buf) == 0);
+      if (length($buf) == 0) {
+        if (length($data) == 0) {
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          return ("Timeout reading answer for $arg", undef);
+        }
+      } else {
+        $data .= uc(unpack('H*', $buf));
+      }
 
     } else {
-      return ("Device lost when reading answer for $arg", undef)
-        if(!$hash->{FD});
-
+      if (!$hash->{FD}) {
+        shift(@{$hash->{helper}{awaitCmdResp}});
+        return ("Device lost when reading answer for $arg", undef);
+      }
       vec($rin, $hash->{FD}, 1) = 1;
       my $nfound = select($rin, undef, undef, $to);
-      if($nfound < 0) {
+      if ($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
         DevIo_Disconnected($hash);
-        return("TCM_ReadAnswer $err", undef);
+        shift(@{$hash->{helper}{awaitCmdResp}});
+        return("Device error: $err", undef);
+      } elsif ($nfound == 0) {
+        if (length($data) == 0) {
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          return ("Timeout reading response for $arg", undef);
+        }
+      } else {
+        $buf = DevIo_SimpleRead($hash);
+        if(!defined($buf)) {
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          return ("No response data for $arg", undef);
+        }
+        $data .= uc(unpack('H*', $buf));
       }
-      return ("Timeout reading answer for $arg", undef)
-        if($nfound == 0);
-      $buf = DevIo_SimpleRead($hash);
-      return ("No data", undef) if(!defined($buf));
-
     }
 
-    if(defined($buf)) {
-      $data .= uc(unpack('H*', $buf));
-      Log3 $name, 5, "TCM $name RAW ReadAnswer: $data";
+    if (length($data) > 4) {
+      Log3 $name, 5, "TCM $name received ESP: $data";
 
-      if($hash->{MODEL} eq "ESP2") {
+      if ($hash->{MODEL} eq "ESP2") {
         # TCM 120
-        if(length($data) >= 28) {
-          return ("$arg: Bogus answer received: $data", undef)
-                if($data !~ m/^A55A(.B.{20})(..)/);
+        if (length($data) >= 28) {
+          if ($data !~ m/^A55A(.B.{20})(..)/) {
+            $hash->{PARTIAL} = '';
+            return ("$arg: Bogus answer received: $data", undef);
+          }
           my ($net, $crc) = ($1, $2);
           my $mycrc = TCM_CSUM($net);
           $hash->{PARTIAL} = substr($data, 28);
-
-          return ("wrong checksum: got $crc, computed $mycrc", undef)
-            if($crc ne $mycrc);
+          if ($crc ne $mycrc) {
+            return ("wrong checksum: got $crc, computed $mycrc", undef);
+          }
           return (undef, $net);
         }
 
       } else {
         # TCM 310
-        if(length($data) >= 14) {
-          return ("$arg: Bogus answer received: $data", undef)
-                if($data !~ m/^55(....)(..)(..)(..)(.*)(..)$/);
-          my ($dlen, $olen, $ptype, $hcrc, $data, $dcrc) = ($1,$2,$3,$4,$5,$6);
-          ### ???
-          # next if(length($data) < hex($dlen)+hex($olen)+6);
-          # next if(length($data) < 2 * hex($dlen) + 2 * hex($olen) + 6);
-          next if(length($data) < 2*hex($dlen));
-
-          my $myhcrc = TCM_CRC8("$dlen$olen$ptype");
-          return ("wrong header checksum: got $hcrc, computed $myhcrc", undef)
-            if($hcrc ne $myhcrc);
-
-          my $mydcrc = TCM_CRC8($data);
-          return ("wrong data checksum: got $dcrc, computed $mydcrc", undef)
-            if($dcrc ne $mydcrc);
-          return (undef, $data);
+        if($data !~ m/^55/) {
+          $data =~ s/.*55/55/;
+          if ($data !~ m/^55/) {
+            #$data = '';
+            $hash->{PARTIAL} = '';
+            shift(@{$hash->{helper}{awaitCmdResp}});
+            return ("$arg: Bogus answer received: $data", undef);
+          }
+          $hash->{PARTIAL} = $data;
         }
+        next if ($data !~ m/^55(....)(..)(..)(..)/);
+        my ($ldata, $lodata, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
+        my $tlen = 2 * (7 + $ldata + $lodata);
+        # data telegram incomplete
+        next if (length($data) < $tlen);
+        my $rest = substr($data, $tlen);
+        $data = substr($data, 0, $tlen);
+        my $hdr = substr($data, 2, 8);
+        my $mdata = substr($data, 12, $ldata * 2);
+        my $odata = substr($data, 12 + $ldata * 2, $lodata * 2);
+        my $mycrc = TCM_CRC8($hdr);
+        if ($crc ne $mycrc) {
+          $hash->{PARTIAL} = $rest;
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          return ("wrong header checksum: got $crc, computed $mycrc", undef);
+        }
+        $mycrc = TCM_CRC8($mdata . $odata);
+        $crc  = substr($data, -2);
+        if ($crc ne $mycrc) {
+          $hash->{PARTIAL} = $rest;
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          return ("wrong data checksum: got $crc, computed $mycrc", undef);
+        }
+        if ($packetType == 1) {
+          # packet type RADIO
+          $mdata =~ m/^(..)(.*)(........)(..)$/;
+          my ($org, $d1, $id, $status) = ($1, $2, $3, $4);
+          my $repeatingCounter = hex substr($status, 1, 1);
+          $odata =~ m/^(..)(........)(..)(..)$/;
+          my ($RSSI, $receivingQuality) = (hex($3), "excellent");
+          if ($RSSI > 87) {
+            $receivingQuality = "bad";
+          } elsif ($RSSI > 75) {
+            $receivingQuality = "good";
+          }
+          my %addvals = (
+            PacketType       => $packetType,
+            SubTelNum        => hex($1),
+            DestinationID    => $2,
+            RSSI             => -$RSSI,
+            ReceivingQuality => $receivingQuality,
+            RepeatingCounter => $repeatingCounter,
+          );
+          $hash->{RSSI} = -$RSSI;
 
+          if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
+            Log3 $name, 4, "TCM $name own telegram from $id blocked.";
+          } else {
+            #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
+            Log3 $name, 3, "TCM $name dispatch EnOcean:$packetType:$org:$d1:$id:$status:$odata";
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
+          }
+          $data = $rest;
+          $hash->{PARTIAL} = $rest;
+          next;
+        } elsif($packetType == 2) {
+        # packet type RESPONSE
+          $hash->{PARTIAL} = $rest;
+          if (defined $hash->{helper}{awaitCmdResp}[0] && $hash->{helper}{awaitCmdResp}[0]) {
+            shift(@{$hash->{helper}{awaitCmdResp}});
+            return (undef, $mdata . $odata);
+          } else {
+            shift(@{$hash->{helper}{awaitCmdResp}});
+            $mdata =~ m/^(..)(.*)$/;
+            my $rc = $1;
+            my %codes = (
+              "00" => "OK",
+              "01" => "ERROR",
+              "02" => "NOT_SUPPORTED",
+              "03" => "WRONG_PARAM",
+              "04" => "OPERATION_DENIED",
+              "05" => "LOCK_SET",
+              "82" => "FLASH_HW_ERROR",
+              "90" => "BASEID_OUT_OF_RANGE",
+              "91" => "BASEID_MAX_REACHED",
+            );
+            my $rcTxt = $codes{$rc} if($codes{$rc});
+            Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
+            #$packetType = sprintf "%01X", $packetType;
+            #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
+            #Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);
+            $data = $rest;
+            next;
+          }
+        } else {
+          return ("Evaluation of the command $arg aborted because the received data telegram is not supported.", undef)
+        }
       }
     }
   }
