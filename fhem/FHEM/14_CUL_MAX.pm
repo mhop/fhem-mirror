@@ -699,7 +699,9 @@ CUL_MAX_BroadcastTime(@)
 
 </ul>
 =end html
-
+=device
+=item summary Uses a CUL (or compatible) to control MAX! devices.
+=item summary_DE Benutzt einen CUL (oder kompatibles Gerät) um MAX! Geräte zu steuern.
 =begin html_DE
 
 <a name="CUL_MAX"></a>
