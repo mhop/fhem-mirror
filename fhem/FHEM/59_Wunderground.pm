@@ -116,7 +116,7 @@ sub Wunderground_Set($$$) {
     my $result;
 
     # update
-    if ( lc( @$a[1] ) eq "statusrequest" ) {
+    if ( lc( @$a[1] ) eq "update" ) {
         Log3 $name, 3, "Wunderground set $name " . @$a[1];
         Wunderground_GetStatus($hash);
     }
