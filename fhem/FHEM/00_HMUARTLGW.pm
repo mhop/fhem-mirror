@@ -2069,8 +2069,10 @@ sub HMUARTLGW_sendAscii($$)
 
 	$msg = sprintf($msg, $hash->{CNT});
 
+	my $logmsg = $msg;
+	$logmsg =~ s/\r\n$//;
 	Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
-	     "HMUARTLGW ${name} send (".length($msg)."): ". $msg =~ s/\r\n//r);
+	     "HMUARTLGW ${name} send (".length($logmsg)."): ". $logmsg);
 	$msg = HMUARTLGW_encrypt($hash, $msg) if ($hash->{crypto} && !($msg =~ m/^V/));
 
 	$hash->{CNT} = ($hash->{CNT} + 1) & 0xff;
