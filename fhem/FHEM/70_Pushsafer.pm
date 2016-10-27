@@ -203,12 +203,8 @@ sub Pushsafer_createBody($$)
         
         if($key =~/^p\d?$/)
         {
-            if(-r $val)
-            {
-                $val = Pushsafer_createDataUrl($hash, $val);
-                next unless(defined($val));
-            }
-            elsif($val =~ /^IPCAM:(\S+)$/)
+
+            if($val =~ /^IPCAM:(\S+)$/)
             {
                 my $ipcam = $1;
                 
@@ -218,12 +214,22 @@ sub Pushsafer_createBody($$)
                     next;
                 }
                 
-                my $path = AttrVal($ipcam, "storage",$attr{global}{modpath}."/www/snapshots");
+                my $path = AttrVal($ipcam, "storage",AttrVal("global", "modpath", ".")."/www/snapshots");
                 $path .= "/" unless($path =~ m,/$,);
                 $path .= ReadingsVal($ipcam, "last", "");
                 
                 $val = Pushsafer_createDataUrl($hash, $path);
+                next unless(defined($val));
+            }
+            elsif(-e $val)
+            {
+                $val = Pushsafer_createDataUrl($hash, $val);
 
+            }
+            else
+            {
+                Log3 $name, 3, "Pushsafer ($name) - picture file does not exist: $val - sending message without a picture...";
+                next;
             }
         }
         
@@ -269,7 +275,8 @@ sub Pushsafer_createDataUrl($$)
 
     if(defined($err))
     {
-        Log3 $name, 3, "Pushsafer ($name) - unable to open image file: $file - sending message without picture...";
+        Log3 $name, 3, "Pushsafer ($name) - unable to open image file $file: $err";
+        Log3 $name, 3, "Pushsafer ($name) - sending message without picture...";
     }
     else
     {
