@@ -203,7 +203,6 @@ sub Pushsafer_createBody($$)
         
         if($key =~/^p\d?$/)
         {
-
             if($val =~ /^IPCAM:(\S+)$/)
             {
                 my $ipcam = $1;
@@ -224,7 +223,7 @@ sub Pushsafer_createBody($$)
             elsif(-e $val)
             {
                 $val = Pushsafer_createDataUrl($hash, $val);
-
+                next unless(defined($val));
             }
             else
             {
