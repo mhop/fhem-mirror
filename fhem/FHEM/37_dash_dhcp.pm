@@ -42,7 +42,7 @@ dash_dhcp_Define($$)
   if( $init_done ) {
     dash_dhcp_startListener($hash);
 
-  } elsif( $hash->{STATE} ne "???" ) {
+  } else {
     readingsSingleUpdate($hash, 'state', 'initialized', 1 );
 
   }
@@ -77,9 +77,9 @@ dash_dhcp_startListener($)
   $hash->{PORT} = AttrVal($name, 'port', $hash->{PORT});
   Log3 $name, 4, "$name: using port $hash->{PORT}";
 
-  my $socket = IO::Socket::INET->new(LocalPort=>$hash->{PORT}, Proto=>'udp', Broadcast=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0);
-  if($socket) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$hash->{PORT}, Proto=>'udp', Broadcast=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
     readingsSingleUpdate($hash, 'state', 'listening', 1 );
+    Log3 $name, 3, "$name: listening";
     $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
 
     $hash->{FD}    = $socket->fileno();
@@ -109,8 +109,8 @@ dash_dhcp_stopListener($)
   delete($hash->{FD});
   delete($hash->{CD});
   delete($selectlist{$name});
-  readingsSingleUpdate($hash, 'state', 'disconnected', 1 );
-  Log3 $name, 3, "$name: Disconnected";
+  readingsSingleUpdate($hash, 'state', 'stopped', 1 );
+  Log3 $name, 3, "$name: stopped";
   $hash->{LAST_DISCONNECT} = FmtDateTime( gettimeofday() );
 }
 

@@ -100,8 +100,8 @@ fakeRoku_Define($$)
     fakeRoku_startDiscovery($hash);
     fakeRoku_startListener($hash);
 
-  } elsif( $hash->{STATE} ne "???" ) {
-    $hash->{STATE} = "Initialized";
+  } else {
+    readingsSingleUpdate($hash, 'state', 'initialized', 1 );
 
   }
 
@@ -230,6 +230,8 @@ fakeRoku_startListener($)
 
   my $port = AttrVal($name, 'httpPort', 0);
   if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+    readingsSingleUpdate($hash, 'state', 'listening', 1 );
+
 
     my $chash = fakeRoku_newChash( $hash, $socket, {NAME=>"$name:listener", STATE=>'accepting'} );
 
@@ -240,7 +242,8 @@ fakeRoku_startListener($)
     Log3 $name, 3, "$name: listener started";
 
   } else {
-    Log3 $name, 3, "$name: failed to start listener: $@";
+    Log3 $name, 3, "$name: failed to start listener on port $port: $@";
+    readingsSingleUpdate($hash, 'state', 'disconnected', 1 );
 
     InternalTimer(gettimeofday()+10, "fakeRoku_startListener", $hash, 0);
   }
@@ -271,6 +274,7 @@ fakeRoku_stopListener($)
     delete($defs{$cname});
     delete $hash->{helper}{listener};
 
+    readingsSingleUpdate($hash, 'state', 'stopped', 1 );
     Log3 $name, 3, "$name: listener stoped";
   }
 }
