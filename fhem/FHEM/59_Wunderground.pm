@@ -54,7 +54,7 @@ sub Wunderground_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl "
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings "
       . $readingFnAttributes;
 
     return;
@@ -155,6 +155,10 @@ sub Wunderground_Define($$$) {
     $hash->{API_KEY} = @$a[2];
     $hash->{PWS_ID}  = @$a[3];
 
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' stateReadings temp_c humidity';
+    }
+
     # start the status update timer
     Wunderground_GetStatus( $hash, 2 );
 
@@ -228,6 +232,7 @@ sub Wunderground_ReceiveCommand($$$) {
     my $name = $hash->{NAME};
     my $lastQueryResult =
       ReadingsVal( $name, "lastQueryResult", "Initialized" );
+    my $state = "Initialized";
     my $return;
 
     Log3 $name, 5,
@@ -267,16 +272,51 @@ sub Wunderground_ReceiveCommand($$$) {
             }
         }
 
-        $lastQueryResult = "ok";
+        $lastQueryResult = "undefined";
 
         #######################
         # process return data
         #
         if ( $return && ref($return) eq "HASH" ) {
-            Wunderground_Hash2Readings( $hash, $return );
+            $lastQueryResult = Wunderground_Hash2Readings( $hash, $return );
         }
     }
 
+    # state
+    my %shortnames = (
+        "dewpoint"       => "D",
+        "humidity"       => "H",
+        "light"          => "L",
+        "pressure"       => "P",
+        "rain"           => "R",
+        "rain_day"       => "RD",
+        "rain_week"      => "RW",
+        "rain_month"     => "RM",
+        "rain_year"      => "RY",
+        "solarradiation" => "SR",
+        "temp_c"         => "T",
+        "wind_speed"     => "W",
+        "wind_chill"     => "WC",
+        "wind_gust"      => "WG",
+        "wind_direction" => "WD",
+        "wind_dewpoint"  => "D",
+    );
+
+    my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
+    foreach (@stateReadings) {
+        $_ =~ /^(\w+):?(\w+)?$/;
+        my $r = $1;
+        my $n = ( $2 ? $2 : ( $shortnames{$r} ? $shortnames{$r} : $1 ) );
+
+        my $v = ReadingsVal( $name, $r, undef );
+        if ($v) {
+            $state .= " " if ( $state ne "Initialized" );
+            $state = "" if ( $state eq "Initialized" );
+            $state .= "$n: $v";
+        }
+    }
+
+    readingsBulkUpdate( $hash, "state", $state );
     readingsBulkUpdateIfChanged( $hash, "lastQueryResult", $lastQueryResult );
     readingsEndUpdate( $hash, 1 );
 
@@ -292,9 +332,13 @@ sub Wunderground_Hash2Readings($$;$) {
 
     if ( ref($h) eq "HASH" ) {
         foreach my $k ( keys %{$h} ) {
+
+            # error
+            return $h->{response}{error}{type}
+              if ( $k eq "response" && defined( $h->{response}{error}{type} ) );
+
             next
-              if ( $k eq "response"
-                || $k eq "image"
+              if ( $k eq "image"
                 || $k eq "station_id"
                 || $k =~ /^.*_string$/ );
 
@@ -560,6 +604,8 @@ sub Wunderground_Hash2Readings($$;$) {
             $i++;
         }
     }
+
+    return "ok" if ( !$loop );
 }
 
 ###################################
