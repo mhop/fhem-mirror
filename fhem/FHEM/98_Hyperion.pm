@@ -92,6 +92,7 @@ sub Hyperion_Define($$)
   {
     $attr{$name}{alias} = "Ambilight";
     $attr{$name}{"event-on-change-reading"} = ".*";
+    $attr{$name}{"event-on-update-reading"} = "serverResponse";
     $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
     $attr{$name}{group} = "colordimmer";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
@@ -269,18 +270,18 @@ sub Hyperion_Read($)
     my $adjB        = $adj ? join(",",@{$adj->{blueAdjust}}) : undef;
     my $corS        = $corr ? join(",",@{$corr->{correctionValues}}) : undef;
     my $temP        = $temp ? join(",",@{$temp->{correctionValues}}) : undef;
-    my $blkL        = $trans->{blacklevel} ? sprintf("%.3f",$trans->{blacklevel}->[0]).",".sprintf("%.3f",$trans->{blacklevel}->[1]).",".sprintf("%.3f",$trans->{blacklevel}->[2]) : undef;
-    my $gamM        = $trans->{gamma} ? sprintf("%.3f",$trans->{gamma}->[0]).",".sprintf("%.3f",$trans->{gamma}->[1]).",".sprintf("%.3f",$trans->{gamma}->[2]) : undef;
-    my $thrE        = $trans->{threshold} ? sprintf("%.3f",$trans->{threshold}->[0]).",".sprintf("%.3f",$trans->{threshold}->[1]).",".sprintf("%.3f",$trans->{threshold}->[2]) : undef;
-    my $whiL        = $trans->{whitelevel} ? sprintf("%.3f",$trans->{whitelevel}->[0]).",".sprintf("%.3f",$trans->{whitelevel}->[1]).",".sprintf("%.3f",$trans->{whitelevel}->[2]) : undef;
-    my $lumG        = defined $trans->{luminanceGain} ? sprintf("%.3f",$trans->{luminanceGain}) : undef;
-    my $lumM        = defined $trans->{luminanceMinimum} ? sprintf("%.3f",$trans->{luminanceMinimum}) : undef;
-    my $satG        = defined $trans->{saturationGain} ? sprintf("%.3f",$trans->{saturationGain}) : undef;
-    my $satL        = defined $trans->{saturationLGain} ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
-    my $valG        = defined $trans->{valueGain} ? sprintf("%.3f",$trans->{valueGain}) : undef;
-    $hash->{hostname} = $data->{hostname} if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
-    $hash->{build_version} = $vers if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
-    $hash->{build_time} = $data->{hyperion_build}->[0]->{time} if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
+    my $blkL        = $trans->{blacklevel} ? sprintf("%.2f",$trans->{blacklevel}->[0]).",".sprintf("%.2f",$trans->{blacklevel}->[1]).",".sprintf("%.2f",$trans->{blacklevel}->[2]) : undef;
+    my $gamM        = $trans->{gamma} ? sprintf("%.2f",$trans->{gamma}->[0]).",".sprintf("%.2f",$trans->{gamma}->[1]).",".sprintf("%.2f",$trans->{gamma}->[2]) : undef;
+    my $thrE        = $trans->{threshold} ? sprintf("%.2f",$trans->{threshold}->[0]).",".sprintf("%.2f",$trans->{threshold}->[1]).",".sprintf("%.2f",$trans->{threshold}->[2]) : undef;
+    my $whiL        = $trans->{whitelevel} ? sprintf("%.2f",$trans->{whitelevel}->[0]).",".sprintf("%.2f",$trans->{whitelevel}->[1]).",".sprintf("%.2f",$trans->{whitelevel}->[2]) : undef;
+    my $lumG        = defined $trans->{luminanceGain} ? sprintf("%.2f",$trans->{luminanceGain}) : undef;
+    my $lumM        = defined $trans->{luminanceMinimum} ? sprintf("%.2f",$trans->{luminanceMinimum}) : undef;
+    my $satG        = defined $trans->{saturationGain} ? sprintf("%.2f",$trans->{saturationGain}) : undef;
+    my $satL        = defined $trans->{saturationLGain} ? sprintf("%.2f",$trans->{saturationLGain}) : undef;
+    my $valG        = defined $trans->{valueGain} ? sprintf("%.2f",$trans->{valueGain}) : undef;
+    $hash->{hostname}       = $data->{hostname} if (($data->{hostname} && !$hash->{hostname}) || ($data->{hostname} && $hash->{hostname} ne $data->{hostname}));
+    $hash->{build_version}  = $vers if (($vers && !$hash->{build_version}) || ($vers && $hash->{build_version} ne $vers));
+    $hash->{build_time}     = $data->{hyperion_build}->[0]->{time} if (($data->{hyperion_build}->[0]->{time} && !$hash->{build_time}) || ($data->{hyperion_build}->[0]->{time} && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"adjustRed",$adjR);
     readingsBulkUpdate($hash,"adjustGreen",$adjG);
@@ -342,7 +343,7 @@ sub Hyperion_Read($)
     }
     else
     {
-      if ($prio)
+      if ($prio && $data->{priorities}->[0]->{duration_ms} && !$data->{priorities}->[1]->{priority})
       {
         readingsBulkUpdate($hash,"mode","clearall");
         readingsBulkUpdate($hash,"mode_before_off","clearall");
@@ -399,17 +400,13 @@ sub Hyperion_GetConfigs($)
   if ($count > 1)
   {
     my $configs = join(",",@files);
-    readingsSingleUpdate($hash,".configs",$configs,1)
-      if (ReadingsVal($name,".configs","") ne $configs);
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config
-      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+    readingsSingleUpdate($hash,".configs",$configs,1) if (ReadingsVal($name,".configs","") ne $configs);
+    $attr{$name}{webCmd} = $Hyperion_webCmd_config if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
   }
   else
   {
-    fhem "deletereading $name .configs"
-      if (defined ReadingsVal($name,".configs",undef));
-    $attr{$name}{webCmd} = $Hyperion_webCmd
-      if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
+    fhem "deletereading $name .configs" if (defined ReadingsVal($name,".configs",undef));
+    $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
     return "Found just one config file. Please add at least one more config file to properly use this function."
       if ($count == 1);
     return "No config files found!";
@@ -481,15 +478,15 @@ sub Hyperion_Set($@)
   $Hyperion_sets_local{gamma} = "textField" if (ReadingsVal($name,"gamma",""));
   $Hyperion_sets_local{threshold} = "textField" if (ReadingsVal($name,"threshold",""));
   $Hyperion_sets_local{whitelevel} = "textField" if (ReadingsVal($name,"whitelevel",""));
-  $Hyperion_sets_local{luminanceGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"luminanceGain",""));
-  $Hyperion_sets_local{luminanceMinimum} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"luminanceMinimum",""));
-  $Hyperion_sets_local{saturationGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"saturationGain",""));
-  $Hyperion_sets_local{saturationLGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"saturationLGain",""));
-  $Hyperion_sets_local{valueGain} = "slider,0,0.010,1.999,1" if (ReadingsVal($name,"valueGain",""));
+  $Hyperion_sets_local{luminanceGain} = "slider,0,0.01,5,1" if (ReadingsVal($name,"luminanceGain",""));
+  $Hyperion_sets_local{luminanceMinimum} = "slider,0,0.01,5,1" if (ReadingsVal($name,"luminanceMinimum",""));
+  $Hyperion_sets_local{saturationGain} = "slider,0,0.01,5,1" if (ReadingsVal($name,"saturationGain",""));
+  $Hyperion_sets_local{saturationLGain} = "slider,0,0.01,5,1" if (ReadingsVal($name,"saturationLGain",""));
+  $Hyperion_sets_local{valueGain} = "slider,0,0.01,5,1" if (ReadingsVal($name,"valueGain",""));
   my $params = join(" ",map {"$_:$Hyperion_sets_local{$_}"} keys %Hyperion_sets_local);
   my %obj;
-  Log3 $name,4,"$name: Hyperion_Set cmd: $cmd" if (defined $cmd);
-  Log3 $name,4,"$name: Hyperion_Set value: $value" if (defined $value && $value ne "");
+  Log3 $name,4,"$name: Hyperion_Set cmd: $cmd";
+  Log3 $name,4,"$name: Hyperion_Set value: $value" if ($value);
   Log3 $name,4,"$name: Hyperion_Set duration: $duration, priority: $priority";
   if ($cmd eq "configFile")
   {
@@ -551,8 +548,7 @@ sub Hyperion_Set($@)
     $obj{color} = [$r,$g,$b];
     $obj{command} = "color";
     $obj{priority} = $priority * 1;
-    $obj{duration} = $duration * 1000
-      if ($duration > 0);
+    $obj{duration} = $duration * 1000 if ($duration > 0);
   }
   elsif ($cmd eq "dim")
   {
@@ -584,10 +580,7 @@ sub Hyperion_Set($@)
     my $dimStep = (defined $value) ? int $value : int AttrVal($name,"hyperionDimStep",5);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
     my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 0;
-    fhem "set $name dim $dimUp"
-      if ($cmd eq "dimUp");
-    fhem "set $name dim $dimDown"
-      if ($cmd eq "dimDown");
+    $cmd eq "dimUp" ? fhem "set $name dim $dimUp" : fhem "set $name dim $dimDown";
     return undef;
   }
   elsif ($cmd eq "effect")
@@ -599,13 +592,11 @@ sub Hyperion_Set($@)
     $obj{effect} = \%ef;
     $obj{command} = "effect";
     $obj{priority} = $priority * 1;
-    $obj{duration} = $duration * 1000
-      if ($duration > 0);
+    $obj{duration} = $duration * 1000 if ($duration > 0);
   }
   elsif ($cmd eq "clearall")
   {
-    return "$cmd need no additional value of $value"
-      if (defined $value);
+    return "$cmd need no additional value of $value" if (defined $value);
     $obj{command} = $cmd;
   }
   elsif ($cmd eq "clear")
@@ -618,16 +609,14 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd eq "off")
   {
-    return "$cmd need no additional value of $value"
-      if (defined $value);
+    return "$cmd need no additional value of $value" if (defined $value);
     $obj{command} = "color";
     $obj{color} = [0,0,0];
     $obj{priority} = 0;
   }
   elsif ($cmd eq "on")
   {
-    return "$cmd need no additional value of $value"
-      if (defined $value);
+    return "$cmd need no additional value of $value" if (defined $value);
     my $rmode     = ReadingsVal($name,"mode_before_off","rgb");
     my $rrgb      = ReadingsVal($name,"rgb","");
     my $reffect   = ReadingsVal($name,"effect","");
@@ -648,16 +637,14 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd eq "toggle")
   {
-    return "$cmd need no additional value of $value"
-      if (defined $value);
+    return "$cmd need no additional value of $value" if (defined $value);
     my $rstate = Value($name);
     ($rstate ne "off") ? fhem "set ".$name." off" : fhem "set ".$name." on";
     return undef;
   }
   elsif ($cmd eq "mode")
   {
-    return "The value of mode has to be rgb,effect,clearall,off"
-      if ($value !~ /^(off|clearall|rgb|effect)$/);
+    return "The value of mode has to be rgb,effect,clearall,off" if ($value !~ /^(off|clearall|rgb|effect)$/);
     Log3 $name,4,"$name: cmd: $cmd, value: $value";
     my $rmode     = $value;
     my $rrgb      = ReadingsVal($name,"rgb","");
@@ -683,28 +670,29 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd =~ /^(luminanceGain|luminanceMinimum|saturationGain|saturationLGain|valueGain)$/)
   {
-    return "The value of $cmd has to be between 0.000 an 1.999 in steps of 0.001."
-      if ($value !~ /^(\d)(\.\d)?(\d{1,2})?$/ || int $1 > 1);
-    $value          = sprintf("%.3f",$value) * 1;
+    return "The value of $cmd has to be from 0.00 to 5.00 in steps of 0.01."
+      if ($value !~ /^((\d)\.(\d){1,2})?$/ || $1 > 5);
+    $value          = sprintf("%.4f",$value) * 1;
     my %tr          = ($cmd => $value);
     $obj{command}   = "transform";
     $obj{transform} = \%tr;
   }
   elsif ($cmd =~ /^(blacklevel|gamma|threshold|whitelevel)$/)
   {
-    return "Each of the three comma separated values of $cmd has to be between 0.000 an 9.999 in steps of 0.001"
-      if ($value !~ /^((\d)\.(\d){1,3}),((\d)\.(\d){1,3}),((\d)\.(\d){1,3})$/ || int $1 > 9 || int $4 > 9 || int $7 > 9);
-    my $arr = Hyperion_list2array($value,"%.3f");
+    return "Each of the three comma separated values of $cmd must be from 0.00 to 1.00 in steps of 0.01"
+      if ($cmd =~ /^blacklevel|threshold|whitelevel$/ && ($value !~ /^((\d)\.(\d){1,2}),((\d)\.(\d){1,2}),((\d)\.(\d){1,2})$/ || $1 > 1 || $4 > 1 || $7 > 1));
+    return "Each of the three comma separated values of $cmd must be from 0.00 to 5.00 in steps of 0.01"
+      if ($cmd eq "gamma" && ($value !~ /^((\d)\.(\d){1,2}),((\d)\.(\d){1,2}),((\d)\.(\d){1,2})$/ || $1 > 5 || $4 > 5 || $7 > 5));
+    my $arr = Hyperion_list2array($value,"%.4f");
     my %ar = ($cmd => $arr);
     $obj{command} = "transform";
     $obj{transform} = \%ar;
   }
   elsif ($cmd =~ /^(correction|colorTemperature)$/)
   {
-    $cmd = "temperature"
-      if ($cmd eq "colorTemperature");
-    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
-      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
+    $cmd = "temperature" if ($cmd eq "colorTemperature");
+    return "Each of the three comma separated values of $cmd must be from 0 to 255 in steps of 1"
+      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || $1 > 255 || $2 > 255 || $3 > 255);
     my $arr = Hyperion_list2array($value,"%d");
     my %ar = ("correctionValues" => $arr);
     $obj{command} = $cmd;
@@ -712,11 +700,11 @@ sub Hyperion_Set($@)
   }
   elsif ($cmd =~ /^(adjustRed|adjustGreen|adjustBlue)$/)
   {
-    return "Each of the three comma separated values of $cmd has to be between 0 an 255 in steps of 1"
-      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || int $1 > 255 || int $2 > 255 || int $3 > 255);
-    $cmd              = "redAdjust" if ($cmd eq "adjustRed");
+    return "Each of the three comma separated values of $cmd must be from 0 an 255 in steps of 1"
+      if ($value !~ /^(\d{1,3})?,(\d{1,3})?,(\d{1,3})?$/ || $1 > 255 || $2 > 255 || $3 > 255);
+    $cmd              = "redAdjust"   if ($cmd eq "adjustRed");
     $cmd              = "greenAdjust" if ($cmd eq "adjustGreen");
-    $cmd              = "blueAdjust" if ($cmd eq "adjustBlue");
+    $cmd              = "blueAdjust"  if ($cmd eq "adjustBlue");
     my $arr           = Hyperion_list2array($value,"%d");
     my %ar            = ($cmd => $arr);
     $obj{command}     = "adjustment";
@@ -920,15 +908,18 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>adjustGreen &lt;0,255,0&gt;</i><br>
-      adjust each color of green separately (comma separated) (R,G,B)
+      adjust each color of green separately (comma separated) (R,G,B)<br>
+      values from 0 to 255 in steps of 1
     </li>
     <li>
       <i>adjustRed &lt;255,0,0&gt;</i><br>
-      adjust each color of red separately (comma separated) (R,G,B)
+      adjust each color of red separately (comma separated) (R,G,B)<br>
+      values from 0 to 255 in steps of 1
     </li>
     <li>
-      <i>blacklevel &lt;0.000,0.000,0.000&gt;</i><br>
-      adjust blacklevel of each color separately (comma separated) (R,G,B)
+      <i>blacklevel &lt;0.00,0.00,0.00&gt;</i><br>
+      adjust blacklevel of each color separately (comma separated) (R,G,B)<br>
+      values from 0.00 to 1.00 in steps of 0.01
     </li>
     <li>
       <i>clear &lt;1000&gt;</i><br>
@@ -940,7 +931,8 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>colorTemperature &lt;255,255,255&gt;</i><br>
-      adjust temperature of each color separately (comma separated) (R,G,B)
+      adjust temperature of each color separately (comma separated) (R,G,B)<br>
+      values from 0 to 255 in steps of 1
     </li>
     <li>
       <i>configFile &lt;filename&gt;</i><br>
@@ -950,7 +942,8 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>correction &lt;255,255,255&gt;</i><br>
-      adjust correction of each color separately (comma separated) (R,G,B)
+      adjust correction of each color separately (comma separated) (R,G,B)<br>
+      values from 0 to 255 in steps of 1
     </li>
     <li>
       <i>dim &lt;percent&gt; [duration] [priority]</i><br>
@@ -969,16 +962,19 @@ sub Hyperion_devStateIcon($;$)
       set effect (replace blanks with underscore) with optional duration in seconds and priority
     </li>
     <li>
-      <i>gamma &lt;1.900,1.900,1.900&gt;</i><br>
-      adjust gamma of each color separately (comma separated) (R,G,B)
+      <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
+      adjust gamma of each color separately (comma separated) (R,G,B)<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
-      <i>luminanceGain &lt;1.000&gt;</i><br>
-      adjust luminanceGain (max. value 1.999)
+      <i>luminanceGain &lt;1.00&gt;</i><br>
+      adjust luminanceGain<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
-      <i>luminanceMinimum &lt;0.000&gt;</i><br>
-      adjust luminanceMinimum (max. value 1.999)
+      <i>luminanceMinimum &lt;0.00&gt;</i><br>
+      adjust luminanceMinimum<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
       <i>mode &lt;clearall|effect|off|rgb&gt;</i><br>
@@ -997,28 +993,33 @@ sub Hyperion_devStateIcon($;$)
       set color in RGB hex format with optional duration in seconds and priority
     </li>
     <li>
-      <i>saturationGain &lt;1.100&gt;</i><br>
-      adjust saturationGain (max. value 1.999)
+      <i>saturationGain &lt;1.10&gt;</i><br>
+      adjust saturationGain<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
-      <i>saturationLGain &lt;1.000&gt;</i><br>
-      adjust saturationLGain (max. value 1.999)
+      <i>saturationLGain &lt;1.00&gt;</i><br>
+      adjust saturationLGain<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
-      <i>threshold &lt;0.160,0.160,0.160&gt;</i><br>
-      adjust threshold of each color separately (comma separated) (R,G,B)
+      <i>threshold &lt;0.16,0.16,0.16&gt;</i><br>
+      adjust threshold of each color separately (comma separated) (R,G,B)<br>
+      values from 0.00 to 1.00 in steps of 0.01
     </li>
     <li>
       <i>toggle</i><br>
       toggles the light between on and off
     </li>
     <li>
-      <i>valueGain &lt;1.700&gt;</i><br>
-      adjust valueGain (max. value 1.999)
+      <i>valueGain &lt;1.70&gt;</i><br>
+      adjust valueGain<br>
+      values from 0.00 to 5.00 in steps of 0.01
     </li>
     <li>
-      <i>whitelevel &lt;0.700,0.800,0.900&gt;</i><br>
-      adjust whitelevel of each color separately (comma separated) (R,G,B)
+      <i>whitelevel &lt;0.70,0.80,0.90&gt;</i><br>
+      adjust whitelevel of each color separately (comma separated) (R,G,B)<br>
+      values from 0.00 to 1.00 in steps of 0.01
     </li>
   </ul>  
   <br>
