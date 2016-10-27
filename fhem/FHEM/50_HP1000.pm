@@ -70,7 +70,7 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-      "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url "
+"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadings "
       . $readingFnAttributes;
 }
 
@@ -167,6 +167,8 @@ sub HP1000_Define($$$) {
         }
 
         $hash->{FW_PORT} = $defs{ $hash->{FW} }{PORT};
+
+        fhem 'attr ' . $name . ' stateReadings temp_c humidity';
     }
 
     if ( HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" ) ) {
@@ -237,7 +239,7 @@ sub HP1000_CGI() {
     my $name = "";
     my $link;
     my $URI;
-    my $result = "";
+    my $result = "Initialized";
     my $webArgs;
     my $servertype;
 
@@ -1057,48 +1059,39 @@ sub HP1000_CGI() {
     # soilTemperature
     # brightness in % ??
 
-    $result = "T: " . $webArgs->{outtemp}
-      if ( defined( $webArgs->{outtemp} ) );
-    $result .= " H: " . $webArgs->{outhumi}
-      if ( defined( $webArgs->{outhumi} ) );
-    $result .= " Ti: " . $webArgs->{intemp}
-      if ( defined( $webArgs->{intemp} ) );
-    $result .= " Hi: " . $webArgs->{inhumi}
-      if ( defined( $webArgs->{inhumi} ) );
-    $result .= " W: " . $webArgs->{windspeed}
-      if ( defined( $webArgs->{windspeed} ) );
-    $result .= " W: " . $webArgs->{windspdmph}
-      if ( defined( $webArgs->{windspdmph} ) );
-    $result .= " WC: " . $webArgs->{windchill}
-      if ( defined( $webArgs->{windchill} ) );
-    $result .= " WG: " . $webArgs->{windgust}
-      if ( defined( $webArgs->{windgust} ) );
-    $result .= " WG: " . $webArgs->{windgustmph}
-      if ( defined( $webArgs->{windgustmph} ) );
-    $result .= " R: " . $webArgs->{rainrate}
-      if ( defined( $webArgs->{rainrate} ) );
-    $result .= " RD: " . $webArgs->{dailyrain}
-      if ( defined( $webArgs->{dailyrain} ) );
-    $result .= " RW: " . $webArgs->{weeklyrain}
-      if ( defined( $webArgs->{weeklyrain} ) );
-    $result .= " RM: " . $webArgs->{monthlyrain}
-      if ( defined( $webArgs->{monthlyrain} ) );
-    $result .= " RY: " . $webArgs->{yearlyrain}
-      if ( defined( $webArgs->{yearlyrain} ) );
-    $result .= " WD: " . $webArgs->{winddir}
-      if ( defined( $webArgs->{winddir} ) );
-    $result .= " D: " . $webArgs->{dewpoint}
-      if ( defined( $webArgs->{dewpoint} ) );
-    $result .= " P: " . $webArgs->{relbaro}
-      if ( defined( $webArgs->{relbaro} ) );
-    $result .= " UVR: " . $webArgs->{UV}
-      if ( defined( $webArgs->{UV} ) );
-    $result .= " UV: " . $webArgs->{UVI}
-      if ( defined( $webArgs->{UVI} ) );
-    $result .= " L: " . $webArgs->{light}
-      if ( defined( $webArgs->{light} ) );
-    $result .= " SR: " . $webArgs->{solarradiation}
-      if ( defined( $webArgs->{solarradiation} ) );
+    # state
+    my %shortnames = (
+        "dewpoint"       => "D",
+        "humidity"       => "H",
+        "light"          => "L",
+        "pressure"       => "P",
+        "rain"           => "R",
+        "rain_day"       => "RD",
+        "rain_week"      => "RW",
+        "rain_month"     => "RM",
+        "rain_year"      => "RY",
+        "solarradiation" => "SR",
+        "temp_c"         => "T",
+        "wind_speed"     => "W",
+        "wind_chill"     => "WC",
+        "wind_gust"      => "WG",
+        "wind_direction" => "WD",
+        "wind_dewpoint"  => "D",
+    );
+
+    my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
+    foreach (@stateReadings) {
+        $_ =~ /^(\w+):?(\w+)?$/;
+        my $r = $1;
+        my $n = ( $2 ? $2 : ( $shortnames{$r} ? $shortnames{$r} : $1 ) );
+
+        my $v = ReadingsVal( $name, $r, undef );
+        if ($v) {
+            $$result .= " " if ( $result ne "Initialized" );
+            $result = "" if ( $result eq "Initialized" );
+            $result .= "$n: $v";
+        }
+    }
 
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
