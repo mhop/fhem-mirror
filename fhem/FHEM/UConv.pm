@@ -94,6 +94,699 @@ my %wdays_txt_en = (
     },
 );
 
+my %units = (
+
+    # temperature
+    "c" => {
+        "unit_symbol" => "°",
+        "unit"        => "C",
+        "unit_prefix" => {
+            "de" => "Grad",
+            "en" => "degree",
+            "fr" => "degree",
+            "nl" => "degree",
+            "pl" => "degree",
+        },
+        "unit_long" => {
+            "de" => "Celsius",
+            "en" => "Celsius",
+            "fr" => "Celsius",
+            "nl" => "Celsius",
+            "pl" => "Celsius",
+        },
+    },
+    "f" => {
+        "unit_symbol" => "°",
+        "unit"        => "F",
+        "unit_prefix" => {
+            "de" => "Grad",
+            "en" => "degree",
+            "fr" => "degree",
+            "nl" => "degree",
+            "pl" => "degree",
+        },
+        "unit_long" => {
+            "de" => "Fahrenheit",
+            "en" => "Fahrenheit",
+            "fr" => "Fahrenheit",
+            "nl" => "Fahrenheit",
+            "pl" => "Fahrenheit",
+        },
+    },
+    "k" => {
+        "unit_symbol" => "°",
+        "unit"        => "K",
+        "unit_prefix" => {
+            "de" => "Grad",
+            "en" => "degree",
+            "fr" => "degree",
+            "nl" => "degree",
+            "pl" => "degree",
+        },
+        "unit_long" => {
+            "de" => "Kelvin",
+            "en" => "Kelvin",
+            "fr" => "Kelvin",
+            "nl" => "Kelvin",
+            "pl" => "Kelvin",
+        },
+    },
+
+    # hydro
+    "hg" => {
+        "unit_symbol" => "%",
+    },
+
+    # speed
+    "bft" => {
+        "unit"        => "bft",
+        "unit_prefix" => {
+            "de" => "Windstärke",
+            "en" => "wind force",
+            "fr" => "wind force",
+            "nl" => "wind force",
+            "pl" => "wind force",
+        },
+        "unit_long" => {
+            "de" => "in Beaufort",
+            "en" => "in Beaufort",
+            "fr" => "in Beaufort",
+            "nl" => "in Beaufort",
+            "pl" => "in Beaufort",
+        },
+    },
+    "fts" => {
+        "unit"      => "ft/s",
+        "unit_long" => {
+            "de" => "Feet pro Sekunde",
+            "en" => "feets per second",
+            "fr" => "feets per second",
+            "nl" => "feets per second",
+            "pl" => "feets per second",
+        },
+    },
+    "kmh" => {
+        "unit"      => "km/h",
+        "unit_long" => {
+            "de" => "Kilometer pro Stunde",
+            "en" => "kilometer per hour",
+            "fr" => "kilometer per hour",
+            "nl" => "kilometer per hour",
+            "pl" => "kilometer per hour",
+        },
+    },
+    "kn" => {
+        "unit"      => "kn",
+        "unit_long" => {
+            "de" => "Knoten",
+            "en" => "knots",
+            "fr" => "knots",
+            "nl" => "knots",
+            "pl" => "knots",
+        },
+    },
+    "mph" => {
+        "unit"      => "mi/h",
+        "unit_long" => {
+            "de" => "Meilen pro Stunde",
+            "en" => "miles per hour",
+            "fr" => "miles per hour",
+            "nl" => "miles per hour",
+            "pl" => "miles per hour",
+        },
+    },
+    "mps" => {
+        "unit"      => "m/s",
+        "unit_long" => {
+            "de" => "Meter pro Sekunde",
+            "en" => "meter per second",
+            "fr" => "meter per second",
+            "nl" => "meter per second",
+            "pl" => "meter per second",
+        },
+    },
+
+    # pressure
+    "hpa" => {
+        "unit"        => "hPa",
+        "unit_prefix" => {
+            "de" => "hecto",
+            "en" => "hecto",
+            "fr" => "hecto",
+            "nl" => "hecto",
+            "pl" => "hecto",
+        },
+        "unit_long" => {
+            "de" => "Pascal",
+            "en" => "Pascal",
+            "fr" => "Pascal",
+            "nl" => "Pascal",
+            "pl" => "Pascal",
+        },
+    },
+    "inhg" => {
+        "unit"        => "inHg",
+        "unit_prefix" => {
+            "de" => "Zoll",
+            "en" => "inches",
+            "fr" => "inches",
+            "nl" => "inches",
+            "pl" => "inches",
+        },
+        "unit_long" => {
+            "de" => "Quecksilbersäule",
+            "en" => "of Mercury",
+            "fr" => "of Mercury",
+            "nl" => "of Mercury",
+            "pl" => "of Mercury",
+        },
+    },
+    "mmhg" => {
+        "unit"        => "mmHg",
+        "unit_prefix" => {
+            "de" => "Millimeter",
+            "en" => "milimeter",
+            "fr" => "milimeter",
+            "nl" => "milimeter",
+            "pl" => "milimeter",
+        },
+        "unit_long" => {
+            "de" => "Quecksilbersäule",
+            "en" => "of Mercury",
+            "fr" => "of Mercury",
+            "nl" => "of Mercury",
+            "pl" => "of Mercury",
+        },
+    },
+    "torr" => {
+        "unit" => "Torr",
+    },
+    "psi" => {
+        "unit"      => "PSI",
+        "unit_long" => {
+            "de" => "Pfund pro Quadradzoll",
+            "en" => "Pound force per square inch",
+            "fr" => "Pound force per square inch",
+            "nl" => "Pound force per square inch",
+            "pl" => "Pound force per square inch",
+        },
+    },
+
+    # solar
+    "lux" => {
+        "unit" => "lux",
+    },
+    "wpsm" => {
+        "unit"      => "W/m2",
+        "unit_long" => {
+            "de" => "Watt pro Quadratmeter",
+            "en" => "Watt per square meter",
+            "fr" => "Watt per square meter",
+            "nl" => "Watt per square meter",
+            "pl" => "Watt per square meter",
+        },
+    },
+
+    # length
+    "km" => {
+        "unit"      => "km",
+        "unit_long" => {
+            "de" => "Kilometer",
+            "en" => "kilometer",
+            "fr" => "kilometer",
+            "nl" => "kilometer",
+            "pl" => "kilometer",
+        },
+    },
+
+    "m" => {
+        "unit"      => "m",
+        "unit_long" => {
+            "de" => "Meter",
+            "en" => "meter",
+            "fr" => "meter",
+            "nl" => "meter",
+            "pl" => "meter",
+        },
+    },
+
+    "mm" => {
+        "unit"      => "mm",
+        "unit_long" => {
+            "de" => "Millimeter",
+            "en" => "milimeter",
+            "fr" => "milimeter",
+            "nl" => "milimeter",
+            "pl" => "milimeter",
+        },
+    },
+
+    "cm" => {
+        "unit"      => "cm",
+        "unit_long" => {
+            "de" => "Zentimeter",
+            "en" => "centimeter",
+            "fr" => "centimeter",
+            "nl" => "centimeter",
+            "pl" => "centimeter",
+        },
+    },
+
+    "mi" => {
+        "unit"      => "mi",
+        "unit_long" => {
+            "de" => "Meilen",
+            "en" => "miles",
+            "fr" => "miles",
+            "nl" => "miles",
+            "pl" => "miles",
+        },
+    },
+
+    "in" => {
+        "unit"      => "in",
+        "unit_long" => {
+            "de" => "Zoll",
+            "en" => "inch",
+            "fr" => "inch",
+            "nl" => "inch",
+            "pl" => "inch",
+        },
+    },
+
+    # angular
+    "degree" => {
+        "unit"      => "°",
+        "unit_long" => {
+            "de" => "Grad",
+            "en" => "degree",
+            "fr" => "degree",
+            "nl" => "degree",
+            "pl" => "degree",
+        },
+    },
+);
+
+# Get unit details in local language as hash
+sub UnitDetails ($;$) {
+    my ( $unit, $lang ) = @_;
+    my $u = lc($unit);
+    my $l = lc($lang);
+    my %details;
+
+    if ( defined( $units{$u} ) ) {
+        foreach my $k ( keys %{ $units{$u} } ) {
+            $details{$k} = $units{$u}{$k};
+        }
+        $details{"unit_abbr"} = $u;
+
+        if ( $lang && $details{"unit_prefix"} ) {
+            delete $details{"unit_prefix"};
+            if ( $units{$u}{"unit_prefix"}{$l} ) {
+                $details{"unit_prefix"} = $units{$u}{"unit_prefix"}{$l};
+            }
+            else {
+                $details{"unit_prefix"} = $units{$u}{"unit_prefix"}{"en"};
+            }
+        }
+
+        if ( $lang && $details{"unit_long"} ) {
+            delete $details{"unit_long"};
+            if ( $units{$u}{"unit_long"}{$l} ) {
+                $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
+            }
+            else {
+                $details{"unit_long"} = $units{$u}{"unit_long"}{"en"};
+            }
+        }
+
+        return \%details;
+    }
+}
+
+my %weather_readings = (
+    "dewpoint" => {
+        "unified" => "dewpoint_c",    # link only
+    },
+    "dewpoint_c" => {
+        "short" => "D",
+        "unit"  => "c",
+    },
+    "dewpoint_f" => {
+        "short" => "Df",
+        "unit"  => "f",
+    },
+    "humidity" => {
+        "short" => "H",
+        "unit"  => "hg",
+    },
+    "humidityabs" => {
+        "unified" => "humidityabs_c",    # link only
+    },
+    "humidityabs_c" => {
+        "short" => "Ha",
+        "unit"  => "c",
+    },
+    "humidityabs_f" => {
+        "short" => "Haf",
+        "unit"  => "f",
+    },
+    "indoordewpoint" => {
+        "unified" => "indoordewpoint_c",    # link only
+    },
+    "indoordewpoint_c" => {
+        "short" => "Di",
+        "unit"  => "c",
+    },
+    "indoordewpoint_f" => {
+        "short" => "Dif",
+        "unit"  => "f",
+    },
+    "indoorhumidity" => {
+        "short" => "Hi",
+        "unit"  => "hg",
+    },
+    "indoorhumidityabs" => {
+        "unified" => "indoorhumidityabs_c",    # link only
+    },
+    "indoorhumidityabs_c" => {
+        "short" => "Hai",
+        "unit"  => "c",
+    },
+    "indoorhumidityabs_f" => {
+        "short" => "Haif",
+        "unit"  => "f",
+    },
+    "indoortemperature" => {
+        "unified" => "indoortemperature_c",    # link only
+    },
+    "indoortemperature_c" => {
+        "short" => "T",
+        "unit"  => "c",
+    },
+    "indoortemperature_f" => {
+        "short" => "Tf",
+        "unit"  => "f",
+    },
+    "israining" => {
+        "short" => "IR",
+    },
+    "luminosity" => {
+        "short" => "L",
+        "unit"  => "lux",
+    },
+    "airpress" => {
+        "unified" => "pressure_hpa",    # link only
+    },
+    "pressure" => {
+        "unified" => "pressure_hpa",    # link only
+    },
+    "pressure_hpa" => {
+        "short" => "P",
+        "unit"  => "hpa",
+    },
+    "pressure_in" => {
+        "short" => "Pin",
+        "unit"  => "inhg",
+    },
+    "pressure_mm" => {
+        "short" => "Pmm",
+        "unit"  => "mmhg",
+    },
+    "pressure_psi" => {
+        "short" => "Ppsi",
+        "unit"  => "psi",
+    },
+    "pressureabs" => {
+        "unified" => "pressureabs_hpa",    # link only
+    },
+    "pressureabs_hpa" => {
+        "short" => "Pa",
+        "unit"  => "hpa",
+    },
+    "pressureabs_in" => {
+        "short" => "Pain",
+        "unit"  => "inhg",
+    },
+    "pressureabs_mm" => {
+        "short" => "Pamm",
+        "unit"  => "mmhg",
+    },
+    "pressureabs_psi" => {
+        "short" => "Papsi",
+        "unit"  => "psi",
+    },
+    "rain" => {
+        "unified" => "rain_mm",    # link only
+    },
+    "rain_mm" => {
+        "short" => "R",
+        "unit"  => "mm",
+    },
+    "rain_in" => {
+        "short" => "Rin",
+        "unit"  => "in",
+    },
+    "rain_day" => {
+        "unified" => "rain_day_mm",    # link only
+    },
+    "rain_day_mm" => {
+        "short" => "Rd",
+        "unit"  => "mm",
+    },
+    "rain_day_in" => {
+        "short" => "Rdin",
+        "unit"  => "in",
+    },
+    "rain_week" => {
+        "unified" => "rain_week_mm",    # link only
+    },
+    "rain_week_mm" => {
+        "short" => "Rw",
+        "unit"  => "mm",
+    },
+    "rain_week_in" => {
+        "short" => "Rwin",
+        "unit"  => "in",
+    },
+    "rain_month" => {
+        "unified" => "rain_month_mm",    # link only
+    },
+    "rain_month_mm" => {
+        "short" => "Rm",
+        "unit"  => "mm",
+    },
+    "rain_month_in" => {
+        "short" => "Rmin",
+        "unit"  => "in",
+    },
+    "rain_year" => {
+        "unified" => "rain_year_mm",     # link only
+    },
+    "rain_year_mm" => {
+        "short" => "Ry",
+        "unit"  => "mm",
+    },
+    "rain_year_in" => {
+        "short" => "Ryin",
+        "unit"  => "in",
+    },
+    "sunshine" => {
+        "unified" => "solarradiation",    # link only
+    },
+    "solarradiation" => {
+        "short" => "S",
+        "unit"  => "wpsm",
+    },
+    "temp" => {
+        "unified" => "temperature_c",     # link only
+    },
+    "temp_c" => {
+        "unified" => "temperature_c",     # link only
+    },
+    "temp_f" => {
+        "unified" => "temperature_f",     # link only
+    },
+    "temperature" => {
+        "unified" => "temperature_c",     # link only
+    },
+    "temperature_c" => {
+        "short" => "T",
+        "unit"  => "c",
+    },
+    "temperature_f" => {
+        "short" => "Tf",
+        "unit"  => "f",
+    },
+    "visibility" => {
+        "unified" => "visibility_km",     # link only
+    },
+    "visibility_km" => {
+        "short" => "V",
+        "unit"  => "km",
+    },
+    "visibility_mi" => {
+        "short" => "Vmi",
+        "unit"  => "mi",
+    },
+    "wind_chill" => {
+        "unified" => "wind_chill_c",      # link only
+    },
+    "wind_chill_c" => {
+        "short" => "Wc",
+        "unit"  => "c",
+    },
+    "wind_chill_f" => {
+        "short" => "Wcf",
+        "unit"  => "f",
+    },
+    "wind_compasspoint" => {
+        "short" => "Wdc",
+    },
+    "windspeeddirection" => {
+        "unified" => "wind_compasspoint",    # link only
+    },
+    "winddirectiontext" => {
+        "unified" => "wind_compasspoint",    # link only
+    },
+    "wind_direction" => {
+        "short" => "Wd",
+        "unit"  => "degree",
+    },
+    "wind_dir" => {
+        "unified" => "wind_direction",       # link only
+    },
+    "winddir" => {
+        "unified" => "wind_direction",       # link only
+    },
+    "winddirection" => {
+        "unified" => "wind_direction",       # link only
+    },
+    "wind_gust" => {
+        "unified" => "wind_gust_kmh",        # link only
+    },
+    "wind_gust_kmh" => {
+        "short" => "Wg",
+        "unit"  => "kmh",
+    },
+    "wind_gust_bft" => {
+        "short" => "Wgbft",
+        "unit"  => "bft",
+    },
+    "wind_gust_fts" => {
+        "short" => "Wgfts",
+        "unit"  => "fts",
+    },
+    "wind_gust_kn" => {
+        "short" => "Wgkn",
+        "unit"  => "kn",
+    },
+    "wind_gust_mph" => {
+        "short" => "Wgmph",
+        "unit"  => "mph",
+    },
+    "wind_gust_mps" => {
+        "short" => "Wgmps",
+        "unit"  => "mps",
+    },
+    "wind_speed" => {
+        "unified" => "wind_speed_kmh",    # link only
+    },
+    "wind_speed_kmh" => {
+        "short" => "Ws",
+        "unit"  => "kmh",
+    },
+    "wind_speed_bft" => {
+        "short" => "Wsbft",
+        "unit"  => "bft",
+    },
+    "wind_speed_fts" => {
+        "short" => "Wsfts",
+        "unit"  => "fts",
+    },
+    "wind_speed_kn" => {
+        "short" => "Wskn",
+        "unit"  => "kn",
+    },
+    "wind_speed_mph" => {
+        "short" => "Wsmph",
+        "unit"  => "mph",
+    },
+    "wind_speed_mps" => {
+        "short" => "Wsmps",
+        "unit"  => "mps",
+    },
+);
+
+# Get reading short name from reading name (e.g. for weather logging)
+sub rname2rsname($) {
+    my ($reading) = @_;
+    my $r = lc($reading);
+
+    if ( $weather_readings{$r}{"short"} ) {
+        return $weather_readings{$r}{"short"};
+    }
+    elsif ( $weather_readings{$r}{"unified"} ) {
+        my $dr = $weather_readings{$r}{"unified"};
+        return $weather_readings{$dr}{"short"};
+    }
+
+    return $reading;
+}
+
+# Get unit details in local language from reading name as hash
+sub rname2unitDetails ($;$) {
+    my ( $reading, $lang ) = @_;
+    my $details;
+    my $r = lc($reading);
+    my $u;
+    my %return;
+
+    # known alias reading names
+    if ( $weather_readings{$r}{"unified"} ) {
+        my $dr = $weather_readings{$r}{"unified"};
+        $return{"unified"} = $dr;
+        $return{"short"}   = $weather_readings{$dr}{"short"};
+        $u                 = $weather_readings{$dr}{"unit"}
+          if ( $weather_readings{$dr}{"unit"} );
+    }
+
+    # known standard reading names
+    elsif ( $weather_readings{$r}{"short"} ) {
+        $return{"unified"} = $r;
+        $return{"short"}   = $weather_readings{$r}{"short"};
+        $u = $weather_readings{$r}{"unit"} if ( $weather_readings{$r}{"unit"} );
+    }
+
+    # just guessing the unit from reading name
+    elsif ( $r =~ /_([a-z]+)$/ ) {
+        $u = $1;
+    }
+
+    return if ( !%return && !$u );
+    return \%return if ( !$u );
+
+    my $unitDetails = UnitDetails( $u, $lang );
+
+    if ( ref($unitDetails) eq "HASH" ) {
+        foreach my $k ( keys %{$unitDetails} ) {
+            $return{$k} = $unitDetails->{$k};
+        }
+    }
+
+    return \%return;
+}
+
+# Get unified reading name from reading name
+sub rname2urname ($) {
+    my ($reading) = @_;
+    my $r = lc($reading);
+
+    return $weather_readings{$r}{"unified"}
+      if ( $weather_readings{$r}{"unified"} );
+    return $reading;
+}
+
 #################################
 ### Inner metric conversions
 ###
@@ -213,13 +906,13 @@ sub f2k($;$) {
 }
 
 # Pressure: convert in (inches of Mercury) to hPa (hecto Pascal)
-sub inhg2hpa($) {
+sub inhg2hpa($;$) {
     my ( $data, $rnd ) = @_;
     return roundX( $data * 33.8638816, $rnd );
 }
 
 # Pressure: convert PSI (Pound force per square inch) to hPa (hecto Pascal)
-sub psi2hpa($) {
+sub psi2hpa($;$) {
     my ( $data, $rnd ) = @_;
     return roundX( $data / 100.00014504, $rnd );
 }
@@ -265,7 +958,9 @@ sub degrees2compasspoint($;$) {
         $directions_txt_i18n = $compasspoint_txt{en};
     }
 
-    return @$directions_txt_i18n[ int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 ) ];
+    return @$directions_txt_i18n[
+      int( ( ( $azimuth + 11.25 ) % 360 ) / 22.5 )
+    ];
 }
 
 #################################
