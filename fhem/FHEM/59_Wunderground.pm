@@ -283,33 +283,14 @@ sub Wunderground_ReceiveCommand($$$) {
     }
 
     # state
-    my %shortnames = (
-        "dewpoint"       => "D",
-        "humidity"       => "H",
-        "light"          => "L",
-        "pressure"       => "P",
-        "rain"           => "R",
-        "rain_day"       => "RD",
-        "rain_week"      => "RW",
-        "rain_month"     => "RM",
-        "rain_year"      => "RY",
-        "solarradiation" => "SR",
-        "temp_c"         => "T",
-        "wind_speed"     => "W",
-        "wind_chill"     => "WC",
-        "wind_gust"      => "WG",
-        "wind_direction" => "WD",
-        "wind_dewpoint"  => "D",
-    );
-
     my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
     foreach (@stateReadings) {
         $_ =~ /^(\w+):?(\w+)?$/;
         my $r = $1;
-        my $n = ( $2 ? $2 : ( $shortnames{$r} ? $shortnames{$r} : $1 ) );
+        my $n = ( $2 ? $2 : UConv::rname2rsname($r) );
 
         my $v = ReadingsVal( $name, $r, undef );
-        if ($v) {
+        if ( defined($v) ) {
             $state .= " " if ( $state ne "Initialized" );
             $state = "" if ( $state eq "Initialized" );
             $state .= "$n: $v";
