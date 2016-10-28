@@ -108,7 +108,7 @@ sub HP1000_Get($$$) {
               if ( !defined($result) );
         }
         else {
-            $result = "Found existing WU device for this PWS ID: @wudev[0]";
+            $result = "Found existing WU device for this PWS ID: $wudev[0]";
         }
     }
 
@@ -168,7 +168,7 @@ sub HP1000_Define($$$) {
 
         $hash->{FW_PORT} = $defs{ $hash->{FW} }{PORT};
 
-        fhem 'attr ' . $name . ' stateReadings temp_c humidity';
+        fhem 'attr ' . $name . ' stateReadings temperature humidity';
     }
 
     if ( HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" ) ) {
@@ -296,8 +296,8 @@ sub HP1000_CGI() {
     delete $hash->{FORECASTDEV} if ( $hash->{FORECASTDEV} );
     my @wudev = devspec2array(
         "TYPE=Wunderground:FILTER=PWS_ID=" . AttrVal( $name, "wu_id", "-" ) );
-    $hash->{FORECASTDEV} = @wudev[0]
-      if ( defined( @wudev[0] ) );
+    $hash->{FORECASTDEV} = $wudev[0]
+      if ( defined( $wudev[0] ) );
 
     HP1000_SetAliveState( $hash, 1 );
 
@@ -1060,34 +1060,15 @@ sub HP1000_CGI() {
     # brightness in % ??
 
     # state
-    my %shortnames = (
-        "dewpoint"       => "D",
-        "humidity"       => "H",
-        "light"          => "L",
-        "pressure"       => "P",
-        "rain"           => "R",
-        "rain_day"       => "RD",
-        "rain_week"      => "RW",
-        "rain_month"     => "RM",
-        "rain_year"      => "RY",
-        "solarradiation" => "SR",
-        "temp_c"         => "T",
-        "wind_speed"     => "W",
-        "wind_chill"     => "WC",
-        "wind_gust"      => "WG",
-        "wind_direction" => "WD",
-        "wind_dewpoint"  => "D",
-    );
-
     my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
     foreach (@stateReadings) {
         $_ =~ /^(\w+):?(\w+)?$/;
         my $r = $1;
-        my $n = ( $2 ? $2 : ( $shortnames{$r} ? $shortnames{$r} : $1 ) );
+        my $n = ( $2 ? $2 : UConv::rname2rsname($r) );
 
         my $v = ReadingsVal( $name, $r, undef );
-        if ($v) {
-            $$result .= " " if ( $result ne "Initialized" );
+        if ( defined($v) ) {
+            $result .= " " if ( $result ne "Initialized" );
             $result = "" if ( $result eq "Initialized" );
             $result .= "$n: $v";
         }
