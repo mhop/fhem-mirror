@@ -33,10 +33,9 @@ use SetExtensions;
 
 sub N4HMODULE_Set($@);
 sub N4HMODULE_Update($@);
-sub N4HMODULE_DbLog_splitFn($);
+sub N4HMODULE_DbLog_splitFn($$);
 
-my $n4hmodule_Version = "1.0.1.2 - 25.10.2016";
-
+my $n4hmodule_Version = "1.0.1.3 - 27.10.2016";
 
 my %OT_devices = (
 	"1" 	=> {"name" => "leer", "OTcanSet" => "false", "OTcanReq" => "false", "fields" => [] },
@@ -111,9 +110,8 @@ sub N4HMODULE_Initialize($) {
 ##################################################################################
 
 	my ($hash) = @_;
-
-
 	my @otlist;
+
 	foreach my $model (keys %OT_devices){
 		push @otlist,$OT_devices{$model}->{name};
 	}
@@ -125,7 +123,7 @@ sub N4HMODULE_Initialize($) {
 	$hash->{AttrFn}  	   = "N4HMODULE_Attr";
 	$hash->{AttrList}	   = "IoDev dummy:1,0 Interval sendack:on,off setList ".
 						     "$readingFnAttributes ";
-						     "OT:"  .join(",", sort @otlist);                      
+#						     "OT:"  .join(",", sort @otlist);                      
     $hash->{DbLog_splitFn} = "N4HMODULE_DbLog_splitFn";
 }
 
@@ -137,7 +135,7 @@ sub N4HMODULE_Define($$) {
 	my ($hash, $def) = @_;
 	my @args = split("[ \t]+", $def);
 	my ($name, $type, $n4hbus, $ot, $objadr) = @args;
-	
+    my ($readings) = "";
 
 	if(@args < 4) {
 		my $msg = "Usage: define <name> N4HMODULE <N4HBUS> <OBJECTTYPE> <OBJADDR>";
@@ -168,10 +166,10 @@ sub N4HMODULE_Define($$) {
 	if ($hash->{OTcanSet}eq"true") {
 		$hash->{helper}{state}	= 'undefined';
 	}
+	
+    $attr{$name}{room} = "net4home" if( !defined($attr{$name}{room}) );
 
-	
-	
-	# Timer zum regelmäßigem aktualisieren auf dem Bus starten
+		# Timer zum regelmäßigem aktualisieren auf dem Bus starten
 	if (($ot ==  24) or #Temperatur
         ($ot ==  25) or #Licht
 	    ($ot ==  26) or #Luftfeuchte
@@ -180,6 +178,33 @@ sub N4HMODULE_Define($$) {
 		($ot == 242) or #Luftdruck
 		($ot == 246) or #Luftdruck-Tendenz
 	    ($ot == 245)) { #Regenmenge l/h
+
+        my $state_format;
+		
+        if( $ot == 24 ) { #Temperatur
+          $state_format .= " " if( $state_format );
+          $state_format .= "T: temperature";
+        } elsif( $ot == 25 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "L: brightness";
+        } elsif( $ot == 26 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "H: humidity";
+        } elsif( $ot == 240 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "W: wind";
+        } elsif( $ot == 241 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "L: brightness";
+        } elsif( $ot == 242 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "P: pressure";
+        } elsif( $ot == 245 ) {
+          $state_format .= " " if( $state_format );
+          $state_format .= "R: rain";
+        }
+		
+        $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
 
 		RemoveInternalTimer($hash);
 	 
@@ -213,20 +238,16 @@ sub N4HMODULE_Start($)
    }
 }
 
-
 ##################################################################################
 sub N4HMODULE_Undefine($$) {
 ##################################################################################
 
 	my ($hash,$arg) = @_;
+	my $name   = $hash->{NAME};
 	
-	# ToDo : Aufräumen noch mal ansehen
-	
-    my $c = $hash->{OBJADR};
-    foreach my $dname (keys %{ $modules{N4HMODULE}{defptr}{$c} }) {
-      delete($modules{N4HMODULE}{defptr}{$c}{$dname})
-        if($modules{N4HMODULE}{defptr}{$c}{$dname} == $hash);
-    }
+	Log3 $hash, 3, "N4HMODULE_Undefine -> $name";
+	RemoveInternalTimer( $hash ); 	
+    delete($modules{N4HMODULE}{defptr}{$hash->{OBJADR}});
 	return undef;
 }
 
@@ -270,7 +291,7 @@ sub N4HMODULE_Parse($$) {
 	my ($iodev, $msg, $local) = @_;
 	my $ioName = $iodev->{NAME};
 	my $object	= "";
- 
+
 	# Modul suchen
 	my $type8   = hex(substr($msg,0,2));
 	my $ipsrc   = substr($msg,4,2).substr($msg,2,2);
@@ -280,8 +301,9 @@ sub N4HMODULE_Parse($$) {
 	my $ddata   = substr($msg,16, ($datalen*2));
 	my $pos 	= $datalen*2+16;
 	
+#	Log3 "xx", 1, "(DECOMP2): T8($type8) - MI$ipsrc DST-> $ipdst SRC<-$objsrc";
+	
 	if ( length($msg) <= $pos ) {
-#		Log3 $hash, 5, "N4MODULE (parse) -> ($msg) (ddata:$ddata) (pos:$pos)";
 		return undef;
 	}
 	
@@ -289,7 +311,6 @@ sub N4HMODULE_Parse($$) {
 	my $csCalc	= substr($msg,$pos+2,2);
 	my $len		= substr($msg,$pos+4,2);
 	my $posb	= substr($msg,$pos+6,2);
-	
 	
 	if ($ipdst == 32767) {
 		$object = $objsrc;
@@ -338,8 +359,10 @@ sub N4HMODULE_ParsePayload($@) {
 
 		if (hex(substr($ddata,2,2))== hex("00")) {
 			readingsBulkUpdate($hash,"state", "off");
+			$hash->{STATE} = "off";
 		} else {
 			readingsBulkUpdate($hash,"state", "on");
+			$hash->{STATE} = "on";
 		}
 	}
 
@@ -351,6 +374,14 @@ sub N4HMODULE_ParsePayload($@) {
 #	+++++++ D0_TOGGLE
 	if ($dev_funcion == hex("35")) {
 		readingsBulkUpdate($hash,"cmd", "D0_TOGGLE");
+
+		if (ReadingsVal($name, "state", "") eq "on") {
+			readingsBulkUpdate($hash,"state", "off");
+			$hash->{STATE} = "off";
+		} elsif (ReadingsVal($name, "state", "") eq "off") {
+			readingsBulkUpdate($hash,"state", "on");
+			$hash->{STATE} = "on";
+		}
 	}
 
 #	+++++++ D0_ACTOR_ACK
@@ -377,34 +408,6 @@ sub N4HMODULE_ParsePayload($@) {
 		readingsBulkUpdate($hash,"cmd", "D0_VALUE_ACK");
 		my ($valtype, $lastval) = N4HMODULE_paramToText($hash, $ddata);
 		if( defined($lastval))	{	readingsBulkUpdate($hash, $valtype, $lastval);	}
-		
-    my $state_format;
-    my $readings = "";
-      if( $readings =~ m/temperature/ ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "T: temperature";
-      }
-      if( $readings =~ m/humidity/ ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "H: humidity";
-      }
-	  
-      if( $readings =~ m/windstrength/ ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "W: windstrength (windangle°)";
-      }
-	  
-      if( $readings =~ m/co2/ ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "C: co2 ppm";
-      }
-
-      if( $readings =~ m/pressure/ ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "P: pressure";
-      }
-
-      $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
 		
 	}
 
@@ -639,7 +642,7 @@ sub N4HMODULE_Update($@) {
 	my $value = shift(@a);
 
 	my $name 		= $hash->{NAME};
-    return unless (defined($hash->{NAME}));
+    return unless (defined($hash->{NAME}) and defined $value );
 
 	Log3 $hash, 5, "N4MODULE (update): ($name) ($value)";
 
@@ -943,9 +946,10 @@ sub N4HMODULE_ParseN56($) {
       <code>define n4h_28204 N4HMODULE n4h 24 28204</code><br />
     </ul>
 
-	Currently the following values are supported:
+	Currently the following values are supported:<br />
+    
+	<b>Measurement</b><br />
 
-	<b>Measurement</b>
 	<ul>
 	 <li> 24 - Measurement,Temperature</li>
 	 <li> 25 - Measurement,Brightness</li>
@@ -993,9 +997,10 @@ sub N4HMODULE_ParseN56($) {
       <code>define MyN4HMODULEice N4HMODULE 24 26004</code><br />
     </ul>
 	
-	Derzeit werden folgende Typen unterst&uuml;tzt:
+	Derzeit werden folgende Typen unterst&uuml;tzt:<br />
 
-	<b>Messwerte</b>
+	<b>Messwerte</b><br />
+
 	<ul>
 	 <li> 24 - Messwert,Temperatur</li>
 	 <li> 25 - Messwert,Helligkeit</li>
