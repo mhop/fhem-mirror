@@ -34,8 +34,8 @@ my %Hyperion_sets =
 
 my $Hyperion_requiredVersion    = "1.03.2";
 my $Hyperion_serverinfo         = {"command" => "serverinfo"};
-my $Hyperion_webCmd             = "rgb:effect:mode:toggle:on:off";
-my $Hyperion_webCmd_config      = "rgb:effect:configFile:mode:toggle:on:off";
+my $Hyperion_webCmd             = "rgb:effect:mode:dimDown:dimUp:on:off";
+my $Hyperion_webCmd_config      = "rgb:effect:configFile:mode:dimDown:dimUp:on:off";
 my $Hyperion_homebridgeMapping  = "On=state,subtype=TV.Licht,valueOn=/rgb.*/,cmdOff=off,cmdOn=mode+rgb ".
                                   "On=state,subtype=Umgebungslicht,valueOn=clearall,cmdOff=off,cmdOn=clearall ".
                                   "On=state,subtype=Effekt,valueOn=/effect.*/,cmdOff=off,cmdOn=mode+effect ";
@@ -91,6 +91,7 @@ sub Hyperion_Define($$)
   if ($init_done && !defined $hash->{OLDDEF})
   {
     $attr{$name}{alias} = "Ambilight";
+    $attr{$name}{cmdIcon} = "on:general_an off:general_aus dimDown:dimdown dimUp:dimup";
     $attr{$name}{"event-on-change-reading"} = ".*";
     $attr{$name}{"event-on-update-reading"} = "serverResponse";
     $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
@@ -255,7 +256,7 @@ sub Hyperion_Read($)
     my $duration    = (defined $data->{priorities}->[0]->{duration_ms} && $data->{priorities}->[0]->{duration_ms} > 999) ? int($data->{priorities}->[0]->{duration_ms} / 1000) : 0;
     $duration       = ($duration) >= 1 ? $duration : "infinite";
     my $adj         = $data->{adjustment}->[0] ? $data->{adjustment}->[0] : undef;
-    my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0] ? $data->{activeLedColor}->[0]->{'HEX Value'}->[0] : "";
+    my $col         = $data->{activeLedColor}->[0]->{"HEX Value"}->[0] ? $data->{activeLedColor}->[0]->{"HEX Value"}->[0] : "";
     my $configs     = ReadingsVal($name,".configs",undef);
     my $corr        = $data->{correction}->[0] ? $data->{correction}->[0] : undef;
     my $effects     = $data->{effects} ? $data->{effects} : undef;
@@ -329,7 +330,7 @@ sub Hyperion_Read($)
     }
     elsif ($col)
     {
-      my $rgb = lc((split('x',$col))[1]);
+      my $rgb = lc((split("x",$col))[1]);
       $rgb =~ m/^(..)(..)(..)/;
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
@@ -343,7 +344,7 @@ sub Hyperion_Read($)
     }
     else
     {
-      if ($prio && $data->{priorities}->[0]->{duration_ms} && !$data->{priorities}->[1]->{priority})
+      if ($prio && defined $data->{priorities}->[0]->{duration_ms} && !defined $data->{priorities}->[1]->{priority})
       {
         readingsBulkUpdate($hash,"mode","clearall");
         readingsBulkUpdate($hash,"mode_before_off","clearall");
@@ -487,15 +488,14 @@ sub Hyperion_Set($@)
   my %obj;
   Log3 $name,4,"$name: Hyperion_Set cmd: $cmd";
   Log3 $name,4,"$name: Hyperion_Set value: $value" if ($value);
-  Log3 $name,4,"$name: Hyperion_Set duration: $duration, priority: $priority";
+  Log3 $name,4,"$name: Hyperion_Set duration: $duration, priority: $priority" if ($cmd =~ /^rgb|dim|dimUp|dimDown|effect$/);
   if ($cmd eq "configFile")
   {
     $value = $value.".config.json";
     my $confdir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
     my $binpath  = AttrVal($name,"hyperionBin","/usr/bin/hyperiond");
     my $bin = (split("/",$binpath))[scalar(split("/",$binpath)) - 1];
-    $bin =~ s/\.sh$//
-      if ($bin =~ /\.sh$/);
+    $bin =~ s/\.sh$// if ($bin =~ /\.sh$/);
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
     my $sudo = ($user eq "root" || int AttrVal($name,"hyperionNoSudo",0) == 1) ? "" : "sudo ";
@@ -553,7 +553,7 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "dim")
   {
     return "Value of $cmd has to be between 1 and 100"
-      if ($value !~ /^(\d+)$/ || int($1) > 100 || int($1) < 1);
+      if ($value !~ /^(\d+)$/ || $1 > 100 || $1 < 1);
     my $rgb = ReadingsVal($name,"rgb","ffffff");
     $value = $value + 1
       if ($cmd eq "dim" && $value < 100);
@@ -575,11 +575,11 @@ sub Hyperion_Set($@)
   elsif ($cmd =~ /^(dimUp|dimDown)$/)
   {
     return "Value of $cmd has to be between 1 and 99"
-      if (defined $value && $value =~ /^(\d+)$/ && int($1) < 1 && int($1) > 99);
-    my $dim = int ReadingsVal($name,"dim",100);
-    my $dimStep = (defined $value) ? int $value : int AttrVal($name,"hyperionDimStep",5);
+      if (defined $value && ($value =~ /^(\d+)$/ || $1 > 99));
+    my $dim = ReadingsVal($name,"dim",100);
+    my $dimStep = $value ? $value : AttrVal($name,"hyperionDimStep",10);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
-    my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 0;
+    my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 1;
     $cmd eq "dimUp" ? fhem "set $name dim $dimUp" : fhem "set $name dim $dimDown";
     return undef;
   }
@@ -602,17 +602,17 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "clear")
   {
     return "Value of $cmd has to be between 0 and 65536 in steps of 1"
-      if ($value !~ /^(\d+)$/ || int $1 < 0 || int $1 > 65536);
-    $value = int $value;
+      if (defined $value && $value !~ /^(\d+)$/ || $1 > 65536);
     $obj{command} = $cmd;
-    $obj{priority} = $value * 1;
+    $1 ? $value = $1 : $value = AttrVal($name,"hyperionDefaultPriority",0);
+    $obj{priority} = $value*1;
   }
   elsif ($cmd eq "off")
   {
     return "$cmd need no additional value of $value" if (defined $value);
     $obj{command} = "color";
     $obj{color} = [0,0,0];
-    $obj{priority} = 0;
+    $obj{priority} = AttrVal($name,"hyperionDefaultPriority",0)*1;
   }
   elsif ($cmd eq "on")
   {
