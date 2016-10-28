@@ -30,7 +30,7 @@
 #	2015-03-07	V1.02 fix schedule
 #       2015-09-12	V1.03 fix errorcount and interval
 #       2016-01-20      V1.04 add Reading onoff for SP2101W
-#       2016-10-28      V1.05 fix wrong user on firststart
+#       2016-10-28      V1.05 fix wrong user on first start
 #
 ################################################################
 
@@ -639,8 +639,8 @@ sub encode_list(@)
 
 =pod
 =item device
-=item summary  controls EDIPLUG WLAN switches
-=item summary_DE steuert EDIPLUG WLAN Schaltsteckdosen
+=item summary  controls EDIPLUG SP2101W / SP1101W WLAN switches
+=item summary_DE steuert EDIPLUG SP2101W / SP1101W WLAN Schaltsteckdosen
 =begin html
 
 <a name="EDIPLUG"></a>
