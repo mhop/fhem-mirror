@@ -17,6 +17,7 @@ sub upd_writeFile($$$$);
 sub upd_mv($$);
 sub upd_metainit($);
 sub upd_metacmd($@);
+sub upd_saveConfig($$$);
 
 my $updateInBackground;
 my $updRet;
@@ -379,6 +380,12 @@ doUpdate($$$$)
     return if(!upd_writeFile($root, $restoreDir, $fName, $remFile));
   }
 
+  if($nChanged) {
+    for my $f ($attr{global}{configfile}, $attr{global}{statefile}) {
+      upd_saveConfig($root, $restoreDir, $f) if($f !~ m,(^/|\.\.),);
+    }
+  }
+
   uLog 1, "nothing to do..." if($nChanged == 0 && $nSkipped == 0);
 
   if(@rl && ($nChanged || $nSkipped)) {
@@ -515,6 +522,21 @@ upd_getUrl($)
     return "";
   }
   return $data;
+}
+
+sub
+upd_saveConfig($$$)
+{
+  my($root, $restoreDir, $fName) = @_;
+
+  return if(!$restoreDir || configDBUsed() || !-r "$root/$fName");
+  upd_mkDir($root, "$restoreDir/$fName", 1);
+  Log 1, "saving $fName";
+  if(!copy("$root/$fName", "$root/$restoreDir/$fName")) {
+    uLog 1, "copy $root/$fName $root/$restoreDir/$fName failed:$!, ".
+              "aborting the update";
+    return 0;
+  }
 }
 
 sub
