@@ -464,6 +464,10 @@ my %weather_readings = (
         "short" => "Df",
         "unit"  => "f",
     },
+    "dewpoint_k" => {
+        "short" => "Dk",
+        "unit"  => "k",
+    },
     "humidity" => {
         "short" => "H",
         "unit"  => "hg",
@@ -479,6 +483,10 @@ my %weather_readings = (
         "short" => "Haf",
         "unit"  => "f",
     },
+    "humidityabs_k" => {
+        "short" => "Hak",
+        "unit"  => "k",
+    },
     "indoordewpoint" => {
         "unified" => "indoordewpoint_c",    # link only
     },
@@ -489,6 +497,10 @@ my %weather_readings = (
     "indoordewpoint_f" => {
         "short" => "Dif",
         "unit"  => "f",
+    },
+    "indoordewpoint_k" => {
+        "short" => "Dik",
+        "unit"  => "k",
     },
     "indoorhumidity" => {
         "short" => "Hi",
@@ -505,6 +517,10 @@ my %weather_readings = (
         "short" => "Haif",
         "unit"  => "f",
     },
+    "indoorhumidityabs_k" => {
+        "short" => "Haik",
+        "unit"  => "k",
+    },
     "indoortemperature" => {
         "unified" => "indoortemperature_c",    # link only
     },
@@ -515,6 +531,10 @@ my %weather_readings = (
     "indoortemperature_f" => {
         "short" => "Tf",
         "unit"  => "f",
+    },
+    "indoortemperature_k" => {
+        "short" => "Tk",
+        "unit"  => "k",
     },
     "israining" => {
         "short" => "IR",
@@ -643,6 +663,9 @@ my %weather_readings = (
     "temp_f" => {
         "unified" => "temperature_f",     # link only
     },
+    "temp_k" => {
+        "unified" => "temperature_k",     # link only
+    },
     "temperature" => {
         "unified" => "temperature_c",     # link only
     },
@@ -654,8 +677,12 @@ my %weather_readings = (
         "short" => "Tf",
         "unit"  => "f",
     },
+    "temperature_k" => {
+        "short" => "Tk",
+        "unit"  => "k",
+    },
     "visibility" => {
-        "unified" => "visibility_km",     # link only
+        "unified" => "visibility_km",    # link only
     },
     "visibility_km" => {
         "short" => "V",
@@ -666,7 +693,7 @@ my %weather_readings = (
         "unit"  => "mi",
     },
     "wind_chill" => {
-        "unified" => "wind_chill_c",      # link only
+        "unified" => "wind_chill_c",     # link only
     },
     "wind_chill_c" => {
         "short" => "Wc",
@@ -675,6 +702,10 @@ my %weather_readings = (
     "wind_chill_f" => {
         "short" => "Wcf",
         "unit"  => "f",
+    },
+    "wind_chill_k" => {
+        "short" => "Wck",
+        "unit"  => "k",
     },
     "wind_compasspoint" => {
         "short" => "Wdc",
