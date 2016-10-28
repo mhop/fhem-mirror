@@ -1,4 +1,4 @@
-##############################################################################
+#############################################################################
 #
 # 20_N4HBUS.pm
 #
@@ -31,7 +31,7 @@ use warnings;
 use POSIX;
 use Data::Dumper;
 
-my $n4hbus_Version = "1.0.1.1 - 24.10.2016";
+my $n4hbus_Version = "1.0.1.2 - 27.10.2016";
 
 sub N4HBUS_Read($@);
 sub N4HBUS_Write($$$$);
@@ -121,7 +121,7 @@ sub N4HBUS_Undef($@) {
 	my ( $hash, $arg ) = @_;       
 	my $name = $hash->{NAME};
 	
-    Log3 $hash, 2, "deleting port for $name";
+    Log3 $hash, 2, "close port for $name";
 	DevIo_CloseDev($hash);         
 	
 	return undef;  	
@@ -381,7 +381,13 @@ sub N4HBUS_Read($@) {
 	
 	$data 	= substr($recdata,0, hex($len)*2); 
 	Log3 $hash, 5, "N4HBUS (DECOMP): Länge (".hex($len)." bytes)-$data";
-# 001c a10f00000400000030 00 01ff a10f bc7f 03 66 00 00 01 76121401022015403a00c00000050d
+	
+#	Log3 $hash, 1, "(DECOMP1): Länge (".hex($len)." bytes)-$data";
+
+# 0005 a10f 0000 04 40 05 0000 1c 7302 ff7f a86a 05 65 09 05 01 c2 		4d617263656c20476f6572747a6b6175403000c000000b24
+# 0005 a10f 0000 04 40 06 0000 1b 01   bc7f 1127 04 41 00 01 04 		624d617263656c20476f6572747a6b6175403000c000000904
+#                              1b 01   ffff 1127 03 ff ff ff 			64b44d617263656c20476f6572747a6b6175403000c000000d33
+# 0005 a10f 0000 04 40 05 0000 1f 2600 ffff 2c0a 03 ff ff ff 			017f2127100320160100271003201601006f00a19c400aff402300c000001333
 
 	my $idx;
 	$idx = index($data,"a10f");
@@ -402,7 +408,6 @@ sub N4HBUS_Read($@) {
 
 			my %addvals = (RAWMSG => $data);
 			Dispatch($hash, $msg, \%addvals) if($init_done);
-			
 		}
 	} # a10f - Statuspaket
 	
@@ -422,8 +427,6 @@ sub N4HBUS_Ready($) {
 }
 
 # function decompSection(p2:pbyte; offset, fs:dword; p2out:pbyte; MaxOutLen:dword; useCS:boolean):dword;
-
-
 #################################################################################
 1;
 
@@ -435,7 +438,8 @@ sub N4HBUS_Ready($) {
 
 <a name="N4HBUS"></a>
 <h3>N4HBUS</h3>
-  This module connects fhem to the net4home Bus.
+  This module connects fhem to the net4home Bus. You need to define ojects with <a href="#N4MODULE">N4MODULE</a> to set or read 
+  data of th net4home bus.
   <br /><br />
   Further technical information can be found at the <a href="http://www.net4home.de">net4home.de</a> Homepage  
   <br /><br />
@@ -474,7 +478,8 @@ sub N4HBUS_Ready($) {
 
 <a name="N4HBUS"></a>
 <h3>N4HBUS</h3>
-  Dieses Modul verbindet fhem &uuml;ber IP mit dem net4home Bus.
+  Dieses Modul verbindet fhem &uuml;ber IP mit dem net4home Bus. Zus&auml;tzlich m&uuml;ssen Objekte &uuml;ber den Typ 
+  <a href="#N4MODULE">N4MODULE</a> definiert werden, um Daten an den net4home-Bus zu senden oder zu lesen.
   <br /><br />
   Weitere technische Informationen gibt es auf der Homepage unter <a href="http://www.net4home.de">net4home.de</a>  
   <br /><br />
