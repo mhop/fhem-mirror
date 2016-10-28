@@ -7,8 +7,8 @@ use warnings;
 use File::Copy qw(cp);
 
 sub CommandUpdate($$);
-sub restoreFile($$);
-sub restoreDir($$);
+sub restoreFile($$$);
+sub restoreDir($$$);
 
 ########################################
 sub
@@ -29,12 +29,14 @@ CommandRestore($$)
   my @args = split(/ +/,$param);
   my $list = (@args > 0 && $args[0] eq "list");
   shift @args if($list);
+  my $all = (@args > 0 && $args[0] eq "-a");
+  shift @args if($all);
   my $filename = shift @args;
   my $dest = $attr{global}{modpath};
   my $src = "$dest/restoreDir";
 
   $list = 1 if(!$list && !$filename);
-  return "Usage: restore [list] filename|directory"
+  return "Usage: restore [-a|list] filename|directory"
     if(@args);
 
   $filename = "" if(!$filename);
@@ -58,30 +60,34 @@ CommandRestore($$)
   $src = "$src/$filename";
   $dest = "$dest/$2" if($2);
 
-  return (-f $src ? restoreFile($src, $dest) : restoreDir($src, $dest)).
+  return (-f $src ? restoreFile($src,$dest,$all) : restoreDir($src,$dest,$all)).
         "\n\nrestore finished";
 }
 
 sub
-restoreFile($$)
+restoreFile($$$)
 {
-  my ($src, $dest) = @_;
+  my ($src, $dest, $all) = @_;
+  if((index($dest,$attr{global}{configfile}) >= 0 || 
+      index($dest,$attr{global}{statefile}) >= 0 ) && !$all) {
+    return "skipping $dest";
+  }
   cp($src, $dest) || return "cp $src $dest failed: $!";
   return "restore $dest";
 }
 
 sub
-restoreDir($$)
+restoreDir($$$)
 {
-  my ($src, $dest, $dh, @ret) = @_;
+  my ($src, $dest, $all, $dh, @ret) = @_;
   opendir($dh, $src) || return "opendir $src: $!";
   my @files = sort grep { $_ ne "." && $_ ne ".." } readdir($dh);
   closedir($dh);
   foreach my $f (@files){
     if(-d "$src/$f") {
-      push @ret, restoreDir("$src/$f", "$dest/$f");
+      push @ret, restoreDir("$src/$f", "$dest/$f", $all);
     } else {
-      push @ret, restoreFile("$src/$f", "$dest/$f");
+      push @ret, restoreFile("$src/$f", "$dest/$f", $all);
     }
   }
   return join("\n", @ret);
@@ -98,12 +104,14 @@ restoreDir($$)
 <a name="restore"></a>
 <h3>restore</h3>
 <ul>
-  <code>restore list [&lt;filename|directory&gt;]<br>
+  <code>restore [-a|list] [&lt;filename|directory&gt;]<br>
         restore [&lt;filename|directory&gt;]</code>
   <br><br>
   Restore the files saved previously by the update command. Check the available
   files with the list argument. See also the update command and its restoreDirs
-  attribute. After a restore normally a "shutdown restart" is necessary.
+  attribute. After a restore normally a "shutdown restart" is necessary.<br>
+  If the -a option is specified, the configuration files are also restored.
+
 </ul>
 
 =end html
@@ -119,7 +127,9 @@ restoreDir($$)
   man die Liste der verf&&uuml;gbaeren Sicherungen anzeigen, und mit der Angabe
   der direkten Datei/Verzeichnis kann man das zur&uuml;cksichern anstossen.
   Siehe auch das update Befehl, bzw. das restoreDirs Attribut.
-  Nach restore ist meistens ein "shutdown restart" notwendig.
+  Nach restore ist meistens ein "shutdown restart" notwendig.<br>
+  Falls die -a Option spezifiziert wurde, dann werden auch die
+  Konfigurationsdateien wiederhergestellt.
 </ul>
 
 
