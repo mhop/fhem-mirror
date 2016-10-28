@@ -16,7 +16,7 @@ restore_Initialize($$)
 {
   my %hash = (
     Fn  => "CommandRestore",
-    Hlp => "[list] [<filename|directory>],restore files saved by update",
+    Hlp => "[-a|list] [<filename|directory>],restore files saved by update",
   );
   $cmds{restore} = \%hash;
 }
@@ -104,8 +104,9 @@ restoreDir($$$)
 <a name="restore"></a>
 <h3>restore</h3>
 <ul>
-  <code>restore [-a|list] [&lt;filename|directory&gt;]<br>
-        restore [&lt;filename|directory&gt;]</code>
+  <code>restore list [&lt;filename|directory&gt;]<br>
+        restore [&lt;filename|directory&gt;]<br>
+        restore -a [&lt;filename|directory&gt;]</code>
   <br><br>
   Restore the files saved previously by the update command. Check the available
   files with the list argument. See also the update command and its restoreDirs
@@ -121,7 +122,8 @@ restoreDir($$$)
 <h3>restore</h3>
 <ul>
   <code>restore list [&lt;filename|directory&gt;]<br>
-        restore &lt;filename|directory&gt;</code>
+        restore [&lt;filename|directory&gt;]<br>
+        restore -a [&lt;filename|directory&gt;]</code>
   <br><br>
   Restauriert die beim update gesicherten Dateien. Mit dem Argument list kann
   man die Liste der verf&&uuml;gbaeren Sicherungen anzeigen, und mit der Angabe
