@@ -114,6 +114,8 @@ my %units = (
             "nl" => "Celsius",
             "pl" => "Celsius",
         },
+        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
+        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
     "f" => {
         "unit_symbol" => "°",
@@ -132,6 +134,8 @@ my %units = (
             "nl" => "Fahrenheit",
             "pl" => "Fahrenheit",
         },
+        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
+        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
     "k" => {
         "unit_symbol" => "°",
@@ -150,6 +154,8 @@ my %units = (
             "nl" => "Kelvin",
             "pl" => "Kelvin",
         },
+        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
+        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
 
     # hydro
@@ -174,6 +180,8 @@ my %units = (
             "nl" => "in Beaufort",
             "pl" => "in Beaufort",
         },
+        "txt_format"      => '%unit_prefix% %VALUE%',
+        "txt_format_long" => '%unit_prefix% %VALUE% %unit_long%',
     },
     "fts" => {
         "unit"      => "ft/s",
@@ -282,13 +290,33 @@ my %units = (
         "unit" => "Torr",
     },
     "psi" => {
-        "unit"      => "PSI",
+        "unit"      => "psi",
         "unit_long" => {
-            "de" => "Pfund pro Quadradzoll",
-            "en" => "Pound force per square inch",
-            "fr" => "Pound force per square inch",
-            "nl" => "Pound force per square inch",
-            "pl" => "Pound force per square inch",
+            "de" => "Pfund pro Quadratzoll",
+            "en" => "Pound-force per square inch",
+            "fr" => "Pound-force per square inch",
+            "nl" => "Pound-force per square inch",
+            "pl" => "Pound-force per square inch",
+        },
+    },
+    "psia" => {
+        "unit"      => "psia",
+        "unit_long" => {
+            "de" => "Pfund pro Quadratzoll absolut",
+            "en" => "pound-force per square inch absolute",
+            "fr" => "pound-force per square inch absolute",
+            "nl" => "pound-force per square inch absolute",
+            "pl" => "pound-force per square inch absolute",
+        },
+    },
+    "psig" => {
+        "unit"      => "psig",
+        "unit_long" => {
+            "de" => "Pfund pro Quadratzoll relativ",
+            "en" => "pounds-force per square inch gauge",
+            "fr" => "pounds-force per square inch gauge",
+            "nl" => "pounds-force per square inch gauge",
+            "pl" => "pounds-force per square inch gauge",
         },
     },
 
@@ -517,6 +545,10 @@ my %weather_readings = (
         "short" => "Ppsi",
         "unit"  => "psi",
     },
+    "pressure_psig" => {
+        "short" => "Ppsi",
+        "unit"  => "psig",
+    },
     "pressureabs" => {
         "unified" => "pressureabs_hpa",    # link only
     },
@@ -533,8 +565,12 @@ my %weather_readings = (
         "unit"  => "mmhg",
     },
     "pressureabs_psi" => {
-        "short" => "Papsi",
-        "unit"  => "psi",
+        "short" => "Ppsia",
+        "unit"  => "psia",
+    },
+    "pressureabs_psia" => {
+        "short" => "Ppsia",
+        "unit"  => "psia",
     },
     "rain" => {
         "unified" => "rain_mm",    # link only
