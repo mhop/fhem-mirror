@@ -359,7 +359,9 @@ OWServer_Find($@)
   return undef unless(defined($hash->{fhem}{owserver}));
 
   my $owserver= $hash->{fhem}{owserver};
-  my @dir= split(",",$owserver->dir("/"));
+  my $fulldir= $owserver->dir("/");
+  return undef unless(defined($fulldir));
+  my @dir= split(",", $fulldir);
   my $path= undef;
   for my $entry (@dir) {
     $entry = substr($entry,1);
