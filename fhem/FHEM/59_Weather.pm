@@ -30,7 +30,6 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw($FW_ss); 
-use YahooWeatherAPI;
 
 my %pressure_trend_txt_en = ( 0 => "steady", 1 => "rising", 2 => "falling" );
 my %pressure_trend_txt_de = ( 0 => "gleichbleibend", 1 => "steigend", 2 => "fallend" );
@@ -391,32 +390,67 @@ sub Weather_Define($$) {
 
   # define <name> Weather <location> [interval]
   # define MyWeather Weather "Maintal,HE" 3600
+  
+  # define <name> Weather location=<location> [API=<API>] [interval=<interval>] [lang=<lang>]
+  
+  my $name;
+  my $API="YahooWeatherAPI,transport:https,cachemaxage:600"; 
+  my $location;
+  my $interval  = 3600;
+  my $lang      = "en"; 
 
-  my @a = split("[ \t][ \t]*", $def);
+  if($def =~ /=/) {
+    
+    my $usage= "syntax: define <name> Weather location=<location> [API=<API>] [lang=<lang>]";
+    
+    my ($arrayref, $hashref)= parseParams($def);
+    my @a= @{$arrayref};
+    my %h= %{$hashref};
+    
+    return $usage unless(scalar @a == 2);
+    $name= $a[0];
+    
+    return $usage unless exists $h{location};
+    $location= $h{location};
+    $lang= $h{lang} if exists $h{lang};
+    $interval= $h{interval} if exists $h{interval};
+    $API= $h{API} if exists $h{API};
 
-  return "syntax: define <name> Weather <location> [interval [en|de|nl]]"
-    if(int(@a) < 3 && int(@a) > 5); 
+  } else {
+    my @a = split("[ \t][ \t]*", $def);
 
+    return "syntax: define <name> Weather <location> [interval [en|de|nl]]"
+        if(int(@a) < 3 && int(@a) > 5); 
+        
+    $name      = $a[0];
+    $location  = $a[2];
+    if(int(@a)>=4) { $interval= $a[3]; }
+    if(int(@a)==5) { $lang= $a[4]; } 
+
+  }
+
+  my ($api,$apioptions)= split(',', $API, 2);
+  $apioptions= "" unless(defined($apioptions));
+  eval {
+    require "$api.pm";
+  };
+  return "$name: cannot load API $api: $@" if($@);
+  
   $hash->{NOTIFYDEV} = "global";
   $hash->{STATE} = "Initialized";
   $hash->{fhem}{interfaces}= "temperature;humidity;wind";
 
-  my $name      = $a[0];
-  my $location  = $a[2];
-  my $interval  = 3600;
-  my $lang      = "en"; 
-  if(int(@a)>=4) { $interval= $a[3]; }
-  if(int(@a)==5) { $lang= $a[4]; } 
-
   $hash->{LOCATION}     = $location;
   $hash->{INTERVAL}     = $interval;
   $hash->{LANG}         = $lang;
+  $hash->{API}          = $api;
+  $hash->{APIOPTIONS}   = $apioptions;
   $hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
   $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
   $hash->{READINGS}{current_date_time}{VAL}= "none";
 
   $hash->{fhem}{allowCache}= 1;
-
+  
   Weather_GetUpdate($hash) if($init_done);
 
   return undef;
@@ -561,6 +595,9 @@ WeatherAsHtmlD($;$)
 1;
 
 =pod
+=item device
+=item summary provides current weather condition and forecast (source: Yahoo Weather API)
+=item summary_DE stellt Wetterbericht und -vorhersage bereit (Quelle: Yahoo Weather API)
 =begin html
 
 <a name="Weather"></a>
