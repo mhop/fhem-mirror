@@ -180,6 +180,7 @@ FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
 FHEM/42_SMARTMON.pm          hexenmeister         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/42_SYSMON.pm            hexenmeister         http://forum.fhem.de Unterstuetzende Dienste
+FHEM/42_Nextion.pm           viegener             http://forum.fhem.de Bastelecke
 FHEM/43_RFXX10REC.pm         wherzig              http://forum.fhem.de RFXTRX
 FHEM/44_S7.pm                charlie71            http://forum.fhem.de Sonstige Systeme
 FHEM/44_S7_ARead.pm          charlie71            http://forum.fhem.de Sonstige Systeme

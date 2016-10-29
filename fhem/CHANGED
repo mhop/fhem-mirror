@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     42_Nextion.pm: New module to connect Nextion displays 
   - changed: YahooWeatherAPI: react on wrong units
   - changed: Pushsafer: optimized picture file error handling
   - new:     59_Wunderground: new weather module to fetch
