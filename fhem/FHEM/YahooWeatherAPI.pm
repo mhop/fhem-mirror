@@ -139,19 +139,24 @@ my %YahooWeatherAPI_CachedDataTs= ();
 
 ###################################
 
-sub F_to_C($) {
+#
+# there is a bug in the Yahoo Weather API that gets all units wrong
+# these routines fix that
+
+
+sub value_to_C($) {
     my ($F)= @_;
     return(int(($F-32)*5/9+0.5));
 }    
 
-sub inHg_to_hPa($) {
+sub value_to_hPa($) {
     my ($inHg)= @_;
     return int($inHg/33.86390+0.5);
 }
 
-sub miles_to_km($) {
-    my ($miles)= @_;
-    return int(1.609347219*$miles+0.5);
+sub value_to_km($) {
+    my ($value)= @_;
+    return int($value/1.609347219+0.5);
 }
 
 ###################################
@@ -253,23 +258,24 @@ sub YahooWeatherAPI_JSONReturnChannelData($) {
 sub YahooWeatherAPI_ConvertChannelData($) {
     my ($data)= @_; # hash reference
     
-    $data->{wind}{chill}= F_to_C($data->{wind}{chill}); # wrongly always °F
-    $data->{atmosphere}{pressure}= inHg_to_hPa($data->{atmosphere}{pressure}); # wrongly always in inHg
+    $data->{wind}{chill}= value_to_C($data->{wind}{chill}); # # API delivers wrong value
+    $data->{atmosphere}{pressure}= value_to_hPa($data->{atmosphere}{pressure}); # API delivers wrong value
     
 
     my $units= YahooWeatherAPI_units($data); # units hash reference
-    return 0 if($units->{temperature} eq "C");
     
-    $data->{wind}{speed}= miles_to_km($data->{wind}{speed});
-    $data->{atmosphere}{visibility}= miles_to_km($data->{atmosphere}{visibility});
+    $data->{wind}{speed}= value_to_km($data->{wind}{speed}); # API delivers km
+    $data->{atmosphere}{visibility}= value_to_km($data->{atmosphere}{visibility}); # API delivers km 
+
+    return 0 if($units->{temperature} eq "C");
 
     my $item= $data->{item};
-    $item->{condition}{temp}= F_to_C($item->{condition}{temp});
+    $item->{condition}{temp}= value_to_C($item->{condition}{temp});
     
     my $forecast= $item->{forecast};
     foreach my $fc (@{$forecast}) {
-        $fc->{low}= F_to_C($fc->{low});
-        $fc->{high}= F_to_C($fc->{high});
+        $fc->{low}= value_to_C($fc->{low});
+        $fc->{high}= value_to_C($fc->{high});
     }    
     return 1;
 
