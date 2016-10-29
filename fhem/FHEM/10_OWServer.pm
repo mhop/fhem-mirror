@@ -283,7 +283,11 @@ OWServer_Read($@)
     $ein = $rin;
     my $nfound = select($rout=$rin, undef, $eout=$ein, 4);
     if( $nfound ) {
-      chomp($ret= <READER>);
+      $ret= <READER>;
+      if(defined($ret)) {
+        chomp($ret) } else {
+        Log3 $hash, 5, "OWServer: undefined response from child $pid";
+      }
       RemoveInternalTimer($pid);
       OWServer_OpenDev($hash) if( $hash->{LAST_READ_FAILED} );
       $hash->{LAST_READ_FAILED} = 0;
