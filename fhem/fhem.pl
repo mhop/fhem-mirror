@@ -2917,9 +2917,11 @@ stacktrace()
   my $i = 1;
   my $max_depth = 50;
   
-  Log 3, "stacktrace:";
+  # Forum #59831
+  Log 1, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $attr{global}{verbose} < 3);
+  Log 1, "stacktrace:";
   while( (my @call_details = (caller($i++))) && ($i<$max_depth) ) {
-    Log 3, sprintf ("    %-35s called by %s (%s)",
+    Log 1, sprintf ("    %-35s called by %s (%s)",
                $call_details[3], $call_details[1], $call_details[2]);
   }
 }
@@ -2952,7 +2954,6 @@ SignalHandling()
     Log 1, "PERL WARNING: $msg"; 
     Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $msg =~ m/\(eval /);
     stacktrace() if($attr{global}{stacktrace} &&
-                    $attr{global}{verbose} >= 3 &&
                     $msg !~ m/ redefined at /);
     $inWarnSub = 0;
   };  
