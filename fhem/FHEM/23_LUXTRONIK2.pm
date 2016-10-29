@@ -641,7 +641,7 @@ LUXTRONIK2_DoUpdate($)
   # 62 - counterHeatQPool
   $return_str .= "|". ($heatpump_visibility[2]==1 ? $heatpump_values[153] : "no");
   # 63 - returnTemperatureTargetMin
-  $return_str .= "|". ($heatpump_visibility[295]==1 ? $heatpump_parameters[979] : "no");
+  $return_str .= "|". (defined($heatpump_visibility[295]) && $heatpump_visibility[295]==1 ? $heatpump_parameters[979] : "no");
   return $return_str;
 }
 
