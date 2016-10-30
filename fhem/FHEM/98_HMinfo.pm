@@ -68,7 +68,7 @@ sub HMinfo_Define($$){#########################################################
   $hash->{nb}{cnt} = 0;
   return;
 }
-sub HMinfo_Undef($$){#########################################################
+sub HMinfo_Undef($$){##########################################################
   my ($hash, $name) = @_;
   return undef;
 }
@@ -186,7 +186,7 @@ sub HMinfo_Attr(@) {###########################################################
   return;
 }
 
-sub HMinfo_Notify(@){#################################
+sub HMinfo_Notify(@){##########################################################
   my ($ntfy, $dev) = @_;
   return "" if ($dev->{NAME} ne "global");
 
@@ -892,7 +892,7 @@ sub HMinfo_tempListTmplView() { ###############################################
   $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
   return $ret;
 }
-sub HMinfo_tempListDefFn(@) { ###########################################
+sub HMinfo_tempListDefFn(@) { #################################################
   #return Default filename for tempList
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
@@ -906,7 +906,7 @@ sub HMinfo_tempListDefFn(@) { ###########################################
   }
   return $ret.$fn;
 }
-sub HMinfo_listOfTempTemplates() { ###########################################
+sub HMinfo_listOfTempTemplates() { ############################################
   # search all entries in tempListFile
   my ($n) =devspec2array("TYPE=HMinfo");
   my $dir = AttrVal($n,"configDir","$attr{global}{modpath}/")."/"; #no dir?  add defDir
@@ -1719,7 +1719,7 @@ sub HMInfo_help(){ ############################################################
            ;
 }
 
-sub HMinfo_verifyConfig($) {##################################################
+sub HMinfo_verifyConfig($) {###################################################
   my ($param) = @_;
   my ($id,$fName) = split ",",$param;
   HMinfo_purgeConfig($param);
