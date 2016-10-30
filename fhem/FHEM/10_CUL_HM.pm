@@ -1815,7 +1815,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if    ($mh{md} =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
       elsif ($mh{md} eq "HM-WDS30-OT2-SM")            {$chn = "05";$h=""}
       elsif ($mh{md} =~  m/^(S550IA|HM-WDS30-T-O)/)   {$chn = "01";$h=""}
-      else                                        {$chn = "01"}
+      else                                            {$chn = "01"}
 
       my $t =  $d1 & 0x7fff;
       $t -= 0x8000 if($t &0x4000);
@@ -2984,9 +2984,8 @@ sub CUL_HM_parseCommon(@){#####################################################
             $response = $response ^ pack("H*", substr($devHlpr->{prt}{rspWait}{cmd}, 24));
             $response = $cipher->encrypt(substr($response, 0, 16));
         
-            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
-        
-            $reply = "AES";
+           CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
+           $reply = "AES";
           }
         } 
         elsif ($cryptFunc != 1){                     #AES is not available
@@ -5805,7 +5804,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           if ($dSet){
            CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[1],$cmdB,$dst,$b[1]));
            CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[2],$cmdB,$dst,$b[2] ));
-         }
+          }
           else{
             CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",$peerFlag,$id,$peerDst,$pCh[1],$cmdB,$dst,$b[2],$b[1] ));
           }
@@ -5815,7 +5814,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           }
           CUL_HM_qAutoRead($peerHash->{NAME},3);
         }
-      $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
+      $devHash = CUL_HM_getDeviceHash($peerHash); # Exchange the hash, as the switch is always alive.
       }
     }
     return ("",1) if ($target && $target eq "remote");#Nothing for actor
@@ -6461,7 +6460,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
     }
 
-    CUL_HM_protState($hash,"CMDs_processing...");
+    CUL_HM_protState($hash,"CMDs_processing...");#if($mTp ne '03');
   }
   else{# no answer expected
     if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
