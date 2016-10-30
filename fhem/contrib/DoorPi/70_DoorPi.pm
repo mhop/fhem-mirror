@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.41";
+my $version = "1.42";
 
 #-- these we may get on request
 my %gets = (
@@ -763,12 +763,12 @@ sub DoorPi_GetHistory {
   #-- decode call history
   if(ref($jhash0->{"history_event"}) ne 'ARRAY'){
      my $mga="Warning - has found an empty event history";
-     Log 1,"[DoorPi_GetHistory] ".$mga
+     Log 1,"[DoorPi_GetHistory] ".$mga;
      return $mga
   }
   if(ref($khash0->{"history_snapshot"}) ne 'ARRAY'){
      my $mga="Warning - has found an empty snapshot history";
-     Log 1,"[DoorPi_GetHistory] ".$mga
+     Log 1,"[DoorPi_GetHistory] ".$mga;
      return $mga
   }
   my @history_event    = ($jhash0)?@{$jhash0->{"history_event"}}:();
