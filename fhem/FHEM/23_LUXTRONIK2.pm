@@ -886,7 +886,7 @@ LUXTRONIK2_UpdateDone($)
      # Consider also heating limit
      if ($a[10] == 0 && $a[11] == 1
           && $averageAmbientTemperature >= $thresholdHeatingLimit 
-          && ($returnTemperatureTarget == $returnTemperatureTargetMin || $returnTemperatureTarget == 20 && $ambientTemperature<10)
+          && ($returnTemperatureTarget eq $returnTemperatureTargetMin || $returnTemperatureTarget == 20 && $ambientTemperature<10)
           ) {
           if ($ambientTemperature>=10 ) {
             $value = "Heizgrenze (Soll ".$returnTemperatureTargetMin." C)";
