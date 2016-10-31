@@ -481,8 +481,8 @@ function FW_weekprofileEditDelInterval(tr)
 
 function FW_weekprofileTransDay(devName,day,bnt)
 {
-  var widget = $('div[informid="'+devName+'"]').get(0)
-  var srcDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"."+shortDays[day]+"\"]");
+  var widget = $('div[informid="'+devName+'"]').get(0);
+  var srcDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"\"][data-day*=\""+shortDays[day]+"\"]");
   
   var dayNames = [];
   var dayAlias = [];
@@ -498,7 +498,7 @@ function FW_weekprofileTransDay(devName,day,bnt)
         if (!selDays || selDays.length==0)
           return;
         for (var k=0; k < selDays.length; k++) {
-          var destDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"."+selDays[k]+"\"]");
+          var destDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"\"][data-day*=\""+selDays[k]+"\"]");
           destDay.empty();
           destDay.append(srcDay.clone().contents());
         }
@@ -621,8 +621,8 @@ function FW_weekprofilePrepAndSendProf(devName)
       return;
     }
     
-    var day = $(tableDay[i]).data("day");
-    
+    var day = $(tableDay[i]).attr("data-day");
+      
     prf[day] = new Object();
     prf[day]['time'] = new Array();
     prf[day]['temp'] = new Array();
