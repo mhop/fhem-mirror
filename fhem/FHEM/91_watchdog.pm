@@ -15,6 +15,7 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{AttrFn}   = "watchdog_Attr";
+  $hash->{SetFn}    = "watchdog_Set";
   $hash->{NotifyFn} = "watchdog_Notify";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnReactivate ".
                         "regexp1WontReactivate:0,1 addStateEvent:0,1 ".
@@ -78,7 +79,7 @@ watchdog_Notify($$)
   my ($watchdog, $dev) = @_;
 
   my $ln = $watchdog->{NAME};
-  return "" if(IsDisabled($ln));
+  return "" if(IsDisabled($ln) || $watchdog->{STATE} eq "inactive");
   my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
   my $n   = $dev->{NAME};
@@ -203,6 +204,32 @@ watchdog_Attr(@)
   return undef;
 }
 
+sub
+watchdog_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $me = $hash->{NAME};
+
+  return "no set argument specified" if(int(@a) < 2);
+  my %sets = (inactive=>0, active=>0);
+  
+  my $cmd = $a[1];
+  return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
+    if(!defined($sets{$cmd}));
+  return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
+
+  if($cmd eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+
+  }
+  elsif($cmd eq "active") {
+    readingsSingleUpdate($hash, "state", "defined", 1)
+        if(!AttrVal($me, "disable", undef));
+  }
+  
+  return undef;
+}
+
 1;
 
 =pod
@@ -277,7 +304,19 @@ watchdog_Attr(@)
   </ul>
 
   <a name="watchdogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <li>inactive<br>
+        Inactivates the current device. Note the slight difference to the
+        disable attribute: using set inactive the state is automatically saved
+        to the statefile on shutdown, there is no explicit save necesary.<br>
+        This command is intended to be used by scripts to temporarily
+        deactivate the notify.<br>
+        The concurrent setting of the disable attribute is not recommended.</li>
+    <li>active<br>
+        Activates the current device (see inactive).</li>
+    </ul>
+    <br>
 
   <a name="watchdogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -388,7 +427,23 @@ watchdog_Attr(@)
   </ul>
 
   <a name="watchdogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <li>inactive<br>
+        Deaktiviert das entsprechende Ger&auml;t. Beachte den leichten
+        semantischen Unterschied zum disable Attribut: "set inactive"
+        wird bei einem shutdown automatisch in fhem.state gespeichert, es ist
+        kein save notwendig.<br>
+        Der Einsatzzweck sind Skripte, um das notify tempor&auml;r zu
+        deaktivieren.<br>
+        Das gleichzeitige Verwenden des disable Attributes wird nicht empfohlen.
+        </li>
+    <li>active<br>
+        Aktiviert das entsprechende Ger&auml;t, siehe inactive.
+        </li>
+    </ul>
+    <br>
+
 
   <a name="watchdogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
