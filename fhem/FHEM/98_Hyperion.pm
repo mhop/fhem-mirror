@@ -21,15 +21,16 @@ use DevIo;
 my %Hyperion_sets =
 (
   "dim"               => "slider,0,1,100",
-  "dimDown"           => "noArg",
-  "dimUp"             => "noArg",
+  "dimDown"           => "textField",
+  "dimUp"             => "textField",
   "clear"             => "textField",
   "clearall"          => "noArg",
   "mode"              => "clearall,effect,off,rgb",
   "off"               => "noArg",
   "on"                => "noArg",
   "rgb"               => "colorpicker,RGB",
-  "toggle"            => "noArg"
+  "toggle"            => "noArg",
+  "toggleMode"        => "noArg"
 );
 
 my $Hyperion_requiredVersion    = "1.03.2";
@@ -60,6 +61,7 @@ sub Hyperion_Initialize($)
                         "hyperionDimStep ".
                         "hyperionNoSudo:1 ".
                         "hyperionSshUser ".
+                        "hyperionToggleModes ".
                         "hyperionVersionCheck:0 ".
                         "queryAfterSet:0 ".
                         $readingFnAttributes;
@@ -100,9 +102,10 @@ sub Hyperion_Define($$)
     $attr{$name}{icon} = "light_led_stripe_rgb";
     $attr{$name}{lightSceneParamsToSave} = "state";
     $attr{$name}{room} = "Hyperion";
+    $attr{$name}{webCmd} = $Hyperion_webCmd;
+    $attr{$name}{widgetOverride} = "dimUp:noArg dimDown:noArg";
     addToDevAttrList($name,"lightSceneParamsToSave") if (index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
     addToDevAttrList($name,"homebridgeMapping") if (index($attr{"global"}{userattr},"homebridgeMapping") == -1);
-    $attr{$name}{webCmd} = $Hyperion_webCmd;
   }
   if ($init_done)
   {
@@ -638,8 +641,24 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "toggle")
   {
     return "$cmd need no additional value of $value" if (defined $value);
-    my $rstate = Value($name);
-    ($rstate ne "off") ? fhem "set ".$name." off" : fhem "set ".$name." on";
+    my $state = Value($name);
+    my $nstate = $state ne "off" ? "off" : "on";
+    fhem "set $name $nstate";
+    return undef;
+  }
+  elsif ($cmd eq "toggleMode")
+  {
+    return "$cmd need no additional value of $value" if (defined $value);
+    my $mode = ReadingsVal($name,"mode","off");
+    my $nmode;
+    my @modeorder = split(",",AttrVal($name,"hyperionToggleModes","clearall,rgb,effect,off"));
+    my $count = scalar @modeorder;
+    for (my $i = 0; $i < $count; $i++)
+    {
+      $nmode = $i < $count - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
+    }
+    $nmode = $nmode ? $nmode : "off";
+    fhem "set $name mode $nmode";
     return undef;
   }
   elsif ($cmd eq "mode")
@@ -789,6 +808,10 @@ sub Hyperion_Attr(@)
         Hyperion_Call($hash);
       }
     }
+    elsif ($attr_name eq "hyperionToggleModes")
+    {
+      $err = "Invalid value $attr_value for attribute $attr_name. Must be a comma separated list of available modes of clearall,rgb,effect,off. Each mode only once in the list." if ($attr_value !~ /^(clearall|rgb|effect|off),(clearall|rgb|effect|off)(,(clearall|rgb|effect|off)){0,2}$/);
+    }
     elsif ($attr_name eq "hyperionVersionCheck")
     {
       $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 0." if ($attr_value !~ /^0$/);
@@ -875,7 +898,7 @@ sub Hyperion_devStateIcon($;$)
   With <i>Hyperion</i> it is possible to change the color or start an effect on a hyperion server.<br>
   It's also possible to control the complete color calibration (changes are temorary and will not be written to the config file).<br>
   The Hyperion server must have enabled the JSON server.<br>
-  You can also restart Hyperion with different configuration files (p.e. switch input)<br>
+  You can also restart Hyperion with different configuration files (p.e. switch input/grabber)<br>
   <br>
   <a name="Hyperion_define"></a>
   <p><b>Define</b></p>
@@ -883,7 +906,7 @@ sub Hyperion_devStateIcon($;$)
     <code>define &lt;name&gt; Hyperion &lt;IP or HOSTNAME&gt; &lt;PORT&gt; [&lt;INTERVAL&gt;]</code><br>
   </ul>
   <br>
-  &lt;INTERVAL&gt; is optional for polling.<br>
+  &lt;INTERVAL&gt; is optional for periodically polling.<br>
   <br>
   <i>After defining "get &lt;name&gt; statusRequest" will be called once automatically to get the list of available effects and the current state of the Hyperion server.</i><br>
   <br>
@@ -904,7 +927,8 @@ sub Hyperion_devStateIcon($;$)
   <ul>
     <li>
       <i>adjustBlue &lt;0,0,255&gt;</i><br>
-      adjust each color of blue separately (comma separated) (R,G,B)
+      adjust each color of blue separately (comma separated) (R,G,B)<br>
+      values from 0 to 255 in steps of 1
     </li>
     <li>
       <i>adjustGreen &lt;0,255,0&gt;</i><br>
@@ -947,7 +971,7 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>dim &lt;percent&gt; [duration] [priority]</i><br>
-      dim the rgb light with optional duration in seconds and priority
+      dim the rgb light to given percentage with optional duration in seconds and optional priority
     </li>
     <li>
       <i>dimDown [delta]</i><br>
@@ -1012,6 +1036,10 @@ sub Hyperion_devStateIcon($;$)
       toggles the light between on and off
     </li>
     <li>
+      <i>toggleMode</i><br>
+      toggles through all modes
+    </li>
+    <li>
       <i>valueGain &lt;1.70&gt;</i><br>
       adjust valueGain<br>
       values from 0.00 to 5.00 in steps of 0.01
@@ -1029,7 +1057,7 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>configFiles</i><br>
       get the available config files in directory from attribute hyperionConfigDir<br>
-      will only work properly if at least two config files are found
+      Will only work properly if at least two config files are found. File names must have no spaces and must end with .config.json .
     </li>
     <li>
       <i>devStateIcon</i><br>
@@ -1037,8 +1065,8 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>statusRequest</i><br>
-      get the currently set effect or color from the Hyperion server,<br>
-      get the internals of Hyperion including available effects
+      get the state of the Hyperion server,<br>
+      get also the internals of Hyperion including available effects
     </li>
   </ul>
   <br>
@@ -1052,8 +1080,8 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>hyperionBin</i><br>
-      path to the hyperion executable<br>
-      OpenELEC users may set hyperiond.sh as executable<br>
+      path to the hyperion daemon<br>
+      OpenELEC users may set hyperiond.sh as daemon<br>
       default: /usr/bin/hyperiond
     </li>
     <li>
@@ -1064,26 +1092,32 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>hyperionDefaultDuration</i><br>
       default duration<br>
-      default: infinity
+      default: 0 = infinity
     </li>
     <li>
       <i>hyperionDefaultPriority</i><br>
       default priority<br>
-      default: 0
+      default: 0 = highest priority
     </li>
     <li>
       <i>hyperionDimStep</i><br>
       dim step for dimDown/dimUp<br>
-      default: 5 (percent)
+      default: 10 (percent)
     </li>
     <li>
       <i>hyperionNoSudo</i><br>
-      disable sudo for non-root users<br>
+      disable sudo for non-root ssh user<br>
       default: 0
     </li>
     <li>
       <i>hyperionSshUser</i><br>
-      user for executing SSH commands
+      user name for executing SSH commands<br>
+      default: pi
+    </li>
+    <li>
+      <i>hyperionToggleModes</i><br>
+      modes and order of toggleMode as comma separated list (min. 2 modes, max. 4 modes, each mode only once)<br>
+      default: clearall,rgb,effect,off
     </li>
     <li>
       <i>hyperionVersionCheck</i><br>
@@ -1094,7 +1128,8 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>queryAfterSet</i><br>
       If set to 0 the state of the Hyperion server will not be queried after setting, instead the state will be queried on next interval query.<br>
-      This is only used when polling is enabled, without polling the state will be queried automatically after set.
+      This is only used if periodically polling is enabled, without this polling the state will be queried automatically after set.<br>
+      default: 1
     </li>
   </ul>
   <br>
@@ -1135,7 +1170,7 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>duration</i><br>
-      active/previous duration in seconds or infinite
+      active/previous/remaining primary duration in seconds or infinite
     </li>
     <li>
       <i>effect</i><br>
@@ -1155,11 +1190,11 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>luminanceGain</i><br>
-      luminanceGain
+      current luminanceGain
     </li>
     <li>
       <i>luminanceMinimum</i><br>
-      luminanceMinimum
+      current luminanceMinimum
     </li>
     <li>
       <i>mode</i><br>
@@ -1179,11 +1214,11 @@ sub Hyperion_devStateIcon($;$)
     </li>
     <li>
       <i>saturationGain</i><br>
-      active/previous saturationGain
+      active saturationGain
     </li>
     <li>
       <i>saturationLGain</i><br>
-      active/previous saturationLGain
+      active saturationLGain
     </li>
     <li>
       <i>serverResponse</i><br>
@@ -1209,4 +1244,358 @@ sub Hyperion_devStateIcon($;$)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="Hyperion"></a>
+<h3>Hyperion</h3>
+<ul>
+  Mit <i>Hyperion</i> ist es m&ouml;glich auf einem Hyperion Server die Farbe oder den Effekt einzustellen.<br>
+  Es ist auch m&ouml;glich eine komplette Farbkalibrierung vorzunehmen (&Auml;nderungen sind tempor&auml;r und werden nicht in die Konfigurationsdatei geschrieben).<br>
+  Der Hyperion Server muss dem JSON Server aktiviert haben.<br>
+  Es ist auch m&ouml;glich Hyperion mit verschiedenen Konfigurationsdateien zu starten (z.B. mit anderem Eingang/Grabber)<br>
+  <br>
+  <a name="Hyperion_define"></a>
+  <p><b>Define</b></p>
+  <ul>
+    <code>define &lt;name&gt; Hyperion &lt;IP oder HOSTNAME&gt; &lt;PORT&gt; [&lt;INTERVAL&gt;]</code><br>
+  </ul>
+  <br>
+  &lt;INTERVAL&gt; ist optional f&uuml;r automatisches Abfragen.<br>
+  <br>
+  <i>Nach dem Definieren des Ger&auml;tes wird einmalig und automatisch "get &lt;name&gt; statusRequest" aufgerufen um den aktuellen Status und die verf&uuml;gbaren Effekte vom Hyperion Server zu holen.</i><br>
+  <br>
+  Beispiel f&uuml;r Hyperion auf dem lokalen System:
+  <br><br>
+  <ul>
+    <code>define Ambilight Hyperion localhost 19444 10</code><br>
+  </ul>
+  <br>
+  Beispiel f&uuml;r Hyperion auf einem entfernten System:
+  <br><br>
+  <ul>
+    <code>define Ambilight Hyperion 192.168.1.4 19444 10</code><br>
+  </ul>
+  <br>
+  <a name="Hyperion_set"></a>
+  <p><b>set &lt;ben&ouml;tigt&gt; [optional]</b></p>
+  <ul>
+    <li>
+      <i>adjustBlue &lt;0,0,255&gt;</i><br>
+      Justiert jede Farbe von Blau separat (Komma separiert) (R,G,B)<br>
+      Werte von 0 bis 255 in Schritten von 1
+    </li>
+    <li>
+      <i>adjustGreen &lt;0,255,0&gt;</i><br>
+      Justiere jede Farbe von Gr&uuml;n separat (Komma separiert) (R,G,B)<br>
+      Werte von 0 bis 255 in Schritten von 1
+    </li>
+    <li>
+      <i>adjustRed &lt;255,0,0&gt;</i><br>
+      Justiert jede Farbe von Rot separat (Komma separiert) (R,G,B)<br>
+      Werte von 0 bis 255 in Schritten von 1
+    </li>
+    <li>
+      <i>blacklevel &lt;0.00,0.00,0.00&gt;</i><br>
+      Justiert den Schwarzwert von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0.00 bis 1.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>clear &lt;1000&gt;</i><br>
+      einen bestimmten Priorit&auml;tskanal l&ouml;schen
+    </li>
+    <li>
+      <i>clearall</i><br>
+      alle Priorit&auml;tskan&auml;le l&ouml;schen / Umschaltung auf Ambilight
+    </li>
+    <li>
+      <i>colorTemperature &lt;255,255,255&gt;</i><br>
+      Justiert die Temperatur von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0 bis 255 in Schritten von 1
+    </li>
+    <li>
+      <i>configFile &lt;Dateiname&gt;</i><br>
+      Neustart des Hyperion Servers mit der angegebenen Konfigurationsdatei (Dateien werden automatisch aufgelistet aus Verzeichnis welches im Attribut hyperionConfigDir angegeben ist)<br>
+      Bitte die doppelte Endung weglassen (.config.json)<br>
+      Nur verf&uuml;gbar nach erfolgreichem "get &lt;name&gt; configFiles"
+    </li>
+    <li>
+      <i>correction &lt;255,255,255&gt;</i><br>
+      Justiert die Korrektur von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0 bis 255 in Schritten von 1
+    </li>
+    <li>
+      <i>dim &lt;Prozent&gt; [Dauer] [Priorit&auml;t]</i><br>
+      Dimmt das RGB Licht auf angegebenen Prozentwert, mit optionaler Dauer in Sekunden und optionaler Priorit&auml;t
+    </li>
+    <li>
+      <i>dimDown [delta]</i><br>
+      Abdunkeln des RGB Lichts um angegebenen Prozentwert oder um Prozentwert der im Attribut hyperionDimStep eingestellt ist (Voreinstellung: 10)
+    </li>
+    <li>
+      <i>dimUp [delta]</i><br>
+      Aufhellen des RGB Lichts um angegebenen Prozentwert oder um Prozentwert der im Attribut hyperionDimStep eingestellt ist (Voreinstellung: 10)
+    </li>
+    <li>
+      <i>effect &lt;effect&gt; [Dauer] [Priorit&auml;t]</i><br>
+      Stellt gew&auml;hlten Effekt ein (ersetzte Leerzeichen mit Unterstrichen) mit optionaler Dauer in Sekunden und optionaler Priorit&auml;t
+    </li>
+    <li>
+      <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
+      Justiert Gamma von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>luminanceGain &lt;1.00&gt;</i><br>
+      Justiert Helligkeit<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>luminanceMinimum &lt;0.00&gt;</i><br>
+      Justiert Hintergrundbeleuchtung<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>mode &lt;clearall|effect|off|rgb&gt;</i><br>
+      Setzt das Licht im gew&auml;hlten Modus mit dem zuletzt f&uuml;r diesen Modus eingestellten Wert
+    </li>
+    <li>
+      <i>off</i><br>
+      Schaltet aus mit Farbe schwarz
+    </li>
+    <li>
+      <i>on</i><br>
+      Schaltet mit letztem Modus und letztem Wert ein
+    </li>
+    <li>
+      <i>rgb &lt;RRGGBB&gt; [Dauer] [Priorit&auml;t]</i><br>
+      Setzt Farbe im RGB Hex Format mit optionaler Dauer in Sekunden und optionaler Priorit&auml;t
+    </li>
+    <li>
+      <i>saturationGain &lt;1.10&gt;</i><br>
+      Justiert S&auml;ttigung<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>saturationLGain &lt;1.00&gt;</i><br>
+      Justiert minimale S&auml;ttigung<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>threshold &lt;0.16,0.16,0.16&gt;</i><br>
+      Justiert den Schwellenwert von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0.00 bis 1.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>toggle</i><br>
+      Schaltet zwischen an und aus hin und her
+    </li>
+    <li>
+      <i>toggleMode</i><br>
+      Schaltet alle Modi durch
+    </li>
+    <li>
+      <i>valueGain &lt;1.70&gt;</i><br>
+      Justiert Helligkeit vom Ambilight<br>
+      Werte von 0.00 bis 5.00 in Schritten von 0.01
+    </li>
+    <li>
+      <i>whitelevel &lt;0.70,0.80,0.90&gt;</i><br>
+      Justiert den Wei&szlig;wert von jeder Farbe separat (Komma separiert) (R,G,B)<br>
+      Werte von 0.00 bis 1.00 in Schritten von 0.01
+    </li>
+  </ul>  
+  <br>
+  <a name="Hyperion_get"></a>
+  <p><b>Get</b></p>
+  <ul>
+    <li>
+      <i>configFiles</i><br>
+      Holt die verf&uuml;gbaren Konfigurationsdateien aus dem Verzeichnis vom Attribut hyperionConfigDir<br>
+      Es m&uuml;ssen mindestens zwei Konfigurationsdateien im Verzeichnis vorhanden sein. Die Dateien d&uuml;rfen keine Leerzeichen enthalten und m&uuml;ssen mit .config.json enden!
+    </li>
+    <li>
+      <i>devStateIcon</i><br>
+      Zeigt den Wert des aktuellen devStateIcon
+    </li>
+    <li>
+      <i>statusRequest</i><br>
+      Holt den aktuellen Status vom Hyperion Server,<br>
+      holt auch die Internals vom Hyperion Server inklusive verf&uuml;gbarer Effekte
+    </li>
+  </ul>
+  <br>
+  <a name="Hyperion_attr"></a>
+  <p><b>Attribute</b></p>
+  <ul>
+    <li>
+      <i>disable</i><br>
+      Abfragen beenden und Verbindung trennen<br>
+      Voreinstellung: 0
+    </li>
+    <li>
+      <i>hyperionBin</i><br>
+      Pfad zum Hyperion Daemon<br>
+      OpenELEC Benutzer m&uuml;ssen eventuell hyperiond.sh als Daemon einstellen<br>
+      Voreinstellung: /usr/bin/hyperiond
+    </li>
+    <li>
+      <i>hyperionConfigDir</i><br>
+      Pfad zu den Hyperion Konfigurationsdateien<br>
+      Voreinstellung: /etc/hyperion/
+    </li>
+    <li>
+      <i>hyperionDefaultDuration</i><br>
+      Voreinstellung f&uuml;r Dauer<br>
+      Voreinstellung: 0 = unendlich
+    </li>
+    <li>
+      <i>hyperionDefaultPriority</i><br>
+      Voreinstellung f&uuml;r Priorit&auml;t<br>
+      Voreinstellung: 0 = h&ouml;chste Priorit&auml;t
+    </li>
+    <li>
+      <i>hyperionDimStep</i><br>
+      Dimmstufen f&uuml;r dimDown/dimUp<br>
+      Voreinstellung: 10 (Prozent)
+    </li>
+    <li>
+      <i>hyperionNoSudo</i><br>
+      Deaktiviert sudo f&uuml;r nicht root SSH Benutzer<br>
+      Voreinstellung: 0
+    </li>
+    <li>
+      <i>hyperionSshUser</i><br>
+      Benutzername mit dem SSH Befehle ausgef&uuml;hrt werden sollen<br>
+      Voreinstellung: pi
+    </li>
+    <li>
+      <i>hyperionToggleModes</i><br>
+      Modi und Reihenfolge von toggleMode als kommaseparierte Liste (min. 2 Werte, max. 4 Werte, jeder Mode nur 1x)<br>
+      Voreinstellung: clearall,rgb,effect,off
+    </li>
+    <li>
+      <i>hyperionVersionCheck</i><br>
+      Deaktiviert Hyperion Version&uuml;berpr&uuml;fung um (eventuell) &auml;ltere Hyperion Versionen zu unterst&uuml;tzen<br>
+      DAS GESCHIEHT AUF EIGENE VERANTWORTUNG! FHEM K&Ouml;NNTE UNERWARTET ABST&Uuml;RTZEN!<br>
+      Voreinstellung: 1
+    </li>
+    <li>
+      <i>queryAfterSet</i><br>
+      Wenn gesetzt auf 0 wird der Status des Hyperion Server nach einem set Befehl nicht abgerufen, stattdessen wird der Status zum n&auml;chsten eingestellten Interval abgerufen.<br>
+      Das wird nur verwendet wenn das priodische Abfragen aktiviert ist, ohne dieses Abfragen wird der Status automatisch nach dem set Befehl abgerufen.<br>
+      Voreinstellung: 1
+    </li>
+  </ul>
+  <br>
+  <a name="Hyperion_read"></a>
+  <p><b>Readings</b></p>
+  <ul>
+    <li>
+      <i>adjustBlue</i><br>
+      jede Farbe von Blau separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>adjustGreen</i><br>
+      jede Farbe von Gr&uuml;n separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>adjustRed</i><br>
+      jede Farbe von Rot separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>blacklevel</i><br>
+      Schwarzwert von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>colorTemperature</i><br>
+      Temperatur von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>configFile</i><br>
+      aktive/zuletzt geladene Konfigurationsdatei, doppelte Endung (.config.json) wird weggelassen
+    </li>
+    <li>
+      <i>correction</i><br>
+      Korrektur von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>dim</i><br>
+      aktive/letzte Dimmstufe (RGB Licht)
+    </li>
+    <li>
+      <i>duration</i><br>
+      aktive/letzte/verbleibende prim&auml;re Dauer in Sekunden oder infinite f&uuml;r unendlich
+    </li>
+    <li>
+      <i>effect</i><br>
+      aktiver/letzter Effekt
+    </li>
+    <li>
+      <i>gamma</i><br>
+      Gamma von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>id</i><br>
+      ID vom Hyperion Server
+    </li>
+    <li>
+      <i>lastError</i><br>
+      letzter aufgetretener Fehler w&auml;hrend der Kommunikation mit dem Hyperion Server
+    </li>
+    <li>
+      <i>luminanceGain</i><br>
+      aktive Helligkeit
+    </li>
+    <li>
+      <i>luminanceMinimum</i><br>
+      aktive Hintergrundbeleuchtung
+    </li>
+    <li>
+      <i>mode</i><br>
+      aktiver Modus
+    </li>
+    <li>
+      <i>mode_before_off</i><br>
+      letzter Modus vor aus
+    </li>
+    <li>
+      <i>priority</i><br>
+      aktive/letzte Priorit&auml;t
+    </li>
+    <li>
+      <i>rgb</i><br>
+      aktive/letzte RGB Farbe
+    </li>
+    <li>
+      <i>saturationGain</i><br>
+      aktive S&auml;ttigung
+    </li>
+    <li>
+      <i>saturationLGain</i><br>
+      aktive minimale S&auml;ttigung
+    </li>
+    <li>
+      <i>serverResponse</i><br>
+      letzte Hyperion Server Antwort (success/ERROR)
+    </li>
+    <li>
+      <i>state</i><br>
+      aktiver Status
+    </li>
+    <li>
+      <i>threshold</i><br>
+      Schwellenwert von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+    <li>
+      <i>valueGain</i><br>
+      aktive Helligkeit vom Ambilight
+    </li>
+    <li>
+      <i>whitelevel</i><br>
+      Wei&szlig;wert von jeder Farbe separat (Komma separiert) (R,G,B)
+    </li>
+  </ul>
+</ul>
+
+=end html_DE
 =cut
