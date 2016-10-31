@@ -10,6 +10,7 @@
 # V 0.10 2015-07-21 - initial beta version
 # V 0.11 2015-07-27 - SetExtensions on-for-timer
 # V 0.12 2015-12-17 - NEW:  Attribut IODev to switch IO-Device 
+# V 0.13 2016-10-31 - NEW:  Attribut sendCount
 ############################################## 
 
 package main;
@@ -32,7 +33,7 @@ sub pilight_raw_Initialize($)
   $hash->{DefFn}    = "pilight_raw_Define";
   $hash->{Match}    = "^PIRAW";
   $hash->{SetFn}    = "pilight_raw_Set";
-  $hash->{AttrList} = "onCode:textField-long offCode:textField-long IODev ".$readingFnAttributes;
+  $hash->{AttrList} = "onCode:textField-long offCode:textField-long IODev sendCount:1,2,3,4,5 ".$readingFnAttributes;
 }
 
 #####################################
@@ -88,7 +89,11 @@ sub pilight_raw_Set($$)
   }
   
   my $msg = "$me,$code";
-  IOWrite($hash, $msg);
+  my $sndCount = AttrVal($me,"sendCount",1);
+  for (my $i = 0; $i < $sndCount; $i++) {
+    Log3 $me, 5, "$me(Set): $cmd $v".($i+1)." of $sndCount";
+    IOWrite($hash, $msg);
+  }
   
   readingsSingleUpdate($hash,"state",$cmd,1) if($updateReading == 1);
   return undef;
@@ -98,6 +103,8 @@ sub pilight_raw_Set($$)
 1;
 
 =pod
+=item summary    Sending pilight raw codes
+=item summary_DE Send pilight Raw-Codes
 =begin html
 
 <a name="pilight_raw"></a>
@@ -149,6 +156,10 @@ sub pilight_raw_Set($$)
     </li>
     <li><a name="offCode">onCode</a><br>
         raw code for state off
+    </li>
+    <li>
+      sendCount<br>
+      How many times the command is send. Default: 1
     </li>
   </ul>
 </ul>
