@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: calc issue due to daylight saving time end (winter time)
   - new:     30_pilight_raw.pm: New Attribut sendCount
   - bugfix: 10_SOMFY: wrong attribute reference ...-up-time-to-close removed
   - new:     42_Nextion.pm: New module to connect Nextion displays 

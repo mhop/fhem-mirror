@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.6          31.10.2016       bugfix calc issue due to daylight saving time end (winter time)
 # 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB),
 #                               modified timeout routine
 # 4.5          17.10.2016       get data of dbstatus, dbvars, tableinfo, svrinfo (database dependend)
@@ -852,6 +853,8 @@ $hash->{HELPER}{CV} = \%cv;
  
     # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
     while (!$ll) {
+    
+        
 
         # collect aggregation strings         
         ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = collaggstr($hash,$runtime,$i,$runtime_string_next);
@@ -973,6 +976,7 @@ sub averval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");   
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -1138,6 +1142,7 @@ sub count_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -1304,6 +1309,7 @@ sub maxval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -1537,6 +1543,7 @@ sub minval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -1770,6 +1777,7 @@ sub diffval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2018,6 +2026,7 @@ sub sumval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # SQL-Startzeit
  my $st = [gettimeofday];  
@@ -3293,21 +3302,20 @@ sub collaggstr($$$$) {
          
          # Monatsaggregation
          if ($aggregation eq "month") {
-             
              $runtime_orig = $runtime;
-             
+             $runtime = $runtime+3600 if((strftime "%m", localtime($runtime)) eq "10");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt     
+
              # Hilfsrechnungen
              my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
              my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
              my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats f. SQL-Select
              Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
-             
-             
+                     
              $runtime_string       = strftime "%Y-%m", localtime($runtime);                            # für Readingname
              
              if ($i==1) {
                  # nur im ersten Durchlauf
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
+                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
              }
              
              if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
@@ -3317,7 +3325,7 @@ sub collaggstr($$$$) {
                 
              } else {
                  if(($runtime) > $epoch_seconds_end) {
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);                     
+                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);                     
                      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
                      $ll=1;
                  } else {
@@ -3337,6 +3345,7 @@ sub collaggstr($$$$) {
          # Wochenaggregation
          if ($aggregation eq "week") {
              
+             $runtime = $runtime+3600 if((strftime "%m-%d", localtime($runtime)) eq "10-30");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zuück gestellt)
              $runtime_orig = $runtime;
              
              my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
@@ -3378,11 +3387,12 @@ sub collaggstr($$$$) {
          }
      
          # Tagesaggregation
-         if ($aggregation eq "day") {
+         if ($aggregation eq "day") {         
+             $runtime = $runtime+3600 if((strftime "%m-%d", localtime($runtime)) eq "10-30");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zuück gestellt)
              $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                         # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-                                 
+                                                                  
              if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
                  $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
                  $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
@@ -3391,7 +3401,8 @@ sub collaggstr($$$$) {
              } else {
                  $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
              }
-         
+         Log3 ($name, 5, "DbRep $name - runtime_string: $runtime_string, runtime_string_first(begin): $runtime_string_first, runtime_string_next(end): $runtime_string_next");
+
          # neue Beginnzeit in Epoche-Sekunden
          $runtime = $runtime+$aggsec;         
          }
