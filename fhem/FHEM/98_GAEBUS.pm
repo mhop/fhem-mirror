@@ -38,6 +38,8 @@
 # 13.10.2016 : A.Goebel : fix "set hex" referres to "ebusctl hex"
 # 13.10.2016 : A.Goebel : fix "class" is now optional for ebusctl
 # 18.10.2016 : A.Goebel : fix removed content of <comment> from attribute names for readings
+# 31.10.2016 : A.Goebel : fix rename hex to ebusd_hex
+# 31.10.2016 : A.Goebel : fix set for writings without comments did not work
 
 package main;
 
@@ -104,7 +106,7 @@ GAEBUS_Initialize($)
   %sets = ( "reopen" => [] );
   %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
   %setsForWriting = ();
-  %getsForWriting = ( "hex" => [] );
+  %getsForWriting = ( "ebusd_hex" => [] );
   
   GAEBUS_initParams($hash);
 
@@ -318,7 +320,7 @@ GAEBUS_Set($@)
       $readingname       =~ s/:.*//;
   
       # only for "w" commands
-      if ($oneattr =~ /^w.*$delimiter.*$delimiter.*$delimiter.*$/)
+      if ($oneattr =~ /^w$delimiter.{1,5}$delimiter.*/ or $oneattr =~ /^w$delimiter.{1,5}install$delimiter.*/)
       {
         unless ($readingname =~ /^\s*$/ or $readingname eq "1")
         {
@@ -367,7 +369,7 @@ GAEBUS_Set($@)
     {
       foreach my $oneattr (sort keys %{$attr{$name}})
       {
-        next unless ($oneattr =~ /^w.*$delimiter.*$delimiter.*$delimiter.*$/);
+        next unless ($oneattr =~ /^w.*$delimiter.{1,5}$delimiter.*$/ or $oneattr =~ /^w.*$delimiter.{1,5}install$delimiter.*$/);
      
         my $readingname    = $attr{$name}{$oneattr};
         next if ($readingname ne $type);
@@ -402,7 +404,7 @@ GAEBUS_Get($@)
 
   return "\"get GAEBUS\" needs at least one parameter" if(@a < 2);
 
-  if ($type eq "hex")
+  if ($type eq "ebusd_hex")
   {
     Log3 ($hash, 4, "$name Set $type $arg");
 
@@ -466,7 +468,7 @@ GAEBUS_Get($@)
     $readingname       =~ s/:.*//;
 
     # only for "r" commands
-    if ($oneattr =~ /^r$delimiter.*$delimiter.*$/)
+    if ($oneattr =~ /^r$delimiter.{1,5}$delimiter.*/)
     {
       $readings{$readingname} = $readingcmdname;
       $readingsCmdaddon{$readingname} = $cmdaddon;
@@ -980,7 +982,7 @@ GAEBUS_doEbusCmd($$$$$$$)
     %sets = ( "reopen" => [] );
     %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
     %setsForWriting = ();
-    %getsForWriting = ( "hex" => [] );
+    %getsForWriting = ( "ebusd_hex" => [] );
 
     my $cnt = 0;
     foreach my $line (split /\n/, $actMessage) {
@@ -1336,7 +1338,7 @@ GAEBUS_valueFormat(@)
         Execude <i>find</i> command on ebusd. Result will be used to display supported "set" and "get" commands.
         </li><br>
 
-    <li>hex<br>
+    <li>ebusd_hex<br>
         Will pass the input value to the "hex" command of ebusd. See "ebusctl help hex" for valid parameters.<br>
         This command is only available if "ebusWritesEnabled" is set to '1'.<br>
         </li><br>
