@@ -158,9 +158,16 @@ my %units = (
         "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
 
-    # hydro
-    "hg" => {
+    # percent
+    "pct" => {
         "unit_symbol" => "%",
+        "unit_long"   => {
+            "de" => "Prozent",
+            "en" => "percent",
+            "fr" => "percent",
+            "nl" => "percent",
+            "pl" => "percent",
+        },
     },
 
     # speed
@@ -403,7 +410,7 @@ my %units = (
     },
 
     # angular
-    "degree" => {
+    "deg" => {
         "unit"      => "°",
         "unit_long" => {
             "de" => "Grad",
@@ -453,8 +460,18 @@ sub UnitDetails ($;$) {
 }
 
 my %weather_readings = (
+    "airpress" => {
+        "unified" => "pressure_hpa",    # link only
+    },
+    "azimuth" => {
+        "short" => "AZ",
+        "unit"  => "deg",
+    },
+    "compasspoint" => {
+        "short" => "CP",
+    },
     "dewpoint" => {
-        "unified" => "dewpoint_c",    # link only
+        "unified" => "dewpoint_c",      # link only
     },
     "dewpoint_c" => {
         "short" => "D",
@@ -468,9 +485,46 @@ my %weather_readings = (
         "short" => "Dk",
         "unit"  => "k",
     },
+    "elevation" => {
+        "short" => "EL",
+        "unit"  => "deg",
+    },
+    "feelslike" => {
+        "unified" => "feelslike_c",    # link only
+    },
+    "feelslike_c" => {
+        "short" => "Tf",
+        "unit"  => "c",
+    },
+    "feelslike_f" => {
+        "short" => "Tff",
+        "unit"  => "f",
+    },
+    "heat_index" => {
+        "unified" => "heat_index_c",    # link only
+    },
+    "heat_index_c" => {
+        "short" => "HI",
+        "unit"  => "c",
+    },
+    "heat_index_f" => {
+        "short" => "HIf",
+        "unit"  => "f",
+    },
+    "high" => {
+        "unified" => "high_c",          # link only
+    },
+    "high_c" => {
+        "short" => "Th",
+        "unit"  => "c",
+    },
+    "high_f" => {
+        "short" => "Thf",
+        "unit"  => "f",
+    },
     "humidity" => {
         "short" => "H",
-        "unit"  => "hg",
+        "unit"  => "pct",
     },
     "humidityabs" => {
         "unified" => "humidityabs_c",    # link only
@@ -486,6 +540,10 @@ my %weather_readings = (
     "humidityabs_k" => {
         "short" => "Hak",
         "unit"  => "k",
+    },
+    "horizon" => {
+        "short" => "HORIZ",
+        "unit"  => "deg",
     },
     "indoordewpoint" => {
         "unified" => "indoordewpoint_c",    # link only
@@ -504,7 +562,7 @@ my %weather_readings = (
     },
     "indoorhumidity" => {
         "short" => "Hi",
-        "unit"  => "hg",
+        "unit"  => "pct",
     },
     "indoorhumidityabs" => {
         "unified" => "indoorhumidityabs_c",    # link only
@@ -525,26 +583,42 @@ my %weather_readings = (
         "unified" => "indoortemperature_c",    # link only
     },
     "indoortemperature_c" => {
-        "short" => "T",
+        "short" => "Ti",
         "unit"  => "c",
     },
     "indoortemperature_f" => {
-        "short" => "Tf",
+        "short" => "Tif",
         "unit"  => "f",
     },
     "indoortemperature_k" => {
-        "short" => "Tk",
+        "short" => "Tik",
         "unit"  => "k",
     },
     "israining" => {
         "short" => "IR",
     },
+    "level" => {
+        "short" => "LVL",
+        "unit"  => "pct",
+    },
+    "low" => {
+        "unified" => "low_c",    # link only
+    },
+    "low_c" => {
+        "short" => "Tl",
+        "unit"  => "c",
+    },
+    "low_f" => {
+        "short" => "Tlf",
+        "unit"  => "f",
+    },
     "luminosity" => {
         "short" => "L",
         "unit"  => "lux",
     },
-    "airpress" => {
-        "unified" => "pressure_hpa",    # link only
+    "pct" => {
+        "short" => "PCT",
+        "unit"  => "pct",
     },
     "pressure" => {
         "unified" => "pressure_hpa",    # link only
@@ -614,8 +688,19 @@ my %weather_readings = (
         "short" => "Rdin",
         "unit"  => "in",
     },
+    "rain_night" => {
+        "unified" => "rain_night_mm",    # link only
+    },
+    "rain_night_mm" => {
+        "short" => "Rn",
+        "unit"  => "mm",
+    },
+    "rain_night_in" => {
+        "short" => "Rnin",
+        "unit"  => "in",
+    },
     "rain_week" => {
-        "unified" => "rain_week_mm",    # link only
+        "unified" => "rain_week_mm",     # link only
     },
     "rain_week_mm" => {
         "short" => "Rw",
@@ -647,11 +732,44 @@ my %weather_readings = (
         "short" => "Ryin",
         "unit"  => "in",
     },
+    "snow" => {
+        "unified" => "snow_cm",          # link only
+    },
+    "snow_cm" => {
+        "short" => "S",
+        "unit"  => "cm",
+    },
+    "snow_in" => {
+        "short" => "Sin",
+        "unit"  => "in",
+    },
+    "snow_day" => {
+        "unified" => "snow_day_cm",      # link only
+    },
+    "snow_day_cm" => {
+        "short" => "Sd",
+        "unit"  => "cm",
+    },
+    "snow_day_in" => {
+        "short" => "Sdin",
+        "unit"  => "in",
+    },
+    "snow_night" => {
+        "unified" => "snow_night_cm",    # link only
+    },
+    "snow_night_cm" => {
+        "short" => "Sn",
+        "unit"  => "cm",
+    },
+    "snow_night_in" => {
+        "short" => "Snin",
+        "unit"  => "in",
+    },
     "sunshine" => {
         "unified" => "solarradiation",    # link only
     },
     "solarradiation" => {
-        "short" => "S",
+        "short" => "SR",
         "unit"  => "wpsm",
     },
     "temp" => {
@@ -718,7 +836,7 @@ my %weather_readings = (
     },
     "wind_direction" => {
         "short" => "Wd",
-        "unit"  => "degree",
+        "unit"  => "deg",
     },
     "wind_dir" => {
         "unified" => "wind_direction",       # link only
