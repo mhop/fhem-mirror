@@ -74,6 +74,7 @@ SVG_Initialize($)
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
   $hash->{SetFn}    = "SVG_Set";
+  $hash->{NotifyFn} = "SVG_Notify";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
   $hash->{FW_atPageEnd} = 1;
@@ -99,6 +100,7 @@ SVG_Define($$)
   $hash->{LOGFILE}   = ($3 ? $3 : "CURRENT");
   $hash->{STATE} = "initialized";
   $hash->{LOGDEVICE} =~ s/^fileplot //; # Autocreate bug.
+  notifyRegexpChanged($hash, "global");
 
   return undef;
 }
@@ -143,6 +145,19 @@ SVG_Attr($$$$)
   my $val = AttrVal($dev, $attr, undef);
   return $val if(defined($val));
   return AttrVal($parent, $attr, $default);
+}
+
+sub
+SVG_Notify($$)
+{
+  my ($me, $dev) = @_;
+
+  my $events = deviceEvents($defs{global}, 0);
+  return if(!$events ||
+            $events->[0] !~m/^RENAMED (.+) (.+)$/ ||
+            $2 ne $me->{NAME} ||
+            $1 ne $me->{GPLOTFILE});
+  SVG_Set($me, $me->{NAME}, "copyGplotFile");   # Forum #59786
 }
 
 ##################
