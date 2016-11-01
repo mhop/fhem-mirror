@@ -74,7 +74,7 @@ SVG_Initialize($)
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
   $hash->{SetFn}    = "SVG_Set";
-  $hash->{NotifyFn} = "SVG_Notify";
+  $hash->{RenameFn} = "SVG_Rename";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
   $hash->{FW_atPageEnd} = 1;
@@ -148,16 +148,12 @@ SVG_Attr($$$$)
 }
 
 sub
-SVG_Notify($$)
+SVG_Rename($$)
 {
-  my ($me, $dev) = @_;
-
-  my $events = deviceEvents($defs{global}, 0);
-  return if(!$events ||
-            $events->[0] !~m/^RENAMED (.+) (.+)$/ ||
-            $2 ne $me->{NAME} ||
-            $1 ne $me->{GPLOTFILE});
-  SVG_Set($me, $me->{NAME}, "copyGplotFile");   # Forum #59786
+  my ($new, $old) = @_;
+  my $hash = $defs{$new};
+  return if($hash->{GPLOTFILE} ne $old);
+  SVG_Set($hash, $new, "copyGplotFile");   # Forum #59786
 }
 
 ##################
