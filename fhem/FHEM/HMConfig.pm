@@ -1849,6 +1849,7 @@ $culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
   sdLead1             =>{ alarmOn       =>""
                          ,alarmOff      =>""
                          ,teamCall      =>""
+                         ,teamCallBat   =>""
                         },
   sdLead2             =>{ alarmOn       =>""
                          ,alarmOff      =>""
