@@ -363,14 +363,21 @@ sub Pushsafer_Callback($$$)
         {
             readingsBulkUpdate($hash, "lastSuccess", $1);
         }
-
-        if($data =~ /available"?\s*:\s*{([^}]+)}/s)
+        
+        if($data =~ /available"?\s*:\s*{(.+)\s*}\s*}\s*$/gcs)
         {
-            my %devices = map { split(/:/, $_) } map { s/"//g; $_ } split(",", $1);
+            my %devices =  grep { defined($_) } map { /^"?(\d+)"?:({.+})$/ ? ($1 => $2) : undef } split(",", $1);
 
             foreach my $dev (keys %devices)
             {
-                readingsBulkUpdate($hash, "availableMessages-$dev", $devices{$dev});
+                if(defined($devices{$dev}) and $devices{$dev} =~ /^{\s*"?([^":]+)"?\s*:\s*"?([^":]+)"?\s*}$/)
+                {
+                    my ($devname, $available) = ($1, $2);
+                    
+                    $devname =~ s/\s+//g;
+                    
+                    readingsBulkUpdate($hash, "availableMessages-$dev-$devname", $available);
+                }
             }
         }
         
@@ -477,7 +484,7 @@ sub Pushsafer_Callback($$$)
   <ul>
     <li><b>lastSuccess</b> - The last successful status message received by the Pushsafer server</li>
     <li><b>lastError</b> - The last errur message received by the Pushsafer server</li>
-    <li><b>availableMessages-<i>&lt;deviceID&gt;</i></b> - The remaining messages that can be send to this device</li>
+    <li><b>availableMessages-<i>&lt;device ID&gt;</i>-<i>&lt;device name&gt;</i></b> - The remaining messages that can be send to this device</li>
   </ul>
 </ul>
 =end html
@@ -574,7 +581,7 @@ sub Pushsafer_Callback($$$)
   <ul>
     <li><b>lastSuccess</b> - Die letzte erfolgreiche Statusmeldung vom Pushsafer Server</li>
     <li><b>lastError</b> - Die letzte Fehlermeldung vom Pushsafer Server</li>
-    <li><b>availableMessages-<i>&lt;Ger&auml;te-ID&gt;</i></b> - Die verbleibende Anzahl an Nachrichten die zu diesem Ger&auml;t noch gesendet werden k&ouml;nnen</li>
+    <li><b>availableMessages-<i>&lt;Ger&auml;te-ID&gt;</i>-<i>&lt;Ger&auml;te-Name&gt;</i></b> - Die verbleibende Anzahl an Nachrichten die zu diesem Ger&auml;t noch gesendet werden k&ouml;nnen</li>
   </ul>
 </ul>
 
