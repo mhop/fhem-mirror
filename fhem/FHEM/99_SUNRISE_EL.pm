@@ -116,7 +116,7 @@ sr_alt($$$$$$$$$)
     $nt += 86400;
     @lt = localtime($nt);
     my $ngmtoff = _calctz($nt,@lt); # in hour
-    $diff = 24+$gmtoff-$ngmtoff;
+    $diff = 24;
 
     ($rt,$st) = _sr_alt($altit,$needrise,$needset,
                         $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
@@ -384,8 +384,8 @@ sub sunrise_coord($$$) { ($long, $lat, $tz) = @_; return undef; }
 
 sub sunrise_rel(@) { return sr_alt(time(),1,1,0,1,shift,shift,shift,shift); }
 sub sunset_rel (@) { return sr_alt(time(),0,1,0,1,shift,shift,shift,shift); }
-sub sunrise_abs(@) { return sr_alt(time(),1,0,0,1,shift,shift,shift,shift); }
-sub sunset_abs (@) { return sr_alt(time(),0,0,0,1,shift,shift,shift,shift); }
+sub sunrise_abs(@) { return sr_alt(time(),1,0,0,0,shift,shift,shift,shift); }
+sub sunset_abs (@) { return sr_alt(time(),0,0,0,0,shift,shift,shift,shift); }
 sub sunrise    (@) { return sr_alt(time(),1,2,0,1,shift,shift,shift,shift); }
 sub sunset     (@) { return sr_alt(time(),0,2,0,1,shift,shift,shift,shift); }
 sub isday      (@) { return sr_alt(time(),1,0,1,1,shift,shift,shift,shift); }
