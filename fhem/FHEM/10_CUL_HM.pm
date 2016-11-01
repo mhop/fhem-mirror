@@ -2961,7 +2961,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       if (AttrVal($mhp->{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" &&
           defined($aesKeyNbr)) {
         if ($cryptFunc == 1 &&                    #AES is available
-	    $devHlpr->{prt}{rspWait}{cmd}){ #There is a previously executed command
+	        $devHlpr->{prt}{rspWait}{cmd}){       #There is a previously executed command
           my (undef, %keys) = CUL_HM_getKeys($mhp->{devH});
         
           my $kNo = hex($aesKeyNbr) / 2;
@@ -2986,6 +2986,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         
            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
            $reply = "AES";
+           $repeat = 1;#prevent stop for messagenumber match
           }
         } 
         elsif ($cryptFunc != 1){                     #AES is not available
@@ -3349,8 +3350,8 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($mhp->{mTp} eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
   }
-  if ($rspWait->{mNo}             &&
-      $rspWait->{mNo} eq $mhp->{mNo}     &&
+  if ($rspWait->{mNo}                &&
+      $rspWait->{mNo} eq $mhp->{mNo} &&
       !$repeat){
     #response we waited for - stop Waiting
     CUL_HM_respPendRm($mhp->{devH});
@@ -5366,7 +5367,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     } else                         {return 'unknown argument '.$a[3];
     }
   }
-  elsif($cmd eq "teamCall") { #################################################
+  elsif($cmd =~ m/^(teamCall|teamCallBat)$/) { ################################
     $state = "";
     my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
                                     # device. It can cause trouble with 
@@ -5375,8 +5376,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $hash->{TESTNR} = ($a[2] ? $a[2] : ($hash->{TESTNR} + 1))%255;
     if ($fkt eq "sdLead1"){# ($md eq "HM-CC-SCD")
       my $tstNo = sprintf("%02X",$hash->{TESTNR});
-      CUL_HM_PushCmdStack($hash, "++9440".$dst.$sId."00".$tstNo);
-      CUL_HM_parseSDteam("40",$dst,$sId,"00".$tstNo);
+      my $val = ($cmd eq "teamCallBat")? "80" : "00";
+      CUL_HM_PushCmdStack($hash, "++9440".$dst.$sId.$val.$tstNo);
+      CUL_HM_parseSDteam("40",$dst,$sId,$val.$tstNo);
     }
     else {#($md eq "HM-SEC-SD-2"){
            # 96 switch on- others unknown
@@ -6391,7 +6393,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
                        ? $hash->{helper}{prt}{wuReSent}
                        :1;#resend count - may need preloaded for WU device
 
-    if   ($mTp eq "01" && $sTp){
+    if   ($mTp eq '01' && $sTp)        {
       if   ($sTp eq "03"){ #PeerList-----------
         #--- remember request params in device level
         CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
@@ -6438,7 +6440,19 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       $hash->{helper}{cSnd} =~ s/.*,// if($hash->{helper}{cSnd});
       $hash->{helper}{cSnd} .= ",".substr($cmd,8);
     }
-    elsif($mTp eq '11'){
+    elsif($mTp eq '03')                {#AES response - keep former wait and start timer again
+      # 
+      if ($hash->{helper}{prt}{rspWait}){
+        RemoveInternalTimer("respPend:$hash->{DEF}");
+        my $to = gettimeofday() + (($hash->{helper}{prt}{rspWait}{Pending})?rand(20)/10+4:
+                                                               rand(40)/10+1);
+        InternalTimer($to,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
+      }
+      else{
+        # nothing - we dont know the origonal message
+      }
+    }
+    elsif($mTp eq '11')                {
       my $to = "";
       if ($chn eq "02"){#!!! chn is subtype!!!
         if ($dat =~ m/(..)....(....)/){#lvl ne 0 and timer on
@@ -6456,7 +6470,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       # response setup - do not repeat, set counter to 250
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss","brstWu:=1");
     }
-    elsif($mTp !~ m /C./){
+    elsif($mTp !~ m /C./)              {#
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
     }
 
@@ -9724,6 +9738,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           controll over the team and don't need to guess.<br>
           <ul>
             <li><B>teamCall</B> - execute a network test to all team members</li>
+            <li><B>teamCallBat</B> - execute a network test simulate bat low</li>
             <li><B>alarmOn</B> - initiate an alarm</li>
             <li><B>alarmOff</B> - switch off the alarm</li>
           </ul>
@@ -11088,6 +11103,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           Kontrolle &uuml;ber die Gruppe und muss nicht raten.<br>
           <ul>
             <li><B>teamCall</B> - f&uuml;hrt einen Netzwerktest unter allen Gruppenmitgliedern aus</li>
+            <li><B>teamCallBat</B> - Simuliert einen low-battery alarm</li>
             <li><B>alarmOn</B> - l&ouml;st einen Alarm aus</li>
             <li><B>alarmOff</B> - schaltet den Alarm aus</li>
           </ul>
