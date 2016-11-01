@@ -3388,11 +3388,11 @@ sub collaggstr($$$$) {
      
          # Tagesaggregation
          if ($aggregation eq "day") {  
-             $runtime = $runtime+3600 if((dsttest($hash,$runtime,$aggsec)));                        # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-                                                                  
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                                               
              if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
                  $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
                  $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
