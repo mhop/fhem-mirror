@@ -37,6 +37,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.6.1        01.11.2016       daylight saving time check improved
 # 4.6          31.10.2016       bugfix calc issue due to daylight saving time end (winter time)
 # 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB),
 #                               modified timeout routine
@@ -3303,8 +3304,8 @@ sub collaggstr($$$$) {
          # Monatsaggregation
          if ($aggregation eq "month") {
              $runtime_orig = $runtime;
-             $runtime = $runtime+3600 if((strftime "%m", localtime($runtime)) eq "10");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt     
-
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             
              # Hilfsrechnungen
              my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
              my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
@@ -3334,7 +3335,6 @@ sub collaggstr($$$$) {
                      
                  } 
              }
-         # my $help_string  = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
          my ($yyyy1, $mm1, $dd1) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+)/);
          $runtime = timelocal("00", "00", "00", "01", $mm1-1, $yyyy1-1900);
          
@@ -3343,11 +3343,10 @@ sub collaggstr($$$$) {
          }
          
          # Wochenaggregation
-         if ($aggregation eq "week") {
-             
-             $runtime = $runtime+3600 if((strftime "%m-%d", localtime($runtime)) eq "10-30");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zuück gestellt)
-             $runtime_orig = $runtime;
-             
+         if ($aggregation eq "week") {          
+             $runtime = $runtime+3600 if($i!=1 && dsttest($hash,$runtime,$aggsec));      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime_orig = $runtime; 
+
              my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
              $runtime_string = "week_".$w;                           # für Readingname
              my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
@@ -3360,15 +3359,16 @@ sub collaggstr($$$$) {
                  # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
                  my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
                  $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
+                 $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                  $runtime = $runtime+$wdadd;
                  $runtime_orig = $runtime-$aggsec;                             
                  
-                 # die Woche Beginn ist gleich der Woche von Ende Auswertung
+                 # die Woche Beginn ist gleich der Woche vom Ende Auswertung
                  if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
                      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
                      $ll=1;
                  } else {
-                     $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
+                      $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
                  }
              } else {
                  # weitere Durchläufe
@@ -3387,9 +3387,9 @@ sub collaggstr($$$$) {
          }
      
          # Tagesaggregation
-         if ($aggregation eq "day") {         
-             $runtime = $runtime+3600 if((strftime "%m-%d", localtime($runtime)) eq "10-30");          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zuück gestellt)
-             $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                         # für Readingname
+         if ($aggregation eq "day") {  
+             $runtime = $runtime+3600 if((dsttest($hash,$runtime,$aggsec)));                        # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
                                                                   
@@ -3409,8 +3409,9 @@ sub collaggstr($$$$) {
      
          # Stundenaggregation
          if ($aggregation eq "hour") {
-             $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                      # für Readingname
+             $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
              
              my @a = split (":",$tsstr);
@@ -3436,6 +3437,31 @@ sub collaggstr($$$$) {
 return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll);
 }
 
+####################################################################################################
+#                 Test auf Daylight saving time
+####################################################################################################
+sub dsttest ($$$) {
+ my ($hash,$runtime,$aggsec) = @_;
+ my $name = $hash->{NAME};
+ my $dstchange = 0;
+
+ # der Wechsel der daylight saving time wird dadurch getestet, dass geprüft wird 
+ # ob im Vergleich der aktuellen zur nächsten Selektionsperiode von "$aggsec (day, week, month)" 
+ # ein Wechsel der daylight saving time vorliegt
+
+ my $dst      = (localtime($runtime))[8];                      # ermitteln daylight saving aktuelle runtime
+ my $time_str = localtime($runtime+$aggsec);                   # textual time representation
+ my $dst_new  = (localtime($runtime+$aggsec))[8];              # ermitteln daylight saving nächste runtime
+
+
+ if ($dst != $dst_new) {
+     $dstchange = 1;
+ }
+
+ Log3 ($name, 5, "DbRep $name - Daylight savings changed: $dstchange (on $time_str)"); 
+
+return $dstchange;
+}
 
 ####################################################################################################
 #                 Test-Sub zu Testzwecken
