@@ -687,31 +687,34 @@ DUOFERN_Set($@)
     return "Wrong argument $arg" if (!exists $commands{$cmd}{$subCmd});
     
     my $position      = ReadingsVal($name, "position", -1);
-   
-    if ($position > 0) {
-      my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
-      my $moving        = ReadingsVal($name, "moving", "stop");
-      my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
-      my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
-      my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
-      
-      readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle") && ($moving eq "stop"));
-      readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on"));
-      readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on"));
-      
-      if ($timer eq "00" || $timeAutomatic eq "on") { 
-        if ($cmd =~ m/^(up|down)$/) {
-          $cmd = "stop" if (($moving ne "stop") && $toggleUpDown);
-          readingsSingleUpdate($hash, "moving", $cmd, 1);
-        } elsif ($cmd eq "position") {
-          if ($arg > $position) {
-            readingsSingleUpdate($hash, "moving", "down", 1);
-          } elsif ($arg < $position) {
-            readingsSingleUpdate($hash, "moving", "up", 1);
-          } else {
-            readingsSingleUpdate($hash, "moving", "stop", 1);
-          }
-        }
+    my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
+    my $moving        = ReadingsVal($name, "moving", "stop");
+    my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
+    my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
+    my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
+        
+    if ($moving ne "stop") {
+      if ($cmd =~ m/^(up|down|toggle)$/) {
+        $cmd = "stop" if ($toggleUpDown);
+      } 
+    }
+    
+    readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle"));
+    readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on") && ($position > 0));
+    readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on") && ($position < 100));
+    
+    if ($timer eq "00" || $timeAutomatic eq "on") {
+      readingsSingleUpdate($hash, "moving", "up", 1)   if (($cmd eq "up")   && ($position > 0));
+      readingsSingleUpdate($hash, "moving", "down", 1) if (($cmd eq "down") && ($position < 100));
+    }
+     
+    if ($cmd eq "position") {
+      if ($arg > $position) {
+        readingsSingleUpdate($hash, "moving", "down", 1);
+      } elsif ($arg < $position) {
+        readingsSingleUpdate($hash, "moving", "up", 1);
+      } else {
+        readingsSingleUpdate($hash, "moving", "stop", 1);
       }
     }
     
