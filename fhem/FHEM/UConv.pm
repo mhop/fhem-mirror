@@ -152,7 +152,7 @@ my %units = (
             "nl" => "wind force",
             "pl" => "wind force",
         },
-        "txt_format_long" => "%unit_long% %value%",
+        "txt_format_long" => '%unit_long% %value%',
     },
     "fts" => {
         "unit"      => "ft/s",
@@ -414,9 +414,9 @@ my %units = (
             "nl" => "inches",
             "pl" => "inches",
         },
-        "txt_format"         => "%value%%unit_symbol%",
-        "txt_format_long"    => "%value% %unit_long%",
-        "txt_format_long_pl" => "%value% %unit_long_pl%",
+        "txt_format"         => '%value%%unit_symbol%',
+        "txt_format_long"    => '%value% %unit_long%',
+        "txt_format_long_pl" => '%value% %unit_long_pl%',
     },
 
     "ft" => {
@@ -436,9 +436,9 @@ my %units = (
             "nl" => "feet",
             "pl" => "feet",
         },
-        "txt_format"         => "%value%%unit_symbol%",
-        "txt_format_long"    => "%value% %unit_long%",
-        "txt_format_long_pl" => "%value% %unit_long_pl%",
+        "txt_format"         => '%value%%unit_symbol%',
+        "txt_format_long"    => '%value% %unit_long%',
+        "txt_format_long_pl" => '%value% %unit_long_pl%',
     },
     "yd" => {
         "unit"      => "yd",
@@ -1073,32 +1073,38 @@ sub UnitDetails ($;$) {
 
             if ( $details{"txt_format"} ) {
                 delete $details{"txt_format"};
-                if ( $units{$u}{"txt_format"}{$l} ) {
+                if ( ref( $units{$u}{"txt_format"} ) eq "HASH"
+                    && $units{$u}{"txt_format"}{$l} )
+                {
                     $details{"txt_format"} = $units{$u}{"txt_format"}{$l};
                 }
-                elsif ( refs( $units{$u}{"txt_format"} ) ne "HASH" ) {
+                elsif ( ref( $units{$u}{"txt_format"} ) ne "HASH" ) {
                     $details{"txt_format"} = $units{$u}{"txt_format"};
                 }
             }
 
             if ( $details{"txt_format_long"} ) {
                 delete $details{"txt_format_long"};
-                if ( $units{$u}{"txt_format_long"}{$l} ) {
+                if ( ref( $units{$u}{"txt_format_long"} ) eq "HASH"
+                    && $units{$u}{"txt_format_long"}{$l} )
+                {
                     $details{"txt_format_long"} =
                       $units{$u}{"txt_format_long"}{$l};
                 }
-                elsif ( refs( $units{$u}{"txt_format_long"} ) ne "HASH" ) {
+                elsif ( ref( $units{$u}{"txt_format_long"} ) ne "HASH" ) {
                     $details{"txt_format_long"} = $units{$u}{"txt_format_long"};
                 }
             }
 
             if ( $details{"txt_format_long_pl"} ) {
                 delete $details{"txt_format_long_pl"};
-                if ( $units{$u}{"txt_format_long_pl"}{$l} ) {
+                if ( ref( $units{$u}{"txt_format_long_pl"} ) eq "HASH"
+                    && $units{$u}{"txt_format_long_pl"}{$l} )
+                {
                     $details{"txt_format_long_pl"} =
                       $units{$u}{"txt_format_long_pl"}{$l};
                 }
-                elsif ( refs( $units{$u}{"txt_format_long_pl"} ) ne "HASH" ) {
+                elsif ( ref( $units{$u}{"txt_format_long_pl"} ) ne "HASH" ) {
                     $details{"txt_format_long_pl"} =
                       $units{$u}{"txt_format_long_pl"};
                 }
@@ -1106,20 +1112,24 @@ sub UnitDetails ($;$) {
 
             if ( $details{"unit_long"} ) {
                 delete $details{"unit_long"};
-                if ( $units{$u}{"unit_long"}{$l} ) {
+                if ( ref( $units{$u}{"unit_long"} ) eq "HASH"
+                    && $units{$u}{"unit_long"}{$l} )
+                {
                     $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
                 }
-                elsif ( refs( $units{$u}{"unit_long"} ) ne "HASH" ) {
+                elsif ( ref( $units{$u}{"unit_long"} ) ne "HASH" ) {
                     $details{"unit_long"} = $units{$u}{"unit_long"};
                 }
             }
 
             if ( $details{"unit_long_pl"} ) {
                 delete $details{"unit_long_pl"};
-                if ( $units{$u}{"unit_long_pl"}{$l} ) {
+                if ( ref( $units{$u}{"unit_long_pl"} ) eq "HASH"
+                    && $units{$u}{"unit_long_pl"}{$l} )
+                {
                     $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"}{$l};
                 }
-                elsif ( refs( $units{$u}{"unit_long_pl"} ) ne "HASH" ) {
+                elsif ( ref( $units{$u}{"unit_long_pl"} ) ne "HASH" ) {
                     $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"};
                 }
             }
