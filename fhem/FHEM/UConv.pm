@@ -1059,7 +1059,7 @@ my %units = (
 sub UnitDetails ($;$) {
     my ( $unit, $lang ) = @_;
     my $u = lc($unit);
-    my $l = ( $lang ? lc($lang) : undef );
+    my $l = ( $lang ? lc($lang) : "en" );
     my %details;
 
     if ( defined( $units{$u} ) ) {
@@ -1068,23 +1068,60 @@ sub UnitDetails ($;$) {
         }
         $details{"unit_abbr"} = $u;
 
-        if ( $l && $details{"unit_prefix"} ) {
-            delete $details{"unit_prefix"};
-            if ( $units{$u}{"unit_prefix"}{$l} ) {
-                $details{"unit_prefix"} = $units{$u}{"unit_prefix"}{$l};
-            }
-            else {
-                $details{"unit_prefix"} = $units{$u}{"unit_prefix"}{"en"};
-            }
-        }
+        if ($lang) {
+            $details{"lang"} = $l;
 
-        if ( $l && $details{"unit_long"} ) {
-            delete $details{"unit_long"};
-            if ( $units{$u}{"unit_long"}{$l} ) {
-                $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
+            if ( $details{"txt_format"} ) {
+                delete $details{"txt_format"};
+                if ( $units{$u}{"txt_format"}{$l} ) {
+                    $details{"txt_format"} = $units{$u}{"txt_format"}{$l};
+                }
+                elsif ( refs( $units{$u}{"txt_format"} ) ne "HASH" ) {
+                    $details{"txt_format"} = $units{$u}{"txt_format"};
+                }
             }
-            else {
-                $details{"unit_long"} = $units{$u}{"unit_long"}{"en"};
+
+            if ( $details{"txt_format_long"} ) {
+                delete $details{"txt_format_long"};
+                if ( $units{$u}{"txt_format_long"}{$l} ) {
+                    $details{"txt_format_long"} =
+                      $units{$u}{"txt_format_long"}{$l};
+                }
+                elsif ( refs( $units{$u}{"txt_format_long"} ) ne "HASH" ) {
+                    $details{"txt_format_long"} = $units{$u}{"txt_format_long"};
+                }
+            }
+
+            if ( $details{"txt_format_long_pl"} ) {
+                delete $details{"txt_format_long_pl"};
+                if ( $units{$u}{"txt_format_long_pl"}{$l} ) {
+                    $details{"txt_format_long_pl"} =
+                      $units{$u}{"txt_format_long_pl"}{$l};
+                }
+                elsif ( refs( $units{$u}{"txt_format_long_pl"} ) ne "HASH" ) {
+                    $details{"txt_format_long_pl"} =
+                      $units{$u}{"txt_format_long_pl"};
+                }
+            }
+
+            if ( $details{"unit_long"} ) {
+                delete $details{"unit_long"};
+                if ( $units{$u}{"unit_long"}{$l} ) {
+                    $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
+                }
+                elsif ( refs( $units{$u}{"unit_long"} ) ne "HASH" ) {
+                    $details{"unit_long"} = $units{$u}{"unit_long"};
+                }
+            }
+
+            if ( $details{"unit_long_pl"} ) {
+                delete $details{"unit_long_pl"};
+                if ( $units{$u}{"unit_long_pl"}{$l} ) {
+                    $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"}{$l};
+                }
+                elsif ( refs( $units{$u}{"unit_long_pl"} ) ne "HASH" ) {
+                    $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"};
+                }
             }
         }
 
@@ -1613,7 +1650,7 @@ sub rname2unitDetails ($;$$) {
     return if ( !%return && !$u );
     return \%return if ( !$u );
 
-    my $unitDetails = UnitDetails( $u, $lang );
+    my $unitDetails = UnitDetails( $u, $l );
 
     if ( ref($unitDetails) eq "HASH" ) {
         $return{"unit_guess"} = "1" if ( !$return{"short"} );
@@ -1637,42 +1674,33 @@ sub rname2unitDetails ($;$$) {
             $return{"value_unit"} = $txt;
         }
 
-        # # value > 1
-        # if (   Scalar::Util::looks_like_number($value)
-        #     && $value > 1
-        #     && $return{"unit_long_pl"} )
-        # {
-        #     my $txt = "%value% %unit_long_pl%";
-        #     if ( %{%return}{"txt_format_long_pl"}->${{$l}} ) {
-        #         $txt = $return{"txt_format_long_pl"}->{$l};
-        #     }
-        #     elsif ( $return{"txt_format_long_pl"} ) {
-        #         $txt = $return{"txt_format_long_pl"};
-        #     }
-        #
-        #     foreach my $k ( keys %return ) {
-        #         $txt =~ s/%$k%/$return{$k}/g;
-        #     }
-        #
-        #     $return{"value_unit_long"} = $txt;
-        # }
-        #
-        # # single value
-        # elsif ( $return{"unit_long"} ) {
-        #     my $txt = "%value% %unit_long%";
-        #     if ( $return{"txt_format_long"}->{$l} ) {
-        #         $txt = $return{"txt_format_long"}->{$l};
-        #     }
-        #     elsif ( $return{"txt_format_long"} ) {
-        #         $txt = $return{"txt_format_long"};
-        #     }
-        #
-        #     foreach my $k ( keys %return ) {
-        #         $txt =~ s/%$k%/$return{$k}/g;
-        #     }
-        #
-        #     $return{"value_unit_long"} = $txt;
-        # }
+        # plural
+        if (   Scalar::Util::looks_like_number($value)
+            && $value > 1
+            && $return{"unit_long_pl"} )
+        {
+            my $txt = '%value% %unit_long_pl%';
+            $txt = $return{"txt_format_long_pl"}
+              if ( $return{"txt_format_long_pl"} );
+
+            foreach my $k ( keys %return ) {
+                $txt =~ s/%$k%/$return{$k}/g;
+            }
+
+            $return{"value_unit_long"} = $txt;
+        }
+
+        # single
+        elsif ( $return{"unit_long"} ) {
+            my $txt = '%value% %unit_long%';
+            $txt = $return{"txt_format_long"} if ( $return{"txt_format_long"} );
+
+            foreach my $k ( keys %return ) {
+                $txt =~ s/%$k%/$return{$k}/g;
+            }
+
+            $return{"value_unit_long"} = $txt;
+        }
     }
 
     return \%return;
