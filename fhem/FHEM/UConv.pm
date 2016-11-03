@@ -9,6 +9,8 @@ sub UConv_Initialize() {
 }
 
 package UConv;
+use Scalar::Util qw(looks_like_number);
+use Data::Dumper;
 
 ####################
 # Translations
@@ -98,55 +100,27 @@ my %units = (
 
     # temperature
     "c" => {
-        "unit_symbol" => "°",
-        "unit"        => "C",
-        "unit_prefix" => {
-            "de" => "Grad",
-            "en" => "degree",
-            "fr" => "degree",
-            "nl" => "degree",
-            "pl" => "degree",
-        },
+        "unit"      => "°C",
         "unit_long" => {
-            "de" => "Celsius",
-            "en" => "Celsius",
-            "fr" => "Celsius",
-            "nl" => "Celsius",
-            "pl" => "Celsius",
+            "de" => "Grad Celsius",
+            "en" => "Degree Celsius",
+            "fr" => "Degree Celsius",
+            "nl" => "Degree Celsius",
+            "pl" => "Degree Celsius",
         },
-        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
-        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
     "f" => {
-        "unit_symbol" => "°",
-        "unit"        => "F",
-        "unit_prefix" => {
-            "de" => "Grad",
-            "en" => "degree",
-            "fr" => "degree",
-            "nl" => "degree",
-            "pl" => "degree",
-        },
+        "unit"      => "°F",
         "unit_long" => {
-            "de" => "Fahrenheit",
-            "en" => "Fahrenheit",
-            "fr" => "Fahrenheit",
-            "nl" => "Fahrenheit",
-            "pl" => "Fahrenheit",
+            "de" => "Grad Fahrenheit",
+            "en" => "Degree Fahrenheit",
+            "fr" => "Degree Fahrenheit",
+            "nl" => "Degree Fahrenheit",
+            "pl" => "Degree Fahrenheit",
         },
-        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
-        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
     "k" => {
-        "unit_symbol" => "°",
-        "unit"        => "K",
-        "unit_prefix" => {
-            "de" => "Grad",
-            "en" => "degree",
-            "fr" => "degree",
-            "nl" => "degree",
-            "pl" => "degree",
-        },
+        "unit"      => "K",
         "unit_long" => {
             "de" => "Kelvin",
             "en" => "Kelvin",
@@ -154,8 +128,6 @@ my %units = (
             "nl" => "Kelvin",
             "pl" => "Kelvin",
         },
-        "txt_format"      => '%VALUE%%unit_symbol%%unit%',
-        "txt_format_long" => '%VALUE% %unit_prefix% %unit_long%',
     },
 
     # percent
@@ -172,23 +144,15 @@ my %units = (
 
     # speed
     "bft" => {
-        "unit"        => "bft",
-        "unit_prefix" => {
+        "unit"      => "bft",
+        "unit_long" => {
             "de" => "Windstärke",
             "en" => "wind force",
             "fr" => "wind force",
             "nl" => "wind force",
             "pl" => "wind force",
         },
-        "unit_long" => {
-            "de" => "in Beaufort",
-            "en" => "in Beaufort",
-            "fr" => "in Beaufort",
-            "nl" => "in Beaufort",
-            "pl" => "in Beaufort",
-        },
-        "txt_format"      => '%unit_prefix% %VALUE%',
-        "txt_format_long" => '%unit_prefix% %VALUE% %unit_long%',
+        "txt_format_long" => "%unit_long% %value%",
     },
     "fts" => {
         "unit"      => "ft/s",
@@ -242,15 +206,18 @@ my %units = (
     },
 
     # pressure
-    "hpa" => {
-        "unit"        => "hPa",
-        "unit_prefix" => {
-            "de" => "hecto",
-            "en" => "hecto",
-            "fr" => "hecto",
-            "nl" => "hecto",
-            "pl" => "hecto",
+    "bar" => {
+        "unit"      => "bar",
+        "unit_long" => {
+            "de" => "Bar",
+            "en" => "Bar",
+            "fr" => "Bar",
+            "nl" => "Bar",
+            "pl" => "Bar",
         },
+    },
+    "pa" => {
+        "unit"      => "Pa",
         "unit_long" => {
             "de" => "Pascal",
             "en" => "Pascal",
@@ -259,38 +226,34 @@ my %units = (
             "pl" => "Pascal",
         },
     },
-    "inhg" => {
-        "unit"        => "inHg",
-        "unit_prefix" => {
-            "de" => "Zoll",
-            "en" => "inches",
-            "fr" => "inches",
-            "nl" => "inches",
-            "pl" => "inches",
-        },
+    "hpa" => {
+        "unit"      => "hPa",
         "unit_long" => {
-            "de" => "Quecksilbersäule",
-            "en" => "of Mercury",
-            "fr" => "of Mercury",
-            "nl" => "of Mercury",
-            "pl" => "of Mercury",
+            "de" => "Hecto Pascal",
+            "en" => "Hecto Pascal",
+            "fr" => "Hecto Pascal",
+            "nl" => "Hecto Pascal",
+            "pl" => "Hecto Pascal",
+        },
+    },
+    "inhg" => {
+        "unit"      => "inHg",
+        "unit_long" => {
+            "de" => "Zoll Quecksilbersäule",
+            "en" => "Inches of Mercury",
+            "fr" => "Inches of Mercury",
+            "nl" => "Inches of Mercury",
+            "pl" => "Inches of Mercury",
         },
     },
     "mmhg" => {
-        "unit"        => "mmHg",
-        "unit_prefix" => {
-            "de" => "Millimeter",
-            "en" => "milimeter",
-            "fr" => "milimeter",
-            "nl" => "milimeter",
-            "pl" => "milimeter",
-        },
+        "unit"      => "mmHg",
         "unit_long" => {
-            "de" => "Quecksilbersäule",
-            "en" => "of Mercury",
-            "fr" => "of Mercury",
-            "nl" => "of Mercury",
-            "pl" => "of Mercury",
+            "de" => "Millimeter Quecksilbersäule",
+            "en" => "Milimeter of Mercury",
+            "fr" => "Milimeter of Mercury",
+            "nl" => "Milimeter of Mercury",
+            "pl" => "Milimeter of Mercury",
         },
     },
     "torr" => {
@@ -328,8 +291,55 @@ my %units = (
     },
 
     # solar
-    "lux" => {
-        "unit" => "lux",
+    "cd" => {
+        "unit"      => "cd",
+        "unit_long" => {
+            "de" => "Candela",
+            "en" => "Candela",
+            "fr" => "Candela",
+            "nl" => "Candela",
+            "pl" => "Candela",
+        },
+    },
+    "lx" => {
+        "unit"      => "lx",
+        "unit_long" => {
+            "de" => "Lux",
+            "en" => "Lux",
+            "fr" => "Lux",
+            "nl" => "Lux",
+            "pl" => "Lux",
+        },
+    },
+    "lm" => {
+        "unit"      => "lm",
+        "unit_long" => {
+            "de" => "Lumen",
+            "en" => "Lumen",
+            "fr" => "Lumen",
+            "nl" => "Lumen",
+            "pl" => "Lumen",
+        },
+    },
+    "uvi" => {
+        "unit"      => "UV-Index",
+        "unit_long" => {
+            "de" => "UV-Index",
+            "en" => "UV-Index",
+            "fr" => "UV-Index",
+            "nl" => "UV-Index",
+            "pl" => "UV-Index",
+        },
+    },
+    "uwpscm" => {
+        "unit"      => "uW/cm2",
+        "unit_long" => {
+            "de" => "Micro-Watt pro Quadratzentimeter",
+            "en" => "Micro-Watt per square centimeter",
+            "fr" => "Micro-Watt per square centimeter",
+            "nl" => "Micro-Watt per square centimeter",
+            "pl" => "Micro-Watt per square centimeter",
+        },
     },
     "wpsm" => {
         "unit"      => "W/m2",
@@ -387,6 +397,66 @@ my %units = (
         },
     },
 
+    "in" => {
+        "unit_symbol" => "″",
+        "unit"        => "in",
+        "unit_long"   => {
+            "de" => "Zoll",
+            "en" => "inch",
+            "fr" => "inch",
+            "nl" => "inch",
+            "pl" => "inch",
+        },
+        "unit_long_pl" => {
+            "de" => "Zoll",
+            "en" => "inches",
+            "fr" => "inches",
+            "nl" => "inches",
+            "pl" => "inches",
+        },
+        "txt_format"         => "%value%%unit_symbol%",
+        "txt_format_long"    => "%value% %unit_long%",
+        "txt_format_long_pl" => "%value% %unit_long_pl%",
+    },
+
+    "ft" => {
+        "unit_symbol" => "′",
+        "unit"        => "ft",
+        "unit_long"   => {
+            "de" => "Fuss",
+            "en" => "foot",
+            "fr" => "foot",
+            "nl" => "foot",
+            "pl" => "foot",
+        },
+        "unit_long_pl" => {
+            "de" => "Fuss",
+            "en" => "feet",
+            "fr" => "feet",
+            "nl" => "feet",
+            "pl" => "feet",
+        },
+        "txt_format"         => "%value%%unit_symbol%",
+        "txt_format_long"    => "%value% %unit_long%",
+        "txt_format_long_pl" => "%value% %unit_long_pl%",
+    },
+    "yd" => {
+        "unit"      => "yd",
+        "unit_long" => {
+            "de" => "Yard",
+            "en" => "yard",
+            "fr" => "yard",
+            "nl" => "yard",
+            "pl" => "yard",
+        },
+        "unit_long_pl" => {
+            "de" => "Yards",
+            "en" => "yards",
+            "fr" => "yards",
+            "nl" => "yards",
+            "pl" => "yards",
+        },
+    },
     "mi" => {
         "unit"      => "mi",
         "unit_long" => {
@@ -398,14 +468,410 @@ my %units = (
         },
     },
 
-    "in" => {
-        "unit"      => "in",
+    # time
+    "sec" => {
+        "unit" => {
+            "de" => "s",
+            "en" => "s",
+            "fr" => "s",
+            "nl" => "s",
+            "pl" => "s",
+        },
         "unit_long" => {
-            "de" => "Zoll",
-            "en" => "inch",
-            "fr" => "inch",
-            "nl" => "inch",
-            "pl" => "inch",
+            "de" => "Sekunde",
+            "en" => "second",
+            "fr" => "second",
+            "nl" => "second",
+            "pl" => "second",
+        },
+        "unit_long_pl" => {
+            "de" => "Sekunden",
+            "en" => "seconds",
+            "fr" => "seconds",
+            "nl" => "seconds",
+            "pl" => "seconds",
+        },
+    },
+
+    "min" => {
+        "unit" => {
+            "de" => "Min",
+            "en" => "min",
+            "fr" => "min",
+            "nl" => "min",
+            "pl" => "min",
+        },
+        "unit_long" => {
+            "de" => "Minute",
+            "en" => "minute",
+            "fr" => "minute",
+            "nl" => "minute",
+            "pl" => "minute",
+        },
+        "unit_long_pl" => {
+            "de" => "Minuten",
+            "en" => "minutes",
+            "fr" => "minutes",
+            "nl" => "minutes",
+            "pl" => "minutes",
+        },
+    },
+
+    "hr" => {
+        "unit" => {
+            "de" => "Std",
+            "en" => "hr",
+            "fr" => "hr",
+            "nl" => "hr",
+            "pl" => "hr",
+        },
+        "unit_long" => {
+            "de" => "Stunde",
+            "en" => "hour",
+            "fr" => "hour",
+            "nl" => "hour",
+            "pl" => "hour",
+        },
+        "unit_long_pl" => {
+            "de" => "Stunden",
+            "en" => "hours",
+            "fr" => "hours",
+            "nl" => "hours",
+            "pl" => "hours",
+        },
+    },
+
+    "d" => {
+        "unit" => {
+            "de" => "T",
+            "en" => "d",
+            "fr" => "d",
+            "nl" => "d",
+            "pl" => "d",
+        },
+        "unit_long" => {
+            "de" => "Tag",
+            "en" => "day",
+            "fr" => "day",
+            "nl" => "day",
+            "pl" => "day",
+        },
+        "unit_long_pl" => {
+            "de" => "Tage",
+            "en" => "days",
+            "fr" => "days",
+            "nl" => "days",
+            "pl" => "days",
+        },
+    },
+
+    "w" => {
+        "unit" => {
+            "de" => "W",
+            "en" => "w",
+            "fr" => "w",
+            "nl" => "w",
+            "pl" => "w",
+        },
+        "unit_long" => {
+            "de" => "Woche",
+            "en" => "week",
+            "fr" => "week",
+            "nl" => "week",
+            "pl" => "week",
+        },
+        "unit_long_pl" => {
+            "de" => "Wochen",
+            "en" => "weeks",
+            "fr" => "weeks",
+            "nl" => "weeks",
+            "pl" => "weeks",
+        },
+    },
+
+    "m" => {
+        "unit" => {
+            "de" => "M",
+            "en" => "m",
+            "fr" => "m",
+            "nl" => "m",
+            "pl" => "m",
+        },
+        "unit_long" => {
+            "de" => "Monat",
+            "en" => "month",
+            "fr" => "month",
+            "nl" => "month",
+            "pl" => "month",
+        },
+        "unit_long_pl" => {
+            "de" => "Monate",
+            "en" => "Monat",
+            "fr" => "Monat",
+            "nl" => "Monat",
+            "pl" => "Monat",
+        },
+    },
+
+    "y" => {
+        "unit" => {
+            "de" => "J",
+            "en" => "y",
+            "fr" => "y",
+            "nl" => "y",
+            "pl" => "y",
+        },
+        "unit_long" => {
+            "de" => "Jahr",
+            "en" => "year",
+            "fr" => "year",
+            "nl" => "year",
+            "pl" => "year",
+        },
+        "unit_long_pl" => {
+            "de" => "Jahre",
+            "en" => "years",
+            "fr" => "years",
+            "nl" => "years",
+            "pl" => "years",
+        },
+    },
+
+    # mass
+    "b" => {
+        "unit"      => "B",
+        "unit_long" => {
+            "de" => "Bel",
+            "en" => "Bel",
+            "fr" => "Bel",
+            "nl" => "Bel",
+            "pl" => "Bel",
+        },
+    },
+    "db" => {
+        "unit"      => "dB",
+        "unit_long" => {
+            "de" => "Dezibel",
+            "en" => "Decibel",
+            "fr" => "Decibel",
+            "nl" => "Decibel",
+            "pl" => "Decibel",
+        },
+    },
+    "mol" => {
+        "unit" => "mol",
+    },
+    "n" => {
+        "unit"      => "N",
+        "unit_long" => {
+            "de" => "Newton",
+            "en" => "Newton",
+            "fr" => "Newton",
+            "nl" => "Newton",
+            "pl" => "Newton",
+        },
+    },
+    "g" => {
+        "unit"      => "g",
+        "unit_long" => {
+            "de" => "Gramm",
+            "en" => "gram",
+            "fr" => "gram",
+            "nl" => "gram",
+            "pl" => "gram",
+        },
+    },
+    "dg" => {
+        "unit"      => "dg",
+        "unit_long" => {
+            "de" => "Dekagramm",
+            "en" => "dekagram",
+            "fr" => "dekagram",
+            "nl" => "dekagram",
+            "pl" => "dekagram",
+        },
+    },
+    "kg" => {
+        "unit"      => "kg",
+        "unit_long" => {
+            "de" => "Kilogramm",
+            "en" => "kilogram",
+            "fr" => "kilogram",
+            "nl" => "kilogram",
+            "pl" => "kilogram",
+        },
+    },
+    "t" => {
+        "unit"      => "t",
+        "unit_long" => {
+            "de" => "Tonne",
+            "en" => "ton",
+            "fr" => "ton",
+            "nl" => "ton",
+            "pl" => "ton",
+        },
+        "unit_long_pl" => {
+            "de" => "Tonnen",
+            "en" => "tons",
+            "fr" => "tons",
+            "nl" => "tons",
+            "pl" => "tons",
+        },
+    },
+    "ml" => {
+        "unit"      => "ml",
+        "unit_long" => {
+            "de" => "Milliliter",
+            "en" => "mililitre",
+            "fr" => "mililitre",
+            "nl" => "mililitre",
+            "pl" => "mililitre",
+        },
+        "unit_long_pl" => {
+            "de" => "Milliliter",
+            "en" => "mililitres",
+            "fr" => "mililitres",
+            "nl" => "mililitres",
+            "pl" => "mililitres",
+        },
+    },
+    "l" => {
+        "unit"      => "l",
+        "unit_long" => {
+            "de" => "Liter",
+            "en" => "litre",
+            "fr" => "litre",
+            "nl" => "litre",
+            "pl" => "litre",
+        },
+        "unit_long_pl" => {
+            "de" => "Liter",
+            "en" => "litres",
+            "fr" => "litres",
+            "nl" => "litres",
+            "pl" => "litres",
+        },
+    },
+    "oz" => {
+        "unit"      => "oz",
+        "unit_long" => {
+            "de" => "Unze",
+            "en" => "ounce",
+            "fr" => "ounce",
+            "nl" => "ounce",
+            "pl" => "ounce",
+        },
+        "unit_long_pl" => {
+            "de" => "Unzen",
+            "en" => "ounces",
+            "fr" => "ounces",
+            "nl" => "ounces",
+            "pl" => "ounces",
+        },
+    },
+    "floz" => {
+        "unit"      => "fl oz",
+        "unit_long" => {
+            "de" => "fl. Unze",
+            "en" => "fl. ounce",
+            "fr" => "fl. ounce",
+            "nl" => "fl. ounce",
+            "pl" => "fl. ounce",
+        },
+        "unit_long_pl" => {
+            "de" => "fl. Unzen",
+            "en" => "fl. ounces",
+            "fr" => "fl. ounces",
+            "nl" => "fl. ounces",
+            "pl" => "fl. ounces",
+        },
+    },
+    "ozfl" => {
+        "unit"      => "fl oz",
+        "unit_long" => {
+            "de" => "fl. Unze",
+            "en" => "fl. ounce",
+            "fr" => "fl. ounce",
+            "nl" => "fl. ounce",
+            "pl" => "fl. ounce",
+        },
+        "unit_long_pl" => {
+            "de" => "fl. Unzen",
+            "en" => "fl. ounces",
+            "fr" => "fl. ounces",
+            "nl" => "fl. ounces",
+            "pl" => "fl. ounces",
+        },
+    },
+    "quart" => {
+        "unit"      => "quart",
+        "unit_long" => {
+            "de" => "Quart",
+            "en" => "quart",
+            "fr" => "quart",
+            "nl" => "quart",
+            "pl" => "quart",
+        },
+        "unit_long_pl" => {
+            "de" => "Quarts",
+            "en" => "quarts",
+            "fr" => "quarts",
+            "nl" => "quarts",
+            "pl" => "quarts",
+        },
+    },
+    "gallon" => {
+        "unit"      => "gallon",
+        "unit_long" => {
+            "de" => "Gallone",
+            "en" => "gallon",
+            "fr" => "gallon",
+            "nl" => "gallon",
+            "pl" => "gallon",
+        },
+        "unit_long_pl" => {
+            "de" => "Gallonen",
+            "en" => "gallons",
+            "fr" => "gallons",
+            "nl" => "gallons",
+            "pl" => "gallons",
+        },
+    },
+    "gallon" => {
+        "unit"      => "gallon",
+        "unit_long" => {
+            "de" => "Gallone",
+            "en" => "gallon",
+            "fr" => "gallon",
+            "nl" => "gallon",
+            "pl" => "gallon",
+        },
+        "unit_long_pl" => {
+            "de" => "Gallonen",
+            "en" => "gallons",
+            "fr" => "gallons",
+            "nl" => "gallons",
+            "pl" => "gallons",
+        },
+    },
+    "lb" => {
+        "unit"      => "lb",
+        "unit_long" => {
+            "de" => "Pfund",
+            "en" => "pound",
+            "fr" => "pound",
+            "nl" => "pound",
+            "pl" => "pound",
+        },
+    },
+    "lbs" => {
+        "unit"      => "lbs",
+        "unit_long" => {
+            "de" => "Pfund",
+            "en" => "pound",
+            "fr" => "pound",
+            "nl" => "pound",
+            "pl" => "pound",
         },
     },
 
@@ -420,13 +886,180 @@ my %units = (
             "pl" => "degree",
         },
     },
+
+    # electric
+    "a" => {
+        "unit"      => "A",
+        "unit_long" => {
+            "de" => "Ampere",
+            "en" => "Ampere",
+            "fr" => "Ampere",
+            "nl" => "Ampere",
+            "pl" => "Ampere",
+        },
+    },
+
+    "v" => {
+        "unit"      => "V",
+        "unit_long" => {
+            "de" => "Volt",
+            "en" => "Volt",
+            "fr" => "Volt",
+            "nl" => "Volt",
+            "pl" => "Volt",
+        },
+    },
+
+    "w" => {
+        "unit"      => "Watt",
+        "unit_long" => {
+            "de" => "Watt",
+            "en" => "Watt",
+            "fr" => "Watt",
+            "nl" => "Watt",
+            "pl" => "Watt",
+        },
+    },
+
+    "j" => {
+        "unit"      => "J",
+        "unit_long" => {
+            "de" => "Joule",
+            "en" => "Joule",
+            "fr" => "Joule",
+            "nl" => "Joule",
+            "pl" => "Joule",
+        },
+    },
+
+    "coul" => {
+        "unit"      => "C",
+        "unit_long" => {
+            "de" => "Coulomb",
+            "en" => "Coulomb",
+            "fr" => "Coulomb",
+            "nl" => "Coulomb",
+            "pl" => "Coulomb",
+        },
+    },
+
+    "far" => {
+        "unit"      => "F",
+        "unit_long" => {
+            "de" => "Farad",
+            "en" => "Farad",
+            "fr" => "Farad",
+            "nl" => "Farad",
+            "pl" => "Farad",
+        },
+    },
+
+    "ohm" => {
+        "unit"      => "Ω",
+        "unit_long" => {
+            "de" => "Ohm",
+            "en" => "Ohm",
+            "fr" => "Ohm",
+            "nl" => "Ohm",
+            "pl" => "Ohm",
+        },
+    },
+
+    "s" => {
+        "unit"      => "S",
+        "unit_long" => {
+            "de" => "Siemens",
+            "en" => "Siemens",
+            "fr" => "Siemens",
+            "nl" => "Siemens",
+            "pl" => "Siemens",
+        },
+    },
+
+    "wb" => {
+        "unit"      => "Wb",
+        "unit_long" => {
+            "de" => "Weber",
+            "en" => "Weber",
+            "fr" => "Weber",
+            "nl" => "Weber",
+            "pl" => "Weber",
+        },
+    },
+
+    "t" => {
+        "unit"      => "T",
+        "unit_long" => {
+            "de" => "Tesla",
+            "en" => "Tesla",
+            "fr" => "Tesla",
+            "nl" => "Tesla",
+            "pl" => "Tesla",
+        },
+    },
+
+    "h" => {
+        "unit"      => "H",
+        "unit_long" => {
+            "de" => "Henry",
+            "en" => "Henry",
+            "fr" => "Henry",
+            "nl" => "Henry",
+            "pl" => "Henry",
+        },
+    },
+
+    "bq" => {
+        "unit"      => "Bq",
+        "unit_long" => {
+            "de" => "Becquerel",
+            "en" => "Becquerel",
+            "fr" => "Becquerel",
+            "nl" => "Becquerel",
+            "pl" => "Becquerel",
+        },
+    },
+
+    "gy" => {
+        "unit"      => "Gy",
+        "unit_long" => {
+            "de" => "Gray",
+            "en" => "Gray",
+            "fr" => "Gray",
+            "nl" => "Gray",
+            "pl" => "Gray",
+        },
+    },
+
+    "sv" => {
+        "unit"      => "Sv",
+        "unit_long" => {
+            "de" => "Sievert",
+            "en" => "Sievert",
+            "fr" => "Sievert",
+            "nl" => "Sievert",
+            "pl" => "Sievert",
+        },
+    },
+
+    "kat" => {
+        "unit"      => "kat",
+        "unit_long" => {
+            "de" => "Katal",
+            "en" => "Katal",
+            "fr" => "Katal",
+            "nl" => "Katal",
+            "pl" => "Katal",
+        },
+    },
+
 );
 
 # Get unit details in local language as hash
 sub UnitDetails ($;$) {
     my ( $unit, $lang ) = @_;
     my $u = lc($unit);
-    my $l = lc($lang);
+    my $l = ( $lang ? lc($lang) : undef );
     my %details;
 
     if ( defined( $units{$u} ) ) {
@@ -435,7 +1068,7 @@ sub UnitDetails ($;$) {
         }
         $details{"unit_abbr"} = $u;
 
-        if ( $lang && $details{"unit_prefix"} ) {
+        if ( $l && $details{"unit_prefix"} ) {
             delete $details{"unit_prefix"};
             if ( $units{$u}{"unit_prefix"}{$l} ) {
                 $details{"unit_prefix"} = $units{$u}{"unit_prefix"}{$l};
@@ -445,7 +1078,7 @@ sub UnitDetails ($;$) {
             }
         }
 
-        if ( $lang && $details{"unit_long"} ) {
+        if ( $l && $details{"unit_long"} ) {
             delete $details{"unit_long"};
             if ( $units{$u}{"unit_long"}{$l} ) {
                 $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
@@ -614,7 +1247,7 @@ my %weather_readings = (
     },
     "luminosity" => {
         "short" => "L",
-        "unit"  => "lux",
+        "unit"  => "lx",
     },
     "pct" => {
         "short" => "PCT",
@@ -799,6 +1432,33 @@ my %weather_readings = (
         "short" => "Tk",
         "unit"  => "k",
     },
+    "uv" => {
+        "unified" => "uvi",    # link only
+    },
+    "uvi" => {
+        "short" => "UV",
+        "unit"  => "uvi",
+    },
+    "uvr" => {
+        "short" => "UVR",
+        "unit"  => "uwpscm",
+    },
+    "valvedesired" => {
+        "unified" => "valve",    # link only
+    },
+    "valvepos" => {
+        "unified" => "valve",    # link only
+    },
+    "valveposition" => {
+        "unified" => "valve",    # link only
+    },
+    "valvepostc" => {
+        "unified" => "valve",    # link only
+    },
+    "valve" => {
+        "short" => "VAL",
+        "unit"  => "pct",
+    },
     "visibility" => {
         "unified" => "visibility_km",    # link only
     },
@@ -920,10 +1580,11 @@ sub rname2rsname($) {
 }
 
 # Get unit details in local language from reading name as hash
-sub rname2unitDetails ($;$) {
-    my ( $reading, $lang ) = @_;
+sub rname2unitDetails ($;$$) {
+    my ( $reading, $lang, $value ) = @_;
     my $details;
     my $r = lc($reading);
+    my $l = ( $lang ? lc($lang) : "en" );
     my $u;
     my %return;
 
@@ -946,6 +1607,7 @@ sub rname2unitDetails ($;$) {
     # just guessing the unit from reading name
     elsif ( $r =~ /_([a-z]+)$/ ) {
         $u = $1;
+        $return{"value"} = $value if ( defined($value) );
     }
 
     return if ( !%return && !$u );
@@ -954,9 +1616,63 @@ sub rname2unitDetails ($;$) {
     my $unitDetails = UnitDetails( $u, $lang );
 
     if ( ref($unitDetails) eq "HASH" ) {
+        $return{"unit_guess"} = "1" if ( !$return{"short"} );
         foreach my $k ( keys %{$unitDetails} ) {
             $return{$k} = $unitDetails->{$k};
         }
+    }
+
+    # generate combined value+unit strings
+    if ( defined($value) ) {
+        $return{"value"} = $value;
+
+        if ( $return{"unit"} ) {
+            my $txt = '%value% %unit%';
+            $txt = $return{"txt_format"} if ( $return{"txt_format"} );
+
+            foreach my $k ( keys %return ) {
+                $txt =~ s/%$k%/$return{$k}/g;
+            }
+
+            $return{"value_unit"} = $txt;
+        }
+
+        # # value > 1
+        # if (   Scalar::Util::looks_like_number($value)
+        #     && $value > 1
+        #     && $return{"unit_long_pl"} )
+        # {
+        #     my $txt = "%value% %unit_long_pl%";
+        #     if ( %{%return}{"txt_format_long_pl"}->${{$l}} ) {
+        #         $txt = $return{"txt_format_long_pl"}->{$l};
+        #     }
+        #     elsif ( $return{"txt_format_long_pl"} ) {
+        #         $txt = $return{"txt_format_long_pl"};
+        #     }
+        #
+        #     foreach my $k ( keys %return ) {
+        #         $txt =~ s/%$k%/$return{$k}/g;
+        #     }
+        #
+        #     $return{"value_unit_long"} = $txt;
+        # }
+        #
+        # # single value
+        # elsif ( $return{"unit_long"} ) {
+        #     my $txt = "%value% %unit_long%";
+        #     if ( $return{"txt_format_long"}->{$l} ) {
+        #         $txt = $return{"txt_format_long"}->{$l};
+        #     }
+        #     elsif ( $return{"txt_format_long"} ) {
+        #         $txt = $return{"txt_format_long"};
+        #     }
+        #
+        #     foreach my $k ( keys %return ) {
+        #         $txt =~ s/%$k%/$return{$k}/g;
+        #     }
+        #
+        #     $return{"value_unit_long"} = $txt;
+        # }
     }
 
     return \%return;
@@ -1270,6 +1986,76 @@ sub mph2bft($) {
 
 ####################
 # HELPER FUNCTIONS
+
+# Generalized function for DbLog unit support
+sub DbLog_split($$) {
+    my ( $event, $device ) = @_;
+    my ( $reading, $value, $unit ) = "";
+
+    # exclude any multi-value events
+    if ( $event =~ /(.*: +.*: +.*)+/ ) {
+        ::Log3 $device, 5,
+          "UConv::DbLog_split $device: Ignoring multi-value event $event";
+        return undef;
+    }
+
+    # exclude sum and avg events
+    elsif ( $event =~ /^(.*_sum[0-9]+m|.*_avg[0-9]+m): +.*/ ) {
+        ::Log3 $device, 5,
+          "UConv::DbLog_split $device: Ignoring sum/avg event $event";
+        return undef;
+    }
+
+    # text conversions
+    elsif ( $event =~ /^(pressure_trend): +(\S+) *(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $value   = "0" if ( $2 eq "=" );
+        $value   = "1" if ( $2 eq "+" );
+        $value   = "2" if ( $2 eq "-" );
+    }
+    elsif ( $event =~ /^(Activity): +(\S+) *(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $value   = "1" if ( $2 eq "alive" );
+        $value   = "0" if ( $2 eq "dead" );
+    }
+    elsif ( $event =~ /^(condition): +(\S+) *(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $value   = "0" if ( $2 eq "clear" );
+        $value   = "1" if ( $2 eq "sunny" );
+        $value   = "2" if ( $2 eq "cloudy" );
+        $value   = "3" if ( $2 eq "rain" );
+    }
+    elsif ( $event =~ /^(.*[Hh]umidity[Cc]ondition): +(\S+) *(.*)/ ) {
+        $reading = $1;
+        $value   = $2;
+        $value   = "0" if ( $2 eq "dry" );
+        $value   = "1" if ( $2 eq "low" );
+        $value   = "2" if ( $2 eq "optimal" );
+        $value   = "3" if ( $2 eq "wet" );
+    }
+
+    # general event handling
+    elsif ( $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/ ) {
+        my $unitDetails = rname2unitDetails( $1, "en", $2 );
+        $reading = $1;
+        $value   = ( $unitDetails->{"value"} ? $unitDetails->{"value"} : $2 );
+        $unit    = ( $unitDetails->{"unit"} ? $unitDetails->{"unit"} : $3 );
+    }
+
+    if ( !Scalar::Util::looks_like_number($value) ) {
+        ::Log3 $device, 5,
+"UConv::DbLog_split $device: Ignoring event $event: value does not look like a number";
+        return undef;
+    }
+
+    ::Log3 $device, 5,
+"UConv::DbLog_split $device: Splitting event $event > reading=$reading value=$value unit=$unit";
+
+    return ( $reading, $value, $unit );
+}
 
 sub roundX($;$) {
     my ( $v, $n ) = @_;
