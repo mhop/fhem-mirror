@@ -132,8 +132,8 @@ my %units = (
 
     # percent
     "pct" => {
-        "unit_symbol" => "%",
-        "unit_long"   => {
+        "unit"      => "%",
+        "unit_long" => {
             "de" => "Prozent",
             "en" => "percent",
             "fr" => "percent",
@@ -1062,6 +1062,8 @@ sub UnitDetails ($;$) {
     my $l = ( $lang ? lc($lang) : "en" );
     my %details;
 
+    return {} if ( !$unit || $unit eq "" );
+
     if ( defined( $units{$u} ) ) {
         foreach my $k ( keys %{ $units{$u} } ) {
             $details{$k} = $units{$u}{$k};
@@ -1640,15 +1642,22 @@ sub rname2unitDetails ($;$$) {
         my $dr = $weather_readings{$r}{"unified"};
         $return{"unified"} = $dr;
         $return{"short"}   = $weather_readings{$dr}{"short"};
-        $u                 = $weather_readings{$dr}{"unit"}
-          if ( $weather_readings{$dr}{"unit"} );
+        $u                 = (
+              $weather_readings{$dr}{"unit"}
+            ? $weather_readings{$dr}{"unit"}
+            : "-"
+        );
     }
 
     # known standard reading names
     elsif ( $weather_readings{$r}{"short"} ) {
         $return{"unified"} = $r;
         $return{"short"}   = $weather_readings{$r}{"short"};
-        $u = $weather_readings{$r}{"unit"} if ( $weather_readings{$r}{"unit"} );
+        $u                 = (
+              $weather_readings{$r}{"unit"}
+            ? $weather_readings{$r}{"unit"}
+            : "-"
+        );
     }
 
     # just guessing the unit from reading name
@@ -1684,6 +1693,11 @@ sub rname2unitDetails ($;$$) {
             $return{"value_unit"} = $txt;
         }
 
+        # fallback
+        else {
+            $return{"value_unit"} = $value;
+        }
+
         # plural
         if (   Scalar::Util::looks_like_number($value)
             && $value > 1
@@ -1710,6 +1724,11 @@ sub rname2unitDetails ($;$$) {
             }
 
             $return{"value_unit_long"} = $txt;
+        }
+
+        # fallback
+        else {
+            $return{"value_unit_long"} = $value;
         }
     }
 
