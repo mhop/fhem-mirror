@@ -50,7 +50,7 @@ sub Wunderground_Initialize($) {
     $hash->{DefFn}         = "Wunderground_Define";
     $hash->{AttrFn}        = "Wunderground_Attr";
     $hash->{UndefFn}       = "Wunderground_Undefine";
-    $hash->{DbLog_splitFn} = "Wunderground_DbLog_split";
+    $hash->{DbLog_splitFn} = "UConv::DbLog_split";
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
@@ -320,6 +320,7 @@ sub Wunderground_Hash2Readings($$;$) {
 
             next
               if ( $k eq "image"
+                || $k eq "response"
                 || $k eq "station_id"
                 || $k =~ /^.*_string$/ );
 
@@ -608,163 +609,6 @@ sub Wunderground_Undefine($$$) {
     delete $modules{Wunderground}{defptr}{$name};
 
     return;
-}
-
-###################################
-sub Wunderground_DbLog_split($$) {
-    my ( $event, $device ) = @_;
-    my ( $reading, $value, $unit ) = "";
-    my $hash = $defs{$device};
-
-    if ( $event =~
-/^(wind_compasspoint.*|.*_sum10m|.*_avg2m|uvCondition):\s([\w\.,]+)\s*(.*)/
-      )
-    {
-        return undef;
-    }
-    elsif ( $event =~ /^(dewpoint|temp_c|wind_chill):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "°C";
-    }
-    elsif ( $event =~ /^(dewpoint_f|temp_f|wind_chill_f):\s([\w\.,]+)\s*(.*)/ )
-    {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "°F";
-    }
-    elsif ( $event =~ /^(.*humidity.*):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "%";
-    }
-    elsif ( $event =~ /^(solarradiation):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "W/m2";
-    }
-    elsif ( $event =~ /^(pressure_trend):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = "";
-        $value   = "0" if ( $2 eq "=" );
-        $value   = "1" if ( $2 eq "+" );
-        $value   = "2" if ( $2 eq "-" );
-        return undef if ( $value eq "" );
-        $unit = "";
-    }
-    elsif ( $event =~ /^(pressure|pressureAbs):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "hPa";
-    }
-    elsif ( $event =~ /^(pressure_in|pressureAbs_in):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "inHg";
-    }
-    elsif ( $event =~ /^(pressure_mm|pressureAbs_mm):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "mmHg";
-    }
-    elsif ( $event =~ /^(rain):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "mm/h";
-    }
-    elsif ( $event =~ /^(rain_in):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "in/h";
-    }
-    elsif ( $event =~ /^(rain|.*rain_day|.*rain_night):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "mm";
-    }
-    elsif ( $event =~
-        /^(rain_in|.*rain_day_in|.*rain_night_in):\s([\w\.,]+)\s*(.*)/ )
-    {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "in";
-    }
-    elsif ( $event =~ /^(UV):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "UVI";
-    }
-    elsif ( $event =~ /^(.*wind_direction.*):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "°";
-    }
-    elsif ( $event =~
-        /^(.*wind_gust|.*wind_speed|.*wind_speed_max):\s([\w\.,]+)\s*(.*)/ )
-    {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "km/h";
-    }
-    elsif ( $event =~
-/^(.*wind_gust_mph|.*wind_speed_mph|.*wind_speed_max_mph):\s([\w\.,]+)\s*(.*)/
-      )
-    {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "mph";
-    }
-    elsif ( $event =~ /^(wind_gust_bft|wind_speed_bft):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "Bft";
-    }
-    elsif ( $event =~ /^(wind_gust_mps|wind_speed_mps):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "m/s";
-    }
-    elsif ( $event =~ /^(wind_gust_fts|wind_speed_fts):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "ft/s";
-    }
-    elsif ( $event =~ /^(wind_gust_kn|wind_speed_kn):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = "kn";
-    }
-    elsif ( $event =~ /^(.*condition):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = "";
-        $value   = "0" if ( $2 eq "clear" );
-        $value   = "1" if ( $2 eq "sunny" );
-        $value   = "2" if ( $2 eq "cloudy" );
-        $value   = "3" if ( $2 eq "rain" );
-        return undef if ( $value eq "" );
-        $unit = "";
-    }
-    elsif ( $event =~ /^(humidity_condition):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = "";
-        $value   = "0" if ( $2 eq "dry" );
-        $value   = "1" if ( $2 eq "low" );
-        $value   = "2" if ( $2 eq "optimal" );
-        $value   = "3" if ( $2 eq "wet" );
-        $value   = "4" if ( $2 eq "rain" );
-        return undef if ( $value eq "" );
-        $unit = "";
-    }
-    elsif ( $event =~ /(.+):\s([\w\.,]+)\s*(.*)/ ) {
-        $reading = $1;
-        $value   = $2;
-        $unit    = $3;
-    }
-
-    Log3 $device, 5,
-"Wunderground $device: Splitting event $event > reading=$reading value=$value unit=$unit";
-
-    return ( $reading, $value, $unit );
 }
 
 1;
