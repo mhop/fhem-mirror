@@ -755,8 +755,8 @@ structure_Attr($@)
 
     <a name="clientstate_behavior"></a>
     <li>clientstate_behavior<br>
-      Der Status einer Struktur h&auml;ngt von den Stati der zugef&uuml;gten
-      Devices ab.  Dabei wird das propagieren der Stati der Devices in zwei
+      Der Status einer Struktur h&auml;ngt von den Status der zugef&uuml;gten
+      Devices ab.  Dabei wird das propagieren der Status der Devices in zwei
       Gruppen klassifiziert und mittels diesem Attribut definiert:
       <ul>
       <li>absolute<br>
@@ -784,7 +784,7 @@ structure_Attr($@)
     <a name="clientstate_priority"></a>
     <li>clientstate_priority<br>
       Wird die Struktur auf ein relatives Verhalten eingestellt, so wird die
-      Priorit&auml;t der Devicestati &uuml;ber das Attribut
+      Priorit&auml;t der Devicestatus &uuml;ber das Attribut
       <code>clientstate_priority</code> beinflusst. Die Priorit&auml;ten sind
       in absteigender Reihenfolge anzugeben.  Dabei k&ouml;nnen Gruppen mit
       identischer Priorit&auml;t angegeben werden, um zb.  unterschiedliche
