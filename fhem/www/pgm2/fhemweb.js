@@ -8,6 +8,7 @@ var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
 var FW_scripts = {}, FW_links = {};
 var FW_docReady = false;
 var FW_root = "/fhem";  // root
+var embedLoadRetry = 100;
 
 // createFn returns an HTML Element, which may contain 
 // - setValueFn, which is called when data via longpoll arrives
@@ -627,7 +628,6 @@ FW_rawDef()
         {
           if(++i1 >= arr.length) {
             return FW_okDialog("Executed everything, no errors found.");
-            return;
           }
           str += arr[i1];
           if(arr[i1].charAt(arr[i1].length-1) === "\\") {
@@ -755,11 +755,20 @@ FW_longpoll()
   var filter = $("body").attr("longpollfilter");
   if(filter == null)
     filter = "";
+  var retry;
   if(filter == "") {
     $("embed").each(function() {
+      if($(this.getSVGDocument()).length == 0 && !retry && 
+                        filter != ".*" && --embedLoadRetry > 0) {
+        retry = 1;
+        setTimeout(FW_longpoll, 100);
+        return;
+      }
       if($(this.getSVGDocument()).find("svg[flog]").attr("flog"))
         filter=".*";
     });
+    if(retry)
+      return;
   }
 
   if(filter == "") {
