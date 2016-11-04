@@ -1511,6 +1511,16 @@ FW_roomOverview($)
 
 }
 
+sub
+FW_alias($)
+{
+  my ($d) = @_;
+  if($FW_room) {
+    return AttrVal($d, "alias_$FW_room", AttrVal($d, "alias", $d));
+  } else {
+    return AttrVal($d, "alias", $d);
+  }
+}
 
 sub
 FW_makeDeviceLine($$$$$)
@@ -1519,7 +1529,7 @@ FW_makeDeviceLine($$$$$)
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
-  my $devName = AttrVal($d, "alias", $d);
+  my $devName = FW_alias($d);
   if(defined($nameDisplay)) {
     my ($DEVICE, $ALIAS) = ($d, $devName);
     $devName = eval $nameDisplay;
@@ -1596,18 +1606,20 @@ FW_showRoom()
   # attribute)
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
-  my (%group, @atEnds, %usuallyAtEnd);
+  my (%group, @atEnds, %usuallyAtEnd, %sortIndex);
   foreach my $dev (@devs) {
     if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
       $usuallyAtEnd{$dev} = 1;
       if(!AttrVal($dev, "group", undef)) {
-        push @atEnds, $dev;
+        $sortIndex{$dev} = lc(AttrVal($dev,"sortby",FW_alias($dev)));
+        push @atEnds, AttrVal($a,"alias",$a);
         next;
       }
     }
     next if(!$FW_types{$dev});   # FHEMWEB connection, missed due to caching
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
+      $sortIndex{$dev} = lc(AttrVal($dev,"sortby",FW_alias($dev)));
       $group{$grp}{$dev} = 1;
     }
   }
@@ -1636,9 +1648,7 @@ FW_showRoom()
       FW_pO "<tr><td>";
       FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
-      foreach my $d (sort { lc(AttrVal($a,"sortby",AttrVal($a,"alias",$a))) cmp
-                            lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) }
-                     keys %{$group{$g}}) {
+      foreach my $d (sort { $sortIndex{$a} cmp $sortIndex{$b} } keys %{$group{$g}}) {
         my $type = $defs{$d}{TYPE};
         $extPage{group} = $g;
 
@@ -1655,9 +1665,7 @@ FW_showRoom()
   FW_pO "</table><br>";
 
   # Now the "atEnds"
-  foreach my $d (sort { lc(AttrVal($a, "sortby", AttrVal($a,"alias",$a))) cmp
-                        lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
-                   @atEnds) {
+  foreach my $d (sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds) {
     no strict "refs";
     $extPage{group} = "atEnd";
     FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, 
@@ -3064,7 +3072,16 @@ FW_widgetOverride($$)
   <a name="FHEMWEBattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#addStateEvent">addStateEvent</a></li>
+    <li><a href="#addStateEvent">addStateEvent</a></li><br>
+
+    <li>alias_&lt;RoomName&gt;<br>
+        If you define a userattr alias_&lt;RoomName&gt; and set this attribute
+        for a device assgined to &lt;RoomName&gt;, then this value will be used
+        when displaying &lt;RoomName&gt;.<br>
+        Note: you can use the userattr alias_.* to allow all rooms, but in this
+        case the attribute dropdown in the device detail view won't work for the
+        alias_.* attributes.
+        </li><br>
 
     <li><a href="#allowfrom">allowfrom</a></li>
     </li><br>
@@ -3370,7 +3387,7 @@ FW_widgetOverride($$)
         userattr named alias_hu for the Hungarian translation, and specify
         nameDisplay for the hungarian FHEMWEB instance as
         <ul>
-          AttrVal($d, "alias_hu", $devName)
+          AttrVal($DEVICE, "alias_hu", $ALIAS)
         </ul>
         </li>
         <br>
@@ -3771,7 +3788,17 @@ FW_widgetOverride($$)
   <a name="FHEMWEBattr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a href="#addStateEvent">addStateEvent</a></li>
+    <li><a href="#addStateEvent">addStateEvent</a></li><br>
+
+    <li>alias_&lt;RoomName&gt;<br>
+        Falls man das Attribut alias_&lt;RoomName&gt; definiert, und dieses
+        Attribut f&uuml;r ein Ger&auml;t setzt, dann wird dieser Wert bei
+        Anzeige von &lt;RoomName&gt; verwendet.<br>
+        Achtung: man kann im userattr auch alias_.* verwenden um alle
+        m&ouml;glichen R&auml;ume abzudecken, in diesem Fall wird aber die
+        Attributauswahl in der Detailansicht f&uuml;r alias_.* nicht
+        funktionieren.
+        </li><br>
 
     <li><a href="#allowfrom">allowfrom</a>
         </li><br>
@@ -4078,7 +4105,7 @@ FW_widgetOverride($$)
         alias_hu hinzu, und man setzt nameDisplay f&uuml;r diese FHEMWEB
         Instanz auf dem Wert:
         <ul>
-          AttrVal($d, "alias_hu", $devName)
+          AttrVal($DEVICE, "alias_hu", $ALIAS)
         </ul>
         </li>
         <br>
