@@ -70,7 +70,7 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadings "
+"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
       . $readingFnAttributes;
 }
 
@@ -169,6 +169,7 @@ sub HP1000_Define($$$) {
         $hash->{FW_PORT} = $defs{ $hash->{FW} }{PORT};
 
         fhem 'attr ' . $name . ' stateReadings temperature humidity';
+        fhem 'attr ' . $name . ' stateReadingsFormat 1';
     }
 
     if ( HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" ) ) {
@@ -1061,16 +1062,24 @@ sub HP1000_CGI() {
 
     # state
     my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
+    my $stateReadingsFormat = AttrVal( $name, "stateReadingsFormat", "0" );
+    my $stateReadingsLang   = AttrVal( $name, "stateReadingsLang",   "en" );
     foreach (@stateReadings) {
         $_ =~ /^(\w+):?(\w+)?$/;
-        my $r = $1;
-        my $n = ( $2 ? $2 : UConv::rname2rsname($r) );
+        my $r  = $1;
+        my $v  = ReadingsVal( $name, $r, undef );
+        my $u  = UConv::rname2unitDetails( $r, $stateReadingsLang, $v );
+        my $n  = ( $2 ? $2 : ( $u->{"short"} ? $u->{"short"} : $1 ) );
+        my $v2 = (
+              $stateReadingsFormat eq "2"
+            ? $u->{"value_unit_long"}
+            : ( $stateReadingsFormat eq "1" ? $u->{"value_unit"} : $v )
+        );
 
-        my $v = ReadingsVal( $name, $r, undef );
-        if ( defined($v) ) {
+        if ( defined($v2) ) {
             $result .= " " if ( $result ne "Initialized" );
             $result = "" if ( $result eq "Initialized" );
-            $result .= "$n: $v";
+            $result .= "$n: $v2";
         }
     }
 
