@@ -334,7 +334,6 @@ sub Hyperion_Read($)
     elsif ($col)
     {
       my $rgb = lc((split("x",$col))[1]);
-      $rgb =~ m/^(..)(..)(..)/;
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
       my $dim = int($v * 100);
@@ -379,8 +378,7 @@ sub Hyperion_Read($)
 sub Hyperion_GetConfigs($)
 {
   my ($hash) = @_;
-  return "Not connected"
-    if (!$hash->{FD});
+  return "Not connected" if (!$hash->{FD});
   my $name = $hash->{NAME};
   my $ip = $hash->{IP};
   my $dir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
@@ -545,7 +543,7 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "rgb")
   {
     return "Value of $cmd has to be in RGB hex format like ffffff or 3F7D90"
-      if ($value !~ /^(\d|[a-f|A-F]){6}$/);
+      if ($value !~ /^[\dA-Fa-f]{6}$/);
     $value = lc($value);
     my ($r,$g,$b) = Color::hex2rgb($value);
     $obj{color} = [$r,$g,$b];
@@ -657,7 +655,7 @@ sub Hyperion_Set($@)
     {
       $nmode = $i < $count - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
     }
-    $nmode = $nmode ? $nmode : "off";
+    $nmode = $nmode ? $nmode : @modeorder[0];
     fhem "set $name mode $nmode";
     return undef;
   }
