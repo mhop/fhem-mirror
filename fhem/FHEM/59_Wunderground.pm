@@ -54,7 +54,7 @@ sub Wunderground_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings "
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
       . $readingFnAttributes;
 
     return;
@@ -157,6 +157,7 @@ sub Wunderground_Define($$$) {
 
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         fhem 'attr ' . $name . ' stateReadings temp_c humidity';
+        fhem 'attr ' . $name . ' stateReadingsFormat 1';
     }
 
     # start the status update timer
@@ -284,16 +285,24 @@ sub Wunderground_ReceiveCommand($$$) {
 
     # state
     my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
+    my $stateReadingsFormat = AttrVal( $name, "stateReadingsFormat", "0" );
+    my $stateReadingsLang   = AttrVal( $name, "wu_lang",             "en" );
     foreach (@stateReadings) {
         $_ =~ /^(\w+):?(\w+)?$/;
-        my $r = $1;
-        my $n = ( $2 ? $2 : UConv::rname2rsname($r) );
+        my $r  = $1;
+        my $v  = ReadingsVal( $name, $r, undef );
+        my $u  = UConv::rname2unitDetails( $r, $stateReadingsLang, $v );
+        my $n  = ( $2 ? $2 : ( $u->{"short"} ? $u->{"short"} : $1 ) );
+        my $v2 = (
+              $stateReadingsFormat eq "2"
+            ? $u->{"value_unit_long"}
+            : ( $stateReadingsFormat eq "1" ? $u->{"value_unit"} : $v )
+        );
 
-        my $v = ReadingsVal( $name, $r, undef );
-        if ( defined($v) ) {
+        if ( defined($v2) ) {
             $state .= " " if ( $state ne "Initialized" );
             $state = "" if ( $state eq "Initialized" );
-            $state .= "$n: $v";
+            $state .= "$n: $v2";
         }
     }
 
