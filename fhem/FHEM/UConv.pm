@@ -1073,68 +1073,48 @@ sub UnitDetails ($;$) {
         if ($lang) {
             $details{"lang"} = $l;
 
-            if ( $details{"txt_format"} ) {
+            if (   $details{"txt_format"}
+                && ref( $units{$u}{"txt_format"} ) eq "HASH"
+                && $units{$u}{"txt_format"}{$l} )
+            {
                 delete $details{"txt_format"};
-                if ( ref( $units{$u}{"txt_format"} ) eq "HASH"
-                    && $units{$u}{"txt_format"}{$l} )
-                {
-                    $details{"txt_format"} = $units{$u}{"txt_format"}{$l};
-                }
-                elsif ( ref( $units{$u}{"txt_format"} ) ne "HASH" ) {
-                    $details{"txt_format"} = $units{$u}{"txt_format"};
-                }
+                $details{"txt_format"} = $units{$u}{"txt_format"}{$l};
             }
 
-            if ( $details{"txt_format_long"} ) {
+            if (   $details{"txt_format_long"}
+                && ref( $units{$u}{"txt_format_long"} ) eq "HASH"
+                && $units{$u}{"txt_format_long"}{$l} )
+            {
                 delete $details{"txt_format_long"};
-                if ( ref( $units{$u}{"txt_format_long"} ) eq "HASH"
-                    && $units{$u}{"txt_format_long"}{$l} )
-                {
-                    $details{"txt_format_long"} =
-                      $units{$u}{"txt_format_long"}{$l};
-                }
-                elsif ( ref( $units{$u}{"txt_format_long"} ) ne "HASH" ) {
-                    $details{"txt_format_long"} = $units{$u}{"txt_format_long"};
-                }
+                $details{"txt_format_long"} =
+                  $units{$u}{"txt_format_long"}{$l};
             }
 
-            if ( $details{"txt_format_long_pl"} ) {
+            if (   $details{"txt_format_long_pl"}
+                && ref( $units{$u}{"txt_format_long_pl"} ) eq "HASH"
+                && $units{$u}{"txt_format_long_pl"}{$l} )
+            {
                 delete $details{"txt_format_long_pl"};
-                if ( ref( $units{$u}{"txt_format_long_pl"} ) eq "HASH"
-                    && $units{$u}{"txt_format_long_pl"}{$l} )
-                {
-                    $details{"txt_format_long_pl"} =
-                      $units{$u}{"txt_format_long_pl"}{$l};
-                }
-                elsif ( ref( $units{$u}{"txt_format_long_pl"} ) ne "HASH" ) {
-                    $details{"txt_format_long_pl"} =
-                      $units{$u}{"txt_format_long_pl"};
-                }
+                $details{"txt_format_long_pl"} =
+                  $units{$u}{"txt_format_long_pl"}{$l};
             }
 
-            if ( $details{"unit_long"} ) {
+            if (   $details{"unit_long"}
+                && ref( $units{$u}{"unit_long"} ) eq "HASH"
+                && $units{$u}{"unit_long"}{$l} )
+            {
                 delete $details{"unit_long"};
-                if ( ref( $units{$u}{"unit_long"} ) eq "HASH"
-                    && $units{$u}{"unit_long"}{$l} )
-                {
-                    $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
-                }
-                elsif ( ref( $units{$u}{"unit_long"} ) ne "HASH" ) {
-                    $details{"unit_long"} = $units{$u}{"unit_long"};
-                }
+                $details{"unit_long"} = $units{$u}{"unit_long"}{$l};
             }
 
-            if ( $details{"unit_long_pl"} ) {
+            if (   $details{"unit_long_pl"}
+                && ref( $units{$u}{"unit_long_pl"} ) eq "HASH"
+                && $units{$u}{"unit_long_pl"}{$l} )
+            {
                 delete $details{"unit_long_pl"};
-                if ( ref( $units{$u}{"unit_long_pl"} ) eq "HASH"
-                    && $units{$u}{"unit_long_pl"}{$l} )
-                {
-                    $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"}{$l};
-                }
-                elsif ( ref( $units{$u}{"unit_long_pl"} ) ne "HASH" ) {
-                    $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"};
-                }
+                $details{"unit_long_pl"} = $units{$u}{"unit_long_pl"}{$l};
             }
+
         }
 
         return \%details;
@@ -1632,10 +1612,25 @@ sub rname2rsname($) {
 sub rname2unitDetails ($;$$) {
     my ( $reading, $lang, $value ) = @_;
     my $details;
-    my $r = lc($reading);
+    my $r = $reading;
     my $l = ( $lang ? lc($lang) : "en" );
     my $u;
     my %return;
+
+    # remove some prefix or other values to
+    # flatten reading name
+    $r =~ s/^fc\d+_//;
+    $r =~ s/_(min|max|avg|sum|avg\d+m|sum\d+m)_/_/;
+    $r =~ s/_(min|max|avg|sum|avg\d+m|sum\d+m)$//;
+    $r =~ s/.*[-_](temp)$/$1/;
+
+    # rename capital letter containing readings
+    if ( !$weather_readings{ lc($r) } ) {
+        $r =~ s/^([A-Z])(.*)/\l$1$2/;
+        $r =~ s/([A-Z][a-z0-9]*)[\/\|\-_]?/_$1/g;
+    }
+
+    $r = lc($r);
 
     # known alias reading names
     if ( $weather_readings{$r}{"unified"} ) {
@@ -1651,7 +1646,7 @@ sub rname2unitDetails ($;$$) {
 
     # known standard reading names
     elsif ( $weather_readings{$r}{"short"} ) {
-        $return{"unified"} = $r;
+        $return{"unified"} = $reading;
         $return{"short"}   = $weather_readings{$r}{"short"};
         $u                 = (
               $weather_readings{$r}{"unit"}
@@ -1662,7 +1657,7 @@ sub rname2unitDetails ($;$$) {
 
     # just guessing the unit from reading name
     elsif ( $r =~ /_([a-z]+)$/ ) {
-        $u = $1;
+        $u = lc($1);
         $return{"value"} = $value if ( defined($value) );
     }
 
@@ -1670,6 +1665,8 @@ sub rname2unitDetails ($;$$) {
     return \%return if ( !$u );
 
     my $unitDetails = UnitDetails( $u, $l );
+
+    $return{"unified"} = $reading if ( !$return{"unified"} );
 
     if ( ref($unitDetails) eq "HASH" ) {
         $return{"unit_guess"} = "1" if ( !$return{"short"} );
