@@ -1612,7 +1612,7 @@ FW_showRoom()
       $usuallyAtEnd{$dev} = 1;
       if(!AttrVal($dev, "group", undef)) {
         $sortIndex{$dev} = lc(AttrVal($dev,"sortby",FW_alias($dev)));
-        push @atEnds, AttrVal($a,"alias",$a);
+        push @atEnds, $dev;
         next;
       }
     }
