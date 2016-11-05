@@ -108,7 +108,9 @@ readingsChangeExec($$)
                 &lt;toReplace&gt; &lt;replaceWith&gt;"</code>
     <br><br>
     Change the content of a reading if it changes, with the perl string
-    substitute mechanism.
+    substitute mechanism. Note: As some modules rely on the known format of
+    some readings, changing such readings may cause these modules to stop
+    working.
     <br><br>
 
     &lt;device&gt;, &lt;readingName&gt; and &lt;toReplace&gt; are regular
