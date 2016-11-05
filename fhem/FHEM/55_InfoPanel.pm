@@ -225,8 +225,8 @@ sub btIP_Get {
      }
      when ("overrides") {
         last if(!defined($defs{$name}{fhem}{override}));
-        while ( my ($key, $value) = each($defs{$name}{fhem}{override}) ) {
-          $ret .= "$key => $value \n";
+        foreach my $key ( keys $defs{$name}{fhem}{override} ) {
+          $ret .= "$key => $defs{$name}{fhem}{override}{$key} \n";
         }
      }
      default {
@@ -1160,9 +1160,11 @@ sub btIP_evalLayout {
 
         when("pop") {
           return unless $pstackcount;
-          while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
-            $params{$key} = $value;
+          foreach my $key ( keys $pstack{$pstackcount} ) {
+#             Debug "pop key: $key, value: $pstack{$pstackcount}{$key}";
+             $params{$key} = $pstack{$pstackcount}{$key};
           }
+
           delete $pstack{$pstackcount};
           $pstackcount--;
         }
@@ -1179,8 +1181,9 @@ sub btIP_evalLayout {
         
         when("push") {
           $pstackcount++;
-          while ( my ($key, $value) = each(%params) ) {
-            $pstack{$pstackcount}{$key} = $value;
+          foreach my $key ( keys %params ) {
+#             Debug "push key: $key, value: $params{$key}";
+             $pstack{$pstackcount}{$key} = $params{$key};
           }
         }
 
