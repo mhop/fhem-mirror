@@ -146,6 +146,7 @@ FHEM/32_TechemSD.pm          herrmannj            http://forum.fhem.de Sonstiges
 FHEM/32_WifiLight.pm         herrmannj            http://forum.fhem.de Beleuchtung
 FHEM/32_yowsup.pm            justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_withings.pm          markus-m             http://forum.fhem.de Sonstiges
+FHEM/33_readingschange.pm    rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends/readingsGroup readingsHistory
 FHEM/33_readingsHistory.pm   justme1968           http://forum.fhem.de Frontends/readingsGroup readingsHistory
 FHEM/33_readingsProxy.pm     justme1968           http://forum.fhem.de Automatisierung
