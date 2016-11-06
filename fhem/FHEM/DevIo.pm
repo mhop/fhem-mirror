@@ -39,9 +39,15 @@ DevIo_DoSimpleRead($)
     $buf = "" if(!defined($res));
 
   } elsif($hash->{IODev}) {
-    $buf = $hash->{IODevRxBuffer};
-    $hash->{IODevRxBuffer} = "";
-    $buf = "" if(!defined($buf));
+
+    if($hash->{IOReadFn}) {
+      $buf = CallFn($hash->{IODev}{NAME},"IOReadFn",$hash);
+
+    } else {
+      $buf = $hash->{IODevRxBuffer};
+      $hash->{IODevRxBuffer} = "";
+      $buf = "" if(!defined($buf));
+    }
 
   }
   return $buf;
