@@ -706,3 +706,6 @@
 
 - Wed Oct 26 2016 (loredo)
   - adding new module 59_Wunderground
+
+- Wed Nov 5 2016 (loredo)
+  - adding general (but optional) unit support for FHEM and FHEM modules
