@@ -76,13 +76,16 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-#  $hash->{SetFn} = "OBIS_Set";
+  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both ".
   					  $readingFnAttributes;
 }
+
+#1B1B1B1B010101017605002605426200620072630101760107FFFFFFFFFFFF05000CAC6C0B0A01454D4800005A561C726201640DF29B620163676F0076050026054362006200726307017707FFFFFFFFFFFF0B0A01454D4800005A561C070100620AFFFF726201640DF29B7577070100603201010101010104454D480177070100600100FF010101010B0A01454D4800005A561C0177070100010800FF641C0104726201640DF29B621E52FF6404AB760177070100020800FF01726201640DF29B621E52FF6324910177070100100700FF0101621B52005301360101016373F100760500260544620062007263020171016326A3000000001B1B1B1B1A03CDC9
+#1B1B1B1B010101017605002605456200620072630101760107FFFFFFFFFFFF05000CAC6D0B0A01454D4800005A561C726201640DF29C62016343D30076050026054662006200726307017707FFFFFFFFFFFF0B0A01454D4800005A561C070100620AFFFF726201640DF29C7577070100603201010101010104454D480177070100600100FF010101010B0A01454D4800005A561C0177070100010800FF641C0104726201640DF29C621E52FF6404AB770177070100020800FF01726201640DF29C621E52FF6324910177070100100700FF0101621B520053012C0101016319F6007605002605476200620072630201710163955D000000001B1B1B1B1A0310B4
 
 #####################################
 sub OBIS_Define($$)
@@ -226,49 +229,49 @@ sub OBIS_Read($)
     	my $buf = DevIo_SimpleRead($hash);
     	my $b=$buf;
     	$b =~ s/(.)/sprintf("%X",ord($1))/eg;
-    	if (defined $hash->{helper}{SpeedChange} && $hash->{helper}{SpeedChange} eq "")
+    	if ( !defined($hash->{helper}{SpeedChange}) ||  ($hash->{helper}{SpeedChange} eq ""))
     	{
     		OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
     		Log3 $hash,4, "parsing....\r\n";
     	} else
     	{
-			if ($hash->{helper}{SpeedChange2} eq "")
-			{
-				Log3 $hash,4,"Part 1";
-#				$hash->{helper}{SPEED}=$bd{$value};
-				DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) ;
-				Log3 $hash,4,"Writing ".$hash->{helper}{DEVICES}[2];
-				$hash->{helper}{SpeedChange2}="1";
-			} elsif ($hash->{helper}{SpeedChange2} eq "1")
-			{	
-				if ($buf ne hex(15)) {
-					Log3 $hash,4,"Part 2";
-			    	my $sp=$hash->{helper}{SPEED};
-					my $d=$hash->{DeviceName};
-					my $repl=$sp;
-					Log3 $hash,4,"Old Dev: $d";
-					$d=~/(.*@)(\d*)(.*)/;
-					my $d2=$1.$hash->{helper}{SpeedChange}.$3;
-			#		$d=~s/(.*@)(\d*)(.*)/$repl$2/ee;
-					
-					Log3 $hash,4, "Replaced dev: $d2";
-					RemoveInternalTimer($hash);  
-					DevIo_CloseDev($hash) if $hash->{DeviceName} ne "none";
-					$hash->{DeviceName} = $d2; 
-					$hash->{helper}{EoM}=-1;
-				  	Log3 $hash,5,"OBIS ($name) - Opening device...";
-					my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
-			    	Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-					InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
-				  	DevIo_OpenDev($hash, 1, "OBIS_Init");
-				} else
-				{	
-					Log3 $hash,4,"Recieved NAK from Meter"; 	
-				}	
-				$hash->{helper}{SpeedChange2}="";
-				$hash->{helper}{SpeedChange}="";    	
-				Log3 $hash,4, "Cleared helper\r\n";			    	
-			}
+#			if ($hash->{helper}{SpeedChange2} eq "")
+#			{
+#				Log3 $hash,4,"Part 1";
+##				$hash->{helper}{SPEED}=$bd{$value};
+#				DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) ;
+#				Log3 $hash,4,"Writing ".$hash->{helper}{DEVICES}[2];
+#				$hash->{helper}{SpeedChange2}="1";
+#			} elsif ($hash->{helper}{SpeedChange2} eq "1")
+#			{	
+#				if ($buf ne hex(15)) {
+#					Log3 $hash,4,"Part 2";
+#			    	my $sp=$hash->{helper}{SPEED};
+#					my $d=$hash->{DeviceName};
+#					my $repl=$sp;
+#					Log3 $hash,4,"Old Dev: $d";
+#					$d=~/(.*@)(\d*)(.*)/;
+#					my $d2=$1.$hash->{helper}{SpeedChange}.$3;
+#			#		$d=~s/(.*@)(\d*)(.*)/$repl$2/ee;
+#					
+#					Log3 $hash,4, "Replaced dev: $d2";
+#					RemoveInternalTimer($hash);  
+#					DevIo_CloseDev($hash) if $hash->{DeviceName} ne "none";
+#					$hash->{DeviceName} = $d2; 
+#					$hash->{helper}{EoM}=-1;
+#				  	Log3 $hash,5,"OBIS ($name) - Opening device...";
+#					my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
+#			    	Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+#					InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+#				  	DevIo_OpenDev($hash, 1, "OBIS_Init");
+#				} else
+#				{	
+#					Log3 $hash,4,"Recieved NAK from Meter"; 	
+#				}	
+#				$hash->{helper}{SpeedChange2}="";
+#				$hash->{helper}{SpeedChange}="";    	
+#				Log3 $hash,4, "Cleared helper\r\n";			    	
+#			}
     	}
 	}
     return(undef);
@@ -298,6 +301,7 @@ sub OBIS_trySMLdecode($$)
 #	    		my $telegramm = $&;
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
       			Log3 $hash, 5,"OBIS: Telegram=$msg";
+      			Log 3,@list;
       			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
@@ -380,6 +384,7 @@ sub OBIS_Parse($$)
 {
 	my ($hash, $buf) = @_;
 	my $buf2=uc(unpack('H*',$buf));
+	Log 5,"uedduhskhdkjhsdkjh";
 	if($hash->{MeterType}!~/SML|Unknown/ && $buf2=~m/7701([0-9A-F]*?)01/g) {
 		Log 3,"OBIS_Ext called";
 		my (undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
@@ -397,7 +402,6 @@ sub OBIS_Parse($$)
 	  	$hash->{helper}{BUFFER}  =substr( $hash->{helper}{BUFFER} , -10000);
    }	
    my %dir=("<"=>"out",">"=>"in");
-	
 	my $buffer=$hash->{helper}{BUFFER};
 	my $remainingSML;
 	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|Unknown/);
@@ -522,7 +526,7 @@ sub OBIS_Parse($$)
     							}
     							if (AttrVal($name,"unitReadings","off") eq "off") {
     								$v1=~s/(.*)\*.*/$1/;
-    								$v2=~s/(.*)\*.*/$1/;
+    								if (length $v2) {}$v2=~s/(.*)\*.*/$1/};
     							}
     							$v1+=0 if (looks_like_number($v1));
     							$v2+=0 if (looks_like_number($v2));
