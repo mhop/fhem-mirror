@@ -223,12 +223,12 @@ sub btIP_Get {
      when ("layout") {
         $ret = $defs{$name}{fhem}{layout};
      }
-#     when ("overrides") {
-#        last if(!defined($defs{$name}{fhem}{override}));
-#        foreach my $key ( keys $defs{$name}{fhem}{override} ) {
-#          $ret .= "$key => $defs{$name}{fhem}{override}{$key} \n";
-#        }
-#     }
+     when ("overrides") {
+        last if(!defined($defs{$name}{fhem}{override}));
+        foreach my $key ( keys %{$defs{$name}{fhem}{override}} ) {
+          $ret .= "$key => $defs{$name}{fhem}{override}{$key} \n";
+        }
+     }
      default {
         $ret = $usage;
      }
@@ -1160,7 +1160,7 @@ sub btIP_evalLayout {
 
         when("pop") {
           return unless $pstackcount;
-          foreach my $key ( keys $pstack{$pstackcount} ) {
+          foreach my $key ( keys %{$pstack{$pstackcount}} ) {
 #             Debug "pop key: $key, value: $pstack{$pstackcount}{$key}";
              $params{$key} = $pstack{$pstackcount}{$key};
           }
