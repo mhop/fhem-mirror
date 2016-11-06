@@ -32,7 +32,7 @@ use warnings;
 use vars qw(%data);
 use HttpUtils;
 use Encode;
-use UConv;
+use Unit;
 use Data::Dumper;
 
 sub Wunderground_Hash2Readings($$;$);
@@ -50,7 +50,7 @@ sub Wunderground_Initialize($) {
     $hash->{DefFn}         = "Wunderground_Define";
     $hash->{AttrFn}        = "Wunderground_Attr";
     $hash->{UndefFn}       = "Wunderground_Undefine";
-    $hash->{DbLog_splitFn} = "UConv::DbLog_split";
+    $hash->{DbLog_splitFn} = "Unit_DbLog_split";
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
@@ -239,7 +239,7 @@ sub Wunderground_ReceiveCommand($$$) {
     Log3 $name, 5,
       "Wunderground $name: called function Wunderground_ReceiveCommand()";
 
-    readingsBeginUpdate($hash);
+    readingsUnitBeginUpdate($hash);
 
     # service not reachable
     if ($err) {
@@ -284,31 +284,18 @@ sub Wunderground_ReceiveCommand($$$) {
     }
 
     # state
-    my @stateReadings = split( /\s+/, AttrVal( $name, "stateReadings", "" ) );
+    my $stateReadings       = AttrVal( $name, "stateReadings",       "" );
+    my $stateReadingsLang   = AttrVal( $name, "stateReadingsLang",   "en" );
     my $stateReadingsFormat = AttrVal( $name, "stateReadingsFormat", "0" );
-    my $stateReadingsLang   = AttrVal( $name, "wu_lang",             "en" );
-    foreach (@stateReadings) {
-        $_ =~ /^(\w+):?(\w+)?$/;
-        my $r  = $1;
-        my $v  = ReadingsVal( $name, $r, undef );
-        my $u  = UConv::rname2unitDetails( $r, $stateReadingsLang, $v );
-        my $n  = ( $2 ? $2 : ( $u->{"short"} ? $u->{"short"} : $1 ) );
-        my $v2 = (
-              $stateReadingsFormat eq "2"
-            ? $u->{"value_unit_long"}
-            : ( $stateReadingsFormat eq "1" ? $u->{"value_unit"} : $v )
-        );
 
-        if ( defined($v2) ) {
-            $state .= " " if ( $state ne "Initialized" );
-            $state = "" if ( $state eq "Initialized" );
-            $state .= "$n: $v2";
-        }
-    }
+    $state =
+      getMultiValStatus( $name, $stateReadings,
+        $stateReadingsLang, $stateReadingsFormat );
 
-    readingsBulkUpdate( $hash, "state", $state );
-    readingsBulkUpdateIfChanged( $hash, "lastQueryResult", $lastQueryResult );
-    readingsEndUpdate( $hash, 1 );
+    readingsUnitBulkUpdate( $hash, "state", $state );
+    readingsUnitBulkUpdateIfChanged( $hash, "lastQueryResult",
+        $lastQueryResult );
+    readingsUnitEndUpdate( $hash, 1 );
 
     return;
 }
@@ -395,16 +382,16 @@ sub Wunderground_Hash2Readings($$;$) {
                 $moonset =~ s/^(\d):(\d\d)$/0$1:$2/;
                 $moonset =~ s/^(\d\d):(\d)$/$1:0$2/;
 
-                readingsBulkUpdate( $hash, "sunrise",  $sunrise );
-                readingsBulkUpdate( $hash, "sunset",   $sunset );
-                readingsBulkUpdate( $hash, "moonrise", $moonrise );
-                readingsBulkUpdate( $hash, "moonset",  $moonset );
+                readingsUnitBulkUpdate( $hash, "sunrise",  $sunrise );
+                readingsUnitBulkUpdate( $hash, "sunset",   $sunset );
+                readingsUnitBulkUpdate( $hash, "moonrise", $moonrise );
+                readingsUnitBulkUpdate( $hash, "moonset",  $moonset );
 
-                readingsBulkUpdate( $hash, "moon_age",
+                readingsUnitBulkUpdate( $hash, "moon_age",
                     $h->{moon_phase}{ageOfMoon} );
-                readingsBulkUpdate( $hash, "moon_pct",
+                readingsUnitBulkUpdate( $hash, "moon_pct",
                     $h->{moon_phase}{percentIlluminated} );
-                readingsBulkUpdate( $hash, "moon_phase",
+                readingsUnitBulkUpdate( $hash, "moon_phase",
                     $h->{moon_phase}{phaseofMoon} );
             }
 
@@ -415,104 +402,104 @@ sub Wunderground_Hash2Readings($$;$) {
                 my $period = $h->{period} - 1;
                 $reading = "fc" . $period . "_";
 
-                readingsBulkUpdate( $hash, $reading . "condition",
+                readingsUnitBulkUpdate( $hash, $reading . "condition",
                     $h->{conditions} );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "high_c",
                     $h->{high}{celsius}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "high_f",
                     $h->{high}{fahrenheit}
                 );
-                readingsBulkUpdate( $hash, $reading . "humidity",
+                readingsUnitBulkUpdate( $hash, $reading . "humidity",
                     $h->{avehumidity} );
-                readingsBulkUpdate( $hash, $reading . "humidity_min",
+                readingsUnitBulkUpdate( $hash, $reading . "humidity_min",
                     $h->{minhumidity} );
-                readingsBulkUpdate( $hash, $reading . "humidity_max",
+                readingsUnitBulkUpdate( $hash, $reading . "humidity_max",
                     $h->{maxhumidity} );
-                readingsBulkUpdate( $hash, $reading . "icon", $h->{icon} );
-                readingsBulkUpdate( $hash, $reading . "icon_url",
+                readingsUnitBulkUpdate( $hash, $reading . "icon", $h->{icon} );
+                readingsUnitBulkUpdate( $hash, $reading . "icon_url",
                     $h->{icon_url} );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "low_c",
                     $h->{low}{celsius}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "low_f",
                     $h->{low}{fahrenheit}
                 );
-                readingsBulkUpdate( $hash, $reading . "pop", $h->{pop} );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate( $hash, $reading . "pop", $h->{pop} );
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "rain_day",
                     $h->{qpf_allday}{mm}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "rain_day_in",
                     $h->{qpf_allday}{in}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "rain_night",
                     $h->{qpf_night}{mm}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "rain_night_in",
                     $h->{qpf_night}{in}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "snow_day",
                     $h->{snow_allday}{cm}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "snow_day_in",
                     $h->{snow_allday}{in}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "snow_night",
                     $h->{snow_night}{cm}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "snow_night_in",
                     $h->{snow_night}{in}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_direction",
                     $h->{avewind}{degrees}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_direction_max",
                     $h->{maxwind}{degrees}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_speed",
                     $h->{avewind}{kph}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_speed_mph",
                     $h->{avewind}{mph}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_speed_max",
                     $h->{maxwind}{kph}
                 );
-                readingsBulkUpdate(
+                readingsUnitBulkUpdate(
                     $hash,
                     $reading . "wind_speed_max_mph",
                     $h->{maxwind}{mph}
@@ -545,16 +532,17 @@ sub Wunderground_Hash2Readings($$;$) {
 
                 $reading = "fc" . $period . "_";
 
-                readingsBulkUpdate( $hash, $reading . "icon$night",
+                readingsUnitBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
-                readingsBulkUpdate( $hash, $reading . "icon_url$night",
+                readingsUnitBulkUpdate( $hash, $reading . "icon_url$night",
                     $h->{icon_url} );
-                readingsBulkUpdate( $hash, $reading . "pop$night", $h->{pop} );
-                readingsBulkUpdate( $hash, $reading . "text$night",
+                readingsUnitBulkUpdate( $hash, $reading . "pop$night",
+                    $h->{pop} );
+                readingsUnitBulkUpdate( $hash, $reading . "text$night",
                     $h->{fcttext_metric} );
-                readingsBulkUpdate( $hash, $reading . "text_f$night",
+                readingsUnitBulkUpdate( $hash, $reading . "text_f$night",
                     $h->{fcttext} );
-                readingsBulkUpdate( $hash, $reading . "title$night",
+                readingsUnitBulkUpdate( $hash, $reading . "title$night",
                     $h->{title} );
             }
 
@@ -577,7 +565,7 @@ sub Wunderground_Hash2Readings($$;$) {
 
                 $value =~ s/^(\d+)%$/$1/;
 
-                readingsBulkUpdate( $hash, $reading, $value );
+                readingsUnitBulkUpdate( $hash, $reading, $value );
             }
         }
     }
@@ -589,7 +577,7 @@ sub Wunderground_Hash2Readings($$;$) {
                 Wunderground_Hash2Readings( $hash, $_, $r . $i );
             }
             else {
-                readingsBulkUpdate( $hash, $r . $i, $_ );
+                readingsUnitBulkUpdate( $hash, $r . $i, $_ );
             }
 
             $i++;
