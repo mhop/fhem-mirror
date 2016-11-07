@@ -18,6 +18,7 @@ FBAHAHTTP_Initialize($)
   $hash->{SetFn}    = "FBAHAHTTP_Set";
   $hash->{AttrFn}   = "FBAHAHTTP_Attr";
   $hash->{ReadyFn}  = "FBAHAHTTP_Ready";
+  $hash->{RenameFn} = "FBAHAHTTP_RenameFn";
   $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay ".
                       "disable:0,1 disabledForIntervals";
 }
@@ -87,6 +88,19 @@ FBAHAHTTP_connect($)
   $hash->{STATE} = "connected";
   Log3 $name, 4, "FBAHAHTTP_connect $name: got SID $sid";
   return undef;
+}
+
+sub
+FBAHAHTTP_RenameFn($$)
+{
+  my ($new, $old) = @_;
+  for my $d (devspec2array("TYPE=FBDECT")) {
+    my $hash = $defs{$d};
+    next if(!$hash);
+    $hash->{DEF} =~ s/^$old:/$new:/;
+    $attr{$d}{IODev} = $new if(AttrVal($d,"IODev","") eq $old);
+  }
+  FBDECT_renameIoDev($new, $old);
 }
 
 #####################################

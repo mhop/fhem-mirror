@@ -281,6 +281,20 @@ FBDECT_ParseHttp($$$)
   return $hash->{NAME};
 }
 
+sub
+FBDECT_renameIoDev($$)  # Called from FBAHAHTTP
+{
+  my ($new, $old) = @_;
+  my $dp = $modules{FBDECT}{defptr};
+  for my $ok (keys %{$dp}) {
+    my $nk = $ok;
+    $nk =~ s/^$old:/$new:/;
+    next if($nk eq $ok);
+    $dp->{$nk} = $dp->{$ok};
+    delete $dp->{$ok};
+  }
+}
+
 ###################################
 sub
 FBDECT_Parse($$@)
