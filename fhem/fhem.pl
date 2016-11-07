@@ -4464,6 +4464,7 @@ notifyRegexpChanged($$)
   } else {
     delete($hash->{NOTIFYDEV}); # when called by modify
   }
+  %ntfyHash = ();
 }
 
 sub
