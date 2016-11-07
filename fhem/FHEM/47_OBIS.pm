@@ -526,7 +526,7 @@ sub OBIS_Parse($$)
     							}
     							if (AttrVal($name,"unitReadings","off") eq "off") {
     								$v1=~s/(.*)\*.*/$1/;
-    								if (length $v2) {}$v2=~s/(.*)\*.*/$1/};
+    								if (length $v2) {}$v2=~s/(.*)\*.*/$1/;
     							}
     							$v1+=0 if (looks_like_number($v1));
     							$v2+=0 if (looks_like_number($v2));
