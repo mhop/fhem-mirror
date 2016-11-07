@@ -879,6 +879,9 @@ sub XBMC_Set($@)
   elsif($cmd eq 'repeat') {
     return XBMC_Set_Repeat($hash, @args);
   }
+  elsif($cmd eq 'seek') {
+    return XBMC_Set_Seek($hash, $args[0], $args[1], $args[2], @args);
+  }
   
   #RPC referring to the Input http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Input
   elsif($cmd eq 'back') {
@@ -994,7 +997,7 @@ sub XBMC_Set($@)
     "off play:all,audio,video,picture playpause:all,audio,video,picture pause:all,audio,video,picture " . 
     "prev:all,audio,video,picture next:all,audio,video,picture goto stop:all,audio,video,picture " . 
     "open opendir openmovieid openepisodeid openchannelid addon shuffle:toggle,on,off repeat:one,all,off volumeUp:noArg volumeDown:noArg " . 
-    "back:noArg contextmenu:noArg down:noArg home:noArg info:noArg left:noArg " . 
+    "seek back:noArg contextmenu:noArg down:noArg home:noArg info:noArg left:noArg " . 
     "right:noArg select:noArg send exec:left,right," . 
     "up,down,pageup,pagedown,select,highlight,parentdir,parentfolder,back," . 
     "previousmenu,info,pause,stop,skipnext,skipprevious,fullscreen,aspectratio," . 
@@ -1149,6 +1152,23 @@ sub XBMC_Set_Stop($@)
   my $obj = {
     'method'  => 'Player.Stop',
     'params' => { 
+      'playerid' => 0 #will be replaced with the active player
+    }
+  };
+  return XBMC_PlayerCommand($hash,$obj,$player);
+}
+
+sub XBMC_Set_Seek($@)
+{
+  my ($hash,$hours,$minutes,$seconds,$player) = @_;
+  my $obj = {
+    'method'  => 'Player.Seek',
+    'params' => { 
+	  'value' => {
+	  'seconds' => $seconds + 0,
+	  'minutes' => $minutes +0 ,
+	  'hours' => $hours + 0
+	  },
       'playerid' => 0 #will be replaced with the active player
     }
   };
@@ -1468,6 +1488,8 @@ sub XBMC_HTTP_Request($$@)
 1;
 
 =pod
+=item summary    control and receive events from Kodi/XBMC
+=item summary_DE Steuern und &uuml;berwachen von Kodi/XBMC
 =begin html
 
 <a name="XBMC"></a>
@@ -1553,6 +1575,7 @@ sub XBMC_HTTP_Request($$@)
     <li><b>openepisodeid &lt;path&gt;</b> -  Plays an episode by id</li>
     <li><b>openchannelid &lt;path&gt;</b> -  Switches to channel by id</li>
     <li><b>addon &lt;addonid&gt; &lt;parametername&gt; &lt;parametervalue&gt;</b> -  Executes addon with one Parameter, for example set xbmc addon script.json-cec command activate</li>
+    <li><b>seek &lt;hours&gt; &lt;minutes&gt; &lt;seconds&gt;</b> - seek to the specified time</li>
   </ul>
   <br>Input related commands:<br>
   <ul> 
