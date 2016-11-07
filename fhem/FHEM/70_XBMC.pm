@@ -880,7 +880,7 @@ sub XBMC_Set($@)
     return XBMC_Set_Repeat($hash, @args);
   }
   elsif($cmd eq 'seek') {
-    return XBMC_Set_Seek($hash, $args[0], $args[1], $args[2], @args);
+    return XBMC_Set_Seek($hash, $args[0], @args);
   }
   
   #RPC referring to the Input http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Input
@@ -1160,13 +1160,14 @@ sub XBMC_Set_Stop($@)
 
 sub XBMC_Set_Seek($@)
 {
-  my ($hash,$hours,$minutes,$seconds,$player) = @_;
+  my ($hash,$position,$player) = @_;
+  my ($hours, $minutes, $seconds) = split(/:/, $position);
   my $obj = {
     'method'  => 'Player.Seek',
     'params' => { 
 	  'value' => {
 	  'seconds' => $seconds + 0,
-	  'minutes' => $minutes +0 ,
+	  'minutes' => $minutes + 0 ,
 	  'hours' => $hours + 0
 	  },
       'playerid' => 0 #will be replaced with the active player
@@ -1575,7 +1576,7 @@ sub XBMC_HTTP_Request($$@)
     <li><b>openepisodeid &lt;path&gt;</b> -  Plays an episode by id</li>
     <li><b>openchannelid &lt;path&gt;</b> -  Switches to channel by id</li>
     <li><b>addon &lt;addonid&gt; &lt;parametername&gt; &lt;parametervalue&gt;</b> -  Executes addon with one Parameter, for example set xbmc addon script.json-cec command activate</li>
-    <li><b>seek &lt;hours&gt; &lt;minutes&gt; &lt;seconds&gt;</b> - seek to the specified time</li>
+    <li><b>seek &lt;hh:mm:ss&gt;</b> - seek to the specified time</li>
   </ul>
   <br>Input related commands:<br>
   <ul> 
