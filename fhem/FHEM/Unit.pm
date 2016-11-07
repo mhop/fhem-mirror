@@ -2616,7 +2616,7 @@ sub GetValueWithUnit ($$@) {
     my $l = ( $lang ? lc($lang) : "en" );
     my $return = GetDetails( $unit, $l );
     my $txt;
-    return $value if ( !$return->{"unit"} );
+    return $value if ( !$return->{"unit"} && !$return->{"unit_symbol"} );
 
     $return->{"value"} = $value;
 
