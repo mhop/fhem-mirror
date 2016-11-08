@@ -10,6 +10,7 @@
 # ABU 20160515 removed compatibility flag for EIB
 # ABU 20160516 added log entry for non-compatibility of tul
 # ABU 20160613 changed log entry for startup
+# ABU 20161108 added knxd. Added doku as well. Added summary. Treat it like eibd. See thread #58375
 
 package main;
 
@@ -449,7 +450,8 @@ TUL_OpenDev($$)
 	Log 3, "TUL opening $name device $dev" if(!$reopen);
 
 	# eibd:host[:port]
-	if($dev =~ m/^(eibd):(.+)$/) 
+	#if($dev =~ m/^(eibd):(.+)$/)
+	if($dev =~ m/^(eibd|knxd):(.+)$/)
 	{
 		my $host = $2;
 		my $port = 6720;
@@ -1153,7 +1155,7 @@ sub sendRequest($$)
   <tr><td>
   The TUL module is the representation of a EIB / KNX connector in FHEM.
   <a href="#KNX">KNX</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
-  The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de
+  The TUL module is designed to connect to EIB network either using eibd, knxd or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de
 
   Note: this module may require the Device::SerialPort or Win32::SerialPort module if you attach the device via USB and the OS sets strange default parameters for serial devices.
 
@@ -1186,6 +1188,7 @@ sub sendRequest($$)
 
 	  Example:<br>
 	  <code>define tul TUL eibd:localhost 1.1.249</code>
+	  <code>define tul TUL knxd:192.168.178.1 1.1.248</code>
     </ul>
     <br>
     If the device is called none, then no device will be opened, so you can experiment without hardware attached.<br>
@@ -1210,7 +1213,9 @@ sub sendRequest($$)
 </ul>
 
 =end html
-
+=device
+=item summary Connects FHEM to KNX-Bus (Base-device)
+=item summary_DE Verbindet FHEM mit dem KNX-Bus (Basisger&umlat)
 =begin html_DE
 
 <a name="TUL"></a>
@@ -1221,7 +1226,7 @@ sub sendRequest($$)
   <tr><td>
   Das Modul TUL stellt die Verbindung von FHEM zum EIB / KNX dar.
   <a href="#KNX">KNX</a> Instanzen stellen die Vrbindung zu den KNX-Gruppen dar und ben&Ouml;tigen ein TUL-Device als IO-Schnittstelle.<br>
-  Das Modul TUL kommuniziert mit dem KNX entweder &Uuml;ber den EIBD, den KNXD oder den TUL <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> hergestellt von busware.de
+  Das Modul TUL kommuniziert mit dem KNX entweder &Uuml;ber den eibd, den knxd oder den TUL <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> hergestellt von busware.de
 
   Anmerkung: das Modul ben&Ouml;tigt die Device::SerialPort oder Win32::SerialPort wenn der Stick &Uuml;ber USB angeschlossen wird, und das OS unrealistische Parameter f&Uuml;r das Device einstellt.
 
@@ -1254,6 +1259,7 @@ sub sendRequest($$)
 
 	  Beispiel:<br>
 	  <code>define tul TUL eibd:localhost 1.1.249</code>
+	  <code>define tul TUL knxd:192.168.178.2 1.1.248</code>
     </ul>
     <br>
 	Wenn das Ger&auml;t none konfiguriert wird, wird kein device ge&Ouml;ffnet. So k&Ouml;nnt Ihr ohne angeschlossene Hardware experimentieren. <br>
