@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  02_RSS: make hash reference explicit
   - updated: 74_AMAD: New Version 2.6.6 remove APSSID in define, add Attribut
                       setAPSSID to prevent WLan sleeps, add Attribut
                       setTtsMsgLang set to tts language
