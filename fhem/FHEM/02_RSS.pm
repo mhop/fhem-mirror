@@ -690,7 +690,7 @@ RSS_evalLayout($$@) {
 	      }
 	    } elsif($cmd eq "pop") {
 	      return unless $pstackcount;
-	      while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
+	      while ( my ($key, $value) = each(%{$pstack{$pstackcount}}) ) {
 		$params{$key} = $value;
 	      }
 	      delete $pstack{$pstackcount};
@@ -925,6 +925,8 @@ plotFromUrl(@)
 
 =pod
 =item helper
+=item summary Provides a freely configurable RSS feed and HTML page.
+=item summary_DE Stellt frei konfigurierbaren RSS-Feed und HTML-Seite bereit. 
 =begin html
 
 <a name="RSS"></a>
