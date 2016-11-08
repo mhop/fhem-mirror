@@ -36,6 +36,29 @@ sub WMBUS_Initialize($) {
                        " $readingFnAttributes";
 }
 
+sub 
+WMBUS_HandleEncoding($$)
+{
+  my ($mb, $msg) = @_;
+  my $encoding = "CUL";
+  my $rssi;
+  
+  ($msg, $rssi) = split(/::/,$msg);
+  
+  if (substr($msg,1,3) eq "AMB") {
+    # Amber Wireless AMB8425-M encoding, does not include CRC16
+    $encoding = "AMB";
+    $mb->setCRCsize(0);
+    # message length (first byte) contains 1 byte for rssi,
+    # remove it 
+    my $msglen = sprintf("%1x", hex(substr($msg,4,1)) - 1);
+    $msg = "b" . $msglen . substr($msg,5);
+  } else {
+    $msg .= WMBUS_RSSIAsRaw($rssi);
+  }
+  return ($msg, $rssi, $encoding);
+}
+
 sub
 WMBUS_Define($$)
 {
@@ -45,7 +68,7 @@ WMBUS_Define($$)
 	my $rssi;
 
   if(@a != 6 && @a != 3) {
-    my $msg = "wrong syntax: define <name> WMBUS [<ManufacturerID> <SerialNo> <Version> <Type>]|b<HexMessage>";
+    my $msg = "wrong syntax: define <name> WMBUS [<ManufacturerID> <SerialNo> <Version> <Type> [<MessageEncoding>]]|b<HexMessage>";
     Log3 undef, 2, $msg;
     return $msg;
   }
@@ -55,14 +78,16 @@ WMBUS_Define($$)
   if (@a == 3) {
 		# unparsed message
 		my $msg = $a[2];
-		
-		($msg, $rssi) = split(/::/,$msg);
-		
-		$msg .= WMBUS_RSSIAsRaw($rssi);
-		
-		return "a WMBus message must be a least 12 bytes long" if $msg !~ m/b[a-zA-Z0-9]{24,}/;
-		
 		$mb = new WMBus;
+		
+		
+		($msg, $rssi, $hash->{MessageEncoding}) = WMBUS_HandleEncoding($mb, $msg);
+		
+		my $minSize = ($mb->getCRCsize() + WMBus::TL_BLOCK_SIZE) * 2;
+    my $reMinSize = qr/b[a-zA-Z0-9]{${minSize},}/;
+		
+		return "a WMBus message must be a least $minSize bytes long, $msg" if $msg !~ m/${reMinSize}/;
+		
 		if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
 			$hash->{Manufacturer} = $mb->{manufacturer};
 			$hash->{IdentNumber} = $mb->{afield_id};
@@ -79,6 +104,7 @@ WMBUS_Define($$)
 		}
 
 	} else {
+	  my $encoding = "CUL";
 	  # manual specification
     if ($a[2] !~ m/[A-Z]{3}/) {
 			return "$a[2] is not a valid WMBUS manufacturer id";
@@ -95,11 +121,20 @@ WMBUS_Define($$)
     if ($a[5] !~ m/[0-9]{1,2}/) {
 			return "$a[5] is not a valid WMBUS type";
 		}
+		
+		if (defined($a[6])) {
+      $encoding = $a[6];
+    }
+    if ($encoding ne "CUL" && $encoding ne "AMB") {
+      return "$a[6] isn't a supported encoding, use either CUL or AMB";
+    }
+		
 
 		$hash->{Manufacturer} = $a[2];
 		$hash->{IdentNumber} = sprintf("%08d",$a[3]);
 		$hash->{Version} = $a[4];
 		$hash->{DeviceType} = $a[5];
+		$hash->{MessageEncoding} = $encoding;
 		
   }
   my $addr = join("_", $hash->{Manufacturer},$hash->{IdentNumber},$hash->{Version},$hash->{DeviceType}) ;
@@ -176,23 +211,23 @@ WMBUS_Fingerprint($$)
 sub
 WMBUS_Parse($$)
 {
-  my ($hash, $msg) = @_;
+  my ($hash, $rawMsg) = @_;
   my $name = $hash->{NAME};
   my $addr;
   my $rhash;
   my $rssi;
+  my $msg;
   
   # $hash is the hash of the IODev!
  
-  if( $msg =~ m/^b/ ) {
+  if( $rawMsg =~ m/^b/ ) {
 		# WMBus message received
 		
-		Log3 $name, 5, "WMBUS raw msg " . $msg;
+		Log3 $name, 5, "WMBUS raw msg " . $rawMsg;
 		
 		my $mb = new WMBus;
 		
-		($msg, $rssi) = split(/::/,$msg);
-		$msg .= WMBUS_RSSIAsRaw($rssi);
+		($msg, $rssi, $hash->{MessageEncoding}) = WMBUS_HandleEncoding($mb, $rawMsg);
 		
 		if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
 			$addr = join("_", $mb->{manufacturer}, $mb->{afield_id}, $mb->{afield_ver}, $mb->{afield_type});  
@@ -200,9 +235,9 @@ WMBUS_Parse($$)
 			$rhash = $modules{WMBUS}{defptr}{$addr};
 
 			if( !$rhash ) {
-					Log3 $name, 3, "WMBUS Unknown device $msg, please define it";
+					Log3 $name, 3, "WMBUS Unknown device $rawMsg, please define it";
 			
-					return "UNDEFINED WMBUS_$addr WMBUS $msg";
+					return "UNDEFINED WMBUS_$addr WMBUS $rawMsg";
 			}
 			
       my $rname = $rhash->{NAME};
@@ -230,14 +265,14 @@ WMBUS_Parse($$)
 			return undef;
 		}
   } else {
-    DoTrigger($name, "UNKNOWNCODE $msg");
-    Log3 $name, 3, "$name: Unknown code $msg, help me!";
+    DoTrigger($name, "UNKNOWNCODE $rawMsg");
+    Log3 $name, 3, "$name: Unknown code $rawMsg, help me!";
     return undef;
   }
 }
 
 
-# if the culfw doesn't send the RSSI value (because it an old version that doesn't implement this) but 00_CUL.pm already expects it
+# if the culfw doesn't send the RSSI value (because it is an old version that doesn't implement this) but 00_CUL.pm already expects it
 # one byte is missing from the data which leads to CRC errors
 # To avoid this calculate the raw data byte from the RSSI and append it to the data.
 # If it is a valid RSSI it will be ignored by the WMBus parser (the data contains the length of the data itself
@@ -346,7 +381,7 @@ sub WMBUS_SetDeviceSpecificReadings($$$)
     
     for $dataBlock ( @$dataBlocks ) {
       # search for VIF_VOLUME
-      if ($dataBlock->{type} eq 'VIF_VOLUME') {
+      if ($dataBlock->{type} eq 'VIF_VOLUME' && $dataBlock->{functionFieldText} eq "Instantaneous value") {
         readingsBulkUpdate($hash, "volume", $dataBlock->{value});
         readingsBulkUpdate($hash, "unit", $dataBlock->{unit});
       }
@@ -412,7 +447,7 @@ WMBUS_Attr(@)
   Wireless M-Bus is a standard protocol supported by various manufacturers.
   
   It uses the 868 MHz band for radio transmissions.
-  Therefore you need a device which can receive Wireless M-Bus messages, e.g. a <a href="#CUL">CUL</a> with culfw >= 1.59.
+  Therefore you need a device which can receive Wireless M-Bus messages, e.g. a <a href="#CUL">CUL</a> with culfw >= 1.59 or an AMBER Wireless AMB8465M.
   <br>
   WMBus uses two different radio protocols, T-Mode and S-Mode. The receiver must be configured to use the same protocol as the sender.
   In case of a CUL this can be done by setting <a href="#rfmode">rfmode</a> to WMBus_T or WMBus_S respectively.
@@ -434,7 +469,7 @@ WMBUS_Attr(@)
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt;]|&lt;bHexCode&gt;</code> <br>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
     <br>
     Normally a WMBus device isn't defined manually but automatically through the <a href="#autocreate">autocreate</a> mechanism upon the first reception of a message.
     <br>
@@ -450,7 +485,8 @@ WMBUS_Attr(@)
       <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a> for a list of registered ids.<br>
       The identification number is the serial no of the meter.<br>
       version is the version code of the meter<br>
-      type is the type of the meter, e.g. water or electricity encoded as a number.
+      type is the type of the meter, e.g. water or electricity encoded as a number.<br>
+      MessageEncoding is either CUL or AMB, depending on which kind of IODev is used.
       </li>
       <br>
     </ul>
@@ -518,7 +554,7 @@ WMBUS_Attr(@)
   Wireless M-Bus ist ein standardisiertes Protokoll das von unterschiedlichen Herstellern unterst&uuml;tzt wird.
 
 	Es verwendet das 868 MHz Band f&uuml;r Radio&uuml;bertragungen.
-	Daher wird ein Ger&auml;t ben&ouml;tigt das die Wireless M-Bus Nachrichten empfangen kann, z. B. ein <a href="#CUL">CUL</a> mit culfw >= 1.59.
+	Daher wird ein Ger&auml;t ben&ouml;tigt das die Wireless M-Bus Nachrichten empfangen kann, z. B. ein <a href="#CUL">CUL</a> mit culfw >= 1.59 oder ein AMBER Wireless AMB8465-M.
   <br>
   WMBus verwendet zwei unterschiedliche Radioprotokolle, T-Mode und S-Mode. Der Empf&auml;nger muss daher so konfiguriert werden, dass er das selbe Protokoll
   verwendet wie der Sender. Im Falle eines CUL kann das erreicht werden, in dem das Attribut <a href="#rfmode">rfmode</a> auf WMBus_T bzw. WMBus_S gesetzt wird.
@@ -540,7 +576,7 @@ WMBUS_Attr(@)
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt;]|&lt;bHexCode&gt;</code> <br>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt:MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
     <br>
     Normalerweise wird ein WMBus Device nicht manuell angelegt. Dies geschieht automatisch bem Empfang der ersten Nachrichten eines Ger&auml;tes &uuml;ber den 
     fhem <a href="#autocreate">autocreate</a> Mechanismus.
@@ -548,7 +584,7 @@ WMBUS_Attr(@)
     F&uuml;r eine manuelle Definition gibt es zwei Wege.
     <ul>
 			<li>
-			Durch Verwendung einer WMBus Rohnachricht wie sie vom CUL empfangen wurde. So eine Nachricht beginnt mit einem kleinen 'b' und enth&auml;lt mindestens
+			Durch Verwendung einer WMBus Rohnachricht wie sie vom IODev empfangen wurde. So eine Nachricht beginnt mit einem kleinen 'b' und enth&auml;lt mindestens
 			24 hexadezimale Zeichen.
 			Das WMBUS Modul extrahiert daraus alle ben&ouml;tigten Informationen.
 			</li>
@@ -558,7 +594,8 @@ WMBUS_Attr(@)
       <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a><br>
       Die Idenitfikationsnummer ist die Seriennummer des Z&auml;hlers.<br>
       Version ist ein Versionscode des Z&auml;hlers.<br>
-      Typ ist die Art des Z&auml;hlers, z. B. Wasser oder Elektrizit&auml;t, kodiert als Zahl.
+      Typ ist die Art des Z&auml;hlers, z. B. Wasser oder Elektrizit&auml;t, kodiert als Zahl.<br>
+      MessageEncoding ist entweder CUL oder AMB, je nachdem welche Art von IODev verwendet wird
       </li>
       <br>
     </ul>
