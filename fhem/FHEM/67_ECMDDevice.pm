@@ -48,7 +48,7 @@ ECMDDevice_Initialize($)
   $hash->{ParseFn}   = "ECMDDevice_Parse";
 
   $hash->{AttrFn}    = "ECMDDevice_Attr";
-  $hash->{AttrList}  = "IODev class ".
+  $hash->{AttrList}  = "IODev class noState ".
                         $readingFnAttributes;
 }
 
@@ -141,7 +141,9 @@ ECMDDevice_Changed($$$)
 	  $state.= " $value" if(defined($value) && $value ne "");
           #Debug "cmd= $cmd, setting state to $state (DEFAULT)";
 	}  
-        readingsBulkUpdate($hash, "state", $state) if(defined($state));
+	if(!AttrVal($hash->{NAME}, "noState", 0)) {
+          readingsBulkUpdate($hash, "state", $state) if(defined($state));
+        }
 
         readingsEndUpdate($hash, 1);
         my $name= $hash->{NAME};
@@ -519,6 +521,9 @@ ECMDDevice_Define($$)
 #############################
 
 =pod
+=item device
+=item summary    user-defined device communicating through ECMD
+=item summary_DE ein benutzerdefiniertes Ger&auml;t, welches &uuml;ber ECMD kommuniziert
 =begin html
 
 <a name="ECMDDevice"></a>
@@ -598,6 +603,12 @@ ECMDDevice_Define($$)
     If you omit the &lt;classname&gt; and &lt;parameter&gt; references in the 
     <a href="#ECMDDevicedefine">definition</a> of the device, you have to add them
     separately as an attribute. Example: <code>attr myRelais2 class relais 8</code>.</li>
+    <li>noState<br>
+    Changes of readings do not change the state reading if this attribute is set to a non-zero value.
+    For example, this is desirable if you need to avoid the second event created by changing the state
+    reading. Previously created state readings can be deleted by means of <a href="#deletereading">deletereading</a>. 
+    The user can define the value shown in the state of the device by means
+    of the <a href="#stateFormat">stateFormat</a> attribute.</li>
     <li><a href="#verbose">verbose</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#IODev">IODev</a></li>
