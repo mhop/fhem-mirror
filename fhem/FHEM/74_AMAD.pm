@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.6.4";
-my $flowsetversion = "2.6.4";
+my $modulversion = "2.6.6";
+my $flowsetversion = "2.6.6";
 
 
 
@@ -65,6 +65,8 @@ sub AMAD_Initialize($) {
 			  "setNotifySndFilePath ".
 			  "setTtsMsgSpeed ".
 			  "setUserFlowState ".
+			  "setTtsMsgLang:de,en ".
+			  "setAPSSID ".
 			  "root:0,1 ".
 			  "port ".
 			  "disable:1 ".
@@ -83,7 +85,7 @@ sub AMAD_Define($$) {
     
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID> has the ACCESPOINT-SSID a space you must space replace @@" if( $a[0] ne "AMADCommBridge" and @a != 4 );
+    return "too few parameters: define <name> AMAD <HOST-IP>" if( $a[0] ne "AMADCommBridge" and @a < 2 and @a > 4 );
 
     my $name    	= $a[0];
     my $host    	= $a[2] if( $a[2] );
@@ -104,7 +106,7 @@ sub AMAD_Define($$) {
 
 
     if( ! $hash->{HOST} ) {
-	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID>" if( $modules{AMAD}{defptr}{BRIDGE} );
+	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST-IP>" if( $modules{AMAD}{defptr}{BRIDGE} );
 
 	$hash->{BRIDGE} = 1;
 	$modules{AMAD}{defptr}{BRIDGE} = $hash;
@@ -120,14 +122,19 @@ sub AMAD_Define($$) {
 
 	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and AccessPoint-SSID $hash->{APSSID}" if(  $hash->{APSSID} );
 	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and NONE AccessPoint-SSID" if( ! $hash->{APSSID} );
-	Log3 $name, 3, "AMAD ($name) - Attention!!! Your Device was defined without ACCESSPOINT-SSID, please modify the DEF to <HOST-IP> <ACCESSPOINT-SSID>" if( ! $hash->{APSSID} );
 	
 	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
 	readingsSingleUpdate ( $hash, "state", "initialized", 1 ) if( $hash->{HOST} );
 	readingsSingleUpdate ( $hash, "deviceState", "unknown", 1 ) if( $hash->{HOST} );
         
         RemoveInternalTimer($hash);
-	InternalTimer( gettimeofday()+30, "AMAD_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) && ($hash->{APSSID}) );
+        
+        
+        if( $init_done ) {
+            AMAD_GetUpdate($hash);
+        } else {
+            InternalTimer( gettimeofday()+30, "AMAD_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) );
+        }
 
 	$modules{AMAD}{defptr}{$hash->{HOST}} = $hash;
 
@@ -266,7 +273,7 @@ sub AMAD_GetUpdate($) {
     
     RemoveInternalTimer( $hash );
 
-    if( $init_done && ( ReadingsVal( $name, "deviceState", "unknown" ) eq "unknown" or ReadingsVal( $name, "deviceState", "online" ) eq "online" ) && AttrVal( $name, "disable", 0 ) ne "1" && ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" && $hash->{APSSID} ) {
+    if( $init_done && ( ReadingsVal( $name, "deviceState", "unknown" ) eq "unknown" or ReadingsVal( $name, "deviceState", "online" ) eq "online" ) && AttrVal( $name, "disable", 0 ) ne "1" && ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" ) {
     
         AMAD_statusRequest( $hash );
         AMAD_checkDeviceState( $hash );
@@ -275,7 +282,6 @@ sub AMAD_GetUpdate($) {
 
         Log3 $name, 4, "AMAD ($name) - GetUpdate, FHEM or Device not ready yet";
         Log3 $name, 3, "AMAD ($bname) - GetUpdate, Please set $bname fhemServerIP <IP-FHEM> NOW!" if( ReadingsVal( $bname, "fhemServerIP", "none" ) eq "none" );
-        Log3 $name, 3, "AMAD ($name) - Attention!!! Your Device was defined without ACCESSPOINT-SSID, please modify the DEF to <HOST-IP> <ACCESSPOINT-SSID>" if( ! $hash->{APSSID} );
 
         InternalTimer( gettimeofday()+15, "AMAD_GetUpdate", $hash, 0 );
     }
@@ -290,10 +296,12 @@ sub AMAD_statusRequest($) {
     my $host = $hash->{HOST};
     my $port = $hash->{PORT};
     my $bport = $bhash->{PORT};
-    my $apssid = $hash->{APSSID};
     my $fhemip = ReadingsVal( $bname, "fhemServerIP", "none" );
     my $activetask = AttrVal( $name, "checkActiveTask", "none" );
     my $userFlowState = AttrVal( $name, "setUserFlowState", "none" );
+    my $apssid = "none";
+    $apssid = $hash->{APSSID} if( defined($hash->{APSSID}) );
+    $apssid = $attr{$name}{setAPSSID} if( defined($attr{$name}{setAPSSID}) );
     
 
     my $url = "http://" . $host . ":" . $port . "/fhem-amad/deviceInfo/"; # Pfad muß so im Automagic als http request Trigger drin stehen
@@ -301,7 +309,7 @@ sub AMAD_statusRequest($) {
     HttpUtils_NonblockingGet(
 	{
 	    url		=> $url,
-	    timeout	=> 15,
+	    timeout	=> 5,
 	    hash	=> $hash,
 	    method	=> "GET",
 	    header	=> "Connection: close\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState",
@@ -635,13 +643,14 @@ sub AMAD_SelectSetCmd($$@) {
     
     elsif( lc $cmd eq 'ttsmsg' ) {
 
-        my $msg = join( " ", @data );
-        my $speed = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+        my $msg     = join( " ", @data );
+        my $speed   = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+        my $lang    = AttrVal( $name, "setTtsMsgLang","de" );
 	
 	$msg =~ s/%/%25/g;
 	$msg =~ s/\s/%20/g;    
 	
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".$msg."&msgspeed=".$speed;
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".$msg."&msgspeed=".$speed."&msglang=".$lang;
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -933,7 +942,7 @@ sub AMAD_HTTP_POST($$) {
     HttpUtils_NonblockingGet(
 	{
 	    url		=> $url,
-	    timeout	=> 60,
+	    timeout	=> 15,
 	    hash	=> $hash,
 	    method	=> "POST",
 	    header	=> "Connection: close",
@@ -1404,14 +1413,14 @@ sub AMAD_decrypt($) {
   <a name="AMADdefine"></a>
   <b>Define</b>
   <ul><br>
-    <code>define &lt;name&gt; AMAD &lt;IP-ADDRESS&gt; &lt;WLANAP-SSID(s)&gt;</code>
+    <code>define &lt;name&gt; AMAD &lt;IP-ADDRESS&gt;</code>
     <br><br>
     Example:
     <ul><br>
-      <code>define WandTabletWohnzimmer AMAD 192.168.0.23 TuxNetAP,Opa@@Zu@@Hause</code><br>
+      <code>define WandTabletWohnzimmer AMAD 192.168.0.23</code><br>
     </ul>
     <br>
-    With this command two new AMAD devices in a room called AMAD are created. The parameter &lt;IP-ADDRESS&lt; defines the IP address of your Android device, parameter WLANAP-SSID defines the SSID(s) of the WLAN(s) from which the FHEM server can be reached. Multiple SSID can be defined. They need to be separated by a comma (,). If a SSID contains spaces replace these spaces by a double at-sign (@@). For Android devices connected by LAN use "usb-ethernet" as SSID. The second device created is the AMADCommBridge which serves as a communication device from each Android device to FHEM.<br>
+    With this command two new AMAD devices in a room called AMAD are created. The parameter &lt;IP-ADDRESS&lt; defines the IP address of your Android device. The second device created is the AMADCommBridge which serves as a communication device from each Android device to FHEM.<br>
     !!!Coming Soon!!! The communication port of each AMAD device may be set by the definition of the "port" attribute. <b>One needs background knowledge of Automagic and HTTP requests as this port will be set in the HTTP request trigger of both flows, therefore the port also needs to be set there.
     <br>
     The communication port of the AMADCommBridge device can easily be changed within the attribut "port".</b>
@@ -1514,8 +1523,10 @@ sub AMAD_decrypt($) {
     <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b></li>
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
+    <li>setAPSSID - set WLAN AccesPoint SSID to prevent WLAN sleeps</li>
     <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - set speaking speed for TTS (Value between 0.5 - 4.0, 0.5 Step) default is 1.0</li>
+    <li>setTtsMsgLang - set speaking language for TTS, de or en (default is de)</li>
     <br>
     To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
     <br><br>
@@ -1564,14 +1575,14 @@ sub AMAD_decrypt($) {
   <a name="AMADdefine"></a>
   <b>Define</b>
   <ul><br>
-    <code>define &lt;name&gt; AMAD &lt;IP-ADRESSE&gt; &lt;WLANAP-SSID('s)&gt;</code>
+    <code>define &lt;name&gt; AMAD &lt;IP-ADRESSE&gt;</code>
     <br><br>
     Beispiel:
     <ul><br>
-      <code>define WandTabletWohnzimmer AMAD 192.168.0.23 TuxNetAP,Opa@@Zu@@Hause</code><br>
+      <code>define WandTabletWohnzimmer AMAD 192.168.0.23</code><br>
     </ul>
     <br>
-    Diese Anweisung erstellt zwei neues AMAD-Device im Raum AMAD.Der Parameter &lt;IP-ADRESSE&gt; legt die IP Adresse des Android Ger&auml;tes fest und der Parameter WLANAP-SSID die SSID Deines WLAN's. Es k&ouml;nnen mehrere SSID's mit angegeben werden, welche dann durch Komma getrennt sein m&uuml;ssen. Haben die SSID's Leerzeichen im Namen werde die Leerzeichen durch 2 @ aufgef&uuml;llt. Gibt es Androidger&auml;te welche nicht &uuml;ber WLAN sondern USB-Ethernet angeschlossen sind, ist die WLANAP-SSID mit "usb-ethernet" zu benennen<br>
+    Diese Anweisung erstellt zwei neues AMAD-Device im Raum AMAD.Der Parameter &lt;IP-ADRESSE&gt; legt die IP Adresse des Android Ger&auml;tes fest.<br>
     Das zweite Device ist die AMADCommBridge welche als Kommunikationsbr&uuml;cke vom Androidger&auml;t zu FHEM diehnt. !!!Comming Soon!!! Wer den Port &auml;ndern m&ouml;chte, kann dies &uuml;ber das Attribut "port" tun. <b>Ihr solltet aber wissen was Ihr tut, da dieser Port im HTTP Request Trigger der beiden Flows eingestellt ist. Demzufolge mu&szlig; der Port dort auch ge&auml;ndert werden. Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.
     <br>
     Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.</b>
@@ -1671,6 +1682,7 @@ sub AMAD_decrypt($) {
     <li>notifySndFile - spielt die angegebene Mediadatei auf dem Androidger&auml;t ab. <b>Die aufzurufende Mediadatei sollte sich im Ordner /storage/emulated/0/Notifications/ befinden. Ist dies nicht der Fall kann man &uuml;ber das Attribut setNotifySndFilePath einen Pfad vorgeben.</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
     <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
+    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern</li>
     <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll!</li>
     <li>screenFullscreen - on/off, (aktiviert/deaktiviert) den Vollbildmodus. <b>Attribut setFullscreen</b></li>
     <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
@@ -1678,6 +1690,7 @@ sub AMAD_decrypt($) {
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <li>setNotifySndFilePath - setzt den korrekten Systempfad zur Notifydatei (default ist /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Werte zwischen 0.5 bis 4.0 in 0.5er Schritten) default ist 1.0</li>
+    <li>setTtsMsgSpeed - setzt die Sprache bei der Sprachausgabe, de oder en (default ist de)</li>
     <br>
     Um openApp verwenden zu k&ouml;nnen, muss als Attribut der Package Name der App angegeben werden.
     <br><br>
