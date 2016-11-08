@@ -20,6 +20,8 @@ sub manId2ascii($$);
 
 
 use constant {
+  # Transport Layer block size
+  TL_BLOCK_SIZE => 10,
   # Link Layer block size
   LL_BLOCK_SIZE => 16,
   # size of CRC in bytes
@@ -920,12 +922,17 @@ sub removeCRC($$)
   my $res;
   my $crc;
   my $blocksize = LL_BLOCK_SIZE;
-  my $blocksize_with_crc = LL_BLOCK_SIZE + CRC_SIZE;
+  my $blocksize_with_crc = LL_BLOCK_SIZE + $self->{crc_size};
   my $crcoffset;
   
   my $msgLen = $self->{datalen}; # size without CRCs
   my $noOfBlocks = $self->{datablocks}; # total number of data blocks, each with a CRC appended
   my $rest = $msgLen % LL_BLOCK_SIZE; # size of the last data block, can be smaller than 16 bytes
+  
+  
+  #print "crc_size $self->{crc_size}\n";
+  
+  return $msg if $self->{crc_size} == 0;
 
   # each block is 16 bytes + 2 bytes CRC
   
@@ -934,14 +941,14 @@ sub removeCRC($$)
   for ($i=0; $i < $noOfBlocks; $i++) {
     $crcoffset = $blocksize_with_crc * $i + LL_BLOCK_SIZE;
     #print "$i: crc offset $crcoffset\n";
-    if ($rest > 0 && $crcoffset + CRC_SIZE > ($noOfBlocks - 1) * $blocksize_with_crc + $rest) {
+    if ($rest > 0 && $crcoffset + $self->{crc_size} > ($noOfBlocks - 1) * $blocksize_with_crc + $rest) {
       # last block is smaller
       $crcoffset = ($noOfBlocks - 1) * $blocksize_with_crc + $rest;
       #print "last crc offset $crcoffset\n";
       $blocksize = $msgLen - ($i * $blocksize); 
     }
     
-    $crc = unpack('n',substr($msg, $crcoffset, CRC_SIZE));
+    $crc = unpack('n',substr($msg, $crcoffset, $self->{crc_size}));
     #printf("%d: CRC %x, calc %x blocksize $blocksize\n", $i, $crc, $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))); 
     if ($crc != $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))) {
       $self->{errormsg} = "crc check failed for block $i";
@@ -984,7 +991,19 @@ sub new {
 sub _initialize {
   my $self = shift;
   
-  #$self->{dataBlocks} = [];
+  $self->{crc_size} = CRC_SIZE;
+}
+
+sub setCRCsize {
+  my $self = shift;
+
+  $self->{crc_size} = shift;
+}
+
+sub getCRCsize {
+  my $self = shift;
+
+  return $self->{crc_size};
 }
 
 sub decodeConfigword($) {
@@ -1411,7 +1430,7 @@ sub decrypt($) {
 
 sub decodeApplicationLayer($) {
   my $self = shift;
-  my $applicationlayer = $self->removeCRC(substr($self->{msg},12));
+  my $applicationlayer = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
   
   #print unpack("H*", $applicationlayer) . "\n";
   
@@ -1504,26 +1523,29 @@ sub decodeLinkLayer($$)
   
   ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
   $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
-  ($self->{afield_ver}, $self->{afield_type}, $self->{crc0}) = unpack('CCn', substr($linklayer,8,4));
-
-  
+  ($self->{afield_ver}, $self->{afield_type}) = unpack('CC', substr($linklayer,8,2));
   
   #printf("lfield %d\n", $self->{lfield});
-  #printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
+
+  if ($self->{crc_size} > 0) {
+    $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
   
-  if ($self->{crc0} != $self->checkCRC(substr($linklayer,0,10))) {
-    $self->{errormsg} = "CRC check failed on link layer";
-    $self->{errorcode} = ERR_CRC_FAILED;
-    #print "CRC check failed on link layer\n";
-    return 0;
+    #printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
+  
+    if ($self->{crc0} != $self->checkCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
+      $self->{errormsg} = "CRC check failed on link layer";
+      $self->{errorcode} = ERR_CRC_FAILED;
+      #print "CRC check failed on link layer\n";
+      return 0;
+    }
   }
 
-  # header block is 12 bytes, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
-  $self->{datalen} = $self->{lfield} - 9; # this is without CRCs and the lfield itself
+  # header block is 10 bytes + 2 bytes CRC, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
+  $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1); # this is without CRCs and the lfield itself
   $self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
   $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
-  $self->{msglen} = 12 + $self->{datalen} + $self->{datablocks} * CRC_SIZE;
-  
+  $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
+    
   #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
   if (length($self->{msg}) > $self->{msglen}) {
     $self->{remainingData} = substr($self->{msg},$self->{msglen});
