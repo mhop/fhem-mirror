@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "async_delay followDevices:1,2 lightSceneRestoreOnlyIfChanged:1,0 switchingOrder ". $readingFnAttributes;
+  $hash->{AttrList} = "async_delay followDevices:1,2 lightSceneRestoreOnlyIfChanged:1,0 showDeviceCurrentState:1,0 switchingOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -113,8 +113,8 @@ LightScene_2html($)
   $ret .= "<tr><td><div class=\"devType\"><a href=\"$FW_ME?detail=$name\">".AttrVal($name, "alias", $name)."</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table class=\"block wide\">";
 
-  if( defined($FW_webArgs{detail}) ) {
-    $room = "&detail=$FW_webArgs{detail}";
+  if( defined($FW_webArgs{detail}) || AttrVal($name,"showDeviceCurrentState",undef) ) {
+    $room = "&detail=$FW_webArgs{detail}" if( defined($FW_webArgs{detail}) );
 
     $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
     #$row++;
@@ -1070,6 +1070,8 @@ LightScene_editTable($) {
         1 -> if no match is found state will be unchanged and a nomatch event will be triggered.<br>
         2 -> if no match is found state will be set to unknown. depending on the scene and devices state can toggle multiple
              times. use a watchdog if you want to handle this.</li>
+      <li>showDeviceCurrentState<br>
+        show the current state of member devices in weblink</li>
       <li>switchingOrder<br>
         space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
         in which the devices should be switched.<br>
