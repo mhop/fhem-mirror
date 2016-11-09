@@ -103,9 +103,12 @@ watchdog_Notify($$)
       }
 
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
+        my $isRe1 = ($re1 eq $re2 || $re1 eq ".");
+        return if($isRe1 && $dontReAct); # 60414
+
         RemoveInternalTimer($watchdog);
 
-        if(($re1 eq $re2 || $re1 eq ".") && !$dontReAct) {
+        if($re1 eq $re2 || $re1 eq ".") {
           watchdog_Activate($watchdog);
           return "";
 
