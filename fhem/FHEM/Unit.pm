@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
 use UConv;
+use JSON;
 
 sub Unit_Initialize() {
 }
@@ -15,120 +16,235 @@ sub Unit_Initialize() {
 # but also recommended to be used by modules
 
 sub ReadingsUnit($$@) {
-    my ( $d, $n, $default, $lang, $format ) = @_;
+    my ( $name, $reading, $default, $lang, $format ) = @_;
     my $ud;
     $default = "" if ( !$default );
     return ""
-      if ( !defined( $defs{$d}{READINGS}{$n} ) );
+      if ( !defined( $defs{$name}{READINGS}{$reading} ) );
 
     addToAttrList("unitFromReading");
 
     my $unitFromReading =
-      AttrVal( $d, "unitFromReading",
+      AttrVal( $name, "unitFromReading",
         AttrVal( "global", "unitFromReading", undef ) );
 
+    my $readingsDesc = readingsDesc( $name, $reading );
+
     # unit defined with reading
-    if ( defined( $defs{$d}{READINGS}{$n}{U} ) ) {
-        $ud = Unit::GetDetails( $defs{$d}{READINGS}{$n}{U}, $lang );
+    if ( defined( $readingsDesc->{unit} ) ) {
+        $ud = Unit::GetDetails( $readingsDesc->{unit}, $lang );
     }
 
     # calculate unit from readingname
     elsif ( $unitFromReading && $unitFromReading ne "0" ) {
-        $ud = Unit::GetDetailsFromReadingname( $n, $lang );
+        $ud = Unit::GetDetailsFromReadingname( $reading, $lang );
     }
 
-    return $ud->{unit_symbol}
-      if ( !$format && defined( $ud->{unit_symbol} ) );
-    return $ud->{unit} if ( !$format && defined( $ud->{unit} ) );
-    return $ud->{unit_long}
-      if ( $format && $format eq "1" && defined( $ud->{unit_long} ) );
-    return $ud->{unit_abbr}
-      if ( $format && $format eq "2" && defined( $ud->{unit_abbr} ) );
+    return $ud->{symbol}
+      if ( !$format && defined( $ud->{symbol} ) );
+    return $ud->{suffix} if ( !$format && defined( $ud->{suffix} ) );
+    return $ud->{txt}
+      if ( $format && $format eq "1" && defined( $ud->{txt} ) );
+    return $ud->{abbr}
+      if ( $format && $format eq "2" && defined( $ud->{abbr} ) );
+
     return $default;
 }
 
 sub ReadingsUnitLong($$@) {
-    my ( $d, $n, $default, $lang ) = @_;
+    my ( $name, $reading, $default, $lang ) = @_;
     $lang = "en" if ( !$lang );
-    return ReadingsUnit( $d, $n, $default, $lang, 1 );
+    return ReadingsUnit( $name, $reading, $default, $lang, 1 );
 }
 
 sub ReadingsUnitAbbr($$@) {
-    my ( $d, $n, $default, $lang ) = @_;
+    my ( $name, $reading, $default, $lang ) = @_;
     $lang = "en" if ( !$lang );
-    return ReadingsUnit( $d, $n, $default, $lang, 2 );
+    return ReadingsUnit( $name, $reading, $default, $lang, 2 );
 }
 
 sub ReadingsValUnit($$$@) {
-    my ( $d, $n, $default, $lang, $format ) = @_;
-    my $v = ReadingsVal( $d, $n, $default );
-    my $u = ReadingsUnitAbbr( $d, $n );
-    return Unit::GetValueWithUnit( $v, $u, $lang, $format );
+    my ( $name, $reading, $default, $lang, $format ) = @_;
+    my $val = ReadingsVal( $name, $reading, $default );
+    my $unit = ReadingsUnitAbbr( $name, $reading );
+    return Unit::GetValueWithUnit( $val, $unit, $lang, $format );
 }
 
 sub ReadingsValUnitLong($$$@) {
-    my ( $d, $n, $default, $lang ) = @_;
-    return ReadingsValUnit( $d, $n, $default, $lang, 1 );
+    my ( $name, $reading, $default, $lang ) = @_;
+    return ReadingsValUnit( $name, $reading, $default, $lang, 1 );
+}
+
+#format a number according to desc and optional format.
+sub formatValue($$;$) {
+    my ( $value, $desc, $format ) = @_;
+
+    return $value if ( !defined($value) );
+
+    $desc = Unit::GetDetails($desc) if ( $desc && !ref($desc) );
+    return $value if ( !$format && ( !$desc || ref($desc) ne 'HASH' ) );
+
+    $value *= $desc->{factor} if ( $desc && $desc->{factor} );
+
+    $format = $desc->{format} if ( !$format && $desc );
+    $format = $Unit::autoscale if ( !$format );
+
+    if ( ref($format) eq 'CODE' ) {
+        $value = $format->($value);
+    }
+    elsif ( ref($format) eq 'HASH' ) {
+        my $v = abs($value);
+        foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
+            next if ( ref( $format->{$l} ne 'HASH' ) );
+            if ( $v >= $l ) {
+                my $scale = $format->{$l}{scale};
+
+                $value *= $scale if ($scale);
+                $value = sprintf( $format->{$l}{format}, $value )
+                  if ( $format->{$l}{format} );
+                last;
+            }
+        }
+    }
+    elsif ($format) {
+        my $scale = $desc->{scale};
+
+        $value *= $scale if ($scale);
+        $value = sprintf( $format, $value );
+    }
+
+    return ( $value, $desc->{suffix} ) if (wantarray);
+
+    return $value;
+}
+
+#find desc and optional format for device:reading
+sub readingsDesc($;$) {
+    my ( $name, $reading ) = @_;
+    my $d          = $defs{$name};
+    my $m          = $modules{ $d->{TYPE} } if ($d);
+    my $attrDesc   = decode_attribute( $name, "readingsDesc" );
+    my $globalDesc = decode_attribute( "global", "readingsDesc" );
+
+    my %desc;
+
+    # module device specific
+    if ( $d && $d->{readingsDesc} ) {
+        %desc = %{ $d->{readingsDesc} };
+    }
+
+    # module general
+    elsif ( $m && $m->{readingsDesc} ) {
+        %desc = %{ $m->{readingsDesc} };
+    }
+
+    # global user overwrite
+    foreach ( keys %{$globalDesc} ) {
+        $desc{$_} = $globalDesc->{$_};
+    }
+
+    # device user overwrite
+    foreach ( keys %{$attrDesc} ) {
+        $desc{$_} = $attrDesc->{$_};
+    }
+
+    return {} if ( $reading && !defined( $desc{$reading} ) );
+    return $desc{$reading} if ($reading);
+    return \%desc;
+}
+
+#format device:reading with optional default value and optional desc and optional format
+#TODO adapt to Unit.pm
+sub formatReading($$;$$$) {
+    my ( $name, $reading, $default, $desc, $format ) = @_;
+
+    $desc = readingsDesc( $name, $reading ) if ( !$desc && $format );
+    ( $desc, $format ) = readingsDesc( $name, $reading )
+      if ( !$desc && !$format );
+
+    my $value = ReadingsVal( $name, $reading, undef );
+
+    #return $default if( !defined($value) && !looks_like_number($default) );
+    $value = $default if ( !defined($value) );
+    return $value if ( !looks_like_number($value) );
+
+    return formatValue( $value, $desc, $format );
+}
+
+# return dimension symbol for device:reading
+#TODO adapt to Unit.pm
+sub readingsDimension($$) {
+    my ( $name, $reading ) = @_;
+
+    if ( my $desc = readingsDesc( $name, $reading ) ) {
+        ;
+        return $desc->{dimension} if ( $desc->{dimension} );
+    }
+
+    return '';
 }
 
 ################################################################
 # Functions used by modules.
 
 sub setReadingsUnit($$@) {
-    my ( $hash, $rname, $unit ) = @_;
-    my $name = $hash->{NAME};
+    my ( $name, $reading, $unit ) = @_;
     my $unitDetails;
+    my $ret;
+    my $readingsDesc = readingsDesc($name);
 
-    return "Cannot assign unit to undefined reading $rname for device $name"
-      if ( !$hash->{READINGS}{$rname}
-        || !defined( $hash->{READINGS}{$rname} ) );
+    return
+      if ( $unit
+        && $readingsDesc->{$reading}{unit}
+        && $readingsDesc->{$reading}{unit} eq $unit );
 
-    # check unit database for unit_abbr
+    # check unit database for correct abbr
     if ($unit) {
         $unitDetails = Unit::GetDetails($unit);
     }
 
     # find unit based on reading name
     else {
-        $unitDetails = Unit::GetDetailsFromReadingname($rname);
+        $unitDetails = Unit::GetDetailsFromReadingname($reading);
         return
-          if ( !$unitDetails || !defined( $unitDetails->{"unit_abbr"} ) );
+          if ( !$unitDetails || !defined( $unitDetails->{abbr} ) );
     }
 
     return
-"$unit is not a registered unit abbreviation and cannot be assigned to reading $name: $rname"
-      if ( !$unitDetails || !defined( $unitDetails->{"unit_abbr"} ) );
+"$unit is not a registered unit abbreviation and cannot be assigned to reading $reading of device $name"
+      if ( !$unitDetails || !defined( $unitDetails->{abbr} ) );
 
-    if (
-        !$unit
-        && ( !defined( $hash->{READINGS}{$rname}{U} )
-            || $hash->{READINGS}{$rname}{U} ne $unitDetails->{"unit_abbr"} )
-      )
-    {
-        $hash->{READINGS}{$rname}{U} = $unitDetails->{"unit_abbr"};
-        return "Set auto-detected unit for reading $name $rname: "
-          . $unitDetails->{"unit_abbr"};
-    }
+    return
+      if ( $readingsDesc->{$reading}{unit}
+        && $readingsDesc->{$reading}{unit} eq $unitDetails->{abbr} );
 
-    $hash->{READINGS}{$rname}{U} = $unitDetails->{"unit_abbr"};
-    return;
+    my $attrDesc = decode_attribute( $name, "readingsDesc" );
+
+    $ret =
+      "Set auto-detected unit for device $name $reading: "
+      . $unitDetails->{abbr}
+      if ( !$unit && !defined( $attrDesc->{$reading}{unit} ) );
+
+    $attrDesc->{$reading}{unit} = $unitDetails->{abbr};
+    encode_attribute( $name, "readingsDesc", $attrDesc );
+
+    return $ret;
 }
 
 sub removeReadingsUnit($$) {
-    my ( $hash, $rname ) = @_;
-    my $name = $hash->{NAME};
+    my ( $name, $reading ) = @_;
+    my $ret;
+    my $attrDesc = decode_attribute( $name, "readingsDesc" );
 
-    return "Cannot remove unit from undefined reading $rname for device $name"
-      if ( !$hash->{READINGS}{$rname}
-        || !defined( $hash->{READINGS}{$rname} ) );
+    if ( defined( $attrDesc->{$reading}{unit} ) ) {
+        my $u = $attrDesc->{$reading}{unit};
+        delete $attrDesc->{$reading}{unit};
+        delete $attrDesc->{$reading}
+          if ( keys %{ $attrDesc->{$reading} } < 1 );
 
-    if ( defined( $hash->{READINGS}{$rname}{U} ) ) {
-        my $u = $hash->{READINGS}{$rname}{U};
-        delete $hash->{READINGS}{$rname}{U};
-        return "Removed unit $u from reading $rname of device $name";
+        encode_attribute( $name, "readingsDesc", $attrDesc );
+        return "Removed unit $u from reading $reading of device $name";
     }
-
-    return;
 }
 
 sub getMultiValStatus($$;$$) {
@@ -160,6 +276,49 @@ sub getMultiValStatus($$;$$) {
     return $txt;
 }
 
+sub encode_attribute ($$$) {
+    my ( $name, $attribute, $data ) = @_;
+    if ( !$data || keys %{$data} < 1 ) {
+        CommandDeleteAttr( undef, "$name $attribute" );
+
+        # empty cache
+        delete $defs{$name}{'.attrCache'}
+          if ( defined( $defs{$name}{'.attrCache'} ) );
+        return;
+    }
+
+    my $json =
+      JSON::PP->new->utf8->indent->indent_length(1)->canonical->allow_nonref;
+    my $js = $json->encode($data);
+    $js =~ s/(:\{|",?)\n\s+/$1 /gsm;
+    addToAttrList("$attribute:textField-long");
+
+    CommandAttr( undef, "$name $attribute $js" );
+
+    # empty cache
+    delete $defs{$name}{'.attrCache'}{$attribute}
+      if ( defined( $defs{$name}{'.attrCache'}{$attribute} ) );
+}
+
+sub decode_attribute ($$) {
+    my ( $name, $attribute ) = @_;
+
+    # force empty cache if attribute was deleted
+    if ( !$attr{$name}{$attribute} ) {
+        delete $defs{$name}{'.attrCache'} if ( $defs{$name}{'.attrCache'} );
+        return;
+    }
+
+    # cache attr
+    if ( !defined( $defs{$name}{'.attrCache'}{$attribute} ) ) {
+        my $data = decode_json( $attr{$name}{$attribute} );
+        return if ( $@ || !$data || $data eq "" );
+        $defs{$name}{'.attrCache'}{$attribute} = $data;
+    }
+
+    return $defs{$name}{'.attrCache'}{$attribute};
+}
+
 ################################################################
 #
 # Wrappers for commonly used core functions in device-specific modules.
@@ -176,7 +335,8 @@ sub readingsUnitSingleUpdate($$$$$) {
 
 sub readingsUnitSingleUpdateIfChanged($$$$$) {
     my ( $hash, $reading, $value, $unit, $dotrigger ) = @_;
-    return undef if ( $value eq ReadingsVal( $hash->{NAME}, $reading, "" ) );
+    return undef
+      if ( $value eq ReadingsVal( $hash->{NAME}, $reading, "" ) );
     readingsUnitBeginUpdate($hash);
     my $rv = readingsUnitBulkUpdate( $hash, $reading, $value, $unit );
     readingsUnitEndUpdate( $hash, $dotrigger );
@@ -185,7 +345,8 @@ sub readingsUnitSingleUpdateIfChanged($$$$$) {
 
 sub readingsUnitBulkUpdateIfChanged($$$@) {
     my ( $hash, $reading, $value, $unit, $changed ) = @_;
-    return undef if ( $value eq ReadingsVal( $hash->{NAME}, $reading, "" ) );
+    return undef
+      if ( $value eq ReadingsVal( $hash->{NAME}, $reading, "" ) );
     return readingsUnitBulkUpdate( $hash, $reading, $value, $unit, $changed );
 }
 
@@ -206,7 +367,7 @@ sub readingsUnitBulkUpdate($$$@) {
     my $return = readingsBulkUpdate( $hash, $reading, $value, $changed );
     return $return if !$return;
 
-    $return = setReadingsUnit( $hash, $reading, $unit );
+    $return = setReadingsUnit( $name, $reading, $unit );
     return $return;
 }
 
@@ -373,7 +534,7 @@ sub CommandSetunit($$$) {
             keys %{ $defs{$sdev}{READINGS} }
           )
         {
-            my $ret = setReadingsUnit( $defs{$sdev}, $reading, $a[2] );
+            my $ret = setReadingsUnit( $sdev, $reading, $a[2] );
             push @rets, $ret if ($ret);
         }
     }
@@ -410,7 +571,7 @@ sub CommandDeleteunit($$$) {
             keys %{ $defs{$sdev}{READINGS} }
           )
         {
-            my $ret = removeReadingsUnit( $defs{$sdev}, $reading );
+            my $ret = removeReadingsUnit( $sdev, $reading );
             push @rets, $ret if ($ret);
         }
     }
@@ -435,8 +596,8 @@ my %autoscale = (
 
 my %scales_m = (
     '1.0e-12' => {
-        'scale'      => 'p',
-        'scale_long' => {
+        'scale_txt_m'      => 'p',
+        'scale_txt_long_m' => {
             de => 'Piko',
             en => 'pico',
             fr => 'pico',
@@ -446,8 +607,8 @@ my %scales_m = (
     },
 
     '1.0e-9' => {
-        'scale'      => 'n',
-        'scale_long' => {
+        'scale_txt_m'      => 'n',
+        'scale_txt_long_m' => {
             de => 'Nano',
             en => 'nano',
             fr => 'nano',
@@ -457,8 +618,8 @@ my %scales_m = (
     },
 
     '1.0e-6' => {
-        'scale'      => 'μ',
-        'scale_long' => {
+        'scale_txt_m'      => 'μ',
+        'scale_txt_long_m' => {
             de => 'Mikro',
             en => 'micro',
             fr => 'micro',
@@ -468,8 +629,8 @@ my %scales_m = (
     },
 
     '1.0e-3' => {
-        'scale'      => 'm',
-        'scale_long' => {
+        'scale_txt_m'      => 'm',
+        'scale_txt_long_m' => {
             de => 'Milli',
             en => 'mili',
             fr => 'mili',
@@ -479,8 +640,8 @@ my %scales_m = (
     },
 
     '1.0e-2' => {
-        'scale'      => 'c',
-        'scale_long' => {
+        'scale_txt_m'      => 'c',
+        'scale_txt_long_m' => {
             de => 'Zenti',
             en => 'centi',
             fr => 'centi',
@@ -490,8 +651,8 @@ my %scales_m = (
     },
 
     '1.0e-1' => {
-        'scale'      => 'd',
-        'scale_long' => {
+        'scale_txt_m'      => 'd',
+        'scale_txt_long_m' => {
             de => 'Dezi',
             en => 'deci',
             fr => 'deci',
@@ -501,13 +662,13 @@ my %scales_m = (
     },
 
     '1.0e0' => {
-        'scale'      => '',
-        'scale_long' => '',
+        'scale_txt_m'      => '',
+        'scale_txt_long_m' => '',
     },
 
     '1.0e1' => {
-        'scale'      => 'da',
-        'scale_long' => {
+        'scale_txt_m'      => 'da',
+        'scale_txt_long_m' => {
             de => 'Deka',
             en => 'deca',
             fr => 'deca',
@@ -517,8 +678,8 @@ my %scales_m = (
     },
 
     '1.0e2' => {
-        'scale'      => 'h',
-        'scale_long' => {
+        'scale_txt_m'      => 'h',
+        'scale_txt_long_m' => {
             de => 'Hekto',
             en => 'hecto',
             fr => 'hecto',
@@ -528,8 +689,8 @@ my %scales_m = (
     },
 
     '1.0e3' => {
-        'scale'      => 'k',
-        'scale_long' => {
+        'scale_txt_m'      => 'k',
+        'scale_txt_long_m' => {
             de => 'Kilo',
             en => 'kilo',
             fr => 'kilo',
@@ -539,8 +700,8 @@ my %scales_m = (
     },
 
     '1.0e6' => {
-        'scale'      => 'M',
-        'scale_long' => {
+        'scale_txt_m'      => 'M',
+        'scale_txt_long_m' => {
             de => 'Mega',
             en => 'mega',
             fr => 'mega',
@@ -551,8 +712,8 @@ my %scales_m = (
 );
 
 my %scales_sq = (
-    'scale'      => '2',
-    'scale_long' => {
+    'scale_txt_sq'      => '2',
+    'scale_txt_long_sq' => {
         de => 'Quadrat',
         en => 'square',
         fr => 'square',
@@ -562,8 +723,8 @@ my %scales_sq = (
 );
 
 my %scales_cu = (
-    'scale'      => '3',
-    'scale_long' => {
+    'scale_txt_cu'      => '3',
+    'scale_txt_long_cu' => {
         de => 'Kubik',
         en => 'cubic',
         fr => 'cubic',
@@ -579,339 +740,419 @@ my %unit_base = (
     0 => {
         dimension      => 'L',
         formula_symbol => 'l',
-        base_unit      => 'm',
-        base_parameter => {
+        si_base        => 'm',
+        txt_base       => {
             de => 'Länge',
             en => 'length',
             fr => 'length',
             nl => 'length',
             pl => 'length',
         },
+        format => '%.1f',
     },
 
     1 => {
         dimension      => 'M',
         formula_symbol => 'm',
-        base_unit      => 'kg',
-        base_parameter => {
+        si_base        => 'kg',
+        txt_base       => {
             de => 'Masse',
             en => 'mass',
             fr => 'mass',
             nl => 'mass',
             pl => 'mass',
         },
+        format => '%.1f',
     },
 
     2 => {
         dimension      => 'T',
         formula_symbol => 't',
-        base_unit      => 's',
-        base_parameter => {
+        si_base        => 's',
+        txt_base       => {
             de => 'Zeit',
             en => 'time',
             fr => 'time',
             nl => 'time',
             pl => 'time',
         },
+        format => \&UConv::fmtTime,
     },
 
     3 => {
         dimension      => 'I',
         formula_symbol => 'i',
-        base_unit      => 'a',
-        base_parameter => {
+        si_base        => 'a',
+        txt_base       => {
             de => 'elektrische Stromstärke',
             en => 'electric current',
             fr => 'electric current',
             nl => 'electric current',
             pl => 'electric current',
         },
+        format => '%.1f',
     },
 
     4 => {
         dimension      => 'θ',
         formula_symbol => 'T',
-        base_unit      => 'k',
-        base_parameter => {
+        si_base        => 'k',
+        txt_base       => {
             de => 'absolute Temperatur',
             en => 'absolute temperature',
             fr => 'absolute temperature',
             nl => 'absolute temperature',
             pl => 'absolute temperature',
         },
+        format => '%.1f',
     },
 
     5 => {
         dimension      => 'N',
         formula_symbol => 'n',
-        base_unit      => 'mol',
-        base_parameter => {
+        si_base        => 'mol',
+        txt_base       => {
             de => 'Stoffmenge',
             en => 'amount of substance',
             fr => 'amount of substance',
             nl => 'amount of substance',
             pl => 'amount of substance',
         },
+        format => '%.1f',
     },
 
     6 => {
         dimension      => 'J',
         formula_symbol => 'Iv',
-        base_unit      => 'cd',
-        base_parameter => {
+        si_base        => 'cd',
+        txt_base       => {
             de => 'Lichtstärke',
             en => 'luminous intensity',
             fr => 'luminous intensity',
             nl => 'luminous intensity',
             pl => 'luminous intensity',
         },
+        format => '%.1f',
     },
 
     7 => {
         dimension      => 'M L^2 T^−2',
         formula_symbol => 'E',
-        base_unit      => 'j',
-        base_parameter => {
+        si_base        => 'j',
+        txt_base       => {
             de => 'Energie',
             en => 'energy',
             fr => 'energy',
             nl => 'energy',
             pl => 'energy',
         },
+        format => '%.1f',
     },
 
     8 => {
         dimension      => 'T^−1',
         formula_symbol => 'f',
-        base_unit      => 'hz',
-        base_parameter => {
+        si_base        => 'hz',
+        txt_base       => {
             de => 'Frequenz',
             en => 'frequency',
             fr => 'frequency',
             nl => 'frequency',
             pl => 'frequency',
         },
+        format => '%i',
     },
 
     9 => {
         dimension      => 'M L^2 T^−3',
         formula_symbol => 'P',
-        base_unit      => 'w',
-        base_parameter => {
+        si_base        => 'w',
+        txt_base       => {
             de => 'Leistung',
             en => 'power',
             fr => 'power',
             nl => 'power',
             pl => 'power',
         },
+        format => '%.1f',
     },
 
     10 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'p',
-        base_unit      => 'pa',
-        base_parameter => {
+        si_base        => 'pa',
+        txt_base       => {
             de => 'Druck',
             en => 'pressure',
             fr => 'pressure',
             nl => 'pressure',
             pl => 'pressure',
         },
+        format => '%i',
     },
 
     11 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'pabs',
-        base_unit      => 'pabs',
-        base_parameter => {
+        si_base        => 'pabs',
+        txt_base       => {
             de => 'absoluter Druck',
             en => 'absolute pressure',
             fr => 'absolute pressure',
             nl => 'absolute pressure',
             pl => 'absolute pressure',
         },
+        format => '%i',
     },
 
     12 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'pamb',
-        base_unit      => 'pamb',
-        base_parameter => {
+        si_base        => 'pamb',
+        txt_base       => {
             de => 'Luftdruck',
             en => 'air pressure',
             fr => 'air pressure',
             nl => 'air pressure',
             pl => 'air pressure',
         },
+        format => '%i',
     },
 
     13 => {
         dimension      => 'M L^2 T^−3 I^−1',
         formula_symbol => 'U',
-        base_unit      => 'v',
-        base_parameter => {
+        si_base        => 'v',
+        txt_base       => {
             de => 'elektrische Spannung',
             en => 'electric voltage',
             fr => 'electric voltage',
             nl => 'electric voltage',
             pl => 'electric voltage',
         },
+        format => '%.1f',
     },
 
     14 => {
         dimension      => '1',
         formula_symbol => '',
-        base_unit      => 'rad',
-        base_parameter => {
+        si_base        => 'rad',
+        txt_base       => {
             de => 'ebener Winkel',
             en => 'plane angular',
             fr => 'plane angular',
             nl => 'plane angular',
             pl => 'plane angular',
         },
+        format => '%i',
     },
 
     15 => {
         dimension      => 'L T^−1',
         formula_symbol => 'v',
-        base_unit      => 'kmh',
-        base_parameter => {
+        si_base        => 'kmh',
+        txt_base       => {
             de => 'Geschwindigkeit',
             en => 'speed',
             fr => 'speed',
             nl => 'speed',
             pl => 'speed',
         },
+        format => '%i',
     },
 
     16 => {
         dimension      => 'L^−2 J',
         formula_symbol => 'Ev',
-        base_unit      => 'lx',
-        base_parameter => {
+        si_base        => 'lx',
+        txt_base       => {
             de => 'Beleuchtungsstärke',
             en => 'illumination intensity',
             fr => 'illumination intensity',
             nl => 'illumination intensity',
             pl => 'illumination intensity',
         },
+        format => '%i',
     },
 
     17 => {
         dimension      => 'J',
         formula_symbol => 'F',
-        base_unit      => 'lm',
-        base_parameter => {
+        si_base        => 'lm',
+        txt_base       => {
             de => 'Lichtstrom',
             en => 'luminous flux',
             fr => 'luminous flux',
             nl => 'luminous flux',
             pl => 'luminous flux',
         },
+        format => '%i',
     },
 
     18 => {
         dimension      => 'L^3',
         formula_symbol => 'V',
-        base_unit      => 'm3',
-        base_parameter => {
+        si_base        => 'm3',
+        txt_base       => {
             de => 'Volumen',
             en => 'volume',
             fr => 'volume',
             nl => 'volume',
             pl => 'volume',
         },
+        format => '%i',
     },
 
     19 => {
         dimension      => '1',
         formula_symbol => 'B',
-        base_unit      => 'b',
-        base_parameter => {
+        si_base        => 'b',
+        txt_base       => {
             de => 'Logarithmische Größe',
             en => 'logarithmic level',
             fr => 'logarithmic level',
             nl => 'logarithmic level',
             pl => 'logarithmic level',
         },
+        format => '%.1f',
     },
 
     20 => {
         dimension      => 'I T',
         formula_symbol => 'C',
-        base_unit      => 'coul',
-        base_parameter => {
+        si_base        => 'coul',
+        txt_base       => {
             de => 'elektrische Ladung',
             en => 'electric charge',
             fr => 'electric charge',
             nl => 'electric charge',
             pl => 'electric charge',
         },
+        format => '%.1f',
     },
 
     21 => {
         dimension      => '',
         formula_symbol => 'F',
-        base_unit      => 'far',
-        base_parameter => {
+        si_base        => 'far',
+        txt_base       => {
             de => 'elektrische Kapazität',
             en => 'electric capacity',
             fr => 'electric capacity',
             nl => 'electric capacity',
             pl => 'electric capacity',
         },
+        format => '%.1f',
     },
 
     22 => {
         dimension      => '',
         formula_symbol => 'F',
-        base_unit      => 'far',
-        base_parameter => {
+        si_base        => 'far',
+        txt_base       => {
             de => 'elektrische Widerstand',
             en => 'electric resistance',
             fr => 'electric resistance',
             nl => 'electric resistance',
             pl => 'electric resistance',
         },
+        format => '%.1f',
+    },
+
+    900 => {
+        txt_base => 'FHEM',
     },
 );
 
 #TODO really translate all languages
 my %unitsDB = (
 
-    pct => {
+    # others
+    closure => {
+        ref_base => 900,
+        format   => [ 'closed', 'open', 'tilted' ],
+        suffix   => 'lock',
+        txt      => {
+            de => 'offen/geschlossen/gekippt',
+            en => 'open/closed/tilted',
+            fr => 'open/closed/tilted',
+            nl => 'open/closed/tilted',
+            pl => 'open/closed/tilted',
+        },
+    },
 
-        unit_symbol => '%',
-        unit_long   => {
+    oknok => {
+        ref_base => 900,
+        format   => [ 'nok', 'ok' ],
+        suffix   => 'oknok',
+        txt      => {
+            de => 'ok/nok',
+            en => 'ok/nok',
+            fr => 'ok/nok',
+            pl => 'ok/nok',
+        },
+    },
+
+    onoff => {
+        ref_base => 900,
+        format   => [ 'off', 'on' ],
+        suffix   => 'onoff',
+        txt      => {
+            de => 'an/aus',
+            en => 'on/off',
+            fr => 'on/off',
+            nl => 'on/off',
+            pl => 'on/off',
+        },
+    },
+
+    bool => {
+        ref_base => 900,
+        format   => [ 'false', 'true' ],
+        suffix   => 'bool',
+        txt      => {
+            de => 'wahr/falsch',
+            en => 'true/false',
+            fr => 'true/false',
+            nl => 'true/false',
+            pl => 'true/false',
+        },
+    },
+
+    pct => {
+        ref_base => 900,
+        format   => '%i',
+        symbol   => '%',
+        suffix   => 'pct',
+        txt      => {
             de => 'Prozent',
             en => 'percent',
             fr => 'percent',
             nl => 'percent',
             pl => 'percent',
         },
-
-        txt_format => '%value% %unit_symbol%',
+        tmpl => '%value% %symbol%',
     },
 
+    # plane angular
     gon => {
-
-        base_ref    => 14,
-        unit_symbol => '°',
-        unit        => 'gon',
-        unit_long   => {
+        ref_base => 14,
+        symbol   => '°',
+        suffix   => 'gon',
+        txt      => {
             de => 'Grad',
             en => 'gradians',
             fr => 'gradians',
             nl => 'gradians',
             pl => 'gradians',
         },
-        txt_format => '%value%%unit_symbol%',
+        tmpl => '%value%%symbol%',
     },
 
     rad => {
-        base_ref  => 14,
-        unit      => 'rad',
-        unit_long => {
+        ref_base => 14,
+        suffix   => 'rad',
+        txt      => {
             de => 'Radiant',
             en => 'radiant',
             fr => 'radiant',
@@ -922,37 +1163,37 @@ my %unitsDB = (
 
     # temperature
     c => {
-        base_ref    => 2,
-        unit_symbol => chr(0xC2) . chr(0xB0) . 'C',
-        unit        => 'C',
-        unit_long   => {
+        ref_base => 2,
+        symbol   => chr(0xC2) . chr(0xB0) . 'C',
+        suffix   => 'C',
+        txt      => {
             de => 'Grad Celsius',
             en => 'Degrees Celsius',
             fr => 'Degrees Celsius',
             nl => 'Degrees Celsius',
             pl => 'Degrees Celsius',
         },
-        txt_format => '%value%%unit_symbol%',
+        tmpl => '%value%%symbol%',
     },
 
     f => {
-        base_ref    => 2,
-        unit_symbol => chr(0xC2) . chr(0xB0) . 'F',
-        unit        => 'F',
-        unit_long   => {
+        ref_base => 2,
+        symbol   => chr(0xC2) . chr(0xB0) . 'F',
+        suffix   => 'F',
+        txt      => {
             de => 'Grad Fahrenheit',
             en => 'Degree Fahrenheit',
             fr => 'Degree Fahrenheit',
             nl => 'Degree Fahrenheit',
             pl => 'Degree Fahrenheit',
         },
-        txt_format => '%value% %unit_symbol%',
+        tmpl => '%value% %symbol%',
     },
 
     k => {
-        base_ref  => 2,
-        unit      => 'K',
-        unit_long => {
+        ref_base => 2,
+        suffix   => 'K',
+        txt      => {
             de => 'Kelvin',
             en => 'Kelvin',
             fr => 'Kelvin',
@@ -963,10 +1204,10 @@ my %unitsDB = (
 
     # pressure
     bar => {
-        base_ref     => 10,
-        unit_scale_m => '1.0e0',
-        unit         => 'bar',
-        unit_long    => {
+        ref_base => 10,
+        scale_m  => '1.0e0',
+        suffix   => 'bar',
+        txt      => {
             de => 'Bar',
             en => 'Bar',
             fr => 'Bar',
@@ -976,15 +1217,15 @@ my %unitsDB = (
     },
 
     mbar => {
-        unit_ref     => 'bar',
-        unit_scale_m => '1.0e-3',
+        ref     => 'bar',
+        scale_m => '1.0e-3',
     },
 
     pa => {
-        base_ref     => 10,
-        unit_scale_m => '1.0e0',
-        unit         => 'Pa',
-        unit_long    => {
+        ref_base => 10,
+        scale_m  => '1.0e0',
+        suffix   => 'Pa',
+        txt      => {
             de => 'Pascal',
             en => 'Pascal',
             fr => 'Pascal',
@@ -994,15 +1235,15 @@ my %unitsDB = (
     },
 
     hpa => {
-        unit_ref     => 'pa',
-        unit_scale_m => '1.0e2',
+        ref     => 'pa',
+        scale_m => '1.0e2',
     },
 
     pamb => {
-        base_ref     => 12,
-        unit_scale_m => '1.0e0',
-        unit         => 'Pa',
-        unit_long    => {
+        ref_base => 12,
+        scale_m  => '1.0e0',
+        suffix   => 'Pa',
+        txt      => {
             de => 'Pascal',
             en => 'Pascal',
             fr => 'Pascal',
@@ -1012,14 +1253,14 @@ my %unitsDB = (
     },
 
     hpamb => {
-        unit_ref     => 'pamb',
-        unit_scale_m => '1.0e2',
+        ref     => 'pamb',
+        scale_m => '1.0e2',
     },
 
     inhg => {
-        base_ref  => 12,
-        unit      => 'inHg',
-        unit_long => {
+        ref_base => 12,
+        suffix   => 'inHg',
+        txt      => {
             de => 'Zoll Quecksilbersäule',
             en => 'Inches of Mercury',
             fr => 'Inches of Mercury',
@@ -1029,9 +1270,9 @@ my %unitsDB = (
     },
 
     mmhg => {
-        base_ref  => 12,
-        unit      => 'mmHg',
-        unit_long => {
+        ref_base => 12,
+        suffix   => 'mmHg',
+        txt      => {
             de => 'Millimeter Quecksilbersäule',
             en => 'Milimeter of Mercury',
             fr => 'Milimeter of Mercury',
@@ -1042,25 +1283,25 @@ my %unitsDB = (
 
     # length
     km => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e3',
+        ref     => 'm',
+        scale_m => '1.0e3',
     },
 
     hm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e2',
+        ref     => 'm',
+        scale_m => '1.0e2',
     },
 
     dam => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e1',
+        ref     => 'm',
+        scale_m => '1.0e1',
     },
 
     m => {
-        base_ref     => 0,
-        unit_scale_m => '1.0e0',
-        unit         => 'm',
-        unit_long    => {
+        ref_base => 0,
+        scale_m  => '1.0e0',
+        suffix   => 'm',
+        txt      => {
             de => 'Meter',
             en => 'meter',
             fr => 'meter',
@@ -1070,97 +1311,97 @@ my %unitsDB = (
     },
 
     dm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-1',
+        ref     => 'm',
+        scale_m => '1.0e-1',
     },
 
     cm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-2',
+        ref     => 'm',
+        scale_m => '1.0e-2',
     },
 
     mm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-3',
+        ref     => 'm',
+        scale_m => '1.0e-3',
     },
 
     um => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-6',
+        ref     => 'm',
+        scale_m => '1.0e-6',
     },
 
     nm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-9',
+        ref     => 'm',
+        scale_m => '1.0e-9',
     },
 
     pm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-12',
+        ref     => 'm',
+        scale_m => '1.0e-12',
     },
 
     fm => {
-        unit_ref     => 'm',
-        unit_scale_m => '1.0e-15',
+        ref     => 'm',
+        scale_m => '1.0e-15',
     },
 
     in => {
-        base_ref    => 4,
-        unit_symbol => '″',
-        unit        => 'in',
-        unit_long   => {
+        ref_base => 4,
+        symbol   => '″',
+        suffix   => 'in',
+        txt      => {
             de => 'Zoll',
             en => 'inch',
             fr => 'inch',
             nl => 'inch',
             pl => 'inch',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Zoll',
             en => 'inches',
             fr => 'inches',
             nl => 'inches',
             pl => 'inches',
         },
-        txt_format         => '%value%%unit_symbol%',
-        txt_format_long    => '%value% %unit_long%',
-        txt_format_long_pl => '%value% %unit_long_pl%',
+        tmpl         => '%value%%symbol%',
+        tmpl_long    => '%value% %txt%',
+        tmpl_long_pl => '%value% %txt_pl%',
     },
 
     ft => {
-        base_ref    => 0,
-        unit_symbol => '′',
-        unit        => 'ft',
-        unit_long   => {
+        ref_base => 0,
+        symbol   => '′',
+        suffix   => 'ft',
+        txt      => {
             de => 'Fuss',
             en => 'foot',
             fr => 'foot',
             nl => 'foot',
             pl => 'foot',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Fuss',
             en => 'feet',
             fr => 'feet',
             nl => 'feet',
             pl => 'feet',
         },
-        txt_format         => '%value%%unit_symbol%',
-        txt_format_long    => '%value% %unit_long%',
-        txt_format_long_pl => '%value% %unit_long_pl%',
+        tmpl         => '%value%%symbol%',
+        tmpl_long    => '%value% %txt%',
+        tmpl_long_pl => '%value% %txt_pl%',
     },
 
     yd => {
-        base_ref  => 0,
-        unit      => 'yd',
-        unit_long => {
+        ref_base => 0,
+        suffix   => 'yd',
+        txt      => {
             de => 'Yard',
             en => 'yard',
             fr => 'yard',
             nl => 'yard',
             pl => 'yard',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Yards',
             en => 'yards',
             fr => 'yards',
@@ -1170,9 +1411,9 @@ my %unitsDB = (
     },
 
     mi => {
-        base_ref  => 0,
-        unit      => 'mi',
-        unit_long => {
+        ref_base => 0,
+        suffix   => 'mi',
+        txt      => {
             de => 'Meilen',
             en => 'miles',
             fr => 'miles',
@@ -1183,23 +1424,23 @@ my %unitsDB = (
 
     # time
     sec => {
-        base_ref     => 2,
-        unit_scale_t => '1',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '1',
+        suffix   => {
             de => 's',
             en => 's',
             fr => 's',
             nl => 'sec',
             pl => 'sec',
         },
-        unit_long => {
+        txt => {
             de => 'Sekunde',
             en => 'second',
             fr => 'second',
             nl => 'second',
             pl => 'second',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Sekunden',
             en => 'seconds',
             fr => 'seconds',
@@ -1209,23 +1450,23 @@ my %unitsDB = (
     },
 
     min => {
-        base_ref     => 2,
-        unit_scale_t => '60',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '60',
+        suffix   => {
             de => 'Min',
             en => 'min',
             fr => 'min',
             nl => 'min',
             pl => 'min',
         },
-        unit_long => {
+        txt => {
             de => 'Minute',
             en => 'minute',
             fr => 'minute',
             nl => 'minute',
             pl => 'minute',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Minuten',
             en => 'minutes',
             fr => 'minutes',
@@ -1235,17 +1476,17 @@ my %unitsDB = (
     },
 
     hr => {
-        base_ref     => 2,
-        unit_scale_t => '3600',
-        unit         => 'h',
-        unit_long    => {
+        ref_base => 2,
+        scale_t  => '3600',
+        suffix   => 'h',
+        txt      => {
             de => 'Stunde',
             en => 'hour',
             fr => 'hour',
             nl => 'hour',
             pl => 'hour',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Stunden',
             en => 'hours',
             fr => 'hours',
@@ -1255,23 +1496,23 @@ my %unitsDB = (
     },
 
     d => {
-        base_ref     => 2,
-        unit_scale_t => '86400',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '86400',
+        suffix   => {
             de => 'T',
             en => 'd',
             fr => 'd',
             nl => 'd',
             pl => 'd',
         },
-        unit_long => {
+        txt => {
             de => 'Tag',
             en => 'day',
             fr => 'day',
             nl => 'day',
             pl => 'day',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Tage',
             en => 'days',
             fr => 'days',
@@ -1281,23 +1522,23 @@ my %unitsDB = (
     },
 
     w => {
-        base_ref     => 2,
-        unit_scale_t => '604800',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '604800',
+        suffix   => {
             de => 'W',
             en => 'w',
             fr => 'w',
             nl => 'w',
             pl => 'w',
         },
-        unit_long => {
+        txt => {
             de => 'Woche',
             en => 'week',
             fr => 'week',
             nl => 'week',
             pl => 'week',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Wochen',
             en => 'weeks',
             fr => 'weeks',
@@ -1307,23 +1548,23 @@ my %unitsDB = (
     },
 
     mon => {
-        base_ref     => 2,
-        unit_scale_t => '2592000',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '2592000',
+        suffix   => {
             de => 'M',
             en => 'm',
             fr => 'm',
             nl => 'm',
             pl => 'm',
         },
-        unit_long => {
+        txt => {
             de => 'Monat',
             en => 'month',
             fr => 'month',
             nl => 'month',
             pl => 'month',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Monate',
             en => 'Monat',
             fr => 'Monat',
@@ -1333,23 +1574,23 @@ my %unitsDB = (
     },
 
     y => {
-        base_ref     => 2,
-        unit_scale_t => '31536000',
-        unit         => {
+        ref_base => 2,
+        scale_t  => '31536000',
+        suffix   => {
             de => 'J',
             en => 'y',
             fr => 'y',
             nl => 'y',
             pl => 'y',
         },
-        unit_long => {
+        txt => {
             de => 'Jahr',
             en => 'year',
             fr => 'year',
             nl => 'year',
             pl => 'year',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Jahre',
             en => 'years',
             fr => 'years',
@@ -1360,22 +1601,22 @@ my %unitsDB = (
 
     # speed
     bft => {
-        base_ref  => 15,
-        unit      => 'bft',
-        unit_long => {
+        ref_base => 15,
+        suffix   => 'bft',
+        txt      => {
             de => 'Windstärke',
             en => 'wind force',
             fr => 'wind force',
             nl => 'wind force',
             pl => 'wind force',
         },
-        txt_format_long => '%unit_long% %value%',
+        tmpl_long => '%txt% %value%',
     },
 
     kn => {
-        base_ref  => 15,
-        unit      => 'kn',
-        unit_long => {
+        ref_base => 15,
+        suffix   => 'kn',
+        txt      => {
             de => 'Knoten',
             en => 'knots',
             fr => 'knots',
@@ -1385,132 +1626,132 @@ my %unitsDB = (
     },
 
     fts => {
-        base_ref        => 15,
-        unit_ref        => 'ft',
-        unit_ref_t      => 'sec',
-        txt_format      => '%value% %unit%/%unit_t%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref_base  => 15,
+        ref       => 'ft',
+        ref_t     => 'sec',
+        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     mph => {
-        base_ref        => 15,
-        unit_ref        => 'mi',
-        unit_ref_t      => 'hr',
-        txt_format      => '%value% %unit%/%unit_t%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref_base  => 15,
+        ref       => 'mi',
+        ref_t     => 'hr',
+        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     kmh => {
-        base_ref        => 15,
-        unit_ref        => 'm',
-        unit_ref_t      => 'hr',
-        unit_scale_m    => '1.0e3',
-        txt_format      => '%value% %unit%/%unit_t%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref_base  => 15,
+        ref       => 'm',
+        ref_t     => 'hr',
+        scale_m   => '1.0e3',
+        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     mps => {
-        base_ref        => 15,
-        unit_ref        => 'm',
-        unit_ref_t      => 'sec',
-        unit_scale_m    => '1.0e0',
-        txt_format      => '%value% %unit%/%unit_t%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref_base  => 15,
+        ref       => 'm',
+        ref_t     => 'sec',
+        scale_m   => '1.0e0',
+        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     # weight
     mol => {
-        base_ref => 5,
-        unit     => 'mol',
+        ref_base => 5,
+        suffix   => 'mol',
     },
 
     pg => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-12",
+        ref     => 'g',
+        scale_m => "1.0e-12",
     },
 
     ng => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-9",
+        ref     => 'g',
+        scale_m => "1.0e-9",
     },
 
     ug => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-6",
+        ref     => 'g',
+        scale_m => "1.0e-6",
     },
 
     mg => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-3",
+        ref     => 'g',
+        scale_m => "1.0e-3",
     },
 
     cg => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-2",
+        ref     => 'g',
+        scale_m => "1.0e-2",
     },
 
     dg => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e-1",
+        ref     => 'g',
+        scale_m => "1.0e-1",
     },
 
     g => {
-        base_ref     => 1,
-        unit_scale_m => "1.0e0",
-        unit         => 'g',
-        unit_long    => {
+        ref_base => 1,
+        scale_m  => "1.0e0",
+        suffix   => 'g',
+        txt      => {
             de => 'Gramm',
             en => 'gram',
             fr => 'gram',
@@ -1520,22 +1761,22 @@ my %unitsDB = (
     },
 
     kg => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e3",
+        ref     => 'g',
+        scale_m => "1.0e3",
     },
 
     t => {
-        unit_ref     => 'g',
-        unit_scale_m => "1.0e6",
-        unit         => 't',
-        unit_long    => {
+        ref     => 'g',
+        scale_m => "1.0e6",
+        suffix  => 't',
+        txt     => {
             de => 'Tonne',
             en => 'ton',
             fr => 'ton',
             nl => 'ton',
             pl => 'ton',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Tonnen',
             en => 'tons',
             fr => 'tons',
@@ -1545,9 +1786,9 @@ my %unitsDB = (
     },
 
     lb => {
-        base_ref  => 1,
-        unit      => 'lb',
-        unit_long => {
+        ref_base => 1,
+        suffix   => 'lb',
+        txt      => {
             de => 'Pfund',
             en => 'pound',
             fr => 'pound',
@@ -1557,9 +1798,9 @@ my %unitsDB = (
     },
 
     lbs => {
-        base_ref  => 1,
-        unit      => 'lbs',
-        unit_long => {
+        ref_base => 1,
+        suffix   => 'lbs',
+        txt      => {
             de => 'Pfund',
             en => 'pound',
             fr => 'pound',
@@ -1570,9 +1811,9 @@ my %unitsDB = (
 
     # luminous intensity
     cd => {
-        base_ref  => 6,
-        unit      => 'cd',
-        unit_long => {
+        ref_base => 6,
+        suffix   => 'cd',
+        txt      => {
             de => 'Candela',
             en => 'Candela',
             fr => 'Candela',
@@ -1583,9 +1824,9 @@ my %unitsDB = (
 
     # illumination intensity
     lx => {
-        base_ref  => 16,
-        unit      => 'lx',
-        unit_long => {
+        ref_base => 16,
+        suffix   => 'lx',
+        txt      => {
             de => 'Lux',
             en => 'Lux',
             fr => 'Lux',
@@ -1596,9 +1837,9 @@ my %unitsDB = (
 
     # luminous flux
     lm => {
-        base_ref  => 17,
-        unit      => 'lm',
-        unit_long => {
+        ref_base => 17,
+        suffix   => 'lm',
+        txt      => {
             de => 'Lumen',
             en => 'Lumen',
             fr => 'Lumen',
@@ -1608,48 +1849,48 @@ my %unitsDB = (
     },
 
     uvi => {
-        unit      => 'UVI',
-        unit_long => {
+        suffix => 'UVI',
+        txt    => {
             de => 'UV-Index',
             en => 'UV-Index',
             fr => 'UV-Index',
             nl => 'UV-Index',
             pl => 'UV-Index',
         },
-        txt_format         => '%unit% %value%',
-        txt_format_long    => '%unit_long% %value%',
-        txt_format_long_pl => '%unit_long% %value%',
+        tmpl         => '%suffix% %value%',
+        tmpl_long    => '%txt% %value%',
+        tmpl_long_pl => '%txt% %value%',
     },
 
     # volume
     cm3 => {
-        base_ref      => 18,
-        unit_ref      => 'm',
-        unit_scale_cu => '1.0e-2',
+        ref_base => 18,
+        ref      => 'm',
+        scale_cu => '1.0e-2',
     },
 
     m3 => {
-        base_ref      => 18,
-        unit_ref      => 'm',
-        unit_scale_cu => '1.0e0',
+        ref_base => 18,
+        ref      => 'm',
+        scale_cu => '1.0e0',
     },
 
     ml => {
-        unit_ref     => 'l',
-        unit_scale_m => '1.0e-3',
+        ref     => 'l',
+        scale_m => '1.0e-3',
     },
 
     l => {
-        base_ref  => 18,
-        unit      => 'l',
-        unit_long => {
+        ref_base => 18,
+        suffix   => 'l',
+        txt      => {
             de => 'Liter',
             en => 'liter',
             fr => 'liter',
             nl => 'liter',
             pl => 'liter',
         },
-        unit_long_pl => {
+        txt_pl => {
             de => 'Liter',
             en => 'liters',
             fr => 'liters',
@@ -1659,15 +1900,15 @@ my %unitsDB = (
     },
 
     hl => {
-        unit_ref     => 'l',
-        unit_scale_m => '1.0e2',
+        ref     => 'l',
+        scale_m => '1.0e2',
     },
 
     b => {
-        base_ref     => 19,
-        unit_scale_m => '1.0e0',
-        unit         => 'B',
-        unit_long    => {
+        ref_base => 19,
+        scale_m  => '1.0e0',
+        suffix   => 'B',
+        txt      => {
             de => 'Bel',
             en => 'Bel',
             fr => 'Bel',
@@ -1677,25 +1918,25 @@ my %unitsDB = (
     },
 
     db => {
-        unit_ref     => 'b',
-        unit_scale_m => '1.0e-1',
+        ref     => 'b',
+        scale_m => '1.0e-1',
     },
 
     ua => {
-        unit_ref     => 'a',
-        unit_scale_m => '1.0e-6',
+        ref     => 'a',
+        scale_m => '1.0e-6',
     },
 
     ma => {
-        unit_ref     => 'a',
-        unit_scale_m => '1.0e-3',
+        ref     => 'a',
+        scale_m => '1.0e-3',
     },
 
     a => {
-        base_ref     => 3,
-        unit_scale_m => '1.0e0',
-        unit         => 'A',
-        unit_long    => {
+        ref_base => 3,
+        scale_m  => '1.0e0',
+        suffix   => 'A',
+        txt      => {
             de => 'Ampere',
             en => 'Ampere',
             fr => 'Ampere',
@@ -1705,20 +1946,20 @@ my %unitsDB = (
     },
 
     uv => {
-        unit_ref     => 'v',
-        unit_scale_m => '1.0e-6',
+        ref     => 'v',
+        scale_m => '1.0e-6',
     },
 
     mv => {
-        unit_ref     => 'v',
-        unit_scale_m => '1.0e-3',
+        ref     => 'v',
+        scale_m => '1.0e-3',
     },
 
     v => {
-        base_ref     => 13,
-        unit_scale_m => '1.0e0',
-        unit         => 'V',
-        unit_long    => {
+        ref_base => 13,
+        scale_m  => '1.0e0',
+        suffix   => 'V',
+        txt      => {
             de => 'Volt',
             en => 'Volt',
             fr => 'Volt',
@@ -1728,20 +1969,20 @@ my %unitsDB = (
     },
 
     uj => {
-        unit_ref     => 'j',
-        unit_scale_m => '1.0e-6',
+        ref     => 'j',
+        scale_m => '1.0e-6',
     },
 
     mj => {
-        unit_ref     => 'j',
-        unit_scale_m => '1.0e-3',
+        ref     => 'j',
+        scale_m => '1.0e-3',
     },
 
     j => {
-        base_ref     => 7,
-        unit_scale_m => '1.0e0',
-        unit         => 'J',
-        unit_long    => {
+        ref_base => 7,
+        scale_m  => '1.0e0',
+        suffix   => 'J',
+        txt      => {
             de => 'Joule',
             en => 'Joule',
             fr => 'Joule',
@@ -1751,20 +1992,20 @@ my %unitsDB = (
     },
 
     uw => {
-        unit_ref     => 'j',
-        unit_scale_m => '1.0e-6',
+        ref     => 'j',
+        scale_m => '1.0e-6',
     },
 
     mw => {
-        unit_ref     => 'j',
-        unit_scale_m => '1.0e-3',
+        ref     => 'j',
+        scale_m => '1.0e-3',
     },
 
     w => {
-        base_ref     => 9,
-        unit_scale_m => '1.0e0',
-        unit         => 'Watt',
-        unit_long    => {
+        ref_base => 9,
+        scale_m  => '1.0e0',
+        suffix   => 'Watt',
+        txt      => {
             de => 'Watt',
             en => 'Watt',
             fr => 'Watt',
@@ -1774,145 +2015,145 @@ my %unitsDB = (
     },
 
     va => {
-        unit_ref => 'w',
+        ref => 'w',
     },
 
     uwpscm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e-6',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e-2',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e-6',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e-2',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     uwpsm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e-6',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e0',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e-6',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e0',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     mwpscm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e-3',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e-2',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e-3',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e-2',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     mwpsm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e-3',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e0',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e-3',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e0',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     wpscm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e0',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e-2',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e0',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e-2',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     wpsm => {
-        unit_ref        => 'w',
-        unit_scale_m    => '1.0e0',
-        unit_ref_sq     => 'm',
-        unit_scale_sq   => '1.0e0',
-        txt_format      => '%value% %unit%/%unit_sq%',
-        txt_format_long => {
-            de => '%value% %unit_long% pro %unit_long_t%',
-            en => '%value% %unit_long% per %unit_long_t%',
-            fr => '%value% %unit_long% per %unit_long_t%',
-            nl => '%value% %unit_long% per %unit_long_t%',
-            pl => '%value% %unit_long% per %unit_long_t%',
+        ref       => 'w',
+        scale_m   => '1.0e0',
+        ref_sq    => 'm',
+        scale_sq  => '1.0e0',
+        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl_long => {
+            de => '%value% %txt% pro %txt_t%',
+            en => '%value% %txt% per %txt_t%',
+            fr => '%value% %txt% per %txt_t%',
+            nl => '%value% %txt% per %txt_t%',
+            pl => '%value% %txt% per %txt_t%',
         },
-        txt_format_long_pl => {
-            de => '%value% %unit_long_pl% pro %unit_long_t%',
-            en => '%value% %unit_long_pl% per %unit_long_t%',
-            fr => '%value% %unit_long_pl% per %unit_long_t%',
-            nl => '%value% %unit_long_pl% per %unit_long_t%',
-            pl => '%value% %unit_long_pl% per %unit_long_t%',
+        tmpl_long_pl => {
+            de => '%value% %txt_pl% pro %txt_t%',
+            en => '%value% %txt_pl% per %txt_t%',
+            fr => '%value% %txt_pl% per %txt_t%',
+            nl => '%value% %txt_pl% per %txt_t%',
+            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
     coul => {
-        base_ref  => 20,
-        unit      => 'C',
-        unit_long => {
+        ref_base => 20,
+        suffix   => 'C',
+        txt      => {
             de => 'Coulomb',
             en => 'Coulomb',
             fr => 'Coulomb',
@@ -1922,9 +2163,9 @@ my %unitsDB = (
     },
 
     far => {
-        base_ref  => 21,
-        unit      => 'F',
-        unit_long => {
+        ref_base => 21,
+        suffix   => 'F',
+        txt      => {
             de => 'Farad',
             en => 'Farad',
             fr => 'Farad',
@@ -1934,10 +2175,10 @@ my %unitsDB = (
     },
 
     ohm => {
-        base_ref    => 22,
-        unit_symbol => 'Ω',
-        unit        => 'Ohm',
-        unit_long   => {
+        ref_base => 22,
+        symbol   => 'Ω',
+        suffix   => 'Ohm',
+        txt      => {
             de => 'Ohm',
             en => 'Ohm',
             fr => 'Ohm',
@@ -2428,8 +2669,8 @@ sub GetList (@) {
     foreach my $u ( keys %unitsDB ) {
         my $details = GetDetails( $u, $lang );
         my $tn = (
-              $details->{base_parameter}
-            ? $details->{base_parameter}
+              $details->{txt_base}
+            ? $details->{txt_base}
             : "others"
         );
         $list{$tn}{$u} = $details
@@ -2452,11 +2693,11 @@ sub GetDetails ($@) {
         foreach my $k ( keys %{ $unitsDB{$u} } ) {
             $details{$k} = $unitsDB{$u}{$k};
         }
-        $details{unit_abbr} = $u;
+        $details{abbr} = $u;
 
-        foreach ( 'unit_ref', 'unit_ref_t', 'unit_ref_sq', 'unit_ref_cu' ) {
+        foreach ( 'ref', 'ref_t', 'ref_sq', 'ref_cu' ) {
             my $suffix = $_;
-            $suffix =~ s/^[a-z]+_[a-z]+//;
+            $suffix =~ s/^[a-z]+//;
             if ( defined( $details{$_} ) ) {
                 my $ref = $details{$_};
                 if ( !defined( $unitsDB{$ref} ) ) {
@@ -2464,7 +2705,9 @@ sub GetDetails ($@) {
                     next;
                 }
                 foreach my $k ( keys %{ $unitsDB{$ref} } ) {
-                    next if ( $k =~ /^unit_scale/ );
+                    next
+                      if ( $k =~ /^scale/ )
+                      ;    # exclude scales from referenced unit
                     if ( !defined( $details{$k} ) ) {
                         $details{$k} = $unitsDB{$ref}{$k};
                     }
@@ -2476,28 +2719,28 @@ sub GetDetails ($@) {
             }
         }
 
-        if ( $details{unit_scale_m} ) {
-            my $ref = $details{unit_scale_m};
+        if ( $details{scale_m} ) {
+            my $ref = $details{scale_m};
             foreach my $k ( keys %{ $scales_m{$ref} } ) {
-                $details{ $k . '_m' } = $scales_m{$ref}{$k}
-                  if ( !defined( $details{ $k . '_m' } ) );
+                $details{$k} = $scales_m{$ref}{$k}
+                  if ( !defined( $details{$k} ) );
             }
         }
-        if ( $details{unit_scale_sq} ) {
+        if ( $details{scale_sq} ) {
             foreach my $k ( keys %scales_sq ) {
-                $details{ $k . "_sq" } = $scales_sq{$k}
-                  if ( !defined( $details{ $k . "_sq" } ) );
+                $details{$k} = $scales_sq{$k}
+                  if ( !defined( $details{$k} ) );
             }
         }
-        if ( $details{unit_scale_cu} ) {
+        if ( $details{scale_cu} ) {
             foreach my $k ( keys %scales_cu ) {
-                $details{ $k . "_cu" } = $scales_cu{$k}
-                  if ( !defined( $details{ $k . "_cu" } ) );
+                $details{$k} = $scales_cu{$k}
+                  if ( !defined( $details{$k} ) );
             }
         }
 
-        if ( defined( $details{base_ref} ) ) {
-            my $ref = $details{base_ref};
+        if ( $details{ref_base} ) {
+            my $ref = $details{ref_base};
             foreach my $k ( keys %{ $unit_base{$ref} } ) {
                 $details{$k} = $unit_base{$ref}{$k}
                   if ( !defined( $details{$k} ) );
@@ -2505,7 +2748,7 @@ sub GetDetails ($@) {
         }
 
         if ($lang) {
-            $details{"lang"} = $l;
+            $details{lang} = $l;
             foreach ( keys %details ) {
                 if ( $details{$_}
                     && ref( $details{$_} ) eq "HASH" )
@@ -2518,23 +2761,22 @@ sub GetDetails ($@) {
                 }
             }
 
-            $details{unit} = $details{scale_m} . $details{unit}
-              if ( $details{scale_m} );
-            $details{unit_long} =
-              $details{scale_long_m} . lc( $details{unit_long} )
-              if ( $details{scale_long_m} );
+            $details{suffix} = $details{scale_txt_m} . $details{suffix}
+              if ( $details{suffix} && $details{scale_txt_m} );
+            $details{txt} = $details{scale_txt_long_m} . lc( $details{txt} )
+              if ( $details{txt} && $details{scale_txt_long_m} );
 
-            $details{unit_sq} = $details{unit_sq} . $details{scale_sq}
-              if ( $details{scale_sq} );
-            $details{unit_long_sq} =
-              $details{scale_long_sq} . lc( $details{unit_long_sq} )
-              if ( $details{scale_long_sq} );
+            $details{unit_sq} = $details{unit_sq} . $details{scale_txt_sq}
+              if ( $details{unit_sq} && $details{scale_txt_sq} );
+            $details{txt_sq} =
+              $details{scale_txt_long_sq} . lc( $details{txt_sq} )
+              if ( $details{txt_sq} && $details{scale_txt_long_sq} );
 
-            $details{unit_cu} = $details{unit_cu} . $details{scale_cu}
-              if ( $details{scale_cu} );
-            $details{unit_long_cu} =
-              $details{scale_long_cu} . lc( $details{unit_long_cu} )
-              if ( $details{scale_long_cu} );
+            $details{unit_cu} = $details{unit_cu} . $details{scale_txt_cu}
+              if ( $details{unit_cu} && $details{scale_txt_cu} );
+            $details{txt_cu} =
+              $details{scale_txt_long_cu} . lc( $details{txt_cu} )
+              if ( $details{txt_cu} && $details{scale_txt_long_cu} );
         }
 
         return \%details;
@@ -2567,24 +2809,24 @@ sub GetDetailsFromReadingname ($@) {
     $r = lc($r);
 
     # known alias reading names
-    if ( $readingsDB{$r}{"unified"} ) {
-        my $dr = $readingsDB{$r}{"unified"};
-        $return{"unified"} = $dr;
-        $return{"short"}   = $readingsDB{$dr}{"short"};
-        $u                 = (
-              $readingsDB{$dr}{"unit"}
-            ? $readingsDB{$dr}{"unit"}
+    if ( $readingsDB{$r}{unified} ) {
+        my $dr = $readingsDB{$r}{unified};
+        $return{unified} = $dr;
+        $return{short}   = $readingsDB{$dr}{short};
+        $u               = (
+              $readingsDB{$dr}{unit}
+            ? $readingsDB{$dr}{unit}
             : "-"
         );
     }
 
     # known standard reading names
-    elsif ( $readingsDB{$r}{"short"} ) {
-        $return{"unified"} = $reading;
-        $return{"short"}   = $readingsDB{$r}{"short"};
-        $u                 = (
-              $readingsDB{$r}{"unit"}
-            ? $readingsDB{$r}{"unit"}
+    elsif ( $readingsDB{$r}{short} ) {
+        $return{unified} = $reading;
+        $return{short}   = $readingsDB{$r}{short};
+        $u               = (
+              $readingsDB{$r}{unit}
+            ? $readingsDB{$r}{unit}
             : "-"
         );
     }
@@ -2600,8 +2842,8 @@ sub GetDetailsFromReadingname ($@) {
     my $unitDetails = GetDetails( $u, $l );
 
     if ( ref($unitDetails) eq "HASH" ) {
-        $return{"unified"}    = $reading if ( !$return{"unified"} );
-        $return{"unit_guess"} = "1"      if ( !$return{"short"} );
+        $return{unified}    = $reading if ( !$return{unified} );
+        $return{unit_guess} = "1"      if ( !$return{short} );
         foreach my $k ( keys %{$unitDetails} ) {
             $return{$k} = $unitDetails->{$k};
         }
@@ -2614,38 +2856,38 @@ sub GetDetailsFromReadingname ($@) {
 sub GetValueWithUnit ($$@) {
     my ( $value, $unit, $lang, $format ) = @_;
     my $l = ( $lang ? lc($lang) : "en" );
-    my $return = GetDetails( $unit, $l );
+    my $details = GetDetails( $unit, $l );
     my $txt;
-    return $value if ( !$return->{"unit"} && !$return->{"unit_symbol"} );
+    return $value if ( !$details->{suffix} && !$details->{symbol} );
 
-    $return->{"value"} = $value;
+    $details->{value} = $value;
 
     # long plural
     if (   $format
         && Scalar::Util::looks_like_number($value)
         && $value > 1
-        && $return->{"unit_long_pl"} )
+        && $details->{txt_pl} )
     {
-        $txt = '%value% %unit_long_pl%';
-        $txt = $return->{"txt_format_long_pl"}
-          if ( $return->{"txt_format_long_pl"} );
+        $txt = '%value% %txt_pl%';
+        $txt = $details->{tmpl_long_pl}
+          if ( $details->{tmpl_long_pl} );
     }
 
     # long singular
-    elsif ( $format && $return->{"unit_long"} ) {
-        $txt = '%value% %unit_long%';
-        $txt = $return->{"txt_format_long"}
-          if ( $return->{"txt_format_long"} );
+    elsif ( $format && $details->{txt} ) {
+        $txt = '%value% %txt%';
+        $txt = $details->{tmpl_long}
+          if ( $details->{tmpl_long} );
     }
 
     # short
     else {
-        $txt = '%value% %unit%';
-        $txt = $return->{"txt_format"} if ( $return->{"txt_format"} );
+        $txt = '%value% %suffix%';
+        $txt = $details->{tmpl} if ( $details->{tmpl} );
     }
 
-    foreach my $k ( keys %{$return} ) {
-        $txt =~ s/%$k%/$return->{$k}/g;
+    foreach my $k ( keys %{$details} ) {
+        $txt =~ s/%$k%/$details->{$k}/g;
     }
 
     return $txt;
@@ -2665,6 +2907,14 @@ sub GetShortReadingname($) {
     }
 
     return $reading;
+}
+
+#TODO rename
+sub numeric {
+    my $obj = shift;
+
+    no warnings "numeric";
+    return length( $obj & "" );
 }
 
 1;

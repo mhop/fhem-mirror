@@ -57,6 +57,120 @@ sub Wunderground_Initialize($) {
 "disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
       . $readingFnAttributes;
 
+    $hash->{readingsDesc} = {
+        "UV"                     => { "unit" => "uvi" },
+        "dewpoint"               => { "unit" => "c" },
+        "dewpoint_f"             => { "unit" => "f" },
+        "fc0_high_c"             => { "unit" => "c" },
+        "fc0_high_f"             => { "unit" => "f" },
+        "fc0_humidity"           => { "unit" => "pct" },
+        "fc0_humidity_max"       => { "unit" => "pct" },
+        "fc0_humidity_min"       => { "unit" => "pct" },
+        "fc0_low_c"              => { "unit" => "c" },
+        "fc0_low_f"              => { "unit" => "f" },
+        "fc0_rain_day"           => { "unit" => "mm" },
+        "fc0_rain_day_in"        => { "unit" => "in" },
+        "fc0_rain_night"         => { "unit" => "mm" },
+        "fc0_rain_night_in"      => { "unit" => "in" },
+        "fc0_snow_day"           => { "unit" => "cm" },
+        "fc0_snow_day_in"        => { "unit" => "in" },
+        "fc0_snow_night"         => { "unit" => "cm" },
+        "fc0_snow_night_in"      => { "unit" => "in" },
+        "fc0_wind_direction"     => { "unit" => "gon" },
+        "fc0_wind_direction_max" => { "unit" => "gon" },
+        "fc0_wind_speed"         => { "unit" => "kmh" },
+        "fc0_wind_speed_max"     => { "unit" => "kmh" },
+        "fc0_wind_speed_max_mph" => { "unit" => "mph" },
+        "fc0_wind_speed_mph"     => { "unit" => "mph" },
+        "fc1_high_c"             => { "unit" => "c" },
+        "fc1_high_f"             => { "unit" => "f" },
+        "fc1_humidity"           => { "unit" => "pct" },
+        "fc1_humidity_max"       => { "unit" => "pct" },
+        "fc1_humidity_min"       => { "unit" => "pct" },
+        "fc1_low_c"              => { "unit" => "c" },
+        "fc1_low_f"              => { "unit" => "f" },
+        "fc1_rain_day"           => { "unit" => "mm" },
+        "fc1_rain_day_in"        => { "unit" => "in" },
+        "fc1_rain_night"         => { "unit" => "mm" },
+        "fc1_rain_night_in"      => { "unit" => "in" },
+        "fc1_snow_day"           => { "unit" => "cm" },
+        "fc1_snow_day_in"        => { "unit" => "in" },
+        "fc1_snow_night"         => { "unit" => "cm" },
+        "fc1_snow_night_in"      => { "unit" => "in" },
+        "fc1_wind_direction"     => { "unit" => "gon" },
+        "fc1_wind_direction_max" => { "unit" => "gon" },
+        "fc1_wind_speed"         => { "unit" => "kmh" },
+        "fc1_wind_speed_max"     => { "unit" => "kmh" },
+        "fc1_wind_speed_max_mph" => { "unit" => "mph" },
+        "fc1_wind_speed_mph"     => { "unit" => "mph" },
+        "fc2_high_c"             => { "unit" => "c" },
+        "fc2_high_f"             => { "unit" => "f" },
+        "fc2_humidity"           => { "unit" => "pct" },
+        "fc2_humidity_max"       => { "unit" => "pct" },
+        "fc2_humidity_min"       => { "unit" => "pct" },
+        "fc2_low_c"              => { "unit" => "c" },
+        "fc2_low_f"              => { "unit" => "f" },
+        "fc2_rain_day"           => { "unit" => "mm" },
+        "fc2_rain_day_in"        => { "unit" => "in" },
+        "fc2_rain_night"         => { "unit" => "mm" },
+        "fc2_rain_night_in"      => { "unit" => "in" },
+        "fc2_snow_day"           => { "unit" => "cm" },
+        "fc2_snow_day_in"        => { "unit" => "in" },
+        "fc2_snow_night"         => { "unit" => "cm" },
+        "fc2_snow_night_in"      => { "unit" => "in" },
+        "fc2_wind_direction"     => { "unit" => "gon" },
+        "fc2_wind_direction_max" => { "unit" => "gon" },
+        "fc2_wind_speed"         => { "unit" => "kmh" },
+        "fc2_wind_speed_max"     => { "unit" => "kmh" },
+        "fc2_wind_speed_max_mph" => { "unit" => "mph" },
+        "fc2_wind_speed_mph"     => { "unit" => "mph" },
+        "fc3_high_c"             => { "unit" => "c" },
+        "fc3_high_f"             => { "unit" => "f" },
+        "fc3_humidity"           => { "unit" => "pct" },
+        "fc3_humidity_max"       => { "unit" => "pct" },
+        "fc3_humidity_min"       => { "unit" => "pct" },
+        "fc3_low_c"              => { "unit" => "c" },
+        "fc3_low_f"              => { "unit" => "f" },
+        "fc3_rain_day"           => { "unit" => "mm" },
+        "fc3_rain_day_in"        => { "unit" => "in" },
+        "fc3_rain_night"         => { "unit" => "mm" },
+        "fc3_rain_night_in"      => { "unit" => "in" },
+        "fc3_snow_day"           => { "unit" => "cm" },
+        "fc3_snow_day_in"        => { "unit" => "in" },
+        "fc3_snow_night"         => { "unit" => "cm" },
+        "fc3_snow_night_in"      => { "unit" => "in" },
+        "fc3_wind_direction"     => { "unit" => "gon" },
+        "fc3_wind_direction_max" => { "unit" => "gon" },
+        "fc3_wind_speed"         => { "unit" => "kmh" },
+        "fc3_wind_speed_max"     => { "unit" => "kmh" },
+        "fc3_wind_speed_max_mph" => { "unit" => "mph" },
+        "fc3_wind_speed_mph"     => { "unit" => "mph" },
+        "feelslike_c"            => { "unit" => "c" },
+        "feelslike_f"            => { "unit" => "f" },
+        "heat_index_c"           => { "unit" => "c" },
+        "heat_index_f"           => { "unit" => "f" },
+        "humidity"               => { "unit" => "pct" },
+        "moon_pct"               => { "unit" => "pct" },
+        "pressure"               => { "unit" => "hpamb" },
+        "pressure_in"            => { "unit" => "inhg" },
+        "rain"                   => { "unit" => "mm" },
+        "rain_day"               => { "unit" => "mm" },
+        "rain_day_in"            => { "unit" => "in" },
+        "rain_in"                => { "unit" => "in" },
+        "solarradiation"         => { "unit" => "wpsm" },
+        "temp_c"                 => { "unit" => "c" },
+        "temp_f"                 => { "unit" => "f" },
+        "visibility"             => { "unit" => "km" },
+        "visibility_mi"          => { "unit" => "mi" },
+        "wind_chill"             => { "unit" => "c" },
+        "wind_chill_f"           => { "unit" => "f" },
+        "wind_direction"         => { "unit" => "gon" },
+        "wind_gust"              => { "unit" => "kmh" },
+        "wind_gust_mph"          => { "unit" => "mph" },
+        "wind_speed"             => { "unit" => "kmh" },
+        "wind_speed_mph"         => { "unit" => "mph" }
+    };
+
     return;
 }
 
@@ -239,7 +353,7 @@ sub Wunderground_ReceiveCommand($$$) {
     Log3 $name, 5,
       "Wunderground $name: called function Wunderground_ReceiveCommand()";
 
-    readingsUnitBeginUpdate($hash);
+    readingsBeginUpdate($hash);
 
     # service not reachable
     if ($err) {
@@ -292,10 +406,10 @@ sub Wunderground_ReceiveCommand($$$) {
       getMultiValStatus( $name, $stateReadings,
         $stateReadingsLang, $stateReadingsFormat );
 
-    readingsUnitBulkUpdate( $hash, "state", $state );
-    readingsUnitBulkUpdateIfChanged( $hash, "lastQueryResult",
+    readingsBulkUpdate( $hash, "state", $state );
+    readingsBulkUpdateIfChanged( $hash, "lastQueryResult",
         $lastQueryResult );
-    readingsUnitEndUpdate( $hash, 1 );
+    readingsEndUpdate( $hash, 1 );
 
     return;
 }
@@ -382,16 +496,16 @@ sub Wunderground_Hash2Readings($$;$) {
                 $moonset =~ s/^(\d):(\d\d)$/0$1:$2/;
                 $moonset =~ s/^(\d\d):(\d)$/$1:0$2/;
 
-                readingsUnitBulkUpdate( $hash, "sunrise",  $sunrise );
-                readingsUnitBulkUpdate( $hash, "sunset",   $sunset );
-                readingsUnitBulkUpdate( $hash, "moonrise", $moonrise );
-                readingsUnitBulkUpdate( $hash, "moonset",  $moonset );
+                readingsBulkUpdate( $hash, "sunrise",  $sunrise );
+                readingsBulkUpdate( $hash, "sunset",   $sunset );
+                readingsBulkUpdate( $hash, "moonrise", $moonrise );
+                readingsBulkUpdate( $hash, "moonset",  $moonset );
 
-                readingsUnitBulkUpdate( $hash, "moon_age",
+                readingsBulkUpdate( $hash, "moon_age",
                     $h->{moon_phase}{ageOfMoon} );
-                readingsUnitBulkUpdate( $hash, "moon_pct",
+                readingsBulkUpdate( $hash, "moon_pct",
                     $h->{moon_phase}{percentIlluminated} );
-                readingsUnitBulkUpdate( $hash, "moon_phase",
+                readingsBulkUpdate( $hash, "moon_phase",
                     $h->{moon_phase}{phaseofMoon} );
             }
 
@@ -402,104 +516,104 @@ sub Wunderground_Hash2Readings($$;$) {
                 my $period = $h->{period} - 1;
                 $reading = "fc" . $period . "_";
 
-                readingsUnitBulkUpdate( $hash, $reading . "condition",
+                readingsBulkUpdate( $hash, $reading . "condition",
                     $h->{conditions} );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "high_c",
                     $h->{high}{celsius}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "high_f",
                     $h->{high}{fahrenheit}
                 );
-                readingsUnitBulkUpdate( $hash, $reading . "humidity",
+                readingsBulkUpdate( $hash, $reading . "humidity",
                     $h->{avehumidity} );
-                readingsUnitBulkUpdate( $hash, $reading . "humidity_min",
+                readingsBulkUpdate( $hash, $reading . "humidity_min",
                     $h->{minhumidity} );
-                readingsUnitBulkUpdate( $hash, $reading . "humidity_max",
+                readingsBulkUpdate( $hash, $reading . "humidity_max",
                     $h->{maxhumidity} );
-                readingsUnitBulkUpdate( $hash, $reading . "icon", $h->{icon} );
-                readingsUnitBulkUpdate( $hash, $reading . "icon_url",
+                readingsBulkUpdate( $hash, $reading . "icon", $h->{icon} );
+                readingsBulkUpdate( $hash, $reading . "icon_url",
                     $h->{icon_url} );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "low_c",
                     $h->{low}{celsius}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "low_f",
                     $h->{low}{fahrenheit}
                 );
-                readingsUnitBulkUpdate( $hash, $reading . "pop", $h->{pop} );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate( $hash, $reading . "pop", $h->{pop} );
+                readingsBulkUpdate(
                     $hash,
                     $reading . "rain_day",
                     $h->{qpf_allday}{mm}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "rain_day_in",
                     $h->{qpf_allday}{in}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "rain_night",
                     $h->{qpf_night}{mm}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "rain_night_in",
                     $h->{qpf_night}{in}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "snow_day",
                     $h->{snow_allday}{cm}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "snow_day_in",
                     $h->{snow_allday}{in}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "snow_night",
                     $h->{snow_night}{cm}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "snow_night_in",
                     $h->{snow_night}{in}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_direction",
                     $h->{avewind}{degrees}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_direction_max",
                     $h->{maxwind}{degrees}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_speed",
                     $h->{avewind}{kph}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_speed_mph",
                     $h->{avewind}{mph}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_speed_max",
                     $h->{maxwind}{kph}
                 );
-                readingsUnitBulkUpdate(
+                readingsBulkUpdate(
                     $hash,
                     $reading . "wind_speed_max_mph",
                     $h->{maxwind}{mph}
@@ -532,17 +646,17 @@ sub Wunderground_Hash2Readings($$;$) {
 
                 $reading = "fc" . $period . "_";
 
-                readingsUnitBulkUpdate( $hash, $reading . "icon$night",
+                readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
-                readingsUnitBulkUpdate( $hash, $reading . "icon_url$night",
+                readingsBulkUpdate( $hash, $reading . "icon_url$night",
                     $h->{icon_url} );
-                readingsUnitBulkUpdate( $hash, $reading . "pop$night",
+                readingsBulkUpdate( $hash, $reading . "pop$night",
                     $h->{pop} );
-                readingsUnitBulkUpdate( $hash, $reading . "text$night",
+                readingsBulkUpdate( $hash, $reading . "text$night",
                     $h->{fcttext_metric} );
-                readingsUnitBulkUpdate( $hash, $reading . "text_f$night",
+                readingsBulkUpdate( $hash, $reading . "text_f$night",
                     $h->{fcttext} );
-                readingsUnitBulkUpdate( $hash, $reading . "title$night",
+                readingsBulkUpdate( $hash, $reading . "title$night",
                     $h->{title} );
             }
 
@@ -565,7 +679,7 @@ sub Wunderground_Hash2Readings($$;$) {
 
                 $value =~ s/^(\d+)%$/$1/;
 
-                readingsUnitBulkUpdate( $hash, $reading, $value );
+                readingsBulkUpdate( $hash, $reading, $value );
             }
         }
     }
@@ -577,7 +691,7 @@ sub Wunderground_Hash2Readings($$;$) {
                 Wunderground_Hash2Readings( $hash, $_, $r . $i );
             }
             else {
-                readingsUnitBulkUpdate( $hash, $r . $i, $_ );
+                readingsBulkUpdate( $hash, $r . $i, $_ );
             }
 
             $i++;
