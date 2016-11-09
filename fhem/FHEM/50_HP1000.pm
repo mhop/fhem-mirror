@@ -72,6 +72,64 @@ sub HP1000_Initialize($) {
     $hash->{AttrList} =
 "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
       . $readingFnAttributes;
+
+    $hash->{readingsDesc} = {
+        "UV"                   => { "unit" => "uvi", },
+        "UVR"                  => { "unit" => "uwpscm", },
+        "dewpoint"             => { "unit" => "c", },
+        "dewpoint_f"           => { "unit" => "f", },
+        "humidity"             => { "unit" => "pct", },
+        "humidityAbs"          => { "unit" => "c", },
+        "humidityAbs_f"        => { "unit" => "f", },
+        "indoorDewpoint"       => { "unit" => "c", },
+        "indoorDewpoint_f"     => { "unit" => "f", },
+        "indoorHumidity"       => { "unit" => "pct", },
+        "indoorHumidityAbs"    => { "unit" => "c", },
+        "indoorHumidityAbs_f"  => { "unit" => "f", },
+        "indoorTemperature"    => { "unit" => "c", },
+        "indoorTemperature_f"  => { "unit" => "f", },
+        "luminosity"           => { "unit" => "lx", },
+        "pressure"             => { "unit" => "hpamb", },
+        "pressureAbs_in"       => { "unit" => "inhg", },
+        "pressureAbs_mm"       => { "unit" => "mmhg", },
+        "pressure_in"          => { "unit" => "inhg", },
+        "pressure_mm"          => { "unit" => "mmhg", },
+        "rain"                 => { "unit" => "mm", },
+        "rain_day"             => { "unit" => "mm", },
+        "rain_day_in"          => { "unit" => "in", },
+        "rain_in"              => { "unit" => "in", },
+        "rain_month"           => { "unit" => "mm", },
+        "rain_month_in"        => { "unit" => "in", },
+        "rain_week"            => { "unit" => "mm", },
+        "rain_week_in"         => { "unit" => "in", },
+        "rain_year"            => { "unit" => "mm", },
+        "rain_year_in"         => { "unit" => "in", },
+        "solarradiation"       => { "unit" => "wpsm", },
+        "temperature"          => { "unit" => "c", },
+        "temperature_f"        => { "unit" => "f", },
+        "wind_chill"           => { "unit" => "c", },
+        "wind_chill_f"         => { "unit" => "f", },
+        "wind_direction"       => { "unit" => "gon", },
+        "wind_direction_avg2m" => { "unit" => "gon", },
+        "wind_gust"            => { "unit" => "kmh", },
+        "wind_gust_bft"        => { "unit" => "bft", },
+        "wind_gust_fts"        => { "unit" => "fts", },
+        "wind_gust_kn"         => { "unit" => "kn", },
+        "wind_gust_mph"        => { "unit" => "mph", },
+        "wind_gust_mph_sum10m" => { "unit" => "mph", },
+        "wind_gust_mps"        => { "unit" => "mps", },
+        "wind_gust_sum10m"     => { "unit" => "kmh", },
+        "wind_speed"           => { "unit" => "kmh", },
+        "wind_speed_avg2m"     => { "unit" => "kmh", },
+        "wind_speed_bft"       => { "unit" => "bft", },
+        "wind_speed_bft_avg2m" => { "unit" => "bft", },
+        "wind_speed_kn"        => { "unit" => "kn", },
+        "wind_speed_kn_avg2m"  => { "unit" => "kn", },
+        "wind_speed_mph"       => { "unit" => "mph", },
+        "wind_speed_mph_avg2m" => { "unit" => "mph", },
+        "wind_speed_mps"       => { "unit" => "mps", },
+        "wind_speed_mps_avg2m" => { "unit" => "mps", },
+    };
 }
 
 ###################################
@@ -222,9 +280,9 @@ sub HP1000_SetAliveState($;$) {
     my $activity = "dead";
     $activity = "alive" if ($alive);
 
-    readingsUnitBeginUpdate($hash);
-    readingsUnitBulkUpdateIfChanged( $hash, "Activity", $activity );
-    readingsUnitEndUpdate( $hash, 1 );
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, "Activity", $activity );
+    readingsEndUpdate( $hash, 1 );
 
     InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash, 0 );
 
@@ -646,7 +704,7 @@ sub HP1000_CGI() {
 
     # write general readings
     #
-    readingsUnitBeginUpdate($hash);
+    readingsBeginUpdate($hash);
 
     while ( ( my $p, my $v ) = each %$webArgs ) {
 
@@ -709,7 +767,7 @@ sub HP1000_CGI() {
         $p = "wind_gust_mph"       if ( $p eq "_windgustmph" );
         $p = "wind_speed_mph"      if ( $p eq "_windspdmph" );
 
-        readingsUnitBulkUpdate( $hash, $p, $v );
+        readingsBulkUpdate( $hash, $p, $v );
     }
 
     # calculate additional readings
@@ -719,20 +777,20 @@ sub HP1000_CGI() {
     my $israining = 0;
     $israining = 1
       if ( defined( $webArgs->{rainrate} ) && $webArgs->{rainrate} > 0 );
-    readingsUnitBulkUpdateIfChanged( $hash, "israining", $israining );
+    readingsBulkUpdateIfChanged( $hash, "israining", $israining );
 
     # daylight
     my $daylight = 0;
     $daylight = 1
       if ( defined( $webArgs->{light} ) && $webArgs->{light} > 50 );
-    readingsUnitBulkUpdateIfChanged( $hash, "daylight", $daylight );
+    readingsBulkUpdateIfChanged( $hash, "daylight", $daylight );
 
     # condition
     if ( defined( $webArgs->{light} ) ) {
         my $temp = ( $webArgs->{outtemp} ? $webArgs->{outtemp} : "10" );
         my $hum  = ( $webArgs->{outhumi} ? $webArgs->{outhumi} : "50" );
 
-        readingsUnitBulkUpdateIfChanged(
+        readingsBulkUpdateIfChanged(
             $hash,
             "condition",
             UConv::values2weathercondition(
@@ -743,25 +801,25 @@ sub HP1000_CGI() {
 
     # humidityCondition
     if ( defined( $webArgs->{outhumi} ) ) {
-        readingsUnitBulkUpdateIfChanged( $hash, "humidityCondition",
+        readingsBulkUpdateIfChanged( $hash, "humidityCondition",
             UConv::humidity2condition( $webArgs->{outhumi} ) );
     }
 
     # indoorHumidityCondition
     if ( defined( $webArgs->{inhumi} ) ) {
-        readingsUnitBulkUpdateIfChanged( $hash, "indoorHumidityCondition",
+        readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition",
             UConv::humidity2condition( $webArgs->{inhumi} ) );
     }
 
     # UV (convert from uW/cm2)
     if ( defined( $webArgs->{UV} ) ) {
         $webArgs->{UVI} = UConv::uwpscm2uvi( $webArgs->{UV} );
-        readingsUnitBulkUpdate( $hash, "UV", $webArgs->{UVI}, "uvi" );
+        readingsBulkUpdate( $hash, "UV", $webArgs->{UVI} );
     }
 
     # UVcondition
     if ( defined( $webArgs->{UVI} ) ) {
-        readingsUnitBulkUpdateIfChanged( $hash, "UVcondition",
+        readingsBulkUpdateIfChanged( $hash, "UVcondition",
             UConv::uvi2condition( $webArgs->{UVI} ) );
     }
 
@@ -769,23 +827,21 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{light} ) ) {
         $webArgs->{solarradiation} =
           UConv::lux2wpsm( $webArgs->{light} );
-        readingsUnitBulkUpdate( $hash, "solarradiation",
-            $webArgs->{solarradiation}, "wpsm" );
+        readingsBulkUpdate( $hash, "solarradiation",
+            $webArgs->{solarradiation} );
     }
 
     # pressure_mm in mmHg (convert from hpa)
     if ( defined( $webArgs->{relbaro} ) ) {
         $webArgs->{barommm} = UConv::hpa2mmhg( $webArgs->{relbaro} );
-        readingsUnitBulkUpdate( $hash, "pressure_mm", $webArgs->{barommm},
-            "mmhg" );
+        readingsBulkUpdate( $hash, "pressure_mm", $webArgs->{barommm} );
     }
 
     # pressureAbs_mm in mmHg (convert from hpa)
     if ( defined( $webArgs->{absbaro} ) ) {
         $webArgs->{absbarommm} =
           UConv::hpa2mmhg( $webArgs->{absbaro} );
-        readingsUnitBulkUpdate( $hash, "pressureAbs_mm",
-            $webArgs->{absbarommm}, "mmhg" );
+        readingsBulkUpdate( $hash, "pressureAbs_mm", $webArgs->{absbarommm} );
     }
 
     # indoorDewpoint in Celsius
@@ -797,8 +853,7 @@ sub HP1000_CGI() {
         );
         $webArgs->{indewpoint} =
           round( dewpoint_dewpoint( $webArgs->{intemp}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "indoorDewpoint",
-            $webArgs->{indewpoint}, "c" );
+        readingsBulkUpdate( $hash, "indoorDewpoint", $webArgs->{indewpoint} );
     }
 
     # indoorDewpoint in Fahrenheit
@@ -814,8 +869,8 @@ sub HP1000_CGI() {
         );
         $webArgs->{indoordewpointf} =
           round( dewpoint_dewpoint( $webArgs->{indoortempf}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "indoorDewpoint_f",
-            $webArgs->{indoordewpointf}, "f" );
+        readingsBulkUpdate( $hash, "indoorDewpoint_f",
+            $webArgs->{indoordewpointf} );
     }
 
     # humidityAbs / humidityAbs_f
@@ -827,12 +882,11 @@ sub HP1000_CGI() {
         );
         $webArgs->{outhumiabs} =
           round( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "humidityAbs", $webArgs->{outhumiabs} );
+        readingsBulkUpdate( $hash, "humidityAbs", $webArgs->{outhumiabs} );
 
         $webArgs->{outhumiabsf} =
           round( dewpoint_absFeuchte( $webArgs->{outtempf}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "humidityAbs_f",
-            $webArgs->{outhumiabsf} );
+        readingsBulkUpdate( $hash, "humidityAbs_f", $webArgs->{outhumiabsf} );
     }
 
     # indoorHumidityAbs
@@ -844,8 +898,7 @@ sub HP1000_CGI() {
         );
         $webArgs->{inhumiabs} =
           round( dewpoint_absFeuchte( $webArgs->{intemp}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "indoorHumidityAbs",
-            $webArgs->{inhumiabs} );
+        readingsBulkUpdate( $hash, "indoorHumidityAbs", $webArgs->{inhumiabs} );
     }
 
     # indoorHumidityAbs_f
@@ -861,7 +914,7 @@ sub HP1000_CGI() {
         );
         $webArgs->{indoorhumidityabsf} =
           round( dewpoint_absFeuchte( $webArgs->{indoortempf}, $h ), 1 );
-        readingsUnitBulkUpdate( $hash, "indoorHumidityAbs_f",
+        readingsBulkUpdate( $hash, "indoorHumidityAbs_f",
             $webArgs->{indoorhumidityabsf} );
     }
 
@@ -869,7 +922,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{winddir} ) ) {
         $webArgs->{windcompasspoint} =
           UConv::deg2compasspoint( $webArgs->{winddir} );
-        readingsUnitBulkUpdate( $hash, "wind_compasspoint",
+        readingsBulkUpdate( $hash, "wind_compasspoint",
             $webArgs->{windcompasspoint} );
     }
 
@@ -877,47 +930,42 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{windspeed} ) ) {
         $webArgs->{windspeedbft} =
           UConv::kph2bft( $webArgs->{windspeed} );
-        readingsUnitBulkUpdate( $hash, "wind_speed_bft",
-            $webArgs->{windspeedbft} );
+        readingsBulkUpdate( $hash, "wind_speed_bft", $webArgs->{windspeedbft} );
     }
 
     # wind_speed_kn in kn (convert from km/h)
     if ( defined( $webArgs->{windspeed} ) ) {
         my $v = UConv::kph2kn( $webArgs->{windspeed} );
         $webArgs->{windspeedkn} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsUnitBulkUpdate( $hash, "wind_speed_kn",
-            $webArgs->{windspeedkn} );
+        readingsBulkUpdate( $hash, "wind_speed_kn", $webArgs->{windspeedkn} );
     }
 
     # wind_speed_fts in ft/s (convert from mph)
     if ( defined( $webArgs->{windspeedmph} ) ) {
         my $v = UConv::mph2fts( $webArgs->{windspeedmph} );
         $webArgs->{windspeedfts} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsUnitBulkUpdate( $hash, "wind_speed_fts",
-            $webArgs->{windspeedfts} );
+        readingsBulkUpdate( $hash, "wind_speed_fts", $webArgs->{windspeedfts} );
     }
 
     # wind_gust_bft in Beaufort (convert from km/h)
     if ( defined( $webArgs->{windgust} ) ) {
         $webArgs->{windgustbft} =
           UConv::kph2bft( $webArgs->{windgust} );
-        readingsUnitBulkUpdate( $hash, "wind_gust_bft",
-            $webArgs->{windgustbft} );
+        readingsBulkUpdate( $hash, "wind_gust_bft", $webArgs->{windgustbft} );
     }
 
     # wind_gust_kn in m/s (convert from km/h)
     if ( defined( $webArgs->{windgust} ) ) {
         my $v = UConv::kph2kn( $webArgs->{windgust} );
         $webArgs->{windgustkn} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsUnitBulkUpdate( $hash, "wind_gust_kn", $webArgs->{windgustkn} );
+        readingsBulkUpdate( $hash, "wind_gust_kn", $webArgs->{windgustkn} );
     }
 
     # wind_gust_fts ft/s (convert from mph)
     if ( defined( $webArgs->{windgustmph} ) ) {
         my $v = UConv::mph2fts( $webArgs->{windgustmph} );
         $webArgs->{windgustfts} = ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsUnitBulkUpdate( $hash, "wind_gust_fts",
-            $webArgs->{windgustfts} );
+        readingsBulkUpdate( $hash, "wind_gust_fts", $webArgs->{windgustfts} );
     }
 
     # averages/wind_direction_avg2m
@@ -926,7 +974,7 @@ sub HP1000_CGI() {
             HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} ) );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsUnitBulkUpdate( $hash, "wind_direction_avg2m", $v );
+            readingsBulkUpdate( $hash, "wind_direction_avg2m", $v );
             $webArgs->{winddir_avg2m} = $v;
         }
     }
@@ -935,7 +983,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{winddir_avg2m} ) ) {
         $webArgs->{windcompasspoint_avg2m} =
           UConv::deg2compasspoint( $webArgs->{winddir_avg2m} );
-        readingsUnitBulkUpdate( $hash, "wind_compasspoint_avg2m",
+        readingsBulkUpdate( $hash, "wind_compasspoint_avg2m",
             $webArgs->{windcompasspoint_avg2m} );
     }
 
@@ -945,7 +993,7 @@ sub HP1000_CGI() {
           HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsUnitBulkUpdate( $hash, "wind_speed_avg2m", $v );
+            readingsBulkUpdate( $hash, "wind_speed_avg2m", $v );
             $webArgs->{windspeed_avg2m} = $v;
         }
     }
@@ -956,7 +1004,7 @@ sub HP1000_CGI() {
           HP1000_GetAvg( $hash, "windspdmph", 2 * 60, $webArgs->{windspdmph} );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsUnitBulkUpdate( $hash, "wind_speed_mph_avg2m", $v );
+            readingsBulkUpdate( $hash, "wind_speed_mph_avg2m", $v );
             $webArgs->{windspdmph_avg2m} = $v;
         }
     }
@@ -965,7 +1013,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{windspeed_avg2m} ) ) {
         $webArgs->{windspeedbft_avg2m} =
           UConv::kph2bft( $webArgs->{windspeed_avg2m} );
-        readingsUnitBulkUpdate( $hash, "wind_speed_bft_avg2m",
+        readingsBulkUpdate( $hash, "wind_speed_bft_avg2m",
             $webArgs->{windspeedbft_avg2m} );
     }
 
@@ -973,7 +1021,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{windspeed_avg2m} ) ) {
         $webArgs->{windspeedkn_avg2m} =
           UConv::kph2kn( $webArgs->{windspeed_avg2m} );
-        readingsUnitBulkUpdate( $hash, "wind_speed_kn_avg2m",
+        readingsBulkUpdate( $hash, "wind_speed_kn_avg2m",
             $webArgs->{windspeedkn_avg2m} );
     }
 
@@ -982,7 +1030,7 @@ sub HP1000_CGI() {
         my $v = UConv::kph2mps( $webArgs->{windspeed_avg2m} );
         $webArgs->{windspeedmps_avg2m} =
           ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsUnitBulkUpdate( $hash, "wind_speed_mps_avg2m",
+        readingsBulkUpdate( $hash, "wind_speed_mps_avg2m",
             $webArgs->{windspeedmps_avg2m} );
     }
 
@@ -992,7 +1040,7 @@ sub HP1000_CGI() {
           HP1000_GetSum( $hash, "windgust", 10 * 60, $webArgs->{windgust} );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsUnitBulkUpdate( $hash, "wind_gust_sum10m", $v );
+            readingsBulkUpdate( $hash, "wind_gust_sum10m", $v );
             $webArgs->{windgust_10m} = $v;
         }
     }
@@ -1004,7 +1052,7 @@ sub HP1000_CGI() {
             $webArgs->{windgustmph} );
 
         if ( $hash->{INTERVAL} > 0 ) {
-            readingsUnitBulkUpdate( $hash, "wind_gust_mph_sum10m", $v );
+            readingsBulkUpdate( $hash, "wind_gust_mph_sum10m", $v );
             $webArgs->{windgustmph_10m} = $v;
         }
     }
@@ -1030,8 +1078,8 @@ sub HP1000_CGI() {
       getMultiValStatus( $name, $stateReadings,
         $stateReadingsLang, $stateReadingsFormat );
 
-    readingsUnitBulkUpdate( $hash, "state", $result );
-    readingsUnitEndUpdate( $hash, 1 );
+    readingsBulkUpdate( $hash, "state", $result );
+    readingsEndUpdate( $hash, 1 );
 
     HP1000_PushWU( $hash, $webArgs )
       if AttrVal( $name, "wu_push", 0 ) eq "1";
@@ -1152,9 +1200,9 @@ sub HP1000_PushWU($$) {
 
         my $return = "error: missing attributes wu_user and wu_password";
 
-        readingsUnitBeginUpdate($hash);
-        readingsUnitBulkUpdateIfChanged( $hash, "wu_state", $return );
-        readingsUnitEndUpdate( $hash, 1 );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
         return;
     }
 
@@ -1228,9 +1276,9 @@ sub HP1000_ReturnSrv($$$) {
         my $return = "error: connection timeout";
         Log3 $name, 4, "HP1000 $name: EXTSRV HTTP " . $return;
 
-        readingsUnitBeginUpdate($hash);
-        readingsUnitBulkUpdateIfChanged( $hash, "extsrv_state", $return );
-        readingsUnitEndUpdate( $hash, 1 );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "extsrv_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     # data received
@@ -1245,9 +1293,9 @@ sub HP1000_ReturnSrv($$$) {
         Log3 $name, $logprio,
           "HP1000 $name: EXTSRV HTTP return: " . $param->{code} . " - $data";
 
-        readingsUnitBeginUpdate($hash);
-        readingsUnitBulkUpdateIfChanged( $hash, "extsrv_state", $return );
-        readingsUnitEndUpdate( $hash, 1 );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "extsrv_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     return;
@@ -1264,9 +1312,9 @@ sub HP1000_ReturnWU($$$) {
         my $return = "error: connection timeout";
         Log3 $name, 4, "HP1000 $name: WU HTTP " . $return;
 
-        readingsUnitBeginUpdate($hash);
-        readingsUnitBulkUpdateIfChanged( $hash, "wu_state", $return );
-        readingsUnitEndUpdate( $hash, 1 );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     # data received
@@ -1283,9 +1331,9 @@ sub HP1000_ReturnWU($$$) {
         Log3 $name, $logprio,
           "HP1000 $name: WU HTTP return: " . $param->{code} . " - $data";
 
-        readingsUnitBeginUpdate($hash);
-        readingsUnitBulkUpdateIfChanged( $hash, "wu_state", $return );
-        readingsUnitEndUpdate( $hash, 1 );
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "wu_state", $return );
+        readingsEndUpdate( $hash, 1 );
     }
 
     return;

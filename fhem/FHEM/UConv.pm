@@ -549,6 +549,25 @@ sub activity2log($) {
     return "0";
 }
 
+#TODO rewrite for Unit.pm
+sub fmtTime($) {
+    my ($value) = @_;
+    my $suffix = ' s';
+
+    if ( $value >= 60 ) {
+        $value = sprintf( "%.1f", $value / 60 );
+        $suffix = ' min';
+
+        if ( $value >= 60 ) {
+            $value = sprintf( "%.1f", $value / 60 );
+            $suffix = ' h';
+        }
+    }
+
+    return ( $value, $suffix ) if (wantarray);
+    return $value . $suffix;
+}
+
 ####################
 # HELPER FUNCTIONS
 
