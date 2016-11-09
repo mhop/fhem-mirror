@@ -22,22 +22,22 @@ sub ReadingsUnit($$@) {
     return ""
       if ( !defined( $defs{$name}{READINGS}{$reading} ) );
 
-    addToAttrList("unitFromReading");
+    addToAttrList("unitFromReading:0,1");
 
     my $unitFromReading =
       AttrVal( $name, "unitFromReading",
         AttrVal( "global", "unitFromReading", undef ) );
 
-    my $readingsDesc = readingsDesc( $name, $reading );
+    my $getKeyValueAttr = getKeyValueAttr( $name, "readingsDesc", $reading );
 
     # unit defined with reading
-    if ( defined( $readingsDesc->{unit} ) ) {
-        $ud = Unit::GetDetails( $readingsDesc->{unit}, $lang );
+    if ( defined( $getKeyValueAttr->{unit} ) ) {
+        $ud = Unit::GetDetails( $name, $getKeyValueAttr->{unit}, $lang );
     }
 
     # calculate unit from readingname
     elsif ( $unitFromReading && $unitFromReading ne "0" ) {
-        $ud = Unit::GetDetailsFromReadingname( $reading, $lang );
+        $ud = Unit::GetDetailsFromReadingname( $name, $reading, $lang );
     }
 
     return $ud->{symbol}
@@ -67,7 +67,7 @@ sub ReadingsValUnit($$$@) {
     my ( $name, $reading, $default, $lang, $format ) = @_;
     my $val = ReadingsVal( $name, $reading, $default );
     my $unit = ReadingsUnitAbbr( $name, $reading );
-    return Unit::GetValueWithUnit( $val, $unit, $lang, $format );
+    return Unit::GetValueWithUnit( $name, $val, $unit, $lang, $format );
 }
 
 sub ReadingsValUnitLong($$$@) {
@@ -75,13 +75,16 @@ sub ReadingsValUnitLong($$$@) {
     return ReadingsValUnit( $name, $reading, $default, $lang, 1 );
 }
 
+################################################################
+# Functions used by modules.
+
 #format a number according to desc and optional format.
 sub formatValue($$;$) {
     my ( $value, $desc, $format ) = @_;
 
     return $value if ( !defined($value) );
 
-    $desc = Unit::GetDetails($desc) if ( $desc && !ref($desc) );
+    $desc = Unit::GetDetails( $desc, $desc ) if ( $desc && !ref($desc) );
     return $value if ( !$format && ( !$desc || ref($desc) ne 'HASH' ) );
 
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
@@ -118,48 +121,14 @@ sub formatValue($$;$) {
     return $value;
 }
 
-#find desc and optional format for device:reading
-sub readingsDesc($;$) {
-    my ( $name, $reading ) = @_;
-    my $d          = $defs{$name};
-    my $m          = $modules{ $d->{TYPE} } if ($d);
-    my $attrDesc   = decode_attribute( $name, "readingsDesc" );
-    my $globalDesc = decode_attribute( "global", "readingsDesc" );
-
-    my %desc;
-
-    # module device specific
-    if ( $d && $d->{readingsDesc} ) {
-        %desc = %{ $d->{readingsDesc} };
-    }
-
-    # module general
-    elsif ( $m && $m->{readingsDesc} ) {
-        %desc = %{ $m->{readingsDesc} };
-    }
-
-    # global user overwrite
-    foreach ( keys %{$globalDesc} ) {
-        $desc{$_} = $globalDesc->{$_};
-    }
-
-    # device user overwrite
-    foreach ( keys %{$attrDesc} ) {
-        $desc{$_} = $attrDesc->{$_};
-    }
-
-    return {} if ( $reading && !defined( $desc{$reading} ) );
-    return $desc{$reading} if ($reading);
-    return \%desc;
-}
-
 #format device:reading with optional default value and optional desc and optional format
 #TODO adapt to Unit.pm
 sub formatReading($$;$$$) {
     my ( $name, $reading, $default, $desc, $format ) = @_;
 
-    $desc = readingsDesc( $name, $reading ) if ( !$desc && $format );
-    ( $desc, $format ) = readingsDesc( $name, $reading )
+    $desc = getKeyValueAttr( $name, "redingsDesc", $reading )
+      if ( !$desc && $format );
+    ( $desc, $format ) = getKeyValueAttr( $name, "readingsDesc", $reading )
       if ( !$desc && !$format );
 
     my $value = ReadingsVal( $name, $reading, undef );
@@ -176,7 +145,7 @@ sub formatReading($$;$$$) {
 sub readingsDimension($$) {
     my ( $name, $reading ) = @_;
 
-    if ( my $desc = readingsDesc( $name, $reading ) ) {
+    if ( my $desc = getKeyValueAttr( $name, "readingsDesc", $reading ) ) {
         ;
         return $desc->{dimension} if ( $desc->{dimension} );
     }
@@ -184,67 +153,173 @@ sub readingsDimension($$) {
     return '';
 }
 
-################################################################
-# Functions used by modules.
+# find desc and optional format for device:reading
+sub getKeyValueAttr($;$$) {
+    my ( $name, $attribute, $reading ) = @_;
+    my $d          = $defs{$name};
+    my $m          = $modules{ $d->{TYPE} } if ($d);
+    my $attrDesc   = decode_attribute( $name, $attribute ) if ($attribute);
+    my $globalDesc = decode_attribute( "global", $attribute ) if ($attribute);
 
-sub setReadingsUnit($$@) {
-    my ( $name, $reading, $unit ) = @_;
-    my $unitDetails;
+    my %desc;
+
+    # module device specific
+    if ( $d && $d->{$attribute} ) {
+        %desc = %{ $d->{$attribute} };
+    }
+
+    # module general
+    elsif ( $m && $m->{$attribute} ) {
+        %desc = %{ $m->{$attribute} };
+    }
+
+    # global user overwrite
+    if ($globalDesc) {
+        foreach ( keys %{$globalDesc} ) {
+            $desc{$_} = $globalDesc->{$_};
+        }
+    }
+
+    # device user overwrite
+    if ($attrDesc) {
+        foreach ( keys %{$attrDesc} ) {
+            $desc{$_} = $attrDesc->{$_};
+        }
+    }
+
+    return if ( $reading && !defined( $desc{$reading} ) );
+    return $desc{$reading} if ($reading);
+    return \%desc;
+}
+
+sub setKeyValueAttr($$$$$) {
+    my ( $name, $attribute, $reading, $desc, $value ) = @_;
     my $ret;
-    my $readingsDesc = readingsDesc($name);
+    my $getKeyValueAttr = getKeyValueAttr( $name, $attribute );
 
     return
-      if ( $unit
-        && $readingsDesc->{$reading}{unit}
-        && $readingsDesc->{$reading}{unit} eq $unit );
+      if ( $getKeyValueAttr->{$reading}{$desc}
+        && $getKeyValueAttr->{$reading}{$desc} eq $value );
 
-    # check unit database for correct abbr
-    if ($unit) {
-        $unitDetails = Unit::GetDetails($unit);
-    }
+    # value sanity check: unit
+    if ( $desc =~ /^unit$/i ) {
+        if ( $value eq "?" ) {
+            return Dumper( Unit::GetList( $name, "en" ) );
+        }
 
-    # find unit based on reading name
-    else {
-        $unitDetails = Unit::GetDetailsFromReadingname($reading);
+        my $unitDetails;
+        $desc = lc($desc);
+
+        # check unit database for correct abbr
+        if ($value) {
+            $unitDetails = Unit::GetDetails( $name, $value );
+        }
+
+        # find unit based on reading name
+        else {
+            $unitDetails = Unit::GetDetailsFromReadingname( $name, $reading );
+            return
+              if ( !$unitDetails || !defined( $unitDetails->{abbr} ) );
+        }
+
         return
+"$value is not a registered $desc abbreviation and cannot be assigned to reading $reading of device $name"
           if ( !$unitDetails || !defined( $unitDetails->{abbr} ) );
+
+        return
+          if ( $getKeyValueAttr->{$reading}{$desc}
+            && $getKeyValueAttr->{$reading}{$desc} eq $unitDetails->{abbr} );
+
+        $ret =
+          "Set auto-detected $desc for device $name $reading: "
+          . $unitDetails->{abbr}
+          if ( !$value && !$getKeyValueAttr->{$reading}{$desc} );
+
+        $value = $unitDetails->{abbr};
     }
 
-    return
-"$unit is not a registered unit abbreviation and cannot be assigned to reading $reading of device $name"
-      if ( !$unitDetails || !defined( $unitDetails->{abbr} ) );
-
-    return
-      if ( $readingsDesc->{$reading}{unit}
-        && $readingsDesc->{$reading}{unit} eq $unitDetails->{abbr} );
-
-    my $attrDesc = decode_attribute( $name, "readingsDesc" );
-
-    $ret =
-      "Set auto-detected unit for device $name $reading: "
-      . $unitDetails->{abbr}
-      if ( !$unit && !defined( $attrDesc->{$reading}{unit} ) );
-
-    $attrDesc->{$reading}{unit} = $unitDetails->{abbr};
-    encode_attribute( $name, "readingsDesc", $attrDesc );
-
+    # update attribute
+    my $attrDesc = decode_attribute( $name, $attribute );
+    $attrDesc->{$reading}{$desc} = $value;
+    encode_attribute( $name, $attribute, $attrDesc );
     return $ret;
 }
 
-sub removeReadingsUnit($$) {
-    my ( $name, $reading ) = @_;
-    my $ret;
-    my $attrDesc = decode_attribute( $name, "readingsDesc" );
+sub deleteKeyValueAttr($$$;$) {
+    my ( $name, $attribute, $reading, $desc ) = @_;
+    my $u;
+    my $attrDesc = decode_attribute( $name, $attribute );
 
-    if ( defined( $attrDesc->{$reading}{unit} ) ) {
-        my $u = $attrDesc->{$reading}{unit};
-        delete $attrDesc->{$reading}{unit};
-        delete $attrDesc->{$reading}
-          if ( keys %{ $attrDesc->{$reading} } < 1 );
+    return
+      if ( !defined( $attrDesc->{$reading} )
+        || ( $desc && !defined( $attrDesc->{$reading}{$desc} ) ) );
 
-        encode_attribute( $name, "readingsDesc", $attrDesc );
-        return "Removed unit $u from reading $reading of device $name";
+    if ($desc) {
+        $u = " $desc=" . $attrDesc->{$reading}{$desc};
+        delete $attrDesc->{$reading}{$desc};
     }
+
+    delete $attrDesc->{$reading}
+      if ( !$desc || keys %{ $attrDesc->{$reading} } < 1 );
+
+    # update attribute
+    encode_attribute( $name, $attribute, $attrDesc );
+    return "Removed $reading$u from attribute $name $attribute";
+}
+
+sub encode_attribute ($$$) {
+    my ( $name, $attribute, $data ) = @_;
+    my $json;
+    my $js;
+
+    if ( !$data || keys %{$data} < 1 ) {
+        CommandDeleteAttr( undef, "$name $attribute" );
+
+        # empty cache
+        delete $defs{$name}{'.attrCache'}
+          if ( defined( $defs{$name}{'.attrCache'} ) );
+        return;
+    }
+
+    eval {
+        $json =
+          JSON::PP->new->utf8->indent->indent_length(1)
+          ->canonical->allow_nonref;
+        1;
+    };
+    return $@ if ($@);
+
+    eval { $js = $json->encode($data); 1 };
+    return $@ if ( $@ || !$js || $js eq "" );
+
+    $js =~ s/(:\{|",?)\n\s+/$1 /gsm;
+    addToAttrList("$attribute:textField-long");
+
+    CommandAttr( undef, "$name $attribute $js" );
+
+    # empty cache
+    delete $defs{$name}{'.attrCache'}{$attribute}
+      if ( defined( $defs{$name}{'.attrCache'}{$attribute} ) );
+}
+
+sub decode_attribute ($$) {
+    my ( $name, $attribute ) = @_;
+
+    # force empty cache if attribute was deleted
+    if ( !$attr{$name}{$attribute} ) {
+        delete $defs{$name}{'.attrCache'} if ( $defs{$name}{'.attrCache'} );
+        return;
+    }
+
+    # cache attr
+    if ( !defined( $defs{$name}{'.attrCache'}{$attribute} ) ) {
+        my $data;
+        eval { $data = decode_json( $attr{$name}{$attribute} ); 1 };
+        return if ( $@ || !$data || $data eq "" );
+        $defs{$name}{'.attrCache'}{$attribute} = $data;
+    }
+
+    return $defs{$name}{'.attrCache'}{$attribute};
 }
 
 sub getMultiValStatus($$;$$) {
@@ -274,49 +349,6 @@ sub getMultiValStatus($$;$$) {
     }
 
     return $txt;
-}
-
-sub encode_attribute ($$$) {
-    my ( $name, $attribute, $data ) = @_;
-    if ( !$data || keys %{$data} < 1 ) {
-        CommandDeleteAttr( undef, "$name $attribute" );
-
-        # empty cache
-        delete $defs{$name}{'.attrCache'}
-          if ( defined( $defs{$name}{'.attrCache'} ) );
-        return;
-    }
-
-    my $json =
-      JSON::PP->new->utf8->indent->indent_length(1)->canonical->allow_nonref;
-    my $js = $json->encode($data);
-    $js =~ s/(:\{|",?)\n\s+/$1 /gsm;
-    addToAttrList("$attribute:textField-long");
-
-    CommandAttr( undef, "$name $attribute $js" );
-
-    # empty cache
-    delete $defs{$name}{'.attrCache'}{$attribute}
-      if ( defined( $defs{$name}{'.attrCache'}{$attribute} ) );
-}
-
-sub decode_attribute ($$) {
-    my ( $name, $attribute ) = @_;
-
-    # force empty cache if attribute was deleted
-    if ( !$attr{$name}{$attribute} ) {
-        delete $defs{$name}{'.attrCache'} if ( $defs{$name}{'.attrCache'} );
-        return;
-    }
-
-    # cache attr
-    if ( !defined( $defs{$name}{'.attrCache'}{$attribute} ) ) {
-        my $data = decode_json( $attr{$name}{$attribute} );
-        return if ( $@ || !$data || $data eq "" );
-        $defs{$name}{'.attrCache'}{$attribute} = $data;
-    }
-
-    return $defs{$name}{'.attrCache'}{$attribute};
 }
 
 ################################################################
@@ -392,20 +424,19 @@ sub readingsUnitEndUpdate($$) {
 
 # Generalized function for DbLog unit support
 sub Unit_DbLog_split($$) {
-    my ( $event, $device ) = @_;
+    my ( $event, $name ) = @_;
     my ( $reading, $value, $unit ) = "";
 
     # exclude any multi-value events
     if ( $event =~ /(.*: +.*: +.*)+/ ) {
-        Log3 $device, 5,
-          "Unit_DbLog_split $device: Ignoring multi-value event $event";
+        Log3 $name, 5,
+          "Unit_DbLog_split $name: Ignoring multi-value event $event";
         return undef;
     }
 
     # exclude sum/cum and avg events
     elsif ( $event =~ /^(.*_sum[0-9]+m|.*_cum[0-9]+m|.*_avg[0-9]+m): +.*/ ) {
-        Log3 $device, 5,
-          "Unit_DbLog_split $device: Ignoring sum/avg event $event";
+        Log3 $name, 5, "Unit_DbLog_split $name: Ignoring sum/avg event $event";
         return undef;
     }
 
@@ -434,18 +465,18 @@ sub Unit_DbLog_split($$) {
     # general event handling
     elsif ( $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/ ) {
         $reading = $1;
-        $value   = ReadingsNum( $device, $1, $2 );
-        $unit    = ReadingsUnit( $device, $1, $3 );
+        $value   = ReadingsNum( $name, $1, $2 );
+        $unit    = ReadingsUnit( $name, $1, $3 );
     }
 
     if ( !Scalar::Util::looks_like_number($value) ) {
-        Log3 $device, 5,
-"Unit_DbLog_split $device: Ignoring event $event: value does not look like a number";
+        Log3 $name, 5,
+"Unit_DbLog_split $name: Ignoring event $event: value does not look like a number";
         return undef;
     }
 
-    Log3 $device, 5,
-"Unit_DbLog_split $device: Splitting event $event > reading=$reading value=$value unit=$unit";
+    Log3 $name, 5,
+"Unit_DbLog_split $name: Splitting event $event > reading=$reading value=$value unit=$unit";
 
     return ( $reading, $value, $unit );
 }
@@ -456,123 +487,252 @@ sub Unit_DbLog_split($$) {
 #
 ################################################################
 
-my %unithash = (
-    Fn  => "CommandUnit",
+# command: type
+my %typehash = (
+    Fn  => "CommandType",
     Hlp => "[<devspec>] [<readingspec>],get unit for <devspec> <reading>",
 );
-$cmds{unit} = \%unithash;
+$cmds{type} = \%typehash;
 
-sub CommandUnit($$) {
+sub CommandType($$) {
     my ( $cl, $def ) = @_;
     my $namedef =
 "where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
       . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
 
     my @a = split( " ", $def, 2 );
-    return "Usage: unit [<name>] [<readingspec>]\n$namedef"
+    return "Usage: type [<name>] [<readingspec>]\n$namedef"
       if ( $a[0] && $a[0] eq "?" );
     $a[0] = ".*" if ( !$a[0] || $a[0] eq "" );
     $a[1] = ".*" if ( !$a[1] || $a[1] eq "" );
 
     my @rets;
-    foreach my $sdev ( devspec2array( $a[0], $cl ) ) {
-        if ( !defined( $defs{$sdev} ) ) {
-            push @rets, "Please define $sdev first";
+    foreach my $name ( devspec2array( $a[0], $cl ) ) {
+        if ( !defined( $defs{$name} ) ) {
+            push @rets, "Please define $name first";
             next;
         }
 
         my $readingspec = '^' . $a[1] . '$';
         foreach my $reading (
             grep { /$readingspec/ }
-            keys %{ $defs{$sdev}{READINGS} }
+            keys %{ $defs{$name}{READINGS} }
           )
         {
-            my $ret = ReadingsUnit( $sdev, $reading, undef, undef, 2 );
+            my $ret = ReadingsUnit( $name, $reading, undef, undef, 2 );
             push @rets,
-              "$sdev $reading unit: $ret ("
-              . ReadingsValUnit( $sdev, $reading, "" ) . ")"
+              "$name $reading type: $ret ("
+              . ReadingsValUnit( $name, $reading, "" ) . ")"
               if ($ret);
         }
     }
     return join( "\n", @rets );
 }
 
-my %setunithash = (
-    Fn  => "CommandSetunit",
-    Hlp => "<devspec> <readingspec> [<unit>],set unit for <devspec> <reading>",
+# command: setreadingdesc
+my %setreadingdeschash = (
+    Fn => "CommandSetReadingDesc",
+    Hlp =>
+"<devspec> <readingspec> [noCheck] <key>=[<value>|?],set reading type information for <devspec> <reading>",
 );
-$cmds{setunit} = \%setunithash;
+$cmds{setreadingdesc} = \%setreadingdeschash;
 
-sub CommandSetunit($$$) {
+sub CommandSetReadingDesc($@) {
     my ( $cl, $def ) = @_;
+    my $attribute = "readingsDesc";
     my $namedef =
 "where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
       . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
 
-    my @a = split( " ", $def, 3 );
+    my ( $a, $h ) = parseParams($def);
 
-    if ( $a[0] && $a[0] eq "?" ) {
-        $namedef .= "\n\n";
-        my $list = Unit::GetList( "en", $a[1] );
-        $namedef .= Dumper($list);
-    }
+    $a->[0] = ".*" if ( !$a->[0] );
+    $a->[1] = ".*" if ( !$a->[1] );
 
-    return "Usage: setunit <name> [<readingspec>] [<unit>]\n$namedef"
-      if ( @a < 1 || ( $a[0] && $a[0] eq "?" ) );
-    $a[1] = ".*" if ( !$a[1] || $a[1] eq "" );
+    return
+"Usage: setreadingdesc <devspec> <readingspec> [noCheck] <key>=[<value>|?]\n$namedef"
+      if ( $a->[0] eq "?" || $a->[1] eq "?" );
 
     my @rets;
-    foreach my $sdev ( devspec2array( $a[0], $cl ) ) {
-        if ( !defined( $defs{$sdev} ) ) {
-            push @rets, "Please define $sdev first";
+    my $last;
+    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
+        if ( !defined( $defs{$name} ) ) {
+            push @rets, "Please define $name first";
             next;
         }
 
-        my $readingspec = '^' . $a[1] . '$';
+        # do not check for existing reading
+        if ( $name eq "global"
+            || ( defined( $a->[2] ) && $a->[2] =~ /nocheck/i ) )
+        {
+            foreach ( keys %$h ) {
+                my $ret =
+                  setKeyValueAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
+                push @rets, $ret if ($ret);
+            }
+            next;
+        }
+
+        # check for existing reading
+        my $readingspec = '^' . $a->[1] . '$';
         foreach my $reading (
             grep { /$readingspec/ }
-            keys %{ $defs{$sdev}{READINGS} }
+            keys %{ $defs{$name}{READINGS} }
           )
         {
-            my $ret = setReadingsUnit( $sdev, $reading, $a[2] );
-            push @rets, $ret if ($ret);
+            foreach ( keys %$h ) {
+                my $ret =
+                  setKeyValueAttr( $name, $attribute, $reading, $_, $h->{$_} );
+                push @rets, $ret if ($ret);
+                if ( $h->{$_} eq "?" ) {
+                    $last = 1;
+                    next;
+                }
+            }
+
+            last if ($last);
+        }
+
+        last if ($last);
+    }
+    return join( "\n", @rets );
+}
+
+# command: deletereadingdesc
+my %deletereadingdeschash = (
+    Fn  => "CommandDeleteReadingDesc",
+    Hlp => "<devspec> <readingspec> [<key>],delete key for <devspec> <reading>",
+);
+$cmds{deletereadingdesc} = \%deletereadingdeschash;
+
+sub CommandDeleteReadingDesc($@) {
+    my ( $cl, $def ) = @_;
+    my $attribute = "readingsDesc";
+    my $namedef =
+"where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
+      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
+
+    my ( $a, $h ) = parseParams($def);
+
+    $a->[0] = ".*" if ( !$a->[0] );
+    $a->[1] = ".*" if ( !$a->[1] );
+
+    return "Usage: deletereadingdesc <devspec> <readingspec> [<key>]\n$namedef"
+      if ( $a->[0] eq "?" || $a->[1] eq "?" );
+
+    my @rets;
+    my $last;
+    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
+        if ( !defined( $defs{$name} ) ) {
+            push @rets, "Please define $name first";
+            next;
+        }
+
+        my $readingspec = '^' . $a->[1] . '$';
+        foreach my $reading (
+            grep { /$readingspec/ }
+            keys %{ $defs{$name}{READINGS} }
+          )
+        {
+            my $i = $a;
+            shift @{$i};
+            shift @{$i};
+            $i->[0] = 0 if ( !$i->[0] );
+            foreach ( @{$i} ) {
+                my $ret = deleteKeyValueAttr( $name, $attribute, $reading, $_ );
+                push @rets, $ret if ($ret);
+            }
         }
     }
     return join( "\n", @rets );
 }
 
-my %deleteunithash = (
-    Fn  => "CommandDeleteunit",
-    Hlp => "<devspec> [<readingspec>],delete unit for <devspec> <reading>",
+# command: setreadingformat
+my %setreadingformathash = (
+    Fn => "CommandSetReadingFormat",
+    Hlp =>
+"<devspec> <readingspec> <key>=<value>,set type format definition for <devspec> <reading>",
 );
-$cmds{deleteunit} = \%deleteunithash;
+$cmds{setreadingformat} = \%setreadingformathash;
 
-sub CommandDeleteunit($$$) {
+sub CommandSetReadingFormat($@) {
     my ( $cl, $def ) = @_;
+    my $attribute = "readingsFormat";
     my $namedef =
 "where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
       . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
 
-    my @a = split( " ", $def, 3 );
-    return "Usage: deleteunit <name> [<readingspec>]\n$namedef"
-      if ( @a < 1 || ( $a[0] && $a[0] eq "?" ) );
-    $a[1] = ".*" if ( !$a[1] || $a[1] eq "" );
+    my ( $a, $h ) = parseParams($def);
+
+    $a->[0] = ".*" if ( !$a->[0] );
+    $a->[1] = ".*" if ( !$a->[1] );
+
+    return
+      "Usage: setreadingformat <devspec> <readingspec> <key>=<value\n$namedef"
+      if ( $a->[0] eq "?" || $a->[1] eq "?" );
 
     my @rets;
-    foreach my $sdev ( devspec2array( $a[0], $cl ) ) {
-        if ( !defined( $defs{$sdev} ) ) {
-            push @rets, "Please define $sdev first";
+    my $last;
+    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
+        if ( !defined( $defs{$name} ) ) {
+            push @rets, "Please define $name first";
             next;
         }
 
-        my $readingspec = '^' . $a[1] . '$';
+        foreach ( keys %$h ) {
+            my $ret =
+              setKeyValueAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
+            push @rets, $ret if ($ret);
+        }
+        next;
+    }
+    return join( "\n", @rets );
+}
+
+# command: deletereadingformat
+my %deletereadingformathash = (
+    Fn  => "CommandDeleteReadingFormat",
+    Hlp => "<devspec> <readingspec> [<key>],delete key for <devspec> <reading>",
+);
+$cmds{deletereadingformat} = \%deletereadingformathash;
+
+sub CommandDeleteReadingFormat($@) {
+    my ( $cl, $def ) = @_;
+    my $attribute = "readingsFormat";
+    my $namedef =
+"where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
+      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
+
+    my ( $a, $h ) = parseParams($def);
+
+    $a->[0] = ".*" if ( !$a->[0] );
+    $a->[1] = ".*" if ( !$a->[1] );
+
+    return "Usage: deletereadingdesc <devspec> <readingspec> [<key>]\n$namedef"
+      if ( $a->[0] eq "?" || $a->[1] eq "?" );
+
+    my @rets;
+    my $last;
+    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
+        if ( !defined( $defs{$name} ) ) {
+            push @rets, "Please define $name first";
+            next;
+        }
+
+        my $readingspec = '^' . $a->[1] . '$';
         foreach my $reading (
             grep { /$readingspec/ }
-            keys %{ $defs{$sdev}{READINGS} }
+            keys %{ $defs{$name}{READINGS} }
           )
         {
-            my $ret = removeReadingsUnit( $sdev, $reading );
-            push @rets, $ret if ($ret);
+            my $i = $a;
+            shift @{$i};
+            shift @{$i};
+            $i->[0] = 0 if ( !$i->[0] );
+            foreach ( @{$i} ) {
+                my $ret = deleteKeyValueAttr( $name, $attribute, $reading, $_ );
+                push @rets, $ret if ($ret);
+            }
         }
     }
     return join( "\n", @rets );
@@ -1059,8 +1219,23 @@ my %unit_base = (
         format => '%.1f',
     },
 
+    23 => {
+        dimension      => 'L^2',
+        formula_symbol => 'A',
+        si_base        => 'm2',
+        txt_base       => {
+            de => 'Flächeninhalt',
+            en => 'surface area',
+            fr => 'surface area',
+            nl => 'surface area',
+            pl => 'surface area',
+        },
+        format => '%i',
+    },
+
     900 => {
-        txt_base => 'FHEM',
+        txt_base => 'FHEM Readings Type',
+        tmpl     => '%value%',
     },
 );
 
@@ -1070,7 +1245,7 @@ my %unitsDB = (
     # others
     closure => {
         ref_base => 900,
-        format   => [ 'closed', 'open', 'tilted' ],
+        scope    => [ 'closed', 'open', 'tilted' ],
         suffix   => 'lock',
         txt      => {
             de => 'offen/geschlossen/gekippt',
@@ -1083,7 +1258,7 @@ my %unitsDB = (
 
     oknok => {
         ref_base => 900,
-        format   => [ 'nok', 'ok' ],
+        scope    => [ 'nok', 'ok' ],
         suffix   => 'oknok',
         txt      => {
             de => 'ok/nok',
@@ -1095,7 +1270,7 @@ my %unitsDB = (
 
     onoff => {
         ref_base => 900,
-        format   => [ 'off', 'on' ],
+        scope    => [ 'off', 'on' ],
         suffix   => 'onoff',
         txt      => {
             de => 'an/aus',
@@ -1108,7 +1283,7 @@ my %unitsDB = (
 
     bool => {
         ref_base => 900,
-        format   => [ 'false', 'true' ],
+        scope    => [ 'false', 'true' ],
         suffix   => 'bool',
         txt      => {
             de => 'wahr/falsch',
@@ -1121,6 +1296,7 @@ my %unitsDB = (
 
     pct => {
         ref_base => 900,
+        scope    => [ 'false', 'true' ],
         format   => '%i',
         symbol   => '%',
         suffix   => 'pct',
@@ -1862,17 +2038,34 @@ my %unitsDB = (
         tmpl_long_pl => '%txt% %value%',
     },
 
+    # surface area
+    cm2 => {
+        ref_base => 23,
+        ref      => 'm',
+        scale_m  => '1.0e-2',
+        scale_sq => 1,
+    },
+
+    m2 => {
+        ref_base => 23,
+        ref      => 'm',
+        scale_m  => '1.0e0',
+        scale_sq => 1,
+    },
+
     # volume
     cm3 => {
         ref_base => 18,
         ref      => 'm',
-        scale_cu => '1.0e-2',
+        scale_m  => '1.0e-2',
+        scale_cu => 1,
     },
 
     m3 => {
         ref_base => 18,
         ref      => 'm',
-        scale_cu => '1.0e0',
+        scale_m  => '1.0e0',
+        scale_cu => 1,
     },
 
     ml => {
@@ -1992,12 +2185,12 @@ my %unitsDB = (
     },
 
     uw => {
-        ref     => 'j',
+        ref     => 'w',
         scale_m => '1.0e-6',
     },
 
     mw => {
-        ref     => 'j',
+        ref     => 'w',
         scale_m => '1.0e-3',
     },
 
@@ -2025,18 +2218,18 @@ my %unitsDB = (
         scale_sq  => '1.0e-2',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2047,18 +2240,18 @@ my %unitsDB = (
         scale_sq  => '1.0e0',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2069,18 +2262,18 @@ my %unitsDB = (
         scale_sq  => '1.0e-2',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2091,18 +2284,18 @@ my %unitsDB = (
         scale_sq  => '1.0e0',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2113,18 +2306,18 @@ my %unitsDB = (
         scale_sq  => '1.0e-2',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2135,18 +2328,18 @@ my %unitsDB = (
         scale_sq  => '1.0e0',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
+            de => '%value% %txt% pro %txt_sq%',
+            en => '%value% %txt% per %txt_sq%',
+            fr => '%value% %txt% per %txt_sq%',
+            nl => '%value% %txt% per %txt_sq%',
+            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
+            de => '%value% %txt_pl% pro %txt_sq%',
+            en => '%value% %txt_pl% per %txt_sq%',
+            fr => '%value% %txt_pl% per %txt_sq%',
+            nl => '%value% %txt_pl% per %txt_sq%',
+            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2662,12 +2855,19 @@ my %readingsDB = (
 
 # Get unit list in local language as hash
 sub GetList (@) {
-    my ( $lang, $type ) = @_;
+    my ( $name, $lang, $type ) = @_;
     my $l = ( $lang ? lc($lang) : "en" );
     my %list;
 
-    foreach my $u ( keys %unitsDB ) {
-        my $details = GetDetails( $u, $lang );
+    my %DB = %unitsDB;
+    my $getKeyValueAttr = ::getKeyValueAttr( $name, "readingsFormat" );
+
+    foreach ( keys %{$getKeyValueAttr} ) {
+        $DB{$_} = $getKeyValueAttr->{$_};
+    }
+
+    foreach my $u ( keys %DB ) {
+        my $details = GetDetails( $name, $u, $lang );
         my $tn = (
               $details->{txt_base}
             ? $details->{txt_base}
@@ -2681,38 +2881,43 @@ sub GetList (@) {
 }
 
 # Get unit details in local language as hash
-sub GetDetails ($@) {
-    my ( $unit, $lang ) = @_;
-    my $u = lc($unit);
+sub GetDetails ($$@) {
+    my ( $name, $unit, $lang ) = @_;
     my $l = ( $lang ? lc($lang) : "en" );
     my %details;
+    my $attribute = "readingsFormat";
 
-    return {} if ( !$unit || $unit eq "" );
+    my %DB = %unitsDB;
+    my $getKeyValueAttr = ::getKeyValueAttr( $name, "readingsFormat" );
 
-    if ( defined( $unitsDB{$u} ) ) {
-        foreach my $k ( keys %{ $unitsDB{$u} } ) {
-            $details{$k} = $unitsDB{$u}{$k};
+    foreach ( keys %{$getKeyValueAttr} ) {
+        $DB{$_} = $getKeyValueAttr->{$_};
+    }
+
+    if ( defined( $DB{$unit} ) ) {
+        foreach my $k ( keys %{ $DB{$unit} } ) {
+            $details{$k} = $DB{$unit}{$k};
         }
-        $details{abbr} = $u;
+        $details{abbr} = $unit;
 
         foreach ( 'ref', 'ref_t', 'ref_sq', 'ref_cu' ) {
             my $suffix = $_;
             $suffix =~ s/^[a-z]+//;
             if ( defined( $details{$_} ) ) {
                 my $ref = $details{$_};
-                if ( !defined( $unitsDB{$ref} ) ) {
+                if ( !defined( $DB{$ref} ) ) {
                     ::Log 1, "Unit::GetDetails($unit) broken reference $_";
                     next;
                 }
-                foreach my $k ( keys %{ $unitsDB{$ref} } ) {
+                foreach my $k ( keys %{ $DB{$ref} } ) {
                     next
                       if ( $k =~ /^scale/ )
                       ;    # exclude scales from referenced unit
                     if ( !defined( $details{$k} ) ) {
-                        $details{$k} = $unitsDB{$ref}{$k};
+                        $details{$k} = $DB{$ref}{$k};
                     }
                     else {
-                        $details{ $k . $suffix } = $unitsDB{$ref}{$k}
+                        $details{ $k . $suffix } = $DB{$ref}{$k}
                           if ( !defined( $details{ $k . $suffix } ) );
                     }
                 }
@@ -2731,15 +2936,25 @@ sub GetDetails ($@) {
                 $details{$k} = $scales_sq{$k}
                   if ( !defined( $details{$k} ) );
             }
+            my $ref = $details{scale_sq};
+            foreach my $k ( keys %{ $scales_m{$ref} } ) {
+                $details{ $k . "_sq" } = $scales_m{$ref}{$k}
+                  if ( !defined( $details{ $k . "_sq" } ) );
+            }
         }
         if ( $details{scale_cu} ) {
             foreach my $k ( keys %scales_cu ) {
                 $details{$k} = $scales_cu{$k}
                   if ( !defined( $details{$k} ) );
             }
+            my $ref = $details{scale_cu};
+            foreach my $k ( keys %{ $scales_m{$ref} } ) {
+                $details{ $k . "_cu" } = $scales_m{$ref}{$k}
+                  if ( !defined( $details{ $k . "_cu" } ) );
+            }
         }
 
-        if ( $details{ref_base} ) {
+        if ( defined( $details{ref_base} ) ) {
             my $ref = $details{ref_base};
             foreach my $k ( keys %{ $unit_base{$ref} } ) {
                 $details{$k} = $unit_base{$ref}{$k}
@@ -2748,7 +2963,10 @@ sub GetDetails ($@) {
         }
 
         if ($lang) {
-            $details{lang} = $l;
+
+            # keep only defined language if set
+            $l = $details{lang} if ( $details{lang} );
+            $details{lang} = $l if ( !$details{lang} );
             foreach ( keys %details ) {
                 if ( $details{$_}
                     && ref( $details{$_} ) eq "HASH" )
@@ -2761,19 +2979,50 @@ sub GetDetails ($@) {
                 }
             }
 
+            # add metric name to suffix
             $details{suffix} = $details{scale_txt_m} . $details{suffix}
               if ( $details{suffix} && $details{scale_txt_m} );
             $details{txt} = $details{scale_txt_long_m} . lc( $details{txt} )
               if ( $details{txt} && $details{scale_txt_long_m} );
 
-            $details{unit_sq} = $details{unit_sq} . $details{scale_txt_sq}
-              if ( $details{unit_sq} && $details{scale_txt_sq} );
+            # add square information to suffix and txt
+            # if no separate suffix_sq and txt_sq was found
+            $details{suffix} = $details{suffix} . $details{scale_txt_sq}
+              if ( !$details{suffix_sq} && $details{scale_txt_sq} );
+            $details{txt} = $details{scale_txt_long_sq} . lc( $details{txt} )
+              if ( !$details{txt_sq} && $details{scale_txt_long_sq} );
+
+            # add cubic information to suffix and txt
+            # if no separate suffix_cu and txt_cu was found
+            $details{suffix} = $details{suffix} . $details{scale_txt_cu}
+              if ( !$details{suffix_cu} && $details{scale_txt_cu} );
+            $details{txt} = $details{scale_txt_long_cu} . lc( $details{txt} )
+              if ( !$details{txt_cu} && $details{scale_txt_long_cu} );
+
+            # add metric name to suffix_sq
+            $details{suffix_sq} = $details{scale_txt_m_sq} . $details{suffix_sq}
+              if ( $details{suffix_sq} && $details{scale_txt_m_sq} );
+            $details{txt_sq} =
+              $details{scale_txt_long_m_sq} . lc( $details{txt_sq} )
+              if ( $details{txt_sq} && $details{scale_txt_long_m_sq} );
+
+            # add square information to suffix_sq
+            $details{suffix_sq} = $details{suffix_sq} . $details{scale_txt_sq}
+              if ( $details{suffix_sq} && $details{scale_txt_sq} );
             $details{txt_sq} =
               $details{scale_txt_long_sq} . lc( $details{txt_sq} )
               if ( $details{txt_sq} && $details{scale_txt_long_sq} );
 
-            $details{unit_cu} = $details{unit_cu} . $details{scale_txt_cu}
-              if ( $details{unit_cu} && $details{scale_txt_cu} );
+            # add metric name to suffix_cu
+            $details{suffix_cu} = $details{scale_txt_m_cu} . $details{suffix_cu}
+              if ( $details{suffix_cu} && $details{scale_txt_m_cu} );
+            $details{txt_cu} =
+              $details{scale_txt_long_m_cu} . lc( $details{txt_cu} )
+              if ( $details{txt_cu} && $details{scale_txt_long_m_cu} );
+
+            # add cubic information to suffix_cu
+            $details{suffix_cu} = $details{suffix_cu} . $details{scale_txt_cu}
+              if ( $details{suffix_cu} && $details{scale_txt_cu} );
             $details{txt_cu} =
               $details{scale_txt_long_cu} . lc( $details{txt_cu} )
               if ( $details{txt_cu} && $details{scale_txt_long_cu} );
@@ -2836,7 +3085,7 @@ sub GetDetailsFromReadingname ($@) {
         $u = lc($1);
     }
 
-    return {} if ( !%return && !$u );
+    return if ( !%return && !$u );
     return \%return if ( !$u );
 
     my $unitDetails = GetDetails( $u, $l );
@@ -2853,12 +3102,13 @@ sub GetDetailsFromReadingname ($@) {
 }
 
 # Get value + unit combined string
-sub GetValueWithUnit ($$@) {
-    my ( $value, $unit, $lang, $format ) = @_;
+sub GetValueWithUnit ($$$@) {
+    my ( $name, $value, $unit, $lang, $format ) = @_;
     my $l = ( $lang ? lc($lang) : "en" );
-    my $details = GetDetails( $unit, $l );
+    my $details = GetDetails( $name, $unit, $l );
     my $txt;
-    return $value if ( !$details->{suffix} && !$details->{symbol} );
+    return $value
+      if ( !$details || ( !$details->{suffix} && !$details->{symbol} ) );
 
     $details->{value} = $value;
 
