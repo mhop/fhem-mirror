@@ -128,7 +128,21 @@ STACKABLE_CC_Parse($$)
 
   return "" if(IsIgnored($name));
 
-  CUL_Parse($defs{$name}, $iohash, $name, $msg);
+  my $sh = $defs{$name};
+  if($sh && $sh->{TCM}) {
+    my $th = $sh->{TCMHash};
+    if($th) {
+      delete $th->{IOReadFn};
+      $th->{IODevRxBuffer} = pack("H*", $msg);
+      CallFn($th->{NAME}, "ReadFn", $th);
+      $th->{IOReadFn} = "STACKABLE_IOReadFn";
+    } else {
+      Log 1, "$name: no TCM device assigned";
+    }
+    
+  } else {
+    CUL_Parse($defs{$name}, $iohash, $name, $msg);
+  }
   return "";
 }
 
@@ -161,6 +175,7 @@ STACKABLE_IOOpenFn($)
 {
   my ($hash) = @_;
   $hash->{FD} = $hash->{IODev}{IODev}{FD};     # Lets fool the TCM
+  $hash->{IODev}{TCMHash} = $hash;
   $hash->{IOReadFn} = "STACKABLE_IOReadFn";
   return 1;
 }
