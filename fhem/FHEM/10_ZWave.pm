@@ -2400,6 +2400,7 @@ ZWave_configParseModel($;$)
     }
   }
 
+  my $partial="";
   while($gz->gzreadline($line)) {
     last if($line =~ m+^\s*</Product>+);
     if($line =~ m/^\s*<CommandClass.*id="([^"]*)"(.*)$/) {
@@ -2427,7 +2428,22 @@ ZWave_configParseModel($;$)
       $hash{$cmdName} = \%h;
     }
 
-    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+^\s*<Help>(.*)</Help>$+);
+    if($line =~ m,<Help>, && $line !~ m,</Help>,) { # Multiline Help
+      $partial = $line;
+      next;
+    }
+    if($partial) {
+      if($line =~ m,</Help>,) {
+        $line = $partial.$line;
+        $line =~ s/[\r\n]//gs;
+        $partial = "";
+      } else {
+        $partial .= $line;
+        next;
+      }
+    }
+    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+<Help>(.*)</Help>+s);
+
     if($line =~ m/^\s*<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
       my $value = $1 if($line =~ m/value="([^"]*)"/i);
