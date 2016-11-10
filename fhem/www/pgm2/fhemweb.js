@@ -892,9 +892,7 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
   $(newEl).addClass(wn+"_widget");
 
   if( $(newEl).find("[informId]").length == 0 && !$(newEl).attr("informId") ) {
-    if(reading && reading == "state")
-      $(newEl).attr("informId", devName);
-    else if(reading)
+    if(reading)
       $(newEl).attr("informId", devName+"-"+reading);
   }
 
