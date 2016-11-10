@@ -775,7 +775,7 @@ HUEDevice_Set($@)
   my $subtype = AttrVal($name, "subType", "extcolordimmer");
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
-  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( $subtype =~ m/dimmer/ );
+  $list .= " pct:colorpicker,BRI,0,1,100 bri:colorpicker,BRI,0,1,254" if( $subtype =~ m/dimmer/ );
   $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{devtype} && $subtype =~ m/dimmer/ );
   $list .= " satUp:noArg satDown:noArg hueUp:noArg hueDown:noArg ctUp:noArg ctDown:noArg " if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) );
   $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
