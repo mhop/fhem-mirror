@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.4
+#  Version 3.5
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -12,21 +12,22 @@
 #
 #  define <name> HMCCUCHN <ccudev> [readonly]
 #
+#  set <name> config <parameter>=<value> [...]
 #  set <name> control <value>
 #  set <name> datapoint <datapoint> <value>
+#  set <name> defaults
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
 #  set <name> on-till <timestamp>
 #  set <name> on-for-timer <ontime>
 #  set <name> pct <level> [{ <ontime> | 0 } [<ramptime>]]
 #  set <name> toggle
-#  set <name> config <parameter>=<value> [...]
 #
-#  get <name> devstate
-#  get <name> datapoint <datapoint>
-#  get <name> channel <datapoint-expr>
 #  get <name> config
 #  get <name> configdesc
+#  get <name> datapoint <datapoint>
+#  get <name> defaults
+#  get <name> devstate
 #  get <name> update
 #
 #  attr <name> ccuackstate { 0 | 1 }
@@ -41,6 +42,7 @@
 #  attr <name> disable { 0 | 1 }
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
+#  attr <name> substexcl <reading-expr>
 #  attr <name> substitute <subst-rule>[;...]
 #
 ################################################################
@@ -74,7 +76,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,nochn0,trace ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,nochn0,trace ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute:textField-long substexcl stripnumber ". $readingFnAttributes;
 }
 
 #####################################
@@ -180,11 +182,12 @@ sub HMCCUCHN_Set ($@)
 	my $name = shift @a;
 	my $opt = shift @a;
 
-	my $rocmds = "clear config";
+	my $rocmds = "clear config defaults:noArg";
 	
 	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
 	return undef
-		if ($hash->{statevals} eq 'readonly' && $opt ne '?' && $opt ne 'clear' && $opt ne 'config');
+		if ($hash->{statevals} eq 'readonly' && $opt ne '?' && $opt ne 'clear' && $opt ne 'config' &&
+			$opt ne 'defaults');
 
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);	
@@ -214,7 +217,7 @@ sub HMCCUCHN_Set ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 2));
 		   
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
@@ -230,7 +233,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$cd;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
@@ -249,7 +252,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
 
@@ -289,7 +292,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Current device state doesn't match statevals")
 		   if ($objvalue eq '');
 
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
@@ -378,7 +381,7 @@ sub HMCCUCHN_Set ($@)
 				
 		# Set state
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, '');
+		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, undef, '');
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
@@ -401,11 +404,17 @@ sub HMCCUCHN_Set ($@)
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
+	elsif ($opt eq 'defaults') {
+		my $rc = HMCCU_SetDefaults ($hash);
+		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
+		HMCCU_SetState ($hash, "OK");
+		return undef;
+	}
 	else {
 		return "HMCCUCHN: Unknown argument $opt, choose one of ".$rocmds
 			if ($hash->{statevals} eq 'readonly');
 
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of clear config datapoint devstate";
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of clear config control datapoint defaults:noArg devstate";
 		if ($hash->{statevals} ne '') {
 			my @cmdlist = split /\|/,$hash->{statevals};
 			shift @cmdlist;
@@ -501,8 +510,12 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $res;
 	}
+	elsif ($opt eq 'defaults') {
+		$result = HMCCU_GetDefaults ($hash, 0);
+		return $result;
+	}
 	else {
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint";
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg defaults:noArg datapoint";
 		
 		my ($a, $c) = split(":", $hash->{ccuaddr});
 		my @valuelist;
@@ -597,6 +610,10 @@ sub HMCCUCHN_SetError ($$)
         Examples:<br/>
         <code>set temp_control datapoint SET_TEMPERATURE 21</code>
       </li><br/>
+      <li><b>set &lt;name&gt; defaults</b><br/>
+   		Set default attributes for CCU device type. Default attributes are only available for
+   		some device types and for some channels of a device type.
+      </li><br/>
       <li><b>set &lt;name&gt; devstate &lt;value&gt;</b><br/>
          Set state of a CCU device channel. The state datapoint of a channel must be defined
          by setting attribute 'statedatapoint' to a valid datapoint name.
@@ -674,13 +691,16 @@ sub HMCCUCHN_SetError ($$)
       <li><b>get &lt;name&gt; configdesc</b><br/>
          Get description of configuration parameters of CCU channel.
       </li><br/>
+      <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
+         Get value of a CCU channel datapoint.
+      </li><br/>
+      <li><b>get &lt;name&gt; defaults</b><br/>
+      	Display default attributes for CCU device type.
+      </li><br/>
       <li><b>get &lt;name&gt; devstate</b><br/>
          Get state of CCU device. Default datapoint STATE can be changed by setting
          attribute 'statedatapoint'. Command will fail if state datapoint does not exist in
          channel.
-      </li><br/>
-      <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
-         Get value of a CCU channel datapoint.
       </li><br/>
       <li><b>get &lt;name&gt; update [{State | <u>Value</u>}]</b><br/>
          Update all datapoints / readings of channel. With option 'State' the device is queried.
@@ -727,7 +747,8 @@ sub HMCCUCHN_SetError ($$)
          Set alternative reading names.
       </li><br/>
       <li><b>ccuscaleval &lt;datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
-      ccuscaleval &lt;[!]datapoint&gt;:&lt;min&gt;:&lt;max&gt;:&lt;minn&gt;:&lt;maxn&gt;[,...]<br/>
+      <b>ccuscaleval &lt;[!]datapoint&gt;:&lt;min&gt;:&lt;max&gt;:&lt;minn&gt;:&lt;maxn&gt;[,...]
+      </b><br/>
          Scale, spread, shift and optionally reverse values before executing set datapoint commands
          or after executing get datapoint commands / before storing values in readings.<br/>
          If first syntax is used during get the value read from CCU is devided by <i>factor</i>.
@@ -751,8 +772,8 @@ sub HMCCUCHN_SetError ($$)
          setting control datapoint. For example if datapoint of thermostat control is 
          SET_TEMPERATURE one can define a slider for setting the destination temperature with
          following attributes:<br/><br/>
-         attr mydev controldatapoint SET_TEMPERATURE
-         attr mydev webCmd control
+         attr mydev controldatapoint SET_TEMPERATURE<br/>
+         attr mydev webCmd control<br/>
          attr mydev widgetOverride control:slider,10,1,25
       </li><br/>
       <li><b>disable {<u>0</u> | 1}</b><br/>
@@ -780,9 +801,22 @@ sub HMCCUCHN_SetError ($$)
       	1 = Trailing zeros are stripped from floating point numbers except one digit.<br/>
    		2 = All trailing zeros are stripped from floating point numbers.
       </li><br/>
-      <li><b>substitude &lt;subst-rule&gt;[;...]</b><br/>
-         Define substitions for reading values. Syntax of <i>subst-rule</i> is<br/><br/>
-         [datapoint!]&lt;regexp1&gt;:&lt;text1&gt;[,...]
+      <li><b>substexcl &lt;reading-expr&gt;</b><br/>
+      	Exclude values of readings matching <i>reading-expr</i> from substitution. This is helpful
+      	for reading 'control' if the reading is used for a slider widget and the corresponding
+      	datapoint is assigned to attribute statedatapoint and controldatapoint.
+      </li><br/>
+      <li><b>substitute &lt;subst-rule&gt;[;...]</b><br/>
+         Define substitutions for datapoint/reading values. Syntax of <i>subst-rule</i> is<br/><br/>
+         [[&lt;channelno.&gt;]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp1}&gt;:&lt;text1&gt;[,...]
+         <br/>
+         If rule expression starts with a hash sign a numeric datapoint value is substituted if
+         it fits in the number range n &lt;= value &lt;= m.
+         <br/><br/>
+         Example: Interpret LEVEL values of dimmer as "on" and "off"<br/>
+         <code>
+         attr my_dim substitute LEVEL!#0-0:off,#1-100:on
+         </code>
       </li>
    </ul>
 </ul>
