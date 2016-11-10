@@ -292,6 +292,7 @@ sub weekprofile_sendDevProfile(@)
     $cmd =~ s/^\s+|\s+$//g; 
     Log3 $me, 4, "$me(sendDevProfile): $cmd";
     $ret = fhem($cmd,1);
+    DoTrigger($me,"PROFILE_TRANSFERED $device",1);
   }
   return $ret;
 }
@@ -942,6 +943,7 @@ sub weekprofile_writeProfilesToFile(@)
     print $fh "entry=".$json->encode($hash->{PROFILES}[$i])."\n";
   }  
   close $fh;
+  DoTrigger($me,"PROFILES_SAVED",1);
 }
 ############################################## 
 sub weekprofile_readProfilesFromFile(@)
@@ -1197,6 +1199,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <br>
   <b>For this module libjson-perl have to be installed</b>
   <br><br>
+  <b>Events:</b><br>
+  Currently the following event will be created:<br>
+  <li>PROFILE_TRANSFERED: if a profile or a part of a profile (changes) is send to a device</li>
+  <li>PROFILES_SAVED: the profile are stored in the config file (also if there are no changes)</li>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
   <ul>
@@ -1342,6 +1348,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <br>
   <b>Für das Module wird libjson-perl benötigt</b>
   <br><br>
+  <b>Events:</b><br>
+  Aktuell werden folgende Events erzeugt:<br>
+  <li>PROFILE_TRANSFERED: wenn ein Profil oder Teile davon zu einem Gerät gesended wurden</li>
+  <li>PROFILES_SAVED: wenn Profile in die Konfigurationsdatei gespeichert wurden (auch wenn es keine Änderung gab!)</li>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
   <ul>
