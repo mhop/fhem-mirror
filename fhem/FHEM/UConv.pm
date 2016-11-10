@@ -9,7 +9,6 @@ sub UConv_Initialize() {
 }
 
 package UConv;
-use Unit;
 use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
 
@@ -258,7 +257,7 @@ sub ft2m($;$) {
 ###
 
 # convert direction in degree to point of the compass
-sub deg2compasspoint($;$) {
+sub direction2compasspoint($;$) {
     my ( $azimuth, $lang ) = @_;
 
     my $directions_txt_i18n;
