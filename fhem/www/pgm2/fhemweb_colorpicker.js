@@ -203,11 +203,23 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       $(newEl).addClass("colorpicker_ct_mired");
     else
       $(newEl).addClass("colorpicker_ct");
+
+    if( currVal ) {
+      newEl.setValueFn(currVal);
+      $(document).ready(function(arg) { newEl.setValueFn(currVal) });
+    }
+
     return newEl;
 
   } else if( mode == 'HUE' ) {
     var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, undefined, params, cmd);
     $(newEl).addClass("colorpicker_hue");
+
+    if( currVal ) {
+      newEl.setValueFn(currVal);
+      $(document).ready(function(arg) { newEl.setValueFn(currVal) });
+    }
+
     return newEl;
 
   } else if( mode == 'BRI' ) {
