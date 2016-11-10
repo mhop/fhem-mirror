@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_weekprofile: create events see help for further information
   - feature: 36_WMBUS: support for Amber Wireless AMB8465-M as IoDev
   - feature: 67_ECMDDevice: new attribute noState
   - bugfix:  02_RSS: make hash reference explicit
