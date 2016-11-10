@@ -73,62 +73,75 @@ sub HP1000_Initialize($) {
 "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
       . $readingFnAttributes;
 
+    $hash->{readingsFormat} = {
+        'activity' => {
+            ref   => 'oknok',
+            scope => [ 'dead', 'alive' ],
+        },
+    };
+
     $hash->{readingsDesc} = {
-        "UV"                   => { "unit" => "uvi", },
-        "UVR"                  => { "unit" => "uwpscm", },
-        "dewpoint"             => { "unit" => "c", },
-        "dewpoint_f"           => { "unit" => "f", },
-        "humidity"             => { "unit" => "pct", },
-        "humidityAbs"          => { "unit" => "c", },
-        "humidityAbs_f"        => { "unit" => "f", },
-        "indoorDewpoint"       => { "unit" => "c", },
-        "indoorDewpoint_f"     => { "unit" => "f", },
-        "indoorHumidity"       => { "unit" => "pct", },
-        "indoorHumidityAbs"    => { "unit" => "c", },
-        "indoorHumidityAbs_f"  => { "unit" => "f", },
-        "indoorTemperature"    => { "unit" => "c", },
-        "indoorTemperature_f"  => { "unit" => "f", },
-        "luminosity"           => { "unit" => "lx", },
-        "pressure"             => { "unit" => "hpamb", },
-        "pressureAbs_in"       => { "unit" => "inhg", },
-        "pressureAbs_mm"       => { "unit" => "mmhg", },
-        "pressure_in"          => { "unit" => "inhg", },
-        "pressure_mm"          => { "unit" => "mmhg", },
-        "rain"                 => { "unit" => "mm", },
-        "rain_day"             => { "unit" => "mm", },
-        "rain_day_in"          => { "unit" => "in", },
-        "rain_in"              => { "unit" => "in", },
-        "rain_month"           => { "unit" => "mm", },
-        "rain_month_in"        => { "unit" => "in", },
-        "rain_week"            => { "unit" => "mm", },
-        "rain_week_in"         => { "unit" => "in", },
-        "rain_year"            => { "unit" => "mm", },
-        "rain_year_in"         => { "unit" => "in", },
-        "solarradiation"       => { "unit" => "wpsm", },
-        "temperature"          => { "unit" => "c", },
-        "temperature_f"        => { "unit" => "f", },
-        "wind_chill"           => { "unit" => "c", },
-        "wind_chill_f"         => { "unit" => "f", },
-        "wind_direction"       => { "unit" => "gon", },
-        "wind_direction_avg2m" => { "unit" => "gon", },
-        "wind_gust"            => { "unit" => "kmh", },
-        "wind_gust_bft"        => { "unit" => "bft", },
-        "wind_gust_fts"        => { "unit" => "fts", },
-        "wind_gust_kn"         => { "unit" => "kn", },
-        "wind_gust_mph"        => { "unit" => "mph", },
-        "wind_gust_mph_sum10m" => { "unit" => "mph", },
-        "wind_gust_mps"        => { "unit" => "mps", },
-        "wind_gust_sum10m"     => { "unit" => "kmh", },
-        "wind_speed"           => { "unit" => "kmh", },
-        "wind_speed_avg2m"     => { "unit" => "kmh", },
-        "wind_speed_bft"       => { "unit" => "bft", },
-        "wind_speed_bft_avg2m" => { "unit" => "bft", },
-        "wind_speed_kn"        => { "unit" => "kn", },
-        "wind_speed_kn_avg2m"  => { "unit" => "kn", },
-        "wind_speed_mph"       => { "unit" => "mph", },
-        "wind_speed_mph_avg2m" => { "unit" => "mph", },
-        "wind_speed_mps"       => { "unit" => "mps", },
-        "wind_speed_mps_avg2m" => { "unit" => "mps", },
+        'Activity'                => { rtype => 'activity', },
+        'UV'                      => { rtype => 'uvi', },
+        'UVR'                     => { rtype => 'uwpscm', },
+        'dewpoint'                => { rtype => 'c', },
+        'dewpoint_f'              => { rtype => 'f', },
+        'humidity'                => { rtype => 'pct', formula_symbol => 'H' },
+        'humidityAbs'             => { rtype => 'c', },
+        'humidityAbs_f'           => { rtype => 'f', },
+        'indoorDewpoint'          => { rtype => 'c', },
+        'indoorDewpoint_f'        => { rtype => 'f', },
+        'indoorHumidity'          => { rtype => 'pct', },
+        'indoorHumidityAbs'       => { rtype => 'c', },
+        'indoorHumidityAbs_f'     => { rtype => 'f', },
+        'indoorTemperature'       => { rtype => 'c', },
+        'indoorTemperature_f'     => { rtype => 'f', },
+        'israining'               => { rtype => 'bool', },
+        'luminosity'              => { rtype => 'lx', },
+        'pressure'                => { rtype => 'hpamb', },
+        'pressureAbs'             => { rtype => 'hpamb', },
+        'pressureAbs_in'          => { rtype => 'inhg', },
+        'pressureAbs_mm'          => { rtype => 'mmhg', },
+        'pressure_in'             => { rtype => 'inhg', },
+        'pressure_mm'             => { rtype => 'mmhg', },
+        'rain'                    => { rtype => 'mm', },
+        'rain_day'                => { rtype => 'mm', },
+        'rain_day_in'             => { rtype => 'in', },
+        'rain_in'                 => { rtype => 'in', },
+        'rain_month'              => { rtype => 'mm', },
+        'rain_month_in'           => { rtype => 'in', },
+        'rain_week'               => { rtype => 'mm', },
+        'rain_week_in'            => { rtype => 'in', },
+        'rain_year'               => { rtype => 'mm', },
+        'rain_year_in'            => { rtype => 'in', },
+        'solarradiation'          => { rtype => 'wpsm', },
+        'temperature'             => { rtype => 'c', },
+        'temperature_f'           => { rtype => 'f', },
+        'wind_compasspoint'       => { rtype => 'compasspoint', },
+        'wind_compasspoint_avg2m' => { rtype => 'compasspoint', },
+        'wind_chill'              => { rtype => 'c', formula_symbol => 'Wc', },
+        'wind_chill_f'            => { rtype => 'f', formula_symbol => 'Wc', },
+        'wind_direction' => { rtype => 'direction', formula_symbol => 'Wdir', },
+        'wind_direction_avg2m' =>
+          { rtype => 'direction', formula_symbol => 'Wdir', },
+        'wind_gust'            => { rtype => 'kmh', formula_symbol => 'Wg', },
+        'wind_gust_bft'        => { rtype => 'bft', formula_symbol => 'Wg', },
+        'wind_gust_fts'        => { rtype => 'fts', formula_symbol => 'Wg', },
+        'wind_gust_kn'         => { rtype => 'kn',  formula_symbol => 'Wg', },
+        'wind_gust_mph'        => { rtype => 'mph', formula_symbol => 'Wg', },
+        'wind_gust_mph_sum10m' => { rtype => 'mph', formula_symbol => 'Wg', },
+        'wind_gust_mps'        => { rtype => 'mps', formula_symbol => 'Wg', },
+        'wind_gust_sum10m'     => { rtype => 'kmh', formula_symbol => 'Wg', },
+        'wind_speed'           => { rtype => 'kmh', formula_symbol => 'Ws', },
+        'wind_speed_avg2m'     => { rtype => 'kmh', formula_symbol => 'Ws', },
+        'wind_speed_bft'       => { rtype => 'bft', formula_symbol => 'Ws', },
+        'wind_speed_bft_avg2m' => { rtype => 'bft', formula_symbol => 'Ws', },
+        'wind_speed_kn'        => { rtype => 'kn',  formula_symbol => 'Ws', },
+        'wind_speed_kn_avg2m'  => { rtype => 'kn',  formula_symbol => 'Ws', },
+        'wind_speed_mph'       => { rtype => 'mph', formula_symbol => 'Ws', },
+        'wind_speed_mph_avg2m' => { rtype => 'mph', formula_symbol => 'Ws', },
+        'wind_speed_mps'       => { rtype => 'mps', formula_symbol => 'Ws', },
+        'wind_speed_mps_avg2m' => { rtype => 'mps', formula_symbol => 'Ws', },
     };
 }
 
@@ -921,7 +934,7 @@ sub HP1000_CGI() {
     # wind_compasspoint
     if ( defined( $webArgs->{winddir} ) ) {
         $webArgs->{windcompasspoint} =
-          UConv::deg2compasspoint( $webArgs->{winddir} );
+          UConv::direction2compasspoint( $webArgs->{winddir} );
         readingsBulkUpdate( $hash, "wind_compasspoint",
             $webArgs->{windcompasspoint} );
     }
@@ -982,7 +995,7 @@ sub HP1000_CGI() {
     # averages/wind_compasspoint_avg2m
     if ( defined( $webArgs->{winddir_avg2m} ) ) {
         $webArgs->{windcompasspoint_avg2m} =
-          UConv::deg2compasspoint( $webArgs->{winddir_avg2m} );
+          UConv::direction2compasspoint( $webArgs->{winddir_avg2m} );
         readingsBulkUpdate( $hash, "wind_compasspoint_avg2m",
             $webArgs->{windcompasspoint_avg2m} );
     }
@@ -1074,9 +1087,11 @@ sub HP1000_CGI() {
     my $stateReadingsLang   = AttrVal( $name, "stateReadingsLang",   "en" );
     my $stateReadingsFormat = AttrVal( $name, "stateReadingsFormat", "0" );
 
-    $result =
-      getMultiValStatus( $name, $stateReadings,
-        $stateReadingsLang, $stateReadingsFormat );
+    # $result =
+    #   makeSTATE( $name, $stateReadings,
+    #     $stateReadingsLang, $stateReadingsFormat );
+
+    $result = makeSTATE( $name, $stateReadings, $stateReadingsFormat );
 
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
