@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.4
+#  Version 3.5
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -25,11 +25,11 @@
 #  set <name> <stateval_cmds>
 #  set <name> toggle
 #
-#  get <name> devstate
-#  get <name> datapoint [<channel-number>.]<datapoint>
-#  get <name> defaults
 #  get <name> config [<channel-number>]
 #  get <name> configdesc [<channel-number>]
+#  get <name> datapoint [<channel-number>.]<datapoint>
+#  get <name> defaults
+#  get <name> devstate
 #  get <name> update
 #
 #  attr <name> ccuackstate { 0 | 1 }
@@ -46,6 +46,7 @@
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint [<channel-number>.]<datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
+#  attr <name> substexcl <reading-expr>
 #  attr <name> substitute <regexp1>:<subtext1>[,...]
 #
 #####################################################################
@@ -79,7 +80,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 statevals substitute statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
 }
 
 #####################################
@@ -273,11 +274,12 @@ sub HMCCUDEV_Set ($@)
 	my $name = shift @a;
 	my $opt = shift @a;
 
-	my $rocmds = "clear config";
+	my $rocmds = "clear config defaults:noArg";
 
 	return HMCCU_SetError ($hash, -3) if (!exists ($hash->{IODev}));
 	return undef
-		if ($hash->{statevals} eq 'readonly' && $opt ne '?' && $opt ne 'clear' && $opt ne 'config');
+		if ($hash->{statevals} eq 'readonly' && $opt ne '?' && $opt ne 'clear' && $opt ne 'config' &&
+			$opt ne 'defaults');
 
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);	
@@ -318,7 +320,7 @@ sub HMCCUDEV_Set ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, 0, $objname, 2));
 		   
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		$objname = $ccuif.'.'.$ccuaddr.':'.$objname;
 
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
@@ -337,7 +339,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2));	
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		
 		my $objname = $ccuif.'.'.$ccuaddr.':'.$cc.'.'.$cd;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
@@ -356,7 +358,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		
 		my $objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.'.$sd;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
@@ -397,7 +399,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, "Current device state doesn't match statevals")
 		   if ($objvalue eq '');
 
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
@@ -475,7 +477,7 @@ sub HMCCUDEV_Set ($@)
 		
 		# Set state
 		$objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.'.$sd;
-		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, '');
+		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, undef, '');
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
@@ -495,7 +497,7 @@ sub HMCCUDEV_Set ($@)
 		   if (@a < 1);
 		my $objname = $ccuaddr;
 		
-		# Channel number is optional because paramter can be related to device or channel
+		# Channel number is optional because parameter can be related to device or channel
 		if ($a[0] =~ /^([0-9]{1,2})$/) {
 			return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
 			$objname .= ':'.$1;
@@ -508,7 +510,8 @@ sub HMCCUDEV_Set ($@)
 		return undef;
 	}
 	elsif ($opt eq 'defaults') {
-		HMCCU_SetDefaults ($hash);
+		my $rc = HMCCU_SetDefaults ($hash);
+		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
@@ -680,7 +683,7 @@ sub HMCCUDEV_Get ($@)
 		return $res;
 	}
 	elsif ($opt eq 'defaults') {
-		$result = HMCCU_GetDefaults ($hash);
+		$result = HMCCU_GetDefaults ($hash, 0);
 		return $result;
 	}
 	else {
@@ -721,7 +724,7 @@ sub HMCCUDEV_Get ($@)
       [readonly] [defaults] [{group={device|channel}[,...]|groupexp=regexp]</code>
       <br/><br/>
       If option 'readonly' is specified no set command will be available. With option 'defaults'
-      some default attribute depending on CCU device type will be set (default attributes are only
+      some default attributes depending on CCU device type will be set. Default attributes are only
       available for some device types. Parameter <i>statechannel</i> corresponds to attribute
       'statechannel'.<br/>
       A HMCCUDEV device supports CCU group devices. The CCU devices or channels related to a group
@@ -753,7 +756,7 @@ sub HMCCUDEV_Get ($@)
       	<a href="#HMCCUCHNset">see HMCCUCHN</a> 
       </li><br/>
       <li><b>set &lt;name&gt; config [&lt;channel-number&gt;] &lt;parameter&gt;=&lt;value&gt;
-       </b><br/>
+        [...]</b><br/>
         Set configuration parameter of CCU device or channel. Valid parameters can be listed by 
         using command 'get configdesc'.
       </li><br/>
@@ -851,7 +854,7 @@ sub HMCCUDEV_Get ($@)
          channel is used.
       </li><br/>
       <li><b>get &lt;name&gt; defaults</b><br/>
-      	Display default attributes for CCU device type.
+      	<a href="#HMCCUCHNget">see HMCCUCHN</a>
       </li><br/>
       <li><b>get &lt;name&gt; deviceinfo [{State | <u>Value</u>}]</b><br/>
          Display all channels and datapoints of device with datapoint values and types.
@@ -919,6 +922,9 @@ sub HMCCUDEV_Get ($@)
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
       <li><b>stripnumber {0 | 1 | 2 | -n}</b><br/>
+         <a href="#HMCCUCHNattr">see HMCCUCHN</a>
+      </li><br/>
+      <li><b>substexcl &lt;reading-expr&gt;</b><br/>
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
       <li><b>substitute &lt;subst-rule&gt;[;...]</b><br/>
