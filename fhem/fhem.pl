@@ -1358,6 +1358,7 @@ GetAllReadings($)
   if(defined($val) &&
      $val ne "unknown" &&
      $val ne "Initialized" &&
+     $val ne "" &&
      $val ne "???") {
     $val =~ s/;/;;/g;
     $val =~ s/\n/\\\n/g;
@@ -2686,7 +2687,7 @@ CommandSetstate($$)
     my $d = $defs{$sdev};
 
     # Detailed state with timestamp
-    if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/) {
+    if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/s) {
       my ($tim, $nameval) =  ($1, $2);
       my ($sname, $sval) = split(" ", $nameval, 2);
       (undef, $sval) = ReplaceEventMap($sdev, [$sdev, $sval], 0)
