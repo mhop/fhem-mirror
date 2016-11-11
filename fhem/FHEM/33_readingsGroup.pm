@@ -283,8 +283,9 @@ lookup($$$$$$$$$)
     if( ref($mapping) eq 'HASH' ) {
       $default = $mapping->{$name} if( defined($mapping->{$name}) );
       $default = $mapping->{$reading} if( defined($mapping->{$reading}) );
-      $default = $mapping->{$name.".".$reading} if( defined($mapping->{$name.".".$reading}) );
-      $default = $mapping->{$reading.".".$value} if( defined($mapping->{$reading.".".$value}) );
+      $default = $mapping->{"$name.$reading"} if( defined($mapping->{"$name.$reading"}) );
+      $default = $mapping->{"$reading.$value"} if( defined($mapping->{"$reading.$value"}) );
+      $default = $mapping->{"$name.$reading.$value"} if( defined($mapping->{"$name.$reading.$value"}) );
     } else {
       $default = $mapping;
     }
@@ -349,8 +350,9 @@ lookup2($$$$;$$)
     my $vf = "";
     $vf = $lookup->{""} if( defined( $lookup->{""} ) );
     $vf = $lookup->{$reading} if( defined($reading) && exists($lookup->{$reading}) );
-    $vf = $lookup->{$name.".".$reading} if( defined($reading) && exists($lookup->{$name.".".$reading}) );
-    $vf = $lookup->{$reading.".".$value} if( defined($value) && exists($lookup->{$reading.".".$value}) );
+    $vf = $lookup->{"$name.$reading"} if( defined($reading) && exists($lookup->{"$reading.$value"}) );
+    $vf = $lookup->{"$reading.$value"} if( defined($value) && exists($lookup->{"$reading.$value"}) );
+    $vf = $lookup->{"$name.$reading.$value"} if( defined($value) && exists($lookup->{"$name.$reading.$value"}) );
     $vf = $lookup->{"r:$row"} if( defined($row) && exists($lookup->{"r:$row"}) );
     $vf = $lookup->{"c:$column"} if( defined($column) && exists($lookup->{"c:$column"}) );
     $vf = $lookup->{"r:$row,c:$column"} if( defined($row) && defined($column) && exists($lookup->{"r:$row,c:$column"}) );
@@ -1727,7 +1729,8 @@ readingsGroup_Attr($$$;$)
         If set to 1 the reading timestamp is not displayed.</li><br>
       <li>mapping<br>
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names
-        to the displayed name. The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
+        to the displayed name. The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt; or
+        &lt;reading&gt;.&lt;value&gt; or &lt;device&gt;.&lt;reading&gt;.&lt;value&gt;.
         %DEVICE, %ALIAS, %ROOM, %GROUP, %ROW and %READING are replaced by the device name, device alias, room attribute,
         group attribute and reading name respectively. You can also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
