@@ -571,8 +571,8 @@ our %zwave_deviceSpecial;
 
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
-my %zwave_pepperLink;
-my %zwave_pepperImg;
+my (%zwave_link, %zwave_img);
+my @helpSites = ("alliance", "pepper");
 
 # standard definitions for regular expression
 # naming scheme: p<number of returned groups>_name
@@ -629,24 +629,26 @@ ZWave_Initialize($)
   }
 
   ################
-  # Read in the pepper translation table
-  my $fn = $attr{global}{modpath}."/FHEM/lib/zwave_pepperlinks.csv.gz";
-  my $gz = gzopen($fn, "rb");
-  if($gz) {
-    my $line;
-    while($gz->gzreadline($line)) {
-      chomp($line);
-      my @a = split(",",$line);
-      $zwave_pepperLink{$a[0]} = $a[1];
-      $zwave_pepperImg{$a[0]} = $a[2];
+  # Read in the pepper/alliance translation table
+  for my $n (@helpSites) {
+    my $fn = $attr{global}{modpath}."/FHEM/lib/zwave_${n}links.csv.gz";
+    my $gz = gzopen($fn, "rb");
+    if($gz) {
+      my $line;
+      while($gz->gzreadline($line)) {
+        chomp($line);
+        my @a = split(",",$line);
+        $zwave_link{$n}{lc($a[0])} = $a[1];
+        $zwave_img{$n}{lc($a[0])} = $a[2];
+      }
+      $gz->gzclose();
+    } else {
+      Log 3, "Can't open $fn: $!";
     }
-    $gz->gzclose();
-  } else {
-    Log 3, "Can't open $fn: $!";
   }
 
   # Create cache directory
-  $fn = $attr{global}{modpath}."/www/deviceimages";
+  my $fn = $attr{global}{modpath}."/www/deviceimages";
   if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
   $fn .= "/zwave";
   if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
@@ -4575,18 +4577,25 @@ sub
 ZWave_getPic($)
 {
   my ($model) = @_;
-  my $img = $zwave_pepperImg{$model};
-  return "" if(!$img);
-
-  my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
-  if(!-f $fn) {      # Cache the picture
-    my $data = GetFileFromURL("http://fhem.de/deviceimages/zwave/$img");
-    if($data && open(FH,">$fn")) {
-      print FH $data;
-      close(FH)
+  
+  for my $n (@helpSites) {
+    my $img = $zwave_img{$n}{$model};
+    next if(!$img);
+    my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
+    if(!-f $fn) {      # Cache the picture
+      my $url = $n eq "alliance" ? 
+        "http://products.z-wavealliance.org/ProductImages/Index?productName=":
+        "http://fhem.de/deviceimages/zwave/";
+      Log 3, "ZWave: downloading $url/$img for $model";
+      my $data = GetFileFromURL("$url/$img");
+      if($data && open(FH,">$fn")) {
+        print FH $data;
+        close(FH)
+      }
     }
+    return "$FW_ME/deviceimages/zwave/$img";
   }
-  return "$FW_ME/deviceimages/zwave/$img";
+  return "";
 }
 
 sub
@@ -4597,26 +4606,22 @@ ZWave_fhemwebFn($$$$)
   my $pl = ""; # Pepper link and image
   my $model = ReadingsVal($d, "modelId", "");
   if($model) {
-    my $link = $zwave_pepperLink{$model};
-    $pl .= "<div class='detLink ZWPepper'>";
-    $pl .= "<a target='_blank' href='http://www.pepper1.net/zwavedb/device/".
-               "$link'>Details in pepper1.net</a>" if($link);
-    $pl .= "</div>";
-
-    my $img = $zwave_pepperImg{$model};
-    if($img && !$FW_ss) {
-      $pl .= "<div class='img ZWPepper'".($FW_tp?"":" style='float:right'").">";
-      $pl .= "<img style='max-width:96;max-height:96px;' ".
-                        "src='$FW_ME/deviceimages/zwave/$img'>";
+    for my $n (@helpSites) {
+      my $link = $zwave_link{$n}{$model};
+      next if(!$link);
+      $pl .= "<div class='detLink ZWPepper'>";
+      my $url = ($n eq "alliance" ?
+                "http://products.z-wavealliance.org/products/" :
+                "http://www.pepper1.net/zwavedb/device/");
+      $pl .= "<a target='_blank' href='$url/$link'>Details in $n DB</a>";
       $pl .= "</div>";
-      my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
-      if(!-f $fn) {      # Cache the picture
-        my $data = GetFileFromURL("http://fhem.de/deviceimages/zwave/$img");
-        if($data && open(FH,">$fn")) {
-          print FH $data;
-          close(FH)
-        }
-      }
+    }
+
+    my $img = ZWave_getPic($model);
+    if($img && !$FW_ss) {
+      $pl .= "<div class='img'".($FW_tp?"":" style='float:right'").">";
+      $pl .= "<img style='max-width:96;max-height:96px;' src='$img'>";
+      $pl .= "</div>";
     }
   }
 
