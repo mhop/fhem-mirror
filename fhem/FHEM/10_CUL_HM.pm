@@ -2295,9 +2295,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"gasCntCalc:".($eo + $eCnt)];
     }
     elsif ($mh{mTp} eq "5E" ||$mh{mTp} eq "5F" ) {  #    POWER_EVENT_CYCLIC
-      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."02"}
-                             if($modules{CUL_HM}{defptr}{$mh{src}."02"});
-      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$mh{p};
+      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."01"}
+                             if($modules{CUL_HM}{defptr}{$mh{src}."01"});
+      my ($eCnt,$P) = map{hex($_)} unpack 'A6A6',$mh{p};
       $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
       $P = $P   /100;                       #0.0  ..167772.15 W
       
@@ -2305,25 +2305,6 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"power:"    .$P];    
 
       my $sumState = "eState:E: $eCnt P: $P";
-      if (defined $I){
-        $I = $I   /1;                         #0.0  ..65535.0   mA
-        push @evtEt,[$mh{shash},1,"current:"  .$I];   
-        push @evtEt,[$defs{$mh{devH}->{channel_04}},1,"state:$I"   ] if ($mh{devH}->{channel_04});
-        $sumState .= " I: $I";        
-      }
-      if (defined $U){
-        $U = $U   /10;                        #0.0  ..6553.5    mV
-        push @evtEt,[$mh{shash},1,"voltage:"  .$U];    
-        push @evtEt,[$defs{$mh{devH}->{channel_05}},1,"state:$U"   ] if ($mh{devH}->{channel_05});
-        $sumState .= " U: $U";        
-      }
-      if (defined $F){
-        $F -= 256 if ($F > 127);
-        $F = $F/100+50;                      # 48.72..51.27     Hz
-        push @evtEt,[$mh{shash},1,"frequency:".$F];
-        push @evtEt,[$defs{$mh{devH}->{channel_06}},1,"state:$F"   ] if ($mh{devH}->{channel_06});
-        $sumState .= " f: $F";        
-      }
       
       push @evtEt,[$mh{shash},1,$sumState];    
       push @evtEt,[$mh{shash},1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
