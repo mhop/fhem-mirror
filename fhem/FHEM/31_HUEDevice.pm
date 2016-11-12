@@ -606,9 +606,23 @@ HUEDevice_Set($@)
       return fhem( "set $hash->{IODev}{NAME} deletescene $aa[1]" );
 
     } elsif( $cmd eq 'scene' ) {
-      return "usage: scene <id>" if( @args != 1 );
+      return "usage: scene <id>" if( @args < 1 );
 
-      my $obj = { 'scene' => $aa[1] };
+      my $obj = {};
+      if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+        my @cmds = split(":", $joined);
+        for( my $i = 0; $i <= $#cmds; ++$i ) {
+          my @parts = split(" ", $cmds[$i]);
+
+          if( $parts[0] eq 'scene' ) {
+            $obj->{'scene'} = $parts[1];
+          } else {
+            HUEDevice_SetParam($name, $obj, @parts );
+          }
+        }
+      } else {
+        $obj->{scene} = $aa[1];
+      }
       $hash->{helper}->{update} = 1;
       my $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",$obj);
       return $result->{error}{description} if( $result->{error} );
