@@ -516,7 +516,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0    ,max=>20    ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
   wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
   wakeupBehavMsg  =>{a=> 33.1,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior status message"       ,lit=>{off=>0,on=>1}},
-  alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
+  alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
 
   baudrate        =>{a=> 35.0,s=>1.0,l=>0,min=>0    ,max=>6     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"baudrate"                             ,lit=>{Bd300=>0,Bd600=>1,Bd1200=>2,Bd2400=>3,Bd4800=>4,Bd9600=>5,Bd19200=>6}},
   serialFormat    =>{a=> 36.0,s=>1.0,l=>0,min=>0    ,max=>3     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"serial Format"                        ,lit=>{s7D1PE1S=>0,s7D1PE2S=>1,s8D0PN1S=>2,s8D1PE1S=>3}},
