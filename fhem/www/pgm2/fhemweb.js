@@ -1070,7 +1070,7 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).append('<input type="hidden" name="'+elName+
                         '" value="'+currVal+'">');
 
-  var lastX=-1, offX=0, maxX=0, val;
+  var lastX=-1, offX=0, maxX=0, val=currVal;
 
   newEl.activateFn = function() {
     if(currVal < min || currVal > max)
