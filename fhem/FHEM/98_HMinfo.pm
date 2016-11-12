@@ -1696,7 +1696,7 @@ sub HMInfo_help(){ ############################################################
            ."\n                 remove a template set"
            ."\n set templateExe -templateName-"
            ."\n                 write all assigned templates to the file"
-           ."\n get templateUsg -templateName-"
+           ."\n get templateUsg -templateName-[sortPeer|sortTemplate]"
            ."\n                 show template usage"
            ."\n get templateChk [-typeFilter-] -templateName- -peer:[long|short]- [-param1- ...] "
            ."\n                 compare whether register match the template values"
@@ -2382,7 +2382,7 @@ sub HMinfo_templateUsg(@){#####################################################
     next if(!defined $defs{$dName}{helper}{tmpl});
     foreach my $tid(keys %{$defs{$dName}{helper}{tmpl}}){
       my ($p,$t) = split(">",$tid);
-      if($tFilter){
+      if($tFilter && $tFilter =~ m/^sort.*/){
         if($tFilter eq "sortTemplate"){
           push @ul,sprintf("%-20s|%-15s|%s|%s",$t,$dName,$p,$defs{$dName}{helper}{tmpl}{$tid});
         }
@@ -2390,8 +2390,9 @@ sub HMinfo_templateUsg(@){#####################################################
           my ($pn,$ls) = split(":",$p);
           push @ul,sprintf("%-20s|%-15s|%5s:%-20s|%s",$pn,$t,$ls,$dName,$defs{$dName}{helper}{tmpl}{$tid});
         }
-        elsif($tFilter ne $t){
-          next;}
+#        elsif($tFilter ne $t){
+#          next;
+#        }
       }
       else{ 
         my @param;
@@ -2404,8 +2405,9 @@ sub HMinfo_templateUsg(@){#####################################################
           }
           $para = join(" ",@param);
         }
-
-        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para);}
+        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para) if(!$tFilter || $tFilter eq $t);
+ 
+      }
     }
   }
   return join("\n",sort(@ul));
@@ -2772,7 +2774,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
       </li>
-      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; <br>
+      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; [sortPeer|sortTemplate]<br>
           templare usage<br>
           template filters the output
       </li>
@@ -3220,7 +3222,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           zeigt eine Liste von Vorlagen. Ist kein Name angegeben, werden alle Vorlagen angezeigt<br>
       </li>
-      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; <br>
+      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; [sortPeer|sortTemplate]<br>
           Liste der genutzten templates.<br>
           template filtert die Einträge nach diesem template
       </li>

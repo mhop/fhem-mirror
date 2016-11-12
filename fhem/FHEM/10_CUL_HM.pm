@@ -6587,13 +6587,6 @@ sub CUL_HM_SndCmd($$) {
         )
       ){
 
-    # shall we delay commands if IO device is not present?
-    # it could cause trouble if light switches on after a long period
-    # repetition will be stopped after 1min forsecurity reason.
-    my @arr = ();
-    $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-    unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunity
-
     # push device to list
     if (!defined $modules{CUL_HM}{$ioName}{tmr}){
       # some setup work for this timer
@@ -6603,9 +6596,24 @@ sub CUL_HM_SndCmd($$) {
         $modules{CUL_HM}{$ioName}{pendDev} = \@arr2;
       }
     }
+    
+    # shall we delay commands if IO device is not present?
+    # it could cause trouble if light switches on after a long period
+    # repetition will be stopped after 1min forsecurity reason.
+    #  so do: return cmd to queue and set state to pending again. 
+    #  device will be queued @ CUL_HM. Timer will perform cyclic check for IO to return. 
+    #  
+    my @arr = ();
+    $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
+    $cmd = $hash->{helper}{prt}{rspWait}{cmd} if(   $hash->{helper}{prt}{rspWait}
+                                                 && $hash->{helper}{prt}{rspWait}{cmd});
+    unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunity
+
     @{$modules{CUL_HM}{$ioName}{pendDev}} =
           CUL_HM_noDup(@{$modules{CUL_HM}{$ioName}{pendDev}},$hash->{NAME});
     CUL_HM_respPendRm($hash);#rm timer - we are out
+    CUL_HM_protState($hash,"CMDs_pending");
+    
     if ($modules{CUL_HM}{$ioName}{tmr} != 1){# need to start timer
       my $tn = gettimeofday();
          InternalTimer($tn+$IOpoll, "CUL_HM_sndIfOpen", "sndIfOpen:$ioName", 0);
@@ -7832,6 +7840,18 @@ sub CUL_HM_CvTflt($) { # config time -> float
   my ($inValue) = @_;
   return ($inValue & 0x1f)*((sort {$a <=> $b} keys(%fltCvT))[$inValue >> 5]);
 }
+
+sub CUL_HM_flt6CvT($) { # float -> config time
+  my ($inValue) = @_;
+  my $exp = ($inValue>127)?1:0;
+  return ($exp << 7)+int($inValue/($exp?60:1));
+}
+sub CUL_HM_CvTflt6($) { # config time -> float
+  my ($inValue) = @_;
+  $inValue = 129 if ($inValue == 128);
+  return ($inValue & 0x7f)*(($inValue >> 7)?60:1);
+}
+
 sub CUL_HM_min2time($) { # minutes -> time
   my $min = shift;
   $min = $min * 30;
