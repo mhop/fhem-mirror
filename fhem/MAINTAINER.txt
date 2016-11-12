@@ -52,6 +52,7 @@ FHEM/10_DUOFERNSTICK         telekatz             http://forum.fhem.de Sonstige 
 FHEM/10_EIB.pm               andi291              http://forum.fhem.de KNX/EIB
 FHEM/10_KNX.pm               andi291              http://forum.fhem.de KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        http://forum.fhem.de EnOcean
+FHEM/10_EQ3BT.pm             dominikkarall        http://forum.fhem.de Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
