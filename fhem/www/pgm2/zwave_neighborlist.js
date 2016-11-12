@@ -203,7 +203,7 @@ zw_adjustLines(h, name)
   var la = h[name].lines;
   for(var i1=0; i1<la.length; i1++) {
     var se = la[i1].split('-');
-    var attName = la[i1].replace(".", "\\.");
+    var attName = la[i1].replace(/\./g, "\\.");
     if(la[i1].indexOf(name) == 0) {     // we are the from line
       var p = zw_calcPos(h[se[0]], h[se[1]]);
       $("svg line[data-name="+attName+"]")
