@@ -352,7 +352,7 @@ lookup2($$$$;$$)
     my $vf = "";
     $vf = $lookup->{""} if( defined( $lookup->{""} ) );
     $vf = $lookup->{$reading} if( defined($reading) && exists($lookup->{$reading}) );
-    $vf = $lookup->{"$name.$reading"} if( defined($reading) && exists($lookup->{"$reading.$value"}) );
+    $vf = $lookup->{"$name.$reading"} if( defined($reading) && exists($lookup->{"$name.$reading"}) );
     $vf = $lookup->{"$reading.$value"} if( defined($value) && exists($lookup->{"$reading.$value"}) );
     $vf = $lookup->{"$name.$reading.$value"} if( defined($value) && exists($lookup->{"$name.$reading.$value"}) );
     $vf = $lookup->{"r:$row"} if( defined($row) && exists($lookup->{"r:$row"}) );
