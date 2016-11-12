@@ -156,7 +156,8 @@ readingsGroup_updateDevices($;$)
 
   foreach my $device (@devices) {
     my $regex = $device->[1];
-    my @list = split(",",$regex) if( $regex );
+    my @list = ('.*');
+    @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
     for( my $i = 0; $i <= $#list; ++$i ) {
@@ -237,6 +238,7 @@ sub readingsGroup_Define($$)
 
   if( $init_done ) {
     readingsGroup_updateDevices($hash);
+    $hash->{fhem}->{lastDefChange} = $lastDefChange+1;
     readingsGroup_inithtml($hash);
   }
 
@@ -752,7 +754,8 @@ readingsGroup_2html($;$)
 
     delete $hash->{groupedList};
 
-    my @list = split(",",$regex) if( $regex );
+    my @list = ('.*');
+    @list = split(",",$regex) if( $regex );
     if( @list && $list[0] =~ m/^@(.*)/ ) {
       my $index = $1;
       my $regex = $list[$index];
@@ -1226,7 +1229,8 @@ readingsGroup_Notify($$)
         next if( $dev->{NAME} ne $h->{NAME} );
         my $n = $h->{NAME};
         my $regex = @{$device}[1];
-        my @list = split(",",$regex) if( $regex );
+        my @list = ('.*');
+        @list = split(",",$regex) if( $regex );
 
         if( $hash->{groupedList} ) {
           @list = @{$hash->{groupedList}};
