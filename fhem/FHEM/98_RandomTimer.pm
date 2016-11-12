@@ -224,7 +224,8 @@ sub RandomTimer_stopTimeReached($) {
 sub RandomTimer_setActive($$) {
    my ($hash, $value) = @_;
    $hash->{helper}{active} = $value;
-   readingsSingleUpdate ($hash,  "active", $value, 1);
+   my $trigger = (RandomTimer_isDisabled($hash)) ? 0 : 1;
+   readingsSingleUpdate ($hash,  "active", $value, $trigger);
 }
 ########################################################################
 sub RandomTimer_isAktive ($) {
@@ -244,7 +245,7 @@ sub RandomTimer_setState($) {
      
   if (RandomTimer_isDisabled($hash)) {
     #$hash->{STATE}  = "disabled";
-     readingsSingleUpdate ($hash,  "state",  "disabled", 1);
+     readingsSingleUpdate ($hash,  "state",  "disabled", 0);
   } else {
      my $state = $hash->{helper}{active} ? "on" : "off";
      readingsSingleUpdate ($hash,  "state", $state,  1);
@@ -454,6 +455,9 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
 1;
 
 =pod
+=item device 
+=item summary    imitates the random switch functionality of a timer clock (FS20 ZSU)
+=item summary_DE bildet die Zufallsfunktion einer Zeitschaltuhr nach
 =begin html
 
 <a name="RandomTimer"></a>
