@@ -85,7 +85,7 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= $readingFnAttributes;
+  $hash->{AttrList}= "disable " . $readingFnAttributes;
   $hash->{NotifyFn}= "Weather_Notify";
 
   #Weather_DebugCodes('de');                    
@@ -116,6 +116,7 @@ sub Weather_RetrieveData($$) {
         hash => $hash,
     );
 
+    # this needs to be finalized to use the APIOPTIONS
     my $maxage= $hash->{fhem}{allowCache} ? 600 : 0; # use cached data if allowed
     $hash->{fhem}{allowCache}= 1;
     YahooWeatherAPI_RetrieveDataWithCache($maxage, \%args);
@@ -302,7 +303,16 @@ sub Weather_GetUpdate($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    Weather_RetrieveData($name, 0);
+    if($attr{$name} && $attr{$name}{disable}) {
+      Log3 $hash, 5, "Weather $name: retrieval of weather data is disabled by attribute.";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "pubDateComment", "disabled by attribute");
+      readingsBulkUpdate($hash, "validity", "stale");
+      readingsEndUpdate($hash, 1);
+      Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
+    } else {
+      Weather_RetrieveData($name, 0);
+    }
 
     return 1;
 }
@@ -368,7 +378,7 @@ sub Weather_Notify($$) {
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  return if($attr{$name} && $attr{$name}{disable});
+  # return if($attr{$name} && $attr{$name}{disable}); 
 
   # update weather after initialization or change of configuration
   # wait 10 to 29 seconds to avoid congestion due to concurrent activities
@@ -709,6 +719,8 @@ WeatherAsHtmlD($;$)
   <a name="Weatherattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>disable: disables the retrieval of weather data - the timer runs according to schedule, 
+    though no data is requested from the API.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -812,6 +824,8 @@ WeatherAsHtmlD($;$)
   <a name="Weatherattr"></a>
   <b>Attribute</b>
   <ul>
+    <li>disable: stellt die Abfrage der Wetterdaten ab - der Timer l&auml;ft gem&auml;&szlig Plan doch es werden keine Daten vom
+    API angefordert.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
