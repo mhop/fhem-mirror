@@ -627,7 +627,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 
   averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
   txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
-  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.00 ,max=>3680   ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"                      ,lit=>{unused=>0}},
+  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.01 ,max=>3680   ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"                      ,lit=>{unused=>0}},
   txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>0    ,max=>16000  ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"                    ,lit=>{unused=>0}},
   txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.0  ,max=>230    ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"                    ,lit=>{unused=>0}},
   txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.00 ,max=>2.55   ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"                  ,lit=>{unused=>0}},
@@ -676,7 +676,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60   ,max=>7620   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1    ,max=>7620   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
   triggerMode     =>{a=>146.0,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"define type of event report "         ,lit=>{off=>0,sensor=>33,switch=>34,button=>35}},
-  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"                 ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
+  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"                 ,lit=>{gas=>1,IR=>2,LED=>4,IEC=>8,unknown=>255}},
   mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>1    ,max=>65536  ,c=>''         ,f=>''      ,u=>'U/kWh',d=>0,t=>"constant IR"},
   mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0.001,max=>65.536 ,c=>''         ,f=>1000    ,u=>'m3/I' ,d=>0,t=>"constant gas"},
   mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1    ,max=>65536  ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
@@ -1674,6 +1674,7 @@ $culHmModelSets{"HM-OU-CFM-TW"}          = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}       = 
 $culHmModelSets{"HM-Dis-WM55"}           = 
 $culHmModelSets{"HM-Dis-EP-WM55"}        = 
+$culHmModelSets{"HM-ES-TX-WM"}           = 
 $culHmModelSets{"HM-RC-Dis-H-x-EU"}      = 
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                          
