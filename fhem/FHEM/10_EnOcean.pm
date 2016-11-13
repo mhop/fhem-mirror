@@ -10444,7 +10444,7 @@ sub EnOcean_Parse($$)
           $brightness = '-';
           push @event, "3:brightness:unknown";
         }
-        my $energyStorage = ($db[4] >> 3) * 5;
+        my $energyStorage = ($db[0] >> 3) * 5;
         my $battery;
         if ($energyStorage <= 5) {
           $battery = 'low';
