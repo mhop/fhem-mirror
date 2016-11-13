@@ -250,7 +250,8 @@ harmony_actionOfCommand($$)
 
   foreach my $group (@{$device->{controlGroup}}) {
     foreach my $function (@{$group->{function}}) {
-      if( lc($function->{name}) eq $command ) {
+      #if( lc($function->{name}) eq $command ) {
+      if( lc($function->{name}) =~ m/^$command$/ ) {
         return decode_json($function->{action}) if( harmony_isFritzBox() );
 
         return JSON->new->utf8(0)->decode($function->{action});
