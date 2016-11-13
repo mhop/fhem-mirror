@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
 use FHEM::UConv;
-use JSON;
+use Data::Dumper;
 
 sub Unit_Initialize() {
 }
@@ -25,10 +25,10 @@ my $scales_m = {
         'scale_txt_m'      => 'p',
         'scale_txt_long_m' => {
             de => 'Piko',
-            en => 'pico',
-            fr => 'pico',
-            nl => 'pico',
-            pl => 'pico',
+            en => 'Pico',
+            fr => 'Pico',
+            nl => 'Pico',
+            pl => 'Pico',
         },
     },
 
@@ -36,10 +36,10 @@ my $scales_m = {
         'scale_txt_m'      => 'n',
         'scale_txt_long_m' => {
             de => 'Nano',
-            en => 'nano',
-            fr => 'nano',
-            nl => 'nano',
-            pl => 'nano',
+            en => 'Nano',
+            fr => 'Nano',
+            nl => 'Nano',
+            pl => 'Nano',
         },
     },
 
@@ -47,10 +47,10 @@ my $scales_m = {
         'scale_txt_m'      => 'μ',
         'scale_txt_long_m' => {
             de => 'Mikro',
-            en => 'micro',
-            fr => 'micro',
-            nl => 'micro',
-            pl => 'micro',
+            en => 'Micro',
+            fr => 'Micro',
+            nl => 'Micro',
+            pl => 'Micro',
         },
     },
 
@@ -58,10 +58,10 @@ my $scales_m = {
         'scale_txt_m'      => 'm',
         'scale_txt_long_m' => {
             de => 'Milli',
-            en => 'mili',
-            fr => 'mili',
-            nl => 'mili',
-            pl => 'mili',
+            en => 'Mili',
+            fr => 'Mili',
+            nl => 'Mili',
+            pl => 'Mili',
         },
     },
 
@@ -69,10 +69,10 @@ my $scales_m = {
         'scale_txt_m'      => 'c',
         'scale_txt_long_m' => {
             de => 'Zenti',
-            en => 'centi',
-            fr => 'centi',
-            nl => 'centi',
-            pl => 'centi',
+            en => 'Centi',
+            fr => 'Centi',
+            nl => 'Centi',
+            pl => 'Centi',
         },
     },
 
@@ -80,10 +80,10 @@ my $scales_m = {
         'scale_txt_m'      => 'd',
         'scale_txt_long_m' => {
             de => 'Dezi',
-            en => 'deci',
-            fr => 'deci',
-            nl => 'deci',
-            pl => 'deci',
+            en => 'Deci',
+            fr => 'Deci',
+            nl => 'Deci',
+            pl => 'Deci',
         },
     },
 
@@ -96,10 +96,10 @@ my $scales_m = {
         'scale_txt_m'      => 'da',
         'scale_txt_long_m' => {
             de => 'Deka',
-            en => 'deca',
-            fr => 'deca',
-            nl => 'deca',
-            pl => 'deca',
+            en => 'Deca',
+            fr => 'Deca',
+            nl => 'Deca',
+            pl => 'Deca',
         },
     },
 
@@ -107,10 +107,10 @@ my $scales_m = {
         'scale_txt_m'      => 'h',
         'scale_txt_long_m' => {
             de => 'Hekto',
-            en => 'hecto',
-            fr => 'hecto',
-            nl => 'hecto',
-            pl => 'hecto',
+            en => 'Hecto',
+            fr => 'Hecto',
+            nl => 'Hecto',
+            pl => 'Hecto',
         },
     },
 
@@ -118,10 +118,10 @@ my $scales_m = {
         'scale_txt_m'      => 'k',
         'scale_txt_long_m' => {
             de => 'Kilo',
-            en => 'kilo',
-            fr => 'kilo',
-            nl => 'kilo',
-            pl => 'kilo',
+            en => 'Kilo',
+            fr => 'Kilo',
+            nl => 'Kilo',
+            pl => 'Kilo',
         },
     },
 
@@ -129,10 +129,10 @@ my $scales_m = {
         'scale_txt_m'      => 'M',
         'scale_txt_long_m' => {
             de => 'Mega',
-            en => 'mega',
-            fr => 'mega',
-            nl => 'mega',
-            pl => 'mega',
+            en => 'Mega',
+            fr => 'Mega',
+            nl => 'Mega',
+            pl => 'Mega',
         },
     },
 };
@@ -141,10 +141,10 @@ my $scales_sq = {
     'scale_txt_sq'      => '2',
     'scale_txt_long_sq' => {
         de => 'Quadrat',
-        en => 'square',
-        fr => 'square',
-        nl => 'square',
-        pl => 'square',
+        en => 'Square',
+        fr => 'Square',
+        nl => 'Square',
+        pl => 'Square',
     },
 };
 
@@ -152,10 +152,10 @@ my $scales_cu = {
     'scale_txt_cu'      => '3',
     'scale_txt_long_cu' => {
         de => 'Kubik',
-        en => 'cubic',
-        fr => 'cubic',
-        nl => 'cubic',
-        pl => 'cubic',
+        en => 'Cubic',
+        fr => 'Cubic',
+        nl => 'Cubic',
+        pl => 'Cubic',
     },
 };
 
@@ -166,7 +166,7 @@ my $rtype_base = {
     0 => {
         dimension      => 'L',
         formula_symbol => 'l',
-        si_base        => 'm',
+        rtype_base     => 'm',
         txt_base       => {
             de => 'Länge',
             en => 'length',
@@ -181,7 +181,7 @@ my $rtype_base = {
     1 => {
         dimension      => 'M',
         formula_symbol => 'm',
-        si_base        => 'kg',
+        rtype_base     => 'kg',
         txt_base       => {
             de => 'Masse',
             en => 'mass',
@@ -196,7 +196,7 @@ my $rtype_base = {
     2 => {
         dimension      => 'T',
         formula_symbol => 't',
-        si_base        => 's',
+        rtype_base     => 's',
         txt_base       => {
             de => 'Zeit',
             en => 'time',
@@ -211,7 +211,7 @@ my $rtype_base = {
     3 => {
         dimension      => 'I',
         formula_symbol => 'i',
-        si_base        => 'a',
+        rtype_base     => 'a',
         txt_base       => {
             de => 'elektrische Stromstärke',
             en => 'electric current',
@@ -226,7 +226,7 @@ my $rtype_base = {
     4 => {
         dimension      => 'θ',
         formula_symbol => 'T',
-        si_base        => 'k',
+        rtype_base     => 'k',
         txt_base       => {
             de => 'absolute Temperatur',
             en => 'absolute temperature',
@@ -241,7 +241,7 @@ my $rtype_base = {
     5 => {
         dimension      => 'N',
         formula_symbol => 'n',
-        si_base        => 'mol',
+        rtype_base     => 'mol',
         txt_base       => {
             de => 'Stoffmenge',
             en => 'amount of substance',
@@ -256,7 +256,7 @@ my $rtype_base = {
     6 => {
         dimension      => 'J',
         formula_symbol => 'Iv',
-        si_base        => 'cd',
+        rtype_base     => 'cd',
         txt_base       => {
             de => 'Lichtstärke',
             en => 'luminous intensity',
@@ -271,7 +271,7 @@ my $rtype_base = {
     7 => {
         dimension      => 'M L^2 T^−2',
         formula_symbol => 'E',
-        si_base        => 'j',
+        rtype_base     => 'j',
         txt_base       => {
             de => 'Energie',
             en => 'energy',
@@ -286,7 +286,7 @@ my $rtype_base = {
     8 => {
         dimension      => 'T^−1',
         formula_symbol => 'f',
-        si_base        => 'hz',
+        rtype_base     => 'hz',
         txt_base       => {
             de => 'Frequenz',
             en => 'frequency',
@@ -301,7 +301,7 @@ my $rtype_base = {
     9 => {
         dimension      => 'M L^2 T^−3',
         formula_symbol => 'P',
-        si_base        => 'w',
+        rtype_base     => 'w',
         txt_base       => {
             de => 'Leistung',
             en => 'power',
@@ -316,7 +316,7 @@ my $rtype_base = {
     10 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'p',
-        si_base        => 'pa',
+        rtype_base     => 'pa',
         txt_base       => {
             de => 'Druck',
             en => 'pressure',
@@ -331,7 +331,7 @@ my $rtype_base = {
     11 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'pabs',
-        si_base        => 'pabs',
+        rtype_base     => 'pabs',
         txt_base       => {
             de => 'absoluter Druck',
             en => 'absolute pressure',
@@ -346,7 +346,7 @@ my $rtype_base = {
     12 => {
         dimension      => 'M L^−1 T^−2',
         formula_symbol => 'pamb',
-        si_base        => 'pamb',
+        rtype_base     => 'pamb',
         txt_base       => {
             de => 'Luftdruck',
             en => 'air pressure',
@@ -361,7 +361,7 @@ my $rtype_base = {
     13 => {
         dimension      => 'M L^2 T^−3 I^−1',
         formula_symbol => 'U',
-        si_base        => 'v',
+        rtype_base     => 'v',
         txt_base       => {
             de => 'elektrische Spannung',
             en => 'electric voltage',
@@ -376,7 +376,7 @@ my $rtype_base = {
     14 => {
         dimension      => '1',
         formula_symbol => '',
-        si_base        => 'rad',
+        rtype_base     => 'rad',
         txt_base       => {
             de => 'ebener Winkel',
             en => 'plane angular',
@@ -391,7 +391,7 @@ my $rtype_base = {
     15 => {
         dimension      => 'L T^−1',
         formula_symbol => 'v',
-        si_base        => 'kmh',
+        rtype_base     => 'kmh',
         txt_base       => {
             de => 'Geschwindigkeit',
             en => 'speed',
@@ -406,7 +406,7 @@ my $rtype_base = {
     16 => {
         dimension      => 'L^−2 J',
         formula_symbol => 'Ev',
-        si_base        => 'lx',
+        rtype_base     => 'lx',
         txt_base       => {
             de => 'Beleuchtungsstärke',
             en => 'illumination intensity',
@@ -421,7 +421,7 @@ my $rtype_base = {
     17 => {
         dimension      => 'J',
         formula_symbol => 'F',
-        si_base        => 'lm',
+        rtype_base     => 'lm',
         txt_base       => {
             de => 'Lichtstrom',
             en => 'luminous flux',
@@ -436,7 +436,7 @@ my $rtype_base = {
     18 => {
         dimension      => 'L^3',
         formula_symbol => 'V',
-        si_base        => 'm3',
+        rtype_base     => 'm3',
         txt_base       => {
             de => 'Volumen',
             en => 'volume',
@@ -451,7 +451,7 @@ my $rtype_base = {
     19 => {
         dimension      => '1',
         formula_symbol => 'B',
-        si_base        => 'b',
+        rtype_base     => 'b',
         txt_base       => {
             de => 'Logarithmische Größe',
             en => 'logarithmic level',
@@ -466,7 +466,7 @@ my $rtype_base = {
     20 => {
         dimension      => 'I T',
         formula_symbol => 'C',
-        si_base        => 'coul',
+        rtype_base     => 'coul',
         txt_base       => {
             de => 'elektrische Ladung',
             en => 'electric charge',
@@ -481,7 +481,7 @@ my $rtype_base = {
     21 => {
         dimension      => '',
         formula_symbol => 'F',
-        si_base        => 'far',
+        rtype_base     => 'far',
         txt_base       => {
             de => 'elektrische Kapazität',
             en => 'electric capacity',
@@ -496,7 +496,7 @@ my $rtype_base = {
     22 => {
         dimension      => '',
         formula_symbol => 'F',
-        si_base        => 'far',
+        rtype_base     => 'far',
         txt_base       => {
             de => 'elektrische Widerstand',
             en => 'electric resistance',
@@ -511,7 +511,7 @@ my $rtype_base = {
     23 => {
         dimension      => 'L^2',
         formula_symbol => 'A',
-        si_base        => 'm2',
+        rtype_base     => 'm2',
         txt_base       => {
             de => 'Flächeninhalt',
             en => 'surface area',
@@ -764,37 +764,51 @@ my $rtypes = {
 
     # temperature
     c => {
-        ref_base => 2,
+        ref_base => 4,
         symbol   => chr(0xC2) . chr(0xB0) . 'C',
         suffix   => 'C',
         txt      => {
             de => 'Grad Celsius',
-            en => 'Degrees Celsius',
-            fr => 'Degrees Celsius',
-            nl => 'Degrees Celsius',
-            pl => 'Degrees Celsius',
+            en => 'Degree Celsius',
+            fr => 'Degree Celsius',
+            nl => 'Degree Celsius',
+            pl => 'Degree Celsius',
+        },
+        txt_pl => {
+            de => 'Grad Celsius',
+            en => 'Degree Celsius',
+            fr => 'Degree Celsius',
+            nl => 'Degree Celsius',
+            pl => 'Degree Celsius',
         },
         tmpl  => '%value%%symbol%',
         scope => { min => -273.15 },
     },
 
     f => {
-        ref_base => 2,
+        ref_base => 4,
         symbol   => chr(0xC2) . chr(0xB0) . 'F',
         suffix   => 'F',
         txt      => {
             de => 'Grad Fahrenheit',
-            en => 'Degree Fahrenheit',
-            fr => 'Degree Fahrenheit',
-            nl => 'Degree Fahrenheit',
-            pl => 'Degree Fahrenheit',
+            en => 'Degrees Fahrenheit',
+            fr => 'Degrees Fahrenheit',
+            nl => 'Degrees Fahrenheit',
+            pl => 'Degrees Fahrenheit',
+        },
+        txt_pl => {
+            de => 'Grad Fahrenheit',
+            en => 'Degrees Fahrenheit',
+            fr => 'Degrees Fahrenheit',
+            nl => 'Degrees Fahrenheit',
+            pl => 'Degrees Fahrenheit',
         },
         tmpl  => '%value% %symbol%',
         scope => { min => -459.67 },
     },
 
     k => {
-        ref_base => 2,
+        ref_base => 4,
         suffix   => 'K',
         txt      => {
             de => 'Kelvin',
@@ -2193,8 +2207,8 @@ my $readingsDB = {
     },
 };
 
-# Get rtype details in local language from reading name as hash
-sub GetDetailsFromReadingname ($$@) {
+# Find rtype through reading name
+sub rname2rtype ($$@) {
     my ( $name, $reading, $lang ) = @_;
     my $details;
     my $r = $reading;
@@ -2248,200 +2262,8 @@ sub GetDetailsFromReadingname ($$@) {
         $rt    = $1;
     }
 
-    return if ( !%return && !$rt );
-    return \%return if ( !$rt );
-
-    my $rdetails = GetDetails( $name, $rt, $l );
-
-    if ( ref($rdetails) eq "HASH" ) {
-        $return{rtype_guess} = "1" if ($guess);
-        foreach my $k ( keys %{$rdetails} ) {
-            $return{$k} = $rdetails->{$k};
-        }
-    }
-
-    return \%return;
+    return $rt if ( $rt && $rtypes->{$rt} );
 }
-
-# # Get rtype list in local language as hash
-# sub GetList (@) {
-#     my ( $name, $lang, $rtype ) = @_;
-#     my $l = ( $lang ? lc($lang) : "en" );
-#     my %list;
-#
-#     my %DB = %rtypes;
-#     my $getKeyValueAttr = ::getKeyValueAttr( $name, "readingsFormat" );
-#
-#     foreach ( keys %{$getKeyValueAttr} ) {
-#         $DB{$_} = $getKeyValueAttr->{$_};
-#     }
-#
-#     foreach my $rt ( keys %DB ) {
-#         my $details = GetDetails( $name, $rt, $lang );
-#         my $tn = (
-#               $details->{txt_base}
-#             ? $details->{txt_base}
-#             : "others"
-#         );
-#         $list{$tn}{$rt} = $details
-#           if ( !$rtype || lc($rtype) eq $tn );
-#     }
-#
-#     return \%list;
-# }
-#
-# # Get rtype details in local language as hash
-# sub GetDetails ($$@) {
-#     my ( $name, $rtype, $lang ) = @_;
-#     my $l = ( $lang ? lc($lang) : "en" );
-#     my %details;
-#     my $attribute = "readingsFormat";
-#
-#     my %DB = %rtypes;
-#     my $getKeyValueAttr = ::getKeyValueAttr( $name, "readingsFormat" );
-#
-#     foreach ( keys %{$getKeyValueAttr} ) {
-#         $DB{$_} = $getKeyValueAttr->{$_};
-#     }
-#
-#     if ( defined( $DB{$rtype} ) ) {
-#         foreach my $k ( keys %{ $DB{$rtype} } ) {
-#             delete $details{$k} if ( $details{$k} );
-#             $details{$k} = $DB{$rtype}{$k};
-#         }
-#         $details{rtype} = $rtype;
-#
-#         foreach ( 'ref', 'ref_t', 'ref_sq', 'ref_cu' ) {
-#             my $suffix = $_;
-#             $suffix =~ s/^[a-z]+//;
-#             if ( defined( $details{$_} ) ) {
-#                 my $ref = $details{$_};
-#                 if ( !defined( $DB{$ref} ) ) {
-#                     ::Log 1, "GetDetails($rtype) broken reference $_";
-#                     next;
-#                 }
-#                 foreach my $k ( keys %{ $DB{$ref} } ) {
-#                     next
-#                       if ( $k =~ /^scale/ )
-#                       ;    # exclude scales from referenced rtype
-#                     if ( !defined( $details{$k} ) ) {
-#                         $details{$k} = $DB{$ref}{$k};
-#                     }
-#                     else {
-#                         $details{ $k . $suffix } = $DB{$ref}{$k}
-#                           if ( !defined( $details{ $k . $suffix } ) );
-#                     }
-#                 }
-#             }
-#         }
-#
-#         if ( $details{scale_m} ) {
-#             my $ref = $details{scale_m};
-#             foreach my $k ( keys %{ $scales_m{$ref} } ) {
-#                 $details{$k} = $scales_m{$ref}{$k}
-#                   if ( !defined( $details{$k} ) );
-#             }
-#         }
-#         if ( $details{scale_sq} ) {
-#             foreach my $k ( keys %scales_sq ) {
-#                 $details{$k} = $scales_sq{$k}
-#                   if ( !defined( $details{$k} ) );
-#             }
-#             my $ref = $details{scale_sq};
-#             foreach my $k ( keys %{ $scales_m{$ref} } ) {
-#                 $details{ $k . "_sq" } = $scales_m{$ref}{$k}
-#                   if ( !defined( $details{ $k . "_sq" } ) );
-#             }
-#         }
-#         if ( $details{scale_cu} ) {
-#             foreach my $k ( keys %scales_cu ) {
-#                 $details{$k} = $scales_cu{$k}
-#                   if ( !defined( $details{$k} ) );
-#             }
-#             my $ref = $details{scale_cu};
-#             foreach my $k ( keys %{ $scales_m{$ref} } ) {
-#                 $details{ $k . "_cu" } = $scales_m{$ref}{$k}
-#                   if ( !defined( $details{ $k . "_cu" } ) );
-#             }
-#         }
-#
-#         if ( defined( $details{ref_base} ) ) {
-#             my $ref = $details{ref_base};
-#             foreach my $k ( keys %{ $rtype_base{$ref} } ) {
-#                 $details{$k} = $rtype_base{$ref}{$k}
-#                   if ( !defined( $details{$k} ) );
-#             }
-#         }
-#
-#         if ($lang) {
-#
-#             # keep only defined language if set
-#             $l = $details{lang} if ( $details{lang} );
-#             $details{lang} = $l if ( !$details{lang} );
-#             foreach ( keys %details ) {
-#                 if ( $details{$_}
-#                     && ref( $details{$_} ) eq "HASH" )
-#                 {
-#                     my $v;
-#                     $v = $details{$_}{$l}
-#                       if ( $details{$_}{$l} );
-#                     delete $details{$_};
-#                     $details{$_} = $v if ($v);
-#                 }
-#             }
-#
-#             # add metric name to suffix
-#             $details{suffix} = $details{scale_txt_m} . $details{suffix}
-#               if ( $details{suffix} && $details{scale_txt_m} );
-#             $details{txt} = $details{scale_txt_long_m} . lc( $details{txt} )
-#               if ( $details{txt} && $details{scale_txt_long_m} );
-#
-#             # add square information to suffix and txt
-#             # if no separate suffix_sq and txt_sq was found
-#             $details{suffix} = $details{suffix} . $details{scale_txt_sq}
-#               if ( !$details{suffix_sq} && $details{scale_txt_sq} );
-#             $details{txt} = $details{scale_txt_long_sq} . lc( $details{txt} )
-#               if ( !$details{txt_sq} && $details{scale_txt_long_sq} );
-#
-#             # add cubic information to suffix and txt
-#             # if no separate suffix_cu and txt_cu was found
-#             $details{suffix} = $details{suffix} . $details{scale_txt_cu}
-#               if ( !$details{suffix_cu} && $details{scale_txt_cu} );
-#             $details{txt} = $details{scale_txt_long_cu} . lc( $details{txt} )
-#               if ( !$details{txt_cu} && $details{scale_txt_long_cu} );
-#
-#             # add metric name to suffix_sq
-#             $details{suffix_sq} = $details{scale_txt_m_sq} . $details{suffix_sq}
-#               if ( $details{suffix_sq} && $details{scale_txt_m_sq} );
-#             $details{txt_sq} =
-#               $details{scale_txt_long_m_sq} . lc( $details{txt_sq} )
-#               if ( $details{txt_sq} && $details{scale_txt_long_m_sq} );
-#
-#             # add square information to suffix_sq
-#             $details{suffix_sq} = $details{suffix_sq} . $details{scale_txt_sq}
-#               if ( $details{suffix_sq} && $details{scale_txt_sq} );
-#             $details{txt_sq} =
-#               $details{scale_txt_long_sq} . lc( $details{txt_sq} )
-#               if ( $details{txt_sq} && $details{scale_txt_long_sq} );
-#
-#             # add metric name to suffix_cu
-#             $details{suffix_cu} = $details{scale_txt_m_cu} . $details{suffix_cu}
-#               if ( $details{suffix_cu} && $details{scale_txt_m_cu} );
-#             $details{txt_cu} =
-#               $details{scale_txt_long_m_cu} . lc( $details{txt_cu} )
-#               if ( $details{txt_cu} && $details{scale_txt_long_m_cu} );
-#
-#             # add cubic information to suffix_cu
-#             $details{suffix_cu} = $details{suffix_cu} . $details{scale_txt_cu}
-#               if ( $details{suffix_cu} && $details{scale_txt_cu} );
-#             $details{txt_cu} =
-#               $details{scale_txt_long_cu} . lc( $details{txt_cu} )
-#               if ( $details{txt_cu} && $details{scale_txt_long_cu} );
-#         }
-#
-#         return \%details;
-#     }
-# }
 
 ######################################
 # package main
@@ -2449,22 +2271,31 @@ sub GetDetailsFromReadingname ($$@) {
 package main;
 
 # Get value + rtype combined string
-sub replaceTemplate ($@) {
-    my ( $value, $desc ) = @_;
+sub replaceTemplate ($$$;$) {
+    my ( $device, $reading, $desc, $value ) = @_;
     my $txt;
     my $txt_long;
-    return $value
-      if (!$value
-        || $value eq ""
-        || !$desc
-        || ref($desc) ne "HASH"
-        || ( !$desc->{suffix} && !$desc->{symbol} ) );
+    my $r = $defs{$device}{READINGS} if ($device);
 
-    $desc->{value} = $value;
+    return
+      if ( !$desc || ref($desc) ne "HASH" );
+
+    $value = $desc->{value}
+      if ( !defined($value) && defined( $desc->{value} ) );
+
+    return $value
+      if ( !defined($value)
+        || $value eq ""
+        || ( !$desc->{suffix} && !$desc->{symbol} ) );
 
     # shortname
     $txt = '%value% %suffix%';
     $txt = $desc->{tmpl} if ( $desc->{tmpl} );
+    if ( $r && $reading && $r->{$reading} ) {
+        foreach my $k ( keys %{ $r->{$reading} } ) {
+            $txt =~ s/%$k%/$r->{$reading}{$k}/g;
+        }
+    }
     foreach my $k ( keys %{$desc} ) {
         $txt =~ s/%$k%/$desc->{$k}/g;
     }
@@ -2489,6 +2320,11 @@ sub replaceTemplate ($@) {
     }
 
     if ($txt_long) {
+        if ( $r && $reading && $r->{$reading} ) {
+            foreach my $k ( keys %{ $r->{$reading} } ) {
+                $txt_long =~ s/%$k%/$r->{$reading}{$k}/g;
+            }
+        }
         foreach my $k ( keys %{$desc} ) {
             $txt_long =~ s/%$k%/$desc->{$k}/g;
         }
@@ -2498,13 +2334,16 @@ sub replaceTemplate ($@) {
 }
 
 # format a number according to desc and optional format.
-sub formatValue($$;$$) {
-    my ( $value, $desc, $format, $lang ) = @_;
+sub formatValue($$$;$$$) {
+    my ( $device, $reading, $value, $desc, $format, $lang ) = @_;
 
-    return $value if ( !defined($value) );
+    return $value if ( !defined($value) || ref($value) );
 
-    $desc = GetDetails( undef, $desc, $lang ) if ( $desc && !ref($desc) );
-    return $value if ( !$format && ( !$desc || ref($desc) ne 'HASH' ) );
+    $desc = readingsDesc( $device, $reading, $lang )
+      if ( !$desc || !ref($desc) );
+    return $value
+      if ( !$format && ( !$desc || ref($desc) ne 'HASH' )
+        || keys %{$desc} < 1 );
 
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
     $format = $desc->{format} if ( !$format && $desc );
@@ -2550,7 +2389,9 @@ sub formatValue($$;$$) {
         # }
     }
 
-    my ( $txt, $txt_long ) = replaceTemplate( $value, $desc );
+    $desc->{value} = $value;
+
+    my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc );
 
     return ( $txt, $txt_long ) if (wantarray);
     return $txt;
@@ -2560,12 +2401,7 @@ sub formatValue($$;$$) {
 sub readingsDesc($;$$) {
     my ( $device, $reading, $lang ) = @_;
     my $l = ( $lang ? lc($lang) : "en" );
-    my $fdesc = getKeyValueAttr( $device, "readingsDesc" );
-    my $desc;
-    $desc = $fdesc->{$reading}
-      if ( $reading && defined( $fdesc->{$reading} ) );
-    $desc = $fdesc
-      if ( !$reading );
+    my $desc = getCombinedKeyValAttr( $device, "readingsDesc", $reading );
 
     my $rtype;
     $rtype = $desc->{rtype} if ( $desc->{rtype} );
@@ -2725,7 +2561,7 @@ sub readingsDesc($;$$) {
     }
 
     ######################
-    my $fformat = getKeyValueAttr( $device, "readingsFormat" );
+    my $fformat = getCombinedKeyValAttr( $device, "readingsFormat" );
     my $format;
     $format = $fformat->{$reading}
       if ( $reading && defined( $fformat->{$reading} ) );
@@ -2746,17 +2582,22 @@ sub formatReading($$;$$$$) {
     my $value = ReadingsVal( $device, $reading, undef );
 
     $value = $default if ( !defined($value) );
-    return formatValue( $value, $desc, $format );
+    return formatValue( $device, $reading, $value, $desc, $format, $lang );
 }
 
 # return unit symbol for device:reading
-sub readingsUnit($$) {
-    my ( $device, $reading ) = @_;
+sub readingsUnit($$;$) {
+    my ( $device, $reading, $desc ) = @_;
+    $desc = readingsDesc( $device, $reading ) if ( !$desc );
 
-    if ( my $desc = readingsDesc( $device, $reading ) ) {
-        return $desc->{symbol} if ( $desc->{symbol} );
-        return $desc->{suffix} if ( $desc->{suffix} );
-    }
+    return (
+        $desc->{suffix} ? $desc->{suffix} : undef,
+        $desc->{symbol} ? $desc->{symbol} : undef,
+        $desc->{txt}    ? $desc->{txt}    : undef
+    ) if (wantarray);
+
+    return $desc->{symbol} if ( $desc->{symbol} );
+    return $desc->{suffix} if ( $desc->{suffix} );
 
     return '';
 }
@@ -2766,14 +2607,15 @@ sub readingsShortname($$) {
     my ( $device, $reading ) = @_;
 
     if ( my $desc = readingsDesc( $device, $reading ) ) {
-        return $desc->{dimension}      if ( $desc->{dimension} && $desc->{dimension} =~ /^[A-Z]+$/ );
         return $desc->{formula_symbol} if ( $desc->{formula_symbol} );
+        return $desc->{dimension}
+          if ( $desc->{dimension} && $desc->{dimension} =~ /^[A-Z]+$/ );
     }
 
     return $reading;
 }
 
-#format device STATE readings according to stateFormat and optional units
+# format device STATE readings according to stateFormat and optional units
 sub makeSTATE($;$$) {
     my ( $device, $stateFormat, $withUnits ) = @_;
     $stateFormat = '' if ( !$stateFormat );
@@ -2791,7 +2633,6 @@ sub makeSTATE($;$$) {
             $stateFormat = "Error evaluating $device stateFormat: $@";
             Log 1, $stateFormat;
         }
-
     }
     else {
         my $r = $hash->{READINGS};
@@ -2810,215 +2651,162 @@ s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? readingsShortname($device,$1). ": ". (format
 }
 
 # get combined hash for settings from module, device, global and device attributes
-sub getKeyValueAttr($;$$) {
+sub getCombinedKeyValAttr($;$$) {
     my ( $name, $attribute, $reading ) = @_;
-    my $d          = $defs{$name};
-    my $m          = $modules{ $d->{TYPE} } if ( $d && $d->{TYPE} );
-    my $globalDesc = decode_attribute( "global", $attribute ) if ($attribute);
-    my $attrDesc   = decode_attribute( $name, $attribute )
-      if ( $name ne "global" && $attribute );
+    my $d = $defs{$name} if ( $defs{$name} );
+    my $g = $defs{"global"};
+    my $m = $modules{ $d->{TYPE} } if ( $d && $d->{TYPE} );
 
-    my %desc;
-
-    # module device specific
-    if ( $d && $d->{$attribute} ) {
-        %desc = %{ $d->{$attribute} };
-    }
-
-    # module general
-    elsif ( $m && $m->{$attribute} ) {
-        %desc = %{ $m->{$attribute} };
-    }
-
-    # global user overwrite
-    if ($globalDesc) {
-        foreach ( keys %{$globalDesc} ) {
-            delete $desc{$_} if ( $desc{$_} );
-            $desc{$_} = $globalDesc->{$_};
+    my $desc;
+    if ( $g && $g->{$attribute} && $g->{$attribute} !~ /^\{\s*\}$/ ) {
+        foreach ( keys %{ $g->{$attribute} } ) {
+            delete $desc->{$_} if ( $desc->{$_} );
+            $desc->{$_} = $g->{$attribute}{$_};
         }
     }
 
-    # device user overwrite
-    if ($attrDesc) {
-        foreach ( keys %{$attrDesc} ) {
-            delete $desc{$_} if ( $desc{$_} );
-            $desc{$_} = $attrDesc->{$_};
+    if ( $m && $m->{$attribute} && $m->{$attribute} !~ /^\{\s*\}$/ ) {
+        foreach ( keys %{ $m->{$attribute} } ) {
+            delete $desc->{$_} if ( $desc->{$_} );
+            $desc->{$_} = $m->{$attribute}{$_};
         }
     }
 
-    return if ( $reading && !defined( $desc{$reading} ) );
-    return $desc{$reading} if ($reading);
-    return \%desc;
+    if ( $d && $d->{$attribute} && $d->{$attribute} !~ /^\{\s*\}$/ ) {
+        foreach ( keys %{ $d->{$attribute} } ) {
+            delete $desc->{$_} if ( $desc->{$_} );
+            $desc->{$_} = $d->{$attribute}{$_};
+        }
+    }
+
+    return
+      if (
+        keys %{$desc} < 1
+        || (
+            $reading
+            && (  !defined( $desc->{$reading} )
+                || keys %{ $desc->{$reading} } < 1 )
+        )
+      );
+    return $desc->{$reading} if ($reading);
+    return $desc;
 }
 
 # save key/value pair to device attribute
-sub setKeyValueAttr($$$$$) {
-    my ( $name, $attribute, $reading, $desc, $value ) = @_;
+sub setKeyValAttr($$$$$) {
+    my ( $name, $attribute, $reading, $key, $value ) = @_;
+    my $d = $defs{$name} if ( $defs{$name} );
     my $ret;
-    my $getKeyValueAttr = getKeyValueAttr( $name, $attribute );
 
     return
-      if ( $getKeyValueAttr->{$reading}{$desc}
-        && $getKeyValueAttr->{$reading}{$desc} eq $value );
+      if (
+        !$d
+        || (   defined( $d->{$attribute} )
+            && defined( $d->{$attribute}{$reading} )
+            && defined( $d->{$attribute}{$reading}{$key} )
+            && $d->{$attribute}{$reading}{$key} eq $value )
+      );
 
     # rtype
-    if ( $desc =~ /^rtype$/i ) {
-        my $rdetails;
-        $desc = lc($desc);
+    if ( $key =~ /^rtype$/i ) {
+        $key = lc($key);
 
-        # check database for correct rtype
-        if ( $value && $value ne "?" ) {
-            $rdetails = GetDetails( $name, $value );
+        # Show all possible values
+        if ( $value && $value eq "?" ) {
+            return "CURRENTLY KNOWN READING TYPES\n\n"
+              . PrintHash( $rtypes, 0 );
         }
 
         # find rtype based on reading name
-        else {
-            $rdetails = GetDetailsFromReadingname( $name, $reading );
-            return
-              if ( !$rdetails || !defined( $rdetails->{rtype} ) );
+        elsif ( !defined($value) || $value eq "" ) {
+            $value = rname2rtype( $name, $reading );
+            $ret =
+              "Set auto-detected $key for device $name $reading: " . $value
+              if ($value);
         }
 
-        return
-"Invalid value $value for $desc: Cannot be assigned to device $name $reading"
-          if ( !$rdetails || !defined( $rdetails->{rtype} ) );
+        my $curr;
+        no strict "refs";
+        $curr = &$attribute( $name, $reading ) if (&$attribute);
+        use strict "refs";
 
         return
-          if ( $getKeyValueAttr->{$reading}{$desc}
-            && $getKeyValueAttr->{$reading}{$desc} eq $rdetails->{rtype} );
+          if (
+               !defined($value)
+            || $value eq ""
+            || (   defined($curr)
+                && defined( $curr->{$key} )
+                && $curr->{$key} eq $value )
+            || (   defined( $d->{$attribute} )
+                && defined( $d->{$attribute}{$reading} )
+                && defined( $d->{$attribute}{$reading}{$key} )
+                && $d->{$attribute}{$reading}{$key} eq $value )
+          );
+
+        return
+"Invalid value $value for $key: Cannot be assigned to device $name $reading"
+          if ( !defined( $rtypes->{$value} ) );
 
         $ret =
-            "Changed value $desc='"
-          . $getKeyValueAttr->{$reading}{$desc}
+            "Changed value $key='"
+          . $d->{$attribute}{$reading}{$key}
           . "' for device $name $reading to: "
-          . $rdetails->{rtype}
-          if ( $getKeyValueAttr->{$reading}{$desc}
-            && $getKeyValueAttr->{$reading}{$desc} ne $rdetails->{rtype} );
-
-        $ret =
-          "Set auto-detected $desc for device $name $reading: "
-          . $rdetails->{rtype}
-          if ( !$value && !$getKeyValueAttr->{$reading}{$desc} );
-
-        $value = $rdetails->{rtype};
+          . $value
+          if ( defined( defined( $d->{$attribute} ) )
+            && defined( $d->{$attribute}{$reading} )
+            && defined( $d->{$attribute}{$reading}{$key} )
+            && $d->{$attribute}{$reading}{$key} ne $value );
     }
 
-    # update attribute
-    my $attrDesc = decode_attribute( $name, $attribute );
-    $attrDesc->{$reading}{$desc} = $value;
-    encode_attribute( $name, $attribute, $attrDesc );
+    $d->{$attribute}{$reading}{$key} = $value;
+
+    # write attribute
+    $Data::Dumper::Terse    = 1;
+    $Data::Dumper::Sortkeys = 1;
+    my $txt = Dumper( $d->{$attribute} );
+    $Data::Dumper::Terse    = 0;
+    $Data::Dumper::Sortkeys = 0;
+    $txt =~ s/(=>\s*\{|['"],?)\s*\n\s*/$1 /gsm;
+    CommandAttr( undef, "$name $attribute $txt" );
     return $ret;
 }
 
-sub deleteKeyValueAttr($$$;$) {
-    my ( $name, $attribute, $reading, $desc ) = @_;
+sub deleteKeyValAttr($$$;$) {
+    my ( $name, $attribute, $reading, $key ) = @_;
+    my $d = $defs{$name} if ( $defs{$name} );
     my $rt;
-    my $attrDesc = decode_attribute( $name, $attribute );
 
     return
-      if ( !defined( $attrDesc->{$reading} )
-        || ( $desc && !defined( $attrDesc->{$reading}{$desc} ) ) );
+      if ( !$d
+        || !defined( $d->{$attribute} )
+        || !defined( $d->{$attribute}{$reading} )
+        || ( $key && !defined( $d->{$attribute}{$reading}{$key} ) ) );
 
-    if ($desc) {
-        $rt = " $desc=" . $attrDesc->{$reading}{$desc};
-        delete $attrDesc->{$reading}{$desc};
+    if ($key) {
+        $rt = " $key=" . $d->{$attribute}{$reading}{$key};
+        delete $d->{$attribute}{$reading}{$key};
     }
 
-    delete $attrDesc->{$reading}
-      if ( !$desc || keys %{ $attrDesc->{$reading} } < 1 );
+    delete $d->{$attribute}{$reading}
+      if ( !$key || keys %{ $d->{$attribute}{$reading} } < 1 );
 
-    # update attribute
-    encode_attribute( $name, $attribute, $attrDesc );
-    return "Removed $reading$rt from attribute $name $attribute";
-}
-
-sub encode_attribute ($$$) {
-    my ( $name, $attribute, $data ) = @_;
-    my $json;
-    my $js;
-
-    if ( !$data || keys %{$data} < 1 ) {
+    # delete attribute
+    if ( keys %{ $d->{$attribute} } < 1 ) {
         CommandDeleteAttr( undef, "$name $attribute" );
-
-        # empty cache
-        delete $defs{$name}{'.attrCache'}
-          if ( defined( $defs{$name}{'.attrCache'} ) );
-        return;
     }
 
-    eval {
-        $json =
-          JSON::PP->new->utf8->indent->indent_length(1)
-          ->canonical->allow_nonref;
-        1;
-    };
-    return $@ if ($@);
-
-    eval { $js = $json->encode($data); 1 };
-    return $@ if ( $@ || !$js || $js eq "" );
-
-    # use Data::Dumper;
-    # $Data::Dumper::Terse = 1;
-    # my $js2 = Dumper($data);
-    # Log 1,
-    #   "DEBUG \n $js2";
-
-    $js =~ s/(:\{|",?)\n\s+/$1 /gsm;
-    addToAttrList("$attribute:textField-long");
-
-    CommandAttr( undef, "$name $attribute $js" );
-
-    # empty cache
-    delete $defs{$name}{'.attrCache'}{$attribute}
-      if ( defined( $defs{$name}{'.attrCache'}{$attribute} ) );
-}
-
-sub decode_attribute ($$) {
-    my ( $name, $attribute ) = @_;
-
-    # force empty cache if attribute was deleted
-    if ( !$attr{$name}{$attribute} ) {
-        delete $defs{$name}{'.attrCache'} if ( $defs{$name}{'.attrCache'} );
-        return;
-    }
-
-    # cache attr
-    if ( !defined( $defs{$name}{'.attrCache'}{$attribute} ) ) {
-        my $data;
-        eval { $data = decode_json( $attr{$name}{$attribute} ); 1 };
-        return if ( $@ || !$data || $data eq "" );
-        $defs{$name}{'.attrCache'}{$attribute} = $data;
-    }
-
-    return $defs{$name}{'.attrCache'}{$attribute};
-}
-
-sub getMultiValStatus($$;$$) {
-    my ( $d, $rlist, $lang, $format ) = @_;
-    my $txt = "";
-
-    if ( !$format ) {
-        $format = "-1";
-    }
+    # write attribute
     else {
-        $format--;
+        $Data::Dumper::Terse    = 1;
+        $Data::Dumper::Sortkeys = 1;
+        my $txt = Dumper( $d->{$attribute} );
+        $Data::Dumper::Terse    = 0;
+        $Data::Dumper::Sortkeys = 0;
+        $txt =~ s/(=>\s*\{|[\'\"0-9],?)\s*\n\s*/$1 /gsm;
+        CommandAttr( undef, "$name $attribute $txt" );
     }
 
-    foreach ( split( /\s+/, $rlist ) ) {
-        $_ =~ /^(\w+):?(\w+)?$/;
-        my $v = (
-            $format > -1
-            ? formatReading( $d, $1, "", undef, undef, $lang )
-            : ReadingsVal( $d, $1, "" )
-        );
-        my $n = ( $2 ? $2 : readingsShortname( $d, $1 ) );
-
-        if ( $v ne "" ) {
-            $txt .= " " if ( $txt ne "" );
-            $txt .= "$n: $v";
-        }
-    }
-
-    return $txt;
+    return "Removed $reading$rt from attribute $name $attribute";
 }
 
 ################################################################
@@ -3092,54 +2880,6 @@ sub Unit_DbLog_split($$) {
 #
 ################################################################
 
-# command: rtype
-my %rtypehash = (
-    Fn  => "CommandType",
-    Hlp => "[<devspec>] [<readingspec>],get rtype for <devspec> <reading>",
-);
-$cmds{rtype} = \%rtypehash;
-
-sub CommandType($$) {
-    my ( $cl, $def ) = @_;
-    my $namedef =
-"where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
-      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
-
-    my @a = split( " ", $def, 2 );
-    return "Usage: rtype [<name>] [<readingspec>]\n$namedef"
-      if ( $a[0] && $a[0] eq "?" );
-
-    $a[0] = "global" if ( !$a[0] || $a[0] eq "" );
-    $a[1] = ".*"     if ( !$a[1] || $a[1] eq "" );
-
-    my @rets;
-    foreach my $name ( devspec2array( $a[0], $cl ) ) {
-        if ( !defined( $defs{$name} ) ) {
-            push @rets, "Please define $name first";
-            next;
-        }
-
-        if ( $a[0] eq "global" ) {
-            my $ret = Dumper( GetList( undef, undef ) );
-            push @rets, $ret
-              if ($ret);
-            last;
-        }
-
-        my $readingspec = '^' . $a[1] . '$';
-        foreach my $reading (
-            grep { /$readingspec/ }
-            keys %{ $defs{$name}{READINGS} }
-          )
-        {
-            my $ret = Dumper( GetList( $name, undef ) );
-            push @rets, $ret
-              if ($ret);
-        }
-    }
-    return join( "\n", @rets );
-}
-
 # command: setreadingdesc
 my %setreadingdeschash = (
     Fn => "CommandSetReadingDesc",
@@ -3177,7 +2917,7 @@ sub CommandSetReadingDesc($@) {
         {
             foreach ( keys %$h ) {
                 my $ret =
-                  setKeyValueAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
+                  setKeyValAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
                 push @rets, $ret if ($ret);
             }
             next;
@@ -3192,7 +2932,7 @@ sub CommandSetReadingDesc($@) {
         {
             foreach ( keys %$h ) {
                 my $ret =
-                  setKeyValueAttr( $name, $attribute, $reading, $_, $h->{$_} );
+                  setKeyValAttr( $name, $attribute, $reading, $_, $h->{$_} );
                 push @rets, $ret if ($ret);
             }
         }
@@ -3202,8 +2942,9 @@ sub CommandSetReadingDesc($@) {
 
 # command: deletereadingdesc
 my %deletereadingdeschash = (
-    Fn  => "CommandDeleteReadingDesc",
-    Hlp => "<devspec> <readingspec> [<key>],delete key for <devspec> <reading>",
+    Fn => "CommandDeleteReadingDesc",
+    Hlp =>
+"<devspec> <readingspec> [<keyspec>],delete key for <devspec> <reading>",
 );
 $cmds{deletereadingdesc} = \%deletereadingdeschash;
 
@@ -3212,105 +2953,16 @@ sub CommandDeleteReadingDesc($@) {
     my $attribute = "readingsDesc";
     my $namedef =
 "where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
-      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
+      . "<readingspec> and <keyspec> can be a single reading name, a list separated by comma (,) or a regexp.";
 
     my ( $a, $h ) = parseParams($def);
 
     $a->[0] = ".*" if ( !$a->[0] );
     $a->[1] = ".*" if ( !$a->[1] );
-
-    return "Usage: deletereadingdesc <devspec> <readingspec> [<key>]\n$namedef"
-      if ( $a->[0] eq "?" || $a->[1] eq "?" );
-
-    my @rets;
-    my $last;
-    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        if ( !defined( $defs{$name} ) ) {
-            push @rets, "Please define $name first";
-            next;
-        }
-
-        my $readingspec = '^' . $a->[1] . '$';
-        foreach my $reading (
-            grep { /$readingspec/ }
-            keys %{ $defs{$name}{READINGS} }
-          )
-        {
-            my $i = $a;
-            shift @{$i};
-            shift @{$i};
-            $i->[0] = 0 if ( !$i->[0] );
-            foreach ( @{$i} ) {
-                my $ret = deleteKeyValueAttr( $name, $attribute, $reading, $_ );
-                push @rets, $ret if ($ret);
-            }
-        }
-    }
-    return join( "\n", @rets );
-}
-
-# command: setreadingformat
-my %setreadingformathash = (
-    Fn => "CommandSetReadingFormat",
-    Hlp =>
-"<devspec> <readingspec> <key>=<value>,set rtype format definition for <devspec> <reading>",
-);
-$cmds{setreadingformat} = \%setreadingformathash;
-
-sub CommandSetReadingFormat($@) {
-    my ( $cl, $def ) = @_;
-    my $attribute = "readingsFormat";
-    my $namedef =
-"where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
-      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
-
-    my ( $a, $h ) = parseParams($def);
-
-    $a->[0] = ".*" if ( !$a->[0] );
-    $a->[1] = ".*" if ( !$a->[1] );
+    $a->[2] = ".*" if ( !$a->[2] );
 
     return
-      "Usage: setreadingformat <devspec> <readingspec> <key>=<value\n$namedef"
-      if ( $a->[0] eq "?" || $a->[1] eq "?" );
-
-    my @rets;
-    my $last;
-    foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        if ( !defined( $defs{$name} ) ) {
-            push @rets, "Please define $name first";
-            next;
-        }
-
-        foreach ( keys %$h ) {
-            my $ret =
-              setKeyValueAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
-            push @rets, $ret if ($ret);
-        }
-        next;
-    }
-    return join( "\n", @rets );
-}
-
-# command: deletereadingformat
-my %deletereadingformathash = (
-    Fn  => "CommandDeleteReadingFormat",
-    Hlp => "<devspec> <readingspec> [<key>],delete key for <devspec> <reading>",
-);
-$cmds{deletereadingformat} = \%deletereadingformathash;
-
-sub CommandDeleteReadingFormat($@) {
-    my ( $cl, $def ) = @_;
-    my $attribute = "readingsFormat";
-    my $namedef =
-"where <devspec> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n"
-      . "<readingspec> can be a single reading name, a list separated by comma (,) or a regexp.";
-
-    my ( $a, $h ) = parseParams($def);
-
-    $a->[0] = ".*" if ( !$a->[0] );
-    $a->[1] = ".*" if ( !$a->[1] );
-
-    return "Usage: deletereadingdesc <devspec> <readingspec> [<key>]\n$namedef"
+      "Usage: deletereadingdesc <devspec> <readingspec> [<keyspec>]\n$namedef"
       if ( $a->[0] eq "?" || $a->[1] eq "?" );
 
     my @rets;
@@ -3324,15 +2976,16 @@ sub CommandDeleteReadingFormat($@) {
         my $readingspec = '^' . $a->[1] . '$';
         foreach my $reading (
             grep { /$readingspec/ }
-            keys %{ $defs{$name}{READINGS} }
+            keys %{ $defs{$name}{$attribute} }
           )
         {
-            my $i = $a;
-            shift @{$i};
-            shift @{$i};
-            $i->[0] = 0 if ( !$i->[0] );
-            foreach ( @{$i} ) {
-                my $ret = deleteKeyValueAttr( $name, $attribute, $reading, $_ );
+            my $keyspec = '^' . $a->[2] . '$';
+            foreach my $key (
+                grep { /$keyspec/ }
+                keys %{ $defs{$name}{$attribute}{$reading} }
+              )
+            {
+                my $ret = deleteKeyValAttr( $name, $attribute, $reading, $key );
                 push @rets, $ret if ($ret);
             }
         }
