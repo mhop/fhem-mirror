@@ -781,6 +781,21 @@ Log 1, "!!!!!!!!!!";
   <ul>
     <li>XML::Simple is needed.</li>
     <li>IO::Socket::Multicast is needed.</li>
+    <li>The following 12 functions are available and can be used:
+      <ul>
+        <li>InstantReplay</li>
+        <li>Home</li>
+        <li>Info</li>
+        <li>Search</li>
+        <li>Back</li>
+        <li>FastForward = Fwd</li>
+        <li>Rewind = Rev</li>
+        <li>Select</li>
+        <li>DirectionUp</li>
+        <li>DirectionRight</li>
+        <li>DirectionLeft</li>
+        <li>DirectionDown</li>
+      </ul></li>
   </ul>
 
   <br><br>
