@@ -4,7 +4,7 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday usleep);
 #use Device::SMBus;
 
 #my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
@@ -18,6 +18,7 @@ I2C_BME280
 I2C_BMP180
 I2C_SHT21
 I2C_TSL2561
+I2C_SUSV
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
@@ -486,7 +487,10 @@ sub RPII2C_HWACCESS_ioctl($$) {
 					last;
 				}
 			}
-			my $buf = undef;
+            if (defined($clientmsg->{usleep})) {
+                usleep($clientmsg->{usleep});
+            }
+            my $buf = undef;
 			my $retval = sysread($fh, $buf, 1);
 			unless (defined($retval) && $retval == 1) {
 				Log3 $hash, 3, "$hash->{NAME}: HWaccess byteweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg} + $n)) : "") . " -> sysread failure: $!" if $!;
@@ -510,6 +514,9 @@ sub RPII2C_HWACCESS_ioctl($$) {
 				last;
 			}
 		}
+        if (defined($clientmsg->{usleep})) {
+            usleep($clientmsg->{usleep});
+        }
 		my $buf = undef;
 		my $retval = sysread($fh, $buf, $nbyte);
 		#Log3 $hash, 1, "test Blockweise lesen menge: |$nbyte|, return: |$retval|, inh: |$buf|";
