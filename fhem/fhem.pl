@@ -1140,7 +1140,8 @@ devspec2array($;$)
 
         my $hash = $defs{$d};
         if(!$hash->{TYPE}) {
-          Log 1, "Error: $d has no TYPE";
+          Log 1, "Error: >$d< has no TYPE, but following keys: >".
+                                join(",", sort keys %{$hash})."<";
           next;
         }
         my $val;
