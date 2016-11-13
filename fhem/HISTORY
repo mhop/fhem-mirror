@@ -709,3 +709,6 @@
 
 - Wed Nov 5 2016 (loredo)
   - adding general (but optional) unit support for FHEM and FHEM modules
+  
+- Sun Nov 13 2016 (risiko)
+  - adding new module 30_pilight_contact

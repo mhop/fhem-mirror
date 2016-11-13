@@ -44,6 +44,8 @@
 # V 1.17 2016-06-28 - FIX: Experimental splice on scalar is now forbidden - use explizit array notation
 # V 1.18 2016-06-28 - NEW: support smoke sensors (protocol: secudo_smoke_sensor)
 # V 1.19 2016-09-20 - FIX: PERL WARNING: Subroutine from Blocking.pm redefined
+# V 1.20 2016-10-27 - FIX: ContactAsSwitch protocol independend
+# V 1.21 2016-11-13 - NEW: support contact sensors 
 ############################################## 
 package main;
 
@@ -70,7 +72,8 @@ my %matchList = ( "1:pilight_switch" => "^PISWITCH",
                   "2:pilight_dimmer" => "^PISWITCH|^PIDIMMER|^PISCREEN",
                   "3:pilight_temp"   => "^PITEMP",
                   "4:pilight_raw"    => "^PIRAW",
-                  "5:pilight_smoke"  => "^PISMOKE");
+                  "5:pilight_smoke"  => "^PISMOKE",
+                  "6:pilight_contact"=> "^PICONTACT");
                   
 my @idList   = ("id","systemcode","gpio"); 
 my @unitList = ("unit","unitcode","programcode");
@@ -99,7 +102,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{StateFn} = "pilight_ctrl_State";
   $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch SendTimeout ".$readingFnAttributes;
   
-  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:pilight_raw::pilight_smoke:";
+  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:pilight_raw:pilight_smoke:pilight_contact:";
   #$hash->{MatchList} = \%matchList; #only for autocreate
 }
 
@@ -570,7 +573,7 @@ sub pilight_ctrl_createWhiteList($)
   foreach my $d (keys %defs)   
   { 
     my $module   = $defs{$d}{TYPE};
-    next if ($module !~ /pilight_[d|s|t].*/);
+    next if ($module !~ /pilight_[d|s|t|c].*/);
     
     pilight_ctrl_addWhiteList($own,$defs{$d});
   }
@@ -782,11 +785,11 @@ sub pilight_ctrl_Parse($$)
 
   # handling ContactAsSwitch befor white list check
   my $asSwitch = $attr{$me}{ContactAsSwitch};
-  if ( defined($asSwitch) && $proto =~ /contact/ && $asSwitch =~ /$id/) {
+  if ( defined($asSwitch) && $asSwitch =~ /$id/ && ($state =~ /opened/ || $state =~ /closed/) ) {
     $proto =~ s/contact/switch/g;
     $state =~ s/opened/on/g;
     $state =~ s/closed/off/g;
-    Log3 $me, 5, "$me(Parse): contact as switch for $id";
+    Log3 $me, 4, "$me(Parse): contact as switch for $id";
   }
         
   my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
@@ -830,7 +833,11 @@ sub pilight_ctrl_Parse($$)
     case m/quigg_gt/    {$protoID = 1;}
     
     case m/dimmer/      {$protoID = 2;}
+    
+    #contact sensors
     case m/contact/     {$protoID = 3;}
+    case m/ev1527/      {$protoID = 3;}
+    case m/sc2262/      {$protoID = 3;}
     
     #Weather Stations temperature, humidity
     case m/alecto/      {$protoID = 4;}
@@ -878,7 +885,7 @@ sub pilight_ctrl_Parse($$)
       Log3 $me, 4, "$me(Dispatch): $msg";
       return Dispatch($hash, $msg ,undef);
     }
-    case 3 {return;}
+    case 3 { return Dispatch($hash, "PICONTACT,$proto,$id,$unit,$state",undef); }
     case 4 {      
         my $piTempData = "";
         $piTempData .= ",temperature:$data->{$s}{temperature}"  if (defined($data->{$s}{temperature}));
