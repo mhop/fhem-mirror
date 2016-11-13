@@ -26,7 +26,18 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     mode = vArr[1]
   //console.log( "mode: "+mode );
 
-  var cmds = [];     // the 3 commands vor hue, sat, bri
+  //preset ?
+  if( params && params.length ) {
+    var color = params[0];
+    if( mode == 'CT' )
+      color = colorpicker_ct2rgb(color);
+
+    var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
+    $(newEl).click(function(arg) { cmd(params[0]) });
+    return newEl;
+  }
+
+  var cmds = [];     // the 3 commands für hue, sat, bri
   var ranges = []; // the 3 slider ranges
   var is_real_hsv = false;
   if( vArr.length == 14 ) { // hsv:colorpicker,HSV,hue,0,1,360,sat,0,1,100,bri,0,1,100
@@ -167,18 +178,6 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   if( mode == 'HSV' )
     return createHSVSliders();
-
-  //preset ?
-  if( params && params.length ) {
-    var color = params[0];
-    if( mode == 'CT' )
-      color = colorpicker_ct2rgb(color);
-
-    var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
-    $(newEl).click(function(arg) { cmd(params[0]) });
-    return newEl;
-
-  }
 
   if( mode == 'CT' ) {
     if( currVal )
