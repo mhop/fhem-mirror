@@ -1807,7 +1807,7 @@ CommandDefine($$)
   my $ret = CallFn($name, "DefFn", \%hash, 
                 $modules{$m}->{parseParams} ? parseParams($def) : $def);
   if($ret) {
-    Log 1, "define $def: $ret";
+    Log 1, "define $def: $ret" if(!$ignoreErr);
     delete $defs{$name};                            # Veto
     delete $attr{$name};
 
@@ -1824,7 +1824,8 @@ CommandDefine($$)
     addStructChange("define", $name, $def);
     DoTrigger("global", "DEFINED $name", 1) if($init_done);
   }
-  return $ret;
+  return ($ret && $ignoreErr ?
+        "Cannot define $name, remove -ignoreErr for details" : $ret);
 }
 
 #####################################
