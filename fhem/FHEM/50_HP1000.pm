@@ -70,10 +70,10 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
+"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
-    $hash->{readingsFormat} = {
+    $hash->{readingsTypes} = {
         'activity' => {
             ref   => 'oknok',
             scope => [ 'dead', 'alive' ],
@@ -83,17 +83,21 @@ sub HP1000_Initialize($) {
     $hash->{readingsDesc} = {
         'Activity'                => { rtype => 'activity', },
         'UV'                      => { rtype => 'uvi', },
+        'UVcondition'             => { rtype => 'condition_uvi', },
         'UVR'                     => { rtype => 'uwpscm', },
+        'daylight'                => { rtype => 'bool', },
         'dewpoint'                => { rtype => 'c', },
         'dewpoint_f'              => { rtype => 'f', },
         'humidity'                => { rtype => 'pct', formula_symbol => 'H' },
         'humidityAbs'             => { rtype => 'c', },
         'humidityAbs_f'           => { rtype => 'f', },
+        'humidityCondition'       => { rtype => 'condition_hum', },
         'indoorDewpoint'          => { rtype => 'c', },
         'indoorDewpoint_f'        => { rtype => 'f', },
         'indoorHumidity'          => { rtype => 'pct', },
         'indoorHumidityAbs'       => { rtype => 'c', },
         'indoorHumidityAbs_f'     => { rtype => 'f', },
+        'indoorHumidityCondition' => { rtype => 'condition_hum', },
         'indoorTemperature'       => { rtype => 'c', },
         'indoorTemperature_f'     => { rtype => 'f', },
         'israining'               => { rtype => 'bool', },
