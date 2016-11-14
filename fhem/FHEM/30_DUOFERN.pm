@@ -25,6 +25,8 @@ my %devices = (
     "69"    => "Umweltsensor",
     "70"    => "Troll Comfort DuoFern",
     "71"    => "Troll Comfort DuoFern (Lichtmodus)",
+    "73"    => "Raumthermostat",
+    "74"    => "Wandtaster 6fach 230V",
     "A0"    => "Handsender (6 Gruppen-48 Geraete)",
     "A1"    => "Handsender (1 Gruppe-48 Geraete)",
     "A2"    => "Handsender (6 Gruppen-1 Geraet)",
@@ -35,6 +37,7 @@ my %devices = (
     "A8"    => "HomeTimer",
     "AA"    => "Markisenwaechter",
     "AB"    => "Rauchmelder",
+    "AD"    => "Wandtaster 6fach Bat",
 );
 
 my %sensorMsg = (
@@ -58,6 +61,8 @@ my %sensorMsg = (
     "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
     "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
     "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
+    "0723"    => {"name" => "closeEnd",    "chan" => 5, "state" => "off"},
+    "0724"    => {"name" => "closeStart",  "chan" => 5, "state" => "on"},
     "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
     "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
     "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
@@ -97,93 +102,104 @@ my %openSpeeds = (
 );
 
 my %commands = (                             
-  "remotePair"           => {"noArg"    => "06010000000000"},
-  "remoteUnpair"         => {"noArg"    => "06020000000000"},
-  "up"                   => {"noArg"    => "0701tt00000000"},
-  "stop"                 => {"noArg"    => "07020000000000"},
-  "down"                 => {"noArg"    => "0703tt00000000"},
-  "position"             => {"value"    => "0707ttnn000000"},
-  "level"                => {"value"    => "0707ttnn000000"},
-  "sunMode"              => {"on"       => "070801FF000000",
-                             "off"      => "070A0100000000"},
-  "dusk"                 => {"noArg"    => "070901FF000000"},
-  "reversal"             => {"noArg"    => "070C0000000000"},
-  "modeChange"           => {"noArg"    => "070C0000000000"},
-  "windMode"             => {"on"       => "070D01FF000000",
-                             "off"      => "070E0100000000"},
-  "rainMode"             => {"on"       => "071101FF000000",
-                             "off"      => "07120100000000"},
-  "dawn"                 => {"noArg"    => "071301FF000000"},
-  "rainDirection"        => {"down"     => "071400FD000000",
-                             "up"       => "071400FE000000"},
-  "windDirection"        => {"down"     => "071500FD000000",
-                             "up"       => "071500FE000000"},
-  "toggle"               => {"noArg"    => "071A0000000000"},
-  "slatPosition"         => {"value"    => "071B00000000nn"},
-  "sunAutomatic"         => {"on"       => "080100FD000000",
-                             "off"      => "080100FE000000"},
-  "sunPosition"          => {"value"    => "080100nn000000"},
-  "ventilatingMode"      => {"on"       => "080200FD000000",
-                             "off"      => "080200FE000000"},
-  "ventilatingPosition"  => {"value"    => "080200nn000000"},
-  "intermediateMode"     => {"on"       => "080200FD000000",
-                             "off"      => "080200FE000000"},
-  "intermediateValue"    => {"value"    => "080200nn000000"},
-  "saveIntermediateOnStop"=>{"on"       => "080200FB000000",
-                             "off"      => "080200FC000000"},
-  "runningTime"          => {"value3"   => "0803nn00000000"},
-  "timeAutomatic"        => {"on"       => "080400FD000000",
-                             "off"      => "080400FE000000"},
-  "duskAutomatic"        => {"on"       => "080500FD000000",
-                             "off"      => "080500FE000000"},                           
-  "manualMode"           => {"on"       => "080600FD000000",
-                             "off"      => "080600FE000000"},
-  "windAutomatic"        => {"on"       => "080700FD000000",
-                             "off"      => "080700FE000000"},
-  "rainAutomatic"        => {"on"       => "080800FD000000",
-                             "off"      => "080800FE000000"},                                                      
-  "dawnAutomatic"        => {"on"       => "080900FD000000",
-                             "off"      => "080900FE000000"},
-  "tiltInSunPos"         => {"on"       => "080C00FD000000",
-                             "off"      => "080C00FE000000"},                           
-  "tiltInVentPos"        => {"on"       => "080D00FD000000",
-                             "off"      => "080D00FE000000"},
-  "tiltAfterMoveLevel"   => {"on"       => "080E00FD000000",
-                             "off"      => "080E00FE000000"},
-  "tiltAfterStopDown"    => {"on"       => "080F00FD000000",
-                             "off"      => "080F00FE000000"},                           
-  "defaultSlatPos"       => {"value"    => "0810nn00000000"},
-  "blindsMode"           => {"on"       => "081100FD000000",
-                             "off"      => "081100FE000000"}, 
-  "slatRunTime"          => {"value4"   => "0812nn00000000"},                                                        
-  "motorDeadTime"        => {"off"      => "08130000000000",
-                             "short"    => "08130100000000",
-                             "long"     => "08130200000000"},
-  "stairwellFunction"    => {"on"       => "081400FD000000",
-                             "off"      => "081400FE000000"},
-  "stairwellTime"        => {"value2"   => "08140000wwww00"},
-  "reset"                => {"settings" => "0815CB00000000",
-                             "full"     => "0815CC00000000"},
-  "10minuteAlarm"        => {"on"       => "081700FD000000",
-                             "off"      => "081700FE000000"},
-  "automaticClosing"     => {"off"      => "08180000000000",
-                             "30"       => "08180001000000",
-                             "60"       => "08180002000000",
-                             "90"       => "08180003000000",
-                             "120"      => "08180004000000",
-                             "150"      => "08180005000000",
-                             "180"      => "08180006000000",
-                             "210"      => "08180007000000",
-                             "240"      => "08180008000000"},
-  "2000cycleAlarm"       => {"on"       => "081900FD000000",
-                             "off"      => "081900FE000000"},
-  "openSpeed"            => {"11"       => "081A0001000000",
-                             "15"       => "081A0002000000",
-                             "19"       => "081A0003000000"},
-  "backJump"             => {"on"       => "081B00FD000000",
-                             "off"      => "081B00FE000000"},          
-  "on"                   => {"noArg"    => "0E03tt00000000"},
-  "off"                  => {"noArg"    => "0E02tt00000000"},                                                                                                             
+  "remotePair"           => {"noArg"    => "06010000000000000000"},
+  "remoteUnpair"         => {"noArg"    => "06020000000000000000"},
+  "up"                   => {"noArg"    => "0701tt00000000000000"},
+  "stop"                 => {"noArg"    => "07020000000000000000"},
+  "down"                 => {"noArg"    => "0703tt00000000000000"},
+  "position"             => {"value"    => "0707ttnn000000000000"},
+  "level"                => {"value"    => "0707ttnn000000000000"},
+  "sunMode"              => {"on"       => "070801FF000000000000",
+                             "off"      => "070A0100000000000000"},
+  "dusk"                 => {"noArg"    => "070901FF000000000000"},
+  "reversal"             => {"noArg"    => "070C0000000000000000"},
+  "modeChange"           => {"noArg"    => "070C0000000000000000"},
+  "windMode"             => {"on"       => "070D01FF000000000000",
+                             "off"      => "070E0100000000000000"},
+  "rainMode"             => {"on"       => "071101FF000000000000",
+                             "off"      => "07120100000000000000"},
+  "dawn"                 => {"noArg"    => "071301FF000000000000"},
+  "rainDirection"        => {"down"     => "071400FD000000000000",
+                             "up"       => "071400FE000000000000"},
+  "windDirection"        => {"down"     => "071500FD000000000000",
+                             "up"       => "071500FE000000000000"},
+  "tempUp"               => {"noArg"    => "0718tt00000000000000"}, 
+  "tempDown"             => {"noArg"    => "0719tt00000000000000"}, 
+  "toggle"               => {"noArg"    => "071A0000000000000000"},
+  "slatPosition"         => {"value"    => "071B00000000nn000000"},
+  "desired-temp"         => {"temp1"    => "0722tt0000wwww000000"},
+  "sunAutomatic"         => {"on"       => "080100FD000000000000",
+                             "off"      => "080100FE000000000000"},
+  "sunPosition"          => {"value"    => "080100nn000000000000"},
+  "ventilatingMode"      => {"on"       => "080200FD000000000000",
+                             "off"      => "080200FE000000000000"},
+  "ventilatingPosition"  => {"value"    => "080200nn000000000000"},
+  "intermediateMode"     => {"on"       => "080200FD000000000000",
+                             "off"      => "080200FE000000000000"},
+  "intermediateValue"    => {"value"    => "080200nn000000000000"},
+  "saveIntermediateOnStop"=>{"on"       => "080200FB000000000000",
+                             "off"      => "080200FC000000000000"},
+  "runningTime"          => {"value3"   => "0803nn00000000000000"},
+  "timeAutomatic"        => {"on"       => "080400FD000000000000",
+                             "off"      => "080400FE000000000000"},
+  "duskAutomatic"        => {"on"       => "080500FD000000000000",
+                             "off"      => "080500FE000000000000"},                           
+  "manualMode"           => {"on"       => "080600FD000000000000",
+                             "off"      => "080600FE000000000000"},
+  "windAutomatic"        => {"on"       => "080700FD000000000000",
+                             "off"      => "080700FE000000000000"},
+  "rainAutomatic"        => {"on"       => "080800FD000000000000",
+                             "off"      => "080800FE000000000000"},                                                      
+  "dawnAutomatic"        => {"on"       => "080900FD000000000000",
+                             "off"      => "080900FE000000000000"},
+  "tiltInSunPos"         => {"on"       => "080C00FD000000000000",
+                             "off"      => "080C00FE000000000000"},                           
+  "tiltInVentPos"        => {"on"       => "080D00FD000000000000",
+                             "off"      => "080D00FE000000000000"},
+  "tiltAfterMoveLevel"   => {"on"       => "080E00FD000000000000",
+                             "off"      => "080E00FE000000000000"},
+  "tiltAfterStopDown"    => {"on"       => "080F00FD000000000000",
+                             "off"      => "080F00FE000000000000"},                           
+  "defaultSlatPos"       => {"value"    => "0810nn00000000000000"},
+  "blindsMode"           => {"on"       => "081100FD000000000000",
+                             "off"      => "081100FE000000000000"}, 
+  "slatRunTime"          => {"value4"   => "0812nn00000000000000"},                                                        
+  "motorDeadTime"        => {"off"      => "08130000000000000000",
+                             "short"    => "08130100000000000000",
+                             "long"     => "08130200000000000000"},
+  "stairwellFunction"    => {"on"       => "081400FD000000000000",
+                             "off"      => "081400FE000000000000"},
+  "stairwellTime"        => {"value2"   => "08140000wwww00000000"},
+  "reset"                => {"settings" => "0815CB00000000000000",
+                             "full"     => "0815CC00000000000000"},
+  "10minuteAlarm"        => {"on"       => "081700FD000000000000",
+                             "off"      => "081700FE000000000000"},
+  "automaticClosing"     => {"off"      => "08180000000000000000",
+                             "30"       => "08180001000000000000",
+                             "60"       => "08180002000000000000",
+                             "90"       => "08180003000000000000",
+                             "120"      => "08180004000000000000",
+                             "150"      => "08180005000000000000",
+                             "180"      => "08180006000000000000",
+                             "210"      => "08180007000000000000",
+                             "240"      => "08180008000000000000"},
+  "2000cycleAlarm"       => {"on"       => "081900FD000000000000",
+                             "off"      => "081900FE000000000000"},
+  "openSpeed"            => {"11"       => "081A0001000000000000",
+                             "15"       => "081A0002000000000000",
+                             "19"       => "081A0003000000000000"},
+  "backJump"             => {"on"       => "081B00FD000000000000",
+                             "off"      => "081B00FE000000000000"},
+  "temperatureThreshold1"=> {"temp2"    => "081E00000001nn000000"},                           
+  "temperatureThreshold2"=> {"temp2"    => "081E0000000200nn0000"},
+  "temperatureThreshold3"=> {"temp2"    => "081E000000040000nn00"},
+  "temperatureThreshold4"=> {"temp2"    => "081E00000008000000nn"},
+  "actTempLimit"         => {"1"        => "081Ett00001000000000",
+                             "2"        => "081Ett00003000000000",
+                             "3"        => "081Ett00005000000000",
+                             "4"        => "081Ett00007000000000"},                        
+  "on"                   => {"noArg"    => "0E03tt00000000000000"},
+  "off"                  => {"noArg"    => "0E02tt00000000000000"},                                                                                                             
 );
 
 my %wCmds = (                             
@@ -234,9 +250,14 @@ my %commandsStatus = (
   "getTime"         => "10",
 );
 
+my %setsBasic = (
+  "reset:settings,full"                 => "",
+  "remotePair:noArg"                    => "",
+  "remoteUnpair:noArg"                  => "",   
+);
+
 my %setsDefaultRollerShutter = (
   "getStatus:noArg"                     => "",
-  "reset:settings,full"                 => "",
   "up:noArg"                            => "",
   "down:noArg"                          => "",
   "stop:noArg"                          => "",
@@ -253,8 +274,6 @@ my %setsDefaultRollerShutter = (
   "sunAutomatic:on,off"                 => "",
   "timeAutomatic:on,off"                => "",
   "ventilatingMode:on,off"              => "",
-  "remotePair:noArg"                    => "",
-  "remoteUnpair:noArg"                  => "",
 );
 
 my %setsRolloTube = (
@@ -291,7 +310,6 @@ my %setsBlinds = (
 
 my %setsSwitchActor = (
   "getStatus:noArg"                     => "",
-  "reset:settings,full"                 => "",
   "dawnAutomatic:on,off"                => "",
   "duskAutomatic:on,off"                => "",
   "manualMode:on,off"                   => "",
@@ -303,15 +321,12 @@ my %setsSwitchActor = (
   "stairwellTime:slider,0,10,3200"      => "",
   "on:noArg"                            => "",
   "off:noArg"                           => "",
-  "remotePair:noArg"                    => "",
-  "remoteUnpair:noArg"                  => "",
   "dusk:noArg"                          => "",
   "dawn:noArg"                          => "",
 );
 
 my %setsUmweltsensor = (
   "getStatus:noArg"                     => "",
-  "reset:settings,full"                 => "",
   "getWeather:noArg"                    => "",
   "getTime:noArg"                       => "",   
 );
@@ -350,7 +365,6 @@ my %setsUmweltsensor01 = (
 
 my %setsSX5 = (
   "getStatus:noArg"                     => "",
-  "reset:settings,full"                 => "",
   "up:noArg"                            => "",
   "down:noArg"                          => "",
   "stop:noArg"                          => "",
@@ -364,13 +378,10 @@ my %setsSX5 = (
   "2000cycleAlarm:on,off"               => "",
   "openSpeed:11,15,19"                  => "",
   "backJump:on,off"                     => "",
-  "remotePair:noArg"                    => "",
-  "remoteUnpair:noArg"                  => "",
 );
 
 my %setsDimmer = (
   "getStatus:noArg"                     => "",
-  "reset:settings,full"                 => "",
   "level:slider,0,1,100"                => "",
   "on:noArg"                            => "",
   "off:noArg"                           => "",
@@ -387,14 +398,28 @@ my %setsDimmer = (
   "intermediateMode:on,off"             => "",
   "intermediateValue:slider,0,1,100"    => "",
   "saveIntermediateOnStop:on,off"       => "",                         
-  "remotePair:noArg"                    => "",
-  "remoteUnpair:noArg"                  => "",
   "dusk:noArg"                          => "",
   "dawn:noArg"                          => "",
 );
+
+my $tempSetList = "4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10.0,10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0,14.5,15.0,15.5,16.0,16.5,17.0,17.5,18.0,18.5,19.0,19.5,20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5,24.0,24.5,25.0,25.5,26.0,26.5,27.0,27.5,28.0,28.5,29.0,29.5,30.0";
+
+my %setsThermostat = (
+  "getStatus:noArg"                     => "",
+  "tempUp:noArg"                        => "",
+  "tempDown:noArg"                      => "",
+  "manualMode:on,off"                   => "",
+  "timeAutomatic:on,off"                => "",
+  "temperatureThreshold1:$tempSetList"  => "",
+  "temperatureThreshold2:$tempSetList"  => "",
+  "temperatureThreshold3:$tempSetList"  => "",
+  "temperatureThreshold4:$tempSetList"  => "",
+  "actTempLimit:0,1,2,3"                => "",
+  "desired-temp:$tempSetList"           => "",
+);
                         
 my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
-my $duoCommand            = "0Dccnnnnnnnnnnnnnn000000000000zzzzzzyyyyyy00";
+my $duoCommand            = "0Dccnnnnnnnnnnnnnnnnnnnn000000zzzzzzyyyyyy00";
 my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
 my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
 my $duoSetTime            = "0D0110800001mmmmmmmmnnnnnn0000000000yyyyyy00";
@@ -435,18 +460,20 @@ DUOFERN_Set($@)
     
   my %sets;
   
-  %sets = (%setsDefaultRollerShutter, %setsRolloTube)                         if ($hash->{CODE} =~ /^49..../);
-  %sets = (%setsDefaultRollerShutter, %setsTroll, ("blindsMode:on,off"=> "")) if ($hash->{CODE} =~ /^(42|4B|4C|70)..../);
-  %sets = (%setsDefaultRollerShutter, %setsTroll)                             if ($hash->{CODE} =~ /^47..../);
-  %sets = (%setsDefaultRollerShutter)                                         if ($hash->{CODE} =~ /^(40|41|61|65)..../);
-  %sets = (%setsUmweltsensor)                                                 if ($hash->{CODE} =~ /^69....$/);
+  %sets = (%setsBasic, %setsDefaultRollerShutter, %setsRolloTube)             if ($hash->{CODE} =~ /^49..../);
+  %sets = (%setsBasic, %setsDefaultRollerShutter, %setsTroll, ("blindsMode:on,off"=> "")) if ($hash->{CODE} =~ /^(42|4B|4C|70)..../);
+  %sets = (%setsBasic, %setsDefaultRollerShutter, %setsTroll)                 if ($hash->{CODE} =~ /^47..../);
+  %sets = (%setsBasic, %setsDefaultRollerShutter)                             if ($hash->{CODE} =~ /^(40|41|61)..../);
+  %sets = (%setsBasic, %setsUmweltsensor)                                     if ($hash->{CODE} =~ /^69....$/);
   %sets = (%setsUmweltsensor00)                                               if ($hash->{CODE} =~ /^69....00/);  
   %sets = (%setsDefaultRollerShutter, %setsUmweltsensor01)                    if ($hash->{CODE} =~ /^69....01/);
   %sets = (%setsSwitchActor)                                                  if ($hash->{CODE} =~ /^43....(01|02)/);
-  %sets = ("getStatus:noArg"=> "")                                            if ($hash->{CODE} =~ /^43....$/);
-  %sets = (%setsSwitchActor)                                                  if ($hash->{CODE} =~ /^(46|71)..../);
-  %sets = (%setsSX5)                                                          if ($hash->{CODE} =~ /^4E..../);
-  %sets = (%setsDimmer)                                                       if ($hash->{CODE} =~ /^48..../);
+  %sets = (%setsBasic, "getStatus:noArg"=> "")                                if ($hash->{CODE} =~ /^(43|65|74)....$/);
+  %sets = (%setsBasic, %setsSwitchActor)                                      if ($hash->{CODE} =~ /^(46|71)..../);
+  %sets = (%setsBasic, %setsSX5)                                              if ($hash->{CODE} =~ /^4E..../);
+  %sets = (%setsBasic, %setsDimmer)                                           if ($hash->{CODE} =~ /^48..../);
+  %sets = (%setsBasic, %setsThermostat)                                       if ($hash->{CODE} =~ /^73..../);
+  %sets = (%setsSwitchActor)                                                  if ($hash->{CODE} =~ /^(65|74)....01/);
 
   my $blindsMode=ReadingsVal($name, "blindsMode", "off");
   %sets = (%sets, %setsBlinds)    if ($blindsMode eq "on");
@@ -677,9 +704,22 @@ DUOFERN_Set($@)
       $arg = $arg/100; 
       $subCmd = "value4";
       $argV = sprintf "%02x", $arg ;
-             
-    } else {
+    
+    } elsif (exists $commands{$cmd}{temp1}) {
       return "Missing argument" if (!defined($arg)); 
+      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < -40 || $arg > 80); 
+      $subCmd = "temp1";
+      $argW = sprintf "%04x", ($arg * 10) + 400;
+    
+    } elsif (exists $commands{$cmd}{temp2}) {
+      return "Missing argument" if (!defined($arg)); 
+      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < -40 || $arg > 80); 
+      $subCmd = "temp2";
+      $argV = sprintf "%02x", ($arg * 2) + 80;
+                 
+    } else {
+      return "Missing argument" if (!defined($arg));
+      $timer= "01" if ($arg2 && ($arg2 eq "timer")); 
       $subCmd = $arg;
       $argV = "00";
     }
@@ -699,13 +739,13 @@ DUOFERN_Set($@)
       } 
     }
     
-    readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle"));
+    readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle") && ($position > -1));
     readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on") && ($position > 0));
-    readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on") && ($position < 100));
+    readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on") && ($position < 100) && ($position > -1));
     
     if ($timer eq "00" || $timeAutomatic eq "on") {
       readingsSingleUpdate($hash, "moving", "up", 1)   if (($cmd eq "up")   && ($position > 0));
-      readingsSingleUpdate($hash, "moving", "down", 1) if (($cmd eq "down") && ($position < 100));
+      readingsSingleUpdate($hash, "moving", "down", 1) if (($cmd eq "down") && ($position < 100) && ($position > -1));
     }
      
     if ($cmd eq "position") {
@@ -721,7 +761,7 @@ DUOFERN_Set($@)
     $command = $commands{$cmd}{$subCmd};
     
     $buf =~ s/yyyyyy/$code/;
-    $buf =~ s/nnnnnnnnnnnnnn/$command/;
+    $buf =~ s/nnnnnnnnnnnnnnnnnnnn/$command/;
     $buf =~ s/nn/$argV/;
     $buf =~ s/tt/$timer/;
     $buf =~ s/wwww/$argW/;
@@ -783,7 +823,7 @@ DUOFERN_Define($$)
   
  return undef if (AttrVal($name,"ignore",0) != 0);
   
-  if ($hash->{CODE} =~ m/^(40|41|42|43|46|47|48|49|4B|4C|4E|61|62|65|69|70|71)....$/) {
+  if ($hash->{CODE} =~ m/^(40|41|42|43|46|47|48|49|4B|4C|4E|61|62|65|69|70|71|73|74)....$/) {
     $hash->{helper}{timeout}{t} = 30;
     InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
     $hash->{helper}{timeout}{count} = 2;
@@ -900,14 +940,16 @@ DUOFERN_Parse($$)
     RemoveInternalTimer($hash);
     delete $hash->{helper}{timeout};
     
-    if ($code =~ m/^69..../) {
+    #Bewegungsmelder, Wettersensor, Mehrfachwandtaster
+    if ($code =~ m/^(65|69|74)..../) {
       readingsSingleUpdate($hash, "state", "OK", 1);
       $def01 = $modules{DUOFERN}{defptr}{$code."01"};
       if(!$def01) {
         DoTrigger("global","UNDEFINED DUOFERN_$code"."_actor DUOFERN $code"."01");
         $def01 = $modules{DUOFERN}{defptr}{$code."01"};
       }
-      
+    
+    #Universalaktor  
     } elsif ($code =~ m/^43..../) {
       readingsSingleUpdate($hash, "state", "OK", 1);
       $def01 = $modules{DUOFERN}{defptr}{$code."01"};
@@ -920,8 +962,8 @@ DUOFERN_Parse($$)
         DoTrigger("global","UNDEFINED DUOFERN_$code"."_02 DUOFERN $code"."02");
         $def02 = $modules{DUOFERN}{defptr}{$code."02"};
       }
-    }
-    
+    } 
+       
     $hash = $def01 if ($def01);
     
     #RolloTron
@@ -1206,7 +1248,41 @@ DUOFERN_Parse($$)
       readingsBulkUpdate($hash, "modeChange",             $modeChange   , 1);
       readingsBulkUpdate($hash, "state",                  $state        , 1);
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch  
+
+    #Thermostat
+    } elsif ($format eq "27") {  
+      my $temperature1      = sprintf("%0.1f", ((hex(substr($msg, 8,  4)) & 0x07FF)-400)/10);
+      my $temperature2      = sprintf("%0.1f", ((hex(substr($msg, 12, 4)) & 0x07FF)-400)/10);
+      my $tempThreshold1    = sprintf("%0.1f", (hex(substr($msg, 16, 2))-80)/2);
+      my $tempThreshold2    = sprintf("%0.1f", (hex(substr($msg, 18, 2))-80)/2);
+      my $tempThreshold3    = sprintf("%0.1f", (hex(substr($msg, 20, 2))-80)/2);
+      my $tempThreshold4    = sprintf("%0.1f", (hex(substr($msg, 22, 2))-80)/2);
+      my $desiredTemp       = sprintf("%0.1f", (hex(substr($msg, 26, 2))-80)/2);
+      my $output            = (hex(substr($msg,  8, 2)) & 0x08 ? "on" : "off");
+      my $manualOverride    = (hex(substr($msg,  8, 2)) & 0x10 ? "on" : "off");
+      my $actTempLimit      = (hex(substr($msg,  8, 2)) & 0x60)>>5;
+      my $timerAuto         = (hex(substr($msg, 12, 2)) & 0x08 ? "on" : "off");
+      my $manualMode        = (hex(substr($msg, 12, 2)) & 0x10 ? "on" : "off");
       
+      $state = "T: $temperature1 desired: $desiredTemp";
+       
+      readingsBeginUpdate($hash); 
+      readingsBulkUpdate($hash, "measured-temp",          $temperature1,    1);
+      readingsBulkUpdate($hash, "measured-temp2",         $temperature2,    1);
+      readingsBulkUpdate($hash, "temperatureThreshold1",  $tempThreshold1,  1);
+      readingsBulkUpdate($hash, "temperatureThreshold2",  $tempThreshold2,  1);
+      readingsBulkUpdate($hash, "temperatureThreshold3",  $tempThreshold3,  1);
+      readingsBulkUpdate($hash, "temperatureThreshold4",  $tempThreshold4,  1);
+      readingsBulkUpdate($hash, "desired-temp",           $desiredTemp,     1);
+      readingsBulkUpdate($hash, "output",                 $output,          1);
+      readingsBulkUpdate($hash, "manualOverride",         $manualOverride,  1);
+      readingsBulkUpdate($hash, "actTempLimit",           $actTempLimit,    1);
+      readingsBulkUpdate($hash, "timeAutomatic",          $timerAuto,       1);
+      readingsBulkUpdate($hash, "manualMode",             $manualMode,      1);
+      
+      readingsBulkUpdate($hash, "state",                  $state,           1);
+      readingsEndUpdate($hash, 1); # Notify is done by Dispatch  
+            
     } else {
       Log3 $hash, 2, "DUOFERN unknown msg: $msg";
     }
@@ -1224,7 +1300,9 @@ DUOFERN_Parse($$)
     
     my @chans;
     if ($sensorMsg{$id}{chan} == 5) {
-      for(my $x=0; $x<5; $x++)  {
+      my $chanCount = 5;
+      $chanCount = 4 if ($code =~ m/^(73)..../);
+      for(my $x=0; $x<$chanCount; $x++)  {
         if((0x01<<$x) & hex($chan)) {
           push(@chans, $x+1);
         }  
@@ -1232,6 +1310,15 @@ DUOFERN_Parse($$)
     } else {
       push(@chans, $chan);
     }
+    
+    if($code =~ m/^(65|69|74).*/) {
+      $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+      if(!$def01) {
+        DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+        $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+      }
+      $hash = $def01 if ($def01);
+    } 
     
     foreach (@chans) {
       $chan = $_;
@@ -1243,18 +1330,10 @@ DUOFERN_Parse($$)
           }
           readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
       } else {
-        if($code =~ m/^69.*/) {
-          $def01 = $modules{DUOFERN}{defptr}{$code."00"};
-          if(!$def01) {
-            DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
-            $def01 = $modules{DUOFERN}{defptr}{$code."00"};
-          }
-          $hash = $def01;
-        } 
-        if(($code !~ m/^69.*/) || ($id =~ m/..(11|12)/)) {
+        if(($code !~ m/^(69|73).*/) || ($id =~ m/..(11|12)/)) {
           $chan="";
         }
-        if($code =~ m/^(A5|AA|AB)..../) {
+        if($code =~ m/^(65|A5|AA|AB)..../) {
           readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
         }
         
@@ -1706,6 +1785,32 @@ DUOFERN_StatusTimeout($)
         Tilt slat after stopping blind while moving down.
         </li><br>
     
+    </ul>    
+    <b>Thermostat commands:</b><br><br>
+    <ul>  
+    <li><b>desired-temp &lt;temp&gt; [timer]</b><br>
+        Set desired temperature. &lt;temp&gt; must be between -40 and 80
+        Celsius, and precision is half a degree. If parameter <b>timer</b> 
+        is used the command will only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><b>tempUp [timer]</b><br>
+        Increases the desired temperature by half a degree. If parameter <b>timer</b> 
+        is used the command will only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><b>tempDown [timer]</b><br>
+        Decrease the desired temperature by half a degree. If parameter <b>timer</b> 
+        is used the command will only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><b>temperatureThreshold[1|2|3|4] &lt;temp&gt;</b><br>
+        Set temperature threshold 1 to 4. &lt;temp&gt; must be between -40 and 80
+        Celsius, and precision is half a degree.
+        </li><br>    
+    <li><b>actTempLimit [timer]</b><br>
+        Set desired temperature to the selected temperatureThreshold. If parameter 
+        <b>timer</b> is used the command will only be executed if timeAutomatic is
+        activated.
+        </li><br>
+        
     </ul>    
     <b>SX5 commands:</b><br><br>
     <ul>  
