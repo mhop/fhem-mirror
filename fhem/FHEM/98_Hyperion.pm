@@ -30,7 +30,9 @@ my %Hyperion_sets =
   "on"                => "noArg",
   "rgb"               => "colorpicker,RGB",
   "toggle"            => "noArg",
-  "toggleMode"        => "noArg"
+  "toggleMode"        => "noArg",
+  "valueGainDown"     => "textField",
+  "valueGainUp"       => "textField"
 );
 
 my $Hyperion_requiredVersion    = "1.03.2";
@@ -59,6 +61,7 @@ sub Hyperion_Initialize($)
                         "hyperionDefaultDuration ".
                         "hyperionDefaultPriority ".
                         "hyperionDimStep ".
+                        "hyperionGainStep ".
                         "hyperionNoSudo:1 ".
                         "hyperionSshUser ".
                         "hyperionToggleModes ".
@@ -576,7 +579,7 @@ sub Hyperion_Set($@)
   elsif ($cmd =~ /^(dimUp|dimDown)$/)
   {
     return "Value of $cmd has to be between 1 and 99"
-      if (defined $value && ($value =~ /^(\d+)$/ || $1 > 99));
+      if (defined $value && ($value !~ /^(\d+)$/ || $1 > 99 || $1 < 1));
     my $dim = ReadingsVal($name,"dim",100);
     my $dimStep = $value ? $value : AttrVal($name,"hyperionDimStep",10);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
@@ -726,6 +729,17 @@ sub Hyperion_Set($@)
     my %ar            = ($cmd => $arr);
     $obj{command}     = "adjustment";
     $obj{adjustment}  = \%ar;
+  }
+  elsif ($cmd =~ /^(valueGainUp|valueGainDown)$/)
+  {
+    return "Value of $cmd has to be between 0.1 and 1.0 in steps of 0.1"
+      if (defined $value && ($value !~ /^(\d\.\d)$/ || $1 > 1 || $1 < 0.1));
+    my $gain = ReadingsNum($name,"valueGain",1);
+    my $gainStep = $value ? $value : AttrVal($name,"hyperionGainStep",0.1);
+    my $gainUp = ($gain + $gainStep < 5) ? $gain + $gainStep : 5;
+    my $gainDown = ($gain - $gainStep > 0) ? $gain - $gainStep : 0.1;
+    $cmd eq "valueGainUp" ? fhem "set $name valueGain $gainUp" : fhem "set $name valueGain $gainDown";
+    return undef;
   }
   if (scalar keys %obj)
   {
@@ -1103,6 +1117,11 @@ sub Hyperion_devStateIcon($;$)
       default: 10 (percent)
     </li>
     <li>
+      <i>hyperionGainStep</i><br>
+      valueGain step for valueGainDown/valueGainUp<br>
+      default: 0.1
+    </li>
+    <li>
       <i>hyperionNoSudo</i><br>
       disable sudo for non-root ssh user<br>
       default: 0
@@ -1455,6 +1474,11 @@ sub Hyperion_devStateIcon($;$)
       <i>hyperionDimStep</i><br>
       Dimmstufen f&uuml;r dimDown/dimUp<br>
       Voreinstellung: 10 (Prozent)
+    </li>
+    <li>
+      <i>hyperionGainStep</i><br>
+      valueGain Dimmstufen f&uuml;r valueGainDown/valueGainUp<br>
+      Voreinstellung: 0.1
     </li>
     <li>
       <i>hyperionNoSudo</i><br>
