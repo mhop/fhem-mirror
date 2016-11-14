@@ -382,7 +382,7 @@ doUpdate($$$$)
 
   if($nChanged) {
     for my $f ($attr{global}{configfile}, $attr{global}{statefile}) {
-      upd_saveConfig($root, $restoreDir, $f) if($f !~ m,(^/|\.\.),);
+      upd_saveConfig($root, $restoreDir, $f) if($f && $f !~ m,(^/|\.\.),);
     }
   }
 
@@ -529,7 +529,7 @@ upd_saveConfig($$$)
 {
   my($root, $restoreDir, $fName) = @_;
 
-  return if(!$restoreDir || configDBUsed() || !-r "$root/$fName");
+  return if(!$fName || !$restoreDir || configDBUsed() || !-r "$root/$fName");
   upd_mkDir($root, "$restoreDir/$fName", 1);
   Log 1, "saving $fName";
   if(!copy("$root/$fName", "$root/$restoreDir/$fName")) {
