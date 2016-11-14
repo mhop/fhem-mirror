@@ -175,10 +175,10 @@ my $rtype_base = {
   # based on https://de.wikipedia.org/wiki/Liste_physikalischer_Gr%C3%B6%C3%9Fen
 
     0 => {
-        dimension      => 'L',
-        formula_symbol => 'l',
-        rtype_base     => 'm',
-        txt_base       => {
+        dimension        => 'L',
+        formula_symbol   => 'l',
+        rtype_base       => 'm',
+        base_description => {
             de => 'Länge',
             en => 'length',
             fr => 'length',
@@ -190,10 +190,10 @@ my $rtype_base = {
     },
 
     1 => {
-        dimension      => 'M',
-        formula_symbol => 'm',
-        rtype_base     => 'kg',
-        txt_base       => {
+        dimension        => 'M',
+        formula_symbol   => 'm',
+        rtype_base       => 'kg',
+        base_description => {
             de => 'Masse',
             en => 'mass',
             fr => 'mass',
@@ -205,10 +205,10 @@ my $rtype_base = {
     },
 
     2 => {
-        dimension      => 'T',
-        formula_symbol => 't',
-        rtype_base     => 's',
-        txt_base       => {
+        dimension        => 'T',
+        formula_symbol   => 't',
+        rtype_base       => 's',
+        base_description => {
             de => 'Zeit',
             en => 'time',
             fr => 'time',
@@ -220,10 +220,10 @@ my $rtype_base = {
     },
 
     3 => {
-        dimension      => 'I',
-        formula_symbol => 'i',
-        rtype_base     => 'a',
-        txt_base       => {
+        dimension        => 'I',
+        formula_symbol   => 'i',
+        rtype_base       => 'a',
+        base_description => {
             de => 'elektrische Stromstärke',
             en => 'electric current',
             fr => 'electric current',
@@ -235,10 +235,10 @@ my $rtype_base = {
     },
 
     4 => {
-        dimension      => 'θ',
-        formula_symbol => 'T',
-        rtype_base     => 'k',
-        txt_base       => {
+        dimension        => 'θ',
+        formula_symbol   => 'T',
+        rtype_base       => 'k',
+        base_description => {
             de => 'absolute Temperatur',
             en => 'absolute temperature',
             fr => 'absolute temperature',
@@ -250,10 +250,10 @@ my $rtype_base = {
     },
 
     5 => {
-        dimension      => 'N',
-        formula_symbol => 'n',
-        rtype_base     => 'mol',
-        txt_base       => {
+        dimension        => 'N',
+        formula_symbol   => 'n',
+        rtype_base       => 'mol',
+        base_description => {
             de => 'Stoffmenge',
             en => 'amount of substance',
             fr => 'amount of substance',
@@ -265,10 +265,10 @@ my $rtype_base = {
     },
 
     6 => {
-        dimension      => 'J',
-        formula_symbol => 'Iv',
-        rtype_base     => 'cd',
-        txt_base       => {
+        dimension        => 'J',
+        formula_symbol   => 'Iv',
+        rtype_base       => 'cd',
+        base_description => {
             de => 'Lichtstärke',
             en => 'luminous intensity',
             fr => 'luminous intensity',
@@ -280,10 +280,10 @@ my $rtype_base = {
     },
 
     7 => {
-        dimension      => 'M L^2 T^−2',
-        formula_symbol => 'E',
-        rtype_base     => 'j',
-        txt_base       => {
+        dimension        => 'M L^2 T^−2',
+        formula_symbol   => 'E',
+        rtype_base       => 'j',
+        base_description => {
             de => 'Energie',
             en => 'energy',
             fr => 'energy',
@@ -295,10 +295,10 @@ my $rtype_base = {
     },
 
     8 => {
-        dimension      => 'T^−1',
-        formula_symbol => 'f',
-        rtype_base     => 'hz',
-        txt_base       => {
+        dimension        => 'T^−1',
+        formula_symbol   => 'f',
+        rtype_base       => 'hz',
+        base_description => {
             de => 'Frequenz',
             en => 'frequency',
             fr => 'frequency',
@@ -310,10 +310,10 @@ my $rtype_base = {
     },
 
     9 => {
-        dimension      => 'M L^2 T^−3',
-        formula_symbol => 'P',
-        rtype_base     => 'w',
-        txt_base       => {
+        dimension        => 'M L^2 T^−3',
+        formula_symbol   => 'P',
+        rtype_base       => 'w',
+        base_description => {
             de => 'Leistung',
             en => 'power',
             fr => 'power',
@@ -325,10 +325,10 @@ my $rtype_base = {
     },
 
     10 => {
-        dimension      => 'M L^−1 T^−2',
-        formula_symbol => 'p',
-        rtype_base     => 'pa',
-        txt_base       => {
+        dimension        => 'M L^−1 T^−2',
+        formula_symbol   => 'p',
+        rtype_base       => 'pa',
+        base_description => {
             de => 'Druck',
             en => 'pressure',
             fr => 'pressure',
@@ -340,10 +340,10 @@ my $rtype_base = {
     },
 
     11 => {
-        dimension      => 'M L^−1 T^−2',
-        formula_symbol => 'pabs',
-        rtype_base     => 'pabs',
-        txt_base       => {
+        dimension        => 'M L^−1 T^−2',
+        formula_symbol   => 'pabs',
+        rtype_base       => 'pabs',
+        base_description => {
             de => 'absoluter Druck',
             en => 'absolute pressure',
             fr => 'absolute pressure',
@@ -355,10 +355,10 @@ my $rtype_base = {
     },
 
     12 => {
-        dimension      => 'M L^−1 T^−2',
-        formula_symbol => 'pamb',
-        rtype_base     => 'pamb',
-        txt_base       => {
+        dimension        => 'M L^−1 T^−2',
+        formula_symbol   => 'pamb',
+        rtype_base       => 'pamb',
+        base_description => {
             de => 'Luftdruck',
             en => 'air pressure',
             fr => 'air pressure',
@@ -370,10 +370,10 @@ my $rtype_base = {
     },
 
     13 => {
-        dimension      => 'M L^2 T^−3 I^−1',
-        formula_symbol => 'U',
-        rtype_base     => 'v',
-        txt_base       => {
+        dimension        => 'M L^2 T^−3 I^−1',
+        formula_symbol   => 'U',
+        rtype_base       => 'v',
+        base_description => {
             de => 'elektrische Spannung',
             en => 'electric voltage',
             fr => 'electric voltage',
@@ -385,10 +385,10 @@ my $rtype_base = {
     },
 
     14 => {
-        dimension      => '1',
-        formula_symbol => '',
-        rtype_base     => 'rad',
-        txt_base       => {
+        dimension        => '1',
+        formula_symbol   => '',
+        rtype_base       => 'rad',
+        base_description => {
             de => 'ebener Winkel',
             en => 'plane angular',
             fr => 'plane angular',
@@ -400,10 +400,10 @@ my $rtype_base = {
     },
 
     15 => {
-        dimension      => 'L T^−1',
-        formula_symbol => 'v',
-        rtype_base     => 'kmh',
-        txt_base       => {
+        dimension        => 'L T^−1',
+        formula_symbol   => 'v',
+        rtype_base       => 'kmh',
+        base_description => {
             de => 'Geschwindigkeit',
             en => 'speed',
             fr => 'speed',
@@ -415,10 +415,10 @@ my $rtype_base = {
     },
 
     16 => {
-        dimension      => 'L^−2 J',
-        formula_symbol => 'Ev',
-        rtype_base     => 'lx',
-        txt_base       => {
+        dimension        => 'L^−2 J',
+        formula_symbol   => 'Ev',
+        rtype_base       => 'lx',
+        base_description => {
             de => 'Beleuchtungsstärke',
             en => 'illumination intensity',
             fr => 'illumination intensity',
@@ -430,10 +430,10 @@ my $rtype_base = {
     },
 
     17 => {
-        dimension      => 'J',
-        formula_symbol => 'F',
-        rtype_base     => 'lm',
-        txt_base       => {
+        dimension        => 'J',
+        formula_symbol   => 'F',
+        rtype_base       => 'lm',
+        base_description => {
             de => 'Lichtstrom',
             en => 'luminous flux',
             fr => 'luminous flux',
@@ -445,10 +445,10 @@ my $rtype_base = {
     },
 
     18 => {
-        dimension      => 'L^3',
-        formula_symbol => 'V',
-        rtype_base     => 'm3',
-        txt_base       => {
+        dimension        => 'L^3',
+        formula_symbol   => 'V',
+        rtype_base       => 'm3',
+        base_description => {
             de => 'Volumen',
             en => 'volume',
             fr => 'volume',
@@ -460,10 +460,10 @@ my $rtype_base = {
     },
 
     19 => {
-        dimension      => '1',
-        formula_symbol => 'B',
-        rtype_base     => 'b',
-        txt_base       => {
+        dimension        => '1',
+        formula_symbol   => 'B',
+        rtype_base       => 'b',
+        base_description => {
             de => 'Logarithmische Größe',
             en => 'logarithmic level',
             fr => 'logarithmic level',
@@ -475,10 +475,10 @@ my $rtype_base = {
     },
 
     20 => {
-        dimension      => 'I T',
-        formula_symbol => 'C',
-        rtype_base     => 'coul',
-        txt_base       => {
+        dimension        => 'I T',
+        formula_symbol   => 'C',
+        rtype_base       => 'coul',
+        base_description => {
             de => 'elektrische Ladung',
             en => 'electric charge',
             fr => 'electric charge',
@@ -490,10 +490,10 @@ my $rtype_base = {
     },
 
     21 => {
-        dimension      => '',
-        formula_symbol => 'F',
-        rtype_base     => 'far',
-        txt_base       => {
+        dimension        => '',
+        formula_symbol   => 'F',
+        rtype_base       => 'far',
+        base_description => {
             de => 'elektrische Kapazität',
             en => 'electric capacity',
             fr => 'electric capacity',
@@ -505,10 +505,10 @@ my $rtype_base = {
     },
 
     22 => {
-        dimension      => '',
-        formula_symbol => 'F',
-        rtype_base     => 'far',
-        txt_base       => {
+        dimension        => '',
+        formula_symbol   => 'F',
+        rtype_base       => 'far',
+        base_description => {
             de => 'elektrische Widerstand',
             en => 'electric resistance',
             fr => 'electric resistance',
@@ -520,10 +520,10 @@ my $rtype_base = {
     },
 
     23 => {
-        dimension      => 'L^2',
-        formula_symbol => 'A',
-        rtype_base     => 'm2',
-        txt_base       => {
+        dimension        => 'L^2',
+        formula_symbol   => 'A',
+        rtype_base       => 'm2',
+        base_description => {
             de => 'Flächeninhalt',
             en => 'surface area',
             fr => 'surface area',
@@ -535,15 +535,15 @@ my $rtype_base = {
     },
 
     900 => {
-        txt_base  => 'FHEM Builtin Readings Type',
-        tmpl      => '%value%',
-        tmpl_long => '%value%',
+        base_description => 'FHEM Builtin Readings Type',
+        tmpl             => '%value%',
+        tmpl_long        => '%value%',
     },
 
     999 => {
-        txt_base  => 'FHEM User Defined Readings Type',
-        tmpl      => '%value%',
-        tmpl_long => '%value%',
+        base_description => 'FHEM User Defined Readings Type',
+        tmpl             => '%value%',
+        tmpl_long        => '%value%',
     },
 };
 
@@ -559,7 +559,14 @@ my $rtypes = {
             nl => [ 'error',  'on' ],
             pl => [ 'error',  'on' ],
         },
-        scope => [ '^(nok|error|0)$', '^(ok|1)$' ],
+        scope             => [ '^(nok|error|0)$', '^(ok|1)$' ],
+        rtype_description => {
+            de => 'Zweiwertiger Fehlerstatus',
+            en => 'two-way error state',
+            fr => 'two-way error state',
+            nl => 'two-way error state',
+            pl => 'two-way error state',
+        },
     },
 
     onoff => {
@@ -571,7 +578,14 @@ my $rtypes = {
             nl => [ 'off', 'on' ],
             pl => [ 'off', 'on' ],
         },
-        scope => [ '^(off|0)$', '^(on|1)$' ],
+        scope             => [ '^(off|0)$', '^(on|1)$' ],
+        rtype_description => {
+            de => 'Schaltstatus',
+            en => 'Switch state',
+            fr => 'Switch state',
+            nl => 'Switch state',
+            pl => 'Switch state',
+        },
     },
 
     bool => {
@@ -583,64 +597,90 @@ my $rtypes = {
             nl => [ 'false',  'true' ],
             pl => [ 'false',  'true' ],
         },
-        scope => [ '^(0|false)$', '^(1|true)$' ],
+        scope             => [ '^(false|0)$', '^(true|1)$' ],
+        rtype_description => {
+            de => 'Boolesch',
+            en => 'Boolean',
+            fr => 'Boolean',
+            nl => 'Boolean',
+            pl => 'Boolean',
+        },
     },
 
     epoch => {
-        ref_base => 900,
-        txt      => {
+        ref_base          => 900,
+        scope             => { min => 0 },
+        rtype_description => {
             de => 'Unix Epoche in s seit 1970-01-01T00:00:00Z',
             en => 'Unix epoch in s since 1970-01-01T00:00:00Z',
             fr => 'Unix epoch in s since 1970-01-01T00:00:00Z',
             nl => 'Unix epoch in s since 1970-01-01T00:00:00Z',
             pl => 'Unix epoch in s since 1970-01-01T00:00:00Z',
         },
-        scope => { min => 0 },
     },
 
     time => {
-        ref_base => 900,
-        txt      => {
+        ref_base          => 900,
+        scope             => '^(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))$',
+        rtype_description => {
             de => 'Uhrzeit hh:mm',
             en => 'time hh:mm',
             fr => 'time hh:mm',
             nl => 'time hh:mm',
             pl => 'time hh:mm',
         },
-        scope => '^(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))$',
     },
 
     datetime => {
         ref_base => 900,
-        txt      => 'YYYY-mm-dd hh:mm',
         scope =>
 '^(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]))$',
+        rtype_description => {
+            de => 'Datum+Uhrzeit YYYY-mm-dd hh:mm',
+            en => 'date+time YYYY-mm-dd hh:mm',
+            fr => 'date+time YYYY-mm-dd hh:mm',
+            nl => 'date+time YYYY-mm-dd hh:mm',
+            pl => 'date+time YYYY-mm-dd hh:mm',
+        },
     },
 
     timesec => {
         ref_base => 900,
-        txt      => {
+        scope    => '^(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]):([0-5]?[0-9]))$',
+        rtype_description => {
             de => 'Uhrzeit hh:mm:ss',
             en => 'time hh:mm:ss',
             fr => 'time hh:mm:ss',
             nl => 'time hh:mm:ss',
             pl => 'time hh:mm:ss',
         },
-        scope => '(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]):([0-5]?[0-9]))',
     },
 
     datetimesec => {
         ref_base => 900,
-        txt      => 'YYYY-mm-dd hh:mm:ss',
         scope =>
 '^(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]):(0?[1-9]|[1-5][0-9]))$',
+        rtype_description => {
+            de => 'Datum+Uhrzeit YYYY-mm-dd hh:mm:ss',
+            en => 'date+time YYYY-mm-dd hh:mm:ss',
+            fr => 'date+time YYYY-mm-dd hh:mm:ss',
+            nl => 'date+time YYYY-mm-dd hh:mm:ss',
+            pl => 'date+time YYYY-mm-dd hh:mm:ss',
+        },
     },
 
     direction => {
-        ref_base       => 900,
-        formula_symbol => 'Dir',
-        ref            => 'gon',
-        scope          => { min => 0, max => 360 },
+        ref_base          => 900,
+        formula_symbol    => 'Dir',
+        ref               => 'gon',
+        scope             => { min => 0, max => 360 },
+        rtype_description => {
+            de => 'Richtungsangabe',
+            en => 'direction',
+            fr => 'direction',
+            nl => 'direction',
+            pl => 'direction',
+        },
     },
 
     compasspoint => {
@@ -698,49 +738,77 @@ my $rtypes = {
             '^(S|8)$',  '^(SSW|9)$',  '^(SW|10)$', '^(WSW|11)$',
             '^(W|12)$', '^(WNW|13)$', '^(NW|14)$', '^(NNW|15)$'
         ],
+        rtype_description => {
+            de => 'Himmelsrichtung',
+            en => 'point of the compass',
+            fr => 'point of the compass',
+            nl => 'point of the compass',
+            pl => 'point of the compass',
+        },
     },
 
     closure => {
         ref_base => 900,
         txt      => {
-            de => 'offen/geschlossen/gekippt',
-            en => 'open/closed/tilted',
-            fr => 'open/closed/tilted',
-            nl => 'open/closed/tilted',
-            pl => 'open/closed/tilted',
+            de => [ 'geschlossen', 'offen', 'gekippt' ],
+            en => [ 'closed',      'open',  'tilted' ],
+            fr => [ 'closed',      'open',  'tilted' ],
+            nl => [ 'closed',      'open',  'tilted' ],
+            pl => [ 'closed',      'open',  'tilted' ],
         },
-        scope => [ '^(closed|0)$', '^(open|1)$', '^(tilted|2)$' ],
+        scope             => [ '^(closed|0)$', '^(open|1)$', '^(tilted|2)$' ],
+        rtype_description => {
+            de => 'Status für Fenster und Türen',
+            en => 'state for windows and doors',
+            fr => 'state for windows and doors',
+            nl => 'state for windows and doors',
+            pl => 'state for windows and doors',
+        },
     },
 
     condition_hum => {
         ref_base => 900,
         txt      => {
+            de => [ 'trocken', 'niedrig', 'optimal', 'hoch', 'feucht' ],
+            en => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
+            fr => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
+            nl => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
+            pl => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
+        },
+        scope => [
+            '^(dry|0)$', '^(low|1)$', '^(optimal|2)$', '^(high|3)$',
+            '^(wet|4)$'
+        ],
+        rtype_description => {
             de => 'Feuchtigkeitsbedingung',
             en => 'humidity condition',
             fr => 'humidity condition',
             nl => 'humidity condition',
             pl => 'humidity condition',
         },
-        scope => [
-            '^(dry|0)$', '^(low|1)$', '^(optimal|2)$', '^(high|3)$',
-            '^(wet|4)$'
-        ],
     },
 
     condition_uvi => {
         ref_base => 900,
         txt      => {
-            de => 'UV Bedingung',
-            en => 'UV condition',
-            fr => 'UV condition',
-            nl => 'UV condition',
-            pl => 'UV condition',
+            de => [ 'niedrig', 'moderat',  'high', 'sehr hoch', 'extrem' ],
+            en => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
+            fr => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
+            nl => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
+            pl => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
         },
         scope => [
             '^(low|0)$',  '^(moderate|1)$',
             '^(high|2)$', '^(veryhigh|3)$',
             '^(extreme|4)$'
         ],
+        rtype_description => {
+            de => 'UV Bedingung',
+            en => 'UV condition',
+            fr => 'UV condition',
+            nl => 'UV condition',
+            pl => 'UV condition',
+        },
     },
 
     pct => {
@@ -2561,7 +2629,9 @@ sub formatValue($$$;$$$$) {
     elsif ( ref($format) eq 'HASH' && looks_like_number($value) ) {
         my $v = abs($value);
         foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
-            next if ( ref( $format->{$l} ) ne 'HASH' || !$format->{$l}{scale} );
+            next
+              if ( ref( $format->{$l} ) ne 'HASH'
+                || !$format->{$l}{scale} );
             if ( $v >= $l ) {
                 my $scale = $format->{$l}{scale};
 
