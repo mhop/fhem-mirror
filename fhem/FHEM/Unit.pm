@@ -5,22 +5,23 @@ use warnings;
 use Scalar::Util qw(looks_like_number);
 use FHEM::UConv;
 use Data::Dumper;
+use Clone qw(clone);
 
 sub Unit_Initialize() {
 }
 
-my $autoscale_m = {
-    '0'     => { format => '%i',   scale => 1000, },
-    '0.001' => { format => '%i',   scale => 1000, },
-    '0.1'   => { format => '%.1f', scale => 1, },
-    '10'    => { format => '%i',   scale => 1, },
-    '1.0e3' => { format => '%.1f', scale => 0.001, },
-    '2.0e3' => { format => '%i',   scale => 0.001, },
-    '1.0e6' => { format => '%.1f', scale => 0.001, },
-    '2.0e6' => { format => '%i',   scale => 0.001, },
-};
-
 my $scales_m = {
+    autoscale => {
+        '0'     => { format => '%i',   scale => 1000, },
+        '0.001' => { format => '%i',   scale => 1000, },
+        '0.1'   => { format => '%.1f', scale => 1, },
+        '10'    => { format => '%i',   scale => 1, },
+        '1.0e3' => { format => '%.1f', scale => 0.001, },
+        '2.0e3' => { format => '%i',   scale => 0.001, },
+        '1.0e6' => { format => '%.1f', scale => 0.001, },
+        '2.0e6' => { format => '%i',   scale => 0.001, },
+    },
+
     '1.0e-12' => {
         'scale_txt_m'      => 'p',
         'scale_txt_long_m' => {
@@ -157,6 +158,16 @@ my $scales_cu = {
         nl => 'Cubic',
         pl => 'Cubic',
     },
+};
+
+my $scales_t = {
+    '1'        => {},
+    '60'       => {},
+    '3600'     => {},
+    '86400'    => {},
+    '604800'   => {},
+    '2592000'  => {},
+    '31536000' => {},
 };
 
 my $rtype_base = {
@@ -524,7 +535,13 @@ my $rtype_base = {
     },
 
     900 => {
-        txt_base  => 'FHEM Readings Type',
+        txt_base  => 'FHEM Builtin Readings Type',
+        tmpl      => '%value%',
+        tmpl_long => '%value%',
+    },
+
+    999 => {
+        txt_base  => 'FHEM User Defined Readings Type',
         tmpl      => '%value%',
         tmpl_long => '%value%',
     },
@@ -542,7 +559,7 @@ my $rtypes = {
             nl => [ 'error',  'on' ],
             pl => [ 'error',  'on' ],
         },
-        scope => [ 'nok', 'ok' ],
+        scope => [ 'nok|error|0/nok', 'ok|1/ok' ],
     },
 
     onoff => {
@@ -554,19 +571,19 @@ my $rtypes = {
             nl => [ 'off', 'on' ],
             pl => [ 'off', 'on' ],
         },
-        scope => [ 'off', 'on' ],
+        scope => [ 'off|0', 'on|1' ],
     },
 
     bool => {
         ref_base => 900,
         txt      => {
-            de => 'wahr/falsch',
-            en => 'true/false',
-            fr => 'true/false',
-            nl => 'true/false',
-            pl => 'true/false',
+            de => [ 'falsch', 'wahr' ],
+            en => [ 'false',  'true' ],
+            fr => [ 'false',  'true' ],
+            nl => [ 'false',  'true' ],
+            pl => [ 'false',  'true' ],
         },
-        scope => [ 'false', 'true' ],
+        scope => [ '0|false', '1|true' ],
     },
 
     epoch => {
@@ -590,14 +607,14 @@ my $rtypes = {
             nl => 'time hh:mm',
             pl => 'time hh:mm',
         },
-        scope => '^([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9])$',
+        scope => '(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))',
     },
 
     datetime => {
         ref_base => 900,
         txt      => 'YYYY-mm-dd hh:mm',
         scope =>
-'^([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9])$',
+'(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]))',
     },
 
     timesec => {
@@ -609,14 +626,14 @@ my $rtypes = {
             nl => 'time hh:mm:ss',
             pl => 'time hh:mm:ss',
         },
-        scope => '^([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]):([0-5]?[0-9])$',
+        scope => '(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]):([0-5]?[0-9]))',
     },
 
     datetimesec => {
         ref_base => 900,
         txt      => 'YYYY-mm-dd hh:mm:ss',
         scope =>
-'^([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]):(0?[1-9]|[1-5][0-9])$',
+'(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]):(0?[1-9]|[1-5][0-9]))',
     },
 
     direction => {
@@ -676,8 +693,9 @@ my $rtypes = {
             ],
         },
         scope => [
-            'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-            'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+            'N|0',  'NNE|1',  'NE|2',  'ENE|3', 'E|4',   'ESE|5',
+            'SE|6', 'SSE|7',  'S|8',   'SSW|9', 'SW|10', 'WSW|11',
+            'W|12', 'WNW|13', 'NW|14', 'NNW|15'
         ],
     },
 
@@ -690,7 +708,7 @@ my $rtypes = {
             nl => 'open/closed/tilted',
             pl => 'open/closed/tilted',
         },
-        scope => [ 'closed', 'open', 'tilted' ],
+        scope => [ 'closed|0', 'open|1', 'tilted|2' ],
     },
 
     condition_hum => {
@@ -702,7 +720,7 @@ my $rtypes = {
             nl => 'humidity condition',
             pl => 'humidity condition',
         },
-        scope => [ 'dry', 'low', 'optimal', 'high', 'wet' ],
+        scope => [ 'dry|0', 'low|1', 'optimal|2', 'high|3', 'wet|4' ],
     },
 
     condition_uvi => {
@@ -714,7 +732,7 @@ my $rtypes = {
             nl => 'UV condition',
             pl => 'UV condition',
         },
-        scope => [ 'low', 'moderate', 'high', 'veryhigh', 'extreme' ],
+        scope => [ 'low|0', 'moderate|1', 'high|2', 'veryhigh|3', 'extreme|4' ],
     },
 
     pct => {
@@ -1657,6 +1675,7 @@ my $rtypes = {
         scale_m   => '1.0e-6',
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1679,6 +1698,7 @@ my $rtypes = {
         scale_m   => '1.0e-6',
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1701,6 +1721,7 @@ my $rtypes = {
         scale_m   => '1.0e-3',
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1723,6 +1744,7 @@ my $rtypes = {
         scale_m   => '1.0e-3',
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1745,6 +1767,7 @@ my $rtypes = {
         scale_m   => '1.0e0',
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1767,6 +1790,7 @@ my $rtypes = {
         scale_m   => '1.0e0',
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
+        format    => '%.0f',
         tmpl      => '%value% %suffix%/%suffix_sq%',
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
@@ -1824,387 +1848,389 @@ my $rtypes = {
 };
 
 my $readingsDB = {
-    airpress => {
-        aliasname => 'pressure_hpa',    # alias only
-    },
-    azimuth => {
-        rtype => 'gon',
-    },
-    compasspoint => {
-        rtype => 'compasspoint'
-    },
-    daylight => {
-        rtype => 'bool',
-    },
-    dewpoint => {
-        aliasname => 'dewpoint_c',      # alias only
-    },
-    dewpoint_c => {
-        rtype => 'c',
-    },
-    dewpoint_f => {
-        rtype => 'f',
-    },
-    dewpoint_k => {
-        rtype => 'k',
-    },
-    elevation => {
-        rtype => 'gon',
-    },
-    feelslike => {
-        aliasname => 'feelslike_c',    # alias only
-    },
-    feelslike_c => {
-        rtype => 'c',
-    },
-    feelslike_f => {
-        rtype => 'f',
-    },
-    heat_index => {
-        aliasname => 'heat_index_c',    # alias only
-    },
-    heat_index_c => {
-        rtype => 'c',
-    },
-    heat_index_f => {
-        rtype => 'f',
-    },
-    high_c => {
-        rtype => 'c',
-    },
-    high_f => {
-        rtype => 'f',
-    },
-    humidity => {
-        rtype => 'pct',
-    },
-    humidityabs => {
-        aliasname => 'humidityabs_c',    # alias only
-    },
-    humidityabs_c => {
-        rtype => 'c',
-    },
-    humidityabs_f => {
-        rtype => 'f',
-    },
-    humidityabs_k => {
-        rtype => 'k',
-    },
-    horizon => {
-        rtype => 'gon',
-    },
-    indoordewpoint => {
-        aliasname => 'indoordewpoint_c',    # alias only
-    },
-    indoordewpoint_c => {
-        rtype => 'c',
-    },
-    indoordewpoint_f => {
-        rtype => 'f',
-    },
-    indoordewpoint_k => {
-        rtype => 'k',
-    },
-    indoorhumidity => {
-        rtype => 'pct',
-    },
-    indoorhumidityabs => {
-        aliasname => 'indoorhumidityabs_c',    # alias only
-    },
-    indoorhumidityabs_c => {
-        rtype => 'c',
-    },
-    indoorhumidityabs_f => {
-        rtype => 'f',
-    },
-    indoorhumidityabs_k => {
-        rtype => 'k',
-    },
-    indoortemperature => {
-        aliasname => 'indoortemperature_c',    # alias only
-    },
-    indoortemperature_c => {
-        rtype => 'c',
-    },
-    indoortemperature_f => {
-        rtype => 'f',
-    },
-    indoortemperature_k => {
-        rtype => 'k',
-    },
-    israining => {
-        rtype => 'bool',
-    },
-    level => {
-        rtype => 'pct',
-    },
-    low_c => {
-        rtype => 'c',
-    },
-    low_f => {
-        rtype => 'f',
-    },
-    luminosity => {
-        rtype => 'lx',
-    },
-    pct => {
-        rtype => 'pct',
-    },
-    pressure => {
-        aliasname => 'pressure_hpa',    # alias only
-    },
-    pressure_hpa => {
-        rtype => 'hpamb',
-    },
-    pressure_in => {
-        rtype => 'inhg',
-    },
-    pressure_mm => {
-        rtype => 'mmhg',
-    },
-    pressure_psi => {
-        rtype => 'psi',
-    },
-    pressure_psig => {
-        rtype => 'psig',
-    },
-    pressureabs => {
-        aliasname => 'pressureabs_hpamb',    # alias only
-    },
-    pressureabs_hpamb => {
-        rtype => 'hpamb',
-    },
-    pressureabs_in => {
-        rtype => 'inhg',
-    },
-    pressureabs_mm => {
-        rtype => 'mmhg',
-    },
-    pressureabs_psi => {
-        rtype => 'psia',
-    },
-    pressureabs_psia => {
-        rtype => 'psia',
-    },
-    rain => {
-        aliasname => 'rain_mm',    # alias only
-    },
-    rain_mm => {
-        rtype => 'mm',
-    },
-    rain_in => {
-        rtype => 'in',
-    },
-    rain_day => {
-        aliasname => 'rain_day_mm',    # alias only
-    },
-    rain_day_mm => {
-        rtype => 'mm',
-    },
-    rain_day_in => {
-        rtype => 'in',
-    },
-    rain_night => {
-        aliasname => 'rain_night_mm',    # alias only
-    },
-    rain_night_mm => {
-        rtype => 'mm',
-    },
-    rain_night_in => {
-        rtype => 'in',
-    },
-    rain_week => {
-        aliasname => 'rain_week_mm',     # alias only
-    },
-    rain_week_mm => {
-        rtype => 'mm',
-    },
-    rain_week_in => {
-        rtype => 'in',
-    },
-    rain_month => {
-        aliasname => 'rain_month_mm',    # alias only
-    },
-    rain_month_mm => {
-        rtype => 'mm',
-    },
-    rain_month_in => {
-        rtype => 'in',
-    },
-    rain_year => {
-        aliasname => 'rain_year_mm',     # alias only
-    },
-    rain_year_mm => {
-        rtype => 'mm',
-    },
-    rain_year_in => {
-        rtype => 'in',
-    },
-    snow => {
-        aliasname => 'snow_cm',          # alias only
-    },
-    snow_cm => {
-        rtype => 'cm',
-    },
-    snow_in => {
-        rtype => 'in',
-    },
-    snow_day => {
-        aliasname => 'snow_day_cm',      # alias only
-    },
-    snow_day_cm => {
-        rtype => 'cm',
-    },
-    snow_day_in => {
-        rtype => 'in',
-    },
-    snow_night => {
-        aliasname => 'snow_night_cm',    # alias only
-    },
-    snow_night_cm => {
-        rtype => 'cm',
-    },
-    snow_night_in => {
-        rtype => 'in',
-    },
-    sunshine => {
-        aliasname => 'solarradiation',    # alias only
-    },
-    solarradiation => {
-        rtype => 'wpsm',
-    },
-    temp => {
-        aliasname => 'temperature_c',     # alias only
-    },
-    temp_c => {
-        aliasname => 'temperature_c',     # alias only
-    },
-    temp_f => {
-        aliasname => 'temperature_f',     # alias only
-    },
-    temp_k => {
-        aliasname => 'temperature_k',     # alias only
-    },
-    temperature => {
-        aliasname => 'temperature_c',     # alias only
-    },
-    temperature_c => {
-        rtype => 'c',
-    },
-    temperature_f => {
-        rtype => 'f',
-    },
-    temperature_k => {
-        rtype => 'k',
-    },
-    uv => {
-        aliasname => 'uvi',               # alias only
-    },
-    uvi => {
-        rtype => 'uvi',
-    },
-    uvr => {
-        rtype => 'uwpscm',
-    },
-    valvedesired => {
-        aliasname => 'valve',             # alias only
-    },
-    valvepos => {
-        aliasname => 'valve',             # alias only
-    },
-    valveposition => {
-        aliasname => 'valve',             # alias only
-    },
-    valvepostc => {
-        aliasname => 'valve',             # alias only
-    },
-    valve => {
-        rtype => 'pct',
-    },
-    visibility => {
-        aliasname => 'visibility_km',     # alias only
-    },
-    visibility_km => {
-        rtype => 'km',
-    },
-    visibility_mi => {
-        rtype => 'mi',
-    },
-    wind_chill => {
-        aliasname => 'wind_chill_c',      # alias only
-    },
-    wind_chill_c => {
-        rtype => 'c',
-    },
-    wind_chill_f => {
-        rtype => 'f',
-    },
-    wind_chill_k => {
-        rtype => 'k',
-    },
-    wind_compasspoint => {
-        rtype => 'compasspoint'
-    },
-    windspeeddirection => {
-        aliasname => 'wind_compasspoint',    # alias only
-    },
-    winddirectiontext => {
-        aliasname => 'wind_compasspoint',    # alias only
-    },
-    wind_direction => {
-        rtype => 'direction',
-    },
-    wind_dir => {
-        aliasname => 'wind_direction',       # alias only
-    },
-    winddir => {
-        aliasname => 'wind_direction',       # alias only
-    },
-    winddirection => {
-        aliasname => 'wind_direction',       # alias only
-    },
-    wind_gust => {
-        aliasname => 'wind_gust_kmh',        # alias only
-    },
-    wind_gust_kmh => {
-        rtype => 'kmh',
-    },
-    wind_gust_bft => {
-        rtype => 'bft',
-    },
-    wind_gust_fts => {
-        rtype => 'fts',
-    },
-    wind_gust_kn => {
-        rtype => 'kn',
-    },
-    wind_gust_mph => {
-        rtype => 'mph',
-    },
-    wind_gust_mps => {
-        rtype => 'mps',
-    },
-    wind_speed => {
-        aliasname => 'wind_speed_kmh',    # alias only
-    },
-    wind_speed_kmh => {
-        rtype => 'kmh',
-    },
-    wind_speed_bft => {
-        rtype => 'bft',
-    },
-    wind_speed_fts => {
-        rtype => 'fts',
-    },
-    wind_speed_kn => {
-        rtype => 'kn',
-    },
-    wind_speed_mph => {
-        rtype => 'mph',
-    },
-    wind_speed_mps => {
-        rtype => 'mps',
-    },
+    global => {
+        airpress => {
+            aliasname => 'pressure_hpa',    # alias only
+        },
+        azimuth => {
+            rtype => 'gon',
+        },
+        compasspoint => {
+            rtype => 'compasspoint'
+        },
+        daylight => {
+            rtype => 'bool',
+        },
+        dewpoint => {
+            aliasname => 'dewpoint_c',      # alias only
+        },
+        dewpoint_c => {
+            rtype => 'c',
+        },
+        dewpoint_f => {
+            rtype => 'f',
+        },
+        dewpoint_k => {
+            rtype => 'k',
+        },
+        elevation => {
+            rtype => 'gon',
+        },
+        feelslike => {
+            aliasname => 'feelslike_c',    # alias only
+        },
+        feelslike_c => {
+            rtype => 'c',
+        },
+        feelslike_f => {
+            rtype => 'f',
+        },
+        heat_index => {
+            aliasname => 'heat_index_c',    # alias only
+        },
+        heat_index_c => {
+            rtype => 'c',
+        },
+        heat_index_f => {
+            rtype => 'f',
+        },
+        high_c => {
+            rtype => 'c',
+        },
+        high_f => {
+            rtype => 'f',
+        },
+        humidity => {
+            rtype => 'pct',
+        },
+        humidityabs => {
+            aliasname => 'humidityabs_c',    # alias only
+        },
+        humidityabs_c => {
+            rtype => 'c',
+        },
+        humidityabs_f => {
+            rtype => 'f',
+        },
+        humidityabs_k => {
+            rtype => 'k',
+        },
+        horizon => {
+            rtype => 'gon',
+        },
+        indoordewpoint => {
+            aliasname => 'indoordewpoint_c',    # alias only
+        },
+        indoordewpoint_c => {
+            rtype => 'c',
+        },
+        indoordewpoint_f => {
+            rtype => 'f',
+        },
+        indoordewpoint_k => {
+            rtype => 'k',
+        },
+        indoorhumidity => {
+            rtype => 'pct',
+        },
+        indoorhumidityabs => {
+            aliasname => 'indoorhumidityabs_c',    # alias only
+        },
+        indoorhumidityabs_c => {
+            rtype => 'c',
+        },
+        indoorhumidityabs_f => {
+            rtype => 'f',
+        },
+        indoorhumidityabs_k => {
+            rtype => 'k',
+        },
+        indoortemperature => {
+            aliasname => 'indoortemperature_c',    # alias only
+        },
+        indoortemperature_c => {
+            rtype => 'c',
+        },
+        indoortemperature_f => {
+            rtype => 'f',
+        },
+        indoortemperature_k => {
+            rtype => 'k',
+        },
+        israining => {
+            rtype => 'bool',
+        },
+        level => {
+            rtype => 'pct',
+        },
+        low_c => {
+            rtype => 'c',
+        },
+        low_f => {
+            rtype => 'f',
+        },
+        luminosity => {
+            rtype => 'lx',
+        },
+        pct => {
+            rtype => 'pct',
+        },
+        pressure => {
+            aliasname => 'pressure_hpa',    # alias only
+        },
+        pressure_hpa => {
+            rtype => 'hpamb',
+        },
+        pressure_in => {
+            rtype => 'inhg',
+        },
+        pressure_mm => {
+            rtype => 'mmhg',
+        },
+        pressure_psi => {
+            rtype => 'psi',
+        },
+        pressure_psig => {
+            rtype => 'psig',
+        },
+        pressureabs => {
+            aliasname => 'pressureabs_hpamb',    # alias only
+        },
+        pressureabs_hpamb => {
+            rtype => 'hpamb',
+        },
+        pressureabs_in => {
+            rtype => 'inhg',
+        },
+        pressureabs_mm => {
+            rtype => 'mmhg',
+        },
+        pressureabs_psi => {
+            rtype => 'psia',
+        },
+        pressureabs_psia => {
+            rtype => 'psia',
+        },
+        rain => {
+            aliasname => 'rain_mm',    # alias only
+        },
+        rain_mm => {
+            rtype => 'mm',
+        },
+        rain_in => {
+            rtype => 'in',
+        },
+        rain_day => {
+            aliasname => 'rain_day_mm',    # alias only
+        },
+        rain_day_mm => {
+            rtype => 'mm',
+        },
+        rain_day_in => {
+            rtype => 'in',
+        },
+        rain_night => {
+            aliasname => 'rain_night_mm',    # alias only
+        },
+        rain_night_mm => {
+            rtype => 'mm',
+        },
+        rain_night_in => {
+            rtype => 'in',
+        },
+        rain_week => {
+            aliasname => 'rain_week_mm',     # alias only
+        },
+        rain_week_mm => {
+            rtype => 'mm',
+        },
+        rain_week_in => {
+            rtype => 'in',
+        },
+        rain_month => {
+            aliasname => 'rain_month_mm',    # alias only
+        },
+        rain_month_mm => {
+            rtype => 'mm',
+        },
+        rain_month_in => {
+            rtype => 'in',
+        },
+        rain_year => {
+            aliasname => 'rain_year_mm',     # alias only
+        },
+        rain_year_mm => {
+            rtype => 'mm',
+        },
+        rain_year_in => {
+            rtype => 'in',
+        },
+        snow => {
+            aliasname => 'snow_cm',          # alias only
+        },
+        snow_cm => {
+            rtype => 'cm',
+        },
+        snow_in => {
+            rtype => 'in',
+        },
+        snow_day => {
+            aliasname => 'snow_day_cm',      # alias only
+        },
+        snow_day_cm => {
+            rtype => 'cm',
+        },
+        snow_day_in => {
+            rtype => 'in',
+        },
+        snow_night => {
+            aliasname => 'snow_night_cm',    # alias only
+        },
+        snow_night_cm => {
+            rtype => 'cm',
+        },
+        snow_night_in => {
+            rtype => 'in',
+        },
+        sunshine => {
+            aliasname => 'solarradiation',    # alias only
+        },
+        solarradiation => {
+            rtype => 'wpsm',
+        },
+        temp => {
+            aliasname => 'temperature_c',     # alias only
+        },
+        temp_c => {
+            aliasname => 'temperature_c',     # alias only
+        },
+        temp_f => {
+            aliasname => 'temperature_f',     # alias only
+        },
+        temp_k => {
+            aliasname => 'temperature_k',     # alias only
+        },
+        temperature => {
+            aliasname => 'temperature_c',     # alias only
+        },
+        temperature_c => {
+            rtype => 'c',
+        },
+        temperature_f => {
+            rtype => 'f',
+        },
+        temperature_k => {
+            rtype => 'k',
+        },
+        uv => {
+            aliasname => 'uvi',               # alias only
+        },
+        uvi => {
+            rtype => 'uvi',
+        },
+        uvr => {
+            rtype => 'uwpscm',
+        },
+        valvedesired => {
+            aliasname => 'valve',             # alias only
+        },
+        valvepos => {
+            aliasname => 'valve',             # alias only
+        },
+        valveposition => {
+            aliasname => 'valve',             # alias only
+        },
+        valvepostc => {
+            aliasname => 'valve',             # alias only
+        },
+        valve => {
+            rtype => 'pct',
+        },
+        visibility => {
+            aliasname => 'visibility_km',     # alias only
+        },
+        visibility_km => {
+            rtype => 'km',
+        },
+        visibility_mi => {
+            rtype => 'mi',
+        },
+        wind_chill => {
+            aliasname => 'wind_chill_c',      # alias only
+        },
+        wind_chill_c => {
+            rtype => 'c',
+        },
+        wind_chill_f => {
+            rtype => 'f',
+        },
+        wind_chill_k => {
+            rtype => 'k',
+        },
+        wind_compasspoint => {
+            rtype => 'compasspoint'
+        },
+        windspeeddirection => {
+            aliasname => 'wind_compasspoint',    # alias only
+        },
+        winddirectiontext => {
+            aliasname => 'wind_compasspoint',    # alias only
+        },
+        wind_direction => {
+            rtype => 'direction',
+        },
+        wind_dir => {
+            aliasname => 'wind_direction',       # alias only
+        },
+        winddir => {
+            aliasname => 'wind_direction',       # alias only
+        },
+        winddirection => {
+            aliasname => 'wind_direction',       # alias only
+        },
+        wind_gust => {
+            aliasname => 'wind_gust_kmh',        # alias only
+        },
+        wind_gust_kmh => {
+            rtype => 'kmh',
+        },
+        wind_gust_bft => {
+            rtype => 'bft',
+        },
+        wind_gust_fts => {
+            rtype => 'fts',
+        },
+        wind_gust_kn => {
+            rtype => 'kn',
+        },
+        wind_gust_mph => {
+            rtype => 'mph',
+        },
+        wind_gust_mps => {
+            rtype => 'mps',
+        },
+        wind_speed => {
+            aliasname => 'wind_speed_kmh',    # alias only
+        },
+        wind_speed_kmh => {
+            rtype => 'kmh',
+        },
+        wind_speed_bft => {
+            rtype => 'bft',
+        },
+        wind_speed_fts => {
+            rtype => 'fts',
+        },
+        wind_speed_kn => {
+            rtype => 'kn',
+        },
+        wind_speed_mph => {
+            rtype => 'mph',
+        },
+        wind_speed_mps => {
+            rtype => 'mps',
+        },
+    }
 };
 
 # Find rtype through reading name
@@ -2226,7 +2252,7 @@ sub rname2rtype ($$@) {
     $r =~ s/.*[-_](temp)$/$1/i;
 
     # rename capital letter containing readings
-    if ( !$readingsDB->{ lc($r) } ) {
+    if ( !$readingsDB->{global}{ lc($r) } ) {
         $r =~ s/^([A-Z])(.*)/\l$1$2/;
         $r =~ s/([A-Z][a-z0-9]+)[\/\|\-_]?/_$1/g;
     }
@@ -2234,32 +2260,32 @@ sub rname2rtype ($$@) {
     $r = lc($r);
 
     # known aliasname reading names
-    if ( $readingsDB->{$r}{aliasname} ) {
-        my $dr = $readingsDB->{$r}{aliasname};
+    if ( $readingsDB->{global}{$r}{aliasname} ) {
+        my $dr = $readingsDB->{global}{$r}{aliasname};
         $return{aliasname} = $dr;
-        $return{shortname} = $readingsDB->{$dr}{shortname};
+        $return{shortname} = $readingsDB->{global}{$dr}{shortname};
         $rt                = (
-              $readingsDB->{$dr}{rtype}
-            ? $readingsDB->{$dr}{rtype}
+              $readingsDB->{global}{$dr}{rtype}
+            ? $readingsDB->{global}{$dr}{rtype}
             : "-"
         );
     }
 
     # known standard reading names
-    elsif ( $readingsDB->{$r}{shortname} ) {
+    elsif ( $readingsDB->{global}{$r}{shortname} ) {
         $return{aliasname} = $reading;
-        $return{shortname} = $readingsDB->{$r}{shortname};
+        $return{shortname} = $readingsDB->{global}{$r}{shortname};
         $rt                = (
-              $readingsDB->{$r}{rtype}
-            ? $readingsDB->{$r}{rtype}
+              $readingsDB->{global}{$r}{rtype}
+            ? $readingsDB->{global}{$r}{rtype}
             : "-"
         );
     }
 
     # just guessing the rtype from reading name format
-    elsif ( $r =~ /^.*_([A-Za-z]+)$/i ) {
-        $guess = 1;
-        $rt    = $1;
+    elsif ( $r =~ /^.*_([A-Za-z0-9]+)$/i ) {
+        $return{guess} = 1;
+        $rt = $1;
     }
 
     return $rt if ( $rt && $rtypes->{$rt} );
@@ -2271,10 +2297,12 @@ sub rname2rtype ($$@) {
 package main;
 
 # Get value + rtype combined string
-sub replaceTemplate ($$$;$) {
-    my ( $device, $reading, $desc, $value ) = @_;
+sub replaceTemplate ($$$$;$) {
+    my ( $device, $reading, $odesc, $lang, $value ) = @_;
+    my $l = ( $lang ? lc($lang) : "en" );
     my $txt;
     my $txt_long;
+    my $desc = clone($odesc);
     my $r = $defs{$device}{READINGS} if ($device);
 
     return
@@ -2284,9 +2312,87 @@ sub replaceTemplate ($$$;$) {
       if ( !defined($value) && defined( $desc->{value} ) );
 
     return $value
-      if ( !defined($value)
-        || $value eq ""
-        || ( !$desc->{suffix} && !$desc->{symbol} ) );
+      if ( !defined($value) || $value eq "" );
+
+    ##########
+    # language support
+    #
+
+    # keep only defined language if set
+    foreach ( keys %{$desc} ) {
+        if (   defined( $desc->{$_} )
+            && ref( $desc->{$_} ) eq "HASH"
+            && defined( $desc->{$_}{$l} ) )
+        {
+            my $v;
+            $v = $desc->{$_}{$l};
+            delete $desc->{$_};
+            $desc->{$_} = $v if ( defined($v) );
+        }
+    }
+
+    # add metric name to suffix
+    $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix}
+      if ( $desc->{suffix}
+        && $desc->{scale_txt_m} );
+    $desc->{txt} = $desc->{scale_txt_long_m} . lc( $desc->{txt} )
+      if ( $desc->{txt}
+        && $desc->{scale_txt_long_m} );
+
+    # add square information to suffix and txt
+    # if no separate suffix_sq and txt_sq was found
+    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_sq}
+      if (!$desc->{suffix_sq}
+        && $desc->{scale_txt_sq} );
+    $desc->{txt} = $desc->{scale_txt_long_sq} . lc( $desc->{txt} )
+      if (!$desc->{txt_sq}
+        && $desc->{scale_txt_long_sq} );
+
+    # add cubic information to suffix and txt
+    # if no separate suffix_cu and txt_cu was found
+    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_cu}
+      if (!$desc->{suffix_cu}
+        && $desc->{scale_txt_cu} );
+    $desc->{txt} = $desc->{scale_txt_long_cu} . lc( $desc->{txt} )
+      if (!$desc->{txt_cu}
+        && $desc->{scale_txt_long_cu} );
+
+    # add metric name to suffix_sq
+    $desc->{suffix_sq} = $desc->{scale_txt_m_sq} . $desc->{suffix_sq}
+      if ( $desc->{suffix_sq}
+        && $desc->{scale_txt_m_sq}
+        && $desc->{suffix_sq} !~ /$desc->{scale_txt_m_sq}/ );
+    $desc->{txt_sq} = $desc->{scale_txt_long_m_sq} . lc( $desc->{txt_sq} )
+      if ( $desc->{txt_sq}
+        && $desc->{scale_txt_long_m_sq} );
+
+    # # add square information to suffix_sq
+    $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_sq}
+      if ( $desc->{suffix_sq}
+        && $desc->{scale_txt_sq} );
+    $desc->{txt_sq} = $desc->{scale_txt_long_sq} . lc( $desc->{txt_sq} )
+      if ( $desc->{txt_sq}
+        && $desc->{scale_txt_long_sq} );
+
+    # add metric name to suffix_cu
+    $desc->{suffix_cu} = $desc->{scale_txt_m_cu} . $desc->{suffix_cu}
+      if ( $desc->{suffix_cu}
+        && $desc->{scale_txt_m_cu} );
+    $desc->{txt_cu} = $desc->{scale_txt_long_m_cu} . lc( $desc->{txt_cu} )
+      if ( $desc->{txt_cu}
+        && $desc->{scale_txt_long_m_cu} );
+
+    # add cubic information to suffix_cu
+    $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_cu}
+      if ( $desc->{suffix_cu}
+        && $desc->{scale_txt_cu} );
+    $desc->{txt_cu} = $desc->{scale_txt_long_cu} . lc( $desc->{txt_cu} )
+      if ( $desc->{txt_cu}
+        && $desc->{scale_txt_long_cu} );
+
+    ##########
+    # template support
+    #
 
     # shortname
     $txt = '%value% %suffix%';
@@ -2334,8 +2440,9 @@ sub replaceTemplate ($$$;$) {
 }
 
 # format a number according to desc and optional format.
-sub formatValue($$$;$$$) {
-    my ( $device, $reading, $value, $desc, $format, $lang ) = @_;
+sub formatValue($$$;$$$$) {
+    my ( $device, $reading, $value, $desc, $format, $scope, $lang ) = @_;
+    $lang = "en" if ( !$lang );
 
     return $value if ( !defined($value) || ref($value) );
 
@@ -2347,11 +2454,80 @@ sub formatValue($$$;$$$) {
 
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
     $format = $desc->{format} if ( !$format && $desc );
-    $format = $autoscale_m if ( !$format );
 
-    if ( ref($format) eq 'CODE' ) {
+    #    $format = $scales_m->{autoscale} if ( !$format );
+
+    $scope = $desc->{scope} if ( !$scope && $desc );
+
+    # scope
+    #
+    if ( ref($scope) eq 'CODE' && &$scope ) {
+        $value = $scope->($value);
+    }
+
+    elsif ( ref($scope) eq 'HASH' && looks_like_number($value) ) {
+        if ( $scope->{min} && $value < $scope->{min} ) {
+            $value = $scope->{min};
+        }
+        elsif ( $scope->{lt} && $value < $scope->{lt} ) {
+            $value = $scope->{lt};
+        }
+        elsif ( $scope->{max} && $value > $scope->{min} ) {
+            $value = $scope->{max};
+        }
+        elsif ( $scope->{gt} && $value > $scope->{gt} ) {
+            $value = $scope->{gt};
+        }
+        elsif ( $scope->{ge} && $value >= $scope->{ge} ) {
+            $value = $scope->{ge};
+        }
+        elsif ( $scope->{le} && $value <= $scope->{le} ) {
+            $value = $scope->{le};
+        }
+    }
+
+    elsif ( ref($scope) eq 'ARRAY' ) {
+        if (   looks_like_number($value)
+            && defined( $scope->[$value] )
+            && $value =~ /$scope->[$value]/gmi )
+        {
+            if ( defined( $desc->{txt}{$lang}[$value] ) ) {
+                $value = $desc->{txt}{$lang}[$value];
+            }
+            else {
+                $value = $1 if ($1);
+                $value = $scope->[$value] if ( !$1 );
+            }
+        }
+
+        else {
+            foreach ($scope) {
+                if ( $value =~ /$_/gmi ) {
+                    $value = $1 if ($1);
+                    $value = ${ $scope->{$_} } if ( !$1 );
+                    if ( defined( $desc->{txt}{$lang}[$_] ) ) {
+                        $value = $desc->{txt}{$lang}[$_];
+                    }
+                    elsif ( defined( $desc->{txt}{$lang}[$value] ) ) {
+                        $value = $desc->{txt}{$lang}[$value];
+                    }
+                    last;
+                }
+            }
+        }
+    }
+
+    elsif ( defined($scope) && $scope ne "" && $value =~ /^$scope$/i ) {
+        $value = $scope->{$1} if ( defined($1) );
+    }
+
+    # format
+    #
+
+    if ( ref($format) eq 'CODE' && &$format ) {
         $value = $format->($value);
     }
+
     elsif ( ref($format) eq 'HASH' && looks_like_number($value) ) {
         my $v = abs($value);
         foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
@@ -2362,45 +2538,31 @@ sub formatValue($$$;$$$) {
                 $value *= $scale if ($scale);
                 $value = sprintf( $format->{$l}{format}, $value )
                   if ( $format->{$l}{format} );
-
-                # if ($scale) {
-                #     if ( my $scale = $scales->{$scale} ) {
-                #         $suffix .= $scale;
-                #     }
-                # }
                 last;
             }
         }
     }
+
     elsif ( ref($format) eq 'ARRAY' ) {
 
     }
-    elsif ($format) {
+
+    elsif ( $format && looks_like_number($value) ) {
         my $scale = $desc->{scale};
-
         $value *= $scale if ($scale);
-
-        #        $value = sprintf( $format, $value );
-
-        # if ($scale) {
-        #     if ( my $scale = $scales->{$scale} ) {
-        #         $suffix .= $scale;
-        #     }
-        # }
+        $value = sprintf( $format, $value );
     }
 
-    $desc->{value} = $value;
-
-    my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc );
+    $desc->{value}{$lang} = $value;
+    my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc, $lang );
 
     return ( $txt, $txt_long ) if (wantarray);
     return $txt;
 }
 
 # find desc and optional format for device:reading
-sub readingsDesc($;$$) {
-    my ( $device, $reading, $lang ) = @_;
-    my $l = ( $lang ? lc($lang) : "en" );
+sub readingsDesc($;$) {
+    my ( $device, $reading ) = @_;
     my $desc = getCombinedKeyValAttr( $device, "readingsDesc", $reading );
 
     my $rtype;
@@ -2466,123 +2628,27 @@ sub readingsDesc($;$$) {
             }
         }
 
-        if ( defined( $desc->{ref_base} ) ) {
-            my $ref = $desc->{ref_base};
-            foreach my $k ( keys %{ $rtype_base->{$ref} } ) {
-                $desc->{$k} = $rtype_base->{$ref}{$k}
-                  if ( !defined( $desc->{$k} ) );
-            }
+        $desc->{ref_base} = 999 if ( !defined( $desc->{ref_base} ) );
+        my $ref = $desc->{ref_base};
+        foreach my $k ( keys %{ $rtype_base->{$ref} } ) {
+            $desc->{$k} = $rtype_base->{$ref}{$k}
+              if ( !defined( $desc->{$k} ) );
         }
-
-        # keep only defined language if set
-        foreach ( keys %{$desc} ) {
-            if ( $desc->{$_}
-                && ref( $desc->{$_} ) eq "HASH" )
-            {
-                my $v;
-                $v = $desc->{$_}{$l}
-                  if ( $desc->{$_}{$l} );
-                delete $desc->{$_};
-                $desc->{$_} = $v if ($v);
-            }
-        }
-
-        # add metric name to suffix
-        $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix}
-          if ( $desc->{suffix}
-            && $desc->{scale_txt_m}
-            && $desc->{suffix} !~ /^$desc->{scale_txt_m}/ );
-        $desc->{txt} = $desc->{scale_txt_long_m} . lc( $desc->{txt} )
-          if ( $desc->{txt}
-            && $desc->{scale_txt_long_m}
-            && $desc->{txt} !~ /^$desc->{scale_txt_long_m}/ );
-
-        # add square information to suffix and txt
-        # if no separate suffix_sq and txt_sq was found
-        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_sq}
-          if (!$desc->{suffix_sq}
-            && $desc->{scale_txt_sq}
-            && $desc->{suffix} !~ /$desc->{scale_txt_sq}/ );
-        $desc->{txt} = $desc->{scale_txt_long_sq} . lc( $desc->{txt} )
-          if (!$desc->{txt_sq}
-            && $desc->{scale_txt_long_sq}
-            && $desc->{suffix} !~ /$desc->{scale_txt_long_sq}/ );
-
-        # add cubic information to suffix and txt
-        # if no separate suffix_cu and txt_cu was found
-        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_cu}
-          if (!$desc->{suffix_cu}
-            && $desc->{scale_txt_cu}
-            && $desc->{suffix} !~ /$desc->{scale_txt_cu}/ );
-        $desc->{txt} = $desc->{scale_txt_long_cu} . lc( $desc->{txt} )
-          if (!$desc->{txt_cu}
-            && $desc->{scale_txt_long_cu}
-            && $desc->{txt} !~ /$desc->{scale_txt_long_cu}/ );
-
-        # add metric name to suffix_sq
-        $desc->{suffix_sq} = $desc->{scale_txt_m_sq} . $desc->{suffix_sq}
-          if ( $desc->{suffix_sq}
-            && $desc->{scale_txt_m_sq}
-            && $desc->{suffix_sq} !~ /$desc->{scale_txt_m_sq}/ );
-        $desc->{txt_sq} = $desc->{scale_txt_long_m_sq} . lc( $desc->{txt_sq} )
-          if ( $desc->{txt_sq}
-            && $desc->{scale_txt_long_m_sq}
-            && $desc->{txt_sq} !~ /$desc->{scale_txt_long_m_sq}/ );
-
-        # # add square information to suffix_sq
-        $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_sq}
-          if ( $desc->{suffix_sq}
-            && $desc->{scale_txt_sq}
-            && $desc->{suffix_sq} !~ /$desc->{scale_txt_sq}/ );
-        $desc->{txt_sq} = $desc->{scale_txt_long_sq} . lc( $desc->{txt_sq} )
-          if ( $desc->{txt_sq}
-            && $desc->{scale_txt_long_sq}
-            && $desc->{txt_sq} !~ /$desc->{scale_txt_long_sq}/ );
-
-        # add metric name to suffix_cu
-        $desc->{suffix_cu} = $desc->{scale_txt_m_cu} . $desc->{suffix_cu}
-          if ( $desc->{suffix_cu}
-            && $desc->{scale_txt_m_cu}
-            && $desc->{suffix_cu} !~ /$desc->{scale_txt_m_cu}/ );
-        $desc->{txt_cu} = $desc->{scale_txt_long_m_cu} . lc( $desc->{txt_cu} )
-          if ( $desc->{txt_cu}
-            && $desc->{scale_txt_long_m_cu}
-            && $desc->{txt_cu} !~ /$desc->{scale_txt_long_m_cu}/ );
-
-        # add cubic information to suffix_cu
-        $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_cu}
-          if ( $desc->{suffix_cu}
-            && $desc->{scale_txt_cu}
-            && $desc->{suffix_cu} !~ /$desc->{scale_txt_cu}/ );
-        $desc->{txt_cu} = $desc->{scale_txt_long_cu} . lc( $desc->{txt_cu} )
-          if ( $desc->{txt_cu}
-            && $desc->{scale_txt_long_cu}
-            && $desc->{txt_cu} !~ /$desc->{scale_txt_long_cu}/ );
     }
 
-    ######################
-    my $fformat = getCombinedKeyValAttr( $device, "readingsFormat" );
-    my $format;
-    $format = $fformat->{$reading}
-      if ( $reading && defined( $fformat->{$reading} ) );
-    $format = $format->{$reading} if ( ref($format) eq 'HASH' );
-
-    return ( $desc, $format ) if (wantarray);
     return $desc;
 }
 
 #format device:reading with optional default value and optional desc and optional format
-sub formatReading($$;$$$$) {
-    my ( $device, $reading, $default, $desc, $format, $lang ) = @_;
+sub formatReading($$;$$$$$) {
+    my ( $device, $reading, $default, $desc, $format, $scope, $lang ) = @_;
 
-    $desc = readingsDesc( $device, $reading, $lang ) if ( !$desc && $format );
-    ( $desc, $format ) = readingsDesc( $device, $reading, $lang )
-      if ( !$desc && !$format );
-
+    $desc = readingsDesc( $device, $reading ) if ( !$desc );
     my $value = ReadingsVal( $device, $reading, undef );
-
     $value = $default if ( !defined($value) );
-    return formatValue( $device, $reading, $value, $desc, $format, $lang );
+
+    return formatValue( $device, $reading, $value, $desc, $format, $scope,
+        $lang );
 }
 
 # return unit symbol for device:reading
@@ -2905,6 +2971,7 @@ sub CommandSetReadingDesc($@) {
       if ( $a->[0] eq "?" || $a->[1] eq "?" || !%{$h} );
 
     my @rets;
+    my $last;
     foreach my $name ( devspec2array( $a->[0], $cl ) ) {
         if ( !defined( $defs{$name} ) ) {
             push @rets, "Please define $name first";
@@ -2919,6 +2986,7 @@ sub CommandSetReadingDesc($@) {
                 my $ret =
                   setKeyValAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
                 push @rets, $ret if ($ret);
+                $last = 1 if ( $h->{$_} eq "?" || $h->{$_} eq "" );
             }
             next;
         }
@@ -2934,8 +3002,11 @@ sub CommandSetReadingDesc($@) {
                 my $ret =
                   setKeyValAttr( $name, $attribute, $reading, $_, $h->{$_} );
                 push @rets, $ret if ($ret);
+                $last = 1 if ( $h->{$_} eq "?" || $h->{$_} eq "" );
             }
         }
+
+        last if ($last);
     }
     return join( "\n", @rets );
 }
@@ -2944,7 +3015,7 @@ sub CommandSetReadingDesc($@) {
 my %deletereadingdeschash = (
     Fn => "CommandDeleteReadingDesc",
     Hlp =>
-"<devspec> <readingspec> [<keyspec>],delete key for <devspec> <reading>",
+      "<devspec> <readingspec> [<keyspec>],delete key for <devspec> <reading>",
 );
 $cmds{deletereadingdesc} = \%deletereadingdeschash;
 
