@@ -13,6 +13,9 @@ use Sys::Hostname;
 use IO::Socket::INET;
 #use Net::Address::IP::Local;
 
+#use MIME::Base64;
+
+use JSON;
 use Encode qw(encode);
 use XML::Simple qw(:strict);
 
@@ -45,7 +48,7 @@ plex_Initialize($)
   $hash->{GetFn}    = "plex_Get";
   $hash->{AttrFn}   = "plex_Attr";
   $hash->{AttrList} = "disable:1,0"
-                      . " httpPort ignoredClients ignoredServers"
+                      . " fhemIP httpPort ignoredClients ignoredServers"
                       . " removeUnusedReadings:1,0 responder:1,0"
                       . " user password "
                       . $readingFnAttributes;
@@ -137,8 +140,8 @@ plex_Define($$)
 
     plex_sendApiCmd( $hash, "http://$hash->{server}:$hash->{port}/servers", "servers" ) if( $hash->{server} );
 
-  } elsif( $hash->{STATE} ne "???" ) {
-    $hash->{STATE} = "Initialized";
+  } else {
+    readingsSingleUpdate($hash, 'state', 'initialized', 1 );
 
   }
 
@@ -407,6 +410,7 @@ plex_startDiscovery($)
     #}
   }
 
+  readingsSingleUpdate($hash, 'state', 'running', 1 );
 }
 sub
 plex_stopDiscovery($)
@@ -755,7 +759,7 @@ plex_startTimelineListener($)
     plex_refreshSubscriptions($chash);
 
   } else {
-    Log3 $name, 3, "$name: failed to start timeline listener started: $@";
+    Log3 $name, 3, "$name: failed to start timeline listener on port $port $@";
 
     InternalTimer(gettimeofday()+10, "plex_startTimelineListener", $hash, 0);
   }
@@ -796,6 +800,7 @@ plex_Undefine($$)
   my ($hash, $arg) = @_;
 
   plex_stopTimelineListener($hash);
+  plex_stopWebsockets($hash);
   plex_stopDiscovery($hash);
 
   delete $modules{plex}{defptr}{MASTER} if( $modules{plex}{defptr}{MASTER} == $hash ) ;
@@ -1222,6 +1227,22 @@ plex_makeLink($$$$;$)
 
   return "<a style=\"cursor:pointer\" onClick=\"FW_cmd(\\\'$FW_ME$FW_subdir?XHR=1&cmd=$cmd\\\')\">$txt</a>";
 }
+sub
+plex_makeImage($$$$)
+{
+  my ($hash, $server, $url, $size) = @_;
+
+  return '' if( !$url );
+
+  my $token = $server->{accessToken};
+  $token = $hash->{token} if( !$token );
+
+  my $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?X-Plex-Token=$token&url=".
+             urlEncode("127.0.0.1:32400$url?X-Plex-Token=$token")
+             ."&width=$size&height=$size\">\n";
+
+  return $ret;
+}
 
 
 sub
@@ -1248,7 +1269,7 @@ plex_mediaList2($$$$)
     $ret .= sprintf( "%-35s %-10s %s\n", 'key', 'type', 'title' );
     foreach my $item (@{$items}) {
       $item->{type} = '' if( !$item->{type} );
-
+      $item->{title} = encode('UTF-8', $item->{title});
       $ret .= plex_makeLink($hash, 'ls', $xml->{parentSection}, $item->{key}, sprintf( "%-35s %-10s %s", $item->{key}, $item->{type}, $item->{title} ) );
       $ret .= " ($item->{year})" if( $item->{year} );
       $ret .= "\n";
@@ -1262,8 +1283,9 @@ plex_mediaList2($$$$)
     $ret .= sprintf( "%-35s %-10s %s\n", 'key', 'type', 'title' );
     foreach my $item (@{$items}) {
       $item->{type} = '' if( !$item->{type} );
+      $item->{title} = encode('UTF-8', $item->{title});
       $ret .= plex_makeLink($hash, 'ls', $xml->{parentSection}, $item->{key}, sprintf( "%-35s %-10s %s\n", $item->{key}, $item->{type}, $item->{title} ) );
-      #$ret .= "  <img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$item->{composite}") ."&width=100&height=100\">\n" if( $item->{composite} );
+      #$ret .= plex_makeImage($hash, $server, $xml->{composite}, 100);
     }
 
   }
@@ -1273,6 +1295,7 @@ plex_mediaList2($$$$)
     $ret .= "$type\n";
     $ret .= sprintf( "%-35s %-10s  nr %s\n", 'key', 'type', 'title' );
     foreach my $item (@{$items}) {
+      $item->{title} = encode('UTF-8', $item->{title});
       if( defined($item->{index}) ) {
         $ret .= plex_makeLink($hash, 'detail', $xml->{parentSection}, $item->{key}, sprintf( "%-35s %-10s %3i %s", $item->{key}, $item->{type}, $item->{index}, $item->{title} ) );
         $ret .= plex_makeLink($hash,'detail', undef, $item->{grandparentKey}, "  ($item->{grandparentTitle}" ) if( $item->{grandparentTitle} );
@@ -1292,6 +1315,7 @@ plex_mediaList2($$$$)
     $ret .= "$type\n";
     $ret .= sprintf( "%-35s %-10s  nr %s\n", 'key', 'type', 'title' );
     foreach my $item (@{$items}) {
+      $item->{title} = encode('UTF-8', $item->{title});
       $ret .= sprintf( "%-35s %-10s %3i %s\n", $item->{key}, $item->{type}, $item->{index}, $item->{title} );
     }
   }
@@ -1307,9 +1331,19 @@ plex_mediaList($$$)
 #Log 1, Dumper $xml;
   return $xml if( ref($xml) ne 'HASH' );
 
+  my $token = $server->{accessToken};
+  $token = $hash->{token} if( !$token );
+
+ $xml->{librarySectionTitle} = encode('UTF-8', $xml->{librarySectionTitle}) if( $xml->{librarySectionTitle} );
+ $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
+ $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
+ $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
+ $xml->{title3} = encode('UTF-8', $xml->{title3}) if( $xml->{title3} );
+
+
   my $ret = '';
-  $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$xml->{thumb}") ."&width=100&height=100\">\n" if( $xml->{thumb} );
-  $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$xml->{composite}") ."&width=100&height=100\">\n" if( $xml->{composite} );
+  $ret .= plex_makeImage($hash, $server, $xml->{thumb}, 100);
+  $ret .= plex_makeImage($hash, $server, $xml->{composite}, 100);
   $ret .= "$xml->{librarySectionTitle}: " if( $xml->{librarySectionTitle} );
   $ret .= plex_makeLink($hash, 'detail', undef, $xml->{ratingKey}, "$xml->{title} ") if( $xml->{title} );
   $ret .= plex_makeLink($hash, 'detail', undef, $xml->{grandparentRatingKey}, "$xml->{title1} ") if( $xml->{title1} );
@@ -1335,6 +1369,10 @@ sub
 plex_mediaDetail2($$$$)
 {
   my ($hash, $server, $xml, $items) = @_;
+
+  my $token = $server->{accessToken};
+  $token = $hash->{token} if( !$token );
+
 #Log 1, Dumper $xml;
 
   if( $items ) {
@@ -1345,13 +1383,20 @@ plex_mediaDetail2($$$$)
     }
   }
 
+  $xml->{viewGroup} = encode('UTF-8', $xml->{viewGroup}) if( $xml->{viewGroup} );
+
   my $ret = '';
   foreach my $item (@{$items}) {
+    $item->{grandparentTitle} = encode('UTF-8', $item->{grandparentTitle}) if( $item->{grandparentTitle} );
+    $item->{parentTitle} = encode('UTF-8', $item->{parentTitle}) if( $item->{parentTitle} );
+    $item->{title} = encode('UTF-8', $item->{title}) if( $item->{title} );
+    $item->{summary} = encode('UTF-8', $item->{summary}) if( $item->{summary} );
+
     $ret .= "\n" if( $ret && (!$xml->{viewGroup} || ($xml->{viewGroup} ne 'track' && $xml->{viewGroup} ne 'secondary') ) );
     if( $item->{type} eq 'playlist' ) {
       $ret .= sprintf( "%s  ", $item->{title} ) if( $item->{title} );
       $ret .= "\n";
-      $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$item->{composite}") ."&width=250&height=250\">" if( $item->{composite} );
+      $ret .= plex_makeImage($hash, $server, $item->{composite}, 250);
       $ret .= "\n";
       $ret .= sprintf( "%s  ", $item->{playlistType} ) if( $item->{playlistType} );
       $ret .= sprintf( "%s  ", plex_timestamp2date($item->{addedAt}) ) if( $item->{addedAt} );
@@ -1366,7 +1411,7 @@ plex_mediaDetail2($$$$)
       $ret .= sprintf("(S%02iE%02i)",$item->{parentIndex}, $item->{index} ) if( $item->{parentIndex} && $item->{type} ne 'season' );
       #$ret .= sprintf("(S%02i)", $item->{index} ) if( $item->{index} && $item->{type} eq 'season' );
       $ret .= "\n";
-      $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$item->{thumb}") ."&width=250&height=250\">" if( $item->{thumb} );
+      $ret .= plex_makeImage($hash, $server, $item->{thumb}, 250);
       $ret .= "\n";
       if( $item->{Genre} ) {
         foreach my $genre ( @{$item->{Genre}}) {
@@ -1392,7 +1437,7 @@ plex_mediaDetail2($$$$)
       $ret .= sprintf( "%s  ", $item->{title} ) if( $item->{title} );
       #$ret .= "\n";
       $ret .= "\n";
-      $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$item->{thumb}") ."&width=250&height=250\">" if( !$xml->{thumb} && $item->{thumb} );
+      $ret .= plex_makeImage($hash, $server, $item->{thumb}, 250);
       #$ret .= "\n";
       $ret .= sprintf( "%s  ", $item->{contentRating} ) if( $item->{contentRating} );
       $ret .= sprintf( "%i  ", $item->{year} ) if( $item->{year} );
@@ -1409,7 +1454,7 @@ plex_mediaDetail2($$$$)
       $ret .= "  ";
       $ret .= plex_sec2hms($item->{duration}/1000);
       $ret .= "\n";
-      $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$item->{thumb}") ."&width=250&height=250\">" if( $item->{thumb} );
+      $ret .= plex_makeImage($hash, $server, $item->{thumb}, 250);
       $ret .= "\n";
       $ret .= sprintf( "%s  ", $item->{contentRating} ) if( $item->{contentRating} );
       $ret .= sprintf( "%s  ", $item->{rating} ) if( $item->{rating} );
@@ -1456,9 +1501,17 @@ plex_mediaDetail($$$)
 
   return $xml if( ref($xml) ne 'HASH' );
 
+  my $token = $server->{accessToken};
+  $token = $hash->{token} if( !$token );
+
+ $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
+ $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
+ $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
+ $xml->{summary} = encode('UTF-8', $xml->{summary}) if( $xml->{summary} );
+
 #Log 1, Dumper $xml;
   my $ret = '';
-  $ret .= "<img src=\"http://$server->{address}:$server->{port}/photo/:/transcode?url=". urlEncode("127.0.0.1:32400$xml->{thumb}") ."&width=250&height=250\">\n" if( $xml->{thumb} );
+  $ret .= plex_makeImage($hash, $server, $xml->{thumb}, 250);
   $ret .= plex_makeLink($hash, 'detail', undef, $xml->{ratingKey}, "$xml->{title} ") if( $xml->{title} );
   $ret .= sprintf( "%s: ", $xml->{title1} ) if( $xml->{title1} );
   $ret .= sprintf( "%s: ", $xml->{title2} ) if( $xml->{title2} );
@@ -1564,6 +1617,11 @@ plex_Get($$@)
       return undef if( !$xml );
       return Dumper $xml;
 
+    } elsif( $cmd eq 'identity' ) {
+      my $xml = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/identity", 'identity', 1 );
+      return undef if( !$xml );
+      return Dumper $xml;
+
     } elsif( $cmd eq 'detail' ) {
       return "usage: detail <key>" if( !$param );
       my $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", 'detail', $hash->{CL} || 1 );
@@ -1598,7 +1656,7 @@ plex_Get($$@)
 
     }
 
-    $list .= 'ls search sessions:noArg detail onDeck:noArg recentlyAdded:noArg playlists:noArg ';
+    $list .= 'identity:noArg ls search sessions:noArg detail onDeck:noArg recentlyAdded:noArg playlists:noArg ';
     $list .= 'servers:noArg pin:noArg ' if( $list !~ m/\bservers\b/ );
 
   }
@@ -1694,11 +1752,14 @@ plex_Attr($$$)
   if( $attrName eq 'disable' ) {
     if( $cmd eq "set" && $attrVal ) {
       plex_stopTimelineListener($hash);
+      plex_stopWebsockets($hash);
       plex_stopDiscovery($hash);
       foreach my $ip ( keys %{$hash->{clients}} ) {
         $hash->{clients}{$ip}{online} = 0;
       }
+      readingsSingleUpdate($hash, 'state', 'disabled', 1 );
     } else {
+      readingsSingleUpdate($hash, 'state', 'running', 1 );
       $attr{$name}{$attrName} = 0;
       plex_startDiscovery($hash);
       plex_startTimelineListener($hash);
@@ -1737,7 +1798,13 @@ plex_Attr($$$)
         delete $hash->{token};
         plex_getToken($hash);
       }
+    }
 
+  } elsif( $attrName eq 'fhemIP' ) {
+    if( $cmd eq "set" && $attrVal ) {
+      $hash->{fhemIP} = $attrVal;
+    } else {
+      $hash->{fhemIP} = plex_getLocalIP();
     }
   }
 
@@ -2115,6 +2182,7 @@ plex_entryOfIP($$$)
   $hash->{$type.'s'} = {} if( !$hash->{$type.'s'} );
 
   my $entries = $hash->{$type.'s'};
+
   foreach my $key ( keys %{$entries} ) {
     return $entries->{$key} if( $entries->{$key}{address} eq $ip );
   }
@@ -2144,9 +2212,9 @@ plex_serverOf($$;$)
   my $entry;
   $entry = plex_entryOfID($hash, 'server', $hash->{currentServer} ) if( $hash->{currentServer} );
 
-  $entry = plex_entryOfIP($hash, 'server', $server) if( $server =~ m/^\d+\.\d+\.\d+\.\d+$/ );
+  $entry = plex_entryOfIP($hash, 'server', $server) if( $server && $server =~ m/^\d+\.\d+\.\d+\.\d+$/ );
 
-  $entry = plex_entryOfID($hash, 'server', $server) if( !$entry );
+  $entry = plex_entryOfID($hash, 'server', $server) if( $server && !$entry );
 
   $entry = plex_entryOfIP($hash, 'server', $hash->{server} ) if( !$entry );
 
@@ -2319,6 +2387,8 @@ plex_discovered($$$$)
       plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/clients", "clients" );
     }
 
+    plex_requestNotifications( $hash, $entry );
+
   } elsif( $type eq 'client' ) {
     Log3 $name, 3, "$name: $type discovered: $ip" if( $new );
 
@@ -2391,6 +2461,76 @@ plex_disappeared($$$)
   }
 }
 sub
+plex_requestNotifications($$)
+{
+  my ($hash,$server) = @_;
+  my $name = $hash->{NAME};
+
+  return if( $hash->{helper}{websockets}{$server->{machineIdentifier}} );
+
+  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$server->{address}:$server->{port}", Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+
+    my $chash = plex_newChash( $hash, $socket,
+                               {NAME=>"$name:websocket:$server->{machineIdentifier}", STATE=>'listening', websocket=>0} );
+
+    $chash->{address} = $server->{address};
+    $chash->{machineIdentifier} = $server->{machineIdentifier};
+
+    Log3 $name, 3, "$name: notification websocket opened to $server->{address}";
+
+    $hash->{helper}{websockets}{$server->{machineIdentifier}} = $chash;
+
+
+    my $ret = "GET /:/websockets/notifications HTTP/1.1\r\n";
+    $ret .= plex_hash2header( {                       'Host' => "$server->{address}:$server->{port}",
+                                              'X-Plex-Token' => $hash->{token},
+                                                   'Upgrade' => 'websocket',
+                                                'Connection' => 'Upgrade',
+                                                    'Pragma' => 'no-cache',
+                                             'Cache-Control' => 'no-cache',
+                                         'Sec-WebSocket-Key' => 'RkhFTQ==',
+                                     'Sec-WebSocket-Version' => '13',
+                                } );
+
+    $ret .= "\r\n";
+#Log 1, $ret;
+
+    syswrite($chash->{CD}, $ret );
+
+  } else {
+    Log3 $name, 2, "$name: failed to open notification websocket to $server->{address}";
+
+  }
+}
+sub
+plex_closeNotifications($)
+{
+  my ($hash,$server) = @_;
+  my $name = $hash->{NAME};
+}
+sub
+plex_stopWebsockets($)
+{
+  my ($hash,$server) = @_;
+  my $name = $hash->{NAME};
+
+  return if( !$hash->{helper}{websockets} );
+
+  foreach my $key ( keys %{$hash->{helper}{websockets}} ) {
+    my $chash = $hash->{helper}{websockets}{$key};
+    my $cname = $chash->{NAME};
+
+    plex_closeSocket($chash);
+
+    delete($hash->{servers}{$chash->{address}}{sessions});
+    delete($hash->{helper}{websockets}{$key});
+    delete($defs{$cname});
+  }
+
+  Log3 $name, 3, "$name: websockets stoped";
+}
+
+sub
 plex_readingsBulkUpdateIfChanged($$$)
 {
   my ($hash,$reading,$value) = @_;
@@ -2438,15 +2578,16 @@ plex_parseTimeline($$$)
   foreach my $entry (@{$xml->{Timeline}}) {
     next if( !$entry->{state} );
 
-    if( $entry->{key} && $entry->{key} ne ReadingsVal($chash->{NAME}, 'key', '') ) {
+    my $key = $entry->{key};
+    if( $key && $key ne ReadingsVal($chash->{NAME}, 'key', '') ) {
       $chash->{currentServer} = $entry->{machineIdentifier};
 
-      readingsBulkUpdate($chash, 'key', $entry->{key} );
+      readingsBulkUpdate($chash, 'key', $key );
       readingsBulkUpdate($chash, 'server', $entry->{machineIdentifier} );
 
       my $server = plex_entryOfID($hash, 'server', $entry->{machineIdentifier} );
       $server = $entry if( !$server );
-      plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$entry->{key}", "#update:$chash->{NAME}" );
+      plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", "#update:$chash->{NAME}" );
     }
 
     plex_readingsBulkUpdateIfChanged($chash, 'volume', $entry->{volume} ) if( $entry->{controllable} && $entry->{controllable} =~ m/\bvolume\b/ );
@@ -2457,13 +2598,14 @@ plex_parseTimeline($$$)
       $entries->{ $entry->{type} } = $entry;
     }
 
-    if( $entry->{time} ) {
-#      if( !$chash->{helper}{time} || abs($entry->{time} - $chash->{helper}{time}) > 2000 ) {
-#        plex_readingsBulkUpdateIfChanged($chash, 'time', plex_sec2hms($entry->{time}/1000) );
+    my $time = $entry->{time};
+    if( defined($time) ) {
+#      if( !$chash->{helper}{time} || abs($time - $chash->{helper}{time}) > 2000 ) {
+#        plex_readingsBulkUpdateIfChanged($chash, 'time', plex_sec2hms($time/1000) );
 #
-#        $chash->{helper}{time} = $entry->{time};
+#        $chash->{helper}{time} = $time;
 #      }
-      $chash->{time} = $entry->{time};
+      $chash->{time} = $time;
     }
 
     $chash->{seekRange} = $entry->{seekRange} if( $entry->{seekRange} && $entry->{seekRange} ne "0-0" );
@@ -3631,6 +3773,8 @@ plex_parseHttpAnswer($$$)
     my $chash = $defs{$1};
     return undef if( !$chash );
 
+#Log 1, Dumper $xml;
+#Log 1, Dumper $param;
     if( $xml->{librarySectionTitle} ne ReadingsVal($chash->{NAME}, 'section', '' ) ) {
       CommandDeleteReading( undef, "$chash->{NAME} currentAlbum|currentArtist|episode|series|track" );
     }
@@ -3718,6 +3862,20 @@ plex_parseHttpAnswer($$$)
       if( my $chash = $modules{plex}{defptr}{$device->{clientIdentifier}} ) {
       }
 
+    }
+
+  } elsif( $param->{key} eq 'sessions' ) {
+    $handled = 1;
+
+    if( my $server = plex_serverOf($hash, $param->{host}) ) {
+      delete $server->{sessions};
+      foreach my $type ( keys %{$xml} ) {
+        next if( ref($xml->{$type}) ne 'ARRAY' );
+
+        foreach my $item (@{$xml->{$type}}) {
+          $server->{sessions}{$item->{sessionKey}} = $item;
+        }
+      }
     }
 
   } elsif( $param->{key} =~ m/#m3u:(.*)/ ) {
@@ -3866,6 +4024,156 @@ Log 1, "!!!!!!!!!!";
       return undef;
     }
 #Log 1, "timeline ($peerhost:$peerport): $buf";
+
+    return undef;
+
+  } elsif( defined($hash->{websocket}) ) {
+    my $pname = $hash->{PNAME} || $name;
+
+    $len = sysread($hash->{CD}, $buf, 10240);
+#Log 1, "2:$len: $buf";
+    my $peerhost = $hash->{CD}->peerhost;
+    my $peerport = $hash->{CD}->peerport;
+
+    my $close = 0;
+    if( !defined($len) || !$len ) {
+      $close = 1;
+
+    } elsif( $hash->{websocket} ) {
+      $hash->{buf} .= $buf;
+
+      do {
+        my $fin = (ord(substr($hash->{buf},0,1)) & 0x80)?1:0;
+        my $op = (ord(substr($hash->{buf},0,1)) & 0x0F);
+        my $mask = (ord(substr($hash->{buf},1,1)) & 0x80)?1:0;
+        my $len = (ord(substr($hash->{buf},1,1)) & 0x7F);
+        my $i = 2;
+        if( $len == 126 ) {
+          $len = unpack( 'n', substr($hash->{buf},$i,2) );
+          $i += 2;
+        } elsif( $len == 127 ) {
+          $len = unpack( 'q', substr($hash->{buf},$i,8) );
+          $i += 8;
+        }
+        if( $mask ) {
+          $i += 4;
+        }
+#Log 1, "$fin $op $mask $len";
+        #FIXME: hande !$fin
+        return if( $len > length($hash->{buf})-$i );
+
+        my $data = substr($hash->{buf}, $i, $len);
+        $hash->{buf} = substr($hash->{buf},$i+$len);
+
+        if( $op == 0x01 ) {
+          my $obj = eval { from_json($data) };
+
+          if( $obj ) {
+            my $phash = $hash->{phash};
+            my $handled = 0;
+
+            if( $obj->{_elementType} eq 'NotificationContainer' ) {
+              if( $obj->{type} eq 'playing' ) {
+                $handled = 1;
+
+                my $cname;
+                my $session_info_requested;
+
+                if( my $session = $obj->{_children}[0]{sessionKey} ) {
+                  if( my $server = plex_serverOf($phash, $peerhost) ) {
+                    if( my $session = $server->{sessions}{$session} ) {
+                      if( my $chash = $modules{plex}{defptr}{$session->{Player}[0]{machineIdentifier}} ) {
+                        $cname = $chash->{NAME};
+#Log 1, Dumper $obj;
+                        readingsBeginUpdate($chash);
+                        my $key = $obj->{_children}[0]{key};
+                        if( $key && $key ne ReadingsVal($chash->{NAME}, 'key', '') ) {
+                          $chash->{currentServer} = $server->{machineIdentifier};
+
+                          readingsBulkUpdate($chash, 'key', $key );
+                          readingsBulkUpdate($chash, 'server', $server->{machineIdentifier} );
+
+                          plex_sendApiCmd( $phash, "http://$server->{address}:$server->{port}$key", "#update:$chash->{NAME}" );
+                        }
+
+                        my $time = $obj->{_children}[0]{viewOffset};
+                        if( defined($time) ) {
+#                          if( !$chash->{helper}{time} || abs($time - $chash->{helper}{time}) > 2000 ) {
+#                            plex_readingsBulkUpdateIfChanged($chash, 'time', plex_sec2hms($time/1000) );
+#
+#                            $chash->{helper}{time} = $time;
+#                          }
+                          $chash->{time} = $time;
+                        }
+
+                        plex_readingsBulkUpdateIfChanged($chash, 'state', $obj->{_children}[0]{state} );
+                        readingsEndUpdate($chash, 1);
+
+                      } else {
+                        Log3 $pname, 3, "$pname: unknown player: $session->{Player}[0]{machineIdentifier}";
+                      }
+                    } else {
+                      Log3 $pname, 3, "$pname: new session $obj->{_children}[0]{sessionKey}";
+
+                      $session_info_requested = 1;
+                      plex_sendApiCmd( $phash, "http://$server->{address}:$server->{port}/status/sessions", 'sessions' );
+                    }
+                  }
+                } else {
+                  Log3 $pname, 3, "$pname: no session in notifcation ";
+                }
+
+                if( !$session_info_requested ) {
+                  if( $obj->{_children}[0]{state} eq 'playing'
+                      || $obj->{_children}[0]{state} eq 'stopped' ) {
+                    if(  !$cname || $obj->{_children}[0]{key} ne ReadingsVal($cname, 'key', '' ) ) {
+                      if( my $server = plex_serverOf($phash, $peerhost) ) {
+                        plex_sendApiCmd( $phash, "http://$server->{address}:$server->{port}/status/sessions", 'sessions' );
+                      }
+                    }
+                  }
+                }
+
+              } elsif( $obj->{type} eq 'status' ) {
+                $handled = 1;
+#Log 1, Dumper $obj;
+               DoTrigger( $pname, "$obj->{_children}[0]{notificationName}: $obj->{_children}[0]{title}" );
+
+              }
+            }
+
+            Log3 $pname, 4, "$pname: unhandled websocket text type: $obj->{type}: $data" if( !$handled );
+
+          } else {
+            Log3 $pname, 2, "$pname: unhandled websocket text $data";
+
+          }
+
+        } else {
+          Log3 $pname, 2, "$pname: unhandled websocket data: $data";
+
+        }
+
+      } while( $hash->{buf} && !$close );
+
+    } elsif( $buf =~ m'^HTTP/1.1 101 Switching Protocols'i )  {
+      $hash->{websocket} = 1;
+      my $buf = plex_msg2hash($buf, 1);
+
+      Log3 $pname, 3, "$pname: notification websocket: Switching Protocols ok";
+
+    } else {
+      $close = 1;
+      Log3 $pname, 2, "$pname: notification websocket: Switching Protocols failed";
+    }
+
+    if( $close ) {
+      my $phash = $hash->{phash};
+      plex_closeSocket( $hash );
+      delete($phash->{helper}{websockets}{$hash->{machineIdentifier}});
+      delete($phash->{servers}{$hash->{address}}{sessions});
+      delete($defs{$name});
+    }
 
     return undef;
 
