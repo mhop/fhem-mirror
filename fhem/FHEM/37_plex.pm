@@ -1479,8 +1479,9 @@ plex_mediaDetail2($$$$)
             next if( !$client->{online} );
 
             my $cmd = 'play';
-            $cmd = 'playalbum' if( $item->{type} eq 'album' );
-            $cmd = "set $hash->{NAME} $client->{address} $cmd $item->{key}";
+            my $key = $item->{key};
+            $key =~ s/.children$//;
+            $cmd = "set $hash->{NAME} $client->{address} $cmd $key";
             $ret .= "<a style=\"cursor:pointer\" onClick=\"FW_cmd(\\\'$FW_ME$FW_subdir?XHR=1&cmd=$cmd\\\')\">$ip</a>  ";
           }
           $ret .= "\n\n";
