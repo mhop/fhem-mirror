@@ -559,7 +559,7 @@ my $rtypes = {
             nl => [ 'error',  'on' ],
             pl => [ 'error',  'on' ],
         },
-        scope => [ 'nok|error|0/nok', 'ok|1/ok' ],
+        scope => [ '^(nok|error|0)$', '^(ok|1)$' ],
     },
 
     onoff => {
@@ -571,7 +571,7 @@ my $rtypes = {
             nl => [ 'off', 'on' ],
             pl => [ 'off', 'on' ],
         },
-        scope => [ 'off|0', 'on|1' ],
+        scope => [ '^(off|0)$', '^(on|1)$' ],
     },
 
     bool => {
@@ -583,7 +583,7 @@ my $rtypes = {
             nl => [ 'false',  'true' ],
             pl => [ 'false',  'true' ],
         },
-        scope => [ '0|false', '1|true' ],
+        scope => [ '^(0|false)$', '^(1|true)$' ],
     },
 
     epoch => {
@@ -607,14 +607,14 @@ my $rtypes = {
             nl => 'time hh:mm',
             pl => 'time hh:mm',
         },
-        scope => '(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))',
+        scope => '^(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))$',
     },
 
     datetime => {
         ref_base => 900,
         txt      => 'YYYY-mm-dd hh:mm',
         scope =>
-'(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]))',
+'^(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]))$',
     },
 
     timesec => {
@@ -633,7 +633,7 @@ my $rtypes = {
         ref_base => 900,
         txt      => 'YYYY-mm-dd hh:mm:ss',
         scope =>
-'(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]):(0?[1-9]|[1-5][0-9]))',
+'^(([1-2][0-9]{3})-(0?[1-9]|1[0-2])-(0?[1-9]|[1-2][0-9]|30|31) (0?[1-9]|1[0-9]|2[0-3]):(0?[1-9]|[1-5][0-9]):(0?[1-9]|[1-5][0-9]))$',
     },
 
     direction => {
@@ -693,9 +693,10 @@ my $rtypes = {
             ],
         },
         scope => [
-            'N|0',  'NNE|1',  'NE|2',  'ENE|3', 'E|4',   'ESE|5',
-            'SE|6', 'SSE|7',  'S|8',   'SSW|9', 'SW|10', 'WSW|11',
-            'W|12', 'WNW|13', 'NW|14', 'NNW|15'
+            '^(N|0)$',  '^(NNE|1)$',  '^(NE|2)$',  '^(ENE|3)$',
+            '^(E|4)$',  '^(ESE|5)$',  '^(SE|6)$',  '^(SSE|7)$',
+            '^(S|8)$',  '^(SSW|9)$',  '^(SW|10)$', '^(WSW|11)$',
+            '^(W|12)$', '^(WNW|13)$', '^(NW|14)$', '^(NNW|15)$'
         ],
     },
 
@@ -708,7 +709,7 @@ my $rtypes = {
             nl => 'open/closed/tilted',
             pl => 'open/closed/tilted',
         },
-        scope => [ 'closed|0', 'open|1', 'tilted|2' ],
+        scope => [ '^(closed|0)$', '^(open|1)$', '^(tilted|2)$' ],
     },
 
     condition_hum => {
@@ -720,7 +721,10 @@ my $rtypes = {
             nl => 'humidity condition',
             pl => 'humidity condition',
         },
-        scope => [ 'dry|0', 'low|1', 'optimal|2', 'high|3', 'wet|4' ],
+        scope => [
+            '^(dry|0)$', '^(low|1)$', '^(optimal|2)$', '^(high|3)$',
+            '^(wet|4)$'
+        ],
     },
 
     condition_uvi => {
@@ -732,7 +736,11 @@ my $rtypes = {
             nl => 'UV condition',
             pl => 'UV condition',
         },
-        scope => [ 'low|0', 'moderate|1', 'high|2', 'veryhigh|3', 'extreme|4' ],
+        scope => [
+            '^(low|0)$',  '^(moderate|1)$',
+            '^(high|2)$', '^(veryhigh|3)$',
+            '^(extreme|4)$'
+        ],
     },
 
     pct => {
@@ -2443,6 +2451,7 @@ sub replaceTemplate ($$$$;$) {
 sub formatValue($$$;$$$$) {
     my ( $device, $reading, $value, $desc, $format, $scope, $lang ) = @_;
     $lang = "en" if ( !$lang );
+    my $value_num;
 
     return $value if ( !defined($value) || ref($value) );
 
@@ -2462,17 +2471,29 @@ sub formatValue($$$;$$$$) {
     # scope
     #
     if ( ref($scope) eq 'CODE' && &$scope ) {
-        $value = $scope->($value);
+        ( $value, $value_num ) = $scope->($value);
     }
 
     elsif ( ref($scope) eq 'HASH' && looks_like_number($value) ) {
-        if ( $scope->{min} && $value < $scope->{min} ) {
+        if ( $scope->{min} && $scope->{max} ) {
+            $value = $scope->{min} if ( $value < $scope->{min} );
+            $value = $scope->{max} if ( $value > $scope->{max} );
+        }
+        elsif ( $scope->{lt} && $scope->{gt} ) {
+            $value = $scope->{lt} if ( $value < $scope->{lt} );
+            $value = $scope->{gt} if ( $value > $scope->{gt} );
+        }
+        elsif ( $scope->{le} && $scope->{ge} ) {
+            $value = $scope->{le} if ( $value <= $scope->{le} );
+            $value = $scope->{ge} if ( $value >= $scope->{ge} );
+        }
+        elsif ( $scope->{min} && $value < $scope->{min} ) {
             $value = $scope->{min};
         }
         elsif ( $scope->{lt} && $value < $scope->{lt} ) {
             $value = $scope->{lt};
         }
-        elsif ( $scope->{max} && $value > $scope->{min} ) {
+        elsif ( $scope->{max} && $value > $scope->{max} ) {
             $value = $scope->{max};
         }
         elsif ( $scope->{gt} && $value > $scope->{gt} ) {
@@ -2491,6 +2512,7 @@ sub formatValue($$$;$$$$) {
             && defined( $scope->[$value] )
             && $value =~ /$scope->[$value]/gmi )
         {
+            $value_num = $value;
             if ( defined( $desc->{txt}{$lang}[$value] ) ) {
                 $value = $desc->{txt}{$lang}[$value];
             }
@@ -2501,18 +2523,26 @@ sub formatValue($$$;$$$$) {
         }
 
         else {
-            foreach ($scope) {
-                if ( $value =~ /$_/gmi ) {
-                    $value = $1 if ($1);
-                    $value = ${ $scope->{$_} } if ( !$1 );
-                    if ( defined( $desc->{txt}{$lang}[$_] ) ) {
-                        $value = $desc->{txt}{$lang}[$_];
+            my $i = 0;
+            foreach ( @{$scope} ) {
+                if ( $value =~ /^$_$/i ) {
+                    if ( defined( $desc->{txt}{$lang}[$i] ) ) {
+                        $value = $desc->{txt}{$lang}[$i];
+                        last;
                     }
-                    elsif ( defined( $desc->{txt}{$lang}[$value] ) ) {
+                    else {
+                        $value = $1 if ($1);
+                        $value = ${ $scope->[$_] } if ( !$1 );
+                    }
+
+                    if ( defined( $desc->{txt}{$lang}[$value] ) ) {
                         $value = $desc->{txt}{$lang}[$value];
                     }
+
+                    $value_num = $i;
                     last;
                 }
+                $i++;
             }
         }
     }
@@ -2554,6 +2584,7 @@ sub formatValue($$$;$$$$) {
     }
 
     $desc->{value}{$lang} = $value;
+    $desc->{value_num} = $value_num if ( defined($value_num) );
     my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc, $lang );
 
     return ( $txt, $txt_long ) if (wantarray);
