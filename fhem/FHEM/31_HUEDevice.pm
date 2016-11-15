@@ -321,7 +321,7 @@ sub HUEDevice_Define($$)
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3] IODev=$iodev";
 
-    $interval = 60 if( $interval && $interval < 5 );
+    $interval = 60 if( $interval && $interval < 1 );
     $hash->{INTERVAL} = $interval;
 
   }
