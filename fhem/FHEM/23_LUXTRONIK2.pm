@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 
   #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#";
-  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#";
+  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
+  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -180,11 +180,13 @@ LUXTRONIK2_Set($$@)
   
    if($cmd eq 'statusRequest') {
       $hash->{LOCAL} = 1;
+      Log3 $name, 3, "set $name $cmd";
       LUXTRONIK2_GetUpdate($hash);
       $hash->{LOCAL} = 0;
       return undef;
    }
    elsif ($cmd eq 'resetStatistics') {
+      Log3 $name, 3, "set $name $cmd $val";
       if ( $val eq "statBoilerGradientCoolDownMin" 
             && exists($hash->{READINGS}{statBoilerGradientCoolDownMin})) {
          delete $hash->{READINGS}{statBoilerGradientCoolDownMin};
@@ -212,6 +214,7 @@ LUXTRONIK2_Set($$@)
    }
    
    elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
+      Log3 $name, 3, "set $name $cmd $val";
       $val = 30 if( $val < 30 );
       $hash->{INTERVAL}=$val;
       return "Polling interval set to $val seconds.";
@@ -264,6 +267,7 @@ LUXTRONIK2_Set($$@)
    elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
+            || $cmd eq 'returnTemperatureHyst'
             || $cmd eq 'returnTemperatureSetBack')) {
       Log3 $name, 3, "set $name $cmd $val";
       $hash->{LOCAL} = 1;
@@ -272,7 +276,7 @@ LUXTRONIK2_Set($$@)
       return $resultStr;
    }
    elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpDeaerate' ) { # Einstellung->Entlüftung
-      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
+      Log3 $name, 3, "set $name $cmd $val";
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
          if $val !~ /on|off/;
       $hash->{LOCAL} = 1;
@@ -289,6 +293,7 @@ LUXTRONIK2_Set($$@)
           ." hotWaterCircPumpDeaerate:on,off"
           ." hotWaterTemperatureTarget "
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
+          ." returnTemperatureHyst "
           ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
@@ -641,8 +646,21 @@ LUXTRONIK2_DoUpdate($)
   # 62 - counterHeatQPool
   $return_str .= "|". ($heatpump_visibility[2]==1 ? $heatpump_values[153] : "no");
   # 63 - returnTemperatureTargetMin
-  $return_str .= "|". (defined($heatpump_visibility[295]) && $heatpump_visibility[295]==1 ? $heatpump_parameters[979] : "no");
-  return $return_str;
+   $heatpump_visibility[295]=1    unless defined($heatpump_visibility[295]);
+   $return_str .= "|". ($heatpump_visibility[295]==1 ? $heatpump_parameters[979] : "no");
+  # 64 - heatSourceMotor
+   $return_str .= "|". ($heatpump_visibility[54]==1 ? $heatpump_values[43] : "no");
+  # 65 - typeSerial
+   $return_str .= "|".substr($heatpump_parameters[874],0,4)."/".substr($heatpump_parameters[874],4)."-".sprintf("%03X",$heatpump_parameters[875]);
+  # 66 - heatSourceDefrostTimer
+   $return_str .= "|". ($heatpump_visibility[219]==1 ? $heatpump_values[141] : "no");
+  # 67 - defrostValve
+   $return_str .= "|". ($heatpump_visibility[47]==1 ? $heatpump_values[37] : "no");
+  # 68 - returnTempHyst
+   $return_str .= "|". ($heatpump_visibility[93]==1 ? $heatpump_parameters[88] : "no");
+
+   
+   return $return_str;
 }
 
 sub ########################################
@@ -728,7 +746,8 @@ LUXTRONIK2_UpdateDone($)
             66 => "MSW 26",  67 => "MSW 30", 68 => "MSW 4S",  69 => "MSW 6S",
             
             70 => "MSW 8S",  71 => "MSW 10S",72 => "MSW 13S", 73 => "MSW 16S",
-            74 => "MSW2-6S", 75 => "MSW4-16" );
+            74 => "MSW2-6S", 75 => "MSW4-16",76 => "LD2AG",   77 => "LWD90V",
+            78 => "MSW3-12", 79 => "MSW3-12S");
              
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;    
@@ -778,7 +797,14 @@ LUXTRONIK2_UpdateDone($)
    my $flowTemperature = LUXTRONIK2_CalcTemp($a[15]);
    my $returnTemperature = LUXTRONIK2_CalcTemp($a[16]);
    my $returnTemperatureTarget = LUXTRONIK2_CalcTemp($a[17]);
+   my $returnTempHyst = LUXTRONIK2_CalcTemp($a[68]);
    my $returnTemperatureTargetMin = LUXTRONIK2_CalcTemp($a[63]);
+   my $compressor1 = $a[6]; #Ausgang Verdichter 1
+   my $heatSourceMotor = $a[64]; #Ausgang Ventilator_BOSUP
+   my $defrostValve = $a[67]; #AVout
+   my $hotWaterBoilerValve = $a[9]; #BUP
+   my $heatingSystemCircPump = $a[27]; #HUP
+   my $opStateHeatPump3 = $a[3];
    
    my $heatPumpPower = 0;
    my $heatRodPower = AttrVal($name, "heatRodElectricalPowerWatt", 0);
@@ -786,7 +812,7 @@ LUXTRONIK2_UpdateDone($)
    #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
    my $thermalPower = 0;
    # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
-   if ($a[3] =~ /^(0|5|16)$/) { 
+   if ($opStateHeatPump3 =~ /^(0|5|16)$/) { 
       if ($a[19] !~ /no/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; } #Nur bei Wärmezählern
       $heatPumpPower = AttrVal($name, "heatPumpElectricalPowerWatt", -1);
       $heatPumpPower *= (1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0));
@@ -802,14 +828,14 @@ LUXTRONIK2_UpdateDone($)
    # if selected, do all the statistic calculations
    if ( $doStatistic == 1) { 
       #LUXTRONIK2_doStatisticBoilerHeatUp $hash, $currOpHours, $currHQ, $currTemp, $opState, $target
-      $value = LUXTRONIK2_doStatisticBoilerHeatUp ($hash, $a[35], $a[37]/10, $hotWaterTemperature, $a[3],$hotWaterTemperatureTarget);
+      $value = LUXTRONIK2_doStatisticBoilerHeatUp ($hash, $a[35], $a[37]/10, $hotWaterTemperature, $opStateHeatPump3,$hotWaterTemperatureTarget);
       if ($value ne "") {
          readingsBulkUpdate($hash,"statBoilerGradientHeatUp",$value); 
          LUXTRONIK2_Log $name, 3, "statBoilerGradientHeatUp set to $value";
       }
 
       #LUXTRONIK2_doStatisticBoilerCoolDown $hash, $time, $currTemp, $opState, $target, $threshold
-      $value = LUXTRONIK2_doStatisticBoilerCoolDown ($hash, $a[22], $hotWaterTemperature, $a[3], $hotWaterTemperatureTarget, $hotWaterTemperatureThreshold);
+      $value = LUXTRONIK2_doStatisticBoilerCoolDown ($hash, $a[22], $hotWaterTemperature, $opStateHeatPump3, $hotWaterTemperatureTarget, $hotWaterTemperatureThreshold);
       if ($value ne "") {
          readingsBulkUpdate($hash,"statBoilerGradientCoolDown",$value); 
          LUXTRONIK2_Log $name, 3, "statBoilerGradientCoolDown set to $value";
@@ -827,9 +853,9 @@ LUXTRONIK2_UpdateDone($)
       }
 
       # LUXTRONIK2_doStatisticThermalPower: $hash, $MonitoredOpState, $currOpState, $currHeatQuantity, $currOpHours,  $currAmbTemp, $currHeatSourceIn, $TargetTemp, $electricalPower
-      $value = LUXTRONIK2_doStatisticThermalPower ($hash, 5, $a[3], $a[37]/10, $a[35], $ambientTemperature, $heatSourceIN,$hotWaterTemperatureTarget, $heatPumpPower);
+      $value = LUXTRONIK2_doStatisticThermalPower ($hash, 5, $opStateHeatPump3, $a[37]/10, $a[35], $ambientTemperature, $heatSourceIN,$hotWaterTemperatureTarget, $heatPumpPower);
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerBoiler",$value); }
-      $value = LUXTRONIK2_doStatisticThermalPower ($hash, 0, $a[3], $a[36]/10, $a[34], $ambientTemperature, $heatSourceIN, $returnTemperatureTarget, $heatPumpPower);
+      $value = LUXTRONIK2_doStatisticThermalPower ($hash, 0, $opStateHeatPump3, $a[36]/10, $a[34], $ambientTemperature, $heatSourceIN, $returnTemperatureTarget, $heatPumpPower);
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerHeating",$value); }
       
     # LUXTRONIK2_doStatisticMinMax $hash, $readingName, $value
@@ -854,17 +880,17 @@ LUXTRONIK2_UpdateDone($)
      }
      readingsBulkUpdate($hash,"opStateHeatPump2",$opStateHeatPump2);
      
-     my $opStateHeatPump3 = $wpOpStat2{$a[3]}; ##############
+     my $opStateHeatPump3Txt = $wpOpStat2{$opStateHeatPump3}; ##############
      # refine text of third state
-     if ($a[3]==6) { 
-        $opStateHeatPump3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." C "; 
+     if ($opStateHeatPump3==6) { 
+        $opStateHeatPump3Txt = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." C "; 
      }
-      elsif ($a[3]==7) { 
-         if ($a[6]==1) {$opStateHeatPump3 = "Abtauen (Kreisumkehr)";}
-         else {$opStateHeatPump3 = "Luftabtauen";}
+      elsif ($opStateHeatPump3==7) { 
+         if ($compressor1==1) {$opStateHeatPump3Txt = "Abtauen (Kreisumkehr)";}
+         else {$opStateHeatPump3Txt = "Luftabtauen";}
       }
-      $opStateHeatPump3 = "unbekannt (".$a[3].")" unless $opStateHeatPump3;
-     readingsBulkUpdate($hash,"opStateHeatPump3",$opStateHeatPump3);
+      $opStateHeatPump3Txt = "unbekannt (".$opStateHeatPump3.")" unless $opStateHeatPump3Txt;
+     readingsBulkUpdate($hash,"opStateHeatPump3",$opStateHeatPump3Txt);
    
    # Hot water operating mode 
      $value = $wpMode{$a[7]};
@@ -872,10 +898,10 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"opModeHotWater",$value);
    # opStateHotWater
      if ($a[8]==0) {$value="Sperrzeit";}
-      elsif ($a[8]==1 && $a[9]==1) {$value="Aufheizen";}
-      elsif ($a[8]==1 && $a[9]==0) {$value="Temp. OK";}
+      elsif ($a[8]==1 && $hotWaterBoilerValve==1) {$value="Aufheizen";}
+      elsif ($a[8]==1 && $hotWaterBoilerValve==0) {$value="Temp. OK";}
      elsif ($a[8]==3) {$value="Aus";}
-      else {$value = "unbekannt (".$a[8]."/".$a[9].")";}
+      else {$value = "unbekannt (".$a[8]."/".$hotWaterBoilerValve.")";}
      readingsBulkUpdate($hash,"opStateHotWater",$value);
 
     # Heating operating mode
@@ -933,12 +959,15 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "hotWaterTemperatureTarget",$hotWaterTemperatureTarget);
      readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
      readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
-     readingsBulkUpdate( $hash, "returnTemperatureTarget",$returnTemperatureTarget);
+     readingsBulkUpdate( $hash, "returnTemperatureTarget", $returnTemperatureTarget);
+     readingsBulkUpdate( $hash, "returnTemperatureHyst", $returnTempHyst);
      readingsBulkUpdate( $hash, "returnTemperatureSetBack",LUXTRONIK2_CalcTemp($a[54]));
      if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));}
      if ($a[19] !~ /no/) {readingsBulkUpdate( $hash, "flowRate",$a[19]);}
      readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
      readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
+     readingsBulkUpdate( $hash, "heatSourceMotor",$heatSourceMotor?"on":"off");
+     if ($a[66] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostTimer",$a[66]);}
      readingsBulkUpdate( $hash, "hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
      if ($a[55] !~ /no/) {readingsBulkUpdate( $hash, "mixer1FlowTemperature",LUXTRONIK2_CalcTemp($a[55]));}
      if ($a[56] !~ /no/) {readingsBulkUpdate( $hash, "mixer1TargetTemperature",LUXTRONIK2_CalcTemp($a[56]));}
@@ -972,9 +1001,9 @@ LUXTRONIK2_UpdateDone($)
       
      
    # Input / Output status
-     readingsBulkUpdate($hash,"heatingSystemCircPump",$a[27]?"on":"off");
+     readingsBulkUpdate($hash,"heatingSystemCircPump",$heatingSystemCircPump?"on":"off");
      readingsBulkUpdate($hash,"hotWaterCircPumpExtern",$a[28]?"on":"off");
-     readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
+     readingsBulkUpdate($hash,"hotWaterSwitchingValve",$hotWaterBoilerValve?"on":"off");
      
    # Deaerate Function
      readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
@@ -996,6 +1025,7 @@ LUXTRONIK2_UpdateDone($)
      $value = $wpType{$a[31]};
      $value = "unbekannt (".$a[31].")" unless $value;
      readingsBulkUpdate($hash,"typeHeatpump",$value);
+     readingsBulkUpdate($hash,"typeSerial",$a[65]);
 
    # Solar
      if ($a[50] !~ /no/) {readingsBulkUpdate($hash, "solarCollectorTemperature", LUXTRONIK2_CalcTemp($a[50]));}
@@ -1007,17 +1037,39 @@ LUXTRONIK2_UpdateDone($)
         $value = ""; #"<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div> \n";
         $value .= "$opStateHeatPump1<br>\n";
         $value .= "$opStateHeatPump2<br>\n";
-        $value .= "$opStateHeatPump3<br>\n";
+        $value .= "$opStateHeatPump3Txt<br>\n";
         $value .= "Brauchwasser: ".$hotWaterTemperature."&deg;C";
         readingsBulkUpdate($hash,"floorplanHTML",$value);
      }
     # State update
-      $value = "$opStateHeatPump1 $opStateHeatPump2 - $opStateHeatPump3";
+      $value = "$opStateHeatPump1 $opStateHeatPump2 - $opStateHeatPump3Txt";
       if ($thermalPower != 0) { 
          $value .= sprintf (" (%.1f kW", $thermalPower);
          if ($heatPumpPower>0) {$value .= sprintf (", COP: %.2f", $cop);}
          $value .= ")"; }
       readingsBulkUpdate($hash, "state", $value);
+     
+    # Special readings
+      # $compressor1 = $a[6]; #Ausgang Verdichter 1
+      # $heatSourceMotor = $a[64]; #Ausgang Ventilator_BOSUP
+      # $defrostValve = $a[67]; #AVout
+      # $hotWaterBoilerValve = $a[9]; #BUP
+      # $heatingSystemCircPump = $a[27]; #HUP
+      # 0=Heizen, 1=keine Anforderung, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
+      if ( $opStateHeatPump3 == 0 ) {
+         readingsBulkUpdate($hash, "heatingCycle", "running");
+      }
+      elsif ( $opStateHeatPump3 > 1 && ReadingsVal($name, "heatingCycle", "") eq "running") {
+         readingsBulkUpdate($hash, "heatingCycle", "paused");
+      }
+      elsif ( $opStateHeatPump3 == 1 && ReadingsVal($name, "heatingCycle", "") eq "running") {
+         readingsBulkUpdate($hash, "heatingCycle", "finished");
+      }
+      elsif ( $opStateHeatPump3 == 1 && ReadingsVal($name, "heatingCycle", "") eq "paused") {
+         if ( $returnTemperature-$returnTemperatureTarget >= $returnTempHyst ) { readingsBulkUpdate($hash, "heatingCycle", "finished"); }
+         else { readingsBulkUpdate($hash, "heatingCycle", "discontinued"); }
+      }
+    
      
       readingsEndUpdate($hash,1);
      
@@ -1133,6 +1185,17 @@ LUXTRONIK2_SetParameter($$$)
      $setValue = $opMode{$realValue};
   }
   
+  elsif ($parameterName eq "returnTemperatureHyst") {
+     #parameter number
+    $setParameter = 88;
+    #limit temperature range
+    $realValue = 0.5 if( $realValue < 0.5 );
+    $realValue = 3.0 if( $realValue > 3.0 );
+    #Allow only integer temperatures
+    $setValue = int($realValue * 10);
+    $realValue = $setValue / 10;
+  }
+
   elsif ($parameterName eq "returnTemperatureSetBack") {
      #parameter number
     $setParameter = 1;
@@ -1200,7 +1263,7 @@ LUXTRONIK2_SetParameter($$$)
      
      $socket->close();
      
-     readingsSingleUpdate($hash,$parameterName,$realValue,1)   unless $parameterName eq "runDeaerate";
+     readingsSingleUpdate($hash,$parameterName,$realValue,0)   unless $parameterName eq "runDeaerate";
      
      return undef;
    }
@@ -1864,9 +1927,13 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          <br>
          Deletes the selected statistic values <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
          </li><br>
-     <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
+     <li><code>returnTemperatureHyst &lt;Temperature&gt;</code>
          <br>
-         Decreasing or increasing of the returnTemperatureTarget by -5&deg;C till + 5&deg;C
+         Hysteresis of the returnTemperatureTarget of the heating controller . 0.5 K till 3 K. Adjustable in 0.1 steps.
+         </li><br>
+     <li><code>returnTemperatureSetBack &lt;Temperature&gt;</code>
+         <br>
+         Decreasing or increasing of the returnTemperatureTarget by -5 K till + 5 K
          </li><br>
       <li><code>statusRequest</code><br>
          Update device information
@@ -1991,6 +2058,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
          L&ouml;scht die ausgew&auml;hlten statisischen Werte: <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
+         </li><br>
+     <li><code>returnTemperatureHyst &lt;Temperatur&gt;</code>
+         <br>
+         Sollwert-Hysterese der Heizungsregelung. 0.5 K bis 3 K. In 0.1er Schritten einstellbar.
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
