@@ -40,7 +40,7 @@ fakeRoku_Initialize($)
   #$hash->{SetFn}    = "fakeRoku_Set";
   #$hash->{GetFn}    = "fakeRoku_Get";
   $hash->{AttrFn}   = "fakeRoku_Attr";
-  $hash->{AttrList} = "disable:1,0 favourites httpPort";
+  $hash->{AttrList} = "disable:1,0 favourites fhemIP httpPort";
 }
 
 #####################################
@@ -360,7 +360,17 @@ fakeRoku_Attr($$$)
       fakeRoku_startListener($hash);
     }
 
-  }
+  } elsif( $attrName eq 'fhemIP' ) {
+    if( $cmd eq "set" && $attrVal ) {
+      $hash->{fhemIP} = $attrVal;
+    } else {              
+      $hash->{fhemIP} = fakeRoku_getLocalIP();
+    }                     
+
+    fakeRoku_startDiscovery($hash);
+    fakeRoku_startListener($hash);
+  }                       
+
 
   if( $cmd eq "set" ) {
     if( $attrVal && $orig ne $attrVal ) {
@@ -823,6 +833,8 @@ Log 1, "!!!!!!!!!!";
   <ul>
     <li>favourites<br>
       comma separated list of names to use as apps/channels/favourites. the list can be reloaded on the harmony with edit->reset.</li>
+    <li>fhemIP<br>
+      overwrites autodetected local ip used in advertising</li>
     <li>httpPort</li>
   </ul>
 
