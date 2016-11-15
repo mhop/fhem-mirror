@@ -88,7 +88,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0206";
+  my $ModuleVersion = "0207";
   
   my $subtype;
   my $name = $a[0];
