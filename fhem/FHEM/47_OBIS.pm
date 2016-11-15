@@ -142,6 +142,7 @@ sub OBIS_Define($$)
     "Standard"	=>	["",                        -1,    ""],
     "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     );
     if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
@@ -526,7 +527,7 @@ sub OBIS_Parse($$)
     							}
     							if (AttrVal($name,"unitReadings","off") eq "off") {
     								$v1=~s/(.*)\*.*/$1/;
-    								if (length $v2) {}$v2=~s/(.*)\*.*/$1/;
+    								if ($v2) {$v2=~s/(.*)\*.*/$1/};
     							}
     							$v1+=0 if (looks_like_number($v1));
     							$v2+=0 if (looks_like_number($v2));
@@ -735,28 +736,30 @@ sub OBIS_decodeTL($){
 	my $lt="";
 	my $tmp="";
 #	Log 3,"In: $msg";
-	$msgType  =hex(substr($msg,0,2)) & 0b01110000;
-	do {
-		$lt=hex(substr($msg,0,2));
-		$msg=substr($msg,2);
-		$msgLength=($msgLength*16) + ($lt & 0b00001111);
-	} while ($lt & 0b10000000);
-	if ($msgType == 0b01110000) {
-		for (my $i=0;$i<$msgLength;$i++) {
-			my $tmp2="";
-#			Log 3,"--> $msg";
-			(undef,undef,undef,$msg,$tmp2)=OBIS_decodeTL($msg);
-#			Log 3,"<-- $tmp2 $msg";
-			$tmp.=$tmp2;
+	if ($msg) {
+		$msgType  =hex(substr($msg,0,2)) & 0b01110000;
+		do {
+			$lt=hex(substr($msg,0,2));
+			$msg=substr($msg,2);
+			$msgLength=($msgLength*16) + ($lt & 0b00001111);
+		} while ($lt & 0b10000000);
+		if ($msgType == 0b01110000) {
+			for (my $i=0;$i<$msgLength;$i++) {
+				my $tmp2="";
+	#			Log 3,"--> $msg";
+				(undef,undef,undef,$msg,$tmp2)=OBIS_decodeTL($msg);
+	#			Log 3,"<-- $tmp2 $msg";
+				$tmp.=$tmp2;
+			}
+			$msgLength-=1;
 		}
 		$msgLength-=1;
-	}
-	$msgLength-=1;
-	my $valu=substr($msg,0,$msgLength*2);
-	$tmp.=$valu;
-	$msg=substr($msg,$msgLength*2);
-#	Log 3,"   Split Msg: $tmp $msg";
+		my $valu=substr($msg,0,$msgLength*2);
+		$tmp.=$valu;
+		$msg=substr($msg,$msgLength*2);
+	#	Log 3,"   Split Msg: $tmp $msg";
 	return $msgLength,$msgType,$valu,$msg,$tmp;
+	};
 }
 
 "Cogito, ergo sum.";
@@ -781,6 +784,7 @@ sub OBIS_decodeTL($){
       Optional:MeterType can be of
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
+      <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
       <li>Standard -&gt; Data comes as plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
@@ -852,6 +856,7 @@ sub OBIS_decodeTL($){
       Optional:MeterType kann sein:
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
+      <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
       <li>Standard -&gt; Daten kommen als plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
