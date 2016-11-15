@@ -73,19 +73,13 @@ sub HP1000_Initialize($) {
 "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
-    $hash->{readingsTypes} = {
-        'activity' => {
-            ref   => 'oknok',
-            scope => [ 'dead', 'alive' ],
-        },
-    };
-
     $hash->{readingsDesc} = {
-        'Activity'                => { rtype => 'activity', },
+        'Activity'                => { rtype => 'oknok', },
         'UV'                      => { rtype => 'uvi', },
         'UVcondition'             => { rtype => 'condition_uvi', },
         'UVR'                     => { rtype => 'uwpscm', },
-        'daylight'                => { rtype => 'bool', },
+        'condition'               => { rtype => 'condition_weather', },
+        'daylight'                => { rtype => 'yesno', },
         'dewpoint'                => { rtype => 'c', },
         'dewpoint_f'              => { rtype => 'f', },
         'humidity'                => { rtype => 'pct', formula_symbol => 'H' },
@@ -94,13 +88,13 @@ sub HP1000_Initialize($) {
         'humidityCondition'       => { rtype => 'condition_hum', },
         'indoorDewpoint'          => { rtype => 'c', },
         'indoorDewpoint_f'        => { rtype => 'f', },
-        'indoorHumidity'          => { rtype => 'pct', },
+        'indoorHumidity'          => { rtype => 'pct', formula_symbol => 'H' },
         'indoorHumidityAbs'       => { rtype => 'c', },
         'indoorHumidityAbs_f'     => { rtype => 'f', },
         'indoorHumidityCondition' => { rtype => 'condition_hum', },
         'indoorTemperature'       => { rtype => 'c', },
         'indoorTemperature_f'     => { rtype => 'f', },
-        'israining'               => { rtype => 'bool', },
+        'israining'               => { rtype => 'yesno', },
         'luminosity'              => { rtype => 'lx', },
         'pressure'                => { rtype => 'hpamb', },
         'pressureAbs'             => { rtype => 'hpamb', },

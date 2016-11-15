@@ -481,66 +481,6 @@ sub values2weathercondition($$$$$) {
 ### Logfile integer conversions
 ###
 
-# Condition: convert humidity condition to logfile value
-sub humiditycondition2log($) {
-    my ($data) = @_;
-    my $v = "0";
-
-    if ( $data eq "wet" ) {
-        $v = "4";
-    }
-    elsif ( $data eq "high" ) {
-        $v = "3";
-    }
-    elsif ( $data eq "optimal" ) {
-        $v = "2";
-    }
-    elsif ( $data eq "low" ) {
-        $v = "1";
-    }
-
-    return $v;
-}
-
-# Condition: convert UV-Index to logfile value
-sub uvcondition2log($) {
-    my ($data) = @_;
-    my $v = "0";
-
-    if ( $data eq "extreme" ) {
-        $v = "4";
-    }
-    elsif ( $data eq "veryhigh" ) {
-        $v = "3";
-    }
-    elsif ( $data eq "high" ) {
-        $v = "2";
-    }
-    elsif ( $data eq "moderate" ) {
-        $v = "1";
-    }
-
-    return $v;
-}
-
-# Condition: convert weather condition to logfile value
-sub weathercondition2log($) {
-    my ($data) = @_;
-    my $v = "0";
-
-    if ( $data eq "cloudy" ) {
-        $v = "1";
-    }
-    elsif ( $data eq "sunny" ) {
-        $v = "2";
-    }
-    elsif ( $data eq "rain" ) {
-        $v = "3";
-    }
-
-    return $v;
-}
-
 sub activity2log($) {
     my ($data) = @_;
 
