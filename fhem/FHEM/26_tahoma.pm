@@ -33,6 +33,7 @@
 # 2016-02-24 V 0204 commands open,close,my,stop and setClosure added
 # 2016-04-24 V 0205 commands taken from setup
 # 2016-06-16 V 0206 updateDevices called for devices created before setup has been read
+# 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribut levelInvert inverts RollerShutter position
 
 package main;
 
@@ -43,6 +44,7 @@ use utf8;
 use Encode qw(encode_utf8 decode_utf8);
 use JSON;
 #use Data::Dumper;
+use Time::HiRes qw(time);
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -72,6 +74,8 @@ sub tahoma_Initialize($)
                       "logfile ".
                       "proxy ".
                       "url ".
+                      "placeClasses ".
+                      "levelInvert ".
                       "userAgent ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
@@ -201,16 +205,18 @@ sub tahoma_login($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "$name: tahoma_login";
-  
+  Log3 $name, 3, "$name: tahoma_login";
+
   $hash->{logged_in} = undef;
+  $hash->{startup_run} = undef;
+  $hash->{startup_done} = undef;
   $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/json/";
   $hash->{url} = $attr{$name}{url} if (defined $attr{$name}{url});
   $hash->{userAgent} = "TaHoma/3640 CFNetwork/711.1.16 Darwin/14.0.0";
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
 
-  print "login start\n";
+  Log3 $name, 2, "$name: login start";
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
@@ -218,51 +224,70 @@ sub tahoma_login($)
     page => 'login',
     data => {'userId' => $hash->{username} , 'userPassword'  => $hash->{password}},
     callback => \&tahoma_dispatch,
-    nonblocking => 0,
+    nonblocking => 1,
   });
-  return if (!$hash->{logged_in});
+}
   
-  my @startup_pages = ( 'getEndUser',
-                        'getSetup',
-                        'getActionGroups',
-                        #'getWeekPlanning',
-                        #'getCalendarDayList',
-                        #'getCalendarRuleList',
-                        #'getScheduledExecutions',
-                        #'getHistory',
-                        #'getSetupTriggers',
-                        #'getUserPreferences',
-                        #'getSetupOptions',
-                        #'getAvailableProtocolsType',
-                        #'getActiveProtocolsType',
-                        '../../enduserAPI/setup/gateways',
-                        'getCurrentExecutions' );
+my @startup_pages = ( 'getEndUser',
+                      'getSetup',
+                      'getActionGroups',
+                      #'getWeekPlanning',
+                      #'getCalendarDayList',
+                      #'getCalendarRuleList',
+                      #'getScheduledExecutions',
+                      #'getHistory',
+                      #'getSetupTriggers',
+                      #'getUserPreferences',
+                      #'getSetupOptions',
+                      #'getAvailableProtocolsType',
+                      #'getActiveProtocolsType',
+                      '../../enduserAPI/setup/gateways',
+                      'getCurrentExecutions',
+                      'refreshAllStates' );
 
-  foreach my $page (@startup_pages) {
-    my $subpage = "";
-    $subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13) eq 'ProtocolsType');
-    $subpage = '?quotaId=smsCredit' if ($page eq 'getSetupQuota');
-    $subpage = '/'.$hash->{gatewayId}.'/version' if (substr($page, -8) eq 'gateways');
-    tahoma_UserAgent_NonblockingGet({
-      timeout => 10,
-      noshutdown => 1,
-      hash => $hash,
-      page => $page,
-      subpage => $subpage,
-      callback => \&tahoma_dispatch,
-      nonblocking => 0,
-    });
-    return if (!$hash->{logged_in});
-  }
+sub tahoma_startup($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_startup";
+
+  return if (!$hash->{logged_in});
+  return if ($hash->{startup_done});
   
-  tahoma_refreshAllStates($hash, 0);
-  tahoma_getStates($hash, 0);
-  tahoma_getEvents($hash, 1);
+  if (!defined($hash->{startup_run}))
+  {
+    $hash->{startup_run} = 0;
+  }
+  else
+  {
+    $hash->{startup_run}++;
+    if ($hash->{startup_run} >= scalar @startup_pages)
+    {
+      $hash->{startup_done} = 1;
+      return;
+    }
+  }
+
+  my $page = $startup_pages[$hash->{startup_run}];
+  my $subpage = "";
+  $subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13) eq 'ProtocolsType');
+  $subpage = '?quotaId=smsCredit' if ($page eq 'getSetupQuota');
+  $subpage = '/'.$hash->{gatewayId}.'/version' if (substr($page, -8) eq 'gateways');
+
+  tahoma_UserAgent_NonblockingGet({
+    timeout => 10,
+    noshutdown => 1,
+    hash => $hash,
+    page => $page,
+    subpage => $subpage,
+    callback => \&tahoma_dispatch,
+    nonblocking => 1,
+  });
 }
 
-sub tahoma_refreshAllStates($$)
+sub tahoma_refreshAllStates($)
 {
-  my ($hash,$nonblocking) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_refreshAllStates";
 
@@ -272,20 +297,17 @@ sub tahoma_refreshAllStates($$)
     hash => $hash,
     page => 'refreshAllStates',
     callback => \&tahoma_dispatch,
-    nonblocking => $nonblocking,
+    nonblocking => 1,
   });
 }
 
-sub tahoma_getEvents($$)
+sub tahoma_getEvents($)
 {
-  my ($hash,$nonblocking) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_getEvents";
 
-  if( !$hash->{logged_in} ) {
-    tahoma_login($hash);
-    return undef;
-  }
+  return if(!$hash->{logged_in} && !$hash->{startup_done});
 
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -293,29 +315,66 @@ sub tahoma_getEvents($$)
     hash => $hash,
     page => 'getEvents',
     callback => \&tahoma_dispatch,
-    nonblocking => $nonblocking,
+    nonblocking => 1,
   });
 }
 
 sub tahoma_readStatusTimer($)
 {
+  my $timestart = time;
+  my $timeinfo = "tahoma_readStatusTimer";
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  RemoveInternalTimer($hash);
+  
   my ($seconds) = gettimeofday();
   $hash->{refreshStateTimer} = $seconds + 10 if ( (!defined($hash->{refreshStateTimer})) || (!$hash->{logged_in}) );
   
-  if( $seconds < $hash->{refreshStateTimer} )
+  if( $hash->{request_active} ) {
+      Log3 $name, 3, "$name: request active";
+    if( ($timestart - $hash->{request_time}) > 10)
+    {
+      Log3 $name, 2, "$name: timeout, close ua";
+      $hash->{socket} = undef;
+      $hash->{request_active} = 0;
+      $hash->{logged_in} = 0;
+      $hash->{startup_done} = 0;
+    }
+  }
+  elsif( !$hash->{logged_in} ) {
+    tahoma_login($hash);
+    $timeinfo = "tahoma_login";
+  }
+  elsif( !$hash->{startup_done} ) {
+    tahoma_startup($hash);
+    $timeinfo = "tahoma_startup";
+    if ( $hash->{startup_done} ) {
+      tahoma_getStates($hash) ;
+      $hash->{refreshStateTimer} = $seconds + 300;
+      $timeinfo = "tahoma_getStates";
+    }
+  }
+  elsif( $seconds < $hash->{refreshStateTimer} )
   {
     Log3 $name, 4, "$name: refreshing event";
-    tahoma_getEvents($hash, 1);
+    tahoma_getEvents($hash);
+    $timeinfo = "tahoma_getEvents";
   }
   else
   {
     Log3 $name, 4, "$name: refreshing state";
-    tahoma_refreshAllStates($hash, 0);
-    tahoma_getStates($hash, 1);
+    tahoma_refreshAllStates($hash);
+    tahoma_getStates($hash);
     $hash->{refreshStateTimer} = $seconds + 300;
+    $timeinfo = "tahoma_refreshAllStates tahoma_getStates";
+  }
+
+  my $timedelta = time -$timestart;
+  if ($timedelta > 0.5)
+  {
+    $timedelta *= 1000;
+    Log3 $name, 3, "$name: $timeinfo took $timedelta ms"
   }
 
   InternalTimer(gettimeofday()+2, "tahoma_readStatusTimer", $hash, 0);
@@ -325,7 +384,7 @@ sub tahoma_connect($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "$name: tahoma_connect";
+  Log3 $name, 3, "$name: tahoma_connect";
 
   RemoveInternalTimer($hash);
   tahoma_login($hash);
@@ -363,22 +422,25 @@ sub tahoma_initDevice($)
     $hash->{inLabel} = $device->{label};
     $hash->{inControllable} = $device->{controllableName};
     $hash->{inPlaceOID} = $device->{placeOID};
+    $hash->{inClass} = $device->{uiClass};
+    $device->{levelInvert} = $attr{$hash->{NAME}}{levelInvert} if (defined $attr{$hash->{NAME}}{levelInvert});
   }
   elsif( defined($device) && ($subtype eq 'PLACE') ) {
     Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
     $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
+    $hash->{inClass} = 'RollerShutter';
+    $hash->{inClass} = $attr{$hash->{NAME}}{placeClasses} if (defined $attr{$hash->{NAME}}{placeClasses});
   }
   elsif( defined($device) && ($subtype eq 'SCENE') ) {
     Log3 $name, 4, "$name: I/O device is label=".$device->{label};
-    $hash->{inType} = $device->{type};
     $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
   }
   else
   {
-    Log3 $name, 4, "$name: unknown device=$hash->{device}, subtype=$subtype";
+    Log3 $name, 3, "$name: unknown device=$hash->{device}, subtype=$subtype";
   }
 
 
@@ -414,7 +476,7 @@ sub tahoma_updateDevices($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 3, "updateDevices";
+  Log3 $name, 3, "$name: tahoma_updateDevices";
 
   return undef if( !$hash->{helper}{devices} ) ;
   
@@ -425,24 +487,25 @@ sub tahoma_updateDevices($)
     my $subtype = $def->{SUBTYPE};
     if (defined($def->{oid}) && !defined($def->{inType}))
     {
-      Log3 $name, 3, "updateDevices oid=$def->{oid}";
+      Log3 $name, 3, "$name: updateDevices oid=$def->{oid}";
       my $device = tahoma_getDeviceDetail( $hash, $def->{oid} );
       if( defined($device) && ($subtype eq 'PLACE') ) {
         Log3 $name, 4, "$name: I/O device is label=".$device->{label};
-        $hash->{inType} = $device->{type};
-        $hash->{inLabel} = $device->{label};
-        $hash->{inOID} = $device->{oid};
+        $def->{inType} = $device->{type};
+        $def->{inLabel} = $device->{label};
+        $def->{inOID} = $device->{oid};
+        $def->{inClass} = 'RollerShutter';
+        $def->{inClass} = $attr{$hash->{NAME}}{placeClasses} if (defined $attr{$hash->{NAME}}{placeClasses});
       }
       elsif( defined($device) && ($subtype eq 'SCENE') ) {
         Log3 $name, 4, "$name: I/O device is label=".$device->{label};
-        $hash->{inType} = $device->{type};
-        $hash->{inLabel} = $device->{label};
-        $hash->{inOID} = $device->{oid};
+        $def->{inLabel} = $device->{label};
+        $def->{inOID} = $device->{oid};
       }
     }
     elsif (defined($def->{device}) && !defined($def->{inType}))
     {
-      Log3 $name, 3, "updateDevices device=$def->{device}";
+      Log3 $name, 3, "$name: updateDevices device=$def->{device}";
       my $device = tahoma_getDeviceDetail( $hash, $def->{device} );
       if( defined($device) && ($subtype eq 'DEVICE') ) {
         Log3 $name, 4, "$name: I/O device is label=".$device->{label};
@@ -450,6 +513,8 @@ sub tahoma_updateDevices($)
         $def->{inLabel} = $device->{label};
         $def->{inControllable} = $device->{controllableName};
         $def->{inPlaceOID} = $device->{placeOID};
+        $def->{inClass} = $device->{uiClass};
+        $device->{levelInvert} = $attr{$def->{NAME}}{levelInvert} if (defined $attr{$def->{NAME}}{levelInvert});
       }
     }
   }
@@ -457,18 +522,19 @@ sub tahoma_updateDevices($)
   return undef;
 }
 
-sub tahoma_getDevices($;$)
+sub tahoma_getDevices($$)
 {
-  my ($hash,$blocking) = @_;
+  my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "tahoma_getDevices";
+  Log3 $name, 4, "$name: tahoma_getDevices";
 
   tahoma_UserAgent_NonblockingGet({
+    timeout => 10,
     noshutdown => 1,
     hash => $hash,
     page => 'getSetup',
     callback => \&tahoma_dispatch,
-    nonblocking => !$blocking,
+    nonblocking => $nonblocking,
   });
 
   return $hash->{helper}{devices};
@@ -478,7 +544,7 @@ sub tahoma_getDeviceDetail($$)
 {
   my ($hash,$id) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "getDeviceDetails $id";
+  Log3 $name, 4, "$name: tahoma_getDeviceDetails $id";
 
   $hash = $hash->{IODev} if( defined($hash->{IODev}) );
 
@@ -487,16 +553,16 @@ sub tahoma_getDeviceDetail($$)
     return $device if( defined($device->{oid}) && ($device->{oid} eq $id) );
   }
 
-  Log3 $name, 4, "getDeviceDetails $id not found";
+  Log3 $name, 4, "$name: getDeviceDetails $id not found";
   
   return undef;
 }
 
-sub tahoma_getStates($$)
+sub tahoma_getStates($)
 {
-  my ($hash,$nonblocking) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "getStates";
+  Log3 $name, 4, "$name: tahoma_getStates";
 
   my $data = '[';
   
@@ -515,7 +581,7 @@ sub tahoma_getStates($$)
   
   $data .= ']';
 
-  Log3 $name, 5, "tahoma_getStates data=".$data;
+  Log3 $name, 5, "$name: tahoma_getStates data=".$data;
   
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -524,71 +590,92 @@ sub tahoma_getStates($$)
     page => 'getStates',
     data => decode_utf8($data),
     callback => \&tahoma_dispatch,
-    nonblocking => $nonblocking,
+    nonblocking => 1,
   });
   
 }
 
-sub tahoma_getDeviceList($$$);
-sub tahoma_getDeviceList($$$)
+sub tahoma_getDeviceList($$$$);
+sub tahoma_getDeviceList($$$$)
 {
-  my ($hash,$oid,$deviceList) = @_;
+  my ($hash,$oid,$placeClasses,$deviceList) = @_;
   #print "tahoma_getDeviceList oid=$oid devices=".scalar @{$deviceList}."\n";
   
+  my @classes = split(' ',$placeClasses);
   my $devices = $hash->{helper}{devices};
   foreach my $device (@{$devices}) {
-    if ( defined($device->{deviceURL}) && defined($device->{placeOID}) && defined($device->{type}) ) {
-      if (($device->{type} eq '1') && ($device->{placeOID} eq $oid)) {
-        push ( @{$deviceList}, { device => $device->{deviceURL}, type => $device->{type} } ) ;
+    if ( defined($device->{deviceURL}) && defined($device->{placeOID}) && defined($device->{uiClass}) ) {
+      if (( grep { $_ eq $device->{uiClass}} @classes ) && ($device->{placeOID} eq $oid)) {
+        push ( @{$deviceList}, { device => $device->{deviceURL}, class => $device->{uiClass}, levelInvert => $device->{levelInvert} } ) ;
         #print "tahoma_getDeviceList url=$device->{deviceURL} devices=".scalar @{$deviceList}."\n";
       }
     } elsif ( defined($device->{oid}) && defined($device->{place}) ) {
       if ($device->{oid} eq $oid)
       {
         foreach my $place (@{$device->{place}}) {
-          tahoma_getDeviceList($hash,$place->{oid},$deviceList);
+          tahoma_getDeviceList($hash,$place->{oid},$placeClasses,$deviceList);
         }
       }
     }
   }
 }
 
-sub tahoma_applyRequest($$$$)
+sub tahoma_checkCommand($$$$)
 {
-  my ($hash,$nonblocking,$command,$value) = @_;
+  my ($hash,$device,$command,$value) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "tahoma_applyRequest";
+  Log3 $name, 4, "$name: tahoma_checkCommand";
+  if (($command eq 'setClosure') && (defined ($device->{levelInvert})))
+  {
+    $value = 100 - $value if ($device->{levelInvert} && ($value >= 0) && ($value <= 100));
+  }
+  return ($command,$value);
+}
 
-  if ( !defined($hash->{IODev}) || !(defined($hash->{device}) || defined($hash->{oid})) || !defined($hash->{inLabel}) || !defined($hash->{inType}) ) {
-    Log3 $name, 4, "tahoma_applyRequest failed - define error";
+sub tahoma_applyRequest($$$)
+{
+  my ($hash,$command,$value) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_applyRequest";
+
+  if ( !defined($hash->{IODev}) || !(defined($hash->{device}) || defined($hash->{oid})) || !defined($hash->{inLabel}) || !defined($hash->{inClass}) ) {
+    Log3 $name, 4, "$name: tahoma_applyRequest failed - define error";
     return;
   }
   
   my @devices = ();
   if ( defined($hash->{device}) ) {
-    push ( @devices, { device => $hash->{device}, type => $hash->{inType} } );
+    push ( @devices, { device => $hash->{device}, class => $hash->{inClass}, commands => $hash->{COMMANDS}, levelInvert => $attr{$hash->{NAME}}{levelInvert} } );
   } else {
-    tahoma_getDeviceList($hash->{IODev},$hash->{oid},\@devices);
+    tahoma_getDeviceList($hash->{IODev},$hash->{oid},$hash->{inClass},\@devices);
   }
 
-  Log3 $name, 4, "tahoma_applyRequest devices=".scalar @devices;
+  Log3 $name, 4, "$name: tahoma_applyRequest devices=".scalar @devices;
   foreach my $dev (@devices) {
-    Log3 $name, 4, "tahoma_applyRequest devices=$dev->{device} type=$dev->{type}";
+    Log3 $name, 4, "$name: tahoma_applyRequest devices=$dev->{device} class=$dev->{class}";
   }
   
   return if (scalar @devices < 1);
 
+  my $data = '';
   $value = '' if (!defined($value));
-  my $data = '{"label":"';
-  $data .= $hash->{inLabel}.' - Positionieren auf '.$value.' % - iPhone","actions":[';
   foreach my $device (@devices) {
-    $data .= ',' if substr($data, -1) eq '}';
-    $data .= '{"deviceURL":"'.$device->{device}.'",';
-    $data .= '"commands":[{"name":"'.$command.'","parameters":['.$value.']}]}';
+    my ($commandChecked, $valueChecked) = tahoma_checkCommand($hash,$device,$command,$value);
+    if (defined($commandChecked) && defined($valueChecked))
+    {
+      $data .= ',' if substr($data, -1) eq '}';
+      $data .= '{"deviceURL":"'.$device->{device}.'",';
+      $data .= '"commands":[{"name":"'.$commandChecked.'","parameters":['.$valueChecked.']}]}';
+    }
   }
-  $data .= ']}';
+  return if (length $data < 20);
+  
+  my $dataHead = '{"label":"' . $hash->{inLabel};
+  $dataHead .= ' - Positionieren auf '.$value.' % - iPhone","actions":[' if ($command eq 'setClosure');
+  $dataHead .= ' - $command $value - iPhone","actions":[' if ($command ne 'setClosure');
+  $data = $dataHead . $data . ']}';
 
-  Log3 $name, 3, "tahoma_applyRequest data=".$data;
+  Log3 $name, 3, "$name: tahoma_applyRequest data=".$data;
   
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -597,18 +684,18 @@ sub tahoma_applyRequest($$$$)
     page => 'apply',
     data => decode_utf8($data),
     callback => \&tahoma_dispatch,
-    nonblocking => $nonblocking,
+    nonblocking => 1,
   });
 }
 
-sub tahoma_scheduleActionGroup($$$)
+sub tahoma_scheduleActionGroup($$)
 {
-  my ($hash,$nonblocking,$delay) = @_;
+  my ($hash,$delay) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "tahoma_scheduleActionGroup";
+  Log3 $name, 4, "$name: tahoma_scheduleActionGroup";
 
   if ( !defined($hash->{IODev}) || !defined($hash->{oid}) ) {
-    Log3 $name, 3, "tahoma_scheduleActionGroup failed - define error";
+    Log3 $name, 3, "$name: tahoma_scheduleActionGroup failed - define error";
     return;
   }
 
@@ -621,24 +708,55 @@ sub tahoma_scheduleActionGroup($$$)
     page => 'scheduleActionGroup',
     subpage => '?oid='.$hash->{oid}.'&delay='.$delay,
     callback => \&tahoma_dispatch,
-    nonblocking => $nonblocking,
+    nonblocking => 1,
   });
 }
 
-sub tahoma_dispatch($$$)
+sub tahoma_dispatch($$$$)
 {
-  my ($param, $err, $data) = @_;
+  my ($param, $err, $data, $dataLenTotal) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
   if( $err ) {
-    Log3 $name, 2, "$name: http request failed: $err";
+    Log3 $name, 2, "$name: tahoma_dispatch http request failed: $err";
+    $hash->{request_active} = 0;
     $hash->{logged_in} = 0;
+    $hash->{lastData} = '';
   } elsif( $data ) {
+    my $dataLen = length $data;
+    $dataLenTotal = 0 if (!defined($dataLenTotal));
+    if ($dataLen == $dataLenTotal) {
+      Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=$dataLen dataLenTotal=$dataLenTotal";
+      $hash->{lastData} = '';
+    } else {
+      my $dataLenSum = $dataLen + length $hash->{lastData};
+      Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=$dataLen dataLenSum=$dataLenSum dataLenTotal=$dataLenTotal";
+      $data = $hash->{lastData} . $data;
+      $hash->{lastData} = '';
+      if (!$dataLenTotal)
+      {
+        my $json = {};
+        eval { $json = JSON->new->utf8(0)->decode($data); };
+        if ($@) {
+          Log3 $name, 3, "$name: tahoma_dispatch json string is faulty, wait for concat ...";
+          $dataLenTotal = $dataLenSum+1;
+        }
+        else {
+          $dataLenTotal = $dataLenSum;
+        }
+      }
+      if ($dataLenSum < $dataLenTotal) {
+        $hash->{lastData} = $data;
+        return;
+      }
+    }
+    $hash->{request_active} = 0;
+    
     $data =~ tr/\r\n//d;
     $data =~ s/\h+/ /g;
-	$data =~ s/\\\//\//g;
-    Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=".length $data;
+    $data =~ s/\\\//\//g;
+
     Log3 $name, (length $data > 120)?4:5, "$name: tahoma_dispatch data=".encode_utf8($data);
 
     # perl exception while parsing json string captured
@@ -689,7 +807,7 @@ sub tahoma_autocreate($)
   my $name = $hash->{NAME};
 
   if( !$hash->{helper}{devices} ) {
-    tahoma_getDevices($hash);
+    tahoma_getDevices($hash,1);
     return undef;
   }
 
@@ -698,7 +816,7 @@ sub tahoma_autocreate($)
     return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
   }
   
-  print "tahoma_autocreate begin\n";
+  Log3 $name, 2, "$name: tahoma_autocreate begin";
 
   my $autocreated = 0;
 
@@ -743,7 +861,7 @@ sub tahoma_autocreate($)
   }
 
   CommandSave(undef,undef) if( $autocreated && AttrVal( "autocreate", "autosave", 1 ) );
-  print "tahoma_autocreate end, new=$autocreated\n";
+  Log3 $name, 2, "$name: tahoma_autocreate end, new=$autocreated";
 }
 
 sub tahoma_defineCommands($)
@@ -787,6 +905,7 @@ sub tahoma_parseLogin($$)
 	$hash->{inVersion} = $json->{version};
     $hash->{logged_in} = 1;
   }
+  Log3 $name, 2, "$name: login end, logged_in=".$hash->{logged_in};
 }
 
 sub tahoma_parseGetEvents($$)
@@ -818,9 +937,14 @@ sub tahoma_parseGetEvents($$)
           readingsBeginUpdate($d);
           foreach my $state (@{$devices->{deviceStates}}) {
             #print "$devname $state->{name} = $state->{value}\n";
-            readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
-            readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
-            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
+            next if (!defined($state->{name}) || !defined($state->{value}));
+            if ($state->{name} eq "core:ClosureState") {
+              $state->{value} = 100 - $state->{value} if ($attr{$d->{NAME}}{levelInvert});
+              readingsBulkUpdate($d, "state", "dim".$state->{value});
+            } elsif ($state->{name} eq "core:OpenClosedState") {
+              readingsBulkUpdate($d, "devicestate", $state->{value});
+            }
+            readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
           }
           my ($seconds) = gettimeofday();
           readingsBulkUpdate( $d, ".lastupdate", $seconds, 0 );
@@ -934,9 +1058,14 @@ sub tahoma_parseGetStates($$)
         {
           readingsBeginUpdate($d);
           foreach my $state (@{$devices->{states}}) {
-            readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
-            readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
-            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
+            next if (!defined($state->{name}) || !defined($state->{value}));
+            if ($state->{name} eq "core:ClosureState") {
+              $state->{value} = 100 - $state->{value} if ($attr{$d->{NAME}}{levelInvert});
+              readingsBulkUpdate($d, "state", "dim".$state->{value});
+            } elsif ($state->{name} eq "core:OpenClosedState") {
+              readingsBulkUpdate($d, "devicestate", $state->{value});
+            }
+            readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
           }
           my ($seconds) = gettimeofday();
           readingsBulkUpdate( $d, ".lastupdate", $seconds, 0 );
@@ -991,7 +1120,7 @@ sub tahoma_Get($$@)
     $list = "devices:noArg";
 
     if( $cmd eq "devices" ) {
-      my $devices = tahoma_getDevices($hash,1);
+      my $devices = tahoma_getDevices($hash,0);
       my $ret;
       foreach my $device (@{$devices}) {
         $ret .= "$device->{deviceURL}\t".$device->{label}."\t$device->{uiClass}\t$device->{controllable}\t\n" if ($device->{deviceURL});
@@ -1024,7 +1153,7 @@ sub tahoma_Set($$@)
     {
       if( $cmd eq (split(":",$command))[0])
       {
-        tahoma_applyRequest($hash,1,$cmd,$val);
+        tahoma_applyRequest($hash,$cmd,$val);
         return undef;
       }
     }
@@ -1034,12 +1163,12 @@ sub tahoma_Set($$@)
     $list = "start:noArg startAt";
 
     if( $cmd eq "start" ) {
-      tahoma_scheduleActionGroup($hash,1,0);
+      tahoma_scheduleActionGroup($hash,0);
       return undef;
     }
     
     if( $cmd eq "startAt" ) {
-      tahoma_scheduleActionGroup($hash,1,$val);
+      tahoma_scheduleActionGroup($hash,$val);
       return undef;
     }
   }
@@ -1069,7 +1198,16 @@ sub tahoma_Attr($$$)
   } elsif( $attrName eq "blocking" ) {
     my $hash = $defs{$name};
     $hash->{BLOCKING} = $attrVal;
+  } elsif( $attrName eq "placeClasses" ) {
+    my $hash = $defs{$name};
+    $hash->{inClass} = $attrVal if $hash->{SUBTYPE} eq "PLACE";
   }
+  elsif ( $attrName eq "levelInvert" ) {
+    my $hash = $defs{$name};
+    my $device = tahoma_getDeviceDetail( $hash, $hash->{device} );
+    $device->{levelInvert} = $attrVal if (defined $device);
+  }
+  
   
   if( $cmd eq "set" ) {
     if( $orig ne $attrVal ) {
@@ -1088,7 +1226,7 @@ sub tahoma_UserAgent_NonblockingGet($)
   return if (!defined $hash);
 
   my $name = $hash->{NAME};
-  Log3 $name, 5, "tahoma_UserAgent_NonblockingGet page=$param->{page}";
+  Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
   
   my $agent = $hash->{socket};
   if (!defined $agent)
@@ -1109,7 +1247,7 @@ sub tahoma_UserAgent_NonblockingGet($)
     $agent->conn_cache(LWP::ConnCache->new());
 
     $proxy = '' if (!defined $proxy);
-    Log3 $name, 4, "tahoma_UserAgent_NonblockingGet create userAgent $userAgent, proxy=$proxy";
+    Log3 $name, 4, "$name: tahoma_UserAgent_NonblockingGet create userAgent $userAgent, proxy=$proxy";
   }
   
   my $response = "";
@@ -1118,7 +1256,12 @@ sub tahoma_UserAgent_NonblockingGet($)
   $url .= '.json' if (substr($url,0,4) eq 'file');
 
   my $nonblocking = !$hash->{BLOCKING} && $param->{nonblocking} && !(substr($url,0,4) eq 'file');
+  
+  $agent->{timeout} = $param->{timeout} if (defined $param->{timeout});
 
+  $hash->{request_active} = 1;
+  $hash->{request_time} = time;
+  
   if ($param->{data} && !(substr($url,0,4) eq 'file'))
   {
     my $data = $param->{data};
@@ -1129,7 +1272,7 @@ sub tahoma_UserAgent_NonblockingGet($)
         $response = $agent->post( $url, $data, ':content_cb' => sub()
           {
             my ($content, $response, $protocol, $entry) = @_;
-            $param->{callback}($param, undef, $content);
+            $param->{callback}($param, undef, $content, $response->header('Content-Length'));
             return;
           } );
       }
@@ -1142,7 +1285,7 @@ sub tahoma_UserAgent_NonblockingGet($)
             my ($content, $response, $protocol, $entry) = @_;
             #my $len = length $content;
             #print "tahoma_UserAgent_NonblockingGet len=$len $content\n\n";
-            $param->{callback}($param, undef, $content);
+            $param->{callback}($param, undef, $content, $response->header('Content-Length') );
             #return;
           } );
       }
@@ -1154,15 +1297,15 @@ sub tahoma_UserAgent_NonblockingGet($)
         $response = $agent->get( $url, ':content_cb' => sub()
           {
             my ($content, $response, $protocol, $entry) = @_;
-            #my $len = length $content;
-            #print "tahoma_UserAgent_NonblockingGet len=$len $content\n\n";
-            $param->{callback}($param, undef, $content);
+            #my $len1 = length $content;
+            #print "tahoma_UserAgent_NonblockingGet len=$len1 $content\n\n";
+            $param->{callback}($param, undef, $content, $response->header('Content-Length'));
             #return;
           } );
       }
   }
   return if ($nonblocking);
-  
+
   my ($err,$data);
   if ($response->is_success)
   {
@@ -1174,7 +1317,8 @@ sub tahoma_UserAgent_NonblockingGet($)
     $data = "";
   }
 
-	$param->{callback}($param, $err, $data) if($param->{callback});
+  #print "tahoma_UserAgent_NonblockingGet BLOCKING\n\n";
+	$param->{callback}($param, $err, $data, length $data) if($param->{callback});
 }
 
 
@@ -1182,16 +1326,21 @@ sub tahoma_UserAgent_NonblockingGet($)
 1;
 
 =pod
+=item summary    commumication modul for io-homecontrol&reg gateway TaHoma&reg
+=item summary_DE Kommunicationsmodul f&uuml;er io-homecontrol&reg Gateway TaHoma&reg
 =begin html
 
 <a name="tahoma"></a>
 <h3>tahoma</h3>
 <ul>
-  xxx<br><br>
+  The module realizes the communication with io-homecontrol&reg; Devices e.g. from Somfy&reg; or Velux&reg;<br>
+  A registered TaHoma&reg; Connect gateway from Overkiz&reg; sold by Somfy&reg; which is continously connected to the internet is necessary for the module.<br>
+  <br><br>
 
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
+    <li>on problems refer also the fhem forum <a href="https://forum.fhem.de/index.php/topic,28045.0.html">IO-Homecontrol Devices &uuml;ber Tahoma Box einbinden</a></li>
   </ul><br>
 
   <a name="tahoma_Define"></a>
@@ -1202,17 +1351,52 @@ sub tahoma_UserAgent_NonblockingGet($)
     <code>define &lt;name&gt; tahoma PLACE &lt;oid&gt;</code><br>
     <code>define &lt;name&gt; tahoma SCENE &lt;oid&gt;</code><br>
     <br>
-
-    Defines a tahoma device.<br><br>
-    If a tahoma device of the type ACCOUNT is created, all other devices acessable by the tahoma gateway are automaticaly created.
     <br>
-
-    Examples:
+    A definition is only necessary for a tahoma device:<br>
+    <code>define &lt;name&gt; tahoma ACCOUNT &lt;username&gt; &lt;password&gt;</code><br>
+    <b>If a tahoma device of the type ACCOUNT is created, all other devices acessable by the tahoma gateway are automaticaly created!</b><br>
+    If the account is valid, the setup will be read from the server.<br>
+    All registrated devices are automatically created with name tahoma_12345 (device number 12345 is used from setup)<br>
+    All defined rooms will be are automatically created.<br>
+    Also all defined scenes will be automatically created.<br>
+    <br>
+    <br>
+    <b>global Attributes for ACCOUNT:</b>
     <ul>
-      <code>define tahomaDev tahoma ACCOUNT abc@test.com myPassword </code><br>
-      <code>define tahomaD01 tahoma DEVICE io://0234-5678-9012/23234545</code><br>
-      <code>define tahomaP01 tahoma PLACE abc12345-0a23-0b45-0c67-d5e6f7a1b2c3</code><br>
-      <code>define tahomaS01 tahoma SCENE 4ef30a23-0b45-0c67-d5e6-f7a1b2c32e3f</code><br>
+      If autocreate is disabled, no devices, places and scenes will be created automatically:<br>
+      <code>attr autocreate disable</code><br>
+    </ul>
+    <br>
+    <b>local Attributes for ACCOUNT:</b>
+    <ul>
+      <code>attr tahoma1 blocking 1</code><br>
+      <code>attr tahoma1 proxy IP:Port</code><br>
+    </ul>
+    <br>
+    <b>Examples:</b>
+    <ul>
+      <code>define tahoma1 tahoma ACCOUNT abc@test.com myPassword</code><br>
+      <code>attr tahoma1 blocking 1</code><br>
+      <code>attr tahoma1 room tahoma</code><br>
+      <br>
+      <br>Automatic created device e.g.:<br>
+      <code>define tahoma_23234545 tahoma DEVICE io://0234-5678-9012/23234545</code><br>
+      <code>attr tahoma_23234545 IODev tahoma1</code><br>
+      <code>attr tahoma_23234545 alias RollerShutter Badezimmer</code><br>
+      <code>attr tahoma_23234545 room tahoma</code><br>
+      <code>attr tahoma_23234545 webCmd dim</code><br>
+      <br>
+      <br>Automatic created place e.g.:<br>
+      <code>define tahoma_abc12345 tahoma PLACE abc12345-0a23-0b45-0c67-d5e6f7a1b2c3</code><br>
+      <code>attr tahoma_abc12345 IODev tahoma1</code><br>
+      <code>attr tahoma_abc12345 alias room Wohnzimmer</code><br>
+      <code>attr tahoma_abc12345 room tahoma</code><br>
+      <br>
+      <br>Automatic created scene e.g.:<br>
+      <code>define tahoma_4ef30a23 tahoma SCENE 4ef30a23-0b45-0c67-d5e6-f7a1b2c32e3f</code><br>
+      <code>attr tahoma_4ef30a23 IODev tahoma1</code><br>
+      <code>attr tahoma_4ef30a23 alias scene Rolladen S&uuml;dfenster zu</code><br>
+      <code>attr tahoma_4ef30a23 room tahoma</code><br>
     </ul>
   </ul><br>
 </ul>
