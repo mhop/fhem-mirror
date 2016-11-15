@@ -756,7 +756,7 @@ HUEBridge_Get($@)
     return $ret;
 
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
+    return "Unknown argument $cmd, choose one of lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
   }
 }
 
@@ -1535,8 +1535,8 @@ HUEBridge_Attr($$$)
   <a name="HUEBridge_Get"></a>
   <b>Get</b>
   <ul>
-    <li>devices<br>
-      list the devices known to the bridge.</li>
+    <li>lights<br>
+      list the lights known to the bridge.</li>
     <li>groups<br>
       list the groups known to the bridge.</li>
     <li>scenes [detail]<br>
