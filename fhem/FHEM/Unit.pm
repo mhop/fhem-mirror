@@ -5,7 +5,6 @@ use warnings;
 use Scalar::Util qw(looks_like_number);
 use FHEM::UConv;
 use Data::Dumper;
-use Clone qw(clone);
 
 sub Unit_Initialize() {
 }
@@ -534,6 +533,41 @@ my $rtype_base = {
         scope  => { min => 0 },
     },
 
+    24 => {
+        base_description => {
+            de => 'Währung',
+            en => 'currency',
+            fr => 'currency',
+            nl => 'currency',
+            pl => 'currency',
+        },
+        format => '%.2f',
+        scope  => '^[0-9]*(?:\.[0-9]*)?$',
+        tmpl   => '%value% %symbol%',
+    },
+
+    25 => {
+        base_description => {
+            de => 'Zahlen',
+            en => 'Numbering',
+            fr => 'Numbering',
+            nl => 'Numbering',
+            pl => 'Numbering',
+        },
+        tmpl => '%value%',
+    },
+
+    26 => {
+        base_description => {
+            de => 'Logische Operatoren',
+            en => 'Logical operators',
+            fr => 'Logical operators',
+            nl => 'Logical operators',
+            pl => 'Logical operators',
+        },
+        tmpl => '%value%',
+    },
+
     900 => {
         base_description => 'FHEM Builtin Readings Type',
         tmpl             => '%value%',
@@ -553,32 +587,36 @@ my $rtypes = {
     oknok => {
         ref_base => 900,
         txt      => {
-            de => [ 'Fehler', 'ok' ],
-            en => [ 'error',  'ok' ],
-            fr => [ 'error',  'on' ],
-            nl => [ 'error',  'on' ],
-            pl => [ 'error',  'on' ],
+            de => [ 'Fehler', 'ok', 'Warnung' ],
+            en => [ 'error',  'ok', 'warning' ],
+            fr => [ 'error',  'ok', 'warning' ],
+            nl => [ 'error',  'ok', 'warning' ],
+            pl => [ 'error',  'ok', 'warning' ],
         },
-        scope             => [ '^(nok|error|0)$', '^(ok|1)$' ],
+        scope => [
+            '^(nok|error|dead|0)$',   '^(ok|alive|1)$',
+            '^(warning|warn|low|2)$', '^(.*)$'
+        ],
         rtype_description => {
-            de => 'Zweiwertiger Fehlerstatus',
-            en => 'two-way error state',
-            fr => 'two-way error state',
-            nl => 'two-way error state',
-            pl => 'two-way error state',
+            de => 'Fehlerstatus',
+            en => 'error state',
+            fr => 'error state',
+            nl => 'error state',
+            pl => 'error state',
         },
     },
 
     onoff => {
         ref_base => 900,
         txt      => {
-            de => [ 'aus', 'an' ],
-            en => [ 'off', 'on' ],
-            fr => [ 'off', 'on' ],
-            nl => [ 'off', 'on' ],
-            pl => [ 'off', 'on' ],
+            de => [ 'aus', 'an', 'nicht verfügbar' ],
+            en => [ 'off', 'on', 'absent' ],
+            fr => [ 'off', 'on', 'absent' ],
+            nl => [ 'off', 'on', 'absent' ],
+            pl => [ 'off', 'on', 'absent' ],
         },
-        scope             => [ '^(off|0)$', '^(on|1)$' ],
+        scope =>
+          [ '^(off|no|standby|0)$', '^(on|yes|1)$', '^(absent|offline|2)$', ],
         rtype_description => {
             de => 'Schaltstatus',
             en => 'Switch state',
@@ -588,22 +626,25 @@ my $rtypes = {
         },
     },
 
-    bool => {
+    presence => {
         ref_base => 900,
         txt      => {
-            de => [ 'falsch', 'wahr' ],
-            en => [ 'false',  'true' ],
-            fr => [ 'false',  'true' ],
-            nl => [ 'false',  'true' ],
-            pl => [ 'false',  'true' ],
+            de => [ 'nicht verfügbar', 'verfügbar' ],
+            en => [ 'absent',           'present' ],
+            fr => [ 'absent',           'present' ],
+            nl => [ 'absent',           'present' ],
+            pl => [ 'absent',           'present' ],
         },
-        scope             => [ '^(false|0)$', '^(true|1)$' ],
+        scope => [
+            '^(unavailable|absent|disappeared|false|no|0)$',
+            '^(available|present|appeared|true|yes|1)$'
+        ],
         rtype_description => {
-            de => 'Boolesch',
-            en => 'Boolean',
-            fr => 'Boolean',
-            nl => 'Boolean',
-            pl => 'Boolean',
+            de => 'Verfügbarkeit',
+            en => 'availability',
+            fr => 'availability',
+            nl => 'availability',
+            pl => 'availability',
         },
     },
 
@@ -710,26 +751,50 @@ my $rtypes = {
         },
         txt_long => {
             de => [
-                'Norden', 'NNO', 'NO',     'ONO', 'Osten', 'OSO',
-                'SO',     'SSO', 'Süden', 'SSW', 'SW',    'WSW',
-                'Westen', 'WNW', 'NW',     'NNW'
+                'Norden', 'Nord-Nordost',  'Nordost',  'Ost-Nordost',
+                'Osten',  'Ost-Südost',   'Südost',  'Süd-Südost',
+                'Süden', 'Süd-Südwest', 'Südwest', 'West-Südwest',
+                'Westen', 'West-Nordwest', 'Nordwest', 'Nord-Nordwest'
             ],
             en => [
-                'North', 'NNE', 'NE',    'ENE', 'East', 'ESE',
-                'SE',    'SSE', 'South', 'SSW', 'SW',   'WSW',
-                'West',  'WNW', 'NW',    'NNW'
+                'North',     'North-Northeast',
+                'Northeast', 'East-Northeast',
+                'East',      'East-Southeast',
+                'Southeast', 'South-Southeast',
+                'South',     'South-Southwest',
+                'Southwest', 'West-Southwest',
+                'West',      'West-Northwest',
+                'Northwest', 'North-Northwest'
             ],
             nl => [
-                'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
-                'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
+                'North',     'North-Northeast',
+                'Northeast', 'East-Northeast',
+                'East',      'East-Southeast',
+                'Southeast', 'South-Southeast',
+                'South',     'South-Southwest',
+                'Southwest', 'West-Southwest',
+                'West',      'West-Northwest',
+                'Northwest', 'North-Northwest'
             ],
             fr => [
-                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
+                'North',     'North-Northeast',
+                'Northeast', 'East-Northeast',
+                'East',      'East-Southeast',
+                'Southeast', 'South-Southeast',
+                'South',     'South-Southwest',
+                'Southwest', 'West-Southwest',
+                'West',      'West-Northwest',
+                'Northwest', 'North-Northwest'
             ],
             pl => [
-                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+                'North',     'North-Northeast',
+                'Northeast', 'East-Northeast',
+                'East',      'East-Southeast',
+                'Southeast', 'South-Southeast',
+                'South',     'South-Southwest',
+                'Southwest', 'West-Southwest',
+                'West',      'West-Northwest',
+                'Northwest', 'North-Northwest'
             ],
         },
         scope => [
@@ -766,6 +831,25 @@ my $rtypes = {
         },
     },
 
+    condition_weather => {
+        ref_base => 900,
+        txt      => {
+            de => [ 'klar',  'sonnig ', 'bewölkt', 'Regen' ],
+            en => [ 'clear', 'sunny',   'cloudy',   'rain' ],
+            fr => [ 'clear', 'sunny',   'cloudy',   'rain' ],
+            nl => [ 'clear', 'sunny',   'cloudy',   'rain' ],
+            pl => [ 'clear', 'sunny',   'cloudy',   'rain' ],
+        },
+        scope => [ '^(clear|0)$', '^(sunny|1)$', '^(cloudy|2)$', '^(rain|3)$' ],
+        rtype_description => {
+            de => 'Wetterbedingung',
+            en => 'weather condition',
+            fr => 'weather condition',
+            nl => 'weather condition',
+            pl => 'weather condition',
+        },
+    },
+
     condition_hum => {
         ref_base => 900,
         txt      => {
@@ -791,11 +875,11 @@ my $rtypes = {
     condition_uvi => {
         ref_base => 900,
         txt      => {
-            de => [ 'niedrig', 'moderat',  'high', 'sehr hoch', 'extrem' ],
-            en => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
-            fr => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
-            nl => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
-            pl => [ 'low',     'moderate', 'high', 'veryhigh',  'extreme' ],
+            de => [ 'niedrig', 'moderat',  'hoch', 'sehr hoch', 'extrem' ],
+            en => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
+            fr => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
+            nl => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
+            pl => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
         },
         scope => [
             '^(low|0)$',  '^(moderate|1)$',
@@ -811,8 +895,139 @@ my $rtypes = {
         },
     },
 
+    # logical operators
+    bool => {
+        ref_base => 26,
+        txt      => {
+            de => [ 'falsch', 'wahr' ],
+            en => [ 'false',  'true' ],
+            fr => [ 'false',  'true' ],
+            nl => [ 'false',  'true' ],
+            pl => [ 'false',  'true' ],
+        },
+        scope             => [ '^(false|no|0)$', '^(true|yes|1)$' ],
+        rtype_description => {
+            de => 'Boolesch wahr/falsch',
+            en => 'Boolean true/false',
+            fr => 'Boolean true/false',
+            nl => 'Boolean true/false',
+            pl => 'Boolean true/false',
+        },
+    },
+
+    yesno => {
+        ref_base => 26,
+        txt      => {
+            de => [ 'nein', 'ja' ],
+            en => [ 'no',   'yes' ],
+            fr => [ 'no',   'yes' ],
+            nl => [ 'no',   'yes' ],
+            pl => [ 'no',   'yes' ],
+        },
+        scope             => [ '^(no|n|false|0)$', '^(yes|y|true|1)$' ],
+        rtype_description => {
+            de => 'Boolesch ja/nein',
+            en => 'Boolean ja/nein',
+            fr => 'Boolean ja/nein',
+            nl => 'Boolean ja/nein',
+            pl => 'Boolean ja/nein',
+        },
+    },
+
+    # numbering
+    short => {
+        ref_base          => 25,
+        format            => '%i',
+        rtype_description => {
+            de => 'Ganzzahl zwischen -32768 und 32767',
+            en => 'Integer between -32768 and 32767',
+            fr => 'Integer between -32768 and 32767',
+            nl => 'Integer between -32768 and 32767',
+            pl => 'Integer between -32768 and 32767',
+        },
+        scope => { min => -32768, max => 32767 },
+    },
+
+    rshort => {
+        ref_base          => 25,
+        format            => '%.0f',
+        rtype_description => {
+            de => 'gerundete Ganzzahl zwischen -32768 und 32767',
+            en => 'rounded integer between -32768 and 32767',
+            fr => 'rounded integer between -32768 and 32767',
+            nl => 'rounded integer between -32768 and 32767',
+            pl => 'rounded integer between -32768 and 32767',
+        },
+        scope => { min => -32768, max => 32767 },
+    },
+
+    long => {
+        ref_base          => 25,
+        format            => '%i',
+        rtype_description => {
+            de => 'Ganzzahl zwischen -2147483648 und 214748364',
+            en => 'Integer between -2147483648 and 214748364',
+            fr => 'Integer between -2147483648 and 214748364',
+            nl => 'Integer between -2147483648 and 214748364',
+            pl => 'Integer between -2147483648 and 214748364',
+        },
+        scope => { min => -2147483648, max => 214748364 },
+    },
+
+    rlong => {
+        ref_base          => 25,
+        format            => '%.0f',
+        rtype_description => {
+            de => 'gerundete Ganzzahl zwischen -2147483648 und 214748364',
+            en => 'rounded integer between -2147483648 and 214748364',
+            fr => 'rounded integer between -2147483648 and 214748364',
+            nl => 'rounded integer between -2147483648 and 214748364',
+            pl => 'rounded integer between -2147483648 and 214748364',
+        },
+        scope => { min => -2147483648, max => 214748364 },
+    },
+
+    integer => {
+        ref_base          => 25,
+        format            => '%i',
+        rtype_description => {
+            de => 'Ganzzahl',
+            en => 'Integer',
+            fr => 'Integer',
+            nl => 'Integer',
+            pl => 'Integer',
+        },
+        scope => '^([0-9]*(?:\.[0-9]*)?)$',
+    },
+
+    rinteger => {
+        ref_base          => 25,
+        format            => '%.0f',
+        rtype_description => {
+            de => 'gerundete Ganzzahl',
+            en => 'rounded integer',
+            fr => 'rounded integer',
+            nl => 'rounded integer',
+            pl => 'rounded integer',
+        },
+        scope => '^([0-9]*(?:\.[0-9]*)?)$',
+    },
+
+    float => {
+        ref_base          => 25,
+        format            => '%.2f',
+        rtype_description => {
+            de => 'Fließkommazahl',
+            en => 'floating number',
+            fr => 'floating number',
+            nl => 'floating number',
+            pl => 'floating number',
+        },
+        scope => '^([0-9]*(?:\.[0-9]*)?)$',
+    },
+
     pct => {
-        ref_base => 900,
+        ref_base => 25,
         format   => '%i',
         symbol   => '%',
         suffix   => 'pct',
@@ -825,6 +1040,49 @@ my $rtypes = {
         },
         tmpl  => '%value% %symbol%',
         scope => { min => 0, max => 100 },
+    },
+
+    # currency
+    euro => {
+        ref_base => 24,
+        format   => '%.2f',
+        symbol   => '€',
+        suffix   => 'EUR',
+        txt      => 'Euro',
+        scope    => '^([0-9]*(?:\.[0-9]*)?)$',
+    },
+
+    pound_uk => {
+        ref_base => 24,
+        format   => '%.2f',
+        symbol   => '£',
+        suffix   => 'GBP',
+        txt      => {
+            de => 'Pfund',
+            en => 'Pound',
+            fr => 'Pound',
+            nl => 'Pound',
+            pl => 'Pound',
+        },
+        txt_long => {
+            de => 'Britische Pfund',
+            en => 'British Pound',
+            fr => 'British Pound',
+            nl => 'British Pound',
+            pl => 'British Pound',
+        },
+        scope => '^([0-9]*(?:\.[0-9]*)?)$',
+    },
+
+    dollar_us => {
+        ref_base => 24,
+        format   => '%.2f',
+        symbol   => '$',
+        suffix   => 'USD',
+        txt      => 'Dollar',
+        txt_long => 'US Dollar',
+        tmpl     => '%symbol%%value%',
+        scope    => '^([0-9]*(?:\.[0-9]*)?)$',
     },
 
     # plane angular
@@ -870,10 +1128,10 @@ my $rtypes = {
         },
         txt_pl => {
             de => 'Grad Celsius',
-            en => 'Degree Celsius',
-            fr => 'Degree Celsius',
-            nl => 'Degree Celsius',
-            pl => 'Degree Celsius',
+            en => 'Degrees Celsius',
+            fr => 'Degrees Celsius',
+            nl => 'Degrees Celsius',
+            pl => 'Degrees Celsius',
         },
         tmpl  => '%value%%symbol%',
         scope => { min => -273.15 },
@@ -885,10 +1143,10 @@ my $rtypes = {
         suffix   => 'F',
         txt      => {
             de => 'Grad Fahrenheit',
-            en => 'Degrees Fahrenheit',
-            fr => 'Degrees Fahrenheit',
-            nl => 'Degrees Fahrenheit',
-            pl => 'Degrees Fahrenheit',
+            en => 'Degree Fahrenheit',
+            fr => 'Degree Fahrenheit',
+            nl => 'Degree Fahrenheit',
+            pl => 'Degree Fahrenheit',
         },
         txt_pl => {
             de => 'Grad Fahrenheit',
@@ -2378,17 +2636,22 @@ sub replaceTemplate ($$$$;$) {
     my $l = ( $lang ? lc($lang) : "en" );
     my $txt;
     my $txt_long;
-    my $desc = clone($odesc);
     my $r = $defs{$device}{READINGS} if ($device);
 
     return
-      if ( !$desc || ref($desc) ne "HASH" );
+      if ( !$odesc || ref($odesc) ne "HASH" );
 
-    $value = $desc->{value}
-      if ( !defined($value) && defined( $desc->{value} ) );
+    $value = $odesc->{value}
+      if ( !defined($value) && defined( $odesc->{value} ) );
 
     return $value
       if ( !defined($value) || $value eq "" );
+
+    # clone
+    my $desc;
+    foreach ( keys %{$odesc} ) {
+        $desc->{$_} = $odesc->{$_};
+    }
 
     ##########
     # language support
@@ -2406,6 +2669,10 @@ sub replaceTemplate ($$$$;$) {
             $desc->{$_} = $v if ( defined($v) );
         }
     }
+
+    ##########
+    # template support
+    #
 
     # add metric name to suffix
     $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix}
@@ -2466,11 +2733,10 @@ sub replaceTemplate ($$$$;$) {
       if ( $desc->{txt_cu}
         && $desc->{scale_txt_long_cu} );
 
-    ##########
-    # template support
-    #
+    # txt,txt_pl,txt_long,txt_long_pl
+    # txt,txt_pl, ?txt_long,?txt_long_pl   tmpl,tmpl_long,tmpl_long_pl
 
-    # shortname
+    # short
     $txt = '%value% %suffix%';
     $txt = $desc->{tmpl} if ( $desc->{tmpl} );
     if ( $r && $reading && $r->{$reading} ) {
@@ -2485,7 +2751,15 @@ sub replaceTemplate ($$$$;$) {
     return ($txt) if ( !wantarray );
 
     # long plural
-    if (   Scalar::Util::looks_like_number($value)
+    if (   looks_like_number($value)
+        && $value > 1
+        && $desc->{txt_long_pl} )
+    {
+        $txt_long = '%value% %txt_long_pl%';
+        $txt_long = $desc->{tmpl_long_pl}
+          if ( $desc->{tmpl_long_pl} );
+    }
+    elsif (looks_like_number($value)
         && $value > 1
         && $desc->{txt_pl} )
     {
@@ -2495,6 +2769,11 @@ sub replaceTemplate ($$$$;$) {
     }
 
     # long singular
+    elsif ( $desc->{txt_long} ) {
+        $txt_long = '%value% %txt_long%';
+        $txt_long = $desc->{tmpl_long}
+          if ( $desc->{tmpl_long} );
+    }
     elsif ( $desc->{txt} ) {
         $txt_long = '%value% %txt%';
         $txt_long = $desc->{tmpl_long}
@@ -2529,10 +2808,13 @@ sub formatValue($$$;$$$$) {
       if ( !$format && ( !$desc || ref($desc) ne 'HASH' )
         || keys %{$desc} < 1 );
 
+    my $llvl = ( defined( $desc->{verbose} ) ? $desc->{verbose} : 3 );
+    $lang = $desc->{lang} if ( $desc->{lang} );
+
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
     $format = $desc->{format} if ( !$format && $desc );
 
-    #    $format = $scales_m->{autoscale} if ( !$format );
+    # $format = $scales_m->{autoscale} if ( !$format );
 
     $scope = $desc->{scope} if ( !$scope && $desc );
 
@@ -2542,37 +2824,69 @@ sub formatValue($$$;$$$$) {
         ( $value, $value_num ) = $scope->($value);
     }
 
-    elsif ( ref($scope) eq 'HASH' && looks_like_number($value) ) {
-        if ( $scope->{min} && $scope->{max} ) {
-            $value = $scope->{min} if ( $value < $scope->{min} );
-            $value = $scope->{max} if ( $value > $scope->{max} );
+    elsif ( ref($scope) eq 'HASH' ) {
+        my $log;
+        if ( !looks_like_number($value) ) {
+            $log = "$value is not a number";
+        }
+        elsif ( $scope->{min} && $scope->{max} ) {
+            if ( $value < $scope->{min} ) {
+                $value = $scope->{min} if ( !$scope->{keep} );
+                $log = "$value is smaller than $scope->{min}";
+            }
+            if ( $value > $scope->{max} ) {
+                $value = $scope->{max} if ( !$scope->{keep} );
+                $log = "$value is higher than $scope->{max}";
+            }
         }
         elsif ( $scope->{lt} && $scope->{gt} ) {
-            $value = $scope->{lt} if ( $value < $scope->{lt} );
-            $value = $scope->{gt} if ( $value > $scope->{gt} );
+            if ( $value < $scope->{lt} ) {
+                $value = $scope->{lt} if ( !$scope->{keep} );
+                $log = "$value is less than $scope->{lt}";
+            }
+            if ( $value > $scope->{gt} ) {
+                $value = $scope->{gt} if ( !$scope->{keep} );
+                $log = "$value is greater than $scope->{gt}";
+            }
         }
         elsif ( $scope->{le} && $scope->{ge} ) {
-            $value = $scope->{le} if ( $value <= $scope->{le} );
-            $value = $scope->{ge} if ( $value >= $scope->{ge} );
+            if ( $value <= $scope->{le} ) {
+                $value = $scope->{le} if ( !$scope->{keep} );
+                $log = "$value is less or equal than $scope->{le}";
+            }
+            if ( $value >= $scope->{ge} ) {
+                $value = $scope->{ge} if ( !$scope->{keep} );
+                $log = "$value is geater or qual than $scope->{ge}";
+            }
         }
         elsif ( $scope->{min} && $value < $scope->{min} ) {
-            $value = $scope->{min};
+            $value = $scope->{min} if ( !$scope->{keep} );
+            $log = "$value is smaller than $scope->{min}";
         }
         elsif ( $scope->{lt} && $value < $scope->{lt} ) {
-            $value = $scope->{lt};
+            $value = $scope->{lt} if ( !$scope->{keep} );
+            $log = "$value is less than $scope->{lt}";
         }
         elsif ( $scope->{max} && $value > $scope->{max} ) {
-            $value = $scope->{max};
+            $value = $scope->{max} if ( !$scope->{keep} );
+            $log = "$value is higher than $scope->{max}";
         }
         elsif ( $scope->{gt} && $value > $scope->{gt} ) {
-            $value = $scope->{gt};
+            $value = $scope->{gt} if ( !$scope->{keep} );
+            $log = "$value is greater than $scope->{gt}";
         }
         elsif ( $scope->{ge} && $value >= $scope->{ge} ) {
-            $value = $scope->{ge};
+            $value = $scope->{ge} if ( !$scope->{keep} );
+            $log = "$value is greater or equal than $scope->{ge}";
         }
         elsif ( $scope->{le} && $value <= $scope->{le} ) {
-            $value = $scope->{le};
+            $value = $scope->{le} if ( !$scope->{keep} );
+            $log = "$value is less or equal than $scope->{le}";
         }
+
+        Log3 $device, $llvl,
+          "formatValue($device:$reading:$desc->{rtype}) out of scope: $log"
+          if ($log);
     }
 
     elsif ( ref($scope) eq 'ARRAY' ) {
@@ -2584,30 +2898,41 @@ sub formatValue($$$;$$$$) {
             if ( defined( $desc->{txt}{$lang}[$value] ) ) {
                 $value = $desc->{txt}{$lang}[$value];
             }
+            elsif ( defined( $desc->{txt}{en}[$value] ) ) {
+                $value = $desc->{txt}{en}[$value];
+            }
+            elsif ( defined( $desc->{txt}[$value] ) ) {
+                $value = $desc->{txt}[$value];
+            }
             else {
-                $value = $1 if ($1);
-                $value = $scope->[$value] if ( !$1 );
+                $value = $1 if ( defined($1) );
+                $value = $scope->[$value] if ( !defined($1) );
             }
         }
 
         else {
             my $i = 0;
             foreach ( @{$scope} ) {
-                if ( $value =~ /^$_$/i ) {
+                if ( $value =~ /^$_$/gmi ) {
+                    $value_num = $i;
                     if ( defined( $desc->{txt}{$lang}[$i] ) ) {
                         $value = $desc->{txt}{$lang}[$i];
-                        last;
+                    }
+                    elsif ( defined( $desc->{txt}{en}[$i] ) ) {
+                        $value = $desc->{txt}{en}[$i];
+                    }
+                    elsif ( defined( $desc->{txt}[$i] ) ) {
+                        $value = $desc->{txt}[$i];
                     }
                     else {
-                        $value = $1 if ($1);
-                        $value = ${ $scope->[$_] } if ( !$1 );
+                        $value = $1 if ( defined($1) );
+                        if ( !defined($1) ) {
+                            Log3 $device, $llvl,
+"formatValue($device:$reading:$desc->{rtype}) out of scope: "
+                              . "missing txt value or regex output";
+                            $value = $scope->[$i];
+                        }
                     }
-
-                    if ( defined( $desc->{txt}{$lang}[$value] ) ) {
-                        $value = $desc->{txt}{$lang}[$value];
-                    }
-
-                    $value_num = $i;
                     last;
                 }
                 $i++;
@@ -2615,18 +2940,22 @@ sub formatValue($$$;$$$$) {
         }
     }
 
-    elsif ( defined($scope) && $scope ne "" && $value =~ /^$scope$/i ) {
+    elsif ( defined($scope) && $scope ne "" && $value =~ /$scope/gmi ) {
         $value = $scope->{$1} if ( defined($1) );
     }
 
     # format
     #
+    if ( $format && !looks_like_number($value) ) {
+        Log3 $device, $llvl,
+"formatValue($device:$reading:$desc->{rtype}) out of scope: $value is not a number";
+    }
 
-    if ( ref($format) eq 'CODE' && &$format ) {
+    elsif ( ref($format) eq 'CODE' && &$format ) {
         $value = $format->($value);
     }
 
-    elsif ( ref($format) eq 'HASH' && looks_like_number($value) ) {
+    elsif ( ref($format) eq 'HASH' ) {
         my $v = abs($value);
         foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
             next
@@ -2644,10 +2973,11 @@ sub formatValue($$$;$$$$) {
     }
 
     elsif ( ref($format) eq 'ARRAY' ) {
-
+        Log3 $device, $llvl, "formatValue($device:$reading:$desc->{rtype})"
+          . " format not implemented: ARRAY";
     }
 
-    elsif ( $format && looks_like_number($value) ) {
+    elsif ($format) {
         my $scale = $desc->{scale};
         $value *= $scale if ($scale);
         $value = sprintf( $format, $value );
@@ -2655,9 +2985,17 @@ sub formatValue($$$;$$$$) {
 
     $desc->{value}{$lang} = $value;
     $desc->{value_num} = $value_num if ( defined($value_num) );
+
     my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc, $lang );
 
-    return ( $txt, $txt_long ) if (wantarray);
+    $desc->{value_txt}{$lang} = $txt;
+    $desc->{value_txt_long}{$lang} = $txt_long if ( defined($txt_long) );
+    delete $desc->{value_txt_long}{$lang}
+      if ( !defined($txt_long) && defined( $desc->{value_txt_long}{$lang} ) );
+
+    return ( $txt, $txt_long, $value, $value_num ) if (wantarray);
+    return $value
+      if ( defined( $desc->{showUnits} ) && $desc->{showUnits} eq "0" );
     return $txt;
 }
 
@@ -2753,8 +3091,8 @@ sub formatReading($$;$$$$$) {
 }
 
 # return unit symbol for device:reading
-sub readingsUnit($$;$) {
-    my ( $device, $reading, $desc ) = @_;
+sub readingsUnit($$;$$$) {
+    my ( $device, $reading, $long, $combined, $desc ) = @_;
     $desc = readingsDesc( $device, $reading ) if ( !$desc );
 
     return (
@@ -2763,9 +3101,20 @@ sub readingsUnit($$;$) {
         $desc->{txt}    ? $desc->{txt}    : undef
     ) if (wantarray);
 
-    return $desc->{symbol} if ( $desc->{symbol} );
-    return $desc->{suffix} if ( $desc->{suffix} );
+    my ( $txt, $txt_long, $value, $value_num ) =
+      formatReading( $device, $reading, "", $desc );
 
+    $txt =~ s/\s*$value\s*//;
+    $txt_long =~ s/\s*$value\s*//;
+
+    return "$txt_long ($txt)"
+      if ( $combined
+        && defined($txt_long)
+        && $txt_long ne ""
+        && defined($txt)
+        && $txt ne "" );
+    return $txt_long if ( $long && defined($txt_long) && $txt_long ne "" );
+    return $txt if ( defined($txt) && $txt ne "" );
     return '';
 }
 
@@ -2777,6 +3126,7 @@ sub readingsShortname($$) {
         return $desc->{formula_symbol} if ( $desc->{formula_symbol} );
         return $desc->{dimension}
           if ( $desc->{dimension} && $desc->{dimension} =~ /^[A-Z]+$/ );
+        return $desc->{symbol} if ( $desc->{symbol} );
     }
 
     return $reading;
@@ -2985,7 +3335,7 @@ sub deleteKeyValAttr($$$;$) {
 # Generalized function for DbLog rtype support
 sub Unit_DbLog_split($$) {
     my ( $event, $name ) = @_;
-    my ( $reading, $value, $rtype ) = "";
+    my ( $reading, $value, $unit ) = "";
 
     # exclude any multi-value events
     if ( $event =~ /(.*: +.*: +.*)+/ ) {
@@ -2995,50 +3345,44 @@ sub Unit_DbLog_split($$) {
     }
 
     # exclude sum/cum and avg events
-    elsif ( $event =~ /^(.*_sum[0-9]+m|.*_cum[0-9]+m|.*_avg[0-9]+m): +.*/ ) {
+    elsif ( $event =~ /^.*(min|max|avg|sum|cum|avg\d+m|sum\d+m|cum\d+m): +.*/ )
+    {
         Log3 $name, 5, "Unit_DbLog_split $name: Ignoring sum/avg event $event";
         return undef;
     }
 
-    # text conversions
-    elsif ( $event =~ /^(pressure_trend_sym): +(\S+) *(.*)/ ) {
-        $reading = $1;
-        $value   = UConv::sym2pressuretrend($2);
-    }
-    elsif ( $event =~ /^(UVcondition): +(\S+) *(.*)/ ) {
-        $reading = $1;
-        $value   = UConv::uvcondition2log($2);
-    }
-    elsif ( $event =~ /^(Activity): +(\S+) *(.*)/ ) {
-        $reading = $1;
-        $value   = UConv::activity2log($2);
-    }
-    elsif ( $event =~ /^(condition): +(\S+) *(.*)/ ) {
-        $reading = $1;
-        $value   = UConv::weathercondition2log($2);
-    }
-    elsif ( $event =~ /^(.*[Hh]umidity[Cc]ondition): +(\S+) *(.*)/ ) {
-        $reading = $1;
-        $value   = UConv::humiditycondition2log($2);
+    # automatic text conversions through reading type
+    elsif ( $event =~ /^(.+): +(\S+) *(.*)/ ) {
+        my ( $txt, $txt_long, $val, $val_num ) = formatReading( $name, $1, "" );
+
+        if ( defined($txt) ) {
+            $txt =~ s/\s*$val\s*//;
+            $txt_long =~ s/\s*$val\s*//;
+            $reading = $1;
+            $value   = defined($val_num) ? $val_num : $val;
+            $unit    = "$txt_long ($txt)";
+        }
     }
 
     # general event handling
-    elsif ( $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/ ) {
+    if ( !defined($value)
+        && $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/ )
+    {
         $reading = $1;
         $value   = ReadingsNum( $name, $1, $2 );
-        $rtype   = ReadingsFormated( $name, $1, $3 );
+        $unit    = defined($3) ? $3 : "";
     }
 
-    if ( !Scalar::Util::looks_like_number($value) ) {
+    if ( !looks_like_number($value) ) {
         Log3 $name, 5,
-"Unit_DbLog_split $name: Ignoring event $event: value does not look like a number";
+"Unit_DbLog_split $name: Ignoring event $event: value $value does not look like a number";
         return undef;
     }
 
     Log3 $name, 5,
-"Unit_DbLog_split $name: Splitting event $event > reading=$reading value=$value rtype=$rtype";
+"Unit_DbLog_split $name: Splitting event $event > reading=$reading value=$value unit=$unit";
 
-    return ( $reading, $value, $rtype );
+    return ( $reading, $value, $unit );
 }
 
 ################################################################
@@ -3086,7 +3430,7 @@ sub CommandSetReadingDesc($@) {
             foreach ( keys %$h ) {
                 my $ret =
                   setKeyValAttr( $name, $attribute, $a->[1], $_, $h->{$_} );
-                push @rets, $ret if ($ret);
+                push @rets, $ret if ( defined($ret) );
                 $last = 1 if ( $h->{$_} eq "?" || $h->{$_} eq "" );
             }
             next;
@@ -3102,7 +3446,7 @@ sub CommandSetReadingDesc($@) {
             foreach ( keys %$h ) {
                 my $ret =
                   setKeyValAttr( $name, $attribute, $reading, $_, $h->{$_} );
-                push @rets, $ret if ($ret);
+                push @rets, $ret if ( defined($ret) );
                 $last = 1 if ( $h->{$_} eq "?" || $h->{$_} eq "" );
             }
         }
@@ -3158,7 +3502,7 @@ sub CommandDeleteReadingDesc($@) {
               )
             {
                 my $ret = deleteKeyValAttr( $name, $attribute, $reading, $key );
-                push @rets, $ret if ($ret);
+                push @rets, $ret if ( defined($ret) );
             }
         }
     }

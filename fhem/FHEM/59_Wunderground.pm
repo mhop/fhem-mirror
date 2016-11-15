@@ -54,7 +54,7 @@ sub Wunderground_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1,2 "
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
     $hash->{readingsDesc} = {
