@@ -89,7 +89,10 @@ sub pilight_contact_Parse($$)
   foreach my $n (keys %{ $modules{pilight_contact}{defptr}{lc($protocol)} }) { 
     my $lh = $modules{pilight_contact}{defptr}{$protocol}{$n};
     next if ( !defined($lh->{ID}) );    
-    if ($lh->{ID} eq $id && $lh->{UNIT} eq $unit) {
+    if ($lh->{ID} eq $id) {
+      if (defined($lh->{UNIT})) {
+        next if ($lh->{UNIT} ne $unit);
+      }
       $chash = $lh;
       last;
     }

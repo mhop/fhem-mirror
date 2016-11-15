@@ -814,6 +814,9 @@ sub pilight_ctrl_Parse($$)
   readingsBulkUpdate($hash,"rcv_raw",$rmsg);
   readingsEndUpdate($hash, 1);
   
+  # some protocols have no id but unit(code) e.q. ev1527
+  $id = $unit if ($id eq "" && $unit ne ""); 
+  
   $unit = "all" if ($unit eq "" && $all ne "");
   
   my $protoID = -1;  
