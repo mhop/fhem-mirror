@@ -15,18 +15,6 @@ use Data::Dumper;
 ####################
 # Translations
 
-my %pressure_trend = ( "=" => "0", "+" => "1", "-" => "2" );
-
-my %pressure_trend_sym = ( 0 => "=", 1 => "+", 2 => "-" );
-
-my %pressure_trend_txt = (
-    "en" => { 0 => "steady",         1 => "rising",    2 => "falling" },
-    "de" => { 0 => "gleichbleibend", 1 => "steigend",  2 => "fallend" },
-    "nl" => { 0 => "stabiel",        1 => "stijgend",  2 => "dalend" },
-    "fr" => { 0 => "stable",         1 => "croissant", 2 => "décroissant" },
-    "pl" => { 0 => "stabilne",       1 => "rośnie",   2 => "spada" },
-);
-
 my %compasspoint_txt = (
     "en" => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -438,26 +426,6 @@ sub uvi2condition($) {
     }
 
     return $v;
-}
-
-sub pressuretrend2sym($) {
-    my ($data) = @_;
-    return $data if !$pressure_trend_sym{$data};
-    return $pressure_trend_sym{$data};
-}
-
-sub pressuretrend2condition($;$) {
-    my ( $data, $lang ) = @_;
-    my $l = ( $lang ? lc($lang) : "en" );
-    return $pressure_trend_txt{$l}{$data}
-      if $pressure_trend_txt{$l}{$data};
-    return $pressure_trend_txt{"en"}{$data};
-}
-
-sub sym2pressuretrend($) {
-    my ($data) = @_;
-    return $data if !$pressure_trend{$data};
-    return $pressure_trend{$data};
 }
 
 sub values2weathercondition($$$$$) {

@@ -571,19 +571,45 @@ my $rtype_base = {
     900 => {
         base_description => 'FHEM Builtin Readings Type',
         tmpl             => '%value%',
-        tmpl_long        => '%value%',
     },
 
     999 => {
         base_description => 'FHEM User Defined Readings Type',
         tmpl             => '%value%',
-        tmpl_long        => '%value%',
     },
 };
 
 my $rtypes = {
 
     # others
+    url => {
+        ref_base          => 900,
+        rtype_description => 'General URL including protocol prefix',
+        tmpl              => '<html><a href="%value%">%value%</a></html>',
+    },
+
+    url_http => {
+        ref_base          => 900,
+        rtype_description => 'HTTP/S URL w/ or w/o protocol prefix',
+        tmpl              => '<html><a href="%value%">%value%</a></html>',
+    },
+
+    trend => {
+        ref_base => 900,
+        txt      => [ '=', '+', '-' ],
+        txt_long => {
+            de => [ 'gleichbleibend', 'steigend',  'fallend' ],
+            en => [ 'steady',         'rising',    'falling' ],
+            fr => [ 'stable',         'croissant', 'décroissant' ],
+            nl => [ 'stabiel',        'stijgend',  'dalend' ],
+            pl => [ 'stabilne',       'rośnie',   'spada' ],
+        },
+        scope             => [ '^(=|0)$', '^(+|1)$', '^(-|2)$' ],
+        tmpl              => '%txt%',
+        tmpl_long         => '%txt_long%',
+        rtype_description => 'Trend',
+    },
+
     oknok => {
         ref_base => 900,
         txt      => {
@@ -598,11 +624,35 @@ my $rtypes = {
             '^(warning|warn|low|2)$', '^(.*)$'
         ],
         rtype_description => {
-            de => 'Fehlerstatus',
+            de =>
+'Fehlerstatus; siehe RType roknok, sofern 0<>1 vertauschte Bedeutung haben',
             en => 'error state',
             fr => 'error state',
             nl => 'error state',
             pl => 'error state',
+        },
+    },
+
+    roknok => {
+        ref_base => 900,
+        txt      => {
+            de => [ 'Fehler', 'ok', 'Warnung' ],
+            en => [ 'error',  'ok', 'warning' ],
+            fr => [ 'error',  'ok', 'warning' ],
+            nl => [ 'error',  'ok', 'warning' ],
+            pl => [ 'error',  'ok', 'warning' ],
+        },
+        scope => [
+            '^(nok|error|dead|1)$',   '^(ok|alive|0)$',
+            '^(warning|warn|low|2)$', '^(.*)$'
+        ],
+        rtype_description => {
+            de =>
+'verdrehter Fehlerstatus, bei dem 0=ok und 1=Fehler bedeutet; Gegenteil von RType oknok',
+            en => 'reversed error state',
+            fr => 'reversed error state',
+            nl => 'reversed error state',
+            pl => 'reversed error state',
         },
     },
 
@@ -660,6 +710,317 @@ my $rtypes = {
         },
     },
 
+    weekday => {
+        ref_base => 900,
+        symbol   => {
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
+            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+        },
+        txt => {
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
+            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+        },
+        txt_long => {
+            de => [
+                'Sonntag',    'Montag',  'Dienstag', 'Mittwoch',
+                'Donnerstag', 'Freitag', 'Samstag'
+            ],
+            en => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            fr => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            nl => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            pl => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+        },
+        scope => [
+            '^(Sun|Su|Sunday|0)$',   '^(Mon|Mo|Monday|1)$',
+            '^(Tue|Tu|Tuesday|2)$',  '^(Wed|We|Wednesday|3)$',
+            '^(Thu|Th|Thursday|4)$', '^(Fri|Fr|Friday|5)$',
+            '^(Sat|Sa|Saturday|6)$'
+        ],
+        tmpl              => '%txt%',
+        tmpl_long         => '%txt_long%',
+        rtype_description => {
+            de =>
+'Wochentag nach englisch-amerikanischer Annahme des Wochenstarts am Sonntag',
+            en =>
+'Day of the week according to english assumption for the week to start on sunday',
+            fr =>
+'Day of the week according to english assumption for the week to start on sunday',
+            nl =>
+'Day of the week according to english assumption for the week to start on sunday',
+            pl =>
+'Day of the week according to english assumption for the week to start on sunday',
+        },
+    },
+
+    weekday_iso => {
+        ref_base => 900,
+        symbol   => {
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
+            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+        },
+        txt => {
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
+            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+        },
+        txt_long => {
+            de => [
+                'Sonntag',    'Montag',  'Dienstag', 'Mittwoch',
+                'Donnerstag', 'Freitag', 'Samstag'
+            ],
+            en => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            fr => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            nl => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+            pl => [
+                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
+                'Thursday', 'Friday', 'Saturday'
+            ],
+        },
+        scope => [
+            '^(Sun|Su|Sunday|6)$',   '^(Mon|Mo|Monday|0)$',
+            '^(Tue|Tu|Tuesday|1)$',  '^(Wed|We|Wednesday|2)$',
+            '^(Thu|Th|Thursday|3)$', '^(Fri|Fr|Friday|4)$',
+            '^(Sat|Sa|Saturday|5)$'
+        ],
+        tmpl              => '%txt%',
+        tmpl_long         => '%txt_long%',
+        rtype_description => {
+            de => 'Wochentag nach ISO-Standard, Woche beginnend mit Montag',
+            en =>
+'Day of the week according to ISO standard, week beginning on Mondays',
+            fr =>
+'Day of the week according to ISO standard, week beginning on Mondays',
+            nl =>
+'Day of the week according to ISO standard, week beginning on Mondays',
+            pl =>
+'Day of the week according to ISO standard, week beginning on Mondays',
+        },
+    },
+
+    weekday_night => {
+        ref_base => 900,
+        symbol   => {
+            de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
+            en =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            fr =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            nl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            pl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+        },
+        txt => {
+            de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
+            en =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            fr =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            nl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            pl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+        },
+        txt_long => {
+            de => [
+                'Sonntag Nacht',
+                'Montag Nacht',
+                'Dienstag Nacht',
+                'Mittwoch Nacht',
+                'Donnerstag Nacht',
+                'Freitag Nacht',
+                'Samstag Nacht'
+            ],
+            en => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            fr => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            nl => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            pl => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+        },
+        scope => [
+            '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|0)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|1)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|2)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|3)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|4)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|5)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|6)\s*(Night|Na)?\s*)$'
+        ],
+        tmpl              => '%txt%',
+        tmpl_long         => '%txt_long%',
+        rtype_description => {
+            de =>
+'Nächtlicher Wochentag nach englisch-amerikanischer Standard des Wochenstarts am Sonntag',
+            en =>
+'Nightly day of the week according to english standard for the week to start on sunday',
+            fr =>
+'Nightly day of the week according to english standard for the week to start on sunday',
+            nl =>
+'Nightly day of the week according to english standard for the week to start on sunday',
+            pl =>
+'Nightly day of the week according to english standard for the week to start on sunday',
+        },
+    },
+
+    weekday_night_iso => {
+        ref_base => 900,
+        symbol   => {
+            de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
+            en =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            fr =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            nl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            pl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+        },
+        txt => {
+            de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
+            en =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            fr =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            nl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            pl =>
+              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+        },
+        txt_long => {
+            de => [
+                'Sonntag Nacht',
+                'Montag Nacht',
+                'Dienstag Nacht',
+                'Mittwoch Nacht',
+                'Donnerstag Nacht',
+                'Freitag Nacht',
+                'Samstag Nacht'
+            ],
+            en => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            fr => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            nl => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+            pl => [
+                'Sunday Night',
+                'Monday Night',
+                'Tuesday Night',
+                'Wednesday Night',
+                'Thursday Night',
+                'Friday Night',
+                'Saturday Night'
+            ],
+        },
+        scope => [
+            '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|6)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|0)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|1)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|2)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|3)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|4)\s*(Night|Na)?\s*)$',
+            '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|5)\s*(Night|Na)?\s*)$'
+        ],
+        tmpl              => '%txt%',
+        tmpl_long         => '%txt_long%',
+        rtype_description => {
+            de =>
+'Nächtlicher Wochentag nach ISO-Standard, Woche beginnend mit Montag',
+            en =>
+'Nightly day of the week according to ISO standard, week beginning on Mondays',
+            fr =>
+'Nightly day of the week according to ISO standard, week beginning on Mondays',
+            nl =>
+'Nightly day of the week according to ISO standard, week beginning on Mondays',
+            pl =>
+'Nightly day of the week according to ISO standard, week beginning on Mondays',
+        },
+    },
+
     time => {
         ref_base          => 900,
         scope             => '^(([0-1]?[0-9]|[0-2]?[0-3]):([0-5]?[0-9]))$',
@@ -670,6 +1031,13 @@ my $rtypes = {
             nl => 'time hh:mm',
             pl => 'time hh:mm',
         },
+        tmpl_long => {
+            de => '%value% Uhr',
+            en => '%value%',
+            fr => '%value%',
+            nl => '%value%',
+            pl => '%value%',
+        }
     },
 
     datetime => {
@@ -797,11 +1165,59 @@ my $rtypes = {
                 'Northwest', 'North-Northwest'
             ],
         },
+
+        #TODO: integrate gradiants into scope regex
+        #   if ($azimuth      < 22.5) {
+        #      $compassPoint = "north";
+        #   } elsif ($azimuth < 45)   {
+        #      $compassPoint = "north-northeast";
+        #   } elsif ($azimuth < 67.5) {
+        #      $compassPoint = "northeast";
+        #   } elsif ($azimuth < 90)   {
+        #      $compassPoint = "east-northeast";
+        #   } elsif ($azimuth < 112.5){
+        #      $compassPoint = "east";
+        #   } elsif ($azimuth < 135)  {
+        #      $compassPoint = "east-southeast";
+        #   } elsif ($azimuth < 157.5){
+        #     $compassPoint = "southeast";
+        #   } elsif ($azimuth < 180)  {
+        #     $compassPoint = "south-southeast";
+        #   } elsif ($azimuth < 202.5){
+        #     $compassPoint = "south";
+        #   } elsif ($azimuth < 225)  {
+        #     $compassPoint = "south-southwest";
+        #   } elsif ($azimuth < 247.5){
+        #     $compassPoint = "southwest";
+        #   } elsif ($azimuth < 270)  {
+        #     $compassPoint = "west-southwest";
+        #   } elsif ($azimuth < 292.5){
+        #     $compassPoint = "west";
+        #   } elsif ($azimuth < 315)  {
+        #     $compassPoint = "west-northwest";
+        #   } elsif ($azimuth < 337.5){
+        #     $compassPoint = "northwest";
+        #   } elsif ($azimuth <= 361)  {
+        #     $compassPoint = "north-northwest";
+        #   }
+
         scope => [
-            '^(N|0)$',  '^(NNE|1)$',  '^(NE|2)$',  '^(ENE|3)$',
-            '^(E|4)$',  '^(ESE|5)$',  '^(SE|6)$',  '^(SSE|7)$',
-            '^(S|8)$',  '^(SSW|9)$',  '^(SW|10)$', '^(WSW|11)$',
-            '^(W|12)$', '^(WNW|13)$', '^(NW|14)$', '^(NNW|15)$'
+            '^(N|North|2[0-2]\.?[0-4]\d*|[01]?[0-9]\.?\d*)$',
+'^(NNE|North-Northeast|4[0-4]\.?\d*|3[0-9]\.?\d*|2[3-9]|\.?\d*22\.?5\d*)$',
+            '^(NE|Northeast|67\.[0-4]\d*|67|6[0-6]\.?\d*|5[0-9]\.?\d*|4[5-9])$',
+'^(ENE|East-Northeast|89\.\d*|[78][0-9]\.?\d*|6[8-9]\.?\d*|67\.[5-9]\d*)$',
+            '^(E|East|4)$',
+            '^(ESE|East-Southeast|5)$',
+            '^(SE|Southeast|6)$',
+            '^(SSE|South-Southeast|7)$',
+            '^(S|South|8)$',
+            '^(SSW|South-Southwest|9)$',
+            '^(SW|Southwest|10)$',
+            '^(WSW|West-Southwest|11)$',
+            '^(W|West|12)$',
+            '^(WNW|West-Northwest|13)$',
+            '^(NW|Northwest|14)$',
+            '^(NNW|North-Northwest|15)$'
         ],
         rtype_description => {
             de => 'Himmelsrichtung',
@@ -810,6 +1226,7 @@ my $rtypes = {
             nl => 'point of the compass',
             pl => 'point of the compass',
         },
+        tmpl_long => '%txt_long%',
     },
 
     closure => {
@@ -1071,18 +1488,20 @@ my $rtypes = {
             nl => 'British Pound',
             pl => 'British Pound',
         },
-        scope => '^([0-9]*(?:\.[0-9]*)?)$',
+        scope     => '^([0-9]*(?:\.[0-9]*)?)$',
+        tmpl_long => '%txt_long%',
     },
 
     dollar_us => {
-        ref_base => 24,
-        format   => '%.2f',
-        symbol   => '$',
-        suffix   => 'USD',
-        txt      => 'Dollar',
-        txt_long => 'US Dollar',
-        tmpl     => '%symbol%%value%',
-        scope    => '^([0-9]*(?:\.[0-9]*)?)$',
+        ref_base  => 24,
+        format    => '%.2f',
+        symbol    => '$',
+        suffix    => 'USD',
+        txt       => 'Dollar',
+        txt_long  => 'US Dollar',
+        tmpl      => '%symbol%%value%',
+        scope     => '^([0-9]*(?:\.[0-9]*)?)$',
+        tmpl_long => '%txt_long%',
     },
 
     # plane angular
@@ -1619,7 +2038,7 @@ my $rtypes = {
         ref_base  => 15,
         ref       => 'mi',
         ref_t     => 'hr',
-        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl      => '%value% mph',
         tmpl_long => {
             de => '%value% %txt% pro %txt_t%',
             en => '%value% %txt% per %txt_t%',
@@ -1818,17 +2237,18 @@ my $rtypes = {
     },
 
     uvi => {
-        suffix => 'UVI',
-        txt    => {
+        ref_base => 900,
+        suffix   => 'UVI',
+        txt      => {
             de => 'UV-Index',
             en => 'UV-Index',
             fr => 'UV-Index',
             nl => 'UV-Index',
             pl => 'UV-Index',
         },
-        tmpl         => '%suffix% %value%',
-        tmpl_long    => '%txt% %value%',
-        tmpl_long_pl => '%txt% %value%',
+        tmpl      => '%suffix% %value%',
+        tmpl_long => '%txt% %value%',
+        format    => '%i',
     },
 
     # surface area
@@ -2193,7 +2613,7 @@ my $readingsDB = {
             rtype => 'compasspoint'
         },
         daylight => {
-            rtype => 'bool',
+            rtype => 'yesno',
         },
         dewpoint => {
             aliasname => 'dewpoint_c',      # alias only
@@ -2201,53 +2621,33 @@ my $readingsDB = {
         dewpoint_c => {
             rtype => 'c',
         },
-        dewpoint_f => {
-            rtype => 'f',
-        },
-        dewpoint_k => {
-            rtype => 'k',
-        },
         elevation => {
             rtype => 'gon',
         },
         feelslike => {
-            aliasname => 'feelslike_c',    # alias only
+            aliasname => 'feelslike_c',     # alias only
         },
         feelslike_c => {
             rtype => 'c',
         },
-        feelslike_f => {
-            rtype => 'f',
-        },
-        heat_index => {
-            aliasname => 'heat_index_c',    # alias only
-        },
-        heat_index_c => {
-            rtype => 'c',
-        },
-        heat_index_f => {
-            rtype => 'f',
-        },
-        high_c => {
-            rtype => 'c',
-        },
-        high_f => {
-            rtype => 'f',
-        },
         humidity => {
-            rtype => 'pct',
+            rtype          => 'pct',
+            formula_symbol => 'H',
         },
         humidityabs => {
             aliasname => 'humidityabs_c',    # alias only
         },
         humidityabs_c => {
-            rtype => 'c',
+            rtype          => 'c',
+            formula_symbol => 'H',
         },
         humidityabs_f => {
-            rtype => 'f',
+            rtype          => 'f',
+            formula_symbol => 'H',
         },
         humidityabs_k => {
-            rtype => 'k',
+            rtype          => 'k',
+            formula_symbol => 'H',
         },
         horizon => {
             rtype => 'gon',
@@ -2258,14 +2658,9 @@ my $readingsDB = {
         indoordewpoint_c => {
             rtype => 'c',
         },
-        indoordewpoint_f => {
-            rtype => 'f',
-        },
-        indoordewpoint_k => {
-            rtype => 'k',
-        },
         indoorhumidity => {
-            rtype => 'pct',
+            rtype          => 'pct',
+            formula_symbol => 'H',
         },
         indoorhumidityabs => {
             aliasname => 'indoorhumidityabs_c',    # alias only
@@ -2273,35 +2668,17 @@ my $readingsDB = {
         indoorhumidityabs_c => {
             rtype => 'c',
         },
-        indoorhumidityabs_f => {
-            rtype => 'f',
-        },
-        indoorhumidityabs_k => {
-            rtype => 'k',
-        },
         indoortemperature => {
             aliasname => 'indoortemperature_c',    # alias only
         },
         indoortemperature_c => {
             rtype => 'c',
         },
-        indoortemperature_f => {
-            rtype => 'f',
-        },
-        indoortemperature_k => {
-            rtype => 'k',
-        },
         israining => {
-            rtype => 'bool',
+            rtype => 'yesno',
         },
         level => {
             rtype => 'pct',
-        },
-        low_c => {
-            rtype => 'c',
-        },
-        low_f => {
-            rtype => 'f',
         },
         luminosity => {
             rtype => 'lx',
@@ -2321,12 +2698,6 @@ my $readingsDB = {
         pressure_mm => {
             rtype => 'mmhg',
         },
-        pressure_psi => {
-            rtype => 'psi',
-        },
-        pressure_psig => {
-            rtype => 'psig',
-        },
         pressureabs => {
             aliasname => 'pressureabs_hpamb',    # alias only
         },
@@ -2340,7 +2711,7 @@ my $readingsDB = {
             rtype => 'mmhg',
         },
         pressureabs_psi => {
-            rtype => 'psia',
+            aliasname => 'pressureabs_psia',
         },
         pressureabs_psia => {
             rtype => 'psia',
@@ -2351,17 +2722,11 @@ my $readingsDB = {
         rain_mm => {
             rtype => 'mm',
         },
-        rain_in => {
-            rtype => 'in',
-        },
         rain_day => {
             aliasname => 'rain_day_mm',    # alias only
         },
         rain_day_mm => {
             rtype => 'mm',
-        },
-        rain_day_in => {
-            rtype => 'in',
         },
         rain_night => {
             aliasname => 'rain_night_mm',    # alias only
@@ -2369,17 +2734,11 @@ my $readingsDB = {
         rain_night_mm => {
             rtype => 'mm',
         },
-        rain_night_in => {
-            rtype => 'in',
-        },
         rain_week => {
             aliasname => 'rain_week_mm',     # alias only
         },
         rain_week_mm => {
             rtype => 'mm',
-        },
-        rain_week_in => {
-            rtype => 'in',
         },
         rain_month => {
             aliasname => 'rain_month_mm',    # alias only
@@ -2387,17 +2746,11 @@ my $readingsDB = {
         rain_month_mm => {
             rtype => 'mm',
         },
-        rain_month_in => {
-            rtype => 'in',
-        },
         rain_year => {
             aliasname => 'rain_year_mm',     # alias only
         },
         rain_year_mm => {
             rtype => 'mm',
-        },
-        rain_year_in => {
-            rtype => 'in',
         },
         snow => {
             aliasname => 'snow_cm',          # alias only
@@ -2405,26 +2758,17 @@ my $readingsDB = {
         snow_cm => {
             rtype => 'cm',
         },
-        snow_in => {
-            rtype => 'in',
-        },
         snow_day => {
             aliasname => 'snow_day_cm',      # alias only
         },
         snow_day_cm => {
             rtype => 'cm',
         },
-        snow_day_in => {
-            rtype => 'in',
-        },
         snow_night => {
             aliasname => 'snow_night_cm',    # alias only
         },
         snow_night_cm => {
             rtype => 'cm',
-        },
-        snow_night_in => {
-            rtype => 'in',
         },
         sunshine => {
             aliasname => 'solarradiation',    # alias only
@@ -2438,23 +2782,11 @@ my $readingsDB = {
         temp_c => {
             aliasname => 'temperature_c',     # alias only
         },
-        temp_f => {
-            aliasname => 'temperature_f',     # alias only
-        },
-        temp_k => {
-            aliasname => 'temperature_k',     # alias only
-        },
         temperature => {
             aliasname => 'temperature_c',     # alias only
         },
         temperature_c => {
             rtype => 'c',
-        },
-        temperature_f => {
-            rtype => 'f',
-        },
-        temperature_k => {
-            rtype => 'k',
         },
         uv => {
             aliasname => 'uvi',               # alias only
@@ -2486,20 +2818,11 @@ my $readingsDB = {
         visibility_km => {
             rtype => 'km',
         },
-        visibility_mi => {
-            rtype => 'mi',
-        },
         wind_chill => {
             aliasname => 'wind_chill_c',      # alias only
         },
         wind_chill_c => {
             rtype => 'c',
-        },
-        wind_chill_f => {
-            rtype => 'f',
-        },
-        wind_chill_k => {
-            rtype => 'k',
         },
         wind_compasspoint => {
             rtype => 'compasspoint'
@@ -2511,16 +2834,16 @@ my $readingsDB = {
             aliasname => 'wind_compasspoint',    # alias only
         },
         wind_direction => {
-            rtype => 'direction',
+            aliasname => 'wind_compasspoint',    # alias only
         },
         wind_dir => {
-            aliasname => 'wind_direction',       # alias only
+            aliasname => 'wind_compasspoint',    # alias only
         },
         winddir => {
-            aliasname => 'wind_direction',       # alias only
+            aliasname => 'wind_compasspoint',    # alias only
         },
         winddirection => {
-            aliasname => 'wind_direction',       # alias only
+            aliasname => 'wind_compasspoint',    # alias only
         },
         wind_gust => {
             aliasname => 'wind_gust_kmh',        # alias only
@@ -2528,41 +2851,11 @@ my $readingsDB = {
         wind_gust_kmh => {
             rtype => 'kmh',
         },
-        wind_gust_bft => {
-            rtype => 'bft',
-        },
-        wind_gust_fts => {
-            rtype => 'fts',
-        },
-        wind_gust_kn => {
-            rtype => 'kn',
-        },
-        wind_gust_mph => {
-            rtype => 'mph',
-        },
-        wind_gust_mps => {
-            rtype => 'mps',
-        },
         wind_speed => {
-            aliasname => 'wind_speed_kmh',    # alias only
+            aliasname => 'wind_speed_kmh',       # alias only
         },
         wind_speed_kmh => {
             rtype => 'kmh',
-        },
-        wind_speed_bft => {
-            rtype => 'bft',
-        },
-        wind_speed_fts => {
-            rtype => 'fts',
-        },
-        wind_speed_kn => {
-            rtype => 'kn',
-        },
-        wind_speed_mph => {
-            rtype => 'mph',
-        },
-        wind_speed_mps => {
-            rtype => 'mps',
         },
     }
 };
@@ -2670,6 +2963,41 @@ sub replaceTemplate ($$$$;$) {
         }
     }
 
+    # handle textual types after language normalisation
+    if ( defined( $desc->{value_num} ) ) {
+        if ( ref( $desc->{txt} ) eq "ARRAY"
+            && $desc->{txt}[ $desc->{value_num} ] )
+        {
+            my $v = $desc->{txt}[ $desc->{value_num} ];
+            delete $desc->{txt};
+            $desc->{txt} = $v;
+        }
+
+        if ( ref( $desc->{txt_pl} ) eq "ARRAY"
+            && $desc->{txt_pl}[ $desc->{value_num} ] )
+        {
+            my $v = $desc->{txt_pl}[ $desc->{value_num} ];
+            delete $desc->{txt_pl};
+            $desc->{txt_pl} = $v;
+        }
+
+        if ( ref( $desc->{txt_long} ) eq "ARRAY"
+            && $desc->{txt_long}[ $desc->{value_num} ] )
+        {
+            my $v = $desc->{txt_long}[ $desc->{value_num} ];
+            delete $desc->{txt_long};
+            $desc->{txt_long} = $v;
+        }
+
+        if ( ref( $desc->{txt_long_pl} ) eq "ARRAY"
+            && $desc->{txt_long_pl}[ $desc->{value_num} ] )
+        {
+            my $v = $desc->{txt_long_pl}[ $desc->{value_num} ];
+            delete $desc->{txt_long_pl};
+            $desc->{txt_long_pl} = $v;
+        }
+    }
+
     ##########
     # template support
     #
@@ -2733,9 +3061,6 @@ sub replaceTemplate ($$$$;$) {
       if ( $desc->{txt_cu}
         && $desc->{scale_txt_long_cu} );
 
-    # txt,txt_pl,txt_long,txt_long_pl
-    # txt,txt_pl, ?txt_long,?txt_long_pl   tmpl,tmpl_long,tmpl_long_pl
-
     # short
     $txt = '%value% %suffix%';
     $txt = $desc->{tmpl} if ( $desc->{tmpl} );
@@ -2752,7 +3077,7 @@ sub replaceTemplate ($$$$;$) {
 
     # long plural
     if (   looks_like_number($value)
-        && $value > 1
+        && ( $value eq "0" || $value > 1 )
         && $desc->{txt_long_pl} )
     {
         $txt_long = '%value% %txt_long_pl%';
@@ -2760,7 +3085,7 @@ sub replaceTemplate ($$$$;$) {
           if ( $desc->{tmpl_long_pl} );
     }
     elsif (looks_like_number($value)
-        && $value > 1
+        && ( $value eq "0" || $value > 1 )
         && $desc->{txt_pl} )
     {
         $txt_long = '%value% %txt_pl%';
@@ -2802,13 +3127,13 @@ sub formatValue($$$;$$$$) {
 
     return $value if ( !defined($value) || ref($value) );
 
-    $desc = readingsDesc( $device, $reading, $lang )
+    $desc = readingsDesc( $device, $reading )
       if ( !$desc || !ref($desc) );
     return $value
       if ( !$format && ( !$desc || ref($desc) ne 'HASH' )
         || keys %{$desc} < 1 );
 
-    my $llvl = ( defined( $desc->{verbose} ) ? $desc->{verbose} : 3 );
+    my $llvl = ( defined( $desc->{verbose} ) ? $desc->{verbose} : 4 );
     $lang = $desc->{lang} if ( $desc->{lang} );
 
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
@@ -2827,65 +3152,75 @@ sub formatValue($$$;$$$$) {
     elsif ( ref($scope) eq 'HASH' ) {
         my $log;
         if ( !looks_like_number($value) ) {
-            $log = "$value is not a number";
+            $log = "'$value' is not a number"
+              if ( !$scope->{empty} && !$scope->{empty_replace} );
+            $value = "0" if ( !$scope->{keep} && !$scope->{empty_replace} );
+            $value = $scope->{empty_replace}
+              if ( defined( $scope->{empty_replace} ) );
         }
         elsif ( $scope->{min} && $scope->{max} ) {
             if ( $value < $scope->{min} ) {
-                $value = $scope->{min} if ( !$scope->{keep} );
+                $value = $scope->{min}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is smaller than $scope->{min}";
             }
             if ( $value > $scope->{max} ) {
-                $value = $scope->{max} if ( !$scope->{keep} );
+                $value = $scope->{max}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is higher than $scope->{max}";
             }
         }
         elsif ( $scope->{lt} && $scope->{gt} ) {
             if ( $value < $scope->{lt} ) {
-                $value = $scope->{lt} if ( !$scope->{keep} );
+                $value = $scope->{lt}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is less than $scope->{lt}";
             }
             if ( $value > $scope->{gt} ) {
-                $value = $scope->{gt} if ( !$scope->{keep} );
+                $value = $scope->{gt}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is greater than $scope->{gt}";
             }
         }
         elsif ( $scope->{le} && $scope->{ge} ) {
             if ( $value <= $scope->{le} ) {
-                $value = $scope->{le} if ( !$scope->{keep} );
+                $value = $scope->{le}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is less or equal than $scope->{le}";
             }
             if ( $value >= $scope->{ge} ) {
-                $value = $scope->{ge} if ( !$scope->{keep} );
+                $value = $scope->{ge}
+                  if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is geater or qual than $scope->{ge}";
             }
         }
         elsif ( $scope->{min} && $value < $scope->{min} ) {
-            $value = $scope->{min} if ( !$scope->{keep} );
+            $value = $scope->{min} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is smaller than $scope->{min}";
         }
         elsif ( $scope->{lt} && $value < $scope->{lt} ) {
-            $value = $scope->{lt} if ( !$scope->{keep} );
+            $value = $scope->{lt} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is less than $scope->{lt}";
         }
         elsif ( $scope->{max} && $value > $scope->{max} ) {
-            $value = $scope->{max} if ( !$scope->{keep} );
+            $value = $scope->{max} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is higher than $scope->{max}";
         }
         elsif ( $scope->{gt} && $value > $scope->{gt} ) {
-            $value = $scope->{gt} if ( !$scope->{keep} );
+            $value = $scope->{gt} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is greater than $scope->{gt}";
         }
         elsif ( $scope->{ge} && $value >= $scope->{ge} ) {
-            $value = $scope->{ge} if ( !$scope->{keep} );
+            $value = $scope->{ge} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is greater or equal than $scope->{ge}";
         }
         elsif ( $scope->{le} && $value <= $scope->{le} ) {
-            $value = $scope->{le} if ( !$scope->{keep} );
+            $value = $scope->{le} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is less or equal than $scope->{le}";
         }
 
         Log3 $device, $llvl,
-          "formatValue($device:$reading:$desc->{rtype}) out of scope: $log"
+"formatValue($device:$reading,rtype=$desc->{rtype}) out of scope: $log"
           if ($log);
     }
 
@@ -2895,13 +3230,21 @@ sub formatValue($$$;$$$$) {
             && $value =~ /$scope->[$value]/gmi )
         {
             $value_num = $value;
-            if ( defined( $desc->{txt}{$lang}[$value] ) ) {
+            if (   ref( $desc->{txt} ) eq "HASH"
+                && ref( $desc->{txt}{$lang} ) eq "ARRAY"
+                && defined( $desc->{txt}{$lang}[$value] ) )
+            {
                 $value = $desc->{txt}{$lang}[$value];
             }
-            elsif ( defined( $desc->{txt}{en}[$value] ) ) {
+            elsif (ref( $desc->{txt} ) eq "HASH"
+                && ref( $desc->{txt}{en} ) eq "ARRAY"
+                && defined( $desc->{txt}{en}[$value] ) )
+            {
                 $value = $desc->{txt}{en}[$value];
             }
-            elsif ( defined( $desc->{txt}[$value] ) ) {
+            elsif ( ref( $desc->{txt} ) eq "ARRAY"
+                && defined( $desc->{txt}[$value] ) )
+            {
                 $value = $desc->{txt}[$value];
             }
             else {
@@ -2915,14 +3258,23 @@ sub formatValue($$$;$$$$) {
             foreach ( @{$scope} ) {
                 if ( $value =~ /^$_$/gmi ) {
                     $value_num = $i;
-                    if ( defined( $desc->{txt}{$lang}[$i] ) ) {
+                    if ( ref( $desc->{txt}{$lang} ) eq "ARRAY"
+                        && defined( $desc->{txt}{$lang}[$i] ) )
+                    {
                         $value = $desc->{txt}{$lang}[$i];
                     }
-                    elsif ( defined( $desc->{txt}{en}[$i] ) ) {
+                    elsif ( ref( $desc->{txt}{en} ) eq "ARRAY"
+                        && defined( $desc->{txt}{en}[$i] ) )
+                    {
                         $value = $desc->{txt}{en}[$i];
                     }
-                    elsif ( defined( $desc->{txt}[$i] ) ) {
+                    elsif ( ref( $desc->{txt} ) eq "ARRAY"
+                        && defined( $desc->{txt}[$i] ) )
+                    {
                         $value = $desc->{txt}[$i];
+                    }
+                    elsif ( !ref( $desc->{txt} ) && defined( $desc->{txt} ) ) {
+                        $value = $desc->{txt};
                     }
                     else {
                         $value = $1 if ( defined($1) );
@@ -2941,14 +3293,15 @@ sub formatValue($$$;$$$$) {
     }
 
     elsif ( defined($scope) && $scope ne "" && $value =~ /$scope/gmi ) {
-        $value = $scope->{$1} if ( defined($1) );
+        $value = $1 if ( defined($1) );
     }
 
     # format
     #
     if ( $format && !looks_like_number($value) ) {
         Log3 $device, $llvl,
-"formatValue($device:$reading:$desc->{rtype}) out of scope: $value is not a number";
+"formatValue($device:$reading,$desc->{rtype}) cannot re-format: $value is not a number"
+          if ( !$scope->{empty} && !$scope->{empty_replace} );
     }
 
     elsif ( ref($format) eq 'CODE' && &$format ) {
@@ -2960,11 +3313,11 @@ sub formatValue($$$;$$$$) {
         foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
             next
               if ( ref( $format->{$l} ) ne 'HASH'
-                || !$format->{$l}{scale} );
+                || !$format->{$l}{rescale} );
             if ( $v >= $l ) {
-                my $scale = $format->{$l}{scale};
+                my $rescale = $format->{$l}{rescale};
 
-                $value *= $scale if ($scale);
+                $value *= $rescale if ($rescale);
                 $value = sprintf( $format->{$l}{format}, $value )
                   if ( $format->{$l}{format} );
                 last;
@@ -2978,8 +3331,8 @@ sub formatValue($$$;$$$$) {
     }
 
     elsif ($format) {
-        my $scale = $desc->{scale};
-        $value *= $scale if ($scale);
+        my $rescale = $desc->{rescale};
+        $value *= $rescale if ($rescale);
         $value = sprintf( $format, $value );
     }
 
@@ -2996,6 +3349,8 @@ sub formatValue($$$;$$$$) {
     return ( $txt, $txt_long, $value, $value_num ) if (wantarray);
     return $value
       if ( defined( $desc->{showUnits} ) && $desc->{showUnits} eq "0" );
+    return $txt_long
+      if ( $desc->{showLong} && !$desc->{showShort} );
     return $txt;
 }
 
@@ -3008,9 +3363,30 @@ sub readingsDesc($;$) {
     $rtype = $desc->{rtype} if ( $desc->{rtype} );
 
     if ( $rtype && defined( $rtypes->{$rtype} ) ) {
+
+        # copy information from other hashes until 3rd level
         foreach my $k ( keys %{ $rtypes->{$rtype} } ) {
-            delete $desc->{$k} if ( $desc->{$k} );
-            $desc->{$k} = $rtypes->{$rtype}{$k};
+            if ( ref( $rtypes->{$rtype}{$k} ) eq "HASH" ) {
+                foreach my $k2 ( keys %{ $rtypes->{$rtype}{$k} } ) {
+
+                    if ( ref( $rtypes->{$rtype}{$k}{$k2} ) eq "HASH" ) {
+                        foreach ( keys %{ $rtypes->{$rtype}{$k}{$k2} } ) {
+                            delete $desc->{$k}{$k2}{$_}
+                              if ( $desc->{$k}{$k2}{$_} );
+                            $desc->{$k}{$k2}{$_} =
+                              $rtypes->{$rtype}{$k}{$k2}{$_};
+                        }
+                    }
+                    else {
+                        delete $desc->{$k}{$k2} if ( $desc->{$k}{$k2} );
+                        $desc->{$k}{$k2} = $rtypes->{$rtype}{$k}{$k2};
+                    }
+                }
+            }
+            else {
+                delete $desc->{$k} if ( $desc->{$k} );
+                $desc->{$k} = $rtypes->{$rtype}{$k};
+            }
         }
 
         foreach ( 'ref', 'ref_t', 'ref_sq', 'ref_cu' ) {
@@ -3171,28 +3547,84 @@ s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? readingsShortname($device,$1). ": ". (format
 sub getCombinedKeyValAttr($;$$) {
     my ( $name, $attribute, $reading ) = @_;
     my $d = $defs{$name} if ( $defs{$name} );
-    my $g = $defs{"global"};
     my $m = $modules{ $d->{TYPE} } if ( $d && $d->{TYPE} );
+    my $g = $defs{"global"};
+
+    # join hashes until 3rd level
 
     my $desc;
-    if ( $g && $g->{$attribute} && $g->{$attribute} !~ /^\{\s*\}$/ ) {
-        foreach ( keys %{ $g->{$attribute} } ) {
-            delete $desc->{$_} if ( $desc->{$_} );
-            $desc->{$_} = $g->{$attribute}{$_};
+    if ( $m && $m->{$attribute} && ref( $m->{$attribute} ) eq "HASH" ) {
+        foreach my $k ( keys %{ $m->{$attribute} } ) {
+            if ( ref( $m->{$attribute}{$k} ) eq "HASH" ) {
+                foreach my $k2 ( keys %{ $m->{$attribute}{$k} } ) {
+                    if ( ref( $m->{$attribute}{$k}{$k2} ) eq "HASH" ) {
+                        foreach ( keys %{ $m->{$attribute}{$k}{$k2} } ) {
+                            delete $desc->{$k}{$k2}{$_}
+                              if ( $desc->{$k}{$k2}{$_} );
+                            $desc->{$k}{$k2}{$_} =
+                              $m->{$attribute}{$k}{$k2}{$_};
+                        }
+                    }
+                    else {
+                        delete $desc->{$k}{$k2} if ( $desc->{$k}{$k2} );
+                        $desc->{$k}{$k2} = $m->{$attribute}{$k}{$k2};
+                    }
+                }
+            }
+            else {
+                delete $desc->{$_} if ( $desc->{$k} );
+                $desc->{$_} = $m->{$attribute}{$k};
+            }
         }
     }
 
-    if ( $m && $m->{$attribute} && $m->{$attribute} !~ /^\{\s*\}$/ ) {
-        foreach ( keys %{ $m->{$attribute} } ) {
-            delete $desc->{$_} if ( $desc->{$_} );
-            $desc->{$_} = $m->{$attribute}{$_};
+    if ( $g && $g->{$attribute} && ref( $g->{$attribute} ) eq "HASH" ) {
+        foreach my $k ( keys %{ $g->{$attribute} } ) {
+            if ( ref( $g->{$attribute}{$k} ) eq "HASH" ) {
+                foreach my $k2 ( keys %{ $g->{$attribute}{$k} } ) {
+                    if ( ref( $g->{$attribute}{$k}{$k2} ) eq "HASH" ) {
+                        foreach ( keys %{ $g->{$attribute}{$k}{$k2} } ) {
+                            delete $desc->{$k}{$k2}{$_}
+                              if ( $desc->{$k}{$k2}{$_} );
+                            $desc->{$k}{$k2}{$_} =
+                              $g->{$attribute}{$k}{$k2}{$_};
+                        }
+                    }
+                    else {
+                        delete $desc->{$k}{$k2} if ( $desc->{$k}{$k2} );
+                        $desc->{$k}{$k2} = $g->{$attribute}{$k}{$k2};
+                    }
+                }
+            }
+            else {
+                delete $desc->{$_} if ( $desc->{$k} );
+                $desc->{$_} = $g->{$attribute}{$k};
+            }
         }
     }
 
-    if ( $d && $d->{$attribute} && $d->{$attribute} !~ /^\{\s*\}$/ ) {
-        foreach ( keys %{ $d->{$attribute} } ) {
-            delete $desc->{$_} if ( $desc->{$_} );
-            $desc->{$_} = $d->{$attribute}{$_};
+    if ( $d && $d->{$attribute} && ref( $d->{$attribute} ) eq "HASH" ) {
+        foreach my $k ( keys %{ $d->{$attribute} } ) {
+            if ( ref( $d->{$attribute}{$k} ) eq "HASH" ) {
+                foreach my $k2 ( keys %{ $d->{$attribute}{$k} } ) {
+                    if ( ref( $d->{$attribute}{$k}{$k2} ) eq "HASH" ) {
+                        foreach ( keys %{ $d->{$attribute}{$k}{$k2} } ) {
+                            delete $desc->{$k}{$k2}{$_}
+                              if ( $desc->{$k}{$k2}{$_} );
+                            $desc->{$k}{$k2}{$_} =
+                              $d->{$attribute}{$k}{$k2}{$_};
+                        }
+                    }
+                    else {
+                        delete $desc->{$k}{$k2} if ( $desc->{$k}{$k2} );
+                        $desc->{$k}{$k2} = $d->{$attribute}{$k}{$k2};
+                    }
+                }
+            }
+            else {
+                delete $desc->{$_} if ( $desc->{$k} );
+                $desc->{$_} = $d->{$attribute}{$k};
+            }
         }
     }
 
@@ -3353,20 +3785,25 @@ sub Unit_DbLog_split($$) {
 
     # automatic text conversions through reading type
     elsif ( $event =~ /^(.+): +(\S+) *(.*)/ ) {
-        my ( $txt, $txt_long, $val, $val_num ) = formatReading( $name, $1, "" );
+        $reading = $1;
 
-        if ( defined($txt) ) {
+        my ( $txt, $txt_long, $val, $val_num ) =
+          formatReading( $name, $reading, "" );
+
+        if ( defined($txt) && defined($reading) && defined($val) ) {
             $txt =~ s/\s*$val\s*//;
             $txt_long =~ s/\s*$val\s*//;
-            $reading = $1;
-            $value   = defined($val_num) ? $val_num : $val;
-            $unit    = "$txt_long ($txt)";
+            $value = defined($val_num) ? $val_num : $val;
+            $unit = "$txt_long ($txt)" if ($txt_long);
+            $unit = "$txt"             if ( !$txt_long );
         }
     }
 
     # general event handling
-    if ( !defined($value)
-        && $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/ )
+    if (   !defined($value)
+        && $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/
+        && defined($1)
+        && defined($2) )
     {
         $reading = $1;
         $value   = ReadingsNum( $name, $1, $2 );
