@@ -94,7 +94,7 @@ average_Notify($$)
 
     ################
     # Avg computing
-    $evName =~ s/[^A-Za-z_-].*//;
+    $evName =~ s/[^A-Za-z\d_\.\-\/]//g;
     $tn = TimeNow() if(!$tn);
 
     my @dNow = split("[ :-]", $tn);
