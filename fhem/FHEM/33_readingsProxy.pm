@@ -120,7 +120,7 @@ readingsProxy_update($$)
     $value = $value_fn if( $value_fn );
   }
 
-  if( AttrVal($name, 'event-on-change-reading', undef ) ) {
+  if( AttrVal($name, 'event-on-change-reading', undef ) || AttrVal($name, 'event-on-update-reading', undef ) ) {
      readingsSingleUpdate($hash, 'state', $value, 1)
   } else {
     readingsSingleUpdate($hash, 'state', $value, 0);
