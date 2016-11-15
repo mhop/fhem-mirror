@@ -572,7 +572,7 @@ our %zwave_deviceSpecial;
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
 my (%zwave_link, %zwave_img);
-my @helpSites = ("alliance", "pepper");
+my $zwave_helpSites = "alliance,pepper";
 
 # standard definitions for regular expression
 # naming scheme: p<number of returned groups>_name
@@ -630,7 +630,7 @@ ZWave_Initialize($)
 
   ################
   # Read in the pepper/alliance translation table
-  for my $n (@helpSites) {
+  for my $n (split(",", $zwave_helpSites)) {
     my $fn = $attr{global}{modpath}."/FHEM/lib/zwave_${n}links.csv.gz";
     my $gz = gzopen($fn, "rb");
     if($gz) {
@@ -4574,11 +4574,12 @@ ZWave_helpFn($$)
 }
 
 sub
-ZWave_getPic($)
+ZWave_getPic($$)
 {
-  my ($model) = @_;
+  my ($iodev, $model) = @_;
   
-  for my $n (@helpSites) {
+  my $hs = AttrVal($iodev, "helpSites", $zwave_helpSites);
+  for my $n (split(",", $hs)) {
     my $img = $zwave_img{$n}{$model};
     next if(!$img);
     my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
@@ -4605,24 +4606,26 @@ ZWave_fhemwebFn($$$$)
 
   my $pl = ""; # Pepper link and image
   my $model = ReadingsVal($d, "modelId", "");
-  if($model) {
-    for my $n (@helpSites) {
-      my $link = $zwave_link{$n}{$model};
-      next if(!$link);
-      $pl .= "<div class='detLink ZWPepper'>";
-      my $url = ($n eq "alliance" ?
-                "http://products.z-wavealliance.org/products/" :
-                "http://www.pepper1.net/zwavedb/device/");
-      $pl .= "<a target='_blank' href='$url/$link'>Details in $n DB</a>";
-      $pl .= "</div>";
-    }
+  return '' if (!$model);
 
-    my $img = ZWave_getPic($model);
-    if($img && !$FW_ss) {
-      $pl .= "<div class='img'".($FW_tp?"":" style='float:right'").">";
-      $pl .= "<img style='max-width:96;max-height:96px;' src='$img'>";
-      $pl .= "</div>";
-    }
+  my $iodev = $defs{$d}{IODev}{NAME};
+  my $hs = AttrVal($iodev, "helpSites", $zwave_helpSites);
+  for my $n (split(",", $hs)) {
+    my $link = $zwave_link{$n}{$model};
+    next if(!$link);
+    $pl .= "<div class='detLink ZWPepper'>";
+    my $url = ($n eq "alliance" ?
+              "http://products.z-wavealliance.org/products/" :
+              "http://www.pepper1.net/zwavedb/device/");
+    $pl .= "<a target='_blank' href='$url/$link'>Details in $n DB</a>";
+    $pl .= "</div>";
+  }
+
+  my $img = ZWave_getPic($iodev, $model);
+  if($img && !$FW_ss) {
+    $pl .= "<div class='img'".($FW_tp?"":" style='float:right'").">";
+    $pl .= "<img style='max-width:96;max-height:96px;' src='$img'>";
+    $pl .= "</div>";
   }
 
   return
