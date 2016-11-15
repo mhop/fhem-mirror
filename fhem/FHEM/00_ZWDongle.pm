@@ -89,7 +89,9 @@ ZWDongle_Initialize($)
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
-                     "homeId networkKey neighborListPos neighborListFmt";
+                     "helpSites:multiple,pepper,alliance homeId networkKey ".
+                     "neighborListPos neighborListFmt";
+
   $hash->{FW_detailFn} = "ZWDongle_fhemwebFn";
 }
 
@@ -178,7 +180,7 @@ ZWDongle_nlData($)
   for my $e (@a) {
     my $h = $defs{$e};
     next if($h->{ZWaveSubDevice} ne "no");
-    $h->{IMAGE} = ZWave_getPic(ReadingsVal($e, "modelId", ""));
+    $h->{IMAGE} = ZWave_getPic($d, ReadingsVal($e, "modelId", ""));
 
     my $nl = ReadingsVal($e, "neighborList", ""); 
     $nl = ReadingsVal($d, "neighborList_".hex($h->{nodeIdHex}), "")
@@ -1148,6 +1150,11 @@ ZWDongle_Ready($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
+    <li><a name="helpSites">helpSites</a><br>
+      Comma separated list of Help Sites to get device pictures from or to
+      show a link to in the detailed window. Valid values are pepper
+      and alliance.
+      </li>
     <li><a name="homeId">homeId</a><br>
       Stores the homeId of the dongle. Is a workaround for some buggy dongles,
       wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
