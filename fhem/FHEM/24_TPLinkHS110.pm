@@ -101,8 +101,9 @@ sub TPLinkHS110_Get($$)
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 	$socket->send($c);
 	my $data;
-	$socket->recv($data,1024);
+	my $retval = $socket->recv($data,8192);
 	$socket->close();
+	unless( defined $retval) { return undef; }
 	$data = decrypt(substr($data,4));
 	my $json = decode_json($data);
 
@@ -129,8 +130,9 @@ sub TPLinkHS110_Get($$)
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 		$socket->send($rc);
 		my $rdata;
-		$socket->recv($rdata,1024);
+		$retval = $socket->recv($rdata,8192);
 		$socket->close();
+		unless( defined $retval) { return undef; }
 		$rdata = decrypt(substr($rdata,4));
 		my $realtimejson = decode_json($rdata);
 		foreach my $key2 (sort keys %{$realtimejson->{'emeter'}->{'get_realtime'}}) {
@@ -148,8 +150,9 @@ sub TPLinkHS110_Get($$)
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 		$socket->send($c);
 		my $data;
-		$socket->recv($data,8192);
+		$retval = $socket->recv($data,8192);
 		$socket->close();
+		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
 		eval {
 			my $json = decode_json($data);
@@ -200,8 +203,9 @@ sub TPLinkHS110_Set($$)
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 	$socket->send($c);
 	my $data;
-	$socket->recv($data,1024);
+	my $retval = $socket->recv($data,8192);
 	$socket->close();
+	unless( defined $retval) { return undef; }
 	$data = decrypt(substr($data,4));
 	my $json = decode_json($data);
         if ($json->{'system'}->{'set_relay_state'}->{'err_code'} eq "0") {
@@ -281,8 +285,9 @@ sub TPLinkHS110_Attr {
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
 		$socket->send($c);
 		my $data;
-		$socket->recv($data,1024);
+		my $retval = $socket->recv($data,8192);
 		$socket->close();
+		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
 		my $json = decode_json($data);
 	}
