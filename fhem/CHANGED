@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     39_siri.pm: configuration of fhem/siri integration
+             39_alexa.pm: configuration of fhem/alexa integration
   - feature: 30_pilight_contact: new module to handle pilight contact sensors
   - feature: 59_Weather: attribute disable
   - new:     10_EQ3BT: Support EQ3 Bluetooth thermostat
