@@ -948,7 +948,7 @@ ZWave_Cmd($$@)
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
     my ($baseId,$ch) = ($1, $2);
     $id = $baseId;
-    $cmdFmt = "0d01$ch$cmdId$cmdFmt";
+    $cmdFmt = "0d00$ch$cmdId$cmdFmt";
     $cmdId = "60";  # MULTI_CHANNEL
     $baseHash = $modules{ZWave}{defptr}{"$hash->{homeId} $baseId"};
     $baseClasses = AttrVal($baseHash->{NAME}, "classes", "");
@@ -2129,7 +2129,7 @@ ZWave_mcCapability($$)
 
   my $homeId = $iodev->{homeId};
   my @l = grep /../, split(/(..)/, lc($caps));
-  my $chid = shift(@l);
+  my $chid = sprintf("%02x", hex(shift(@l)) & 0x7f); # Forum #50176
   my $id = $hash->{nodeIdHex};
 
   my @classes;
@@ -2140,7 +2140,7 @@ ZWave_mcCapability($$)
   }
   return "mcCapability_$chid:no classes" if(!@classes);
 
-  if(!$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
+  if($chid ne "00" && !$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
     my $lid = hex("$id$chid");
     my $lcaps = substr($caps, 6);
     $id = hex($id);
@@ -4372,9 +4372,11 @@ ZWave_Parse($$@)
     $arg = sprintf("%02x$2", length($2)/2);
   }
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V2
-    $ep = ($1 ne "00" ? $1 : $2);
-    $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
-    $id = "$id$ep";
+    $ep = sprintf("%02x", hex($1) & 0x7f); # Forum #50176
+    if($ep ne "00") {
+      $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
+      $id = "$id$ep";
+    }
     $arg = sprintf("%02x$3", length($3)/2);
   }
   $hash = $modules{ZWave}{defptr}{"$homeId $id"};
