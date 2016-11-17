@@ -86,6 +86,7 @@
 #  2016-10-18 viegener - positionInverse documentation and complettion (no change to set on/off logic)
 #  2016-10-25 viegener - drive-Attribute - correct syntax check - add note in commandref
 #  2016-10-30 viegener - FIX: remove wrong attribute up-time-to-close - typo in attr setter
+#  2016-10-14 viegener - FIX: Use of uninitialized value $updateState in concatenation
 # 
 #  
 #  
@@ -1290,7 +1291,8 @@ sub SOMFY_UpdateState($$$$$) {
     my $rounded;
     my $stateTrans;
   
-    Log3($name,4,"SOMFY_UpdateState: $name enter with  newState:$newState:   updatestate:$updateState:   move:$move:");
+    Log3($name,4,"SOMFY_UpdateState: $name enter with  newState:$newState:   updatestate:".(defined( $updateState )?$updateState:"<undef>").
+        ":   move:$move:");
 
     # do conversions
     if ( AttrVal( $name, "positionInverse", 0 ) ) {
