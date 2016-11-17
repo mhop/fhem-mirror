@@ -272,6 +272,8 @@ and use the port attribute to configure the redirected port.</li>
     comma separated list of allowed mac adresses</li>
     <li>port<br>
       the listen port. defaults to 67 for root and 6767 for other users.</li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
   </ul><br>
 </ul><br>
 
