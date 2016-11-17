@@ -1590,7 +1590,7 @@ ReplaceSetMagic($$@)       # Forum #38276
 
   $a =~ s/\[([a-z0-9._]+):([a-z0-9._-]+)(:d)?\]/{
     my $x = $3 ? ReadingsNum($1,$2,"") : ReadingsVal($1,$2,"");
-    $x eq "" ? "[$1:$2$3]" : $x
+    $x eq "" ? "[$1:$2".($3?$3:"")."]" : $x
   }/egi;
 
   $evalSpecials->{'%DEV'} = $hash->{NAME};
