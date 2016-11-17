@@ -1604,6 +1604,8 @@ HUEBridge_Attr($$$)
   <a name="HUEBridge_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li>pollDevices<br>
       the bridge will poll all devices instead of each device itself. default is 1.</li>
     <li>queryAfterSet<br>

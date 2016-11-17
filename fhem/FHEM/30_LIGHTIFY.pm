@@ -1008,6 +1008,14 @@ LIGHTIFY_Read($)
     <li>statusRequest<br>
       Update light status.</li>
   </ul><br>
+
+  <a name="LIGHTIFY_Attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+  </ul><br>
+
 </ul><br>
 
 =end html
