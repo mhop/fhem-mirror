@@ -20,6 +20,9 @@
 # 23.09.16 GA fix set default for maxPulse to 1 (from 0.85)
 # 28.09.16 GA add "get timers" to collect a maximum of all timers from the rooms attached
 # 11.10.16 GA add new delayTimeOn can now suspend switching of OverallHeadtingSwitch from "off" to "on"
+# 16.11.16 GA add new attribute overallHeatingSwitchRef for threshold based configuration
+# 17.11.16 GA add internals for configuration parameters: p_interval, p_cycletime, p_minOnOffTime, 
+#                 p_maxPulse, p_roomsMinOnOffThreshold and p_overallHeatingSwitch
 
 ##############################################
 # $Id$
@@ -73,7 +76,7 @@ PWM_Initialize($)
   $hash->{UndefFn}   = "PWM_Undef";
   $hash->{AttrFn}    = "PWM_Attr";
 
-  $hash->{AttrList}  = "event-on-change-reading event-min-interval valveProtectIdlePeriod";
+  $hash->{AttrList}  = "event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn";
   #$hash->{GetList}   = "status timers";
 
 }
@@ -92,8 +95,11 @@ PWM_Calculate($)
   my %RoomsValveProtect     = ();
   my %RoomsPulses           = ();
   my $roomsActive           = 0;
-  my $newpulseSum           = 0;
   my $newpulseMax           = 0;
+  my $newpulseSum           = 0;
+  my $newpulseAvg           = 0;
+  my $newpulseAvg2          = 0;
+  my $newpulseAvg3          = 0;
   my $wkey                  = "";
 
   if($hash->{INTERVAL} > 0) {
@@ -250,7 +256,6 @@ PWM_Calculate($)
   # try to minimize the situation where all rooms are "on" at the same time
   # switch "on" only one room at the same time
   
-
   # sort rooms with decending "newpulse"
   foreach my $room (sort { $RoomsToSwitchOn{$b} <=> $RoomsToSwitchOn{$a} } keys %RoomsToSwitchOn) {
 
@@ -278,6 +283,7 @@ PWM_Calculate($)
     }
 
   }
+
 
   # in addition to the above max. of 85% of the active rooms may be on at the same time
   # 11 * 0.8 = 8.8 ... 8 is ok ... 9, 10, 11 is not (laraEG!)
@@ -460,8 +466,24 @@ PWM_Calculate($)
         }
 
   }
-  
 
+  my $cntAvg = 0;
+
+  # sort rooms with decending "newpulse"
+  foreach my $room (sort { $RoomsPulses{$b} <=> $RoomsPulses{$a} } keys %RoomsPulses) {
+
+    $newpulseAvg  += $RoomsPulses{$room};
+    $newpulseAvg2 += $RoomsPulses{$room} if ($cntAvg < 2);
+    $newpulseAvg3 += $RoomsPulses{$room} if ($cntAvg < 3);
+
+    $cntAvg++;
+  }
+
+  $newpulseAvg  = sprintf ("%.02f", $newpulseAvg  / $cntAvg)             if ($cntAvg > 0);
+  $newpulseAvg2 = sprintf ("%.02f", $newpulseAvg2 / minNum (2, $cntAvg)) if ($cntAvg > 0);
+  $newpulseAvg3 = sprintf ("%.02f", $newpulseAvg3 / minNum (3, $cntAvg)) if ($cntAvg > 0);
+
+  
   readingsBulkUpdate ($hash,  "roomsActive",   $roomsActive);
   readingsBulkUpdate ($hash,  "roomsOn",       $cntRoomsOn);
   readingsBulkUpdate ($hash,  "roomsOff",      $cntRoomsOff);
@@ -469,6 +491,9 @@ PWM_Calculate($)
   readingsBulkUpdate ($hash,  "avgPulseRoomsOff", ($cntRoomsOff > 0 ? sprintf ("%.2f", $pulseRoomsOff /$cntRoomsOff) : 0));
   readingsBulkUpdate ($hash,  "pulseMax",      $newpulseMax);
   readingsBulkUpdate ($hash,  "pulseSum",      $newpulseSum);
+  readingsBulkUpdate ($hash,  "pulseAvg",      $newpulseAvg);
+  readingsBulkUpdate ($hash,  "pulseAvg2",     $newpulseAvg2);
+  readingsBulkUpdate ($hash,  "pulseAvg3",     $newpulseAvg3);
 
   if ( $hash->{NoRoomsToStayOn} > 0) {
     readingsBulkUpdate ($hash,  "roomsToStayOn", $minRoomsOn);
@@ -482,7 +507,20 @@ PWM_Calculate($)
       if ( $hash->{OverallHeatingSwitch_threshold} > 0) {
 
         # threshold based
-        $newstateOHS = ($newpulseMax > $hash->{OverallHeatingSwitch_threshold}) ? "on" : "off";
+	my $refValue = $newpulseMax;
+
+	if (defined($attr{$name}{overallHeatingSwitchRef})) {
+
+          my $ref = $attr{$name}{overallHeatingSwitchRef};
+
+          $refValue = $newpulseMax   if ($ref eq "pulseMax");
+          $refValue = $newpulseSum   if ($ref eq "pulseSum");
+          $refValue = $newpulseAvg   if ($ref eq "pulseAvg");
+          $refValue = $newpulseAvg2  if ($ref eq "pulseAvg2");
+          $refValue = $newpulseAvg3  if ($ref eq "pulseAvg3");
+        }
+
+        $newstateOHS = ($refValue > $hash->{OverallHeatingSwitch_threshold}) ? "on" : "off";
 
       } else {
 
@@ -831,13 +869,13 @@ PWM_Define($$)
   my $name = $hash->{NAME};
 
   return "syntax: define <name> PWM [<interval>] [<cycletime>] [<minonofftime>] [<maxPulse>] [<maxSwitchOnPerCycle>,<maxSwitchOffPerCycle>] [<roomStayOn>,<roomStayOff>,<stayOnThreshold>]".
-    " [<overallHeatingSwitch>[,<pulseMaxThreshold>[,<followUpTime>[,<h_regexp_on>[,<delayTimeOn>]]]]"
+    " [<overallHeatingSwitch>[,<pulseThreshold>[,<followUpTime>[,<h_regexp_on>[,<delayTimeOn>]]]]"
     if(int(@a) < 2 || int(@a) > 9);
 
   my $interval     = ((int(@a) > 2) ? $a[2] : 60);
   my $cycletime    = ((int(@a) > 3) ? $a[3] : 900);
   my $minonofftime = ((int(@a) > 4) ? $a[4] : 120);
-  my $maxPulse     = ((int(@a) > 5) ? min ($a[5], 1.00) : 1.00);
+  my $maxPulse     = ((int(@a) > 5) ? minNum ($a[5], 1.00) : 1.00);
 
   $hash->{INTERVAL}             = $interval;
   $hash->{CYCLETIME}            = $cycletime;
@@ -845,6 +883,10 @@ PWM_Define($$)
   $hash->{MaxPulse}             = $maxPulse;
 
   $hash->{STATE}                = "defined";
+  $hash->{p_interval}           = $interval;
+  $hash->{p_cycletime}          = $cycletime;
+  $hash->{p_minOnOfftime}       = $minonofftime;
+  $hash->{p_maxPulse}           = $maxPulse;
 
 
   ##########
@@ -881,12 +923,14 @@ PWM_Define($$)
     $hash->{NoRoomsToStayOn}             = $stayOn; 	    # eg. 4 rooms stay switched on (unless average pulse is less then threshold)
     $hash->{NoRoomsToStayOff}            = $stayOff;       # 1 room stays off to limit energy used (maxPulse should be < 1 if this is used)
     $hash->{NoRoomsToStayOnThreshold}    = $onThreshold;   # $stayOn is used only if average pluse is >= threshold
+    $hash->{p_roomsMinOnOffThreshold}    = $a[7];
 
   } else {
 
     $hash->{NoRoomsToStayOn}             = 0;		# switch off all rooms is allowd
     $hash->{NoRoomsToStayOff}            = 0;		# switch on all rooms if allowed
     $hash->{NoRoomsToStayOnThreshold}    = 0;		# pulse threshold to use "NoRoomsToStayOn"
+    $hash->{p_minOnOffThreshold}         = "";
 
   }
 
@@ -907,12 +951,13 @@ PWM_Define($$)
       return $msg;
     }
 
-    $hash->{OverallHeatingSwitch}           = $hactor;
-    $hash->{OverallHeatingSwitch_threshold} = $h_threshold;
-    $hash->{OverallHeatingSwitch_regexp_on} = $h_regexp_on;
-    $hash->{OverallHeatingSwitch_roomBased} = ($h_threshold > 0) ? "off" : "on";
+    $hash->{OverallHeatingSwitch}               = $hactor;
+    $hash->{OverallHeatingSwitch_threshold}     = $h_threshold;
+    $hash->{OverallHeatingSwitch_regexp_on}     = $h_regexp_on;
+    $hash->{OverallHeatingSwitch_roomBased}     = ($h_threshold > 0) ? "off" : "on";
     $hash->{OverallHeatingSwitch_followUpTime}  = $h_followUpTime;
-    $hash->{OverallHeatingSwitch_delayTimeOn} = $h_delayTimeOn;
+    $hash->{OverallHeatingSwitch_delayTimeOn}   = $h_delayTimeOn;
+    $hash->{p_overallHeatingSwitch}             = $a[8];
     readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitch", "", 0);
@@ -920,12 +965,13 @@ PWM_Define($$)
     delete ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitUntil});
     delete ($hash->{READINGS}{OverallHeatingSwitchWaitBefore}) if defined ($hash->{READINGS}{OverallHeatingSwitchWaitBefore});
   } else {
-    $hash->{OverallHeatingSwitch}           = "";
-    $hash->{OverallHeatingSwitch_threshold} = "";
-    $hash->{OverallHeatingSwitch_regexp_on} = "";
-    $hash->{OverallHeatingSwitch_roomBased} = "";
+    $hash->{OverallHeatingSwitch}               = "";
+    $hash->{OverallHeatingSwitch_threshold}     = "";
+    $hash->{OverallHeatingSwitch_regexp_on}     = "";
+    $hash->{OverallHeatingSwitch_roomBased}     = "";
     $hash->{OverallHeatingSwitch_followUpTime}  = "";
-    $hash->{OverallHeatingSwitch_delayTimeOn} = "";
+    $hash->{OverallHeatingSwitch_delayTimeOn}   = "";
+    $hash->{p_overallHeatingSwitch}             = "";
     readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "", 0);
     readingsSingleUpdate ($hash,  "OverallHeatingSwitch", "", 0);
@@ -1015,7 +1061,7 @@ PWM_Attr(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWM [&lt;interval&gt;] [&lt;cycletime&gt;] [&lt;minonofftime&gt;] [&lt;maxPulse&gt;] [&lt;maxSwitchOnPerCycle&gt;,&lt;maxSwitchOffPerCycle&gt;] [&lt;roomStayOn&gt;,&lt;roomStayOff&gt;,&lt;stayOnThreshold&gt;] [&lt;overallHeatingSwitch&gt;[,&lt;pulseMaxThreshold&gt;[,&lt;followUpTime&gt;[,&lt;h_regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]]<br></code>
+    <code>define &lt;name&gt; PWM [&lt;interval&gt;] [&lt;cycletime&gt;] [&lt;minonofftime&gt;] [&lt;maxPulse&gt;] [&lt;maxSwitchOnPerCycle&gt;,&lt;maxSwitchOffPerCycle&gt;] [&lt;roomStayOn&gt;,&lt;roomStayOff&gt;,&lt;stayOnThreshold&gt;] [&lt;overallHeatingSwitch&gt;[,&lt;pulseThreshold&gt;[,&lt;followUpTime&gt;[,&lt;h_regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]]<br></code>
     <br>
     eg. define fb PWM 60 900 120 1 99,99 0,0,0 pumpactor<br>
     <br>
@@ -1063,13 +1109,14 @@ PWM_Attr(@)
       <br>
     </li>
 
-    <li>&lt;overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]<br>
+    <li>&lt;overallHeatingSwitch&gt[,&lt;pulseThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt;[,&lt;delayTimeOn&gt;]]]]<br>
       Universal switch to controll eg. pumps or the heater itself. It will be set to "off" if no heating is required and otherwise "on".<br>
-      <i>pulseMaxThreshold</i> defines a threshold which is applied to reading <i>maxPulse</i> of the PWM object to decide if heating is required. If (calculated maxPulse > threshold) then actor is set to "on", otherwise "off".<br>
-      If <i>pulseMaxThreshold</i> is set to 0 (or is not defined) then the decision is based on <i>roomsOn</i>. If (roomsOn > 0) then actor is set to "on", otherwise "off".<br>
+      <i>pulseThreshold</i> defines a threshold which is applied to reading <i>pulseMax</i>, <i>pulseSum</i>, <i>pulseAvg</i>, <i>pulseAvg2</i> or <i>pulseAvg3</i> of the PWM object to decide if heating is required. If (calculated pulse > threshold) then actor is set to "on", otherwise "off".<br>
+      If <i>pulseThreshold</i> is set to 0 (or is not defined) then the decision is based on <i>roomsOn</i>. If (roomsOn > 0) then actor is set to "on", otherwise "off".<br>
       <i>followUpTime</i> defines a number of seconds which is used to delay the status change from "on" to "off". This can be used to prevent a toggling switch.<br>
       <i>regexp_on</i> defines a regular expression to be applied to the state of the actor. Default is "on". If state matches the regular expression it is handled as "on", otherwise "off".<br>
       <i>delayTimeOn</i> defines a number of seconds which is used to delay the status change from "off" to "on". This can be used to give the valves time to open before switching..<br>
+      The pulse used for comparision is defined by attribute <i>overallHeatingSwitchRef</i>. Default is <i>maxPulse</i>.<br>
       <br>
     </li>
 
@@ -1125,6 +1172,17 @@ PWM_Attr(@)
         Protect Valve by switching on actor for 300 seconds.<br>
         After <i>valveProtectIdlePeriod</i> number of days without switching the valve the actor is set to "on" for 300 seconds.
         overallHeatingSwitch is not affected.
+        </li><br>
+    <li>overallHeatingSwitchRef<br>
+        Defines which reading is used for threshold comparision for <i>OverallHeatingSwitch</i> calculation. Possible values are:<br>
+        <i>pulseMax</i>,
+        <i>pulseSum</i>,
+        <i>pulseAvg</i>,
+        <i>pulseAvg2</i>,
+        <i>pulseAvg3</i>,
+	<i>avgPulseRoomsOn</i><br>
+        pulseAvg is an average pulse of all rooms which should be switched to "on".<br>
+        pulseAvg2 and pulseAvg3 refer to the 2 or 3 romms with highest pulses.
         </li><br>
   </ul>
   <br>
