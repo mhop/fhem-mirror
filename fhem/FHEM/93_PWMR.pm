@@ -37,6 +37,9 @@
 # 04.10.16 GA fix adjust readings for tempRules if temperature changes
 # 11.10.16 GA fix delete log entries for PWMR_NormalizeRules
 # 17.10.16 GA fix attribute tempFrostProtect is now evaluated
+# 16.11.16 GA add display time until in state if "ManualSetUntil"
+# 16.11.16 GA fix format desired-temp with one digit after the decimal point
+# 17.11.16 GA add internals for configuration parameters: p_factor, p_tsensor, p_actor, p_window, p_pid
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -189,7 +192,7 @@ PWMR_CalcDesiredTemp($)
 
         Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
           $hash->{READINGS}{"desired-temp"}{TIME});
-        $hash->{STATE}     = "ManualSetUntil";
+        #$hash->{STATE}     = "ManualSetUntil";
         return undef;
       }
       else
@@ -214,11 +217,12 @@ PWMR_CalcDesiredTemp($)
   # frost protection
 
   if ($hash->{c_frostProtect} > 0) {
-    if ($hash->{READINGS}{"desired-temp"}{VAL} ne $hash->{c_tempFrostProtect}  
+
+    if ($hash->{READINGS}{"desired-temp"}{VAL} != $hash->{c_tempFrostProtect}
         or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-      readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 1);
+      readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $hash->{c_tempFrostProtect}), 1);
     } else {
-      readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 0);
+      readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $hash->{c_tempFrostProtect}), 0);
     }
 
     #$hash->{READINGS}{"desired-tem"}{TIME} = TimeNow();
@@ -281,11 +285,11 @@ PWMR_CalcDesiredTemp($)
   
                 Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
                  
-                if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature 
+                if ($hash->{READINGS}{"desired-temp"}{VAL} != $temperature 
                     or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-                  readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
+                  readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 1);
                 } else {
-                  readingsSingleUpdate ($hash,  "desired-temp", $temperature, 0);
+                  readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $temperature), 0);
                 }
   
                 #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
@@ -307,7 +311,7 @@ PWMR_CalcDesiredTemp($)
   
             if ($act_dtemp ne $newTemp
               or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-              readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+              readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $newTemp), 1);
             #} else {
             #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
             }
@@ -326,11 +330,11 @@ PWMR_CalcDesiredTemp($)
 
       my $newTemp = PWMR_getDesiredTempFrom ($hash, $defs{$hash->{d_name}}, $hash->{d_reading}, $hash->{d_regexpTemp});
 
-      if ($hash->{READINGS}{"desired-temp"}{VAL} ne $newTemp 
+      if ($hash->{READINGS}{"desired-temp"}{VAL} != $newTemp 
          or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-           readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+           readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%.01f", $newTemp), 1);
       } else {
-         readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
+         readingsSingleUpdate ($hash,  "desired-temp", sprintf ("%0.1f", $newTemp), 0);
       }
   
     }
@@ -371,12 +375,19 @@ PWMR_Set($@)
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
 
+  my $desiredTempString = "";
+  if (defined($hash->{READINGS}{"desired-temp"}{VAL}) 
+    and ($hash->{READINGS}{"desired-temp"}{VAL} < 6 or $hash->{READINGS}{"desired-temp"}{VAL} > 30)) {
+    $desiredTempString = $hash->{READINGS}{"desired-temp"}{VAL}.",";
+  }
+
+
   my @list = map { ($_.".0", $_+0.5) } (6..29);
   my $valList = join (",", @list);
   $valList .= ",30.0";
   #my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:knob,min:6,max:26,step:0.5,linecap:round interval manualTempDuration:slider,60,60,600";
   #my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:uzsuDropDown:$valList interval manualTempDuration:slider,60,60,600";
-  my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:$valList interval manualTempDuration:slider,60,60,600 frostProtect:off,on";
+  my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:$desiredTempString$valList interval manualTempDuration:slider,60,60,600 frostProtect:off,on";
 
   $valList = "slider,6,0.5,30,0.5";
 
@@ -402,7 +413,7 @@ PWMR_Set($@)
 
   if ( $cmd eq "desired-temp" ) {
     my $val = $a[2];
-    if ( $val < 6 || $val > 30 ) {
+    if ( $val < 0 || $val > 30 ) {
       return "Unknown argument for $cmd, choose <6..30>";
     }
     
@@ -418,11 +429,11 @@ PWMR_Set($@)
     my $now =  time();
 
     readingsBeginUpdate ($hash);
-    readingsBulkUpdate ($hash,  "desired-temp", $a[2]);
+    readingsBulkUpdate ($hash,  "desired-temp", sprintf ("%.01f", $a[2]));
     if ($hash->{c_autoCalcTemp} == 0) {
       $hash->{STATE}     = "Manual";
     } else {
-      $hash->{STATE}     = "ManualSetUntil";
+      $hash->{STATE}     = "ManualSetUntil ".FmtTime($now + $duration);
       readingsBulkUpdate ($hash,  "desired-temp-until", FmtDateTime($now + $duration));
     }
     readingsEndUpdate($hash, 1);
@@ -511,6 +522,12 @@ PWMR_Define($$)
   $hash->{FACTOR}             = $f;		# pulse is calculated using the below formular
   $hash->{FOFFSET}            = $o;             # ( $deltaTemp * $factor) ** 2) + $factoroffset
   $hash->{c_desiredTempFrom}  = "";
+
+  $hash->{p_factor}           = $factor;
+  $hash->{p_tsensor}          = $tsensor;
+  $hash->{p_actor}            = $actor;
+  $hash->{p_window}           = $window;
+  $hash->{p_pid}              = $pid;
   
   #$hash->{helper}{cycletime}  = 0;
 
@@ -1466,7 +1483,7 @@ PWMR_Boost(@)
       my $now =  time();
 
       readingsBeginUpdate ($room);
-      readingsBulkUpdate ($room,  "desired-temp", $desiredTemp + $desiredOffset);
+      readingsBulkUpdate ($room,  "desired-temp", sprintf ("%.01f", $desiredTemp + $desiredOffset));
       readingsBulkUpdate ($room,  "desired-temp-until", FmtDateTime($now + $boostDuration * 60));
       readingsEndUpdate($room, 1);
 
