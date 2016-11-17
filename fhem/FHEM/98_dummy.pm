@@ -14,6 +14,7 @@ dummy_Initialize($)
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
   $hash->{AttrList}  = "readingList setList useSetExtensions " .
+                       "disable disabledForIntervals ".
                        $readingFnAttributes;
 }
 
@@ -36,6 +37,11 @@ dummy_Set($@)
   } else {
     return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
   }
+
+  return undef
+    if($attr{$name} &&  # Avoid checking it if only STATE is inactive
+       ($attr{$name}{disable} || $attr{$name}{disabledForIntervals}) &&
+       IsDisabled($name));
 
   my @rl = split(" ", AttrVal($name, "readingList", ""));
   my $doRet;
@@ -110,6 +116,8 @@ dummy_Define($$)
   <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="readingList">readingList</a><br>
       Space separated list of readings, which will be set, if the first
       argument of the set command matches one of them.</li>
@@ -171,6 +179,8 @@ dummy_Define($$)
   <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="readingList">readingList</a><br>
       Leerzeichen getrennte Liste mit Readings, die mit "set" gesetzt werden
       k&ouml;nnen.</li>
