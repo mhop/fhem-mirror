@@ -2642,20 +2642,27 @@ sub CUL_HM_Parse($$) {#########################################################
     my($sType,$chn,$lvl,$stat) = @mI;
     if(($mh{mTp} eq "10" && $sType eq "06") ||
        ($mh{mTp} eq "02" && $sType eq "01")){
+      my $move = 0;
+      $stat = hex($stat);
       $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
-      # stateflag meaning unknown
-      push @evtEt,[$mh{shash},1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)))];
       if ($chn eq "01"){
         my %err = (0=>"ok",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
-        push @evtEt,[$mh{shash},1,"motorErr:"  .$err{(hex($stat)>>1)&0x03}];
-        push @evtEt,[$mh{shash},1,"direction:" .$dir{(hex($stat)>>4)&0x03}];
+        $move = ($stat >> 4) & 0x03;
+        push @evtEt,[$mh{shash},1,"motorErr:"  .$err{($stat >> 1) & 0x03}];
+        push @evtEt,[$mh{shash},1,"direction:" .$dir{$move}];
       }
       else{ #should be akku
         my %statF = (0=>"trickleCharge",1=>"charge",2=>"dischange",3=>"unknown");
-        push @evtEt,[$mh{shash},1,"charge:".$statF{(hex($stat)>>4)&0x03}];
+        push @evtEt,[$mh{shash},1,"charge:"    .$statF{($stat >> 4) & 0x03}];
       }
+      # stateflag meaning unknown
+      my $lvlS = $lvl eq "FF" ? 0:1;
+      $lvl = hex($lvl)/2;
+      push @evtEt,[$mh{shash},1,"state:".($lvlS ? "locked" : $lvl)      ];
+      push @evtEt,[$mh{shash},1,"level:".($lvlS ? "0"      : $lvl)      ] if($move==0);
+      push @evtEt,[$mh{shash},1,"lock:" .($lvlS ? "locked" : "unlocked")];
     }
   }
   elsif($mh{st} eq "keyMatic") {  #############################################
