@@ -2488,7 +2488,9 @@ sub CUL_HM_Parse($$) {#########################################################
         my $val = hex($mI[2])/2;
         $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
         push @evtEt,[$mh{cHash},1,"state:$val"];
+        push @evtEt,[$mh{devH} ,1,"battery:".(hex($mI[3]&0x80)?"low":"ok" )]if ($mh{md} eq "HM-OU-CFM-TW" && $mI[3]);
       }
+      
     }
   }
   elsif($mh{st} =~ m /^(motionDetector|motionAndBtn)$/) { #####################
