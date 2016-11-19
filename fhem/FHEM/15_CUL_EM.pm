@@ -143,7 +143,7 @@ CUL_EM_Parse($$)
     if($oldraw) {
       my @a = split(" ", $oldraw);
       if($a[3] > $total_cnt) {
-        $basis_cnt += ($a[3]+$total_cnt)/$corr2;
+        $basis_cnt += ($a[3]+$total_cnt); # Forum #60489
         readingsSingleUpdate($hash, "basis", $basis_cnt, 0);
         Log 1, "$n was reset, old CUM $a[3], new CUM: $total_cnt, ".
                         "new basis $basis_cnt";
