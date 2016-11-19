@@ -1486,12 +1486,12 @@ YAMAHA_AVR_ParseResponse($$$)
                         delete($hash->{helper}{CURRENT_INPUT_TAG}) if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
                         delete($hash->{helper}{LAST_INPUT_TAG}) if(exists($hash->{helper}{LAST_INPUT_TAG}));
                         $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} = 0;
-                        readingsBulkUpdate($hash, "currentAlbum", "", 0);
-                        readingsBulkUpdate($hash, "currentTitle", "", 0);
-                        readingsBulkUpdate($hash, "currentChannel", "", 0);
-                        readingsBulkUpdate($hash, "currentStation", "", 0);
-                        readingsBulkUpdate($hash, "currentStationFrequency","", 0);
-                        readingsBulkUpdate($hash, "currentArtist", "", 0);
+                        readingsBulkUpdateIfChanged($hash, "currentAlbum", "");
+                        readingsBulkUpdateIfChanged($hash, "currentTitle", "");
+                        readingsBulkUpdateIfChanged($hash, "currentChannel", "");
+                        readingsBulkUpdateIfChanged($hash, "currentStation", "");
+                        readingsBulkUpdateIfChanged($hash, "currentStationFrequency","");
+                        readingsBulkUpdateIfChanged($hash, "currentArtist", "");
                     }
                 }
                 
@@ -1558,7 +1558,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 else
                 {
-                    readingsBulkUpdate($hash, "currentArtist", "", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentArtist", "");
                 }
 
                 if($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
@@ -1571,7 +1571,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 else
                 {
-                    readingsBulkUpdate($hash, "currentStation", "", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentStation", "");
                 }  
                 
                 if($data =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
@@ -1580,7 +1580,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 else
                 {
-                    readingsBulkUpdate($hash, "currentChannel", "", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentChannel", "");
                 }
                 
                 if($data =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
@@ -1589,7 +1589,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 else
                 {
-                    readingsBulkUpdate($hash, "currentAlbum", "", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentAlbum", "");
                 }
                 
                 if($data =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
@@ -1615,7 +1615,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }    
                 else
                 {
-                    readingsBulkUpdate($hash, "currentTitle", "", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentTitle", "");
                 }
                 
                 if($data =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
@@ -1635,7 +1635,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 elsif(ReadingsVal($name, "currentStationFrequency", "") ne "")
                 {
-                    readingsBulkUpdate($hash, "currentStationFrequency","", 0);
+                    readingsBulkUpdateIfChanged($hash, "currentStationFrequency","");
                 }
             }
             elsif($arg eq "playShuffle")
