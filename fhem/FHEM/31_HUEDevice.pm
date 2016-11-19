@@ -256,19 +256,19 @@ sub HUEDevice_Define($$)
   $hash->{ID} = $hash->{helper}->{devtype}.$id;
 
   AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
-  if(defined($hash->{IODev}->{NAME})) {
+  if(defined($hash->{IODev})) {
     Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
   } else {
     Log3 $name, 1, "$name: no I/O device";
   }
-  $iodev = $hash->{IODev}->{NAME};
+  $iodev = $hash->{IODev}->{NAME} if( defined($hash->{IODev}) );
 
   my $code = $hash->{ID};
   $code = $iodev ."-". $code if( defined($iodev) );
   my $d = $modules{HUEDevice}{defptr}{$code};
   return "HUEDevice device $hash->{ID} on HUEBridge $iodev already defined as $d->{NAME}."
          if( defined($d)
-             && $d->{IODev} == $hash->{IODev}
+             && $d->{IODev} && $hash->{IODev} && $d->{IODev} == $hash->{IODev}
              && $d->{NAME} ne $name );
 
   $modules{HUEDevice}{defptr}{$code} = $hash;
@@ -281,7 +281,7 @@ sub HUEDevice_Define($$)
 
   $args[3] = "" if( !defined( $args[3] ) );
   if( !$hash->{helper}->{devtype} ) {
-    $hash->{DEF} = "$id $args[3] IODev=$iodev";
+    $hash->{DEF} = "$id $args[3] IODev=$iodev" if( $iodev );
 
     $interval = 60 if( $interval && $interval < 10 );
     $hash->{INTERVAL} = $interval;
@@ -306,7 +306,7 @@ sub HUEDevice_Define($$)
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
   } elsif( $hash->{helper}->{devtype} eq 'G' ) {
-    $hash->{DEF} = "group $id $args[3] IODev=$iodev";
+    $hash->{DEF} = "group $id $args[3] IODev=$iodev" if( $iodev );
 
     $hash->{helper}{all_on} = -1;
     $hash->{helper}{any_on} = -1;
@@ -319,7 +319,7 @@ sub HUEDevice_Define($$)
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
-    $hash->{DEF} = "sensor $id $args[3] IODev=$iodev";
+    $hash->{DEF} = "sensor $id $args[3] IODev=$iodev" if( $iodev );
 
     $interval = 60 if( $interval && $interval < 1 );
     $hash->{INTERVAL} = $interval;
