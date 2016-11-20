@@ -3471,7 +3471,7 @@ ZWave_secGetMsg ($)
     }
   }
   Log3 $name, 1, "$name: no stored commands in Internal secMsg found";
-  return undef;
+  return "";
 }
 
 sub
