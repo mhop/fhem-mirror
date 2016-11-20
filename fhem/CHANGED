@@ -1,8 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - change:  93_DbRep: diffValue changed due to Forum #msg520154, 
-                       attr diffAccept added, changed fieldlength to DbLog new 
-                       standard, diffValue state Warnings added
   - change:  YAMAHA_AVR: create events even when current.* readings will be 
              set to an empty string. (Forum: #60902)
   - bugfix:  10_ZWave: possible changes for multichannel devices (Forum #50176)
