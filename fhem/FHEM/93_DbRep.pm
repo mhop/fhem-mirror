@@ -1,4 +1,4 @@
-##########################################################################################################
+﻿##########################################################################################################
 # $Id$
 ##########################################################################################################
 #       93_DbRep.pm
@@ -22,7 +22,10 @@
 #       GNU General Public License for more details.
 #
 #       You should have received a copy of the GNU General Public License
-#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.#  
+#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Credits:
+#  - some proposals to boost and improve SQL-Statements by JoeALLb
 #
 ###########################################################################################################
 #
@@ -32,11 +35,16 @@
 #
 # Definition: define <name> DbRep <DbLog-Device>
 #
-# This module uses credentials of 93_DbLog.pm - devices
+# This module uses credentials of DbLog-devices
 #
 ###########################################################################################################
 #  Versions History:
 #
+# 4.7.2        20.11.2016       commandref adapted, state = Warnings adapted
+# 4.7.1        17.11.2016       changed fieldlength to DbLog new standard, diffValue state Warnings due to 
+#                               several situations and generate readings not_enough_data_in_period, diff-overrun_limit
+# 4.7          16.11.2016       sub diffValue changed due to Forum #msg520154, attr diffAccept added,
+#                               diffValue now able to calculate if counter was going to 0
 # 4.6.1        01.11.2016       daylight saving time check improved
 # 4.6          31.10.2016       bugfix calc issue due to daylight saving time end (winter time)
 # 4.5.1        18.10.2016       get svrinfo contains SQLite database file size (MB),
@@ -142,21 +150,13 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my %dbrep_col_postgre = ("DEVICE"  => 64,
-                         "TYPE"    => 64,
-                         "EVENT"   => 512,
-                         "READING" => 64,
-                         "VALUE"   => 128,
-                         "UNIT"    => 32
-                          );
-
-my %dbrep_col_mysql = ("DEVICE"  => 32,
-                       "TYPE"    => 64,
-                       "EVENT"   => 512,
-                       "READING" => 32,
-                       "VALUE"   => 32,
-                       "UNIT"    => 32
-                       );
+my %dbrep_col = ("DEVICE"  => 64,
+                 "TYPE"    => 64,
+                 "EVENT"   => 512,
+                 "READING" => 64,
+                 "VALUE"   => 128,
+                 "UNIT"    => 32
+                );
                            
 ###################################################################################
 # DbRep_Initialize
@@ -178,6 +178,7 @@ sub DbRep_Initialize($) {
                        "device ".
                        "expimpfile ".
                        "aggregation:hour,day,week,month,no ".
+					   "diffAccept ".
                        "role:Client,Agent ".
                        "showproctime:1,0 ".
                        "showSvrInfo ".
@@ -316,17 +317,10 @@ sub DbRep_Set($@) {
           
           # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
           if ($dbmodel ne 'SQLITE') {
-              if ($dbmodel eq 'POSTGRESQL') {
-                  $i_device   = substr($i_device,0, $dbrep_col_postgre{DEVICE});
-                  $i_reading  = substr($i_reading,0, $dbrep_col_postgre{READING});
-                  $i_value    = substr($i_value,0, $dbrep_col_postgre{VALUE});
-                  $i_unit     = substr($i_unit,0, $dbrep_col_postgre{UNIT}) if($i_unit);
-              } elsif ($dbmodel eq 'MYSQL') {
-                  $i_device   = substr($i_device,0, $dbrep_col_mysql{DEVICE});
-                  $i_reading  = substr($i_reading,0, $dbrep_col_mysql{READING});
-                  $i_value    = substr($i_value,0, $dbrep_col_mysql{VALUE});
-                  $i_unit     = substr($i_unit,0, $dbrep_col_mysql{UNIT}) if($i_unit);
-              }
+              $i_device   = substr($i_device,0, $dbrep_col{DEVICE});
+              $i_reading  = substr($i_reading,0, $dbrep_col{READING});
+              $i_value    = substr($i_value,0, $dbrep_col{VALUE});
+              $i_unit     = substr($i_unit,0, $dbrep_col{UNIT}) if($i_unit);
           }
           
           $hash->{HELPER}{I_TIMESTAMP} = $i_timestamp;
@@ -428,6 +422,7 @@ sub DbRep_Attr($$$$) {
                          readingNameMap
                          readingPreventFromDel
                          device
+						 diffAccept
                          expimpfile
                          timestamp_begin
                          timestamp_end
@@ -518,7 +513,7 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         }
-        if ($aName eq "timeout") {
+        if ($aName eq "timeout" || $aName eq "diffAccept") {
             unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         } 
         if ($aName eq "readingNameMap") {
@@ -539,9 +534,9 @@ sub DbRep_Attr($$$$) {
         if ($aName eq "reading" || $aName eq "device") {
             if ($dbmodel && $dbmodel ne 'SQLITE') {
                 if ($dbmodel eq 'POSTGRESQL') {
-                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col_postgre{READING}" if(length($aVal) > $dbrep_col_postgre{READING});
+                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
                 } elsif ($dbmodel eq 'MYSQL') {
-                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col_mysql{READING}" if(length($aVal) > $dbrep_col_mysql{READING});
+                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
                 }
             }
         }
@@ -1394,7 +1389,7 @@ sub maxval_DoParse($) {
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
           $a[3] =~ s/\s+$//g;
-          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
           return "$name|''|$device|$reading|''|$err";
@@ -1629,7 +1624,7 @@ sub minval_DoParse($) {
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
           $a[3] =~ s/\s+$//g;
-          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in minValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
           return "$name|''|$device|$reading|''|$err";
@@ -1770,7 +1765,7 @@ sub diffval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|''|''|$err";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -1783,42 +1778,55 @@ sub diffval_DoParse($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
+ # SQL zusammenstellen für DB-Operation neu diffValue + prepare
+ my $sql = "SELECT TIMESTAMP,VALUE,
+           if(VALUE-\@V < 0 OR \@RB = 1 , \@diff:= 0, \@diff:= VALUE-\@V ) as DIFF, 
+           \@V:= VALUE as VALUEBEFORE,
+		   \@RB:= '0' as RBIT 
+           FROM `history` where ";
+ $sql .= "`DEVICE` LIKE '$device' AND " if($device);
+ $sql .= "`READING` LIKE '$reading' AND " if($reading); 
+ $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";
+ 
+ my $sth = $dbh->prepare($sql); 
+ 
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my @row_array;
- foreach my $row (@ts) {
 
+ foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];   
-     
-     # SQL zusammenstellen für DB-Operation
-     my $sql = "SELECT TIMESTAMP,VALUE FROM `history` where ";
-     $sql .= "`DEVICE` LIKE '$device' AND " if($device);
-     $sql .= "`READING` LIKE '$reading' AND " if($reading); 
-     $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;"; 
+     my $runtime_string_next   = $a[2];  
+
+     $runtime_string = encode_base64($runtime_string,""); 
      
      # SQL zusammenstellen für Logausgabe
-     my $sql1 = "SELECT TIMESTAMP,VALUE FROM `history` where ";
+     my $sql1 = "SELECT ... where ";
      $sql1 .= "`DEVICE` LIKE '$device' AND " if($device);
      $sql1 .= "`READING` LIKE '$reading' AND " if($reading); 
      $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
      
-     $runtime_string = encode_base64($runtime_string,"");
-     my $sth = $dbh->prepare($sql);   
-     
-     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
-     
+     eval {$dbh->do("set \@V:= 0, \@diff:= 0, \@diffTotal:= 0, \@RB:= 1;");};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|''|''|$err";
+     }
+ 
+     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+         return "$name|''|$device|$reading|''|''|''|$err";
      } else {
-         my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+         my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]." ".$_ -> [2]."\n" } @{ $sth->fetchall_arrayref() };
          
          if(!@array) {
              if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -1830,7 +1838,7 @@ sub diffval_DoParse($) {
              }
          }
          push(@row_array, @array);
-     }    
+     }  
  }
  
  # SQL-Laufzeit ermitteln
@@ -1840,29 +1848,31 @@ sub diffval_DoParse($) {
   
  Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
  
-  # ----- Berechnung diffValue aus Ergebnishash -------
-  my %rh = ();
+  # Berechnung diffValue aus Selektionshash
+  my %rh = ();                    # Ergebnishash, wird alle Ergebniszeilen enthalten
+  my %ch = ();                    # counthash, enthält die Anzahl der verarbeiteten Datasets pro runtime_string
   my $lastruntimestring;
   my $i = 1;
-  my $fe;                         # Startelement Value
-  my $le;                         # letztes Element Value
+  my $diff_current;               # Differenzwert des aktuellen Datasets 
+  my $diff_before;                # Differenzwert vorheriger Datensatz
+  my $rejectstr;                  # String der ignorierten Differenzsätze
+  my $diff_total;                 # Summenwert aller berücksichtigten Teildifferenzen
   my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
 
   Log3 ($name, 5, "DbRep $name - data of row_array result assigned to fields:\n");
   
+  my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)
+  
   foreach my $row (@row_array) {
-      my @a = split("[ \t][ \t]*", $row, 4);
+      my @a = split("[ \t][ \t]*", $row, 6);
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
-      
-      my $value          = $a[3]?$a[3]:0;  
-      
-      $a[2]              =~ s/:/-/g if($a[2]);          # substituieren unsupported characters -> siehe fhem.pl
       my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
+      my $value          = $a[3]?$a[3]:0;  
+      my $diff           = $a[4]?sprintf("%.4f",$a[4]):0;    
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
-      
       
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
@@ -1870,47 +1880,65 @@ sub diffval_DoParse($) {
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-          return "$name|''|$device|$reading|''|$err";
+          return "$name|''|$device|$reading|''|''|''|$err";
       }
 
-      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
-             
+      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, \nTIMESTAMP: $timestamp, VALUE: $value, DIFF: $diff");
+      
+	  # String ignorierter Zeilen erzeugen 
+	  $diff_current = $timestamp." ".$diff;
+	  if($diff > $difflimit) {
+	      $rejectstr .= $diff_before." -> ".$diff_current."\n";
+	  }
+	  $diff_before = $diff_current;
+	  
+	  # Ergebnishash erzeugen
       if ($runtime_string eq $lastruntimestring) {
           if ($i == 1) {
-              $fe = $value;
-              $le = $value;
+			  $diff_total = $diff?$diff:0 if($diff <= $difflimit);
+              $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp; 	
+              $ch{$runtime_string} = 1 if($value);			  
           }
           
-          if ($value >= $le) {
-              $le    = $value;
-              my $diff  = $le - $fe;
-              
-              $rh{$runtime_string} = $runtime_string."|".$diff."|".$timestamp;            
+          if ($diff) {
+		      if($diff <= $difflimit) {
+                  $diff_total = $diff_total+$diff;
+			  }
+              $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
+              $ch{$runtime_string}++ if($value && $i > 1);			  
           }
       } else {
           # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
           $lastruntimestring = $runtime_string;
           $i  = 1;
-          $fe = $value;
-          $le = $value;
-          
-          if ($value >= $le) {
-              $le    = $value;
-              my $diff  = $le - $fe;
-              
-              $rh{$runtime_string} = $runtime_string."|".$diff."|".$timestamp;
-          }
-      }
+          $diff_total = $diff?$diff:0 if($diff <= $difflimit);
+          $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
+          $ch{$runtime_string} = 1 if($value);			  
+      } 
       $i++;
   }
-  # ------------------------------------------------------------------------------
   
- Log3 ($name, 5, "DbRep $name - result of diffValue calculation before encoding:");
+ Log3 ($name, 4, "DbRep $name - result of diffValue calculation before encoding:");
  foreach my $key (sort(keys(%rh))) {
-     Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
+     Log3 ($name, 4, "runtimestring Key: $key, value: ".$rh{$key}); 
  }
-     
+ 
+ my $ncp = calcount($hash,\%ch);
+ 
+ my ($ncps,$ncpslist);
+ if(%$ncp) {
+     Log3 ($name, 3, "DbRep $name - time/aggregation periods containing only one dataset -> no diffValue calc was possible in period:");
+     foreach my $key (sort(keys%{$ncp})) {
+         Log3 ($name, 3, $key) ;
+     }
+ $ncps = join('§', %$ncp);	
+ $ncpslist = encode_base64($ncps,""); 
+ }
+  
  # Ergebnishash als Einzeiler zurückgeben
+ # ignorierte Zeilen ($diff > $difflimit)
+ my $rowsrej      = encode_base64($rejectstr,"") if($rejectstr);
+ # Ergebnishash  
  my $rows = join('§', %rh); 
  my $rowlist = encode_base64($rows,"");
   
@@ -1921,7 +1949,7 @@ sub diffval_DoParse($) {
  
  $rt = $rt.",".$brt;
  
- return "$name|$rowlist|$device|$reading|$rt|0";
+ return "$name|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|0";
 }
 
 ####################################################################################################
@@ -1937,11 +1965,14 @@ sub diffval_ParseDone($) {
   my $device     = $a[2];
      $device     =~ s/%/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/%/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $rowsrej    = $a[5]?decode_base64($a[5]):undef;     # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
+  my $ncpslist   = decode_base64($a[6]);                 # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period" 
+  my $err        = $a[7]?decode_base64($a[7]):undef;
   my $reading_runtime_string;
+  my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
   
@@ -1952,30 +1983,51 @@ sub diffval_ParseDone($) {
       Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
       return;
   }
+
+ # only for this block because of warnings if details of readings are not set
+ no warnings 'uninitialized'; 
  
+ # Auswertung hashes für state-Warning
+ $rowsrej =~ s/_/ /g;
+ Log3 ($name, 3, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
+          if($rowsrej);
+ $rowsrej =~ s/\n/ \|\| /g;
+ 
+ my %ncp    = split("§", $ncpslist);
+ my $ncpstr;
+ if(%ncp) {
+     foreach my $ncpkey (sort(keys(%ncp))) {
+         $ncpstr .= $ncpkey." || ";    
+     }
+ }
+ 
+# my $warn;
+# $warn .= "Warning - " if($rowsrej||$ncpstr);
+# $warn .= "at least in one period only one dataset exists" if ($ncpstr);
+# $warn .= " || " if($ncpstr && $rowsrej);
+# $warn .= "one or more differences overrun diffAccept-limit" if ($rowsrej);
+ 
+ # Readingaufbereitung
  my %rh = split("§", $rowlist);
  
- Log3 ($name, 5, "DbRep $name - result of diffValue calculation after decoding:");
+ Log3 ($name, 4, "DbRep $name - result of diffValue calculation after decoding:");
  foreach my $key (sort(keys(%rh))) {
-     Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
+     Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
  }
   
-  # Readingaufbereitung
-  readingsBeginUpdate($hash);
-  
-  # only for this block because of warnings if details of readings are not set
-  no warnings 'uninitialized'; 
+ readingsBeginUpdate($hash);
  
   foreach my $key (sort(keys(%rh))) {
       my @k    = split("\\|",$rh{$key});
-      my $rsf  = $k[2]."__";
+      my $rts  = $k[2]."__";
+	  $rts     =~ s/:/-/g;      # substituieren unsupported characters -> siehe fhem.pl
   
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
+          $reading_runtime_string = $rts.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
       } else {
           my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $rsf.$ds.$rds."DIFF__".$k[0];
+          my $rds  = $reading."__" if ($reading);                                   
+          $reading_runtime_string = $rts.$ds.$rds."DIFF__".$k[0];
       }
       my $rv = $k[1];
       readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
@@ -1983,7 +2035,9 @@ sub diffval_ParseDone($) {
   }
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));           
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  readingsBulkUpdate($hash, "diff-overrun_limit-".$difflimit, $rowsrej) if($rowsrej);
+  readingsBulkUpdate($hash, "not_enough_data_in_period", $ncpstr) if($ncpstr);
+  readingsBulkUpdate($hash, "state", ($ncpstr||$rowsrej)?"Warning":"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2912,17 +2966,10 @@ sub impfile_Push($) {
      
      # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
      if ($dbmodel ne 'SQLITE') {
-         if ($dbmodel eq 'POSTGRESQL') {
-             $i_device   = substr($i_device,0, $dbrep_col_postgre{DEVICE});
-             $i_reading  = substr($i_reading,0, $dbrep_col_postgre{READING});
-             $i_value    = substr($i_value,0, $dbrep_col_postgre{VALUE});
-             $i_unit     = substr($i_unit,0, $dbrep_col_postgre{UNIT}) if($i_unit);
-         } elsif ($dbmodel eq 'MYSQL') {
-             $i_device   = substr($i_device,0, $dbrep_col_mysql{DEVICE});
-             $i_reading  = substr($i_reading,0, $dbrep_col_mysql{READING});
-             $i_value    = substr($i_value,0, $dbrep_col_mysql{VALUE});
-             $i_unit     = substr($i_unit,0, $dbrep_col_mysql{UNIT}) if($i_unit);
-         }
+         $i_device   = substr($i_device,0, $dbrep_col{DEVICE});
+         $i_reading  = substr($i_reading,0, $dbrep_col{READING});
+         $i_value    = substr($i_value,0, $dbrep_col{VALUE});
+         $i_unit     = substr($i_unit,0, $dbrep_col{UNIT}) if($i_unit);
      }     
      
      Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
@@ -3464,6 +3511,29 @@ return $dstchange;
 }
 
 ####################################################################################################
+#                          Counthash Untersuchung 
+#  Logausgabe der Anzahl verarbeiteter Datensätze pro Zeitraum / Aggregation
+#  Rückgabe eines ncp-hash (no calc in period) mit den Perioden für die keine Differenz berechnet
+#  werden konnte weil nur ein Datensatz in der Periode zur Verfügung stand
+####################################################################################################
+sub calcount ($$) {
+ my ($hash,$ch) = @_;
+ my $name = $hash->{NAME};
+ my %ncp = (); 
+ 
+ Log3 ($name, 4, "DbRep $name - count of values used for calc:");
+ foreach my $key (sort(keys%{$ch})) {
+     Log3 ($name, 4, "$key => ". %$ch{$key});
+     
+	 if(%$ch{$key} eq "1") {
+	     $ncp{"$key"} = " ||";
+	 } 
+ }
+return \%ncp;
+}
+
+
+####################################################################################################
 #                 Test-Sub zu Testzwecken
 ####################################################################################################
 sub testexit ($) {
@@ -3499,15 +3569,9 @@ my $name = $hash->{NAME};
        }
        
     }
-     
-
-      # $sth->finish;
+    # $sth->finish;
    
-     
-     
-     
-    
-     $dbh->disconnect;
+    $dbh->disconnect;
  }
 return;
 }
@@ -3638,7 +3702,14 @@ return;
                                  
                                  <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
                                  # field lenth is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
-                                 </li> <br>
+                                 <br>
+								 
+								 <b>Note: </b><br>
+                                 Please consider to insert AT LEAST two datasets into the intended time / aggregatiom period (day, week, month, etc.) because of
+								 it's needed by function diffValue. Otherwise no difference can be calculated and diffValue will be print out "0" for the respective period !
+                                 <br>
+                                 <br>
+								 </li>
                                  </ul>
                                  
     <li><b> importFromFile </b> - imports datasets in CSV format from file into database. The filename will be set by <a href="#DbRepattr">attribute</a> "expimpfile". <br><br>
@@ -3668,9 +3739,23 @@ return;
     <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
                                  This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
-                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the specified time linits/aggregation. </li> <br>
+                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
+								 specified time linits/aggregation. 
+								 An possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br>
+								 If only one dataset will be found within the evalution period, no difference can be calculated  
+								 and the reading "not_enough_data_in_period" with a list of concerned periods will be generated in that case. <br><br>
+								 
+                                 <ul>
+                                 <b>Note: </b><br>
+                                 Within the evaluation respectively aggregation period (day, week, month, etc.) AT LEAST two datasets per period MUST be 
+								 available for calulation. Otherwise no difference can be calculated and diffValue will be print "0" for the respective period !
+                                 <br>
+                                 <br>
+                                 </li>
+                                 </ul>
                                  
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
+    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
+	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
                                  
                                  <ul>
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
@@ -3797,6 +3882,26 @@ return;
   <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". Delivers e.g. the count of database entries for a day (countEntries), Summation of difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
   <li><b>device </b>          - selection of a particular device   </li> <br>
+  <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated difference between two 
+                                straight sequently datasets should be commenly accepted (default = 20). <br>
+                                Hence faulty DB entries with a disproportional high difference value will be eliminated and don't tamper the result.
+                                If a threshold overrun happens, the reading "diff-overrun_limit-&lt;diffLimit&gt;" will be generated 
+								(&lt;diffLimit&gt; will be substituted with the present prest attribute value). <br>
+								The reading contains a list of relevant pair of values. Using verbose=3 this list will also be reported in the FHEM
+                                logfile. 								
+								</li><br> 
+
+                              <ul>
+							  Example report in logfile if threshold of diffAccept=10 overruns: <br><br>
+							  
+                              DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
+							  2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
+							  
+                              # The first dataset with a value of 0.0340 is untypical low compared to the next value of 13.3440 and results a untypical
+							    high difference value. <br>
+							  # Now you have to decide if the (second) dataset should be deleted, ignored of the attribute diffAccept should be adjusted. 
+                              </ul><br> 
+							  
   <li><b>disable </b>         - deactivates the module  </li> <br>
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
@@ -3870,9 +3975,15 @@ return;
   In addition the following readings will be created: <br><br>
   
   <ul><ul>
+  <li><b>state                      </b>  - contains the current state of evaluation. If warnings are occured (state = Warning) compare Readings
+                                            "diff-overrun_limit-&lt;diffLimit&gt;" and "not_enough_data_in_period"  </li> <br>
   <li><b>errortext                  </b>     - description about the reason of an error state </li> <br>
   <li><b>background_processing_time </b>     - the processing time spent for operations in background/forked operation </li> <br>
   <li><b>sql_processing_time        </b>     - the processing time wasted for all sql-statements used for an operation </li> <br>
+  <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - contains a list of pairs of datasets which have overrun the threshold (&lt;diffLimit&gt;) 
+                                                     of calculated difference each other determined by attribute "diffAccept" (default=20). </li> <br>
+  <li><b>not_enough_data_in_period</b>    - contains a list of time periods within only one dataset was found and therefor no difference calculation 
+                                            could be done. Valid for function "diffValue". </li> <br>	
   </ul></ul>
   <br><br>
 
@@ -4014,7 +4125,7 @@ return;
 <ul>
 
  Zur Zeit gibt es folgende Set-Kommandos. Über sie werden die Auswertungen angestoßen und definieren selbst die Auswertungsvariante. 
- Nach welchen Kriterien die Datenbankinhalte durchsucht werden und die Aggregation erfolgt wird durch <a href="#DbRepattr">Attribute</a> gesteuert. 
+ Nach welchen Kriterien die Datenbankinhalte durchsucht werden und die Aggregation erfolgt, wird durch <a href="#DbRepattr">Attribute</a> gesteuert. 
  <br><br>
  
  <ul><ul>
@@ -4054,8 +4165,16 @@ return;
                                  # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
                                  <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # die Feldlänge ist maximal 32 (MySQL) bzw. 64 (POSTGRESQL) Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
-                                 </li> <br>
+                                 # die Feldlänge ist maximal 64 Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
+                                 <br>
+								 
+								 <b>Hinweis: </b><br>
+                                 Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
+								 Datensätze für die Funktion diffValue zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue 
+								 gibt in diesem Fall "0" in der betroffenen Periode aus !
+                                 <br>
+                                 <br>
+								 </li>
                                  </ul>
     
     <li><b> importFromFile </b> - importiert Datensätze im CSV-Format aus einem File in die Datenbank. Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br><br>
@@ -4088,9 +4207,21 @@ return;
                                  
     <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
-                                 Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. 
+                                 Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
                                  Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
-                                 Zeitgrenzen/Aggregation gebildet. </li> <br>
+                                 Zeitgrenzen/Aggregation gebildet. <br>
+								 Dabei wird ein Zählerüberlauf (Neubeginn bei 0) mit berücksichtigt (vergleiche <a href="#DbRepattr">Attribut</a> "diffAccept"). <br>
+								 Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann keine Differenz berechnet werden 
+								 und das Reading "not_enough_data_in_period" mit einer Liste der betroffenen Perioden wird erzeugt. <br><br>
+								 
+                                 <ul>
+                                 <b>Hinweis: </b><br>
+                                 Im Auswertungs- bzw. Aggregationszeitraum (Tag, Woche, Monat, etc.) MÜSSEN dem Modul pro Periode MINDESTENS zwei 
+								 Datensätze zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue ergibt in diesem Fall "0" !
+                                 <br>
+                                 <br>
+                                 </li>
+                                 </ul>
     
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt folgendermaßen: <br><br>
                                  
@@ -4220,6 +4351,25 @@ return;
   <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tages,Kalenderwochen,Kalendermonaten oder "no". Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summation von Differenzwerten eines Readings (sumValue), usw. Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum sondern die Ausgabe ergibt alle Werte eines Device/Readings zwischen den definierten Zeiträumen.  </li> <br>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
+  <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
+                                zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden soll (Standard ist 20). <br>
+								Damit werden fehlerhafte DB-Einträge mit einem unverhältnismäßig hohen Differenzwert von der Berechnung ausgeschlossen und 
+								verfälschen nicht das Ergebnis. Sollten Schwellenwertüberschreitungen vorkommen, wird das Reading "diff-overrun_limit-&lt;diffLimit&gt;"
+								erstellt. (&lt;diffLimit&gt; wird dabei durch den aktuellen Attributwert ersetzt) 
+								Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
+								</li> <br> 
+
+                              <ul>
+							  Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10: <br><br>
+							  
+                              DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
+							  2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
+							  
+                              # Der erste Datensatz mit einem Wert von 0.0340 ist untypisch gering zum nächsten Wert 13.3440 und führt zu einem zu hohen
+							    Differenzwert. <br>
+							  # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte. 
+                              </ul><br> 
+							  
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>              
@@ -4286,15 +4436,22 @@ return;
 
 <br>
 <ul>
-  Abhängig von der ausgeführten DB-Operation werden die Ergebnisse in entsrechnden Readings dargestellt. Zu Beginn einer neuen Operation werden alle alten Readings
+  Abhängig von der ausgeführten DB-Operation werden die Ergebnisse in entsrechenden Readings dargestellt. Zu Beginn einer neuen Operation werden alle alten Readings
   einer vorangegangenen Operation gelöscht um den Verbleib unpassender bzw. ungültiger Readings zu vermeiden.  <br><br>
   
   Zusätzlich werden folgende Readings erzeugt: <br><br>
   
   <ul><ul>
+  <li><b>state                      </b>  - enthält den aktuellen Status der Auswertung. Wenn Warnungen auftraten (state = Warning) vergleiche Readings
+                                            "diff-overrun_limit-&lt;diffLimit&gt;" und "not_enough_data_in_period"  </li> <br>
   <li><b>errortext                  </b>  - Grund eines Fehlerstatus </li> <br>
   <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
   <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
+  <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - enthält eine Liste der Wertepaare die eine durch das Attribut "diffAccept" festgelegte Differenz
+                                                     &lt;diffLimit&gt; (Standard: 20) überschreiten. Gilt für Funktion "diffValue". </li> <br>
+  <li><b>not_enough_data_in_period</b>    - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde und dadurch keine 
+                                            Differenzberechnung durchgeführt werden konnte.  Gilt für Funktion "diffValue". </li> <br>													 
+													
   </ul></ul>
   <br>
 
