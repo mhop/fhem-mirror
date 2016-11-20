@@ -473,9 +473,9 @@ my %zwave_class = (
     set   => { mcaAdd      => "01%02x%02x*",
                mcaDel      => "04%02x*" },
     get   => { mca         => "02%02x",
-               mcaGroupings=> "05" },
-    parse => { "..8e03(..)(..)(.*)" =>
-                '"mca_".hex($1).":max:".hex($2)." param:".hex($3)',
+               mcaGroupings=> "05",
+               mcaAll      => 'ZWave_mcaAllGet($hash,"")' },
+    parse => { "..8e03(..)(..)..(.*)" => 'ZWave_mcaReport($homeId,$1,$2,$3)',
                "..8e06(.*)"=> '"mcaSupportedGroupings:".hex($1)' } },
 
   MULTI_CMD                => { id => '8f' }, # Handled in Parse
@@ -2986,6 +2986,28 @@ ZWave_associationAllGet($$)
   return;
 }
 
+sub
+ZWave_mcaAllGet($$)
+{
+  my ($hash, $data) = @_;
+
+  if(!$data) { # called by the user
+    $zwave_parseHook{"$hash->{nodeIdHex}:..8e"} = \&ZWave_mcaAllGet;
+    delete($hash->{CL});
+    ZWave_Get($hash, $hash->{NAME}, "mcaGroupings");
+    return("working in the background", "EMPTY");
+  }
+
+  my $nGrp = ($data =~ m/..8e06(..)/ ? hex($1) :
+                ReadingsVal($hash->{NAME}, "mcaSupportedGroupings", 0));
+  my $grp = 0;
+  $grp = hex($1) if($data =~ m/..8e03(..)/);
+  return if($grp >= $nGrp);
+  $zwave_parseHook{"$hash->{nodeIdHex}:..8e"} = \&ZWave_mcaAllGet;
+  ZWave_Get($hash, $hash->{NAME}, "mca", $grp+1);
+  return;
+}
+
 my %zwave_roleType = (
   "00"=>"CentralStaticController",
   "01"=>"SubStaticController",
@@ -3056,6 +3078,30 @@ ZWave_assocGroup($$$$)
            ($nodes =~ m/../g));
   return sprintf("assocGroup_%d:Max %d Nodes %s", hex($gId),hex($max), $nodes);
 }
+
+sub
+ZWave_mcaReport($$$$)
+{
+  my ($homeId, $gId, $max, $arg) = @_;
+  my %list = map { $defs{$_}{nodeIdHex} => $_ }
+             grep { $defs{$_}{homeId} && $defs{$_}{homeId} eq $homeId }
+             keys %defs;
+  my $nodes="";
+  my $ep="";
+  my $marker = index($arg, "00");
+  if($marker<0) {
+    $nodes = substr($arg, 0, length($arg));
+  } else {
+    $nodes = substr($arg, 0, $marker);
+    $ep = substr($arg, $marker+2, length($arg));
+  }
+  $nodes = join(" ",
+           map { $list{$_} ? $list{$_} : "UNKNOWN_".hex($_); }
+           ($nodes =~ m/../g));
+  return sprintf("mca_%d:Max %d Nodes %s Endpoints %s",
+        hex($gId),hex($max), $nodes, $ep);
+}
+
 
 sub
 ZWave_CRC16($)
@@ -4372,7 +4418,7 @@ ZWave_Parse($$@)
     $arg = sprintf("%02x$2", length($2)/2);
   }
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V2
-    $ep = sprintf("%02x", hex($1) & 0x7f); # Forum #50176
+    $ep = sprintf("%02x", hex($1 ne "00" ? $1 : $2) & 0x7f); # Forum #50176
     if($ep ne "00") {
       $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
       $id = "$id$ep";
@@ -5241,7 +5287,7 @@ s2Hex($)
     return the number of association groups<br>
     </li>
   <li>associationAll<br>
-    request association info for all possibe groups.</li>
+    request association info for all possible groups.</li>
 
   <br><br><b>Class ASSOCIATION_GRP_INFO</b>
   <li>associationGroupName groupId<br>
@@ -5376,7 +5422,9 @@ s2Hex($)
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mca groupid<br>
     return the associations for the groupid. for the syntax of the returned
-    data see the mcaAdd command above.
+    data see the mcaAdd command above.</li>
+  <li>mcaAll<br>
+    request association info for all possible groupids.
     </li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
@@ -5612,7 +5660,7 @@ s2Hex($)
       Generate an an additional event for the RAW message.  Can be used if
       someone fears that critical notifies wont work, if FHEM changes the event
       text after an update.  </li>
-    <li>extendedAlarmReadings<br>
+    <li><a name="extendedAlarmReadings">extendedAlarmReadings</a><br>
       Some devices support more than one alarm type, this attribute
       selects which type of reading is used for the reports of the ALARM
       (or NOTIFICATION) class:<br>
