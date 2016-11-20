@@ -175,8 +175,10 @@ sub HUEBridge_fillBridgeInfo($$)
   $hash->{swversion} = $config->{swversion};
   $hash->{apiversion} = $config->{apiversion};
 
-  my @l = split( '\.', $config->{apiversion} );
-  $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
+  if( $hash->{apiversion} ) {
+    my @l = split( '\.', $config->{apiversion} );
+    $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
+  }
 
   if( !defined($config->{'linkbutton'})
       && !defined($attr{$name}{icon}) ) {
@@ -815,11 +817,16 @@ HUEBridge_Parse($$)
   if( my $utc = $config->{UTC} ) {
     substr( $utc, 10, 1, '_' );
 
-    my $localtime = $config->{localtime};
-    $localtime = TimeNow() if( $localtime eq 'none' );
-    substr( $localtime, 10, 1, '_' );
+    if( my $localtime = $config->{localtime} ) {
+      $localtime = TimeNow() if( $localtime eq 'none' );
+      substr( $localtime, 10, 1, '_' );
 
-    $hash->{helper}{offsetUTC} = SVG_time_to_sec($localtime) - SVG_time_to_sec($utc);
+      $hash->{helper}{offsetUTC} = SVG_time_to_sec($localtime) - SVG_time_to_sec($utc);
+
+    } else {
+      Log3 $name, 2, "$name: missing localtime configuration";
+
+    }
   }
 
   if( defined( $config->{swupdate} ) ) {
