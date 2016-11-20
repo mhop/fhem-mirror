@@ -67,7 +67,7 @@ loadOneDoc(mname, lang)
     ret = ret.replace(/Keine deutsche Hilfe gefunden!<br\/>/,'');
     ret = '<div id="FD_'+mname+'">'+ret+'</div>';
     ret = ret.replace(/target="_blank"/g, '');  // revert help URL rewrite
-    ret = ret.replace(/href=".*commandref.*.html#/g, 'href="#');
+    ret = ret.replace(/href=".*?commandref.*?.html#/g, 'href="#');
 
     if(fd_loadedHash[mname])
       $("div#FD_"+mname).remove();
