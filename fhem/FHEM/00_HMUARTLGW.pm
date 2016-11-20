@@ -732,13 +732,13 @@ sub HMUARTLGW_ParsePeer($$) {
 		$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = "assigned";
 		$hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}} = substr($msg, 12);
 		$hash->{Helper}{UpdatePeer}{aes} = $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}};
-		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
+		Log3($hash, HMUARTLGW_getVerbLvl($hash, $hash->{Helper}{UpdatePeer}->{id}, $hash->{Helper}{UpdatePeer}->{id}, 4),
 			"HMUARTLGW $hash->{NAME} added peer: " . $hash->{Helper}{UpdatePeer}->{id} .
 			", aesChannels: " . $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
 	} else {
 		delete($hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}});
 		delete($hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
-		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
+		Log3($hash, HMUARTLGW_getVerbLvl($hash, $hash->{Helper}{UpdatePeer}->{id}, $hash->{Helper}{UpdatePeer}->{id}, 4),
 			"HMUARTLGW $hash->{NAME} remove peer: ". $hash->{Helper}{UpdatePeer}->{id});
 	}
 }
