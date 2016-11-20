@@ -164,7 +164,7 @@ sub HMUARTLGW_GetSetParameterReq($);
 sub HMUARTLGW_getAesKeys($);
 sub HMUARTLGW_updateMsgLoad($$);
 sub HMUARTLGW_Read($);
-sub HMUARTLGW_send($$$);
+sub HMUARTLGW_send($$$;$);
 sub HMUARTLGW_send_frame($$);
 sub HMUARTLGW_crc16($;$);
 sub HMUARTLGW_encrypt($$);
@@ -695,7 +695,7 @@ sub HMUARTLGW_UpdatePeerReq($;$) {
 	}
 
 	if ($msg) {
-		HMUARTLGW_send($hash, $msg, HMUARTLGW_DST_APP);
+		HMUARTLGW_send($hash, $msg, HMUARTLGW_DST_APP, $peer->{id});
 		RemoveInternalTimer($hash);
 		InternalTimer(gettimeofday()+HMUARTLGW_CMD_TIMEOUT, "HMUARTLGW_CheckCmdResp", $hash, 0);
 	}
@@ -1102,7 +1102,7 @@ sub HMUARTLGW_Parse($$$$)
 			my $running = pack("H*", substr($msg, 2));
 
 			if ($hash->{DevState} <= HMUARTLGW_STATE_ENTER_APP) {
-				Log3($hash, 3, "HMUARTLGW ${name} currently running ${running}");
+				Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4), "HMUARTLGW ${name} currently running ${running}");
 
 				if ($running eq "Co_CPU_App") {
 					$hash->{DevState} = HMUARTLGW_STATE_GETSET_PARAMETERS;
@@ -1135,7 +1135,7 @@ sub HMUARTLGW_Parse($$$$)
 			if ($ack eq HMUARTLGW_ACK_INFO && $hash->{DevState} == HMUARTLGW_STATE_QUERY_APP) {
 				my $running = pack("H*", substr($msg, 4));
 
-				Log3($hash, 3, "HMUARTLGW ${name} currently running ${running}");
+				Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4), "HMUARTLGW ${name} currently running ${running}");
 
 				if ($running eq "Co_CPU_App") {
 					#Reset module
@@ -1966,9 +1966,9 @@ sub HMUARTLGW_updateMsgLoad($$) {
 	}
 }
 
-sub HMUARTLGW_send($$$)
+sub HMUARTLGW_send($$$;$)
 {
-	my ($hash, $msg, $dst) = @_;
+	my ($hash, $msg, $dst, $peer) = @_;
 	my $name = $hash->{NAME};
 
 	my $log;
@@ -1997,7 +1997,7 @@ sub HMUARTLGW_send($$$)
 		$v = HMUARTLGW_getVerbLvl($hash, undef, undef, 5);
 	} else {
 		$log = sprintf("%02X", $dst). " ".uc($msg);
-		$v = HMUARTLGW_getVerbLvl($hash, undef, undef, 5);
+		$v = HMUARTLGW_getVerbLvl($hash, $peer, $peer, 5);
 	}
 
 	Log3($hash, $v, "HMUARTLGW ${name} send: ${log}");
