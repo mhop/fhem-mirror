@@ -202,7 +202,7 @@ sub GEOFANCY_CGI() {
             $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
             my ( $p, $v ) = split( "=", $pv, 2 );
 
-            $webArgs->{$p} = $v;
+            $webArgs->{$p} = trim($v);
         }
 
         # validate id
