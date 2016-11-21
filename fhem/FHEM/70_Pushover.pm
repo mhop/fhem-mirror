@@ -59,7 +59,7 @@ use Encode;
 
 no if $] >= 5.017011, warnings => 'experimental';
 
-my %sets = ( "msg" => 1 );
+my %sets = ( "msg" => 1, "glance" => 1 );
 
 #------------------------------------------------------------------------------
 sub Pushover_Initialize($$) {
@@ -172,6 +172,7 @@ sub Pushover_Undefine($$) {
 #------------------------------------------------------------------------------
 sub Pushover_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
+    my ( $a, $h ) = parseParams( join " ", @args );
 
     if ( !defined( $sets{$cmd} ) ) {
         return
@@ -190,8 +191,16 @@ sub Pushover_Set($@) {
     return "Unable to send message: App token is invalid"
       if ( ReadingsVal( $name, "tokenState", "valid" ) eq "invalid" );
 
+    return Pushover_SetMessage2( $hash, $cmd, $a, $h )
+      if (
+        $cmd eq 'glance'
+        || ( $cmd eq 'msg'
+            && ( join( " ", @args ) !~ /^(".*"|'.*').*$/ || defined($h) ) )
+      );
+
     return Pushover_SetMessage( $hash, @args )
       if ( $cmd eq 'msg' );
+
 }
 
 #------------------------------------------------------------------------------
@@ -1022,6 +1031,300 @@ sub Pushover_SetMessage {
 "Syntax: $name msg ['<title>'] '<msg>' ['<device>' <priority> '<sound>' "
               . "[<retry> <expire> ['<url_title>' '<action>']]]";
         }
+    }
+}
+
+#------------------------------------------------------------------------------
+sub Pushover_SetMessage2 ($$$$) {
+    my ( $hash, $cmd, $a, $h ) = @_;
+    my $name   = $hash->{NAME};
+    my %values = ();
+
+    # general values
+    $values{title} =
+      $h->{title} ? $h->{title} : AttrVal( $hash->{NAME}, "title", "" );
+    $values{device} =
+      $h->{device} ? $h->{device} : AttrVal( $hash->{NAME}, "device", "" );
+
+    # message only
+    $values{message} = join ' ', @$a if ( $cmd eq "msg" );
+    $values{priority} =
+      $h->{priority} ? $h->{priority} : AttrVal( $hash->{NAME}, "priority", 0 );
+    $values{sound} =
+      $h->{sound} ? $h->{sound} : AttrVal( $hash->{NAME}, "sound", "" );
+    $values{retry}     = $h->{retry}     ? $h->{retry}     : "";
+    $values{expire}    = $h->{expire}    ? $h->{expire}    : "";
+    $values{url_title} = $h->{url_title} ? $h->{url_title} : "";
+    $values{action}    = $h->{action}    ? $h->{action}    : "";
+
+    # glances only
+    $values{text} = join ' ', @$a if ( $cmd eq "glance" );
+    $values{subtext} = $h->{subtext} ? $h->{subtext} : undef;
+    $values{count}   = $h->{count}   ? $h->{count}   : undef;
+    $values{percent} = $h->{percent} ? $h->{percent} : undef;
+
+    my $callback = (
+        defined( $attr{$name}{callbackUrl} )
+          && defined( $hash->{fhem}{infix} )
+        ? $attr{$name}{callbackUrl}
+        : ""
+    );
+
+    # check if we got a user or group key as device and use it as
+    # user-key instead of hash->USER_KEY
+    if ( $values{device} =~ /^([A-Za-z0-9]{30})?:?([A-Za-z0-9_-]*)?(.*)?$/ ) {
+        $values{USER_KEY} = $1 if ( $1 ne "" );
+        $values{device} = $2;
+
+        return $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} }
+          if ( $values{USER_KEY}
+            && defined( $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} } )
+          );
+    }
+
+    # Check if all mandatory arguments are filled:
+    # "message" can not be empty and if "priority" is set to "2" "retry" and
+    # "expire" must also be set.
+    # "url_title" and "action" need to be set together and require "expire"
+    # to be set as well.
+    if (
+        (
+               defined( $values{message} )
+            || defined( $values{text} )
+            || defined( $values{subtext} )
+            || defined( $values{count} )
+            || defined( $values{percent} )
+        )
+        && ( ( $values{retry} ne "" && $values{expire} ne "" )
+            || $values{priority} < 2 )
+        && (
+            (
+                   $values{url_title} ne ""
+                && $values{action} ne ""
+                && $values{expire} ne ""
+            )
+            || ( $values{url_title} eq "" && $values{action} eq "" )
+        )
+      )
+    {
+        my $body;
+        $body = "title=" . urlEncode( $values{title} )
+          if ( $values{title} ne "" );
+
+        if (   $values{message}
+            && $values{message} =~
+            /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/
+            && $values{message} !~ /^nohtml:.*/ )
+        {
+            Log3 $name, 4, "Pushover $name: handling message with HTML content";
+            $body = $body . "&html=1";
+
+            # replace \n by <br /> but ignore \\n
+            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
+        }
+
+        elsif ( $values{message} && $values{message} =~ /^nohtml:.*/ ) {
+            Log3 $name, 4,
+              "Pushover $name: explicitly ignoring HTML tags in message";
+            $values{message} =~ s/^(nohtml:).*//;
+        }
+
+        if ( $values{message} ) {
+
+            # HttpUtil's urlEncode() does not handle \n but would escape %
+            # so we encode first
+            $values{message} = urlEncode( $values{message} );
+
+           # replace any URL-encoded \n with their hex equivalent but ignore \\n
+            $values{message} =~ s/(?<!%5c)(%5cn)/%0a/g;
+
+            # replace any URL-encoded \\n by \n
+            $values{message} =~ s/%5c%5cn/%5cn/g;
+
+            $body = $body . "&message=" . $values{message};
+        }
+
+        elsif ( $values{text} ) {
+
+            # HttpUtil's urlEncode() does not handle \n but would escape %
+            # so we encode first
+            $values{text} = urlEncode( $values{text} );
+
+           # replace any URL-encoded \n with their hex equivalent but ignore \\n
+            $values{text} =~ s/(?<!%5c)(%5cn)/%0a/g;
+
+            # replace any URL-encoded \\n by \n
+            $values{text} =~ s/%5c%5cn/%5cn/g;
+
+            $body = $body . "&text=" . $values{text};
+        }
+
+        if ( $values{subtext} ) {
+
+            # HttpUtil's urlEncode() does not handle \n but would escape %
+            # so we encode first
+            $values{subtext} = urlEncode( $values{subtext} );
+
+           # replace any URL-encoded \n with their hex equivalent but ignore \\n
+            $values{subtext} =~ s/(?<!%5c)(%5cn)/%0a/g;
+
+            # replace any URL-encoded \\n by \n
+            $values{subtext} =~ s/%5c%5cn/%5cn/g;
+
+            $body = $body . "&subtext=" . $values{subtext};
+        }
+
+        if ( defined( $values{count} )
+            && looks_like_number( $values{percent} ) )
+        {
+            $body = $body . "&count=" . $values{count};
+        }
+
+        if (   defined( $values{percent} )
+            && looks_like_number( $values{percent} )
+            && $values{percent} >= 0
+            && $values{percent} <= 100 )
+        {
+            $body = $body . "&percent=" . $values{percent};
+        }
+
+        if ( $values{device} ne "" ) {
+            $body = $body . "&device=" . $values{device};
+        }
+
+        if ( $values{priority} ne "" ) {
+            $values{priority} = 2  if ( $values{priority} > 2 );
+            $values{priority} = -2 if ( $values{priority} < -2 );
+            $body = $body . "&priority=" . $values{priority};
+        }
+
+        if ( $values{sound} ne "" ) {
+            $body = $body . "&sound=" . $values{sound};
+        }
+
+        if ( $values{retry} ne "" ) {
+            $body = $body . "&retry=" . $values{retry};
+        }
+
+        if ( $values{expire} ne "" ) {
+            $body = $body . "&expire=" . $values{expire};
+
+            $values{cbNr} = int( time() ) + $values{expire};
+            my $cbReading = "cb_" . $values{cbNr};
+            until ( ReadingsVal( $name, $cbReading, "" ) eq "" ) {
+                $values{cbNr}++;
+                $cbReading = "cb_" . $values{cbNr};
+            }
+        }
+
+        if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
+            $body = $body . "&timestamp=" . int( time() );
+        }
+
+        if ( $callback ne "" && $values{priority} > 1 ) {
+            Log3 $name, 5,
+              "Pushover $name: Adding emergency callback URL $callback";
+            $body = $body . "&callback=" . $callback;
+        }
+
+        if (   $values{url_title} ne ""
+            && $values{action} ne ""
+            && $values{expire} ne "" )
+        {
+            my $url;
+
+            if (
+                $callback eq ""
+                || (   $values{action} !~ /^http[s]?:\/\/.*$/
+                    && $values{action} =~ /^[\w-]+:\/\/.*$/ )
+              )
+            {
+                $url = $values{action};
+                $values{expire} = "";
+            }
+            else {
+                $url =
+                    $callback
+                  . "?acknowledged=1&acknowledged_by="
+                  . $hash->{USER_KEY}
+                  . "&FhemCallbackId="
+                  . $values{cbNr};
+            }
+
+            Log3 $name, 5,
+"Pushover $name: Adding supplementary URL '$values{url_title}' ($url) with "
+              . "action '$values{action}' (expires after $values{expire} => "
+              . "$values{cbNr})";
+            $body =
+                $body
+              . "&url_title="
+              . urlEncode( $values{url_title} ) . "&url="
+              . urlEncode($url);
+        }
+
+        # cleanup callback readings
+        my $revReadings;
+        while ( ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            if ( $key =~ /^cb_\d+$/ ) {
+                my @rBase  = split( "_", $key );
+                my $rTit   = "cbTitle_" . $rBase[1];
+                my $rMsg   = "cbMsg_" . $rBase[1];
+                my $rPrio  = "cbPrio_" . $rBase[1];
+                my $rAct   = "cbAct_" . $rBase[1];
+                my $rAck   = "cbAck_" . $rBase[1];
+                my $rAckAt = "cbAckAt_" . $rBase[1];
+                my $rAckBy = "cbAckBy_" . $rBase[1];
+                my $rDev   = "cbDev_" . $rBase[1];
+
+                Log3 $name, 5,
+                    "Pushover $name: checking to clean up "
+                  . $hash->{NAME}
+                  . " $key: time="
+                  . $rBase[1] . " ack="
+                  . ReadingsVal( $name, $rAck, "-" )
+                  . " curTime="
+                  . int( time() );
+
+                if ( ReadingsVal( $name, $rAck, 0 ) == 1
+                    || $rBase[1] <= int( time() ) )
+                {
+                    delete $hash->{READINGS}{$key};
+                    delete $hash->{READINGS}{$rTit};
+                    delete $hash->{READINGS}{$rMsg};
+                    delete $hash->{READINGS}{$rPrio};
+                    delete $hash->{READINGS}{$rAck};
+                    delete $hash->{READINGS}{$rDev};
+
+                    if ( defined( $hash->{READINGS}{$rAct} ) ) {
+                        delete $hash->{READINGS}{$rAct};
+                    }
+                    if ( defined( $hash->{READINGS}{$rAckAt} ) ) {
+                        delete $hash->{READINGS}{$rAckAt};
+                    }
+                    if ( defined( $hash->{READINGS}{$rAckBy} ) ) {
+                        delete $hash->{READINGS}{$rAckBy};
+                    }
+
+                    Log3 $name, 4,
+                      "Pushover $name: cleaned up expired receipt " . $rBase[1];
+                }
+            }
+        }
+
+        Pushover_SendCommand( $hash, "messages.json", $body, %values )
+          if ( $cmd eq "msg" );
+        Pushover_SendCommand( $hash, "glances.json", $body, %values )
+          if ( $cmd eq "glance" );
+
+        return;
+    }
+    else {
+
+        # There was a problem with the arguments, so tell the user the
+        # correct usage of the 'set msg' command
+        return
+"Syntax: $name msg <msg> [ title='<title>' device='<device>' priority='<priority>' sound='<sound>' "
+          . "retry='<retry>' expire='<expire>' url_title='<url_title>' action='<action>' ]";
     }
 }
 
