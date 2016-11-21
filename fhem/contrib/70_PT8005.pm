@@ -751,6 +751,7 @@ sub PT8005_Set ($@) {
         </ul>
         <a name="PT8005set"></a>
         <h4>Set</h4>
+        <ul>
           <li><a name="pt8005_interval">
                     <code>set &lt;name&gt; interval &lt;value&gt;</code>
                 </a>
