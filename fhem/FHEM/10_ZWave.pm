@@ -3104,7 +3104,7 @@ ZWave_mcaReport($$$$)
     $ret .= " ".($step == 1 ? $n : ($n.":".hex($arg[$idx+1])));
   }
   return sprintf("mca_%d:Max %d %s",
-                hex($gId), hex($max), ($ret ? "Active$ret" : ""));
+                hex($gId), hex($max), ($ret ? "Nodes$ret" : ""));
 }
 
 
