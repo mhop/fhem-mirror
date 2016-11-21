@@ -3071,7 +3071,9 @@ ZWave_assocGroup($$$$)
 {
   my ($homeId, $gId, $max, $nodes) = @_;
   my %list = map { $defs{$_}{nodeIdHex} => $_ }
-             grep { $defs{$_}{homeId} && $defs{$_}{homeId} eq $homeId }
+             grep { $defs{$_}{homeId} && 
+                    $defs{$_}{nodeIdHex} &&
+                    $defs{$_}{homeId} eq $homeId }
              keys %defs;
   $nodes = join(" ",
            map { $list{$_} ? $list{$_} : "UNKNOWN_".hex($_); }
@@ -3084,22 +3086,25 @@ ZWave_mcaReport($$$$)
 {
   my ($homeId, $gId, $max, $arg) = @_;
   my %list = map { $defs{$_}{nodeIdHex} => $_ }
-             grep { $defs{$_}{homeId} && $defs{$_}{homeId} eq $homeId }
+             grep { $defs{$_}{homeId} && 
+                    $defs{$_}{nodeIdHex} &&
+                    $defs{$_}{homeId} eq $homeId }
              keys %defs;
-  my $nodes="";
-  my $ep="";
-  my $marker = index($arg, "00");
-  if($marker<0) {
-    $nodes = substr($arg, 0, length($arg));
-  } else {
-    $nodes = substr($arg, 0, $marker);
-    $ep = substr($arg, $marker+2, length($arg));
+
+  my ($ret, $step) = ("", 1);
+  my @arg = ($arg =~ m/../g);
+  for(my $idx = 0; $idx < @arg; $idx += $step) {
+    my $a = $arg[$idx];
+    if($step == 1 && $a eq "00") {
+      $step = 2;
+      $idx--;
+      next;
+    }
+    my $n = ($list{$a} ? $list{$a} : sprintf("UNKNOWN_%d", hex($a)));
+    $ret .= " ".($step == 1 ? $n : ($n.":".hex($arg[$idx+1])));
   }
-  $nodes = join(" ",
-           map { $list{$_} ? $list{$_} : "UNKNOWN_".hex($_); }
-           ($nodes =~ m/../g));
-  return sprintf("mca_%d:Max %d Nodes %s Endpoints %s",
-        hex($gId),hex($max), $nodes, $ep);
+  return sprintf("mca_%d:Max %d %s",
+                hex($gId), hex($max), ($ret ? "Active$ret" : ""));
 }
 
 
