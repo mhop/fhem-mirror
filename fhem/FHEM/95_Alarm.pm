@@ -2,7 +2,7 @@
 #
 # Alarm.pm
 #
-# FHEM module for house alarm
+# FHEM module to set up a house alarm system with 8 different alarm levels
 #
 # Prof. Dr. Peter A. Henning
 #
@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.6";
+my $alarmversion    = "2.8";
 
 #########################################################################################
 #
@@ -58,7 +58,7 @@ sub Alarm_Initialize ($) {
   $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
-  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none armdelay armwait armact disarmact cancelact";
+  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,none armdelay armwait armact disarmact cancelact";
   for( my $level=0;$level<$alarmno;$level++ ){
      $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact ";
   }
@@ -154,8 +154,21 @@ sub Alarm_CreateEntry($) {
 	     }	
       }
    }
+   #-- recover state from stored readings
+   for( my $level=0;$level<$alarmno;$level++ ){
+      my $val = $hash->{READINGS}{"level".$level}{VAL};
+        if( $val eq "disarmed" ){#
+          CommandAttr (undef,$name.' level'.$level.'xec disarmed');
+        }elsif( $val eq "armed" ){
+          CommandAttr (undef,$name.' level'.$level.'xec armed');
+        }else{
+          Log3 $hash,1,"[Alarm $level] has undefined save data, disarming";
+          CommandAttr (undef,$name.' level'.$level.'xec disarmed');
+        }
+   }
    my $mga = Alarm_getstate($hash)." Keine Störung";
    readingsSingleUpdate( $hash, "state", $mga, 1 );
+
 }
 
 #########################################################################################
@@ -228,10 +241,12 @@ sub Alarm_getstate($) {
   my ($hash) = @_;
   my $res = '';
   my $type = AttrVal($hash->{NAME},"statedisplay",0);
+  my $val;
   #--------------------------
   if( $type eq "simple" ){
      for( my $level=0;$level<$alarmno;$level++ ){
-        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+       $val = $hash->{READINGS}{"level".$level}{VAL};
+        if( ($val eq "disarmed")||($val eq "armed") ){
            $res.='O';
         }else{
            $res.='X';
@@ -241,7 +256,8 @@ sub Alarm_getstate($) {
   }elsif( $type eq "color" ){
      $res = '<span style="color:green">';
      for( my $level=0;$level<$alarmno;$level++ ){
-        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+        $val = $hash->{READINGS}{"level".$level}{VAL};
+        if( ($val eq "disarmed")||($val eq "armed") ){
            $res.=' '.$level;
         }else{
            $res.=' <span style="width:1ex;color:red">'.$level.'</span>';
@@ -252,7 +268,8 @@ sub Alarm_getstate($) {
   }elsif( $type eq "table" ){
      $res = '<table><tr style="height:1ex">';
      for( my $level=0;$level<$alarmno;$level++ ){
-        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+        $val = $hash->{READINGS}{"level".$level}{VAL};
+        if( ($val eq "disarmed")||($val eq "armed") ){
            $res.='<td style="width:1ex;background-color:green"/>';
         }else{
            $res.='<td style="width:1ex;background-color:red"/>';
@@ -295,7 +312,7 @@ sub Alarm_Exec($$$$$){
    #-- raising the alarm 
    if( $act eq "on" ){
       #-- only if this level is armed and not yet active
-      if( ($xec eq "armed") && ($xac eq "off") ){ 
+      if( ($xec eq "armed") && ($xac eq "armed") ){ 
          #-- check for time
          my $start = AttrVal($name, "level".$level."start", 0);
          if(  index($start, '{') != -1){
@@ -325,7 +342,7 @@ sub Alarm_Exec($$$$$){
      
          if( (($stp < $etp) && ($ntp <= $etp) && ($ntp >= $stp)) ||  (($stp > $etp) && (($ntp <= $etp) || ($ntp >= $stp))) ){  
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
-            @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
+            @sta = split('\|',  AttrVal($dev, "alarmSettings", ""));
             if( $sta[2] ){
               $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
               #-- replace some parts
@@ -338,11 +355,17 @@ sub Alarm_Exec($$$$$){
               #-- readings
               readingsSingleUpdate( $hash, "level".$level,$dev,0 );
               readingsSingleUpdate( $hash, "short", $mga, 0);
-              $mga = Alarm_getstate($hash)." ".$mga;
-              readingsSingleUpdate( $hash, "state", $mga, 1 );
+              $msg = Alarm_getstate($hash)." ".$mga;
+              readingsSingleUpdate( $hash, "state", $msg, 1 );
               $msg = "[Alarm $level] raised from device $dev with event $evt";
               #-- calling actors AFTER state update
               $cmd = AttrVal($name, "level".$level."onact", 0);
+              $cmd =~ s/\$NAME/$dev/g;
+              $cmd =~ s/\$EVENT/$evt/g;
+              $cmd =~ s/\$SHORT/$mga/g;
+              for( my $i=1;$i<= int(@evtpart);$i++){
+                 $cmd =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
+              }
               fhem($cmd); 
               Log3 $hash,3,$msg;
            }else{  
@@ -359,7 +382,7 @@ sub Alarm_Exec($$$$$){
       } 
    }elsif( ($act eq "off")||($act eq "cancel") ){
       #-- only if this level is active
-      if( $xac ne "off"){
+      if( ($xac ne "armed")&&($xac ne "disarmed") ){
          #-- deleting all running ats
          $dly = sprintf("alarm%1ddly",$level);
          foreach my $d (sort keys %intAt ) {
@@ -375,8 +398,8 @@ sub Alarm_Exec($$$$$){
          $cmd = AttrVal($name, "cancelact", 0);
          fhem($cmd)
            if( $cmd );
-         #-- readings
-         readingsSingleUpdate( $hash, "level".$level,"off",0 );
+         #-- readings - arm status does not change
+         readingsSingleUpdate( $hash, "level".$level,"armed",0 );
          $mga = " Level $level canceled";
          readingsSingleUpdate( $hash, "short", "", 0);
          $mga = Alarm_getstate($hash)." ".$mga;
@@ -418,7 +441,7 @@ sub Alarm_Arm($$$$$){
       my $cmdact  = AttrVal($name, "armact", 0);
       if( ($xdl eq '')|($xdl eq '0:00')|($xdl eq '00:00') ){
          CommandAttr(undef,$name.' level'.$level.'xec armed');
-         $msg = "[Alarm $level] armed from device $dev with event $evt"; 
+         $msg = "[Alarm $level] armed from alarmSensor $dev with event $evt"; 
          Log3 $hash,3,$msg; 
       } elsif( $xdl =~ /([0-9])?:([0-5][0-9])?/  ){
          CommandAttr(undef,$name.' level'.$level.'xec armwait');
@@ -434,8 +457,9 @@ sub Alarm_Arm($$$$$){
            }
          }
          #-- compose commands
-         $cmd = sprintf("define alarm%1d.arm.dly at +00:%02d:%02d {fhem(\"attr %s level%1dxec armed\");;%s}",$level,$1,$2,$name,$level,$cmdactf);
-         $msg = "[Alarm $level] will be armed from device $dev with event $evt, delay $xdl"; 
+         $cmd = sprintf("define alarm%1d.arm.dly at +00:%02d:%02d {fhem(\"setreading %s level%1d armed\");;fhem(\"attr %s level%1dxec armed\");;%s}",
+            $level,$1,$2,$name,$level,$name,$level,$cmdactf);
+         $msg = "[Alarm $level] will be armed from alarmSensor $dev with event $evt, delay $xdl"; 
          #-- delete old delayed arm
          fhem('delete alarm'.$level.'.arm.dly' )
            if( defined $defs{'alarm'.$level.'.arm.dly'});
@@ -455,8 +479,9 @@ sub Alarm_Arm($$$$$){
          if( defined $defs{'alarm'.$level.'.arm.dly'});
       CommandAttr (undef,$name.' level'.$level.'xec disarmed');
       Alarm_Exec($name,$level,"program","disarm","cancel");
+      readingsSingleUpdate( $hash, "level".$level,"disarmed",0 );
       #--
-      $msg = "[Alarm $level] disarmed from device $dev with event $evt";
+      $msg = "[Alarm $level] disarmed from alarmSensor $dev with event $evt";
       $cmd = AttrVal($name, "disarmact", 0);
       fhem("define alarm".$level.".disarm.T at +00:00:03 ".$cmd)
         if( $cmd ); 
@@ -557,19 +582,19 @@ sub Alarm_CreateNotifiers($){
            if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
               my @aval = split('\|',AttrVal($d, "alarmSettings",""));
               if( int(@aval) != 4){
-                 # Log3 $hash, 1, "[Alarm $level] Settings incomplete for sensor $d";
+                 Log3 $hash, 5, "[Alarm $level] Settings incomplete for alarmSensor $d";
                  next;
               }
               if( index($aval[0],"alarm".$level) != -1){
                  if( $aval[3] eq "on" ){
                     $cmd .= '('.$aval[1].')|';
-                    # Log3 $hash,1,"[Alarm $level] Adding sensor $d to raise notifier";
+                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to raise notifier";
                  }elsif( $aval[3] eq "arm" ){
                     $cmdarm .= '('.$aval[1].')|';
-                    #Log3 $hash,1,"[Alarm $level] Adding sensor $d to arm notifier";
+                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to arm notifier";
                  }elsif( $aval[3] eq "disarm" ){
                     $cmddisarm .= '('.$aval[1].')|';
-                    # Log3 $hash,1,"[Alarm $level] Adding sensor $d to disarm notifier";
+                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to disarm notifier";
                  }
               }
            }   
@@ -595,12 +620,12 @@ sub Alarm_CreateNotifiers($){
               if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
                  my @aval = split('\|',AttrVal($d, "alarmSettings",""));
                  if( int(@aval) != 4){
-                   Log3 $hash, 5, "[Alarm $level] Settings incomplete for actor $d";
+                   Log3 $hash, 5, "[Alarm $level] Settings incomplete for alarmActor $d";
                    next;
                  }
                  if( index($aval[0],"alarm".$level) != -1 ){
                     #-- activate without delay 
-                    if(( $aval[3] eq "0" )||($aval[3] eq "00:00")){
+                    if(( $aval[3] eq "0" )||($aval[3] eq "0:00")||($aval[3] eq "00:00")){
                        $cmd  .= $aval[1].';';
                     #-- activate with delay
                     } else {
@@ -705,17 +730,17 @@ sub Alarm_Html($)
     $ret .= "<tr class=\"odd\"><td class=\"col1\" colspan=\"4\"><table id=\"armtable\" border=\"0\">\n";
     $ret .= "<tr class==\"odd\"><td class=\"col1\" align=\"right\">Arm Button &#8608</td>";
     $ret .=                    "<td class=\"col2\" align=\"right\"> Wait Action ";
-    $ret .= sprintf("<input type=\"text\" id=\"armwait\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "armwait","")); 
+    $ret .= sprintf("<input type=\"text\" id=\"armwait\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "armwait","") eq "1")?"":AttrVal($name, "armwait","")); 
     $ret .=               "</td><td class=\"col3\" rowspan=\"2\"> &#8628 Delay <br> &#8626";
-    $ret .= sprintf("<input type=\"text\" id=\"armdelay\" size=\"4\" maxlength=\"5\" value=\"%s\"/>",AttrVal($name, "armdelay",""));
+    $ret .= sprintf("<input type=\"text\" id=\"armdelay\" size=\"4\" maxlength=\"5\" value=\"%s\"/>",(AttrVal($name, "armdelay","0:00") eq "1")?"":AttrVal($name, "armdelay","0:00"));
     $ret .=               "</td></tr>\n"; 
     $ret .= "<tr class==\"even\"><td class=\"col1\"></td><td class=\"col2\" align=\"right\">Arm Action ";
-    $ret .= sprintf("<input type=\"text\" id=\"armaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "armact","")); 
+    $ret .= sprintf("<input type=\"text\" id=\"armaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "armact","") eq "1")?"":AttrVal($name, "armact","")); 
     $ret .=               "</td></tr>\n";
     $ret .="<tr class==\"odd\"><td class=\"col1\">Disarm Button &#8608</td><td class=\"col2\" align=\"right\">Disarm Action ";
-    $ret .= sprintf("<input type=\"text\" id=\"disarmaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "disarmact","")); 
+    $ret .= sprintf("<input type=\"text\" id=\"disarmaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "disarmact","") eq "1")?"":AttrVal($name, "disarmact","")); 
     $ret .= "</td><td></td></tr><tr class==\"odd\"><td class=\"col1\">Cancel Button &#8608</td><td class=\"col2\" align=\"right\"> Cancel Action ";
-    $ret .= sprintf("<input type=\"text\" id=\"cancelaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "cancelact","")); 
+    $ret .= sprintf("<input type=\"text\" id=\"cancelaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "cancelact","") eq "1")?"":AttrVal($name, "cancelact","")); 
     $ret .= "</td><td></td></tr></table></td></tr>";
     $ret .= "<tr class=\"odd\"><td class=\"col1\">Level</td><td class=\"col2\">Time [hh:mm]</td><td class=\"col3\">Message Part II</td>".
             "<td class=\"col4\">Armed/Cancel</td></tr>\n";
@@ -752,7 +777,7 @@ sub Alarm_Html($)
        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
            my @aval = split('\|',AttrVal($d, "alarmSettings",""));
            if( int(@aval) != 4){
-             @aval=("","","","");
+             Log3 $hash, 1, "[Alarm] Settings incomplete for alarmSensor $d";
            }
            $row++;
            $ret .= sprintf("<tr class=\"%s\" informId=\"$d\" name=\"sensor\">", ($row&1)?"odd":"even");
@@ -781,8 +806,9 @@ sub Alarm_Html($)
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
-           my @aval = split('\|',AttrVal($d, "alarmSettings",""));
+           my @aval = split('\|',AttrVal($d, "alarmSettings","|||0:00"));
            if( int(@aval) != 4){
+             Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $d";
              @aval=("","","","");
            }
            $row++;
@@ -807,11 +833,13 @@ sub Alarm_Html($)
 1;
 
 =pod
+=item helper
+=item summary to set up a house alarm system with 8 different alarm levels
 =begin html
 
    <a name="Alarm"></a>
         <h3>Alarm</h3>
-        <p> FHEM module to set up a House Alarm System with 8 different alarm levels</p>
+        <p> FHEM module to set up a house alarm system with 8 different alarm levels</p>
         <a name="Alarmdefine"></a>
         <h4>Define</h4>
         <p>
@@ -863,12 +891,12 @@ sub Alarm_Html($)
                         simple,color,table,none</code></a>
                 <br />defines how the state of all eight alarm levels is shown. Example for the case
                 when only alarm no. 2 is raised: <ul>
-                    <li> simple=OOXOOOOO</li>
-                    <li> color=<span style="color:green"> 0 1 <span style="width:1ex;color:red"
+                    <li> simple = OOXOOOOO</li>
+                    <li> color = <span style="color:green"> 0 1 <span style="width:1ex;color:red"
                                 >2</span> 3 4 5 6 7</span></li>
-                    <li> table (ATTENTION: TABLE MOMENTARILY REMOVED)
+                    <li> table = HTML mini table with green and red fields for alarms
                     </li>
-                    <li> none=no state display</li>
+                    <li> none = no state display</li>
                 </ul>
             </li>
             <li><a name="alarm_armdelay"><code>attr &lt;name&gt; armdelay <i>mm:ss</i></code></a>

@@ -1,5 +1,7 @@
 //########################################################################################
 // alarm.js
+// Version 2.8
+// See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
 
@@ -42,6 +44,13 @@ function HashTable() {
             return typeof(this.items[in_key]) != 'undefined';
         }
     }
+    
+function encodeParm(oldval) {
+    var newval;
+    newval=oldval.replace('+', '%2B');
+    newval=newval.replace('#', '%23');
+    return newval;
+}
 
 var ah = new HashTable('l0s','','l0e','');
 
@@ -53,6 +62,7 @@ function alarm_setAttribute(name, attr, val) {//set Alarm Attribute
     if (location.substr(location.length-1,1) == '/') {location = location.substr(0,location.length-1);}
 	var url = document.location.protocol+"//"+document.location.host+location;
 	attr = attr.replace('+', '%2B');
+	val = val.replace('#', '%23');
 	FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' '+attr+' '+val);
 }
 
@@ -129,6 +139,7 @@ function alarm_set(name){
         val += "|"+sarr[k].children[2].children[1].value;
         val += "|"+sarr[k].children[3].children[0].options[sarr[k].children[3].children[0].selectedIndex].value;
         val = val.replace('+', '%2B');
+        val = val.replace('#', '%23');
         FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + val);
     }
     
@@ -147,6 +158,7 @@ function alarm_set(name){
         val += "|"+aarr[k].children[2].children[1].value;
         val += "|"+aarr[k].children[3].children[0].value;
         val = val.replace('+', '%2B');
+        val = val.replace('#', '%23');
         FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + val);
     }
     
