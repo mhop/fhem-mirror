@@ -476,7 +476,7 @@ my %zwave_class = (
                mcaGroupings=> "05",
                mcaAll      => 'ZWave_mcaAllGet($hash,"")' },
     parse => { "..8e03(..)(..)..(.*)" => 'ZWave_mcaReport($homeId,$1,$2,$3)',
-               "..8e06(.*)"=> '"mcaSupportedGroupings:".hex($1)' } },
+               "..8e06(.*)"=> '"mcaGroups:".hex($1)' } },
 
   MULTI_CMD                => { id => '8f' }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90' },
@@ -2999,7 +2999,7 @@ ZWave_mcaAllGet($$)
   }
 
   my $nGrp = ($data =~ m/..8e06(..)/ ? hex($1) :
-                ReadingsVal($hash->{NAME}, "mcaSupportedGroupings", 0));
+                ReadingsVal($hash->{NAME}, "mcaGroups", 0));
   my $grp = 0;
   $grp = hex($1) if($data =~ m/..8e03(..)/);
   return if($grp >= $nGrp);
