@@ -620,8 +620,8 @@ my $rtypes = {
             pl => [ 'error',  'ok', 'warning' ],
         },
         scope => [
-            '^(nok|error|dead|0)$',   '^(ok|alive|1)$',
-            '^(warning|warn|low|2)$', '^(.*)$'
+            '^(nok|error|dead|invalid|0)$', '^(ok|alive|valid|1)$',
+            '^(warning|warn|low|2)$',       '^(.*)$'
         ],
         rtype_description => {
             de =>
@@ -643,8 +643,8 @@ my $rtypes = {
             pl => [ 'error',  'ok', 'warning' ],
         },
         scope => [
-            '^(nok|error|dead|1)$',   '^(ok|alive|0)$',
-            '^(warning|warn|low|2)$', '^(.*)$'
+            '^(nok|error|dead|invalid|1)$', '^(ok|alive|valid|0)$',
+            '^(warning|warn|low|2)$',       '^(.*)$'
         ],
         rtype_description => {
             de =>
@@ -3125,7 +3125,10 @@ sub formatValue($$$;$$$$) {
     $lang = "en" if ( !$lang );
     my $value_num;
 
-    return $value if ( !defined($value) || ref($value) );
+    return $value
+      if (!defined($value)
+        || ref($value)
+        || AttrVal( $device, "showUnits", 1 ) eq "0" );
 
     $desc = readingsDesc( $device, $reading )
       if ( !$desc || !ref($desc) );
@@ -3159,62 +3162,62 @@ sub formatValue($$$;$$$$) {
               if ( defined( $scope->{empty_replace} ) );
         }
         elsif ( $scope->{min} && $scope->{max} ) {
-            if ( $value < $scope->{min} ) {
+            if ( abs($value) < $scope->{min} ) {
                 $value = $scope->{min}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is smaller than $scope->{min}";
             }
-            if ( $value > $scope->{max} ) {
+            if ( abs($value) > $scope->{max} ) {
                 $value = $scope->{max}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is higher than $scope->{max}";
             }
         }
         elsif ( $scope->{lt} && $scope->{gt} ) {
-            if ( $value < $scope->{lt} ) {
+            if ( abs($value) < $scope->{lt} ) {
                 $value = $scope->{lt}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is less than $scope->{lt}";
             }
-            if ( $value > $scope->{gt} ) {
+            if ( abs($value) > $scope->{gt} ) {
                 $value = $scope->{gt}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is greater than $scope->{gt}";
             }
         }
         elsif ( $scope->{le} && $scope->{ge} ) {
-            if ( $value <= $scope->{le} ) {
+            if ( abs($value) <= $scope->{le} ) {
                 $value = $scope->{le}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is less or equal than $scope->{le}";
             }
-            if ( $value >= $scope->{ge} ) {
+            if ( abs($value) >= $scope->{ge} ) {
                 $value = $scope->{ge}
                   if ( !$scope->{keep} || $scope->{strict} );
                 $log = "$value is geater or qual than $scope->{ge}";
             }
         }
-        elsif ( $scope->{min} && $value < $scope->{min} ) {
+        elsif ( $scope->{min} && abs($value) < $scope->{min} ) {
             $value = $scope->{min} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is smaller than $scope->{min}";
         }
-        elsif ( $scope->{lt} && $value < $scope->{lt} ) {
+        elsif ( $scope->{lt} && abs($value) < $scope->{lt} ) {
             $value = $scope->{lt} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is less than $scope->{lt}";
         }
-        elsif ( $scope->{max} && $value > $scope->{max} ) {
+        elsif ( $scope->{max} && abs($value) > $scope->{max} ) {
             $value = $scope->{max} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is higher than $scope->{max}";
         }
-        elsif ( $scope->{gt} && $value > $scope->{gt} ) {
+        elsif ( $scope->{gt} && abs($value) > $scope->{gt} ) {
             $value = $scope->{gt} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is greater than $scope->{gt}";
         }
-        elsif ( $scope->{ge} && $value >= $scope->{ge} ) {
+        elsif ( $scope->{ge} && abs($value) >= $scope->{ge} ) {
             $value = $scope->{ge} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is greater or equal than $scope->{ge}";
         }
-        elsif ( $scope->{le} && $value <= $scope->{le} ) {
+        elsif ( $scope->{le} && abs($value) <= $scope->{le} ) {
             $value = $scope->{le} if ( !$scope->{keep} || $scope->{strict} );
             $log = "$value is less or equal than $scope->{le}";
         }
@@ -3348,7 +3351,8 @@ sub formatValue($$$;$$$$) {
 
     return ( $txt, $txt_long, $value, $value_num ) if (wantarray);
     return $value
-      if ( defined( $desc->{showUnits} ) && $desc->{showUnits} eq "0" );
+      if ( ( defined( $desc->{showUnits} ) && $desc->{showUnits} eq "2" )
+        || AttrVal( $device, "showUnits", 1 ) eq "2" );
     return $txt_long
       if ( $desc->{showLong} && !$desc->{showShort} );
     return $txt;
@@ -3520,6 +3524,7 @@ sub makeSTATE($;$$) {
       if ( !$stateFormat );
     return '' if ( !$stateFormat );
 
+    my $txt;
     if ( $stateFormat =~ m/^{(.*)}$/ ) {
         $stateFormat = eval $1;
         if ($@) {
@@ -3529,15 +3534,38 @@ sub makeSTATE($;$$) {
     }
     else {
         my $r = $hash->{READINGS};
-        if ($withUnits) {
-            $stateFormat =~
-s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? readingsShortname($device,$1). ": ". formatReading($device,$1) : $1)/ge;
-        }
-        else {
-            $stateFormat =~
-s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? readingsShortname($device,$1). ": ". (formatReading($device,$1))[0] : $1)/ge;
+        my %usedShortnames;
+        while ( $stateFormat =~ /\b([A-Za-z\d_\.-]+):?([A-Za-z\d_\.-]+)?\b/g ) {
+            $txt .= " " if ($txt);
+
+            if ( defined( $r->{$1} ) ) {
+                my $sname = readingsShortname( $device, $1 );
+                $usedShortnames{$sname}++ if ( $usedShortnames{$sname} );
+                $usedShortnames{$sname} = 1 if ( !$usedShortnames{$sname} );
+                if ( $2 && $2 ne "" ) {
+                    $txt .= "$2: ";
+                }
+                elsif ( $usedShortnames{$sname} > 1 ) {
+                    $txt .= "$sname" . $usedShortnames{$sname} . ": ";
+                }
+                else {
+                    $txt .= "$sname: ";
+                }
+
+                if ($withUnits) {
+                    $txt .= formatReading( $device, $1 );
+                }
+                else {
+                    $txt .= ( formatReading( $device, $1 ) )[2];
+                }
+            }
+            else {
+                $txt .= $1;
+                $txt .= ":$2" if ($2);
+            }
         }
 
+        return $txt;
     }
 
     return $stateFormat;
