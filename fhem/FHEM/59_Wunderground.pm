@@ -700,6 +700,8 @@ sub Wunderground_Hash2Readings($$;$) {
                 }
 
                 $reading = "fc" . $period . "_";
+                $h->{fcttext_metric} =~ s/(\d)C/$1°C/g;
+                $h->{fcttext} =~ s/(\d)F/$1 °F/g;
 
                 readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
