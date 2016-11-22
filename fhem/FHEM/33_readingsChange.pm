@@ -126,7 +126,7 @@ readingsChangeExec($$)
       define pShort readingsChange pm power (.*W).* $1<br>
       <br>
       # format each decimal number in the power reading to 2 decimal places<br>
-      define p2dec readingsChange pm power (\d+\.\d+) {sprintf("%02.f", $1)}
+      define p2dec readingsChange pm power (\d+\.\d+) {sprintf("%0.2f", $1)}
     </code></ul>
   </ul>
   <br>
