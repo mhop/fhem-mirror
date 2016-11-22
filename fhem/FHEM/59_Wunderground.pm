@@ -473,6 +473,7 @@ sub Wunderground_ReceiveCommand($$$) {
 sub Wunderground_Hash2Readings($$;$) {
     my ( $hash, $h, $r ) = @_;
     my $name = $hash->{NAME};
+    my $lang = AttrVal( $name, "wu_lang", "en" );
     my $loop = 0;
     $loop = 1 if ( defined($r) );
 
@@ -708,12 +709,16 @@ sub Wunderground_Hash2Readings($$;$) {
                 readingsBulkUpdate( $hash, $reading . "icon_url$night",
                     $h->{icon_url} );
                 readingsBulkUpdate( $hash, $reading . "pop$night", $h->{pop} );
+                readingsBulkUpdate( $hash, $reading . "title$night",
+                    $h->{title} );
                 readingsBulkUpdate( $hash, $reading . "text$night",
                     $h->{fcttext_metric} );
                 readingsBulkUpdate( $hash, $reading . "text_f$night",
                     $h->{fcttext} );
-                readingsBulkUpdate( $hash, $reading . "title$night",
-                    $h->{title} );
+
+                $hash->{readingDesc}{"title$night"}{lang}  = $lang if ($lang);
+                $hash->{readingDesc}{"text$night"}{lang}   = $lang if ($lang);
+                $hash->{readingDesc}{"text_f$night"}{lang} = $lang if ($lang);
             }
 
             elsif ( ref( $h->{$k} ) eq "HASH" || ref( $h->{$k} ) eq "ARRAY" ) {
