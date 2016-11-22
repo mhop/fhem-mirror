@@ -92,6 +92,7 @@ CommandJsonList2($$)
     my $h = $defs{$d};
     my $n = $h->{NAME};
     next if(!$h || !$n);
+    $cnt++;
 
     my @r;
     if(!$attr) {
