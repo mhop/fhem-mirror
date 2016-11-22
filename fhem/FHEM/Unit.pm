@@ -26,9 +26,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Piko',
             en => 'Pico',
-            fr => 'Pico',
-            nl => 'Pico',
-            pl => 'Pico',
         },
     },
 
@@ -37,9 +34,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Nano',
             en => 'Nano',
-            fr => 'Nano',
-            nl => 'Nano',
-            pl => 'Nano',
         },
     },
 
@@ -48,9 +42,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Mikro',
             en => 'Micro',
-            fr => 'Micro',
-            nl => 'Micro',
-            pl => 'Micro',
         },
     },
 
@@ -59,9 +50,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Milli',
             en => 'Mili',
-            fr => 'Mili',
-            nl => 'Mili',
-            pl => 'Mili',
         },
     },
 
@@ -70,9 +58,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Zenti',
             en => 'Centi',
-            fr => 'Centi',
-            nl => 'Centi',
-            pl => 'Centi',
         },
     },
 
@@ -81,9 +66,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Dezi',
             en => 'Deci',
-            fr => 'Deci',
-            nl => 'Deci',
-            pl => 'Deci',
         },
     },
 
@@ -97,9 +79,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Deka',
             en => 'Deca',
-            fr => 'Deca',
-            nl => 'Deca',
-            pl => 'Deca',
         },
     },
 
@@ -108,9 +87,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Hekto',
             en => 'Hecto',
-            fr => 'Hecto',
-            nl => 'Hecto',
-            pl => 'Hecto',
         },
     },
 
@@ -119,9 +95,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Kilo',
             en => 'Kilo',
-            fr => 'Kilo',
-            nl => 'Kilo',
-            pl => 'Kilo',
         },
     },
 
@@ -130,9 +103,6 @@ my $scales_m = {
         'scale_txt_long_m' => {
             de => 'Mega',
             en => 'Mega',
-            fr => 'Mega',
-            nl => 'Mega',
-            pl => 'Mega',
         },
     },
 };
@@ -142,9 +112,6 @@ my $scales_sq = {
     'scale_txt_long_sq' => {
         de => 'Quadrat',
         en => 'Square',
-        fr => 'Square',
-        nl => 'Square',
-        pl => 'Square',
     },
 };
 
@@ -153,9 +120,6 @@ my $scales_cu = {
     'scale_txt_long_cu' => {
         de => 'Kubik',
         en => 'Cubic',
-        fr => 'Cubic',
-        nl => 'Cubic',
-        pl => 'Cubic',
     },
 };
 
@@ -180,11 +144,8 @@ my $rtype_base = {
         base_description => {
             de => 'Länge',
             en => 'length',
-            fr => 'length',
-            nl => 'length',
-            pl => 'length',
         },
-        format => '%.1f',
+        format => '%.0f',
         scope  => { min => 0 },
     },
 
@@ -195,11 +156,8 @@ my $rtype_base = {
         base_description => {
             de => 'Masse',
             en => 'mass',
-            fr => 'mass',
-            nl => 'mass',
-            pl => 'mass',
         },
-        format => '%.1f',
+        format => '%.0f',
         scope  => { min => 0 },
     },
 
@@ -210,9 +168,6 @@ my $rtype_base = {
         base_description => {
             de => 'Zeit',
             en => 'time',
-            fr => 'time',
-            nl => 'time',
-            pl => 'time',
         },
         format => '%.0f',
         scope  => { min => 0 },
@@ -225,9 +180,6 @@ my $rtype_base = {
         base_description => {
             de => 'elektrische Stromstärke',
             en => 'electric current',
-            fr => 'electric current',
-            nl => 'electric current',
-            pl => 'electric current',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -240,9 +192,6 @@ my $rtype_base = {
         base_description => {
             de => 'absolute Temperatur',
             en => 'absolute temperature',
-            fr => 'absolute temperature',
-            nl => 'absolute temperature',
-            pl => 'absolute temperature',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -255,9 +204,6 @@ my $rtype_base = {
         base_description => {
             de => 'Stoffmenge',
             en => 'amount of substance',
-            fr => 'amount of substance',
-            nl => 'amount of substance',
-            pl => 'amount of substance',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -270,9 +216,6 @@ my $rtype_base = {
         base_description => {
             de => 'Lichtstärke',
             en => 'luminous intensity',
-            fr => 'luminous intensity',
-            nl => 'luminous intensity',
-            pl => 'luminous intensity',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -285,9 +228,6 @@ my $rtype_base = {
         base_description => {
             de => 'Energie',
             en => 'energy',
-            fr => 'energy',
-            nl => 'energy',
-            pl => 'energy',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -300,9 +240,6 @@ my $rtype_base = {
         base_description => {
             de => 'Frequenz',
             en => 'frequency',
-            fr => 'frequency',
-            nl => 'frequency',
-            pl => 'frequency',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -315,9 +252,6 @@ my $rtype_base = {
         base_description => {
             de => 'Leistung',
             en => 'power',
-            fr => 'power',
-            nl => 'power',
-            pl => 'power',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -330,9 +264,6 @@ my $rtype_base = {
         base_description => {
             de => 'Druck',
             en => 'pressure',
-            fr => 'pressure',
-            nl => 'pressure',
-            pl => 'pressure',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -345,9 +276,6 @@ my $rtype_base = {
         base_description => {
             de => 'absoluter Druck',
             en => 'absolute pressure',
-            fr => 'absolute pressure',
-            nl => 'absolute pressure',
-            pl => 'absolute pressure',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -360,9 +288,6 @@ my $rtype_base = {
         base_description => {
             de => 'Luftdruck',
             en => 'air pressure',
-            fr => 'air pressure',
-            nl => 'air pressure',
-            pl => 'air pressure',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -375,9 +300,6 @@ my $rtype_base = {
         base_description => {
             de => 'elektrische Spannung',
             en => 'electric voltage',
-            fr => 'electric voltage',
-            nl => 'electric voltage',
-            pl => 'electric voltage',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -390,9 +312,6 @@ my $rtype_base = {
         base_description => {
             de => 'ebener Winkel',
             en => 'plane angular',
-            fr => 'plane angular',
-            nl => 'plane angular',
-            pl => 'plane angular',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -405,9 +324,6 @@ my $rtype_base = {
         base_description => {
             de => 'Geschwindigkeit',
             en => 'speed',
-            fr => 'speed',
-            nl => 'speed',
-            pl => 'speed',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -420,9 +336,6 @@ my $rtype_base = {
         base_description => {
             de => 'Beleuchtungsstärke',
             en => 'illumination intensity',
-            fr => 'illumination intensity',
-            nl => 'illumination intensity',
-            pl => 'illumination intensity',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -435,9 +348,6 @@ my $rtype_base = {
         base_description => {
             de => 'Lichtstrom',
             en => 'luminous flux',
-            fr => 'luminous flux',
-            nl => 'luminous flux',
-            pl => 'luminous flux',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -450,9 +360,6 @@ my $rtype_base = {
         base_description => {
             de => 'Volumen',
             en => 'volume',
-            fr => 'volume',
-            nl => 'volume',
-            pl => 'volume',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -465,9 +372,6 @@ my $rtype_base = {
         base_description => {
             de => 'Logarithmische Größe',
             en => 'logarithmic level',
-            fr => 'logarithmic level',
-            nl => 'logarithmic level',
-            pl => 'logarithmic level',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -480,9 +384,6 @@ my $rtype_base = {
         base_description => {
             de => 'elektrische Ladung',
             en => 'electric charge',
-            fr => 'electric charge',
-            nl => 'electric charge',
-            pl => 'electric charge',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -495,9 +396,6 @@ my $rtype_base = {
         base_description => {
             de => 'elektrische Kapazität',
             en => 'electric capacity',
-            fr => 'electric capacity',
-            nl => 'electric capacity',
-            pl => 'electric capacity',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -510,9 +408,6 @@ my $rtype_base = {
         base_description => {
             de => 'elektrische Widerstand',
             en => 'electric resistance',
-            fr => 'electric resistance',
-            nl => 'electric resistance',
-            pl => 'electric resistance',
         },
         format => '%.1f',
         scope  => { min => 0 },
@@ -525,9 +420,6 @@ my $rtype_base = {
         base_description => {
             de => 'Flächeninhalt',
             en => 'surface area',
-            fr => 'surface area',
-            nl => 'surface area',
-            pl => 'surface area',
         },
         format => '%i',
         scope  => { min => 0 },
@@ -537,9 +429,6 @@ my $rtype_base = {
         base_description => {
             de => 'Währung',
             en => 'currency',
-            fr => 'currency',
-            nl => 'currency',
-            pl => 'currency',
         },
         format => '%.2f',
         scope  => '^[0-9]*(?:\.[0-9]*)?$',
@@ -550,9 +439,6 @@ my $rtype_base = {
         base_description => {
             de => 'Zahlen',
             en => 'Numbering',
-            fr => 'Numbering',
-            nl => 'Numbering',
-            pl => 'Numbering',
         },
         tmpl => '%value%',
     },
@@ -561,9 +447,6 @@ my $rtype_base = {
         base_description => {
             de => 'Logische Operatoren',
             en => 'Logical operators',
-            fr => 'Logical operators',
-            nl => 'Logical operators',
-            pl => 'Logical operators',
         },
         tmpl => '%value%',
     },
@@ -604,7 +487,7 @@ my $rtypes = {
             nl => [ 'stabiel',        'stijgend',  'dalend' ],
             pl => [ 'stabilne',       'rośnie',   'spada' ],
         },
-        scope             => [ '^(=|0)$', '^(+|1)$', '^(-|2)$' ],
+        scope             => [ '^(=|0)$', '^(\+|1)$', '^(-|2)$' ],
         tmpl              => '%txt%',
         tmpl_long         => '%txt_long%',
         rtype_description => 'Trend',
@@ -615,9 +498,6 @@ my $rtypes = {
         txt      => {
             de => [ 'Fehler', 'ok', 'Warnung' ],
             en => [ 'error',  'ok', 'warning' ],
-            fr => [ 'error',  'ok', 'warning' ],
-            nl => [ 'error',  'ok', 'warning' ],
-            pl => [ 'error',  'ok', 'warning' ],
         },
         scope => [
             '^(nok|error|dead|invalid|0)$', '^(ok|alive|valid|1)$',
@@ -627,9 +507,6 @@ my $rtypes = {
             de =>
 'Fehlerstatus; siehe RType roknok, sofern 0<>1 vertauschte Bedeutung haben',
             en => 'error state',
-            fr => 'error state',
-            nl => 'error state',
-            pl => 'error state',
         },
     },
 
@@ -638,9 +515,6 @@ my $rtypes = {
         txt      => {
             de => [ 'Fehler', 'ok', 'Warnung' ],
             en => [ 'error',  'ok', 'warning' ],
-            fr => [ 'error',  'ok', 'warning' ],
-            nl => [ 'error',  'ok', 'warning' ],
-            pl => [ 'error',  'ok', 'warning' ],
         },
         scope => [
             '^(nok|error|dead|invalid|1)$', '^(ok|alive|valid|0)$',
@@ -650,9 +524,6 @@ my $rtypes = {
             de =>
 'verdrehter Fehlerstatus, bei dem 0=ok und 1=Fehler bedeutet; Gegenteil von RType oknok',
             en => 'reversed error state',
-            fr => 'reversed error state',
-            nl => 'reversed error state',
-            pl => 'reversed error state',
         },
     },
 
@@ -661,18 +532,12 @@ my $rtypes = {
         txt      => {
             de => [ 'aus', 'an', 'nicht verfügbar' ],
             en => [ 'off', 'on', 'absent' ],
-            fr => [ 'off', 'on', 'absent' ],
-            nl => [ 'off', 'on', 'absent' ],
-            pl => [ 'off', 'on', 'absent' ],
         },
         scope =>
           [ '^(off|no|standby|0)$', '^(on|yes|1)$', '^(absent|offline|2)$', ],
         rtype_description => {
             de => 'Schaltstatus',
             en => 'Switch state',
-            fr => 'Switch state',
-            nl => 'Switch state',
-            pl => 'Switch state',
         },
     },
 
@@ -681,9 +546,6 @@ my $rtypes = {
         txt      => {
             de => [ 'nicht verfügbar', 'verfügbar' ],
             en => [ 'absent',           'present' ],
-            fr => [ 'absent',           'present' ],
-            nl => [ 'absent',           'present' ],
-            pl => [ 'absent',           'present' ],
         },
         scope => [
             '^(unavailable|absent|disappeared|false|no|0)$',
@@ -692,9 +554,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Verfügbarkeit',
             en => 'availability',
-            fr => 'availability',
-            nl => 'availability',
-            pl => 'availability',
         },
     },
 
@@ -704,9 +563,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Unix Epoche in s seit 1970-01-01T00:00:00Z',
             en => 'Unix epoch in s since 1970-01-01T00:00:00Z',
-            fr => 'Unix epoch in s since 1970-01-01T00:00:00Z',
-            nl => 'Unix epoch in s since 1970-01-01T00:00:00Z',
-            pl => 'Unix epoch in s since 1970-01-01T00:00:00Z',
         },
     },
 
@@ -714,17 +570,11 @@ my $rtypes = {
         ref_base => 900,
         symbol   => {
             de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
         },
         txt => {
             de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
         },
         txt_long => {
             de => [
@@ -735,37 +585,27 @@ my $rtypes = {
                 'Sunday',   'Monday', 'Tuesday', 'Wednesday',
                 'Thursday', 'Friday', 'Saturday'
             ],
-            fr => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+        },
+        scope => {
+            de => [
+                '^(So|Son|Sonntag|0)$',    '^(Mo|Mon|Montag|1)$',
+                '^(Di|Die|Dienstag|2)$',   '^(Mi|Mit|Mittwoch|3)$',
+                '^(Do|Don|Donnerstag|4)$', '^(Fr|Fre|Freitag|5)$',
+                '^(Sa|Sam|Samstag|6)$'
             ],
-            nl => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
-            ],
-            pl => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+            en => [
+                '^(Sun|Su|Sunday|0)$',   '^(Mon|Mo|Monday|1)$',
+                '^(Tue|Tu|Tuesday|2)$',  '^(Wed|We|Wednesday|3)$',
+                '^(Thu|Th|Thursday|4)$', '^(Fri|Fr|Friday|5)$',
+                '^(Sat|Sa|Saturday|6)$'
             ],
         },
-        scope => [
-            '^(Sun|Su|Sunday|0)$',   '^(Mon|Mo|Monday|1)$',
-            '^(Tue|Tu|Tuesday|2)$',  '^(Wed|We|Wednesday|3)$',
-            '^(Thu|Th|Thursday|4)$', '^(Fri|Fr|Friday|5)$',
-            '^(Sat|Sa|Saturday|6)$'
-        ],
         tmpl              => '%txt%',
         tmpl_long         => '%txt_long%',
         rtype_description => {
             de =>
 'Wochentag nach englisch-amerikanischer Annahme des Wochenstarts am Sonntag',
             en =>
-'Day of the week according to english assumption for the week to start on sunday',
-            fr =>
-'Day of the week according to english assumption for the week to start on sunday',
-            nl =>
-'Day of the week according to english assumption for the week to start on sunday',
-            pl =>
 'Day of the week according to english assumption for the week to start on sunday',
         },
     },
@@ -774,17 +614,11 @@ my $rtypes = {
         ref_base => 900,
         symbol   => {
             de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
         },
         txt => {
             de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            fr => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            nl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
-            pl => [ 'Sun', 'Mon', 'Tus', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
         },
         txt_long => {
             de => [
@@ -795,36 +629,26 @@ my $rtypes = {
                 'Sunday',   'Monday', 'Tuesday', 'Wednesday',
                 'Thursday', 'Friday', 'Saturday'
             ],
-            fr => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+        },
+        scope => {
+            de => [
+                '^(So|Son|Sonntag|6)$',    '^(Mo|Mon|Montag|0)$',
+                '^(Di|Die|Dienstag|1)$',   '^(Mi|Mit|Mittwoch|2)$',
+                '^(Do|Don|Donnerstag|3)$', '^(Fr|Fre|Freitag|4)$',
+                '^(Sa|Sam|Samstag|5)$'
             ],
-            nl => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
-            ],
-            pl => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+            en => [
+                '^(Sun|Su|Sunday|6)$',   '^(Mon|Mo|Monday|0)$',
+                '^(Tue|Tu|Tuesday|1)$',  '^(Wed|We|Wednesday|2)$',
+                '^(Thu|Th|Thursday|3)$', '^(Fri|Fr|Friday|4)$',
+                '^(Sat|Sa|Saturday|5)$'
             ],
         },
-        scope => [
-            '^(Sun|Su|Sunday|6)$',   '^(Mon|Mo|Monday|0)$',
-            '^(Tue|Tu|Tuesday|1)$',  '^(Wed|We|Wednesday|2)$',
-            '^(Thu|Th|Thursday|3)$', '^(Fri|Fr|Friday|4)$',
-            '^(Sat|Sa|Saturday|5)$'
-        ],
         tmpl              => '%txt%',
         tmpl_long         => '%txt_long%',
         rtype_description => {
-            de => 'Wochentag nach ISO-Standard, Woche beginnend mit Montag',
+            de => 'Wochentag nach ISO-Standard, Woche beginnend am Montag',
             en =>
-'Day of the week according to ISO standard, week beginning on Mondays',
-            fr =>
-'Day of the week according to ISO standard, week beginning on Mondays',
-            nl =>
-'Day of the week according to ISO standard, week beginning on Mondays',
-            pl =>
 'Day of the week according to ISO standard, week beginning on Mondays',
         },
     },
@@ -833,25 +657,15 @@ my $rtypes = {
         ref_base => 900,
         symbol   => {
             de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
-            en =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            fr =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            nl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            pl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            en => [
+                'Sun N', 'Mon N', 'Tue N', 'Wed N', 'Thu N', 'Fri N ', 'Sat N'
+            ],
         },
         txt => {
             de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
-            en =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            fr =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            nl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            pl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            en => [
+                'Sun N', 'Mon N', 'Tue N', 'Wed N', 'Thu N', 'Fri N ', 'Sat N'
+            ],
         },
         txt_long => {
             de => [
@@ -872,55 +686,33 @@ my $rtypes = {
                 'Friday Night',
                 'Saturday Night'
             ],
-            fr => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
+        },
+        scope => {
+            de => [
+                '^(\s*(Nacht|Na)?\s*(So|Son|Sonntag|0)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Mo|Mon|Montag|1)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Di|Die|Dienstag|2)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Mi|Mit|Mittwoch|3)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Do|Don|Donnerstag|4)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Fr|Fre|Freitag|5)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Sa|Sam|Samstag|6)\s*(Nacht|Na)?\s*)$'
             ],
-            nl => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
-            ],
-            pl => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
+            en => [
+                '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|0)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|1)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|2)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|3)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|4)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|5)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|6)\s*(Night|Na)?\s*)$'
             ],
         },
-        scope => [
-            '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|0)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|1)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|2)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|3)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|4)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|5)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|6)\s*(Night|Na)?\s*)$'
-        ],
         tmpl              => '%txt%',
         tmpl_long         => '%txt_long%',
         rtype_description => {
             de =>
-'Nächtlicher Wochentag nach englisch-amerikanischer Standard des Wochenstarts am Sonntag',
+'Nächtlicher Wochentag nach englisch-amerikanischem Standard des Wochenstarts am Sonntag',
             en =>
-'Nightly day of the week according to english standard for the week to start on sunday',
-            fr =>
-'Nightly day of the week according to english standard for the week to start on sunday',
-            nl =>
-'Nightly day of the week according to english standard for the week to start on sunday',
-            pl =>
 'Nightly day of the week according to english standard for the week to start on sunday',
         },
     },
@@ -929,25 +721,15 @@ my $rtypes = {
         ref_base => 900,
         symbol   => {
             de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
-            en =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            fr =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            nl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            pl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            en => [
+                'Sun N', 'Mon N', 'Tue N', 'Wed N', 'Thu N', 'Fri N ', 'Sat N'
+            ],
         },
         txt => {
             de => [ 'So N', 'Mo N', 'Di N', 'Mi N', 'Do N', 'Fr N', 'Sa N' ],
-            en =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            fr =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            nl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
-            pl =>
-              [ 'Sun N', 'Mon N', 'Tus N', 'Wed N', 'Thu N', 'FriN ', 'Sat N' ],
+            en => [
+                'Sun N', 'Mon N', 'Tue N', 'Wed N', 'Thu N', 'Fri N ', 'Sat N'
+            ],
         },
         txt_long => {
             de => [
@@ -968,55 +750,33 @@ my $rtypes = {
                 'Friday Night',
                 'Saturday Night'
             ],
-            fr => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
+        },
+        scope => {
+            de => [
+                '^(\s*(Nacht|Na)?\s*(So|Son|Sonntag|6)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Mo|Mon|Montag|0)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Di|Die|Dienstag|1)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Mi|Mit|Mittwoch|2)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Do|Don|Donnerstag|3)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Fr|Fre|Freitag|4)\s*(Nacht|Na)?\s*)$',
+                '^(\s*(Nacht|Na)?\s*(Sa|Sam|Samstag|5)\s*(Nacht|Na)?\s*)$'
             ],
-            nl => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
-            ],
-            pl => [
-                'Sunday Night',
-                'Monday Night',
-                'Tuesday Night',
-                'Wednesday Night',
-                'Thursday Night',
-                'Friday Night',
-                'Saturday Night'
+            en => [
+                '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|6)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|0)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|1)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|2)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|3)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|4)\s*(Night|Na)?\s*)$',
+                '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|5)\s*(Night|Na)?\s*)$'
             ],
         },
-        scope => [
-            '^(\s*(Night|Na)?\s*(Sun|Su|Sunday|6)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Mon|Mo|Monday|0)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Tue|Tu|Tuesday|1)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Wed|We|Wednesday|2)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Thu|Th|Thursday|3)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Fri|Fr|Friday|4)\s*(Night|Na)?\s*)$',
-            '^(\s*(Night|Na)?\s*(Sat|Sa|Saturday|5)\s*(Night|Na)?\s*)$'
-        ],
         tmpl              => '%txt%',
         tmpl_long         => '%txt_long%',
         rtype_description => {
             de =>
-'Nächtlicher Wochentag nach ISO-Standard, Woche beginnend mit Montag',
+'Nächtlicher Wochentag nach ISO-Standard, Woche beginnend am Montag',
             en =>
-'Nightly day of the week according to ISO standard, week beginning on Mondays',
-            fr =>
-'Nightly day of the week according to ISO standard, week beginning on Mondays',
-            nl =>
-'Nightly day of the week according to ISO standard, week beginning on Mondays',
-            pl =>
 'Nightly day of the week according to ISO standard, week beginning on Mondays',
         },
     },
@@ -1027,16 +787,10 @@ my $rtypes = {
         rtype_description => {
             de => 'Uhrzeit hh:mm',
             en => 'time hh:mm',
-            fr => 'time hh:mm',
-            nl => 'time hh:mm',
-            pl => 'time hh:mm',
         },
         tmpl_long => {
             de => '%value% Uhr',
             en => '%value%',
-            fr => '%value%',
-            nl => '%value%',
-            pl => '%value%',
         }
     },
 
@@ -1047,9 +801,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Datum+Uhrzeit YYYY-mm-dd hh:mm',
             en => 'date+time YYYY-mm-dd hh:mm',
-            fr => 'date+time YYYY-mm-dd hh:mm',
-            nl => 'date+time YYYY-mm-dd hh:mm',
-            pl => 'date+time YYYY-mm-dd hh:mm',
         },
     },
 
@@ -1059,9 +810,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Uhrzeit hh:mm:ss',
             en => 'time hh:mm:ss',
-            fr => 'time hh:mm:ss',
-            nl => 'time hh:mm:ss',
-            pl => 'time hh:mm:ss',
         },
     },
 
@@ -1072,9 +820,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Datum+Uhrzeit YYYY-mm-dd hh:mm:ss',
             en => 'date+time YYYY-mm-dd hh:mm:ss',
-            fr => 'date+time YYYY-mm-dd hh:mm:ss',
-            nl => 'date+time YYYY-mm-dd hh:mm:ss',
-            pl => 'date+time YYYY-mm-dd hh:mm:ss',
         },
     },
 
@@ -1086,9 +831,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Richtungsangabe',
             en => 'direction',
-            fr => 'direction',
-            nl => 'direction',
-            pl => 'direction',
         },
     },
 
@@ -1101,18 +843,6 @@ my $rtypes = {
                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
             ],
             en => [
-                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
-            ],
-            nl => [
-                'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
-                'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
-            ],
-            fr => [
-                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
-            ],
-            pl => [
                 'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
             ],
@@ -1134,97 +864,209 @@ my $rtypes = {
                 'West',      'West-Northwest',
                 'Northwest', 'North-Northwest'
             ],
-            nl => [
-                'North',     'North-Northeast',
-                'Northeast', 'East-Northeast',
-                'East',      'East-Southeast',
-                'Southeast', 'South-Southeast',
-                'South',     'South-Southwest',
-                'Southwest', 'West-Southwest',
-                'West',      'West-Northwest',
-                'Northwest', 'North-Northwest'
-            ],
-            fr => [
-                'North',     'North-Northeast',
-                'Northeast', 'East-Northeast',
-                'East',      'East-Southeast',
-                'Southeast', 'South-Southeast',
-                'South',     'South-Southwest',
-                'Southwest', 'West-Southwest',
-                'West',      'West-Northwest',
-                'Northwest', 'North-Northwest'
-            ],
-            pl => [
-                'North',     'North-Northeast',
-                'Northeast', 'East-Northeast',
-                'East',      'East-Southeast',
-                'Southeast', 'South-Southeast',
-                'South',     'South-Southwest',
-                'Southwest', 'West-Southwest',
-                'West',      'West-Northwest',
-                'Northwest', 'North-Northwest'
-            ],
         },
 
-        #TODO: integrate gradiants into scope regex
-        #   if ($azimuth      < 22.5) {
-        #      $compassPoint = "north";
-        #   } elsif ($azimuth < 45)   {
-        #      $compassPoint = "north-northeast";
-        #   } elsif ($azimuth < 67.5) {
-        #      $compassPoint = "northeast";
-        #   } elsif ($azimuth < 90)   {
-        #      $compassPoint = "east-northeast";
-        #   } elsif ($azimuth < 112.5){
-        #      $compassPoint = "east";
-        #   } elsif ($azimuth < 135)  {
-        #      $compassPoint = "east-southeast";
-        #   } elsif ($azimuth < 157.5){
-        #     $compassPoint = "southeast";
-        #   } elsif ($azimuth < 180)  {
-        #     $compassPoint = "south-southeast";
-        #   } elsif ($azimuth < 202.5){
-        #     $compassPoint = "south";
-        #   } elsif ($azimuth < 225)  {
-        #     $compassPoint = "south-southwest";
-        #   } elsif ($azimuth < 247.5){
-        #     $compassPoint = "southwest";
-        #   } elsif ($azimuth < 270)  {
-        #     $compassPoint = "west-southwest";
-        #   } elsif ($azimuth < 292.5){
-        #     $compassPoint = "west";
-        #   } elsif ($azimuth < 315)  {
-        #     $compassPoint = "west-northwest";
-        #   } elsif ($azimuth < 337.5){
-        #     $compassPoint = "northwest";
-        #   } elsif ($azimuth <= 361)  {
-        #     $compassPoint = "north-northwest";
-        #   }
-
-        scope => [
-            '^(N|North|2[0-2]\.?[0-4]\d*|[01]?[0-9]\.?\d*)$',
-'^(NNE|North-Northeast|4[0-4]\.?\d*|3[0-9]\.?\d*|2[3-9]|\.?\d*22\.?5\d*)$',
-            '^(NE|Northeast|67\.[0-4]\d*|67|6[0-6]\.?\d*|5[0-9]\.?\d*|4[5-9])$',
-'^(ENE|East-Northeast|89\.\d*|[78][0-9]\.?\d*|6[8-9]\.?\d*|67\.[5-9]\d*)$',
-            '^(E|East|4)$',
-            '^(ESE|East-Southeast|5)$',
-            '^(SE|Southeast|6)$',
-            '^(SSE|South-Southeast|7)$',
-            '^(S|South|8)$',
-            '^(SSW|South-Southwest|9)$',
-            '^(SW|Southwest|10)$',
-            '^(WSW|West-Southwest|11)$',
-            '^(W|West|12)$',
-            '^(WNW|West-Northwest|13)$',
-            '^(NW|Northwest|14)$',
-            '^(NNW|North-Northwest|15)$'
-        ],
+        scope => {
+            de => [
+                {
+                    ge        => 0.0,
+                    lt        => 22.5,
+                    regex     => '^(N|Norden|0|360|360\.\d*)$',
+                    value_num => 0.0,
+                },
+                {
+                    ge        => 22.5,
+                    lt        => 45.0,
+                    regex     => '^(NNO|Nord-Nordost|1)$',
+                    value_num => 22.5,
+                },
+                {
+                    ge        => 45.0,
+                    lt        => 67.5,
+                    regex     => '^(NO|Nordost|2)$',
+                    value_num => 45.0,
+                },
+                {
+                    ge        => 67.5,
+                    lt        => 90.0,
+                    regex     => '^(ONO|Ost-Nordost|3)$',
+                    value_num => 67.5,
+                },
+                {
+                    ge        => 90.0,
+                    lt        => 112.5,
+                    regex     => '^(O|Osten|4)$',
+                    value_num => 90.0,
+                },
+                {
+                    ge        => 112.5,
+                    lt        => 135.0,
+                    regex     => '^(OSO|Ost-S(ü|ue)dost|5)$',
+                    value_num => 112.5,
+                },
+                {
+                    ge        => 135.0,
+                    lt        => 157.5,
+                    regex     => '^(SO|S(ü|ue)dost|6)$',
+                    value_num => 135.0,
+                },
+                {
+                    ge        => 157.5,
+                    lt        => 180.0,
+                    regex     => '^(SSO|S(ü|ue)d-S(ü|ue)dost|7)$',
+                    value_num => 157.5,
+                },
+                {
+                    ge        => 180.0,
+                    lt        => 202.5,
+                    regex     => '^(S|S(ü|ue)den|8)$',
+                    value_num => 180.0,
+                },
+                {
+                    ge        => 202.5,
+                    lt        => 225.0,
+                    regex     => '^(SSW|S(ü|ue)d-S(ü|ue)dwest|9)$',
+                    value_num => 202.5,
+                },
+                {
+                    ge        => 225.0,
+                    lt        => 247.5,
+                    regex     => '^(SW|S(ü|ue)dwest|10)$',
+                    value_num => 225.0,
+                },
+                {
+                    ge        => 247.5,
+                    lt        => 270.0,
+                    regex     => '^(WSW|West-S(ü|ue)dwest|11)$',
+                    value_num => 247.5,
+                },
+                {
+                    ge        => 270.0,
+                    lt        => 292.5,
+                    regex     => '^(W|Westen|12)$',
+                    value_num => 270.0,
+                },
+                {
+                    ge        => 292.5,
+                    lt        => 315.0,
+                    regex     => '^(WNW|West-Nordwest|13)$',
+                    value_num => 292.5,
+                },
+                {
+                    ge        => 315.0,
+                    lt        => 337.5,
+                    regex     => '^(NW|Nordwest|14)$',
+                    value_num => 315.0,
+                },
+                {
+                    ge        => 337.5,
+                    lt        => 360,
+                    regex     => '^(NNW|Nord-Nordwest|15)$',
+                    value_num => 337.5,
+                },
+            ],
+            en => [
+                {
+                    ge        => 0.0,
+                    lt        => 22.5,
+                    regex     => '^(N|North|0|360|360\.\d*)$',
+                    value_num => 0.0,
+                },
+                {
+                    ge        => 22.5,
+                    lt        => 45.0,
+                    regex     => '^(NNE|North-Northeast|1)$',
+                    value_num => 22.5,
+                },
+                {
+                    ge        => 45.0,
+                    lt        => 67.5,
+                    regex     => '^(NE|Northeast|2)$',
+                    value_num => 45.0,
+                },
+                {
+                    ge        => 67.5,
+                    lt        => 90.0,
+                    regex     => '^(ENE|East-Northeast|3)$',
+                    value_num => 67.5,
+                },
+                {
+                    ge        => 90.0,
+                    lt        => 112.5,
+                    regex     => '^(E|East|4)$',
+                    value_num => 90.0,
+                },
+                {
+                    ge        => 112.5,
+                    lt        => 135.0,
+                    regex     => '^(ESE|East-Southeast|5)$',
+                    value_num => 112.5,
+                },
+                {
+                    ge        => 135.0,
+                    lt        => 157.5,
+                    regex     => '^(SE|Southeast|6)$',
+                    value_num => 135.0,
+                },
+                {
+                    ge        => 157.5,
+                    lt        => 180.0,
+                    regex     => '^(SSE|South-Southeast|7)$',
+                    value_num => 157.5,
+                },
+                {
+                    ge        => 180.0,
+                    lt        => 202.5,
+                    regex     => '^(S|South|8)$',
+                    value_num => 180.0,
+                },
+                {
+                    ge        => 202.5,
+                    lt        => 225.0,
+                    regex     => '^(SSW|South-Southwest|9)$',
+                    value_num => 202.5,
+                },
+                {
+                    ge        => 225.0,
+                    lt        => 247.5,
+                    regex     => '^(SW|Southwest|10)$',
+                    value_num => 225.0,
+                },
+                {
+                    ge        => 247.5,
+                    lt        => 270.0,
+                    regex     => '^(WSW|West-Southwest|11)$',
+                    value_num => 247.5,
+                },
+                {
+                    ge        => 270.0,
+                    lt        => 292.5,
+                    regex     => '^(W|West|12)$',
+                    value_num => 270.0,
+                },
+                {
+                    ge        => 292.5,
+                    lt        => 315.0,
+                    regex     => '^(WNW|West-Northwest|13)$',
+                    value_num => 292.5,
+                },
+                {
+                    ge        => 315.0,
+                    lt        => 337.5,
+                    regex     => '^(NW|Northwest|14)$',
+                    value_num => 315.0,
+                },
+                {
+                    ge        => 337.5,
+                    lt        => 360,
+                    regex     => '^(NNW|North-Northwest|15)$',
+                    value_num => 337.5,
+                },
+            ],
+        },
         rtype_description => {
             de => 'Himmelsrichtung',
             en => 'point of the compass',
-            fr => 'point of the compass',
-            nl => 'point of the compass',
-            pl => 'point of the compass',
         },
         tmpl_long => '%txt_long%',
     },
@@ -1234,17 +1076,11 @@ my $rtypes = {
         txt      => {
             de => [ 'geschlossen', 'offen', 'gekippt' ],
             en => [ 'closed',      'open',  'tilted' ],
-            fr => [ 'closed',      'open',  'tilted' ],
-            nl => [ 'closed',      'open',  'tilted' ],
-            pl => [ 'closed',      'open',  'tilted' ],
         },
         scope             => [ '^(closed|0)$', '^(open|1)$', '^(tilted|2)$' ],
         rtype_description => {
             de => 'Status für Fenster und Türen',
             en => 'state for windows and doors',
-            fr => 'state for windows and doors',
-            nl => 'state for windows and doors',
-            pl => 'state for windows and doors',
         },
     },
 
@@ -1253,17 +1089,11 @@ my $rtypes = {
         txt      => {
             de => [ 'klar',  'sonnig ', 'bewölkt', 'Regen' ],
             en => [ 'clear', 'sunny',   'cloudy',   'rain' ],
-            fr => [ 'clear', 'sunny',   'cloudy',   'rain' ],
-            nl => [ 'clear', 'sunny',   'cloudy',   'rain' ],
-            pl => [ 'clear', 'sunny',   'cloudy',   'rain' ],
         },
         scope => [ '^(clear|0)$', '^(sunny|1)$', '^(cloudy|2)$', '^(rain|3)$' ],
         rtype_description => {
             de => 'Wetterbedingung',
             en => 'weather condition',
-            fr => 'weather condition',
-            nl => 'weather condition',
-            pl => 'weather condition',
         },
     },
 
@@ -1272,9 +1102,6 @@ my $rtypes = {
         txt      => {
             de => [ 'trocken', 'niedrig', 'optimal', 'hoch', 'feucht' ],
             en => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
-            fr => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
-            nl => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
-            pl => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
         },
         scope => [
             '^(dry|0)$', '^(low|1)$', '^(optimal|2)$', '^(high|3)$',
@@ -1283,9 +1110,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Feuchtigkeitsbedingung',
             en => 'humidity condition',
-            fr => 'humidity condition',
-            nl => 'humidity condition',
-            pl => 'humidity condition',
         },
     },
 
@@ -1294,9 +1118,6 @@ my $rtypes = {
         txt      => {
             de => [ 'niedrig', 'moderat',  'hoch', 'sehr hoch', 'extrem' ],
             en => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
-            fr => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
-            nl => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
-            pl => [ 'low',     'moderate', 'high', 'very high', 'extreme' ],
         },
         scope => [
             '^(low|0)$',  '^(moderate|1)$',
@@ -1306,9 +1127,6 @@ my $rtypes = {
         rtype_description => {
             de => 'UV Bedingung',
             en => 'UV condition',
-            fr => 'UV condition',
-            nl => 'UV condition',
-            pl => 'UV condition',
         },
     },
 
@@ -1318,17 +1136,11 @@ my $rtypes = {
         txt      => {
             de => [ 'falsch', 'wahr' ],
             en => [ 'false',  'true' ],
-            fr => [ 'false',  'true' ],
-            nl => [ 'false',  'true' ],
-            pl => [ 'false',  'true' ],
         },
         scope             => [ '^(false|no|0)$', '^(true|yes|1)$' ],
         rtype_description => {
             de => 'Boolesch wahr/falsch',
             en => 'Boolean true/false',
-            fr => 'Boolean true/false',
-            nl => 'Boolean true/false',
-            pl => 'Boolean true/false',
         },
     },
 
@@ -1337,17 +1149,11 @@ my $rtypes = {
         txt      => {
             de => [ 'nein', 'ja' ],
             en => [ 'no',   'yes' ],
-            fr => [ 'no',   'yes' ],
-            nl => [ 'no',   'yes' ],
-            pl => [ 'no',   'yes' ],
         },
         scope             => [ '^(no|n|false|0)$', '^(yes|y|true|1)$' ],
         rtype_description => {
             de => 'Boolesch ja/nein',
             en => 'Boolean ja/nein',
-            fr => 'Boolean ja/nein',
-            nl => 'Boolean ja/nein',
-            pl => 'Boolean ja/nein',
         },
     },
 
@@ -1358,9 +1164,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Ganzzahl zwischen -32768 und 32767',
             en => 'Integer between -32768 and 32767',
-            fr => 'Integer between -32768 and 32767',
-            nl => 'Integer between -32768 and 32767',
-            pl => 'Integer between -32768 and 32767',
         },
         scope => { min => -32768, max => 32767 },
     },
@@ -1371,9 +1174,6 @@ my $rtypes = {
         rtype_description => {
             de => 'gerundete Ganzzahl zwischen -32768 und 32767',
             en => 'rounded integer between -32768 and 32767',
-            fr => 'rounded integer between -32768 and 32767',
-            nl => 'rounded integer between -32768 and 32767',
-            pl => 'rounded integer between -32768 and 32767',
         },
         scope => { min => -32768, max => 32767 },
     },
@@ -1384,9 +1184,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Ganzzahl zwischen -2147483648 und 214748364',
             en => 'Integer between -2147483648 and 214748364',
-            fr => 'Integer between -2147483648 and 214748364',
-            nl => 'Integer between -2147483648 and 214748364',
-            pl => 'Integer between -2147483648 and 214748364',
         },
         scope => { min => -2147483648, max => 214748364 },
     },
@@ -1397,9 +1194,6 @@ my $rtypes = {
         rtype_description => {
             de => 'gerundete Ganzzahl zwischen -2147483648 und 214748364',
             en => 'rounded integer between -2147483648 and 214748364',
-            fr => 'rounded integer between -2147483648 and 214748364',
-            nl => 'rounded integer between -2147483648 and 214748364',
-            pl => 'rounded integer between -2147483648 and 214748364',
         },
         scope => { min => -2147483648, max => 214748364 },
     },
@@ -1410,9 +1204,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Ganzzahl',
             en => 'Integer',
-            fr => 'Integer',
-            nl => 'Integer',
-            pl => 'Integer',
         },
         scope => '^([0-9]*(?:\.[0-9]*)?)$',
     },
@@ -1423,9 +1214,6 @@ my $rtypes = {
         rtype_description => {
             de => 'gerundete Ganzzahl',
             en => 'rounded integer',
-            fr => 'rounded integer',
-            nl => 'rounded integer',
-            pl => 'rounded integer',
         },
         scope => '^([0-9]*(?:\.[0-9]*)?)$',
     },
@@ -1436,9 +1224,6 @@ my $rtypes = {
         rtype_description => {
             de => 'Fließkommazahl',
             en => 'floating number',
-            fr => 'floating number',
-            nl => 'floating number',
-            pl => 'floating number',
         },
         scope => '^([0-9]*(?:\.[0-9]*)?)$',
     },
@@ -1451,9 +1236,6 @@ my $rtypes = {
         txt      => {
             de => 'Prozent',
             en => 'percent',
-            fr => 'percent',
-            nl => 'percent',
-            pl => 'percent',
         },
         tmpl  => '%value% %symbol%',
         scope => { min => 0, max => 100 },
@@ -1477,16 +1259,10 @@ my $rtypes = {
         txt      => {
             de => 'Pfund',
             en => 'Pound',
-            fr => 'Pound',
-            nl => 'Pound',
-            pl => 'Pound',
         },
         txt_long => {
             de => 'Britische Pfund',
             en => 'British Pound',
-            fr => 'British Pound',
-            nl => 'British Pound',
-            pl => 'British Pound',
         },
         scope     => '^([0-9]*(?:\.[0-9]*)?)$',
         tmpl_long => '%txt_long%',
@@ -1512,9 +1288,6 @@ my $rtypes = {
         txt      => {
             de => 'Grad',
             en => 'gradians',
-            fr => 'gradians',
-            nl => 'gradians',
-            pl => 'gradians',
         },
         tmpl  => '%value%%symbol%',
         scope => { min => 0 },
@@ -1526,9 +1299,6 @@ my $rtypes = {
         txt      => {
             de => 'Radiant',
             en => 'radiant',
-            fr => 'radiant',
-            nl => 'radiant',
-            pl => 'radiant',
         },
         scope => { min => 0 },
     },
@@ -1541,16 +1311,10 @@ my $rtypes = {
         txt      => {
             de => 'Grad Celsius',
             en => 'Degree Celsius',
-            fr => 'Degree Celsius',
-            nl => 'Degree Celsius',
-            pl => 'Degree Celsius',
         },
         txt_pl => {
             de => 'Grad Celsius',
             en => 'Degrees Celsius',
-            fr => 'Degrees Celsius',
-            nl => 'Degrees Celsius',
-            pl => 'Degrees Celsius',
         },
         tmpl  => '%value%%symbol%',
         scope => { min => -273.15 },
@@ -1563,16 +1327,10 @@ my $rtypes = {
         txt      => {
             de => 'Grad Fahrenheit',
             en => 'Degree Fahrenheit',
-            fr => 'Degree Fahrenheit',
-            nl => 'Degree Fahrenheit',
-            pl => 'Degree Fahrenheit',
         },
         txt_pl => {
             de => 'Grad Fahrenheit',
             en => 'Degrees Fahrenheit',
-            fr => 'Degrees Fahrenheit',
-            nl => 'Degrees Fahrenheit',
-            pl => 'Degrees Fahrenheit',
         },
         tmpl  => '%value% %symbol%',
         scope => { min => -459.67 },
@@ -1584,9 +1342,6 @@ my $rtypes = {
         txt      => {
             de => 'Kelvin',
             en => 'Kelvin',
-            fr => 'Kelvin',
-            nl => 'Kelvin',
-            pl => 'Kelvin',
         },
     },
 
@@ -1598,9 +1353,6 @@ my $rtypes = {
         txt      => {
             de => 'Bar',
             en => 'Bar',
-            fr => 'Bar',
-            nl => 'Bar',
-            pl => 'Bar',
         },
     },
 
@@ -1616,9 +1368,6 @@ my $rtypes = {
         txt      => {
             de => 'Pascal',
             en => 'Pascal',
-            fr => 'Pascal',
-            nl => 'Pascal',
-            pl => 'Pascal',
         },
     },
 
@@ -1634,9 +1383,6 @@ my $rtypes = {
         txt      => {
             de => 'Pascal',
             en => 'Pascal',
-            fr => 'Pascal',
-            nl => 'Pascal',
-            pl => 'Pascal',
         },
     },
 
@@ -1651,9 +1397,6 @@ my $rtypes = {
         txt      => {
             de => 'Zoll Quecksilbersäule',
             en => 'Inches of Mercury',
-            fr => 'Inches of Mercury',
-            nl => 'Inches of Mercury',
-            pl => 'Inches of Mercury',
         },
     },
 
@@ -1663,9 +1406,6 @@ my $rtypes = {
         txt      => {
             de => 'Millimeter Quecksilbersäule',
             en => 'Milimeter of Mercury',
-            fr => 'Milimeter of Mercury',
-            nl => 'Milimeter of Mercury',
-            pl => 'Milimeter of Mercury',
         },
     },
 
@@ -1692,9 +1432,6 @@ my $rtypes = {
         txt      => {
             de => 'Meter',
             en => 'meter',
-            fr => 'meter',
-            nl => 'meter',
-            pl => 'meter',
         },
     },
 
@@ -1734,22 +1471,16 @@ my $rtypes = {
     },
 
     in => {
-        ref_base => 4,
+        ref_base => 0,
         symbol   => '″',
         suffix   => 'in',
         txt      => {
             de => 'Zoll',
             en => 'inch',
-            fr => 'inch',
-            nl => 'inch',
-            pl => 'inch',
         },
         txt_pl => {
             de => 'Zoll',
             en => 'inches',
-            fr => 'inches',
-            nl => 'inches',
-            pl => 'inches',
         },
         tmpl         => '%value%%symbol%',
         tmpl_long    => '%value% %txt%',
@@ -1763,16 +1494,10 @@ my $rtypes = {
         txt      => {
             de => 'Fuss',
             en => 'foot',
-            fr => 'foot',
-            nl => 'foot',
-            pl => 'foot',
         },
         txt_pl => {
             de => 'Fuss',
             en => 'feet',
-            fr => 'feet',
-            nl => 'feet',
-            pl => 'feet',
         },
         tmpl         => '%value%%symbol%',
         tmpl_long    => '%value% %txt%',
@@ -1785,16 +1510,10 @@ my $rtypes = {
         txt      => {
             de => 'Yard',
             en => 'yard',
-            fr => 'yard',
-            nl => 'yard',
-            pl => 'yard',
         },
         txt_pl => {
             de => 'Yards',
             en => 'yards',
-            fr => 'yards',
-            nl => 'yards',
-            pl => 'yards',
         },
     },
 
@@ -1804,9 +1523,6 @@ my $rtypes = {
         txt      => {
             de => 'Meilen',
             en => 'miles',
-            fr => 'miles',
-            nl => 'miles',
-            pl => 'miles',
         },
     },
 
@@ -1817,23 +1533,14 @@ my $rtypes = {
         suffix   => {
             de => 's',
             en => 's',
-            fr => 's',
-            nl => 'sec',
-            pl => 'sec',
         },
         txt => {
             de => 'Sekunde',
             en => 'second',
-            fr => 'second',
-            nl => 'second',
-            pl => 'second',
         },
         txt_pl => {
             de => 'Sekunden',
             en => 'seconds',
-            fr => 'seconds',
-            nl => 'seconds',
-            pl => 'seconds',
         },
     },
 
@@ -1843,23 +1550,14 @@ my $rtypes = {
         suffix   => {
             de => 'Min',
             en => 'min',
-            fr => 'min',
-            nl => 'min',
-            pl => 'min',
         },
         txt => {
             de => 'Minute',
             en => 'minute',
-            fr => 'minute',
-            nl => 'minute',
-            pl => 'minute',
         },
         txt_pl => {
             de => 'Minuten',
             en => 'minutes',
-            fr => 'minutes',
-            nl => 'minutes',
-            pl => 'minutes',
         },
     },
 
@@ -1870,16 +1568,10 @@ my $rtypes = {
         txt      => {
             de => 'Stunde',
             en => 'hour',
-            fr => 'hour',
-            nl => 'hour',
-            pl => 'hour',
         },
         txt_pl => {
             de => 'Stunden',
             en => 'hours',
-            fr => 'hours',
-            nl => 'hours',
-            pl => 'hours',
         },
     },
 
@@ -1889,23 +1581,14 @@ my $rtypes = {
         suffix   => {
             de => 'T',
             en => 'd',
-            fr => 'd',
-            nl => 'd',
-            pl => 'd',
         },
         txt => {
             de => 'Tag',
             en => 'day',
-            fr => 'day',
-            nl => 'day',
-            pl => 'day',
         },
         txt_pl => {
             de => 'Tage',
             en => 'days',
-            fr => 'days',
-            nl => 'days',
-            pl => 'days',
         },
     },
 
@@ -1915,23 +1598,14 @@ my $rtypes = {
         suffix   => {
             de => 'W',
             en => 'w',
-            fr => 'w',
-            nl => 'w',
-            pl => 'w',
         },
         txt => {
             de => 'Woche',
             en => 'week',
-            fr => 'week',
-            nl => 'week',
-            pl => 'week',
         },
         txt_pl => {
             de => 'Wochen',
             en => 'weeks',
-            fr => 'weeks',
-            nl => 'weeks',
-            pl => 'weeks',
         },
     },
 
@@ -1941,23 +1615,14 @@ my $rtypes = {
         suffix   => {
             de => 'M',
             en => 'm',
-            fr => 'm',
-            nl => 'm',
-            pl => 'm',
         },
         txt => {
             de => 'Monat',
             en => 'month',
-            fr => 'month',
-            nl => 'month',
-            pl => 'month',
         },
         txt_pl => {
             de => 'Monate',
             en => 'Monat',
-            fr => 'Monat',
-            nl => 'Monat',
-            pl => 'Monat',
         },
     },
 
@@ -1967,23 +1632,14 @@ my $rtypes = {
         suffix   => {
             de => 'J',
             en => 'y',
-            fr => 'y',
-            nl => 'y',
-            pl => 'y',
         },
         txt => {
             de => 'Jahr',
             en => 'year',
-            fr => 'year',
-            nl => 'year',
-            pl => 'year',
         },
         txt_pl => {
             de => 'Jahre',
             en => 'years',
-            fr => 'years',
-            nl => 'years',
-            pl => 'years',
         },
     },
 
@@ -1994,9 +1650,6 @@ my $rtypes = {
         txt      => {
             de => 'Windstärke',
             en => 'wind force',
-            fr => 'wind force',
-            nl => 'wind force',
-            pl => 'wind force',
         },
         tmpl_long => '%txt% %value%',
     },
@@ -2007,9 +1660,6 @@ my $rtypes = {
         txt      => {
             de => 'Knoten',
             en => 'knots',
-            fr => 'knots',
-            nl => 'knots',
-            pl => 'knots',
         },
     },
 
@@ -2021,16 +1671,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_t%',
             en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_t%',
             en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
@@ -2042,16 +1686,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_t%',
             en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_t%',
             en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
@@ -2064,16 +1702,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_t%',
             en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_t%',
             en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
@@ -2086,16 +1718,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_t%',
             en => '%value% %txt% per %txt_t%',
-            fr => '%value% %txt% per %txt_t%',
-            nl => '%value% %txt% per %txt_t%',
-            pl => '%value% %txt% per %txt_t%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_t%',
             en => '%value% %txt_pl% per %txt_t%',
-            fr => '%value% %txt_pl% per %txt_t%',
-            nl => '%value% %txt_pl% per %txt_t%',
-            pl => '%value% %txt_pl% per %txt_t%',
         },
     },
 
@@ -2142,9 +1768,6 @@ my $rtypes = {
         txt      => {
             de => 'Gramm',
             en => 'gram',
-            fr => 'gram',
-            nl => 'gram',
-            pl => 'gram',
         },
     },
 
@@ -2160,16 +1783,10 @@ my $rtypes = {
         txt     => {
             de => 'Tonne',
             en => 'ton',
-            fr => 'ton',
-            nl => 'ton',
-            pl => 'ton',
         },
         txt_pl => {
             de => 'Tonnen',
             en => 'tons',
-            fr => 'tons',
-            nl => 'tons',
-            pl => 'tons',
         },
     },
 
@@ -2179,9 +1796,6 @@ my $rtypes = {
         txt      => {
             de => 'Pfund',
             en => 'pound',
-            fr => 'pound',
-            nl => 'pound',
-            pl => 'pound',
         },
     },
 
@@ -2191,9 +1805,6 @@ my $rtypes = {
         txt      => {
             de => 'Pfund',
             en => 'pound',
-            fr => 'pound',
-            nl => 'pound',
-            pl => 'pound',
         },
     },
 
@@ -2204,9 +1815,6 @@ my $rtypes = {
         txt      => {
             de => 'Candela',
             en => 'Candela',
-            fr => 'Candela',
-            nl => 'Candela',
-            pl => 'Candela',
         },
     },
 
@@ -2217,9 +1825,6 @@ my $rtypes = {
         txt      => {
             de => 'Lux',
             en => 'Lux',
-            fr => 'Lux',
-            nl => 'Lux',
-            pl => 'Lux',
         },
     },
 
@@ -2230,9 +1835,6 @@ my $rtypes = {
         txt      => {
             de => 'Lumen',
             en => 'Lumen',
-            fr => 'Lumen',
-            nl => 'Lumen',
-            pl => 'Lumen',
         },
     },
 
@@ -2242,9 +1844,6 @@ my $rtypes = {
         txt      => {
             de => 'UV-Index',
             en => 'UV-Index',
-            fr => 'UV-Index',
-            nl => 'UV-Index',
-            pl => 'UV-Index',
         },
         tmpl      => '%suffix% %value%',
         tmpl_long => '%txt% %value%',
@@ -2292,16 +1891,10 @@ my $rtypes = {
         txt      => {
             de => 'Liter',
             en => 'liter',
-            fr => 'liter',
-            nl => 'liter',
-            pl => 'liter',
         },
         txt_pl => {
             de => 'Liter',
             en => 'liters',
-            fr => 'liters',
-            nl => 'liters',
-            pl => 'liters',
         },
     },
 
@@ -2317,9 +1910,6 @@ my $rtypes = {
         txt      => {
             de => 'Bel',
             en => 'Bel',
-            fr => 'Bel',
-            nl => 'Bel',
-            pl => 'Bel',
         },
     },
 
@@ -2345,9 +1935,6 @@ my $rtypes = {
         txt      => {
             de => 'Ampere',
             en => 'Ampere',
-            fr => 'Ampere',
-            nl => 'Ampere',
-            pl => 'Ampere',
         },
     },
 
@@ -2368,9 +1955,6 @@ my $rtypes = {
         txt      => {
             de => 'Volt',
             en => 'Volt',
-            fr => 'Volt',
-            nl => 'Volt',
-            pl => 'Volt',
         },
     },
 
@@ -2391,9 +1975,6 @@ my $rtypes = {
         txt      => {
             de => 'Joule',
             en => 'Joule',
-            fr => 'Joule',
-            nl => 'Joule',
-            pl => 'Joule',
         },
     },
 
@@ -2414,9 +1995,6 @@ my $rtypes = {
         txt      => {
             de => 'Watt',
             en => 'Watt',
-            fr => 'Watt',
-            nl => 'Watt',
-            pl => 'Watt',
         },
     },
 
@@ -2434,16 +2012,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2457,16 +2029,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2480,16 +2046,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2503,16 +2063,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2526,16 +2080,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2549,16 +2097,10 @@ my $rtypes = {
         tmpl_long => {
             de => '%value% %txt% pro %txt_sq%',
             en => '%value% %txt% per %txt_sq%',
-            fr => '%value% %txt% per %txt_sq%',
-            nl => '%value% %txt% per %txt_sq%',
-            pl => '%value% %txt% per %txt_sq%',
         },
         tmpl_long_pl => {
             de => '%value% %txt_pl% pro %txt_sq%',
             en => '%value% %txt_pl% per %txt_sq%',
-            fr => '%value% %txt_pl% per %txt_sq%',
-            nl => '%value% %txt_pl% per %txt_sq%',
-            pl => '%value% %txt_pl% per %txt_sq%',
         },
     },
 
@@ -2568,9 +2110,6 @@ my $rtypes = {
         txt      => {
             de => 'Coulomb',
             en => 'Coulomb',
-            fr => 'Coulomb',
-            nl => 'Coulomb',
-            pl => 'Coulomb',
         },
     },
 
@@ -2580,9 +2119,6 @@ my $rtypes = {
         txt      => {
             de => 'Farad',
             en => 'Farad',
-            fr => 'Farad',
-            nl => 'Farad',
-            pl => 'Farad',
         },
     },
 
@@ -2593,9 +2129,6 @@ my $rtypes = {
         txt      => {
             de => 'Ohm',
             en => 'Ohm',
-            fr => 'Ohm',
-            nl => 'Ohm',
-            pl => 'Ohm',
         },
     },
 
@@ -3137,14 +2670,11 @@ sub formatValue($$$;$$$$) {
         || keys %{$desc} < 1 );
 
     my $llvl = ( defined( $desc->{verbose} ) ? $desc->{verbose} : 4 );
-    $lang = $desc->{lang} if ( $desc->{lang} );
+    $lang = $desc->{dstlang} if ( $desc->{dstlang} );
 
     $value *= $desc->{factor} if ( $desc && $desc->{factor} );
     $format = $desc->{format} if ( !$format && $desc );
-
-    # $format = $scales_m->{autoscale} if ( !$format );
-
-    $scope = $desc->{scope} if ( !$scope && $desc );
+    $scope  = $desc->{scope}  if ( !$scope  && $desc );
 
     # scope
     #
@@ -3259,14 +2789,16 @@ sub formatValue($$$;$$$$) {
         else {
             my $i = 0;
             foreach ( @{$scope} ) {
-                if ( $value =~ /^$_$/gmi ) {
+                if ( $value =~ /$_/gmi ) {
                     $value_num = $i;
-                    if ( ref( $desc->{txt}{$lang} ) eq "ARRAY"
+                    if (   ref( $desc->{txt} ) eq "HASH"
+                        && ref( $desc->{txt}{$lang} ) eq "ARRAY"
                         && defined( $desc->{txt}{$lang}[$i] ) )
                     {
                         $value = $desc->{txt}{$lang}[$i];
                     }
-                    elsif ( ref( $desc->{txt}{en} ) eq "ARRAY"
+                    elsif (ref( $desc->{txt} ) eq "HASH"
+                        && ref( $desc->{txt}{en} ) eq "ARRAY"
                         && defined( $desc->{txt}{en}[$i] ) )
                     {
                         $value = $desc->{txt}{en}[$i];
