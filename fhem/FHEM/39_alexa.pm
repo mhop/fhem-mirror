@@ -19,7 +19,7 @@ alexa_Initialize($)
   #$hash->{NOTIFYDEV} = "global";
   #$hash->{NotifyFn} = "alexa_Notify";
   $hash->{UndefFn}  = "alexa_Undefine";
-  #$hash->{SetFn}    = "alexa_Set";
+  $hash->{SetFn}    = "alexa_Set";
   #$hash->{GetFn}    = "alexa_Get";
   #$hash->{AttrFn}   = "alexa_Attr";
   $hash->{AttrList} = "$readingFnAttributes";
@@ -76,7 +76,14 @@ alexa_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "";
+  my $list = "reload";
+
+  if( $cmd eq 'reload' ) {
+    $hash->{".triggerUsed"} = 1;
+    FW_directNotify($name, 'reload');
+
+    return undef;
+  }
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -153,6 +160,14 @@ alexa_Attr($$$)
   Notes:
   <ul>
     <li><br>
+    </li>
+  </ul>
+
+  <a name="alexa_Set"></a>
+  <b>Set</b>
+  <ul>
+    <li>reload<br>
+      Reloads the device list in alexa-fhem. Sequently you have to start a device discovery in alexa.
     </li>
   </ul>
 
