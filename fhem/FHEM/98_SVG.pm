@@ -58,7 +58,7 @@ SVG_Initialize($)
   $hash->{DefFn} = "SVG_Define";
   no warnings 'qw';
   my @attrList = qw(
-    captionLeft:1,0"
+    captionLeft:1,0
     endPlotNow
     endPlotToday
     fixedoffset
