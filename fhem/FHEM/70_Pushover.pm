@@ -194,13 +194,15 @@ sub Pushover_Set($@) {
     return Pushover_SetMessage2( $hash, $cmd, $a, $h )
       if (
         $cmd eq 'glance'
-        || ( $cmd eq 'msg'
-            && ( join( " ", @args ) !~ /^(".*"|'.*').*$/ || defined($h) ) )
+        || (
+            $cmd eq 'msg'
+            && ( join( " ", @args ) !~ m/^(".*"|'.*').*$/
+                || ( defined($h) && keys %{$h} > 0 ) )
+        )
       );
 
     return Pushover_SetMessage( $hash, @args )
       if ( $cmd eq 'msg' );
-
 }
 
 #------------------------------------------------------------------------------
@@ -718,6 +720,8 @@ sub Pushover_SetMessage {
     my $name   = $hash->{NAME};
     my %values = ();
 
+    Log3 $name, 5, "Pushover $name: called function Pushover_SetMessage()";
+
     #Set defaults
     $values{title}     = AttrVal( $hash->{NAME}, "title", "" );
     $values{message}   = "";
@@ -1039,6 +1043,8 @@ sub Pushover_SetMessage2 ($$$$) {
     my ( $hash, $cmd, $a, $h ) = @_;
     my $name   = $hash->{NAME};
     my %values = ();
+
+    Log3 $name, 5, "Pushover $name: called function Pushover_SetMessage2()";
 
     # general values
     $values{title} =
