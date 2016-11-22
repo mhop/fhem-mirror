@@ -159,8 +159,8 @@ siri_Attr($$$)
   <a name="siri_Attr"></a>
   <b>Attr</b>
   <ul>
-    <li><br>
-    </li>
+    <li>siriName<br>
+    The name to use for a device with siri.</li>
   </ul>
 </ul><br>
 
