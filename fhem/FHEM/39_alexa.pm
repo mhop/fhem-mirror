@@ -159,7 +159,8 @@ alexa_Attr($$$)
   <a name="alexa_Attr"></a>
   <b>Attr</b>
   <ul>
-    <li><br>
+    <li>alexaName<br>
+      The name to use for a device with alexa.
     </li>
   </ul>
 </ul><br>
