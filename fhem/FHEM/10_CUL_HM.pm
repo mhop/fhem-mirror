@@ -2642,27 +2642,26 @@ sub CUL_HM_Parse($$) {#########################################################
     my($sType,$chn,$lvl,$stat) = @mI;
     if(($mh{mTp} eq "10" && $sType eq "06") ||
        ($mh{mTp} eq "02" && $sType eq "01")){
-      my $move = 0;
       $stat = hex($stat);
       $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      my $lvlS = $lvl eq "FF" ? 1:0;
+      $lvl = hex($lvl)/2;
+      my $dat4 = ($stat >> 4) & 0x03;
       if ($chn eq "01"){
         my %err = (0=>"ok",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
-        $move = ($stat >> 4) & 0x03;
         push @evtEt,[$mh{shash},1,"motorErr:"  .$err{($stat >> 1) & 0x03}];
-        push @evtEt,[$mh{shash},1,"direction:" .$dir{$move}];
+        push @evtEt,[$mh{shash},1,"direction:" .$dir{$dat4}];
+        push @evtEt,[$mh{shash},1,"level:"     .($lvlS ? "0"      : $lvl)      ] if($dat4 == 0);
+        push @evtEt,[$mh{shash},1,"lock:"      .($lvlS ? "locked" : "unlocked")];
       }
       else{ #should be akku
-        my %statF = (0=>"trickleCharge",1=>"charge",2=>"dischange",3=>"unknown");
-        push @evtEt,[$mh{shash},1,"charge:"    .$statF{($stat >> 4) & 0x03}];
+        my %statF = (0=>"trickleCharge",1=>"charge",2=>"discharge",3=>"unknown");
+        push @evtEt,[$mh{shash},1,"charge:"    .$statF{$dat4}];
       }
       # stateflag meaning unknown
-      my $lvlS = $lvl eq "FF" ? 0:1;
-      $lvl = hex($lvl)/2;
       push @evtEt,[$mh{shash},1,"state:".($lvlS ? "locked" : $lvl)      ];
-      push @evtEt,[$mh{shash},1,"level:".($lvlS ? "0"      : $lvl)      ] if($move==0);
-      push @evtEt,[$mh{shash},1,"lock:" .($lvlS ? "locked" : "unlocked")];
     }
   }
   elsif($mh{st} eq "keyMatic") {  #############################################
@@ -2843,6 +2842,9 @@ sub CUL_HM_parseCommon(@){#####################################################
   # VD wakes up with 8202
   #                  9610
   my $rxt = CUL_HM_getRxType($mhp->{shash});
+  $devHlpr->{PONtest} = 1 if($mhp->{mNo} eq "00" &&
+                             $devHlpr->{HM_CMDNR} < 250);# this is power on
+  $devHlpr->{HM_CMDNR} = hex($mhp->{mNo});# sync msgNo prior to any sending
   if($rxt & 0x08){ #wakeup device
     if(($mhp->{mFlgH} & 0xA2) == 0x82){ #wakeup signal
       CUL_HM_appFromQ($mhp->{devN},"wu");# stack cmds if waiting
@@ -2869,9 +2871,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
   }  
   
-  $devHlpr->{PONtest} = 1 if($mhp->{mNo} eq "00" &&
-                             $devHlpr->{HM_CMDNR} < 250);# this is power on
-  $devHlpr->{HM_CMDNR} = hex($mhp->{mNo});# sync msgNo
   my $repeat;
   if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
     my $reply;
