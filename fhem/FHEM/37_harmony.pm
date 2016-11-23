@@ -607,9 +607,30 @@ harmony_getLoginToken($)
 {
   my ($hash) = @_;
 
+  #return if( defined($hash->{helper}{UserAuthToken}) );
+
+  if( 0 ) {
+  my $https = "https";
+  $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
+
+  my $json = encode_json( { clientId => '',
+                            clientTypeId => 'ControlApp' } );
+
+  my($err,$data) = HttpUtils_BlockingGet({
+    url => "$https://svcs.myharmony.com/discovery/Discovery.svc/json/GetJson2Uris",
+    timeout => 10,
+    #noshutdown => 1,
+    #httpversion => "1.1",
+    header => "Content-Type: application/json;charset=utf-8",
+    data => $json,
+  });
+
+  harmony_dispatch( {hash=>$hash,type=>'GetJson2Uris'},$err,$data );
+  }
+
   return if( defined($hash->{helper}{UserAuthToken}) );
 
-  if( !$hash->{helper}{username} ) {
+  if( 1 || !$hash->{helper}{username} ) {
     $hash->{helper}{UserAuthToken} = "";
     return;
 
@@ -1357,7 +1378,10 @@ harmony_dispatch($$$)
     }
 
     if( $param->{type} eq 'token' ) {
-      harmony_parseToken($hash,$json);
+      harmony_parseToken($hash, $json);
+
+    } elsif( $param->{type} eq 'GetJson2Uris' ) {
+Log 1, Dumper $json;
 
     }
   }
