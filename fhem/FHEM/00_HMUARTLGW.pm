@@ -1768,8 +1768,8 @@ sub HMUARTLGW_Attr(@)
 			return "wrong syntax: dutyCycle must be 1 or 0"
 			    if ($aVal !~ m/^[01]$/);
 			$attr{$name}{$aName} = $aVal;
-			$retVal = "Please make sure to be in compliance with local regulations when disabling dutyCycle!"
-			    if (!($aVal));
+			#$retVal = "Please make sure to be in compliance with local regulations when disabling dutyCycle!"
+			#    if (!($aVal));
 		} else {
 			delete $attr{$name}{$aName};
 		}
