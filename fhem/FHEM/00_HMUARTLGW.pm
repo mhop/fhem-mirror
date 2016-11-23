@@ -1423,6 +1423,8 @@ sub HMUARTLGW_Write($$$)
 	my ($hash, $fn, $msg) = @_;
 	my $name = $hash->{NAME};
 
+	Log3($hash, 5, "HMUARTLGW ${name} HMUARTLGW_Write: ${msg}");
+
 	if($msg =~ m/init:(......)/) {
 		my $dst = $1;
 		if ($modules{CUL_HM}{defptr}{$dst} &&
@@ -1515,6 +1517,13 @@ sub HMUARTLGW_Write($$$)
 				flags => "00",
 				kNo => "00",
 			};
+			if ($modules{CUL_HM}{defptr}{$dst} &&
+			    $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn}) {
+				my (undef, $flags, $kNo, $aesChannels) = split(/,/, $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn});
+				$peer->{flags} = $flags;
+				$peer->{kNo} = $kNo;
+				$peer->{aesChannels} = $aesChannels;
+			}
 			HMUARTLGW_UpdatePeer($hash, $peer);
 		}
 
@@ -1759,6 +1768,8 @@ sub HMUARTLGW_Attr(@)
 			return "wrong syntax: dutyCycle must be 1 or 0"
 			    if ($aVal !~ m/^[01]$/);
 			$attr{$name}{$aName} = $aVal;
+			$retVal = "Please make sure to be in compliance with local regulations when disabling dutyCycle!"
+			    if (!($aVal));
 		} else {
 			delete $attr{$name}{$aName};
 		}
