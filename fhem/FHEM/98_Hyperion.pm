@@ -20,6 +20,7 @@ use DevIo;
 
 my %Hyperion_sets =
 (
+  "addEffect"         => "textField",
   "dim"               => "slider,0,1,100",
   "dimDown"           => "textField",
   "dimUp"             => "textField",
@@ -58,6 +59,7 @@ sub Hyperion_Initialize($)
   $hash->{AttrList}   = "disable:1,0 ".
                         "hyperionBin ".
                         "hyperionConfigDir ".
+                        "hyperionCustomEffects:textField-long ".
                         "hyperionDefaultDuration ".
                         "hyperionDefaultPriority ".
                         "hyperionDimStep ".
@@ -266,8 +268,16 @@ sub Hyperion_Read($)
     my $configs     = ReadingsVal($name,".configs",undef);
     my $corr        = $data->{correction}->[0] ? $data->{correction}->[0] : undef;
     my $effects     = $data->{effects} ? $data->{effects} : undef;
+    if ($hash->{helper}{customeffects})
+    {
+      foreach my $eff (@{$hash->{helper}{customeffects}})
+      {
+        push @{$effects},$eff;
+      }
+    }
     my $effectList  = $effects ? join(",",map {"$_->{name}"} @{$effects}) : "";
     $effectList     =~ s/ /_/g;
+    my $effargs     = $data->{activeEffects}->[0]->{args} ? JSON->new->convert_blessed->canonical->encode($data->{activeEffects}->[0]->{args}) : undef;
     my $script      = $data->{activeEffects}->[0]->{script} ? $data->{activeEffects}->[0]->{script} : undef;
     my $temp        = $data->{temperature}->[0] ? $data->{temperature}->[0] : undef;
     my $trans       = $data->{transform}->[0] ? $data->{transform}->[0] : undef;
@@ -298,6 +308,7 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"correction",$corS);
     readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0]) if (!defined ReadingsVal($name,"effect",undef));
     readingsBulkUpdate($hash,".effects",$effectList);
+    readingsBulkUpdate($hash,"effectArgs",$effargs);
     readingsBulkUpdate($hash,"duration",$duration);
     readingsBulkUpdate($hash,"gamma",$gamM);
     readingsBulkUpdate($hash,"id",$id);
@@ -312,27 +323,30 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"whitelevel",$whiL);
     if ($script)
     {
-      my $args = $data->{activeEffects}->[0]->{args};
+      my $effname;
+      my $tempname;
       foreach my $e (@$effects)
       {
-        if ($e->{script} eq $script)
+        if ($e->{script} && $e->{script} eq $script)
         {
-          my $arg = $e->{args};
-          my $x   = JSON->new->convert_blessed->canonical->encode($arg);
-          my $y   = JSON->new->convert_blessed->canonical->encode($args);
-
-          if ("$x" eq "$y")
-          {
-            my $en = $e->{name};
-            $en =~ s/ /_/g;
-            readingsBulkUpdate($hash,"effect",$en);
-            readingsBulkUpdate($hash,"mode","effect");
-            readingsBulkUpdate($hash,"state","effect $en");
-            readingsBulkUpdate($hash,"mode_before_off","effect");
-            Log3 $name,4,"$name: effect $en";
-          }
+          $tempname = $e->{name};
+          $effname = $e->{name} if (JSON->new->convert_blessed->canonical->encode($e->{args}) eq $effargs);
         }
       }
+      if (!$effname)
+      {
+        foreach my $e (@{$hash->{helper}{customeffects}})
+        {
+          $effname = $e->{name} if (JSON->new->convert_blessed->canonical->encode($e->{args}) eq $effargs);
+        }
+      }
+      $effname = $effname?$effname:$tempname;
+      $effname =~ s/ /_/g;
+      readingsBulkUpdate($hash,"effect",$effname);
+      readingsBulkUpdate($hash,"mode","effect");
+      readingsBulkUpdate($hash,"state","effect $effname");
+      readingsBulkUpdate($hash,"mode_before_off","effect");
+      Log3 $name,4,"$name: effect $effname";
     }
     elsif ($col)
     {
@@ -399,10 +413,9 @@ sub Hyperion_GetConfigs($)
     $cmd .= " $user\@$ip $com";
     @files = Hyperion_listFilesInDir($hash,$cmd);
   }
-  my $count = scalar @files;
   return "No files found on server $ip in directory $dir. Maybe the wrong directory? If SSH is used, has the user ".AttrVal($name,"hyperionSshUser","pi")." been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?"
-    if ($count == 0);
-  if ($count > 1)
+    if (@files == 0);
+  if (@files > 1)
   {
     my $configs = join(",",@files);
     readingsSingleUpdate($hash,".configs",$configs,1) if (ReadingsVal($name,".configs","") ne $configs);
@@ -413,11 +426,11 @@ sub Hyperion_GetConfigs($)
     fhem "deletereading $name .configs" if (defined ReadingsVal($name,".configs",undef));
     $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
     return "Found just one config file. Please add at least one more config file to properly use this function."
-      if ($count == 1);
+      if (@files == 1);
     return "No config files found!";
   }
   Hyperion_GetUpdate($hash);
-  return "Found $count config files. Please refresh this page to see the result.";
+  return "Found ".@files." config files. Please refresh this page to see the result.";
 }
 
 sub Hyperion_listFilesInDir($$)
@@ -429,8 +442,7 @@ sub Hyperion_listFilesInDir($$)
   if (open($fh,"$cmd|"))
   {
     my @files = <$fh>;
-    my $count = scalar @files;
-    for (my $i = 0; $i < $count; $i++)
+    for (my $i = 0; $i < @files; $i++)
     {
       my $file = $files[$i];
       $file =~ s/\s+//gm;
@@ -463,8 +475,7 @@ sub Hyperion_Set($@)
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
   my $value = (defined($args[0])) ? $args[0] : undef;
-  return "\"set $name\" needs at least one argument and maximum five arguments"
-    if (scalar @aa < 1 || scalar @aa > 4);
+  return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
   my %Hyperion_sets_local = %Hyperion_sets;
@@ -590,9 +601,23 @@ sub Hyperion_Set($@)
   elsif ($cmd eq "effect")
   {
     return "Effect $value is not available in the effect list of $name!"
-      if ($value !~ /^(\w+)?((_)\w+){0,}$/ || index(ReadingsVal($name,".effects",""),$value) == -1);
+      if ($value !~ /^([\w-]+)$/ || index(ReadingsVal($name,".effects",""),$value) == -1);
+    my $arg = $args[3]?eval{from_json $args[3]}:"";
+    my $ce  = $hash->{helper}{customeffects};
+    if (!$arg && $ce)
+    {
+      foreach my $eff (@{$ce})
+      {
+        if ($eff->{name} eq $value)
+        {
+          $value = $eff->{oname};
+          $arg = $eff->{args};
+        }
+      }
+    }
     $value =~ s/_/ /g;
     my %ef = ("name" => $value);
+    $ef{args} = $arg if ($arg);
     $obj{effect} = \%ef;
     $obj{command} = "effect";
     $obj{priority} = $priority * 1;
@@ -608,7 +633,7 @@ sub Hyperion_Set($@)
     return "Value of $cmd has to be between 0 and 65536 in steps of 1"
       if (defined $value && $value !~ /^(\d+)$/ || $1 > 65536);
     $obj{command} = $cmd;
-    $1 ? $value = $1 : $value = AttrVal($name,"hyperionDefaultPriority",0);
+    $value = defined $1?$1:AttrVal($name,"hyperionDefaultPriority",0);
     $obj{priority} = $value*1;
   }
   elsif ($cmd eq "off")
@@ -653,12 +678,11 @@ sub Hyperion_Set($@)
     my $mode = ReadingsVal($name,"mode","off");
     my $nmode;
     my @modeorder = split(",",AttrVal($name,"hyperionToggleModes","clearall,rgb,effect,off"));
-    my $count = scalar @modeorder;
-    for (my $i = 0; $i < $count; $i++)
+    for (my $i = 0; $i < @modeorder; $i++)
     {
-      $nmode = $i < $count - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
+      $nmode = $i < @modeorder - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
     }
-    $nmode = $nmode ? $nmode : @modeorder[0];
+    $nmode = $nmode?$nmode:$modeorder[0];
     fhem "set $name mode $nmode";
     return undef;
   }
@@ -672,19 +696,19 @@ sub Hyperion_Set($@)
     my ($r,$g,$b) = Color::hex2rgb($rrgb);
     if ($rmode eq "rgb")
     {
-      fhem "set ".$name." $rmode $rrgb";
+      fhem "set $name $rmode $rrgb";
     }
     elsif ($rmode eq "effect")
     {
-      fhem "set ".$name." $rmode $reffect";
+      fhem "set $name $rmode $reffect";
     }
     elsif ($rmode eq "clearall")
     {
-      fhem "set ".$name." clearall";
+      fhem "set $name clearall";
     }
     elsif ($rmode eq "off")
     {
-      fhem "set ".$name." $rmode";
+      fhem "set $name $rmode";
     }
     return undef;
   }
@@ -741,6 +765,22 @@ sub Hyperion_Set($@)
     $cmd eq "valueGainUp" ? fhem "set $name valueGain $gainUp" : fhem "set $name valueGain $gainDown";
     return undef;
   }
+  elsif ($cmd eq "addEffect")
+  {
+    return "$name must be in effect mode!" if (ReadingsVal($name,"mode","off") ne "effect");
+    return "Value of $cmd has to be a name like My_custom_EffeKt1 or my-effect!" if (!defined $value || $value !~ /^[a-zA-Z0-9_-]+$/);
+    return "Effect with name $value already defined! Please choose a different name!" if (grep(/^$value$/,split(",",ReadingsVal($name,".effects",""))));
+    my $eff  = ReadingsVal($name,"effect","");
+    foreach my $e (@{$hash->{helper}{customeffects}})
+    {
+      return "The base effect can't be a custom effect! Please set a non-custom effect first!" if ($e->{name} eq $eff);
+    }
+    my $effs = AttrVal($name,"hyperionCustomEffects","");
+    $effs .= "\r\n" if ($effs);
+    $effs .= '{"name":"'.$value.'","oname":"'.$eff.'","args":'.ReadingsVal($name,"effectArgs","").'}';
+    $attr{$name}{hyperionCustomEffects} = $effs;
+    return undef;
+  }
   if (scalar keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
@@ -778,6 +818,33 @@ sub Hyperion_Attr(@)
       elsif ($local && !-e $attr_value)
       {
         $err = "The given file $attr_value is not available.";
+      }
+    }
+    elsif ($attr_name eq "hyperionCustomEffects")
+    {
+      if ($attr_value !~ /^{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":{[a-zA-Z0-9:_\[\]\.",-]+}}([\s(\r\n)]{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":{[a-zA-Z0-9:_\[\]\.",-]+}}){0,}$/)
+      {
+        $err = "Invalid value $attr_value for attribute $attr_name. Must be a space separated list of JSON strings.";
+      }
+      else
+      {
+        $attr_value =~ s/\r\n/ /;
+        $attr_value =~ s/\s{2,}/ /;
+        my @custeffs = split(" ",$attr_value);
+        my @effs;
+        if (@custeffs > 1)
+        {
+          foreach my $eff (@custeffs)
+          {
+            push @effs,eval{from_json $eff};
+          }
+        }
+        else
+        {
+          push @effs,eval{from_json $attr_value};
+        }
+        $hash->{helper}{customeffects} = \@effs;
+        Hyperion_Call($hash);
       }
     }
     elsif ($attr_name eq "hyperionConfigDir")
@@ -850,6 +917,7 @@ sub Hyperion_Attr(@)
   }
   else
   {
+    delete $hash->{helper}{customeffects} if ($attr_name eq "hyperionCustomEffects");
     Hyperion_GetUpdate($hash) if (!IsDisabled($hash));
   }
   return $err if (defined $err);
@@ -938,6 +1006,12 @@ sub Hyperion_devStateIcon($;$)
   <p><b>set &lt;required&gt; [optional]</b></p>
   <ul>
     <li>
+      <i>addEffect &lt;custom_name&gt;</i><br>
+      add the current effect with the given name to the custom effects<br>
+      can be altered after adding in attribute hyperionCustomEffects<br>
+      device has to be in effect mode with a non-custom effect and given name must be a unique effect name
+    </li>
+    <li>
       <i>adjustBlue &lt;0,0,255&gt;</i><br>
       adjust each color of blue separately (comma separated) (R,G,B)<br>
       values from 0 to 255 in steps of 1
@@ -994,8 +1068,9 @@ sub Hyperion_devStateIcon($;$)
       dim up rgb light by steps defined in attribute hyperionDimStep or by given value (default: 10)
     </li>
     <li>
-      <i>effect &lt;effect&gt; [duration] [priority]</i><br>
-      set effect (replace blanks with underscore) with optional duration in seconds and priority
+      <i>effect &lt;effect&gt; [duration] [priority] [effectargs]</i><br>
+      set effect (replace blanks with underscore) with optional duration in seconds and priority<br>
+      effectargs can also be set as very last argument - must be a JSON string without any whitespace
     </li>
     <li>
       <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
@@ -1102,6 +1177,12 @@ sub Hyperion_devStateIcon($;$)
       default: /etc/hyperion/
     </li>
     <li>
+      <i>hyperionCustomEffects</i><br>
+      space separated list of JSON strings (without spaces - please replace spaces in effect names with underlines)<br>
+      must include name (as diplay name), oname (name of the base effect) and args (the different effect args), only this order is allowed (if different an error will be thrown on attribute save and the attribut value will not be saved).<br>
+      example: {"name":"Knight_Rider_speed_2","oname":"Knight_rider","args":{"color":[255,0,255],"speed":2}} {"name":"Knight_Rider_speed_4","oname":"Knight_rider","args":{"color":[0,0,255],"speed":4}}
+    </li>
+    <li>
       <i>hyperionDefaultDuration</i><br>
       default duration<br>
       default: 0 = infinity
@@ -1192,6 +1273,10 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>effect</i><br>
       active/previous effect
+    </li>
+    <li>
+      <i>effectArgs</i><br>
+      active/previous effect arguments as JSON
     </li>
     <li>
       <i>gamma</i><br>
@@ -1297,6 +1382,12 @@ sub Hyperion_devStateIcon($;$)
   <p><b>set &lt;ben&ouml;tigt&gt; [optional]</b></p>
   <ul>
     <li>
+      <i>addEffect &lt;eigener_name&gt;</i><br>
+      f&uuml;gt den aktuellen Effekt mit dem &uuml;bergebenen Namen den eigenen Effekten hinzu<br>
+      kann nachtr&auml;glich im Attribut hyperionCustomEffects ge&auml;ndert werden<br>
+      Ger&auml;t muss dazu im Effekt Modus in einen nicht-eigenen Effekt sein und der &uuml;bergebene Name muss ein einmaliger Effektname sein
+    </li>
+    <li>
       <i>adjustBlue &lt;0,0,255&gt;</i><br>
       Justiert jede Farbe von Blau separat (Komma separiert) (R,G,B)<br>
       Werte von 0 bis 255 in Schritten von 1
@@ -1353,8 +1444,9 @@ sub Hyperion_devStateIcon($;$)
       Aufhellen des RGB Lichts um angegebenen Prozentwert oder um Prozentwert der im Attribut hyperionDimStep eingestellt ist (Voreinstellung: 10)
     </li>
     <li>
-      <i>effect &lt;effect&gt; [Dauer] [Priorit&auml;t]</i><br>
-      Stellt gew&auml;hlten Effekt ein (ersetzte Leerzeichen mit Unterstrichen) mit optionaler Dauer in Sekunden und optionaler Priorit&auml;t
+      <i>effect &lt;effect&gt; [Dauer] [Priorit&auml;t] [effectargs]</i><br>
+      Stellt gew&auml;hlten Effekt ein (ersetzte Leerzeichen mit Unterstrichen) mit optionaler Dauer in Sekunden und optionaler Priorit&auml;t<br>
+      effectargs k&ouml;nnen ebenfalls &uuml;bermittelt werden - muss ein JSON String ohne Leerzeichen sein
     </li>
     <li>
       <i>gamma &lt;1.90,1.90,1.90&gt;</i><br>
@@ -1461,6 +1553,12 @@ sub Hyperion_devStateIcon($;$)
       Voreinstellung: /etc/hyperion/
     </li>
     <li>
+      <i>hyperionCustomEffects</i><br>
+      Leerzeichen separierte Liste von JSON Strings (ohne Leerzeichen - bitte Leerzeichen in Effektnamen durch Unterstriche ersetzen)<br>
+      muss name (als Anzeigename), oname (Name des basierenden Effekts) und args (die eigentlichen unterschiedlichen Effekt Argumente) beinhalten (auch genau in dieser Reihenfolge, sonst kommt beim &Uuml;bernehmen des Attributs ein Fehler und das Attribut wird nicht gespeichert)<br>
+      Beispiel: {"name":"Knight_Rider_speed_2","oname":"Knight_rider","args":{"color":[255,0,255],"speed":2}} {"name":"Knight_Rider_speed_4","oname":"Knight_rider","args":{"color":[0,0,255],"speed":4}}
+    </li>
+    <li>
       <i>hyperionDefaultDuration</i><br>
       Voreinstellung f&uuml;r Dauer<br>
       Voreinstellung: 0 = unendlich
@@ -1551,6 +1649,10 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>effect</i><br>
       aktiver/letzter Effekt
+    </li>
+    <li>
+      <i>effectArgs</i><br>
+      aktive/letzte Effekt Argumente als JSON
     </li>
     <li>
       <i>gamma</i><br>
