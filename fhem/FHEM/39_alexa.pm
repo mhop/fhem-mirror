@@ -80,7 +80,11 @@ alexa_Set($$@)
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
-    FW_directNotify($name, 'reload');
+	if( @args ) {
+      FW_directNotify($name, "reload $args[0]");
+	} else {
+      FW_directNotify($name, 'reload');
+	}
 
     return undef;
   }
@@ -166,8 +170,8 @@ alexa_Attr($$$)
   <a name="alexa_Set"></a>
   <b>Set</b>
   <ul>
-    <li>reload<br>
-      Reloads the device list in alexa-fhem. Sequently you have to start a device discovery in alexa.
+    <li>reload [name]<br>
+      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery in alexa.
     </li>
   </ul>
 
