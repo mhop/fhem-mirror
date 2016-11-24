@@ -620,6 +620,32 @@ sub Pushover_ReceiveCommand($$$) {
             }
         }
 
+        # glances.json
+        elsif ( $service eq "glances.json" ) {
+
+            readingsBulkUpdate( $hash, "lastTitle", $values->{title} );
+            readingsBulkUpdate( $hash, "lastText",
+                urlDecode( $values->{text} ) )
+              if ( $values->{text} ne "" );
+            readingsBulkUpdate( $hash, "lastSubtext",
+                urlDecode( $values->{subtext} ) )
+              if ( $values->{subtext} ne "" );
+            readingsBulkUpdate( $hash, "lastCount", $values->{count} )
+              if ( $values->{count} ne "" );
+            readingsBulkUpdate( $hash, "lastPercent", $values->{percent} )
+              if ( $values->{percent} ne "" );
+            readingsBulkUpdate( $hash, "lastDevice", $values->{device} )
+              if ( $values->{device} ne "" );
+            readingsBulkUpdate( $hash, "lastDevice",
+                ReadingsVal( $name, "devices", "all" ) )
+              if ( $values->{device} eq "" );
+
+            if ( ref($return) eq "HASH" ) {
+                readingsBulkUpdate( $hash, "lastRequest", $return->{request} )
+                  if ( defined $return->{request} );
+            }
+        }
+
         # users/validate.json
         elsif ( $service eq "users/validate.json" ) {
             if ( ref($return) eq "HASH" ) {
@@ -833,8 +859,7 @@ sub Pushover_SetMessage {
 
     # check if we got a user or group key as device and use it as
     # user-key instead of hash->USER_KEY
-    if ( $values{device} =~ /^(([A-Za-z0-9]{30}):)?([A-Za-z0-9,_-]*)(.*)$/ )
-    {
+    if ( $values{device} =~ /^(([A-Za-z0-9]{30}):)?([A-Za-z0-9,_-]*)(.*)$/ ) {
         $values{USER_KEY} = $2 if ( $2 ne "" );
         $values{device} = $3;
 
@@ -872,7 +897,7 @@ sub Pushover_SetMessage {
             && $values{message} !~ /^nohtml:.*/ )
         {
             Log3 $name, 4, "Pushover $name: handling message with HTML content";
-            $body = $body . "&html=1";
+            $body .= "&html=1";
 
             # replace \n by <br /> but ignore \\n
             $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
@@ -894,28 +919,28 @@ sub Pushover_SetMessage {
         # replace any URL-encoded \\n by \n
         $values{message} =~ s/%5c%5cn/%5cn/g;
 
-        $body = $body . "&message=" . $values{message};
+        $body .= "&message=" . $values{message};
 
         if ( $values{device} ne "" ) {
-            $body = $body . "&device=" . $values{device};
+            $body .= "&device=" . $values{device};
         }
 
         if ( $values{priority} ne "" ) {
             $values{priority} = 2  if ( $values{priority} > 2 );
             $values{priority} = -2 if ( $values{priority} < -2 );
-            $body = $body . "&priority=" . $values{priority};
+            $body .= "&priority=" . $values{priority};
         }
 
         if ( $values{sound} ne "" ) {
-            $body = $body . "&sound=" . $values{sound};
+            $body .= "&sound=" . $values{sound};
         }
 
         if ( $values{retry} ne "" ) {
-            $body = $body . "&retry=" . $values{retry};
+            $body .= "&retry=" . $values{retry};
         }
 
         if ( $values{expire} ne "" ) {
-            $body = $body . "&expire=" . $values{expire};
+            $body .= "&expire=" . $values{expire};
 
             $values{cbNr} = int( time() ) + $values{expire};
             my $cbReading = "cb_" . $values{cbNr};
@@ -926,13 +951,13 @@ sub Pushover_SetMessage {
         }
 
         if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
-            $body = $body . "&timestamp=" . int( time() );
+            $body .= "&timestamp=" . int( time() );
         }
 
         if ( $callback ne "" && $values{priority} > 1 ) {
             Log3 $name, 5,
               "Pushover $name: Adding emergency callback URL $callback";
-            $body = $body . "&callback=" . $callback;
+            $body .= "&callback=" . $callback;
         }
 
         if (   $values{url_title} ne ""
@@ -1079,8 +1104,7 @@ sub Pushover_SetMessage2 ($$$$) {
 
     # check if we got a user or group key as device and use it as
     # user-key instead of hash->USER_KEY
-    if ( $values{device} =~ /^(([A-Za-z0-9]{30}):)?([A-Za-z0-9,_-]*)(.*)$/ )
-    {
+    if ( $values{device} =~ /^(([A-Za-z0-9]{30}):)?([A-Za-z0-9,_-]*)(.*)$/ ) {
         $values{USER_KEY} = $2 if ( $2 ne "" );
         $values{device} = $3;
 
@@ -1125,7 +1149,7 @@ sub Pushover_SetMessage2 ($$$$) {
             && $values{message} !~ /^nohtml:.*/ )
         {
             Log3 $name, 4, "Pushover $name: handling message with HTML content";
-            $body = $body . "&html=1";
+            $body .= "&html=1";
 
             # replace \n by <br /> but ignore \\n
             $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
@@ -1149,7 +1173,7 @@ sub Pushover_SetMessage2 ($$$$) {
             # replace any URL-encoded \\n by \n
             $values{message} =~ s/%5c%5cn/%5cn/g;
 
-            $body = $body . "&message=" . $values{message};
+            $body .= "&message=" . $values{message};
         }
 
         elsif ( $values{text} ) {
@@ -1164,7 +1188,7 @@ sub Pushover_SetMessage2 ($$$$) {
             # replace any URL-encoded \\n by \n
             $values{text} =~ s/%5c%5cn/%5cn/g;
 
-            $body = $body . "&text=" . $values{text};
+            $body .= "&text=" . $values{text};
         }
 
         if ( $values{subtext} ) {
@@ -1179,13 +1203,13 @@ sub Pushover_SetMessage2 ($$$$) {
             # replace any URL-encoded \\n by \n
             $values{subtext} =~ s/%5c%5cn/%5cn/g;
 
-            $body = $body . "&subtext=" . $values{subtext};
+            $body .= "&subtext=" . $values{subtext};
         }
 
         if ( defined( $values{count} )
             && looks_like_number( $values{count} ) )
         {
-            $body = $body . "&count=" . $values{count};
+            $body .= "&count=" . $values{count};
         }
 
         if (   defined( $values{percent} )
@@ -1193,29 +1217,29 @@ sub Pushover_SetMessage2 ($$$$) {
             && $values{percent} >= 0
             && $values{percent} <= 100 )
         {
-            $body = $body . "&percent=" . $values{percent};
+            $body .= "&percent=" . $values{percent};
         }
 
         if ( $values{device} ne "" ) {
-            $body = $body . "&device=" . $values{device};
+            $body .= "&device=" . $values{device};
         }
 
         if ( $values{priority} ne "" ) {
             $values{priority} = 2  if ( $values{priority} > 2 );
             $values{priority} = -2 if ( $values{priority} < -2 );
-            $body = $body . "&priority=" . $values{priority};
+            $body .= "&priority=" . $values{priority};
         }
 
         if ( $values{sound} ne "" ) {
-            $body = $body . "&sound=" . $values{sound};
+            $body .= "&sound=" . $values{sound};
         }
 
         if ( $values{retry} ne "" ) {
-            $body = $body . "&retry=" . $values{retry};
+            $body .= "&retry=" . $values{retry};
         }
 
         if ( $values{expire} ne "" ) {
-            $body = $body . "&expire=" . $values{expire};
+            $body .= "&expire=" . $values{expire};
 
             $values{cbNr} = int( time() ) + $values{expire};
             my $cbReading = "cb_" . $values{cbNr};
@@ -1226,13 +1250,13 @@ sub Pushover_SetMessage2 ($$$$) {
         }
 
         if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
-            $body = $body . "&timestamp=" . int( time() );
+            $body .= "&timestamp=" . int( time() );
         }
 
         if ( $callback ne "" && $values{priority} > 1 ) {
             Log3 $name, 5,
               "Pushover $name: Adding emergency callback URL $callback";
-            $body = $body . "&callback=" . $callback;
+            $body .= "&callback=" . $callback;
         }
 
         if (   $values{url_title} ne ""
