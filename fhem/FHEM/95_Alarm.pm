@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.8";
+my $alarmversion    = "2.81";
 
 #########################################################################################
 #
@@ -441,6 +441,17 @@ sub Alarm_Arm($$$$$){
       my $cmdact  = AttrVal($name, "armact", 0);
       if( ($xdl eq '')|($xdl eq '0:00')|($xdl eq '00:00') ){
          CommandAttr(undef,$name.' level'.$level.'xec armed');
+         readingsSingleUpdate( $hash, "level".$level,"armed",0 );
+         #--transform commands from fhem to perl level
+         my @cmdactarr = split(/;/,$cmdact);
+         my $cmdactf;
+         if( int(@cmdactarr) == 1 ){
+           fhem("$cmdact");
+         }else{
+             for(my $i=0;$i<int(@cmdactarr);$i++){
+               fhem("$cmdactarr[$i]");
+           }
+         }
          $msg = "[Alarm $level] armed from alarmSensor $dev with event $evt"; 
          Log3 $hash,3,$msg; 
       } elsif( $xdl =~ /([0-9])?:([0-5][0-9])?/  ){
