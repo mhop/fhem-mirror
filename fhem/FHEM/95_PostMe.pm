@@ -41,7 +41,7 @@ use vars qw($FW_wname);         # Web instance
 
 #########################
 # Global variables
-my $postmeversion  = "1.0";
+my $postmeversion  = "1.1";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -1094,9 +1094,19 @@ sub PostMe_widget($) {
             <br />Defines the PostMe system, &lt;postit&gt; is an arbitrary name for the system. </p>
         <a name="PostMeusage"></a>
         <h4>Usage</h4>
-        Special meta data for items may be included by using "[" and "]"; characters, e.g.
+        See http://www.fhemwiki.de/wiki/Modul_PostMe
+        
+        An arbitrary number of lists may be added to the system with the <i>create</i> command as
+        <code>set &lt;postit&gt; create &lt;name&gt;</code>
+        List items may consist of one or more words, and are added/removed by the <i>add</i> and 
+        <i>remove</i>  command. 
+        Attention: A comma "," is the separator for list items.
+        <code>set &lt;postit&gt; add &lt;name&gt; &lt;some text, but careful with commas&gt;</code>
+        
+        Special meta data for items may be included in the items by using "[" and "]"; characters, e.g.
         <code>set &lt;postit&gt; add &lt;name&gt; &lt;item&gt; [&lt;attribute1&gt;="&lt;data1&gt;" ...</code>
-        The attribute-value pairs may be added,modified and removed with the set modify command, see below. 
+        These attribute-value pairs may be added, modified and removed with the <i>modify</i> command 
+        
         The sticky notes may be integrated into any Web page by simply embedding the following tags
            <ul>
            <li> <code>&lt;embed src="/fhem/PostMe_widget?type=pins&amp;postit=&lt;postit&gt;"/&gt;</code> <br/>
