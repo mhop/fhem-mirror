@@ -1183,7 +1183,7 @@ sub Pushover_SetMessage2 ($$$$) {
         }
 
         if ( defined( $values{count} )
-            && looks_like_number( $values{percent} ) )
+            && looks_like_number( $values{count} ) )
         {
             $body = $body . "&count=" . $values{count};
         }
