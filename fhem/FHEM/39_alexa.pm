@@ -100,7 +100,11 @@ alexa_Get($$@)
   my $list = "customSlotTypes";
 
   if( lc($cmd) eq 'customslottypes' ) {
-    FW_directNotify($name, 'customSlotTypes');
+    if( $hash->{CL} ) {
+      FW_directNotify($name, "customSlotTypes $hash->{CL}{NAME}");
+    } else {
+      FW_directNotify($name, 'customSlotTypes');
+    }
 
     return undef;
   }
@@ -185,7 +189,8 @@ alexa_Attr($$$)
   <b>Get</b>
   <ul>
     <li>customSlotTypes<br>
-      Instructs alexa-fhem to write the Custom Slot Types for the Interaction Model to the console.
+      Instructs alexa-fhem to write the Custom Slot Types for the Interaction Model to the alexa-fhem console
+      and if possible to the requesting fhem frontend.
     </li>
   </ul>
 
