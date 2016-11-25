@@ -20,7 +20,7 @@ alexa_Initialize($)
   #$hash->{NotifyFn} = "alexa_Notify";
   $hash->{UndefFn}  = "alexa_Undefine";
   $hash->{SetFn}    = "alexa_Set";
-  #$hash->{GetFn}    = "alexa_Get";
+  $hash->{GetFn}    = "alexa_Get";
   #$hash->{AttrFn}   = "alexa_Attr";
   $hash->{AttrList} = "$readingFnAttributes";
 }
@@ -80,11 +80,11 @@ alexa_Set($$@)
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
-	if( @args ) {
+    if( @args ) {
       FW_directNotify($name, "reload $args[0]");
-	} else {
+    } else {
       FW_directNotify($name, 'reload');
-	}
+    }
 
     return undef;
   }
@@ -97,7 +97,13 @@ alexa_Get($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "";
+  my $list = "customSlotTypes";
+
+  if( lc($cmd) eq 'customslottypes' ) {
+    FW_directNotify($name, 'customSlotTypes');
+
+    return undef;
+  }
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -172,6 +178,14 @@ alexa_Attr($$$)
   <ul>
     <li>reload [name]<br>
       Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery in alexa.
+    </li>
+  </ul>
+
+  <a name="alexa_Get"></a>
+  <b>Get</b>
+  <ul>
+    <li>customSlotTypes<br>
+      Instructs alexa-fhem to write the Custom Slot Types for the Interaction Model to the console.
     </li>
   </ul>
 
