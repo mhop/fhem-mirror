@@ -523,14 +523,18 @@ ZWDongle_Get($@)
 
   } elsif($cmd eq "routeFor") {                ############################
     my $homeId = $hash->{homeId};
-    my @list = (hex(substr($msg, 6, 2)));
-    for(my $off=8; $off<16; $off+=2) {
+    my @list;
+    for(my $off=6; $off<16; $off+=2) {
         my $dec = hex(substr($msg, $off, 2));
         my $hex = sprintf("%02x", $dec);
-        my $h = $modules{ZWave}{defptr}{"$homeId $hex"};
+        my $h = ($hex eq $hash->{nodeIdHex} ?
+                        $hash : $modules{ZWave}{defptr}{"$homeId $hex"});
         push @list, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
     }
-    $msg = "NrRouters:".join(" ", @list);
+    my $f = substr($msg, 17, 1);
+    push @list, ("at ".($f==1 ? "9.6": ($f==2 ? "40":"100"))."kbps")
+        if(@list && $f =~ m/[123]/);
+    $msg = (@list ? join(" ", @list) : "N/A");
   }
 
   $cmd .= "_".join("_", @a) if(@a);
@@ -1148,6 +1152,10 @@ ZWDongle_Ready($)
 
   <li>raw &lt;hex&gt;<br>
     Send raw data &lt;hex&gt; to the controller. Developer only.
+    </li>
+
+  <li>routeFor node<br>
+    request priority routing for node
     </li>
 
   <li>sucNodeId<br>
