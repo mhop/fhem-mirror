@@ -15,8 +15,7 @@ CUL_HOERMANN_Initialize($)
   $hash->{ParseFn}   = "CUL_HOERMANN_Parse";
   $hash->{SetFn}     = "CUL_HOERMANN_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 ".
-                       "disable:0,1 disabledForIntervals ".
-
+                       "disable:0,1 disabledForIntervals ";
 }
 
 #############################
@@ -70,7 +69,7 @@ CUL_HOERMANN_Set($@)
   return "Unknown argument $a[1], choose one of toggle:noArg"
     if($a[1] ne "toggle");
 
-  return if(IsDisabled($name));
+  return if(IsDisabled($hash->{NAME}));
 
   IOWrite($hash, "", "hn".$hash->{DEF})
 }
