@@ -64,6 +64,7 @@ my %gets = (
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
   "raw"             => "%s",      # hex
+  "routeFor"        => "92%02x",  # hex
   "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
   "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
   "version"         => "15",      # ZW_GET_VERSION
@@ -434,8 +435,10 @@ ZWDongle_Get($@)
 
   return "No $cmd for dummies" if(IsDummy($name));
 
+  my $a0 = $a[0];
   if($cmd eq "neighborList" ||
      $cmd eq "nodeInfo" ||
+     $cmd eq "routeFor" ||
      $cmd eq "isFailedNode") {
 
     $a[0] =~ s/^UNKNOWN_//;
@@ -451,6 +454,7 @@ ZWDongle_Get($@)
   return $err if($err);
 
   my $msg="";
+  $a[0] = $a0 if(defined($a0));
   $msg = $ret if($ret);
   my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
 
@@ -517,6 +521,16 @@ ZWDongle_Get($@)
   } elsif($cmd eq "sucNodeId") {               ############################
     $msg = ($r[2]==0)?"no":$r[2];
 
+  } elsif($cmd eq "routeFor") {                ############################
+    my $homeId = $hash->{homeId};
+    my @list = (hex(substr($msg, 6, 2)));
+    for(my $off=8; $off<16; $off+=2) {
+        my $dec = hex(substr($msg, $off, 2));
+        my $hex = sprintf("%02x", $dec);
+        my $h = $modules{ZWave}{defptr}{"$homeId $hex"};
+        push @list, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
+    }
+    $msg = "NrRouters:".join(" ", @list);
   }
 
   $cmd .= "_".join("_", @a) if(@a);

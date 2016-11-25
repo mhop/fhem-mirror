@@ -90,6 +90,8 @@ use vars qw(%zw_type6);
   '84'  => 'STORE_HOME_ID',
   '90'  => 'LOCK_ROUTE_RESPONSE',
   '91'  => 'ZW_SEND_DATA_ROUTE_DEMO',
+  '92'  => 'ZW_GET_PRIORITY_ROUTE',
+  '93'  => 'ZW_SET_PRIORITY_ROUTE',
   '95'  => 'SERIAL_API_TEST',
   'a0'  => 'SERIAL_API_SLAVE_NODE_INFO',
   'a1'  => 'APPLICATION_SLAVE_COMMAND_HANDLER',
