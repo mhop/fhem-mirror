@@ -1703,10 +1703,14 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                 $routeStatus .= "+LOCATION";
                             }
 
-                            my $gatewayType =
-                              $type[$i] eq "mail"
-                              ? "fhemMsgMail"
-                              : $defs{$gatewayDev}{TYPE};
+                            my $gatewayType = (
+                                $type[$i] eq "mail" ? "fhemMsgMail"
+                                : (
+                                      $defs{$gatewayDev}{TYPE}
+                                    ? $defs{$gatewayDev}{TYPE}
+                                    : "UNDEFINED"
+                                )
+                            );
 
                             my $defTitle = "";
                             $defTitle =
@@ -2338,7 +2342,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                           . " due to absence";
 
                         push @type, $fw_residentAbsent;
-                        $forwarded .= "," . $type[$i] . ">" . $fw_residentAbsent
+                        $forwarded .=
+                          "," . $type[$i] . ">" . $fw_residentAbsent
                           if ( $forwarded ne "" );
                         $forwarded .= $type[$i] . ">" . $fw_residentAbsent
                           if ( $forwarded eq "" );
