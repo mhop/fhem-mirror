@@ -12,18 +12,20 @@
 # ABU 20160416 Removed logs, added eventonchangedreading, removed debug, added 1=true for json data
 # ABU 20160426 Fixed decode warning, added error support
 # ABU 20160515 Added splitFn and doku
+# BJOERNAR 20160715 added duration and wlan-signal
+# ABU 20160831 Integrated API-changes for RC9, added attribute timeout for httpData
+# ABU 20160831 added calculations for duration and wlan - show in hours and percent
+# ABU 20160901 rounded duration and wlan
+# ABU 20161120 addaed encode_utf8 at json decode, tuned 0.5b repiar-stuff, added hibernate
+# ABU 20161126 added summary
 
 package main;
 
 use strict;
 use warnings;
 use HttpUtils;
+use Encode;
 use JSON;
-
-#available get cmds
-my %gets = (
-	"status" => "noArg"
-);
 
 my $EOD = "feierabend";
 my $HOME = "home";
@@ -32,15 +34,22 @@ my $MANUAL = "manuell";
 my $START = "start";
 my $STOP = "stop";
 my $OFFLINE = "offline";
+my $HYBERNATE = "winterschlaf";
+
+#available get cmds
+my %gets = (
+	"status" => "noArg"
+);
 
 #available set cmds
 my %sets = (
-	$EOD => "noArg",
+	"feierabend" => "noArg",
 	$HOME => "noArg",
 	$AUTO => "noArg",
 	$MANUAL => "noArg",
 	$START => "noArg",
-	$STOP => "noArg"	
+	$STOP => "noArg",
+	$HYBERNATE => "on,off"
 );
 
 my %commands = (
@@ -60,9 +69,10 @@ my %elements = (
 		"status" =>
 		{
 			ALIAS		=> "allgemein",
-			"status" 	=> {ALIAS=>"status", 0=>"schlafen", 1=>"parken", 2=>"maehen", 3=>"suche-base", 4=>"laden", 5=>"suche", 7=>"fehler", 8=>"schleife-fehlt"}, 
+			"status" 	=> {ALIAS=>"status", 0=>"schlafen", 1=>"parken", 2=>"maehen", 3=>"suche-base", 4=>"laden", 5=>"suche", 7=>"fehler", 8=>"schleife-fehlt", 16=>"abgeschaltet", 17=>"schlafen"}, 
 			"mode"	 	=> {ALIAS=>"modus", 0=>"automatik", 1=>"manuell", 2=>"home", 3=>"demo"}, 
 			"battery" 	=> {ALIAS=>"batteriezustand"},
+			"duration" 	=> {ALIAS=>"dauer"},
 			"hours"		=> {ALIAS=>"betriebsstunden"}
 		},
 		
@@ -78,6 +88,12 @@ my %elements = (
 				#"date"		=> {ALIAS=>"start-unix"},
 			}
 		},
+		
+		"wlan" =>
+		{
+			ALIAS			=> "wlan",
+			"signal"		=> {ALIAS=>"signal"}
+		},		
 		
 		"error" =>
 		{
@@ -109,6 +125,7 @@ sub Robonect_Initialize($) {
 								"credentials " .			#user/password combination for authentication in mower, stored in a credentials file
 								"basicAuth " .				#user/password combination for authentication in mower								
 								"pollInterval " .			#interval to poll in seconds
+								"timeout " .				#interval to poll in seconds
 								"$readingFnAttributes ";	#standard attributes
 }
 
@@ -207,7 +224,8 @@ sub Robonect_Undef($$)
 #############################
 sub Robonect_Shutdown($) 
 {
-	my ($hash, $name) = @_;
+	my $hash = @_;
+	my $name = $hash->{NAME};
 	
 	Log3 ($name, 5, "enter shutdown $name: hash: $hash name: $name");
 	Log3 ($name, 5, "exit shutdown");
@@ -238,13 +256,14 @@ sub Robonect_Get($@)
 
 	#backup cmd
 	my $cmd = $a[1];
-	#response for gui
-	return "Unknown argument, choose one of " . join(" ", " ", sort keys %gets) if(!defined($cmd));	
-	return "Unknown argument $cmd, choose one of " . join(" ", " ", sort keys %gets) if(!defined($gets{$cmd}));
 	#lower cmd
 	$cmd = lc($cmd);
 	
-	my ($userName, $passWord) = getCredentials ($hash);
+	#create response, if cmd is wrong or gui asks
+	my $cmdTemp = Robonect_getCmdList ($hash, $cmd, %gets);
+	return $cmdTemp if (defined ($cmdTemp)); 
+	
+	my ($userName, $passWord) = Robonect_getCredentials ($hash);
 	
 	#basic url
 	my $url = "http://" . $hash->{IP} . "/json?";
@@ -258,17 +277,25 @@ sub Robonect_Get($@)
 	$httpData->{loglevel} = AttrVal ($name, "verbose", 2);
 	$httpData->{loglevel} = 5;
 	$httpData->{hideurl} = 0;		
-	$httpData->{callback} = \&callback;
+	$httpData->{callback} = \&Robonect_callback;
 	$httpData->{hash} = $hash;
 	$httpData->{cmd} = $commands{GET_STATUS};
+	$httpData->{timeout} = AttrVal ($name, "timeout", 4);
 		
 	HttpUtils_NonblockingGet($httpData);
-		
-	return $httpData->{err};
 	
-	Log3 ($name, 5, "exit get");	
+	Log3 ($name, 5, "exit get");
 	
-	return undef;
+	my $err = $httpData->{err};
+	
+	if (defined ($err) and (length ($err) > 0))
+	{
+		return $err;
+	}
+	else
+	{
+		return "update requested";
+	}
 }
 
 #Sends commands to the mower
@@ -283,40 +310,66 @@ sub Robonect_Set($@)
 	
 	#backup cmd
 	my $cmd = $a[1];
-	#response for gui
-	return "Unknown argument, choose one of " . join(" ", " ", sort keys %sets) if(!defined($cmd));	
-	return "Unknown argument $cmd, choose one of " . join(" ", " ", sort keys %sets) if(!defined($sets{$cmd}));
 	#lower cmd
 	$cmd = lc($cmd);
 	
-	my ($userName, $passWord) = getCredentials ($hash);
-	my $decodedCmd = $commands{SET_MODE}{$cmd};
+	#create response, if cmd is wrong or gui asks
+	my $cmdTemp = Robonect_getCmdList ($hash, $cmd, %sets);
+	return $cmdTemp if (defined ($cmdTemp)); 
 	
-	#execute it
-	if (defined ($decodedCmd))
+	my ($userName, $passWord) = Robonect_getCredentials ($hash);
+	my $decodedCmd = $commands{SET_MODE}{$cmd};
+
+	#if command is hybernate, do this
+	if ($cmd = lc($HYBERNATE))
 	{
+		Log3 ($name, 5, "got hybernate for set-command");
+			
+		my $val = lc($a[2]);
+		$val = "off" if (!defined ($val));
+			
+		if ($val =~ m/on/)
+		{
+			readingsSingleUpdate($hash, $HYBERNATE, "on", 1);
+			Log3 ($name, 5, "activated hybernate");
+		}
+		elsif ($val =~ m/off/)
+		{
+			readingsSingleUpdate($hash, $HYBERNATE, "off", 1);
+			Log3 ($name, 5, "deactivated hybernate");
+		}
+		else
+		{
+			return "only on or off are supported for $HYBERNATE";
+		}	
+	}
+	#else proceed with communication to mower
+	#execute it
+	elsif (defined ($decodedCmd))
+	{
+
 		my $url = "http://" . $hash->{IP} . "/json?";
 		#append userdata, if given
 		$url = $url . "user=" . $userName . "&pass=" . $passWord . "&" if (defined ($userName) and defined ($passWord));
 		#append command
 		$url = $url . $decodedCmd;
-		
+			
 		print "URL: $url\n";
-		
+			
 		my $httpData;
 		$httpData->{url} = $url;
 		$httpData->{loglevel} = AttrVal ($name, "verbose", 2);
 		$httpData->{loglevel} = 5;
 		$httpData->{hideurl} = 0;		
-		$httpData->{callback} = \&callback;
+		$httpData->{callback} = \&Robonect_callback;
 		$httpData->{hash} = $hash;
 		$httpData->{cmd} = $decodedCmd;
-		
+			
 		HttpUtils_NonblockingGet($httpData);
-		
+			
 		return $httpData->{err};
-		
-		Robonect_GetUpdate($hash);
+			
+		Robonect_GetUpdate($hash);		
     }	
 	
 	Log3 ($name, 5, "exit set");	
@@ -425,11 +478,17 @@ sub Robonect_GetUpdate($)
 	
 	Log3 ($name, 5, "enter update $name: $name");
 
-	#get status	
-	my @callAttr;
-	$callAttr[0] = $name;
-	$callAttr[1] = "status";
-	Robonect_Get ($hash, @callAttr);
+	#evaluate reading hybernate
+	my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
+	#supress sending, if hybernate is set
+	if (!defined ($hybernate) or ($hybernate =~ m/off/))
+	{
+		#get status	
+		my @callAttr;
+		$callAttr[0] = $name;
+		$callAttr[1] = "status";
+		Robonect_Get ($hash, @callAttr);
+	}
 
 	my $interval = AttrVal($name,"pollInterval",90);
 	#reset timer
@@ -440,7 +499,7 @@ sub Robonect_GetUpdate($)
 
 #Private function which handles http-responses
 #############################
-sub callback ($)
+sub Robonect_callback ($)
 {
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
@@ -461,12 +520,13 @@ sub callback ($)
 		
 		#repair V5.0b
 		$data =~ s/:"/,"/g;
-				
-		my $answer = decode_json $data;
+		$data = "" if (!defined($data));
+		
+		my $answer = decode_json (encode_utf8($data));
 		
 		Log3 ($name, 3, "callback - url ".$param->{url}." repaired: $data");
 		
-		my ($key, $value) = decodeContent ($hash, $answer, "successful", undef, undef);
+		my ($key, $value) = Robonect_decodeContent ($hash, $answer, "successful", undef, undef);
 		
 		$hash->{LAST_CMD} = $param->{cmd};
 		$hash->{LAST_COMM_STATUS} = "success: " . $value;
@@ -483,26 +543,39 @@ sub callback ($)
 			
 			readingsBeginUpdate($hash);
 
-			#($key, $value) = decodeContent ($hash, $answer, "successful", undef);
+			#($key, $value) = Robonect_decodeContent ($hash, $answer, "successful", undef);
 			#readingsBulkUpdate($hash, $key, $value);			
 
-			($key, $value) = decodeContent ($hash, $answer, "status", "status", undef);
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "status", undef);
 			readingsBulkUpdate($hash, $key, $value);
 			readingsBulkUpdate($hash, "state", $value);
-			($key, $value) = decodeContent ($hash, $answer, "status", "mode", undef);
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "mode", undef);
 			readingsBulkUpdate($hash, $key, $value);
-			($key, $value) = decodeContent ($hash, $answer, "status", "battery", undef);
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "battery", undef);
 			readingsBulkUpdate($hash, $key, $value);
-			($key, $value) = decodeContent ($hash, $answer, "status", "hours", undef);
+			$value = 0;
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "duration", undef);
+			readingsBulkUpdate($hash, $key, sprintf ("%d", $value/3600));				
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "hours", undef);
 			readingsBulkUpdate($hash, $key, $value);
 
-			($key, $value) = decodeContent ($hash, $answer, "timer", "status", undef);
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "status", undef);
 			readingsBulkUpdate($hash, $key, $value);
 			
-			($key, $value) = decodeContent ($hash, $answer, "timer", "next", "date");
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "next", "date");
 			readingsBulkUpdate($hash, $key, $value);
-			($key, $value) = decodeContent ($hash, $answer, "timer", "next", "time");
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "next", "time");
 			readingsBulkUpdate($hash, $key, $value);
+			
+			$value = -95;
+			($key, $value) = Robonect_decodeContent ($hash, $answer, "wlan", "signal", undef);
+			readingsBulkUpdate($hash, $key, $value);			
+			
+			if (defined($value))
+			{
+				$value = sprintf ("%d", ($value + 95) / 0.6);
+				readingsBulkUpdate($hash, $key . "-prozent", $value);
+			}
 			
 			readingsEndUpdate($hash, 1);
 		}
@@ -532,7 +605,7 @@ sub callback ($)
 
 #Private function to get json-content
 #############################
-sub decodeContent ($$$$$)
+sub Robonect_decodeContent ($$$$$)
 {
 	my ($hash, $msg, $key1, $key2, $key3) = @_;
 	my $name = $hash->{NAME};
@@ -571,7 +644,7 @@ sub decodeContent ($$$$$)
 
 #Private function to evaluate credentials
 #############################
-sub decodeAnswer ($$$)
+sub Robonect_decodeAnswer ($$$)
 {
 	my ($hash, $getCmd, @readings) = @_;
 	my $name = $hash->{NAME};
@@ -620,7 +693,7 @@ sub decodeAnswer ($$$)
 
 #Private function to evaluate credentials
 #############################
-sub getCredentials ($)
+sub Robonect_getCredentials ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
@@ -682,6 +755,45 @@ sub getCredentials ($)
 	return $userName, $passWord;
 }
 
+#Private function to evaluate command-lists
+#############################
+sub Robonect_getCmdList ($$$)
+{
+	my ($hash, $cmd, %cmdArray) = @_;
+
+	my $name = $hash->{NAME};
+
+	#return, if cmd is valid
+	return undef if (defined ($cmd) and defined ($cmdArray{$cmd}));
+	
+	#response for gui or the user, if command is invalid
+	my $retVal;
+	foreach my $mySet (keys %cmdArray)
+	{
+		#append set-command
+		$retVal = $retVal . " " if (defined ($retVal));
+		$retVal = $retVal . $mySet;
+		#get options
+		my $myOpt = $cmdArray{$mySet};
+		#append option, if valid
+		$retVal = $retVal . ":" . $myOpt if (defined ($myOpt) and (length ($myOpt) > 0));
+		$myOpt = "" if (!defined($myOpt));
+		Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+	}
+	
+	if (!defined ($retVal))
+	{
+		$retVal = "error while parsing set-table" ;
+	}
+	else
+	{
+		$retVal = "Unknown argument $cmd, choose one of " . $retVal;	
+	}
+	
+		
+	return $retVal;
+}
+
 1;
 
 =pod
@@ -696,6 +808,8 @@ sub getCredentials ($)
   <ul>
     <code>define &lt;name&gt; Robonect &lt;ip-adress&gt [&lt;user&gt; &lt;password&gt;]</code>
     
+	<p>Setting Winterschlaf prevents communicating with the mower.</p>
+	
 	<p>The authentication can be supplied in the definition as plaine text or in a differen way - see the attributes. Per default the status is polled every 90s.</p>
 
     <p>Example:</p>
@@ -776,9 +890,16 @@ sub getCredentials ($)
   <ul>
 	Supplies the interval top poll the robonect in seconds. Per default 90s is set.
   </ul>
+  
+  <p><a name="RobonectTimeout"></a> <b>timeout</b></p>
+  <ul>
+	Timeout for httpData to recive data. Default is 4s.
+  </ul>
 </ul>
 =end html
-
+=device
+=item summary Communicates to HW-module robonect
+=item summary_DE Kommuniziert mit dem HW-Modul Robonect
 =begin html_DE
 
 <a name="Robonect"></a> 
@@ -791,6 +912,8 @@ sub getCredentials ($)
   <ul>
     <code>define &lt;name&gt; Robonect &lt;ip-adress&gt [&lt;user&gt; &lt;password&gt;]</code>
     
+	<p>Mit gesetztem Winterschlaf wird die Kommunikation zum Mäher unterbunden.</p>
+	
 	<p>Die Zugangsinformationen können im Klartext bei der Definition angegeben werden. Wahlweise auch per Attribut. Standardmäßig wird der Status vom RObonect alle 90s aktualisiert.</p>
 
     <p>Beispiel:</p>
@@ -871,6 +994,11 @@ sub getCredentials ($)
   <ul>
 	Hier kann das polling-interval in Sekunden angegeben werden. Default sind 90s.
   </ul>
+  
+  <p><a name="RobonectTimeout"></a> <b>timeout</b></p>
+  <ul>
+	Für das holen der Daten per Wlan kann hier ein Timeout angegeben werden. Default sind 4s.
+  </ul>  
 </ul>
 =end html_DE
 
