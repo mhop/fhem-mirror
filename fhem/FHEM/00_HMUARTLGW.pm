@@ -1481,6 +1481,13 @@ sub HMUARTLGW_Write($$$)
 		                                 substr($msg, 10, 6),
 		                                 substr($msg, 16, 6));
 
+		if (!defined($hash->{owner}) ||
+		    !defined($hash->{Helper}{FW})) {
+			Log3($hash, 1, "HMUARTLGW ${name}: Device not initialized (state: $hash->{DevState}, " .
+			               ReadingsVal($name, "cond", "").") but asked to send data. Dropping: ${msg}");
+			return;
+		}
+
 		if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24 &&
 		    defined($hash->{Peers}{$dst})) {
 			# Acks are generally send by HMUARTLGW autonomously
