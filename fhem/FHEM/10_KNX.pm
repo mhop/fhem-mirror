@@ -19,6 +19,7 @@
 # ABU 20161121 cleaned get/set options
 # ABU 20161122 fixed set-handling
 # ABU 20161126 added summary
+# ABU 20161126 fixed doku
 
 package main;
 
@@ -1774,7 +1775,8 @@ sub KNX_getCmdList ($$$)
 	dpt14.056 -Inf.0..+Inf.0 W<br>
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
-	dpt16 String<br>
+	dpt16 String;<br>
+	dpt232 RGB-Value RRGGBB<br>	
   </ul>		
 </ul>
 =end html
@@ -2033,7 +2035,8 @@ sub KNX_getCmdList ($$$)
 	dpt14.056 -Inf.0..+Inf.0 W<br>
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
-	dpt16 String<br>
+	dpt16 String;<br>
+	dpt232 RGB-Wert RRGGBB<br>	
   </ul>
 </ul>
 =end html_DE
