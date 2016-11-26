@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMAD: 74_AMADautomagicFlowset_2.6.7.xml fix Problems with zero
+                      Global Variables
   - feature: 18_CUL_HOERMANN has toggle. culfw 1.67 needed
   - feature: 98_Hyperion: effects can now be set with additional effect args
                           new set addEffect

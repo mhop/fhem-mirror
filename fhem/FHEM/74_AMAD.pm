@@ -38,7 +38,7 @@ use Encode qw(encode);
 
 
 my $modulversion = "2.6.6";
-my $flowsetversion = "2.6.6";
+my $flowsetversion = "2.6.7";
 
 
 
