@@ -31,7 +31,8 @@ use strict;
 use warnings;
 use vars qw(%data);
 use HttpUtils;
-use Encode;
+use utf8;
+use Encode qw(encode_utf8 decode_utf8);
 use Unit;
 use Data::Dumper;
 
@@ -701,8 +702,13 @@ sub Wunderground_Hash2Readings($$;$) {
                 }
 
                 $reading = "fc" . $period . "_";
-                $h->{fcttext_metric} =~ s/(\d)C/$1°C/g;
-                $h->{fcttext} =~ s/(\d)F/$1 °F/g;
+                my $symbol_c = Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'C' );
+                my $symbol_f = Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'F' );
+                my $symbol_pct = Encode::encode_utf8( chr(0x00A0) . '%' );
+                $h->{fcttext_metric} =~ s/(\d)C/$1$symbol_c/g;
+                $h->{fcttext} =~ s/(\d)F/$1$symbol_f/g;
+                $h->{fcttext_metric} =~ s/(\d)\s*%/$1$symbol_pct/g;
+                $h->{fcttext} =~ s/(\d)\s*%/$1$symbol_pct/g;
 
                 readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
