@@ -224,8 +224,11 @@ sub Robonect_Undef($$)
 #############################
 sub Robonect_Shutdown($) 
 {
-	my $hash = @_;
-	my $name = $hash->{NAME};
+	my ($hash) = @_;
+	
+	#hash may be de-referenced already
+	my $name = "robonect-not_named_any_more";	
+	$name = $hash{NAME} if (ref($hash) eq 'HASH');
 	
 	Log3 ($name, 5, "enter shutdown $name: hash: $hash name: $name");
 	Log3 ($name, 5, "exit shutdown");
