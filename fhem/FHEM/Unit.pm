@@ -434,7 +434,6 @@ my $rtype_base = {
         },
         format => '%.2f',
         scope  => '^[0-9]*(?:\.[0-9]*)?$',
-        tmpl   => '%value%' . chr(0x202F) . '%symbol%',
     },
 
     25 => {
@@ -1239,7 +1238,6 @@ my $rtypes = {
             de => 'Prozent',
             en => 'percent',
         },
-        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => 0, max => 100 },
     },
 
@@ -1323,8 +1321,6 @@ my $rtypes = {
             de => 'Grad Celsius',
             en => 'Degrees Celsius',
         },
-
-        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => -273.15 },
     },
 
@@ -1340,7 +1336,6 @@ my $rtypes = {
             de => 'Grad Fahrenheit',
             en => 'Degrees Fahrenheit',
         },
-        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => -459.67 },
     },
 
@@ -1686,7 +1681,7 @@ my $rtypes = {
         ref_base  => 15,
         ref       => 'mi',
         ref_t     => 'hr',
-        tmpl      => '%value%' . chr(0x202F) . 'mph',
+        tmpl      => '%value%' . chr(0x00A0) . 'mph',
         tmpl_long => {
             de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
             en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
@@ -2600,8 +2595,9 @@ sub replaceTemplate ($$$$;$) {
         && $desc->{scale_txt_long_cu} );
 
     # short
-    $txt = '%value%' . chr(0x202F) . '%suffix%';
-    $txt = $desc->{tmpl} if ( $desc->{tmpl} );
+    $txt = '%value%' . chr(0x00A0) . '%suffix%' if ( !$desc->{symbol} );
+    $txt = '%value%' . chr(0x202F) . '%symbol%' if ( $desc->{symbol} );
+    $txt = $desc->{tmpl}                        if ( $desc->{tmpl} );
     if ( $r && $reading && $r->{$reading} ) {
         foreach my $k ( keys %{ $r->{$reading} } ) {
             $txt =~ s/%$k%/$r->{$reading}{$k}/g;
