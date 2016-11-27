@@ -704,11 +704,17 @@ sub Wunderground_Hash2Readings($$;$) {
                 $reading = "fc" . $period . "_";
                 my $symbol_c = Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'C' );
                 my $symbol_f = Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'F' );
-                my $symbol_pct = Encode::encode_utf8( chr(0x00A0) . '%' );
+                my $symbol_pct = Encode::encode_utf8( chr(0x202F) . '%' );
+                my $symbol_kmh = Encode::encode_utf8( chr(0x00A0) . 'km/h' );
+                my $symbol_mph = Encode::encode_utf8( chr(0x00A0) . 'mph' );
                 $h->{fcttext_metric} =~ s/(\d)C/$1$symbol_c/g;
                 $h->{fcttext} =~ s/(\d)F/$1$symbol_f/g;
                 $h->{fcttext_metric} =~ s/(\d)\s*%/$1$symbol_pct/g;
                 $h->{fcttext} =~ s/(\d)\s*%/$1$symbol_pct/g;
+                $h->{fcttext_metric} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
+                $h->{fcttext} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
+                $h->{fcttext_metric} =~ s/(\d)\s*mph/$1$symbol_mph/g;
+                $h->{fcttext} =~ s/(\d)\s*mph/$1$symbol_mph/g;
 
                 readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
