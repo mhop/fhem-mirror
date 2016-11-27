@@ -822,7 +822,7 @@ sub Hyperion_Attr(@)
     }
     elsif ($attr_name eq "hyperionCustomEffects")
     {
-      if ($attr_value !~ /^{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":{[a-zA-Z0-9:_\[\]\.",-]+}}([\s(\r\n)]{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":{[a-zA-Z0-9:_\[\]\.",-]+}}){0,}$/)
+      if ($attr_value !~ /^\{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":\{[a-zA-Z0-9:_\[\]\.",-]+\}\}([\s(\r\n)]\{"name":"[a-zA-Z0-9_-]+","oname":"[a-zA-Z0-9_-]+","args":\{[a-zA-Z0-9:_\[\]\.",-]+\}\}){0,}$/)
       {
         $err = "Invalid value $attr_value for attribute $attr_name. Must be a space separated list of JSON strings.";
       }
