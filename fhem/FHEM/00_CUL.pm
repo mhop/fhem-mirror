@@ -25,7 +25,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "raw"      => ["", '.*'],
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
   "fhtbuf"   => ["T03", '^[0-9A-F]+[\r\n]*$' ],
-  "cmds"     => ["?", '.*Use one of[ \*0-9A-Za-z]+[\r\n]*$' ],
+  "cmds"     => ["?", '.*Use one of( .)*[\r\n]*$' ],
   "credit10ms" => [ "X", '^.. *\d*[\r\n]*$' ],
 );
 

@@ -150,7 +150,7 @@ sub
 STACKABLE_CC_DelPrefix($$)
 {
   my ($hash, $msg) = @_;
-  $msg =~ s/^.//;
+  $msg =~ s/^[^A-Z0-9]//i;
   return $msg;
 }
 
