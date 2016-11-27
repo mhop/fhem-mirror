@@ -6,7 +6,7 @@ package main;
 use strict;
 use warnings;
 
-#use IO::Socket::INET;
+use JSON;
 
 sub
 alexa_Initialize($)
@@ -22,7 +22,7 @@ alexa_Initialize($)
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
   #$hash->{AttrFn}   = "alexa_Attr";
-  $hash->{AttrList} = "$readingFnAttributes";
+  $hash->{AttrList} = "alexaMapping:textField-long articles prepositions $readingFnAttributes";
 }
 
 #####################################
@@ -105,6 +105,173 @@ alexa_Get($$@)
     } else {
       FW_directNotify($name, 'customSlotTypes');
     }
+
+    my %mappings;
+    if( my $mappings = AttrVal( $name, 'alexaMapping', undef ) ) {
+      foreach my $mapping ( split( / |\n/, $mappings ) ) {
+        next if( !$mapping );
+        next if( $mapping =~ /^#/ );
+
+        my %characteristic;
+        my ($characteristic, $remainder) = split( /:|=/, $mapping, 2 );
+        if( $characteristic =~ m/([^.]+)\.([^.]+)/ ) {
+          $characteristic = $1;
+          $characteristic{device} = $2;
+        }
+
+        my @parts = split( /,/, $remainder );
+        foreach my $part (@parts) {
+          my @p = split( '=', $part );
+          if( $p[1] =~ m/;/ ) {
+            my @values = split(';', $p[1]);
+            my @values2 = grep {$_ ne ''} @values;
+
+            $characteristic{$p[0]} = \@values2;
+
+            if( scalar @values != scalar @values2 ) {
+              $characteristic{"_$p[0]"} = \@values;
+              $characteristic{$p[0]} = $values2[0] if( scalar @values2 == 1 );
+            }
+          } else {
+            $characteristic{$p[0]} = $p[1];
+          }
+        }
+
+        $mappings{$characteristic} = [] if( !$mappings{$characteristic} );
+        push $mappings{$characteristic}, \%characteristic;
+      }
+    }
+#Log 1, Dumper \%mappings;
+
+    my $schema = { intents => [] };
+    my $types = {};
+    $types->{FHEM_article} = [split( /,|;/, AttrVal( $name, 'articles', 'der,die,das,den' ) ) ];
+    $types->{FHEM_preposition} = [split( /,|;/, AttrVal( $name, 'prepositions', 'in,im,in der' ) ) ];
+    my $samples = '';
+    foreach my $characteristic ( keys %mappings ) {
+      my $mappings = $mappings{$characteristic};
+      $mappings = [$mappings] if( ref($mappings) ne 'ARRAY');
+      my $i = 0;
+      foreach my $mapping (@{$mappings}) {
+        if( !$mapping->{verb} ) {
+          Log3 $name, 2, "alexaMapping: no verb given for $characteristic characteristic";
+          next;
+        }
+
+        sub merge($$) {
+          my ($a, $b) = @_;
+          return $a if( !defined($b) );
+
+          my @result = ();
+
+          if( ref($b) eq 'ARRAY' ) {
+            @result = keys %{{map {((split(':',$_,2))[0] => 1)} (@{$a}, @{$b})}};
+          } else {
+            push @{$a}, $b;
+            return $a;
+          }
+
+          return \@result;
+        }
+
+        my $values = [];
+        $values = merge( $values, $mapping->{values} );
+        $values = merge( $values, $mapping->{valueOn} );
+        $values = merge( $values, $mapping->{valueOff} );
+        $values = merge( $values, $mapping->{valueToggle} );
+
+
+        my $nr = $i?chr(65+$i):'';
+        my $intent = $characteristic .'Intent'. $nr;
+
+        my $slots = [];
+        push $slots, { name => 'article', type => 'FHEM_article' };
+        push $slots, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
+        push $slots, { name => 'preposition', type => 'FHEM_preposition' };
+        push $slots, { name => 'Room', type => 'FHEM_Room' };
+        if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
+          push $slots, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
+          $types->{"${characteristic}_prefix$nr"} = $mapping->{valuePrefix};
+        }
+        if( $mapping->{values} && $mapping->{values} =~ /^AMAZON/ ) {
+          push $slots, { name => "${characteristic}_Value$nr", type => $mapping->{values} };
+        } else {
+          push $slots, { name => "${characteristic}_Value$nr", type => "${characteristic}_Value$nr" };
+          $types->{"${characteristic}_Value$nr"} = $values if( $values->[0] );
+        }
+        if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
+          push $slots, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
+          $types->{"${characteristic}_suffix"} = $mapping->{valueSuffix$nr};
+        }
+
+        if( ref($mapping->{articles}) eq 'ARRAY' ) {
+          $types->{"${characteristic}_article$nr"} = $mapping->{articles};
+        }
+
+        $mapping->{verb} = [$mapping->{verb}] if( ref($mapping->{verb}) ne 'ARRAY' );
+        foreach my $verb (@{$mapping->{verb}}) {
+          my @articles = ('','{article}');
+          if( ref($mapping->{articles}) eq 'ARRAY' ) {
+            $articles[1] = "{${characteristic}_article}";
+          } elsif( $mapping->{articles} ) {
+            @articles = ($mapping->{articles});
+          }
+          foreach my $article (@articles) {
+            foreach my $room ('','{Room}') {
+              my $line;
+
+              $line .= "$intent $verb";
+              $line .= " $article" if( $article );
+              $line .= $mapping->{device}?" $mapping->{device}":' {Device}';
+              $line .= " {preposition} $room" if( $room );
+              if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
+                $line .= " {${characteristic}_valuePrefix$nr}";
+              } else {
+                $line .= " $mapping->{valuePrefix}" if( $mapping->{valuePrefix} );
+              }
+              $line .= " {${characteristic}_Value$nr}";
+              if( ref($mapping->{_valueSuffix}) eq 'ARRAY' ) {
+                $line .= "\n$line";
+              }
+              if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
+                $line .= " {${characteristic}_valueSuffix$nr}";
+              } else {
+                $line .= " $mapping->{valueSuffix}" if( $mapping->{valueSuffix} );
+              }
+
+              $samples .= "\n" if( $samples );
+              $samples .= $line;
+            }
+          }
+        }
+        push $schema->{intents}, {intent => $intent, slots => $slots};
+
+        ++$i;
+      }
+      $samples .= "\n";
+    }
+
+    my $json = JSON->new;
+    $json->pretty(1);
+
+    my $t;
+    foreach my $type ( sort keys %{$types} ) {
+      $t .= "\n" if( $t );
+      $t .= "$type\n  ";
+      $t .= join("\n  ", sort @{$types->{$type}} );
+    }
+
+    return "Intent Schema:\n".
+           "--------------\n".
+           $json->utf8->encode( $schema ) ."\n".
+           "Custom Slot Types:\n".
+           "----------_-------\n".
+           $t. "\n\n".
+           "Sample Utterances:\n".
+           "------------------\n".
+           $samples.
+           "\nreload 39_alexa\n".
+           "get alexa customSlotTypes\n";
 
     return undef;
   }
