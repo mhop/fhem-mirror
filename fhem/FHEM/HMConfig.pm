@@ -1796,7 +1796,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,statusRequest  =>""
                                                 ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
                                                }
-                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."}
+                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright[0-100]- -colVal[0-100]- -duration- -ramp- ..."}
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."}
                      ,"HM-Sec-Sir-WM01"      =>{ on             =>""
                                                 ,off            =>""
