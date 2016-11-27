@@ -5,6 +5,8 @@ use warnings;
 use Scalar::Util qw(looks_like_number);
 use FHEM::UConv;
 use Data::Dumper;
+use utf8;
+use Encode qw(encode_utf8 decode_utf8);
 
 sub Unit_Initialize() {
 }
@@ -432,7 +434,7 @@ my $rtype_base = {
         },
         format => '%.2f',
         scope  => '^[0-9]*(?:\.[0-9]*)?$',
-        tmpl   => '%value% %symbol%',
+        tmpl   => '%value%' . chr(0x00A0) . '%symbol%',
     },
 
     25 => {
@@ -789,7 +791,7 @@ my $rtypes = {
             en => 'time hh:mm',
         },
         tmpl_long => {
-            de => '%value% Uhr',
+            de => '%value%' . chr(0x00A0) . 'Uhr',
             en => '%value%',
         }
     },
@@ -1237,7 +1239,7 @@ my $rtypes = {
             de => 'Prozent',
             en => 'percent',
         },
-        tmpl  => '%value% %symbol%',
+        tmpl  => '%value%' . chr(0x00A0) . '%symbol%',
         scope => { min => 0, max => 100 },
     },
 
@@ -1283,7 +1285,7 @@ my $rtypes = {
     # plane angular
     gon => {
         ref_base => 14,
-        symbol   => '°',
+        symbol   => chr(0x00B0),
         suffix   => 'gon',
         txt      => {
             de => 'Grad',
@@ -1306,7 +1308,7 @@ my $rtypes = {
     # temperature
     c => {
         ref_base => 4,
-        symbol   => chr(0xC2) . chr(0xB0) . 'C',
+        symbol   => chr(0x00B0) . 'C',
         suffix   => 'C',
         txt      => {
             de => 'Grad Celsius',
@@ -1316,13 +1318,14 @@ my $rtypes = {
             de => 'Grad Celsius',
             en => 'Degrees Celsius',
         },
-        tmpl  => '%value%%symbol%',
+
+        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => -273.15 },
     },
 
     f => {
         ref_base => 4,
-        symbol   => chr(0xC2) . chr(0xB0) . 'F',
+        symbol   => chr(0x00B0) . 'F',
         suffix   => 'F',
         txt      => {
             de => 'Grad Fahrenheit',
@@ -1332,7 +1335,7 @@ my $rtypes = {
             de => 'Grad Fahrenheit',
             en => 'Degrees Fahrenheit',
         },
-        tmpl  => '%value% %symbol%',
+        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => -459.67 },
     },
 
@@ -1483,8 +1486,8 @@ my $rtypes = {
             en => 'inches',
         },
         tmpl         => '%value%%symbol%',
-        tmpl_long    => '%value% %txt%',
-        tmpl_long_pl => '%value% %txt_pl%',
+        tmpl_long    => '%value%' . chr(0x00A0) . '%txt%',
+        tmpl_long_pl => '%value%' . chr(0x00A0) . '%txt_pl%',
     },
 
     ft => {
@@ -1500,8 +1503,8 @@ my $rtypes = {
             en => 'feet',
         },
         tmpl         => '%value%%symbol%',
-        tmpl_long    => '%value% %txt%',
-        tmpl_long_pl => '%value% %txt_pl%',
+        tmpl_long    => '%value%' . chr(0x00A0) . '%txt%',
+        tmpl_long_pl => '%value%' . chr(0x00A0) . '%txt_pl%',
     },
 
     yd => {
@@ -1667,14 +1670,14 @@ my $rtypes = {
         ref_base  => 15,
         ref       => 'ft',
         ref_t     => 'sec',
-        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_t%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_t%',
         },
     },
 
@@ -1682,14 +1685,14 @@ my $rtypes = {
         ref_base  => 15,
         ref       => 'mi',
         ref_t     => 'hr',
-        tmpl      => '%value% mph',
+        tmpl      => '%value%' . chr(0x00A0) . 'mph',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_t%',
         },
     },
 
@@ -1698,14 +1701,14 @@ my $rtypes = {
         ref       => 'm',
         ref_t     => 'hr',
         scale_m   => '1.0e3',
-        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_t%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_t%',
         },
     },
 
@@ -1714,14 +1717,14 @@ my $rtypes = {
         ref       => 'm',
         ref_t     => 'sec',
         scale_m   => '1.0e0',
-        tmpl      => '%value% %suffix%/%suffix_t%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_t%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_t%',
-            en => '%value% %txt% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_t%',
-            en => '%value% %txt_pl% per %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_t%',
         },
     },
 
@@ -2008,14 +2011,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2025,14 +2028,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2042,14 +2045,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2059,14 +2062,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2076,14 +2079,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e-2',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2093,14 +2096,14 @@ my $rtypes = {
         ref_sq    => 'm',
         scale_sq  => '1.0e0',
         format    => '%.0f',
-        tmpl      => '%value% %suffix%/%suffix_sq%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%/%suffix_sq%',
         tmpl_long => {
-            de => '%value% %txt% pro %txt_sq%',
-            en => '%value% %txt% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt% per %txt_sq%',
         },
         tmpl_long_pl => {
-            de => '%value% %txt_pl% pro %txt_sq%',
-            en => '%value% %txt_pl% per %txt_sq%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl% pro %txt_sq%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl% per %txt_sq%',
         },
     },
 
@@ -2455,6 +2458,7 @@ sub rname2rtype ($$@) {
 # package main
 #
 package main;
+use utf8;
 
 # Get value + rtype combined string
 sub replaceTemplate ($$$$;$) {
@@ -2595,7 +2599,7 @@ sub replaceTemplate ($$$$;$) {
         && $desc->{scale_txt_long_cu} );
 
     # short
-    $txt = '%value% %suffix%';
+    $txt = '%value%' . chr(0x00A0) . '%suffix%';
     $txt = $desc->{tmpl} if ( $desc->{tmpl} );
     if ( $r && $reading && $r->{$reading} ) {
         foreach my $k ( keys %{ $r->{$reading} } ) {
@@ -2613,7 +2617,7 @@ sub replaceTemplate ($$$$;$) {
         && ( $value eq "0" || $value > 1 )
         && $desc->{txt_long_pl} )
     {
-        $txt_long = '%value% %txt_long_pl%';
+        $txt_long = '%value%' . chr(0x00A0) . '%txt_long_pl%';
         $txt_long = $desc->{tmpl_long_pl}
           if ( $desc->{tmpl_long_pl} );
     }
@@ -2621,19 +2625,19 @@ sub replaceTemplate ($$$$;$) {
         && ( $value eq "0" || $value > 1 )
         && $desc->{txt_pl} )
     {
-        $txt_long = '%value% %txt_pl%';
+        $txt_long = '%value%' . chr(0x00A0) . '%txt_pl%';
         $txt_long = $desc->{tmpl_long_pl}
           if ( $desc->{tmpl_long_pl} );
     }
 
     # long singular
     elsif ( $desc->{txt_long} ) {
-        $txt_long = '%value% %txt_long%';
+        $txt_long = '%value%' . chr(0x00A0) . '%txt_long%';
         $txt_long = $desc->{tmpl_long}
           if ( $desc->{tmpl_long} );
     }
     elsif ( $desc->{txt} ) {
-        $txt_long = '%value% %txt%';
+        $txt_long = '%value%' . chr(0x00A0) . '%txt%';
         $txt_long = $desc->{tmpl_long}
           if ( $desc->{tmpl_long} );
     }
@@ -2649,7 +2653,7 @@ sub replaceTemplate ($$$$;$) {
         }
     }
 
-    return ( $txt, $txt_long );
+    return ( Encode::encode_utf8($txt), Encode::encode_utf8($txt_long) );
 }
 
 # format a number according to desc and optional format.
