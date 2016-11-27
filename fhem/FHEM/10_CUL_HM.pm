@@ -4539,7 +4539,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
       $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
     }
-    if ($st eq "dimmer"){# at least blind cannot stand ramp time...
+    if ($st =~ m /(dimmer|rgb)/){# at least blind cannot stand ramp time...
       if (!$a[3]){
         $tval = "FFFF";
         $duration = 0;
@@ -4563,7 +4563,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     # store desiredLevel in and its Cmd in case we have to repeat
     my $plvl = ($lvl eq "old")?"C9"
                               :sprintf("%02X",(($lvlInv)?100-$lvl :$lvl)*2);
-    if (($tval && $tval ne "FFFF") || $lvl eq "old"){
+    if (($tval ne "FFFF") || $lvl eq "old"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
@@ -4758,8 +4758,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "brightCol") { ################################################
     my (undef,undef,$bright,$colVal,$duration,$ramp) = @a; #date prepared extention to entdate
-    return "please enter the duration in seconds"
-          if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+    return "cmd requires brightness[0..100] step 0.5, color[0..100] step 0.5, duration, ramptime" if (!defined $ramp);
+    return "please enter the duration in seconds"                                                 if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+    ($bright,$colVal) = (int($bright*2),int($colVal*2));# convert percent to [0..200]
+    return "obey range for brightness[0..100] color[0..100]" if (   $bright < 0 or $bright > 200 
+                                                                 or $colVal < 0 or $colVal > 200);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     $ramp = CUL_HM_encodeTime16($ramp);
 
