@@ -20,11 +20,13 @@
 # ABU 20161122 fixed set-handling
 # ABU 20161126 added summary
 # ABU 20161126 fixed doku
+# ABU 20161127 adjusted dpt-16-sending, added dpt16.001
 
 package main;
 
 use strict;
 use warnings;
+use Encode;
 
 #set to 1 for debug
 my $debug = 0;
@@ -141,6 +143,8 @@ my %dpttypes = (
   
 	# 14-Octet String
 	"dpt16"         => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
+	"dpt16.000"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
+	"dpt16.001"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
 	
 	# Color-Code
 	"dpt232"        => {CODE=>"dpt232", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/[0-9A-Fa-f]{6}/, MIN=>undef, MAX=>undef},
@@ -1180,7 +1184,10 @@ KNX_encodeByDpt ($$$) {
 	}	
 	#14-Octet String
 	elsif ($code eq "dpt16")
-	{		
+	{
+		#convert to latin-1
+		$value = encode("iso-8859-1", decode("utf8", $value));
+		
 		#convert to hex-string
 		my $dat = unpack "H*", $value;
 		#format for 14-byte-length
@@ -1450,7 +1457,7 @@ KNX_decodeByDpt ($$$) {
 			my $c = hex(substr($value, $i * 2, 2));
 			
 			#exit at string terminator, otherwise append current char
-			if ($c eq 0)
+			if (($i != 0) and ($c eq 0))
 			{
 				$i = 14;
 			} 
@@ -1459,6 +1466,9 @@ KNX_decodeByDpt ($$$) {
 				$state .=  sprintf("%c", $c);
 			}
 		}
+
+		#convert to latin-1
+		$state = encode ("utf8", $state) if ($model =~ m/16.001/);		
 	}
 	#RGB-Code
 	elsif ($code eq "dpt232")
@@ -1776,6 +1786,8 @@ sub KNX_getCmdList ($$$)
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
+	dpt16.000 ASCII-String;<br>
+	dpt16.001 ISO-8859-1-String (Latin1);<br>
 	dpt232 RGB-Value RRGGBB<br>	
   </ul>		
 </ul>
@@ -2036,6 +2048,8 @@ sub KNX_getCmdList ($$$)
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
+	dpt16.000 ASCII-String;<br>
+	dpt16.001 ISO-8859-1-String (Latin1);<br>	
 	dpt232 RGB-Wert RRGGBB<br>	
   </ul>
 </ul>
