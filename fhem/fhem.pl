@@ -3363,6 +3363,8 @@ HandleArchiving($;$)
   my $ard = $attr{$ln}{archivedir};
   return if(!defined($nra));
 
+  $nra++ if($ln eq "global"); # Forum #61450
+
   # If nrarchive is set, then check the last files:
   # Get a list of files:
 
