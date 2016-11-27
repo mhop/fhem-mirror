@@ -30,6 +30,8 @@ use strict;
 use warnings;
 use vars qw(%data);
 use HttpUtils;
+use utf8;
+use Encode qw(encode_utf8 decode_utf8);
 use Unit;
 use Time::Local;
 use List::Util qw(sum);
@@ -76,12 +78,13 @@ sub HP1000_Initialize($) {
     $hash->{readingsDesc} = {
         'Activity'            => { rtype => 'oknok', },
         'UV'                  => { rtype => 'uvi', },
-        'UVcondition'         => { rtype => 'condition_uvi', },
         'UVR'                 => { rtype => 'uwpscm', },
+        'UVcondition'         => { rtype => 'condition_uvi', },
         'condition'           => { rtype => 'condition_weather', },
         'daylight'            => { rtype => 'yesno', },
         'dewpoint'            => { rtype => 'c', formula_symbol => 'Td', },
         'dewpoint_f'          => { rtype => 'f', formula_symbol => 'Td', },
+        'extsrv_state'        => { rtype => 'oknok', },
         'humidity'            => { rtype => 'pct', formula_symbol => 'H', },
         'humidityAbs'         => { rtype => 'c', formula_symbol => 'Tabs', },
         'humidityAbs_f'       => { rtype => 'f', formula_symbol => 'Tabs', },
@@ -119,9 +122,10 @@ sub HP1000_Initialize($) {
         'wind_compasspoint_avg2m' => { rtype => 'compasspoint', },
         'wind_chill'              => { rtype => 'c', formula_symbol => 'Wc', },
         'wind_chill_f'            => { rtype => 'f', formula_symbol => 'Wc', },
-        'wind_direction' => { rtype => 'direction', formula_symbol => 'Wdir', },
+        'wind_direction' =>
+          { rtype => 'compasspoint', formula_symbol => 'Wdir', },
         'wind_direction_avg2m' =>
-          { rtype => 'direction', formula_symbol => 'Wdir', },
+          { rtype => 'compasspoint', formula_symbol => 'Wdir', },
         'wind_gust'            => { rtype => 'kmh', formula_symbol => 'Wg', },
         'wind_gust_bft'        => { rtype => 'bft', formula_symbol => 'Wg', },
         'wind_gust_fts'        => { rtype => 'fts', formula_symbol => 'Wg', },
@@ -140,6 +144,7 @@ sub HP1000_Initialize($) {
         'wind_speed_mph_avg2m' => { rtype => 'mph', formula_symbol => 'W', },
         'wind_speed_mps'       => { rtype => 'mps', formula_symbol => 'W', },
         'wind_speed_mps_avg2m' => { rtype => 'mps', formula_symbol => 'W', },
+        'wu_state' => { rtype => 'oknok', },
     };
 }
 
@@ -340,7 +345,7 @@ sub HP1000_CGI() {
             $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
             my ( $p, $v ) = split( "=", $pv, 2 );
 
-            $webArgs->{$p} = $v;
+            $webArgs->{$p} = $v ne "" ? Encode::encode_utf8($v) : $v;
         }
 
         if (   !defined( $webArgs->{softwaretype} )
