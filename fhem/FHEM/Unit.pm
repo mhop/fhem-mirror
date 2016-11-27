@@ -434,7 +434,7 @@ my $rtype_base = {
         },
         format => '%.2f',
         scope  => '^[0-9]*(?:\.[0-9]*)?$',
-        tmpl   => '%value%' . chr(0x00A0) . '%symbol%',
+        tmpl   => '%value%' . chr(0x202F) . '%symbol%',
     },
 
     25 => {
@@ -1239,7 +1239,7 @@ my $rtypes = {
             de => 'Prozent',
             en => 'percent',
         },
-        tmpl  => '%value%' . chr(0x00A0) . '%symbol%',
+        tmpl  => '%value%' . chr(0x202F) . '%symbol%',
         scope => { min => 0, max => 100 },
     },
 
@@ -1263,11 +1263,16 @@ my $rtypes = {
             en => 'Pound',
         },
         txt_long => {
+            de => 'Britisches Pfund',
+            en => 'British Pound',
+        },
+        txt_long_pl => {
             de => 'Britische Pfund',
             en => 'British Pound',
         },
+        tmpl      => '%symbol%%value%',
+        tmpl_long => '%value%' . chr(0x00A0) . '%txt_long%',
         scope     => '^([0-9]*(?:\.[0-9]*)?)$',
-        tmpl_long => '%txt_long%',
     },
 
     dollar_us => {
@@ -1278,8 +1283,8 @@ my $rtypes = {
         txt       => 'Dollar',
         txt_long  => 'US Dollar',
         tmpl      => '%symbol%%value%',
+        tmpl_long => '%value%' . chr(0x00A0) . '%txt_long%',
         scope     => '^([0-9]*(?:\.[0-9]*)?)$',
-        tmpl_long => '%txt_long%',
     },
 
     # plane angular
@@ -1485,9 +1490,7 @@ my $rtypes = {
             de => 'Zoll',
             en => 'inches',
         },
-        tmpl         => '%value%%symbol%',
-        tmpl_long    => '%value%' . chr(0x00A0) . '%txt%',
-        tmpl_long_pl => '%value%' . chr(0x00A0) . '%txt_pl%',
+        tmpl => '%value%%symbol%',
     },
 
     ft => {
@@ -1502,9 +1505,7 @@ my $rtypes = {
             de => 'Fuss',
             en => 'feet',
         },
-        tmpl         => '%value%%symbol%',
-        tmpl_long    => '%value%' . chr(0x00A0) . '%txt%',
-        tmpl_long_pl => '%value%' . chr(0x00A0) . '%txt_pl%',
+        tmpl => '%value%%symbol%',
     },
 
     yd => {
@@ -1685,7 +1686,7 @@ my $rtypes = {
         ref_base  => 15,
         ref       => 'mi',
         ref_t     => 'hr',
-        tmpl      => '%value%' . chr(0x00A0) . 'mph',
+        tmpl      => '%value%' . chr(0x202F) . 'mph',
         tmpl_long => {
             de => '%value%' . chr(0x00A0) . '%txt% pro %txt_t%',
             en => '%value%' . chr(0x00A0) . '%txt% per %txt_t%',
@@ -1848,8 +1849,8 @@ my $rtypes = {
             de => 'UV-Index',
             en => 'UV-Index',
         },
-        tmpl      => '%suffix% %value%',
-        tmpl_long => '%txt% %value%',
+        tmpl      => '%suffix%' . chr(0x00A0) . '%value%',
+        tmpl_long => '%txt%' . chr(0x00A0) . '%value%',
         format    => '%i',
     },
 
@@ -2599,7 +2600,7 @@ sub replaceTemplate ($$$$;$) {
         && $desc->{scale_txt_long_cu} );
 
     # short
-    $txt = '%value%' . chr(0x00A0) . '%suffix%';
+    $txt = '%value%' . chr(0x202F) . '%suffix%';
     $txt = $desc->{tmpl} if ( $desc->{tmpl} );
     if ( $r && $reading && $r->{$reading} ) {
         foreach my $k ( keys %{ $r->{$reading} } ) {
