@@ -445,17 +445,6 @@ sub values2weathercondition($$$$$) {
     return $condition;
 }
 
-#################################
-### Logfile integer conversions
-###
-
-sub activity2log($) {
-    my ($data) = @_;
-
-    return "1" if ( $data =~ /^(alive|ok)$/i );
-    return "0";
-}
-
 #TODO rewrite for Unit.pm
 sub fmtTime($) {
     my ($value) = @_;
@@ -477,6 +466,21 @@ sub fmtTime($) {
 
 ####################
 # HELPER FUNCTIONS
+
+sub decimal_mark ($$) {
+    my ( $v, $f ) = @_;
+    return $v unless ( looks_like_number($v) && $f );
+
+    my $text = reverse $v;
+    if ( $f eq "2" ) {
+        $text =~ s:\.:,:g;
+        $text =~ s/(\d\d\d)(?=\d)(?!\d*,)/$1./g;
+    }
+    else {
+        $text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1,/g;
+    }
+    return scalar reverse $text;
+}
 
 sub roundX($;$) {
     my ( $v, $n ) = @_;

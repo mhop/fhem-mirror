@@ -147,8 +147,12 @@ my $rtype_base = {
             de => 'Länge',
             en => 'length',
         },
-        format => '%.0f',
-        scope  => { min => 0 },
+        format       => '%.0f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     1 => {
@@ -159,8 +163,12 @@ my $rtype_base = {
             de => 'Masse',
             en => 'mass',
         },
-        format => '%.0f',
-        scope  => { min => 0 },
+        format       => '%.0f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     2 => {
@@ -171,8 +179,12 @@ my $rtype_base = {
             de => 'Zeit',
             en => 'time',
         },
-        format => '%.0f',
-        scope  => { min => 0 },
+        format       => '%.0f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     3 => {
@@ -183,8 +195,12 @@ my $rtype_base = {
             de => 'elektrische Stromstärke',
             en => 'electric current',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     4 => {
@@ -195,8 +211,12 @@ my $rtype_base = {
             de => 'absolute Temperatur',
             en => 'absolute temperature',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     5 => {
@@ -207,8 +227,12 @@ my $rtype_base = {
             de => 'Stoffmenge',
             en => 'amount of substance',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     6 => {
@@ -219,8 +243,12 @@ my $rtype_base = {
             de => 'Lichtstärke',
             en => 'luminous intensity',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     7 => {
@@ -231,8 +259,12 @@ my $rtype_base = {
             de => 'Energie',
             en => 'energy',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     8 => {
@@ -243,8 +275,12 @@ my $rtype_base = {
             de => 'Frequenz',
             en => 'frequency',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     9 => {
@@ -255,8 +291,12 @@ my $rtype_base = {
             de => 'Leistung',
             en => 'power',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     10 => {
@@ -267,8 +307,12 @@ my $rtype_base = {
             de => 'Druck',
             en => 'pressure',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     11 => {
@@ -279,8 +323,12 @@ my $rtype_base = {
             de => 'absoluter Druck',
             en => 'absolute pressure',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     12 => {
@@ -291,8 +339,12 @@ my $rtype_base = {
             de => 'Luftdruck',
             en => 'air pressure',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     13 => {
@@ -303,8 +355,12 @@ my $rtype_base = {
             de => 'elektrische Spannung',
             en => 'electric voltage',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     14 => {
@@ -315,8 +371,12 @@ my $rtype_base = {
             de => 'ebener Winkel',
             en => 'plane angular',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     15 => {
@@ -327,8 +387,12 @@ my $rtype_base = {
             de => 'Geschwindigkeit',
             en => 'speed',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     16 => {
@@ -339,8 +403,12 @@ my $rtype_base = {
             de => 'Beleuchtungsstärke',
             en => 'illumination intensity',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     17 => {
@@ -351,8 +419,12 @@ my $rtype_base = {
             de => 'Lichtstrom',
             en => 'luminous flux',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     18 => {
@@ -363,8 +435,12 @@ my $rtype_base = {
             de => 'Volumen',
             en => 'volume',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     19 => {
@@ -375,8 +451,12 @@ my $rtype_base = {
             de => 'Logarithmische Größe',
             en => 'logarithmic level',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     20 => {
@@ -387,8 +467,12 @@ my $rtype_base = {
             de => 'elektrische Ladung',
             en => 'electric charge',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     21 => {
@@ -399,8 +483,12 @@ my $rtype_base = {
             de => 'elektrische Kapazität',
             en => 'electric capacity',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     22 => {
@@ -411,8 +499,12 @@ my $rtype_base = {
             de => 'elektrische Widerstand',
             en => 'electric resistance',
         },
-        format => '%.1f',
-        scope  => { min => 0 },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     23 => {
@@ -423,8 +515,12 @@ my $rtype_base = {
             de => 'Flächeninhalt',
             en => 'surface area',
         },
-        format => '%i',
-        scope  => { min => 0 },
+        format       => '%i',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => { min => 0 },
     },
 
     24 => {
@@ -432,14 +528,23 @@ my $rtype_base = {
             de => 'Währung',
             en => 'currency',
         },
-        format => '%.2f',
-        scope  => '^[0-9]*(?:\.[0-9]*)?$',
+        format       => '%.2f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        scope => '^[0-9]*(?:\.[0-9]*)?$',
     },
 
     25 => {
         base_description => {
             de => 'Zahlen',
             en => 'Numbering',
+        },
+        format       => '%.1f',
+        decimal_mark => {
+            de => 2,
+            en => 1,
         },
         tmpl => '%value%',
     },
@@ -1242,13 +1347,24 @@ my $rtypes = {
     },
 
     # currency
+
+    #https://en.wikipedia.org/wiki/Euro
+    #https://en.wikipedia.org/wiki/Linguistic_issues_concerning_the_euro
     euro => {
         ref_base => 24,
         format   => '%.2f',
         symbol   => '€',
         suffix   => 'EUR',
-        txt      => 'Euro',
-        scope    => '^([0-9]*(?:\.[0-9]*)?)$',
+        txt      => {
+            de => 'Euro',
+            en => 'euro',
+        },
+        tmpl => {
+            de    => '%symbol%%value%',
+            de_de => '%value%' . chr(0x202F) . '%symbol%',
+            en    => '%symbol%%value%',
+        },
+        scope => '^([0-9]*(?:\.[0-9]*)?)$',
     },
 
     pound_uk => {
@@ -1258,15 +1374,15 @@ my $rtypes = {
         suffix   => 'GBP',
         txt      => {
             de => 'Pfund',
-            en => 'Pound',
+            en => 'pound',
         },
         txt_long => {
             de => 'Britisches Pfund',
-            en => 'British Pound',
+            en => 'British pound',
         },
         txt_long_pl => {
             de => 'Britische Pfund',
-            en => 'British Pound',
+            en => 'British pound',
         },
         tmpl      => '%symbol%%value%',
         tmpl_long => '%value%' . chr(0x00A0) . '%txt_long%',
@@ -1274,12 +1390,18 @@ my $rtypes = {
     },
 
     dollar_us => {
-        ref_base  => 24,
-        format    => '%.2f',
-        symbol    => '$',
-        suffix    => 'USD',
-        txt       => 'Dollar',
-        txt_long  => 'US Dollar',
+        ref_base => 24,
+        format   => '%.2f',
+        symbol   => '$',
+        suffix   => 'USD',
+        txt      => {
+            de => 'Dollar',
+            en => 'dollar',
+        },
+        txt_long => {
+            de => 'US Dollar',
+            en => 'US dollar',
+        },
         tmpl      => '%symbol%%value%',
         tmpl_long => '%value%' . chr(0x00A0) . '%txt_long%',
         scope     => '^([0-9]*(?:\.[0-9]*)?)$',
@@ -2467,8 +2589,10 @@ sub replaceTemplate ($$$$;$) {
     return
       if ( !$odesc || ref($odesc) ne "HASH" );
 
-    $value = $odesc->{value}
-      if ( !defined($value) && defined( $odesc->{value} ) );
+    $value = ${$odesc}{value}{$lang}
+      if (!defined($value)
+        && defined( $odesc->{value} )
+        && defined( $odesc->{value}{$lang} ) );
 
     return $value
       if ( !defined($value) || $value eq "" );
@@ -2485,12 +2609,23 @@ sub replaceTemplate ($$$$;$) {
 
     # keep only defined language if set
     foreach ( keys %{$desc} ) {
-        if (   defined( $desc->{$_} )
-            && ref( $desc->{$_} ) eq "HASH"
-            && defined( $desc->{$_}{$l} ) )
-        {
+        next if ( !defined( $desc->{$_} )
+            || ref( $desc->{$_} ) ne "HASH" );
+
+        # find any direct format
+        if ( defined( $desc->{$_}{$l} ) ) {
             my $v;
             $v = $desc->{$_}{$l};
+            delete $desc->{$_};
+            $desc->{$_} = $v if ( defined($v) );
+        }
+
+        # extract xx from xx_yz formats
+        elsif ( $l =~ /^([a-z]+)(_([a-z]+))?$/i
+            && defined( $desc->{$_}{$1} ) )
+        {
+            my $v;
+            $v = $desc->{$_}{$1};
             delete $desc->{$_};
             $desc->{$_} = $v if ( defined($v) );
         }
@@ -2604,7 +2739,10 @@ sub replaceTemplate ($$$$;$) {
         }
     }
     foreach my $k ( keys %{$desc} ) {
-        $txt =~ s/%$k%/$desc->{$k}/g;
+        my $vdm = $desc->{$k};
+        $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
+          if ( defined( $desc->{decimal_mark} ) );
+        $txt =~ s/%$k%/$vdm/g;
     }
 
     return ($txt) if ( !wantarray );
@@ -2646,7 +2784,10 @@ sub replaceTemplate ($$$$;$) {
             }
         }
         foreach my $k ( keys %{$desc} ) {
-            $txt_long =~ s/%$k%/$desc->{$k}/g;
+            my $vdm = $desc->{$k};
+            $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
+              if ( defined( $desc->{decimal_mark} ) );
+            $txt_long =~ s/%$k%/$vdm/g;
         }
     }
 
@@ -2875,7 +3016,8 @@ sub formatValue($$$;$$$$) {
     $desc->{value}{$lang} = $value;
     $desc->{value_num} = $value_num if ( defined($value_num) );
 
-    my ( $txt, $txt_long ) = replaceTemplate( $device, $reading, $desc, $lang );
+    my ( $txt, $txt_long ) =
+      replaceTemplate( $device, $reading, $desc, $lang, $value );
 
     $desc->{value_txt}{$lang} = $txt;
     $desc->{value_txt_long}{$lang} = $txt_long if ( defined($txt_long) );
