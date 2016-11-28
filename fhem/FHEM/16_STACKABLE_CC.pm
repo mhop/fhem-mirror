@@ -110,7 +110,7 @@ STACKABLE_CC_Write($$)
 
   ($fn, $msg) = CUL_WriteTranslate($hash, $fn, $msg);
   return if(!defined($fn));
-  IOWrite($hash, "", "*$fn$msg"); # No more translations
+  IOWrite($hash, "", ($hash->{TCM} ? "%":"*")."$fn$msg"); # No more translations
 }
 
 #####################################
