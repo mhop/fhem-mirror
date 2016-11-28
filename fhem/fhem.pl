@@ -813,6 +813,21 @@ GetLogLevel(@)
   return $df;
 }
 
+sub
+GetVerbose($)
+{
+  my ($dev) = @_;
+  if(defined($dev) &&
+     defined($attr{$dev}) &&
+     defined (my $devlevel = $attr{$dev}{verbose})) {
+    return $devlevel;
+
+  } else {
+    return $attr{global}{verbose};
+
+  }
+}
+
 
 ################################################
 # the new Log with integrated loglevel checking
@@ -2921,7 +2936,8 @@ stacktrace()
   my $max_depth = 50;
   
   # Forum #59831
-  Log 1, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $attr{global}{verbose} < 3);
+  Log 1, "eval: $cmdFromAnalyze"
+        if($cmdFromAnalyze && $attr{global}{verbose} < 3);
   Log 1, "stacktrace:";
   while( (my @call_details = (caller($i++))) && ($i<$max_depth) ) {
     Log 1, sprintf ("    %-35s called by %s (%s)",
@@ -3177,7 +3193,10 @@ DoTrigger($$@)
   # the inner loop.
   if($max && !defined($hash->{INTRIGGER})) {
     $hash->{INTRIGGER}=1;
-    Log 5, "Starting notify loop for $dev, first event $hash->{CHANGED}->[0]";
+    if($attr{global}{verbose} >= 5) {
+      Log 5, "Starting notify loop for $dev, " . scalar(@{$hash->{CHANGED}}) . 
+        " event(s), first is " . escapeLogLine($hash->{CHANGED}->[0]);
+    }
     createNtfyHash() if(!%ntfyHash);
     $hash->{NTFY_TRIGGERTIME} = $now; # Optimize FileLog
     my $ntfyLst = (defined($ntfyHash{$dev}) ? $ntfyHash{$dev} : $ntfyHash{"*"});
@@ -3405,7 +3424,9 @@ Dispatch($$$)
   my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
-  Log3 $hash, 5, "$name dispatch $dmsg";
+  if(GetVerbose($name) == 5) {
+    Log3 $hash, 5, escapeLogLine("$name: dispatch $dmsg");
+  }
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $module->{FingerprintFn});
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
