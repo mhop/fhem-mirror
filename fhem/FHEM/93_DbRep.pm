@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.7.4        28.11.2016       sub calcount changed due to Forum #msg529312
 # 4.7.3        20.11.2016       new diffValue function made suitable to SQLite
 # 4.7.2        20.11.2016       commandref adapted, state = Warnings adapted
 # 4.7.1        17.11.2016       changed fieldlength to DbLog new standard, diffValue state Warnings due to 
@@ -3561,9 +3562,9 @@ sub calcount ($$) {
  
  Log3 ($name, 4, "DbRep $name - count of values used for calc:");
  foreach my $key (sort(keys%{$ch})) {
-     Log3 ($name, 4, "$key => ". %$ch{$key});
+     Log3 ($name, 4, "$key => ". $ch->{$key});
      
-	 if(%$ch{$key} eq "1") {
+	 if($ch->{$key} eq "1") {
 	     $ncp{"$key"} = " ||";
 	 } 
  }
