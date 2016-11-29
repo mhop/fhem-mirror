@@ -18,6 +18,7 @@
 # ABU 20160901 rounded duration and wlan
 # ABU 20161120 addaed encode_utf8 at json decode, tuned 0.5b repiar-stuff, added hibernate
 # ABU 20161126 added summary
+# ABU 20161129 fixed hash issues which prevents the module from loading
 
 package main;
 
@@ -228,7 +229,7 @@ sub Robonect_Shutdown($)
 	
 	#hash may be de-referenced already
 	my $name = "robonect-not_named_any_more";	
-	$name = $hash{NAME} if (ref($hash) eq 'HASH');
+	$name = $hash->{NAME} if (ref($hash) eq "HASH");
 	
 	Log3 ($name, 5, "enter shutdown $name: hash: $hash name: $name");
 	Log3 ($name, 5, "exit shutdown");
