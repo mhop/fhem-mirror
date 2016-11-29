@@ -218,6 +218,8 @@ readingsProxy_Set($@)
   }
   return SetExtensions($hash,$setList,$name,@a) if( !$found );
 
+  SetExtensionsCancel($hash);
+
   my $v = join(" ", @a);
   my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
   if( $set_fn =~ m/^{.*}$/s ) {
