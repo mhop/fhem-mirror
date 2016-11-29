@@ -320,6 +320,7 @@ KNX_Get($@) {
 	Log3 ($name, 5, "enter get $name: hash: $hash, attributes: $tempStr");
 	
 	#FHEM asks with a ? at startup - no action, no log
+	#do not use KNX_getCmdList because argument will be a group-adress
 	return "Unknown argument ?, choose one of -" if(defined($a[1]) and ($a[1] =~ m/\?/));
 	
 	splice(@a, 1, 1) if (defined ($a[1]) and ($a[1] =~ m/-/));
