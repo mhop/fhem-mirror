@@ -750,7 +750,11 @@ HUEDevice_Set($@)
       $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/state",\%obj);
     }
 
-    SetExtensionsCancel($hash) if( !$hash->{InSetExtensions} );
+    if( !$hash->{InSetExtensions} ) {
+      SetExtensionsCancel($hash);
+      my $at = $name ."_till";
+      CommandDelete(undef, $at) if($defs{$at});
+    }  
 
     if( defined($result) && $result->{'error'} ) {
       $hash->{STATE} = $result->{'error'}->{'description'};
