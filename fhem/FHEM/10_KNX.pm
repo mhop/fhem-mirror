@@ -21,6 +21,7 @@
 # ABU 20161126 added summary
 # ABU 20161126 fixed doku
 # ABU 20161127 adjusted dpt-16-sending, added dpt16.001
+# ABU 20161129 fixed get-mechanism
 
 package main;
 
@@ -319,14 +320,13 @@ KNX_Get($@) {
 	Log3 ($name, 5, "enter get $name: hash: $hash, attributes: $tempStr");
 	
 	#FHEM asks with a ? at startup - no action, no log
-	#return "" if($a[1] && $a[1] eq "?");
-	return "Unknown argument ?, only a group-adress is allowed" if($a[1] && $a[1] eq "?");
+	return "Unknown argument ?, choose one of -" if(defined($a[1]) and ($a[1] =~ m/\?/));
 	
 	splice(@a, 1, 1) if (defined ($a[1]) and ($a[1] =~ m/-/));
 	my $na = int(@a);
 	
 	#not more then 2 arguments allowed
-	return "too much arguments. Maximum two arguments allowed" if($na>2);
+	return "too much arguments. Only one argument allowed (group-address)." if($na>2);
 	
 	# the command can be send to any of the defined groups indexed starting by 1
 	# optional last argument starting with g indicates the group
