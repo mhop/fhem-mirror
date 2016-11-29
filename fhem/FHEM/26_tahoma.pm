@@ -34,6 +34,7 @@
 # 2016-04-24 V 0205 commands taken from setup
 # 2016-06-16 V 0206 updateDevices called for devices created before setup has been read
 # 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribut levelInvert inverts RollerShutter position
+# 2016-11-29 V 0208 HttpUtils used instead of LWP::UserAgent, BLOCKING=0 set as default, umlaut can be used in Tahoma names
 
 package main;
 
@@ -41,17 +42,16 @@ use strict;
 use warnings;
 
 use utf8;
-use Encode qw(encode_utf8 decode_utf8);
+use Encode qw(decode_utf8);
 use JSON;
 #use Data::Dumper;
 use Time::HiRes qw(time);
 
-use LWP::UserAgent;
-use LWP::ConnCache;
-use HTTP::Cookies;  
+use HttpUtils;
 
 sub tahoma_parseGetSetupPlaces($$);
 sub tahoma_UserAgent_NonblockingGet($);
+sub tahoma_encode_utf8($);
 
 my $hash_;
 
@@ -72,7 +72,6 @@ sub tahoma_Initialize($)
                       "disable:1 ".
                       "interval ".
                       "logfile ".
-                      "proxy ".
                       "url ".
                       "placeClasses ".
                       "levelInvert ".
@@ -88,7 +87,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0207";
+  my $ModuleVersion = "0208";
   
   my $subtype;
   my $name = $a[0];
@@ -150,7 +149,7 @@ sub tahoma_Define($$)
 
     $hash->{username} = $username;
     $hash->{password} = $password;
-    $hash->{BLOCKING} = 1;
+    $hash->{BLOCKING} = 0;
     $hash->{INTERVAL} = 2;
 	$hash->{VERSION} = $ModuleVersion;
 
@@ -212,9 +211,10 @@ sub tahoma_login($)
   $hash->{startup_done} = undef;
   $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/json/";
   $hash->{url} = $attr{$name}{url} if (defined $attr{$name}{url});
-  $hash->{userAgent} = "TaHoma/3640 CFNetwork/711.1.16 Darwin/14.0.0";
+  $hash->{userAgent} = "TaHoma/7845 CFNetwork/758.3.15 Darwin/15.4.0";
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
+  $hash->{HTTPCookies} = undef;
 
   Log3 $name, 2, "$name: login start";
   tahoma_UserAgent_NonblockingGet({
@@ -495,7 +495,7 @@ sub tahoma_updateDevices($)
         $def->{inLabel} = $device->{label};
         $def->{inOID} = $device->{oid};
         $def->{inClass} = 'RollerShutter';
-        $def->{inClass} = $attr{$hash->{NAME}}{placeClasses} if (defined $attr{$hash->{NAME}}{placeClasses});
+        $def->{inClass} = $attr{$def->{NAME}}{placeClasses} if (defined $attr{$def->{NAME}}{placeClasses});
       }
       elsif( defined($device) && ($subtype eq 'SCENE') ) {
         Log3 $name, 4, "$name: I/O device is label=".$device->{label};
@@ -588,7 +588,7 @@ sub tahoma_getStates($)
     noshutdown => 1,
     hash => $hash,
     page => 'getStates',
-    data => decode_utf8($data),
+    data => tahoma_encode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -682,7 +682,7 @@ sub tahoma_applyRequest($$$)
     noshutdown => 1,
     hash => $hash->{IODev},
     page => 'apply',
-    data => decode_utf8($data),
+    data => tahoma_encode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -712,52 +712,29 @@ sub tahoma_scheduleActionGroup($$)
   });
 }
 
-sub tahoma_dispatch($$$$)
+sub tahoma_dispatch($$$)
 {
-  my ($param, $err, $data, $dataLenTotal) = @_;
+  my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+  
+  if (!$hash->{logged_in})
+  {
+    tahoma_GetCookies($hash,$param->{httpheader});
+  }
 
   if( $err ) {
     Log3 $name, 2, "$name: tahoma_dispatch http request failed: $err";
     $hash->{request_active} = 0;
     $hash->{logged_in} = 0;
-    $hash->{lastData} = '';
   } elsif( $data ) {
-    my $dataLen = length $data;
-    $dataLenTotal = 0 if (!defined($dataLenTotal));
-    if ($dataLen == $dataLenTotal) {
-      Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=$dataLen dataLenTotal=$dataLenTotal";
-      $hash->{lastData} = '';
-    } else {
-      my $dataLenSum = $dataLen + length $hash->{lastData};
-      Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=$dataLen dataLenSum=$dataLenSum dataLenTotal=$dataLenTotal";
-      $data = $hash->{lastData} . $data;
-      $hash->{lastData} = '';
-      if (!$dataLenTotal)
-      {
-        my $json = {};
-        eval { $json = JSON->new->utf8(0)->decode($data); };
-        if ($@) {
-          Log3 $name, 3, "$name: tahoma_dispatch json string is faulty, wait for concat ...";
-          $dataLenTotal = $dataLenSum+1;
-        }
-        else {
-          $dataLenTotal = $dataLenSum;
-        }
-      }
-      if ($dataLenSum < $dataLenTotal) {
-        $hash->{lastData} = $data;
-        return;
-      }
-    }
     $hash->{request_active} = 0;
     
     $data =~ tr/\r\n//d;
     $data =~ s/\h+/ /g;
     $data =~ s/\\\//\//g;
 
-    Log3 $name, (length $data > 120)?4:5, "$name: tahoma_dispatch data=".encode_utf8($data);
+    Log3 $name, (length $data > 120)?4:5, "$name: tahoma_dispatch data=".decode_utf8($data);
 
     # perl exception while parsing json string captured
     my $json = {};
@@ -796,8 +773,6 @@ sub tahoma_dispatch($$$$)
     } elsif( $param->{page} eq 'scheduleActionGroup' ) {
       tahoma_parseScheduleActionGroup($hash,$json);
     }
-	
-    
   }
 }
 
@@ -1081,7 +1056,9 @@ sub tahoma_parseEnduserAPISetupGateways($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseEnduserAPISetupGateways";
-  $hash->{inGateway} = $json->{result};
+  
+  eval { $hash->{inGateway} = $json->{result}; };
+  eval { $hash->{inGateway} = $json->[0]{gatewayId}; };
 }
 
 sub tahoma_parseGetCurrentExecutions($$)
@@ -1117,7 +1094,7 @@ sub tahoma_Get($$@)
     $list = "";
 
   } elsif( $hash->{SUBTYPE} eq "ACCOUNT" ) {
-    $list = "devices:noArg";
+    $list = "devices:noArg reset:noArg";
 
     if( $cmd eq "devices" ) {
       my $devices = tahoma_getDevices($hash,0);
@@ -1130,6 +1107,11 @@ sub tahoma_Get($$@)
       $ret = "id\t\t\t\tname\t\t\tuiClass\t\tcontrollable\n" . $ret if( $ret );
       $ret = "no devices found" if( !$ret );
       return $ret;
+    }
+    elsif( $cmd eq "reset" ) {
+      HttpUtils_Close($hash);
+      $hash->{logged_in} = undef;
+      return "connection closed";
     }
   }
 
@@ -1223,104 +1205,62 @@ sub tahoma_UserAgent_NonblockingGet($)
 {
 	my ($param) = @_;
   my ($hash) = $param->{hash};
-  return if (!defined $hash);
 
   my $name = $hash->{NAME};
   Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
+
+  #headers,343:29:4:Host,18:www.tahomalink.com,]34:16:Proxy-Connection,10:keep-alive,]36:15:Accept-Encoding,13:gzip, deflate,]53:12:Content-Type,33:application/x-www-form-urlencoded,]23:14:Content-Length,2:49,]27:15:Accept-Language,5:de-de,]15:6:Accept,3:*/*,]28:10:Connection,10:keep-alive,]62:10:User-Agent,44:TaHoma/7845 CFNetwork/758.3.15 Darwin/15.4.0,]]
+  $param->{header} = {'User-Agent' => $hash->{userAgent} }; #, 'Accept-Language' => "de-de", 'Accept-Encoding' => "gzip, deflate"};
+  $param->{header}{Cookie} = $hash->{HTTPCookies} if ($hash->{HTTPCookies});
+  $param->{compress} = 1;
+  $param->{keepalive} = 1;
+  $param->{url} = $hash->{url} . $param->{page};
+  $param->{url} .= $param->{subPage} if ($param->{subPage});
   
-  my $agent = $hash->{socket};
-  if (!defined $agent)
-  {
-    $agent = LWP::UserAgent->new(
-      cookie_jar => HTTP::Cookies->new(hide_cookie2 => 1),
-      requests_redirectable => [ 'GET', 'HEAD', 'POST' ]
-    );
-    $hash->{socket} = $agent;
-
-    my $proxy = $attr{$name}{proxy};
-    my $userAgent = $hash->{userAgent};
-    $agent->agent("$userAgent") if (defined $userAgent);
-    $agent->default_header('Accept-Language' => "de-de");
-    $agent->default_header('Accept-Encoding' => "gzip, deflate");
-    $agent->proxy(['http', 'https'], "$proxy") if (defined $proxy);
-    # keep alive
-    $agent->conn_cache(LWP::ConnCache->new());
-
-    $proxy = '' if (!defined $proxy);
-    Log3 $name, 4, "$name: tahoma_UserAgent_NonblockingGet create userAgent $userAgent, proxy=$proxy";
-  }
-  
-  my $response = "";
-  my $url = $hash->{url} . $param->{page};
-  $url .= $param->{subpage} if ((defined $param->{subpage}) && !(substr($url,0,4) eq 'file'));
-  $url .= '.json' if (substr($url,0,4) eq 'file');
-
-  my $nonblocking = !$hash->{BLOCKING} && $param->{nonblocking} && !(substr($url,0,4) eq 'file');
-  
-  $agent->{timeout} = $param->{timeout} if (defined $param->{timeout});
-
   $hash->{request_active} = 1;
   $hash->{request_time} = time;
   
-  if ($param->{data} && !(substr($url,0,4) eq 'file'))
+  if ($param->{blocking})
   {
-    my $data = $param->{data};
-    if (ref $data eq ref {}) {
-      if (!$nonblocking) {
-        $response = $agent->post( $url, $data );
-      } else {
-        $response = $agent->post( $url, $data, ':content_cb' => sub()
-          {
-            my ($content, $response, $protocol, $entry) = @_;
-            $param->{callback}($param, undef, $content, $response->header('Content-Length'));
-            return;
-          } );
-      }
-    } else {
-      if (!$nonblocking) {
-        $response = $agent->post( $url, content => $data );
-      } else {
-        $response = $agent->post( $url, content => $data, ':content_cb' => sub()
-          {
-            my ($content, $response, $protocol, $entry) = @_;
-            #my $len = length $content;
-            #print "tahoma_UserAgent_NonblockingGet len=$len $content\n\n";
-            $param->{callback}($param, undef, $content, $response->header('Content-Length') );
-            #return;
-          } );
-      }
-    }
-  } else {
-      if (!$nonblocking) {
-        $response = $agent->get( $url );
-      } else {
-        $response = $agent->get( $url, ':content_cb' => sub()
-          {
-            my ($content, $response, $protocol, $entry) = @_;
-            #my $len1 = length $content;
-            #print "tahoma_UserAgent_NonblockingGet len=$len1 $content\n\n";
-            $param->{callback}($param, undef, $content, $response->header('Content-Length'));
-            #return;
-          } );
-      }
+    my($err,$data) = HttpUtils_BlockingGet($param);
+  	$param->{callback}($param, $err, $data, length $data) if($param->{callback});
   }
-  return if ($nonblocking);
-
-  my ($err,$data);
-  if ($response->is_success)
+  else
   {
-    $err = "";
-    $data = $response->decoded_content();
-    
-  } else {
-    $err = $response->message;
-    $data = "";
+    my($err,$data) = HttpUtils_NonblockingGet($param);
   }
-
-  #print "tahoma_UserAgent_NonblockingGet BLOCKING\n\n";
-	$param->{callback}($param, $err, $data, length $data) if($param->{callback});
+  
 }
 
+sub tahoma_encode_utf8($)
+{
+  my ($text) = @_;
+  $text =~ s/Ã„/Ae/g;
+  $text =~ s/Ã–/Oe/g;
+  $text =~ s/Ãœ/Ue/g;
+  $text =~ s/Ã¤/ae/g;
+  $text =~ s/Ã¶/oe/g;
+  $text =~ s/Ã¼/ue/g;
+  $text =~ s/ÃŸ/ss/g;
+  return $text;
+}
+
+sub tahoma_GetCookies($$)
+{
+    my ($hash, $header) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 5, "$name: tahoma_GetCookies looking for Cookies in header";
+    foreach my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
+        Log3 $name, 5, "$name: Set-Cookie: $cookie";
+        $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*(.*)/;
+        Log3 $name, 4, "$name: Cookie: $1 Wert $2 Rest $3";
+        $hash->{HTTPCookieHash}{$1}{Value} = $2;
+        $hash->{HTTPCookieHash}{$1}{Options} = ($3 ? $3 : "");
+    }
+    $hash->{HTTPCookies} = join ("; ", map ($_ . "=".$hash->{HTTPCookieHash}{$_}{Value}, 
+                                        sort keys %{$hash->{HTTPCookieHash}}));
+    
+}
 
 
 1;
@@ -1369,14 +1309,27 @@ sub tahoma_UserAgent_NonblockingGet($)
     <br>
     <b>local Attributes for ACCOUNT:</b>
     <ul>
+      Normally, the web commands will be send asynchron, and this can be forced to wait of the result by blocking=1<br>
       <code>attr tahoma1 blocking 1</code><br>
-      <code>attr tahoma1 proxy IP:Port</code><br>
+    </ul>
+    <br>
+    <b>local Attributes for DEVICE:</b>
+    <ul>
+      If the closure value 0..100 should be 100..0, the level can be inverted:<br>
+      <code>attr tahoma_23234545 levelInvert 1</code><br>
+    </ul>
+    <br>
+    <b>local Attributes for PLACE:</b>
+    <ul>
+      The commands in a room will only affect the devices in the room with inClass=RollerShutter.<br>
+      This can be extend or changed by setting the placeClasses attribut:<br>
+      <code>attr tahoma_abc12345 placeClasses RollerShutter ExteriorScreen Window</code><br>
     </ul>
     <br>
     <b>Examples:</b>
     <ul>
       <code>define tahoma1 tahoma ACCOUNT abc@test.com myPassword</code><br>
-      <code>attr tahoma1 blocking 1</code><br>
+      <code>attr tahoma1 blocking 0</code><br>
       <code>attr tahoma1 room tahoma</code><br>
       <br>
       <br>Automatic created device e.g.:<br>
