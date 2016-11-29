@@ -44,6 +44,7 @@ alexa_Define($$)
   $modules{$hash->{TYPE}}{defptr} = $hash;
 
   addToAttrList("$hash->{TYPE}Name");
+  addToAttrList("$hash->{TYPE}Room");
 
   $hash->{STATE} = 'active';
 
@@ -366,6 +367,9 @@ alexa_Attr($$$)
   <ul>
     <li>alexaName<br>
       The name to use for a device with alexa.
+    </li>
+    <li>alexaRoom<br>
+      The room name to use for a device with alexa.
     </li>
   </ul>
 </ul><br>
