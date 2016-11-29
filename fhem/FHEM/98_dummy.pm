@@ -34,6 +34,7 @@ dummy_Set($@)
       unshift @a, $name;
       return SetExtensions($hash, $setList, @a) 
     }
+    SetExtensionsCancel($hash);
   } else {
     return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
   }

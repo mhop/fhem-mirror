@@ -889,6 +889,7 @@ ZWave_Cmd($$@)
     }
 
   }
+  SetExtensionsCancel($hash) if($type eq "set");
 
   return ZWave_neighborList($hash) if($cmd eq "neighborList");
 

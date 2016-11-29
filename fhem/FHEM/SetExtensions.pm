@@ -15,16 +15,28 @@ SetExtensionsCancel($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
+  return undef if( $hash->{InSetExtensions} );
   my $name = $hash->{NAME};
 
-  return undef if( !$hash->{TIMED_OnOff} );
-  my $cmd = $hash->{TIMED_OnOff}{CMD};
+  if($hash->{TIMED_OnOff}) {      # on-for-timer, blink
+    my $cmd = $hash->{TIMED_OnOff}{CMD};
+    RemoveInternalTimer("SE $name $cmd");
+    delete $hash->{TIMED_OnOff};
+  }
 
-  RemoveInternalTimer("SE $name $cmd");
-
-  delete $hash->{TIMED_OnOff};
-
+  for my $sfx ("_till", "_intervalFrom", "_intervalNext") {
+    CommandDelete(undef, $name.$sfx) if($defs{$name.$sfx});
+  }
   return undef;
+}
+
+sub
+SE_DoSet(@)
+{
+  my $hash = $defs{$_[0]};
+  $hash->{InSetExtensions} = 1;
+  DoSet(@_);
+  delete $hash->{InSetExtensions};
 }
 
 sub
@@ -41,7 +53,7 @@ SetExtensions($$@)
     "off-till"          => 1,
     "on-till-overnight" => 1,
     "off-till-overnight"=> 1,
-    "blink"             => 2,
+    "blink"             => 0,
     "intervals"         => 0,
     "toggle"            => 0
   );
@@ -75,28 +87,27 @@ SetExtensions($$@)
     return "$cmd requires $se_list{$cmd} parameter";
   }
 
+  SetExtensionsCancel($hash);
   my $cmd1 = ($cmd =~ m/^on.*/ ? "on" : "off");
   my $cmd2 = ($cmd =~ m/^on.*/ ? "off" : "on");
   my $param = $a[0];
 
+
   if($cmd eq "on-for-timer" || $cmd eq "off-for-timer") {
-    SetExtensionsCancel($hash);
     return "$cmd requires a number as argument" if($param !~ m/^\d*\.?\d*$/);
 
     if($param) {
       $hash->{TIMED_OnOff} = {
-        START=>time(), START_FMT=>TimeNow(), DURATION=>$param, CMD=>$cmd 
+        START=>time(), START_FMT=>TimeNow(), DURATION=>$param,
+        CMD=>$cmd, NEXTCMD=>$cmd2
       };
-      DoSet($name, $cmd1);
+      SE_DoSet($name, $cmd1);
       InternalTimer(gettimeofday()+$param,"SetExtensionsFn","SE $name $cmd",0);
     }
 
   } elsif($cmd =~ m/^(on|off)-till/) {
     my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($param);
     return "$cmd: $err" if($err);
-
-    my $at = $name . "_till";
-    CommandDelete(undef, $at) if($defs{$at});
 
     my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
     if($cmd =~ m/-till$/) {
@@ -108,31 +119,27 @@ SetExtensions($$@)
         return "";
       }
     }
-    DoSet($name, $cmd1);
-    CommandDefine(undef, "$at at $hms_till set $name $cmd2");
+    SE_DoSet($name, $cmd1);
+    CommandDefine(undef, "${name}_till at $hms_till set $name $cmd2");
 
   } elsif($cmd eq "blink") {
     my $p2 = $a[1];
-    delete($hash->{SE_BLINKPARAM});
     return "$cmd requires 2 numbers as argument"
-        if($param !~ m/^\d+$/ || $p2 !~ m/^\d*\d?\d*$/);
+        if($param !~ m/^\d+$/ || $p2 !~ m/^\d*\.?\d*$/);
 
     if($param) {
-      DoSet($name, "on-for-timer", $p2);
-      $param--;
+      SE_DoSet($name, $a[2] ? "off" : "on");
+      $param-- if($a[2]);
       if($param) {
-        $hash->{SE_BLINKPARAM} = "$param $p2";
-        InternalTimer(gettimeofday()+2*$p2,"SetExtensionsFn","SE $name $cmd",0);
+        $hash->{TIMED_OnOff} = {
+          START=>time(), START_FMT=>TimeNow(), DURATION=>$param,
+          CMD=>$cmd, NEXTCMD=>"$cmd $param $p2 ".($a[2] ? "0" : "1")
+        };
+        InternalTimer(gettimeofday()+$p2, "SetExtensionsFn","SE $name $cmd",0);
       }
     }
 
   } elsif($cmd eq "intervals") {
-    my $at0 = "${name}_till";
-    my $at1 = "${name}_intervalFrom",
-    my $at2 = "${name}_intervalNext";
-    CommandDelete(undef, $at0) if($defs{$at0});
-    CommandDelete(undef, $at1) if($defs{$at1});
-    CommandDelete(undef, $at2) if($defs{$at2});
 
     my $intSpec = shift(@a);
     if($intSpec) {
@@ -148,20 +155,22 @@ SetExtensions($$@)
         SetExtensions($hash, $list, $name, "on-till", $till);
 
       } else {
-        CommandDefine(undef, "$at1 at $from set $name on-till $till");
+        CommandDefine(undef,
+                "${name}_intervalFrom at $from set $name on-till $till");
 
       }
 
       if(@a) {
         my $rest = join(" ", @a);
         my ($from, $till) = split("-", shift @a);
-        CommandDefine(undef, "$at2 at $from set $name intervals $rest");
+        CommandDefine(undef,
+                "${name}_intervalNext at $from set $name intervals $rest");
       }
     }
     
   } elsif($cmd eq "toggle") {
     $value = ($1==0 ? "off" : "on") if($value =~ m/dim (\d+)/); # Forum #49391
-    DoSet($name, $value =~ m/^on/ ? "off" : "on");
+    SE_DoSet($name, $value =~ m/^on/ ? "off" : "on");
 
   }
 
@@ -173,21 +182,11 @@ SetExtensionsFn($)
 {
   my (undef, $name, $cmd) = split(" ", shift, 3);
   my $hash = $defs{$name};
-  return if(!$hash);
+  return if(!$hash || !$hash->{TIMED_OnOff});
 
+  my $nextcmd = $hash->{TIMED_OnOff}{NEXTCMD};
   delete $hash->{TIMED_OnOff};
-
-  if($cmd eq "on-for-timer") {
-    DoSet($name, "off");
-
-  } elsif($cmd eq "off-for-timer") {
-    DoSet($name, "on");
-
-  } elsif($cmd eq "blink" && $defs{$name}{SE_BLINKPARAM}) {
-    DoSet($name, "blink", split(" ", $defs{$name}{SE_BLINKPARAM}, 2));
-
-  }
-
+  SE_DoSet($name, split(" ",$nextcmd));
 }
 
 1;

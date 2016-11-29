@@ -210,8 +210,8 @@ FS20_Set($@)
     $list = (join(" ", sort keys %fs20_c2b) . " dim:slider,0,6.25,100")
         if(!defined($list));
     return SetExtensions($hash, $list, @a);
-
   }
+  SetExtensionsCancel($hash);
 
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
