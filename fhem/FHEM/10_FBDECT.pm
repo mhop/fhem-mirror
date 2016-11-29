@@ -98,6 +98,7 @@ FBDECT_SetHttp($@)
     my $cmdList = join(" ", map { "$_:$cmd{$_}" } sort keys %cmd);
     return SetExtensions($hash, $cmdList, @a)
   }
+  SetExtensionsCancel($hash);
 
   my $cmd = $a[1];
   my $name = $hash->{NAME};
@@ -138,6 +139,7 @@ FBDECT_Set($@)
     my $usage =  join(" ", sort keys %sets);
     return SetExtensions($hash, $usage, @a);
   }
+  SetExtensionsCancel($hash);
 
   my $name = $hash->{NAME};
   Log3 $name, 3, "FBDECT set $name $cmd";
