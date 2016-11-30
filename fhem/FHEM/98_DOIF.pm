@@ -56,10 +56,10 @@ DOIF_delAll($)
   delete ($hash->{triggertime});
   delete ($hash->{interval});
   delete ($hash->{regexp});
-  delete ($hash->{state});
+  #delete ($hash->{state});
   #delete ($defs{$hash->{NAME}}{READINGS});
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
-    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key !~ "^[A-Z]_");
+    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
   }
 
 }   
@@ -163,6 +163,7 @@ my ($hash,$attr,$value)=@_;
 return undef if (!defined($value));
 my $err="";
 my $pn=$hash->{NAME};
+   $value =~ s/\$SELF/$pn/g;
   ($value,$err)=ReplaceAllReadingsDoIf($hash,$value,-1,1);
   if ($err) {
     my $error="$pn: error in $attr: $err";
@@ -624,6 +625,7 @@ sub ReplaceAllReadingsDoIf($$$$)
   if (!defined $tailBlock) {
     return ("","");
   } 
+  $tailBlock =~ s/\$SELF/$hash->{NAME}/g;
   while ($tailBlock ne "") {
     $trigger=1;
     ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\[\]]');
@@ -656,7 +658,7 @@ sub ReplaceAllReadingsDoIf($$$$)
             $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
             
           } elsif ($condition == -2) {
-            $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device) if ($device ne $hash->{NAME});
+              $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device); #if ($device ne $hash->{NAME});
           } elsif ($condition == -3) {
               $hash->{itimer}{all} = AddItemDoIf($hash->{itimer}{all},$device);
           }
@@ -923,6 +925,7 @@ DOIF_SetState($$$$$)
   my $err="";
   my $attr=AttrVal($hash->{NAME},"cmdState","");
   my $state=AttrVal($hash->{NAME},"state","");
+  $state =~ s/\$SELF/$pn/g;
   my @cmdState=SplitDoIf('|',$attr);
   return undef if (AttrVal($hash->{NAME},"disable",""));
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
@@ -1817,6 +1820,7 @@ CmdDoIf($$)
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
 
+  return("","") if ($tail =~ /^ *$/);
   
   while ($tail ne "") {
     return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
@@ -1916,6 +1920,8 @@ DOIF_Attr(@)
       delete ($hash->{state}{device});
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
       return $err if ($err);
+  } elsif($a[0] eq "del" && $a[2] eq "state") {
+      delete ($hash->{state}{device});
   } elsif($a[0] eq "set" && $a[2] eq "wait") {
       RemoveInternalTimer($hash);
       #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
@@ -2997,7 +3003,7 @@ Zu beachten ist, dass bei einer wahren Bedingung die dazugehörigen Befehle ausg
 <a name="DOIF_setList__readingList"></a>
 <b>Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Die unter <a href="#dummy">Dummy</a> beschriebenen Attribute <a href="#readingList">readingList</a> und <a href="#setList">setList</a> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <a href="#setList">setList</a>, die in <a href="#FHEMWEB">FHEMWEB</a> angegebenen Modifier des Attributs <a href="#widgetOverride">widgetOverride</a> verwendet werden. Siehe auch das <a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrende Beispiel für Tablet-UI</a>.<br>
+Die unter <a href="#dummy">Dummy</a> beschriebenen Attribute <a href="#readingList">readingList</a> und <a href="#setList">setList</a> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <a href="#setList">setList</a>, die in <a href="#FHEMWEB">FHEMWEB</a> angegebenen Modifier des Attributs <a href="#widgetOverride">widgetOverride</a> verwendet werden. Siehe auch das <a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrende Beispiel für Tablet-UI</a>. Für die Verwendung moduleigener Readings ist die Funktionalität nicht gew&auml;hrleistet.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Eine Schaltuhr mit time-Widget f&uuml;r die Ein- u. Ausschaltzeiten und der M&ouml;glichkeit &uuml;ber eine Auswahlliste manuell ein und aus zu schalten.<br>
 <br>
@@ -3220,8 +3226,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>wait_timer</dt>
                 <dd>Angabe des aktuellen Wait-Timers</dd>
 </br>
-        <dt><b>A-Z_</b>&lt;persistent user defined readingname&gt;</dt>
-                <dd>benutzerdefinierte Readings beginnend mit einem Großbuchstaben mit Unterstrich als Pr&auml;fix überdauern ein Modify</dd>
+        <dt>[A-Z]_&lt;readingname&gt;</dt>
+                <dd>Readings, die mit einem Großbuchstaben und nachfolgendem Unterstrich beginnen, sind für User reserviert und werden auch zuk&uuml;nftig nicht vom Modul selbst benutzt.</dd>
 </dl>
 </br>
 </ul>
