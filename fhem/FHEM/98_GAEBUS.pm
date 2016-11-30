@@ -956,7 +956,7 @@ GAEBUS_doEbusCmd($$$$$$$)
 
       if ( $rbuffer =~ /\n\n$/ )
       {
-        Log3 ($name, 3, "$name answer terminated by empty line");
+        #Log3 ($name, 3, "$name answer terminated by empty line");
         last;
       }
  
