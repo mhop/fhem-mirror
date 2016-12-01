@@ -461,13 +461,18 @@ sub Twilight_WeatherTimerSet($) {
   my $now    = time();
 
   myRemoveInternalTimer    ("weather", $hash);
-  foreach my $key ("sr_weather", "ss_weather") {
-     my $tim = $hash->{TW}{$key}{TIME};
-     if ($tim-60*60>$now+60) {
-        myInternalTimer       ("weather", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+# statt sr_weather und ss_weather  5 Minuten vor sr_naut und 65 Minuten vor ss_twilight
+     my $tim = $hash->{TW}{"sr_naut"}{TIME};
+     if ($tim-5*60>$now+60) { # mehr als 1 Minute zur nächsten Abrufzeit
+        myInternalTimer       ("weather", $tim-5*60, "Twilight_WeatherTimerUpdate", $hash, 0);
         last;
      }
-  }
+     my $tim = $hash->{TW}{"sr_twilight"}{TIME};
+     if ($tim-65*60>$now+60) { # mehr als 1 Minute zur nächsten Abrufzeit
+        myInternalTimer       ("weather", $tim-65*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+        last;
+     }
+
 }
 ################################################################################
 sub Twilight_sunposTimerSet($) {
