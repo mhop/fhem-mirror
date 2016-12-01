@@ -172,7 +172,7 @@ sub I2C_BME280_Set($@) {					# Messwerte manuell anfordern
 		} else {											#..but get calibration variables first
 			Log3 $hash, 5, "$name: in set but no calibrationData, requesting again"; 
 			I2C_BME280_i2cread($hash, 0x88, 26);
-			I2C_BME280_i2cread($hash, 0xE1, 16);
+			I2C_BME280_i2cread($hash, 0xE1, 8);
 		}
 	}
 	return undef
@@ -194,7 +194,7 @@ sub I2C_BME280_Get($@) {					# Messwerte manuell anfordern
 		} else {											#..but get calibration variables first
 			Log3 $hash, 5, "$name: in set but no calibrationData, requesting again"; 
 			I2C_BME280_i2cread($hash, 0x88, 26);
-			I2C_BME280_i2cread($hash, 0xE1, 16);
+			I2C_BME280_i2cread($hash, 0xE1, 8);
 		}
 	} else {
 		return 'Unknown argument ' . $cmd . ', choose one of readValues:noArg';
@@ -230,7 +230,7 @@ sub I2C_BME280_I2CRec ($$) {				# wird vom IODev aus aufgerufen wenn I2C Daten v
 		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
 			Log3 $hash, 5, "$name Rx, Reg: $clientmsg->{reg}, Data: $clientmsg->{received}";
 			I2C_BME280_GetCal1  	($hash, $clientmsg->{received}) if $clientmsg->{reg} == 0x88 && $clientmsg->{nbyte} == 26;
-			I2C_BME280_GetCal2  	($hash, $clientmsg->{received}) if $clientmsg->{reg} == 0xE1 && $clientmsg->{nbyte} == 8;
+			I2C_BME280_GetCal2  	($hash, $clientmsg->{received}) if $clientmsg->{reg} == 0xE1 && $clientmsg->{nbyte} >= 8;
 			I2C_BME280_GetId   		($hash, $clientmsg->{received}) if $clientmsg->{reg} == 0xD0;
 			I2C_BME280_GetReadings  ($hash, $clientmsg->{received}) if $clientmsg->{reg} == 0xF7 && $clientmsg->{nbyte} == 8;
 		}
