@@ -699,6 +699,7 @@ JeeLink_Parse($$$$)
   return if($dmsg =~ m/^Available commands:/ );    # ignore startup messages
   return if($dmsg =~ m/^  / );                     # ignore startup messages
   return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
+  return if($dmsg =~ m/^LGW/);                     # ignore LGW communication
 
   if( $dmsg =~ /^INIT / ) {
     $hash->{initMessages} .= "\n" if( $hash->{initMessages} );
