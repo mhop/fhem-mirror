@@ -2,12 +2,12 @@
 #
 # DoorPi.pm
 #
-# FHEM module to communicate with a Raspberry Pi door station
-#
+# FHEM module to communicate with a Raspberry Pi door station running DoorPi
 # Prof. Dr. Peter A. Henning, 2016
 # 
 #  $Id: 70_DoorPi.pm 2016-05 - pahenning $
 #
+#  TODO: Link /xx weglassen beim letzten Call
 #
 ########################################################################################
 #
@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.42";
+my $version = "1.6";
 
 #-- these we may get on request
 my %gets = (
@@ -121,7 +121,7 @@ sub DoorPi_Define($$) {
   my $oid = $init_done;
   $init_done = 1;
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"state","Initialized");
+  readingsBulkUpdate($hash,"state","initialized");
   readingsBulkUpdate($hash,"lockstate","Unknown");
   readingsBulkUpdate($hash,"door","Unknown");
   readingsEndUpdate($hash,1); 
@@ -274,11 +274,14 @@ sub DoorPi_Set ($@) {
 
   #-- hidden command "call" to be used by DoorPi for communicating with this module
   if( $key eq "call" ){ 
-    Log3 $name,1,"[DoorPi] call $value received";
+    #Log3 $name,1,"[DoorPi] call $value received";
     #-- call init
     if( $value eq "init" ){
       DoorPi_GetConfig($hash);
       InternalTimer(gettimeofday()+10, "DoorPi_GetHistory", $hash,0);
+    #-- alive
+    }elsif( $value eq "alive" ){
+      readingsSingleUpdate($hash,"state","alive",1);
     #-- call start
     }elsif( $value =~ "start.*" ){
       readingsSingleUpdate($hash,"call","started",1);
@@ -626,7 +629,7 @@ sub DoorPi_GetConfig {
   $hash->{HELPER}->{wwwpath} = $jhash0->{"config"}->{"DoorPiWeb"}->{"www"};
    
   #-- put into READINGS
-  readingsSingleUpdate($hash,"state","Initialized",1);
+  readingsSingleUpdate($hash,"state","initialized",1);
   readingsSingleUpdate($hash,"config","ok",1);
   return undef;
 }
@@ -703,8 +706,8 @@ sub DoorPi_GetHistory {
   my ($hash,$err1,$status1,$err2,$status2) = @_;
   my $name = $hash->{NAME};
   my $url;
-  
-    if( $hash->{READINGS}{state}{VAL} ne "Initialized"){
+  my $state= $hash->{READINGS}{state}{VAL};
+    if( ( $state ne "initialized") && ($state ne "alive") ){
     Log 1,"[DoorPi_GetHistory] cannot be called, no connection";
     return
   }
@@ -946,10 +949,10 @@ sub DoorPi_GetHistory {
  sub DoorPi_Cmd {
   my ($hash, $cmd, $err, $data) = @_;
   my $name = $hash->{NAME};
- 
   my $url;
+  my $state = $hash->{READINGS}{state}{VAL};
   
-  if( $hash->{READINGS}{state}{VAL} ne "Initialized"){
+  if( ($state ne "initialized") && ($state ne "alive") ){
     Log 1,"[DoorPi_Cmd] cannot be called, no connection";
     return
   }
@@ -1289,6 +1292,8 @@ sub DoorPi_list($;$){
 1;
 
 =pod
+=item device
+=item summary to communicate with a Raspberry Pi door station running DoorPi
 =begin html
 
  <a name="DoorPi"></a>
