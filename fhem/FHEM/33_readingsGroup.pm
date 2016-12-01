@@ -788,7 +788,7 @@ readingsGroup_2html($;$)
         @l = sort rgSort @l;
 	  }
 
-      $hash->{groupedList} = ();
+      $hash->{groupedList} = [];
       foreach my $n (@l) {
         my $cg1 = @{$n}[1]; my $cg2 = @{$n}[2]; my $cg3 = @{$n}[3]; my $cg4 = @{$n}[4];
         my @l = @list[1..@list-1];
@@ -797,7 +797,7 @@ readingsGroup_2html($;$)
         push @{$hash->{groupedList}}, '<br2>' if( $hash->{groupedList} );
         push @{$hash->{groupedList}}, @l;
       }
-      @list = @{$hash->{groupedList}};
+      @list = @{$hash->{groupedList}} if( $hash->{groupedList} );
     }
 
     my $first = 1;
