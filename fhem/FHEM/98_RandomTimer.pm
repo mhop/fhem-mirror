@@ -547,7 +547,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         <b>Examples</b>
         <pre>
         attr   ZufallsTimerZ         disableCond      (!isVerreist())
-        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy") ne "present"))        
+        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy") ne "present")      
         </pre>
     </li>
 
