@@ -272,11 +272,8 @@ FBDECT_ParseHttp($$$)
       if($n eq "tsoll");
     $val = $type if($n eq "productname" && $val eq "");
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
-    if($n eq "tsoll") {
-      readingsBulkUpdate($hash, "state", "$ptyp: $pyld")
-    } else {
-      readingsBulkUpdate($hash, $ptyp, $pyld);
-    }
+    readingsBulkUpdate($hash, "state", "$ptyp: $pyld") if($n eq "tsoll");
+    readingsBulkUpdate($hash, $ptyp, $pyld);
   }
   readingsEndUpdate($hash, 1);
 
