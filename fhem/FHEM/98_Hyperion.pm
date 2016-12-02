@@ -118,7 +118,7 @@ sub Hyperion_Define($$)
   }
   else
   {
-    InternalTimer(gettimeofday() + $interval,"Hyperion_GetUpdate",$hash,0);
+    InternalTimer(gettimeofday() + $interval,"Hyperion_GetUpdate",$hash);
   }
   return undef;
 }
@@ -463,7 +463,7 @@ sub Hyperion_GetUpdate(@)
   RemoveInternalTimer($hash);
   if ($hash->{INTERVAL})
   {
-    InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash,1);
+    InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash);
   }
   return undef if (IsDisabled($hash));
   Hyperion_Call($hash);
