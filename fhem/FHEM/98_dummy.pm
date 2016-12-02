@@ -27,6 +27,7 @@ dummy_Set($@)
 
   return "no set value specified" if(int(@a) < 1);
   my $setList = AttrVal($name, "setList", " ");
+  $setList =~ s/\n/ /g;
 
   if(AttrVal($name,"useSetExtensions",undef)) {
     my $a0 = $a[0]; $a0 =~ s/([.?*])/\\$1/g;
