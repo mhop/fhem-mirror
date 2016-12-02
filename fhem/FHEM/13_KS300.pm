@@ -159,7 +159,7 @@ KS300_Parse($$)
       my $rain_raw_delta = $rain_raw - $rain_raw_prev;
       my $deltatsecs= ($tsecs - $tsecs_prev); # we have observed two datagrams at the same second
       $deltatsecs= 1 if($deltatsecs< 1); 
-      my $thours_delta = ($tsecs - $tsecs_prev)/3600.0; # in hours
+      my $thours_delta = $deltatsecs/3600.0; # in hours
       my $rain_raw_per_hour = $rain_raw_delta/$thours_delta;
       if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
             $rain_raw_ofs = $rain_raw_ofs_prev-$rain_raw_delta;
