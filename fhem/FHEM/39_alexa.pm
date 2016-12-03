@@ -139,7 +139,7 @@ alexa_Get($$@)
         }
 
         $mappings{$characteristic} = [] if( !$mappings{$characteristic} );
-        push $mappings{$characteristic}, \%characteristic;
+        push @{$mappings{$characteristic}}, \%characteristic;
       }
     }
 #Log 1, Dumper \%mappings;
@@ -186,22 +186,22 @@ alexa_Get($$@)
         my $intent = $characteristic .'Intent'. $nr;
 
         my $slots = [];
-        push $slots, { name => 'article', type => 'FHEM_article' };
-        push $slots, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
-        push $slots, { name => 'preposition', type => 'FHEM_preposition' };
-        push $slots, { name => 'Room', type => 'FHEM_Room' };
+        push @{$slots}, { name => 'article', type => 'FHEM_article' };
+        push @{$slots}, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
+        push @{$slots}, { name => 'preposition', type => 'FHEM_preposition' };
+        push @{$slots}, { name => 'Room', type => 'FHEM_Room' };
         if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
-          push $slots, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
+          push @{$slots}, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
           $types->{"${characteristic}_prefix$nr"} = $mapping->{valuePrefix};
         }
         if( $mapping->{values} && $mapping->{values} =~ /^AMAZON/ ) {
-          push $slots, { name => "${characteristic}_Value$nr", type => $mapping->{values} };
+          push @{$slots}, { name => "${characteristic}_Value$nr", type => $mapping->{values} };
         } else {
-          push $slots, { name => "${characteristic}_Value$nr", type => "${characteristic}_Value$nr" };
+          push @{$slots}, { name => "${characteristic}_Value$nr", type => "${characteristic}_Value$nr" };
           $types->{"${characteristic}_Value$nr"} = $values if( $values->[0] );
         }
         if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
-          push $slots, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
+          push @{$slots}, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
           $types->{"${characteristic}_suffix"} = $mapping->{valueSuffix$nr};
         }
 
@@ -245,7 +245,7 @@ alexa_Get($$@)
             }
           }
         }
-        push $schema->{intents}, {intent => $intent, slots => $slots};
+        push @{$schema->{intents}}, {intent => $intent, slots => $slots};
 
         ++$i;
       }
