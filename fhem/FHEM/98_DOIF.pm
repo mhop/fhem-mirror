@@ -1986,6 +1986,7 @@ DOIF_Set($@)
 
 
       my $setList = AttrVal($pn, "setList", " ");
+      $setList =~ s/\n/ /g;
       return "unknown argument ? for $pn, choose one of disable initialize enable $setList" if($arg eq "?");
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
@@ -3003,7 +3004,7 @@ Zu beachten ist, dass bei einer wahren Bedingung die dazugehörigen Befehle ausg
 <a name="DOIF_setList__readingList"></a>
 <b>Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Die unter <a href="#dummy">Dummy</a> beschriebenen Attribute <a href="#readingList">readingList</a> und <a href="#setList">setList</a> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <a href="#setList">setList</a>, die in <a href="#FHEMWEB">FHEMWEB</a> angegebenen Modifier des Attributs <a href="#widgetOverride">widgetOverride</a> verwendet werden. Siehe auch das <a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrende Beispiel für Tablet-UI</a>. Für die Verwendung moduleigener Readings ist die Funktionalität nicht gew&auml;hrleistet.<br>
+Die unter <a href="#dummy">Dummy</a> beschriebenen Attribute <a href="#readingList">readingList</a> und <a href="#setList">setList</a> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <a href="#setList">setList</a>, die in <a href="#FHEMWEB">FHEMWEB</a> angegebenen Modifier des Attributs <a href="#widgetOverride">widgetOverride</a> verwendet werden. Siehe auch das <a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrende Beispiel für Tablet-UI</a>. Für die Verwendung moduleigener Readings ist die Funktionalität nicht gew&auml;hrleistet, siehe <a href="#DOIF_Benutzerreadings">benutzerdefinierte Readings</a>.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Eine Schaltuhr mit time-Widget f&uuml;r die Ein- u. Ausschaltzeiten und der M&ouml;glichkeit &uuml;ber eine Auswahlliste manuell ein und aus zu schalten.<br>
 <br>
@@ -3226,6 +3227,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>wait_timer</dt>
                 <dd>Angabe des aktuellen Wait-Timers</dd>
 </br>
+  <a name="DOIF_Benutzerreadings"></a>
         <dt>[A-Z]_&lt;readingname&gt;</dt>
                 <dd>Readings, die mit einem Großbuchstaben und nachfolgendem Unterstrich beginnen, sind für User reserviert und werden auch zuk&uuml;nftig nicht vom Modul selbst benutzt.</dd>
 </dl>
