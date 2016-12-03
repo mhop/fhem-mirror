@@ -727,8 +727,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   dInProp6        =>{a=>178.6,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
   dInProp7        =>{a=>178.7,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
 
-  refRunTimeSlats =>{a=>179  ,s=>2  ,l=>1,min=>0    ,max=>10     ,c=>''         ,f=>''      ,u=>'s'    ,d=>0,t=>"reference run time slats"     ,lit=>{off=>0,on=>1}},
-  posSaveTime     =>{a=>181  ,s=>1  ,l=>1,min=>0.1  ,max=>25.5   ,c=>''         ,f=>''      ,u=>'s'    ,d=>0,t=>"position save time"           ,lit=>{off=>0,on=>1}},
+  refRunTimeSlats =>{a=>179  ,s=>2  ,l=>1,min=>0    ,max=>10     ,c=>''         ,f=>50      ,u=>'s'    ,d=>0,t=>"reference run time slats"     ,lit=>{off=>0,on=>1}},
+  posSaveTime     =>{a=>181  ,s=>1  ,l=>1,min=>0.1  ,max=>25.5   ,c=>''         ,f=>10      ,u=>'s'    ,d=>0,t=>"position save time"           ,lit=>{off=>0,on=>1}},
 #rf_es_tx_wm               r:TX_THRESHOLD_POWER                       l:1   idx:124      size:3      type:integer    log## ty: float      min:0.01       max:160000.0   def:100.00     uni:W         Conv## ty: float_integer_scale            factor:100        offset:           
 #rf_es_tx_wm               r:METER_TYPE                               l:1   idx:149      size:1      type:integer    log## ty: option     min:           max:           def:           uni:          Conv## ty: option_integer                 factor:           offset:           
 #rf_es_tx_wm               r:POWER_STRING                             l:1   idx:54       size:16     type:string     log## ty: string     min:           max:           def:           uni:           
