@@ -38,7 +38,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."configDir configFilename configTempFile "
                        ."hmDefaults "
                        .$readingFnAttributes;
-
+  $hash->{NOTIFYDEV} = "global";
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -192,14 +192,17 @@ sub HMinfo_Notify(@){##########################################################
 
   my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
   return undef if(!$events); # Some previous notify deleted the array.
-  return undef if (grep !/INITIALIZED/,@{$events});
-  delete $modules{HMinfo}{NotifyFn};
-  HMinfo_SetFn($ntfy,$ntfy->{NAME},"loadConfig") 
-       if (substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0);
 
   #we need to init the templist if HMInfo is in use
-  HMinfo_listOfTempTemplates();
+  my $cfgFn  = AttrVal($ntfy->{NAME},"configTempFile","tempList.cfg");
+  HMinfo_listOfTempTemplates() if (grep /(FILEWRITE.*$cfgFn|INITIALIZED)/,@{$events});
+
+  return undef if (grep !/INITIALIZED/,@{$events});
+  HMinfo_SetFn($ntfy,$ntfy->{NAME},"loadConfig") 
+       if (  grep /INITIALIZED/,@{$events}
+           && substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0);
   
+  #delete $modules{HMinfo}{NotifyFn};
   return undef;
 }
 sub HMinfo_status($){##########################################################
