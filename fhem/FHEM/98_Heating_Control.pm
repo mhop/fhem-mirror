@@ -124,6 +124,9 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
 1;
 
 =pod
+=item device
+=item summary    sends heating commands to heating at defined times
+=item summary_DE sendet Temperaturwerte zu festgelegen Zeiten an eine Heizung
 =begin html
 
 <a name="Heating_Control"></a>
@@ -228,7 +231,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         The is switched at time myFunction(). It is sent the Command "night-temp 18" and "dayTemp 16".<p>
 
         If you want to have set all Heating_Controls their current value (after a temperature lowering phase holidays)
-        you can call the function <b>Heating_Control_SetTemp(&lt;"HC-device"&gt;)</b> or <b>Heating_Control_SetAllTemps()</b>.<br>
+        you can call the function <b>Heating_Control_SetTemp("HC-device")</b> or <b>Heating_Control_SetAllTemps()</b>.<br>
         This call can be automatically coupled to a dummy by a notify:<br>
         <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps()}</code>
         <br><p>
@@ -408,7 +411,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         Das Ger&aumlt wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.<p>
 
         Wenn du beispielsweise nach einer Temperaturabsenkungsphase erreichen willst, dass  alle Heating_Controls ihren aktuellen Wert
-        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetTemp(&lt;"HC-device"&gt;)</b> or <b>Heating_Control_SetAllTemps()</b> aufrufen.<p>
+        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetTemp("HC-device")</b> or <b>Heating_Control_SetAllTemps()</b> aufrufen.<p>
         Dieser Aufruf kann per notify automatisch an ein dummy gekoppelt werden:<br>
         <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
         <br><p>
