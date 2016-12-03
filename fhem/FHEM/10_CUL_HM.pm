@@ -8,6 +8,7 @@ package main;
 use strict;
 use warnings;
 use HMConfig;
+use Color;
 use Digest::MD5 qw(md5);
 
 eval "use Crypt::Rijndael";
@@ -1933,7 +1934,8 @@ sub CUL_HM_Parse($$) {#########################################################
         ($mh{mTyp} eq "1006")) { #    or Info_Status message here
 
       my $rSUpdt = 0;# require status update
-      my ($val,$err) = (hex($mI[2])/2,hex($mI[3]));
+      my ($val,$err) = (hex($mI[2]),hex($mI[3]));
+      $val /= 2 if ($mh{st} ne "rgb" || $mh{chn} != 3);
       CUL_HM_m_setCh(\%mh,$mI[1]);
       my($lvlMin,$lvlMax)=split",",AttrVal($mh{cName}, "levelRange", "0,100");
       my $physLvl;                             #store phys level if available
@@ -2064,6 +2066,13 @@ sub CUL_HM_Parse($$) {#########################################################
           push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
+      }
+      elsif($mh{st} eq "rgb"){
+        if ($mh{chn} == 2){
+          push @evtEt,[$mh{cHash},1,"color:$val"]; # duplicate to color - necessary for "colorpicker"
+          push @evtEt,[$mh{cHash},1,"rgb:".(($val==100)?("FFFFFF"):(Color::hsv2hex($val/100,1,1)))];
+        }
+        push @evtEt,[$mh{cHash},1,"colProgram:$val"] if ($mh{chn} == 3); # duplicate to colProgram - necessary for "slider"
       }
       elsif ($mh{st} eq "blindActuator"){
         my $param = AttrVal($mh{cName}, "param", "");
@@ -3919,6 +3928,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
+    $usg =~ s/ color/ color:colorpicker,HUE,0,0.5,100/;
+    $usg =~ s/ colProgram/ colProgram:0,1,2,3,4,5,6/;
 	if ($usg =~ m/ tempTmplSet/){
       my $tl = $modules{CUL_HM}{AttrList};
       my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
@@ -4812,6 +4823,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
                            sprintf("%02X%02X",$bright,$colVal).$ramp.$tval);
   }
+  elsif($cmd eq "color") { ################################################
+    my (undef,undef,$colVal) = @a; #date prepared extention to entdate
+    return "cmd requires color[0..100] step 0.5" if (!defined $colVal 
+                                                ||$colVal < 0 ||$colVal > 100);
+    $colVal = int($colVal*2);# convert percent to [0..200]
+
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
+                           sprintf("%02X",$colVal)."00A0");
+  }
   elsif($cmd eq "brightAuto") { ###############################################
     my (undef,undef,$bright,$colProg,$min,$max,$duration,$ramp) = @a; #date prepared extention to entdate
     return "please enter the duration in seconds"
@@ -4826,6 +4846,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
                            sprintf("%02X%02X",$bright,$colProg).$min.$max.$ramp.$tval);
+  }
+  elsif($cmd eq "colProgram") { ################################################
+    my (undef,undef,$colProg) = @a; #date prepared extention to entdate
+    return "cmd requires a colorProgram[0..255]" if (!defined $colProg 
+                                                     ||$colProg < 0 ||$colProg > 255);
+
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
+                           sprintf("%02X",$colProg)."00A0");
   }
   elsif($cmd eq "playTone") { #################################################
     my $msg;
@@ -6640,8 +6668,10 @@ sub CUL_HM_SndCmd($$) {
     #  
     my @arr = ();
     $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-    $cmd = $hash->{helper}{prt}{rspWait}{cmd} if(   $hash->{helper}{prt}{rspWait}
-                                                 && $hash->{helper}{prt}{rspWait}{cmd});
+    
+    if( $hash->{helper}{prt}{rspWait} && $hash->{helper}{prt}{rspWait}{cmd}){
+      (undef,$cmd) = unpack 'A4A*',$hash->{helper}{prt}{rspWait}{cmd};
+    }
     unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunity
 
     @{$modules{CUL_HM}{$ioName}{pendDev}} =
