@@ -319,6 +319,9 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
  ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw4-SM-2" }
  ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim1_V:2:3"}
+ ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"0106" => {name=>"HM-MOD-EM-8Bit"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
+ ,"0107" => {name=>"HM-LC-Ja1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1",}
 
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
@@ -454,7 +457,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   CtRefOn         =>{a=> 28.0,s=>0.4,l=>3,min=>0    ,max=>5     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOn"          ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0    ,max=>5     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"         ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
                                                     
-  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5    ,max=>30    ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature if required by CtrlRc reg"},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>4.5  ,max=>30.5  ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature if required by CtrlRc reg"},
   CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0    ,max=>6     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"          ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
   ActHsvCol       =>{a=> 47  ,s=>1  ,l=>3,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate color value"},
   ActColPrgm      =>{a=> 48  ,s=>1  ,l=>3,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate color program"},
@@ -474,6 +477,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   backlOnMode2    =>{a=>  5.6,s=>0.2,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"                       ,lit=>{off=>0,on=>1}},
   ledMode         =>{a=>  5.6,s=>0.2,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED mode"                             ,lit=>{off=>0,on=>1}},
   displayInvert   =>{a=>  5.6,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"invert Display"                       ,lit=>{off=>0,on=>1}},
+  statMsgTxtAlign =>{a=>  5.7,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Status message align"                 ,lit=>{right=>0,left=>1}},
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Language"                             ,lit=>{English=>0,German=>1}},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke"               ,lit=>{off=>0,on=>1}},
   backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"                  ,lit=>{off=>0,on=>1}},
@@ -514,8 +518,9 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   speedMultiply   =>{a=> 30.0,s=>1.0,l=>0,min=>1    ,max=>5     ,c=>''         ,f=>''      ,u=>'x200Hz',d=>0,t=>"speed multiply"},
   devRepeatCntMax =>{a=> 31.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"act as repeater"},
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0    ,max=>20    ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
-  wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
-  wakeupBehavMsg  =>{a=> 33.1,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior status message"       ,lit=>{off=>0,on=>1}},
+  wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
+  wakeupBehavMsg  =>{a=> 33.1,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior status message"           ,lit=>{off=>0,on=>1}},
+  wakeupBehavMsg_R=>{a=> 33.2,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior status message resistance",lit=>{off=>0,on=>1}},
   alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
 
   baudrate        =>{a=> 35.0,s=>1.0,l=>0,min=>0    ,max=>6     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"baudrate"                             ,lit=>{Bd300=>0,Bd600=>1,Bd1200=>2,Bd2400=>3,Bd4800=>4,Bd9600=>5,Bd19200=>6}},
@@ -694,8 +699,6 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   waGreen         =>{a=>165.0,s=>1  ,l=>1,min=>0    ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance green"},
   waBlue          =>{a=>166.0,s=>1  ,l=>1,min=>0    ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance blue"},
   colChangeSpeed  =>{a=>167.0,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>'s/U'  ,d=>0,t=>"color change speed"},
-  soundId         =>{a=>171.0,s=>1  ,l=>1,min=>0    ,max=>72     ,c=>''         ,f=>''      ,u=>''     ,d=>0,t=>"sound ID"                     ,lit=>{unused=>0}},
-
   
   acusticMultiDly =>{a=>169.7,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"acustic mutli exec delay"      ,lit=>{off=>0,on=>1}},
   acusticArmSens  =>{a=>169.4,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"acustic arm sensor"            ,lit=>{off=>0,on=>1}},
@@ -709,9 +712,23 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   opticExtArm     =>{a=>170.2,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"optic external arm sensor"     ,lit=>{off=>0,on=>1}},
   opticExtDly     =>{a=>170.1,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"optic external delay arm"      ,lit=>{off=>0,on=>1}},
   opticDisArm     =>{a=>170.0,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"optic disarm "                 ,lit=>{off=>0,on=>1}},
-
+  soundId         =>{a=>171.0,s=>1  ,l=>1,min=>0    ,max=>72     ,c=>''         ,f=>''      ,u=>''     ,d=>0,t=>"sound ID"                     ,lit=>{unused=>0}},
 
   txThresPercent  =>{a=>172.0,s=>1  ,l=>1,min=>10   ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"threshold percent"            ,lit=>{unused=>0}},
+  dataTransCond   =>{a=>176.0,s=>1  ,l=>1,min=>10   ,max=>111600 ,c=>'lit'      ,f=>''      ,u=>''     ,d=>1,t=>"dataTransmitCondition"        ,lit=>{lvlChng_H_L=>0,lvlChng_L_H=>1,lvlChng_any=>2,stbl4TimeEnable=>3,sndImmediateEnable=>4,stbl4TimeDisable=>5,sndImmediateDisable=>6}},
+  stabFltTime     =>{a=>177.0,s=>1  ,l=>1,min=>10   ,max=>111600 ,c=>'fltCvT'   ,f=>''      ,u=>'s'    ,d=>0,t=>"stability filter time"},
+
+  dInProp0        =>{a=>178.0,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp1        =>{a=>178.1,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp2        =>{a=>178.2,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp3        =>{a=>178.3,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp4        =>{a=>178.4,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp5        =>{a=>178.5,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp6        =>{a=>178.6,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+  dInProp7        =>{a=>178.7,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"Data Input Propertie"         ,lit=>{off=>0,on=>1}},
+
+  refRunTimeSlats =>{a=>179  ,s=>2  ,l=>1,min=>0    ,max=>10     ,c=>''         ,f=>''      ,u=>'s'    ,d=>0,t=>"reference run time slats"     ,lit=>{off=>0,on=>1}},
+  posSaveTime     =>{a=>181  ,s=>1  ,l=>1,min=>0.1  ,max=>25.5   ,c=>''         ,f=>''      ,u=>'s'    ,d=>0,t=>"position save time"           ,lit=>{off=>0,on=>1}},
 #rf_es_tx_wm               r:TX_THRESHOLD_POWER                       l:1   idx:124      size:3      type:integer    log## ty: float      min:0.01       max:160000.0   def:100.00     uni:W         Conv## ty: float_integer_scale            factor:100        offset:           
 #rf_es_tx_wm               r:METER_TYPE                               l:1   idx:149      size:1      type:integer    log## ty: option     min:           max:           def:           uni:          Conv## ty: option_integer                 factor:           offset:           
 #rf_es_tx_wm               r:POWER_STRING                             l:1   idx:54       size:16     type:string     log## ty: string     min:           max:           def:           uni:           
@@ -969,6 +986,9 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
+ ,"HM-LC-Dim1T-DR"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,localResDis     =>1,fuseDelay       =>1,logicCombination=>1
+                        }
  ,"HM-LC-Dim1T-Pl"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,fuseDelay       =>1
                         }
@@ -1004,7 +1024,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
  ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1,language        =>1,localResDis     =>1}
  ,"HM-Dis-EP-WM55"    =>{ intKeyVisib     =>1,transmDevTryMax =>1
-                         ,powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1,wakeupBehavMsg  =>1
+                         ,powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1
+                         ,wakeupBehavMsg  =>1,wakeupBehavMsg_R=>1,statMsgTxtAlign =>1
                          ,displayInvert   =>1}
  
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
@@ -1091,7 +1112,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         }
  ,"HM-SEC-SD-2"       =>{ devRepeatCntMax =>1}
  ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
-
+ ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
+ ,"HM-LC-Ja1PBU-FM"   =>{ refRunTimeSlats =>1,posSaveTime     =>1}
 );
 
 #clones - - - - - - - - - - - - - - -
@@ -1292,6 +1314,10 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          }
  ,"HM-Dis-EP-WM5501"  =>{ transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1}
  ,"HM-Dis-EP-WM5503"  =>{ transmitTryMax  =>1}
+ ,"HM-MOD-EM-8Bit03"  =>{ dataTransCond   =>1,stabFltTime     =>1
+                         ,dInProp0        =>1,dInProp1        =>1,dInProp2        =>1,dInProp3        =>1
+                         ,dInProp4        =>1,dInProp5        =>1,dInProp6        =>1,dInProp7        =>1
+                        }
  );
  
 
@@ -1661,6 +1687,9 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                      ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
                      ,"ActionDetector"   =>{ clear          =>"[readings|all]"
                                             ,update         => ""
+                                           }
+                     ,"HM-LC-Ja1PBU-FM"  =>{ pctSlat        =>"-value-|old|noChng"
+                                            ,pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
                                            }
 );
 

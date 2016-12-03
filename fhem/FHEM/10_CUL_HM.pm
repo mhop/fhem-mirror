@@ -2047,7 +2047,7 @@ sub CUL_HM_Parse($$) {#########################################################
         delete $mh{cHash}->{helper}{stateUpdatDly};
       }
  
-      if   ($mh{st} eq "dimmer"){
+      if    ($mh{st} eq "dimmer"){
         if (lc($mh{md}) =~ m/^hm-lc-dim.l.*/){
           push @evtEt,[$mh{cHash},1,"loadFail:".(($err == 6)?"on":"off")];#note: err is times 2!
         }
@@ -2065,7 +2065,7 @@ sub CUL_HM_Parse($$) {#########################################################
           $mh{devH}->{helper}{PONtest} = 0;
         }
       }
-      elsif($mh{st} eq "blindActuator"){
+      elsif ($mh{st} eq "blindActuator"){
         my $param = AttrVal($mh{cName}, "param", "");
         if ($param =~ m/ponRestoreSmart/){
           if($parse eq "powerOn"){
@@ -2103,6 +2103,11 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
 
+        if ($mh{md} eq "HM-LC-Ja1PBU-FM" && defined $mI[6]){
+          my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
+          push @evtEt,[$mh{cHash},1,"slat:".hex($mI[5])/2];
+          push @evtEt,[$mh{cHash},1,"slatDir:".$dirName{hex($mI[6]) & 0x3}];          
+        }
       }
       elsif ($mh{md} eq "HM-SEC-SFA-SM"){ 
         push @evtEt,[$mh{devH},1,"powerError:"   .(($err&0x02) ? "on":"off")];
@@ -4427,10 +4432,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                 ? ($lvlInv?'C8':'00')
                                 : ($lvlInv?'00':'C8');
     my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
-    $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax*2) 
-          if ($hash->{helper}{dlvl} eq 'C8');
-    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
-                               ."02$chn$hash->{helper}{dlvl}".'0000';
+    $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax*2)   if ($hash->{helper}{dlvl} eq 'C8');
+    if ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$hash->{helper}{dlvl}"."CA";}
+    else{                          $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$hash->{helper}{dlvl}".'0000';}
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $hash = $chnHash; # report to channel if defined
   }
@@ -4569,11 +4573,50 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $hash->{helper}{dlvl} = $plvl;
     }
-    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";
+    if ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$plvl"."CA";}
+    else{                          $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";}
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $state = "set_".$lvl;
     CUL_HM_UpdtReadSingle($hash,"level",$state,1);
   }
+  
+  elsif($cmd eq "pctSlat") { ##################################################
+    my $slat = $a[2];
+    if    ($slat eq "old")   {$slat = "C9"}
+    elsif ($slat eq "noChng"){$slat = "CA"}
+    else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
+                              $slat = sprintf("%02X",$slat*2);
+    }
+
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}CA$slat");
+    $state = "";
+    CUL_HM_UpdtReadSingle($hash,"levelSlat",$state,1);
+  }
+  elsif($cmd eq "pctLvlSlat") { ###############################################
+    my ($lvl,$slat) = ($a[2],$a[3]);
+    my $lvlInv = (AttrVal($name, "param", "") =~ m /levelInverse/)?1:0;
+    my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
+
+    if    ($slat eq "old")   {$slat = "C9"}
+    elsif ($slat eq "noChng"){$slat = "CA"}
+    else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
+                              $slat = sprintf("%02X",$slat*2);
+    }
+    my $plvl;
+    $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
+    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
+    if    ($lvl eq "old")   {$plvl = "C9"}
+    elsif ($lvl eq "noChng"){$plvl = "CA"}
+    else{                    $lvl =~ s/(\d*\.?\d*).*/$1/;
+                             $plvl = sprintf("%02X",sprintf("%02X",(($lvlInv)?100-$lvl :$lvl)*2));
+    }
+
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}CA$slat");
+    $state = "set_".$lvl;
+    CUL_HM_UpdtReadSingle($hash,"levelSlat","set_".$slat,1);
+    CUL_HM_UpdtReadSingle($hash,"level",$state,1);
+  }
+  
   elsif($cmd eq "stop") { #####################################################
     delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
