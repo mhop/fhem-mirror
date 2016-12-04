@@ -590,13 +590,15 @@ sub WeekdayTimer_SetTimer($) {
   
   my ($aktIdx,$aktTime,$aktParameter,$nextTime,$nextParameter) = 
      WeekdayTimer_searchAktNext($hash, time()+5);
+  if(!defined $aktTime) {  
+    Log3 $hash, 3, "[$name] can not compute past switching time";      
+  }  
      
   readingsSingleUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime), 1);
   readingsSingleUpdate ($hash,  "nextValue",  $nextParameter,         1);  
   readingsSingleUpdate ($hash,  "currValue",  $aktParameter,          1); # HB  
-
   
-  if ($switchInThePast) {  
+  if ($switchInThePast && defined $aktTime) {  
      # Fensterkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
      if (WeekdayTimer_FensterOffen($hash, $aktParameter, $aktIdx)) {
         return;
@@ -712,7 +714,7 @@ sub WeekdayTimer_Update($) {
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
-  my $newParam    = $hash->{profil}{$idx}{PARA};
+  my $newParam    = WeekdayTimer_evalAndcleanupParam($hash,$time,$hash->{profil}{$idx}{PARA});
   
  #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
     
@@ -940,13 +942,45 @@ sub WeekdayTimer_FensterOffen ($$$) {
   delete $hash->{VERZOEGRUNG_IDX} if defined($hash->{VERZOEGRUNG_IDX});
   return 0;
 }
+
+################################################################################
+sub WeekdayTimer_evalAndcleanupParam($$$) {
+  my ($hash,$time,$param) = @_;
+  
+  my $name   = $hash->{DEVICE} ;
+  my $wdName = $hash->{NAME};
+  
+  my $newParam = $param;
+  if ($param =~ m/^{.*}$/) {
+     
+        Log3 $hash, 4, "[$wdName] calculating dynamic param before all: .......  $newParam";
+  
+     $newParam =~ s/\$NAME/$hash->{DEVICE}/g;
+     $newParam =~ s/\$TIME/$time/g;          
+        Log3 $hash, 4, "[$wdName] calculating dynamic param after substitutions: $newParam";
+     
+     $newParam = eval $newParam;
+     if ($@ || not defined $newParam) {
+        Log3 $hash, 1, "[$wdName] problem calculating dynamic param: ........... $param";
+        Log3 $hash, 1, "[$wdName] $@";
+     } else {
+        Log3 $hash, 4, "[$wdName] calculating dynamic param after eval: ........ $newParam";
+     }
+    
+ }elsif($param =~ m/^\d{1,3}$/){
+     $newParam = sprintf("%.1f", $param);
+ }
+ return $newParam;
+}
+
 ################################################################################
 sub WeekdayTimer_Device_Schalten($$$) {
   my ($hash, $newParam, $tage)  = @_;
 
   my ($command, $condition, $tageAsHash) = "";
-  my $name = $hash->{NAME};                                        ###
-
+  my $name  = $hash->{NAME};                                        ###
+  my $dummy = "";                                       
+  
   my $now = time();
   #modifier des Zieldevices auswaehlen
   my $setModifier = WeekdayTimer_isHeizung($hash);
@@ -957,10 +991,9 @@ sub WeekdayTimer_Device_Schalten($$$) {
   my $activeTimer = 1;
   
   my $isHeating = $setModifier gt "";
-  my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
-     $aktParam  = sprintf("%.1f", $aktParam)   if ($isHeating && $aktParam =~ m/^[0-9]{1,3}$/i);
-     $newParam  = sprintf("%.1f", $newParam)   if ($isHeating && $newParam =~ m/^[0-9]{1,3}$/i);
-
+  my $aktParam  = WeekdayTimer_evalAndcleanupParam($hash,$dummy,ReadingsVal($hash->{DEVICE}, $setModifier, ""));
+  # newParam is already processed by evalAndcleanupParam()
+  
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
   my $disabled_txt = $disabled ? " " : " not";
   Log3 $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
@@ -969,7 +1002,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
   if ($command && !$disabled && $activeTimer 
     && $aktParam ne $newParam 
     ) {
-    $newParam =~ s/:/ /g;
+    $newParam =~ s/:/ /;
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
     $command= EvalSpecials($command, %specials);
@@ -1058,6 +1091,9 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
 1;
 
 =pod
+=item device
+=item summary    sends parameter to devices at defined times
+=item summary_DE sendet Parameter an devices zu einer Liste mit festen Zeiten  
 =begin html
 
 <a name="WeekdayTimer"></a>
@@ -1116,6 +1152,7 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
          It is possible to define $we or !$we in daylist to easily allow weekend an holiday. $we !$we are coded as 7 8, when using a numeric daylist.<br><br>
       <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}. Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br><br>
       <u>parameter:</u>the parameter to be set, using any text value like <b>on</b>, <b>off</b>, <b>dim30%</b>, <b>eco</b> or <b>comfort</b> - whatever your device understands.<br>
+     If the parameter is perl code (embraced in {}), it is evaluated automatically.<br>
     </ul>
     <p>
     <ul><b>command</b><br>
@@ -1138,7 +1175,7 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
       The parameters $NAME and $EVENT will be interpreted.
     </ul>
     <p>
-    <b>Example:</b>
+    <b>Examples:</b>
     <ul>
         <code>define shutter WeekdayTimer bath 12345|05:20|up  12345|20:30|down</code><br>
         Mo-Fr are setting the shutter at 05:20 to <b>up</b>, and at 20:30 <b>down</b>.<p>
@@ -1151,31 +1188,38 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
         The dimmer is only set to dimXX% if the dummy variable WeAreThere is "yes"(not a real live example).<p>
 
         If you want to have set all WeekdayTimer their current value (after a temperature lowering phase holidays)
-        you can call the function <b>WeekdayTimer_SetParm(&lt;"WD-device"&gt;)</b> or <b>WeekdayTimer_SetAllParms()</b>.<br>
+        you can call the function <b>WeekdayTimer_SetParm("WD-device")</b> or <b>WeekdayTimer_SetAllParms()</b>.<br>
         This call can be automatically coupled to a dummy by a notify:<br>
         <code>define dummyNotify notify Dummy:. * {WeekdayTimer_SetAllTemps()}</code>
         <br><p>
         Some definitions without comment:
         <code>
         <pre> 
-        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
-        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
-        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
-        
-        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22  
-        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22 
-        
-        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
-        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16    
+        define wd    Weekdaytimer  device de         7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
+        define wd    Weekdaytimer  device de         fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
+        define wd    Weekdaytimer  device de         20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
+                                                     
+        define wd    Weekdaytimer  device de         mo-so, $we|{sunrise_abs_dat($date)}|on       mo-so, $we|{sunset_abs_dat($date)}|off  
+        define wd    Weekdaytimer  device de         mo-so,!$we|{sunrise_abs_dat($date)}|aus      mo-so,!$we|{sunset_abs_dat($date)}|aus 
+                                                     
+        define wd    Weekdaytimer  device de         {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
+        define wd    Weekdaytimer  device de         22:35|25  23:00|16    
         </code></pre>
-        The daylist can be given globaly for the whole Heating_Control:<p>
+        The daylist can be given globaly for the whole Weekdaytimer:<p>
         <code><pre>
-        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
+        define wd    Weekdaytimer device de  !$we     09:00|19  (function("Ein"))  
+        define wd    Weekdaytimer device de   $we     09:00|19  (function("Ein"))  
+        define wd    Weekdaytimer device de   78      09:00|19  (function("exit"))  
+        define wd    Weekdaytimer device de   57      09:00|19  (function("exit"))  
+        define wd    Weekdaytimer device de  fr,$we   09:00|19  (function("exit"))  
         </code></pre>
+        
+       it is possible to construct the parameter as Perlcode:<p>
+        <code><pre>
+        ...   7|23:35|{getParameter(13,"this")}   7|23:36|{getParameter(14,"that")}
+        </code></pre>
+        A detailed examle can be found in Heating_Control<p>
+      
     </ul>
   </ul>
 
