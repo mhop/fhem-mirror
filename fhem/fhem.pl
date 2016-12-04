@@ -3530,7 +3530,7 @@ Dispatch($$$)
         DoTrigger($found, undef);
       } else {
         Log 1, "ERROR: >$found< returned by the $parserMod ParseFn is invalid,".
-               " notfy the module maintainer";
+               " notify the module maintainer";
         return undef;
       }
     }
