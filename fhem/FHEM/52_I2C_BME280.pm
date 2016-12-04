@@ -117,7 +117,7 @@ sub I2C_BME280_Attr (@) {					# Wird beim Attribut anlegen/aendern aufgerufen
 			if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
 				main::AssignIoPort($hash,$val);
 				my @def = split (' ',$hash->{DEF});
-				I2C_LCD_Init($hash,\@def) if (defined ($hash->{IODev}));
+				I2C_BME280_Init($hash,\@def) if (defined ($hash->{IODev}));
 			}
         };
 		$msg = I2C_BME280_Catch($@) if $@;
