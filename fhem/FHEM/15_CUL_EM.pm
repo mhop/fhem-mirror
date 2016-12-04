@@ -98,7 +98,7 @@ CUL_EM_Parse($$)
   # basis_cnt=  correction to total (cumulated) value in ticks to account for
   #             counter wraparounds
   # total    =  total (cumulated) value in device units
-  # current_cnt =  current value (average over latest 5 minutes) in device units
+  # current_cnt  =  current value (average over latest 5 minutes) in device units
   # peak     =  maximum value in device units
 
   my $seqno = hex($a[5].$a[6]);
@@ -132,23 +132,19 @@ CUL_EM_Parse($$)
       $total_cnt_last= $hash->{READINGS}{total_cnt}{VAL};
     }
 
+
+    # initialize basis_cnt_last
+    my $basis_cnt = 0;
+    if(defined($hash->{READINGS}{basis})) {
+      $basis_cnt = $hash->{READINGS}{basis}{VAL};
+    }
+
+
     #
     # translate into device units
     #
     my $corr1 = $hash->{corr1}; # EMEM power correction factor
     my $corr2 = $hash->{corr2}; # EMEM energy correction factor
-    my $counter_offset = AttrVal($n,"CounterOffset",0);
-    my $oldraw = ReadingsVal($n, "RAW", "");          # Forum #55626
-    my $basis_cnt = ReadingsVal($n, "basis", 0);
-    if($oldraw) {
-      my @a = split(" ", $oldraw);
-      if($a[3] > $total_cnt) {
-        $basis_cnt += ($a[3]+$total_cnt); # Forum #60489
-        readingsSingleUpdate($hash, "basis", $basis_cnt, 0);
-        Log 1, "$n was reset, old CUM $a[3], new CUM: $total_cnt, ".
-                        "new basis $basis_cnt";
-      }
-    }
 
     my $peak;
 
@@ -181,6 +177,7 @@ CUL_EM_Parse($$)
       $basis_cnt += ($total_cnt_last > 65000 ? 65536 : $total_cnt_last);
       $readings{basis} = $basis_cnt;
     }
+    my $counter_offset = AttrVal($n,"CounterOffset",0);
 
     my $total    = (($basis_cnt+$total_cnt)*$corr2)+$counter_offset;
     my $current  = $current_cnt*$corr1;
