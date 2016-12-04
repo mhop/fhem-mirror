@@ -1,6 +1,6 @@
 //########################################################################################
 // alarm.js
-// Version 2.8
+// Version 2.81
 // See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -61,9 +61,7 @@ function alarm_setAttribute(name, attr, val) {//set Alarm Attribute
 	var location = document.location.pathname;
     if (location.substr(location.length-1,1) == '/') {location = location.substr(0,location.length-1);}
 	var url = document.location.protocol+"//"+document.location.host+location;
-	attr = attr.replace('+', '%2B');
-	val = val.replace('#', '%23');
-	FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' '+attr+' '+val);
+	FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' '+encodeParm(attr)+' '+ encodeParm(val));
 }
 
 function alarm_cancel(name,level){
@@ -103,11 +101,11 @@ function alarm_set(name){
 	var url = document.location.protocol+"//"+document.location.host+location;
     
     // saving arm data
-    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armdelay '+document.getElementById('armdelay').value);
-    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armwait '+document.getElementById('armwait').value);
-    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armact '+document.getElementById('armaction').value);
-    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' disarmact '+document.getElementById('disarmaction').value);
-    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' cancelact '+document.getElementById('cancelaction').value);
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armdelay '+ document.getElementById('armdelay').value);
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armwait '+ encodeParm(document.getElementById('armwait').value));
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armact '+ encodeParm(document.getElementById('armaction').value));
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' disarmact '+ encodeParm(document.getElementById('disarmaction').value));
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' cancelact '+ encodeParm(document.getElementById('cancelaction').value));
     
     // saving start and end times
     for (var i = 0; i < alarmno; i++){
@@ -138,9 +136,7 @@ function alarm_set(name){
         val += "|"+sarr[k].children[2].children[0].value;
         val += "|"+sarr[k].children[2].children[1].value;
         val += "|"+sarr[k].children[3].children[0].options[sarr[k].children[3].children[0].selectedIndex].value;
-        val = val.replace('+', '%2B');
-        val = val.replace('#', '%23');
-        FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + val);
+        FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + encodeParm(val));
     }
     
     // acquiring data for each actor
@@ -157,9 +153,7 @@ function alarm_set(name){
         val += "|"+aarr[k].children[2].children[0].value;
         val += "|"+aarr[k].children[2].children[1].value;
         val += "|"+aarr[k].children[3].children[0].value;
-        val = val.replace('+', '%2B');
-        val = val.replace('#', '%23');
-        FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + val);
+        FW_cmd(url+'?XHR=1&cmd.'+nam+'=attr '+nam+' alarmSettings ' + encodeParm(val));
     }
     
     // creating notifiers
