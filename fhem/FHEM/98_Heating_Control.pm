@@ -211,7 +211,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       The parameter $NAME and $EVENT will be interpreted.
     </ul>
     <p>
-    <b>Example:</b>
+    <b>Examples:</b>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
         Mo-Fr are setting the temperature at 05:20 to 21&deg;C, and at 05:25 to <b>comfort</b>.
@@ -236,27 +236,79 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps()}</code>
         <br><p>
         Some definitions without comment:
-        <code>
-        <pre> 
-        define hc            WeekdayTimer WDdevice  de           7|23:35|veryHigh       34|23:30|low 23:30|high 23:15|off     8|23:45|down 
-        define hc            WeekdayTimer WDdevice  de           fr,$we|23:35|veryHigh  34|23:30|low 23:30|high 23:15|off    12|23:45|down  
-        define hc            WeekdayTimer WDdevice  de           20:35|veryHigh         34|14:30|low 21:30|high 21:15|off    12|23:00|down 
-		
-        define hw            WeekdayTimer WDdevice  de           mo-so, $we|{sunrise_abs_dat($date)}|on      mo-so, $we|{sunset_abs_dat($date)}|off  
-        define ht            WeekdayTimer WDdevice  de           mo-so,!$we|{sunrise_abs_dat($date)}|on      mo-so,!$we|{sunset_abs_dat($date)}|off 
-        define hh            WeekdayTimer WDdevice  de           {sunrise_abs_dat($date)}|on                 {sunset_abs_dat($date)}|off  
+        <code><pre> 
+        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
+        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
+        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
         
-        define hx            WeekdayTimer WDdevice  de           22:35|hi  23:00|on    
+        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22  
+        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22 
+        
+        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
+        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16    
         </code></pre>
-        The daylist can be given globaly for the whole WeekdayTimer:<p>
+        
+        the list of days can be set globaly for the whole  Heating_Control:<p>
+        
         <code><pre>
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de  !$we     09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   $we     09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   78      09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   57      09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de  fr,$we   09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
+        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
         </code></pre>
 
+      An example to be able to temporarily boost the temperature for one hour:
+      <code><pre>
+      define hc Heating_Control HeatingBath de !$we|05:00|{HC_WithBoost(23,"HeatingBath")} $we|07:00|{HC_WithBoost(23,"HeatingBath")} 23:00|{HC_WithBoost(20,"HeatingBath")}
+      </code></pre>
+      and using a "HeatingBath_Boost" dummy variable:
+      <code><pre>
+      define HeatingBath_Boost dummy
+      attr HeatingBath_Boost setList state:0,23,24,25
+      attr HeatingBath_Boost webCmd state
+      define di_ResetBoostBath DOIF ([HeatingBath_Boost] > 0) 
+         ({Heating_Control_SetAllTemps()}, defmod di_ResetBoostBath_Reset at +01:00:00 set HeatingBath_Boost 0) 
+        DOELSE 
+         ({Heating_Control_SetAllTemps()})
+      attr di_ResetBoostBath do always
+      </code></pre>
+      and the perl subroutine in 99_myUtils.pm (or the like)
+      <code><pre>
+      sub HC_BathWithBoost {
+        my $numParams = @_;
+        my ($degree, $boostPrefix) = @_;
+        if ($numParams > 1)
+         {
+         my $boost = ReadingsVal($boostPrefix . "_Boost", "state", "0");
+         return $boost if ($boost =~ m/^\d+$/) && ($boost > 0); # boost?
+         }
+        return $degree; # otherwise return given temperature
+      }
+      </code></pre>
+      Now you can set "HeatingBath_Boost" in the web interface for a one-hour boost of 3 degrees in the bath.
+      (you can trigger that using the PRESENCE function using your girlfriend's device... grin).
+      
+      Easy to extend this with a vacation timer using another dummy variable, here <code>VacationTemp</code>.<br>
+      Then you can use the command
+      <code>defmod defVacationEnd at 2016-12-30T00:00:00 set VacationTemp off, {Heating_Control_SetAllTemps()}</code>
+      to stop the vacation temperature before you return in january 2017 and let the appartment heat up again.
+      <code><pre>
+      sub HC_BathWithBoost($) {
+        my $vacation = ReadingsVal("VacationTemp", "state", "unfortunately not on vacation");
+        return $vacation if $vacation =~ /^(\d+|eco)$/; # set vacation temperature if given
+
+        my $numParams = @_;
+        my ($degree, $boostPrefix) = @_;
+        if ($numParams > 1)
+         {
+         my $boost = ReadingsVal($boostPrefix . "_Boost", "state", "0");
+         return $boost if ($boost =~ m/^\d+$/) && ($boost > 0); # boost?
+         }
+      }
+      </code></pre>
+      Pray that the device does not restart during your vacation, as the <code>define defVacationEnd ... at </code> is volatile and will be lost at restart!
+                
     </ul>
   </ul>
 
@@ -391,7 +443,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       Die Parameter $NAME und $EVENT werden interpretiert.
     </ul>
     <p>
-    <b>Beispiel:</b>
+    <b>Beispiele:</b>
     <ul>
         <code>define HCW Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
         Mo-Fr wird die Temperatur um 05:20Uhr auf 21&deg;C, und um 05:25Uhr auf <b>comfort</b> gesetzt.
@@ -416,8 +468,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
         <br><p>
         Einige Definitionen ohne weitere Erkl&aumlrung:
-        <code>
-        <pre> 
+        <code><pre> 
         define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
         define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
         define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
@@ -437,7 +488,12 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
         </code></pre>
 
-        <p>
+       es ist möglich den Parameter als Perlcode zu spezifizieren:<p>
+        <code><pre>
+        ...   7|23:35|{getParameter(13,"this")}   7|23:36|{getParameter(14,"that")}
+        </code></pre>
+        ein detailiertes Beispiel ist in Heating_Control(EN) beschrieben<p>
+        
     </ul>
   </ul>
 
