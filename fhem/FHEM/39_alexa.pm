@@ -22,7 +22,7 @@ alexa_Initialize($)
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
   #$hash->{AttrFn}   = "alexa_Attr";
-  $hash->{AttrList} = "alexaMapping:textField-long articles prepositions $readingFnAttributes";
+  $hash->{AttrList} = "alexaMapping:textField-long alexaTypes articles prepositions $readingFnAttributes";
 }
 
 #####################################
@@ -98,7 +98,7 @@ alexa_Get($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "customSlotTypes";
+  my $list = "customSlotTypes interactionModel";
 
   if( lc($cmd) eq 'customslottypes' ) {
     if( $hash->{CL} ) {
@@ -107,6 +107,9 @@ alexa_Get($$@)
       FW_directNotify($name, 'customSlotTypes');
     }
 
+    return undef;
+
+  } elsif( lc($cmd) eq 'interactionmodel' ) {
     my %mappings;
     if( my $mappings = AttrVal( $name, 'alexaMapping', undef ) ) {
       foreach my $mapping ( split( / |\n/, $mappings ) ) {
@@ -144,6 +147,87 @@ alexa_Get($$@)
     }
 #Log 1, Dumper \%mappings;
 
+    my %types;
+    if( my $entries = AttrVal( $name, 'alexaTypes', undef ) ) {
+      sub append($$$) {
+        my($a, $c, $v) = @_;
+
+        if( !defined($a->{$c}) ) {
+          $a->{$c} = {};
+        }
+        $a->{$c}{$v} = 1;
+      }
+
+      sub merge($$) {
+       my ($a, $b) = @_;
+       return $a if( !defined($b) );
+
+       my @result = ();
+
+       if( ref($b) eq 'ARRAY' ) {
+         @result = sort keys %{{map {((split(':',$_,2))[0] => 1)} (@{$a}, @{$b})}};
+       } else {
+         push @{$a}, $b;
+         return $a;
+       }
+
+       return \@result;
+     }
+
+      foreach my $entry ( split( / |\n/, $entries ) ) {
+        next if( !$entry );
+        next if( $entry =~ /^#/ );
+
+        my ($type, $remainder) = split( /:|=/, $entry, 2 );
+        $types{$type} = [];
+        my @names = split( /,/, $remainder );
+        foreach my $name (@names) {
+          push @{$types{$type}}, $name;
+        }
+      }
+    }
+Log 1, Dumper \%types;
+
+    my $verbsOfIntent = {};
+    my $intentsOfVerb = {};
+    my $valuesOfIntent = {};
+    my $intentsOfCharacteristic = {};
+    my $characteristicsOfIntent = {};
+    foreach my $characteristic ( keys %mappings ) {
+      my $mappings = $mappings{$characteristic};
+      $mappings = [$mappings] if( ref($mappings) ne 'ARRAY');
+      my $i = 0;
+      foreach my $mapping (@{$mappings}) {
+        if( !$mapping->{verb} ) {
+          Log3 $name, 2, "alexaMapping: no verb given for $characteristic characteristic";
+          next;
+        }
+
+
+        my $intent = $characteristic;
+        $intent = lcfirst($mapping->{valueSuffix}) if( $mapping->{valueSuffix} );
+        $intent .= 'Intent';
+
+        my $values = [];
+        $values = merge( $values, $mapping->{values} );
+        $values = merge( $values, $mapping->{valueOn} );
+        $values = merge( $values, $mapping->{valueOff} );
+        $values = merge( $values, $mapping->{valueToggle} );
+
+        append($verbsOfIntent, $intent, $mapping->{verb} );
+        append($intentsOfVerb, $mapping->{verb}, $intent );
+        append($valuesOfIntent, $intent, join( ',', @{$values} ) );
+        append($intentsOfCharacteristic, $characteristic, $intent );
+        append($characteristicsOfIntent, $intent, $characteristic );
+      }
+    }
+Log 1, Dumper $verbsOfIntent;
+Log 1, Dumper $intentsOfVerb;
+Log 1, Dumper $valuesOfIntent;
+Log 1, Dumper $intentsOfCharacteristic;
+Log 1, Dumper $characteristicsOfIntent;
+
+    my $intents = {};
     my $schema = { intents => [] };
     my $types = {};
     $types->{FHEM_article} = [split( /,|;/, AttrVal( $name, 'articles', 'der,die,das,den' ) ) ];
@@ -159,22 +243,6 @@ alexa_Get($$@)
           next;
         }
 
-        sub merge($$) {
-          my ($a, $b) = @_;
-          return $a if( !defined($b) );
-
-          my @result = ();
-
-          if( ref($b) eq 'ARRAY' ) {
-            @result = keys %{{map {((split(':',$_,2))[0] => 1)} (@{$a}, @{$b})}};
-          } else {
-            push @{$a}, $b;
-            return $a;
-          }
-
-          return \@result;
-        }
-
         my $values = [];
         $values = merge( $values, $mapping->{values} );
         $values = merge( $values, $mapping->{valueOn} );
@@ -183,7 +251,14 @@ alexa_Get($$@)
 
 
         my $nr = $i?chr(65+$i):'';
-        my $intent = $characteristic .'Intent'. $nr;
+        $nr = '';
+        #my $intent = $characteristic .'Intent'. $nr;
+        my $intent = $characteristic;
+        $intent = lcfirst($mapping->{valueSuffix}) if( $mapping->{valueSuffix} );
+        $intent .= 'Intent';
+
+        next if( $intents->{$intent} );
+        $intents->{$intent} = 1;
 
         my $slots = [];
         push @{$slots}, { name => 'article', type => 'FHEM_article' };
@@ -194,11 +269,13 @@ alexa_Get($$@)
           push @{$slots}, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
           $types->{"${characteristic}_prefix$nr"} = $mapping->{valuePrefix};
         }
+        my $slot_name = "${characteristic}_Value$nr";
+        $slot_name = lcfirst($mapping->{valueSuffix})."_Value$nr" if( $mapping->{valueSuffix} );
         if( $mapping->{values} && $mapping->{values} =~ /^AMAZON/ ) {
-          push @{$slots}, { name => "${characteristic}_Value$nr", type => $mapping->{values} };
+          push @{$slots}, { name => $slot_name, type => $mapping->{values} };
         } else {
-          push @{$slots}, { name => "${characteristic}_Value$nr", type => "${characteristic}_Value$nr" };
-          $types->{"${characteristic}_Value$nr"} = $values if( $values->[0] );
+          push @{$slots}, { name => $slot_name, type => "${characteristic}_Value$nr" };
+          $types->{$slot_name} = $values if( $values->[0] );
         }
         if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
           push @{$slots}, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
@@ -230,7 +307,7 @@ alexa_Get($$@)
               } else {
                 $line .= " $mapping->{valuePrefix}" if( $mapping->{valuePrefix} );
               }
-              $line .= " {${characteristic}_Value$nr}";
+              $line .= " {$slot_name}";
               if( ref($mapping->{_valueSuffix}) eq 'ARRAY' ) {
                 $line .= "\n$line";
               }
@@ -259,20 +336,20 @@ alexa_Get($$@)
     foreach my $type ( sort keys %{$types} ) {
       $t .= "\n" if( $t );
       $t .= "$type\n  ";
-      $t .= join("\n  ", sort @{$types->{$type}} );
+      $t .= join("\n  ", @{$types->{$type}} );
     }
 
     return "Intent Schema:\n".
            "--------------\n".
            $json->utf8->encode( $schema ) ."\n".
            "Custom Slot Types:\n".
-           "----------_-------\n".
+           "------------------\n".
            $t. "\n\n".
            "Sample Utterances:\n".
            "------------------\n".
            $samples.
            "\nreload 39_alexa\n".
-           "get alexa customSlotTypes\n";
+           "get alexa interactionmodel\n";
 
     return undef;
   }
@@ -341,36 +418,40 @@ alexa_Attr($$$)
 
   Notes:
   <ul>
-    <li><br>
-    </li>
+    <li>JSON has to be installed on the FHEM host.</li>
   </ul>
 
   <a name="alexa_Set"></a>
   <b>Set</b>
   <ul>
     <li>reload [name]<br>
-      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery in alexa.
-    </li>
+      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery in alexa.  </li>
   </ul>
 
   <a name="alexa_Get"></a>
   <b>Get</b>
   <ul>
     <li>customSlotTypes<br>
-      Instructs alexa-fhem to write the Custom Slot Types for the Interaction Model to the alexa-fhem console
-      and if possible to the requesting fhem frontend.
-    </li>
+      Instructs alexa-fhem to write the device specific Custom Slot Types for the Interaction Model
+      configuration to the alexa-fhem console and if possible to the requesting fhem frontend.</li>
+    <li>interactionModel<br>
+      Get Intent Schema, non device specific Custom Slot Types and Sample Utterances for the Interaction Model
+      configuration.</li>
   </ul>
 
   <a name="alexa_Attr"></a>
   <b>Attr</b>
   <ul>
     <li>alexaName<br>
-      The name to use for a device with alexa.
-    </li>
+      The name to use for a device with alexa.</li>
     <li>alexaRoom<br>
-      The room name to use for a device with alexa.
-    </li>
+      The room name to use for a device with alexa.</li>
+    <li>articles<br>
+      defaults to: der,die,das,den</li>
+    <li>prepositions<br>
+      defaults to: in,im,in der</li>
+    <li>alexaTypes<br>
+      maps spoken device types to ServiceClasses. eg: attr alexa alexaTypes light:licht,lampe,lampen blind:rolladen,jalousie,rollo Outlet:steckdose TemperatureSensor:thermometer LockMechanism:schloss OccupancySensor: anwesenheit</li>
   </ul>
 </ul><br>
 
