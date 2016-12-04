@@ -3432,6 +3432,7 @@ Dispatch($$$)
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
+  my $parserMod="";
   my $clientArray = $hash->{".clientArray"};
   $clientArray = computeClientArray($hash, $module) if(!$clientArray);
 
@@ -3447,6 +3448,7 @@ Dispatch($$$)
     no strict "refs"; $readingsUpdateDelayTrigger = 1;
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
     use strict "refs"; $readingsUpdateDelayTrigger = 0;
+    $parserMod = $m;
     last if(int(@found));
   }
 
@@ -3464,6 +3466,7 @@ Dispatch($$$)
               no strict "refs"; $readingsUpdateDelayTrigger = 1;
               @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
               use strict "refs"; $readingsUpdateDelayTrigger = 0;
+              $parserMod = $mname;
               last if(defined($found[0]));
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
@@ -3524,9 +3527,12 @@ Dispatch($$$)
           $defs{$found}{LASTInputDev} = $name;
         }
         delete($defs{$found}{".noDispatchVars"});
+        DoTrigger($found, undef);
+      } else {
+        Log 1, "ERROR: >$found< returned by the $parserMod ParseFn is invalid,".
+               " notfy the module maintainer";
+        return undef;
       }
-
-      DoTrigger($found, undef);
     }
   }
 
