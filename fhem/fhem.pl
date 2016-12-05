@@ -777,10 +777,14 @@ IsDisabled($)
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-    my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
+    my $dhms = sprintf("%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec);
     foreach my $ft (split(" ", $dfi)) {
       my ($from, $to) = split("-", $ft);
-      return 2 if($from && $to && $from le $hms && $hms le $to);
+      if($from && $to) {
+        $from = "$wday\@$from" if(index($from,"@") < 0);
+        $to   = "$wday\@$to"   if(index($to,  "@") < 0);
+        return 2 if($from le $dhms && $dhms le $to);
+      }
     }
   }
 
