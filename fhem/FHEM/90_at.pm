@@ -550,10 +550,12 @@ EOF
 
     <a name="disabledForIntervals"></a>
     <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
-        Space separated list of HH:MM tupels. If the current time is between
-        the two time specifications, the current device is disabled. Instead of
-        HH:MM you can also specify HH or HH:MM:SS. To specify an interval
-        spawning midnight, you have to specify two intervals, e.g.:
+        Space separated list of HH:MM or D@HH:MM tupels. If the current time is
+        between the two time specifications, the current device is disabled.
+        Instead of HH:MM you can also specify HH or HH:MM:SS. D is the day of
+        the week, with 0 indicating Sunday and 3 indicating Wednesday. To
+        specify an interval spawning midnight, you have to specify two
+        intervals, e.g.:
         <ul>
           23:00-24:00 00:00-01:00
         </ul>
@@ -735,11 +737,12 @@ EOF
     <a name="disabledForIntervals"></a>
     <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
         Das Argument ist eine Leerzeichengetrennte Liste von Minuszeichen-
-        getrennten HH:MM Paaren. Falls die aktuelle Uhrzeit zwischen diesen
-        Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie beim disable,
-        ausgesetzt.  Statt HH:MM kann man auch HH oder HH:MM:SS angeben.
-        Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei
-        einzelne angeben, z.Bsp.:
+        getrennten HH:MM oder D@HH:MM Paaren. Falls die aktuelle Uhrzeit
+        zwischen diesen Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie
+        beim disable, ausgesetzt. Statt HH:MM kann man auch HH oder HH:MM:SS
+        angeben.  D ist der Tag der Woche, mit 0 als Sonntag and 3 als
+        Mittwoch.  Um einen Intervall um Mitternacht zu spezifizieren, muss man
+        zwei einzelne angeben, z.Bsp.:
         <ul>
           23:00-24:00 00:00-01:00
         </ul>
