@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.7.5        05.12.2016       collaggstr day aggregation changed
 # 4.7.4        28.11.2016       sub calcount changed due to Forum #msg529312
 # 4.7.3        20.11.2016       new diffValue function made suitable to SQLite
 # 4.7.2        20.11.2016       commandref adapted, state = Warnings adapted
@@ -3479,7 +3480,7 @@ sub collaggstr($$$$) {
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
              $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                                                
-             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec-1)) > $epoch_seconds_end) {
                  $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
                  $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
                  $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
