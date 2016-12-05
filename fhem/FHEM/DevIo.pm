@@ -235,10 +235,11 @@ DevIo_OpenDev($$$;$)
     }
 
     if(!$ret) {
+      my $l = $hash->{devioLoglevel}; # Forum #61970
       if($reopen) {
-        Log3 $name, 1, "$dev reappeared ($name)";
+        Log3 $name, ($l ? $l:1), "$dev reappeared ($name)";
       } else {
-        Log3 $name, 3, "$name device opened" if(!$hash->{DevioText});
+        Log3 $name, ($l ? $l:3), "$name device opened" if(!$hash->{DevioText});
       }
     }
 
@@ -519,7 +520,8 @@ DevIo_Disconnected($)
 
   return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
-  Log3 $name, 1, "$dev disconnected, waiting to reappear ($name)";
+  my $l = $hash->{devioLoglevel}; # Forum #61970
+  Log3 $name, ($l ? $l:1), "$dev disconnected, waiting to reappear ($name)";
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   DevIo_setStates($hash, "disconnected");
