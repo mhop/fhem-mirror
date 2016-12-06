@@ -124,7 +124,7 @@ Hideki_Parse($$)
 	}
 	else{
 		Log3 $iohash, 4, "$name Sensor Typ $sensorTyp not supported, please report sensor information!";
-		return "$name Sensor Typ $sensorTyp not supported, please report sensor information!";
+		return "";
 	}
 	my $longids = AttrVal($iohash->{NAME},'longids',0);
 	if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))

@@ -308,11 +308,13 @@ SIGNALduino_un_Parse($$)
 
 	
 	} else {
-		return $dummyreturnvalue;
+		Log3 $hash, 4, $dummyreturnvalue;
+		
+		return undef;
 	}
 
-	
-	return $dummyreturnvalue;  # This prevents unkown code Messages in our log
+	Log3 $hash, 4, $dummyreturnvalue;
+	return undef;  
 }
 
 

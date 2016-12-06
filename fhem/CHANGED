@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugix:   14_Hideki:  fixed wrong return in ParseFn (msg533900)
+             14_SD_WS:   fixed wrong return in ParseFn (msg533900)
+             90_SIGNALduino_un:   fixed wrong return in ParseFn (msg533900)
   - change:  93_DbRep: change of day aggregation
   - bugfix:  93_DbRep: Syntaxerror due to Forum #msg529312
   - bugfix:  74_AMAD: 74_AMADautomagicFlowset_2.6.7.xml fix Problems with zero
