@@ -175,8 +175,8 @@ sub SD_WS_Parse($$)
 	 
 	 	   	$SensorTyp=$decodingSubs{$protocol}{sensortype};
 		    
-		    return "Prematch Error" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) prematch error" if (!$decodingSubs{$protocol}{prematch}->( $rawData ));
-		    return "crc Error" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) crc  error"  if (!$decodingSubs{$protocol}{crcok}->( $rawData ));
+		    return "" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) prematch error" if (!$decodingSubs{$protocol}{prematch}->( $rawData ));
+		    return "" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) crc  error"  if (!$decodingSubs{$protocol}{crcok}->( $rawData ));
 		    
 	    	$id=$decodingSubs{$protocol}{id}->( $rawData,$bitData );
 	    	#my $temphex=$decodingSubs{$protocol}{temphex}->( $rawData,$bitData );
@@ -191,13 +191,13 @@ sub SD_WS_Parse($$)
 		
 	} 
 	else {
-		Log3 $iohash, 4, "SD_WS_Parse_unknown: converted to bits: $bitData";
-		return $dummyreturnvalue;
+		Log3 $iohash, 4, "SD_WS_Parse: unknown message, please report. converted to bits: $bitData";
+		return undef;
 	}
 
 
 	if (!defined($model)) {
-		return $dummyreturnvalue;
+		return undef;
 	}
 	
 	my $deviceCode;
