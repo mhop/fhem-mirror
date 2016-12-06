@@ -2168,7 +2168,7 @@ PrintHash($$)
       } elsif(ref($h->{$c}) eq "ARRAY") {
          $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
          foreach my $v (@{$h->{$c}}) {
-           $sstr .= sprintf("%*s %s\n", $lev+2, " ", $v);
+           $sstr .= sprintf("%*s %s\n", $lev+2, " ", defined($v) ? $v:"undef");
          }
       }
     } else {
