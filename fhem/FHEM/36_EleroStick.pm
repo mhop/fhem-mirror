@@ -164,9 +164,11 @@ sub EleroStick_Define($$) {
 
 #=======================================================================================
 sub EleroStick_Undef($$) {
-  my ( $hash, $arg ) = @_;       
-  DevIo_CloseDev($hash);         
-  RemoveInternalTimer($hash);    
+  my ( $hash, $arg ) = @_;
+  if($hash->{STATE} ne "disconnected") {
+    DevIo_CloseDev($hash);
+  }
+  RemoveInternalTimer($hash);
   return undef;    
 }
 
