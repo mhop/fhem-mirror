@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: DbRep version as INTERNAL, check if DBI module is 
+                       installed 
   - bugfix:  76_MSGMail: Clean up net::smtp version number before comparison
   - bugix:   14_Hideki:  fixed wrong return in ParseFn (msg533900)
              14_SD_WS:   fixed wrong return in ParseFn (msg533900)
