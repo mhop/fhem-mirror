@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  76_MSGMail: Clean up net::smtp version number before comparison
   - bugix:   14_Hideki:  fixed wrong return in ParseFn (msg533900)
              14_SD_WS:   fixed wrong return in ParseFn (msg533900)
              90_SIGNALduino_un:   fixed wrong return in ParseFn (msg533900)

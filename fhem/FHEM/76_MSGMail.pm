@@ -68,7 +68,8 @@ sub MSGMail_Initialize($)
 
     # check version of libnet - if < 3.00, try to load Net::SMTP::SSL
     $MSGMail_SMTP = $Net::SMTP::VERSION;
-    if ($Net::SMTP::VERSION >= 3)
+    $MSGMail_SMTP =~ s/[^0-9.].*$//;
+    if ($MSGMail_SMTP >= 3.00)
     {
         $MSGMail_SSL = 1;
     }
