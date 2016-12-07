@@ -799,7 +799,7 @@ logProxy_Get($@)
 
       while (@options) {
         my $option = shift(@options);
-        while ($option && $option =~ m/={/ && $option !~ m/>}/ ) {
+        while ($option && $option =~ m/=\{/ && $option !~ m/>}/ ) {
           my $next = shift(@options);
           last if( !defined($next) );
           $option .= ",". $next;
