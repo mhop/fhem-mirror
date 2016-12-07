@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.7.6        07.12.2016       DbRep version as internal, check if perl module DBI is installed
 # 4.7.5        05.12.2016       collaggstr day aggregation changed
 # 4.7.4        28.11.2016       sub calcount changed due to Forum #msg529312
 # 4.7.3        20.11.2016       new diffValue function made suitable to SQLite
@@ -147,11 +148,13 @@ use warnings;
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
-use DBI;
+eval "use DBI;1" or my $DbRepMMDBI = "DBI";
 use DBI::Const::GetInfoType;
 use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
+
+my $DbRepVersion = "4.7.6";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -210,20 +213,24 @@ sub DbRep_Define($@) {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
+ return "Error: Perl module ".$DbRepMMDBI." is missing. 
+        Install it on Debian with: sudo apt-get install libdbi-perl" if($DbRepMMDBI);
+  
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 2) {
         return "You need to specify more parameters.\n". "Format: define <name> DbRep <DbLog-Device> <Reading> <Timestamp-Begin> <Timestamp-Ende>";
         }
   
-  $hash->{LASTCMD} = " ";
-  $hash->{ROLE}    = AttrVal($name, "role", "Client");
+  $hash->{LASTCMD}             = " ";
+  $hash->{ROLE}                = AttrVal($name, "role", "Client");
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
+  $hash->{VERSION}             = $DbRepVersion;
   
-  $hash->{NOTIFYDEV} = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
+  $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
   
-  my $dbconn         = $defs{$a[2]}{dbconn};
-  $hash->{DATABASE} = (split(/;|=/, $dbconn))[1];
+  my $dbconn                   = $defs{$a[2]}{dbconn};
+  $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
   
   RemoveInternalTimer($hash);
   InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
