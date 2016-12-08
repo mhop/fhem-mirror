@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.7.7        08.12.2016       code review
 # 4.7.6        07.12.2016       DbRep version as internal, check if perl module DBI is installed
 # 4.7.5        05.12.2016       collaggstr day aggregation changed
 # 4.7.4        28.11.2016       sub calcount changed due to Forum #msg529312
@@ -154,7 +155,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.7.6";
+my $DbRepVersion = "4.7.7";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -205,8 +206,6 @@ return undef;
 # DbRep_Define
 ###################################################################################
 sub DbRep_Define($@) {
-  # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
-  # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
   # define <name> DbRep <DbLog-Device> 
   #       ($hash)  [1]        [2]      
   #
@@ -859,14 +858,9 @@ $hash->{HELPER}{CV} = \%cv;
  
     # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
     while (!$ll) {
-    
-        
-
         # collect aggregation strings         
         ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = collaggstr($hash,$runtime,$i,$runtime_string_next);
-       
         $ts .= $runtime_string."#".$runtime_string_first."#".$runtime_string_next."|";
-         
         $i++;
     } 
 
@@ -997,14 +991,10 @@ sub averval_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      # SQL zusammenstellen für DB-Abfrage
-     my $sql = "SELECT AVG(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE LIKE '$device' " if($device);
-     $sql .= "AND " if($device && $reading);
-     $sql .= "READING LIKE '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
-     $sql .= ";";
+     my $sql = "SELECT AVG(VALUE) FROM `history` where ";
+     $sql .= "DEVICE LIKE '$device' AND " if($device);
+     $sql .= "READING LIKE '$reading' AND " if($reading);
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
@@ -1163,14 +1153,10 @@ sub count_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      # SQL zusammenstellen für DB-Abfrage
-     my $sql = "SELECT COUNT(*) FROM `history` ";
-     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE LIKE '$device' " if($device);
-     $sql .= "AND " if($device && $reading);
-     $sql .= "READING LIKE '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
-     $sql .= ";";
+     my $sql = "SELECT COUNT(*) FROM `history` where ";
+     $sql .= "DEVICE LIKE '$device' AND " if($device);
+     $sql .= "READING LIKE '$reading' AND " if($reading);
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next';"; 
      
      Log3($name, 4, "DbRep $name - SQL execute: $sql");        
      
@@ -2048,12 +2034,6 @@ sub diffval_ParseDone($) {
      }
  }
  
-# my $warn;
-# $warn .= "Warning - " if($rowsrej||$ncpstr);
-# $warn .= "at least in one period only one dataset exists" if ($ncpstr);
-# $warn .= " || " if($ncpstr && $rowsrej);
-# $warn .= "one or more differences overrun diffAccept-limit" if ($rowsrej);
- 
  # Readingaufbereitung
  my %rh = split("§", $rowlist);
  
@@ -2143,14 +2123,10 @@ sub sumval_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      # SQL zusammenstellen für DB-Abfrage
-     my $sql = "SELECT SUM(VALUE) FROM `history` ";
-     $sql .= "where " if($reading || $device || $runtime_string_first || AttrVal($hash->{NAME},"aggregation", "no") ne "no" || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME}, "timeOlderThan",undef));
-     $sql .= "DEVICE LIKE '$device' " if($device);
-     $sql .= "AND " if($device && $reading);
-     $sql .= "READING LIKE '$reading' " if($reading);
-     $sql .= "AND " if((AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME}, "timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef)) && ($device || $reading));
-     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' " if(AttrVal($hash->{NAME}, "aggregation", "no") ne "no" || $runtime_string_first || AttrVal($hash->{NAME},"timestamp_end",undef) || AttrVal($hash->{NAME},"timeDiffToNow",undef) || AttrVal($hash->{NAME},"timeOlderThan",undef));
-     $sql .= ";";
+     my $sql = "SELECT SUM(VALUE) FROM `history` where ";
+     $sql .= "DEVICE LIKE '$device' AND " if($device);
+     $sql .= "READING LIKE '$reading' AND " if($reading);
+     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
