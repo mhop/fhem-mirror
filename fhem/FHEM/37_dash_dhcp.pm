@@ -22,7 +22,7 @@ dash_dhcp_Initialize($)
   #$hash->{SetFn}    = "dash_dhcp_Set";
   #$hash->{GetFn}    = "dash_dhcp_Get";
   $hash->{AttrFn}   = "dash_dhcp_Attr";
-  $hash->{AttrList} = "disable:1,0 disabledForIntervals allowed port $readingFnAttributes";
+  $hash->{AttrList} = "devAlias disable:1,0 disabledForIntervals allowed port $readingFnAttributes";
 }
 
 #####################################
@@ -173,6 +173,7 @@ dash_dhcp_Parse($$;$)
     Log3 $name, 4, "$name: got $chaddr";
 
     $chaddr =~ s/:/-/g;
+    $chaddr = $hash->{helper}{devAliases}{$chaddr} if( defined($hash->{helper}{devAliases}{$chaddr}) );
     readingsSingleUpdate( $hash, $chaddr, 'short', 1 );
 
   } else {
@@ -210,7 +211,17 @@ dash_dhcp_Attr($$$)
   my $orig = $attrVal;
 
   my $hash = $defs{$name};
-  if( $attrName eq "disable" ) {
+  if( $attrName eq "devAlias" ) {
+    delete $hash->{helper}{devAliases};
+    if( $cmd eq 'set' && $attrVal ) {
+      $hash->{helper}{devAliases}  = {};
+      foreach my $entry (split( ' ', $attrVal ) ) {
+        my ($mac, $alias) = split( ':', $entry );
+        $hash->{helper}{devAliases}{$mac} = $alias;
+      }
+    }
+
+  } elsif( $attrName eq "disable" ) {
     if( $cmd eq 'set' && $attrVal ne "0" ) {
       dash_dhcp_stopListener($hash);
     } else {
@@ -268,8 +279,10 @@ and use the port attribute to configure the redirected port.</li>
   <a name="dash_dhcp_Attr"></a>
   <b>Attr</b>
   <ul>
+    <li>devAlias<br>
+      space separated list of &lt;mac&gt;:&lt;alias&gt; pairs.</li>
     <li>allowed<br>
-    comma separated list of allowed mac adresses</li>
+      comma separated list of allowed mac adresses</li>
     <li>port<br>
       the listen port. defaults to 67 for root and 6767 for other users.</li>
     <li><a href="#disable">disable</a></li>
