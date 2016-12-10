@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.81";
+my $alarmversion    = "2.82";
 
 #########################################################################################
 #
@@ -156,15 +156,15 @@ sub Alarm_CreateEntry($) {
    }
    #-- recover state from stored readings
    for( my $level=0;$level<$alarmno;$level++ ){
-      my $val = $hash->{READINGS}{"level".$level}{VAL};
-        if( $val eq "disarmed" ){#
-          CommandAttr (undef,$name.' level'.$level.'xec disarmed');
-        }elsif( $val eq "armed" ){
-          CommandAttr (undef,$name.' level'.$level.'xec armed');
-        }else{
-          Log3 $hash,1,"[Alarm $level] has undefined save data, disarming";
-          CommandAttr (undef,$name.' level'.$level.'xec disarmed');
-        }
+      my $val = ReadingsVal($name,"level".$level,"");
+      if( $val eq "disarmed" ){#
+        CommandAttr (undef,$name.' level'.$level.'xec disarmed');
+      }elsif( $val eq "armed" ){
+        CommandAttr (undef,$name.' level'.$level.'xec armed');
+      }else{
+        Log3 $hash,1,"[Alarm $level] has undefined save data $val, disarming";
+        CommandAttr (undef,$name.' level'.$level.'xec disarmed');
+      }
    }
    my $mga = Alarm_getstate($hash)." Keine Störung";
    readingsSingleUpdate( $hash, "state", $mga, 1 );

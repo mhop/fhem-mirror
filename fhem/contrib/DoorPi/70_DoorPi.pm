@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.6";
+my $version = "1.8";
 
 #-- these we may get on request
 my %gets = (
@@ -74,7 +74,7 @@ sub DoorPi_Initialize ($) {
 
   $hash->{AttrList}= "verbose ".
                      "language:de,en ringcmd ".
-                     "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
+                     "doorbutton dooropencmd doorlockcmd doorunlockcmd dooropendly ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
                      "snapshotbutton streambutton ".
                      "dashlightbutton iconpic iconaudio ".
@@ -221,9 +221,15 @@ sub DoorPi_Get ($@) {
 
 sub DoorPi_Set ($@) {
   my ($hash, @a) = @_;
-  #-- only hash as parameter when acting as timer callback
+  #-- if only hash as parameter, this is acting as timer callback
   if( !@a ){
-    @a=($hash->{NAME},"light","off");
+    Log 1,"[DoorPi_Set] delayed action started with ".$hash->{DELAYED};
+    if( $hash->{DELAYED} eq "light"){
+      @a=($hash->{NAME},"light","off");
+    }elsif( $hash->{DELAYED} eq "door_time"){
+      @a=($hash->{NAME},"door","opened");
+    }
+    $hash->{DELAYED} = "";
   }
   my $name = shift @a;
   
@@ -231,7 +237,7 @@ sub DoorPi_Set ($@) {
 
   #-- commands
   my $door     = AttrVal($name, "doorbutton", "door");
-  my $doorsubs = "open";
+  my $doorsubs = "opened";
     $doorsubs   .= ",locked"
     if(AttrVal($name, "doorlockcmd",undef));
   $doorsubs   .= ",unlocked"
@@ -339,6 +345,10 @@ sub DoorPi_Set ($@) {
     #-- from FHEM: door opening, forward to DoorPi
     if( $value eq "opened" ){
       if( $lockstate eq "unlocked" ){
+        if( $hash->{DELAYED} eq "door_event"){
+          fhem("delete dooropendelay");
+          $hash->{DELAYED} = "";
+        } 
         $v=DoorPi_Cmd($hash,"dooropen");
         Log 1,"[DoorPi_Set] sent dooropen command to DoorPi";
         if(AttrVal($name, "dooropencmd",undef)){
@@ -346,35 +356,49 @@ sub DoorPi_Set ($@) {
         }
         readingsSingleUpdate($hash,$door,"opened",1);
       }else{
-        Log 1,"[DoorPi_Set] opening of door not possible, is locked";
+        Log3 $name, 1,"[DoorPi_Set] opening of door not possible, is locked";
       }
       
     #-- from DoorPi: door has to be unlocked if necessary
     }elsif( $value eq "unlockandopen" ){
-       #-- need to unlock the door now
+    
+       #-- unlocking the door now, delayed opening
        if( $lockstate eq "locked" ){
          if( AttrVal($name, "doorunlockcmd",undef) ){
            fhem(AttrVal($name, "doorunlockcmd",undef));
-           Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi and executed FHEM doorunlock command";
+           Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi and executed FHEM doorunlock command";
            readingsSingleUpdate($hash,"lockstate","unlocked",1);
            readingsSingleUpdate($hash,$door,"unlocked",1);
-           $v=DoorPi_Cmd($hash,"doorunlocked");
+           $v=DoorPi_Cmd($hash,"doorunlocked");           
+           my $dly=AttrVal($name, "dooropendly",5);
+           #-- delay by fixed number of seconds
+           if( $dly =~ /\d+/ ){       
+             $hash->{DELAYED} = "door_time";
+             InternalTimer(gettimeofday() + $dly, "DoorPi_Set", $hash,1);
+           #-- delay by event
+           }else{
+             $hash->{DELAYED} = "door_event";
+             fhem(" define dooropendelay notify $dly set $name $door opened");
+           }
          }else{
-          Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but no FHEM doorunlock command";
+          Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi, but no FHEM doorunlock command";
          }
+       
+       #-- no unlocking necessary, immediate door opening
        }elsif( $lockstate eq "unlocked" ){
-         Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but is already unlocked";
+         Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi, but is already unlocked";
+         $v=DoorPi_Cmd($hash,"dooropen");
+     
+       #-- error message 
        }else{
-         #-- error message
-         Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but uncertain lockstate";
+         Log3 $name, 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but uncertain lockstate";
          return;
        }
-       #-- Now open the door by DoorPi
-       $v=DoorPi_Cmd($hash,"dooropen");
        
     #-- from DoorPi: door has to be locked if necessary
     }elsif( $value eq "softlock" ){
-       #-- need to lock the door now
+       
+       #-- locking the door now
        if( $lockstate eq "unlocked" ){
          if( AttrVal($name, "doorlockcmd",undef) ){
            fhem(AttrVal($name, "doorlockcmd",undef));
@@ -458,6 +482,7 @@ sub DoorPi_Set ($@) {
       }
       readingsSingleUpdate($hash,$light,"on",1);
       #-- Intiate turning off light
+      $hash->{DELAYED} = "light";
       InternalTimer(gettimeofday() + 60, "DoorPi_Set", $hash,1);
     }
   #-- dashboard lighting
@@ -1375,6 +1400,7 @@ sub DoorPi_list($;$){
                 <br /> Returns the version number of the FHEM DoorPi module</li>
         </ul>
         <h4>Attributes</h4>
+        <h5>Basic DoorPi actions</h5>
         <ul>
             <li><a name="doorpi_target2"><code>attr &lt;DoorPi-Device&gt; target[0|1|2|3]
                         &lt;string&gt;</code></a>
@@ -1388,12 +1414,28 @@ sub DoorPi_list($;$){
             <li><a name="doorpi_dooropencmd"><code>attr &lt;DoorPi-Device&gt; dooropencmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command additionally executed for door opening action (no default)</li>
+        </ul>
+        <h5>Basic FHEM actions</h5>
+        Door locking and unlocking is executed by FHEM only. After an unlocking action, the following 
+        opening action will be delayed either by a fixed number of seconds or by waiting for an event.
+        <ul>
             <li><a name="doorpi_doorlockcmd"><code>attr &lt;DoorPi-Device&gt; doorlockcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command for door locking action (no default)</li>
             <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
                         &lt;string&gt;</code></a>
+            <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
+                        &lt;string&gt;</code></a>
                 <br />FHEM command for door unlocking action (no default)</li>
+            <li><a name="doorpi_dooropendly"><code>attr &lt;DoorPi-Device&gt; dooropendly
+                        &lt;number&gt;|&lt;string&gt;</code></a>
+                <br />If number, delay of opening action after unlocking is given by &lt;number&gt; seconds;
+                otherwise the string will be interpreted as a regular expression for an event that 
+                has to be registered befor sending the door opening command from FHEM to DoorPi after an 
+                unlocking action.
+        <h5>Advanced DoorPi actions</h5>
+        These actions will only be possible if they are defined in the virtual DoorPi keyboard
+        <ul>
             <li><a name="doorpi_snapshotbutton"><code>attr &lt;DoorPi-Device&gt; snapshotbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for snapshot action (default: snapshot)</li>
@@ -1412,6 +1454,10 @@ sub DoorPi_list($;$){
             <li><a name="doorpi_dashlightbutton"><code>attr &lt;DoorPi-Device&gt; dashlightbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for dashlight action (default: dashlight)</li>
+                   </ul>
+        <h5>Visual attributes</h5>
+        These actions will only be possible if they are defined in the virtual DoorPi keyboard
+        <ul>
             <li><a name="doorpi_iconpic"><code>attr &lt;DoorPi-Device&gt; iconpic
                         &lt;string&gt;</code></a>
                 <br />Icon to be used in overview instead of a (slow !) miniature picture</li>
