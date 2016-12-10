@@ -405,7 +405,6 @@ HttpUtils_Connect2($)
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
-    delete($hash->{httpdatalen});
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
     my %timerHash = (hash=>$hash, checkSTS=>$selectTimestamp, msg=>"write to");
     $hash->{directReadFn} = sub() {
@@ -413,12 +412,12 @@ HttpUtils_Connect2($)
       my $len = sysread($hash->{conn},$buf,65536);
       $hash->{buf} .= $buf if(defined($len) && $len > 0);
       if(!defined($len) || $len <= 0 || 
-         HttpUtils_DataComplete($hash)) {
+         HttpUtils_DataComplete($hash->{buf})) {
         delete($hash->{FD});
         delete($hash->{directReadFn});
         delete($selectlist{$hash});
         RemoveInternalTimer(\%timerHash);
-        my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
+        my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash, $hash->{buf});
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
       }
     };
@@ -460,48 +459,13 @@ HttpUtils_Connect2($)
 sub
 HttpUtils_DataComplete($)
 {
-  my ($hash) = @_;
-  my ($hdr, $data) = ($1, $2);
-  my $hl = $hash->{httpdatalen};
-  if(!defined($hl)) {
-    return 0 if($hash->{buf} !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
-    my ($hdr, $data) = ($1, $2);
-    if($hdr =~ m/Transfer-Encoding:\s*chunked/si) {
-      $hash->{httpheader} = $hdr;
-      $hash->{httpdata} = "";
-      $hash->{buf} = $data;
-      $hash->{httpdatalen} = -1;
-
-    } elsif($hdr =~ m/Content-Length:\s*(\d+)/si) {
-      $hash->{httpdatalen} = $1;
-      $hash->{httpheader} = $hdr;
-      $hash->{httpdata} = $data;
-      $hash->{buf} = "";
-
-    } else {
-      $hash->{httpdatalen} = -2;
-
-    }
-    $hl = $hash->{httpdatalen};
-  }
-  return 0 if($hl == -2);
-
-  if($hl == -1) {       # chunked
-    while($hash->{buf} =~ m/^[\r\n]*([0-9A-F]+)\r?\n(.*)$/si) {
-      my ($l, $r) = (hex($1), $2);
-      return 0 if(length($r) < $l);
-      $hash->{httpdata} .= substr($r, 0, $l);
-      $hash->{buf} = substr($r, $l);
-    }
-    return 0;
-
-  } else {
-    $hash->{httpdata} .= $hash->{buf};
-    $hash->{buf} = "";
-    return 0 if(length($hash->{httpdata}) < $hash->{httpdatalen});
-    return 1;
-    
-  }
+  my ($ret) = @_;
+  return 0 if($ret !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
+  my $hdr = $1;
+  my $data = $2;
+  return 0 if($hdr !~ m/Content-Length:\s*(\d+)/si);
+  return 0 if(length($data) < $1);
+  return 1;
 }
 
 sub
@@ -555,16 +519,16 @@ HttpUtils_DigestHeader($$)
 }
 
 sub
-HttpUtils_ParseAnswer($)
+HttpUtils_ParseAnswer($$)
 {
-  my ($hash) = @_;
+  my ($hash, $ret) = @_;
 
   if(!$hash->{keepalive}) {
     $hash->{conn}->close();
     undef $hash->{conn};
   }
 
-  if(!$hash->{buf} && !$hash->{httpheader}) {
+  if(!$ret) {
     # Server answer: Keep-Alive: timeout=2, max=200
     if($hash->{keepalive} && $hash->{hu_filecount}) {
       my $bc = $hash->{hu_blocking};
@@ -582,12 +546,11 @@ HttpUtils_ParseAnswer($)
   $hash->{hu_filecount} = 0 if(!$hash->{hu_filecount});
   $hash->{hu_filecount}++;
 
-  return ("", $hash->{buf}) if(!defined($hash->{httpheader}));
-  my $ret = $hash->{httpdata};
-  delete $hash->{httpdata};
-  delete $hash->{httpdatalen};
+  $ret=~ s/(.*?)\r?\n\r?\n//s; # Not greedy: separate the header (F:#43482)
+  return ("", $ret) if(!defined($1));
 
-  my @header= split("\r\n", $hash->{httpheader});
+  $hash->{httpheader} = $1;
+  my @header= split("\r\n", $1);
   my @header0= split(" ", shift @header);
   my $code= $header0[1];
 
@@ -620,7 +583,7 @@ HttpUtils_ParseAnswer($)
     }
    
   } elsif($code==401 && defined($hash->{auth})) {
-    return ("$hash->{displayurl}: wrong authentication", "")
+   return ("$hash->{displayurl}: wrong authentication", "")
 
   }
   
@@ -645,9 +608,31 @@ HttpUtils_ParseAnswer($)
     }
   }
 
+  if( $hash->{httpheader} =~ m/^Transfer-Encoding: Chunked/mi ) {
+    my $data;
+    my $header;
+    my ($size, $offset) = (length($ret), 0);
+    while( $offset < $size ) {
+      my $next = index($ret, "\r\n", $offset);
+      last if( $next == -1 );
+      if( substr($ret,$offset,$next-$offset) =~ m/([\da-f]+)/i ) {
+        my $len = hex($1);
+        $offset = $next + 2;
+        $data .= substr($ret,$offset,$len);
+        $offset += $len + 2;
+        next if( $len > 0 );
+      }
+
+    $hash->{httpheader} .= substr($ret,$offset);
+
+    }
+
+    $ret = $data;
+  }
+
   # Debug
   Log3 $hash, $hash->{loglevel},
-       "HttpUtils $hash->{displayurl}: Got data, length: ". length($ret);
+       "HttpUtils $hash->{displayurl}: Got data, length: ".  length($ret);
   if(!length($ret)) {
     Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
          "Zero length data, header follows:";
@@ -693,10 +678,8 @@ HttpUtils_BlockingGet($)
   my $err = HttpUtils_Connect($hash);
   return ($err, undef) if($err);
   
-  my $buf = "";
+  my ($buf, $ret) = ("", "");
   $hash->{conn}->timeout($hash->{timeout});
-  $hash->{buf} = "";
-  delete($hash->{httpdatalen});
   for(;;) {
     my ($rout, $rin) = ('', '');
     vec($rin, $hash->{conn}->fileno(), 1) = 1;
@@ -708,10 +691,10 @@ HttpUtils_BlockingGet($)
 
     my $len = sysread($hash->{conn},$buf,65536);
     last if(!defined($len) || $len <= 0);
-    $hash->{buf} .= $buf;
-    last if(HttpUtils_DataComplete($hash));
+    $ret .= $buf;
+    last if(HttpUtils_DataComplete($ret));
   }
-  return HttpUtils_ParseAnswer($hash);
+  return HttpUtils_ParseAnswer($hash, $ret);
 }
 
 # Deprecated, use GetFileFromURL/GetFileFromURLQuiet
