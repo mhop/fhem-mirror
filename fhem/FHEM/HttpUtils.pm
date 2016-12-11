@@ -406,6 +406,7 @@ HttpUtils_Connect2($)
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
     delete($hash->{httpdatalen});
+    delete($hash->{httpheader});
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
     my %timerHash = (hash=>$hash, checkSTS=>$selectTimestamp, msg=>"write to");
     $hash->{directReadFn} = sub() {
@@ -595,6 +596,7 @@ HttpUtils_ParseAnswer($)
     }
   }
   my $ret = $hash->{httpdata};
+  $ret = "" if(!defined($ret));
   delete $hash->{httpdata};
   delete $hash->{httpdatalen};
 
@@ -708,6 +710,7 @@ HttpUtils_BlockingGet($)
   $hash->{conn}->timeout($hash->{timeout});
   $hash->{buf} = "";
   delete($hash->{httpdatalen});
+  delete($hash->{httpheader});
   for(;;) {
     my ($rout, $rin) = ('', '');
     vec($rin, $hash->{conn}->fileno(), 1) = 1;
