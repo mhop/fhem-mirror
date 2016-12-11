@@ -608,17 +608,18 @@ sub ElectricityCalculator_Notify($$)
 			my $ElectricityCalcEnergyDayLast      = ($ElectricityCountReadingValuePrevious - ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_CounterDay1st", "0"));
 			### Calculate pure Electricity cost of previous day ElectricityCalcEnergyDayLast * Price per kWh
 			my $ElectricityCalcEnergyCostDayLast  = $ElectricityCalcEnergyDayLast * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
-
+			### Reload last Power Value
+			my $ElectricityCalcPowerCurrent = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerCurrent", "0");
+			
 			### Save Electricity pure cost of previous day, current electric Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDayLast",  (sprintf('%.3f', ($ElectricityCalcEnergyCostDayLast     ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyDayLast",      (sprintf('%.3f', ($ElectricityCalcEnergyDayLast         ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDaySum",        0                                                          , 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayCount",      0                                                          , 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMin",        0                                                          , 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf('%.3f', ($ElectricityCalcPowerCurrent          ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMax",        0                                                          , 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDay1st",      (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDayLast",     (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
-
 			
 			### Check whether the current value is the first one after change of month
 			if ($ElectricityCountReadingTimestampCurrentMday < $ElectricityCountReadingTimestampPreviousMday)
@@ -710,6 +711,9 @@ sub ElectricityCalculator_Notify($$)
 
 			### Calculate consumed Energy of Electricity-meter year W = (Wcurrent[kWh] - W1stReadMeter[kWh]) 
 			my $ElectricityCalcEnergyMeter     = ($ElectricityCountReadingValueCurrent - ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_CounterMeter1st", "0"));
+
+			### Calculate pure Electricity cost since midnight
+			my $ElectricityCalcEnergyCostDay = $ElectricityCalcEnergyDay * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
 
 			### Calculate pure Electricity cost since first day of month
 			my $ElectricityCalcEnergyCostMonth = $ElectricityCalcEnergyMonth * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
@@ -809,6 +813,9 @@ sub ElectricityCalculator_Notify($$)
 			
 			### Write energy consumption since last meter reading
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeter",       sprintf('%.3f', ($ElectricityCalcEnergyMeter)));
+			
+			### Write pure energy costs since midnight
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDay",   sprintf('%.3f', ($ElectricityCalcEnergyCostDay)));
 			
 			### Write pure energy costs since beginning of month
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonth",   sprintf('%.3f', ($ElectricityCalcEnergyCostMonth)));
