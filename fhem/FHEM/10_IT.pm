@@ -41,7 +41,27 @@ my %codes = (
   "99" => "on-till",
 );
 
+my %codes_he800 = (
+  "XMIToff" => "off",
+  "XMITon"  => "on", # Set to previous dim value (before switching it off)
+  "00" => "off",
+  #"01" => "last-dim-on",
+  "02" => "dim12%",
+  "03" => "dim25%",
+  "04" => "dim37%",
+  "05" => "dim50%",
+  "06" => "dim62%",
+  "07" => "dim75%",
+  "08" => "dim87%",
+  "09" => "dim100%",
+  "XMITdimup" 	=> "dimup",
+  "XMITdimdown" => "dimdown",
+  "99" => "on-till",
+);
+
 my %it_c2b;
+
+my %it_c2b_he800;
 
 my $it_defrepetition = 6;   ## Default number of InterTechno Repetitions
 
@@ -77,6 +97,9 @@ my %ev_action = (
 sub bin2dec {
 	unpack("N", pack("B32", substr("0" x 32 . shift, -32)));
 }
+sub bin2dec64 {
+	unpack("N", pack("B32", substr("0" x 64 . shift, -64)));
+}
 sub
 IT_Initialize($)
 {
@@ -84,6 +107,10 @@ IT_Initialize($)
 
   foreach my $k (keys %codes) {
     $it_c2b{$codes{$k}} = $k;
+  }
+
+  foreach my $k (keys %codes_he800) {
+    $it_c2b_he800{$codes_he800{$k}} = $k;
   }
 
   $hash->{Match}     = "^i......";
@@ -157,6 +184,7 @@ IT_Set($@)
   $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
 
   my $c = $it_c2b{$a[0]};
+ 
 
   if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
       if($na > 1 && $a[0] eq "dim") {  
@@ -197,12 +225,22 @@ IT_Set($@)
   } elsif ($hash->{READINGS}{protocol}{VAL} eq "EV1527") {                 # EV1527
     #Log3 $hash, 2, "Set ignored for EV1527 (1527X) devices";
     return "";
+  } elsif ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+    $c = $it_c2b_he800{$a[0]};
+    if($na > 1 && $a[0] eq "dim") {  
+            $a[0] = ($a[1] eq "0" ? "off" : sprintf("dim%02d%%",$a[1]) );
+            
+            splice @a, 1, 1;
+            $na = int(@a);
+    }
+    $list = (join(" ", sort keys %it_c2b_he800) . " dim:slider,0,12.5,100")
+        if( AttrVal($name, "model", "") eq "itdimmer" );
   } else {
     $list .= "dimup:noArg dimdown:noArg on-till" if( AttrVal($name, "model", "") eq "itdimmer" );
   }
-  if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
-    $list .= " learn_on_codes:noArg learn_off_codes:noArg";
-  }
+  #if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+  #  $list .= " learn_on_codes:noArg learn_off_codes:noArg";
+  #}
 
   return SetExtensions($hash, $list, $name, @a) if( $a[0] eq "?" );
   return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^\Q$a[0]\E($|:)/, split( ' ', $list ) ) );
@@ -222,28 +260,28 @@ IT_Set($@)
   foreach my $n (keys %{ $modules{IT}{defptr}{$code} }) {
     my $lh = $modules{IT}{defptr}{$code}{$n};
     
-    $lh->{STATE} = $cmd;
+    #$lh->{STATE} = $cmd;
     if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
-      if ($cmd eq "learn_on_codes") {
-        $lh->{"learn"}  = 'ON';
-        readingsSingleUpdate($lh, "init_count", 0, 1);
-      } elsif ($cmd eq "learn_off_codes") {
-        $lh->{"learn"}  = 'OFF';
-        readingsSingleUpdate($lh, "init_count", 0, 1);
-      } else {
         my $count = $hash->{"count"};
         $count = $count + 1;
         if ($count > 3) {
           $count = 0;
         }
         $hash->{"count"}  = $count;
-      }
+     # }
     }
-    if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
+    if ($hash->{READINGS}{protocol}{VAL} eq "V3" || $hash->{READINGS}{protocol}{VAL} eq "HE800") {
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         if ($cmd eq "on") {
-          readingsSingleUpdate($lh, "dim", "100",1);
-          readingsSingleUpdate($lh, "state", "on",1);
+          my $lastDimVal = $hash->{READINGS}{lastDimValue}{VAL};
+          if ($lastDimVal ne "") {
+              #$cmd = $lastDimVal;
+              #readingsSingleUpdate($lh, "state", $lastDimVal,1);
+              readingsSingleUpdate($lh, "dim", substr($lastDimVal, 3, -1),1);
+           } else {
+              readingsSingleUpdate($lh, "dim", "100",1);
+           }
+           readingsSingleUpdate($lh, "state", "on",1);
         } elsif ($cmd eq "off") {
           readingsSingleUpdate($lh, "dim", "0",1);
           readingsSingleUpdate($lh, "state", "off",1);
@@ -253,9 +291,24 @@ IT_Set($@)
             readingsSingleUpdate($lh, "state", "on",1);
           } elsif ($cmd eq "dim00%") {
             $lh->{STATE} = "off";
+            readingsSingleUpdate($lh, "lastDimValue", "",1);
             readingsSingleUpdate($lh, "state", "off",1);
+          #} elsif ($cmd eq "last-dim-on") {
+          #  $cmd = AttrVal($name, "lastDimValue", "");
+          #  readingsSingleUpdate($lh, "state", $cmd,1);
           } else {
             readingsSingleUpdate($lh, "state", $cmd,1);
+          }
+          if ($cmd eq "dimup") {
+                readingsSingleUpdate($lh, "lastDimValue", "dim100%",1);
+          } elsif ($cmd eq "dimdown") {
+                if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+                    readingsSingleUpdate($lh, "lastDimValue", "dim12%",1);
+                } else {
+                    readingsSingleUpdate($lh, "lastDimValue", "dim06%",1);
+                }
+          } else {
+                readingsSingleUpdate($lh, "lastDimValue", $cmd,1);
           }
         }
       } else {
@@ -315,10 +368,12 @@ IT_Set($@)
       my @itvalues = split(' ', $v);
       if ($itvalues[1] eq "dimup") {
         $a[0] = "dim100%";
+        readingsSingleUpdate($hash, "state", $itvalues[1],1);
         readingsSingleUpdate($hash, "dim", 100, 1);
         $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."D".$hash->{READINGS}{unit}{VAL}."1111");
       } elsif ($itvalues[1] eq "dimdown") {
         $a[0] = "dim06%";
+        readingsSingleUpdate($hash, "state", $itvalues[1],1);
         readingsSingleUpdate($hash, "dim", 6, 1);
         $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."D".$hash->{READINGS}{unit}{VAL}."0000");
       } elsif ($itvalues[1] =~ /dim/) {
@@ -342,6 +397,7 @@ IT_Set($@)
           $stateVal = "0"; 
         } else {
           $stateVal = $hash->{$c};
+          readingsSingleUpdate($hash, "lastDimValue", "",1);
         }
         $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$stateVal.$hash->{READINGS}{unit}{VAL});
       }
@@ -359,20 +415,134 @@ IT_Set($@)
     $message = "ise".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-7).$hash->{$c}.$masterVal.$hash->{READINGS}{unit}{VAL});
   } elsif ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
     my $cVal;
+    my $mode;
+    my @mn;
+    my $msg;
+
+    my %he800MapingTable = (
+       12 => 2,
+       25 => 3,
+       37 => 4,
+       50 => 5,
+       62 => 6,
+       75 => 7,
+       87 => 8,
+       100 => 9,
+    );
+
     (undef, $cVal) = split(" ", $v, 2);	# Not interested in the name...
-    my $count = $hash->{"count"};
-    if ($count > 3) {
-      $count = 0;
+
+    my @key = (9, 6, 3, 8, 10, 0, 2, 12, 4, 14, 7, 5, 1, 15, 11, 13, 9); # cryptokey 
+
+    my $rollingCode = $hash->{"count"};
+    if ($rollingCode > 3) {
+      $rollingCode = 0;
     }
-    if ($cVal eq "learn_on_codes" || $cVal eq "learn_off_codes") {
-      $message = "ish0";
-    } elsif ($cVal eq "on") {
-      my $sendVal = $hash->{READINGS}{"on_" . $count}{VAL};
-      $message = "ish".uc($sendVal);
-    
+    my $oldMode = 0;
+    if ($cVal eq "on") {
+      my $sendVal = $hash->{READINGS}{"on_" . $rollingCode}{VAL};
+      if (defined $sendVal && $sendVal ne "" && $sendVal ne "0") {
+        $message = "ish".uc($sendVal);
+        $oldMode = 1;
+        Log3 $hash,4, "Use old Mode sendVal $sendVal ";
+      } else {
+        readingsSingleUpdate($hash, "lastDimValue", "",1);
+        $mode = 1;
+      }
+    } elsif ($cVal eq "off") {
+      my $sendVal = $hash->{READINGS}{"off_" . $rollingCode}{VAL};
+      if (defined $sendVal && $sendVal ne "" && $sendVal ne "0") {
+        $message = "ish".uc($sendVal);
+        $oldMode = 1;
+        Log3 $hash,4, "Use old Mode sendVal $sendVal ";
+      } else {
+        $mode = 0;
+      }
     } else {
-      my $sendVal = $hash->{READINGS}{"off_" . $count}{VAL};
-      $message = "ish".uc($sendVal);
+      Log3 $hash,5, "mode is DIM MODE: $v Model: " . AttrVal($name, "model", "");
+      # DIM Mode
+      if( AttrVal($name, "model", "") eq "itdimmer" ) {
+
+          my @itvalues = split(' ', $v);
+          if ($itvalues[1] eq "dimup") {
+            readingsSingleUpdate($hash, "state", $itvalues[1],1);
+            readingsSingleUpdate($hash, "dim", 100, 1);
+            $mode = 9;
+          } elsif ($itvalues[1] eq "dimdown") {
+            readingsSingleUpdate($hash, "state", $itvalues[1],1);
+            readingsSingleUpdate($hash, "dim", 12, 1);
+            $mode = 2;
+          } else {
+         
+              if ($itvalues[1] =~ /dim/) {
+                my $dperc = substr($itvalues[1], 3, -1);
+                #my $dperc = $itvalues[2]; 
+                my $dec = $he800MapingTable{$dperc};
+                my $bin = sprintf ("%b",$dec);
+                while (length($bin) < 4) {
+                  # suffix 0
+                  $bin = '0'.$bin;   
+                }
+                readingsSingleUpdate($hash, "dim", $dperc, 1);
+                if ($dperc == 0) { 
+                  $mode = 0;
+                } else {
+                  $mode = $dec;
+                }
+	          }
+          }
+      
+      }
+    }
+    #}
+    if ($oldMode == 0) {
+        Log3 $hash,5, "mode is $mode";
+        my @XMIT_split = split(/_/,$hash->{XMIT});
+        my $receiverID = $XMIT_split[1];
+        my $transmitterID = $XMIT_split[0];
+        #encrypt
+        $mn[0] = $XMIT_split[1];                 # mn[0] = iiiib i=receiver-ID
+        $mn[1] = ($rollingCode << 2) & 15;    # 2 lowest bits of rolling-code
+        if ($mode > 0) {                      # ON or OFF
+            $mn[1] |= 2;		      # mn[1] = rrs0b r=rolling-code, s=ON/OFF, 0=const 0?
+        }                                                             
+        $mn[2] = $transmitterID & 15;         # mn[2..5] = ttttb t=txID in nibbles -> 4x ttttb
+        $mn[3] = ($transmitterID >> 4) & 15;
+        $mn[4] = ($transmitterID >> 8) & 15;
+        $mn[5] = ($transmitterID >> 12) & 15;
+        if ($mode >= 2 && $mode <= 9) {       # mn[6] = dpppb d = dim ON/OFF, p=%dim/10 - 1
+            $mn[6] = $mode - 2;               # dim: 0=10%..7=80%
+            $mn[6] |= 8;                      # dim: ON
+        } else {
+            $mn[6] = 0;                       # dim: OFF
+        }
+
+        #XOR encryption 2 rounds
+        for (my $r=0; $r<=1; $r++){           # 2 encryption rounds
+            $mn[0] = $key[ $mn[0]-$r+1];       # encrypt first nibble
+            my $i = 0;
+            for ($i=1; $i<=5 ; $i++){      # encrypt 4 nibbles
+                $mn[$i] = $key[($mn[$i] ^ $mn[$i-1])-$r+1];   # crypted with predecessor & key
+            }
+        }
+                    
+        $mn[6] = $mn[6] ^ 9;                  # no  encryption
+
+
+        $msg = ($mn[6] << 0x18) | ($mn[5] << 0x14) |       # copy the encrypted nibbles in output buffer
+               ($mn[4] << 0x10) | ($mn[3] << 0x0c) |
+               ($mn[2] << 0x08) | ($mn[1] << 0x04) | $mn[0];
+        $msg = ($msg >> 2) | (($msg & 3) << 0x1a);         # shift 2 bits right & copy lowest 2 bits of cbuf[0] in msg bit 27/28
+        $msg = ~$msg & 0xFFFFFFF;
+                    
+        my $bin1=sprintf("%024b",$msg);
+        while (length($bin1) < 28) {
+          # suffix 0
+          $bin1 = '0'.$bin1;   
+        }
+        my $bin = $bin1;# . $bin3;
+        Log3 $hash,4, "msg $msg - bin1 $bin1";
+        $message = "ish".uc($bin);
     }
   } else {
     $message = "is".uc($hash->{XMIT}.$hash->{$c});
@@ -492,8 +662,18 @@ IT_Define($$)
   my $groupBit;
   my $name = $a[0];
 
+   
   if ($a[3] eq "HE800") {
+    # OLD, do not use anymore
     $housecode = $a[2];
+    $hash->{READINGS}{protocol}{VAL}  = 'HE800';
+    $hash->{"count"}  = '0';
+    $oncode = "N/A";
+    $offcode = "N/A";
+    $unitCode="N/A";
+    #return "FALSE";
+  } elsif ($a[2] eq "HE800") {
+    $housecode = ($a[3] + 0) . "_" . ($a[4] + 0);
     $hash->{READINGS}{protocol}{VAL}  = 'HE800';
     $hash->{"count"}  = '0';
     $oncode = "N/A";
@@ -631,6 +811,7 @@ IT_Parse($$)
   my ($hash, $msg) = @_;
   my $ioname = $hash->{NAME};
   my $housecode;
+  my $transmittercode;
   my $dimCode;
   my $unitCode;
   my $groupBit;
@@ -776,11 +957,64 @@ IT_Parse($$)
     $unitCode=substr($msgcode,50,7);
     $housecode=substr($msgcode,0,46).$unitCode;
   } elsif (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy HE800
-    $housecode=substr($msgcode,0,6).substr($msgcode,26,2);
-    $onoffcode=0;
+    #$housecode=substr($msgcode,0,6).substr($msgcode,26,2);
+    #$onoffcode=0;
+
+    Log3 $hash,4,"$ioname IT: msg:" . $msg . " msgcode:" . substr($msg, 2, 8) ;
+    my $msgVal = hex(substr($msg, 2, 8));
+    my @mn;
+    my $receiverID; 
+    my $mode;
+    my @ikey = (5, 12, 6, 2, 8, 11, 1, 10, 3, 0, 4, 14, 7, 15, 9, 13);  #invers cryptokey (exchanged index & value)
+
+    Log3 $hash,4,"$ioname IT: HEX:" . $msg . " DEC:" . $msgVal ;
+    $msgVal = ~($msgVal >> 4) & 0xFFFFFFF;
+    Log3 $hash,4,"$ioname IT: DEC:" . $msgVal ;
+
+    $msgVal = (($msgVal << 2) & 0x0FFFFFFF) | (($msgVal & 0xC000000) >> 0x1a);        # shift 2 bits left & copy bit 27/28 to bit 1/2
+    Log3 $hash,4,"$ioname IT: DEC:" . $msgVal ;
+    $mn[0] = $msgVal & 0x0000000F;
+    $mn[1] = ($msgVal & 0x000000F0) >> 0x4;
+    $mn[2] = ($msgVal & 0x00000F00) >> 0x8;
+    $mn[3] = ($msgVal & 0x0000F000) >> 0xc;
+    $mn[4] = ($msgVal & 0x000F0000) >> 0x10;
+    $mn[5] = ($msgVal & 0x00F00000) >> 0x14;
+    $mn[6] = ($msgVal & 0x0F000000) >> 0x18;
+
+    $mn[6] = $mn[6] ^ 9; # no decryption
+
+    Log3 $hash,4,"$ioname IT: mn: @mn";
+
+    # XOR decryption 2 rounds
+    my $r = 0;
+    for ($r=0; $r<=1; $r++){                    # 2 decryption rounds
+            my $i = 5;
+	    for ($i=5; $i>=1 ; $i--){             # decrypt 4 nibbles
+		    $mn[$i] = (($ikey[$mn[$i]]-$r) & 0x0F) ^ $mn[$i-1];    # decrypted with predecessor & key
+	    }
+	    $mn[0] = ($ikey[$mn[0]]-$r) & 0x0F;                #decrypt first nibble
+    }
+
+    Log3 $hash,4,"$ioname IT: mn: @mn ";
+
+    $receiverID = $mn[0];
+    $mode = ((($mn[1]>>1) & 1) + ($mn[6] & 0x7) + (($mn[6] & 0x8) >> 3));
+    my $rollingCode = ($mn[1] >> 2);
+    my $transmitterID = (($mn[5] << 12) + ($mn[4] << 8) + ($mn[3] << 4) + $mn[2]);
+
+    $housecode = $transmitterID . "_" . $receiverID;
+    $transmittercode = $transmitterID;
+    $unitCode = $receiverID;
+    $onoffcode = $mode; 
+
+    Log3 $hash,4,"receiverID    : " . $receiverID ; # receiver-ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)
+    Log3 $hash,4,"OFF/ON/DIM    : " . $mode ; # 0=OFF 1=ON, 2=10%dim..9=80%dim (no 90%dim!)
+    Log3 $hash,4,"Rolling-Code  : " . $rollingCode ; # rolling-code 0-3 (differentiate new message from repeated message)
+    Log3 $hash,4,"Transmitter-ID: " . $transmitterID ; # unique transmitter-ID    [0]1..65535    (0 valid?, 65535 or lower limit?)
+
   } else {
     Log3 $hash,4,"$ioname IT: Wrong IT message received: $msgcode";
-    return "Wrong IT message received: $msgcode";
+    return undef;
   }
   
   if(!defined($modules{IT}{defptr}{lc("$housecode")})) {
@@ -792,8 +1026,8 @@ IT_Parse($$)
       my $tmpOnCode;
       if (!defined($isEV1527)) { # itv1
         if ($onoffcode eq "F0") { # on code IT
-          Log3 $hash,4,"$ioname IT: For autocreate please use the on button.";
-          return "$housecode not defined (Switch code: $onoffcode)! \n For autocreate please use the on button.";
+          Log3 $hash,3,"$ioname IT: For autocreate please use the on button.";
+          return undef;
         } 
         $tmpOffCode = "F0";
         $tmpOnCode = "0F";
@@ -821,11 +1055,12 @@ IT_Parse($$)
       return "UNDEFINED IT_$housecode IT " . substr($msgcode,0,46) . " $isGroupCode $unitCode" if(!$def);
     } elsif (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HE800
       Log3 $hash,2,"$ioname IT: $housecode not defined (HE800)";
-      return "UNDEFINED IT_$housecode IT " . "$housecode HE800 $msgcode" if(!$def);
+      return "UNDEFINED IT_HE800_$housecode IT " . "HE800 $transmittercode $unitCode" if(!$def);
     } else {
-      Log3 $hash,2,"$ioname IT: $housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)";
-      #return "$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)!";
-      return "UNDEFINED IT_$housecode IT " . substr($msgcode,0,26) . " $groupBit $unitCode" if(!$def);
+      Log3 $hash,2,"$ioname IT: " . substr($msgcode,0,26) . " not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)";
+      my $tmpHouseCode = substr($msgcode,0,26);
+      my $decCode = bin2dec($tmpHouseCode);
+      return "UNDEFINED IT_V3_$decCode IT " . substr($msgcode,0,26) . " $groupBit $unitCode" if(!$def);
     }
   }
   $def=$modules{IT}{defptr}{lc($housecode)};
@@ -841,57 +1076,70 @@ IT_Parse($$)
       Log3 $hash,4,"$ioname IT EV1527: " . $def->{$name}{NAME} . ', on code=' . $def->{$name}->{$it_c2b{"on"}} . ", Switch code=$onoffcode";
     }
     if ($def->{$name}->{READINGS}{protocol}{VAL}  eq 'HE800') {
-      my $learnVal = "n/a";      
-      if (defined($def->{$name}->{"learn"})) {
-         $learnVal = $def->{$name}->{"learn"} . "";
-      } else {
-        $def->{$name}->{"learn"}  = 'Disabled';
-      }
-      if ($learnVal  eq 'ON') {
-          my $count = $def->{$name}->{READINGS}->{"init_count"}{VAL};
-          readingsSingleUpdate($def->{$name}, "init_count", $count + 1, 1);
-          readingsSingleUpdate($def->{$name}, "on_" . $count, $msgcode, 1);
-          if ($count == 3) {
-            $def->{$name}->{"learn"}  = 'Disabled';
-          }
-      } elsif ($learnVal  eq 'OFF') {
-          my $count = $def->{$name}->{READINGS}->{"init_count"}{VAL};
-          readingsSingleUpdate($def->{$name}, "init_count", $count + 1, 1);
-          readingsSingleUpdate($def->{$name}, "off_" . $count, $msgcode, 1);
-          if ($count == 3) {
-            $def->{$name}->{"learn"}  = 'Disabled';
-          }
-      } else {
-        $newstate="Unknown, Please learn codes!";
-        # search for on code
-        for (my $i=0; $i < 4; $i++) {
-           my $value = $def->{$name}->{READINGS}->{"on_" . $i}{VAL};
-           if (defined($value)) {
-             if ($value eq $msgcode) {
-                $newstate="on";
-             }
-           }
+
+      my %he800MapingTable = (
+       2 => 12,
+       3 => 25,
+       4 => 37,
+       5 => 50,
+       6 => 62,
+       7 => 75,
+       8 => 87,
+       9 => 100,
+      );
+
+      if ($onoffcode == 0) {
+        # OFF
+        my $actState = $hash->{READINGS}{state}{VAL};
+        $newstate="off";
+        if( AttrVal($name, "model", "") eq "itdimmer" ) {
+            readingsSingleUpdate($def->{$name},"dim",0,1);
         }
-        for (my $i=0; $i < 4; $i++) {
-           my $value = $def->{$name}->{READINGS}->{"off_" . $i}{VAL};
-           if (defined($value)) {
-            if ($value eq $msgcode) {
-              $newstate="off";
+      } elsif ($onoffcode == 1) {
+        # On
+        $newstate="on";
+        if( AttrVal($name, "model", "") eq "itdimmer" ) {
+            my $lastDimVal = $def->{$name}->{READINGS}{lastDimValue}{VAL};
+            if (defined $lastDimVal && $lastDimVal ne "") {
+                my $dperc = substr($lastDimVal, 3, -1);
+                readingsSingleUpdate($def->{$name},"dim",$dperc,1);
+                readingsSingleUpdate($def->{$name}, "lastDimValue", "",1);
+            } else {
+                readingsSingleUpdate($def->{$name},"dim",100,1);
             }
-           }
         }
+      } else {
+        my $binVal = $he800MapingTable{$onoffcode};
+        $binVal =  int($binVal);
+        
+        $newstate = sprintf("dim%02d%%",$binVal);
+        readingsSingleUpdate($def->{$name},"dim",$binVal,1);
+        readingsSingleUpdate($def->{$name}, "lastDimValue", $newstate,1);
+        Log3 $hash,4,"$ioname HE800: onoffcode $onoffcode   newstate " . $newstate;
+        #if ($binVal == 100) {
+        #    $newstate="on";
+        #} els
+        if ($binVal == 0) {
+            $newstate="off";
+        } 
       }
     } elsif ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
-        readingsSingleUpdate($def->{$name},"dim",1,1);
+        my $lastDimVal = $def->{$name}->{READINGS}{lastDimValue}{VAL};
+        if (defined $lastDimVal && $lastDimVal ne "") {
+            my $dperc = substr($lastDimVal, 3, -1);
+            readingsSingleUpdate($def->{$name},"dim",$dperc,1);
+            readingsSingleUpdate($def->{$name}, "lastDimValue", "",1);
+        } else {
+            readingsSingleUpdate($def->{$name},"dim",100,1);
+        }
       }
     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
       $newstate="off";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         readingsSingleUpdate($def->{$name},"dim",0,1);
       }
-      
     } elsif ($def->{$name}->{$it_c2b{"dimup"}} eq lc($onoffcode)) {
       $newstate="dimup";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
@@ -909,6 +1157,7 @@ IT_Parse($$)
       $newstate = sprintf("dim%02d%%",$binVal);
       
       readingsSingleUpdate($def->{$name},"dim",$binVal,1);
+      readingsSingleUpdate($def->{$name}, "lastDimValue", $newstate,1);
       if ($binVal == 100) {
         $newstate="on";
       } elsif ($binVal == 0) {
@@ -970,6 +1219,8 @@ sub IT_Attr(@)
     <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
     <br>or<br>
     <code>define &lt;name&gt; IT &lt;address 26 Bit&gt; &lt;group bit&gt; &lt;unit Code&gt;</code>
+    <br>or<br>
+    <code>define &lt;name&gt; IT HE800 &lt;Transmitter ID&gt; &lt;Receiver ID&gt;</code>
     <br><br>
 
    The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
@@ -1000,6 +1251,13 @@ sub IT_Attr(@)
    <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
    </ul>
+   <br>
+   <b>HE800</b><br>
+   <ul>
+     <li><code>&lt;Transmitter ID&gt;</code> Eindeutige Transmitter-ID (1..65535)</li>
+     <li><code>&lt;Receiver ID&gt;</code> Receiver-ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)</li>
+   </ul>
+   
 <br>
 Examples:
     <ul>
@@ -1012,6 +1270,7 @@ Examples:
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
       <code>define lamp IT II2</code><br>
+      <code>define HE800_TID1_SW1 IT HE800 1 1</code><br>
     </ul>
  <br>
    For Intertechno protocol 3 the &lt;housecode&gt; is a 26-digits number.
@@ -1187,8 +1446,10 @@ Examples:
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
     <br>oder<br>
     <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
-    <br>or<br>
+    <br>oder<br>
     <code>define &lt;name&gt; IT &lt;Adresse 26 Bit&gt; &lt;Group bit&gt; &lt;Unit Code&gt;</code>
+    <br>oder<br>
+    <code>define &lt;name&gt; IT HE800 &lt;Transmitter ID&gt; &lt;Receiver ID&gt;</code>
     <br><br>
 
    Der Wert von housecode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code Protokoll 1. 
@@ -1221,6 +1482,13 @@ Examples:
      die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
    </ul>
    <br>
+   <b>HE800</b><br>
+   <ul>
+     <li><code>&lt;Transmitter ID&gt;</code> Eindeutige Transmitter-ID (1..65535)</li>
+     <li><code>&lt;Receiver ID&gt;</code> Receiver-ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)</li>
+   </ul>
+   <br>
+   
 
 Beispiele:
     <ul>
@@ -1233,6 +1501,7 @@ Beispiele:
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
       <code>define lamp IT II2</code><br>
+      <code>define HE800_TID1_SW1 IT HE800 1 1</code><br>
     </ul>
    <br>
    F&uuml;r Intertechno Protokoll 3 ist der &lt;housecode&gt; eine 26-stellige Zahl. Zus&auml;tzlich wird noch ein 1 stelliger Gruppen-Code, sowie 
