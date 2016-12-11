@@ -1341,7 +1341,7 @@ logProxy_Get($@)
         <code>#logProxy Polar::{[map{ReadingsVal($_,"temperature",0)}devspec2array("MAX.*")]}</code><br>
         <code>#logProxy Polar::{[map{ReadingsVal($_,"desiredTemperature",0)}devspec2array("MAX.*")]}</code><br>
         <code>#logProxy Polar::{[map{ReadingsVal($_,"temperature",0)}devspec2array("MAX.*")]}</code><br>
-        <code>#logProxy Polar::{[devspec2array("tc.*")]}</code><br><br>
+        <code>#logProxy Polar::{[devspec2array("MAX.*")]}</code><br><br>
 
         <code>plot "<IN>" using 1:2 axes x1y1 title 'Ist' ls l0 lw 1 with lines,\</code><br>
         <code>plot "<IN>" using 1:2 axes x1y1 title 'Soll' ls l1fill lw 1 with lines,\</code><br>
