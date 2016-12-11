@@ -7,9 +7,16 @@
 # FHEM module to communicate with BOSE SoundTouch system
 # API as defined in BOSE SoundTouchAPI_WebServices_v1.0.1.pdf
 #
-# Version: 2.0.0
+# Version: 2.0.1
 #
 #############################################################
+#
+# v2.0.1 - 20161203
+# - FEATURE: support shuffle/repeat (thx@rockyou)
+# - BUGFIX:  support special characters for TTS (thx@hschuett)
+# - BUGFIX:  module didn't work if you had only 1 preset active
+# - CHANGE:  add link to commandref on how to setup TTS
+# - BUGFIX:  remove "unknown event" log entry for ping/pong messages
 #
 # v2.0.0 - 20160718
 # - CHANGE: first official release within fhem repository
@@ -227,6 +234,7 @@ use Mojolicious 5.54;
 use Net::Bonjour;
 use Scalar::Util qw(looks_like_number);
 use XML::Simple;
+use URI::Escape;
 
 my $BOSEST_GOOGLE_NOT_AVAILABLE_TEXT = "Hello, I'm sorry, but Google Translate is currently not available.";
 my $BOSEST_GOOGLE_NOT_AVAILABLE_LANG = "en";
@@ -301,7 +309,7 @@ sub BOSEST_Define($$) {
     $hash->{helper}{supportedBassCmds} = "";
     
     if (int(@a) < 3) {
-        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.0.0";
+        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.0.1";
         #start discovery process 30s delayed
         InternalTimer(gettimeofday()+30, "BOSEST_startDiscoveryProcess", $hash, 0);
         
@@ -350,6 +358,8 @@ sub BOSEST_Set($@) {
 
     my $list = "on:noArg off:noArg power:noArg play:noArg
                 mute:on,off,toggle recent source:".$hash->{helper}{supportedSourcesCmds}."
+                shuffle:on,off
+                repeat:all,one,off
                 nextTrack:noArg prevTrack:noArg playTrack speak speakOff
                 playEverywhere:noArg stopPlayEverywhere:noArg createZone addToZone removeFromZone
                 clock:enable,disable
@@ -395,6 +405,15 @@ sub BOSEST_Set($@) {
         return "BOSEST: mute requires on/off/toggle as additional parameter" if(int(@params) < 1);
         #params[0] = mute value
         BOSEST_setMute($hash, $params[0]);
+    } elsif($workType eq "shuffle") {
+        return "BOSEST: shuffle requires on/off as additional parameter" if(int(@params) < 1);
+        #params[0] = shuffle value
+        BOSEST_setShuffle($hash, $params[0]);
+    } elsif($workType eq "repeat") {
+        return "BOSEST: repeat requires all/one/off as additional parameter" if(int(@params) < 1);
+        return "BOSEST: repeat one not supported by spotify" if ($params[0] eq "one" && ReadingsVal($hash->{NAME}, "source", "") eq "SPOTIFY");
+        #params[0] = repeat value
+        BOSEST_setRepeat($hash, $params[0]);
     } elsif($workType eq "recent") {
         return "BOSEST: recebt requires number as additional parameter" if(int(@params) < 1);
         #params[0] = recent value
@@ -428,7 +447,7 @@ sub BOSEST_Set($@) {
         BOSEST_on($hash);
     } elsif($workType eq "off") {
         BOSEST_off($hash);
-		InternalTimer(gettimeofday()+2, "BOSEST_off", $hash, 0);
+		    InternalTimer(gettimeofday()+2, "BOSEST_off", $hash, 0);
     } elsif($workType eq "nextTrack") {
         BOSEST_next($hash);
     } elsif($workType eq "prevTrack") {
@@ -717,7 +736,7 @@ sub BOSEST_off($) {
 			BOSEST_power($hash);
 		}
 		$hash->{helper}{sent_off} = 1;
-	}	
+	}
 }
 
 sub BOSEST_setRecent($$) {
@@ -792,6 +811,33 @@ sub BOSEST_setMute($$) {
         BOSEST_sendKey($hash, "MUTE");
     }
     
+    return undef;
+}
+
+sub BOSEST_setShuffle($$) {
+    my ($hash, $shuffle) = @_;
+
+    if($shuffle eq "on") {
+        BOSEST_sendKey($hash, "SHUFFLE_ON");
+    }
+    if ($shuffle eq "off") {
+      BOSEST_sendKey($hash, "SHUFFLE_OFF");
+    }
+    return undef;
+}
+
+sub BOSEST_setRepeat($$) {
+    my ($hash, $repeat) = @_;
+
+    if($repeat eq "one") {
+        BOSEST_sendKey($hash, "REPEAT_ONE");
+    }
+    if ($repeat eq "all") {
+      BOSEST_sendKey($hash, "REPEAT_ALL");
+    }
+    if ($repeat eq "off") {
+      BOSEST_sendKey($hash, "REPEAT_OFF");
+    }
     return undef;
 }
 
@@ -897,8 +943,10 @@ sub BOSEST_speakChannel {
     my $speakChannel = AttrVal($hash->{NAME}, "speakChannel", "");
     if($speakChannel ne "") {
         my $channelNr = ReadingsVal($hash->{NAME}, "channel", "");
+        Log3 $hash, 5, "BOSEST: speakChannel, $channelNr is in $speakChannel range?";
         if($channelNr =~ /[$speakChannel]/g) {
             my $channelName = ReadingsVal($hash->{NAME}, "contentItemItemName", "");
+            Log3 $hash, 5, "BOSEST: speakChannel, start speak for channl $channelName";
             if($channelNr ne "" && $channelName ne "" && $hash->{helper}{lastSpokenChannel} ne $channelName) {
                 #speak channel name
                 $hash->{helper}{lastSpokenChannel} = $channelName;
@@ -993,8 +1041,9 @@ sub BOSEST_downloadGoogleNotAvailable($) {
 
 sub BOSEST_downloadGoogleTTS($$$$$;$) {
     my ($hash, $filename, $md5, $text, $lang, $callback) = @_;
-    
-    $hash->{helper}{useragent}->get("http://translate.google.com/translate_tts?tl=$lang&client=tw-ob&q=$text" => sub {
+
+    my $uri_text = uri_escape($text);
+    $hash->{helper}{useragent}->get("http://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$uri_text" => sub {
             my ($ua, $tx) = @_;
             my $downloadOk = 0;
             if($tx->res->headers->content_type eq "audio/mpeg") {
@@ -1311,6 +1360,8 @@ sub BOSEST_checkDoubleTap($$) {
 sub BOSEST_processXml($$) {
     my ($hash, $wsxml) = @_;
     
+    Log3 $hash, 5, "BOSEST: processXml:\n".Dumper($wsxml);
+    
     if($wsxml->{updates}) {
         if($wsxml->{updates}->{nowPlayingUpdated}) {
             if($wsxml->{updates}->{nowPlayingUpdated}->{nowPlaying}) {
@@ -1324,8 +1375,8 @@ sub BOSEST_processXml($$) {
         } elsif ($wsxml->{updates}->{volumeUpdated}) {
             BOSEST_parseAndUpdateVolume($hash, $wsxml->{updates}->{volumeUpdated}->{volume});
         } elsif ($wsxml->{updates}->{nowSelectionUpdated}) {
-            BOSEST_parseAndUpdateChannel($hash, $wsxml->{updates}->{nowSelectionUpdated}->{preset});
-            BOSEST_checkDoubleTap($hash, $wsxml->{updates}->{nowSelectionUpdated}->{preset}->{id});
+            BOSEST_parseAndUpdateChannel($hash, $wsxml->{updates}->{nowSelectionUpdated}->{preset}[0]);
+            BOSEST_checkDoubleTap($hash, $wsxml->{updates}->{nowSelectionUpdated}->{preset}[0]->{id});
         } elsif ($wsxml->{updates}->{recentsUpdated}) {
             BOSEST_parseAndUpdateRecents($hash, $wsxml->{updates}->{recentsUpdated}->{recents});
         } elsif ($wsxml->{updates}->{connectionStateUpdated}) {
@@ -1365,6 +1416,12 @@ sub BOSEST_processXml($$) {
         BOSEST_parseAndUpdateZone($hash, $wsxml->{zone});
     } elsif($wsxml->{sources}) {
         BOSEST_parseAndUpdateSources($hash, $wsxml->{sources}->{sourceItem});
+    } elsif($wsxml->{msg}) {
+        if($wsxml->{msg}->{body} && $wsxml->{msg}->{body}->{pingRequest}) {
+            #pingpong
+        } else {
+            Log3 $hash, 4, "BOSEST: Unknown event, please implement:\n".Dumper($wsxml);
+        }
     } else {
         Log3 $hash, 4, "BOSEST: Unknown event, please implement:\n".Dumper($wsxml);
     }
@@ -1626,6 +1683,8 @@ sub BOSEST_parseAndUpdateNowPlaying($$) {
     BOSEST_XMLUpdate($hash, "artistID", $nowPlaying->{artistID});
     BOSEST_XMLUpdate($hash, "rating", $nowPlaying->{rating});
     BOSEST_XMLUpdate($hash, "description", $nowPlaying->{description});
+    BOSEST_XMLUpdate($hash, "shuffle", $nowPlaying->{shuffleSetting});
+    BOSEST_XMLUpdate($hash, "repeat", $nowPlaying->{repeatSetting});
     if($nowPlaying->{time}) {
         BOSEST_XMLUpdate($hash, "time", $nowPlaying->{time}->{content});
         BOSEST_XMLUpdate($hash, "timeTotal", $nowPlaying->{time}->{total});
@@ -1909,24 +1968,33 @@ sub BOSEST_updateIP($$$) {
         readingsSingleUpdate($deviceHash, "presence", "online", 1);
         Log3 $hash, 3, "BOSEST: $deviceHash->{NAME}, new IP ($ip)";
         #get info
+        Log3 $hash, 5, "BOSEST: BOSEST_updateInfo";
         BOSEST_updateInfo($deviceHash, $deviceID);
+        Log3 $hash, 5, "BOSEST: BOSEST_updateNowPlaying";
         #get now_playing
         BOSEST_updateNowPlaying($deviceHash, $deviceID);
+        Log3 $hash, 5, "BOSEST: BOSEST_setVolume";
         #set previous volume if not playing anything
         if(ReadingsVal($deviceHash->{NAME}, "state", "") eq "online") {
             BOSEST_setVolume($deviceHash, ReadingsVal($deviceHash->{NAME}, "volume", 10));
         }
         #get current volume
+        Log3 $hash, 5, "BOSEST: BOSEST_updateVolume";
         BOSEST_updateVolume($deviceHash, $deviceID);
         #get current presets
+        Log3 $hash, 5, "BOSEST: BOSEST_updatePresets";
         BOSEST_updatePresets($deviceHash, $deviceID);
         #get current bass settings
+        Log3 $hash, 5, "BOSEST: BOSEST_updateBass";
         BOSEST_updateBass($deviceHash, $deviceID);
         #get current zone settings
+        Log3 $hash, 5, "BOSEST: BOSEST_updateZone";
         BOSEST_updateZone($deviceHash, $deviceID);
         #get current sources
+        Log3 $hash, 5, "BOSEST: BOSEST_updateSources";
         BOSEST_updateSources($deviceHash, $deviceID);
         #get current clock state
+        Log3 $hash, 5, "BOSEST: BOSEST_updateClock";
         BOSEST_updateClock($deviceHash, $deviceID);
         #connect websocket
         Log3 $hash, 4, "BOSEST: $deviceHash->{NAME}, start new WebSocket.";
@@ -1987,8 +2055,8 @@ sub BOSEST_webSocketFinished($$) {
     $hash->{helper}{wsconnected} -= 1;
     
     #set presence & state to offline due to connection drop
-	readingsBeginUpdate($hash);
-	BOSEST_readingsSingleUpdateIfChanged($hash, "IP", "unknown", 1);
+    readingsBeginUpdate($hash);
+    BOSEST_readingsSingleUpdateIfChanged($hash, "IP", "unknown", 1);
     BOSEST_readingsSingleUpdateIfChanged($hash, "presence", "offline", 1);
     BOSEST_readingsSingleUpdateIfChanged($hash, "state", "offline", 1);
     readingsEndUpdate($hash, 1);
@@ -2020,7 +2088,7 @@ sub BOSEST_webSocketReceivedMsg($$$) {
     #parse XML
     my $xml = "";
     eval {
-        $xml = XMLin($msg, KeepRoot => 1, ForceArray => [qw(media_server item member recent)], KeyAttr => []);
+        $xml = XMLin($msg, KeepRoot => 1, ForceArray => [qw(media_server item member recent preset)], KeyAttr => []);
     };
     
     if($@) {
@@ -2161,7 +2229,7 @@ sub BOSEST_HTTPGET($$$) {
     if($response->is_success) {
         my $xmlres = "";
         eval {
-            $xmlres = XMLin($response->decoded_content, KeepRoot => 1, ForceArray => [qw(media_server item member recent)], KeyAttr => []);
+            $xmlres = XMLin($response->decoded_content, KeepRoot => 1, ForceArray => [qw(media_server item member recent preset)], KeyAttr => []);
         };
         
         if($@) {
@@ -2188,7 +2256,7 @@ sub BOSEST_HTTPPOST($$$) {
         Log3 $hash, 4, "BOSEST: success: ".$response->decoded_content;
         my $xmlres = "";
         eval {
-            $xmlres = XMLin($response->decoded_content, KeepRoot => 1, ForceArray => [qw(media_server item member recent)], KeyAttr => []);
+            $xmlres = XMLin($response->decoded_content, KeepRoot => 1, ForceArray => [qw(media_server item member recent preset)], KeyAttr => []);
         };
         
         if($@) {
@@ -2215,17 +2283,17 @@ sub BOSEST_XMLUpdate($$$) {
     #TODO update only on change
     if(ref $xmlItem eq ref {}) {
         if(keys %{$xmlItem}) {
-			$newVal = Encode::encode('UTF-8', $xmlItem);
+          $newVal = Encode::encode('UTF-8', $xmlItem);
         }
     } elsif($xmlItem) {
         $newVal = Encode::encode('UTF-8', $xmlItem);
     }
 	
 	if($curVal ne $newVal) {
-		readingsBulkUpdate($hash, $readingName, $newVal);
+		  readingsBulkUpdate($hash, $readingName, $newVal);
 	}
 	
-    return undef;
+  return undef;
 }
 
 sub BOSEST_readingsSingleUpdateIfChanged {
@@ -2233,13 +2301,16 @@ sub BOSEST_readingsSingleUpdateIfChanged {
   my $curVal = ReadingsVal($hash->{NAME}, $reading, "");
   
   if($curVal ne $value) {
-    readingsSingleUpdate($hash, $reading, $value, $trigger);
+      readingsSingleUpdate($hash, $reading, $value, $trigger);
   }
 }
 
 1;
 
 =pod
+=item device
+=item summary Easily autodiscover and control your BOSE SoundTouch devices
+=item summary_DE Autodiscover und einfache Steuerung deiner BOSE SoundTouch Geräte
 =begin html
 
 <a name="BOSEST"></a>
@@ -2247,11 +2318,15 @@ sub BOSEST_readingsSingleUpdateIfChanged {
 <ul>
   BOSEST is used to control a BOSE SoundTouch system (one or more SoundTouch 10, 20 or 30 devices)<br><br>
 	<b>Note:</b> The followig libraries  are required for this module:
-		<ul><li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><br>
+		<ul><li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li><br>
 		Use <b>sudo apt-get install libwww-perl libmojolicious-perl libxml-simple-perl libnet-bonjour-perl libev-perl</b> to install this libraries.<br>Please note:
 		libmojolicious-perl must be >=5.54, but under wheezy is only 2.x avaible.<br>
-		Use <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> to update to the newest version</ul><br>
-
+		Use <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> to update to the newest version<br>
+		TTS can be configured as described in the following thread: <a href=https://forum.fhem.de/index.php/topic,46838.0.html>Link</a><br>
+		<br>
+		Questions and/or feedback can be posted on the FHEM forum: <a https://forum.fhem.de/index.php/topic,46838.msg533050.html#new>Link</a><br>
+    </ul><br>
+		
   <a name="BOSESTdefine" id="BOSESTdefine"></a>
     <b>Define</b>
   <ul>
@@ -2284,6 +2359,8 @@ sub BOSEST_readingsSingleUpdateIfChanged {
           <li><code><b>nextTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play next track</li>
           <li><code><b>prevTrack</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; play previous track</li>
           <li><code><b>mute</b> on|off|toggle</code> &nbsp;&nbsp;-&nbsp;&nbsp; control volume mute</li>
+          <li><code><b>shuffle</b> on|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control shuffle mode</li>
+          <li><code><b>repeat</b> all|one|off</code> &nbsp;&nbsp;-&nbsp;&nbsp; control repeat mode</li>
           <li><code><b>bass</b> 0...10</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the bass level</li>
           <li><code><b>recent</b> 0...15</code> &nbsp;&nbsp;-&nbsp;&nbsp; set number of names in the recent list in readings</li>
           <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay</code> &nbsp;&nbsp;-&nbsp;&nbsp; select a local source</li><br>

@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_BOSEST: support shuffle/repeat
+  - bugfix:  98_BOSEST: NEW LIBRARY URI::Escape library required
+                        support special characters
+                        module didn't work if you had only 1 preset
+                        remove unknow event log entry for ping/pong
   - bugfix:  14_CUL_TCM97001: Fix checksum calculation for GT_WT_02
   - change:  10_IT: Implementation for HE800 de-/encoding
                     Implementation for HE800 dimmer
