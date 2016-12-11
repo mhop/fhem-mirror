@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  10_EQ3BT: better error handling if no notification was received
+                       allow multiple gatttools to be executed in parallel
+                       remove error reading
+                       add errorCounters based on function (update/...)
+                         which will be increased if reading from the thermostat
+                         fails 30 times for one command
+                       remain consumption values after restart
   - feature: 98_BOSEST: support shuffle/repeat
   - bugfix:  98_BOSEST: NEW LIBRARY URI::Escape library required
                         support special characters
