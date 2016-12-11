@@ -366,6 +366,7 @@ FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatis
 FHEM/98_TRAFFIC.pm           jmike                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_UbiquitiPM.pm        Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 http://forum.fhem.de Sonstige Systeme
+FHEM/98_Verkehrsinfo.pm      martins              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_WeekdayTimer.pm      dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
