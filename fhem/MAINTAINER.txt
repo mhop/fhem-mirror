@@ -298,6 +298,7 @@ FHEM/75_MSG.pm               loredo               http://forum.fhem.de Automatis
 FHEM/75_msgConfig.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung
+FHEM/76_SMAInverter.pm       DS_Starter           http://forum.fhem.de Sonstige Systeme
 FHEM/77_UWZ.pm               CoolTux              http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
 FHEM/77_SMAEM.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
 FHEM/77_SMASTP.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
