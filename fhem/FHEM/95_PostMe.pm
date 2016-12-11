@@ -41,7 +41,7 @@ use vars qw($FW_wname);         # Web instance
 
 #########################
 # Global variables
-my $postmeversion  = "1.1";
+my $postmeversion  = "1.3";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -64,6 +64,8 @@ sub PostMe_Initialize ($) {
   $hash->{InitFn}      = "PostMe_Init";  
   $hash->{AttrFn}      = "PostMe_Attr";
   $hash->{AttrList}    = "postmeTTSDev postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 ".$readingFnAttributes;		
+  
+  $hash->{FW_detailFn}  = "PostMe_detailFn";
     	 
   $data{FWEXT}{"/PostMe_widget"}{FUNC} = "PostMe_widget";
   $data{FWEXT}{"/PostMe_widget"}{FORKABLE} = 1; 
@@ -140,6 +142,7 @@ sub PostMe_Init($) {
     
    #-- current number of PostMes
    my $cnop = ReadingsVal($devname,"postmeCnt",0);
+   Log 1,"[PostMe_Init] postme01Name ".ReadingsVal($devname,"postme01Name",0)." postme01Cont ".ReadingsVal($devname,"postme01Cont",0)." postme02Name ".ReadingsVal($devname,"postme02Name",0)." postme02Cont ".ReadingsVal($devname,"postme02Cont",0);
    my @std  = split(',',AttrVal("$devname","postmeStd",undef));
    
    for( my $i=0;$i<int(@std);$i++ ){
@@ -305,32 +308,13 @@ sub PostMe_Rename($$$) {
 
    my $pnn=PostMe_Check($hash,$newname);
    
-   if( !$pnn ){ 
-     if( ReadingsVal($devname, sprintf("postme%02dName",$pnn),"") ne ""){
+   if( $pnn ){ 
        my $mga = "Error, a PostMe named $newname does already exist and is not empty";
        Log 1,"[PostMe_Rename] $mga";
        return "$mga";
-     }  
+   }  
    
-     #-- current number of PostMes
-     my $cnop = ReadingsVal($devname,"postmeCnt",0);
-   
-     readingsBeginUpdate($hash);
-     #-- re-ordering
-     for( $loop=$pnn;$loop<$cnop;$loop++){
-       readingsBulkUpdate($hash, sprintf("postme%02dName",$loop),
-         ReadingsVal($devname, sprintf("postme%02dName",$loop+1),""));
-       readingsBulkUpdate($hash, sprintf("postme%02dCont",$loop),
-         ReadingsVal($devname, sprintf("postme%02dCont",$loop+1),""));
-     }
-     $cnop--;
-     readingsBulkUpdate($hash, "postmeCnt",$cnop);
-     readingsEndUpdate($hash,1); 
-      
-     fhem("deletereading $devname ".sprintf("postme%02dName",$cnop+1));
-     fhem("deletereading $devname ".sprintf("postme%02dCont",$cnop+1));
-   }
-   ReadingsSingleUpdate($hash,sprintf("postme%02dName",$pmn),$newname,1);
+   readingsSingleUpdate($hash,sprintf("postme%02dName",$pmn),$newname,1);
    
    Log3 $devname,3,"[PostMe] Renamed PostMe named $name into $newname";
    return undef;
@@ -673,12 +657,15 @@ sub PostMe_Set($@) {
 
   #-- for the selector: which values are possible
   if ($key eq "?"){
+    #--prevent any default set
+    return undef;
+    #-- obsolete
     my @cmds = ("create","delete","rename","add","modify","remove","clear");
     return "Unknown argument $key, choose one of " .join(" ",@cmds);
   }
   
   my $value = shift @args; 
-  #Log 1,"[PostMe_Set] called with key ".$key." and value ".$value;
+  #Log 1,"[PostMe_Set] called with key ".$key." and value $value ".join(' ',@args);
   
   if( $key eq "create"){
     PostMe_Create($hash,$value);
@@ -687,7 +674,7 @@ sub PostMe_Set($@) {
     PostMe_Delete($hash,$value);
       
   }elsif( $key eq "rename"){
-    PostMe_Remove($hash,$value,@args);
+    PostMe_Rename($hash,$value,@args[0]);
   
   }elsif( $key eq "add"){
     PostMe_Add($hash,$value,@args);
@@ -725,6 +712,9 @@ sub PostMe_Get($$$@) {
   
   #-- for the selector: which values are possible
   if ($key eq "?"){
+    #-- prevent any default get
+    return undef;
+    #-- obsolete
     #-- current number of PostMes
     my $cnop = ReadingsVal($devname,"postmeCnt",0);
     my $pml  = "";
@@ -746,7 +736,7 @@ sub PostMe_Get($$$@) {
     return $res;
   }
   
-  Log 1,"[PostMe_Get] with key=$key";
+  #Log 1,"[PostMe_Get] with key=$key";
     
   if ($key eq "version") {
     return "PostMe.version => $postmeversion";
@@ -829,9 +819,83 @@ sub PostMe_Get($$$@) {
     for( my $loop=1;$loop<=$cnop;$loop++){
       $res .= ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
       $res .= ": ".PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$loop),"")."\n",10);
+      $res .= "\n";
     }
     return $res;
   } 
+}
+
+#########################################################################################
+#
+# PostMe_detailFn - Displays PostMes in detailed view of FHEM
+# 
+# Parameter = web argument list
+#
+#########################################################################################
+
+sub PostMe_detailFn(){
+  my ($FW_wname, $devname, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  my $hash = $defs{$devname};
+
+  $hash->{mayBeVisible} = 1;
+  
+  my $pmname=$hash->{NAME};
+  my $pmfirst = ReadingsVal($devname, "postme01Name","");
+  my $pmlist="";
+  my $pmoption="";
+  
+  #-- current number of PostMes
+  my $cnop = ReadingsVal($devname,"postmeCnt",0);
+   
+  for( my $loop=1;$loop<=$cnop;$loop++){
+      my $n = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+      $pmlist .= $n;
+      $pmlist .= ","
+        if( $loop != $cnop);
+      if( $loop == 1){
+        $pmoption .= '<option selected="selected" value="'.$n.'">'.$n.'</option>';
+      }else{
+        $pmoption .= '<option value="'.$n.'">'.$n.'</option>';
+      }
+    }
+    
+  my $icon = AttrVal($devname, "icon", "");
+  $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
+
+  my $html = '<div  id="ddtable" class="makeTable wide"><table class="block wide"><tr class="odd">'.
+             '<td width="300px"><div>'.$icon.'</div></td>'.
+             '<td informId="'.$pmname.'"><div id="'.$pmname.'"  title="Initialized" class="col2">Initialized</div></td>'.
+             '</tr></table></div>';
+   
+  $html .= '<script type="text/javascript">function oc(){var p1=document.getElementById("val1_set'.$pmname.'").value;var p2=document.getElementById("val2_set'.$pmname.'").value;'.
+           'var p3;if(document.getElementById("sel_set'.$pmname.'").selectedIndex == 3) p3=p2; else p3=p1+" "+p2;document.getElementById("val_set'.$pmname.'").value=p3;}'.
+           'function dc(i){if(i == 3)document.getElementById("val1_set'.$pmname.'").style.visibility = "hidden";'.
+           'else document.getElementById("val1_set'.$pmname.'").style.visibility = "visible";'.
+           'if(i > 4)document.getElementById("val2_set'.$pmname.'").style.visibility = "hidden"; else document.getElementById("val2_set'.$pmname.'").style.visibility = "visible";}</script>'.
+           '<div>'.
+           '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.set'.$pmname.'" value="'.$pmname.'"/>'.
+           '<input type="submit" name="cmd.set'.$pmname.'" value="set" class="set"/><div class="set downText">&nbsp;'.$pmname.'&nbsp;</div>'.
+           '<select  id="sel_set'.$pmname.'" informId="sel_set'.$pmname.'" name="arg.set'.$pmname.'" class="set" style="width:100px;" '.
+           'onchange="dc(this.selectedIndex)">'.
+           '<option selected="selected" value="add">add</option><option value="modify">modify</option><option value="remove">remove</option><option value="create">create</option>'.
+           '<option value="rename">rename</option><option value="clear">clear</option><option value="delete">delete</option>'.
+           '</select>'.
+           '<select id="val1_set'.$pmname.'" informId="val1_set'.$pmname.'" name="val1.set'.$pmname.'" class="set" onchange="oc()">'.$pmoption.'</select>'.
+           '<input type="text" id="val2_set'.$pmname.'" informId="val2_set'.$pmname.'" name="val2.set'.$pmname.'" class="set" size="30" value="" onchange="oc()"/>'.
+           '<input type="hidden" id="val_set'.$pmname.'" informId="val_set'.$pmname.'" name="val.set'.$pmname.'" class="set" size="30" value="'.$pmfirst.'"/></form></div>';
+  
+  $html .= '<div class="makeSelect" dev="'.$pmname.'" cmd="get" list="version:noArg all:noArg list:'.$pmlist.' mail:'.$pmlist.' message:'.$pmlist.' ttsSay:'.$pmlist.' z_JSON:'.$pmlist.'">'.
+           '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.get'.$pmname.'" value="'.$pmname.'"/>'.
+           '<input type="submit" name="cmd.get'.$pmname.'" value="get" class="get"/><div class="get downText">&nbsp;'.$pmname.'&nbsp;</div>'.
+           '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;">'.
+           '<option selected="selected" value="list">list</option><option value="mail">mail</option><option value="message">message</option><option value="ttsSay">ttsSay</option>'.
+           '<option value="z_JSON">z_JSON</option><option value="all">all</option><option value="version">version</option>'.
+           '</select>'.
+           '<select id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
+           '</form></div>';
+
+  return $html;
 }
 
 #########################################################################################
