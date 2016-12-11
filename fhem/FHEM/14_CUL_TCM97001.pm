@@ -202,9 +202,10 @@ sub checkCRC_Mebus {
 sub checkCRC_GTWT02 {
   my $msg = shift;
   my @a = split("", $msg);
-
   my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
-            +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7])) -1;
+            +hex($a[4])+hex($a[5])+hex($a[6])+(hex($a[7]) & 0xE));
+#  my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
+#            +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7])) -1;
   my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
   if ($CRC == $CRCCHECKVAL) {
       return TRUE;
@@ -1247,6 +1248,8 @@ CUL_TCM97001_Parse($$)
 
 
 =pod
+=item summary    This module interprets temperature sensor messages.
+=item summary_DE Module verarbeitet empfangene Nachrichten von Temp-Sensoren.
 =begin html
 
 <a name="CUL_TCM97001"></a>
