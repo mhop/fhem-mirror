@@ -320,7 +320,7 @@ sub HMCCU_Define ($$)
 	foreach my $d (keys %defs) {
 		my $ch = $defs{$d};
 		next if (!exists ($ch->{TYPE}));
-		$ccucount++ if ($ch->{TYPE} eq 'HMCCU');
+		$ccucount++ if ($ch->{TYPE} eq 'HMCCU' && exists ($ch->{CCUNum}));
 	}
 	$hash->{CCUNum} = $ccucount;
 	$hash->{version} = $HMCCU_VERSION;
