@@ -1742,7 +1742,7 @@ sub ElectricityCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>Der letzte Z&auml;hlerstand seit Mitternacht des ersten Tages des vorherigen Jahres.<BR>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des letzten Jahres.<BR>
 			</td></tr>
 			</td>
 		</tr>
