@@ -42,7 +42,7 @@ sub readingsGroup_Initialize($)
   $hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 firstCalcRow:1,2,3,4 alwaysTrigger:1,2 sortDevices:1 sortFn visibility:hidden,hideable,collapsed,collapsible setList setFn:textField-long";
+  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 firstCalcRow:1,2,3,4 alwaysTrigger:1,2 sortDevices:1 sortFn visibility:hidden,hideable,collapsed,collapsible setList setFn:textField-long headerRows sortColumn";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -454,6 +454,7 @@ rgCalc($$$$)
 
   my $args;
   my $cells;
+  # format: $<operator>[(<zellen>)][@<alias>]
   if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
     $calc = $1;
     $cells = $5;
@@ -712,6 +713,11 @@ readingsGroup_2html($;$)
 
   my $timestamp_style = AttrVal( $d, "timestampStyle", "" );
 
+  my $header_rows = AttrVal( $d, 'headerRows', 0 );
+  my $in_footer = 0;
+
+  my $sort_column = AttrVal( $d, 'sortColumn', undef );
+
   my $devices = $hash->{DEVICES};
 
   my $group;
@@ -737,7 +743,11 @@ readingsGroup_2html($;$)
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"$FW_ME$FW_subdir?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$show_hide&nbsp;$txt</div></td></tr>" if( $show_heading );
-  $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide readingsGroup\">";
+  $ret .= "<tr><td><table $style id='readingsGroup-$d'".
+          (defined($sort_column)?" sortColumn=\"$sort_column\"":'').
+          " groupId=\"$group\" class=\"block wide readingsGroup".
+          (defined($sort_column)?' sortable':'') ."\">";
+  $ret .= "<thead>" if( $header_rows );
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
 
   foreach my $device (@{$devices}) {
@@ -862,6 +872,11 @@ readingsGroup_2html($;$)
           $ret .= sprintf("<tr $row_style class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
           $ret .= "<td style='padding:0px' colspan='99'><hr/></td>";
+          next;
+        } elsif( $txt eq 'tfoot' ) {
+          $ret .= "</tbody>" if( $header_rows && !$in_footer );
+          $ret .= "<tfoot>" if( !$in_footer );
+          $in_footer = 1;
           next;
         } elsif( $txt eq '-' || $txt eq '+' || $txt eq '+-' ) {
           my $collapsed = $visibility && ( $visibility eq "collapsed" ) && !$FW_webArgs{"detail"};
@@ -1006,7 +1021,7 @@ readingsGroup_2html($;$)
           $h = undef;
           $calc = $regex;
           $name = $d;
-          #if( $regex =~ m/([^\(]*)/ ) {
+          # format: $<operator>[(<zellen>)][@<alias>]
           if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
             $regex = $7;
             $regex = $1 if( !defined($regex) );
@@ -1110,12 +1125,22 @@ readingsGroup_2html($;$)
         ++$cell_column;
       }
     }
+    
+    if( $cell_row == $header_rows ) {
+      $ret .= "</thead>";
+      $ret .= "<tbody>";
+    }
     ++$cell_row;
   }
+  $ret .= "</tbody>" if( $header_rows && !$in_footer );
+ 
   if( $disable > 0 ) {
+    $ret .= "<tfoot>" if( !$in_footer );
+    $in_footer = 1;
     $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
     $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>";
   }
+  $ret .= "</tfoot>" if( $in_footer );
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
 
@@ -1423,6 +1448,7 @@ readingsGroup_Notify($$)
         my $calc = $hash->{helper}{values}{calc}[$col][$row];
 
         my $func = $calc;
+        # format: $<operator>[(<zellen>)][@<alias>]
         if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
           $func = $7;
           $func = $1 if( !defined($func) );
@@ -1636,6 +1662,7 @@ readingsGroup_Attr($$$;$)
           <ul><li>the item will be skipped if STRING is undef</li>
               <li>if STRING is br a new line will be started</li>
               <li>if STRING is hr a horizontal line will be inserted</li>
+              <li>if STRING is tfoot the table footer is started</li>
               <li>if STRING is of the form %ICON[%CMD] ICON will be used as the name of an icon instead of a text and CMD
                   as the command to be executed if the icon is clicked. also see the commands attribute.</li></ul>
           if readings is given the perl expression will be reevaluated during longpoll updates.</li>
@@ -1822,6 +1849,10 @@ readingsGroup_Attr($$$;$)
         collapsed -> default state is collapsed but can be expanded<br>
         collapsible -> default state is visible but can be collapsed </li>
         </ul>
+        <li>headerRows<br>
+        </li>
+        <li>sortColumn<br>
+        </li>
         <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
     </ul><br>
 
