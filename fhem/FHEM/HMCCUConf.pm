@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.5
+#  Version 3.6
 #
 #  Configuration parameters for Homematic devices.
 #
@@ -75,6 +75,30 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statedatapoint   => "STATE",
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off;LOWBAT,UNREACH!(1|true):yes,(0|false):no"
+	},
+	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM" => {
+	_description     => "1 Kanal Funk-Schaltaktor",
+	_channels        => "1",
+	ccureadingfilter => "(STATE|LOWBAT|^UNREACH)",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off;LOWBAT,UNREACH!(1|true):yes,(0|false):no"	
+	},
+	"HM-LC-Sw2-SM|HM-LC-Sw2-FM|HM-LC-Sw2-PB-FM|HM-LC-Sw2-DR" => {
+	_description     => "2 Kanal Funk-Schaltaktor",
+	_channels        => "1,2",
+	ccureadingfilter => "(STATE|LOWBAT|^UNREACH)",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off;LOWBAT,UNREACH!(1|true):yes,(0|false):no"	
+	},
+	"HM-LC-Sw4-DR|HM-LC-Sw4-WM|HM-LC-Sw4-PCB|HM-LC-Sw4-SM" => {
+	_description     => "4 Kanal Funk-Schaltaktor",
+	_channels        => "1,2,3,4",
+	ccureadingfilter => "(STATE|LOWBAT|^UNREACH)",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off;LOWBAT,UNREACH!(1|true):yes,(0|false):no"	
 	},
 	"HM-Sen-LI-O" => {
 	_description     => "Lichtsensor",
