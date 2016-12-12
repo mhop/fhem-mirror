@@ -1425,6 +1425,11 @@ readingsGroup_Notify($$)
     }
   }
 
+  if( %triggers ) {
+    my $sort_column = AttrVal( $hash->{NAME}, 'sortColumn', undef );
+    DoTrigger( $hash->{NAME}, "sort: $sort_column" ) if( defined($sort_column) )
+  }
+
   readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
   foreach my $trigger (keys %triggers) {
     DoTrigger( $name, "$trigger: <html>$triggers{$trigger}</html>" );

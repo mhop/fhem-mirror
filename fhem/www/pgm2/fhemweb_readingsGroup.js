@@ -128,7 +128,17 @@ FW_readingsGroupUpdateLine(d){
   if(dd.length != 2)
     return;
 
-  if( dd[1] != "visibility" )
+  if( dd[1] === 'sort' ) {
+    var rg = document.getElementById( 'readingsGroup-'+dd[0] );
+    var sort = parseInt(d[1]);
+    if( rg && sort >= 0 ) {
+      var col = $(rg).find('tr').eq(0).find('td').eq(sort).get(0);
+      if( sorttable && col !== undefined ) {
+        // TODO: find current sorted collumn and resort with current values
+      }
+    }
+
+  } else if( dd[1] != "visibility" )
     return
 
   if( d[1] == 'toggle' ) FW_readingsGroupToggle( dd[0] );
