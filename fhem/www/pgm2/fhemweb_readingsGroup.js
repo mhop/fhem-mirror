@@ -4,8 +4,24 @@ $(FW_readingsGroupReadyFn);
 
 function
 FW_readingsGroupReadyFn() {
+
   // replace all informIds of the form devName-readingName with rgName-devName.readingName
   $(".readingsGroup").each(function() {
+    if( this.className.search(/\bsortable\b/) ) {
+      loadScript( 'pgm2/sorttable.js', function() {
+        setTimeout( function() {
+          $(".readingsGroup").each(function() {
+            var sort = parseInt($(this).attr('sortColumn'));
+            if( sort >= 0 ) {
+              var col = $(this).find('tr').eq(0).find('td').eq(sort).get(0);
+              if( sorttable && col !== undefined )
+                sorttable.innerSortFunction.apply(col, []);
+            }
+          } );
+        }, 10 );
+      } );
+    }
+
     var name = $(this).attr('id').split("-")[1];
     $(this).find("[informId]").each(function() {
       var informId = $(this).attr('informId');
