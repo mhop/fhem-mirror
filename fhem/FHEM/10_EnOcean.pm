@@ -1,5 +1,15 @@
 ##############################################
 # $Id$
+# 2016-12-06
+
+# Added new EEP:
+# Remote Management:
+# EEP changed:
+# EnOcean_Notify():
+# EnOcean_Attr():
+# function SetExtensionsCancel() added
+# subType hvac.01: attribute pidCtrl, model added
+# commandref: further explanations added
 
 package main;
 
@@ -397,6 +407,7 @@ my @EnO_models = qw (
   FT55
   FTS12
   TF
+  OEM
   tracker
 );
 
@@ -2127,6 +2138,8 @@ sub EnOcean_Set($@)
       if (defined $sendCmd) {
         $data = sprintf "%02X", $switchCmd;
         $rorg = "F6";
+        #####
+        SetExtensionsCancel($hash);
         Log3 $name, 3, "EnOcean set $name $cmd";
         if ($updateState) {
           readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);
@@ -2167,6 +2180,8 @@ sub EnOcean_Set($@)
       } else {
         $data = sprintf "%02X", $EnO_switch_00Btn{$switchCmd};
         $rorg = "D2";
+        #####
+        SetExtensionsCancel($hash);
       }
       Log3 $name, 3, "EnOcean set $name $switchCmd";
 
@@ -2704,7 +2719,9 @@ sub EnOcean_Set($@)
           readingsBulkUpdate($hash, "waitingCmds", "setpointTemp");
           readingsEndUpdate($hash, 0);
           # PID regulator active
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'start', '');
+          #####
+          my $activatePID = AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 'start' : 'stop';
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
           CommandDeleteReading(undef, "$name setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
@@ -2725,8 +2742,9 @@ sub EnOcean_Set($@)
         $updateState = 2;
 
       } else {
-        $cmdList .= "setpointTemp:slider,10,1,30 " if (AttrVal($name, "pidCtrl", 'on') eq 'on');
-        $cmdList .= "setpoint:slider,0,5,100 runInit:noArg valveCloses:noArg valveOpens:noArg";
+        $cmdList .= "setpointTemp:slider,10,1,30 " if (AttrVal($name, "pidCtrl", 'on') eq 'on' || AttrVal($name, "model", '') eq 'OEM');
+        $cmdList .= "setpoint:slider,0,5,100 " if (AttrVal($name, "pidCtrl", 'on') eq 'off' && AttrVal($name, "model", '') ne 'OEM');
+        $cmdList .= "runInit:noArg valveCloses:noArg valveOpens:noArg";
         return "Unknown command " . $cmd . ", choose one of " . $cmdList;
       }
 
@@ -2816,6 +2834,8 @@ sub EnOcean_Set($@)
         readingsBulkUpdate($hash, "powerSwitch", "off");
         readingsBulkUpdate($hash, "state", "off");
         readingsEndUpdate($hash, 0);
+        #####
+        SetExtensionsCancel($hash);
       } elsif ($ctrlFuncID == 2) {
         # on
         $powerSwitch = "on";
@@ -2824,6 +2844,8 @@ sub EnOcean_Set($@)
         readingsBulkUpdate($hash, "powerSwitch", "on");
         readingsBulkUpdate($hash, "state", "off");
         readingsEndUpdate($hash, 0);
+        #####
+        SetExtensionsCancel($hash);
       } elsif ($ctrlFuncID == 3) {
         # occupancy
         if (defined $a[1] && $a[1] =~ m/^occupied|standby|unoccupied|off$/) {
@@ -3020,6 +3042,8 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           #$updateState = 0;
+          #####
+          SetExtensionsCancel($hash);
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "off") {
           if ($model eq "FSA12") {
@@ -3037,6 +3061,8 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           #$updateState = 0;
+          #####
+          SetExtensionsCancel($hash);
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "local") {
           if ($a[1]) {
@@ -3180,6 +3206,8 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           #$updateState = 0;
+          #####
+          SetExtensionsCancel($hash);
           $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
 
         } else {
@@ -3722,10 +3750,14 @@ sub EnOcean_Set($@)
       } elsif ($ctrlFuncID == 1) {
         # off
         CommandDeleteReading(undef, "$name scene");
+        #####
+        SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 2) {
         # on
         CommandDeleteReading(undef, "$name scene");
+        #####
+        SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 3 || $ctrlFuncID == 4) {
         # dimup / dimdown
@@ -3743,10 +3775,14 @@ sub EnOcean_Set($@)
         $ctrlParam2 = ($rampTime & 0xFF00) >> 8;
         readingsSingleUpdate($hash, "rampTime", $rampTime, 1);
         CommandDeleteReading(undef, "$name scene");
+        #####
+        SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 5) {
         # stop
         CommandDeleteReading(undef, "$name scene");
+        #####
+        SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 6) {
         # dim
@@ -3770,6 +3806,8 @@ sub EnOcean_Set($@)
         $ctrlParam2 = ($rampTime & 0xFF00) >> 8;
         CommandDeleteReading(undef, "$name scene");
         readingsSingleUpdate($hash, "rampTime", $rampTime, 1);
+        #####
+        SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 7) {
         # RGB
@@ -5065,7 +5103,7 @@ sub EnOcean_Set($@)
         } else {
           $channel = 15;
         }
-        readingsSingleUpdate($hash, "state", "stoped", 1);
+        readingsSingleUpdate($hash, "state", "stopped", 1);
         $data = sprintf "%02X", $channel << 4 | $cmdID;
 
       } elsif ($cmd eq "opens") {
@@ -7767,6 +7805,7 @@ sub EnOcean_Parse($$)
 
       Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
 
+      my $activatePID = AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 'actuator' : 'stop';
       my $blockKey = ((AttrVal($name, "blockKey", 'no') eq 'yes') ? 1 : 0) << 2;
       my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
       my $maintenanceMode = ReadingsVal($name, "maintenanceMode", "off");
@@ -7891,7 +7930,7 @@ sub EnOcean_Parse($$)
           $waitingCmds = 2;
         } else {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
           $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);
           $setpointTemp = $setpointTempSet;
           push @event, "3:setpointTemp:$setpointTemp";
@@ -7946,7 +7985,7 @@ sub EnOcean_Parse($$)
           $waitingCmds = 2;
         } else {
           # activate PID regulator
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, '');
           $setpointSet = ReadingsVal($name, "setpointSet", $setpointSet);
           push @event, "3:setpointTemp:$setpointTemp";
           push @event, "3:maintenanceMode:off";
@@ -7977,7 +8016,7 @@ sub EnOcean_Parse($$)
       # sent message to the actuator
       $data = sprintf "%02X%02X%02X%02X", $setpointSet,
                                           ($setpointTempSet - 10) / 20 * 255,
-                                          $measurementCtrl | $wakeUpCycle,
+                                          (AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 0 : 0x80) | $measurementCtrl | $wakeUpCycle,
                                           $displayOrientation | 8 | $blockKey | $waitingCmds;
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
 
@@ -13089,9 +13128,9 @@ sub EnOcean_setPID($$$) {
   @{$hash->{helper}{calcPID}} = (undef, $hash, $cmd);
   if ($cmd eq 'stop' || AttrVal($name, 'pidCtrl', 'on') eq 'off') {
     $hash->{helper}{stopped} = 1;
-    readingsSingleUpdate($hash, "pidState", 'stoped', 0);
+    readingsSingleUpdate($hash, "pidState", 'stopped', 0);
     RemoveInternalTimer($hash->{helper}{calcPID});
-    $response = 'stoped';
+    $response = 'stopped';
   } elsif ($cmd eq 'start' || $cmd eq 'actuator') {
     $hash->{helper}{stopped} = 0;
     $hash->{helper}{adjust}  = $adjust;
@@ -14495,7 +14534,7 @@ sub EnOcean_observeParse($$@)
     delete $hash->{helper}{lastCmdValue};
     my %functionHash = (hash => $hash, function => "observe");
     RemoveInternalTimer(\%functionHash);
-    Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stoped";
+    Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stopped";
   } else {
     # remove the device that has sent a telegram
     Log3 $name, 4, "EnOcean $name < observeRefDev " . $hash->{helper}{observeRefDev}[$observeRefDevIdx] . " removed";
@@ -14515,7 +14554,7 @@ sub EnOcean_observeParse($$@)
       delete $hash->{helper}{lastCmdValue};
       my %functionHash = (hash => $hash, function => "observe");
       RemoveInternalTimer(\%functionHash);
-      Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stoped";
+      Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stopped";
     }
   }
 
@@ -14614,7 +14653,7 @@ sub EnOcean_RLT($) {
       }
     } else {
       RemoveInternalTimer($hash->{helper}{rlt}{param});
-      readingsSingleUpdate($hash, 'state', 'stoped', 1);
+      readingsSingleUpdate($hash, 'state', 'stopped', 1);
       EnOcean_RLTResult(undef, $hash, $rltType, $rltCntrMax);
       if (exists $hash->{helper}{rlt}{oldDev}) {
         # activate old device subType
@@ -14648,7 +14687,7 @@ sub EnOcean_RLT($) {
     }
 
   } elsif ($ctrl eq 'waiting') {
-    readingsSingleUpdate($hash, 'state', 'stoped', 1);
+    readingsSingleUpdate($hash, 'state', 'stopped', 1);
     EnOcean_RLTResult(undef, $hash, $rltType, $rltCntrMax);
     if (exists $hash->{helper}{rlt}{oldDev}) {
       # activate old device subType
@@ -14682,7 +14721,7 @@ sub EnOcean_RLT($) {
       $modules{EnOcean}{defptr}{$oldDef} = $oldHash;
     }
     delete $hash->{helper}{rlt};
-    readingsSingleUpdate($hash, 'state', 'stoped', 1);
+    readingsSingleUpdate($hash, 'state', 'stopped', 1);
     # delete deviceID
     CommandModify(undef, "$name 00000000");
     delete $modules{EnOcean}{defptr}{$def};
@@ -16001,7 +16040,7 @@ EnOcean_Delete($$)
   is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute [<a href="#EnOcean_teachMethod">teachMethod</a>] = confirm.<br>
   For example the remote device Eltako TF100D can be learned as follows
   <ul><br>
-  <code>set &lt;name&gt; EnOcean H5-38-08</code><br>
+  <code>define &lt;name&gt; EnOcean H5-38-08</code><br>
   set TF100D in learning mode<br>
   <code>set &lt;name&gt; teach</code>
   </ul>
@@ -16841,6 +16880,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_blockKey">blockKey</a></li>
          <li><a href="#EnOcean_displayOrientation">displayOrientation</a></li>
          <li><a href="#EnOcean_measurementCtrl">measurementCtrl</a></li>
+         <li><a href="#model">model</a></li>
          <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
          <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
          <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
@@ -16866,6 +16906,8 @@ EnOcean_Delete($$)
     The attr subType must be hvac.04. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
     see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    The OEM version of the Holter SmartDrive MX has an internal PID controller. This function is activated by
+    attr <device> model OEM and attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
     every 5 minutes.
     </li>
@@ -18110,7 +18152,7 @@ EnOcean_Delete($$)
     </li>
     <li><a name="EnOcean_pidCtrl">pidCtrl</a> on|off,
         [pidCtrl] = on is default<br>
-        Activate PID regulator
+        Activate the Fhem PID regulator
     </li>
     <li><a name="EnOcean_pidDeltaTreshold">pidDeltaTreshold</a> &lt;floating-point number&gt;,
         [pidDeltaTreshold] = 0 is default<br>
@@ -19922,7 +19964,7 @@ EnOcean_Delete($$)
         <li>endPosition&lt;channel&gt;: open|closed|not_reached|unknown</li>
         <li>position&lt;channel&gt;: unknown|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
         <li>teach: &lt;result of teach procedure&gt;</li>
-        <li>state: open|closed|in_motion|stoped|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
+        <li>state: open|closed|in_motion|stopped|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
      </ul>
         <br>
         The attr subType must be blindsCtrl.00 or blindsCtrl.01. This is done if the device was
@@ -20198,10 +20240,10 @@ EnOcean_Delete($$)
 
     <li>Radio Link Test<br>
     <ul>
-      <li>standby|active|stoped</li>
+      <li>standby|active|stopped</li>
       <li>msgLost: msgLost/%</li>
       <li>rssiMasterAvg: LP/dBm</li>
-      <li>state: standby|active|stoped<br></li>
+      <li>state: standby|active|stopped<br></li>
     </ul><br>
       The attr subType must be readioLinkTest. This is done if the device was
       created by autocreate or manually by <code>define &lt;name&gt; EnOcean A5-3F-00</code><br>.
