@@ -9,7 +9,7 @@
 #
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
-#     Fhem Forum                 : http://forum.fhem.de/index.php/topic,47909.0.html
+#     Fhem Forum                 : https://forum.fhem.de/index.php/topic,47909.0.html
 #     Fhem Wiki                  : Not yet implemented
 #
 #     This file is part of fhem.
@@ -72,6 +72,7 @@ sub GasCalculator_Initialize($)
 								  "MonthlyPayment " .
 								  "MonthOfAnnualReading " .
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
+								  "SiPrefixPower:W,kW,MW,GW " .
 								  "Volume:m&#179;,ft&#179; " .
 								  "Currency:&#8364;,&#163;,&#36; " .
 								   $readingFnAttributes;
@@ -100,7 +101,20 @@ sub GasCalculator_Define($$$)
 	$hash->{NAME}							= $name;
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
-    	
+
+	if(defined($attr{$hash}{SiPrefixPower}))
+	{
+		if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
+		elsif ($attr{$hash}{SiPrefixPower} eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
+		else                                        {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+	}
+	else
+	{
+                                                     $hash->{system}{SiPrefixPowerFactor} = 1;
+	}
+	
 	### Writing log entry
 	Log3 $name, 5, $name. " : GasCalculator - Starting to define module";
 
@@ -141,9 +155,21 @@ sub GasCalculator_Attr(@)
 			$hash->{STATE} = "diabled";
 		}
 	}
+
+	### Check whether "SiPrefixPower" attribute has been provided
+	if ($a[2] eq "SiPrefixPower")
+	{
+		if    ($a[3] eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+		elsif ($a[3] eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
+		elsif ($a[3] eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
+		elsif ($a[3] eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
+		else                  {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
+	}
+
 	return undef;
 }
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
+
 
 ###START###### Manipulate reading after "set" command by fhem #################################################START####
 sub GasCalculator_Get($@)
@@ -317,6 +343,15 @@ sub GasCalculator_Notify($$)
 
 		### Writing log entry
 		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute Currency was missing and has been set to &#8364;";
+	}
+	if(!defined($attr{$GasCalcName}{SiPrefixPower}))
+	{
+		### Set attribute with standard value since it is not available
+		$attr{$GasCalcName}{SiPrefixPower}         = "W";
+		$GasCalcDev->{system}{SiPrefixPowerFactor} = 1;
+		
+		### Writing log entry
+		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute SiPrefixPower was missing and has been set to W";
 	}
 	if(!defined($attr{$GasCalcName}{Volume}))
 	{
@@ -536,17 +571,18 @@ sub GasCalculator_Notify($$)
 			my $GasCalcEnergyDayLast      = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
 			### Calculate pure gas cost of previous day GasCalcEnergyLastDay * Price per kWh
 			my $GasCalcEnergyCostDayLast  = $GasCalcEnergyDayLast * $attr{$GasCalcName}{GasPricePerKWh};
-			### Save gas energy and pure cost of previous day
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostDayLast",   (sprintf('%.3f', ($GasCalcEnergyCostDayLast))), 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyDayLast", (sprintf('%.3f', ($GasCalcEnergyDayLast))), 1);
-			
-			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMax",   0, 1);
+			### Reload last Power Value
+			my $GasCalcPowerCurrent = ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerCurrent", "0");
+		
+			### Save gas pure cost of previous day, current gas Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum			
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_EnergyCostDayLast",	(sprintf('%.3f', ($GasCalcEnergyCostDayLast ))), 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_EnergyDayLast", 	(sprintf('%.3f', ($GasCalcEnergyDayLast     ))), 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_Vol1stDay",     	$GasCountReadingValueCurrent                   , 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_VolLastDay",    	$GasCountReadingValuePrevious                  , 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDaySum",   	0                                              , 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_PowerDayCount", 	0                                              , 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMin",   	(sprintf('%.3f', ($GasCalcPowerCurrent      ))), 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_PowerDayMax",   	0                                              , 1);
 			
 			### Check whether the current value is the first one after change of month
 			if ($GasCountReadingTimestampCurrentMday < $GasCountReadingTimestampPreviousMday)
@@ -624,8 +660,8 @@ sub GasCalculator_Notify($$)
 			my $GasCountReadingValueDelta = sprintf('%.3f', ($GasCountReadingValueCurrent - $GasCountReadingValuePrevious));
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValueDelta                : " . $GasCountReadingValueDelta . " " . $attr{$GasCalcName}{Volume};
 
-			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h]
-			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600;
+			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h] * SiPrefixPowerFactor
+			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600 * $GasCalcDev->{system}{SiPrefixPowerFactor};
 			
 			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
 			my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
