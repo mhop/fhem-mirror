@@ -207,7 +207,8 @@ my %zwave_class = (
   THERMOSTAT_FAN_MODE      => { id => '44' },
   THERMOSTAT_FAN_STATE     => { id => '45' },
   CLIMATE_CONTROL_SCHEDULE => { id => '46',
-    set   => { ccs                => 'ZWave_ccsSet("%s")' },
+    set   => { ccs                => 'ZWave_ccsSet("%s")' ,
+               ccsOverride        => 'ZWave_ccsSetOverride("%s")'},
     get   => { ccs                => 'ZWave_ccsGet("%s")',
                ccsAll             => 'ZWave_ccsAllGet($hash)',
                ccsChanged         => "04",
@@ -2267,6 +2268,34 @@ ZWave_ccsSet($)
     $ret .= "00007f";
   }
   return ("", "01$ret");
+}
+
+sub
+ZWave_ccsSetOverride($)
+{
+  my ($arg) = @_;
+  
+  my $override_type;
+  my $override_state;
+  my $err = "wrong arguments, see commandref for details";
+  
+  if ($arg =~ m/(no|temporary|permanent) (.*)/) {
+      $override_type = (lc($1) eq "no" ? 0 : (lc($1) eq "temporary" ? 1 : 2));
+    my $state = $2;
+    if ($state =~ m/(frost|energy)/) {
+      $override_state = (lc($state) eq "frost" ? 0x79 : 0x7a);
+    } elsif ($state =~ m/[-+]?[0-9]*\.?[0-9]+/) {
+        $state *= 10;
+        $state = 120 if ($state > 120);
+        $state = -128 if ($state < -128);
+        $state += 256 if ($state < 0);
+        $override_state = $state;
+    } else {
+      return($err, "");
+    }
+    return ("", sprintf("06%02x%02x", $override_type, $override_state));
+  }
+  return($err, "");
 }
 
 sub
@@ -4844,6 +4873,15 @@ s2Hex($)
     and 12, with one decimal point, measured in Kelvin (or Centigrade).<br>
     If only a weekday is specified without any time and tempDiff, then the
     complete schedule for the specified day is removed and marked as unused.
+    </li>
+  <li>cssSetOverride (no|temporary|permanent) (frost|energy|$tempOffset) <br>
+    set the override state<br>
+    no: switch the override off<br>
+    temporary: override the current schedule only<br>
+    permanent: override all schedules<br>
+    frost/energy: set override mode to frost protection or engergy saving<br>
+    $tempOffset: the temperature setback (offset to setpoint) in 1/10 degrees<br>
+    range from -12.8 to 12.0, values will be limited to this range.
     </li>
 
   <br><br><b>Class CLOCK</b>
