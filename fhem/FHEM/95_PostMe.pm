@@ -41,7 +41,7 @@ use vars qw($FW_wname);         # Web instance
 
 #########################
 # Global variables
-my $postmeversion  = "1.3";
+my $postmeversion  = "1.4";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -870,32 +870,37 @@ sub PostMe_detailFn(){
    
   $html .= '<script type="text/javascript">function oc(){var p1=document.getElementById("val1_set'.$pmname.'").value;var p2=document.getElementById("val2_set'.$pmname.'").value;'.
            'var p3;if(document.getElementById("sel_set'.$pmname.'").selectedIndex == 3) p3=p2; else p3=p1+" "+p2;document.getElementById("val_set'.$pmname.'").value=p3;}'.
-           'function dc(i){if(i == 3)document.getElementById("val1_set'.$pmname.'").style.visibility = "hidden";'.
+           'function dc1(i){if(i == 3)document.getElementById("val1_set'.$pmname.'").style.visibility = "hidden";'.
            'else document.getElementById("val1_set'.$pmname.'").style.visibility = "visible";'.
-           'if(i > 4)document.getElementById("val2_set'.$pmname.'").style.visibility = "hidden"; else document.getElementById("val2_set'.$pmname.'").style.visibility = "visible";}</script>'.
-           '<div>'.
+           'if(i > 4)document.getElementById("val2_set'.$pmname.'").style.visibility = "hidden"; else document.getElementById("val2_set'.$pmname.'").style.visibility = "visible";}'.
+           'function dc2(i){if(i > 4)document.getElementById("val_get'.$pmname.'").style.visibility = "hidden";'.
+           'else document.getElementById("val_get'.$pmname.'").style.visibility = "visible";};</script>';
+           
+  $html .= '<table><tr><td>'.
            '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.set'.$pmname.'" value="'.$pmname.'"/>'.
            '<input type="submit" name="cmd.set'.$pmname.'" value="set" class="set"/><div class="set downText">&nbsp;'.$pmname.'&nbsp;</div>'.
            '<select  id="sel_set'.$pmname.'" informId="sel_set'.$pmname.'" name="arg.set'.$pmname.'" class="set" style="width:100px;" '.
-           'onchange="dc(this.selectedIndex)">'.
+           'onchange="dc1(this.selectedIndex)">'.
            '<option selected="selected" value="add">add</option><option value="modify">modify</option><option value="remove">remove</option><option value="create">create</option>'.
            '<option value="rename">rename</option><option value="clear">clear</option><option value="delete">delete</option>'.
            '</select>'.
            '<select id="val1_set'.$pmname.'" informId="val1_set'.$pmname.'" name="val1.set'.$pmname.'" class="set" onchange="oc()">'.$pmoption.'</select>'.
            '<input type="text" id="val2_set'.$pmname.'" informId="val2_set'.$pmname.'" name="val2.set'.$pmname.'" class="set" size="30" value="" onchange="oc()"/>'.
-           '<input type="hidden" id="val_set'.$pmname.'" informId="val_set'.$pmname.'" name="val.set'.$pmname.'" class="set" size="30" value="'.$pmfirst.'"/></form></div>';
+           '<input type="hidden" id="val_set'.$pmname.'" informId="val_set'.$pmname.'" name="val.set'.$pmname.'" class="set" size="30" value="'.$pmfirst.'"/></form></td></tr>';
   
-  $html .= '<div class="makeSelect" dev="'.$pmname.'" cmd="get" list="version:noArg all:noArg list:'.$pmlist.' mail:'.$pmlist.' message:'.$pmlist.' ttsSay:'.$pmlist.' z_JSON:'.$pmlist.'">'.
+  $html .= '<tr><td>'.
            '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.get'.$pmname.'" value="'.$pmname.'"/>'.
            '<input type="submit" name="cmd.get'.$pmname.'" value="get" class="get"/><div class="get downText">&nbsp;'.$pmname.'&nbsp;</div>'.
-           '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;">'.
+           '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;" '.
+           'onchange="dc2(this.selectedIndex)">'.
            '<option selected="selected" value="list">list</option><option value="mail">mail</option><option value="message">message</option><option value="ttsSay">ttsSay</option>'.
-           '<option value="z_JSON">z_JSON</option><option value="all">all</option><option value="version">version</option>'.
+           '<option value="JSON">JSON</option><option value="all">all</option><option value="version">version</option>'.
            '</select>'.
-           '<select id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
-           '</form></div>';
+           '<select type="hidden" id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
+           '</form></td></tr></table>';
 
   return $html;
+
 }
 
 #########################################################################################
@@ -1202,10 +1207,6 @@ sub PostMe_widget($) {
         <a name="PostMeget"></a>
         <h4>Get</h4>
         <ul>
-            <li><code>get &lt;postit&gt; version</code>
-                <br />Display the version of the module</li>
-            <li><code>get &lt;postit&gt; all</code>
-                <br />Show all sticky notes and their content</li>
             <li><code>get &lt;postit&gt; list &lt;name&gt;</code>
                 <br />Show the sticky note named &lt;name&gt; and its content</li>
             <li><code>get &lt;postit&gt; mail &lt;name&gt;</code>
@@ -1218,7 +1219,13 @@ sub PostMe_widget($) {
                 and text. </li>
             <li><code>get &lt;postit&gt; ttsSay &lt;name&gt;</code>
                 <br />Speak the sticky note named &lt;name&gt; and its content on a predefined
-                device <postmeTTSDev></li>
+                device <postmeTTSDev></li>         
+            <li><code>get &lt;postit&gt; JSON &lt;name&gt;</code>
+                <br />Return the sticky note named &lt;name&gt; in JSON format</li>       
+            <li><code>get &lt;postit&gt; all</code>
+                <br />Show all sticky notes and their content</li>
+            <li><code>get &lt;postit&gt; version</code>
+                <br />Display the version of the module</li>
         </ul>
         <a name="PostMeattr"></a>
         <h4>Attributes</h4>
