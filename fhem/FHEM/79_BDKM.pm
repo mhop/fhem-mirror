@@ -446,9 +446,6 @@ sub BDKM_JobQueueNextIdHttpDone($)
     my $name                     = $hash ->{NAME};
     my $json;
 
-    my $hth= $param->{httpheader};
-    $hth =~ s/[\r\n]//g;
-    Log3 $name, 5, "$name HTTP done @{$hash->{JOBQUEUE}}[0],$hth";
     if($err) {
         readingsSingleUpdate($hash, "state", 
                              "reading ids ERROR - retrying every 60s", 1);
@@ -457,6 +454,9 @@ sub BDKM_JobQueueNextIdHttpDone($)
         BDKM_Timer($hash,60,"BDKM_JobQueueNextId");
         return; 
     }
+    my $hth= $param->{httpheader};
+    $hth =~ s/[\r\n]//g;
+    Log3 $name, 5, "$name HTTP done @{$hash->{JOBQUEUE}}[0],$hth";
     # did this type, remove from job queue:
     my $id = shift(@{$hash->{JOBQUEUE}});
 
@@ -1101,6 +1101,9 @@ sub BDKM_MapSwitchPrograms
 # perl ./contrib/commandref_join.pl 
 
 =pod
+=item device
+=item summary support for Buderus KM-Gateways
+=item summary_DE Unterst&uuml;tzung f&uuml;r Buderus KM-Gateways
 =begin html
 
 <a name="BDKM"></a>
