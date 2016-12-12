@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.5
+#  Version 3.6
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -23,8 +23,9 @@
 #  set <name> pct <level> [{ <ontime> | 0 } [<ramptime>]]
 #  set <name> toggle
 #
-#  get <name> config
+#  get <name> config [<filter-expr>]
 #  get <name> configdesc
+#  get <name> configlist
 #  get <name> datapoint <datapoint>
 #  get <name> defaults
 #  get <name> devstate
@@ -89,7 +90,8 @@ sub HMCCUCHN_Define ($@)
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 
-	return "Specifiy the CCU device name or address as parameters" if (@a < 3);
+	my $usage = "Usage: define $name HMCCUCHN {device} ['readonly'] ['defaults']";
+	return $usage if (@a < 3);
 
 	my $devname = shift @a;
 	my $devtype = shift @a;
@@ -124,9 +126,27 @@ sub HMCCUCHN_Define ($@)
 	$hash->{channels} = 1;
 	$hash->{statevals} = 'devstate';
 
+#	my $arg = shift @a;
+#	if (defined ($arg) && $arg eq 'readonly') {
+#		$hash->{statevals} = $arg;
+#	}
+
+	# Parse optional command line parameters
+	my $n = 0;
 	my $arg = shift @a;
-	if (defined ($arg) && $arg eq 'readonly') {
-		$hash->{statevals} = $arg;
+	while (defined ($arg)) {
+		return $usage if ($n == 3);
+		if ($arg eq 'readonly') {
+			$hash->{statevals} = $arg;
+		}
+		elsif ($arg eq 'defaults') {
+			HMCCU_SetDefaults ($hash);
+		}
+		else {
+			return $usage;
+		}
+		$n++;
+		$arg = shift @a;
 	}
 
 	# Inform HMCCU device about client device
@@ -498,15 +518,26 @@ sub HMCCUCHN_Get ($@)
 	}
 	elsif ($opt eq 'config') {
 		my $ccuobj = $ccuaddr;
+		my $par = shift @a;
+		$par = '.*' if (!defined ($par));
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $res;
+	}
+	elsif ($opt eq 'configlist') {
+		my $ccuobj = $ccuaddr;
+		my $par = shift @a;
+		$par = '.*' if (!defined ($par));
+
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return $res;
 	}
 	elsif ($opt eq 'configdesc') {
 		my $ccuobj = $ccuaddr;
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $res;
 	}
@@ -521,7 +552,7 @@ sub HMCCUCHN_Get ($@)
 		my @valuelist;
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
 		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
-		$retmsg .= " update:noArg config:noArg configdesc:noArg";
+		$retmsg .= " update:noArg config configlist configdesc:noArg";
 		
 		return $retmsg;
 	}
@@ -576,10 +607,12 @@ sub HMCCUCHN_SetError ($$)
    <b>Define</b><br/><br/>
    <ul>
       <code>define &lt;name&gt; HMCCUCHN {&lt;channel-name&gt; | &lt;channel-address&gt;}
-      [readonly]</code>
+      [readonly] [defaults]</code>
       <br/><br/>
-      If option 'readonly' is specified no set command will be available. Define command
-      accepts a CCU2 channel name or channel address as parameter.
+      If option 'readonly' is specified no set command will be available. With option 'defaults'
+      some default attributes depending on CCU device type will be set. Default attributes are only
+      available for some device types.<br/>
+      The define command accepts a CCU2 channel name or channel address as parameter.
       <br/><br/>
       Examples:<br/>
       <code>define window_living HMCCUCHN WIN-LIV-1 readonly</code><br/>
@@ -684,12 +717,16 @@ sub HMCCUCHN_SetError ($$)
    <a name="HMCCUCHNget"></a>
    <b>Get</b><br/><br/>
    <ul>
-      <li><b>get &lt;name&gt; config</b><br/>
+      <li><b>get &lt;name&gt; config [&lt;filter-expr&gt;]</b><br/>
          Get configuration parameters of CCU channel. If attribute 'ccureadings' is 0 results
-         are displayed in browser window.
+         are displayed in browser window. Parameters can be filtered by <i>filter-expr</i>.
       </li><br/>
       <li><b>get &lt;name&gt; configdesc</b><br/>
          Get description of configuration parameters of CCU channel.
+      </li><br/>
+      <li><b>get &lt;name&gt; configlist [&lt;filter-expr&gt;]</b><br/>
+         Get configuration parameters of CCU channel. Parameters can be filtered by 
+         <i>filter-expr</i>.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
          Get value of a CCU channel datapoint.
