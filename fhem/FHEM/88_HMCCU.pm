@@ -689,7 +689,7 @@ sub HMCCU_Notify ($$)
 	foreach my $event (@{$events}) {	
 		if ($devname eq 'global') {
 			if ($event eq 'INITIALIZED') {
-				return if ($rpcserver eq 'on');
+				return if ($rpcserver eq 'off');
 				my $delay = $HMCCU_INIT_INTERVAL0;
 				Log3 $name, 0, "HMCCU: Start of RPC server after FHEM initialization in $delay seconds";
 				if ($ccuflags =~ /extrpc/) {
@@ -777,7 +777,7 @@ sub HMCCU_AggregateReadings ($$)
 		foreach my $r (keys %{$ch->{READINGS}}) {
 			next if ($r !~ /$fread/);
 			my $rv = $ch->{READINGS}{$r}{VAL};
-			if (($fcond eq 'any' || $fcond eq 'all') && $rv eq $ftrue) {
+			if (($fcond eq 'any' || $fcond eq 'all') && $rv =~ /$ftrue/) {
 				$mc++;
 				$rl .= ($mc > 1 ? ",$fcoll" : $fcoll);
 				last;
