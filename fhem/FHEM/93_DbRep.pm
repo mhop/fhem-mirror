@@ -40,6 +40,12 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.8.3        12.12.2016       balance diff to next period if value of period is 0 between two periods with 
+#                               values 
+# 4.8.2        10.12.2016       bugfix negativ diff if balanced
+# 4.8.1        10.12.2016       added balance diff to diffValue, a difference between the last value of an
+#                               old aggregation period to the first value of a new aggregation period will be take over now
+# 4.8          09.12.2016       diffValue selection chenged to "between"
 # 4.7.7        08.12.2016       code review
 # 4.7.6        07.12.2016       DbRep version as internal, check if perl module DBI is installed
 # 4.7.5        05.12.2016       collaggstr day aggregation changed
@@ -155,7 +161,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.7.7";
+my $DbRepVersion = "4.8.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1785,12 +1791,12 @@ sub diffval_DoParse($) {
              FROM `history` where ";
      $sql .= "`DEVICE` LIKE '$device' AND " if($device);
      $sql .= "`READING` LIKE '$reading' AND " if($reading);
-	 $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";
+	 $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;";
  } else {
      $sql  = "SELECT TIMESTAMP,VALUE FROM `history` where ";
      $sql .= "`DEVICE` LIKE '$device' AND " if($device);
      $sql .= "`READING` LIKE '$reading' AND " if($reading); 
-     $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ORDER BY TIMESTAMP ;";
+	 $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;";
  }
  
  my $sth = $dbh->prepare($sql); 
@@ -1810,7 +1816,7 @@ sub diffval_DoParse($) {
      my $sql1 = "SELECT ... where ";
      $sql1 .= "`DEVICE` LIKE '$device' AND " if($device);
      $sql1 .= "`READING` LIKE '$reading' AND " if($reading); 
-     $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ORDER BY TIMESTAMP;"; 
+	 $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
      
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
      
@@ -1881,11 +1887,16 @@ sub diffval_DoParse($) {
   
  Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
  
+ my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
+ 
   # Berechnung diffValue aus Selektionshash
   my %rh = ();                    # Ergebnishash, wird alle Ergebniszeilen enthalten
   my %ch = ();                    # counthash, enthält die Anzahl der verarbeiteten Datasets pro runtime_string
   my $lastruntimestring;
   my $i = 1;
+  my $lval;                       # immer der letzte Wert von $value
+  my $rslval;                     # runtimestring von lval
+  my $uediff;                     # Übertragsdifferenz (Differenz zwischen letzten Wert einer Aggregationsperiode und dem ersten Wert der Folgeperiode)
   my $diff_current;               # Differenzwert des aktuellen Datasets 
   my $diff_before;                # Differenzwert vorheriger Datensatz
   my $rejectstr;                  # String der ignorierten Differenzsätze
@@ -1893,16 +1904,20 @@ sub diffval_DoParse($) {
   my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
 
   Log3 ($name, 5, "DbRep $name - data of row_array result assigned to fields:\n");
-  
-  my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)
-  
+    
   foreach my $row (@row_array) {
       my @a = split("[ \t][ \t]*", $row, 6);
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
       my $value          = $a[3]?$a[3]:0;  
-      my $diff           = $a[4]?sprintf("%.4f",$a[4]):0;    
+      my $diff           = $a[4]?sprintf("%.4f",$a[4]):0;   
+
+#      if ($uediff)	  {
+#	      $diff = $diff + $uediff;
+#		  Log3 ($name, 4, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
+#		  $uediff = 0;
+#	  } 
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
@@ -1930,7 +1945,9 @@ sub diffval_DoParse($) {
           if ($i == 1) {
 			  $diff_total = $diff?$diff:0 if($diff <= $difflimit);
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp; 	
-              $ch{$runtime_string} = 1 if($value);			  
+              $ch{$runtime_string} = 1 if($value);
+              $lval = $value;
+              $rslval = $runtime_string;			  
           }
           
           if ($diff) {
@@ -1938,15 +1955,27 @@ sub diffval_DoParse($) {
                   $diff_total = $diff_total+$diff;
 			  }
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              $ch{$runtime_string}++ if($value && $i > 1);			  
+              $ch{$runtime_string}++ if($value && $i > 1);
+              $lval = $value;
+              $rslval = $runtime_string;			  
           }
       } else {
-          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
+          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
           $lastruntimestring = $runtime_string;
           $i  = 1;
+		  
+		  $uediff = $value - $lval if($value > $lval);
+          $diff = $uediff;
+          $lval = $value if($value);	# Übetrag über Perioden mit value = 0 hinweg !
+          $rslval = $runtime_string;
+		  Log3 ($name, 4, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
+		  
+		  
           $diff_total = $diff?$diff:0 if($diff <= $difflimit);
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-          $ch{$runtime_string} = 1 if($value);			  
+          $ch{$runtime_string} = 1 if($value);	
+
+          $uediff = 0;		  
       } 
       $i++;
   }
