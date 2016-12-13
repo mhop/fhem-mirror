@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_TRAFFIC: flexible update schedule, travelMode
   - bugfix:  88_HMCCU: Wrong CCUNum
   - bugfix   73_GasCalculator: Corrected hidden power average power readings
   - bugfix:  73_ElectricityCalculator: German commandref corrected
