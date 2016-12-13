@@ -1125,7 +1125,7 @@ readingsGroup_2html($;$)
         ++$cell_column;
       }
     }
-    
+
     if( $cell_row == $header_rows ) {
       $ret .= "</thead>";
       $ret .= "<tbody>";
@@ -1133,7 +1133,7 @@ readingsGroup_2html($;$)
     ++$cell_row;
   }
   $ret .= "</tbody>" if( $header_rows && !$in_footer );
- 
+
   if( $disable > 0 ) {
     $ret .= "<tfoot>" if( !$in_footer );
     $in_footer = 1;
@@ -1425,11 +1425,6 @@ readingsGroup_Notify($$)
     }
   }
 
-  if( %triggers ) {
-    my $sort_column = AttrVal( $hash->{NAME}, 'sortColumn', undef );
-    DoTrigger( $hash->{NAME}, "sort: $sort_column" ) if( defined($sort_column) )
-  }
-
   readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
   foreach my $trigger (keys %triggers) {
     DoTrigger( $name, "$trigger: <html>$triggers{$trigger}</html>" );
@@ -1488,6 +1483,11 @@ readingsGroup_Notify($$)
 
   }
   readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+
+  if( %triggers ) {
+    my $sort_column = AttrVal( $hash->{NAME}, 'sortColumn', undef );
+    DoTrigger( $hash->{NAME}, "sort: $sort_column" ) if( defined($sort_column) )
+  }
 
   return undef;
 }
