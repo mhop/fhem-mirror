@@ -28,6 +28,9 @@
 #   2016-08-09 added auto-update if status returns UNKOWN_ERROR, added outputReading average
 #   2016-09-25 bugfix Blocking, improved errormessage
 #   2016-10-07 version 1.0, adding to SVN
+#   2016-10-15 adding attribute updateSchedule to provide flexible updates, changed internal interval to INTERVAL
+#   2016-12-13 adding travelMode, fixing stateReading with value 0
+
 
 package main;
 
@@ -50,7 +53,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.0';
+my $TRVersion = '1.1';
 
 sub TRAFFIC_Initialize($){
 
@@ -61,7 +64,7 @@ sub TRAFFIC_Initialize($){
     $hash->{SetFn}      = "TRAFFIC_Set";
     $hash->{AttrFn}     = "TRAFFIC_Attr";
     $hash->{AttrList}   = 
-      "disable:0,1 start_address end_address raw_data:0,1 language waypoints stateReading outputReadings includeReturn:0,1 " .
+      "disable:0,1 start_address end_address raw_data:0,1 language waypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule " .
       $readingFnAttributes;  
       
 }
@@ -80,6 +83,9 @@ sub TRAFFIC_Define($$){
     $hash->{NAME}    = $apiDefs[0];
     $hash->{APIKEY}  = $apiDefs[2];
     $hash->{VERSION} = $TRVersion;
+    delete($hash->{BURSTCOUNT}) if $hash->{BURSTCOUNT};
+    delete($hash->{BURSTINTERVAL}) if $hash->{BURSTINTERVAL};
+    
 
     my $name = $hash->{NAME};
 
@@ -89,13 +95,13 @@ sub TRAFFIC_Define($$){
         delete($hash->{READINGS}{$clearReading}); 
     }
     
-    # basic update interval
+    # basic update INTERVAL
     if(scalar(@apiDefs) > 3 && $apiDefs[3] =~ m/^\d+$/){
-        $hash->{Interval} = $apiDefs[3];
+        $hash->{INTERVAL} = $apiDefs[3];
     }else{
-        $hash->{Interval} = 3600;
+        $hash->{INTERVAL} = 3600;
     }
-    Log3 $hash, 3, "TRAFFIC: ($name) defined ".$hash->{NAME}.' with interval set to '.$hash->{Interval};
+    Log3 $hash, 3, "TRAFFIC: ($name) defined ".$hash->{NAME}.' with interval set to '.$hash->{INTERVAL};
     
     # put in default verbose level
     $attr{$name}{"verbose"} = 1 if !$attr{$name}{"verbose"};
@@ -159,7 +165,7 @@ sub TRAFFIC_Set($@){
     my $name = shift @param;
 	my $set = shift @param;
     
-    $hash->{VERSION} = $TRVersion if $hash->{VERSION} != $TRVersion;
+    $hash->{VERSION} = $TRVersion if $hash->{VERSION} ne $TRVersion;
     
     if(AttrVal($name, "disable", 0 ) == 1){
         readingsSingleUpdate( $hash, "state", "disabled", 1 );
@@ -190,7 +196,7 @@ sub TRAFFIC_Set($@){
         $hash->{TRIGGERTIME}     = $updateTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($updateTrigger);
         RemoveInternalTimer($hash);
-        
+
         # start update
         InternalTimer($updateTrigger, "TRAFFIC_StartUpdate", $hash, 0);            
 
@@ -203,30 +209,69 @@ sub TRAFFIC_StartUpdate($){
 
     my ( $hash ) = @_;
     my $name = $hash->{NAME};
+    my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
+    $wday=7 if $wday == 0; #sunday 0 -> sunday 7, monday 0 -> monday 1 ...
+
 
     if(AttrVal($name, "disable", 0 ) == 1){
         RemoveInternalTimer ($hash);
         Log3 $hash, 3, "TRAFFIC: ($name) is disabled";
         return undef;
     }
-    if ( $hash->{Interval}) {
+    if ( $hash->{INTERVAL}) {
         RemoveInternalTimer ($hash);
-        my $nextTrigger = gettimeofday() + $hash->{Interval};
+        delete($hash->{UPDATESCHEDULE});
+
+        my $nextTrigger = gettimeofday() + $hash->{INTERVAL};
         
+        if(defined(AttrVal($name, "updateSchedule", undef ))){
+            Log3 $hash, 5, "TRAFFIC: ($name) flexible update Schedule defined";
+            my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+            my @updateScheduleDef = split('\|', AttrVal($name, "updateSchedule", undef ));
+            foreach my $upSched (@updateScheduleDef){
+                my ($upFrom, $upTo, $upDay, $upInterval ) = $upSched =~ m/(\d+)-(\d+)\s(\d{1,})\s?(\d{1,})?/;
+                if (!$upInterval){
+                    $upInterval = $upDay;
+                    $upDay='';
+                }
+                Log3 $hash, 5, "TRAFFIC: ($name) parsed schedule to upFrom $upFrom, upTo $upTo, upDay $upDay, upInterval $upInterval";
+
+                if(!$upFrom || !$upTo || !$upInterval){
+                    Log3 $hash, 1, "TRAFIC: ($name) updateSchedule $upSched not defined correctly";
+                }else{
+                    if($hour >= $upFrom && $hour < $upTo){
+                        if(!$upDay || $upDay == $wday ){
+                            $nextTrigger = gettimeofday() + $upInterval;
+                            Log3 $hash, 3, "TRAFFIC: ($name) schedule from $upFrom to $upTo (on day $upDay) every $upInterval seconds, matches (current hour $hour), nextTrigger set to $nextTrigger";
+                            $hash->{UPDATESCHEDULE} = $upSched;
+                            last;
+                        }else{
+                            Log3 $hash, 3, "TRAFFIC: ($name) $upSched does match the time but not the day ($wday)";
+                        }
+                    }else{
+                        Log3 $hash, 5, "TRAFFIC: ($name) schedule $upSched does not match ($hour)";
+                    }
+                }
+            }
+        }
         
         if(defined($hash->{BURSTCOUNT}) && $hash->{BURSTCOUNT} > 0){
             $nextTrigger = gettimeofday() + $hash->{BURSTINTERVAL};
+            Log3 $hash, 3, "TRAFFIC: ($name) next update defined by burst";
             $hash->{BURSTCOUNT}--;
         }elsif(defined($hash->{BURSTCOUNT}) && $hash->{BURSTCOUNT} == 0){
             delete($hash->{BURSTCOUNT});
             delete($hash->{BURSTINTERVAL});
+            Log3 $hash, 3, "TRAFFIC: ($name) burst update is done";
         }
         
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
         InternalTimer($nextTrigger, "TRAFFIC_StartUpdate", $hash, 0);            
-        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call StartUpdate again in " . int($hash->{Interval}). " seconds";
+        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call StartUpdate again at " . $hash->{TRIGGERTIME_FMT};
     }
+
+    
     
     if(defined(AttrVal($name, "start_address", undef )) && defined(AttrVal($name, "end_address", undef ))){
         
@@ -259,13 +304,13 @@ sub TRAFFIC_DoUpdate(){
 
     Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_DoUpdate start";
 
-    if ( $hash->{Interval}) {
+    if ( $hash->{INTERVAL}) {
         RemoveInternalTimer ($hash);
-        my $nextTrigger = gettimeofday() + $hash->{Interval};
+        my $nextTrigger = gettimeofday() + $hash->{INTERVAL};
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
         InternalTimer($nextTrigger, "TRAFFIC_DoUpdate", $hash, 0);            
-        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{Interval}). " seconds";
+        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{INTERVAL}). " seconds";
     }
     
     my $returnJSON;
@@ -291,13 +336,14 @@ sub TRAFFIC_DoUpdate(){
     
     my $origin = AttrVal($name, "start_address", 0 );
     my $destination = AttrVal($name, "end_address", 0 );
+    my $travelMode = AttrVal($name, "travelMode", 'driving' );
     
     if($direction eq "return"){
         $origin = AttrVal($name, "end_address", 0 );
         $destination = AttrVal($name, "start_address", 0 );
     }
     
-    my $url = 'https://maps.googleapis.com/maps/api/directions/json?origin='.$origin.'&destination='.$destination.'&mode=driving'.$TRlanguage.'&departure_time=now'.$TRwaypoints.'&key='.$hash->{APIKEY};
+    my $url = 'https://maps.googleapis.com/maps/api/directions/json?origin='.$origin.'&destination='.$destination.'&mode='.$travelMode.$TRlanguage.'&departure_time=now'.$TRwaypoints.'&key='.$hash->{APIKEY};
     Log3 $hash, 2, "TRAFFIC: ($name) using $url";
     
     my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
@@ -313,13 +359,15 @@ sub TRAFFIC_DoUpdate(){
     $returnJSON->{'distance'}               = $json->{'routes'}[0]->{'legs'}[0]->{'distance'}->{'text'}             if AttrVal($name, "outputReadings", "" ) =~ m/text/;
     $returnJSON->{'state'}                  = $json->{'status'};
     $returnJSON->{'status'}                 = $json->{'status'};
-    $returnJSON->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec );
+    $returnJSON->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
     
     if($duration_in_traffic_sec && $duration_sec){
         $returnJSON->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
         Log3 $hash, 3, "TRAFFIC: ($name) delay in seconds = $duration_in_traffic_sec - $duration_sec";
         
-        $returnJSON->{'delay_min'}          = int($duration_in_traffic_sec - $duration_sec) if AttrVal($name, "outputReadings", "" ) =~ m/min/;
+        if (AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_in_traffic_sec) && defined($duration_sec)){
+            $returnJSON->{'delay_min'} = int($duration_in_traffic_sec - $duration_sec);
+        }
         if(defined($returnJSON->{'delay_min'})){
             if( ( $returnJSON->{'delay_min'} && $returnJSON->{'delay_min'} =~ m/^-/ ) || $returnJSON->{'delay_min'} < 60){
                 Log3 $hash, 5, "TRAFFIC: ($name) delay_min was negative or less than 1min (".$returnJSON->{'delay_min'}."), set to 0";
@@ -336,8 +384,8 @@ sub TRAFFIC_DoUpdate(){
     # condition based values
     $returnJSON->{'error_message'} = $json->{'error_message'} if $json->{'error_message'};
     # output readings
-    $returnJSON->{'duration_min'}               = int($duration_sec / 60  + 0.5)            if AttrVal($name, "outputReadings", "" ) =~ m/min/;
-    $returnJSON->{'duration_in_traffic_min'}    = int($duration_in_traffic_sec / 60  + 0.5) if AttrVal($name, "outputReadings", "" ) =~ m/min/;
+    $returnJSON->{'duration_min'}               = int($duration_sec / 60  + 0.5)            if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_sec);
+    $returnJSON->{'duration_in_traffic_min'}    = int($duration_in_traffic_sec / 60  + 0.5) if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_in_traffic_sec);
     $returnJSON->{'duration_sec'}               = $duration_sec                             if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
     $returnJSON->{'duration_in_traffic_sec'}    = $duration_in_traffic_sec                  if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
     # raw data (seconds)
@@ -390,10 +438,11 @@ sub TRAFFIC_FinishUpdate($){
 
     if(my $stateReading = AttrVal($name,"stateReading",undef)){
         Log3 $hash, 5, "TRAFFIC: ($name) stateReading defined, override state";
-        if(!$json->{$stateReading}){
-            Log3 $hash, 1, "TRAFFIC: ($name) stateReading $stateReading not found";
-        }else{
+        if(defined($json->{$stateReading})){
             readingsBulkUpdate($hash,'state',$json->{$stateReading});
+        }else{
+            
+            Log3 $hash, 1, "TRAFFIC: ($name) stateReading $stateReading not found";
         }
     }
 
@@ -497,6 +546,8 @@ sub prettySeconds {
     <li>"disable" - 0:1</li>
     <li>"stateReading" - name the reading which will be used in device state</li>
     <li>"outputReadings" - define what kind of readings you want to get: text, min, sec, average</li>
+    <li>"updateSchedule" - define a flexible update schedule, syntax &lt;starthour&gt;-&lt;endhour&gt; [&lt;day&gt;] &lt;seconds&gt; , multiple entries by sparated by |<br> <i>example:</i> 7-9 1 120 - Monday between 7 and 9 every 2minutes <br> <i>example:</i> 17-19 120 - every Day between 17 and 19 every 2minutes <br> <i>example:</i> 6-8 1 60|6-8 2 60|6-8 3 60|6-8 4 60|6-8 5 60 - Monday till Friday, 60 seconds between 6 and 8 am</li>
+    <li>"travelMode" - default: driving, options walking, bicycling or transit </li>
     <li>"includeReturn" - 0:1</li>
   </ul>
   <br>
