@@ -318,7 +318,7 @@ InternalDoIf
 { 
   my ($hash,$name,$internal,$default,$regExp,$output)=@_;
 
-  $default=AttrVal($hash->{NAME},'notexist','') if (!$default);
+  $default=AttrVal($hash->{NAME},'notexist','') if (!defined $default);
   $regExp='' if (!defined $regExp);
   $output='' if (!defined $output);
   if ($default =~ /^"(.*)"$/) {
@@ -328,8 +328,8 @@ InternalDoIf
   }
   my $r="";
   my $element;
-  return ($default =~ /^"(.*)"$/) ? $1 : $default if (!defined $defs{$name});
-  return ($default =~ /^"(.*)"$/) ? $1 : $default if (!defined $defs{$name}{$internal});
+  return ($default) if (!defined $defs{$name});
+  return ($default) if (!defined $defs{$name}{$internal});
   $r=$defs{$name}{$internal};
   if ($regExp) {
     $element = ($r =~  /$regExp/) ? $1 : "";
@@ -361,7 +361,7 @@ ReadingValDoIf
 
   my ($hash,$name,$reading,$default,$regExp,$output)=@_;
   
-  $default=AttrVal($hash->{NAME},'notexist','') if (!$default);
+  $default=AttrVal($hash->{NAME},'notexist','') if (!defined $default);
   $output='' if (!defined $output);
   $regExp='' if (!defined $regExp);
   if ($default =~ /^"(.*)"$/) {
@@ -372,8 +372,8 @@ ReadingValDoIf
 
   my $r;
   my $element;
-    return ($default =~ /^"(.*)"$/) ? $1 : $default if (!defined $defs{$name});
-    return ($default =~ /^"(.*)"$/) ? $1 : $default if (!defined $defs{$name}{READINGS}{$reading}{VAL});
+    return ($default) if (!defined $defs{$name});
+    return ($default) if (!defined $defs{$name}{READINGS}{$reading}{VAL});
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     $r="" if (!defined($r));
     if ($regExp) {
@@ -3036,7 +3036,7 @@ Die Trennzeichen Komma und | sind in Klammern und Anführungszeichen geschützt 
 <br>
 Zustände cmd1_1, cmd1 und cmd2 sollen wie folgt umdefiniert werden:<br>
 <br>
-<code>attr di_mytwilight [mytwilight:ss_astro], {([mytwilight:twilight_weather]*2+10)}|My attribut is: {(Attr("mydevice","myattr",""))}</code><br>
+<code>attr di_mytwilight cmdState [mytwilight:ss_astro], {([mytwilight:twilight_weather]*2+10)}|My attribut is: {(Attr("mydevice","myattr",""))}</code><br>
 <br>
 <a name="DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen"></a>
 <b>Reine Statusanzeige ohne Ausführung von Befehlen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
