@@ -1,3 +1,10 @@
+
+/*
+** please note: this file should still be compatible to the original 
+**              but has additions and modifications to allow triggered
+**              resorting after fhemweb longpoll updates
+*/
+
 /*
   SortTable
   version 2
@@ -91,12 +98,14 @@ sorttable = {
 	      headrow[i].sorttable_columnindex = i;
 	      headrow[i].sorttable_tbody = table.tBodies[0];
 	      dean_addEvent(headrow[i],"click", sorttable.innerSortFunction = function(e) {
+                //moved inline code to _doSort()
                 sorttable._doSort.bind(this)();
 	      });
 	    }
     }
   },
 
+  //added force and reverse parameters
   _doSort: function(force, reverse) {
     if (!force && this.className.search(/\bsorttable_sorted\b/) != -1) {
       // if we're already sorted by this column, just
@@ -177,6 +186,7 @@ sorttable = {
    delete row_array;
   },
 
+  //added table, column and reverse paramters
   doSort: function(table, column, reverse) {
     if( typeof column !== 'object' ) {
       if( table === undefined ) {
