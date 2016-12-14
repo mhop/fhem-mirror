@@ -209,7 +209,6 @@ sub BDKM_Define($$)
     my @a            = split(/\s+/, $def);
     my $name                    = $a[0];
 
-    # salt will be removed in future versions and must be set by user in fhem.cfg
     my $salt = "";
     my $cryptkey="";
     my $usage="usage: \"define <devicename> BDKM <IPv4-address|hostname>  <GatewayPassword> <PrivatePassword> <md5salt>\" or\n".
@@ -272,7 +271,8 @@ sub BDKM_Define($$)
     # init attrs to defaults:
     map {BDKM_Attr("del",$name,$_)} qw(BaseInterval InterPollDelay ReadBackDelay HttpTimeout);
 
-    BDKM_reInit($hash);
+    # delay start to have a chance that all attrs are set
+    BDKM_Timer($hash,10,"BDKM_doSequence");
     return undef;
 }
 
@@ -292,7 +292,6 @@ sub BDKM_Attr(@)
             return $error."needs interger value >= 30";
         } else {
             $hash->{BASEINTERVAL} = $val;            
-            BDKM_reInit($hash);
         } 
     } elsif ($attr eq "InterPollDelay") {
         $del and $val = 0; # default
@@ -300,7 +299,6 @@ sub BDKM_Attr(@)
             return $error."needs interger value";
         } else {
             $hash->{INTERPOLLDELAY} = $val/1000;            
-            BDKM_reInit($hash);
         } 
     } elsif($attr eq "ReadBackDelay") {
         $del and $val = 500;
@@ -378,33 +376,19 @@ sub BDKM_Attr(@)
     return undef;
 }
 
-sub BDKM_reInit($)
-{
-    my ($hash)                                = @_;
-    BDKM_RemoveTimer($hash);
-    $hash->{UPDATES} = [];
-    if($hash->{ISPOLLING}) {
-        # let sequence finish and try again
-        BDKM_Timer($hash,29,"BDKM_reInit");
-        return;
-    }
-    if(!$hash->{SEQUENCE}) { # init
-        # delay start to have a chance that all attrs are set
-        BDKM_Timer($hash,5,"BDKM_doSequence");
-    } else {
-        BDKM_Timer($hash,$hash->{BASEINTERVAL},"BDKM_doSequence");
-    }
-}
+
 
 sub BDKM_doSequence($)
 {
     my ($hash)                 = @_;
-    
+
+    # BDKM_doSequence is never called directly. It's only triggered by its own timer.
+
     # restart timer for next sequence
     BDKM_Timer($hash,$hash->{BASEINTERVAL},"BDKM_doSequence");
     # only start polling if we are not polling (e.g. due to network promlems)
     if($hash->{ISPOLLING}) {
-        Log3 $hash, 3, $hash->{NAME}." trying to start new sequence while previous not finished";
+        Log3 $hash, 3, $hash->{NAME}." ERROR: trying to start new sequence while previous not finished";
         Log3 $hash, 3, $hash->{NAME}." Gateway not responding? BaseInterval too short? InterPollDelay too high?";
         return;
     }
@@ -494,9 +478,10 @@ sub BDKM_JobQueueNextIdHttpDone($)
                 $hth =~ s|HTTP/...|HTTP|;
                 $hth =~ s/\s+/_/g;
                 $hth =~ /200/ or $hash->{IDS}{$id}{HTTPHEADER} = $hth;
+                $hth =~ /200/ or $data = $hth;
             }
-                
-            Log3 $hash, 4, "$name $id - no JSON data available - raw data: $data";
+
+            Log3 $hash, 4, "$name $id: $data";
         }
     }
     if($hash->{INTERPOLLDELAY}) {
