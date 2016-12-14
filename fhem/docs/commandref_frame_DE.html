@@ -937,7 +937,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>list [devspec] [value]</code><br>
   oder<br>
-  <code>list -r devspec</code><br>
+  <code>list {-r|-R} devspec</code><br>
   <br><br>
   Auflistung aller &quot;definitions&quot;, &quot;notify&quot; und
   &quot;at&quot;-Definitionen. Dies ist eines der wenigen Befehle, die im
@@ -999,7 +999,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     [...]
   </code></pre>
   Mit der -r (raw) Option werden die Daten in einem f&uuml;r fhem.cfg bzw.
-  fhem.state passenden format generiert.
+  fhem.state passenden Format generiert. -R liefert diese Daten auch f&uuml;r
+  alle von diesem Ger&auml;t vermutlich ben&ouml;gten Ger&auml;te.
+  Achtung: die Bestimmung dieser Liste ist ungenau.
 </ul>
 
 

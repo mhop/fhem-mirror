@@ -602,23 +602,32 @@ FW_rawDef()
       $("#content").append('<div id="rawDef">'+
           '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
           '<button>Execute commands</button>'+
+          ' Dump "Probably associated with" too <input type="checkbox">'+
         '</div></br>');
 
-      FW_cmd(FW_root+"?cmd=list -r "+dev+"&XHR=1", function(data) {
-        data = data.replace(/^define/, "defmod");
-        $("#rawDef textarea").val(data);
-        var off = $("#rawDef").position().top-20;
-        $('body, html').animate({scrollTop:off}, 500);
-        $("#rawDef button").hide();
+      function
+      fillData(opt)
+      {
+        FW_cmd(FW_root+"?cmd=list "+opt+" "+dev+"&XHR=1", function(data) {
+          var re = new RegExp("^define", "gm");
+          data = data.replace(re, "defmod");
+          $("#rawDef textarea").val(data);
+          var off = $("#rawDef").position().top-20;
+          $('body, html').animate({scrollTop:off}, 500);
+          $("#rawDef button").hide();
 
-        $('#rawDef textarea').bind('input propertychange', function() {
-          var nData = $("#rawDef textarea").val();
-          if(nData != data)
-            $("#rawDef button").show();
-          else
-            $("#rawDef button").hide();
+          $('#rawDef textarea').bind('input propertychange', function() {
+            var nData = $("#rawDef textarea").val();
+            if(nData != data)
+              $("#rawDef button").show();
+            else
+              $("#rawDef button").hide();
+          });
         });
-      });
+      }
+      fillData("-r");
+
+      $("#rawDef input").click(function(){fillData(this.checked ?"-R":"-r")});
 
       $("#rawDef button").click(function(){
         var data = $("#rawDef textarea").val();
