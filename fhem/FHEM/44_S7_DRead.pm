@@ -56,10 +56,11 @@ sub S7_DRead_Define($$) {
 
 		if ( uc $a[2] =~ m/^Q(\d*)/ ) {
 			$startposition = 1;
-			if ( $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+			
+			if ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
 				$Offset = 942;
 			}
-			elsif ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+			elsif ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
 				$Offset = 1064;
 			}
 			else {
@@ -263,7 +264,7 @@ sub S7_DRead_Parse_new($$) {
 			#aktualisierung des wertes
 
 			my $s = int( $h->{POSITION} / 8 ) - $start;
-			my $myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+			my $myI = $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 
 			Log3 $name, 6, "$name S7_DRead_Parse update $n ";
 
@@ -346,7 +347,7 @@ sub S7_DRead_Parse($$) {
 				#aktualisierung des wertes
 				my $s = int( $h->{POSITION} / 8 ) - $start;
 
-				my $myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+				my $myI = $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 
 				Log3 $name, 6, "$name S7_DRead_Parse update $clientName ";
 
@@ -390,7 +391,7 @@ sub S7_DRead_Parse($$) {
 						#my $b = pack( "C" x $length, @Writebuffer );
 
 						my $myI =
-						  $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+						  $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 
 						Log3 $name, 6, "$name S7_DRead_Parse update $n ";
 
@@ -452,30 +453,30 @@ sub S7_DRead_Attr(@) {
 1;
 
 =pod
+=item summary logical device for a digital reading from a S7/S5
+=item summary_DE logisches Device für einen binären Nur Lese Datenpunkt von einer S5 / S7
 =begin html
 
 <a name="S7_DRead"></a>
 <h3>S7_DRead</h3>
 <ul>
-	This module is a logical module of the physical module S7.<br />
-	This module provides digital data (ON/OFF).<br />
-	Note: you have to configure a PLC reading at the physical modul (S7) first.<br />
-	<br />
-	<br />
-	<b>Define</b>
+This module is a logical module of the physical module S7. <br>
+This module provides digital data (ON/OFF).<br>
+Note: you have to configure a PLC reading at the physical modul (S7) first.<br>
+<br><br>
+<b>Define</b>
+<ul>
+<code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
 
-	<ul>
-		<li><code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
-
-		<ul>
-			<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
-			<li>DB &hellip; Number of the DB</li>
-			<li>address &hellip; address you want to read. bit number to read. Example: 10.3</li>
-		</ul>
-		Note: the required memory area need to be with in the configured PLC reading of the physical module.</li>
-	</ul>
+<ul>
+<li>inputs|outputs|flags|db … defines where to read.</li>
+<li>DB … Number of the DB</li>
+<li>address … address you want to read. bit number to read. Example: 10.3</li>
+</ul>
+Note: the required memory area need to be with in the configured PLC reading of the physical module.
 </ul>
 
+</ul>
 =end html
 
 =begin html_DE
@@ -483,26 +484,23 @@ sub S7_DRead_Attr(@) {
 <a name="S7_DRead"></a>
 <h3>S7_DRead</h3>
 <ul>
-	This module is a logical module of the physical module S7.<br />
-	This module provides digital data (ON/OFF).<br />
-	Note: you have to configure a PLC reading at the physical modul (S7) first.<br />
-	<br />
-	<br />
-	<b>Define</b>
 
-	<ul>
-		<li><code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
+This module is a logical module of the physical module S7. <br>
+This module provides digital data (ON/OFF).<br>
+Note: you have to configure a PLC reading at the physical modul (S7) first.<br>
+<br><br>
+<b>Define</b>
+<ul>
+<code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
 
-		<ul>
-			<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
-			<li>DB &hellip; Number of the DB</li>
-			<li>address &hellip; address you want to read. bit number to read. Example: 10.3</li>
-		</ul>
-		Note: the required memory area need to be with in the configured PLC reading of the physical module.</li>
-	</ul>
+<ul>
+<li>inputs|outputs|flags|db … defines where to read.</li>
+<li>DB … Number of the DB</li>
+<li>address … address you want to read. bit number to read. Example: 10.3</li>
 </ul>
-
+Note: the required memory area need to be with in the configured PLC reading of the physical module.
+</ul>
+</ul>
 =end html_DE
 
 =cut
-

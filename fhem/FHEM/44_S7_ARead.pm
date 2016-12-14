@@ -180,25 +180,25 @@ sub S7_ARead_Parse($$) {
 				my $myI;
 
 				if ( $h->{DATATYPE} eq "u8" ) {
-					$myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "s8" ) {
-					$myI = $hash->{S7TCPClient}->ShortAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->ShortAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "u16" ) {
-					$myI = $hash->{S7TCPClient}->WordAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->WordAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "s16" ) {
-					$myI = $hash->{S7TCPClient}->IntegerAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->IntegerAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "u32" ) {
-					$myI = $hash->{S7TCPClient}->DWordAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->DWordAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "s32" ) {
-					$myI = $hash->{S7TCPClient}->DintAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->DintAt( \@Writebuffer, $s );
 				}
 				elsif ( $h->{DATATYPE} eq "float" ) {
-					$myI = $hash->{S7TCPClient}->FloatAt( \@Writebuffer, $s );
+					$myI = $hash->{S7PLCClient}->FloatAt( \@Writebuffer, $s );
 				}
 				else {
 					Log3 $name, 3,
@@ -256,34 +256,34 @@ sub S7_ARead_Parse($$) {
 
 						if ( $h->{DATATYPE} eq "u8" ) {
 							$myI =
-							  $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+							  $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "s8" ) {
 							$myI =
-							  $hash->{S7TCPClient}
+							  $hash->{S7PLCClient}
 							  ->ShortAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "u16" ) {
 							$myI =
-							  $hash->{S7TCPClient}->WordAt( \@Writebuffer, $s );
+							  $hash->{S7PLCClient}->WordAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "s16" ) {
 							$myI =
-							  $hash->{S7TCPClient}
+							  $hash->{S7PLCClient}
 							  ->IntegerAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "u32" ) {
 							$myI =
-							  $hash->{S7TCPClient}
+							  $hash->{S7PLCClient}
 							  ->DWordAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "s32" ) {
 							$myI =
-							  $hash->{S7TCPClient}->DintAt( \@Writebuffer, $s );
+							  $hash->{S7PLCClient}->DintAt( \@Writebuffer, $s );
 						}
 						elsif ( $h->{DATATYPE} eq "float" ) {
 							$myI =
-							  $hash->{S7TCPClient}
+							  $hash->{S7PLCClient}
 							  ->FloatAt( \@Writebuffer, $s );
 						}
 						else {
@@ -364,43 +364,45 @@ sub S7_ARead_Attr(@) {
 1;
 
 =pod
+=item summary logical device for a analog reading from a S7/S5
+=item summary_DE logisches Device für einen analogen Nur Lese Datenpunkt von einer S5 / S7
 =begin html
 
 <a name="S7_ARead"></a>
 <h3>S7_ARead</h3>
 <ul>
-	This module is a logical module of the physical module S7.<br />
-	This module provides analog data (signed / unsigned integer Values).<br />
-	Note: you have to configure a PLC reading at the physical module (S7) first.<br />
-	<br />
-	<br />
-	<b>Define</b><br />
-	<code>define &lt;name&gt; S7_ARead {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32}</code><br />
-	&nbsp;
-	<ul>
-		<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
-		<li>DB &hellip; Number of the DB</li>
-		<li>start &hellip; start byte of the reading</li>
-		<li>{u8|s8|u16|s16|u32|s32} &hellip; defines the datatype:
-		<ul>
-			<li>u8 &hellip;. unsigned 8 Bit integer</li>
-			<li>s8 &hellip;. signed 8 Bit integer</li>
-			<li>u16 &hellip;. unsigned 16 Bit integer</li>
-			<li>s16 &hellip;. signed 16 Bit integer</li>
-			<li>u32 &hellip;. unsigned 32 Bit integer</li>
-			<li>s32 &hellip;. signed 32 Bit integer</li>
-		</ul>
-		</li>
-		<li>Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC reading of the physical module.</li>
-	</ul>
-	<br />
-	<b>Attr</b><br />
-	The following parameters are used to scale every reading
-	<ul>
-		<li>multiplicator</li>
-		<li>offset</li>
-	</ul>
-	newValue = &lt;multiplicator&gt; * Value + &lt;offset&gt;
+
+This module is a logical module of the physical module S7. <br>
+This module provides analog data (signed / unsigned integer Values).<br>
+Note: you have to configure a PLC reading at the physical module (S7) first.<br>
+<br><br>
+<b>Define</b><br>
+<code>define &lt;name&gt; S7_ARead {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32}</code>
+<br><br>
+<ul>
+<li>inputs|outputs|flags|db … defines where to read.</li>
+<li>DB … Number of the DB</li>
+<li>start … start byte of the reading</li>
+<li>{u8|s8|u16|s16|u32|s32} … defines the datatype: </li>
+<ul>
+	<li>u8 …. unsigned 8 Bit integer</li>
+	<li>s8 …. signed 8 Bit integer</li>
+	<li>u16 …. unsigned 16 Bit integer</li>
+	<li>s16 …. signed 16 Bit integer</li>
+	<li>u32 …. unsigned 32 Bit integer</li>
+	<li>s32 …. signed 32 Bit integer</li>
+</ul>
+Note: the required memory area  (start – start + datatypelength) need to be with in the configured PLC reading of the physical module.
+</ul>
+<br>
+<b>Attr</b><br>
+The following parameters are used to scale every reading<br>
+<ul>
+<li>multiplicator</li>
+<li>offset</li>
+</ul>
+
+newValue = &lt;multiplicator&gt; * Value + &lt;offset&gt;
 </ul>
 =end html
 
@@ -409,40 +411,38 @@ sub S7_ARead_Attr(@) {
 <a name="S7_ARead"></a>
 <h3>S7_ARead</h3>
 <ul>
-	This module is a logical module of the physical module S7.<br />
-	This module provides analog data (signed / unsigned integer Values).<br />
-	Note: you have to configure a PLC reading at the physical module (S7) first.<br />
-	<br />
-	<br />
-	<b>Define</b><br />
-	<code>define &lt;name&gt; S7_ARead {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32}</code><br />
-	&nbsp;
-	<ul>
-		<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
-		<li>DB &hellip; Number of the DB</li>
-		<li>start &hellip; start byte of the reading</li>
-		<li>{u8|s8|u16|s16|u32|s32} &hellip; defines the datatype:
-		<ul>
-			<li>u8 &hellip;. unsigned 8 Bit integer</li>
-			<li>s8 &hellip;. signed 8 Bit integer</li>
-			<li>u16 &hellip;. unsigned 16 Bit integer</li>
-			<li>s16 &hellip;. signed 16 Bit integer</li>
-			<li>u32 &hellip;. unsigned 32 Bit integer</li>
-			<li>s32 &hellip;. signed 32 Bit integer</li>
-			<li>float &hellip;. 4 byte float</li>
-		</ul>
-		</li>
-		<li>Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC reading of the physical module.</li>
-	</ul>
-	<b>Attr</b><br />
-	The following parameters are used to scale every reading
-	<ul>
-		<li>multiplicator</li>
-		<li>offset</li>
-	</ul>
-	newValue = &lt;multiplicator&gt; * Value + &lt;offset&gt;
+
+This module is a logical module of the physical module S7. <br>
+This module provides analog data (signed / unsigned integer Values).<br>
+Note: you have to configure a PLC reading at the physical module (S7) first.<br>
+<br><br>
+<b>Define</b><br>
+<code>define &lt;name&gt; S7_ARead {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32}</code>
+<br><br>
+<ul>
+<li>inputs|outputs|flags|db … defines where to read.</li>
+<li>DB … Number of the DB</li>
+<li>start … start byte of the reading</li>
+<li>{u8|s8|u16|s16|u32|s32} … defines the datatype: </li>
+<ul>
+	<li>u8 …. unsigned 8 Bit integer</li>
+	<li>s8 …. signed 8 Bit integer</li>
+	<li>u16 …. unsigned 16 Bit integer</li>
+	<li>s16 …. signed 16 Bit integer</li>
+	<li>u32 …. unsigned 32 Bit integer</li>
+	<li>s32 …. signed 32 Bit integer</li>
+	<li>float …. 4 byte float </li>
+</ul>
+Note: the required memory area  (start – start + datatypelength) need to be with in the configured PLC reading of the physical module.
+</ul>
+<b>Attr</b>
+The following parameters are used to scale every reading
+<ul>
+<li>multiplicator</li>
+<li>offset</li>
+</ul>
+newValue = &lt;multiplicator&gt; * Value + &lt;offset&gt;
 </ul>
 =end html_DE
 
 =cut
-
