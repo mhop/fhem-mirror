@@ -1857,8 +1857,9 @@ readingsGroup_Attr($$$;$)
         <li>headerRows<br>
         </li>
         <li>sortColumn<br>
-          -1 -> allows sorting of the table by clicking on a column header
-          &gt;= 0 -> automatically sort the table by this column after page loading
+          &gt; 0 -> automatically sort the table by this column after page loading
+          0 -> do not sort automatically but allow sorting of the table by clicking on a column header
+          &lt; 0 -> automatically sort the table in reverse by this column after page loading
         </li>
         <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
     </ul><br>

@@ -12,13 +12,10 @@ FW_readingsGroupReadyFn() {
         setTimeout( function() {
           $(".readingsGroup").each(function() {
             var sort = parseInt($(this).attr('sortColumn'));
-            if( sort >= 0 ) {
-              var col = $(this).find('tr').eq(0).find('td').eq(sort).get(0);
-              if( sorttable && col !== undefined )
-                sorttable.innerSortFunction.apply(col, []);
-            }
+            if( sort )
+              sorttable.doSort(this, Math.abs(sort)-1, sort<0?true:false );
           } );
-        }, 10 );
+        }, 100 );
       } );
     }
 
