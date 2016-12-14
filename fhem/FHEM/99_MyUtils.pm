@@ -305,7 +305,8 @@ sub RollCheck() {
     my $tag=0;
 
     #my $tempOut=ReadingsVal("wetter", "temp_c", 99);
-    my $tempOut=ReadingsVal("naAussen", "temperature", 99);
+    #my $tempOut=ReadingsVal("naAussen", "temperature", 99);
+    my $tempOut=ReadingsVal("myWH1080", "Temp-outside", 99);
 
     my $twil=Value("twil");
     if ($twil>=3 && $twil<10) { # civil
