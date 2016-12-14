@@ -289,6 +289,8 @@ Log 1, Dumper $characteristicsOfIntent;
 
         $mapping->{verb} = [$mapping->{verb}] if( ref($mapping->{verb}) ne 'ARRAY' );
         foreach my $verb (@{$mapping->{verb}}) {
+          $samples .= "\n" if( $samples );
+
           my @articles = ('','{article}');
           if( ref($mapping->{articles}) eq 'ARRAY' ) {
             $articles[1] = "{${characteristic}_article}";
@@ -327,8 +329,21 @@ Log 1, Dumper $characteristicsOfIntent;
 
         ++$i;
       }
-      $samples .= "\n";
     }
+    $samples .= "\n";
+
+    push @{$schema->{intents}}, {intent => "StatusIntent",
+                                 slots => [ { name => 'Device', type => 'FHEM_Device' },
+                                            { name => 'Room', type => 'FHEM_Room' } ]};
+    push @{$schema->{intents}}, {intent => "RoomListIntent", };
+    push @{$schema->{intents}}, {intent => "DeviceListIntent",
+                                 slots => [ { name => 'Device', type => 'FHEM_Device' }, ]};
+
+    $samples .= "\nRoomListIntent raumliste";
+    $samples .= "\nDeviceListIntent geräteliste";
+    $samples .= "\nDeviceListIntent geräteliste {Room}";
+    $samples .= "\nDeviceListIntent geräteliste für {artikel} {Room}";
+    $samples .= "\n";
 
     my $json = JSON->new;
     $json->pretty(1);
