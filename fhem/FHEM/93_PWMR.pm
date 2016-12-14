@@ -41,6 +41,7 @@
 # 16.11.16 GA fix format desired-temp with one digit after the decimal point
 # 17.11.16 GA add internals for configuration parameters: p_factor, p_tsensor, p_actor, p_window, p_pid
 # 11.12.16 GA add alternative PID calculation, selectable by usePID=2, implementation from user Albatros_
+# 14.12.16 GA fix adjust rounding of PVal and newpulsePID
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -1094,6 +1095,7 @@ PWMR_ReadRoom(@)
     my $IVal = $ISum;
     my $DVal = $room->{c_PID_DFactor} * ($room->{h_deltaTemp_D} - $room->{h_deltaTemp});
 
+    $PVal    = sprintf ("%.4f", $PVal);
     $IVal    = minNum (1, sprintf ("%.4f", $IVal));
     $DVal    = minNum (1, sprintf ("%.4f", $DVal));
 
@@ -1101,8 +1103,8 @@ PWMR_ReadRoom(@)
 
 
     my $newpulsePID  = ($PVal + $IVal + $DVal);
-    $newpulsePID     = minNum ($MaxPulse, sprintf ("%.4f", $newpulsePID));
-    $newpulsePID     = maxNum (0,         sprintf ("%.4f", $newpulsePID));
+    $newpulsePID     = minNum ($MaxPulse, sprintf ("%.2f", $newpulsePID));
+    $newpulsePID     = maxNum (0,         sprintf ("%.2f", $newpulsePID));
 
     my $PWMPulsePID  = $newpulsePID * 100;
     my $PWMOnTimePID =  sprintf ("%02s:%02s", int ($newpulsePID * $cycletime / 60), ($newpulsePID * $cycletime) % 60);
