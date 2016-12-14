@@ -1113,6 +1113,8 @@ PWMR_ReadRoom(@)
     Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
     Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulsePID/$PWMOnTimePID), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
 
+    $newpulse = $newpulsePID;
+
   } elsif($room->{c_PID_useit} >= 2) {
 
     my $DBuffer = $room->{helper}{PID_D_previousTemps};
@@ -1171,6 +1173,8 @@ PWMR_ReadRoom(@)
 
     Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
     Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulsePID/$PWMOnTimePID), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
+
+    $newpulse = $newpulsePID;
   }
 
   readingsEndUpdate($room, 1);
