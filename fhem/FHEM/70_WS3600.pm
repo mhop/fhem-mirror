@@ -181,7 +181,8 @@ WS3600_Initialize($)
 
 # Consumer
   $hash->{DefFn}   = "WS3600_Define";
-  $hash->{AttrList}= "model:WS3600,WS2300,WS1080,WS3080";
+  $hash->{AttrList}= "model:WS3600,WS2300,WS1080,WS3080 ".
+                     $readingFnAttributes;
 #  $hash->{ReadFn}  = "WS3600_Read";
   $hash->{UndefFn} = "WS3600_Undef";
 }
@@ -267,7 +268,7 @@ WS3600_Read($)
 #  Log 1-GetLogLevel($name,0), "WS3600(Err): (1) Error";
 
 #  Log3 $name, 4, "WS3600(Dbg): $name Read started using \"$dev\"";
-  Log3 $name, 3, "WS3600(Msg): $name Read started";
+#  Log3 $name, 3, "WS3600(Msg): $name Read started";
   @lines = `$dev`;	# call external program
 
   foreach my $inputline ( @lines ) {
@@ -275,10 +276,14 @@ WS3600_Read($)
     my ($rawreading, $val, $val2) = split(/ /, $inputline, 3);
     if(defined($rawreading)) {
       if(!defined($val2)) { $val2 = ""; }
-      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
+      my $logmsg = "WS3600(Dbg): $name read $inputline|$rawreading|$val";
+         $logmsg .= "|$val2" if(defined($val2));
+#      Log3 $name, 4, $logmsg;
+#      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
 	    if(defined($TranslatedCodes{$rawreading})) {
 	      $reading = $TranslatedCodes{$rawreading};
               readingsBulkUpdate($hash,$reading, $val);
+      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$reading|$val|$val2";
 	      $AnythingRead = 1;
 	    }
 	    # write Date/Time-Records
@@ -304,7 +309,7 @@ WS3600_Read($)
 	                 . " Ti: " . $defs{$name}{READINGS}{"Temp-inside"}{VAL}
 	                 . " Hi: " . $defs{$name}{READINGS}{"rel-Humidity-inside"}{VAL};
 
-    $hash->{CHANGED}[0] = $hash->{STATE};
+#    $hash->{CHANGED}[0] = $hash->{STATE};
   }
   else {
     $hash->{STATE} = "no data received";
