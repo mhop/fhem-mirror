@@ -334,15 +334,25 @@ Log 1, Dumper $characteristicsOfIntent;
 
     push @{$schema->{intents}}, {intent => "StatusIntent",
                                  slots => [ { name => 'Device', type => 'FHEM_Device' },
+                                            { name => 'preposition', type => 'FHEM_preposition' },
                                             { name => 'Room', type => 'FHEM_Room' } ]};
     push @{$schema->{intents}}, {intent => "RoomListIntent", };
     push @{$schema->{intents}}, {intent => "DeviceListIntent",
-                                 slots => [ { name => 'Device', type => 'FHEM_Device' }, ]};
+                                 slots => [ { name => 'preposition', type => 'FHEM_preposition' },
+                                            { name => 'Room', type => 'FHEM_Room' } ]};
+    push @{$schema->{intents}}, {intent => "AMAZON.CancelIntent", };
+    push @{$schema->{intents}}, {intent => "AMAZON.StopIntent", };
+
+    $samples .= "\nStatusIntent status";
+    $samples .= "\nStatusIntent {Device} status";
+    $samples .= "\nStatusIntent status von {Device}";
+    $samples .= "\nStatusIntent wie ist der status von {Device}";
+    $samples .= "\nStatusIntent wie ist der status {preposition} {Room}";
 
     $samples .= "\nRoomListIntent raumliste";
     $samples .= "\nDeviceListIntent geräteliste";
     $samples .= "\nDeviceListIntent geräteliste {Room}";
-    $samples .= "\nDeviceListIntent geräteliste für {artikel} {Room}";
+    $samples .= "\nDeviceListIntent geräteliste für {article} {Room}";
     $samples .= "\n";
 
     my $json = JSON->new;
