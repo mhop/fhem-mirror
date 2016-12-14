@@ -4742,13 +4742,8 @@ sub HMCCU_EncodeEPDisplay ($)
 my $hmccu_child;
 
 # Queue file
-my $queue;
 my %child_queue;
 my $cpqueue = \%child_queue;
-
-# In-Memory queue
-my @evqueue;
-my $evq_lock = 0;
 
 # Statistic data of child process
 my %child_hash = (
@@ -4783,12 +4778,6 @@ sub HMCCU_CCURPC_Write ($$)
 # SUBPROCESS
 	HMCCU_QueueEnq ($cpqueue, $et."|".$msg);
 	
-	if (!$evq_lock) {
-		$evq_lock = 1;
-		push (@evqueue, $et."|".$msg);
-		$evq_lock = 0;
-	}
-
 # SUBPROCESS	
 # 	Log3 $name, 1, "CCURPC: Write $et $msg";
 #  	my $bytes = $hmccu_child->writeToParent ($et."|".$msg);
@@ -5095,15 +5084,6 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
 	
 	$cb = "unknown" if (!defined ($cb));
 	Log3 $name, 1, "CCURPC: $cb GetEvents";
-
-	if (scalar (@evqueue) > 0 && !$evq_lock) {
-		$evq_lock = 1;
-		@result = @evqueue;
-		@evqueue = ();
-		$evq_lock = 0;
-		
-		return \@result;
-	}
 
 	return undef;
 }
