@@ -42,6 +42,8 @@
 # 17.11.16 GA add internals for configuration parameters: p_factor, p_tsensor, p_actor, p_window, p_pid
 # 11.12.16 GA add alternative PID calculation, selectable by usePID=2, implementation from user Albatros_
 # 14.12.16 GA fix adjust rounding of PVal and newpulsePID
+# 14.12.16 GA fix supply DBuffer with delta temps for usePID=2 calculation
+# 14.12.16 GA add implement get previousTemps
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -355,9 +357,19 @@ PWMR_Get($@)
 {
   my ($hash, @a) = @_;
 
+  my $u = "Unknown argument $a[1], choose one of previousTemps";
+  return $u if ($a[1] eq "?");
+
   return "argument is missing" if(int(@a) != 2);
 
-  my $msg;
+  if ($a[1] eq "previousTemps") {
+    my $msg = "";
+    $msg .= "IBuffer: ".join (" ", @{$hash->{helper}{PID_I_previousTemps}})."\n" if (defined ($hash->{helper}{PID_I_previousTemps}));
+    $msg .= "DBuffer: ".join (" ", @{$hash->{helper}{PID_D_previousTemps}})."\n" if (defined ($hash->{helper}{PID_D_previousTemps}));
+
+    return $msg
+  }
+
 
   if($a[1] ne "status") {
     return "unknown get value, valid is status";
@@ -508,7 +520,7 @@ PWMR_Define($$)
   return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] ".
          "[<usePID=0>]|".
          "[<usePID=1>:<PFactor>:<IFactor>[,<ILookBackCnt>]:<DFactor>[,<DLookBackCnt>]]|".
-         "[<usePID=2>:<PFactor>:<IFactor>:<DFactor>]"
+         "[<usePID=2>:<PFactor>:<IFactor>:<DFactor>[,<DLookBackCnt>]]"
     if(int(@a) < 6 || int(@a) > 9);
 
   my $iodevname = $a[2];
@@ -687,6 +699,8 @@ PWMR_Define($$)
 
   } else {
 
+    # usePID >= 2
+
     delete ($hash->{READINGS}{PWMPulse})      if (defined($hash->{READINGS}{PWMPulse}));
     delete ($hash->{READINGS}{PWMOnTime})     if (defined($hash->{READINGS}{PWMOnTime}));
 
@@ -700,17 +714,34 @@ PWMR_Define($$)
     $hash->{c_PID_IFactor}      = !defined($IFactor) ?       0.01 : $IFactor;
     $hash->{c_PID_DFactor}      = !defined($DFactor) ?       0    : $DFactor;
 
-    delete ($hash->{helper}{PID_I_previousTemps}) if (defined (($hash->{helper}{PID_I_previousTemps})));
-    delete ($hash->{helper}{PID_D_previousTemps}) if (defined (($hash->{helper}{PID_D_previousTemps})));
+    $hash->{c_PID_DLookBackCnt} = !defined($DLookBackCnt) ?  10   : $DLookBackCnt;
 
-    delete ($hash->{h_PID_I_previousTemps})       if (defined (($hash->{h_PID_I_previousTemps})));
-    delete ($hash->{h_PID_D_previousTemps})       if (defined (($hash->{h_PID_D_previousTemps})));
+    delete ($hash->{helper}{PID_I_previousTemps}) if (defined (($hash->{helper}{PID_I_previousTemps})));
+    #delete ($hash->{helper}{PID_D_previousTemps}) if (defined (($hash->{helper}{PID_D_previousTemps})));
 
     delete ($hash->{c_PID_ILookBackCnt})          if (defined ($hash->{c_PID_ILookBackCnt}));
-    delete ($hash->{c_PID_DLookBackCnt})          if (defined ($hash->{c_PID_DLookBackCnt}));
+    #delete ($hash->{c_PID_DLookBackCnt})          if (defined ($hash->{c_PID_DLookBackCnt}));
 
-    delete ($hash->{h_deltaTemp})                 if (defined ($hash->{h_deltaTemp}));
-    delete ($hash->{h_deltaTemp_D})               if (defined ($hash->{h_deltaTemp_D}));
+    #delete ($hash->{h_deltaTemp})                 if (defined ($hash->{h_deltaTemp}));
+    #delete ($hash->{h_deltaTemp_D})               if (defined ($hash->{h_deltaTemp_D}));
+
+    ### D-Factor
+
+    # initialize if not yet done 
+    $hash->{helper}{PID_D_previousTemps} = [] unless defined (($hash->{helper}{PID_D_previousTemps}));
+
+    # shorter reference to array
+    my $DBuffer = $hash->{helper}{PID_D_previousTemps};
+    my $Dcnt = ( @{$DBuffer} ); # or scalar @{$DBuffer}
+
+    # reference
+    #Log3 ($hash, 3, "org reference DBuffer is $hash->{helper}{PID_D_previousTemps} short is $DBuffer, cnt is ". scalar @{$DBuffer}." (starting from 0)");
+    Log3 ($hash, 4, "content of DBuffer is @{$DBuffer}");
+
+    # cut Buffer if it is too large
+    while (scalar @{$DBuffer} > $hash->{c_PID_DLookBackCnt}) {
+      my $v = shift @{$DBuffer};
+    }
   }
 
   
@@ -1084,12 +1115,23 @@ PWMR_ReadRoom(@)
 
   } elsif($room->{c_PID_useit} >= 2) {
 
+    my $DBuffer = $room->{helper}{PID_D_previousTemps};
+    push @{$DBuffer}, $temperaturV;
+
+    # cut D-Buffer if it is too large
+    while (scalar @{$DBuffer} > $room->{c_PID_DLookBackCnt}) {
+      my $v = shift @{$DBuffer};
+      #Log3 ($room, 3, "shift $v from DBuffer");
+    }
+    #Log3 ($room, 3, "DBuffer contains ".scalar @{$DBuffer}." elements");
+
     my $deltaTempPID = $desiredTemp - $temperaturV;
     $room->{h_deltaTemp}   = sprintf ("%.1f", -1 * $deltaTempPID);
+    $room->{h_deltaTemp_D} = sprintf ("%.1f", -1 * ($desiredTemp - $DBuffer->[0]));
 
     #calculate IValue
     my $ISum = $room->{READINGS}{"PID_IVal"}{VAL};
-    $ISum = $ISum + ($deltaTempPID*$room->{c_PID_IFactor});
+    $ISum = $ISum + ($deltaTempPID * $room->{c_PID_IFactor});
  
     my $PVal = $room->{c_PID_PFactor} * $deltaTempPID;
     my $IVal = $ISum;
@@ -1642,7 +1684,7 @@ PWMR_valueFormat(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [ &lt;usePID=0&gt; | &lt;usePID=1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;] | &lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt; ]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [ &lt;usePID=0&gt; | &lt;usePID=1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;] | &lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt[,&lt;DLookBackCnt&gt;] ] <br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1692,11 +1734,12 @@ PWMR_valueFormat(@)
       Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
     </li>
     <li>
-     <code>&lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;</code><br>
+     <code>&lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;]</code><br>
       <i>PFactor</i>: Konstant for P. Default is 0.8.<br>
       <i>IFactor</i>: Konstant for I. Default is 0.01<br>
       <i>DFactor</i>: Konstant for D. Default is 0<br> 
-      Internals c_PID_PFactor, c_PID_IFactor, c_PID_DFactor and c_PID_useit will reflect the above configuration values.<br>
+      <i>DLookBackCnt</i>: Buffer size to store previous temperatures. For D calculation actual and oldest temperature will be used. Default is 10.<br> 
+      Internals c_PID_PFactor, c_PID_IFactor, c_PID_DFactor, c_PID_DLookBackCnt and c_PID_useit will reflect the above configuration values.<br>
       Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
     </li>
 
@@ -1712,7 +1755,8 @@ PWMR_valueFormat(@)
     <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen dummy 0</code><br>
     <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 1:0.8:0.3:0.5</code><br>
     <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 1:0.8:0.3,5:0.5,10</code><br>
-    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 2:0.8:0.01:0</code><br>
+    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 2:0.8:0.01:00</code><br>
+    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 2:0.8:0.01:0.1,10</code><br>
     <br>
        
 
@@ -1750,7 +1794,12 @@ PWMR_valueFormat(@)
 
   </ul>
 
-  <br>
+  <b>Get </b>
+  <ul>
+    <li>previousTemps<br>
+        Get conent of buffers defined by <i>ILookBackCnt</i> and <i>DLookBackCnt</i>.
+        </li><br>
+  </ul>
 
   <b>Attributes</b>
   <ul>
