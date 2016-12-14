@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 01_FHEMWEB: Dump "Probably associated with" in Raw definition
   - bugfix:  93_DbRep: added balance diff to diffValue, balance diff to next
                        period if value is 0 between two periods with values
                        are set

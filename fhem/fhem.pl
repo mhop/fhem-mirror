@@ -114,6 +114,7 @@ sub fhemTzOffset($);
 sub getAllAttr($);
 sub getAllGets($);
 sub getAllSets($);
+sub getPawList($);
 sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
@@ -2187,9 +2188,17 @@ CommandList($$)
   my ($cl, $param) = @_;
   my $str = "";
 
-  if($param =~ m/^-r *(.*)$/) {
-    my @list = devspec2array($1 ? $1 : ".*", $cl);
-    foreach my $d (sort @list) {
+  if($param =~ m/^-r *(.*)$/i) {
+    my @list;
+    my $arg = $1;
+    if($param =~ m/^-R/) {
+      return "-R needs a valid device as argument" if(!$arg);
+      push @list, $arg;
+      push @list, getPawList($arg);
+    } else {
+      @list = devspec2array($arg ? $arg : ".*", $cl);
+    }
+    foreach my $d (@list) {
       return "No device named $d found" if(!defined($defs{$d}));
       $str .= "\n" if($str);
       my @a = GetDefAndAttr($d);
@@ -4802,7 +4811,7 @@ parseParams($;$)
       $value =~ s/^.(.*).$/$1/;
     }
 
-    #collext all parts until opening { and closing } are matched
+    #collect all parts until opening { and closing } are matched
     if( $value =~ m/^{/ ) { # } for match
       my $count = 0;
       for my $i (0..length($value)-1) {
@@ -4835,5 +4844,22 @@ parseParams($;$)
   return(\@a, \%h);
 }
 
+# get "Porbably Associated With" list for a devicename
+sub
+getPawList($)
+{
+  my ($d) = @_;
+  my $h = $defs{$d};
+  my @dob;
+  foreach my $dn (sort keys %defs) {
+    next if(!$dn || $dn eq $d);
+    my $dh = $defs{$dn};
+    if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
+       ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/)) {
+      push(@dob, $dn);
+    }
+  }
+  return @dob;
+}
 
 1;

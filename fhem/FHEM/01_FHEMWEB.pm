@@ -1260,17 +1260,7 @@ FW_doDetail($)
   FW_pO FW_detailSelect($d, "attr", $attrList);
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
-  ## dependent objects
-  my @dob;  # dependent objects - triggered by current device
-  foreach my $dn (sort keys %defs) {
-    next if(!$dn || $dn eq $d);
-    my $dh = $defs{$dn};
-    if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
-       ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/)) {
-      push(@dob, $dn);
-    }
-  }
-  FW_makeTableFromArray("Probably associated with", "assoc", @dob,);
+  FW_makeTableFromArray("Probably associated with", "assoc", getPawList($d));
 
   FW_pO "</td></tr></table>";
 
@@ -1278,7 +1268,7 @@ FW_doDetail($)
 
   FW_pH "cmd=style iconFor $d", "Select icon",         undef, "detLink iconFor";
   FW_pH "cmd=style showDSI $d", "Extend devStateIcon", undef, "detLink showDSI";
-  FW_pH "cmd=rawDef $d", "Raw defintion", undef, "detLink rawDef";
+  FW_pH "cmd=rawDef $d", "Raw definition", undef, "detLink rawDef";
   FW_pH "cmd=delete $d", "Delete this device ($d)",    undef, "detLink delDev"
          if($d ne "global");
   my $sfx = AttrVal("global", "language", "EN");

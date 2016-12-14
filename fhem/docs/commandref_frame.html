@@ -888,7 +888,7 @@ The following local attributes are used by a wider range of devices:
 <ul>
   <code>list [devspec] [value]</code><br>
   or<br>
-  <code>list -r devspec</code><br>
+  <code>list {-r|-R} devspec</code><br>
   <br><br>
   Output a list of all definitions, all notify settings and all at
   entries. This is one of the few commands which return a string in a
@@ -950,7 +950,9 @@ The following local attributes are used by a wider range of devices:
     [...]
   </code></pre>
   With the -r (raw) option output the device definition in a format suitable
-  for inclusion in fhem.cfg and fhem.state.
+  for inclusion in fhem.cfg and fhem.state. -R returns the definition of the
+  device itself, together with the definition of probably associated devices.
+  Note: the algorithm to select associated devices is known to be imperfect.
 </ul>
 
 <a name="modify"></a>
