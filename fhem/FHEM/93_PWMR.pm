@@ -40,6 +40,7 @@
 # 16.11.16 GA add display time until in state if "ManualSetUntil"
 # 16.11.16 GA fix format desired-temp with one digit after the decimal point
 # 17.11.16 GA add internals for configuration parameters: p_factor, p_tsensor, p_actor, p_window, p_pid
+# 11.12.16 GA add alternative PID calculation, selectable by usePID=2, implementation from user Albatros_
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -503,24 +504,27 @@ PWMR_Define($$)
 
   my $name = $hash->{NAME};
 
-  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] [<usePID 0|1>:<PFactor>:<IFactor>[,<ILookBackCnt>]:<DFactor>[,<DLookBackCnt>]]"
+  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] ".
+         "[<usePID=0>]|".
+         "[<usePID=1>:<PFactor>:<IFactor>[,<ILookBackCnt>]:<DFactor>[,<DLookBackCnt>]]|".
+         "[<usePID=2>:<PFactor>:<IFactor>:<DFactor>]"
     if(int(@a) < 6 || int(@a) > 9);
 
   my $iodevname = $a[2];
-  my $factor  = ((int(@a) > 2) ? $a[3] : 0.2);
+  my $factor  = ((int(@a) > 2) ? $a[3] : 0.8);
   my $tsensor = ((int(@a) > 3) ? $a[4] : "");
   my $actor   = ((int(@a) > 4) ? $a[5] : "");
   my $window  = ((int(@a) > 6) ? $a[6] : "");
   my $pid     = ((int(@a) > 7) ? $a[7] : "");
 
-  my ($f, $o) = split (",", $factor, 2);
-  $o = 0.11 unless (defined ($o));       # if cycletime is 900 then this increases the on-time by 1:39 (=99 seconds)
- 
   $hash->{TEMPSENSOR}         = $tsensor;
   $hash->{ACTOR}              = $actor;
   $hash->{WINDOW}             = ($window eq "dummy" ? "" : $window);
-  $hash->{FACTOR}             = $f;		# pulse is calculated using the below formular
-  $hash->{FOFFSET}            = $o;             # ( $deltaTemp * $factor) ** 2) + $factoroffset
+
+  # definitions used in the past moved to c_factor and c_foffset
+  delete ($hash->{FACTOR})                  if (defined (($hash->{FACTOR})));
+  delete ($hash->{FOFFSET})                 if (defined (($hash->{FOFFSET})));
+
   $hash->{c_desiredTempFrom}  = "";
 
   $hash->{p_factor}           = $factor;
@@ -542,15 +546,6 @@ PWMR_Define($$)
   #$hash->{IODev} = $iodev;
   $hash->{IODev} = $defs{$iodevname};
   
-  ##########
-  # calculage factoroffset 
-  # 01.10.2015
-  #my $minonoff     = $defs{$iodev}->{MINONOFFTIME};
-  #my $cycle        = $defs{$iodev}->{CYCLETIME};
-  #my $factorOffset = ($minonoff / $cycle) - 0.02;
-  #$factorOffset = sprintf ("%.2f", $factorOffset);
-  #$hash->{factoroffset} = $factorOffset;
-
   ##########
   # check window
 
@@ -588,40 +583,70 @@ PWMR_Define($$)
   ##########
   # check pid definition
 
-  my ($usePID, $PFactor, $IFactorTemp, $DFactorTemp) = split (":", $pid, 5);
+  my ($usePID, $PFactor, $IFactorTmp, $DFactorTmp) = split (":", $pid);
 
-  $IFactorTemp = "0,1" unless (defined ($IFactorTemp));
-  $DFactorTemp = "0,1"unless (defined ($DFactorTemp));
+  $IFactorTmp = "" unless (defined ($IFactorTmp));
+  $DFactorTmp = "" unless (defined ($DFactorTmp));
 
-  my ($IFactor, $ILookBackCnt) = split (",", $IFactorTemp, 2);
-  my ($DFactor, $DLookBackCnt) = split (",", $DFactorTemp, 2);
+  my ($IFactor, $ILookBackCnt) = split (",", $IFactorTmp);
+  my ($DFactor, $DLookBackCnt) = split (",", $DFactorTmp);
 
-  $hash->{c_PID_useit}        = !defined($usePID)  ?      -1 : $usePID;
-  $hash->{c_PID_PFactor}      = !defined($PFactor) ?       0 : $PFactor;
-  $hash->{c_PID_IFactor}      = !defined($IFactor) ?       0 : $IFactor;
-  $hash->{c_PID_DFactor}      = !defined($DFactor) ?       0 : $DFactor;
+  $hash->{c_PID_useit}        = !defined($usePID)  ?       0 : $usePID;
 
-  $hash->{c_PID_ILookBackCnt} = !defined($ILookBackCnt) ?  3 : $ILookBackCnt;
-  $hash->{c_PID_DLookBackCnt} = !defined($DLookBackCnt) ?  1 : $DLookBackCnt;
+  if ($hash->{c_PID_useit} eq 0) {
 
-  $hash->{h_deltaTemp}      = 0 unless defined ($hash->{h_deltaTemp});
-  $hash->{h_deltaTemp_D}    = 0 unless defined ($hash->{h_deltaTemp_D});
-  #$hash->{h_pid_integrator} = 0;
+    # simple p-factor calculation will be done
 
-  if ($pid eq "") {
-
-    delete ($hash->{READINGS}{PID_PVal})        if (defined($hash->{READINGS}{PID_PVal}));
-    delete ($hash->{READINGS}{PID_IVal})        if (defined($hash->{READINGS}{PID_IVal}));
-    delete ($hash->{READINGS}{PID_DVal})        if (defined($hash->{READINGS}{PID_DVal}));
-    delete ($hash->{READINGS}{PID_PWMPulse})    if (defined($hash->{READINGS}{PID_PWMPulse}));
-    delete ($hash->{READINGS}{PID_PWMOnTime})   if (defined($hash->{READINGS}{PID_PWMOnTime}));
+    delete ($hash->{READINGS}{PID_PVal})          if (defined($hash->{READINGS}{PID_PVal}));
+    delete ($hash->{READINGS}{PID_IVal})          if (defined($hash->{READINGS}{PID_IVal}));
+    delete ($hash->{READINGS}{PID_DVal})          if (defined($hash->{READINGS}{PID_DVal}));
+    delete ($hash->{READINGS}{PID_PWMPulse})      if (defined($hash->{READINGS}{PID_PWMPulse}));
+    delete ($hash->{READINGS}{PID_PWMOnTime})     if (defined($hash->{READINGS}{PID_PWMOnTime}));
  
+    delete ($hash->{helper}{PID_I_previousTemps}) if (defined (($hash->{helper}{PID_I_previousTemps})));
     delete ($hash->{helper}{PID_D_previousTemps}) if (defined (($hash->{helper}{PID_D_previousTemps})));
 
-    #delete ($hash->{h_deltaTemp})            if (defined($hash->{h_deltaTemp}));
-    #delete ($hash->{h_pid_integrator})       if (defined($hash->{h_pid_integrator}));
+    delete ($hash->{h_PID_I_previousTemps})       if (defined (($hash->{h_PID_I_previousTemps})));
+    delete ($hash->{h_PID_D_previousTemps})       if (defined (($hash->{h_PID_D_previousTemps})));
 
-  } else {
+    delete ($hash->{c_PID_PFactor})               if (defined (($hash->{c_PID_PFactor})));
+    delete ($hash->{c_PID_IFactor})               if (defined (($hash->{c_PID_IFactor})));
+    delete ($hash->{c_PID_DFactor})               if (defined (($hash->{c_PID_DFactor})));
+
+    delete ($hash->{c_PID_ILookBackCnt})          if (defined (($hash->{c_PID_ILookBackCnt})));
+    delete ($hash->{c_PID_DLookBackCnt})          if (defined (($hash->{c_PID_DLookBackCnt})));
+
+    delete ($hash->{h_deltaTemp})                 if (defined($hash->{h_deltaTemp}));
+    delete ($hash->{h_deltaTemp_D})               if (defined($hash->{h_deltaTemp_D}));
+
+    my ($f, $o) = split (",", $factor);
+    $f = 1    unless (defined ($f));
+    $o = 0.11 unless (defined ($o));       # if cycletime is 900 then this increases the on-time by 1:39 (=99 seconds)
+ 
+
+    $hash->{c_factor}             = $f;		# pulse is calculated using the below formular
+    $hash->{c_foffset}            = $o;           # ( $deltaTemp * $c_factor) ** 2) + $c_foffset
+
+  } elsif ($hash->{c_PID_useit} eq 1) {
+
+    delete ($hash->{READINGS}{PWMPulse})      if (defined($hash->{READINGS}{PWMPulse}));
+    delete ($hash->{READINGS}{PWMOnTime})     if (defined($hash->{READINGS}{PWMOnTime}));
+
+    delete ($hash->{h_PID_I_previousTemps})   if (defined (($hash->{h_PID_I_previousTemps})));
+    delete ($hash->{h_PID_D_previousTemps})   if (defined (($hash->{h_PID_D_previousTemps})));
+
+    delete ($hash->{c_factor})                  if (defined (($hash->{c_factor})));
+    delete ($hash->{c_foffset})                 if (defined (($hash->{c_foffset})));
+
+    $hash->{c_PID_PFactor}      = !defined($PFactor) ?      0.8 : $PFactor;
+    $hash->{c_PID_IFactor}      = !defined($IFactor) ?      0.3 : $IFactor;
+    $hash->{c_PID_DFactor}      = !defined($DFactor) ?      0.5 : $DFactor;
+
+    $hash->{c_PID_ILookBackCnt} = !defined($ILookBackCnt) ?   5 : $ILookBackCnt;
+    $hash->{c_PID_DLookBackCnt} = !defined($DLookBackCnt) ?  10 : $DLookBackCnt;
+
+    $hash->{h_deltaTemp}      = 0 unless defined ($hash->{h_deltaTemp});
+    $hash->{h_deltaTemp_D}    = 0 unless defined ($hash->{h_deltaTemp_D});
 
     ### I-Factor
 
@@ -639,9 +664,7 @@ PWMR_Define($$)
     # cut Buffer if it is too large
     while (scalar @{$IBuffer} > $hash->{c_PID_DLookBackCnt}) {
       my $v = shift @{$IBuffer};
-#      Log3 ($hash, 3, "shift $v from IBuffer");
     }
-#    Log3 ($hash, 3, "IBuffer contains ".scalar @{$IBuffer}." elements");
 
     ### D-Factor
 
@@ -656,30 +679,39 @@ PWMR_Define($$)
     #Log3 ($hash, 3, "org reference DBuffer is $hash->{helper}{PID_D_previousTemps} short is $DBuffer, cnt is ". scalar @{$DBuffer}." (starting from 0)");
     Log3 ($hash, 4, "content of DBuffer is @{$DBuffer}");
 
-#    for my $i ( 0 .. $cnt -1 ) {
-#      Log3 ($hash, 3, "value $i $DBuffer->[$i]");
-#    }
-#
-#    push @{$DBuffer}, $DBuffer->[1] + $DBuffer->[0];
-#
-#    for my $i ( 0 .. @{$DBuffer} -1 ) {
-#      Log3 ($hash, 3, "value after push $i $DBuffer->[$i]");
-#    }
-#
-#    shift @{$DBuffer};
-#
-#    for my $i ( 0 .. @{$DBuffer} -1 ) {
-#      Log3 ($hash, 3, "value after shift $i $DBuffer->[$i]");
-#    }
-
     # cut Buffer if it is too large
     while (scalar @{$DBuffer} > $hash->{c_PID_DLookBackCnt}) {
       my $v = shift @{$DBuffer};
-#      Log3 ($hash, 3, "shift $v from DBuffer");
     }
-#    Log3 ($hash, 3, "DBuffer contains ".scalar @{$DBuffer}." elements");
 
+  } else {
+
+    delete ($hash->{READINGS}{PWMPulse})      if (defined($hash->{READINGS}{PWMPulse}));
+    delete ($hash->{READINGS}{PWMOnTime})     if (defined($hash->{READINGS}{PWMOnTime}));
+
+    delete ($hash->{h_PID_I_previousTemps})   if (defined (($hash->{h_PID_I_previousTemps})));
+    delete ($hash->{h_PID_D_previousTemps})   if (defined (($hash->{h_PID_D_previousTemps})));
+
+    delete ($hash->{c_factor})                  if (defined (($hash->{c_factor})));
+    delete ($hash->{c_foffset})                 if (defined (($hash->{c_foffset})));
+
+    $hash->{c_PID_PFactor}      = !defined($PFactor) ?       0.8  : $PFactor;
+    $hash->{c_PID_IFactor}      = !defined($IFactor) ?       0.01 : $IFactor;
+    $hash->{c_PID_DFactor}      = !defined($DFactor) ?       0    : $DFactor;
+
+    delete ($hash->{helper}{PID_I_previousTemps}) if (defined (($hash->{helper}{PID_I_previousTemps})));
+    delete ($hash->{helper}{PID_D_previousTemps}) if (defined (($hash->{helper}{PID_D_previousTemps})));
+
+    delete ($hash->{h_PID_I_previousTemps})       if (defined (($hash->{h_PID_I_previousTemps})));
+    delete ($hash->{h_PID_D_previousTemps})       if (defined (($hash->{h_PID_D_previousTemps})));
+
+    delete ($hash->{c_PID_ILookBackCnt})          if (defined ($hash->{c_PID_ILookBackCnt}));
+    delete ($hash->{c_PID_DLookBackCnt})          if (defined ($hash->{c_PID_DLookBackCnt}));
+
+    delete ($hash->{h_deltaTemp})                 if (defined ($hash->{h_deltaTemp}));
+    delete ($hash->{h_deltaTemp_D})               if (defined ($hash->{h_deltaTemp_D}));
   }
+
   
 
   ##########
@@ -844,8 +876,8 @@ PWMR_ReadRoom(@)
 
   #$room->{helper}{cycletime} = $cycletime;
 
-  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV) = 
-    (99, "off", 0, 0, 0, 0, 0);
+  my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $newpulsePID, $prevswitchtime, $windowV) = 
+    (99, "off", 0, 0, 0, 0, 0, 0);
 
   #Log3 ($room, 4, "PWMR_ReadRoom $name <$room->{t_sensor}> <$room->{actor}>");
 
@@ -908,7 +940,6 @@ PWMR_ReadRoom(@)
     readingsSingleUpdate ($room,  "lastswitch", time(), 0);
   }
 
-  $factor          = $room->{FACTOR};
   $oldpulse        = $room->{READINGS}{oldpulse}{VAL};
   $prevswitchtime  = $room->{READINGS}{lastswitch}{VAL};
   $prevswitchtimeT = $room->{READINGS}{lastswitch}{TIME};
@@ -939,115 +970,167 @@ PWMR_ReadRoom(@)
     $desiredTemp    = $room->{READINGS}{"desired-temp"}{VAL};
   }
 
-  my $deltaTemp    = maxNum (0, $desiredTemp - $temperaturV);
-  
-  my $factoroffset = $room->{FOFFSET};
-  
-  $newpulse        = minNum ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset); # default 85% max ontime
-  $newpulse        = sprintf ("%.2f", $newpulse);
-
-  
-  my $PWMPulse     = $newpulse * 100;
-  my $PWMOnTime    =  sprintf ("%02s:%02s", int ($newpulse * $cycletime / 60), ($newpulse * $cycletime) % 60);
-
-  my $iodev = $room->{IODev};
-  #if ($newpulse * $defs{$iodev}->{CYCLETIME} < $defs{$iodev}->{MINONOFFTIME}) {
-  if ($newpulse * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
-	$PWMPulse = 0;
-	$PWMOnTime = "00:00";
-  }
-
-  ### PID calculation
-
-  my $DBuffer = $room->{helper}{PID_D_previousTemps};
-  push @{$DBuffer}, $temperaturV;
-
-  my $IBuffer = $room->{helper}{PID_I_previousTemps};
-  push @{$IBuffer}, $temperaturV;
-
-  # cut I-Buffer if it is too large
-  while (scalar @{$IBuffer} > $room->{c_PID_ILookBackCnt}) {
-    my $v = shift @{$IBuffer};
-    #Log3 ($room, 3, "shift $v from IBuffer");
-  }
-  #Log3 ($room, 3, "IBuffer contains ".scalar @{$IBuffer}." elements");
-
-  # cut D-Buffer if it is too large
-  while (scalar @{$DBuffer} > $room->{c_PID_DLookBackCnt}) {
-    my $v = shift @{$DBuffer};
-    #Log3 ($room, 3, "shift $v from DBuffer");
-  }
-  #Log3 ($room, 3, "DBuffer contains ".scalar @{$DBuffer}." elements");
-
-  $room->{h_PID_I_previousTemps} = join (" ", @{$IBuffer});
-  $room->{h_PID_D_previousTemps} = join (" ", @{$DBuffer});
-
-
-  my $deltaTempPID = $desiredTemp - $temperaturV;
-  $room->{h_deltaTemp}   = sprintf ("%.1f", -1 * $deltaTempPID);
-  $room->{h_deltaTemp_D} = sprintf ("%.1f", -1 * ($desiredTemp - $DBuffer->[0]));
-
-  my $ISum = 0;
-  foreach my $t (@{$IBuffer}) {
-    $ISum += ($desiredTemp - $t);
-  }
-  #$ISum = $ISum / scalar @{$IBuffer};
-  $ISum = $ISum;
-
-  #my $deltaTempPID = $desiredTemp - $temperaturV;
-  #my $IVal = $room->{c_PID_IFactor} * $deltaTempPID + $room->{h_pid_integrator};
-  
-  my $PVal = $room->{c_PID_PFactor} * $deltaTemp;
-  my $IVal = $room->{c_PID_IFactor} * $ISum;
-  my $DVal = $room->{c_PID_DFactor} * ($room->{h_deltaTemp_D} - $room->{h_deltaTemp});
-
-  $PVal    = minNum (1, sprintf ("%.2f", $PVal));
-  $IVal    = minNum (1, sprintf ("%.2f", $IVal));
-  $DVal    = minNum (1, sprintf ("%.2f", $DVal));
-
-  $IVal    = maxNum (-1, $IVal);
-
-  #$room->{h_pid_integrator} = $IVal;
-
-  my $newpulsePID  = ($PVal + $IVal + $DVal);
-  $newpulsePID     = minNum ($MaxPulse, sprintf ("%.2f", $newpulsePID));
-  $newpulsePID     = maxNum (0,         sprintf ("%.2f", $newpulsePID));
-
-  my $PWMPulsePID  = $newpulsePID * 100;
-  my $PWMOnTimePID =  sprintf ("%02s:%02s", int ($newpulsePID * $cycletime / 60), ($newpulsePID * $cycletime) % 60);
-
-
-  if ($PWMPulsePID * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
-	$PWMPulsePID = 0;
-	$PWMOnTimePID = "00:00";
-  }
-  # end PID calculation
-
-  if ($room->{c_PID_useit} >= 1) {
-    $newpulse   = $newpulsePID;
-    #$PWMPulse   = $PWMPulsePID;
-    #$PWMOnTime  = $PWMOnTimePID;
-  }
-
   readingsBeginUpdate ($room);
-  readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
-  readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTime);
-  readingsBulkUpdate ($room,  "PWMPulse", $PWMPulse);
-  readingsBulkUpdate ($room,  "temperature", $temperaturV);
+  
+  if ($room->{c_PID_useit} eq 0) {
 
-  if ($room->{c_PID_useit} >= 0) {
+    # simple P-Factor calculation
+
+    my $deltaTemp    = maxNum (0, $desiredTemp - $temperaturV);
+  
+    $factor          = $room->{c_factor};
+    my $factoroffset = $room->{c_foffset};
+  
+    $newpulse        = minNum ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset); # default 85% max ontime
+    $newpulse        = sprintf ("%.2f", $newpulse);
+
+  
+    my $PWMPulse     = $newpulse * 100;
+    my $PWMOnTime    =  sprintf ("%02s:%02s", int ($newpulse * $cycletime / 60), ($newpulse * $cycletime) % 60);
+
+    my $iodev = $room->{IODev};
+    if ($newpulse * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
+      $PWMPulse = 0;
+      $PWMOnTime = "00:00";
+    }
+
+    readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
+    readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTime);
+    readingsBulkUpdate ($room,  "PWMPulse", $PWMPulse);
+    readingsBulkUpdate ($room,  "temperature", $temperaturV);
+
+    Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
+    Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulse/$PWMOnTime), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
+
+  } elsif ($room->{c_PID_useit} eq 1) {
+
+    ### PID calculation
+
+    my $DBuffer = $room->{helper}{PID_D_previousTemps};
+    push @{$DBuffer}, $temperaturV;
+
+    my $IBuffer = $room->{helper}{PID_I_previousTemps};
+    push @{$IBuffer}, $temperaturV;
+
+    # cut I-Buffer if it is too large
+    while (scalar @{$IBuffer} > $room->{c_PID_ILookBackCnt}) {
+      my $v = shift @{$IBuffer};
+      #Log3 ($room, 3, "shift $v from IBuffer");
+    }
+    #Log3 ($room, 3, "IBuffer contains ".scalar @{$IBuffer}." elements");
+
+    # cut D-Buffer if it is too large
+    while (scalar @{$DBuffer} > $room->{c_PID_DLookBackCnt}) {
+      my $v = shift @{$DBuffer};
+      #Log3 ($room, 3, "shift $v from DBuffer");
+    }
+    #Log3 ($room, 3, "DBuffer contains ".scalar @{$DBuffer}." elements");
+
+    # helper for previousTemps
+    #$room->{h_PID_I_previousTemps} = join (" ", @{$IBuffer});
+    #$room->{h_PID_D_previousTemps} = join (" ", @{$DBuffer});
+
+
+    my $deltaTempPID = $desiredTemp - $temperaturV;
+    $room->{h_deltaTemp}   = sprintf ("%.1f", -1 * $deltaTempPID);
+    $room->{h_deltaTemp_D} = sprintf ("%.1f", -1 * ($desiredTemp - $DBuffer->[0]));
+
+    my $ISum = 0;
+    foreach my $t (@{$IBuffer}) {
+      $ISum += ($desiredTemp - $t);
+    }
+    $ISum = $ISum;
+
+  
+    my $PVal = $room->{c_PID_PFactor} * maxNum (0, $deltaTempPID);
+    my $IVal = $room->{c_PID_IFactor} * $ISum;
+    my $DVal = $room->{c_PID_DFactor} * ($room->{h_deltaTemp_D} - $room->{h_deltaTemp});
+
+    $PVal    = minNum (1, sprintf ("%.2f", $PVal));
+    $IVal    = minNum (1, sprintf ("%.2f", $IVal));
+    $DVal    = minNum (1, sprintf ("%.2f", $DVal));
+
+    $IVal    = maxNum (-1, $IVal);
+
+    my $newpulsePID  = ($PVal + $IVal + $DVal);
+    $newpulsePID     = minNum ($MaxPulse, sprintf ("%.2f", $newpulsePID));
+    $newpulsePID     = maxNum (0,         sprintf ("%.2f", $newpulsePID));
+
+    my $PWMPulsePID  = $newpulsePID * 100;
+    my $PWMOnTimePID =  sprintf ("%02s:%02s", int ($newpulsePID * $cycletime / 60), ($newpulsePID * $cycletime) % 60);
+
+
+    my $iodev = $room->{IODev};
+    if ($PWMPulsePID * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
+      $PWMPulsePID = 0;
+      $PWMOnTimePID = "00:00";
+    }
+
+    readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
+    readingsBulkUpdate ($room,  "temperature", $temperaturV);
+
+    #readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTimePID);
+    #readingsBulkUpdate ($room,  "PWMPulse", $PWMPulsePID);
+
     readingsBulkUpdate ($room,  "PID_PVal", $PVal);
     readingsBulkUpdate ($room,  "PID_IVal", $IVal);
     readingsBulkUpdate ($room,  "PID_DVal", $DVal);
     readingsBulkUpdate ($room,  "PID_PWMPulse", $PWMPulsePID);
     readingsBulkUpdate ($room,  "PID_PWMOnTime", $PWMOnTimePID);
+
+    Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
+    Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulsePID/$PWMOnTimePID), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
+
+  } elsif($room->{c_PID_useit} >= 2) {
+
+    my $deltaTempPID = $desiredTemp - $temperaturV;
+    $room->{h_deltaTemp}   = sprintf ("%.1f", -1 * $deltaTempPID);
+
+    #calculate IValue
+    my $ISum = $room->{READINGS}{"PID_IVal"}{VAL};
+    $ISum = $ISum + ($deltaTempPID*$room->{c_PID_IFactor});
+ 
+    my $PVal = $room->{c_PID_PFactor} * $deltaTempPID;
+    my $IVal = $ISum;
+    my $DVal = $room->{c_PID_DFactor} * ($room->{h_deltaTemp_D} - $room->{h_deltaTemp});
+
+    $IVal    = minNum (1, sprintf ("%.4f", $IVal));
+    $DVal    = minNum (1, sprintf ("%.4f", $DVal));
+
+    $IVal    = maxNum (0, $IVal);
+
+
+    my $newpulsePID  = ($PVal + $IVal + $DVal);
+    $newpulsePID     = minNum ($MaxPulse, sprintf ("%.4f", $newpulsePID));
+    $newpulsePID     = maxNum (0,         sprintf ("%.4f", $newpulsePID));
+
+    my $PWMPulsePID  = $newpulsePID * 100;
+    my $PWMOnTimePID =  sprintf ("%02s:%02s", int ($newpulsePID * $cycletime / 60), ($newpulsePID * $cycletime) % 60);
+
+    my $iodev = $room->{IODev};
+    if ($PWMPulsePID * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
+      $PWMPulsePID = 0;
+      $PWMOnTimePID = "00:00";
+    }
+
+    readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
+    readingsBulkUpdate ($room,  "temperature", $temperaturV);
+
+    #readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTimePID);
+    #readingsBulkUpdate ($room,  "PWMPulse", $PWMPulsePID);
+
+    readingsBulkUpdate ($room,  "PID_PVal", $PVal);
+    readingsBulkUpdate ($room,  "PID_IVal", $IVal);
+    readingsBulkUpdate ($room,  "PID_DVal", $DVal);
+    readingsBulkUpdate ($room,  "PID_PWMPulse", $PWMPulsePID);
+    readingsBulkUpdate ($room,  "PID_PWMOnTime", $PWMOnTimePID);
+
+    Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
+    Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulsePID/$PWMOnTimePID), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
   }
 
   readingsEndUpdate($room, 1);
-
   
-  Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
-  Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulse/$PWMOnTime), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
 
   return ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $prevswitchtime, $windowV);
 
@@ -1557,7 +1640,7 @@ PWMR_valueFormat(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;,[&lt;DLookBackCnt&gt;]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [ &lt;usePID=0&gt; | &lt;usePID=1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;] | &lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt; ]<br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1590,15 +1673,28 @@ PWMR_valueFormat(@)
       <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
     </li>
 
-    <li>&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;]<br>
-      <i>usePID 0|1</i>: 0 .. calculate Pulse based on PID but do not use it. 1 .. calculate Pulse based on PID and use it.<br>
-      <i>PFactor</i>: Konstant for P.<br>
-      <i>IFactor</i>: Konstant for I.<br>
-      <i>DFactor</i>: Konstant for D.<br> 
-      <i>ILookBackCnt</i>: Buffer size to store previous temperatures. For I calculation all values will be used. Default is 3.<br> 
-      <i>DLookBackCnt</i>: Buffer size to store previous temperatures. For D calculation actual and oldest temperature will be used. Default is 1.<br> 
+    <li>
+     <code>&lt;usePID=0&gt;</code><br>
+      <i>usePID 0</i>: calculate Pulse based on parameters factor and offset.<br>
+      Internals c_factor and c_foffset will reflect the values used for calculatio. Defaults are 1 and 0.11 (if not specified)<br>
+      Readings PWMOnTime and PWMPulse will reflect the actual calculated Pulse.<br>
+    </li>
+    <li>
+     <code>&lt;usePID=1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;[,&lt;ILookBackCnt&gt;]:&lt;DFactor&gt;[,&lt;DLookBackCnt&gt;]</code><br>
+      <i>PFactor</i>: Konstant for P. Default is 0.8.<br>
+      <i>IFactor</i>: Konstant for I. Default is 0.3<br>
+      <i>DFactor</i>: Konstant for D. Default is 0.5<br> 
+      <i>ILookBackCnt</i>: Buffer size to store previous temperatures. For I calculation all values will be used. Default is 5.<br> 
+      <i>DLookBackCnt</i>: Buffer size to store previous temperatures. For D calculation actual and oldest temperature will be used. Default is 10.<br> 
+      Internals c_PID_PFactor, c_PID_IFactor, c_PID_ILookBackCnt, c_PID_DFactor, c_PID_DLookBackCnt and c_PID_useit will reflect the above configuration values.<br>
+      Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
+    </li>
+    <li>
+     <code>&lt;usePID=2&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;</code><br>
+      <i>PFactor</i>: Konstant for P. Default is 0.8.<br>
+      <i>IFactor</i>: Konstant for I. Default is 0.01<br>
+      <i>DFactor</i>: Konstant for D. Default is 0<br> 
       Internals c_PID_PFactor, c_PID_IFactor, c_PID_DFactor and c_PID_useit will reflect the above configuration values.<br>
-      Internals h_deltaTemp h_deltaTemp_D store the values needed for calculation of the next PID value.<br>
       Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
     </li>
 
@@ -1607,12 +1703,14 @@ PWMR_valueFormat(@)
     <br>
     Example:<br>
     <br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen</code><br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code><br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2:.*Open.*</code><br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code> 0:0.8:1:0<br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen dummy 0:0.8:1:0</code><br>
-    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen dummy 1:0.8:1:0</code><br>
+    <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen</code><br>
+    <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code><br>
+    <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen windowKitchen1,windowKitchen2:.*Open.*</code><br>
+    <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code><br>
+    <code>define roomKitchen PWMR fh 1,0.11 tempKitchen relaisKitchen dummy 0</code><br>
+    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 1:0.8:0.3:0.5</code><br>
+    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 1:0.8:0.3,5:0.5,10</code><br>
+    <code>define roomKitchen PWMR fh 0 tempKitchen relaisKitchen dummy 2:0.8:0.01:0</code><br>
     <br>
        
 
