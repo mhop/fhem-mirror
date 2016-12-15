@@ -362,7 +362,9 @@ DUOFERNSTICK_DoInit($)
     next if ($module ne "DUOFERN");
     
     my $code = $defs{$d}{CODE};
-    push(@pairs, $code) if(length($code) == 6);
+    if(AttrVal($defs{$d}{NAME}, "ignore", "0") == "0") {
+      push(@pairs, $code) if(length($code) == 6);
+    }
   }
 
   $hash->{helper}{cmdEx} = 0;
@@ -581,6 +583,8 @@ DUOFERNSTICK_AddSendQueue($$)
 1;
 
 =pod
+=item summary    IO device for Rademacher DuoFern devices
+=item summary_DE IO device für Rademacher DuoFern Ger&auml;te
 =begin html
 
 <a name="DUOFERNSTICK"></a>
