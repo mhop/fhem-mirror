@@ -454,6 +454,7 @@ contrib/Infratec/*           wzut                 http://forum.fhem.de Basteleck
 contrib/PRESENCE             markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 contrib/PRESENCE/lepresenced PatrickR             http://forum.fhem.de Unterstuetzende Dienste
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
+contrib/Widgets/DateTimePicker* Matscher          http://forum.fhem.de Frontends
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
 
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
