@@ -1289,9 +1289,9 @@ Options:
     
     The presenced is available as:<br><br>
     <ul>
-    <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
-    <li>.deb package for Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
+    <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
+    <li>.deb package for Raspberry Pi (raspbian): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
     </ul>
     </ul><br><br>
         <u>lepresenced</u><br><br>
@@ -1323,8 +1323,8 @@ Examples:
     
     The presenced is available as:<br><br>
     <ul>
-    <li>Perl script: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
-    <li>.deb package (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
+    <li>Perl script: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
+    <li>.deb package (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1378,8 +1378,8 @@ Options:
     The collectord is available as:<br><br>
     
     <ul>
-    <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.6.deb" target="_new">collectord-1.6.deb</a></li>
+    <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
+    <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.6.deb" target="_new">collectord-1.6.deb</a></li>
     </ul>
     </ul><br><br>
 
@@ -1577,9 +1577,9 @@ Options:
     
     Der presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
-    <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
-    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    <li>Perl Skript: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
+    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
     </ul>
     </ul><br><br>
     <u>lepresenced</u><br><br>
@@ -1612,8 +1612,8 @@ Examples:
     
     Der le presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
-    <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
-    <li>.deb Paket (architekturunabh&auml;ngig) unter <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
+    <li>Perl Skript: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
+    <li>.deb Paket (architekturunabh&auml;ngig) unter <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1667,8 +1667,8 @@ Options:
     Der collectord ist zum Download verf&uuml;gbar als:<br><br>
     
     <ul>
-    <li>Perl Skript:  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.6.deb" target="_new">collectord-1.6.deb</a></li>
+    <li>Perl Skript:  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.6.deb" target="_new">collectord-1.6.deb</a></li>
     </ul>
     </ul>
 
