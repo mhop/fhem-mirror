@@ -35,6 +35,7 @@
 # 2016-06-16 V 0206 updateDevices called for devices created before setup has been read
 # 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribut levelInvert inverts RollerShutter position
 # 2016-11-29 V 0208 HttpUtils used instead of LWP::UserAgent, BLOCKING=0 set as default, umlaut can be used in Tahoma names
+# 2016-12-15 V 0209 perl warnings during startup and login eliminated
 
 package main;
 
@@ -87,7 +88,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0208";
+  my $ModuleVersion = "0209";
   
   my $subtype;
   my $name = $a[0];
@@ -440,7 +441,10 @@ sub tahoma_initDevice($)
   }
   else
   {
-    Log3 $name, 3, "$name: unknown device=$hash->{device}, subtype=$subtype";
+	my $device=$hash->{device};
+	$device ||= 'undefined';
+    $subtype ||= 'undefined';
+    Log3 $name, 3, "$name: unknown device=$device, subtype=$subtype";
   }
 
 
@@ -718,17 +722,16 @@ sub tahoma_dispatch($$$)
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   
-  if (!$hash->{logged_in})
-  {
-    tahoma_GetCookies($hash,$param->{httpheader});
-  }
-
+  $hash->{request_active} = 0;
+  
   if( $err ) {
     Log3 $name, 2, "$name: tahoma_dispatch http request failed: $err";
-    $hash->{request_active} = 0;
     $hash->{logged_in} = 0;
-  } elsif( $data ) {
-    $hash->{request_active} = 0;
+    return;
+  }
+  
+  if( $data ) {
+    tahoma_GetCookies($hash,$param->{httpheader}) if (!$hash->{logged_in});
     
     $data =~ tr/\r\n//d;
     $data =~ s/\h+/ /g;
