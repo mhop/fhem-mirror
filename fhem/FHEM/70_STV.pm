@@ -661,11 +661,13 @@ sub STV_Set($@)
     }
     return $ret;
   }
+  return $undef;
 }
 
 1;
 
 =pod
+=item summary device to communicate with an Samsung Television
 =begin html
 
 <a name="STV"></a>
