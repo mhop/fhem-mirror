@@ -44,7 +44,8 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
       };
 
   for(var i1=0; i1<vArr.length; i1++) {
-    var kv = vArr[i1].split(":");
+    var kv = vArr[i1].split(/:(.*)/);
+    log("Attribute check: " + kv[0]);    
     var value;
     if(kv[1] == "false")
     {
@@ -56,8 +57,8 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
     }
     else
     {
-        var number = parseInt(kv[1], 10);
-        log(number);
+        var number = Number(kv[1]);
+        log("Number check: " + number);
         if(isNaN(number))
         {
             value = kv[1];
