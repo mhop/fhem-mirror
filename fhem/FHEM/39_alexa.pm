@@ -338,7 +338,7 @@ Log 1, Dumper $characteristicsOfIntent;
                                             { name => 'Room', type => 'FHEM_Room' } ]};
     push @{$schema->{intents}}, {intent => "RoomListIntent", };
     push @{$schema->{intents}}, {intent => "DeviceListIntent",
-                                 slots => [ { name => 'preposition', type => 'FHEM_preposition' },
+                                 slots => [ { name => 'article', type => 'FHEM_article' },
                                             { name => 'Room', type => 'FHEM_Room' } ]};
     push @{$schema->{intents}}, {intent => "AMAZON.CancelIntent", };
     push @{$schema->{intents}}, {intent => "AMAZON.StopIntent", };
