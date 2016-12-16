@@ -252,11 +252,13 @@ Log 1, Dumper $characteristicsOfIntent;
 
 
         my $nr = $i?chr(65+$i):'';
-        $nr = '';
+        $nr = '' if( $mapping->{valueSuffix} );
         #my $intent = $characteristic .'Intent'. $nr;
         my $intent = $characteristic;
         $intent = lcfirst($mapping->{valueSuffix}) if( $mapping->{valueSuffix} );
         $intent .= 'Intent';
+        $intent .= $nr;
+
 
         next if( $intents->{$intent} );
         $intents->{$intent} = 1;
