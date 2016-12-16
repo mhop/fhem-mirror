@@ -336,6 +336,9 @@ Log 1, Dumper $characteristicsOfIntent;
                                  slots => [ { name => 'Device', type => 'FHEM_Device' },
                                             { name => 'preposition', type => 'FHEM_preposition' },
                                             { name => 'Room', type => 'FHEM_Room' } ]};
+    push @{$schema->{intents}}, {intent => "RoomAnswerIntent",
+                                 slots => [ { name => 'preposition', type => 'FHEM_preposition' },
+                                            { name => 'Room', type => 'FHEM_Room' } ]};
     push @{$schema->{intents}}, {intent => "RoomListIntent", };
     push @{$schema->{intents}}, {intent => "DeviceListIntent",
                                  slots => [ { name => 'article', type => 'FHEM_article' },
@@ -348,6 +351,10 @@ Log 1, Dumper $characteristicsOfIntent;
     $samples .= "\nStatusIntent status von {Device}";
     $samples .= "\nStatusIntent wie ist der status von {Device}";
     $samples .= "\nStatusIntent wie ist der status {preposition} {Room}";
+    $samples .= "\n";
+
+    $samples .= "\nRoomAnswerIntent {preposition} {Room}";
+    $samples .= "\n";
 
     $samples .= "\nRoomListIntent raumliste";
     $samples .= "\nDeviceListIntent geräteliste";
