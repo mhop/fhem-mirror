@@ -517,7 +517,7 @@ upd_getUrl($)
     uLog 1, $err;
     return "";
   }
-  if(length($data) == 0) {
+  if(!$data) {
     uLog 1, "$url: empty file received";
     return "";
   }
