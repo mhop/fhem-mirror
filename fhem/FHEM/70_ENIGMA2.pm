@@ -2243,16 +2243,16 @@ sub ENIGMA2_wake ($$) {
       AttrVal( $name, "WOL_useUdpBroadcast",
         AttrVal( $name, "useUdpBroadcast", "255.255.255.255" ) );
     my $port = AttrVal( $name, "WOL_port", "9" );
-    my $mode = AttrVal( $name, "WOL_mode", "UDP" );
+    my $mode = lc( AttrVal( $name, "WOL_mode", "UDP" ) );
 
     Log3 $name, 4,
       "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
       . $mac;
 
-    if ( $mode eq "BOTH" || $mode eq "EW" ) {
+    if ( $mode eq "both" || $mode eq "ew" ) {
         WOL_by_ew( $hash, $mac );
     }
-    if ( $mode eq "BOTH" || $mode eq "UDP" ) {
+    if ( $mode eq "both" || $mode eq "udp" ) {
         WOL_by_udp( $hash, $mac, $host, $port );
     }
 }
