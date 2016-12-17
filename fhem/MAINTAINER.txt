@@ -437,6 +437,8 @@ FHEM/lib/ProtoThreads.pm     ntruchsess           http://forum.fhem.de FHEM Deve
 FHEM/lib/SHC_packet_layout.xml  rr2000            http://forum.fhem.de Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           http://forum.fhem.de Multimedia
+FHEM/lib/*deviceconfig.xml.gz        krikan       http://forum.fhem.de ZWave
+FHEM/lib/*manufacturer_specific.xml  krikan       http://forum.fhem.de ZWave
 FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Development
 
