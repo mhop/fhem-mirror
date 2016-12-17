@@ -36,7 +36,6 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-
 #####################################
 sub
 FB_CALLMONITOR_Initialize($)
