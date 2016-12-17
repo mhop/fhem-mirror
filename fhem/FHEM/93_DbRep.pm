@@ -40,6 +40,11 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.8.6        17.12.2016       new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5
+#                               (Forum #msg541103)
+# 4.8.5        16.12.2016       bugfix group by-clause due to Forum #msg540610
+# 4.8.4        13.12.2016       added "group by ...,table_schema" to select in dbmeta_DoParse due to Forum #msg539228,
+#                               commandref adapted, changed "not_enough_data_in_period" to "less_data_in_period"
 # 4.8.3        12.12.2016       balance diff to next period if value of period is 0 between two periods with 
 #                               values 
 # 4.8.2        10.12.2016       bugfix negativ diff if balanced
@@ -161,7 +166,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.8.3";
+my $DbRepVersion = "4.8.6";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -549,9 +554,9 @@ sub DbRep_Attr($$$$) {
         if ($aName eq "reading" || $aName eq "device") {
             if ($dbmodel && $dbmodel ne 'SQLITE') {
                 if ($dbmodel eq 'POSTGRESQL') {
-                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
+                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
                 } elsif ($dbmodel eq 'MYSQL') {
-                    return "Length of \"$aName\" is too big. Maximum lenth for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
+                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
                 }
             }
         }
@@ -2092,7 +2097,7 @@ sub diffval_ParseDone($) {
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));           
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "diff-overrun_limit-".$difflimit, $rowsrej) if($rowsrej);
-  readingsBulkUpdate($hash, "not_enough_data_in_period", $ncpstr) if($ncpstr);
+  readingsBulkUpdate($hash, "less_data_in_period", $ncpstr) if($ncpstr);
   readingsBulkUpdate($hash, "state", ($ncpstr||$rowsrej)?"Warning":"done");
   readingsEndUpdate($hash, 1);
 
@@ -3164,6 +3169,18 @@ sub dbmeta_DoParse($) {
  my $sth;
  my $sql;
  
+ # due to incompatible changes made in MyQL 5.7.5, see http://johnemb.blogspot.de/2014/09/adding-or-removing-individual-sql-modes.html
+ if($dbmodel eq "MYSQL") {
+     eval {$dbh->do("SET sql_mode=(SELECT REPLACE(\@\@sql_mode,'ONLY_FULL_GROUP_BY',''));");};
+ }
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     $dbh->disconnect;
+     Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
+     return "$name|''|''|''|$err";
+ }
+ 
  if ($opt ne "svrinfo") {
     foreach my $ple (@parlist) {
          if ($opt eq "dbvars") {
@@ -3181,7 +3198,7 @@ sub dbmeta_DoParse($) {
                      engine,
                      table_type,
                      create_time
-                     from information_schema.tables group by table_name;";
+                     from information_schema.tables group by 1;";
          }
      
          Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
@@ -3207,7 +3224,7 @@ sub dbmeta_DoParse($) {
                      $param =~ tr/%//d;
                      if($line[0] =~ m/($param)/i) {
                          push(@row_array, $line[0].".table_schema ".$line[1]);
-                         push(@row_array, $line[0].".data_index_lenth_MB ".$line[2]);
+                         push(@row_array, $line[0].".data_index_length_MB ".$line[2]);
                          push(@row_array, $line[0].".table_name ".$line[1]);
                          push(@row_array, $line[0].".data_free_MB ".$line[3]);
                          push(@row_array, $line[0].".row_format ".$line[4]);
@@ -3753,7 +3770,7 @@ return;
                                  # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br><br>
                                  
                                  <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # field lenth is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
+                                 # field length is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
                                  <br>
 								 
 								 <b>Note: </b><br>
@@ -3792,15 +3809,22 @@ return;
                                  The reading to evaluate must be defined using attribute "reading". 
                                  This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
                                  The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
-								 specified time linits/aggregation. 
+								 specified time linits/aggregation, in which a balanced difference value of the previous aggregation period will be transfered to the
+								 following aggregation period in case this period contains a value. <br>
 								 An possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br>
-								 If only one dataset will be found within the evalution period, no difference can be calculated  
-								 and the reading "not_enough_data_in_period" with a list of concerned periods will be generated in that case. <br><br>
+								 If only one dataset will be found within the evalution period, the difference can be calculated only in combination with the balanced
+								 difference of the previous aggregation period. In this case a logical inaccuracy according the assignment of the difference to the particular aggregation period
+								 can be possible. Hence in warning in "state" will be placed and the reading "less_data_in_period" with a list of periods
+								 with only one dataset found in it will be created. <br><br>
+								 
+								 
+								 no difference can be calculated  
+								 and the reading "less_data_in_period" with a list of concerned periods will be generated in that case. <br><br>
 								 
                                  <ul>
-                                 <b>Note: </b><br>
-                                 Within the evaluation respectively aggregation period (day, week, month, etc.) AT LEAST two datasets per period MUST be 
-								 available for calulation. Otherwise no difference can be calculated and diffValue will be print "0" for the respective period !
+                                 <b>Note: </b><br>								 
+								 Within the evaluation respectively aggregation period (day, week, month, etc.) you should make available at least one dataset 
+                                 at the beginning and one dataset at the end of each aggregation period to take the difference calculation as much as possible.
                                  <br>
                                  <br>
                                  </li>
@@ -4028,14 +4052,14 @@ return;
   
   <ul><ul>
   <li><b>state                      </b>  - contains the current state of evaluation. If warnings are occured (state = Warning) compare Readings
-                                            "diff-overrun_limit-&lt;diffLimit&gt;" and "not_enough_data_in_period"  </li> <br>
+                                            "diff-overrun_limit-&lt;diffLimit&gt;" and "less_data_in_period"  </li> <br>
   <li><b>errortext                  </b>     - description about the reason of an error state </li> <br>
   <li><b>background_processing_time </b>     - the processing time spent for operations in background/forked operation </li> <br>
   <li><b>sql_processing_time        </b>     - the processing time wasted for all sql-statements used for an operation </li> <br>
   <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - contains a list of pairs of datasets which have overrun the threshold (&lt;diffLimit&gt;) 
                                                      of calculated difference each other determined by attribute "diffAccept" (default=20). </li> <br>
-  <li><b>not_enough_data_in_period</b>    - contains a list of time periods within only one dataset was found and therefor no difference calculation 
-                                            could be done. Valid for function "diffValue". </li> <br>	
+  <li><b>less_data_in_period</b>    - contains a list of time periods within only one dataset was found.  The difference calculation considers
+                                            the last value of the aggregation period before the current one. Valid for function "diffValue". </li> <br>	
   </ul></ul>
   <br><br>
 
@@ -4261,15 +4285,19 @@ return;
                                  Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
                                  Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
                                  Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
-                                 Zeitgrenzen/Aggregation gebildet. <br>
+                                 Zeitgrenzen/Aggregation gebildet, wobei ein Übertragswert der Vorperiode (Aggregation) zur darauf folgenden Aggregationsperiode 
+                                 berücksichtigt wird sofern diese einen Value-Wert enhtält.  <br>
 								 Dabei wird ein Zählerüberlauf (Neubeginn bei 0) mit berücksichtigt (vergleiche <a href="#DbRepattr">Attribut</a> "diffAccept"). <br>
-								 Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann keine Differenz berechnet werden 
-								 und das Reading "not_enough_data_in_period" mit einer Liste der betroffenen Perioden wird erzeugt. <br><br>
+								 Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann die Differenz in Verbindung mit dem 
+								 Differenzübertrag der Vorperiode berechnet werden. in diesem Fall kann es zu einer logischen Ungenauigkeit in der Zuordnung der Differenz
+                                 zu der Aggregationsperiode kommen. Deswegen wird eine Warnung im "state" und das 						 
+								 Reading "less_data_in_period" mit einer Liste der betroffenen Perioden wird erzeugt. <br><br>
 								 
                                  <ul>
                                  <b>Hinweis: </b><br>
-                                 Im Auswertungs- bzw. Aggregationszeitraum (Tag, Woche, Monat, etc.) MÜSSEN dem Modul pro Periode MINDESTENS zwei 
-								 Datensätze zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue ergibt in diesem Fall "0" !
+                                 Im Auswertungs- bzw. Aggregationszeitraum (Tag, Woche, Monat, etc.) sollten dem Modul pro Periode mindestens ein Datensatz 
+                                 zu Beginn und ein Datensatz gegen Ende des Aggregationszeitraumes zur Verfügung stehen um eine möglichst genaue Auswertung 
+                                 der Differenzwerte vornehmen zu können.
                                  <br>
                                  <br>
                                  </li>
@@ -4495,14 +4523,14 @@ return;
   
   <ul><ul>
   <li><b>state                      </b>  - enthält den aktuellen Status der Auswertung. Wenn Warnungen auftraten (state = Warning) vergleiche Readings
-                                            "diff-overrun_limit-&lt;diffLimit&gt;" und "not_enough_data_in_period"  </li> <br>
+                                            "diff-overrun_limit-&lt;diffLimit&gt;" und "less_data_in_period"  </li> <br>
   <li><b>errortext                  </b>  - Grund eines Fehlerstatus </li> <br>
   <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
   <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
   <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - enthält eine Liste der Wertepaare die eine durch das Attribut "diffAccept" festgelegte Differenz
                                                      &lt;diffLimit&gt; (Standard: 20) überschreiten. Gilt für Funktion "diffValue". </li> <br>
-  <li><b>not_enough_data_in_period</b>    - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde und dadurch keine 
-                                            Differenzberechnung durchgeführt werden konnte.  Gilt für Funktion "diffValue". </li> <br>													 
+  <li><b>less_data_in_period</b>    - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde. Die
+                                            Differenzberechnung berücksichtigt den letzten Wert der Vorperiode.  Gilt für Funktion "diffValue". </li> <br>													 
 													
   </ul></ul>
   <br>

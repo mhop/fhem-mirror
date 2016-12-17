@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: bugfix group by-clause due to incompatible changes made
+                       in MyQL 5.7.5 (Forum #msg541103)
   - feature: 66_ECMD, 67_ECMDDevice:
               - if split is used, the strings at which the messages are split 
                 are still part of the messages
