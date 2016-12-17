@@ -4188,18 +4188,26 @@ readingsBulkUpdate($$$@)
     if( $eocr
         && $eocrv[0] =~ m/.*:(.*)/ ) {
       my $threshold = $1;
+      my $ov = $value;
 
-      if($value =~ m/([\d\.\-eE]+)/ && looks_like_number($1)) { #41083, #62190
-        my $mv = $1;
+      $value =~ s/[^\d\.\-eE]//g; # We expect only numbers here.
+      my $isNum = looks_like_number($value);
+      if(!$isNum) {   # Forum #41083
+        $value = $ov;
+        $value =~ s/[^\d\.\-]//g;
+        $isNum = looks_like_number($value);
+      }
+      if($isNum) {
         my $last_value = $hash->{".attreocr-threshold$reading"};
         if( !defined($last_value) ) {
-          $hash->{".attreocr-threshold$reading"} = $mv;
-        } elsif( abs($mv - $last_value) < $threshold ) {
+          $hash->{".attreocr-threshold$reading"} = $value;
+        } elsif( abs($value-$last_value) < $threshold ) {
           $eocr = 0;
         } else {
-          $hash->{".attreocr-threshold$reading"} = $mv;
+          $hash->{".attreocr-threshold$reading"} = $value;
         }
       }
+      $value = $ov;
     }
 
     # determine if an event should be created:
