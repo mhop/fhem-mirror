@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 66_ECMD, 67_ECMDDevice:
+              - if split is used, the strings at which the messages are split 
+                are still part of the messages
+              - no default attributes for requestSeparator and responseSeparator
+              - input of raw data as perl-encoded string (for setting 
+                attributes)
+              - be more verbose and explicit at loglevel 5
+              - documentation corrected and amended
   - feature: 57_Calendar: BYDAY: recognizes and honors one or several weekdays 
                           with and without prefix (e.g. -1SU, 2MO) with MONTHLY
   - bugfix:  contrib/Widgets/DateTimePicker/fhemweb_datetime.js: parameter 
