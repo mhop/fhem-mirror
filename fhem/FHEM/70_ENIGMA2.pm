@@ -1866,13 +1866,15 @@ sub ENIGMA2_ReceiveCommand($$$) {
                       "ENIGMA2 $name: detected single event in timerlist";
 
                     # queued recording
-                    if (   defined( $return->{e2timer}{e2state} )
+                    if (
+                           defined( $return->{e2timer}{e2state} )
                         && $return->{e2timer}{e2state} eq "0"
-                        && defined( $return->{e2timer}{e2disabled} )
-                        && $return->{e2timer}{e2disabled} eq "0"
+                        && ( !defined( $return->{e2timer}{e2disabled} )
+                            || $return->{e2timer}{e2disabled} eq "0" )
                         && defined( $return->{e2timer}{e2eit} )
                         && defined( $return->{e2timer}{e2servicename} )
-                        && defined( $return->{e2timer}{e2name} ) )
+                        && defined( $return->{e2timer}{e2name} )
+                      )
                     {
 
                         my $timeleft =
@@ -1941,13 +1943,15 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     while ( $i < $arr_size ) {
 
                         # queued recording
-                        if (   defined( $return->{e2timer}[$i]{e2state} )
+                        if (
+                               defined( $return->{e2timer}[$i]{e2state} )
                             && $return->{e2timer}[$i]{e2state} eq "0"
-                            && defined( $return->{e2timer}[$i]{e2disabled} )
-                            && $return->{e2timer}[$i]{e2disabled} eq "0"
+                            && ( !defined( $return->{e2timer}[$i]{e2disabled} )
+                                || $return->{e2timer}[$i]{e2disabled} eq "0" )
                             && defined( $return->{e2timer}[$i]{e2eit} )
                             && defined( $return->{e2timer}[$i]{e2servicename} )
-                            && defined( $return->{e2timer}[$i]{e2name} ) )
+                            && defined( $return->{e2timer}[$i]{e2name} )
+                          )
                         {
 
                             my $timeleft =
@@ -2022,30 +2026,32 @@ sub ENIGMA2_ReceiveCommand($$$) {
             readingsBulkUpdateIfChanged( $hash, "recordings",
                 $recordingsElementsCount );
 
+            my $ri = 0;
             if ( $recordingsElementsCount > 0 ) {
-                my $i = 0;
 
-                while ( $i < $recordingsElementsCount ) {
-                    $i++;
+                while ( $ri < $recordingsElementsCount ) {
+                    $ri++;
 
-                    $readingname = "recordings" . $i . "_servicename";
+                    $readingname = "recordings" . $ri . "_servicename";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
-                      if ( $recordings{$i}{servicename} =~
+                      if ( $recordings{$ri}{servicename} =~
                         /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
 
-                    $readingname = "recordings" . $i . "_name";
+                    $readingname = "recordings" . $ri . "_name";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
-                      if ( $recordings{$i}{name} =~
+                      if ( $recordings{$ri}{name} =~
                         /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
                 }
             }
 
             # clear inactive recordingsX_* readings
             foreach my $recReading (
-                grep { /recordings\d_.*/ }
+                grep { /^recordings\d+_.*/ }
                 keys %{ $defs{$name}{READINGS} }
               )
             {
+                next if ( $recReading =~ m/^recordings(\d+).*/ && $1 <= $ri );
+
                 Log3 $name, 5,
                   "ENIGMA2 $name: old reading $recReading was deleted";
                 delete( $defs{$name}{READINGS}{$recReading} );
