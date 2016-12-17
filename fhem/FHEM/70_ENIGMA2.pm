@@ -1526,7 +1526,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         {
                             my $tuner_name = lc( $tuner->{name} );
                             $tuner_name =~ s/\s/_/g;
-                            $tuner_name =~ s/[A-Za-z\/\d_\.-]/$1/g;
+                            $tuner_name = "tuner_$tuner_name"
+                              if ( $tuner_name !~ /^[Tt]uner_/ );
+                            $tuner_name =~ s/[^A-Za-z\/\d_\.-]//g;
 
                             readingsBulkUpdateIfChanged( $hash, $tuner_name,
                                 $tuner->{type} );
@@ -1543,7 +1545,11 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                         my $tuner_name =
                           lc( $return->{e2about}{e2tunerinfo}{e2nim}{name} );
+
                         $tuner_name =~ s/\s/_/g;
+                        $tuner_name = "tuner_$tuner_name"
+                          if ( $tuner_name !~ /^[Tt]uner_/ );
+                        $tuner_name =~ s/[^A-Za-z\/\d_\.-]//g;
 
                         readingsBulkUpdateIfChanged( $hash, $tuner_name,
                             $return->{e2about}{e2tunerinfo}{e2nim}{type} );
