@@ -240,8 +240,9 @@ MINUTELY
 HOURLY
 DAILY
 WEEKLY
-    BYDAY: recognizes and honors one or several weekdays but not with prefix (e.g. -1SU, 2MO)
+    BYDAY: recognizes and honors one or several weekdays without prefix (e.g. -1SU, 2MO)
 MONTHLY
+    BYDAY: recognizes and honors one or several weekdays with and without prefix (e.g. -1SU, 2MO)
     BYMONTHDAY: recognized but ignored
     BYMONTH: recognized but ignored
 YEARLY
@@ -1138,6 +1139,93 @@ sub plusNMonths($$) {
   return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
 }
 
+# This function gets the next date according to interval and byDate
+# Alex, 2016-11-24
+# 1. parameter: startTime
+# 2. parameter: interval (months)
+# 3. parameter: byDay	(string with byDay-value(s), e.g. "FR" or "4SA" or "-1SU" or "4SA,4SU" (not sure if this is possible, i just take the first byDay))
+sub getNextMonthlyDateByDay($$$) {
+	my ( $ipTimeLocal, $ipByDays, $ipInterval )= @_;
+	
+	my ($lSecond, $lMinute, $lHour, $lDay, $lMonth, $lYear, $lWday, $lYday, $lIsdst )= localtime( $ipTimeLocal );
+ 
+	#main::Debug "getNextMonthlyDateByDay($ipTimeLocal, $ipByDays, $ipInterval)";
+ 
+	my @lByDays = split(",", $ipByDays);
+	my $lByDay = $lByDays[0];	#only get first day element within string
+	my $lByDayLength = length( $lByDay );
+	
+	my $lDayStr;		# which day to set the date
+	my $lDayInterval;	# e.g. 2 = 2nd $lDayStr of month or -1 = last $lDayStr of month
+	if ( $lByDayLength > 2 ) {
+		$lDayStr= substr( $lByDay, -2 );
+		$lDayInterval= int( substr( $lByDay, 0, $lByDayLength - 2 ) );
+	} else {
+		$lDayStr= $lByDay;
+		$lDayInterval= 1;
+	}
+
+        my @weekdays = qw(SU MO TU WE TH FR SA);
+        my ($lDayOfWeek)= grep { $weekdays[$_] eq $lDayStr } 0..$#weekdays;
+	
+	# get next day from beginning of the month, e.g. "4FR" = 4th friday of the month
+	my $lNextMonth;
+	my $lNextYear;
+	my $lDayOfWeekNew;
+	my $lDaysToAddOrSub;
+	my $lNewTime;
+	if ( $lDayInterval > 0 ) {
+		#get next month and year according to $ipInterval
+		$lNextMonth= $lMonth + $ipInterval;
+		$lNextYear= $lYear;
+		$lNextYear  += int( $lNextMonth / 12);
+		$lNextMonth %= 12;
+
+		my $lFirstOfNextMonth = main::fhemTimeLocal( $lSecond, $lMinute, $lHour, 1, $lNextMonth, $lNextYear );
+		($lSecond, $lMinute, $lHour, $lDay, $lMonth, $lYear, $lDayOfWeekNew, $lYday, $lIsdst )= localtime( $lFirstOfNextMonth );
+
+		if ( $lDayOfWeekNew <= $lDayOfWeek ) {
+			$lDaysToAddOrSub = $lDayOfWeek - $lDayOfWeekNew;
+		} else {
+			$lDaysToAddOrSub = 7 - $lDayOfWeekNew + $lDayOfWeek;
+		}
+		$lDaysToAddOrSub += ( 7 * ( $lDayInterval - 1 ) ); #add day interval, e.g. 4th friday...
+
+		$lNewTime = plusNSeconds( $lFirstOfNextMonth, 24*60*60*$lDaysToAddOrSub, 1);
+		($lSecond, $lMinute, $lHour, $lDay, $lMonth, $lYear, $lWday, $lYday, $lIsdst )= localtime( $lNewTime );
+		if ( $lMonth ne $lNextMonth ) {    #skip this date and move on to the next interval...
+			$lNewTime = getNextMonthlyDateByDay( $lFirstOfNextMonth, $ipByDays, $ipInterval );
+		}
+	} else { #calculate date from end of month
+		#get next month and year according to ipInterval
+		$lNextMonth	= $lMonth + $ipInterval + 1; 	#first get the month after the desired month
+		$lNextYear  = $lYear;
+		$lNextYear  += int( $lNextMonth / 12);
+		$lNextMonth %= 12;
+
+		my $lLastOfNextMonth = main::fhemTimeLocal( $lSecond, $lMinute, $lHour, 1, $lNextMonth, $lNextYear ); # get time
+		$lLastOfNextMonth = plusNSeconds( $lLastOfNextMonth, -24*60*60, 1 );	#subtract one day
+
+		($lSecond, $lMinute, $lHour, $lDay, $lMonth, $lYear, $lDayOfWeekNew, $lYday, $lIsdst )= localtime( $lLastOfNextMonth );
+
+		if ( $lDayOfWeekNew >= $lDayOfWeek )
+		{
+			$lDaysToAddOrSub = $lDayOfWeekNew - $lDayOfWeek;
+		}
+		else
+		{
+			$lDaysToAddOrSub =  7 - $lDayOfWeek + $lDayOfWeekNew;
+		}
+		$lDaysToAddOrSub += ( 7 * ( abs( $lDayInterval ) - 1 ) );
+
+		$lNewTime = plusNSeconds( $lLastOfNextMonth, -24*60*60*$lDaysToAddOrSub, 1);
+	}	
+	#main::Debug "lByDay = $lByDay, lByDayLength = $lByDayLength, lDay = $lDay, lDayInterval = $lDayInterval, lDayOfWeek = $lDayOfWeek, lFirstOfNextMonth = $lFirstOfNextMonth, lNextYear = $lNextYear, lNextMonth = $lNextMonth";
+	#main::Debug main::FmtDateTime($lNewTime);
+ 
+	return $lNewTime;
+}
+
 use constant eventsLimitMinus => -34560000; # -400d
 use constant eventsLimitPlus  =>  34560000; # +400d
 
@@ -1368,9 +1456,14 @@ sub createEvents($$$%) {
                     $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval);
                 }
             } elsif($freq eq "MONTHLY") {
-                # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}
-                # to be equal to BYMONTHDAY.
-                $nextstart= plusNMonths($nextstart, $interval);
+				if ( $byday ne "" ) {
+					$nextstart = getNextMonthlyDateByDay( $nextstart, $byday, $interval );
+				}
+				else {
+                                        # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}
+                                        # to be equal to BYMONTHDAY.
+                                        $nextstart= plusNMonths($nextstart, $interval);
+				}
             } elsif($freq eq "YEARLY") {
                 $nextstart= plusNMonths($nextstart, 12*$interval);
             } else {
@@ -2486,6 +2579,8 @@ sub CalendarAsHtml($;$) {
 
 =pod
 =item device
+=item summary handles calendar events from iCal file or URL
+=item summary_DE handhabt Kalendertermine aus iCal-Dateien und URLs
 =begin html
 
 <a name="Calendar"></a>
@@ -2666,7 +2761,7 @@ sub CalendarAsHtml($;$) {
   
   Recurring calendar events (series) are currently supported to an extent: 
   FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST 
-  are recognized but not interpreted. BYDAY is only correctly interpreted for weekly events.
+  are recognized but not interpreted. BYDAY is correctly interpreted for weekly and monthly events.
   The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   Out-of-order events and events excluded from a series (EXDATE) are handled.
@@ -3036,7 +3131,7 @@ sub CalendarAsHtml($;$) {
   Ein Kalender ist eine Menge von Terminen. Ein Termin hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Termine werden
   aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewissen Umfang unterst&uuml;tzt: 
   FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST 
-  werden erkannt aber nicht ausgewertet. BYDAY wird nur f&uuml;r w&ouml;chentliche Termine
+  werden erkannt aber nicht ausgewertet. BYDAY wird f&uuml;r w&ouml;chentliche und monatliche Termine
   korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;sselw&ouml;rtern hast.<p>
 
   Termine werden erzeugt, wenn FHEM gestartet wird oder der betreffende Eintrag im Quell-Kalender ver&auml;ndert
