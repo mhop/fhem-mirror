@@ -462,7 +462,7 @@ contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends/SVG/Plots/logProxy
-www/images/*                 ulimaass             http://forum.fhem.de Frontends
+www/images/*                 Wuppi68              http://forum.fhem.de Frontends
 www/jscolor/*                justme1968           http://forum.fhem.de Frontends
 www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
 www/pgm2/dashboard/*         svenson08            http://forum.fhem.de Frontends
