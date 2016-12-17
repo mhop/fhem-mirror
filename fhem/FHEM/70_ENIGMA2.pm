@@ -31,7 +31,6 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
-use IO::Socket;
 use HttpUtils;
 use Encode;
 
@@ -62,7 +61,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField wakeupCmd:textField "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -1033,8 +1032,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
             }
 
             $presence = "absent";
-            readingsBulkUpdate( $hash, "presence", $presence )
-              if ( ReadingsVal( $name, "presence", "" ) ne $presence );
+            readingsBulkUpdateIfChanged( $hash, "presence", $presence );
         }
 
     }
@@ -1042,8 +1040,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
     # data received
     elsif ($data) {
         $presence = "present";
-        readingsBulkUpdate( $hash, "presence", $presence )
-          if ( ReadingsVal( $name, "presence", "" ) ne $presence );
+        readingsBulkUpdateIfChanged( $hash, "presence", $presence );
 
         if ( !defined($cmd) || $cmd eq "" ) {
             Log3 $name, 4, "ENIGMA2 $name: RCV $service";
@@ -1422,20 +1419,12 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         if (   $return->{e2about}{$e2reading} eq "False"
                             || $return->{e2about}{$e2reading} eq "True" )
                         {
-                            if ( ReadingsVal( $name, $reading, "" ) ne
-                                lc( $return->{e2about}{$e2reading} ) )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    lc( $return->{e2about}{$e2reading} ) );
-                            }
+                            readingsBulkUpdateIfChanged( $hash, $reading,
+                                lc( $return->{e2about}{$e2reading} ) );
                         }
                         else {
-                            if ( ReadingsVal( $name, $reading, "" ) ne
-                                $return->{e2about}{$e2reading} )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    $return->{e2about}{$e2reading} );
-                            }
+                            readingsBulkUpdateIfChanged( $hash, $reading,
+                                $return->{e2about}{$e2reading} );
                         }
 
                         # model
@@ -1449,8 +1438,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     }
 
                     else {
-                        readingsBulkUpdate( $hash, $reading, "-" )
-                          if ( ReadingsVal( $name, $reading, "" ) ne "-" );
+                        readingsBulkUpdateIfChanged( $hash, $reading, "-" );
                     }
                 }
 
@@ -1467,9 +1455,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         while ( $i < $arr_size ) {
                             my $counter     = $i + 1;
                             my $readingname = "hdd" . $counter . "_model";
-                            readingsBulkUpdate( $hash, $readingname,
-                                $return->{e2about}{e2hddinfo}[$i]{model} )
-                              if ( ReadingsVal( $name, $readingname, "" ) ne
+                            readingsBulkUpdateIfChanged( $hash, $readingname,
                                 $return->{e2about}{e2hddinfo}[$i]{model} );
 
                             $readingname = "hdd" . $counter . "_capacity";
@@ -1499,9 +1485,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         Log3 $name, 5, "ENIGMA2 $name: single HDD detected";
 
                         my $readingname = "hdd1_model";
-                        readingsBulkUpdate( $hash, $readingname,
-                            $return->{e2about}{e2hddinfo}{model} )
-                          if ( ReadingsVal( $name, $readingname, "" ) ne
+                        readingsBulkUpdateIfChanged( $hash, $readingname,
                             $return->{e2about}{e2hddinfo}{model} );
 
                         $readingname = "hdd1_capacity";
@@ -1542,10 +1526,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         {
                             my $tuner_name = lc( $tuner->{name} );
                             $tuner_name =~ s/\s/_/g;
+                            $tuner_name =~ s/[A-Za-z\/\d_\.-]/$1/g;
 
-                            readingsBulkUpdate( $hash, $tuner_name,
-                                $tuner->{type} )
-                              if ( ReadingsVal( $name, $tuner_name, "" ) ne
+                            readingsBulkUpdateIfChanged( $hash, $tuner_name,
                                 $tuner->{type} );
                         }
                     }
@@ -1562,9 +1545,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                           lc( $return->{e2about}{e2tunerinfo}{e2nim}{name} );
                         $tuner_name =~ s/\s/_/g;
 
-                        readingsBulkUpdate( $hash, $tuner_name,
-                            $return->{e2about}{e2tunerinfo}{e2nim}{type} )
-                          if ( ReadingsVal( $name, $tuner_name, "" ) ne
+                        readingsBulkUpdateIfChanged( $hash, $tuner_name,
                             $return->{e2about}{e2tunerinfo}{e2nim}{type} );
                     }
                     else {
@@ -1657,8 +1638,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             {
                                 Log3 $name, 5,
 "ENIGMA2 $name: detected servicereference type: radio";
-                                readingsBulkUpdate( $hash, "input", "radio" )
-                                  if ( ReadingsVal( $name, "input", "" ) ne
+                                readingsBulkUpdateIfChanged( $hash, "input",
                                     "radio" );
                             }
                             else {
@@ -1814,13 +1794,11 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     11 );
                             }
 
-                            readingsBulkUpdate( $hash, $reading, $timestring )
-                              if ( ReadingsVal( $name, $reading, "" ) ne
+                            readingsBulkUpdateIfChanged( $hash, $reading,
                                 $timestring );
                         }
                         else {
-                            readingsBulkUpdate( $hash, $reading, "-" )
-                              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
+                            readingsBulkUpdateIfChanged( $hash, $reading, "-" );
                         }
 
                         # next event
@@ -1845,13 +1823,11 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     11 );
                             }
 
-                            readingsBulkUpdate( $hash, $reading, $timestring )
-                              if ( ReadingsVal( $name, $reading, "" ) ne
+                            readingsBulkUpdateIfChanged( $hash, $reading,
                                 $timestring );
                         }
                         else {
-                            readingsBulkUpdate( $hash, $reading, "-" )
-                              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
+                            readingsBulkUpdateIfChanged( $hash, $reading, "-" );
                         }
                     }
                 }
@@ -2037,8 +2013,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
             my $recordingsElementsCount = scalar( keys %recordings );
             my $readingname;
 
-            readingsBulkUpdate( $hash, "recordings", $recordingsElementsCount )
-              if ( ReadingsVal( $name, "recordings", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings",
                 $recordingsElementsCount );
 
             if ( $recordingsElementsCount > 0 ) {
@@ -2048,16 +2023,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     $i++;
 
                     $readingname = "recordings" . $i . "_servicename";
-                    readingsBulkUpdate( $hash, $readingname,
-                        $recordings{$i}{servicename} )
-                      if ( ReadingsVal( $name, $readingname, "" ) ne
-                        $recordings{$i}{servicename} );
+                    readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
+                      if ( $recordings{$i}{servicename} =~
+                        /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
 
                     $readingname = "recordings" . $i . "_name";
-                    readingsBulkUpdate( $hash, $readingname,
-                        $recordings{$i}{name} )
-                      if ( ReadingsVal( $name, $readingname, "" ) ne
-                        $recordings{$i}{name} );
+                    readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
+                      if ( $recordings{$i}{name} =~
+                        /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
                 }
             }
 
@@ -2072,52 +2045,29 @@ sub ENIGMA2_ReceiveCommand($$$) {
                 delete( $defs{$name}{READINGS}{$recReading} );
             }
 
-            readingsBulkUpdate( $hash, "recordings_next", $recordingsNext_time )
-              if ( ReadingsVal( $name, "recordings_next", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next",
                 $recordingsNext_time );
-
-            readingsBulkUpdate( $hash, "recordings_next_hr",
-                $recordingsNext_time_hr )
-              if ( ReadingsVal( $name, "recordings_next_hr", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next_hr",
                 $recordingsNext_time_hr );
-
-            readingsBulkUpdate( $hash, "recordings_next_counter",
-                $recordingsNext_counter )
-              if ( ReadingsVal( $name, "recordings_next_counter", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next_counter",
                 $recordingsNext_counter );
-
-            readingsBulkUpdate( $hash, "recordings_next_counter_hr",
-                $recordingsNext_counter_hr )
-              if ( ReadingsVal( $name, "recordings_next_counter_hr", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next_counter_hr",
                 $recordingsNext_counter_hr );
-
-            readingsBulkUpdate( $hash, "recordings_next_servicename",
-                $recordingsNextServicename )
-              if ( ReadingsVal( $name, "recordings_next_servicename", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next_servicename",
                 $recordingsNextServicename );
-
-            readingsBulkUpdate( $hash, "recordings_next_name",
-                $recordingsNextName )
-              if ( ReadingsVal( $name, "recordings_next_name", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_next_name",
                 $recordingsNextName );
-
-            readingsBulkUpdate( $hash, "recordings_error", $recordingsError )
-              if ( ReadingsVal( $name, "recordings_error", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_error",
                 $recordingsError );
-
-            readingsBulkUpdate( $hash, "recordings_finished",
-                $recordingsFinished )
-              if ( ReadingsVal( $name, "recordings_finished", "" ) ne
+            readingsBulkUpdateIfChanged( $hash, "recordings_finished",
                 $recordingsFinished );
         }
 
         # volume
         elsif ( $service eq "vol" ) {
             if ( ref($return) eq "HASH" && defined( $return->{e2current} ) ) {
-                readingsBulkUpdate( $hash, "volume", $return->{e2current} )
-                  if (
-                    ReadingsVal( $name, "volume", "" ) ne $return->{e2current}
-                  );
+                readingsBulkUpdateIfChanged( $hash, "volume",
+                    $return->{e2current} );
             }
             else {
                 Log3 $name, 5,
@@ -2128,8 +2078,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                 my $muteState = "on";
                 $muteState = "off"
                   if ( lc( $return->{e2ismuted} ) eq "false" );
-                readingsBulkUpdate( $hash, "mute", $muteState )
-                  if ( ReadingsVal( $name, "mute", "" ) ne $muteState );
+                readingsBulkUpdateIfChanged( $hash, "mute", $muteState );
             }
             else {
                 Log3 $name, 5,
@@ -2180,18 +2129,15 @@ sub ENIGMA2_ReceiveCommand($$$) {
     my $readingPower = "off";
     $readingPower = "on"
       if ( $state eq "on" );
-    readingsBulkUpdate( $hash, "power", $readingPower )
-      if ( ReadingsVal( $name, "power", "" ) ne $readingPower );
+    readingsBulkUpdateIfChanged( $hash, "power", $readingPower );
 
     # Set reading for state
     #
-    readingsBulkUpdate( $hash, "state", $state )
-      if ( ReadingsVal( $name, "state", "" ) ne $state );
+    readingsBulkUpdateIfChanged( $hash, "state", $state );
 
     # Set reading for stateAV
     my $stateAV = ENIGMA2_GetStateAV($hash);
-    readingsBulkUpdate( $hash, "stateAV", $stateAV )
-      if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+    readingsBulkUpdateIfChanged( $hash, "stateAV", $stateAV );
 
     # Set ENIGMA2 online-only readings to "-" in case box is in
     # offline or in standby mode
@@ -2200,47 +2146,43 @@ sub ENIGMA2_ReceiveCommand($$$) {
         || $state eq "undefined" )
     {
         foreach my $reading (
-            'servicename',                   'providername',
-            'servicereference',              'videowidth',
-            'videoheight',                   'servicevideosize',
-            'apid',                          'vpid',
-            'pcrpid',                        'pmtpid',
-            'txtpid',                        'tsid',
-            'onid',                          'sid',
-            'iswidescreen',                  'mute',
-            'volume',                        'channel',
-            'currentTitle',                  'nextTitle',
-            'currentMedia',                  'eventcurrenttime',
-            'eventcurrenttime_hr',           'eventdescription',
-            'eventdescriptionextended',      'eventduration',
-            'eventduration_hr',              'eventremaining',
-            'eventremaining_hr',             'eventstart',
-            'eventstart_hr',                 'eventtitle',
-            'eventname',                     'eventcurrenttime_next',
-            'eventcurrenttime_next_hr',      'eventdescription_next',
-            'eventdescriptionextended_next', 'eventduration_next',
-            'eventduration_next_hr',         'eventremaining_next',
-            'eventremaining_next_hr',        'eventstart_next',
-            'eventstart_next_hr',            'eventtitle_next',
-            'eventname_next',
+            'servicename',           'providername',
+            'servicereference',      'videowidth',
+            'videoheight',           'servicevideosize',
+            'apid',                  'vpid',
+            'pcrpid',                'pmtpid',
+            'txtpid',                'tsid',
+            'onid',                  'sid',
+            'iswidescreen',          'mute',
+            'channel',               'currentTitle',
+            'nextTitle',             'currentMedia',
+            'eventcurrenttime',      'eventcurrenttime_hr',
+            'eventdescription',      'eventdescriptionextended',
+            'eventduration',         'eventduration_hr',
+            'eventremaining',        'eventremaining_hr',
+            'eventstart',            'eventstart_hr',
+            'eventtitle',            'eventname',
+            'eventcurrenttime_next', 'eventcurrenttime_next_hr',
+            'eventdescription_next', 'eventdescriptionextended_next',
+            'eventduration_next',    'eventduration_next_hr',
+            'eventremaining_next',   'eventremaining_next_hr',
+            'eventstart_next',       'eventstart_next_hr',
+            'eventtitle_next',       'eventname_next',
           )
         {
-            readingsBulkUpdate( $hash, $reading, "-" )
-              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
+            readingsBulkUpdateIfChanged( $hash, $reading, "-" );
         }
 
         # special handling for signal values
         foreach my $reading ( 'acg', 'ber', 'snr', 'snrdb', ) {
-            readingsBulkUpdate( $hash, $reading, "0" )
-              if ( ReadingsVal( $name, $reading, "" ) ne "0" );
+            readingsBulkUpdateIfChanged( $hash, $reading, "0" );
         }
     }
 
     # Set ENIGMA2 online+standby readings to "-" in case box is in
     # offline mode
     if ( $state eq "absent" || $state eq "undefined" ) {
-        readingsBulkUpdate( $hash, "input", "-" )
-          if ( ReadingsVal( $name, "input", "" ) ne "-" );
+        readingsBulkUpdateIfChanged( $hash, "input", "-" );
     }
 
     readingsEndUpdate( $hash, 1 );
@@ -2286,33 +2228,33 @@ sub ENIGMA2_GetStateAV($) {
 
 ###################################
 sub ENIGMA2_wake ($$) {
-    my ( $name, $mac_addr ) = @_;
-    my $address;
-    my $port;
+    if ( !$modules{WOL}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_WOL.pm" )
+    {
+        my $ret = CommandReload( undef, "98_WOL" );
+        return $ret if ($ret);
+    }
+    elsif ( !-f "$attr{global}{modpath}/FHEM/98_WOL.pm" ) {
+        return "Missing module: $attr{global}{modpath}/FHEM/98_WOL.pm";
+    }
 
-    if ( !defined $address ) { $address = '255.255.255.255' }
-    if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
-
-    my $sock = new IO::Socket::INET( Proto => 'udp' )
-      or die "socket : $!";
-    die "Can't create WOL socket" if ( !$sock );
-
-    my $ip_addr = inet_aton($address);
-    my $sock_addr = sockaddr_in( $port, $ip_addr );
-    $mac_addr =~ s/://g;
-    my $packet =
-      pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
-
-    setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
-      or die "setsockopt : $!";
+    my ( $name, $mac ) = @_;
+    my $hash = $defs{$name};
+    my $host =
+      AttrVal( $name, "WOL_useUdpBroadcast",
+        AttrVal( $name, "useUdpBroadcast", "255.255.255.255" ) );
+    my $port = AttrVal( $name, "WOL_port", "9" );
+    my $mode = AttrVal( $name, "WOL_mode", "BOTH" );
 
     Log3 $name, 4,
       "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
-      . $mac_addr;
-    send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
-    close($sock);
+      . $mac;
 
-    return;
+    if ( $hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW" ) {
+        WOL_by_ew( $hash, $mac );
+    }
+    if ( $hash->{MODE} eq "BOTH" || $hash->{MODE} eq "UDP" ) {
+        WOL_by_udp( $hash, $mac, $host, $port );
+    }
 }
 
 #####################################
