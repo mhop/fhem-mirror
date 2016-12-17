@@ -35,7 +35,7 @@ use Encode qw(encode_utf8 decode_utf8);
 use Unit;
 use Time::Local;
 use List::Util qw(sum);
-use FHEM::98_dewpoint;
+use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
 
 #########################
@@ -64,6 +64,13 @@ sub HP1000_Initialize($) {
     my ($hash) = @_;
 
     Log3 $hash, 5, "HP1000_Initialize: Entering";
+
+    if ( !$modules{dewpoint}{LOADED}
+        && -f "$attr{global}{modpath}/FHEM/98_dewpoint.pm" )
+    {
+        my $ret = CommandReload( undef, "98_dewpoint" );
+        Log3 undef, 1, $ret if ($ret);
+    }
 
     $hash->{GetFn}         = "HP1000_Get";
     $hash->{DefFn}         = "HP1000_Define";
@@ -861,12 +868,16 @@ sub HP1000_CGI() {
     }
 
     # indoorDewpoint in Celsius
-    if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
+    if (   defined( $webArgs->{intemp} )
+        && defined( $webArgs->{inhumi} )
+        && exists &dewpoint_dewpoint )
+    {
         my $h = (
             $webArgs->{inhumi} > 110
             ? 110
             : ( $webArgs->{inhumi} <= 0 ? 0.01 : $webArgs->{inhumi} )
         );
+
         $webArgs->{indewpoint} =
           round( dewpoint_dewpoint( $webArgs->{intemp}, $h ), 1 );
         readingsBulkUpdate( $hash, "indoorDewpoint", $webArgs->{indewpoint} );
@@ -874,7 +885,8 @@ sub HP1000_CGI() {
 
     # indoorDewpoint in Fahrenheit
     if (   defined( $webArgs->{indoortempf} )
-        && defined( $webArgs->{indoorhumidity} ) )
+        && defined( $webArgs->{indoorhumidity} )
+        && exists &dewpoint_dewpoint )
     {
         my $h = (
             $webArgs->{indoorhumidity} > 110 ? 110
@@ -883,14 +895,20 @@ sub HP1000_CGI() {
                 : $webArgs->{indoorhumidity}
             )
         );
+
         $webArgs->{indoordewpointf} =
           round( dewpoint_dewpoint( $webArgs->{indoortempf}, $h ), 1 );
         readingsBulkUpdate( $hash, "indoorDewpoint_f",
             $webArgs->{indoordewpointf} );
     }
 
-    # humidityAbs / humidityAbs_f
-    if ( defined( $webArgs->{outtemp} ) && defined( $webArgs->{outhumi} ) ) {
+    # humidityAbs
+    if (   defined( $webArgs->{outtemp} )
+        && defined( $webArgs->{outhumi} )
+        && looks_like_number( $webArgs->{outtemp} )
+        && looks_like_number( $webArgs->{outhumi} )
+        && exists &dewpoint_absFeuchte )
+    {
         my $h = (
             $webArgs->{outhumi} > 110
             ? 110
@@ -899,14 +917,32 @@ sub HP1000_CGI() {
         $webArgs->{outhumiabs} =
           round( dewpoint_absFeuchte( $webArgs->{outtemp}, $h ), 1 );
         readingsBulkUpdate( $hash, "humidityAbs", $webArgs->{outhumiabs} );
+    }
 
+    # humidityAbs_f
+    if (   defined( $webArgs->{outtempf} )
+        && defined( $webArgs->{outhumi} )
+        && looks_like_number( $webArgs->{outtempf} )
+        && looks_like_number( $webArgs->{outhumi} )
+        && exists &dewpoint_absFeuchte )
+    {
+        my $h = (
+            $webArgs->{outhumi} > 110
+            ? 110
+            : ( $webArgs->{outhumi} <= 0 ? 0.01 : $webArgs->{outhumi} )
+        );
         $webArgs->{outhumiabsf} =
           round( dewpoint_absFeuchte( $webArgs->{outtempf}, $h ), 1 );
         readingsBulkUpdate( $hash, "humidityAbs_f", $webArgs->{outhumiabsf} );
     }
 
     # indoorHumidityAbs
-    if ( defined( $webArgs->{intemp} ) && defined( $webArgs->{inhumi} ) ) {
+    if (   defined( $webArgs->{intemp} )
+        && defined( $webArgs->{inhumi} )
+        && looks_like_number( $webArgs->{intemp} )
+        && looks_like_number( $webArgs->{inhumi} )
+        && exists &dewpoint_absFeuchte )
+    {
         my $h = (
             $webArgs->{inhumi} > 110
             ? 110
@@ -919,7 +955,10 @@ sub HP1000_CGI() {
 
     # indoorHumidityAbs_f
     if (   defined( $webArgs->{indoortempf} )
-        && defined( $webArgs->{indoorhumidity} ) )
+        && defined( $webArgs->{indoorhumidity} )
+        && looks_like_number( $webArgs->{indoortempf} )
+        && looks_like_number( $webArgs->{indoorhumidity} )
+        && exists &dewpoint_absFeuchte )
     {
         my $h = (
             $webArgs->{indoorhumidity} > 110 ? 110
