@@ -1,7 +1,4 @@
-
 # $Id$
-#
-# TODO:
 
 package main;
 
