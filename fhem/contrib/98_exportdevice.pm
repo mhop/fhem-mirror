@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_exportdevice.pm 12047 2016-08-22 08:06:24Z loredo $
 
 package main;
 use strict;

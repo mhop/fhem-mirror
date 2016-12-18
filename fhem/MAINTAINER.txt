@@ -271,7 +271,7 @@ FHEM/70_VolumeLink.pm        rapster              http://forum.fhem.de Multimedi
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/70_XBMC.pm              vbs                  http://forum.fhem.de Multimedia
 FHEM/70_Pushbullet.pm        fhainz               http://forum.fhem.de Unterstuetzende Dienste
-FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstuetzende Dienste
+FHEM/70_Pushover.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushalot.pm          Talkabout            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushsafer.pm         markusbloch          http://forum.fhem.de Unterstuetzende Dienste
@@ -383,7 +383,6 @@ FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstue
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        http://forum.fhem.de Sonstige Systeme   
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/98_exportdevice.pm      loredo               http://forum.fhem.de Sonstiges
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
@@ -447,6 +446,7 @@ contrib/55_BBB_BMP180.pm     betateilchen         http://forum.fhem.de Einplatin
 contrib/55_weco.pm           betateilchen         http://forum.fhem.de Wettermodule
 contrib/70_ONKYO_AVR_PULL.pm loredo               http://forum.fhem.de Multimedia
 contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedia
+contrib/98_exportdevice.pm   loredo               http://forum.fhem.de Sonstiges
 contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
 contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Wettermodule
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
