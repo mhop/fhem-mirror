@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  73_NUKIBridge,74_NUKIDevice: New Version 0.4.0
+             More Feature get,set ,Callback/Webhook Funktion
   - change:  98_exportdevice: command was deprecated and moved to contrib in
                               favor of FHEMWEB builtin functions
   - bugfix:  93_DbRep: bugfix group by-clause due to incompatible changes made
