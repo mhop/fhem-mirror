@@ -321,7 +321,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim1_V:2:3"}
  ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"0106" => {name=>"HM-MOD-EM-8Bit"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
- ,"0107" => {name=>"HM-LC-Ja1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1",}
+ ,"0107" => {name=>"HM-LC-Ja1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
 
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
@@ -1058,8 +1058,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,msgScPosA       =>1,msgScPosB       =>1
                          ,                    ledOnTime       =>1,eventDlyTime    =>1}
  ,"HM-SEC-SCo"        =>{                     sabotageMsg     =>1,localResDis     =>1,
-                         ,msgScPosA       =>1,msgScPosB       =>1
-                         ,                    ledOnTime       =>1,eventDlyTime    =>1}
+                         ,msgScPosA       =>1,msgScPosB       =>1,eventDlyTime    =>1}
  ,"HM-SCI-3-FM"       =>{ msgScPosA       =>1,msgScPosB       =>1
                          ,                                        eventDlyTime    =>1}
  ,"HM-SEC-TIS"        =>{                     sabotageMsg     =>1
