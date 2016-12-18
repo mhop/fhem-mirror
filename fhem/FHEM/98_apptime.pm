@@ -141,7 +141,7 @@ sub apptime_CommandDispTiming($$@) {
       my $h = $defs{$d}{helper}{bm}{$f};
 
       my $arg = "";
-      if ($h->{mAr}){
+      if ($h->{mAr} && scalar(@{$h->{mAr}})){
         foreach my $i (0..scalar(@{$h->{mAr}})){ 
           if(ref(${$h->{mAr}}[$i]) eq 'HASH' and exists(${$h->{mAr}}[$i]->{NAME})){
             ${$h->{mAr}}[$i] = "HASH(".${$h->{mAr}}[$i]->{NAME}.")";
@@ -174,6 +174,9 @@ sub apptime_CommandDispTiming($$@) {
 
 1;
 =pod
+=item command
+=item summary    support to analyse function performance
+=item summary_DE unterstuetzung der analyse der Performance von Funktionen
 =begin html
 
 <a name="apptime"></a>
