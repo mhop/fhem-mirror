@@ -66,7 +66,7 @@ FHEM/10_MQTT_DEVICE          ntruchsess           http://forum.fhem.de Sonstige 
 FHEM/10_MYSENSORS_DEVICE     ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_OWServer.pm          neubert/mfr69bs      http://forum.fhem.de 1Wire
 FHEM/10_SOMFY.pm             viegener             http://forum.fhem.de Sonstige Systeme
-FHEM/10_UNIRoll.pm           c-herrmann           http://forum.fhem.de SlowRF
+FHEM/10_UNIRoll.pm           C_Herrmann           http://forum.fhem.de SlowRF
 FHEM/10_ZWave.pm             rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/10_RESIDENTS.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/10_pilight_ctrl.pm      risiko               http://forum.fhem.de Sonstige Systeme
