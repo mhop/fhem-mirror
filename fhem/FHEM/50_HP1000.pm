@@ -920,9 +920,9 @@ sub HP1000_CGI() {
     }
 
     # humidityAbs_f
-    if (   defined( $webArgs->{outtempf} )
+    if (   defined( $webArgs->{tempf} )
         && defined( $webArgs->{outhumi} )
-        && looks_like_number( $webArgs->{outtempf} )
+        && looks_like_number( $webArgs->{tempf} )
         && looks_like_number( $webArgs->{outhumi} )
         && exists &dewpoint_absFeuchte )
     {
@@ -932,7 +932,7 @@ sub HP1000_CGI() {
             : ( $webArgs->{outhumi} <= 0 ? 0.01 : $webArgs->{outhumi} )
         );
         $webArgs->{outhumiabsf} =
-          round( dewpoint_absFeuchte( $webArgs->{outtempf}, $h ), 1 );
+          round( dewpoint_absFeuchte( $webArgs->{tempf}, $h ), 1 );
         readingsBulkUpdate( $hash, "humidityAbs_f", $webArgs->{outhumiabsf} );
     }
 
