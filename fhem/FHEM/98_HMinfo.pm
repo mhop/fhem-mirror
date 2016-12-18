@@ -18,6 +18,8 @@ sub HMinfo_register ($);
 use Blocking;
 use HMConfig;
 my $doAli = 0;#display alias names as well (filter option 2)
+my $tmplDefChange = 0;
+my $tmplUsgChange = 0;
 
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
@@ -198,9 +200,10 @@ sub HMinfo_Notify(@){##########################################################
   HMinfo_listOfTempTemplates() if (grep /(FILEWRITE.*$cfgFn|INITIALIZED)/,@{$events});
 
   return undef if (grep !/INITIALIZED/,@{$events});
+
   HMinfo_SetFn($ntfy,$ntfy->{NAME},"loadConfig") 
-       if (  grep /INITIALIZED/,@{$events}
-           && substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0);
+       if (  grep (/INITIALIZED/,@{$events})
+           && (substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0));
   
   #delete $modules{HMinfo}{NotifyFn};
   return undef;
@@ -1825,7 +1828,6 @@ sub HMinfo_loadConfig($@) {####################################################
   my ($filter,$fName)=@_;
   $filter = "." if (!$filter);
   my $ret;
-
   open(rFile, "$fName") || return("Can't open $fName: $!");
   my @el = ();
   my @elincmpl = ();
@@ -1941,8 +1943,8 @@ sub HMinfo_loadConfig($@) {####################################################
     delete $HMConfig::culHmTpl{$tmplCmd[1]};
     my $r = HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
   }
-  $HMConfig::culHmTpl{tmplDefChange} = 0;# all changes are obsolete
-  $HMConfig::culHmTpl{tmplUsgChange} = 0;# all changes are obsolete
+  $tmplDefChange = 0;# all changes are obsolete
+  $tmplUsgChange = 0;# all changes are obsolete
   foreach my $tmpN(devspec2array("TYPE=CUL_HM")){
     $defs{$tmpN}{helper}{tmplChg} = 0 if(!$defs{$tmpN}{helper}{role}{vrt});
     CUL_HM_setTmplDisp($defs{$tmpN});#set readings if desired    
@@ -2226,7 +2228,7 @@ sub HMinfo_templateChk_Get ($){ ###############################################
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter, no param" if(!defined $param);
-  $HMConfig::culHmTpl{tmplDefChange} = 1;# signal we have a change!
+  $tmplDefChange = 1;# signal we have a change!
   if ($param eq "del"){
     delete $HMConfig::culHmTpl{$name};
     return;
@@ -2352,7 +2354,7 @@ sub HMinfo_templateSet(@){#####################################################
 sub HMinfo_templateMark(@){####################################################
   my ($aHash,$tmplID,@p) = @_;
   $aHash->{helper}{tmpl}{$tmplID} = join(" ",@p);
-  $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
+  $tmplUsgChange = 1; # mark change
   $aHash->{helper}{tmplChg} = 1;
   CUL_HM_setTmplDisp($aHash);#set readings if desired
   return;
@@ -2361,7 +2363,7 @@ sub HMinfo_templateDel(@){#####################################################
   my ($aName,$tmpl,$pSet) = @_;
   return if (!defined $defs{$aName});
   delete $defs{$aName}{helper}{tmpl}{"$pSet>$tmpl"};
-  $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
+  $tmplUsgChange = 1; # mark change
   $defs{$aName}{helper}{tmplChg} = 1;
   CUL_HM_setTmplDisp($defs{$aName});#set readings if desired
   return;
@@ -2491,13 +2493,13 @@ sub HMinfo_templateList($){####################################################
 }
 sub HMinfo_templateWrite($){###################################################
   my $fName = shift;
-  HMinfo_templateWriteDef($fName) if ($HMConfig::culHmTpl{tmplDefChange});
-  HMinfo_templateWriteUsg($fName) if ($HMConfig::culHmTpl{tmplUsgChange});
+  HMinfo_templateWriteDef($fName) if ($tmplDefChange);
+  HMinfo_templateWriteUsg($fName) if ($tmplUsgChange);
   return;
 }
 sub HMinfo_templateWriteDef($){################################################
   my $fName = shift;
-  $HMConfig::culHmTpl{tmplDefChange} = 0; # reset changed bits
+  $tmplDefChange = 0; # reset changed bits
   my @tmpl =();
   #set templateDef <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... 
   foreach my $tpl(sort keys%HMConfig::culHmTpl){
@@ -2525,7 +2527,7 @@ sub HMinfo_templateWriteDef($){################################################
 }
 sub HMinfo_templateWriteUsg($){################################################
   my $fName = shift;
-  $HMConfig::culHmTpl{tmplUsgChange} = 0; # reset changed bits
+  $tmplUsgChange = 0; # reset changed bits
   my @tmpl =();
   foreach my $eN(sort (devspec2array("TYPE=CUL_HM"))){
     next if($defs{$eN}{helper}{role}{vrt} || !$defs{$eN}{helper}{tmplChg});
@@ -2608,72 +2610,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   delete $all{""}; #remove empties if present
   return (sort keys %all);
 }
-
-
-########################tetsection#############################################
-# HM overview
-##############################################################
-# Gives an overview of all CUL_HM devices and their channels
-#
-# $p1: regexp to select devicenames
-# $p2: list of internals, readings and attributes to be displayed. Comma-separated, case sensitive.
-#
-# use vars qw($FW_encoding); #for handover from fhemweb
-# sub HMI_overview(@) {
-#   my ($p1,$paramList)=@_;
-#   my @dd = @{$p1};
-#   my @p2l = ("DEF","peerList");
-#   if (!defined($paramList)){
-#     @p2l=@{$paramList};
-#   }
-#   ######### prepare html
-#   my $html ='<html><table class="block wide">'."\n"
-#            .'<style> .HMIdev { border-top:3px solid #555555; width:10%; }'
-#            .'        .HMIchn { width:10%;  }'
-#            .'</style>'
-#            ."\n"
-#            .'<tr><th>Device/Channel</th><th>'
-#            .join('</th><th>',@p2l)
-#            ."</th></tr>\n";
-#   ######### loop for output
-#   my $row=0;
-#   foreach my $d (sort @dd) {
-#     $html.=HMI_output($defs{$d},1,$row++,\@p2l);
-#     foreach my $c (CUL_HM_getAssChnNames($d)) {
-#       $html.=HMI_output($defs{$c},2,$row++,\@p2l);
-#     }
-#   }
-#   $html.="</table></html>\n";
-#   return ('text/html; charset=UTF-8',$html);
-# } #end sub HMI_overview
-#
-# sub HMI_output(@) {
-#   my ($hash,$lvl,$drow,$l)=@_;
-#   my @list = @{$l};
-#   my $n=$hash->{NAME};
-#   my $class= ($lvl==1)?'HMIdev':'HMIchn';
-#   ######### device/channel
-#   my $html.='<tr class = "'
-#            .(($drow/2==int($drow/2))?"even":"odd")
-#            ."\"><td class=\"$class\">"
-#            .($lvl==2?"&nbsp&nbsp&nbsp":"")
-#            ."<a href=\"$FW_ME?detail=$n\">$n<\/a>"
-#            .'</td>';
-#   ######### further values
-# 
-#   foreach my $p (@list) {
-#     $html.="<td class=\"$class\">";
-#     foreach my $pp (split(',',CUL_HM_Get($defs{$n},$n,"param",$p))) {
-#       $pp =~ s/(.*)/<a href=\"$FW_ME?detail=$1\">$1<\/a>/ if (defined($defs{$pp}));
-#       $pp = "" if($pp eq "undefined");
-#       $html.=$pp.', ' if ($pp !~ /HASH.*/);
-#     }
-#     $_  =~ s/(.*), $/$1/;
-#     $html.='</td>';
-#   }
-#   $html.="</tr>\n";
-#   return $html;
-# } #end sub HMI_output
 
 
 1;
