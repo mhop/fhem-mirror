@@ -180,6 +180,7 @@ FHEMWEB_Initialize($)
     stylesheetPrefix
     title
     touchpad:unused
+    viewport
     webname
   );
   use warnings 'qw';
@@ -808,13 +809,15 @@ FW_answerCall($)
   if($FW_tp || $FW_ss) {
     my $icon = FW_iconPath("fhemicon_ios.png");
     $icon = $FW_ME."/images/".($icon ? $icon : "default/fhemicon_ios.png");
+    my $viewport = '';
     if($FW_ss) {
        my $stf = $FW_userAgent =~ m/iPad|iPhone|iPod/ ? ",shrink-to-fit=no" :"";
-       FW_pO "<meta name='viewport' ".
-                        "content='initial-scale=1.0,user-scalable=1$stf'/>";
+       $viewport = "initial-scale=1.0,user-scalable=1$stf";
     } elsif($FW_tp) {
-      FW_pO '<meta name="viewport" content="width=768"/>';
+      $viewport = "width=768";
     }
+    $viewport = AttrVal($FW_wname, "viewport", $viewport);
+    FW_pO '<meta name="viewport" content="'.$viewport.'"/>' if ($viewport);
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     FW_pO '<meta name="mobile-web-app-capable" content="yes"/>'; # Forum #36183
     FW_pO '<link rel="apple-touch-icon" href="'.$icon.'"/>';
@@ -3569,6 +3572,14 @@ FW_widgetOverride($$)
         Sets the title of the page. If enclosed in {} the content is evaluated.
     </li><br>
 
+    <a name="viewport"></a>
+    <li>viewport<br>
+       Sets the &quot;viewport&quot; attribute in the HTML header. This can for
+       example be used to force the width of the page or disable zooming.<br>
+       Example: attr WEB viewport
+       width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no
+    </li><br>
+
     <a name="webCmd"></a>
     <li>webCmd<br>
         Colon separated list of commands to be shown in the room overview for a
@@ -4286,6 +4297,14 @@ FW_widgetOverride($$)
     <li>title<br>
        Setzt den Titel der Seite. Falls in {} eingeschlossen, dann wird es
        als Perl Ausdruck evaluiert.
+    </li><br>
+
+    <a name="viewport"></a>
+    <li>viewport<br>
+       Setzt das &quot;viewport&quot; Attribut im HTML Header. Das kann benutzt
+       werden um z.B. die Breite fest vorzugeben oder Zoomen zu verhindern.<br>
+       Beispiel: attr WEB viewport
+       width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no
     </li><br>
 
     <a name="webCmd"></a>
