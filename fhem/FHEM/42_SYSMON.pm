@@ -1557,6 +1557,10 @@ SYSMON_getCPUCoreNum_intern($) {
   
   return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
   
+  # TODO: Umstellung auf 
+  # cat /sys/devices/system/cpu/present
+  # cat /sys/devices/system/cpu/online
+  
   # nur wenn verfuegbar
   if(SYSMON_isSysCpuNum($hash)) {
     my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
@@ -4162,6 +4166,9 @@ sub SYSMON_Log($$$) {
 1;
 
 =pod
+=item device
+=item summary    provides some statistics about the system
+=item summary_DE liefert einige Statistiken ueber das Host-System
 =begin html
 
 <!-- ================================ -->
