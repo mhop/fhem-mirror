@@ -17,6 +17,13 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
+#     versioning: MAJOR.MINOR.PATCH, increment the:
+#     MAJOR version when you make incompatible API changes
+#      - includes changing CLI options, changing log-messages
+#     MINOR version when you add functionality in a backwards-compatible manner
+#      - includes adding new features and log-messages (as long as they don't break anything existing)
+#     PATCH version when you make backwards-compatible bug fixes.
+#
 ##############################################################################
 #   Changelog:
 #
@@ -30,18 +37,21 @@
 #   2016-10-07 version 1.0, adding to SVN
 #   2016-10-15 adding attribute updateSchedule to provide flexible updates, changed internal interval to INTERVAL
 #   2016-12-13 adding travelMode, fixing stateReading with value 0
+#   2016-12-15 adding reverseWaypoints attribute, adding weblink with auto create route via gmaps on verbose 5
 
 
 package main;
 
 use strict;                          
 use warnings;                        
-use Time::HiRes qw(gettimeofday);    
 use Data::Dumper;
+use Time::HiRes qw(gettimeofday);    
 use LWP::Simple qw($ua get);
-use JSON;
-use POSIX;
 use Blocking;
+use POSIX;
+die "MIME::Base64 missing!" unless(eval{require MIME::Base64});
+die "JSON missing!" unless(eval{require JSON});
+
 
 sub TRAFFIC_Initialize($);
 sub TRAFFIC_Define($$);
@@ -53,7 +63,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.1';
+my $TRVersion = '1.2';
 
 sub TRAFFIC_Initialize($){
 
@@ -64,9 +74,11 @@ sub TRAFFIC_Initialize($){
     $hash->{SetFn}      = "TRAFFIC_Set";
     $hash->{AttrFn}     = "TRAFFIC_Attr";
     $hash->{AttrList}   = 
-      "disable:0,1 start_address end_address raw_data:0,1 language waypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule " .
+      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule " .
       $readingFnAttributes;  
-      
+    $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC_debug";
+    $data{FWEXT}{"/TRAFFIC"}{FORKABLE} = 1; 
+
 }
 
 sub TRAFFIC_Define($$){
@@ -85,7 +97,6 @@ sub TRAFFIC_Define($$){
     $hash->{VERSION} = $TRVersion;
     delete($hash->{BURSTCOUNT}) if $hash->{BURSTCOUNT};
     delete($hash->{BURSTINTERVAL}) if $hash->{BURSTINTERVAL};
-    
 
     my $name = $hash->{NAME};
 
@@ -145,7 +156,19 @@ sub TRAFFIC_Attr(@){
     if($attrName eq "disable" && $attrValue eq "1"){
         readingsSingleUpdate( $hash, "state", "disabled", 1 );
     }
-    if($attrName eq "outputReadings" || $attrName eq "includeReturn"){
+    
+    if($attrName eq "verbose" && $attrValue eq "5"){
+        if (!defined $defs{$name."_weblink"}) {
+            FW_fC("define ".$name."_weblink weblink htmlCode {TRAFFIC_weblink(\"".$name."\",0)}");
+            FW_fC("attr ".$name."_weblink room TRAFFIC_debug");
+            Log3 $hash, 5, "TRAFFIC: ($name) weblink created";
+        }
+    }elsif($attrName eq "verbose" && $attrValue < 5){
+        FW_fC("delete ".$name."_weblink");
+    }
+    
+    
+    if($attrName eq "outputReadings" || $attrName eq "includeReturn" || $attrName eq "verbose"){
         #clear all readings
         foreach my $clearReading ( keys %{$hash->{READINGS}}){
             Log3 $hash, 5, "TRAFFIC: ($name) READING: $clearReading deleted";
@@ -201,7 +224,10 @@ sub TRAFFIC_Set($@){
         InternalTimer($updateTrigger, "TRAFFIC_StartUpdate", $hash, 0);            
 
         return undef;
+    }elsif($set =~ m/debug/){
+        # TRAFFIC_widget();
     }
+
 }
 
 
@@ -325,13 +351,19 @@ sub TRAFFIC_DoUpdate(){
     my $TRwaypoints = ''; 
     if(defined(AttrVal($name,"waypoints",undef))){
         $TRwaypoints = '&waypoints=via:' . join('|via:', split('\|', AttrVal($name,"waypoints",undef)));
-        
-        if($direction eq "return"){
-            $TRwaypoints = '&waypoints=via:' . join('|via:', reverse split('\|', AttrVal($name,"waypoints",undef)));
-            Log3 $hash, 5, "TRAFFIC: ($name) reversing waypoints";
-        }
     }else{
-        Log3 $hash, 5, "TRAFFIC: ($name) no waypoints specified";
+        Log3 $hash, 3, "TRAFFIC: ($name) no waypoints specified";
+    }
+    if($direction eq "return"){
+        if(defined(AttrVal($name,"returnWaypoints",undef))){
+            $TRwaypoints = '&waypoints=via:' . join('|via:', split('\|', AttrVal($name,"returnWaypoints",undef)));
+            Log3 $hash, 3, "TRAFFIC: ($name) using returnWaypoints";
+        }elsif(defined(AttrVal($name,"waypoints",undef))){
+            $TRwaypoints = '&waypoints=via:' . join('|via:', reverse split('\|', AttrVal($name,"waypoints",undef)));    
+            Log3 $hash, 3, "TRAFFIC: ($name) reversing waypoints";
+        }else{
+            Log3 $hash, 3, "TRAFFIC: ($name) no waypoints for return specified";
+        }
     }
     
     my $origin = AttrVal($name, "start_address", 0 );
@@ -360,6 +392,9 @@ sub TRAFFIC_DoUpdate(){
     $returnJSON->{'state'}                  = $json->{'status'};
     $returnJSON->{'status'}                 = $json->{'status'};
     $returnJSON->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
+    
+    $returnJSON->{'debugLocation'}      = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng} if AttrVal($name, "verbose", 0 ) == 5;
+    $returnJSON->{'debugPoly'}          = encode_base64 ($json->{'routes'}[0]->{overview_polyline}->{points}) if AttrVal($name, "verbose", 0 ) == 5;
     
     if($duration_in_traffic_sec && $duration_sec){
         $returnJSON->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
@@ -445,11 +480,86 @@ sub TRAFFIC_FinishUpdate($){
             Log3 $hash, 1, "TRAFFIC: ($name) stateReading $stateReading not found";
         }
     }
-
     readingsEndUpdate($hash, $dotrigger);
     Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
 }
 
+sub TRAFFIC_weblink{
+    my $name = shift();
+    my $return = shift();
+    return "<a href='/fhem/TRAFFIC_debug?name=$name&return=$return'>open Map for TRAFFIC $name </a><br>";
+}
+
+sub TRAFFIC_debug(){
+    my $name    = $FW_webArgs{name};
+    my $return  = $FW_webArgs{return};
+    return if(!defined($name));
+
+    $FW_RETTYPE = "text/html; charset=UTF-8";
+    $FW_RET="";
+
+    Log 1,"[traffic debug] called for $name";
+
+    my $debugPoly = 'debugPoly';
+    my $debugLocation = 'debugLocation';
+    if($return eq 1){
+        $debugPoly = 'return_'.$debugPoly;
+        $debugLocation = 'return_'.$debugLocation;
+    }
+
+    my $web = '<script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&amp;sensor=false"></script>
+<input size="200" type="hidden" id="path" value="'.decode_base64(ReadingsVal($name, "debugPoly", undef) ).'">';
+$web .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64(ReadingsVal($name, "return_debugPoly", undef) ).'">' if decode_base64(ReadingsVal($name, "return_debugPoly", undef) );
+$web .= '
+<div id="map"></div>
+<style>
+    #map {width:800px;height:800px;}
+</style>
+<script type="text/javascript">
+function initialize() {
+    var myLatlng = new google.maps.LatLng('.ReadingsVal($name, "$debugLocation", undef ).');
+    var myOptions = {
+        zoom: 10,
+        center: myLatlng,
+        mapTypeId: google.maps.MapTypeId.ROADMAP
+    }
+    var map = new google.maps.Map(document.getElementById("map"), myOptions);
+    var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path").value); 
+    var decodedLevels = decodeLevels("");
+    var setRegion = new google.maps.Polyline({
+        path: decodedPath,
+        levels: decodedLevels,
+        strokeColor: "#4cde44",
+        strokeOpacity: 1.0,
+        strokeWeight: 6,
+        map: map
+    });';
+    
+    $web .= 'var decodedPathR = google.maps.geometry.encoding.decodePath(document.getElementById("pathR").value); 
+    var decodedLevelsR = decodeLevels("");
+    var setRegionR = new google.maps.Polyline({
+        path: decodedPathR,
+        levels: decodedLevels,
+        strokeColor: "#FF0000",
+        strokeOpacity: 1.0,
+        strokeWeight: 2,
+        map: map
+    });' if decode_base64(ReadingsVal($name, "return_debugPoly", undef) );
+$web .='   
+}
+function decodeLevels(encodedLevelsString) {
+    var decodedLevels = [];
+    for (var i = 0; i < encodedLevelsString.length; ++i) {
+        var level = encodedLevelsString.charCodeAt(i) - 63;
+        decodedLevels.push(level);
+    }
+    return decodedLevels;
+}
+initialize();
+</script>';
+    FW_pO $web;
+    return ($FW_RETTYPE, $FW_RET);
+}
 
 sub prettySeconds {
     my $time = shift;
@@ -502,6 +612,7 @@ sub prettySeconds {
   requirements:<br>
   perl JSON module<br>
   perl LWP::SIMPLE module<br>
+  perl MIME::Base64 module<br>
   Google maps API key<br>
   <br>
     <b>Features:</b>
@@ -523,6 +634,9 @@ sub prettySeconds {
     <li>configure the state-reading </li>
     <li>optionally display the same route in return</li>
     <li>one-time-burst, specify the amount and interval between updates</li>
+    <li>different Travel Modes (driving, walking, bicycling and transit)</li>
+    <li>flexible update schedule</li>
+    <li>integrated Map to visualize configured route at verbose 5</li>
   </ul>
   <br>
   <br>
@@ -543,6 +657,7 @@ sub prettySeconds {
     <li>"raw_data" -  0:1</li>
     <li>"language" - de, en etc.</li>
     <li>"waypoints" - Lat, Long coordinates, separated by | </li>
+    <li>"returnWaypoints" - Lat, Long coordinates, separated by | </li>
     <li>"disable" - 0:1</li>
     <li>"stateReading" - name the reading which will be used in device state</li>
     <li>"outputReadings" - define what kind of readings you want to get: text, min, sec, average</li>
