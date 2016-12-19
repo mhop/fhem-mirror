@@ -60,7 +60,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.6";
+my $version         = "1.4.7";
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -273,6 +273,8 @@ sub UWZ_Initialize($) {
                         "maps ".
                         "humanreadable:0,1 ".
                         "htmlattr ".
+                        "htmltitle ".
+                        "htmltitleclass ".
                         "htmlsequence:ascending,descending ".
                         "lang ".
                         "sort_readings_by:severity,start ".
@@ -294,7 +296,7 @@ sub UWZ_Define($$) {
     my @a    = split( "[ \t][ \t]*", $def );
    
     return "Error: Perl moduls ".$missingModul."are missing on this system" if( $missingModul );
-    return "Wrong syntax: use define <name> UWZ [CountryCode] [PLZ] [Interval] "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
+    return "Wrong syntax: use define <name> UWZ <CountryCode> <PLZ> <Interval> "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
 
     if ((lc $a[2]) ne "search") {
 
@@ -974,7 +976,9 @@ sub UWZAsHtml($;$) {
     my $hash = $defs{$name};    
 
     my $htmlsequence = AttrVal($name, "htmlsequence", "none");
-    
+    my $htmltitle = AttrVal($name, "htmltitle", "");
+    my $htmltitleclass = AttrVal($name, "htmltitleclass", "");
+
 
     my $attr;
     if (AttrVal($name, "htmlattr", "none") ne "none") {
@@ -984,13 +988,13 @@ sub UWZAsHtml($;$) {
     }
 
 
-    if (ReadingsVal($name, "WarnCount", "") != 0 ) {
+    if (ReadingsVal($name, "WarnCount", 0) != 0 ) {
     
         $ret .= '<table><tr><td>';
-        $ret .= '<table class="block" '.$attr.'><tr><th></th><th></th></tr>';
+        $ret .= '<table class="block" '.$attr.'><tr><th class="'.$htmltitleclass.'" colspan="2">'.$htmltitle.'</th></tr>';
 
         if ($htmlsequence eq "descending") {
-            for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
+            for ( my $i=ReadingsVal($name, "WarnCount", -1)-1; $i>=0; $i--){
             
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
@@ -1010,7 +1014,7 @@ sub UWZAsHtml($;$) {
             }
         } else {
 ###        
-            for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
+            for ( my $i=0; $i<ReadingsVal($name, "WarnCount", 0); $i++){
             
                 $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
                 $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
@@ -1039,7 +1043,7 @@ sub UWZAsHtml($;$) {
     } else {
     
         $ret .= '<table><tr><td>';
-        $ret .= '<table class="block wide" width="600px"><tr><th></th><th></th></tr>';
+        $ret .= '<table class="block wide" width="600px"><tr><th class="'.$htmltitleclass.'" colspan="2">'.$htmltitle.'</th></tr>';
         $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;">';
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
@@ -1064,7 +1068,10 @@ sub UWZAsHtmlLite($;$) {
     my $ret = '';
     my $hash = $defs{$name}; 
     my $htmlsequence = AttrVal($name, "htmlsequence", "none");
+    my $htmltitle = AttrVal($name, "htmltitle", "");
+    my $htmltitleclass = AttrVal($name, "htmltitleclass", "");
     my $attr;
+    
     if (AttrVal($name, "htmlattr", "none") ne "none") {
         $attr = AttrVal($name, "htmlattr", "");
     } else {
@@ -1074,7 +1081,7 @@ sub UWZAsHtmlLite($;$) {
     if (ReadingsVal($name, "WarnCount", "") != 0 ) {
 
         $ret .= '<table><tr><td>';
-        $ret .= '<table class="block" '.$attr.'><tr><th></th><th></th></tr>';
+        $ret .= '<table class="block" '.$attr.'><tr><th class="'.$htmltitleclass.'" colspan="2">'.$htmltitle.'</th></tr>';
   
         if ($htmlsequence eq "descending") {
             for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
@@ -1116,14 +1123,16 @@ sub UWZAsHtmlLite($;$) {
     } else {
   
         $ret .= '<table><tr><td>';
-        $ret .= '<table class="block wide" width="600px"><tr><th></th><th></th></tr>';
+        $ret .= '<table class="block wide" width="600px"><tr><th class="'.$htmltitleclass.'" colspan="2">'.$htmltitle.'</th></tr>';
         $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;">';
+        
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $ret .='<b>Keine Warnungen</b>';
         } else {
             $ret .='<b>No Warnings</b>';
         }
+        
         # end language by AttrVal
         $ret .= '</td></tr>';
         $ret .= '</table>';
@@ -1140,9 +1149,11 @@ sub UWZAsHtmlFP($;$) {
     my ($name,$items) = @_;
     my $tablewidth = ReadingsVal($name, "WarnCount", "") * 80;
     my $htmlsequence = AttrVal($name, "htmlsequence", "none");
+    my $htmltitle = AttrVal($name, "htmltitle", "");
+    my $htmltitleclass = AttrVal($name, "htmltitleclass", "");
     my $ret = '';
     
-    $ret .= '<table class="uwz-fp" style="width:'.$tablewidth.'px"><tr><th></th><th></th></tr>';
+    $ret .= '<table class="uwz-fp" style="width:'.$tablewidth.'px"><tr><th class="'.$htmltitleclass.'" colspan="'.ReadingsVal($name, "WarnCount", "none").'">'.$htmltitle.'</th></tr>';
     $ret .= "<tr>";
     
     if ($htmlsequence eq "descending") {
@@ -1398,6 +1409,10 @@ sub UWZSearchAreaID($$) {
 
 
 =pod
+=item device
+=item summary    Modul extracts thunderstorm warnings from unwetterzentrale.de
+=item summary_DE Modul extrahiert Unwetterwarnungen von unwetterzentrale.de.
+
 =begin html
 
 <a name="UWZ"></a>
@@ -1586,6 +1601,16 @@ sub UWZSearchAreaID($$) {
          define warn order of html output (ascending|descending). 
          <br>
       </li>
+      <li><code>htmltitle</code>
+         <br>
+          title / header for the html ouput
+          <br>
+       </li>
+       <li><code>htmltitleclass</code>
+          <br>
+          css-Class of title / header for the html ouput
+          <br>
+       </li>
       <li><code>localiconbase</code>
          <br>
          define baseurl to host your own thunderstorm warn pics (filetype is png). 
@@ -1961,6 +1986,16 @@ sub UWZSearchAreaID($$) {
       <li><code>htmlsequence</code>
          <br>
          Anzeigereihenfolge der html warnungen. (ascending|descending). 
+         <br>
+      </li>
+      <li><code>htmltitle</code>
+         <br>
+         Titel / Ueberschrift der HTML Ausgabe 
+         <br>
+      </li>
+      <li><code>htmltitleclass</code>
+         <br>
+         css-Class des Titels der HTML Ausgabe 
          <br>
       </li>
       <li><code>localiconbase</code>
