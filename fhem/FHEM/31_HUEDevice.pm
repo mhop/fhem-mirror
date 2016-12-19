@@ -1041,7 +1041,7 @@ HUEDeviceSetIcon($;$)
     $attr{$name}{icon} = $icon;
   } elsif( $hash->{class} ) {
     my $class = lc( $hash->{class} );
-    $class ~= s/ room//;
+    $class =~ s/ room//;
 
     $attr{$name}{icon} = "hue_room_$class";
   }
