@@ -124,6 +124,7 @@ my %sets = (
 );
 
 my %gets = (
+	"assignIDs"    => "noArg",
 );
 
 sub HMUARTLGW_Initialize($)
@@ -295,6 +296,7 @@ sub HMUARTLGW_Undefine($$;$)
 		Log3($hash, 3, "${name} device closed") if (!defined($hash->{FD}));
 	}
 	$hash->{DevState} = HMUARTLGW_STATE_NONE;
+	$hash->{XmitOpen} = 0;
 	HMUARTLGW_updateCondition($hash);
 }
 
@@ -729,15 +731,13 @@ sub HMUARTLGW_ParsePeer($$) {
 	#040701010002fffffffffffffff9
 	$hash->{AssignedPeerCnt} = hex(substr($msg, 8, 4));
 	if (length($msg) > 12) {
-		$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = "assigned";
-		$hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}} = substr($msg, 12);
-		$hash->{Helper}{UpdatePeer}{aes} = $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}};
+		$hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}} = $hash->{Helper}{UpdatePeer}->{config};
+		$hash->{Helper}{UpdatePeer}{aes} = substr($msg, 12);
 		Log3($hash, HMUARTLGW_getVerbLvl($hash, $hash->{Helper}{UpdatePeer}->{id}, $hash->{Helper}{UpdatePeer}->{id}, 4),
 			"HMUARTLGW $hash->{NAME} added peer: " . $hash->{Helper}{UpdatePeer}->{id} .
-			", aesChannels: " . $hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
+			", aesChannels: " . $hash->{Helper}{UpdatePeer}{aes});
 	} else {
 		delete($hash->{Peers}{$hash->{Helper}{UpdatePeer}->{id}});
-		delete($hash->{Helper}{AssignedPeers}{$hash->{Helper}{UpdatePeer}->{id}});
 		Log3($hash, HMUARTLGW_getVerbLvl($hash, $hash->{Helper}{UpdatePeer}->{id}, $hash->{Helper}{UpdatePeer}->{id}, 4),
 			"HMUARTLGW $hash->{NAME} remove peer: ". $hash->{Helper}{UpdatePeer}->{id});
 	}
@@ -955,7 +955,6 @@ sub HMUARTLGW_GetSetParameters($;$$)
 	    (!$hash->{Helper}{OneParameterOnly})) {
 		#Init sequence over, add known peers
 		$hash->{AssignedPeerCnt} = 0;
-		%{$hash->{Helper}{AssignedPeers}} = ();
 
 		foreach my $peer (keys(%{$hash->{Peers}})) {
 			if ($modules{CUL_HM}{defptr}{$peer} &&
@@ -967,6 +966,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 					flags => $flags,
 					kNo => $kNo,
 					aesChannels => $aesChannels,
+					config => $modules{CUL_HM}{defptr}{$peer}{helper}{io}{newChn},
 				};
 				#enqueue for later
 				if ($p->{operation} eq "+") {
@@ -1436,6 +1436,7 @@ sub HMUARTLGW_Write($$$)
 				flags => $flags,
 				kNo => $kNo,
 				aesChannels => $aesChannels,
+				config => $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn},
 			};
 			$hash->{Peers}{$peer->{id}} = "pending";
 			HMUARTLGW_UpdatePeer($hash, $peer);
@@ -1456,6 +1457,7 @@ sub HMUARTLGW_Write($$$)
 			flags => $flags,
 			kNo => $kNo,
 			aesChannels => $aesChannels,
+			config => $msg,
 		};
 		if ($peer->{operation} eq "+") {
 			$hash->{Peers}{$peer->{id}} = "pending";
@@ -1523,6 +1525,7 @@ sub HMUARTLGW_Write($$$)
 				operation => "+",
 				flags => "00",
 				kNo => "00",
+				config => "+${dst}",
 			};
 			if ($modules{CUL_HM}{defptr}{$dst} &&
 			    $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn}) {
@@ -1530,7 +1533,9 @@ sub HMUARTLGW_Write($$$)
 				$peer->{flags} = $flags;
 				$peer->{kNo} = $kNo;
 				$peer->{aesChannels} = $aesChannels;
+				$peer->{config} = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn};
 			}
+			$hash->{Peers}{$dst} = "pending";
 			HMUARTLGW_UpdatePeer($hash, $peer);
 		}
 
@@ -1654,6 +1659,21 @@ sub HMUARTLGW_CheckCmdResp($)
 
 sub HMUARTLGW_Get($@)
 {
+	my ( $hash, $name, $cmd, @args ) = @_;
+	my $ret = "";
+
+	if ($cmd eq "assignIDs") {
+		foreach my $peer (keys(%{$hash->{Peers}})) {
+			next if ($hash->{Peers}{$peer} !~ m/^\+/);
+			$ret .= "\n${peer} : " . CUL_HM_id2Name($peer);
+		}
+		$ret = "assignedIDs: ". ($ret =~ tr/\n//) . $ret;
+	} else {
+		$ret = "Unknown argument ${cmd}, choose one of " .
+		    join(" ",map {"$_" . ($gets{$_} ? ":$gets{$_}" : "")} keys %gets);
+	}
+
+	return $ret;
 }
 
 sub HMUARTLGW_RemoveHMPair($)
@@ -1889,7 +1909,7 @@ sub HMUARTLGW_updateCondition($)
 		readingsSingleUpdate($hash, "load", $load, 0);
 
 		$cond = "ok";
-		#FIXME: Dynamic ;evels
+		#FIXME: Dynamic levels
 		if ($load >= 100) {
 			$cond = "ERROR-Overload";
 			$loadLvl = "suspended";
