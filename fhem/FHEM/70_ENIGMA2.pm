@@ -2035,12 +2035,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     $readingname = "recordings" . $ri . "_servicename";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
                       if ( $recordings{$ri}{servicename} =~
-                        /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
+/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
+                      );
 
                     $readingname = "recordings" . $ri . "_name";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
                       if ( $recordings{$ri}{name} =~
-                        /^(\[[\w=]+\])?([ \w\(\)]+)(\[[\w=\/]+\])?$/ );
+/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
+                      );
                 }
             }
 
