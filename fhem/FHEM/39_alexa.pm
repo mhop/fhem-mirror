@@ -22,11 +22,27 @@ alexa_Initialize($)
   $hash->{UndefFn}  = "alexa_Undefine";
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
-  #$hash->{AttrFn}   = "alexa_Attr";
-  $hash->{AttrList} = "alexaMapping:textField-long alexaTypes articles prepositions $readingFnAttributes";
+  $hash->{AttrFn}   = "alexa_Attr";
+  $hash->{AttrList} = "alexaMapping:textField-long alexaTypes fhemIntents:textField-long articles prepositions $readingFnAttributes";
 }
 
 #####################################
+
+sub
+alexa_AttrDefaults($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if( !AttrVal( $name, 'alexaMapping', undef ) ) {
+    CommandAttr(undef,"$name alexaMapping #Characteristic:<name>=<value>,...");
+  }
+
+  if( !AttrVal( $name, 'fhemIntents', undef ) ) {
+    CommandAttr(undef,"$name fhemIntents #IntentName:<sample utterance>" );
+  }
+
+}
 
 sub
 alexa_Define($$)
@@ -41,11 +57,13 @@ alexa_Define($$)
   $hash->{NAME} = $name;
 
   my $d = $modules{$hash->{TYPE}}{defptr};
-  return "$hash->{TYPE} device already defined as $d->{NAME}." if( defined($d) );
+  return "$hash->{TYPE} device already defined as $d->{NAME}." if( defined($d) && $name ne $d->{NAME} );
   $modules{$hash->{TYPE}}{defptr} = $hash;
 
   addToAttrList("$hash->{TYPE}Name");
   addToAttrList("$hash->{TYPE}Room");
+
+  alexa_AttrDefaults($hash);
 
   $hash->{STATE} = 'active';
 
@@ -331,8 +349,24 @@ Log 1, Dumper $characteristicsOfIntent;
 
         ++$i;
       }
+      $samples .= "\n";
     }
-    $samples .= "\n";
+
+    if( my $entries = AttrVal( $name, 'fhemIntents', undef ) ) {
+      foreach my $entry ( split( /\n/, $entries ) ) {
+        next if( !$entry );
+        next if( $entry =~ /^#/ );
+
+        my ($intent, $remainder) = split( /:|=/, $entry, 2 );
+        my @parts = split( /,/, $remainder );
+        my $utterance = $parts[$#parts];
+
+        push @{$schema->{intents}}, {intent => "FHEM${intent}Intent", };
+
+        $samples .= "\nFHEM${intent}Intent $utterance";
+      }
+      $samples .= "\n";
+    }
 
     push @{$schema->{intents}}, {intent => "StatusIntent",
                                  slots => [ { name => 'Device', type => 'FHEM_Device' },
@@ -429,10 +463,12 @@ alexa_Attr($$$)
   }
 
   if( $cmd eq 'set' ) {
-    if( $orig ne $attrVal ) {
-      $attr{$name}{$attrName} = $attrVal;
-      return $attrName ." set to ". $attrVal;
-    }
+
+  } else {
+    delete $attr{$name}{$attrName};
+
+     RemoveInternalTimer($hash);
+     InternalTimer(gettimeofday(), "alexa_AttrDefaults", $hash, 0);
   }
 
   return;
