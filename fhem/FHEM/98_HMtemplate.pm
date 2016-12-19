@@ -369,7 +369,7 @@ sub HMtemplate_SetFn($@) {#####################################################
       if ($culHmRegDefLS->{$rN}){# template for short/long
         next if($tType && $tType !~ m/peer-(Long|Short)/);
         $tType = "peer-Long";
-        $lits = ":".join(",",(sort (keys %{$culHmRegDefLS->{$rN}{lit}}),$paramS)) if ($culHmRegDefLS->{$rN}{c} eq "lit");
+        $lits = ":".join(",",(sort(keys %{$culHmRegDefLS->{$rN}{lit}}),$paramS)) if ($culHmRegDefLS->{$rN}{c} eq "lit");
       }
       elsif ($culHmRegDef->{$rN}){
         if($culHmRegDef->{$rN}{l} eq 3){
@@ -380,7 +380,7 @@ sub HMtemplate_SetFn($@) {#####################################################
           next if($tType && $tType ne "basic");
           $tType = "basic";
         }
-        $lits = ":".join(",",(sort (keys %{$culHmRegDef->{$rN}{lit}}),$paramS)) if ($culHmRegDef->{$rN}{c} eq "lit");
+        $lits = ":".join(",",(sort(keys %{$culHmRegDef->{$rN}{lit}}),$paramS)) if ($culHmRegDef->{$rN}{c} eq "lit");
       }
       else{
         next;
