@@ -500,7 +500,7 @@ alexa_Attr($$$)
 <a name="alexa"></a>
 <h3>alexa</h3>
 <ul>
-  Module to control the FHEM/Alexa integration.<br><br>
+  Module to control the integration of Amazon Alexa devices with FHEM.<br><br>
 
   Notes:
   <ul>
@@ -511,7 +511,8 @@ alexa_Attr($$$)
   <b>Set</b>
   <ul>
     <li>reload [name]<br>
-      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery in alexa.  </li>
+      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery
+      for the home automation skill in the amazon alexa app.</li>
   </ul>
 
   <a name="alexa_Get"></a>
@@ -536,8 +537,14 @@ alexa_Attr($$$)
       defaults to: der,die,das,den</li>
     <li>prepositions<br>
       defaults to: in,im,in der</li>
+    <li>alexaMapping<br>
+      maps spoken commands to intents for certain characteristics.</li>
     <li>alexaTypes<br>
       maps spoken device types to ServiceClasses. eg: attr alexa alexaTypes light:licht,lampe,lampen blind:rolladen,jalousie,rollo Outlet:steckdose TemperatureSensor:thermometer LockMechanism:schloss OccupancySensor: anwesenheit</li>
+    <li>fhemIntents<br>
+      maps spoken commands directed to fhem as a whole (i.e. not to specific devices) to events from the alexa device.</li>
+    Note: changes to attributes of the alexa device will automatically trigger a reconfiguration of
+          alxea-fhem and there is no need to restart the service.
   </ul>
 </ul><br>
 
