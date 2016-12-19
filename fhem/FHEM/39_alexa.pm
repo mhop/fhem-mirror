@@ -35,11 +35,26 @@ alexa_AttrDefaults($)
   my $name = $hash->{NAME};
 
   if( !AttrVal( $name, 'alexaMapping', undef ) ) {
-    CommandAttr(undef,"$name alexaMapping #Characteristic:<name>=<value>,...");
+    CommandAttr(undef,"$name alexaMapping #Characteristic=<name>=<value>,...\n".
+                                         "On=verb=schalte,valueOn=an;ein,valueOff=aus,valueToggle=um\n\n".
+
+                                         "Brightness=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
+
+                                         "TargetPosition=verb=mach,articles=den,values=auf:100;zu:0\n".
+                                         "TargetPosition=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
+
+                                         "Hue=verb=stelle,valuePrefix=auf,values=rot:0;grün:128;blau:200\n".
+                                         "Hue=verb=färbe,values=rot:0;grün:120;blau:220\n\n".
+
+                                         "TargetTemperature=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=grad\n\n".
+
+                                         "#Weckzeit=verb=stelle,valuePrefix=auf;für,values=AMAZON.TIME,valueSuffix=uhr" );
   }
 
   if( !AttrVal( $name, 'fhemIntents', undef ) ) {
-    CommandAttr(undef,"$name fhemIntents #IntentName:<sample utterance>" );
+    CommandAttr(undef,"$name fhemIntents #IntentName=<sample utterance>\n".
+                                        "gutenMorgen=guten morgen\n".
+                                        "guteNacht=gute nacht" );
   }
 
 }
