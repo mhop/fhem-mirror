@@ -1,9 +1,9 @@
 # $Id$
-###########################
+############################
 #	CALVIEW
 #	needs a defined Device 57_Calendar
 #   needs perl-modul Date::Parse
-###########################
+############################
 package main;
 
 use strict;
