@@ -1130,6 +1130,7 @@ HUEDevice_Parse($$)
         #$readings{state} = $s;
 
       }
+      }
 
       readingsBeginUpdate($hash);
       foreach my $key ( keys %readings ) {
@@ -1140,7 +1141,6 @@ HUEDevice_Parse($$)
       }
       readingsEndUpdate($hash,1);
 
-    }
     }
 
     if( defined($hash->{helper}->{update}) ) {
