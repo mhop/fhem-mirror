@@ -160,7 +160,8 @@ sub Text2Speech_Initialize($)
                        " TTS_SentenceAppendix".
                        " TTS_FileMapping".
                        " TTS_FileTemplateDir".
-		                   " TTS_VolumeAdjust".
+                       " TTS_VolumeAdjust".
+                       " TTS_noStatisticsLog:1,0".
                        " TTS_Language:".join(",", sort keys %{$language{"Google"}}).
                        " ".$readingFnAttributes;
 }
@@ -377,9 +378,32 @@ sub Text2Speech_Write($$) {
   #my $call = "set tts tts Das ist ein Test.";
   my $call = "set $name $msg"; 
 
-  Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
-  #lets try again
-  Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
+  #Prüfen ob PRESENCE vorhanden und present
+  my $isPresent = 0;
+  my $hasPRESENCE = 0;
+  my $devname="";
+  if ($hash->{MODE}  eq "REMOTE") {
+    foreach $devname (devspec2array("TYPE=PRESENCE")) {
+      if (defined $defs{$devname}->{ADDRESS} && $dev) {
+        if ($dev =~ $defs{$devname}->{ADDRESS}) {
+          $hasPRESENCE = 1;
+          $isPresent = 1 if (ReadingsVal($devname,"presence","unknown") eq "present");
+          last;
+        }
+      }
+    }
+  }
+  if ($hasPRESENCE) {
+    Log3 $hash, 4, "Text2Speech($name): found PRESENCE Device $devname for host: $dev, it\'s state is: ".($isPresent ? "present" : "absent");
+    Text2Speech_OpenDev($hash) if(!$hash->{TCPDev} && $isPresent);
+    #lets try again
+    Text2Speech_OpenDev($hash) if(!$hash->{TCPDev} && $isPresent);
+  } else {
+    Log3 $hash, 4, "Text2Speech($name): no proper PRESENCE Device for host: $dev";
+    Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
+    #lets try again
+    Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
+  }
 
   if($hash->{TCPDev}) {
     Log3 $hash, 4, "Text2Speech: Write remote message to $dev: $call";
@@ -421,10 +445,10 @@ sub Text2Speech_Set($@)
 
   # Abbruch falls Disabled
   return undef if(AttrVal($hash->{NAME}, "disable", "0") eq "1");
-
   if($cmd eq "tts") {
-    readingsSingleUpdate($hash, "playing", "1", 1);
+    
     if($hash->{MODE} eq "DIRECT") {
+      readingsSingleUpdate($hash, "playing", "1", 1);
       Text2Speech_PrepareSpeech($hash, join(" ", @a));
       $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     } elsif ($hash->{MODE} eq "REMOTE") {
@@ -433,7 +457,7 @@ sub Text2Speech_Set($@)
   } elsif($cmd eq "volume") {
     my $vol = join(" ", @a);
     return "volume level expects 0..100 percent" if($vol !~ m/^([0-9]{1,3})$/ or $vol > 100);
-    
+
     if($hash->{MODE} eq "DIRECT") {
       $hash->{VOLUME} = $vol  if($vol <= 100);
       delete($hash->{VOLUME}) if($vol > 100);
@@ -795,7 +819,7 @@ sub Text2Speech_DoIt($) {
 
       if(! -e $Mp3WrapFile) {
         $cmd = "mp3wrap " .$TTS_CacheFileDir. "/" .$Mp3WrapPrefix. ".mp3 " .join(" ", @Mp3WrapFiles);
-        $cmd .= " >/dev/null" if($verbose < 5);;
+        $cmd .= " >/dev/null" if($verbose < 5);
 
         Log3 $hash->{NAME}, 4, "Text2Speech: " .$cmd;
         system($cmd);
@@ -876,7 +900,7 @@ sub Text2Speech_Done($) {
     for(my $i=0; $i<$tts_done; $i++) { 
       push(@text, $hash->{helper}{Text2Speech}[$i]);
     }         
-    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text));
+    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "1"));
   }
 
   delete($hash->{helper}{RUNNING_PID});
@@ -896,6 +920,7 @@ sub Text2Speech_AbortFn($)     {
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 $hash->{NAME}, 2, "Text2Speech: BlockingCall for ".$hash->{NAME}." was aborted";
+  readingsSingleUpdate($hash, "playing", "0", 1);
 }
 
 #####################################
@@ -922,7 +947,7 @@ sub Text2Speech_WriteStats($$$$){
   }
   return undef if($defs{$DbLogDev}{STATE} !~ m/(active|connected)/); # muss active sein!
 
-  # den letzten Value von "Usage" ermitteln um dann die Staistik um 1 zu erhoehen.
+  # den letzten Value von "Usage" ermitteln um dann die Statistik um 1 zu erhoehen.
   my @LastValue = DbLog_Get($defs{$DbLogDev}, "", "current", "array", "-", "-", $hash->{NAME} ."|". $file.":Usage");
   my $NewValue = 1;
   $NewValue = $LastValue[0]{value} + 1 if($LastValue[0]);
@@ -990,6 +1015,7 @@ sub Text2Speech_WriteStats($$$$){
           <code>define MyTTS Text2Speech 192.168.178.10:7072 fhempasswd</code>
           <code>define MyTTS Text2Speech 192.168.178.10</code>
         </p>
+      If a PRESENCE Device is avilable for the host IP-address, than this will be used to detect the reachability instead of the blocking  internal method.
       </ul>
     </li>
 
@@ -1106,6 +1132,12 @@ sub Text2Speech_WriteStats($$$$){
     Optional, Default: <code>cache/templates</code>
   </li>
 
+  <li>TTS_noStatisticsLog<br>
+    If set to <b>1</b>, it prevents logging statistics to DbLog Devices, default is <b>0</b><br>
+    But please notice: this looging is important to able to delete longer unused cachefiles. If you disable this
+    please take care to cleanup your cachedirectory by yourself.
+  </li>
+
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
 
   <li><a href="#disable">disable</a><br>
@@ -1185,6 +1217,7 @@ sub Text2Speech_WriteStats($$$$){
           <code>define MyTTS Text2Speech 192.168.178.10:7072 fhempasswd</code>
           <code>define MyTTS Text2Speech 192.168.178.10</code>
         </p>
+        Wenn ein PRESENCE Gerät die Host IP-Adresse abfragt, wird die blockierende interne Prüfung auf Erreichbarkeit umgangen und das PRESENCE Gerät genutzt.
       </ul>
     </li>
 
@@ -1310,6 +1343,12 @@ sub Text2Speech_WriteStats($$$$){
     Anhebung der Grundlautstärke zur Anpassung an die angeschlossenen Lautsprecher. <br>
     Default: 110<br>
     <code>attr myTTS TTS_VolumeAdjust 400</code><br>
+  </li>
+
+  <li>TTS_noStatisticsLog<br>
+  <b>1</b>, verhindert das Loggen von Statistikdaten in DbLog Geräten, default ist <b>0</b><br>
+  Bitte zur Beachtung: Das Logging ist wichtig um alte, lang nicht genutzte Cachedateien automatisiert zu loeschen.
+  Wenn dieses hier dektiviert wird muss sich der User selbst darum kuemmern.
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a>

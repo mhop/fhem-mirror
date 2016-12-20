@@ -338,7 +338,10 @@ FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
+FHEM/97_SprinkleControl.pm   Tobias               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_Text2Speech.pm       Tobias               http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_MediaList.pm         Tobias               http://forum.fhem.de Multimedia
+FHEM/98_Sprinkle.pm          Tobias               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_BOSEST.pm            dominikkarall        http://forum.fhem.de Multimedia
 FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
