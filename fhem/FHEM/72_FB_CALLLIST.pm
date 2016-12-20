@@ -388,6 +388,16 @@ sub FB_CALLLIST_Notify($$)
     
     if($event =~ /^call|ring$/)
     {
+        # end running calls with same call-id (Forum: #62468)
+        while(my $old_data = FB_CALLLIST_getDataReference($hash, $call_id))
+        {
+            Log3 $name, 4, "FB_CALLLIST ($name) - found running call with same call id: $old_data\n".Dumper($old_data);
+
+            delete($old_data->{running_call});
+            $old_data->{finished} = gettimeofday();
+            $old_data->{call_duration} = 0;
+        }
+        
         my $timestamp = gettimeofday();
 
         $hash->{helper}{DATA}{$timestamp} = undef;
@@ -407,7 +417,7 @@ sub FB_CALLLIST_Notify($$)
             $data->{internal_connection} = ReadingsVal($fb, "internal_connection", undef);
         }
         
-        Log3 $name, 5, "FB_CALLLIST ($name) - created new data hash: $data";
+        Log3 $name, 5, "FB_CALLLIST ($name) - created new data hashcreated new data hash: $data";
     }
     else 
     {
@@ -470,7 +480,7 @@ sub FB_CALLLIST_getDataReference($$)
     
     my @result = grep {$hash->{helper}{DATA}{$_}{call_id} eq $call_id and defined($hash->{helper}{DATA}{$_}{running_call}) and $hash->{helper}{DATA}{$_}{running_call} == 1} keys %{$hash->{helper}{DATA}};
 
-    return \%{$hash->{helper}{DATA}{$result[0]}} if(exists($result[0]));
+    return \%{$hash->{helper}{DATA}{$result[0]}} if(defined($result[0]));
     return undef;  
 }
 
