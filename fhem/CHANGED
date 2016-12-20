@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix   73_GasCalculator: Monthly reading and yearly reading name alingned 
   - feature: 98_TRAFFIC: reverse waypoints, integrated map for visualization
   - update:  77_UWZ: New Version 1.4.7 added headlines for weblinks
   - update:  73_NUKIBridge,74_NUKIDevice: New Version 0.4.0
