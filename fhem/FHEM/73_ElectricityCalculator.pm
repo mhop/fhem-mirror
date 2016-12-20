@@ -590,6 +590,9 @@ sub ElectricityCalculator_Notify($$)
 		my $ElectricityCountReadingTimestampCurrentRelative  = time_str2num($ElectricityCountReadingTimestampCurrent);
 		my($ElectricityCountReadingTimestampCurrentSec,$ElectricityCountReadingTimestampCurrentMin,$ElectricityCountReadingTimestampCurrentHour,$ElectricityCountReadingTimestampCurrentMday,$ElectricityCountReadingTimestampCurrentMon,$ElectricityCountReadingTimestampCurrentYear,$ElectricityCountReadingTimestampCurrentWday,$ElectricityCountReadingTimestampCurrentYday,$ElectricityCountReadingTimestampCurrentIsdst)			= localtime($ElectricityCountReadingTimestampCurrentRelative);
 		
+		### Correct current month by one month since Unix/Linux start January with 0 instead of 1
+		$ElectricityCountReadingTimestampCurrentMon = $ElectricityCountReadingTimestampCurrentMon + 1;
+		
 		### Create Log entries for debugging
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Reading Name                             : " . $ElectricityCountReadingName;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous Reading Value                   : " . $ElectricityCountReadingTimestampPrevious;
@@ -612,14 +615,15 @@ sub ElectricityCalculator_Notify($$)
 			my $ElectricityCalcPowerCurrent = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerCurrent", "0");
 			
 			### Save Electricity pure cost of previous day, current electric Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDayLast",  (sprintf('%.3f', ($ElectricityCalcEnergyCostDayLast     ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyDayLast",      (sprintf('%.3f', ($ElectricityCalcEnergyDayLast         ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDaySum",        0                                                          , 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayCount",      0                                                          , 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf('%.3f', ($ElectricityCalcPowerCurrent          ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMax",        0                                                          , 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDay1st",      (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterDayLast",     (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyCostDayLast",  (sprintf('%.3f', ($ElectricityCalcEnergyCostDayLast     ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyDayLast",      (sprintf('%.3f', ($ElectricityCalcEnergyDayLast         ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDay1st",      (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDayLast",     (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,  "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",        0                                                          , 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,  "." . $ElectricityCalcReadingPrefix . "_PowerDayCount",      0                                                          , 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf('%.3f', ($ElectricityCalcPowerCurrent          ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMax",        0                                                          , 1);
+			
 			
 			### Check whether the current value is the first one after change of month
 			if ($ElectricityCountReadingTimestampCurrentMday < $ElectricityCountReadingTimestampPreviousMday)
@@ -726,13 +730,13 @@ sub ElectricityCalculator_Notify($$)
 			
 			### Calculate the payment month since the year of Electricity meter reading started
 			my $ElectricityCalcMeterYearMonth=0;
-			if (($ElectricityCountReadingTimestampCurrentMon + 1 - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1) < 1)
+			if (($ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1) < 1)
 			{
-				$ElectricityCalcMeterYearMonth  = 12 + $ElectricityCountReadingTimestampCurrentMon + 1 - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1;
+				$ElectricityCalcMeterYearMonth  = 12 + $ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading};
 			}
 			else
 			{
-				$ElectricityCalcMeterYearMonth  =      $ElectricityCountReadingTimestampCurrentMon + 1 - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1;
+				$ElectricityCalcMeterYearMonth  =  1 + $ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading};
 			}
 			
 			### Calculate reserves at electricity supplier based on monthly advance payments within year of Electricity meter reading 
@@ -747,6 +751,7 @@ sub ElectricityCalculator_Notify($$)
 
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Times__________________________________________";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcMeterYearMonth                    : " . $ElectricityCalcMeterYearMonth;
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Current Month                                    : " . $ElectricityCountReadingTimestampCurrentMon;
 
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Energy_________________________________________";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyDay                         : " . sprintf('%.3f', ($ElectricityCalcEnergyDay))       . " kWh";
@@ -815,7 +820,7 @@ sub ElectricityCalculator_Notify($$)
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeter",       sprintf('%.3f', ($ElectricityCalcEnergyMeter)));
 			
 			### Write pure energy costs since midnight
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDay",   sprintf('%.3f', ($ElectricityCalcEnergyCostDay)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDay",     sprintf('%.3f', ($ElectricityCalcEnergyCostDay)));
 			
 			### Write pure energy costs since beginning of month
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonth",   sprintf('%.3f', ($ElectricityCalcEnergyCostMonth)));
@@ -832,6 +837,9 @@ sub ElectricityCalculator_Notify($$)
 			### Write current meter reading as sshown on the mechanical meter
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterCurrent",    sprintf('%.3f', ($ElectricityCountReadingValueCurrent)));
 			
+			### Write months since last meter reading
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_MonthMeterReading", sprintf('%.0f', ($ElectricityCalcMeterYearMonth)));
+
 			### Finish and execute Bulkupdate
 			readingsEndUpdate($ElectricityCalcReadingDestinationDevice, 1);
 		}
@@ -1372,6 +1380,17 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Financial Reserve based on the advanced payments done on the first of every month towards the Electricity supplier. With negative values, an additional payment is to be expected.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Number of month since last meter reading. The month when the reading occured is the first month = 1.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1930,6 +1949,17 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Elektrizit&auml;tsversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.<BR>
 			</td></tr>
 			</td>
 		</tr>
