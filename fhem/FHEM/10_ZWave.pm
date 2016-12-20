@@ -198,6 +198,8 @@ my %zwave_class = (
     set   => { setpointHeating => "010101%02x",
                setpointCooling => "010201%02x",
                thermostatSetpointSet
+                  => 'ZWave_thermostatSetpointSet($hash, "%s")',
+               "desired-temp"  => # alias
                   => 'ZWave_thermostatSetpointSet($hash, "%s")'},
     get   => { setpoint => 'ZWave_thermostatSetpointGet("%s")',
                thermostatSetpointSupported => '04' },
@@ -5244,6 +5246,10 @@ s2Hex($)
         4 byte: 0 decimals [-2147483648, 2147483647], ...<br>
         </ul>
       </ul>
+    </li>
+  <li>desired-temp value<br>
+    same as thermostatSetpoint, used to make life easier for helper-modules
+    like 
     </li>
 
   <br><br><b>Class TIME, V2</b>
