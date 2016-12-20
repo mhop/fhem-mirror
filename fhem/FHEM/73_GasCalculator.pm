@@ -594,13 +594,12 @@ sub GasCalculator_Notify($$)
 				my $GasCalcEnergyMonthLast     = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMonth", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
 				### Calculate pure gas cost of previous month GasCalcEnergyLastMonth * Price per kWh
 				my $GasCalcEnergyCostMonthLast = $GasCalcEnergyMonthLast * $attr{$GasCalcName}{GasPricePerKWh};
-				### Save gas energy and pure cost of previous month
-				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_CostMonthLast",   (sprintf('%.3f', ($GasCalcEnergyCostMonthLast))), 1);
-				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMonthLast", (sprintf('%.3f', ($GasCalcEnergyMonthLast    ))), 1);
 
-				### Save current Volume as first reading of month and the last reading of the last month
-				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth",  $GasCountReadingValueCurrent,  1);
-				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMonth", $GasCountReadingValuePrevious, 1);
+				### Save gas energy and pure cost of previous and current month 
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMonthLast", (sprintf('%.3f', ($GasCalcEnergyCostMonthLast   ))), 1);
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMonthLast",     (sprintf('%.3f', ($GasCalcEnergyMonthLast       ))), 1);
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth",         (sprintf('%.3f', ($GasCountReadingValueCurrent  ))), 1);
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMonth",        (sprintf('%.3f', ($GasCountReadingValuePrevious ))), 1);
 				
 				### Check whether the current value is the first one of the meter-reading month
 				if ($GasCountReadingTimestampCurrentMon eq $attr{$GasCalcName}{MonthOfAnnualReading})
@@ -617,17 +616,15 @@ sub GasCalculator_Notify($$)
 					### Calculate pure gas cost of previous meter reading year € = GasCalcEnergyLastMeter * Price per kWh
 					my $GasCalcEnergyCostMeterLast = $GasCalcEnergyMeterLast * $attr{$GasCalcName}{GasPricePerKWh};
 					
-					### Save gas energy and pure cost of previous meter year
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMeterLast", (sprintf('%.3f', ($GasCalcEnergyCostMeterLast))), 1);
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMeterLast",     (sprintf('%.3f', ($GasCalcEnergyMeterLast    ))), 1);
-
-					### Save current Volume as first reading of month where gas-meter is read and the last measured value of the last meter period
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter",  $GasCountReadingValueCurrent,  1);
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMeter", $GasCountReadingValuePrevious, 1);
+					### Save gas energy and pure cost of previous and current meter year
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMeterLast", (sprintf('%.3f', ($GasCalcEnergyCostMeterLast   ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMeterLast",     (sprintf('%.3f', ($GasCalcEnergyMeterLast       ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter",         (sprintf('%.3f', ($GasCountReadingValueCurrent  ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMeter",        (sprintf('%.3f', ($GasCountReadingValuePrevious ))), 1);
 				}
 
 				### Check whether the current value is the first one of the calendar year
-				if ($GasCountReadingTimestampCurrentYear < $GasCountReadingTimestampPreviousYear)
+				if ($GasCountReadingTimestampCurrentYear > $GasCountReadingTimestampPreviousYear)
 				{
 					### Create Log entries for debugging
 					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of calendar year detected";
@@ -637,13 +634,11 @@ sub GasCalculator_Notify($$)
 					### Calculate pure gas cost of previous calendar year € = GasCalcEnergyLastYear * Price per kWh
 					my $GasCalcEnergyCostYearLast = $GasCalcEnergyYearLast * $attr{$GasCalcName}{GasPricePerKWh};
 
-					### Save gas energy and pure cost of previous calendar year
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostYearLast", (sprintf('%.3f', ($GasCalcEnergyCostYearLast))), 1);
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyYearLast",     (sprintf('%.3f', ($GasCalcEnergyYearLast    ))), 1);
-					
-					### Save current Volume as first reading of the calendar year and the last reading of the previous year
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear",  $GasCountReadingValueCurrent,  1);
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastYear", $GasCountReadingValuePrevious, 1);
+					### Save gas energy and pure cost of previous and current calendar year
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostYearLast", (sprintf('%.3f', ($GasCalcEnergyCostYearLast    ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyYearLast",     (sprintf('%.3f', ($GasCalcEnergyYearLast        ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear",         (sprintf('%.3f', ($GasCountReadingValueCurrent  ))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastYear",        (sprintf('%.3f', ($GasCountReadingValuePrevious ))), 1);
 				}
 			}
 		}
@@ -680,6 +675,9 @@ sub GasCalculator_Notify($$)
 			### Calculate consumed Energy of gas-meter year W = (Vcurrent[cubic] - V1stReadMeter[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
 			my $GasCalcEnergyMeter     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMeter", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
 
+			### Calculate pure Electricity cost since midnight
+			my $GasCalcEnergyCostDay   = $GasCalcEnergyDay * $attr{$GasCalcName}{GasPricePerKWh};
+			
 			### Calculate pure gas cost since first day of month
 			my $GasCalcEnergyCostMonth = $GasCalcEnergyMonth * $attr{$GasCalcName}{GasPricePerKWh};
 			
@@ -782,6 +780,9 @@ sub GasCalculator_Notify($$)
 			### Write energy consumption since last meter reading
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMeter",      sprintf('%.3f', ($GasCalcEnergyMeter)));
 			
+			### Write pure energy costs since midnight
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostDay",    sprintf('%.3f', ($GasCalcEnergyCostDay)));
+
 			### Write pure energy costs since beginning of month
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMonth",  sprintf('%.3f', ($GasCalcEnergyCostMonth)));
 			
