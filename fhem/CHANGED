@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_ElectricityCalculator: Corrected month of annual reading
   - update:  98_Text2Speech.pm: (thanks to Ellert)
                  * attribute 'playing' will updated only in local mode
                  * in case of abort of blockingfunction, 'playing' is set to 0
