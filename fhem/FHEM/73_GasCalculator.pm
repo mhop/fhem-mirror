@@ -553,6 +553,9 @@ sub GasCalculator_Notify($$)
 		my $GasCountReadingTimestampCurrentRelative  = time_str2num($GasCountReadingTimestampCurrent);
 		my($GasCountReadingTimestampCurrentSec,$GasCountReadingTimestampCurrentMin,$GasCountReadingTimestampCurrentHour,$GasCountReadingTimestampCurrentMday,$GasCountReadingTimestampCurrentMon,$GasCountReadingTimestampCurrentYear,$GasCountReadingTimestampCurrentWday,$GasCountReadingTimestampCurrentYday,$GasCountReadingTimestampCurrentIsdst)			= localtime($GasCountReadingTimestampCurrentRelative);
 		
+		### Correct current month by one month since Unix/Linux start January with 0 instead of 1
+		$GasCountReadingTimestampCurrentMon = $GasCountReadingTimestampCurrentMon + 1;
+		
 		### Create Log entries for debugging
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Reading Name                             : " . $GasCountReadingName;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous Reading Value                   : " . $GasCountReadingTimestampPrevious;
@@ -689,13 +692,13 @@ sub GasCalculator_Notify($$)
 			
 			### Calculate the payment month since the year of gas meter reading started
 			my $GasCalcMeterYearMonth=0;
-			if (($GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1) < 1)
+			if (($GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading} + 1) < 1)
 			{
-				$GasCalcMeterYearMonth  = 12 + $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
+				$GasCalcMeterYearMonth  = 12 + $GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading};
 			}
 			else
 			{
-				$GasCalcMeterYearMonth  =      $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
+				$GasCalcMeterYearMonth  =  1 + $GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading};
 			}
 			
 			### Calculate reserves at gas provider based on monthly advance payments within year of gas meter reading 
@@ -710,6 +713,7 @@ sub GasCalculator_Notify($$)
 
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Times__________________________________________";
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcMeterYearMonth                    : " . $GasCalcMeterYearMonth;
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Current Month                            : " . $GasCountReadingTimestampCurrentMon;
 
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Energy_________________________________________";
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyDay                         : " . sprintf('%.3f', ($GasCalcEnergyDay))       . " kWh";
@@ -795,6 +799,9 @@ sub GasCalculator_Notify($$)
 			### Write reserves at gas provider based on monthly advance payments within year of gas meter reading
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_FinanceReserve",   sprintf('%.3f', ($GasCalcReserves)));
 
+			### Write months since last meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_MonthMeterReading", sprintf('%.0f', ($GasCalcMeterYearMonth)));
+			
 			### Finish and execute Bulkupdate
 			readingsEndUpdate($GasCalcReadingDestinationDevice, 1);
 		}
@@ -1240,6 +1247,17 @@ sub GasCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Financial Reserver based on the advanced payments done on the first of every month towards the gas supplier. With negative values, an additional payment is to be excpected.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Number of month since last meter reading. The month when the reading occured is the first month = 1.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1803,6 +1821,17 @@ sub GasCalculator_Notify($$)
 		<tr>
 			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Gas-Versorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.<BR>
 			</td></tr>
 			</td>
 		</tr>
