@@ -730,7 +730,7 @@ sub ElectricityCalculator_Notify($$)
 			
 			### Calculate the payment month since the year of Electricity meter reading started
 			my $ElectricityCalcMeterYearMonth=0;
-			if (($ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1) < 1)
+			if (($ElectricityCountReadingTimestampCurrentMon - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1) < 1)
 			{
 				$ElectricityCalcMeterYearMonth  = 12 + $ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading};
 			}
