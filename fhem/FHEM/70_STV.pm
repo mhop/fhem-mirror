@@ -661,7 +661,7 @@ sub STV_Set($@)
     }
     return $ret;
   }
-  return $undef;
+  return undef;
 }
 
 1;
