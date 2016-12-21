@@ -12,6 +12,7 @@
 #
 # Date		   Who				Comment																												   
 # ----------  -------------   	-------------------------------------------------------------------------------------------------------------------------------
+# 2016-12-19  RaspII			Test if new repository is working
 # 2016-03-20  RaspII			Added some information to Commandref, now attrib contains correct information
 # 2016-01-30  RaspII			Now also Blinds and Switches are implemented (all actuators I have). 
 # 2016-01-12  RaspII			Implemented Dimmer Commands for 1&3 key remote, removed toggle	
@@ -778,6 +779,9 @@ if( $msg =~ m/^kr/ ) {																			# if first two char's are "kr" then we 
 1;
 
 =pod
+=item device
+=item summary controls "Kopp Free Control" Devices via 868 Mhz CUL, CCD...
+=item summary_DE steuert "Kopp Free Control" Devices via 868 Mhz CULs, CCD...
 =begin html
 
 <a name="KOPP_FC"></a>
