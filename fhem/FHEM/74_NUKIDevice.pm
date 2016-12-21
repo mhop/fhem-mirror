@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 #use Time::HiRes qw(gettimeofday);
 
-my $version = "0.4.0";
+my $version = "0.4.1";
 
 
 
@@ -402,9 +402,9 @@ sub NUKIDevice_WriteReadings($$) {
     
     my $battery;
     if( defined($decode_json->{batteryCritical}) ) {
-        if( $decode_json->{batteryCritical} eq "false" ) {
+        if( $decode_json->{batteryCritical} eq "false" or $decode_json->{batteryCritical} == 0 ) {
             $battery = "ok";
-        } elsif ( $decode_json->{batteryCritical} eq "true" ) {
+        } elsif ( $decode_json->{batteryCritical} eq "true" or $decode_json->{batteryCritical} == 1 ) {
             $battery = "low";
         } else {
             $battery = "parseError";
