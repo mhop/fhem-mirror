@@ -41,7 +41,7 @@ use vars qw($FW_wname);         # Web instance
 
 #########################
 # Global variables
-my $postmeversion  = "1.4";
+my $postmeversion  = "1.6";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -63,7 +63,7 @@ sub PostMe_Initialize ($) {
   $hash->{UndefFn}     = "PostMe_Undef";  
   $hash->{InitFn}      = "PostMe_Init";  
   $hash->{AttrFn}      = "PostMe_Attr";
-  $hash->{AttrList}    = "postmeTTSDev postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 ".$readingFnAttributes;		
+  $hash->{AttrList}    = "postmeTTSDev postmeTTSFun postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 ".$readingFnAttributes;		
   
   $hash->{FW_detailFn}  = "PostMe_detailFn";
     	 
@@ -142,7 +142,6 @@ sub PostMe_Init($) {
     
    #-- current number of PostMes
    my $cnop = ReadingsVal($devname,"postmeCnt",0);
-   Log 1,"[PostMe_Init] postme01Name ".ReadingsVal($devname,"postme01Name",0)." postme01Cont ".ReadingsVal($devname,"postme01Cont",0)." postme02Name ".ReadingsVal($devname,"postme02Name",0)." postme02Cont ".ReadingsVal($devname,"postme02Cont",0);
    my @std  = split(',',AttrVal("$devname","postmeStd",undef));
    
    for( my $i=0;$i<int(@std);$i++ ){
@@ -162,6 +161,15 @@ sub PostMe_Init($) {
      PostMe_Create($hash,$std[$i]);
    }
    readingsSingleUpdate($hash,"state","OK",1);
+   
+   #temporary solution
+   if( AttrVal("$devname","postmeTTSDev",undef) ){
+     Log 1,"[PostMe] REMOVE OBSOLETE ATTRIBUTE postmeTTSDev !!!";
+     readingsSingleUpdate($hash,"state","REMOVE OBSOLETE ATTRIBUTE postmeTTSDev !!!",1);
+   }else{
+     readingsSingleUpdate($hash,"state","OK",1);
+   }
+   
 }
  
 #########################################################################################
@@ -604,7 +612,7 @@ sub PostMe_LineOut($$$) {
            my ($i,$j)= split(/=/, $item2);
            $j =~ s/^"//;
            $meta{$i} = $j;
-           Log 1,"Setting META $i to VALUE $j";
+           #Log 1,"Setting META $i to VALUE $j";
          }
        }else{
          $item = $line2;
@@ -708,7 +716,7 @@ sub PostMe_Get($$$@) {
  
   my $hasMail = defined(AttrVal($devname,"postmeMailFun",undef)) ? 1 : 0;
   my $hasMsgr = defined(AttrVal($devname,"postmeMsgFun",undef)) ? 1 : 0;
-  my $hasTTS  = defined(AttrVal($devname,"postmeTTSDev",undef)) ? 1 : 0;
+  my $hasTTS  = defined(AttrVal($devname,"postmeTTSFun",undef)) ? 1 : 0;
   
   #-- for the selector: which values are possible
   if ($key eq "?"){
@@ -729,9 +737,9 @@ sub PostMe_Get($$$@) {
       if($hasMail);
     $res.= " message:".$pml
       if($hasMsgr);
-    $res.= " ttsSay:".$pml
+    $res.= " TTS:".$pml
       if($hasTTS);
-    $res.= " z_JSON:".$pml;
+    $res.= " JSON:".$pml;
       
     return $res;
   }
@@ -742,7 +750,7 @@ sub PostMe_Get($$$@) {
     return "PostMe.version => $postmeversion";
    
    #-- list one PostMe
-  } elsif( ($key eq "list")||($key eq "z_JSON")||($key eq "mail")||($key eq "message")||($key eq "ttsSay") ){
+  } elsif( ($key eq "list")||($key eq "JSON")||($key eq "mail")||($key eq "message")||($key eq "TTS") ){
    
     $pmn = PostMe_Check($hash,$args[0]);
     if( !$pmn ){
@@ -758,7 +766,7 @@ sub PostMe_Get($$$@) {
       return $res;
       
     ##-- JSON
-    }elsif( $key eq "z_JSON" ){
+    }elsif( $key eq "JSON" ){
       my $line = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
       $res = PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""),15);
       return '{"'.$line.'": ['.$res.']}';
@@ -796,14 +804,14 @@ sub PostMe_Get($$$@) {
       return undef;
       
     ##-- speak as TTS
-    }elsif( $key eq "ttsSay" ){
+    }elsif( $key eq "TTS" ){
       my $sbjt = ReadingsVal($devname, sprintf("postme%02dName",$pmn),undef);
-      my $text = PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
-      $text =~ s/,/\<break time=\"1s\"\/\>/g;
-      my $dev  = AttrVal($devname,"postmeTTSDev",undef);
+      my $text = $sbjt.": ".PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
+      my $fun  = AttrVal($devname,"postmeTTSFun",undef);
       
-      if( $sbjt && $text && $dev ){
-        fhem('set '.$dev.' ttsSay '.$sbjt.' enthält <break time="1s"/> '.$text);
+      if( $sbjt && $text && $fun ){
+        my $ref = \&$fun;
+        &$ref($text);
       }
       my $mga = "$sbjt spoken by TTS";
       readingsSingleUpdate($hash,"state",$mga,1 );
@@ -865,7 +873,7 @@ sub PostMe_detailFn(){
 
   my $html = '<div  id="ddtable" class="makeTable wide"><table class="block wide"><tr class="odd">'.
              '<td width="300px"><div>'.$icon.'</div></td>'.
-             '<td informId="'.$pmname.'"><div id="'.$pmname.'"  title="Initialized" class="col2">Initialized</div></td>'.
+             '<td informId="'.$pmname.'"><div id="'.$pmname.'"  title="Initialized" class="col2">'.ReadingsVal($devname,"state","").'</div></td>'.
              '</tr></table></div>';
    
   $html .= '<script type="text/javascript">function oc(){var p1=document.getElementById("val1_set'.$pmname.'").value;var p2=document.getElementById("val2_set'.$pmname.'").value;'.
@@ -893,7 +901,7 @@ sub PostMe_detailFn(){
            '<input type="submit" name="cmd.get'.$pmname.'" value="get" class="get"/><div class="get downText">&nbsp;'.$pmname.'&nbsp;</div>'.
            '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;" '.
            'onchange="dc2(this.selectedIndex)">'.
-           '<option selected="selected" value="list">list</option><option value="mail">mail</option><option value="message">message</option><option value="ttsSay">ttsSay</option>'.
+           '<option selected="selected" value="list">list</option><option value="mail">mail</option><option value="message">message</option><option value="TTS">TTS</option>'.
            '<option value="JSON">JSON</option><option value="all">all</option><option value="version">version</option>'.
            '</select>'.
            '<select type="hidden" id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
@@ -1108,7 +1116,7 @@ sub PostMe_widget($) {
   
   my @lines=split(',',ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""));
   if( !(int(@lines)>0) ){
-    Log 1,"[PostMe_widget] Asking to display empty PostMe $name";
+    #Log 1,"[PostMe_widget] Asking to display empty PostMe $name";
     return undef;
   }
 
@@ -1217,9 +1225,9 @@ sub PostMe_widget($) {
                 recipient (e.g. sticky note <postme01Name> is sent to <postme01MsgRec>). The messenger 
                 subroutine <postmeMsgFun> is called with three parameters for recipient, subject
                 and text. </li>
-            <li><code>get &lt;postit&gt; ttsSay &lt;name&gt;</code>
-                <br />Speak the sticky note named &lt;name&gt; and its content on a predefined
-                device <postmeTTSDev></li>         
+            <li><code>get &lt;postit&gt; TTS &lt;name&gt;</code>
+                <br />Speak the sticky note named &lt;name&gt; and its content. The TTS 
+                subroutine <postmeTTSFun> is called with one parameter text. </li>   
             <li><code>get &lt;postit&gt; JSON &lt;name&gt;</code>
                 <br />Return the sticky note named &lt;name&gt; in JSON format</li>       
             <li><code>get &lt;postit&gt; all</code>
@@ -1241,6 +1249,10 @@ sub PostMe_widget($) {
                 <br />If jQuery, embedded sticky notes will produce jQuery code (default) <br/>
                       If HTML, embedded sticky notes will produce HTML code <br/>
                       If SVG, embedded sticky notes will produce SVG code</li>
+            </ul>
+            Note, that in the parameters sent to the following functions, ":" serves as separator between list name and items, 
+            and "," serves as separator between items. They may be exchanged with simple regular expression operations.
+            <ul>
             <li><code>attr &lt;postit&gt; postmeMailFun &lt;string&gt;</code>
                 <br />Function name for the eMail function.  This subroutine 
                 is called with three parameters for recipient, subject
@@ -1249,8 +1261,10 @@ sub PostMe_widget($) {
                 <br />Function name for the instant messenger function.  This subroutine 
                 is called with three parameters for recipient, subject
                 and text.</li>
-            <li><code>attr &lt;postit&gt; postmeTTSDev &lt;string&gt;</code>
-                <br />Device name for the TTS function.</li>
+            <li><code>attr &lt;postit&gt; postmeTTSFun &lt;string&gt;</code>
+                <br />Function name for the text-to-speech function.  This subroutine 
+                is called with only one parameter, the composite text.
+                </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
