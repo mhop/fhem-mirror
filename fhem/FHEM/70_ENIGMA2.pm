@@ -2058,7 +2058,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                   "ENIGMA2 $name: old reading $recReading was deleted";
 
                 # trigger event before deleting this reading to notify GUI
-                readingsSingleUpdate( $hash, $recReading, "", 1 );
+                readingsBulkUpdateIfChanged( $hash, $recReading, "" );
                 delete( $defs{$name}{READINGS}{$recReading} );
             }
 
