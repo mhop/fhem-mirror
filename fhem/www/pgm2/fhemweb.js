@@ -509,7 +509,7 @@ FW_replaceLink(el)
       if(!txt)
         return;
       if(ma[2].match(/=set/)) // Forum #38875
-        FW_okDialog(txt, el);
+        FW_okDialog('<pre>'+txt+'<pre>', el);
       else
         FW_errmsg(txt, 5000);
     });
