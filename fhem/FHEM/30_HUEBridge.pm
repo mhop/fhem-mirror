@@ -40,7 +40,7 @@ sub HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 noshutdown:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 }
 
 sub
@@ -775,9 +775,10 @@ HUEBridge_GetUpdate($)
 
   my $type;
   my $result;
-  if( AttrVal($name,"pollDevices",1) ) {
+  my $poll_devices = AttrVal($name, "pollDevices", 1);
+  if( $poll_devices ) {
     my ($now) = gettimeofday();
-    if( $hash->{LOCAL} || $now - $hash->{helper}{last_config_timestamp} > 300 ) {
+    if( $poll_devices > 1 || $hash->{LOCAL} || $now - $hash->{helper}{last_config_timestamp} > 300 ) {
       $result = HUEBridge_Call($hash, $hash, undef, undef);
       $hash->{helper}{last_config_timestamp} = $now;
     } else {
@@ -1614,7 +1615,9 @@ HUEBridge_Attr($$$)
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li>pollDevices<br>
-      the bridge will poll all devices instead of each device itself. default is 1.</li>
+      1 -> the bridge will poll all lights in one go instead of each device polling itself independently<br>
+      2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
+      default is 1.</li>
     <li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
     <li>noshutdown<br>

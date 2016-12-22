@@ -273,17 +273,19 @@ sub HUEDevice_Define($$)
 
   $modules{HUEDevice}{defptr}{$code} = $hash;
 
-  if( AttrVal($iodev, "pollDevices", undef) ) {
-    $interval = 0 unless defined($interval);
-  } else {
+  if( AttrVal($iodev, "pollDevices", 1) ) {
+    $interval = undef unless defined($interval);
+
+  } elsif( !$hash->{helper}->{devtype} ||  $hash->{helper}->{devtype} ne 'G' ) {
     $interval = 60 unless defined($interval);
+
   }
 
   $args[3] = "" if( !defined( $args[3] ) );
   if( !$hash->{helper}->{devtype} ) {
     $hash->{DEF} = "$id $args[3] IODev=$iodev" if( $iodev );
 
-    $interval = 60 if( $interval && $interval < 10 );
+    $interval = 60 if( defined($interval) && $interval < 10 );
     $hash->{INTERVAL} = $interval;
 
     $hash->{helper}{on} = -1;
@@ -308,6 +310,9 @@ sub HUEDevice_Define($$)
   } elsif( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{DEF} = "group $id $args[3] IODev=$iodev" if( $iodev );
 
+    $interval = 60 if( defined($interval) && $interval < 10 );
+    $hash->{INTERVAL} = $interval;
+
     $hash->{helper}{all_on} = -1;
     $hash->{helper}{any_on} = -1;
 
@@ -321,7 +326,7 @@ sub HUEDevice_Define($$)
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3] IODev=$iodev" if( $iodev );
 
-    $interval = 60 if( $interval && $interval < 1 );
+    $interval = 60 if( defined($interval) && $interval < 1 );
     $hash->{INTERVAL} = $interval;
 
   }
@@ -754,7 +759,7 @@ HUEDevice_Set($@)
       return undef;
     }
 
-    $hash->{".triggerUsed"} = 1 if( $hash->{helper}->{devtype} ne 'G' );
+    $hash->{".triggerUsed"} = 1;
     return undef if( !defined($result) );
 
     if( $hash->{helper}->{update_timeout} == -1 ) {
@@ -997,7 +1002,6 @@ HUEDevice_GetUpdate($)
 
     HUEDevice_Parse($hash,$result);
 
-    return undef;
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
   }
 
@@ -1005,6 +1009,8 @@ HUEDevice_GetUpdate($)
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
   }
+
+  return undef if( $hash->{helper}->{devtype} eq 'G' );
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
@@ -1066,7 +1072,6 @@ HUEDevice_Parse($$)
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
-    $hash->{STATE} = 'Initialized';
     if( $result->{lights} ) {
       $hash->{lights} = join( ",", @{$result->{lights}} );
     } else {
