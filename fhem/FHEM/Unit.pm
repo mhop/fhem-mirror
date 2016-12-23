@@ -518,11 +518,11 @@ my $rtype_base = {
     },
 
     22 => {
-        dimension        => '',
-        formula_symbol   => 'F',
-        rtype_base       => 'far',
+        dimension        => 'M L2 T−3 I−2',
+        formula_symbol   => 'R',
+        rtype_base       => 'ohm',
         base_description => {
-            de => 'elektrische Widerstand',
+            de => 'elektrischer Widerstand',
             en => 'electric resistance',
         },
         format       => '%.1f',
