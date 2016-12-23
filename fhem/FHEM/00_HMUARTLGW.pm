@@ -672,7 +672,7 @@ sub HMUARTLGW_UpdatePeerReq($;$) {
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_PEER_AES2) {
 		if ($peer->{operation} eq "+" && defined($peer->{aesChannels})) {
-			Log3($hash, 4, "HMUARTLGW ${name} AESchannels: " . sprintf("%08x", $peer->{aesChannels}));
+			Log3($hash, 4, "HMUARTLGW ${name} AESchannels: " . $peer->{aesChannels});
 			my $offset = 0;
 			foreach my $c (unpack "(A2)*", $peer->{aesChannels}) {
 				$c = hex($c);
