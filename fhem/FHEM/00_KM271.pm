@@ -17,11 +17,15 @@ my %km271_sets = (
                         OPT => ":slider,10,0.5,30,1"},
   "hk1_tagsoll"     => {SET => "0700656565%02x6565:0703%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
+  "hk1_urlaubsoll"  => {SET => "07006565656565%02x:0705%02x", # 0.5 celsius
+                        OPT => ":slider,10,0.5,30,1"},
   "hk1_betriebsart" => {SET => "070065656565%02x65:0704%02x",
                         OPT => ""},
   "hk2_nachtsoll"   => {SET => "08006565%02x656565:0802%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
   "hk2_tagsoll"     => {SET => "0800656565%02x6565:0803%02x", # 0.5 celsius
+                        OPT => ":slider,10,0.5,30,1"},
+  "hk2_urlaubsoll"  => {SET => "08006565656565%02x:0805%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
   "hk2_betriebsart" => {SET => "080065656565%02x65:0804%02x",
                         OPT => ""},
@@ -47,6 +51,9 @@ my %km271_sets = (
   "sommer_ab"       => {SET => "070065%02x65656565:0701%02x",
                         OPT => ":slider,9,1,31"},
 
+  "urlaub"          => {SET => "1100656565%02x6565",
+                        OPT => ":slider,0,1,99"},
+
   "logmode"         => {SET => "EE0000",
                         OPT => ":noArg"}
 );
@@ -71,6 +78,8 @@ my %km271_tr = (
   "cFG_HK1_Tagtemperatur"           => "0703:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Betriebsart"             => "0000:4,a:4",
   "cFG_HK1_Betriebsart"             => "0704:0,a:4",  # fake reading for internal notify
+  "CFG_HK1_Urlaubtemperatur"        => "0000:5,d:2",
+  "cFG_HK1_Urlaubtemperatur"        => "0705:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Max_Temperatur"          => "000e:2",
   "CFG_HK1_Auslegung"               => "000e:4",
   "CFG_HK1_Aufschalttemperatur"     => "0015:0,a:9",
@@ -85,6 +94,8 @@ my %km271_tr = (
   "cFG_HK2_Tagtemperatur"           => "0803:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Betriebsart"             => "0038:4,a:4",
   "cFG_HK2_Betriebsart"             => "0804:0,a:4",  # fake reading for internal notify
+  "CFG_HK2_Urlaubtemperatur"        => "0038:5,d:2",
+  "cFG_HK2_Urlaubtemperatur"        => "0805:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Max_Temperatur"          => "0046:2",
   "CFG_HK2_Auslegung"               => "0046:4",
   "CFG_HK2_Aufschalttemperatur"     => "004d:0,a:9",
@@ -480,6 +491,11 @@ KM271_Set($@)
     return "Argument must be numeric (between 9 and 31)" if(!$numeric_val || $val < 9 || $val > 31);
 	# Two updates needed, here additionally HK2
     push @{$hash->{SENDBUFFER}}, sprintf("080065%02x65656565", $val);
+  }
+  elsif($a[0] eq 'urlaub') {
+    return "Argument must be numeric (between 0 and 99)" if(!$numeric_val || $val < 0 || $val > 99);
+    # Two updates needed, here additionally HK2
+    push @{$hash->{SENDBUFFER}}, sprintf("1200656565%02x6565", $val);
   }
   elsif($a[0] =~ m/^hk.*timer$/) {  # Timer calculation
     return "\"set KM271 $a[0]\" needs typically 5 parameters (position on-day on-time off-day off-time)" if(@a < 3);
@@ -1035,6 +1051,12 @@ KM271_SetReading($$$$)
       <li>hk2_nachtsoll &lt;temp&gt;<br>
           sets the by night temperature for heating circuit 2<br>
           (see above)</li>
+      <li>hk1_urlaubsoll &lt;temp&gt;<br>
+          sets the temperature during holiday mode for heating circuit 1<br>
+          (see above)</li>
+      <li>hk2_urlaubsoll &lt;temp&gt;<br>
+          sets the temperature during holiday mode for heating circuit 2<br>
+          (see above)</li>
       <li>hk1_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for heating circuit 1<br>
           <ul>
@@ -1072,6 +1094,12 @@ KM271_SetReading($$$$)
           <ul>
             <li> 9: fixed summer mode (only hot water and frost protection)</li>
             <li>31: fixed winter mode</li>
+          </ul></li>
+      <li>urlaub [count]<br>
+          sets the duration of the holiday mode to count days<br>
+          count must be between 0 and 99 with special meaning for<br>
+          <ul>
+            <li> 0: holiday mode is deactivated</li>
           </ul></li>
       <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
           sets the timer program for heating circuit 1<br>
