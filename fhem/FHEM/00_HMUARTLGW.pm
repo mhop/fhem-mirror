@@ -2029,9 +2029,9 @@ sub HMUARTLGW_send($$$;$)
 			$log .= $m;
 		}
 		$v = HMUARTLGW_getVerbLvl($hash, $4, $5, 5);
-	} elsif ($dst == HMUARTLGW_DST_APP && uc($msg) =~ m/^(0[3BF]).*[^0].*$/) {
+	} elsif ($dst == HMUARTLGW_DST_APP && uc($msg) =~ m/^(0[3BF]).*[^0].*(..)$/) {
 		#Key, do not log
-		$log = sprintf("%02X", $dst). " ${1}" . ("XX"x17);
+		$log = sprintf("%02X", $dst). " ${1}" . ("XX"x16) . $2;
 		$v = HMUARTLGW_getVerbLvl($hash, undef, undef, 5);
 	} else {
 		$log = sprintf("%02X", $dst). " ".uc($msg);
