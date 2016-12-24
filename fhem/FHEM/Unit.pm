@@ -108,6 +108,30 @@ my $scales_m = {
             en => 'Mega',
         },
     },
+
+    '1.0e9' => {
+        'scale_txt_m'      => 'G',
+        'scale_txt_long_m' => {
+            de => 'Giga',
+            en => 'Giga',
+        },
+    },
+
+    '1.0e12' => {
+        'scale_txt_m'      => 'T',
+        'scale_txt_long_m' => {
+            de => 'Tera',
+            en => 'Tera',
+        },
+    },
+
+    '1.0e15' => {
+        'scale_txt_m'      => 'P',
+        'scale_txt_long_m' => {
+            de => 'Peta',
+            en => 'Peta',
+        },
+    },
 };
 
 # scale helper for metric square numbers
@@ -408,7 +432,7 @@ my $rtype_base = {
     15 => {
         dimension        => 'L T^−1',
         formula_symbol   => 'v',
-        rtype_base       => 'kmh',
+        rtype_base       => 'kmph',
         base_description => {
             de => 'Geschwindigkeit',
             en => 'speed',
@@ -1062,7 +1086,7 @@ my $rtypes = {
                     ge        => 0.0,
                     lt        => 22.5,
                     eq        => 360,
-                    regex     => '^(N|North|0',
+                    regex     => '^(N|North|0)$',
                     value_num => 0.0,
                 },
                 {
@@ -1874,7 +1898,7 @@ my $rtypes = {
         },
     },
 
-    kmh => {
+    kmph => {
         ref_base  => 15,
         ref       => 'm',
         ref_t     => 'hr',
@@ -2172,7 +2196,7 @@ my $rtypes = {
     w => {
         ref_base => 9,
         scale_m  => '1.0e0',
-        suffix   => 'Watt',
+        suffix   => 'W',
         txt      => {
             de => 'Watt',
             en => 'Watt',
@@ -2181,6 +2205,100 @@ my $rtypes = {
 
     va => {
         ref => 'w',
+    },
+
+    kw => {
+        ref     => 'w',
+        scale_m => '1.0e3',
+    },
+
+    megaw => {
+        ref     => 'w',
+        scale_m => '1.0e6',
+    },
+
+    whr => {
+        base_ref  => 7,
+        ref       => 'w',
+        ref_t     => 'hr',
+        scale_m   => '1.0e0',
+        format    => '%.0f',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl_long => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+        },
+        tmpl_long_pl => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl_t%',
+        },
+        rtype_description => {
+            de => 'Wattstunde',
+            en => 'Watt hour',
+        }
+    },
+
+    kwhr => {
+        base_ref  => 7,
+        ref       => 'w',
+        ref_t     => 'hr',
+        scale_m   => '1.0e3',
+        format    => '%.0f',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl_long => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+        },
+        tmpl_long_pl => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl%',
+        },
+        rtype_description => {
+            de => 'Kilowattstunde',
+            en => 'Kilowatt hour',
+        }
+    },
+
+    mwhr => {
+        base_ref  => 7,
+        ref       => 'w',
+        ref_t     => 'hr',
+        scale_m   => '1.0e6',
+        format    => '%.0f',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl_long => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+        },
+        tmpl_long_pl => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl%',
+        },
+        rtype_description => {
+            de => 'Megawattstunde',
+            en => 'Megawatt hour',
+        }
+    },
+
+    gwhr => {
+        base_ref  => 7,
+        ref       => 'w',
+        ref_t     => 'hr',
+        scale_m   => '1.0e9',
+        format    => '%.0f',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl_long => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+        },
+        tmpl_long_pl => {
+            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl%',
+            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl%',
+        },
+        rtype_description => {
+            de => 'Gigawattstunde',
+            en => 'Gigawatt hour',
+        }
     },
 
     uwpscm => {
@@ -2704,58 +2822,62 @@ sub replaceTemplate ($$$$;$) {
 
     # if original value was a text string and we got value_num out of it,
     # now try to find the right standardized text value from the ARRAY
-    if ( defined( $desc->{value_num} ) ) {
+    my $value_num =
+      ref( $desc->{value_num} ) eq "ARRAY"
+      ? $desc->{value_num}[0]
+      : ( defined( $desc->{value_num} ) ? $desc->{value_num} : undef );
+    if ( defined($value_num) ) {
 
         # suffix
         if ( ref( $desc->{suffix} ) eq "ARRAY"
-            && $desc->{suffix}[ $desc->{value_num} ] )
+            && $desc->{suffix}[$value_num] )
         {
-            my $v = $desc->{suffix}[ $desc->{value_num} ];
+            my $v = $desc->{suffix}[$value_num];
             delete $desc->{suffix};
             $desc->{suffix} = $v;
         }
 
         # symbol
         if ( ref( $desc->{symbol} ) eq "ARRAY"
-            && $desc->{symbol}[ $desc->{value_num} ] )
+            && $desc->{symbol}[$value_num] )
         {
-            my $v = $desc->{symbol}[ $desc->{value_num} ];
+            my $v = $desc->{symbol}[$value_num];
             delete $desc->{symbol};
             $desc->{symbol} = $v;
         }
 
         # txt
         if ( ref( $desc->{txt} ) eq "ARRAY"
-            && $desc->{txt}[ $desc->{value_num} ] )
+            && $desc->{txt}[$value_num] )
         {
-            my $v = $desc->{txt}[ $desc->{value_num} ];
+            my $v = $desc->{txt}[$value_num];
             delete $desc->{txt};
             $desc->{txt} = $v;
         }
 
         # txt_pl
         if ( ref( $desc->{txt_pl} ) eq "ARRAY"
-            && $desc->{txt_pl}[ $desc->{value_num} ] )
+            && $desc->{txt_pl}[$value_num] )
         {
-            my $v = $desc->{txt_pl}[ $desc->{value_num} ];
+            my $v = $desc->{txt_pl}[$value_num];
             delete $desc->{txt_pl};
             $desc->{txt_pl} = $v;
         }
 
         # txt_long
         if ( ref( $desc->{txt_long} ) eq "ARRAY"
-            && $desc->{txt_long}[ $desc->{value_num} ] )
+            && $desc->{txt_long}[$value_num] )
         {
-            my $v = $desc->{txt_long}[ $desc->{value_num} ];
+            my $v = $desc->{txt_long}[$value_num];
             delete $desc->{txt_long};
             $desc->{txt_long} = $v;
         }
 
         # txt_long_pl
         if ( ref( $desc->{txt_long_pl} ) eq "ARRAY"
-            && $desc->{txt_long_pl}[ $desc->{value_num} ] )
+            && $desc->{txt_long_pl}[$value_num] )
         {
-            my $v = $desc->{txt_long_pl}[ $desc->{value_num} ];
+            my $v = $desc->{txt_long_pl}[$value_num];
             delete $desc->{txt_long_pl};
             $desc->{txt_long_pl} = $v;
         }
@@ -3144,7 +3266,7 @@ sub formatValue($$$;$$$$) {
         else {
             my $i = 0;
             foreach ( @{$scope} ) {
-                if ( $value =~ /$_/gmi ) {
+                if ( !ref($_) && $value =~ /$_/gmi ) {
                     $value_num = $i;
                     if (   ref( $desc->{txt} ) eq "HASH"
                         && ref( $desc->{txt}{$lang} ) eq "ARRAY"
@@ -3183,6 +3305,33 @@ sub formatValue($$$;$$$$) {
                     }
                     last;
                 }
+
+                #TODO
+                elsif ( ref($_) eq "HASH" ) {
+                    if ( !looks_like_number($value) && $_->{regex} ) {
+                        if ( $value =~ /$_->{regex}/ ) {
+                            if ( defined( $_->{value_num} ) ) {
+                                $value_num->[0] = $i;
+                                $value_num->[1] = $_->{value_num};
+                            }
+                            else {
+                                $value_num = $i;
+                            }
+
+                            last;
+                        }
+
+                     #TODO
+                     # we want to run the code from above to verify number scope
+                     # here as well so it need to be transferred into a
+                     # subroutine first.
+                     # Not sure about the duplicate regex handling from above...
+                        else {
+
+                        }
+                    }
+                }
+
                 $i++;
             }
         }
