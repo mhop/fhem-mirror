@@ -143,7 +143,7 @@ my $scales_sq = {
     },
 };
 
-# scale helper for metric square numbers
+# scale helper for metric cubic numbers
 my $scales_cu = {
     'scale_txt_cu'      => chr(0x00B3),
     'scale_txt_long_cu' => {
@@ -156,25 +156,98 @@ my $scales_cu = {
 my $scales_t = {
 
     # second
-    '1' => {},
+    's' => {
+        'scale_txt_t'      => 's',
+        'scale_txt_long_t' => {
+            de => 'Sekunde',
+            en => 'second',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Sekunden',
+            en => 'seconds',
+        },
+    },
 
     # minute
-    '60' => {},
+    'min' => {
+        'scale_txt_t' => {
+            de => 'Min',
+            en => 'min',
+        },
+        'scale_txt_long_t' => {
+            de => 'Minute',
+            en => 'minute',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Minuten',
+            en => 'minutes',
+        },
+    },
 
     # hour
-    '3600' => {},
+    'h' => {
+        'scale_txt_t'      => 'h',
+        'scale_txt_long_t' => {
+            de => 'Stunde',
+            en => 'hour',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Stunden',
+            en => 'hours',
+        },
+    },
 
     # day
-    '86400' => {},
+    'd' => {
+        'scale_txt_t'      => 'd',
+        'scale_txt_long_t' => {
+            de => 'Tag',
+            en => 'day',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Tage',
+            en => 'days',
+        },
+    },
 
     # week
-    '604800' => {},
+    'w' => {
+        'scale_txt_t'      => 'w',
+        'scale_txt_long_t' => {
+            de => 'Woche',
+            en => 'week',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Wochen',
+            en => 'weeks',
+        },
+    },
 
     # month
-    '2592000' => {},
+    'm' => {
+        'scale_txt_t'      => 'm',
+        'scale_txt_long_t' => {
+            de => 'Monat',
+            en => 'month',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Monate',
+            en => 'month',
+        },
+    },
 
     # year
-    '31536000' => {},
+    'a' => {
+        'scale_txt_t'      => 'a',
+        'scale_txt_long_t' => {
+            de => 'Jahr',
+            en => 'year',
+        },
+        'scale_txt_long_pl_t' => {
+            de => 'Jahre',
+            en => 'years',
+        },
+    },
 };
 
 # scale helper for time related numbers
@@ -623,9 +696,9 @@ my $rtype_base = {
 # cross-references to $rtype_base, $scales_m, $scales_sq, $scales_cu, $scales_t
 #
 # ref_base => reference to $rtype_base id to include it's keys here
-# ref_sq   => include keys from $scales_sq here
-# ref_cu   => include keys from $scales_cu here
-# ref_t    => reference to $scales_t id to include it's keys here
+# ref_sq   => include keys from $scales_sq here; normally combined with a scale_sq reference as well
+# ref_cu   => include keys from $scales_cu here; normally combined with a scale_cu reference as well
+# ref_t    => reference to $scales_t id to include it's keys here; ; normally combined with a scale_t reference as well
 # ref      => self-reference to $rtype id to include it's keys here (RType alias helper)
 my $rtypes = {
 
@@ -1682,7 +1755,7 @@ my $rtypes = {
     # time
     sec => {
         ref_base => 2,
-        scale_t  => '1',
+        scale_t  => 's',
         suffix   => {
             de => 's',
             en => 's',
@@ -1699,7 +1772,7 @@ my $rtypes = {
 
     min => {
         ref_base => 2,
-        scale_t  => '60',
+        scale_t  => 'min',
         suffix   => {
             de => 'Min',
             en => 'min',
@@ -1716,7 +1789,7 @@ my $rtypes = {
 
     hr => {
         ref_base => 2,
-        scale_t  => '3600',
+        scale_t  => 'h',
         suffix   => 'h',
         txt      => {
             de => 'Stunde',
@@ -1730,7 +1803,7 @@ my $rtypes = {
 
     d => {
         ref_base => 2,
-        scale_t  => '86400',
+        scale_t  => 'd',
         suffix   => {
             de => 'T',
             en => 'd',
@@ -1747,7 +1820,7 @@ my $rtypes = {
 
     w => {
         ref_base => 2,
-        scale_t  => '604800',
+        scale_t  => 'w',
         suffix   => {
             de => 'W',
             en => 'w',
@@ -1764,7 +1837,7 @@ my $rtypes = {
 
     mon => {
         ref_base => 2,
-        scale_t  => '2592000',
+        scale_t  => 'm',
         suffix   => {
             de => 'M',
             en => 'm',
@@ -1781,7 +1854,7 @@ my $rtypes = {
 
     y => {
         ref_base => 2,
-        scale_t  => '31536000',
+        scale_t  => 'a',
         suffix   => {
             de => 'J',
             en => 'y',
@@ -1798,7 +1871,7 @@ my $rtypes = {
 
     epoch => {
         ref_base          => 2,
-        scale_t           => '1',
+        scale_t           => 's',
         scope             => { minValue => 0 },
         rtype_description => {
             de => 'Unix Epoche in s seit 1970-01-01T00:00:00Z',
@@ -2220,17 +2293,18 @@ my $rtypes = {
     whr => {
         base_ref  => 7,
         ref       => 'w',
-        ref_t     => 'hr',
         scale_m   => '1.0e0',
+        ref_t     => 'hr',
+        scale_t   => 'h',
         format    => '%.0f',
-        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%',
         tmpl_long => {
-            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
-            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt%',
+            en => '%value%' . chr(0x00A0) . '%txt%',
         },
         tmpl_long_pl => {
-            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl_t%',
-            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl_t%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl%',
         },
         rtype_description => {
             de => 'Wattstunde',
@@ -2241,17 +2315,18 @@ my $rtypes = {
     kwhr => {
         base_ref  => 7,
         ref       => 'w',
-        ref_t     => 'hr',
         scale_m   => '1.0e3',
+        ref_t     => 'hr',
+        scale_t   => 'h',
         format    => '%.0f',
-        tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
+        tmpl      => '%value%' . chr(0x00A0) . '%suffix%',
         tmpl_long => {
-            de => '%value%' . chr(0x00A0) . '%txt%%txt_t%',
-            en => '%value%' . chr(0x00A0) . '%txt% %txt_t%',
+            de => '%value%' . chr(0x00A0) . '%txt%',
+            en => '%value%' . chr(0x00A0) . '%txt%',
         },
         tmpl_long_pl => {
-            de => '%value%' . chr(0x00A0) . '%txt%%txt_pl%',
-            en => '%value%' . chr(0x00A0) . '%txt% %txt_pl%',
+            de => '%value%' . chr(0x00A0) . '%txt_pl%',
+            en => '%value%' . chr(0x00A0) . '%txt_pl%',
         },
         rtype_description => {
             de => 'Kilowattstunde',
@@ -2262,8 +2337,9 @@ my $rtypes = {
     mwhr => {
         base_ref  => 7,
         ref       => 'w',
-        ref_t     => 'hr',
         scale_m   => '1.0e6',
+        ref_t     => 'hr',
+        scale_t   => 'h',
         format    => '%.0f',
         tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
         tmpl_long => {
@@ -2283,8 +2359,9 @@ my $rtypes = {
     gwhr => {
         base_ref  => 7,
         ref       => 'w',
-        ref_t     => 'hr',
         scale_m   => '1.0e9',
+        ref_t     => 'hr',
+        scale_t   => 'h',
         format    => '%.0f',
         tmpl      => '%value%' . chr(0x00A0) . '%suffix%%suffix_t%',
         tmpl_long => {
@@ -2887,13 +2964,24 @@ sub replaceTemplate ($$$$;$) {
     # template support
     #
 
-    # add metric name to suffix
+    # add metric name to suffix and txt
     $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix}
       if ( $desc->{suffix}
         && $desc->{scale_txt_m} );
     $desc->{txt} = $desc->{scale_txt_long_m} . lc( $desc->{txt} )
       if ( $desc->{txt}
         && $desc->{scale_txt_long_m} );
+
+    # add time information to suffix and txt
+    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t}
+      if ( $desc->{suffix}
+        && $desc->{scale_txt_t} );
+    $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} )
+      if ( $desc->{txt}
+        && $desc->{scale_txt_long_pl_t} );
+    $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} )
+      if ( $desc->{txt}
+        && $desc->{scale_txt_long_t} );
 
     # add square information to suffix and txt
     # if no separate suffix_sq and txt_sq was found
@@ -2913,6 +3001,18 @@ sub replaceTemplate ($$$$;$) {
       if (!$desc->{txt_cu}
         && $desc->{scale_txt_long_cu} );
 
+    # add time information to suffix and txt
+    # if no separate suffix_t and txt_t was found
+    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t}
+      if (!$desc->{suffix_t}
+        && $desc->{scale_txt_t} );
+    $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} )
+      if (!$desc->{txt_t}
+        && $desc->{scale_txt_long_pl_t} );
+    $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} )
+      if (!$desc->{txt_t}
+        && $desc->{scale_txt_long_t} );
+
     # add metric name to suffix_sq
     $desc->{suffix_sq} = $desc->{scale_txt_m_sq} . $desc->{suffix_sq}
       if ( $desc->{suffix_sq}
@@ -2922,13 +3022,24 @@ sub replaceTemplate ($$$$;$) {
       if ( $desc->{txt_sq}
         && $desc->{scale_txt_long_m_sq} );
 
-    # # add square information to suffix_sq
+    # add square information to suffix_sq
     $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_sq}
       if ( $desc->{suffix_sq}
         && $desc->{scale_txt_sq} );
     $desc->{txt_sq} = $desc->{scale_txt_long_sq} . lc( $desc->{txt_sq} )
       if ( $desc->{txt_sq}
         && $desc->{scale_txt_long_sq} );
+
+    # add time information to suffix_sq
+    $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_t}
+      if ( $desc->{suffix_sq}
+        && $desc->{scale_txt_t} );
+    $desc->{txt_pl_sq} = $desc->{txt_sq} . lc( $desc->{scale_txt_long_pl_t} )
+      if ( $desc->{txt_sq}
+        && $desc->{scale_txt_long_pl_t} );
+    $desc->{txt_sq} = $desc->{txt_sq} . lc( $desc->{scale_txt_long_t} )
+      if ( $desc->{txt_sq}
+        && $desc->{scale_txt_long_t} );
 
     # add metric name to suffix_cu
     $desc->{suffix_cu} = $desc->{scale_txt_m_cu} . $desc->{suffix_cu}
@@ -2945,6 +3056,17 @@ sub replaceTemplate ($$$$;$) {
     $desc->{txt_cu} = $desc->{scale_txt_long_cu} . lc( $desc->{txt_cu} )
       if ( $desc->{txt_cu}
         && $desc->{scale_txt_long_cu} );
+
+    # add time information to suffix_cu
+    $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_t}
+      if ( $desc->{suffix_cu}
+        && $desc->{scale_txt_t} );
+    $desc->{txt_pl_cu} = $desc->{txt_cu} . lc( $desc->{scale_txt_long_pl_t} )
+      if ( $desc->{txt_cu}
+        && $desc->{scale_txt_long_pl_t} );
+    $desc->{txt_cu} = $desc->{txt_cu} . lc( $desc->{scale_txt_long_t} )
+      if ( $desc->{txt_cu}
+        && $desc->{scale_txt_long_t} );
 
     ###############################
     # generate short text string
@@ -3505,6 +3627,13 @@ sub readingsDesc($;$) {
             foreach my $k ( keys %{ $scales_m->{$ref} } ) {
                 $desc->{ $k . "_cu" } = $scales_m->{$ref}{$k}
                   if ( !defined( $desc->{ $k . "_cu" } ) );
+            }
+        }
+        if ( $desc->{scale_t} ) {
+            my $ref = $desc->{scale_t};
+            foreach my $k ( keys %{ $scales_t->{$ref} } ) {
+                $desc->{$k} = $scales_t->{$ref}{$k}
+                  if ( !defined( $desc->{$k} ) );
             }
         }
 
