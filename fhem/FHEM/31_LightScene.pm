@@ -590,7 +590,7 @@ LightScene_Set($@)
 
   my @sorted = sort keys %{$hash->{SCENES}};
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." nextScene:noArg previousScene:noArg"};
+     if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." n))extScene:noArg previousScene:noArg"};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
@@ -645,8 +645,13 @@ LightScene_Set($@)
     my( $index )= grep { $sorted[$_] eq $current } 0..$#sorted;
     $index = -1 if( !defined($index) );
 
+Log 1, $index;
     ++$index if( $cmd eq 'nextScene' );
     --$index if( $cmd eq 'previousScene' );
+
+    return if( $scene && $scene eq 'nowrap' && $index > $#sorted );
+    return if( $scene && $scene eq 'nowrap' && $index < 0 );
+
     $index = 0 if( $index > $#sorted );
     $index = $#sorted if( $index < 0 );
 
@@ -1010,9 +1015,9 @@ LightScene_editTable($) {
       save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
-      <li>nextScene<br>
+      <li>nextScene [nowrap]<br>
       activates the next scene in alphabetical order after the current scene or the first if no current scene is set.</li>
-      <li>previousScene<br>
+      <li>previousScene [nowrap]<br>
       activates the previous scene in alphabetical order before the current scene or the last if no current scene is set.</li>
       <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
       set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
