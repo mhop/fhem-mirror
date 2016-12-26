@@ -36,7 +36,9 @@ sub LaCrosseGateway_Initialize($) {
                            ." dummy"
                            ." initCommands"
                            ." timeout"
+                           ." watchdog"
                            ." disable:0,1"
+                           ." tftFile"
                            ." kvp:dispatch,readings,both"
                            ." ownSensors:dispatch,readings,both"
                            ." mode:USB,WiFi,Cable"
@@ -111,7 +113,7 @@ sub LaCrosseGateway_Set($@) {
   my $cmd = shift @a;
   my $arg = join(" ", @a);
 
-  my $list = "raw connect LaCrossePairForSec flash parse reboot";
+  my $list = "raw connect LaCrossePairForSec flash nextionUpload parse reboot";
   return $list if( $cmd eq '?' || $cmd eq '');
 
   if ($cmd eq "raw") {
@@ -161,6 +163,43 @@ sub LaCrosseGateway_Set($@) {
 
     LaCrosseGateway_Connect($hash);
     $log .= "$name opened\n";
+    
+    return $log;
+  }
+   elsif ($cmd eq "nextionUpload") {
+    my $log = "";
+    my @deviceName = split('@', $hash->{DeviceName});
+    my $port = $deviceName[0];
+    my $logFile = AttrVal("global", "logdir", "./log") . "/NextionUpload.log";
+    my $tftFile = AttrVal($name, "tftFile", "./FHEM/firmware/nextion.tft");
+    
+    return "The file '$tftFile' does not exist" if(!-e $tftFile);
+
+    $log .= "upload Nextion firmware to $name\n";
+    $log .= "tft file: $tftFile\n";
+
+    eval "use LWP::UserAgent";
+    return "\nERROR: Please install LWP::UserAgent" if($@);
+
+    eval "use HTTP::Request::Common";
+    return "\nERROR: Please install HTTP::Request::Common" if($@);
+
+    my @spl = split(':', $hash->{DeviceName});
+    my $targetIP = $spl[0];
+    my $targetURL = "http://" . $targetIP . "/ota/nextion";
+    $log .= "target: $targetURL\n";
+
+    my $request = POST($targetURL, Content_Type => 'multipart/form-data', Content => [ file => [$tftFile, "nextion.tft"] ]);
+    my $userAgent = LWP::UserAgent->new;
+    $userAgent->timeout(300);
+    my $response = $userAgent->request($request);
+    if ($response->is_success) {
+      $log .= "\n\nLGW reports:\n";
+      $log .= $response->decoded_content;
+    }
+    else {
+      $log .= "\nERROR: " . $response->code . " " . $response->decoded_content;
+    }
     
     return $log;
   }
@@ -334,14 +373,49 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
 }
 
 #=======================================================================================
+sub LaCrosseGateway_HandleAnalogData($$) {
+  my ($hash, $data) = @_;
+
+  if ($data =~ m/^LGW ANALOG /) {
+    readingsBeginUpdate($hash);
+
+    my @bytes = split( ' ', substr($data, 10) );
+    return "" if(@bytes < 2);
+
+    my $value = $bytes[0]*256 + $bytes[1];
+    readingsBulkUpdate($hash, "analog", $value);
+
+    readingsEndUpdate($hash, 1);
+
+}}
+
+#=======================================================================================
 sub LaCrosseGateway_Parse($$$$) {
   my ($hash, $iohash, $name, $msg) = @_;
 
-  next if(!$msg || length($msg) < 1);
+  next if (!$msg || length($msg) < 1);
   return if ($msg =~ m/^\*\*\*CLEARLOG/);
+
+  if ($msg =~ m/^LGW/) {
+    if ($msg =~ /ALIVE/) {
+      $hash->{Alive} = TimeNow();
+    }
+
+    LaCrosseGateway_HandleAnalogData($hash, $msg);
+
+    return;
+  }
 
   if($msg =~ m/^\[LaCrosseITPlusReader.Gateway/ ) {
     $hash->{model} = $msg;
+
+    my $attrVal = AttrVal($name, "timeout", undef);
+    if(defined($attrVal)) {
+      my ($timeout, $interval) = split(',', $attrVal);
+      if (!$interval) {
+        $hash->{Alive} = TimeNow();
+      }
+    }
 
     if (ReadingsVal($name, "state", "") eq "opened") {
       if (my $initCommandsString = AttrVal($name, "initCommands", undef)) {
@@ -429,28 +503,60 @@ sub LaCrosseGateway_Connect($;$) {
 }
 
 #=======================================================================================
+sub LaCrosseGateway_TriggerWatchdog($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $watchDog = "";
+
+  my $watchDogAttribute = AttrVal($name, "watchdog", undef);
+  if($watchDogAttribute) {
+    $watchDog = "=$watchDogAttribute"
+  }
+
+  my $command = "\"WATCHDOG Ping$watchDog\"";
+
+  LaCrosseGateway_SimpleWrite($hash, $command);
+}
+
+#=======================================================================================
 sub LaCrosseGateway_OnConnectTimer($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  
+
   RemoveInternalTimer($hash, "LaCrosseGateway_OnConnectTimer");
 
   my $attrVal = AttrVal($name, "timeout", undef);
   if(defined($attrVal)) {
     my ($timeout, $interval) = split(',', $attrVal);
-    my $LaCrosseGatewayTime = InternalVal($name, "${name}_TIME", "2000-01-01 00:00:00");
-    my ($date, $time, $year, $month, $day, $hour, $min, $sec, $timestamp);
-    ($date, $time) = split( ' ', $LaCrosseGatewayTime);
-    ($year, $month, $day) = split( '-', $date);
-    ($hour, $min, $sec) = split( ':', $time);
-    $month -= 01;
-    $timestamp = timelocal($sec, $min, $hour, $day, $month, $year);
+    my $useOldMethod = $interval;
+    $interval = $timeout if !$interval;
 
     InternalTimer(gettimeofday() + $interval, "LaCrosseGateway_OnConnectTimer", $hash, 0);
-    
-    if (gettimeofday() - $timestamp > $timeout) {
-      return LaCrosseGateway_Connect($hash, 1);
+
+    if(AttrVal($name, "disable", "0") != "1") {
+      my ($date, $time, $year, $month, $day, $hour, $min, $sec, $timestamp, $alive);
+      if($useOldMethod) {
+        $alive = InternalVal($name, "${name}_TIME", "2000-01-01 00:00:00");
+      }
+      else {
+        LaCrosseGateway_TriggerWatchdog($hash);
+        $timeout += 5;
+        $alive = $hash->{Alive};
+        $alive = "2000-01-01 00:00:00" if !$alive;
+      }
+
+      ($date, $time) = split( ' ', $alive);
+      ($year, $month, $day) = split( '-', $date);
+      ($hour, $min, $sec) = split( ':', $time);
+      $month -= 01;
+      $timestamp = timelocal($sec, $min, $hour, $day, $month, $year);
+
+      if (gettimeofday() - $timestamp > $timeout) {
+        return LaCrosseGateway_Connect($hash, 1);
+      }
+
     }
+
   }
 }
 
@@ -464,14 +570,17 @@ sub LaCrosseGateway_Attr(@) {
     $hash->{Clients} = $clients if( !$hash->{Clients});
   }
   elsif ($aName eq "timeout") {
-    return "Usage: attr $name $aName <timeout,checkInterval>" if($aVal && $aVal !~ m/^[0-9]{1,6},[0-9]{1,6}$/);
+    return "Usage: attr $name $aName <checkInterval>" if($aVal && $aVal !~ m/^[0-9]{1,6}(,[0-9]{1,6})*/);
   
     RemoveInternalTimer($hash, "LaCrosseGateway_OnConnectTimer");
     if($aVal) {
+      LaCrosseGateway_TriggerWatchdog($hash);
+
       my ($timeout, $interval) = split(',', $aVal);
+      $interval = $timeout if !$interval;
       InternalTimer(gettimeofday()+$interval, "LaCrosseGateway_OnConnectTimer", $hash, 0);
     }
-  
+
   }
   elsif ($aName eq "disable") {
     if($aVal eq "1") {
@@ -572,9 +681,16 @@ sub LaCrosseGateway_Attr(@) {
     </li><br>
 
     <li>flash<br>
-    The LaCrosseGateway needs the right firmware to be able to receive and deliver the sensor data to fhem.
-    This provides a way to flash it directly from FHEM.<br><br>
+      The LaCrosseGateway needs the right firmware to be able to receive and deliver the sensor data to fhem.<br>
+      This provides a way to flash it directly from FHEM.
     </li><br>
+    
+    <li>nextionUpload<br>
+      Requires LaCrosseGateway V1.24 or newer.<br>
+      Sends a Nextion firmware file (.tft) to the LaCrosseGateway. The LaCrosseGateway then distributes it to a connected Nextion display.<br>
+      You can define the .tft file that shall be uploaded in the tftFile attribute. If this attribute does not exists, it will try to use FHEM/firmware/nextion.tft
+    </li><br>
+    
   </ul>
 
   <a name="LaCrosseGateway_Get"></a>
@@ -594,17 +710,30 @@ sub LaCrosseGateway_Attr(@) {
     </li><br>
 
     <li>MatchList<br>
-      Can be set to a perl expression that returns a hash that is used as the MatchList<br>
+      Can be set to a perl expression that returns a hash that is used as the MatchList
     </li><br>
 
     <li>initCommands<br>
-      Space separated list of commands to send for device initialization.<br>
+      Space separated list of commands to send for device initialization.
     </li><br>
 
     <li>timeout<br>
-      format: &lt;timeout, checkInterval&gt;
-      Checks every 'checkInterval' seconds if the last data reception is longer than 'timout' seconds ago.<br>
+      format: &lt;timeout&gt<br>
+      Asks the LaCrosseGateway every timeout seconds if it is still alive. If there is no response it reconnects to the LaCrosseGateway.<br>
+      Can be combined with the watchdog attribute. If the watchdog attribute is set, the LaCrosseGateway also will check if it gets
+      a request within watchdog seconds and if not, it will reboot.
+      watchdog must be longer than timeout and does only work in combination with timeout.<br>
+      Both should not be too short because the LaCrosseGateway needs enough time to boot before the next check.<br>
+      Good values are: timeout 60 and watchdog 300<br>
+      This mode needs LaCrosseGateway V1.24 or newer.
+      <br><br><u>Old version (still working):</u><br>
+      format: &lt;timeout, checkInterval&gt;<br>
+      Checks every 'checkInterval' seconds if the last data reception is longer than 'timeout' seconds ago.<br>
       If this is the case, a new connect will be tried.
+    </li><br>
+
+    <li>watchdog<br>
+      see timeout attribute.
     </li><br>
 
     <li>disable<br>
@@ -612,14 +741,14 @@ sub LaCrosseGateway_Attr(@) {
     </li><br>
 
     <li>kvp<br>
-      defines how the incoming KVP-data of the LGW is handled<br>
+      defines how the incoming KVP-data of the LaCrosseGateway is handled<br>
       dispatch: (default) dispatch it to a KVP device<br>
       readings: create readings (e.g. RSSI, ...) in this device<br>
       both: dispatch and create readings
     </li><br>
 
     <li>ownSensors<br>
-      defines how the incoming data of the internal LGW sensors is handled<br>
+      defines how the incoming data of the internal LaCrosseGateway sensors is handled<br>
       dispatch: (default) dispatch it to a LaCrosse device<br>
       readings: create readings (e.g. temperature, humidity, ...) in this device<br>
       both: dispatch and create readings
@@ -627,7 +756,11 @@ sub LaCrosseGateway_Attr(@) {
 
     <li>mode<br>
       USB, WiFi or Cable<br>
-      Depending on how the LGW ist connected, it must be handled differently (init, ...)
+      Depending on how the LaCrosseGateway is connected, it must be handled differently (init, ...)
+    </li><br>
+    
+    <li>tftFile<br>
+      defines the .tft file that shall be used by the Nextion firmware upload (set nextionUpload)
     </li><br>
 
   </ul>
