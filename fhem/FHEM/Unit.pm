@@ -1090,43 +1090,43 @@ my $rtypes = {
                 {
                     ge        => 112.5,
                     lt        => 135.0,
-                    regex     => '^(OSO|Ost-S(ü|ue)dost|5)$',
+                    regex     => '^(OSO|Ost-S(ü|u|ue)dost|5)$',
                     value_num => 112.5,
                 },
                 {
                     ge        => 135.0,
                     lt        => 157.5,
-                    regex     => '^(SO|S(ü|ue)dost|6)$',
+                    regex     => '^(SO|S(ü|u|ue)dost|6)$',
                     value_num => 135.0,
                 },
                 {
                     ge        => 157.5,
                     lt        => 180.0,
-                    regex     => '^(SSO|S(ü|ue)d-S(ü|ue)dost|7)$',
+                    regex     => '^(SSO|S(ü|u|ue)d-S(ü|u|ue)dost|7)$',
                     value_num => 157.5,
                 },
                 {
                     ge        => 180.0,
                     lt        => 202.5,
-                    regex     => '^(S|S(ü|ue)den|8)$',
+                    regex     => '^(S|S(ü|u|ue)den|8)$',
                     value_num => 180.0,
                 },
                 {
                     ge        => 202.5,
                     lt        => 225.0,
-                    regex     => '^(SSW|S(ü|ue)d-S(ü|ue)dwest|9)$',
+                    regex     => '^(SSW|S(ü|u|ue)d-S(ü|u|ue)dwest|9)$',
                     value_num => 202.5,
                 },
                 {
                     ge        => 225.0,
                     lt        => 247.5,
-                    regex     => '^(SW|S(ü|ue)dwest|10)$',
+                    regex     => '^(SW|S(ü|u|ue)dwest|10)$',
                     value_num => 225.0,
                 },
                 {
                     ge        => 247.5,
                     lt        => 270.0,
-                    regex     => '^(WSW|West-S(ü|ue)dwest|11)$',
+                    regex     => '^(WSW|West-S(ü|u|ue)dwest|11)$',
                     value_num => 247.5,
                 },
                 {
@@ -2865,6 +2865,11 @@ sub replaceTemplate ($$$$;$) {
     # clone
     my $desc;
     foreach ( keys %{$odesc} ) {
+        next
+          if ( $_ eq "scope"
+            || $_ eq "format"
+            || $_ eq "factor"
+            || $_ eq "scale" );
         $desc->{$_} = $odesc->{$_};
     }
 
@@ -2874,7 +2879,8 @@ sub replaceTemplate ($$$$;$) {
 
     # keep only defined language if set
     foreach ( keys %{$desc} ) {
-        next if ( !defined( $desc->{$_} )
+        next
+          if (!defined( $desc->{$_} )
             || ref( $desc->{$_} ) ne "HASH" );
 
         # find any direct format
@@ -2883,6 +2889,9 @@ sub replaceTemplate ($$$$;$) {
             $v = $desc->{$_}{$l};
             delete $desc->{$_};
             $desc->{$_} = $v if ( defined($v) );
+            Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr $_: value replaced by language specific version ($l)"
+            );
         }
 
         # try base language format instead
@@ -2894,6 +2903,9 @@ sub replaceTemplate ($$$$;$) {
             $v = $desc->{$_}{$1};
             delete $desc->{$_};
             $desc->{$_} = $v if ( defined($v) );
+            Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr $_: value replaced by base language specific version ($1)"
+            );
         }
     }
 
@@ -2904,59 +2916,19 @@ sub replaceTemplate ($$$$;$) {
       ? $desc->{value_num}[0]
       : ( defined( $desc->{value_num} ) ? $desc->{value_num} : undef );
     if ( defined($value_num) ) {
-
-        # suffix
-        if ( ref( $desc->{suffix} ) eq "ARRAY"
-            && $desc->{suffix}[$value_num] )
+        foreach ( 'suffix', 'symbol', 'txt', 'txt_pl', 'txt_long',
+            'txt_long_pl' )
         {
-            my $v = $desc->{suffix}[$value_num];
-            delete $desc->{suffix};
-            $desc->{suffix} = $v;
-        }
-
-        # symbol
-        if ( ref( $desc->{symbol} ) eq "ARRAY"
-            && $desc->{symbol}[$value_num] )
-        {
-            my $v = $desc->{symbol}[$value_num];
-            delete $desc->{symbol};
-            $desc->{symbol} = $v;
-        }
-
-        # txt
-        if ( ref( $desc->{txt} ) eq "ARRAY"
-            && $desc->{txt}[$value_num] )
-        {
-            my $v = $desc->{txt}[$value_num];
-            delete $desc->{txt};
-            $desc->{txt} = $v;
-        }
-
-        # txt_pl
-        if ( ref( $desc->{txt_pl} ) eq "ARRAY"
-            && $desc->{txt_pl}[$value_num] )
-        {
-            my $v = $desc->{txt_pl}[$value_num];
-            delete $desc->{txt_pl};
-            $desc->{txt_pl} = $v;
-        }
-
-        # txt_long
-        if ( ref( $desc->{txt_long} ) eq "ARRAY"
-            && $desc->{txt_long}[$value_num] )
-        {
-            my $v = $desc->{txt_long}[$value_num];
-            delete $desc->{txt_long};
-            $desc->{txt_long} = $v;
-        }
-
-        # txt_long_pl
-        if ( ref( $desc->{txt_long_pl} ) eq "ARRAY"
-            && $desc->{txt_long_pl}[$value_num] )
-        {
-            my $v = $desc->{txt_long_pl}[$value_num];
-            delete $desc->{txt_long_pl};
-            $desc->{txt_long_pl} = $v;
+            if ( ref( $desc->{$_} ) eq "ARRAY"
+                && $desc->{$_}[$value_num] )
+            {
+                my $v = $desc->{$_}[$value_num];
+                delete $desc->{$_};
+                $desc->{$_} = $v;
+                Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr $_: value replaced based on ARRAY found using value from 'value_num'"
+                );
+            }
         }
     }
 
@@ -2965,108 +2937,240 @@ sub replaceTemplate ($$$$;$) {
     #
 
     # add metric name to suffix and txt
-    $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix}
-      if ( $desc->{suffix}
-        && $desc->{scale_txt_m} );
-    $desc->{txt} = $desc->{scale_txt_long_m} . lc( $desc->{txt} )
-      if ( $desc->{txt}
-        && $desc->{scale_txt_long_m} );
+    if (   $desc->{suffix}
+        && $desc->{scale_txt_m} )
+    {
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix value rewritten by adding value from 'scale_txt_m'"
+        );
+        $desc->{suffix} = $desc->{scale_txt_m} . $desc->{suffix};
+    }
+    if (   $desc->{txt}
+        && $desc->{scale_txt_long_m} )
+    {
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt value rewritten by adding value from 'scale_txt_long_m'"
+        );
+        $desc->{txt} = $desc->{scale_txt_long_m} . lc( $desc->{txt} );
+    }
 
     # add time information to suffix and txt
-    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t}
-      if ( $desc->{suffix}
-        && $desc->{scale_txt_t} );
-    $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} )
-      if ( $desc->{txt}
-        && $desc->{scale_txt_long_pl_t} );
-    $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} )
-      if ( $desc->{txt}
-        && $desc->{scale_txt_long_t} );
+    if (   $desc->{suffix}
+        && $desc->{scale_txt_t} )
+    {
+        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix value rewritten by adding value from 'scale_txt_t'"
+        );
+    }
+    if (   $desc->{txt}
+        && $desc->{scale_txt_long_pl_t} )
+    {
+        $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_pl value rewritten by adding value from 'scale_txt_long_pl_t'"
+        );
+    }
+    if (   $desc->{txt}
+        && $desc->{scale_txt_long_t} )
+    {
+        $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt value rewritten by adding value from 'scale_txt_long_t'"
+        );
+    }
 
     # add square information to suffix and txt
     # if no separate suffix_sq and txt_sq was found
-    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_sq}
-      if (!$desc->{suffix_sq}
-        && $desc->{scale_txt_sq} );
-    $desc->{txt} = $desc->{scale_txt_long_sq} . lc( $desc->{txt} )
-      if (!$desc->{txt_sq}
-        && $desc->{scale_txt_long_sq} );
+    if (  !$desc->{suffix_sq}
+        && $desc->{scale_txt_sq} )
+    {
+        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_sq};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix value rewritten by adding value from 'scale_txt_sq'"
+        );
+    }
+    if (  !$desc->{txt_sq}
+        && $desc->{scale_txt_long_sq} )
+    {
+        $desc->{txt} = $desc->{scale_txt_long_sq} . lc( $desc->{txt} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt value rewritten by adding value from 'scale_txt_long_sq'"
+        );
+    }
 
     # add cubic information to suffix and txt
     # if no separate suffix_cu and txt_cu was found
-    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_cu}
-      if (!$desc->{suffix_cu}
-        && $desc->{scale_txt_cu} );
-    $desc->{txt} = $desc->{scale_txt_long_cu} . lc( $desc->{txt} )
-      if (!$desc->{txt_cu}
-        && $desc->{scale_txt_long_cu} );
+    if (  !$desc->{suffix_cu}
+        && $desc->{scale_txt_cu} )
+    {
+        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_cu};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix value rewritten by adding value from 'scale_txt_cu'"
+        );
+    }
+    if (  !$desc->{txt_cu}
+        && $desc->{scale_txt_long_cu} )
+    {
+        $desc->{txt} = $desc->{scale_txt_long_cu} . lc( $desc->{txt} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt value rewritten by adding value from 'scale_txt_long_cu'"
+        );
+    }
 
     # add time information to suffix and txt
     # if no separate suffix_t and txt_t was found
-    $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t}
-      if (!$desc->{suffix_t}
-        && $desc->{scale_txt_t} );
-    $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} )
-      if (!$desc->{txt_t}
-        && $desc->{scale_txt_long_pl_t} );
-    $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} )
-      if (!$desc->{txt_t}
-        && $desc->{scale_txt_long_t} );
+    if (  !$desc->{suffix_t}
+        && $desc->{scale_txt_t} )
+    {
+        $desc->{suffix} = $desc->{suffix} . $desc->{scale_txt_t};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix value rewritten by adding value from 'scale_txt_t'"
+        );
+    }
+    if (  !$desc->{txt_t}
+        && $desc->{scale_txt_long_pl_t} )
+    {
+        $desc->{txt_pl} = $desc->{txt} . lc( $desc->{scale_txt_long_pl_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_pl value rewritten by adding value from 'scale_txt_long_pl_t'"
+        );
+    }
+    if (  !$desc->{txt_t}
+        && $desc->{scale_txt_long_t} )
+    {
+        $desc->{txt} = $desc->{txt} . lc( $desc->{scale_txt_long_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt value rewritten by adding value from 'scale_txt_long_t'"
+        );
+    }
 
     # add metric name to suffix_sq
-    $desc->{suffix_sq} = $desc->{scale_txt_m_sq} . $desc->{suffix_sq}
-      if ( $desc->{suffix_sq}
+    if (   $desc->{suffix_sq}
         && $desc->{scale_txt_m_sq}
-        && $desc->{suffix_sq} !~ /$desc->{scale_txt_m_sq}/ );
-    $desc->{txt_sq} = $desc->{scale_txt_long_m_sq} . lc( $desc->{txt_sq} )
-      if ( $desc->{txt_sq}
-        && $desc->{scale_txt_long_m_sq} );
+        && $desc->{suffix_sq} !~ /$desc->{scale_txt_m_sq}/ )
+    {
+        $desc->{suffix_sq} = $desc->{scale_txt_m_sq} . $desc->{suffix_sq};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_sq value rewritten by adding value from 'scale_txt_m_sq'"
+        );
+    }
+    if (   $desc->{txt_sq}
+        && $desc->{scale_txt_long_m_sq} )
+    {
+        $desc->{txt_sq} = $desc->{scale_txt_long_m_sq} . lc( $desc->{txt_sq} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_sq value rewritten by adding value from 'scale_txt_long_m_sq'"
+        );
+    }
 
     # add square information to suffix_sq
-    $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_sq}
-      if ( $desc->{suffix_sq}
-        && $desc->{scale_txt_sq} );
-    $desc->{txt_sq} = $desc->{scale_txt_long_sq} . lc( $desc->{txt_sq} )
-      if ( $desc->{txt_sq}
-        && $desc->{scale_txt_long_sq} );
+    if (   $desc->{suffix_sq}
+        && $desc->{scale_txt_sq} )
+    {
+        $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_sq};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_sq value rewritten by adding value from 'scale_txt_sq'"
+        );
+    }
+    if (   $desc->{txt_sq}
+        && $desc->{scale_txt_long_sq} )
+    {
+        $desc->{txt_sq} = $desc->{scale_txt_long_sq} . lc( $desc->{txt_sq} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_sq value rewritten by adding value from 'scale_txt_long_sq'"
+        );
+    }
 
     # add time information to suffix_sq
-    $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_t}
-      if ( $desc->{suffix_sq}
-        && $desc->{scale_txt_t} );
-    $desc->{txt_pl_sq} = $desc->{txt_sq} . lc( $desc->{scale_txt_long_pl_t} )
-      if ( $desc->{txt_sq}
-        && $desc->{scale_txt_long_pl_t} );
-    $desc->{txt_sq} = $desc->{txt_sq} . lc( $desc->{scale_txt_long_t} )
-      if ( $desc->{txt_sq}
-        && $desc->{scale_txt_long_t} );
+    if (   $desc->{suffix_sq}
+        && $desc->{scale_txt_t} )
+    {
+        $desc->{suffix_sq} = $desc->{suffix_sq} . $desc->{scale_txt_t};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_sq value rewritten by adding value from 'scale_txt_t'"
+        );
+    }
+    if (   $desc->{txt_sq}
+        && $desc->{scale_txt_long_pl_t} )
+    {
+        $desc->{txt_pl_sq} =
+          $desc->{txt_sq} . lc( $desc->{scale_txt_long_pl_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_pl_sq value rewritten by adding value from 'scale_txt_long_pl_t'"
+        );
+    }
+    if (   $desc->{txt_sq}
+        && $desc->{scale_txt_long_t} )
+    {
+        $desc->{txt_sq} = $desc->{txt_sq} . lc( $desc->{scale_txt_long_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_sq value rewritten by adding value from 'scale_txt_long_t'"
+        );
+    }
 
     # add metric name to suffix_cu
-    $desc->{suffix_cu} = $desc->{scale_txt_m_cu} . $desc->{suffix_cu}
-      if ( $desc->{suffix_cu}
-        && $desc->{scale_txt_m_cu} );
-    $desc->{txt_cu} = $desc->{scale_txt_long_m_cu} . lc( $desc->{txt_cu} )
-      if ( $desc->{txt_cu}
-        && $desc->{scale_txt_long_m_cu} );
+    if (   $desc->{suffix_cu}
+        && $desc->{scale_txt_m_cu} )
+    {
+        $desc->{suffix_cu} = $desc->{scale_txt_m_cu} . $desc->{suffix_cu};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_cu value rewritten by adding value from 'scale_txt_m_cu'"
+        );
+    }
+    if (   $desc->{txt_cu}
+        && $desc->{scale_txt_long_m_cu} )
+    {
+        $desc->{txt_cu} = $desc->{scale_txt_long_m_cu} . lc( $desc->{txt_cu} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_cu value rewritten by adding value from 'scale_txt_long_m_cu'"
+        );
+    }
 
     # add cubic information to suffix_cu
-    $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_cu}
-      if ( $desc->{suffix_cu}
-        && $desc->{scale_txt_cu} );
-    $desc->{txt_cu} = $desc->{scale_txt_long_cu} . lc( $desc->{txt_cu} )
-      if ( $desc->{txt_cu}
-        && $desc->{scale_txt_long_cu} );
+    if (   $desc->{suffix_cu}
+        && $desc->{scale_txt_cu} )
+    {
+        $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_cu};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_cu value rewritten by adding value from 'scale_txt_cu'"
+        );
+    }
+    if (   $desc->{txt_cu}
+        && $desc->{scale_txt_long_cu} )
+    {
+        $desc->{txt_cu} = $desc->{scale_txt_long_cu} . lc( $desc->{txt_cu} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_cu value rewritten by adding value from 'scale_txt_long_cu'"
+        );
+    }
 
     # add time information to suffix_cu
-    $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_t}
-      if ( $desc->{suffix_cu}
-        && $desc->{scale_txt_t} );
-    $desc->{txt_pl_cu} = $desc->{txt_cu} . lc( $desc->{scale_txt_long_pl_t} )
-      if ( $desc->{txt_cu}
-        && $desc->{scale_txt_long_pl_t} );
-    $desc->{txt_cu} = $desc->{txt_cu} . lc( $desc->{scale_txt_long_t} )
-      if ( $desc->{txt_cu}
-        && $desc->{scale_txt_long_t} );
+    if (   $desc->{suffix_cu}
+        && $desc->{scale_txt_t} )
+    {
+        $desc->{suffix_cu} = $desc->{suffix_cu} . $desc->{scale_txt_t};
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr suffix_cu value rewritten by adding value from 'scale_txt_t'"
+        );
+    }
+    if (   $desc->{txt_cu}
+        && $desc->{scale_txt_long_pl_t} )
+    {
+        $desc->{txt_pl_cu} =
+          $desc->{txt_cu} . lc( $desc->{scale_txt_long_pl_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_pl_cu value rewritten by adding value from 'scale_txt_long_pl_t'"
+        );
+    }
+    if (   $desc->{txt_cu}
+        && $desc->{scale_txt_long_t} )
+    {
+        $desc->{txt_cu} = $desc->{txt_cu} . lc( $desc->{scale_txt_long_t} );
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: RAttr txt_cu value rewritten by adding value from 'scale_txt_long_t'"
+        );
+    }
 
     ###############################
     # generate short text string
@@ -3075,7 +3179,12 @@ sub replaceTemplate ($$$$;$) {
     # find text template
     $txt = '%value%' . chr(0x00A0) . '%suffix%' if ( !$desc->{symbol} );
     $txt = '%value%' . chr(0x202F) . '%symbol%' if ( $desc->{symbol} );
+    $txt = '%value%' . chr(0x202F) . '%symbol%' if ( $desc->{symbol} );
     $txt = $desc->{tmpl}                        if ( $desc->{tmpl} );
+    $txt = '%txt%' if ( defined( $desc->{txt} ) );    #TODO
+
+    Unit_Log3( $device, $reading, $odesc, 9,
+        "replaceTemplate $device $reading: detected txt template: $txt" );
 
     # Replace all %text% placeholders with text value found
     # in old style READINGS.
@@ -3083,7 +3192,12 @@ sub replaceTemplate ($$$$;$) {
     # extended this and we want people to be able to make use of it.
     if ( $r && $reading && $r->{$reading} ) {
         foreach my $k ( keys %{ $r->{$reading} } ) {
+            next if ( ref( $r->{$reading}{$k} ) );
+
             $txt =~ s/%$k%/$r->{$reading}{$k}/g;
+            Unit_Log3( $device, $reading, $odesc, 10,
+                "replaceTemplate $device $reading: RAttr txt: replacing '%$k%'"
+            );
         }
     }
 
@@ -3091,9 +3205,13 @@ sub replaceTemplate ($$$$;$) {
     # in matching reading desc hash keys
     foreach my $k ( keys %{$desc} ) {
         my $vdm = $desc->{$k};
+        next if ( ref($vdm) );
+
         $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
           if ( defined( $desc->{decimal_mark} ) );
         $txt =~ s/%$k%/$vdm/g;
+        Unit_Log3( $device, $reading, $odesc, 10,
+            "replaceTemplate $device $reading: RAttr txt: replacing '%$k%'" );
     }
 
     return ($txt) if ( !wantarray );
@@ -3139,13 +3257,22 @@ sub replaceTemplate ($$$$;$) {
     # for either plural or singular long text string
     if ($txt_long) {
 
-        # Replace all %text% placeholders with text value found
-        # in old style READINGS.
-        # Normally only TIME & VAL would be available but some modules might
-        # have extended this and we want people to be able to make use of it.
+        Unit_Log3( $device, $reading, $odesc, 9,
+"replaceTemplate $device $reading: detected txt_long template: $txt_long"
+        );
+
+       # Replace all %text% placeholders with text value found
+       # in old style READINGS.
+       # Normally only TIME & VAL would be available but some modules might have
+       # extended this and we want people to be able to make use of it.
         if ( $r && $reading && $r->{$reading} ) {
             foreach my $k ( keys %{ $r->{$reading} } ) {
+                next if ( ref( $r->{$reading}{$k} ) );
+
                 $txt_long =~ s/%$k%/$r->{$reading}{$k}/g;
+                Unit_Log3( $device, $reading, $odesc, 10,
+"replaceTemplate $device $reading: RAttr txt_long: replacing '%$k%'"
+                );
             }
         }
 
@@ -3153,13 +3280,105 @@ sub replaceTemplate ($$$$;$) {
         # in matching reading desc hash keys
         foreach my $k ( keys %{$desc} ) {
             my $vdm = $desc->{$k};
+            next if ( ref($vdm) );
+
             $vdm = UConv::decimal_mark( $vdm, $desc->{decimal_mark} )
               if ( defined( $desc->{decimal_mark} ) );
             $txt_long =~ s/%$k%/$vdm/g;
+            Unit_Log3( $device, $reading, $odesc, 10,
+"replaceTemplate $device $reading: RAttr txt_long: replacing '%$k%'"
+            );
+        }
+
+    }
+
+    $txt      = Encode::encode_utf8($txt)      if ( defined($txt) );
+    $txt_long = Encode::encode_utf8($txt_long) if ( defined($txt_long) );
+
+    return ( $txt, $txt_long );
+}
+
+sub Unit_verifyValueNumber($$) {
+    my ( $value, $scope ) = @_;
+    my $log;
+    my $value_num;
+    my $verified = 0;
+
+    foreach ( keys %{$scope} ) {
+        next
+          if ( $_ !~ /^(regex|eq|minValue|maxValue|lt|gt|le|ge)$/ );
+
+        $verified = 1;
+
+        if ( !looks_like_number($value) ) {
+            if ( $_ eq 'regex' ) {
+                $log .= " '$value' does not match regex $scope->{$_}."
+                  if ( $value !~ /$scope->{$_}/ );
+                $value_num = $scope->{value_num}
+                  if ( defined( $scope->{value_num} ) );
+            }
+            elsif ( $_ eq 'eq' ) {
+                if ( $value ne $scope->{eq} ) {
+                    $value = $scope->{eq}
+                      if ( !$scope->{keep} || $scope->{strict} );
+                    $log .= " $value is not equal to $scope->{eq}.";
+                }
+            }
+            elsif ( !$scope->{regex} && !defined( $scope->{eq} ) ) {
+                $log .= " '$value' is not a number."
+                  if ( !$scope->{empty} && !$scope->{empty_replace} );
+                $value = "0"
+                  if ( !$scope->{keep} && !$scope->{empty_replace} );
+                $value = $scope->{empty_replace}
+                  if ( defined( $scope->{empty_replace} ) );
+                last;
+            }
+        }
+        elsif ( $_ eq 'minValue' ) {
+            if ( $value < $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is smaller than $scope->{$_}.";
+            }
+        }
+        elsif ( $_ eq 'maxValue' ) {
+            if ( $value > $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is higher than $scope->{$_}.";
+            }
+        }
+        elsif ( $_ eq 'lt' ) {
+            if ( $value >= $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is not $_ $scope->{$_}.";
+            }
+        }
+        elsif ( $_ eq 'le' ) {
+            if ( $value > $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is not $_ $scope->{$_}.";
+            }
+        }
+        elsif ( $_ eq 'gt' ) {
+            if ( $value <= $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is not $_ $scope->{$_}.";
+            }
+        }
+        elsif ( $_ eq 'ge' ) {
+            if ( $value < $scope->{$_} ) {
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+                $log .= " $value is not $_ $scope->{$_}.";
+            }
         }
     }
 
-    return ( Encode::encode_utf8($txt), Encode::encode_utf8($txt_long) );
+    return ( $verified, $value, $value_num, $log );
 }
 
 # format a number according to desc and optional format.
@@ -3170,18 +3389,25 @@ sub formatValue($$$;$$$$) {
     $lang_base =~ s/^(\w+)(_.*)$/$1/;
     my $value_num;
 
-    return $value
-      if (!defined($value)
+    if (  !defined($value)
         || ref($value)
-        || AttrVal( $device, "showUnits", 1 ) eq "0" );
+        || AttrVal( $device, "showUnits", 1 ) eq "0" )
+    {
+        Unit_Log3( $device, $reading, $desc, 10,
+            "formatValue $device $reading: explicit return of original value" );
+        return $value;
+    }
 
     $desc = readingsDesc( $device, $reading )
       if ( !$desc || !ref($desc) );
-    return $value
-      if ( !$format && ( !$desc || ref($desc) ne 'HASH' )
-        || keys %{$desc} < 1 );
-
-    my $llvl = ( defined( $desc->{verbose} ) ? $desc->{verbose} : 4 );
+    if ( !$format && ( !$desc || ref($desc) ne 'HASH' )
+        || keys %{$desc} < 1 )
+    {
+        Unit_Log3( $device, $reading, $desc, 10,
+                "formatValue $device $reading: "
+              . "no readings description found, returning original value" );
+        return $value;
+    }
 
     # source value language
     my $slang = "en";
@@ -3191,18 +3417,28 @@ sub formatValue($$$;$$$$) {
 
     # factor
     if ( $desc && $desc->{factor} ) {
-        if ( looks_like_number($value) ) {
+        if ( ref( $desc->{factor} ) || !looks_like_number( $desc->{factor} ) ) {
+            Unit_Log3( $device, $reading, $desc, 5,
+                    "formatValue $device $reading: ERROR: "
+                  . "RAttr factor is not numeric" );
+        }
+        elsif ( looks_like_number($value) ) {
+            Unit_Log3( $device, $reading, $desc, 9,
+                    "formatValue $device $reading: "
+                  . "multiply original numeric value with factor "
+                  . $desc->{factor} );
             $value *= $desc->{factor};
         }
         else {
-            Log3 $device, $llvl,
-              "formatValue($device:$reading,rtype=$desc->{rtype}): factor "
-              . "multiplication failed - '$value' is not a number";
+            Unit_Log3( $device, $reading, $desc, 8,
+                    "formatValue $device $reading: factor "
+                  . "multiplication failed - '$value' is not a number" );
         }
     }
 
-    $format = $desc->{format} if ( !$format && $desc && $desc->{format} );
-    $scope  = $desc->{scope}  if ( !$scope  && $desc && $desc->{scope} );
+    $format = $desc->{format}
+      if ( !$format && $desc && $desc->{format} );
+    $scope = $desc->{scope} if ( !$scope && $desc && $desc->{scope} );
 
     # language handling for scope
     if ( ref($scope) eq "HASH" && defined( $scope->{$slang} ) ) {
@@ -3210,13 +3446,23 @@ sub formatValue($$$;$$$$) {
         $v     = $scope->{$slang};
         $scope = undef;
         $scope = $v;
+        Unit_Log3( $device, $reading, $desc, 8,
+                "formatValue $device $reading: RAttr scope: "
+              . "value replaced by language specific version ($slang)" );
     }
     elsif ( ref($scope) eq "HASH" && defined( $scope->{$slang_base} ) ) {
         my $v;
         $v     = $scope->{$slang_base};
         $scope = undef;
         $scope = $v;
+        Unit_Log3( $device, $reading, $desc, 8,
+                "formatValue $device $reading: RAttr scope: "
+              . "value replaced by language specific version ($slang_base)" );
     }
+
+    Unit_Log3( $device, $reading, $desc, 9,
+        "formatValue $device $reading: scope dump:\n" . Dumper($scope) )
+      if ($scope);
 
     ################################
     # scope:
@@ -3225,101 +3471,25 @@ sub formatValue($$$;$$$$) {
 
     # Use user defined subroutine
     if ( ref($scope) eq 'CODE' && &$scope ) {
+        Unit_Log3( $device, $reading, $desc, 9,
+                "formatValue $device $reading: scope: "
+              . "running external subroutine $scope()" );
         ( $value, $value_num ) = $scope->($value);
     }
 
     # scope was defined as HASH
     elsif ( ref($scope) eq 'HASH' ) {
-        my $log;
-        if ( !looks_like_number($value) ) {
-            if ( $scope->{regex} ) {
-                $log .= "'$value' does not match regex $scope. "
-                  if ( $value !~ /$scope->{regex}/ );
-                $value_num = $scope->{value_num}
-                  if ( defined( $scope->{value_num} ) );
-            }
-            if ( $scope->{eq} && $value ne $scope->{eq} ) {
-                $value = $scope->{eq}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log .= "$value is not equal to $scope->{eq}. ";
-            }
-            if ( !$scope->{regex} && !$scope->{eq} ) {
-                $log = "'$value' is not a number"
-                  if ( !$scope->{empty} && !$scope->{empty_replace} );
-                $value = "0" if ( !$scope->{keep} && !$scope->{empty_replace} );
-                $value = $scope->{empty_replace}
-                  if ( defined( $scope->{empty_replace} ) );
-            }
-        }
-        elsif ( $scope->{minValue} && $scope->{maxValue} ) {
-            if ( abs($value) < $scope->{minValue} ) {
-                $value = $scope->{minValue}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is smaller than $scope->{minValue}";
-            }
-            if ( abs($value) > $scope->{maxValue} ) {
-                $value = $scope->{maxValue}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is higher than $scope->{maxValue}";
-            }
-        }
-        elsif ( $scope->{lt} && $scope->{gt} ) {
-            if ( abs($value) < $scope->{lt} ) {
-                $value = $scope->{lt}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is less than $scope->{lt}";
-            }
-            if ( abs($value) > $scope->{gt} ) {
-                $value = $scope->{gt}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is greater than $scope->{gt}";
-            }
-        }
-        elsif ( $scope->{le} && $scope->{ge} ) {
-            if ( abs($value) <= $scope->{le} ) {
-                $value = $scope->{le}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is less or equal than $scope->{le}";
-            }
-            if ( abs($value) >= $scope->{ge} ) {
-                $value = $scope->{ge}
-                  if ( !$scope->{keep} || $scope->{strict} );
-                $log = "$value is geater or qual than $scope->{ge}";
-            }
-        }
-        elsif ( $scope->{minValue} && abs($value) < $scope->{minValue} ) {
-            $value = $scope->{minValue}
-              if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is smaller than $scope->{minValue}";
-        }
-        elsif ( $scope->{lt} && abs($value) < $scope->{lt} ) {
-            $value = $scope->{lt} if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is less than $scope->{lt}";
-        }
-        elsif ( $scope->{maxValue} && abs($value) > $scope->{maxValue} ) {
-            $value = $scope->{maxValue}
-              if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is higher than $scope->{maxValue}";
-        }
-        elsif ( $scope->{gt} && abs($value) > $scope->{gt} ) {
-            $value = $scope->{gt} if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is greater than $scope->{gt}";
-        }
-        elsif ( $scope->{ge} && abs($value) >= $scope->{ge} ) {
-            $value = $scope->{ge} if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is greater or equal than $scope->{ge}";
-        }
-        elsif ( $scope->{le} && abs($value) <= $scope->{le} ) {
-            $value = $scope->{le} if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is less or equal than $scope->{le}";
-        }
-        elsif ( $scope->{eq} && $value ne $scope->{eq} ) {
-            $value = $scope->{eq} if ( !$scope->{keep} || $scope->{strict} );
-            $log = "$value is not equal to $scope->{eq}";
-        }
 
-        Log3 $device, $llvl,
-"formatValue($device:$reading,rtype=$desc->{rtype}) out of scope: $log"
+        Unit_Log3( $device, $reading, $desc, 9,
+                "formatValue $device $reading: scope: "
+              . "verifying '$value' based on HASH structure" );
+
+        my ( $log, $verified );
+        ( $verified, $value, $value_num, $log ) =
+          Unit_verifyValueNumber( $value, $scope );
+
+        Unit_Log3( $device, $reading, $desc, 3,
+            "formatValue $device $reading: scope: WARNING - $log" )
           if ($log);
     }
 
@@ -3330,6 +3500,10 @@ sub formatValue($$$;$$$$) {
     # different reading names representing similar/comparable content in
     # some way.
     elsif ( ref($scope) eq 'ARRAY' ) {
+
+        Unit_Log3( $device, $reading, $desc, 9,
+                "formatValue $device $reading: scope: "
+              . "verifying value '$value' based on ARRAY structure" );
 
         # value found as index within array.
         # assuming this scope was defined as string in regex format
@@ -3350,6 +3524,10 @@ sub formatValue($$$;$$$$) {
                 && ref( $desc->{txt}{$lang} ) eq "ARRAY"
                 && defined( $desc->{txt}{$lang}[$value] ) )
             {
+                Unit_Log3( $device, $reading, $desc, 8,
+                        "formatValue $device $reading: scope: rattr value: "
+                      . "replaced by language specific value from 'txt' ($lang)"
+                );
                 $value = $desc->{txt}{$lang}[$value];
             }
 
@@ -3358,6 +3536,10 @@ sub formatValue($$$;$$$$) {
                 && ref( $desc->{txt}{$lang_base} ) eq "ARRAY"
                 && defined( $desc->{txt}{$lang_base}[$value] ) )
             {
+                Unit_Log3( $device, $reading, $desc, 8,
+                        "formatValue $device $reading: scope: rattr value: "
+                      . "replaced by language specific value from 'txt' ($lang_base)"
+                );
                 $value = $desc->{txt}{$lang_base}[$value];
             }
 
@@ -3366,6 +3548,10 @@ sub formatValue($$$;$$$$) {
                 && ref( $desc->{txt}{en} ) eq "ARRAY"
                 && defined( $desc->{txt}{en}[$value] ) )
             {
+                Unit_Log3( $device, $reading, $desc, 8,
+                        "formatValue $device $reading: scope: rattr value: "
+                      . "replaced by language specific value from 'txt' (en / default language)"
+                );
                 $value = $desc->{txt}{en}[$value];
             }
 
@@ -3373,83 +3559,180 @@ sub formatValue($$$;$$$$) {
             elsif ( ref( $desc->{txt} ) eq "ARRAY"
                 && defined( $desc->{txt}[$value] ) )
             {
+                Unit_Log3( $device, $reading, $desc, 8,
+                        "formatValue $device $reading: scope: rattr value: "
+                      . "replaced by value from 'txt'" );
                 $value = $desc->{txt}[$value];
+            }
+
+            # if there is no language defined at all
+            elsif ( !ref( $desc->{txt} )
+                && defined( $desc->{txt} ) )
+            {
+                Unit_Log3( $device, $reading, $desc, 8,
+                        "formatValue $device $reading: scope: rattr value: "
+                      . "replaced by plane value from 'txt'" );
+                $value = $desc->{txt};
             }
 
             # if there is no txt definition at all
             # arrays are unbalanced
             else {
-                Log3 $device, 3,
-                  "formatValue($device:$reading:$desc->{rtype}): "
-                  . "ERROR - unbalanced number of items in arrays";
+                Unit_Log3( $device, $reading, $desc, 7,
+                        "formatValue $device $reading: scope: ERROR - "
+                      . "unbalanced number of items in arrays" );
             }
         }
 
         else {
             my $i = 0;
             foreach ( @{$scope} ) {
+
+                #TODO
                 if ( !ref($_) && $value =~ /$_/gmi ) {
                     $value_num = $i;
+
+                    # some language handling
+                    # to replace original value with language specific
+                    # and FHEM harmonised value
+                    #
+
+                    # If specified language was found
                     if (   ref( $desc->{txt} ) eq "HASH"
                         && ref( $desc->{txt}{$lang} ) eq "ARRAY"
                         && defined( $desc->{txt}{$lang}[$i] ) )
                     {
+                        Unit_Log3( $device, $reading, $desc, 8,
+                            "formatValue $device $reading: scope: rattr value: "
+                              . "replaced by language specific value from 'txt' ($lang)"
+                        );
                         $value = $desc->{txt}{$lang}[$i];
                     }
+
+                    # also try base language
                     elsif (ref( $desc->{txt} ) eq "HASH"
                         && ref( $desc->{txt}{$lang_base} ) eq "ARRAY"
                         && defined( $desc->{txt}{$lang_base}[$i] ) )
                     {
+                        Unit_Log3( $device, $reading, $desc, 8,
+                            "formatValue $device $reading: scope: rattr value: "
+                              . "replaced by language specific value from 'txt' ($lang_base)"
+                        );
                         $value = $desc->{txt}{$lang_base}[$i];
                     }
+
+                    # fallback to english
                     elsif (ref( $desc->{txt} ) eq "HASH"
                         && ref( $desc->{txt}{en} ) eq "ARRAY"
                         && defined( $desc->{txt}{en}[$i] ) )
                     {
+                        Unit_Log3( $device, $reading, $desc, 8,
+                            "formatValue $device $reading: scope: rattr value: "
+                              . "replaced by language specific value from 'txt' (en / default language)"
+                        );
                         $value = $desc->{txt}{en}[$i];
                     }
+
+                    # if there is no language defined at all
                     elsif ( ref( $desc->{txt} ) eq "ARRAY"
                         && defined( $desc->{txt}[$i] ) )
                     {
+                        Unit_Log3( $device, $reading, $desc, 8,
+                            "formatValue $device $reading: scope: rattr value: "
+                              . "replaced by value from 'txt'" );
                         $value = $desc->{txt}[$i];
                     }
-                    elsif ( !ref( $desc->{txt} ) && defined( $desc->{txt} ) ) {
+
+                    # if there is no language defined at all
+                    elsif ( !ref( $desc->{txt} )
+                        && defined( $desc->{txt} ) )
+                    {
+                        Unit_Log3( $device, $reading, $desc, 8,
+                            "formatValue $device $reading: scope: rattr value: "
+                              . "replaced by plane value from 'txt'" );
                         $value = $desc->{txt};
                     }
+
+                    # if there is no txt definition at all
+                    # arrays are unbalanced
                     else {
                         $value = $1 if ( defined($1) );
                         if ( !defined($1) ) {
-                            Log3 $device, $llvl,
-"formatValue($device:$reading:$desc->{rtype}) out of scope: "
-                              . "missing txt value or regex output";
-                            $value = $scope->[$i];
+                            Unit_Log3( $device, $reading, $desc, 7,
+                                "formatValue device $reading: scope: ERROR - "
+                                  . "missing txt value or regex output (i=$i)"
+                            );
                         }
                     }
+
                     last;
                 }
 
                 #TODO
                 elsif ( ref($_) eq "HASH" ) {
                     if ( !looks_like_number($value) && $_->{regex} ) {
+                        Unit_Log3( $device, $reading, $desc, 9,
+                                "formatValue $device $reading: scope: "
+                              . "searching numeric value for string '$value' (i=$i)"
+                        );
+
                         if ( $value =~ /$_->{regex}/ ) {
                             if ( defined( $_->{value_num} ) ) {
+                                Unit_Log3( $device, $reading, $desc, 9,
+                                        "formatValue $device $reading: scope: "
+                                      . "static numeric value found in HASH" );
+
                                 $value_num->[0] = $i;
                                 $value_num->[1] = $_->{value_num};
                             }
                             else {
+                                Unit_Log3( $device, $reading, $desc, 9,
+                                        "formatValue $device $reading: scope: "
+                                      . "assuming indirect numeric value from ARRAY index number"
+                                );
+
                                 $value_num = $i;
                             }
 
                             last;
                         }
+                    }
 
-                     #TODO
-                     # we want to run the code from above to verify number scope
-                     # here as well so it need to be transferred into a
-                     # subroutine first.
-                     # Not sure about the duplicate regex handling from above...
-                        else {
+                    else {
+                        Unit_Log3( $device, $reading, $desc, 9,
+                                "formatValue $device $reading: scope: "
+                              . "verifying numeric value '$value' (i=$i)" );
 
+                        my ( $verified, $tval, $tval_num, $log ) =
+                          Unit_verifyValueNumber( $value, $_ );
+
+                        if ( !$verified && $log ) {
+                            Unit_Log3( $device, $reading, $desc, 3,
+"formatValue $device $reading: scope: WARNING - $log"
+                            );
+
+                        }
+                        elsif ( $verified && !$log ) {
+
+                            if ( defined($tval_num) ) {
+                                Unit_Log3( $device, $reading, $desc, 9,
+                                        "formatValue $device $reading: scope: "
+                                      . "static numeric value found in HASH" );
+
+                                $value_num->[0] = $i;
+                                $value_num->[1] = $tval_num;
+                            }
+                            else {
+                                Unit_Log3( $device, $reading, $desc, 9,
+                                        "formatValue $device $reading: scope: "
+                                      . "assuming indirect numeric value from ARRAY index number"
+                                );
+
+                                $value_num = $i;
+                            }
+
+                            $value = $tval;
+                            last;
                         }
                     }
                 }
@@ -3465,25 +3748,27 @@ sub formatValue($$$;$$$$) {
         # if regex matches and returns a $1, let's assume this is
         # by intention to replace something
         if ( defined($1) ) {
-            Log3 $device, $llvl,
-              "formatValue($device:$reading:$desc->{rtype}): "
-              . "'$value' replaced by regex $scope with result from variable \$1";
+            Unit_Log3( $device, $reading, $desc, 9,
+                    "formatValue $device $reading: scope: "
+                  . "'$value' replaced by regex $scope with result from variable \$1"
+            );
             $value = $1;
         }
     }
 
     # scope definition present but value seems to be out of regex scope
     elsif ( defined($scope) && $scope ne "" ) {
-        Log3 $device, $llvl,
-          "formatValue($device:$reading:$desc->{rtype}) out of scope: "
-          . "'$value' does not match regex $scope";
+        Unit_Log3( $device, $reading, $desc, 8,
+                "formatValue $device $reading: scope: WARNING - "
+              . "'$value' does not match regex $scope" );
     }
 
     # format
     #
     if ( $format && !looks_like_number($value) ) {
-        Log3 $device, $llvl,
-"formatValue($device:$reading,$desc->{rtype}) cannot re-format: $value is not a number"
+        Unit_Log3( $device, $reading, $desc, 8,
+"formatValue $device $reading: format: ERROR - $value is not a number"
+          )
           if ( ref($scope) eq 'HASH'
             && !$scope->{empty}
             && !$scope->{empty_replace} );
@@ -3494,7 +3779,7 @@ sub formatValue($$$;$$$$) {
     }
 
     elsif ( ref($format) eq 'HASH' ) {
-        my $v = abs($value);
+        my $v = $value;
         foreach my $l ( sort { $b <=> $a } keys( %{$format} ) ) {
             next
               if ( ref( $format->{$l} ) ne 'HASH'
@@ -3511,8 +3796,9 @@ sub formatValue($$$;$$$$) {
     }
 
     elsif ( ref($format) eq 'ARRAY' ) {
-        Log3 $device, $llvl, "formatValue($device:$reading:$desc->{rtype})"
-          . " format not implemented: ARRAY";
+        Unit_Log3( $device, $reading, $desc, 8,
+                "formatValue($device:$reading:$desc->{rtype})"
+              . " format not implemented: ARRAY" );
     }
 
     elsif ($format) {
@@ -3527,10 +3813,12 @@ sub formatValue($$$;$$$$) {
     my ( $txt, $txt_long ) =
       replaceTemplate( $device, $reading, $desc, $lang, $value );
 
-    $desc->{value_txt}{$lang} = $txt;
-    $desc->{value_txt_long}{$lang} = $txt_long if ( defined($txt_long) );
+    $desc->{value_txt}{$lang}      = $txt;
+    $desc->{value_txt_long}{$lang} = $txt_long
+      if ( defined($txt_long) );
     delete $desc->{value_txt_long}{$lang}
-      if ( !defined($txt_long) && defined( $desc->{value_txt_long}{$lang} ) );
+      if (!defined($txt_long)
+        && defined( $desc->{value_txt_long}{$lang} ) );
 
     return ( $txt, $txt_long, $value, $value_num ) if (wantarray);
     return $value
@@ -3645,6 +3933,9 @@ sub readingsDesc($;$) {
         }
     }
 
+    Unit_Log3( $device, $reading, $desc, 10,
+        "readingsDesc $device $reading:\n" . Dumper($desc) );
+
     return $desc;
 }
 
@@ -3656,8 +3947,8 @@ sub formatReading($$;$$$$$) {
     my $value = ReadingsVal( $device, $reading, undef );
     $value = $default if ( !defined($value) );
 
-    return formatValue( $device, $reading, $value, $desc, $format, $scope,
-        $lang );
+    return formatValue( $device, $reading, $value, $desc, $format,
+        $scope, $lang );
 }
 
 # return unit symbol for device:reading
@@ -3683,7 +3974,8 @@ sub readingsUnit($$;$$$) {
         && $txt_long ne ""
         && defined($txt)
         && $txt ne "" );
-    return $txt_long if ( $long && defined($txt_long) && $txt_long ne "" );
+    return $txt_long
+      if ( $long && defined($txt_long) && $txt_long ne "" );
     return $txt if ( defined($txt) && $txt ne "" );
     return '';
 }
@@ -3738,8 +4030,10 @@ sub makeSTATE($;$$) {
 
             if ( defined( $r->{$1} ) ) {
                 my $sname = readingsShortname( $device, $1 );
-                $usedShortnames{$sname}++ if ( $usedShortnames{$sname} );
-                $usedShortnames{$sname} = 1 if ( !$usedShortnames{$sname} );
+                $usedShortnames{$sname}++
+                  if ( $usedShortnames{$sname} );
+                $usedShortnames{$sname} = 1
+                  if ( !$usedShortnames{$sname} );
                 if ( $2 && $2 ne "" ) {
                     $txt .= "$2: ";
                 }
@@ -3780,6 +4074,10 @@ sub getCombinedKeyValAttr($;$$) {
 
     my $desc;
     if ( $m && $m->{$attribute} && ref( $m->{$attribute} ) eq "HASH" ) {
+        Log3( $name, 5,
+"getCombinedKeyValAttr $name $reading: including HASH from module X_Initialize() function"
+        );
+
         foreach my $k ( keys %{ $m->{$attribute} } ) {
             if ( ref( $m->{$attribute}{$k} ) eq "HASH" ) {
                 foreach my $k2 ( keys %{ $m->{$attribute}{$k} } ) {
@@ -3805,6 +4103,10 @@ sub getCombinedKeyValAttr($;$$) {
     }
 
     if ( $g && $g->{$attribute} && ref( $g->{$attribute} ) eq "HASH" ) {
+        Log3( $name, 5,
+"getCombinedKeyValAttr $name $reading: including HASH from global attribute $attribute"
+        );
+
         foreach my $k ( keys %{ $g->{$attribute} } ) {
             if ( ref( $g->{$attribute}{$k} ) eq "HASH" ) {
                 foreach my $k2 ( keys %{ $g->{$attribute}{$k} } ) {
@@ -3830,6 +4132,10 @@ sub getCombinedKeyValAttr($;$$) {
     }
 
     if ( $d && $d->{$attribute} && ref( $d->{$attribute} ) eq "HASH" ) {
+        Log3( $name, 5,
+"getCombinedKeyValAttr $name $reading: including HASH from device attribute $attribute"
+        );
+
         foreach my $k ( keys %{ $d->{$attribute} } ) {
             if ( ref( $d->{$attribute}{$k} ) eq "HASH" ) {
                 foreach my $k2 ( keys %{ $d->{$attribute}{$k} } ) {
@@ -4037,15 +4343,38 @@ sub Unit_DbLog_split($$) {
     }
 
     if ( !looks_like_number($value) ) {
-        Log3 $name, 5,
-"Unit_DbLog_split $name: Ignoring event $event: value $value does not look like a number";
+        Unit_Log3( $name, $reading, undef, 10,
+"Unit_DbLog_split $name: Ignoring event $event: value $value does not look like a number"
+        );
         return undef;
     }
 
-    Log3 $name, 5,
-"Unit_DbLog_split $name: Splitting event $event > reading=$reading value=$value unit=$unit";
+    Unit_Log3( $name, $reading, undef, 9,
+"Unit_DbLog_split $name: Splitting event $event > reading=$reading value=$value unit=$unit"
+    );
 
     return ( $reading, $value, $unit );
+}
+
+################################################
+# the new Log with integrated loglevel checking for readings
+sub Unit_Log3($$$$$) {
+    my ( $dev, $rname, $desc, $loglevel, $text ) = @_;
+
+    $dev = $dev->{NAME} if ( defined($dev) && ref($dev) eq "HASH" );
+    $desc = readingsDesc( $dev, $rname )
+      if ( !$desc || !ref($desc) );
+    my $rloglevel = $loglevel;
+
+    if (   $desc
+        && ref($desc) eq "HASH"
+        && defined( my $rlevel = $desc->{verbose} ) )
+    {
+        return if ( $loglevel > $rlevel );
+        $rloglevel = $rloglevel - 9;
+    }
+
+    return Log3( $dev, $rloglevel, "RType: " . $text );
 }
 
 ################################################################
