@@ -23,7 +23,10 @@ alexa_Initialize($)
   $hash->{SetFn}    = "alexa_Set";
   $hash->{GetFn}    = "alexa_Get";
   $hash->{AttrFn}   = "alexa_Attr";
-  $hash->{AttrList} = "alexaMapping:textField-long alexaTypes fhemIntents:textField-long articles prepositions $readingFnAttributes";
+  $hash->{AttrList} = "alexaMapping:textField-long alexaTypes:textField-long fhemIntents:textField-long ".
+                      "articles prepositions ".
+                      "alexaConfirmationLevel:2,1 alexaStatusLevel:2,1 ".
+                      $readingFnAttributes;
 }
 
 #####################################
@@ -38,17 +41,28 @@ alexa_AttrDefaults($)
     CommandAttr(undef,"$name alexaMapping #Characteristic=<name>=<value>,...\n".
                                          "On=verb=schalte,valueOn=an;ein,valueOff=aus,valueToggle=um\n\n".
 
-                                         "Brightness=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
-
-                                         "TargetPosition=verb=mach,articles=den,values=auf:100;zu:0\n".
-                                         "TargetPosition=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
+                                         "Brightness=verb=stelle,property=helligkeit,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
 
                                          "Hue=verb=stelle,valuePrefix=auf,values=rot:0;grün:128;blau:200\n".
                                          "Hue=verb=färbe,values=rot:0;grün:120;blau:220\n\n".
 
+                                         "Saturation=verb=stelle,property=sättigung,valuePrefix=auf,values=AMAZON.NUMBER\n".
+                                         "Saturation=verb=sättige,values=AMAZON.NUMBER\n\n".
+
+                                         "TargetPosition=verb=mach,articles=den,values=auf:100;zu:0\n".
+                                         "TargetPosition=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
+
                                          "TargetTemperature=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=grad\n\n".
 
+                                         "Volume:verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
+
                                          "#Weckzeit=verb=stelle,valuePrefix=auf;für,values=AMAZON.TIME,valueSuffix=uhr" );
+  }
+
+  if( !AttrVal( $name, 'alexaTypes', undef ) ) {
+    CommandAttr(undef,"$name alexaTypes #Type=<alias>[,<alias2>[,...]]\n".
+                                       "light=licht,lampen\n".
+                                       "blind=rolladen,rolläden,jalousie,jalousien,rollo,rollos" );
   }
 
   if( !AttrVal( $name, 'fhemIntents', undef ) ) {
@@ -111,7 +125,7 @@ alexa_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "reload";
+  my $list = "reload:noArg";
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
@@ -132,7 +146,7 @@ alexa_Get($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "customSlotTypes interactionModel";
+  my $list = "customSlotTypes:noArg interactionModel:noArg";
 
   if( lc($cmd) eq 'customslottypes' ) {
     if( $hash->{CL} ) {
@@ -171,6 +185,7 @@ alexa_Get($$@)
               $characteristic{$p[0]} = $values2[0] if( scalar @values2 == 1 );
             }
           } else {
+            $p[1] =~ s/\+/ /g;
             $characteristic{$p[0]} = $p[1];
           }
         }
@@ -237,22 +252,25 @@ Log 1, Dumper \%types;
           next;
         }
 
+        $mapping->{property} = '' if( !$mapping->{property} );
+        $mapping->{property} = [$mapping->{property}] if( ref($mapping->{property}) ne 'ARRAY' );
+        foreach my $property (@{$mapping->{property}}) {
+          my $intent = $characteristic;
+          $intent = lcfirst($mapping->{valueSuffix}) if( !$property && $mapping->{valueSuffix} );
+          $intent .= 'Intent';
 
-        my $intent = $characteristic;
-        $intent = lcfirst($mapping->{valueSuffix}) if( $mapping->{valueSuffix} );
-        $intent .= 'Intent';
+          my $values = [];
+          $values = merge( $values, $mapping->{values} );
+          $values = merge( $values, $mapping->{valueOn} );
+          $values = merge( $values, $mapping->{valueOff} );
+          $values = merge( $values, $mapping->{valueToggle} );
 
-        my $values = [];
-        $values = merge( $values, $mapping->{values} );
-        $values = merge( $values, $mapping->{valueOn} );
-        $values = merge( $values, $mapping->{valueOff} );
-        $values = merge( $values, $mapping->{valueToggle} );
-
-        append($verbsOfIntent, $intent, $mapping->{verb} );
-        append($intentsOfVerb, $mapping->{verb}, $intent );
-        append($valuesOfIntent, $intent, join( ',', @{$values} ) );
-        append($intentsOfCharacteristic, $characteristic, $intent );
-        append($characteristicsOfIntent, $intent, $characteristic );
+          append($verbsOfIntent, $intent, $mapping->{verb} );
+          append($intentsOfVerb, $mapping->{verb}, $intent );
+          append($valuesOfIntent, $intent, join( ',', @{$values} ) );
+          append($intentsOfCharacteristic, $characteristic, $intent );
+          append($characteristicsOfIntent, $intent, $characteristic );
+        }
       }
     }
 Log 1, Dumper $verbsOfIntent;
@@ -283,84 +301,89 @@ Log 1, Dumper $characteristicsOfIntent;
         $values = merge( $values, $mapping->{valueOff} );
         $values = merge( $values, $mapping->{valueToggle} );
 
+        $mapping->{property} = '' if( !$mapping->{property} );
+        $mapping->{property} = [$mapping->{property}] if( ref($mapping->{property}) ne 'ARRAY' );
+        foreach my $property (@{$mapping->{property}}) {
 
-        my $nr = $i?chr(65+$i):'';
-        $nr = '' if( $mapping->{valueSuffix} );
-        #my $intent = $characteristic .'Intent'. $nr;
-        my $intent = $characteristic;
-        $intent = lcfirst($mapping->{valueSuffix}) if( $mapping->{valueSuffix} );
-        $intent .= 'Intent';
-        $intent .= $nr;
+          my $nr = $i?chr(65+$i):'';
+          $nr = '' if( $mapping->{valueSuffix} );
+          #my $intent = $characteristic .'Intent'. $nr;
+          my $intent = $characteristic;
+          $intent = lcfirst($mapping->{valueSuffix}) if( !$property && $mapping->{valueSuffix} );
+          $intent .= 'Intent';
+          $intent .= $nr;
 
 
-        next if( $intents->{$intent} );
-        $intents->{$intent} = 1;
+          next if( $intents->{$intent} );
+          $intents->{$intent} = 1;
 
-        my $slots = [];
-        push @{$slots}, { name => 'article', type => 'FHEM_article' };
-        push @{$slots}, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
-        push @{$slots}, { name => 'preposition', type => 'FHEM_preposition' };
-        push @{$slots}, { name => 'Room', type => 'FHEM_Room' };
-        if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
-          push @{$slots}, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
-          $types->{"${characteristic}_prefix$nr"} = $mapping->{valuePrefix};
-        }
-        my $slot_name = "${characteristic}_Value$nr";
-        $slot_name = lcfirst($mapping->{valueSuffix})."_Value$nr" if( $mapping->{valueSuffix} );
-        if( $mapping->{values} && $mapping->{values} =~ /^AMAZON/ ) {
-          push @{$slots}, { name => $slot_name, type => $mapping->{values} };
-        } else {
-          push @{$slots}, { name => $slot_name, type => "${characteristic}_Value$nr" };
-          $types->{$slot_name} = $values if( $values->[0] );
-        }
-        if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
-          push @{$slots}, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
-          $types->{"${characteristic}_suffix"} = $mapping->{valueSuffix$nr};
-        }
-
-        if( ref($mapping->{articles}) eq 'ARRAY' ) {
-          $types->{"${characteristic}_article$nr"} = $mapping->{articles};
-        }
-
-        $mapping->{verb} = [$mapping->{verb}] if( ref($mapping->{verb}) ne 'ARRAY' );
-        foreach my $verb (@{$mapping->{verb}}) {
-          $samples .= "\n" if( $samples );
-
-          my @articles = ('','{article}');
-          if( ref($mapping->{articles}) eq 'ARRAY' ) {
-            $articles[1] = "{${characteristic}_article}";
-          } elsif( $mapping->{articles} ) {
-            @articles = ($mapping->{articles});
+          my $slots = [];
+          push @{$slots}, { name => 'article', type => 'FHEM_article' };
+          push @{$slots}, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
+          push @{$slots}, { name => 'preposition', type => 'FHEM_preposition' };
+          push @{$slots}, { name => 'Room', type => 'FHEM_Room' };
+          if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
+            push @{$slots}, { name => "${characteristic}_valuePrefix$nr", type => "${characteristic}_prefix$nr" };
+            $types->{"${characteristic}_prefix$nr"} = $mapping->{valuePrefix};
           }
-          foreach my $article (@articles) {
-            foreach my $room ('','{Room}') {
-              my $line;
+          my $slot_name = "${characteristic}_Value$nr";
+          $slot_name = lcfirst($mapping->{valueSuffix})."_Value$nr" if( !$property && $mapping->{valueSuffix} );
+          if( $mapping->{values} && $mapping->{values} =~ /^AMAZON/ ) {
+            push @{$slots}, { name => $slot_name, type => $mapping->{values} };
+          } else {
+            push @{$slots}, { name => $slot_name, type => "${characteristic}_Value$nr" };
+            $types->{$slot_name} = $values if( $values->[0] );
+          }
+          if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
+            push @{$slots}, { name => "${characteristic}_valueSuffix$nr", type => "${characteristic}_suffix$nr" };
+            $types->{"${characteristic}_suffix"} = $mapping->{valueSuffix$nr};
+          }
 
-              $line .= "$intent $verb";
-              $line .= " $article" if( $article );
-              $line .= $mapping->{device}?" $mapping->{device}":' {Device}';
-              $line .= " {preposition} $room" if( $room );
-              if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
-                $line .= " {${characteristic}_valuePrefix$nr}";
-              } else {
-                $line .= " $mapping->{valuePrefix}" if( $mapping->{valuePrefix} );
-              }
-              $line .= " {$slot_name}";
-              if( ref($mapping->{_valueSuffix}) eq 'ARRAY' ) {
-                $line .= "\n$line";
-              }
-              if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
-                $line .= " {${characteristic}_valueSuffix$nr}";
-              } else {
-                $line .= " $mapping->{valueSuffix}" if( $mapping->{valueSuffix} );
-              }
+          if( ref($mapping->{articles}) eq 'ARRAY' ) {
+            $types->{"${characteristic}_article$nr"} = $mapping->{articles};
+          }
 
-              $samples .= "\n" if( $samples );
-              $samples .= $line;
+          $mapping->{verb} = [$mapping->{verb}] if( ref($mapping->{verb}) ne 'ARRAY' );
+          foreach my $verb (@{$mapping->{verb}}) {
+            $samples .= "\n" if( $samples );
+
+            my @articles = ('','{article}');
+            if( ref($mapping->{articles}) eq 'ARRAY' ) {
+              $articles[1] = "{${characteristic}_article}";
+            } elsif( $mapping->{articles} ) {
+              @articles = ($mapping->{articles});
+            }
+            foreach my $article (@articles) {
+              foreach my $room ('','{Room}') {
+                my $line;
+
+                $line .= "$intent $verb";
+                $line .= " $property" if( $property );
+                $line .= " $article" if( $article );
+                $line .= $mapping->{device}?" $mapping->{device}":' {Device}';
+                $line .= " {preposition} $room" if( $room );
+                if( ref($mapping->{valuePrefix}) eq 'ARRAY' ) {
+                  $line .= " {${characteristic}_valuePrefix$nr}";
+                } else {
+                  $line .= " $mapping->{valuePrefix}" if( $mapping->{valuePrefix} );
+                }
+                $line .= " {$slot_name}";
+                if( ref($mapping->{_valueSuffix}) eq 'ARRAY' ) {
+                  $line .= "\n$line";
+                }
+                if( ref($mapping->{valueSuffix}) eq 'ARRAY' ) {
+                  $line .= " {${characteristic}_valueSuffix$nr}";
+                } else {
+                  $line .= " $mapping->{valueSuffix}" if( $mapping->{valueSuffix} );
+                }
+
+                $samples .= "\n" if( $samples );
+                $samples .= $line;
+              }
             }
           }
+          push @{$schema->{intents}}, {intent => $intent, slots => $slots};
         }
-        push @{$schema->{intents}}, {intent => $intent, slots => $slots};
 
         ++$i;
       }
@@ -543,6 +566,10 @@ alexa_Attr($$$)
       maps spoken device types to ServiceClasses. eg: attr alexa alexaTypes light:licht,lampe,lampen blind:rolladen,jalousie,rollo Outlet:steckdose TemperatureSensor:thermometer LockMechanism:schloss OccupancySensor: anwesenheit</li>
     <li>fhemIntents<br>
       maps spoken commands directed to fhem as a whole (i.e. not to specific devices) to events from the alexa device.</li>
+    <li>alexaConfirmationLevel<br>
+      </li>
+    <li>alexaStatusLevel<br>
+      </li>
     Note: changes to attributes of the alexa device will automatically trigger a reconfiguration of
           alxea-fhem and there is no need to restart the service.
   </ul>
