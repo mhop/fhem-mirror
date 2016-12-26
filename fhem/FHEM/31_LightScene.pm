@@ -645,7 +645,6 @@ LightScene_Set($@)
     my( $index )= grep { $sorted[$_] eq $current } 0..$#sorted;
     $index = -1 if( !defined($index) );
 
-Log 1, $index;
     ++$index if( $cmd eq 'nextScene' );
     --$index if( $cmd eq 'previousScene' );
 
