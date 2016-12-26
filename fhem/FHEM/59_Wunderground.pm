@@ -87,8 +87,8 @@ sub Wunderground_Initialize($) {
         'fc0_title_night'        => { rtype => 'weekday_night', showLong => 1 },
         'fc0_wind_direction'     => { rtype => 'compasspoint' },
         'fc0_wind_direction_max' => { rtype => 'compasspoint' },
-        'fc0_wind_speed'         => { rtype => 'kmh', formula_symbol => 'Ws' },
-        'fc0_wind_speed_max'     => { rtype => 'kmh', formula_symbol => 'Ws' },
+        'fc0_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
+        'fc0_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc0_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc0_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc1_high_c' =>
@@ -116,8 +116,8 @@ sub Wunderground_Initialize($) {
         'fc1_title_night'        => { rtype => 'weekday_night', showLong => 1 },
         'fc1_wind_direction'     => { rtype => 'compasspoint' },
         'fc1_wind_direction_max' => { rtype => 'compasspoint' },
-        'fc1_wind_speed'         => { rtype => 'kmh', formula_symbol => 'Ws' },
-        'fc1_wind_speed_max'     => { rtype => 'kmh', formula_symbol => 'Ws' },
+        'fc1_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
+        'fc1_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc1_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc1_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc2_high_c' =>
@@ -145,8 +145,8 @@ sub Wunderground_Initialize($) {
         'fc2_title_night'    => { rtype => 'weekday_night', showLong => 1, },
         'fc2_wind_direction' => { rtype => 'compasspoint' },
         'fc2_wind_direction_max' => { rtype => 'compasspoint' },
-        'fc2_wind_speed'         => { rtype => 'kmh', formula_symbol => 'Ws' },
-        'fc2_wind_speed_max'     => { rtype => 'kmh', formula_symbol => 'Ws' },
+        'fc2_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
+        'fc2_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc2_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc2_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc3_high_c' =>
@@ -174,8 +174,8 @@ sub Wunderground_Initialize($) {
         'fc3_title_night'        => { rtype => 'weekday_night', showLong => 1 },
         'fc3_wind_direction'     => { rtype => 'compasspoint' },
         'fc3_wind_direction_max' => { rtype => 'compasspoint' },
-        'fc3_wind_speed'         => { rtype => 'kmh', formula_symbol => 'Ws' },
-        'fc3_wind_speed_max'     => { rtype => 'kmh', formula_symbol => 'Ws' },
+        'fc3_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
+        'fc3_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc3_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc3_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
         'feelslike_c'            => { rtype => 'c', formula_symbol => 'Tf', },
@@ -222,9 +222,9 @@ sub Wunderground_Initialize($) {
             scope          => { empty_replace => '--.-' }
         },
         'wind_direction' => { rtype => 'compasspoint' },
-        'wind_gust'      => { rtype => 'kmh', formula_symbol => 'Wg' },
+        'wind_gust'      => { rtype => 'kmph', formula_symbol => 'Wg' },
         'wind_gust_mph'  => { rtype => 'mph', formula_symbol => 'Wg' },
-        'wind_speed'     => { rtype => 'kmh', formula_symbol => 'Ws' },
+        'wind_speed'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'wind_speed_mph' => { rtype => 'mph', formula_symbol => 'Ws' }
     };
 
