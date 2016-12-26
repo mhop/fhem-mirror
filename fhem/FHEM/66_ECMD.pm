@@ -642,7 +642,7 @@ ECMD_Write($$$)
           $answer= ECMD_SimpleExpect($hash, $msg, $expect);
           $answer= "" unless(defined($answer));
           ECMD_Log $hash, 5, "received answer " . dq($answer);
-          $answer.= $responseSeparator if($#ecmds>0);
+          $answer.= $responseSeparator if(defined($responseSeparator) && ($#ecmds>0));
           $ret.= $answer;
         } else {
           ECMD_SimpleWrite($hash, $msg);
@@ -795,7 +795,7 @@ ECMD_Write($$$)
     A single command from FHEM to the device might need to be broken down into several requests. 
     A command string is split at all
     occurrences of the request separator. The request separator itself is removed from the command string and thus is
-    not part of the request. The default is to have no response separator. Use a request separator that does not occur in the actual request.
+    not part of the request. The default is to have no request separator. Use a request separator that does not occur in the actual request.
     </li>
     <li>responseSeparator &lt;separator&gt<br>
     In order to identify the single responses from the device for each part of the command broken down by request separators, a response separator can be appended to the response to each single request. 

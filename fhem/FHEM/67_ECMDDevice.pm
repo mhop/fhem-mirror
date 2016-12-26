@@ -160,9 +160,9 @@ ECMDDevice_PostProc($$$%)
   if($postproc) {
         my $command= ECMDDevice_ReplaceSpecials($postproc, %specials);
 	$_= $value;
-	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
+	Log3 $hash, 5, "Postprocessing \"" . dq($value) . "\" with perl command $command.";
 	$value= AnalyzePerlCommand(undef, $command);
-	Log3 $hash, 5, "Postprocessed value is \"" . escapeLogLine($value) . "\".";
+	Log3 $hash, 5, "Postprocessed value is \"" . dq($value) . "\".";
   }
   return $value;
 }
@@ -174,9 +174,9 @@ ECMDDevice_EvalCommand($$$)
 
   if($command) {
 	$_= $value;
-	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
+	Log3 $hash, 5, "Postprocessing \"" . dq($value) . "\" with perl command $command.";
 	$value= AnalyzePerlCommand(undef, $command);
-	Log3 $hash, 5, "Postprocessed value is \"" . escapeLogLine($value) . "\".";
+	Log3 $hash, 5, "Postprocessed value is \"" . dq($value) . "\".";
   }
   return $value;
 }
