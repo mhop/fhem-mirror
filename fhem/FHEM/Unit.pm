@@ -1025,6 +1025,7 @@ my $rtypes = {
     compasspoint => {
         ref_base       => 900,
         formula_symbol => 'CP',
+        ref            => 'gon',
         txt            => {
             de => [
                 'N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
@@ -1521,8 +1522,12 @@ my $rtypes = {
             de => 'Grad',
             en => 'gradians',
         },
-        tmpl  => '%value%%symbol%',
-        scope => { minValue => 0 },
+        tmpl         => '%value%%symbol%',
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        format => '%i',
     },
 
     rad => {
@@ -1532,7 +1537,11 @@ my $rtypes = {
             de => 'Radiant',
             en => 'radiant',
         },
-        scope => { minValue => 0 },
+        decimal_mark => {
+            de => 2,
+            en => 1,
+        },
+        format => '%i',
     },
 
     # temperature
@@ -3181,7 +3190,8 @@ sub replaceTemplate ($$$$;$) {
     $txt = '%value%' . chr(0x202F) . '%symbol%' if ( $desc->{symbol} );
     $txt = '%value%' . chr(0x202F) . '%symbol%' if ( $desc->{symbol} );
     $txt = $desc->{tmpl}                        if ( $desc->{tmpl} );
-    $txt = '%txt%' if ( defined( $desc->{txt} ) );    #TODO
+    $txt = '%txt%'
+      if ( defined( $desc->{txt} ) && !looks_like_number($value) );
 
     Unit_Log3( $device, $reading, $odesc, 9,
         "replaceTemplate $device $reading: detected txt template: $txt" );
@@ -3319,9 +3329,9 @@ sub Unit_verifyValueNumber($$) {
             }
             elsif ( $_ eq 'eq' ) {
                 if ( $value ne $scope->{eq} ) {
+                    $log .= " $value is not equal to $scope->{eq}.";
                     $value = $scope->{eq}
                       if ( !$scope->{keep} || $scope->{strict} );
-                    $log .= " $value is not equal to $scope->{eq}.";
                 }
             }
             elsif ( !$scope->{regex} && !defined( $scope->{eq} ) ) {
@@ -3336,44 +3346,44 @@ sub Unit_verifyValueNumber($$) {
         }
         elsif ( $_ eq 'minValue' ) {
             if ( $value < $scope->{$_} ) {
+                $log .= " $value is lesser than $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is smaller than $scope->{$_}.";
             }
         }
         elsif ( $_ eq 'maxValue' ) {
             if ( $value > $scope->{$_} ) {
+                $log .= " $value is greater than $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is higher than $scope->{$_}.";
             }
         }
         elsif ( $_ eq 'lt' ) {
             if ( $value >= $scope->{$_} ) {
+                $log .= " $value is not $_ $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is not $_ $scope->{$_}.";
             }
         }
         elsif ( $_ eq 'le' ) {
             if ( $value > $scope->{$_} ) {
+                $log .= " $value is not $_ $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is not $_ $scope->{$_}.";
             }
         }
         elsif ( $_ eq 'gt' ) {
             if ( $value <= $scope->{$_} ) {
+                $log .= " $value is not $_ $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is not $_ $scope->{$_}.";
             }
         }
         elsif ( $_ eq 'ge' ) {
             if ( $value < $scope->{$_} ) {
+                $log .= " $value is not $_ $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
-                $log .= " $value is not $_ $scope->{$_}.";
             }
         }
     }
@@ -3488,8 +3498,8 @@ sub formatValue($$$;$$$$) {
         ( $verified, $value, $value_num, $log ) =
           Unit_verifyValueNumber( $value, $scope );
 
-        Unit_Log3( $device, $reading, $desc, 3,
-            "formatValue $device $reading: scope: WARNING - $log" )
+        Unit_Log3( $device, $reading, $desc, 4,
+            "formatValue $device $reading: scope: WARNING -$log" )
           if ($log);
     }
 
@@ -3707,8 +3717,8 @@ sub formatValue($$$;$$$$) {
                           Unit_verifyValueNumber( $value, $_ );
 
                         if ( !$verified && $log ) {
-                            Unit_Log3( $device, $reading, $desc, 3,
-"formatValue $device $reading: scope: WARNING - $log"
+                            Unit_Log3( $device, $reading, $desc, 4,
+"formatValue $device $reading: scope: WARNING -$log"
                             );
 
                         }
