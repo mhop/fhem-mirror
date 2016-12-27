@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #     98_WeekdayTimer.pm
-#     written by Dietmar Ortmann(Orti)
+#     written by Dietmar Ortmann
 #     modified by Tobias Faust
 #
 #     This file is part of fhem.
@@ -791,8 +791,10 @@ sub WeekdayTimer_isHeizung($) {
   my $allSets = getAllSets($dName);
 
   foreach my $ts (@tempSet) {
-     Log3 $hash, 4, "[$name] device type heating recognized, setModifier:$ts"; 
-     return $ts if ($allSets =~ m/$ts/);  
+     if ($allSets =~ m/$ts/) {
+        Log3 $hash, 4, "[$name] device type heating recognized, setModifier:$ts"; 
+        return $ts 
+     }
   }  
 }
 ################################################################################
