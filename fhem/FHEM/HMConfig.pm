@@ -1642,8 +1642,8 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,inhibit        =>"[on|off]"
                                           ,statusRequest  =>""
                                          }
-                     ,repeater         =>{ setRepeat      => "[no1..36] -sendName- -recName- [bdcast-yes|no]"
-                                          ,inhibit        => "[on|off]"
+                     ,repeater         =>{ setRepeat      =>"[no1..36] -sendName- -recName- [bdcast-yes|no]"
+                                          ,inhibit        =>"[on|off]"
                                           ,statusRequest  =>""
                                          }
                      ,KFM100           =>{ statusRequest  =>""}
@@ -1828,7 +1828,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,color          =>"-colVal[0-100]-"
                                                }
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
-                                                ,colProgram     =>"-colProg[0-255]-"
+                                                ,colProgram     =>"[0|1|2|3|4|5|6]"
                                                }
                      ,"HM-Sec-Sir-WM01"      =>{ on             =>""
                                                 ,off            =>""
