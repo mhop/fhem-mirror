@@ -3904,11 +3904,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     @arr1 = CUL_HM_noDup(@arr1);
     foreach(@arr1){
       my ($cmd,$val) = split(":",$_,2);
-      if (!$val               ||
-          $val !~ m/^\[.*\]$/ ||
-          $val =~ m/\[.*\[/   ||
-          $val =~ m/(\<|\>)]/
-          ){
+      if (!$val){ # no agruments possible
+        $_ = "$cmd:noArg";
+      }
+      elsif($val !~ m/^\[.*\]$/ ||
+            $val =~ m/\[.*\[/   ||
+            $val =~ m/(\<|\>)]/
+            ){
         $_ = $cmd;
       }
       else{
@@ -3929,7 +3931,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
     $usg =~ s/ color/ color:colorpicker,HUE,0,0.5,100/;
-    $usg =~ s/ colProgram/ colProgram:0,1,2,3,4,5,6/;
 	if ($usg =~ m/ tempTmplSet/){
       my $tl = $modules{CUL_HM}{AttrList};
       my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
