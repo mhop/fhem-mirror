@@ -590,7 +590,7 @@ LightScene_Set($@)
 
   my @sorted = sort keys %{$hash->{SCENES}};
 
-     if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." n))extScene:noArg previousScene:noArg"};
+     if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." nextScene:noArg previousScene:noArg"};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
