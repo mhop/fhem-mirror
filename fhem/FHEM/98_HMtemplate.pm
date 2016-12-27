@@ -219,7 +219,6 @@ sub HMtemplate_GetFn($@) {#####################################################
     my ($type) = @a;
     my $tN = InternalVal($name,"tpl_Name",undef);
     return "template not defined" if (!$tN || ! defined $culHmTpl->{$tN});
-    Log 1,"General ######### my template $tN";
     $ret = HMinfo_templateUsg("","",$tN);
   }  
 
@@ -409,7 +408,6 @@ sub HMtemplate_SetFn($@) {#####################################################
   else{
     my @cmdLst = @{$HtState{${$eSt}}{cmd}};
     my $tList = ":".join(",",sort keys%{$culHmTpl});
-    Log 1,"General start\n".join("\n     :",sort keys%{$culHmTpl});
     $_ .=$tList foreach(grep/^(edit|delete|select)$/,@cmdLst);
     
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
