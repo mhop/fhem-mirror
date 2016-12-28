@@ -40,6 +40,8 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
+# 4.9          23.12.2016       function readingRename added
 # 4.8.6        17.12.2016       new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5
 #                               (Forum #msg541103)
 # 4.8.5        16.12.2016       bugfix group by-clause due to Forum #msg540610
@@ -166,7 +168,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.8.6";
+my $DbRepVersion = "4.10";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -270,6 +272,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"averageValue:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
                 "deviceRename ".
+				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
                 (($hash->{ROLE} ne "Agent")?"exportToFile:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"importFromFile:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"maxValue:noArg ":"").
@@ -302,8 +305,17 @@ sub DbRep_Set($@) {
   } elsif ($opt eq "deviceRename") {
       my ($olddev, $newdev) = split(",",$prop);
       if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set ... deviceRename olddevname,newdevname\" ";}
-      $hash->{HELPER}{OLDDEV} = $olddev;
-      $hash->{HELPER}{NEWDEV} = $newdev;
+      $hash->{HELPER}{OLDDEV}  = $olddev;
+      $hash->{HELPER}{NEWDEV}  = $newdev;
+	  $hash->{HELPER}{RENMODE} = "devren";
+      sqlexec($hash,$opt);
+      
+  } elsif ($opt eq "readingRename") {
+      my ($oldread, $newread) = split(",",$prop);
+      if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set ... readingRename oldreadingname,newreadingname\" ";}
+      $hash->{HELPER}{OLDREAD} = $oldread;
+      $hash->{HELPER}{NEWREAD} = $newread;
+	  $hash->{HELPER}{RENMODE} = "readren";
       sqlexec($hash,$opt);
       
   } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") { 
@@ -917,7 +929,7 @@ $hash->{HELPER}{CV} = \%cv;
  } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "deviceRename") { 
+ } elsif ($opt eq "deviceRename" || $opt eq "readingRename") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
          
  }
@@ -2300,14 +2312,14 @@ sub del_DoParse($) {
  
  # SQL zusammenstellen für DB-Operation
  my $sql = "DELETE FROM history where ";
- $sql .= "DEVICE = '$device' AND " if($device);
- $sql .= "READING = '$reading' AND " if($reading); 
+ $sql .= "DEVICE LIKE '$device' AND " if($device);
+ $sql .= "READING LIKE '$reading' AND " if($reading); 
  $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ;"; 
  
  # SQL zusammenstellen für Logausgabe
  my $sql1 = "DELETE FROM history where ";
- $sql1 .= "DEVICE = '$device' AND " if($device);
- $sql1 .= "READING = '$reading' AND " if($reading); 
+ $sql1 .= "DEVICE LIKE '$device' AND " if($device);
+ $sql1 .= "READING LIKE '$reading' AND " if($reading); 
  $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next';"; 
     
  Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");        
@@ -2371,14 +2383,21 @@ sub del_ParseDone($) {
   }
   
   my $reading = AttrVal($hash->{NAME}, "reading", undef);
+  $reading     =~ s/%/\//g;
   my $device  = AttrVal($hash->{NAME}, "device", undef);
+  $device     =~ s/%/\//g;
  
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  my $ds   = $device." -- " if ($device);
-  my $rds  = $reading." -- " if ($reading);
-  my $reading_runtime_string = $ds.$rds." -- DELETED ROWS -- ";
+  my ($reading_runtime_string, $ds, $rds);
+  if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
+      $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")." -- DELETED ROWS -- ";
+  } else {
+      $ds   = $device." -- " if ($device);
+      $rds  = $reading." -- " if ($reading);
+      $reading_runtime_string = $ds.$rds." -- DELETED ROWS -- ";
+  }
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, $reading_runtime_string, $rows);
@@ -2526,7 +2545,7 @@ return;
 }
 
 ####################################################################################################
-# nichtblockierendes DB deviceRename
+# nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
 
 sub devren_Push($) {
@@ -2554,24 +2573,42 @@ sub devren_Push($) {
      return "$name|''|''|$err";
  }
  
- my $olddev = delete $hash->{HELPER}{OLDDEV};
- my $newdev = delete $hash->{HELPER}{NEWDEV};
-      
- # SQL zusammenstellen für DB-Operation
-    
- Log3 ($name, 5, "DbRep $name -> Rename old device name \"$olddev\" to new device name \"$newdev\" in database $dblogname ");     
- 
+ my $renmode = $hash->{HELPER}{RENMODE};
+
  # SQL-Startzeit
  my $st = [gettimeofday];
-
+ 
+ my ($sth,$old,$new);
  $dbh->begin_work();
- my $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE=? WHERE DEVICE=? ") ;
- eval {$sth->execute($newdev, $olddev);};
+ 
+ if ($renmode eq "devren") {
+     $old  = delete $hash->{HELPER}{OLDDEV};
+     $new  = delete $hash->{HELPER}{NEWDEV};
+	 
+	 # SQL zusammenstellen für DB-Operation
+     Log3 ($name, 5, "DbRep $name -> Rename old device name \"$old\" to new device name \"$new\" in database $dblogname ");
+	 
+	 # prepare DB operation
+	 $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE=? WHERE DEVICE=? ") ;
+ 
+ } elsif ($renmode eq "readren") {
+     $old = delete $hash->{HELPER}{OLDREAD};
+     $new = delete $hash->{HELPER}{NEWREAD};
+	 
+	 # SQL zusammenstellen für DB-Operation
+     Log3 ($name, 5, "DbRep $name -> Rename old reading name \"$old\" to new reading name \"$new\" in database $dblogname ");
+	 
+	 # prepare DB operation
+	 $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,READING=? WHERE READING=? ") ;
+ }     
+ 
+ eval {$sth->execute($new, $old);};
  
  my $urow;
  if ($@) {
      $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - Failed to rename old device name \"$olddev\" to new device name \"$newdev\": $@");
+     Log3 ($name, 2, "DbRep $name - Failed to rename old device name \"$old\" to new device name \"$new\": $@") if($renmode eq "devren");
+	 Log3 ($name, 2, "DbRep $name - Failed to rename old reading name \"$old\" to new reading name \"$new\": $@") if($renmode eq "readren");
      $dbh->rollback();
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
@@ -2592,7 +2629,7 @@ sub devren_Push($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$urow|$rt|0|$olddev|$newdev";
+ return "$name|$urow|$rt|0|$old|$new";
 }
 
 ####################################################################################################
@@ -2608,12 +2645,12 @@ sub devren_Done($) {
   my $bt         = $a[2];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
-  my $olddev     = $a[4];
-  my $newdev     = $a[5]; 
+  my $old        = $a[4];
+  my $new        = $a[5]; 
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall devren_Done");
   
-   
+  my $renmode = delete $hash->{HELPER}{RENMODE};
   
   if ($err) {
       readingsSingleUpdate($hash, "errortext", $err, 1);
@@ -2627,18 +2664,26 @@ sub devren_Done($) {
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "number_lines_updated", $urow);    
-  readingsBulkUpdate($hash, "device_renamed", "old: ".$olddev." to new: ".$newdev) if ($urow != 0); 
-  readingsBulkUpdate($hash, "device_not_renamed", "WARNING - old: ".$olddev." not found, not renamed to new: ".$newdev) if ($urow == 0); 
+  readingsBulkUpdate($hash, "number_lines_updated", $urow);
+  if($renmode eq "devren") {
+      readingsBulkUpdate($hash, "device_renamed", "old: ".$old." to new: ".$new) if($urow != 0);
+	  readingsBulkUpdate($hash, "device_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) if($urow == 0);
+  }
+  if($renmode eq "readren") {
+      readingsBulkUpdate($hash, "reading_renamed", "old: ".$old." to new: ".$new)  if($urow != 0);
+	  readingsBulkUpdate($hash, "reading_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) if ($urow == 0);
+  }
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
   readingsBulkUpdate($hash, "state", "done"); 
   readingsEndUpdate($hash, 1);
   
   if ($urow != 0) {
-      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$olddev\", new: \"$newdev\", amount: $urow "); 
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", amount: $urow ") if($renmode eq "devren"); 
+	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - READING renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", amount: $urow ") if($renmode eq "readren"); 
   } else {
-      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old device \"$olddev\" was not found in database \"$hash->{DATABASE}\" "); 
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old device \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "devren");
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old reading \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "readren"); 	  
   }
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3749,11 +3794,24 @@ return;
                                  <ul>
                                  <b>input format: </b>  set &lt;name&gt; deviceRename &lt;old device name&gt;,&lt;new device name&gt;  <br>               
                                  # The amount of renamed device names (datasets) will be displayed in reading "device_renamed". <br>
-                                 # If the device name to be renamed was not found in the database, a WARNUNG would appear in reading "device_not_renamed". <br>
-                                 # Appropriate entries will be written to Logfile with verbose=3.
+                                 # If the device name to be renamed was not found in the database, a WARNUNG will appear in reading "device_not_renamed". <br>
+                                 # Appropriate entries will be written to Logfile if verbose >= 3 is set.
                                  <br><br>
                                  </li> <br>
-                                 </ul>                        
+                                 </ul>     
+
+    <li><b> readingRename </b> - renames the reading name of a device inside the connected database (see Internal DATABASE).
+                                 The readingname will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
+                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
+                                 
+                                 <ul>
+                                 <b>input format: </b>  set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
+                                 # The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
+                                 # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
+                                 # Appropriate entries will be written to Logfile if verbose >= 3 is set.
+                                 <br><br>
+                                 </li> <br>
+                                 </ul>   								 
     
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
@@ -4223,7 +4281,20 @@ return;
                                  # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3
                                  <br><br>
                                  </li> <br>
-                                 </ul>                                                       
+                                 </ul>
+								 
+    <li><b> readingRename </b> - benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
+                                 Der Readingname wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte Zeitgrenzen oder Beschränkungen 
+                                 durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading werden nicht berücksichtigt.  <br><br>
+                                 
+                                 <ul>
+                                 <b>Eingabeformat: </b>  set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
+                                 # Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" ausgegeben. <br>
+                                 # Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "reading_not_renamed" ausgegeben. <br>
+                                 # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
+                                 <br><br>
+                                 </li> <br>
+                                 </ul>  								 
                                  
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
