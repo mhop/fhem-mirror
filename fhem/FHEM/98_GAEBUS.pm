@@ -40,6 +40,9 @@
 # 18.10.2016 : A.Goebel : fix removed content of <comment> from attribute names for readings
 # 31.10.2016 : A.Goebel : fix rename hex to ebusd_hex
 # 31.10.2016 : A.Goebel : fix set for writings without comments did not work
+# 26.12.2016 : A.Goebel : fix handling for non "userattr" attributes
+# 27.12.2016 : A.Goebel : fix handling if ebusctl reports "usage:"
+# 27.12.2016 : A.Goebel : fix scan removed from supported classes
 
 package main;
 
@@ -320,7 +323,7 @@ GAEBUS_Set($@)
       $readingname       =~ s/:.*//;
   
       # only for "w" commands
-      if ($oneattr =~ /^w$delimiter.{1,5}$delimiter.*/ or $oneattr =~ /^w$delimiter.{1,5}install$delimiter.*/)
+      if ($oneattr =~ /^w$delimiter.{1,7}$delimiter.*/ or $oneattr =~ /^w$delimiter.{1,7}install$delimiter.*/)
       {
         unless ($readingname =~ /^\s*$/ or $readingname eq "1")
         {
@@ -369,7 +372,7 @@ GAEBUS_Set($@)
     {
       foreach my $oneattr (sort keys %{$attr{$name}})
       {
-        next unless ($oneattr =~ /^w.*$delimiter.{1,5}$delimiter.*$/ or $oneattr =~ /^w.*$delimiter.{1,5}install$delimiter.*$/);
+        next unless ($oneattr =~ /^w.*$delimiter.{1,7}$delimiter.*$/ or $oneattr =~ /^w.*$delimiter.{1,7}install$delimiter.*$/);
      
         my $readingname    = $attr{$name}{$oneattr};
         next if ($readingname ne $type);
@@ -468,7 +471,7 @@ GAEBUS_Get($@)
     $readingname       =~ s/:.*//;
 
     # only for "r" commands
-    if ($oneattr =~ /^r$delimiter.{1,5}$delimiter.*/)
+    if ($oneattr =~ /^r$delimiter.{1,7}$delimiter.*/)
     {
       $readings{$readingname} = $readingcmdname;
       $readingsCmdaddon{$readingname} = $cmdaddon;
@@ -689,9 +692,11 @@ GAEBUS_Attr(@)
 
   $attrval = "" unless defined ($attrval);
 
+  my $userattr = defined($attr{$name}{userattr}) ? $attr{$name}{userattr} : "";
+
   if ($action eq "del")
   {
-    my $userattr = $attr{$name}{userattr};
+    #my $userattr = $attr{$name}{userattr};
     #Log3 ($hash, 2, ">$userattr<>$attrname<");
     if ( " $userattr " =~ / $attrname / ) 
     {
@@ -730,7 +735,6 @@ GAEBUS_Attr(@)
   }
   elsif ($action eq "set")
   {
-
     if ($attrname eq "valueFormat") {
       my $attrVal = $attrval;
       if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
@@ -754,50 +758,55 @@ GAEBUS_Attr(@)
       return undef;
     } 
 
-    if (!defined $attr{$name}{$attrname}) 
+    if ( " $userattr " =~ / $attrname / ) 
     {
-      # attribute is not yet defined	
-      if ( $attrname =~ /$delimiter/ )
+      # this is an attribute form "userattr"
+
+      if (!defined $attr{$name}{$attrname}) 
       {
-        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
-        $hash->{helper}{longAttributesCount}++ if (defined($comment));
-        #Log3 ($hash->{NAME}, 1, "$hash->{NAME} helper longAttributesCount set to ".$hash->{helper}{longAttributesCount});
-      }
-    }
-
-    if (defined $attr{$name}{$attrname}) 
-    {
-      my $oldreading = $attr{$name}{$attrname};
-      $oldreading    =~ s/ .*//;
-      $oldreading    =~ s/:.*//;
-      my $newreading = $attrval;
-      $newreading    =~ s/ .*//;
-      $newreading    =~ s/:.*//;
-
-      my @or = split /;/, $oldreading;
-      my @nr = split /;/, $newreading;
-
-      for (my $i; $i <= $#or; $i++)
-      {
-        if ($or[$i] ne $nr[$i])
+        # attribute is not yet defined	
+        if ( $attrname =~ /$delimiter/ )
         {
-          #Log3 ($name, 2, "$name: adjust reading: $or[$i]");
+          my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+          $hash->{helper}{longAttributesCount}++ if (defined($comment));
+          #Log3 ($hash->{NAME}, 1, "$hash->{NAME} helper longAttributesCount set to ".$hash->{helper}{longAttributesCount});
+        }
+      }
 
-          if (defined($defs{$name}{READINGS}{$or[$i]}))
+      if (defined $attr{$name}{$attrname}) 
+      {
+        my $oldreading = $attr{$name}{$attrname};
+        $oldreading    =~ s/ .*//;
+        $oldreading    =~ s/:.*//;
+        my $newreading = $attrval;
+        $newreading    =~ s/ .*//;
+        $newreading    =~ s/:.*//;
+
+        my @or = split /;/, $oldreading;
+        my @nr = split /;/, $newreading;
+
+        for (my $i; $i <= $#or; $i++)
+        {
+          if ($or[$i] ne $nr[$i])
           {
-            if (defined ($nr[$i] and $nr[$i] ne "dummy" ))
+            #Log3 ($name, 2, "$name: adjust reading: $or[$i]");
+
+            if (defined($defs{$name}{READINGS}{$or[$i]}))
             {
-              unless ($nr[$i] =~ /^1*$/)  # matches "1" or ""
+              if (defined ($nr[$i] and $nr[$i] ne "dummy" ))
               {
-                #Log3 ($name, 2, "$name: change attribute $attrname ($or[$i] -> $nr[$i])");
+                unless ($nr[$i] =~ /^1*$/)  # matches "1" or ""
+                {
+                  #Log3 ($name, 2, "$name: change attribute $attrname ($or[$i] -> $nr[$i])");
 
-                $defs{$name}{READINGS}{$nr[$i]}{VAL}  = $defs{$name}{READINGS}{$or[$i]}{VAL};
-                $defs{$name}{READINGS}{$nr[$i]}{TIME} = $defs{$name}{READINGS}{$or[$i]}{TIME};
+                  $defs{$name}{READINGS}{$nr[$i]}{VAL}  = $defs{$name}{READINGS}{$or[$i]}{VAL};
+                  $defs{$name}{READINGS}{$nr[$i]}{TIME} = $defs{$name}{READINGS}{$or[$i]}{TIME};
+                }
               }
-            }
 
-            delete($defs{$name}{READINGS}{$or[$i]});
+              delete($defs{$name}{READINGS}{$or[$i]});
           
+            }
           }
         }
       }
@@ -910,8 +919,6 @@ GAEBUS_doEbusCmd($$$$$$$)
     $cmd .= "$var ";
     $cmd .= "$cmdaddon";
 
-    #$cmd =~ s/^h /r /; #obsolete
-
   } elsif ($action eq "v") {
 
     $cmd = "$io ";
@@ -963,6 +970,13 @@ GAEBUS_doEbusCmd($$$$$$$)
     }
     #$actMessage =~ s/\n//g;
 
+    # handle usage messages
+
+    if ($actMessage =~ /^usage:/)
+    {
+      $actMessage = "usage: syntay error";
+    }
+
 
     #Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
@@ -1001,7 +1015,8 @@ GAEBUS_doEbusCmd($$$$$$$)
       # drop "memory"
 
       next if ($class eq "memory");
-      next if ($class eq "scan");
+      #next if ($class eq "scan");
+      next if ($class =~ /^scan/);
 
 
       push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
@@ -1026,6 +1041,7 @@ GAEBUS_doEbusCmd($$$$$$$)
   }
 
   $actMessage =~ s/\n//g;
+  $actMessage =~ s/\|//g;
   Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
   my @values = split /;/, $actMessage;
@@ -1162,7 +1178,7 @@ GAEBUS_GetUpdatesDoit($)
   foreach my $oneattr (keys %{$attr{$name}})
   {
     # only for "r" commands
-    if ($oneattr =~ /^r$delimiter.{1,5}$delimiter.*/)
+    if ($oneattr =~ /^r$delimiter.{1,7}$delimiter.*/)
     {
 
       my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
