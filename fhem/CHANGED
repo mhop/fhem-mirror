@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_Verkehrsinfo.pm: Fix state update, Hessenschau message
   - feature: 50_TelegramBot:  msgForceReply, disable, 
                   keyboards in messages, inline keyboards and dialogs
   - bugfix:  74_NUKIDevice: Fix Problem with battery Reading

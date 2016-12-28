@@ -25,6 +25,14 @@
 ############################################################################
 #
 # Changelog:
+# 2016-12-26, v2.1
+# Bugfix:  update state with readings update
+# CHANGE:  update commandref with link to readingFn-Attributen
+#
+# Changelog:
+# 2016-12-13, v2.0RC1
+# Bugfix:  Bugfix Hessenschau Message
+#
 # 2016-11-17, v2.0
 # CHANGE:  Module change to HttpNonBlocking
 # CHANGE:  remove requirement perl-module json
@@ -153,7 +161,7 @@ sub Verkehrsinfo_Define($$) {
 	
 	InternalTimer(gettimeofday()+4, "Verkehrsinfo_GetUpdate", $hash, 0);
 	
-	$hash->{STATE} = 'initialized';
+	readingsSingleUpdate($hash, "state",  'initialized',1 );
     
     return undef;
 }
@@ -168,7 +176,7 @@ sub Verkehrsinfo_HttpNbDefineZone($) {
 	
 	if($err ne "")    {
         Log3 $name, 3, "error while requesting ".$param->{url}." - $err";
-		$hash->{STATE} = 'ERROR Update Zone ' . FmtDateTime(time());
+		readingsSingleUpdate($hash, "state",  'ERROR Update Zone ' . FmtDateTime(time()), 1);
     }
 	
 	elsif($content ne "")
@@ -233,7 +241,6 @@ sub Verkehrsinfo_Set($@) {
 	if(!defined($Verkehrsinfo_gets{$opt})) {
 		return "Unknown argument $opt, choose one of update:noArg";
 	}
-    $hash->{STATE} = $Verkehrsinfo_gets{$opt} = $value;
 
 	if ($opt eq "update"){
 		Verkehrsinfo_GetUpdate($hash);
@@ -283,7 +290,7 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 	
 	if($err ne "")    {
         Log3 $name, 3, "error while requesting ".$param->{url}." - $err";
-		$hash->{STATE} = 'ERROR Update Readings ' . FmtDateTime(time());
+		readingsSingleUpdate($hash, "state",  'ERROR Update Readings ' . FmtDateTime(time()), 1);
     }
 	
 	elsif($content ne "")
@@ -392,6 +399,8 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 		}
 		
 		$dataarray->{'message'} = $message_head . ' ' . $message;
+		$dataarray->{'message'} =~ s/\<pre\>//;
+		$dataarray->{'message'} =~ s/\<\/pre\>//;
 		$dataarray->{'count'} = $i - 1;
 		
 		
@@ -409,9 +418,8 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 			Log3 $hash, 4, "Verkehrsinfo: ($name) ReadingsUpdate: $readingName - ".$dataarray->{$readingName};
 				readingsBulkUpdate($hash,$readingName,$dataarray->{$readingName});
 		}
-		
+		readingsBulkUpdate($hash, "state",  'update ' . FmtDateTime(time()));
 		readingsEndUpdate($hash, 1);
-		$hash->{STATE} = 'update ' . FmtDateTime(time());
 	
 	}
 	Log3 $hash, 4, "Verkehrsinfo: ($name) Verkehrsinfo_HttpNbUpdateData done";
@@ -580,6 +588,7 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Multiple searching keywords can be seperated with the pipe "|".<br><br></li>
 			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de)<br>
 				Using this parameter you can format the output, regarding streets, direction or both.<br><br></li>
+			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
     <br>
@@ -705,6 +714,7 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Mehrer Suchbegriffe können mit einer Pipe "|" getrennt werden.<br><br></li>
 			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de)<br>
 				Über diesen Parameter kann die Meldung formatiert werden nach Strasse, Richtung oder beides<br><br></li>
+			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
     </ul>
     <br>
