@@ -136,7 +136,7 @@ sub CALVIEW_GetUpdate($){
 				@termyear = split(/\./,$termin->{bdate});
 				if($yobfield eq "_location" && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
 				elsif($yobfield eq "_description" && length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
-				else {$age = "no calculation passible"}
+				else {$age = " "}
 			}
 			#standard reading t_[3steliger counter] anlegen
 			if($isbday == 1 ){ readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_age", $age);}
