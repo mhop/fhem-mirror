@@ -710,14 +710,11 @@ sub WeekdayTimer_Update($) {
   my $now      = time();
   
  #my $sollZeit    = $myHash->{TIME};
- 
-  my $setModifier = WeekdayTimer_isHeizung($hash);
-  my $isHeating = $setModifier gt "";
 
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
-  my $newParam    = WeekdayTimer_evalAndcleanupParam($hash,$time,$hash->{profil}{$idx}{PARA}, $isHeating );
+  my $newParam    = WeekdayTimer_evalAndcleanupParam($hash,$time,$hash->{profil}{$idx}{PARA});
   
  #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
     
@@ -778,24 +775,51 @@ sub WeekdayTimer_isAnActiveTimer ($$$) {
   return  $ret;
 }
 ################################################################################
-#   {WeekdayTimer_isHeizung($defs{HeizungKueche_an_wt})}
 sub WeekdayTimer_isHeizung($) {
   my ($hash)  = @_;
-
+  
   my $name = $hash->{NAME};
-  
-  my $dHash = $defs{$hash->{DEVICE}};                                           
-  my $dName = $dHash->{NAME};
-  
-  my @tempSet = ("desired-temp", "desiredTemperature", "desired", "thermostatSetpointSet"); 
-  my $allSets = getAllSets($dName);
 
-  foreach my $ts (@tempSet) {
-     if ($allSets =~ m/$ts/) {
-        Log3 $hash, 4, "[$name] device type heating recognized, setModifier:$ts"; 
-        return $ts 
-     }
-  }  
+  my %setmodifiers =
+     ("FHT"     =>  "desired-temp",
+      "PID20"   =>  "desired",
+      "EnOcean" =>  {  "subTypeReading" => "subType", "setModifier" => "desired-temp",
+                       "roomSensorControl.05"  => 1,
+                       "hvac.01"               => 1 },
+      "MAX"     =>  {  "subTypeReading" => "type", "setModifier" => "desiredTemperature",
+                       "HeatingThermostatPlus" => 1,
+                       "HeatingThermostat"     => 1,
+                       "WallMountedThermostat" => 1 },
+      "CUL_HM"  =>  {  "subTypeReading" => "model","setModifier" => "desired-temp",
+                       "HM-CC-TC"              => 1,
+                       "HM-TC-IT-WM-W-EU"      => 1,
+                       "HM-CC-RT-DN"           => 1 } );
+  
+  my $model = "";
+  my $dHash = $defs{$hash->{DEVICE}};                                           
+  my $dType = $dHash->{TYPE};
+  return ""   if (!defined($dType));  
+
+  my $setModifier = $setmodifiers{$dType};
+     $setModifier = ""  if (!defined($setModifier));
+  if (ref($setModifier)) {
+
+      my $subTypeReading = $setmodifiers{$dType}{subTypeReading};
+      
+      if ($subTypeReading eq "type" ) {
+         $model = $dHash->{type};
+      } else {   
+         $model = AttrVal($hash->{DEVICE}, $subTypeReading, "nF");
+      }        
+      
+      if (defined($setmodifiers{$dType}{$model})) {
+         $setModifier = $setmodifiers{$dType}{setModifier}
+      } else {
+         $setModifier = "";
+      }
+  }
+  Log3 $hash, 4, "[$name] device type $dType:$model recognized, setModifier:$setModifier";  
+  return $setModifier;
 }
 ################################################################################
 #
@@ -918,13 +942,10 @@ sub WeekdayTimer_FensterOffen ($$$) {
   delete $hash->{VERZOEGRUNG_IDX} if defined($hash->{VERZOEGRUNG_IDX});
   return 0;
 }
-#
-# delete tsxXXX; define tsxXXX WeekdayTimer tstYYY  17:55|{23} 17:56|{45} 17:57|off 17:58|{43} ; attr tsxXXX room Wohnzimmer; attr tsxXXX  verbose 5
-# delete tsxXXX; define tsxXXX WeekdayTimer tstYYY  19:07|{sprintf("%s %s %d","$NAME", "$TIME", 5)} ; attr tsxXXX room Wohnzimmer; attr tsxXXX  verbose 5
-#
+
 ################################################################################
-sub WeekdayTimer_evalAndcleanupParam($$$$) {
-  my ($hash,$time,$param,$isHeating) = @_;
+sub WeekdayTimer_evalAndcleanupParam($$$) {
+  my ($hash,$time,$param) = @_;
   
   my $name   = $hash->{DEVICE} ;
   my $wdName = $hash->{NAME};
@@ -946,11 +967,12 @@ sub WeekdayTimer_evalAndcleanupParam($$$$) {
         Log3 $hash, 4, "[$wdName] calculating dynamic param after eval: ........ $newParam";
      }
     
- }elsif($isHeating && $param =~ m/^\d{1,3}$/){
+ }elsif($param =~ m/^\d{1,3}$/){
      $newParam = sprintf("%.1f", $param);
  }
  return $newParam;
 }
+
 ################################################################################
 sub WeekdayTimer_Device_Schalten($$$) {
   my ($hash, $newParam, $tage)  = @_;
@@ -969,7 +991,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
   my $activeTimer = 1;
   
   my $isHeating = $setModifier gt "";
-  my $aktParam  = WeekdayTimer_evalAndcleanupParam($hash,$dummy,ReadingsVal($hash->{DEVICE}, $setModifier, ""),$isHeating);
+  my $aktParam  = WeekdayTimer_evalAndcleanupParam($hash,$dummy,ReadingsVal($hash->{DEVICE}, $setModifier, ""));
   # newParam is already processed by evalAndcleanupParam()
   
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
