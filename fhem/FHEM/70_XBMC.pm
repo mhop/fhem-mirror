@@ -31,7 +31,7 @@ sub XBMC_Initialize($$)
   $hash->{ReadyFn}  = "XBMC_Ready";
   $hash->{UndefFn}  = "XBMC_Undefine";
   $hash->{AttrFn}   = "XBMC_Attr";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby updateInterval disable:1,0 " . $readingFnAttributes;
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:1,0 " . $readingFnAttributes;
   
   $data{RC_makenotify}{XBMC} = "XBMC_RCmakenotify";
   $data{RC_layout}{XBMC_RClayout}  = "XBMC_RClayout";
