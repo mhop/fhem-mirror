@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.10.1       30.11.2016       bugfix importFromFile format problem if UNIT-field wasn't set
 # 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
 # 4.9          23.12.2016       function readingRename added
 # 4.8.6        17.12.2016       new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5
@@ -168,7 +169,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.10";
+my $DbRepVersion = "4.10.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -2383,9 +2384,9 @@ sub del_ParseDone($) {
   }
   
   my $reading = AttrVal($hash->{NAME}, "reading", undef);
-  $reading     =~ s/%/\//g;
+  $reading     =~ s/%/\//g if ($reading);
   my $device  = AttrVal($hash->{NAME}, "device", undef);
-  $device     =~ s/%/\//g;
+  $device     =~ s/%/\//g if ($device);
  
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
@@ -3043,15 +3044,17 @@ sub impfile_Push($) {
      $al = $_;
      chomp $al; 
      my @alarr = split("\",\"", $al);
+	 foreach(@alarr) {
+         tr/"//d;
+     }
      my $i_timestamp = $alarr[0];
-     $i_timestamp =~ tr/"//d;
+     # $i_timestamp =~ tr/"//d;
      my $i_device    = $alarr[1];
      my $i_type      = $alarr[2];
      my $i_event     = $alarr[3];
      my $i_reading   = $alarr[4];
      my $i_value     = $alarr[5];
      my $i_unit      = $alarr[6] ? $alarr[6]: " ";
-     $i_unit =~ tr/"//d;
      $irowcount++;
      next if(!$i_timestamp);  #leerer Datensatz
      
@@ -3059,7 +3062,7 @@ sub impfile_Push($) {
      my ($i_date, $i_time) = split(" ",$i_timestamp);
      if ($i_date !~ /(\d{4})-(\d{2})-(\d{2})/ || $i_time !~ /(\d{2}):(\d{2}):(\d{2})/) {
          $err = encode_base64("Format of date/time is not valid in row $irowcount of $infile. Must be format \"YYYY-MM-DD HH:MM:SS\" !","");
-         Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets of file $infile was NOT done. Invalid date/time field format in row $irowcount !");    
+         Log3 ($name, 2, "DbRep $name -> ERROR - Import from file $infile was not done. Invalid date/time field format in row $irowcount.");    
          close(FH);
          $dbh->rollback;
          Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
@@ -3842,8 +3845,8 @@ return;
     <li><b> importFromFile </b> - imports datasets in CSV format from file into database. The filename will be set by <a href="#DbRepattr">attribute</a> "expimpfile". <br><br>
                                  
                                  <ul>
-                                 <b>dataset format: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
-                                 # The fields "TIMESTAMP","DEVICE", "READING" have to be set. All other fields are optional.
+                                 <b>dataset format: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>						 
+                                 # The fields "TIMESTAMP","DEVICE","TYPE","EVENT","READING" and "VALUE" have to be set. The field "UNIT" is optional.
                                  The file content will be imported transactional. That means all of the content will be imported or, in case of error, nothing of it. 
                                  If an extensive file will be used, DON'T set verbose = 5 because of a lot of datas would be written to the logfile in this case. 
                                  It could lead to blocking or overload FHEM ! <br><br>
@@ -4328,7 +4331,7 @@ return;
                                  
                                  <ul>
                                  <b>Datensatzformat: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
-                                 # Die Felder "TIMESTAMP","DEVICE", "READING" müssen gesetzt sein. Alle anderen Felder sind optional.
+                                 # Die Felder "TIMESTAMP","DEVICE","TYPE","EVENT","READING" und "VALUE" müssen gesetzt sein. Das Feld "UNIT" ist optional.
                                  Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
                                  Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
                                  das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte. <br><br>
