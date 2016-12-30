@@ -324,9 +324,14 @@ western_easter($)
       <li>4<br>
           Interval. Arguments: &lt;MM-DD&gt; &lt;MM-DD&gt; &lt;holiday-name&gt;
           .<br>
+          Note: An interval cannot contain the year-end.
           Example:<br>
           <ul>
             4 06-01 06-30 Summer holiday<br>
+            4 12-20 01-10 Winter holiday  # DOES NOT WORK.
+                                        Use the following 2 lines instead:<br>
+            4 12-20 12-31 Winter holiday<br>
+            4 01-01 01-10 Winter holiday<br>
           </ul>
           </li>
       <li>5<br>
@@ -429,9 +434,14 @@ western_easter($)
       <li>4<br>
           Intervall. Argument: &lt;MM-TT&gt; &lt;MM-TT&gt; &lt;Feiertag-Name&gt;
           .<br>
+          Achtung: Ein Intervall darf kein Jahresende enthalten.
           Beispiel:<br>
           <ul>
             4 06-01 06-30 Sommerferien<br>
+            4 12-20 01-10 Winterferien # FUNKTIONIER NICHT,
+                                        stattdessen folgendes verwenden:<br>
+            4 12-20 12-31 Winterferien<br>
+            4 01-01 01-10 Winterferien<br>
           </ul>
           </li>
       <li>5<br>
