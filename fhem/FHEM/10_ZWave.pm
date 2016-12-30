@@ -3592,13 +3592,94 @@ ZWave_secCreateNonce($)
 {
   my ($hash) = @_;
   if (ZWave_secIsEnabled($hash)) {
-    my $nonce = ZWave_secGetNonce();
-    setReadingsVal($hash, "send_nonce", $nonce, TimeNow());
-    #return ("",'80'.$nonce);
+    my $nonce;
+    my $nonce_id;
+    my $n=0;
+
+    $hash->{secNonce} = {} if (!$hash->{secNonce});
+    foreach my $id (sort keys %{$hash->{secNonce}}) {
+      $n++;
+    }
+    
+    my $time = gettimeofday();
+    if ($n>50) { #clean up only if more than 50 nonce are active
+      foreach my $id (sort keys %{$hash->{secNonce}}) {
+        my $dt = $time - $hash->{secNonce}{$id}{timeStamp};
+        if ($dt > 10) {
+          Log3 $hash->{NAME}, 3, "$hash->{NAME}: SECURITY: nonce "
+            .$hash->{secNonce}{$id}{nonce} ."is too old ("
+            .sprintf("%d seconds", $dt)
+            .") and is removed from list";
+          delete($hash->{secNonce}{$id});
+          $n--;
+        }
+      }
+    }
+    if ($n >10) {
+      Log3 $hash->{NAME}, 2, "$hash->{NAME}: SECURITY: multiple nonce warning, "
+                          ."there are $n nonce active";
+    }
+    
+    $n=0;
+    do {
+      $nonce = ZWave_secGetNonce();
+      $nonce_id = substr($nonce, 0, 2);
+      $n++;
+    } until ((!$hash->{secNonce}{$nonce_id}) || $n>512);
+    
+    if ($n >512) {
+      Log3 $hash->{NAME}, 1, "$hash->{NAME}: SECURITY: could not generate "
+                              ."unique nonce, ignoring request!";
+      return ('00');       
+    }
+
+    my $id = substr($nonce, 0 ,2);
+  
+    $hash->{secNonce} = {} if (!$hash->{secNonce});
+  
+    $hash->{secNonce}{$id}{nonce} = $nonce;
+    $hash->{secNonce}{$id}{timeStamp} = gettimeofday();
+  
     return ('80'.$nonce);
   } else {
-    #return ("", '00');
     return ('00');
+  }
+}
+
+sub
+ZWave_secRetrieveNonce($$)
+{
+  my ($hash, $s_nonce_id_hex) = @_;
+  my $s_nonce_hex;
+  my $n=0;
+ 
+  return undef if (!$hash->{secNonce});
+  
+  # remove old (>10 seconds) entries BEFORE trying to retrieve nonce
+  my $time = gettimeofday();
+  foreach my $id (sort keys %{$hash->{secNonce}}) {
+    $n++;
+    my $dt = $time - $hash->{secNonce}{$id}{timeStamp};
+    if ($dt > 10) {
+      Log3 $hash->{NAME}, 5, "$hash->{NAME}: SECURITY: nonce "
+          .$hash->{secNonce}{$id}{nonce} ."is too old ("
+          .sprintf("%d seconds", $dt)
+          .") and is removed from list";
+      delete($hash->{secNonce}{$id});
+      $n--;
+    }
+  }
+  if ($n >1) {
+    Log3 $hash->{NAME}, 5, "$hash->{NAME}: SECURITY: multiple nonce warning, "
+                          ."there are $n nonce active";
+  }
+  
+  if ($hash->{secNonce}{$s_nonce_id_hex}) {
+      $s_nonce_hex = $hash->{secNonce}{$s_nonce_id_hex}{nonce};
+      delete($hash->{secNonce}{$s_nonce_id_hex});
+      return $s_nonce_hex;
+  } else {
+    return undef;
   }
 }
 
@@ -3664,15 +3745,6 @@ ZWave_secDecrypt($$$)
   my $enc_key  = ZWave_secEncryptECB($key, $init_enc_key);
   my $auth_key = ZWave_secEncryptECB($key, $init_auth_key);
 
-  my $s_nonce_hex = ReadingsVal($name, "send_nonce", undef);
-  if (!$s_nonce_hex) {
-    Log3 $name, 1, "$name: Error, no send_nonce to decrypt message available";
-    ZWave_secEnd($hash);
-    return "";
-  }
-
-  delete $hash->{READINGS}{send_nonce};
-
   # encrypted message format:
   # data=  bcb328fe5d924a402b2901fc2699cc3bcacd30e0
   # bcb328fe5d924a40 = 8 byte r_nonce
@@ -3685,6 +3757,14 @@ ZWave_secDecrypt($$$)
     return "";
   }
   my ($r_nonce_hex, $msg_hex, $s_nonce_id_hex, $auth_code_hex) = ($1, $2, $3, $4);
+  my $s_nonce_hex = ZWave_secRetrieveNonce($hash, $s_nonce_id_hex);
+  if (!$s_nonce_hex) {
+    Log3 $name, 1, "$name: Error, no send_nonce to decrypt message available";
+    ZWave_secEnd($hash);
+    return "";
+  }
+  Log3 $name, 5, "$name: secDecrypt: send_nonce $s_nonce_hex with "
+                        ."nonce_id $s_nonce_id_hex retrieved";
 
   my $iv = pack 'H*', $r_nonce_hex . $s_nonce_hex;
   my $out_hex = ZWave_secEncryptOFB ($enc_key, $iv, $msg_hex);
