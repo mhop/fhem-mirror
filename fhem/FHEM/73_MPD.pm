@@ -21,7 +21,8 @@
 #  GNU General Public License for more details.
 ################################################################
 
-# Version 1.3    - 28.12.16
+# Version 1.31   - 30.12.16
+# Version 1.3    - 14.12.16
 # Version 1.2    - 10.04.16
 # Version 1.1    - 03.02.16
 # Version 1.01   - 18.08.14
@@ -218,7 +219,7 @@ sub MPD_Define($$)
   $attr{$name}{player}       = 'mpd' unless (exists($attr{$name}{player}));
   $attr{$name}{loadPlaylists} = '1'  unless (exists($attr{$name}{loadPlaylists}));
   $attr{$name}{cache}        = 'lfm'  unless (exists($attr{$name}{cache}));
-  #$attr{$name}{loadMusic}   = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
+  #$attr{$name}{loadMusic}     = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "MPD_updateConfig", $hash, 0);
@@ -334,6 +335,7 @@ sub MPD_ClearReadings($)
     readingsBulkUpdate($hash,"name","");
     readingsBulkUpdate($hash,"date","");
     readingsBulkUpdate($hash,"track","");
+    readingsBulkUpdate($hash,"playlistname","");
     #readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer", "");
     #readingsBulkUpdate($hash,"artist_image_html","");
     readingsBulkUpdate($hash,"artist_summary","")  if (AttrVal($hash->{NAME}, "artist_summary",""));
@@ -489,10 +491,9 @@ sub MPD_Set($@)
    return "$name : no name !" if (!$subcmd);
 
    MPD_ClearReadings($hash);
-
    $hash->{".music"}    = "";
    $hash->{".playlist"} = $subcmd; # interne Playlisten Verwaltung
-
+   readingsSingleUpdate($hash,"playlistname",$subcmd,1);
    $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$subcmd\"\nplay\n".cle);
  }
 
@@ -503,6 +504,7 @@ sub MPD_Set($@)
    MPD_ClearReadings($hash);
 
    $hash->{".playlist"} = "";
+   readingsSingleUpdate($hash,"playlistname","",1);
    $hash->{".music"}    = $subcmd; # interne Song Verwaltung
    
    $ret = mpd_cmd($hash, clb."stop\nclear\nadd \"$subcmd\"\nplay\n".cle);
@@ -634,6 +636,7 @@ sub mpd_cmd($$)
  my $sp;
  my $artist;
  my $name      = $hash->{NAME};
+ my $playlists = $hash->{".playlists"};
 
 
  $hash->{VERSION}   = undef;
@@ -736,9 +739,7 @@ sub mpd_cmd($$)
          readingsBulkUpdate($hash,$b,$c);
         }
 
-        else { readingsBulkUpdate($hash,$b,$c);
-               #Log3 $name, 4 , "$name, BU -> $b,$c";
-             } # irgendwas aber kein Titel
+        else { readingsBulkUpdate($hash,$b,$c); } # irgendwas aber kein Titel
       } # defined $c
     } # while
   } # foreach
@@ -782,6 +783,15 @@ sub mpd_cmd($$)
 
  print $sock "close\n";
  close($sock); 
+
+ if ($hash->{".playlists"} ne $playlists) # haben sich sich die Listen geändert ?
+ {
+  $hash->{".playlists"} =~ s/\n+\z//;
+  my $plists = $hash->{".playlists"}; 
+  $plists =~ tr/\n/\:/; # Tablet UI will diese Art der Liste
+  readingsSingleUpdate($hash,"playlistcollection", $plists,1);
+  Log3 $name ,4 ,"$name, ".$hash->{READINGS}{"playlistcollection"}{VAL};
+ }
 
  return $output; # falls es einen gibt , wenn nicht - auch gut ;)
 
@@ -1413,15 +1423,16 @@ sub MPD_summaryFn($$$$) {
 
 =pod
 =item device
-=item summary  controls Music Player Deamon (MPD)
-=item summary_DE steuert Music Player Deamon (MPD)
+=item summary  controls MPD or Mopidy music server
+=item summary_DE steuert den MPD oder Mopidy Musik Server
 =begin html
 
 <a name="MPD"></a>
 <h3>MPD</h3>
- FHEM module to control a MPD like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
+ FHEM module to control a MPD (or Mopidy) like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
 To install a MPD on a Raspberry Pi you will find a lot of documentation at the web e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
 FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a> ( in german )<br>
+Modul requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
 <ul>
  <a name="MPDdefine"></a>
   <b>Define</b>
@@ -1510,12 +1521,12 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
 <a name="MPD"></a>
 <h3>MPD</h3>
 <ul>
-  FHEM Modul zur Steuerung des MPD &auml;hnlich dem MPC (MPC =  Music Player Command, das Kommando Zeilen Interface f&uuml;r den 
+  FHEM Modul zur Steuerung des MPD (oder Mopidy) &auml;hnlich dem MPC (MPC =  Music Player Command, das Kommando Zeilen Interface f&uuml;r den 
   <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> ) (englisch)<br>
   Um den MPD auf einem Raspberry Pi zu installieren finden sich im Internet zahlreiche gute Dokumentaionen 
-  z.B. <a href="http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi">hier</a><br>
+  z.B. <a href="http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi"><b>hier</b></a><br>
   Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a><br>
-  <br>&nbsp;<br>
+  Das Modul ben&ouml;tigt zwingend XML:Simple, installation z.B. mit <i>sudo apt-get install libxml-simple-perl</i><br>
   <a name="MPDdefine"></a>
   <b>Define</b>
   <ul>
@@ -1554,7 +1565,8 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
     updateDb => wie MPC update, Update der MPD Datenbank<br>
     reset => reset des FHEM MPD Moduls<br>
     mpdCMD (cmd) => sende cmd direkt zum MPD Server ( siehe auch <a href="http://www.musicpd.org/doc/protocol/">MPD Comm Ref</a> )<br>
-    IdleNow => sendet das Kommando idle zum MPD und wartet auf Ereignisse - siehe auch Attribut useIdle<br>
+    IdleNow => sendet das Kommando idle zum MPD und wartet auf Ereignisse<br>
+    clear_readings => l&ouml;scht sehr viele Readings<br>
    </ul>
   <br>
   <a name="MPDget"></a>
@@ -1583,16 +1595,28 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
     <li>loadPlaylists 1|0 => lade die MPD Playlisten beim FHEM Start : mpd.conf - playlist_directory</li>
     <li>volumeStep x => Schrittweite f&uuml;r Volume +/-</li>
     <li>titleSplit 1|0 => zerlegt die aktuelle Titelangabe am ersten Vorkommen von - (BlankMinusBlank) in die zwei Felder Artist und Titel,<br>
-    wenn im abgespielten Titel die Artist Information nicht verf&uuml;gbar ist (sehr oft bei Radio-Streams default 1)<br>
+    wenn im abgespielten Titel die Interpreten Information nicht verf&uuml;gbar ist (sehr oft bei Radio-Streams default 1)<br>
     Liegen keine Titelangaben vor wird die Ausgabe durch den Namen der Radiostation ersetzt</li>
     <li>timeout (default 1) => Timeoutwert in Sekunden für die Verbindung fhem-mpd</li>
     <li>waits (default 60) => Wartezeit in Sekunden bis zum Start eines neuen Idle Prozess im Fehlerfall</li>
     <li>stateMusic 1|0 => zeige Musikliste als DropDown im Webfrontend</li>
     <li>statePlaylists 1|0 => zeige Playlisten als DropDown im Webfrontend</li>
-    <li>image_size -1|0|1|2|3  (default -1 = zeige kein Interpretenbild  von lastfm)<br>
-    lastfm stellt verschiedene Bildgroessen zur Verfügung :<br>
+    <li>player  mpd|mopidy|forked-daapd (default mpd) => welcher Player wird gesteuert<br>
+    <b>ACHTUNG</b> : Mopidy unterst&uuml;tzt nicht alle Kommandos des echten MPD ! (siehe <a href="https://docs.mopidy.com/en/latest/ext/mpd/">Mopidy Dokumentation</a>)</li>
+    <li>Cover Art Funktionen von <a href="http://www.last.fm/"><b>last.fm</b></a> :</li>
+    <li>image_size -1|0|1|2|3  (default -1 = keine Interpretenbilder und Infos von last.fm verwenden)<br>
+    last.fm stellt verschiedene Bildgroessen zur Verfügung :<br>
      0 = 32x32 , 1 = 64x64 , 2 = 174x174 , 3 = 300x300</li>
-    <li>player  mpd|mopidy|forked-daapd (default mpd) => welcher Player wird gesteuert</li>
+   <li>artist_content 0|1 => stellt Interpreteninformation im Reading artist_content zur Verf&uuml;gung</li>
+   <li>artist_summary 0|1 => stellt weitere Interpreteninformation im Reading artist_summary zur Verf&uuml;gung<br>
+    Beispiel Anzeige mittels readingsGroup :<br>
+    <pre>
+      define rg_artist &ltMPD name&gt:artist,artist_image_html,artist_summary
+      attr rg_artist room MPD
+    </pre></li>
+   <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die XML und PNG Dateien<br>
+   <b>Wichtig</b> : Der User unter dem der fhem Prozess ausgef&uuml;hrt wird (default fhem) muss Lese und Schreibrechte in diesem Verzeichniss haben !<br>
+   Das Verzeichnis sollte auch unterhalb von www liegen, damit der fhem Webserver direkten Zugriff auf die Bilder hat.</li>
    </ul>
   <br>
   <b>Readings</b>
