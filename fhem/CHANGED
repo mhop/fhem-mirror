@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_fhemdebug, to aid "Error: >< no TYPE" debugging.
   - feature: 70_Jabber Added possibility to change componentname via 
              attr JabberDomain
   - feature: 93_DbRep: function readingRename added, delEntries is able to 

@@ -1025,6 +1025,7 @@ AnalyzePerlCommand($$;$)
 
   $cmdFromAnalyze = $cmd;
   my $ret = eval $cmd;
+  Log 1, "ERROR evaluating $cmd: $@" if($@);
   $ret = $@ if($@);
   $cmdFromAnalyze = undef;
   return $ret;
@@ -1162,6 +1163,7 @@ devspec2array($;$)
         if(!$hash->{TYPE}) {
           Log 1, "Error: >$d< has no TYPE, but following keys: >".
                                 join(",", sort keys %{$hash})."<";
+          delete($defs{$d});
           next;
         }
         my $val;
@@ -4670,7 +4672,7 @@ fhemFork()
   foreach my $d (sort keys %defs) {
     my $h = $defs{$d};
     $h->{DBH}->{InactiveDestroy} = 1
-      if($h->{TYPE} eq 'DbLog' && $h->{DBH}); #Forum #43271
+      if($h->{DBH} && $h->{TYPE} eq 'DbLog'); #Forum #43271
     TcpServer_Close($h) if($h->{SERVERSOCKET});
     if($h->{DeviceName}) {
       require "$attr{global}{modpath}/FHEM/DevIo.pm";
