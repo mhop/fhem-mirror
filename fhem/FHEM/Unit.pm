@@ -726,7 +726,10 @@ my $rtypes = {
             nl => [ 'stabiel',        'stijgend',  'dalend' ],
             pl => [ 'stabilne',       'rośnie',   'spada' ],
         },
-        scope             => [ '^(=|0)$', '^(\+|1)$', '^(-|2)$' ],
+        scope => [
+            '^(=|steady|stable|0)$', '^(\+|rising|up|1)$',
+            '^(-|falling|down|2)$'
+        ],
         tmpl              => '%symbol%',
         tmpl_long         => '%txt_long%',
         rtype_description => 'Trend',
@@ -3232,7 +3235,7 @@ sub replaceTemplate ($$$$;$) {
 
     # find text template
     if (   looks_like_number($value)
-        && ( $value eq "0" || $value > 1 )
+        && ( $value eq "0" || $value > 1 || $value < -1 )
         && $desc->{txt_long_pl} )
     {
         $txt_long = '%value%' . chr(0x00A0) . '%txt_long_pl%';
@@ -3240,7 +3243,7 @@ sub replaceTemplate ($$$$;$) {
           if ( $desc->{tmpl_long_pl} );
     }
     elsif (looks_like_number($value)
-        && ( $value eq "0" || $value > 1 )
+        && ( $value eq "0" || $value > 1 || $value < -1 )
         && $desc->{txt_pl} )
     {
         $txt_long = '%value%' . chr(0x00A0) . '%txt_pl%';
@@ -3333,6 +3336,8 @@ sub Unit_verifyValueNumber($$) {
                     $value = $scope->{eq}
                       if ( !$scope->{keep} || $scope->{strict} );
                 }
+                $value_num = $scope->{value_num}
+                  if ( defined( $scope->{value_num} ) );
             }
             elsif ( !$scope->{regex} && !defined( $scope->{eq} ) ) {
                 $log .= " '$value' is not a number."
@@ -3384,6 +3389,17 @@ sub Unit_verifyValueNumber($$) {
                 $log .= " $value is not $_ $scope->{$_}.";
                 $value = $scope->{$_}
                   if ( !$scope->{keep} || $scope->{strict} );
+            }
+        }
+        elsif ( $_ eq 'eq' ) {
+            if ( $value ne $scope->{$_} ) {
+                $log .= " $value is not equal to $scope->{$_}.";
+                $value = $scope->{$_}
+                  if ( !$scope->{keep} || $scope->{strict} );
+            }
+            else {
+                $log = undef;
+                last;
             }
         }
     }
@@ -3708,6 +3724,7 @@ sub formatValue($$$;$$$$) {
                         }
                     }
 
+         #TODO: wenn nummer out of scope, dann muss ein maximalwert gesetzt sein
                     else {
                         Unit_Log3( $device, $reading, $desc, 9,
                                 "formatValue $device $reading: scope: "
@@ -3716,11 +3733,10 @@ sub formatValue($$$;$$$$) {
                         my ( $verified, $tval, $tval_num, $log ) =
                           Unit_verifyValueNumber( $value, $_ );
 
-                        if ( !$verified && $log ) {
+                        if ($log) {
                             Unit_Log3( $device, $reading, $desc, 4,
 "formatValue $device $reading: scope: WARNING -$log"
                             );
-
                         }
                         elsif ( $verified && !$log ) {
 
@@ -4336,8 +4352,7 @@ sub Unit_DbLog_split($$) {
             $txt =~ s/\s*$val\s*//;
             $txt_long =~ s/\s*$val\s*//;
             $value = defined($val_num) ? $val_num : $val;
-            $unit = "$txt_long ($txt)" if ($txt_long);
-            $unit = "$txt"             if ( !$txt_long );
+            $unit = "$txt";
         }
     }
 
