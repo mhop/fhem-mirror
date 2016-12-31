@@ -921,17 +921,17 @@ sub HMinfo_listOfTempTemplates() { ############################################
   my $tDefault = $dir.$tFiles[0].":";
   my @tmpl;
   foreach my $fn (map{$dir.$_}@tFiles){
-    if (!(-r $fn)){
-      next;
-    }
+    next if (!(-r $fn));
+
     open(aSave, "$fn") || return("Can't open $fn: $!");
     while(<aSave>){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
       if($line =~ m/^entities:(.*)/){
-        $1 =~s/.*://;
-        push @tmpl,map{"$fn:$_"}split(",",$1);
+        my $l =$1;
+        $l =~s/.*://;
+        push @tmpl,map{"$fn:$_"}split(",",$l);
       }  
     }
     close (aSave);
