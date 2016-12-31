@@ -302,6 +302,12 @@ sub CUL_HM_updateConfig($){
         }
       }
     }
+    elsif ($st =~ m /^(motionDetector|motionAndBtn)$/ ){
+      CUL_HM_UpdtReadSingle($hash,"state","-",0);
+      CUL_HM_UpdtReadSingle($hash,"motion","-",0);
+      RemoveInternalTimer($name.":motionCheck");
+      InternalTimer(gettimeofday()+30+2,"CUL_HM_motionCheck", $name.":motionCheck", 0);
+    }
     elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
       my $mId = CUL_HM_getMId($hash);
       #configure Dimmer virtual channel assotiation
@@ -5191,7 +5197,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                       ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
                       ,CUL_HM_name2Id($name)                                                              # myself
                       );
-
       foreach my $tId (@teamList){
         my $teamC = CUL_HM_id2Name($tId);
         $tId = substr($tId,0,6);
@@ -6231,16 +6236,16 @@ sub CUL_HM_getConfig($){
 sub CUL_HM_calcDisWmSet($){
   my $dh = shift; 
   my ($txt,$col,$icon) = eval $dh->{exe};
-  if ($txt eq "off")    { delete $dh->{txt};}
+  if   ($txt eq "off")  { delete $dh->{txt};}
   elsif($txt ne "nc")   { $dh->{txt} = substr($txt,0,12);}
 
-  if($col eq "off")              { delete $dh->{col};}
+  if   (!$col ||$col eq "off")   { delete $dh->{col};}
   elsif($col ne "nc"){
     if (!defined $disColor{$col}){ delete $dh->{col};}
     else                         { $dh->{col}=$col; }
   }
 
-  if($icon eq "noIcon"){           delete $dh->{icn};}
+  if   (!$icon ||$icon eq "noIcon"){delete $dh->{icn};}
   elsif($icon ne "nc"){ 
     if (!defined $disIcon {$icon}){delete $dh->{icn}}
     else                          {$dh->{icn}=$icon;}
