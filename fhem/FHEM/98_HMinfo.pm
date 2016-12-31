@@ -1601,6 +1601,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
           if ($fn !~ m/\//);
+
     my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
@@ -1729,7 +1730,7 @@ sub HMinfo_verifyConfig($) {###################################################
   my ($param) = @_;
   my ($id,$fName) = split ",",$param;
   HMinfo_purgeConfig($param);
-  open(aSave, "$fName") || return("Can't open $fName: $!");
+  open(aSave, "$fName") || return("$id;Can't open $fName: $!");
   my @elPeer = ();
   my @elReg = ();
   my @entryNF = ();
@@ -1956,7 +1957,7 @@ sub HMinfo_purgeConfig($) {####################################################
   my ($id,$fName) = split ",",$param;
   $fName = "regSave.cfg" if (!$fName);
 
-  open(aSave, "$fName") || return("Can't open $fName: $!");
+  open(aSave, "$fName") || return("$id;Can't open $fName: $!");
   my %purgeH;
   while(<aSave>){
     chomp;
@@ -1984,7 +1985,7 @@ sub HMinfo_purgeConfig($) {####################################################
     $purgeH{$eN}{$cmd}{$typ} = $p1.($timeStamp?"#$timeStamp":"");
   }
   close(aSave);
-  open(aSave, ">$fName") || return("Can't open $fName: $!");
+  open(aSave, ">$fName") || return("$id;Can't open $fName: $!");
   print aSave "\n\n#============data purged: ".TimeNow();
   foreach my $eN(sort keys %purgeH){
     next if (!defined $defs{$eN}); # remove deleted devices
@@ -2185,9 +2186,14 @@ sub HMinfo_register ($){ ######################################################
 sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
   my ($name,$id,$cl,$ret) = split(";",$rep,4);
-  if ($ret && defined $defs{$cl}){
-    $ret =~s/-ret-/\n/g; # re-insert new-line
+  if ($rep =~ m/Can't open/){
     asyncOutput($defs{$cl},$ret);
+  }
+  else{
+    if ($ret && defined $defs{$cl}){
+      $ret =~s/-ret-/\n/g; # re-insert new-line
+      asyncOutput($defs{$cl},$ret);
+    }
   }
   delete $defs{$name}{nb}{$id};
   return;
