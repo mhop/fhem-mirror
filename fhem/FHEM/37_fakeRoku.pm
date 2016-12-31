@@ -179,7 +179,7 @@ fakeRoku_startDiscovery($)
 
   if( 1 ) {
     # respond to multicast client discovery messages
-    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>1900, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>1900, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
       $socket->mcast_add('239.255.255.250');
 
       my $chash = fakeRoku_newChash( $hash, $socket,
@@ -229,7 +229,7 @@ fakeRoku_startListener($)
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
   my $port = AttrVal($name, 'httpPort', 0);
-  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
     readingsSingleUpdate($hash, 'state', 'listening', 1 );
 
 

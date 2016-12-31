@@ -260,7 +260,7 @@ plex_startDiscovery($)
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
   # udp multicast for servers
-  if( my $socket = IO::Socket::Multicast->new(Proto => 'udp', Timeout => 5, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::Multicast->new(Proto => 'udp', Timeout => 5, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:serverDiscoveryMcast", STATE=>'discovering', multicast => 1} );
 
@@ -300,7 +300,7 @@ plex_startDiscovery($)
   }
 
   # udp multicast for clients
-  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
     $socket->mcast_add('239.0.0.250');
 
     my $chash = plex_newChash( $hash, $socket,
@@ -342,7 +342,7 @@ plex_startDiscovery($)
   }
 
   # listen for udp mulicast HELLO and BYE messages from PHT
-  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32413, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32413, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
     $socket->mcast_add('239.0.0.250');
 
     my $chash = plex_newChash( $hash, $socket,
@@ -359,7 +359,7 @@ plex_startDiscovery($)
   }
 
   # listen for udp multicast server UPDATE messages (playerAdd, playerDel)
-#  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32415, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+#  if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32415, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
 #    $socket->mcast_add('239.0.0.250');
 #
 #    my $chash = plex_newChash( $hash, $socket,
@@ -377,7 +377,7 @@ plex_startDiscovery($)
 
   if( AttrVal($name, 'responder', undef) ) {
     # respond to multicast client discovery messages
-    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32412, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>32412, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
       $socket->mcast_add('239.0.0.250');
 
       my $chash = plex_newChash( $hash, $socket,
@@ -394,7 +394,7 @@ plex_startDiscovery($)
     }
 
     # respond to broadcast client discovery messages
-    #if( my $socket = new IO::Socket::INET ( Proto => 'udp', Broadcast => 1, LocalAddr => '0.0.0.0', LocalPort => 32412, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+    #if( my $socket = new IO::Socket::INET ( Proto => 'udp', Broadcast => 1, LocalAddr => '0.0.0.0', LocalPort => 32412, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
 
     #  my $chash = plex_newChash( $hash, $socket,
     #                             {NAME=>"$name:clientDiscoveryResponderBcast", STATE=>'listening', broadcast => 1} );
@@ -605,7 +605,7 @@ plex_sendTimelines($$)
     if( $hash->{helper}{subscriptionsFrom}{$key} ) {
       $chash = $hash->{helper}{subscriptionsFrom}{$key};
 
-    } elsif( my $socket = IO::Socket::INET->new(PeerAddr=>$addr, Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+    } elsif( my $socket = IO::Socket::INET->new(PeerAddr=>$addr, Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
 
       $chash = plex_newChash( $hash, $socket,
                               {NAME=>"$name:timelineSubscription:$addr", STATE=>'opened', timeline=>1} );
@@ -743,7 +743,7 @@ plex_startTimelineListener($)
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
   my $port = AttrVal($name, 'httpPort', 0);
-  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
 
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:timelineListener", STATE=>'accepting'} );
@@ -2469,7 +2469,7 @@ plex_requestNotifications($$)
 
   return if( $hash->{helper}{websockets}{$server->{machineIdentifier}} );
 
-  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$server->{address}:$server->{port}", Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$server->{address}:$server->{port}", Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
 
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:websocket:$server->{machineIdentifier}", STATE=>'listening', websocket=>0} );

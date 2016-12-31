@@ -77,7 +77,7 @@ dash_dhcp_startListener($)
   $hash->{PORT} = AttrVal($name, 'port', $hash->{PORT});
   Log3 $name, 4, "$name: using port $hash->{PORT}";
 
-  if( my $socket = IO::Socket::INET->new(LocalPort=>$hash->{PORT}, Proto=>'udp', Broadcast=>1, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$hash->{PORT}, Proto=>'udp', Broadcast=>1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
     readingsSingleUpdate($hash, 'state', 'listening', 1 );
     Log3 $name, 3, "$name: listening";
     $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
