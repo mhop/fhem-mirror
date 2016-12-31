@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 71_YAMAHA_AVR: support for dsp/straight command/reading for
+             DSP-Z based models (thanks to dev0) and RX-Vx67 series
   - feature: 10_SOMFY: new RTS commands 0x9 und 0xA (set wind_sun_9/wind_only_a)
   - bugfix:  93_DbRep: importFromFile format problem if UNIT-field wasn't set
   - feature: 98_fhemdebug, to aid "Error: >< no TYPE" debugging.

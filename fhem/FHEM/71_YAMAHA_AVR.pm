@@ -569,7 +569,15 @@ YAMAHA_AVR_Set($@)
                     
                     if(defined($command) and length($command) > 0)
                     {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Sound_Program>$command</Sound_Program></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+                        if(YAMAHA_AVR_isModel_DSP($hash))
+                        {
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surr><Pgm_Sel><Pgm>$command</Pgm></Pgm_Sel></Surr></$zone></YAMAHA_AV>", $what, $a[2]);
+                        }
+                        else
+                        {
+                            my $straight_command = ((defined($hash->{MODEL}) && $hash->{MODEL} =~ /^RX-(?:A\d{1,2}00|V\d{1,2}67)$/) ? "<Straight>Off</Straight>" : "");
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current>$straight_command<Sound_Program>$command</Sound_Program></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+                        }
                     }
                     else
                     {
@@ -595,11 +603,25 @@ YAMAHA_AVR_Set($@)
     {
         if($a[2] eq "on")
         {
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>On</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+            if(YAMAHA_AVR_isModel_DSP($hash))
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surr><Pgm_Sel><Straight>On</Straight></Pgm_Sel></Surr></$zone></YAMAHA_AV>", $what, $a[2]);
+            }
+            else
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>On</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+            }
         }
         elsif($a[2] eq "off")
         {
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>Off</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+            if(YAMAHA_AVR_isModel_DSP($hash))
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surr><Pgm_Sel><Straight>Off</Straight></Pgm_Sel></Surr></$zone></YAMAHA_AV>", $what, $a[2]);
+            }
+            else
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>Off</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>", $what, $a[2]);
+            }
         }
         else
         {
@@ -1274,7 +1296,7 @@ YAMAHA_AVR_ParseResponse($$$)
                YAMAHA_AVR_SendCommand($hash,0,"statusRequest","retrieveDescXML", {
                                                                                     url        => "http://".$hash->{helper}{ADDRESS}.$hash->{helper}{XML} ,
                                                                                     callback   => \&YAMAHA_AVR_ParseXML,
-                                                                                    options    => {at_first => 1, priority => 1}
+                                                                                    options    => {priority => 2}
                                                                                  });
             }
             elsif($arg eq "systemConfig")
@@ -1509,6 +1531,10 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdate($hash, "straight", lc($1));
                 }
+                elsif($data =~ /<Surr>.*?<Straight>(.+?)<\/Straight>.*?<\/Surr>/) # DSP-Z based models
+                {
+                    readingsBulkUpdate($hash, "straight", lc($1));
+                }
                 
                 if($data =~ /<Surround>.*?<Current>.*?<Enhancer>(.+?)<\/Enhancer>.*?<\/Current>.*?<\/Surround>/)
                 {
@@ -1516,6 +1542,10 @@ YAMAHA_AVR_ParseResponse($$$)
                 }
                 
                 if($data =~ /<Surround>.*?<Current>.*?<Sound_Program>(.+?)<\/Sound_Program>.*?<\/Current>.*?<\/Surround>/)
+                {
+                    readingsBulkUpdate($hash, "dsp", YAMAHA_AVR_Param2Fhem($1, 0));
+                }
+                elsif($data =~ /<Surr>.*?<Pgm>(.+?)<\/Pgm>.*?<\/Surr>/) # DSP-Z based models
                 {
                     readingsBulkUpdate($hash, "dsp", YAMAHA_AVR_Param2Fhem($1, 0));
                 }
@@ -1944,6 +1974,68 @@ YAMAHA_AVR_ParseXML($$$)
     else
     {
         Log3 $name, 4, "YAMAHA_AVR ($name) - no DSP modes found in XML";
+        # DSP-Z based series does not offer DSP modes in unit description
+        if(YAMAHA_AVR_isModel_DSP($hash))
+        {
+            Log3 $name, 4, "YAMAHA_AVR ($name) - using static DSP mode list für DSP-Z based models";
+            $hash->{helper}{DSP_MODES} =    "Hall in Munich|".
+                                            "Hall in Vienna|".
+                                            "Hall in Amsterdam|".
+                                            "Church in Freiburg|".
+                                            "Chamber|".
+                                            "Village Vanguard|".
+                                            "Warehouse Loft|".
+                                            "Cellar Club|".
+                                            "The Roxy Theatre|".
+                                            "The Bottom Line|".
+                                            "Sports|".
+                                            "Action Game|".
+                                            "Roleplaying Game|".
+                                            "Music Video|".
+                                            "Recital/Opera|".
+                                            "Standard|".
+                                            "Spectacle|".
+                                            "Sci-Fi|".
+                                            "Adventure|".
+                                            "Drama|".
+                                            "Mono Movie|".
+                                            "2ch Stereo|".
+                                            "7ch Stereo|".
+                                            "Straight Enhancer|".
+                                            "7ch Enhancer|".
+                                            "Surround Decoder";
+                                            
+        } # RX-Vx67's based series does not offer DSP modes in unit description
+        elsif($hash->{MODEL} =~ /^RX-(?:A\d{1,2}00|V\d{1,2}67)$/) 
+        {
+        
+            Log3 $name, 4, "YAMAHA_AVR ($name) - using static DSP mode list for RX-Vx67-based models";
+            $hash->{helper}{DSP_MODES} =    "Hall in Munich|".
+                                            "Hall in Vienna|".
+                                            "Hall in Amsterdam|".
+                                            "Church in Freiburg|".
+                                            "Church in Royaumont|".
+                                            "Chamber|".
+                                            "Village Vanguard|".
+                                            "Warehouse Loft|".
+                                            "Cellar Club|".
+                                            "The Roxy Theatre|".
+                                            "The Bottom Line|".
+                                            "Sports|".
+                                            "Action Game|".
+                                            "Roleplaying Game|".
+                                            "Music Video|".
+                                            "Recital/Opera|".
+                                            "Standard|".
+                                            "Spectacle|".
+                                            "Sci-Fi|".
+                                            "Adventure|".
+                                            "Drama|".
+                                            "Mono Movie|".
+                                            "2ch Stereo|".
+                                            "7ch Stereo|".
+                                            "Surround Decoder";
+        }
     }
     
     # uncomment line for zone detection testing
