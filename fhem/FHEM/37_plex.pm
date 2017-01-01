@@ -394,7 +394,7 @@ plex_startDiscovery($)
     }
 
     # respond to broadcast client discovery messages
-    #if( my $socket = new IO::Socket::INET ( Proto => 'udp', Broadcast => 1, LocalAddr => '0.0.0.0', LocalPort => 32412, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+    #if( my $socket = new IO::Socket::INET ( Proto => 'udp', Broadcast => 1, LocalAddr => '0.0.0.0', LocalPort => 32412, ReuseAddr=>1) ) {
 
     #  my $chash = plex_newChash( $hash, $socket,
     #                             {NAME=>"$name:clientDiscoveryResponderBcast", STATE=>'listening', broadcast => 1} );
@@ -605,7 +605,7 @@ plex_sendTimelines($$)
     if( $hash->{helper}{subscriptionsFrom}{$key} ) {
       $chash = $hash->{helper}{subscriptionsFrom}{$key};
 
-    } elsif( my $socket = IO::Socket::INET->new(PeerAddr=>$addr, Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+    } elsif( my $socket = IO::Socket::INET->new(PeerAddr=>$addr, Timeout=>2, Blocking=>1, ReuseAddr=>1) ) {
 
       $chash = plex_newChash( $hash, $socket,
                               {NAME=>"$name:timelineSubscription:$addr", STATE=>'opened', timeline=>1} );
@@ -743,7 +743,7 @@ plex_startTimelineListener($)
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
   my $port = AttrVal($name, 'httpPort', 0);
-  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1) ) {
 
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:timelineListener", STATE=>'accepting'} );
@@ -1334,12 +1334,11 @@ plex_mediaList($$$)
   my $token = $server->{accessToken};
   $token = $hash->{token} if( !$token );
 
- $xml->{librarySectionTitle} = encode('UTF-8', $xml->{librarySectionTitle}) if( $xml->{librarySectionTitle} );
- $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
- $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
- $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
- $xml->{title3} = encode('UTF-8', $xml->{title3}) if( $xml->{title3} );
-
+  $xml->{librarySectionTitle} = encode('UTF-8', $xml->{librarySectionTitle}) if( $xml->{librarySectionTitle} );
+  $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
+  $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
+  $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
+  $xml->{title3} = encode('UTF-8', $xml->{title3}) if( $xml->{title3} );
 
   my $ret = '';
   $ret .= plex_makeImage($hash, $server, $xml->{thumb}, 100);
@@ -2469,7 +2468,7 @@ plex_requestNotifications($$)
 
   return if( $hash->{helper}{websockets}{$server->{machineIdentifier}} );
 
-  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$server->{address}:$server->{port}", Timeout=>2, Blocking=>1, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$server->{address}:$server->{port}", Timeout=>2, Blocking=>1, ReuseAddr=>1) ) {
 
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:websocket:$server->{machineIdentifier}", STATE=>'listening', websocket=>0} );

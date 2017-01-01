@@ -229,7 +229,7 @@ fakeRoku_startListener($)
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
   my $port = AttrVal($name, 'httpPort', 0);
-  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1) ) {
     readingsSingleUpdate($hash, 'state', 'listening', 1 );
 
 
@@ -363,13 +363,13 @@ fakeRoku_Attr($$$)
   } elsif( $attrName eq 'fhemIP' ) {
     if( $cmd eq "set" && $attrVal ) {
       $hash->{fhemIP} = $attrVal;
-    } else {              
+    } else {
       $hash->{fhemIP} = fakeRoku_getLocalIP();
-    }                     
+    }
 
     fakeRoku_startDiscovery($hash);
     fakeRoku_startListener($hash);
-  }                       
+  }
 
 
   if( $cmd eq "set" ) {
