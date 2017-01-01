@@ -1,15 +1,5 @@
 ##############################################
 # $Id$
-# 2016-12-06
-
-# Added new EEP:
-# Remote Management:
-# EEP changed:
-# EnOcean_Notify():
-# EnOcean_Attr():
-# function SetExtensionsCancel() added
-# subType hvac.01: attribute pidCtrl, model added
-# commandref: further explanations added
 
 package main;
 
@@ -223,6 +213,7 @@ my %EnO_eepConfig = (
   "A5.09.09" => {attr => {subType => "CO2Sensor.01"}, GPLOT => "EnO_CO2:CO2,"},
   "A5.09.0A" => {attr => {subType => "HSensor.01"}, GPLOT => "EnO_A5-09-0A:H/Temp,EnO_voltage4:Voltage,"},
   "A5.09.0B" => {attr => {subType => "radiationSensor.01"}, GPLOT => "EnO_radioactivity4/Radioactivity,EnO_voltage4:Voltage,"},
+  "A5.09.0C" => {attr => {subType => "vocSensor.01"}, GPLOT => "EnO_A5-09-05:Concentration,"},
   "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "EnO_temp4:Temp,"},
@@ -283,6 +274,10 @@ my %EnO_eepConfig = (
   "A5.14.04" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
   "A5.14.05" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
   "A5.14.06" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.07" => {attr => {subType => "doorContact"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.08" => {attr => {subType => "doorContact"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.09" => {attr => {subType => "windowContact"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.0A" => {attr => {subType => "windowContact"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
   "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-01:Temp/SetpointTemp/Setpoint,EnO_A5-20-01_2:PID,"},
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
@@ -327,6 +322,7 @@ my %EnO_eepConfig = (
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.05.01" => {attr => {subType => "blindsCtrl.01", webCmd => "opens:stop:closes:position"}},
+  "D2.05.02" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.06.01" => {attr => {subType => "multisensor.01"}, GPLOT => "EnO_temp4humi4:Temp/Humi,EnO_brightness4:Brightness,"},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
@@ -350,7 +346,9 @@ my %EnO_eepConfig = (
   "D2.50.10" => {attr => {subType => "heatRecovery.00", webCmd => "ventilation"}, GPLOT => "EnO_D2-50-xx:Temp/AirQuality,EnO_D2-50-xx_2:AirFlow/FanSpeed,"},
   "D2.50.11" => {attr => {subType => "heatRecovery.00", webCmd => "ventilation"}, GPLOT => "EnO_D2-50-xx:Temp/AirQuality,EnO_D2-50-xx_2:AirFlow/FanSpeed,"},
   "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}, GPLOT => "EnO_valveCtrl:Valve,"},
+  "D2.B0.51" => {attr => {subType => "liquidLeakage.51"}, GPLOT => "EnO_liquidLeakage:LiquidLeakage,"},
   "D5.00.01" => {attr => {subType => "contact", manufID => "7FF"}, GPLOT => "EnO_contact:Contact,"},
+  "F6.01.01" => {attr => {subType => "switch", sensorMode => "pushbutton"}},
   "F6.02.01" => {attr => {subType => "switch"}},
   "F6.02.02" => {attr => {subType => "switch"}},
   "F6.02.03" => {attr => {subType => "switch"}},
@@ -359,7 +357,9 @@ my %EnO_eepConfig = (
   "F6.03.02" => {attr => {subType => "switch"}},
   "F6.04.01" => {attr => {subType => "keycard"}, GPLOT => "EnO_keycard:Keycard,"},
  #"F6.04.02" => {attr => {subType => "keycard.02"}, GPLOT => "EnO_keycard:Keycard,"},
+  "F6.05.00" => {attr => {subType => "windSpeed.00"}},
   "F6.05.01" => {attr => {subType => "liquidLeakage"}, GPLOT => "EnO_liquidLeakage:LiquidLeakage,"},
+  "F6.05.02" => {attr => {subType => "smokeDetector.02"}},
   "F6.10.00" => {attr => {subType => "windowHandle"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
  #"F6.10.01" => {attr => {subType => "windowHandle.01"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
@@ -373,7 +373,7 @@ my %EnO_eepConfig = (
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
-  "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
+  "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
 
@@ -6443,8 +6443,35 @@ sub EnOcean_Set($@)
           return "Wrong parameter, choose GPSD <data 1 ... 512 Byte hex> [status 1 Byte hex]";
         }
 
+      } elsif ($cmd eq "SEC") {
+        # secure telegram
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = uc($a[1]);
+          $rorg = "30";
+        } else {
+          return "Wrong parameter, choose SEC <data 1 ... 14 Byte hex> [status 1 Byte hex]";
+        }
+
+      } elsif ($cmd eq "ENC") {
+        # secure telegram with encapsulation
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = uc($a[1]);
+          $rorg = "31";
+        } else {
+          return "Wrong parameter, choose ENC <data 1 ... 14 Byte hex> [status 1 Byte hex]";
+        }
+
+      } elsif ($cmd eq "STE") {
+        # secure Teach-In
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = uc($a[1]);
+          $rorg = "35";
+        } else {
+          return "Wrong parameter, choose STE <data 1 ... 14 Byte hex> [status 1 Byte hex]";
+        }
+
       } else {
-        return "Unknown argument $cmd, choose one of 1BS 4BS GPCD GPSD GPTI GPTR MSC RPS UTE VLD";
+        return "Unknown argument $cmd, choose one of 1BS 4BS ENC GPCD GPSD GPTI GPTR MSC RPS SEC STE UTE VLD";
       }
       if ($a[2]) {
         if ($a[2] !~ m/^[\dA-Fa-f]{2}$/) {
@@ -6938,6 +6965,12 @@ sub EnOcean_Parse($$)
         Log3 $name, 2, "EnOcean $name security ERROR: $err";
         return "";
       }
+    } elsif ($rorg eq "35") {
+      # pass second teach-in telegram
+
+    } else {
+      Log3 $name, 2, "EnOcean $name unsecure telegram locked";
+      return "";
     }
     if ($rorg eq "32") {
       if (defined $eep) {
@@ -6955,12 +6988,6 @@ sub EnOcean_Parse($$)
           return "";
         }
       }
-    } elsif ($rorg eq "35") {
-      # pass second teach-in telegram
-
-    } else {
-      Log3 $name, 2, "EnOcean $name unsecure telegram locked";
-      return "";
     }
   }
 
@@ -6996,29 +7023,58 @@ sub EnOcean_Parse($$)
   $st = $subtypeReading if (defined $subtypeReading);
 
   if ($rorg eq "F6") {
-    # RPS Telegram (PTM200)
-    # Rocker Switch (EEP F6-02-01 ... F6-03-02)
-    # Position Switch, Home and Office Application (EEP F6-04-01)
-    # Mechanical Handle (EEP F6-10-00)
+    # RPS Telegram
     my $event = "state";
     my $nu =  (hex($status) & 0x10) >> 4;
     # unused flags (AFAIK)
     #push @event, "1:T21:".((hex($status) & 0x20) >> 5);
     #push @event, "1:NU:$nu";
 
-    if ($st eq "FRW") {
-      # smoke detector Eltako FRW
-      if ($db[0] == 0x30) {
-        push @event, "3:battery:low";
-      } elsif ($db[0] == 0x10) {
-        push @event, "3:alarm:smoke-alarm";
-        $msg = "smoke-alarm";
-      } elsif ($db[0] == 0) {
-        push @event, "3:alarm:off";
-        push @event, "3:battery:ok";
-        $msg = "off";
+    if ($st eq "FRW" || $st eq "smokeDetector.02") {
+      # smoke detector
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0]) {
+        if ($db[0] == 0x30) {
+          push @event, "3:battery:low";
+        } elsif ($db[0] == 0x10) {
+          push @event, "3:alarm:smoke-alarm";
+          $msg = "smoke-alarm";
+        } elsif ($db[0] == 0) {
+          push @event, "3:alarm:off";
+          push @event, "3:battery:ok";
+          $msg = "off";
+        }
+        push @event, "3:$event:$msg";
+        $hash->{helper}{lastEvent} = $db[0];
       }
-      push @event, "3:$event:$msg";
+      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'dead_sensor', 1, 5);
+      RemoveInternalTimer($hash->{helper}{alarmTimer});
+      RemoveInternalTimer($hash->{helper}{stateTimer});
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
+
+    } elsif ($st eq "windSpeed.00") {
+      # wind speed threshold detector
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0]) {
+        if ($db[0] == 0x30) {
+          push @event, "3:battery:low";
+        } elsif ($db[0] == 0x10) {
+          push @event, "3:windSpeed:on";
+          $msg = "on";
+        } elsif ($db[0] == 0) {
+          push @event, "3:windSpeed:off";
+          push @event, "3:battery:ok";
+          $msg = "off";
+        }
+        push @event, "3:$event:$msg";
+        $hash->{helper}{lastEvent} = $db[0];
+      }
+      @{$hash->{helper}{windSpeedTimer}} = ($hash, 'windSpeed', 'dead_sensor', 1, 5);
+      @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'dead_sensor', 1, 5);
+      RemoveInternalTimer($hash->{helper}{windSpeedTimer});
+      RemoveInternalTimer($hash->{helper}{stateTimer});
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{windSpeedTimer}, 0);
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
 
     } elsif ($model eq "FAE14" || $model eq "FHK14" || $model eq "FHK61") {
       # heating/cooling relay FAE14, FHK14, untested
@@ -8216,7 +8272,7 @@ sub EnOcean_Parse($$)
       push @event, "3:state:$rn";
 
     } elsif ($st eq "vocSensor.01") {
-      # Gas Sensor, VOC Sensor (EEP A5-09-05)
+      # Gas Sensor, VOC Sensor (EEP A5-09-05, A5-09-0C)
       # [untested]
       # $db[3]_bit_7 ... $db[2]_bit_0 is the VOC concentration where 0 = 0 ppb ... 65535 = 65535 ppb
       # $db[1] is the VOC identification
@@ -8259,6 +8315,15 @@ sub EnOcean_Parse($$)
         24 => "2-Butanol",
         25 => "2-Methylpropanol",
         26 => "Diethyl Ether",
+        27 => "Naphthalene",
+        28 => "4-Phenylcyclohexene",
+        29 => "Limonene",
+        30 => "Tricloroethylene",
+        31 => "Isovaleric Acid",
+        32 => "Indole",
+        33 => "Cadaverine",
+        34 => "Putrescine",
+        35 => "Caproic Acid",
         255 => "Ozone",
       );
       if (exists $vocID{$db[1]}) {
@@ -8267,6 +8332,7 @@ sub EnOcean_Parse($$)
         push @event, "3:vocName:unknown";
       }
       push @event, "3:concentration:$vocConc";
+      push @event, "3:concentrationUnit:" . $db[0] & 4 ? 'ug/m3' : 'ppb';
       push @event, "3:state:$vocConc";
 
     } elsif ($st eq "particlesSensor.01") {
@@ -9465,6 +9531,43 @@ sub EnOcean_Parse($$)
       push @event, "3:vibration:$vibration";
       push @event, "3:voltage:$voltage";
       push @event, "3:state:C: $contact V: $vibration E: $lux U: $voltage";
+
+    } elsif ($st eq "doorContact") {
+      # dual door contact (EEP A5-14-07, A5-14-08)
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $data) {
+        my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+        my $doorContact = $db[0] & 4 ? 'open' : 'closed';
+        my $lockContact = $db[0] & 2 ? 'unlocked' : 'locked';
+        my $vibration = $db[0] & 1 ? 'on' : 'off';
+        push @event, "3:voltage:$voltage";
+        push @event, "3:contact:$doorContact";
+        push @event, "3:block:$lockContact";
+        push @event, "3:vibration:$vibration";
+        push @event, "3:state:C: $doorContact B: $lockContact V: $vibration U: $voltage";
+        $hash->{helper}{lastEvent} = $data;
+      }
+      CommandDeleteReading(undef, "$name alarm");
+      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      RemoveInternalTimer($hash->{helper}{alarmTimer});
+      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+
+    } elsif ($st eq "windowContact") {
+      # window contact (EEP A5-14-09, A5-14-0A)
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $data) {
+        my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+        my %window = (0 => 'closed', 1 => 'tilt', 2 => 'reserved', 3 => 'open');
+        my $window = $window{(($db[0] & 6) >> 1)};
+        my $vibration = $db[0] & 1 ? 'on' : 'off';
+        push @event, "3:voltage:$voltage";
+        push @event, "3:window:$window";
+        push @event, "3:vibration:$vibration";
+        push @event, "3:state:W: $window V: $vibration U: $voltage";
+        $hash->{helper}{lastEvent} = $data;
+      }
+      CommandDeleteReading(undef, "$name alarm");
+      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      RemoveInternalTimer($hash->{helper}{alarmTimer});
+      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
 
     } elsif ($st =~ m/^digitalInput\.0[12]$/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
@@ -10931,6 +11034,10 @@ sub EnOcean_Parse($$)
         }
       }
 
+    } elsif ($st eq "liquidLeakage.51") {
+      # liquid leakage sensor
+      push @event, "3:state:" . $db[0] & 3 ? 'wet' : 'dry';
+
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
@@ -10938,6 +11045,7 @@ sub EnOcean_Parse($$)
       for (my $dbCntr = 0; $dbCntr <= $#db; $dbCntr++) {
         push @event, "3:DB_" . $dbCntr . ":" . $db[$dbCntr];
       }
+
     } else {
       # unknown devices
       push @event, "3:state:$data";
@@ -15234,79 +15342,73 @@ sub EnOcean_sec_parseTeachIn($$$$) {
   my $key1; # First part of private key
   my $key2; # Second part of private key
 
-	# Extract byte fields from telegram
-	# TEACH_IN_INFO, SLF, RLC/KEY/variable
-	$telegram =~ /^(..)(..)(.*)/;	# TODO Parse error handling?
-	my $teach_bin = unpack('B8',pack('H2', $1));	# Parse as ASCII HEX, unpack to bitstring
-	my $slf_bin = unpack('B8',pack('H2', $2));	# Parse as ASCII HEX, unpack to bitstring
-	my $crypt = $3;
+  # Extract byte fields from telegram
+  # TEACH_IN_INFO, SLF, RLC/KEY/variable
+  $telegram =~ /^(..)(..)(.*)/;	# TODO Parse error handling?
+  my $teach_bin = unpack('B8',pack('H2', $1));	# Parse as ASCII HEX, unpack to bitstring
+  my $slf_bin = unpack('B8',pack('H2', $2));	# Parse as ASCII HEX, unpack to bitstring
+  my $crypt = $3;
 
-	# Extract bit fields from teach-in info field
-	# IDX, CNT, PSK, TYPE, INFO
-	$teach_bin =~ /(..)(..)(.)(.)(..)/;	# TODO Parse error handling?
-	my $idx = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
-	my $cnt = unpack('C',pack('B8', '000000'.$2));  # Padd to byte, parse as unsigned char
-	my $psk = $3;
-	my $type = $4;
-	my $info = unpack('C',pack('B8', '000000'.$5)); # Padd to byte, parse as unsigned char
+  # Extract bit fields from teach-in info field
+  # IDX, CNT, PSK, TYPE, INFO
+  $teach_bin =~ /(..)(..)(.)(.)(..)/;	# TODO Parse error handling?
+  my $idx = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
+  my $cnt = unpack('C',pack('B8', '000000'.$2));  # Padd to byte, parse as unsigned char
+  my $psk = $3;
+  my $type = $4;
+  my $info = unpack('C',pack('B8', '000000'.$5)); # Padd to byte, parse as unsigned char
 
-	# Extract bit fields from SLF field
-	# RLC_ALGO, RLC_TX, MAC_ALGO, DATA_ENC
-	$slf_bin =~ /(..)(.)(..)(...)/;	# TODO Parse error handling?
-	my $rlc_algo = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
-	my $rlc_tx = $2;
-	my $mac_algo = unpack('C',pack('B8', '000000'.$3));	# Padd to byte, parse as unsigned char
-	my $data_enc = unpack('C',pack('B8', '00000'.$4));	# Padd to byte, parse as unsigned char
+  # Extract bit fields from SLF field
+  # RLC_ALGO, RLC_TX, MAC_ALGO, DATA_ENC
+  $slf_bin =~ /(..)(.)(..)(...)/;	# TODO Parse error handling?
+  my $rlc_algo = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
+  my $rlc_tx = $2;
+  my $mac_algo = unpack('C',pack('B8', '000000'.$3));	# Padd to byte, parse as unsigned char
+  my $data_enc = unpack('C',pack('B8', '00000'.$4));	# Padd to byte, parse as unsigned char
 
-	#print "IDX: $idx, CNT: $cnt, PSK: $psk, TYPE: $type, INFO: $info\n"
+  # The teach-in information is split in two telegrams due to the ERP1 limitations on telegram length
+  # So we should get a telegram with index 0 and count 2 with the first half of the infos needed
+  if ($idx == 0 && $cnt == 2) {
+    # First part of the teach in message
 
-	# The teach-in information is split in two telegrams due to the ERP1 limitations on telegram length
-	# So we should get a telegram with index 0 and count 2 with the first half of the infos needed
-	if ($idx == 0 && $cnt == 2) {
-	  # First part of the teach in message
-	  #print "First part of 2 part teach in message received\n";
-          #print "RLC_ALGO: $rlc_algo, RLC_TX: $rlc_tx, MAC_ALGO: $mac_algo, DATA_ENC: $data_enc\n";
-	  #print "RLC and KEY are ". ($psk == 1 ? "" : "not") . " encrypted\n";
-	  #print "Application is ". ($type == 1 ? "a PTM" : "non-specfic") . "\n";
+    # Decode teach in type
+    if ($type == 0) {
+      # 1BS, 4BS, UTE or GP teach-in expected
+      if ($info == 0) {
+        $attr{$name}{comMode} = "uniDir";
+        $attr{$name}{secMode} = "rcv";
+      } else {
+        $attr{$name}{comMode} = "biDir";
+        $attr{$name}{secMode} = "biDir";
+      }
+      $hash->{helper}{teachInWait} = "STE";
+    } else {
+      # switch teach-in
+      $attr{$name}{teachMethod} = 'STE';
+      if ($info == 0) {
+        $attr{$name}{comMode} = "uniDir";
+        $attr{$name}{eep} = "D2-03-00";
+        $attr{$name}{manufID} = "7FF";
+        $attr{$name}{secMode} = "rcv";
+        foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
+          $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
+        }
+        readingsSingleUpdate($hash, "teach", "STE teach-in accepted EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
+        Log3 $name, 2, "EnOcean $name STE teach-in accepted EEP D2-03-00 Rocker A Manufacturer: " . $EnO_manuf{"7FF"};
+      } else {
+        $attr{$name}{comMode} = "uniDir";
+        $attr{$name}{eep} = "D2-03-00";
+        $attr{$name}{manufID} = "7FF";
+        $attr{$name}{secMode} = "rcv";
+        foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
+          $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
+        }
+        readingsSingleUpdate($hash, "teach", "STE teach-in accepted EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
+        Log3 $name, 2, "EnOcean $name STE teach-in accepted EEP D2-03-00 Rocker B Manufacturer: " . $EnO_manuf{"7FF"};
+      }
+    }
 
-	  # Decode teach in type
-	  if ($type == 0) {
-	    # 1BS, 4BS, UTE or GP teach-in expected
-            if ($info == 0) {
-              $attr{$name}{comMode} = "uniDir";
-    	      $attr{$name}{secMode} = "rcv";
-            } else {
-              $attr{$name}{comMode} = "biDir";
-              $attr{$name}{secMode} = "biDir";
-            }
-            $hash->{helper}{teachInWait} = "STE";
-	  } else {
-	    # switch teach-in
-            $attr{$name}{teachMethod} = 'STE';
-            if ($info == 0) {
-              $attr{$name}{comMode} = "uniDir";
-              $attr{$name}{eep} = "D2-03-00";
-              $attr{$name}{manufID} = "7FF";
-    	      $attr{$name}{secMode} = "rcv";
-              foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
-                $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
-	      }
-              readingsSingleUpdate($hash, "teach", "STE teach-in accepted EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
-              Log3 $name, 2, "EnOcean $name STE teach-in accepted EEP D2-03-00 Rocker A Manufacturer: " . $EnO_manuf{"7FF"};
-            } else {
-              $attr{$name}{comMode} = "uniDir";
-              $attr{$name}{eep} = "D2-03-00";
-              $attr{$name}{manufID} = "7FF";
-    	      $attr{$name}{secMode} = "rcv";
-              foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
-                $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
-              }
-              readingsSingleUpdate($hash, "teach", "STE teach-in accepted EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
-              Log3 $name, 2, "EnOcean $name STE teach-in accepted EEP D2-03-00 Rocker B Manufacturer: " . $EnO_manuf{"7FF"};
-            }
-	  }
-
-		# Decode RLC algorithm and extract RLC and private key (only first part most likely)
+  # Decode RLC algorithm and extract RLC and private key (only first part most likely)
 		if ($rlc_algo == 0) {
 			# No RLC used in telegram or internally in memory, use case untested
 			return ("Secure modes without RLC not tested or supported", undef);
@@ -15406,9 +15508,11 @@ sub EnOcean_sec_parseTeachIn($$$$) {
 			return ("Could not parse data encryption information, $data_enc", undef);
 		}
 
-		# Ok we got a lots of infos and the first part of the private key
-		return (undef, "part1: $name");
-	} elsif ($idx == 1 && $cnt == 0) {
+          $hash->{helper}{teachInSTE} = $cnt - 1;
+          # Ok we got a lots of infos and the first part of the private key
+          return (undef, "part1: $name");
+
+	} elsif ($idx == 1 && exists($hash->{helper}{teachInSTE})) {
 	  # Second part of the teach-in telegrams
 
 	  # Extract byte fields from telegram
@@ -15443,7 +15547,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
               Log3 $name, $logLevel, "EnOcean $name $response";
             }
           }
-          # We're done
+	  delete $hash->{helper}{teachInSTE};
 	  return (undef, "part2: $name");
 	}
 
@@ -15647,124 +15751,116 @@ sub EnOcean_sec_generateMAC($$$) {
 # lack of hardware suporting this.
 #
 sub EnOcean_sec_convertToNonsecure($$$) {
-	my ($hash, $rorg, $crypt_data) = @_;
-        my $name = $hash->{NAME};
-        if ($cryptFunc == 0) {
-	  return ("Cryptographic functions are not available", undef, undef);
-        }
-        my $private_key;
+  my ($hash, $rorg, $crypt_data) = @_;
+  my $name = $hash->{NAME};
+  if ($cryptFunc == 0) {
+    return ("Cryptographic functions are not available", undef, undef);
+  }
+  my $private_key;
+  # Prefix of pattern to extract the different cryptographic infos
+  my $crypt_pattern = "^(.*)";;
+  # Flags and infos for fields to expect
+  my $expect_rlc = 0;
+  my $expect_mac = 0;
+  my $mac_len;
+  my $expect_enc = 0;
 
-	# Prefix of pattern to extract the different cryptographic infos
-	my $crypt_pattern = "^(.*)";;
-
-	# Flags and infos for fields to expect
-	my $expect_rlc = 0;
-	my $expect_mac = 0;
-	my $mac_len;
-	my $expect_enc = 0;
-
-    # Check if the RORG is supported
-    if ($rorg ne '30') {
-        return ("RORG $rorg unsupported", undef, undef);
+  # Check if RLC is transmitted and when, which length to expect
+  if($attr{$name}{rlcTX} eq 'true') {
+    # Message should contain RLC
+    if ($attr{$name}{rlcAlgo} eq '2++') {
+      $crypt_pattern .= "(....)";
+      $expect_rlc = 1;
+    } elsif ($attr{$name}{rlcAlgo} eq '3++') {
+      $crypt_pattern .= "(......)";
+      $expect_rlc = 1;
+    } else {
+      # RLC_TX but no info on RLC length
+      return ("RLC_TX and RLC_ALGO inconsistent", undef, undef);
     }
-	#$attr{$name}{rlcAlgo} = '2++';
-	# Check if RLC is transmitted and when, which length to expect
-	if($attr{$name}{rlcTX} eq 'true') {
-		# Message should contain RLC
-		if ($attr{$name}{rlcAlgo} eq '2++') {
-			$crypt_pattern .= "(....)";
-			$expect_rlc = 1;
-		} elsif ($attr{$name}{rlcAlgo} eq '3++') {
-			$crypt_pattern .= "(......)";
-			$expect_rlc = 1;
-		} else {
-			# RLC_TX but no info on RLC length
-			return ("RLC_TX and RLC_ALGO inconsistent", undef, undef);
-		}
-	}
+  }
 
-	# Check what length of MAC to expect
-	if($attr{$name}{macAlgo} eq '3') {
-		$crypt_pattern .= "(......)";
-		$mac_len = 3;
-		$expect_mac = 1;
-	} elsif ($attr{$name}{macAlgo} eq '4') {
-		$crypt_pattern .= "(........)";
-		$mac_len = 4;
-		$expect_mac = 1;
-	} else {
-		# According to the specification it's possible to transmit no MAC, bt we don't implement this for now
-		return ("Secure mode messages without MAC unsupported", undef, undef);
-	}
+  # Check what length of MAC to expect
+  if($attr{$name}{macAlgo} eq '3') {
+    $crypt_pattern .= "(......)";
+    $mac_len = 3;
+    $expect_mac = 1;
+  } elsif ($attr{$name}{macAlgo} eq '4') {
+    $crypt_pattern .= "(........)";
+    $mac_len = 4;
+    $expect_mac = 1;
+  } else {
+    # According to the specification it's possible to transmit no MAC, bt we don't implement this for now
+    return ("Secure mode messages without MAC unsupported", undef, undef);
+  }
 
-	# Suffix for crypt pattern
-	$crypt_pattern .= '$';
+  # Suffix for crypt pattern
+  $crypt_pattern .= '$';
 
-	#print "Crypt_pattern: $crypt_pattern\n";
+  # Extract byte fields from message payload
+  $crypt_data =~ /$crypt_pattern/;
+  my $data_enc = $1;
+  my $dataLength = length($data_enc);
+  return ("Telegrams with a length of more than 16 bytes are not supported", undef, undef) if ($dataLength > 32);
+  my $rlc;
+  my $mac;
+  if ($expect_rlc == 1 && $expect_mac == 1) {
+    $rlc = $2;
+    $mac = $3;
+  } elsif ($expect_rlc == 0 && $expect_mac == 1) {
+    $mac = $2;
+  }
 
-	# Extract byte fields from message payload
-	$crypt_data =~ /$crypt_pattern/;
-	my $data_enc = $1;
-	my $rlc;
-	my $mac;
-	if ($expect_rlc == 1 && $expect_mac == 1) {
-		$rlc = $2;
-		$mac = $3;
-	} elsif ($expect_rlc == 0 && $expect_mac == 1) {
-		$mac = $2;
-	}
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG: $rorg DATA_ENC: $data_enc";
+  if ($expect_rlc == 1) {
+    Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RLC: $rlc";
+  };
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure MAC: $mac";
 
-	#print "DATA: $data_enc\n";
-        Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure DATA: $data_enc";
-	#if ($expect_rlc == 1) { print "RLC: $rlc\n";};
-	if ($expect_rlc == 1) { Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RLC: $rlc";};
-	#print "MAC: $mac\n";
-        Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure MAC: $mac";
+  # TODO RLC could be transmitted with data, could not test this
+  #if(!defined($rlc)) {
+  #	print "No RLC in message, using stored value\n";
+  #	$rlc = getRLC($senderID);
+  #}
 
-	# TODO RLC could be transmitted with data, could not test this
-	#if(!defined($rlc)) {
-	#	print "No RLC in message, using stored value\n";
-	#	$rlc = getRLC($senderID);
-	#}
+  # Maximum RLC search window is 128
+  foreach my $rlc_window (0..128) {
+    #print "Trying RLC offset $rlc_window\n";
+    # Fetch stored RLC
+    $rlc = EnOcean_sec_getRLC($hash, "rlcRcv");
+    # Fetch private Key for VAES
+    if ($attr{$name}{keyRcv} =~ /[\dA-F]{32}/) {
+      $private_key = pack('H32',$attr{$name}{keyRcv});
+    } else {
+      return ("private key wrong, please teach-in the device new", undef, undef);
+    }
 
-	# Maximum RLC search window is 128
-	foreach my $rlc_window (0..128) {
-		#print "Trying RLC offset $rlc_window\n";
+    # Generate and check MAC over RORG+DATA+RLC fields
+    if ($mac eq EnOcean_sec_generateMAC($private_key, $rorg.$data_enc.$rlc, $mac_len)) {
+      #print "RLC verfified\n";
+      # Expand RLC to 16byte
+      my $rlc_expanded = pack('H32',$rlc);
 
-		# Fetch stored RLC
-		$rlc = EnOcean_sec_getRLC($hash, "rlcRcv");
+      # Expand data to 16byte
+      my $data_expanded = pack('H32',$data_enc);
 
-		# Fetch private Key for VAES
-
-		if ($attr{$name}{keyRcv} =~ /[\dA-F]{32}/) {
-		  $private_key = pack('H32',$attr{$name}{keyRcv});
-		} else {
-	          return ("private key wrong, please teach-in the device new", undef, undef);
-		}
-
-		# Generate and check MAC over RORG+DATA+RLC fields
-		if($mac eq EnOcean_sec_generateMAC($private_key, $rorg.$data_enc.$rlc, $mac_len)) {
-			#print "RLC verfified\n";
-
-			# Expand RLC to 16byte
-			my $rlc_expanded = pack('H32',$rlc);
-
-			# Expand data to 16byte
-			my $data_expanded = pack('H32',$data_enc);
-
-			# Decode data using VAES
-			my $data_dec = EnOcean_sec_decodeVAES($rlc_expanded, $private_key, $data_expanded);
-
-			# Extract one nibble of data
-			my $data_end = unpack('H32', $data_dec);
-			$data_end =~ /^.(.)/;
-
-			#print "MSG: $1\n";
-			return (undef, '32', "0" . uc($1));
-		}
-	}
-	# Couldn't verify or decrypt message in RLC window
-	return ("Can't verify or decrypt telegram", undef, undef);
+      # Decode data using VAES
+      my $data_dec = EnOcean_sec_decodeVAES($rlc_expanded, $private_key, $data_expanded);
+      my $data_end = unpack('H32', $data_dec);
+      if ($rorg eq '30') {
+        # Extract one nibble of data
+        $data_end =~ /^.(.)/;
+        return (undef, '32', "0" . uc($1));
+      } else {
+        $dataLength -= 2;
+        $data_end =~ /^(..)(.{$dataLength})/;
+        Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG: " . uc($1) . " DATA: " . uc($2);
+        return (undef, uc($1), uc($2));
+      }
+    }
+  }
+  # Couldn't verify or decrypt message in RLC window
+  return ("Can't verify or decrypt telegram", undef, undef);
 }
 
 #
@@ -18530,7 +18626,7 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-     <li>Pushbutton Switch, Pushbutton Input Module (EEP F6-02-01 ... F6-02-02)<br>
+     <li>Pushbutton Switch, Pushbutton Input Module (EEP F6-02-01 ... F6-02-02, F6-01-01)<br>
          [Eltako FT55, FSM12, FSM61, FTS12]<br>
      <ul>
          <li>A0</li>
@@ -18595,20 +18691,6 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-     <li>Smoke Detector (EEP F6-02-01 ... F6-02-02)<br>
-         [Eltako FRW]<br>
-     <ul>
-         <li>smoke-alarm</li>
-         <li>off</li>
-         <li>alarm: smoke-alarm|off</li>
-         <li>battery: low|ok</li>
-         <li>buttons: pressed|released</li>
-         <li>state: smoke-alarm|off</li>
-     </ul><br>
-        Set attr subType to FRW manually.
-     </li>
-     <br><br>
-
      <li>Heating/Cooling Relay (EEP F6-02-01 ... F6-02-02)<br>
          [Eltako FAE14, FHK14, untested]<br>
      <ul>
@@ -18635,6 +18717,19 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li>Wind Speed Threshold Detector (EEP F6-05-00)<br>
+     <ul>
+         <li>dead_sensor</li>
+         <li>on</li>
+         <li>off</li>
+         <li>windSpeed: dead_sensor|on|off</li>
+         <li>battery: low|ok</li>
+         <li>state: dead_sensor|on|off</li>
+     </ul><br>
+        Set attr subType to windSpeed.00 manually.
+     </li>
+     <br><br>
+
      <li>Liquid Leakage Sensor (EEP F6-05-01)<br>
          [untested]<br>
      <ul>
@@ -18643,6 +18738,20 @@ EnOcean_Delete($$)
          <li>state: dry|wet</li>
      </ul><br>
          Set attr subType to liquidLeakage manually.
+     </li>
+     <br><br>
+
+     <li>Smoke Detector (EEP F6-05-02)<br>
+         [Eltako FRW]<br>
+     <ul>
+         <li>dead_sensor</li>
+         <li>smoke-alarm</li>
+         <li>off</li>
+         <li>alarm: dead_sensor|smoke-alarm|off</li>
+         <li>battery: low|ok</li>
+         <li>state: dead_sensor|smoke-alarm|off</li>
+     </ul><br>
+        Set attr subType to smokeDetector.02 manually.
      </li>
      <br><br>
 
@@ -18903,12 +19012,13 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-     <li>Gas Sensor, Volatile organic compounds (VOC) Sensor (EEP A5-09-05)<br>
+     <li>Gas Sensor, Volatile organic compounds (VOC) Sensor (EEP A5-09-05, A5-09-0C)<br>
          [untested]<br>
      <ul>
-       <li>concentration: c/ppb (Sensor Range: c = 0 ppb ...  655350 ppb)</li>
+       <li>concentration: c/[unit] (Sensor Range: c = 0 ...  655350</li>
+       <li>concentrationUnit: ppb|&mu;/m3</li>
        <li>vocName: Name of last measured VOC</li>
-       <li>state: c/ppb</li>
+       <li>state: c/[unit]</li>
      </ul><br>
         The attr subType must be vocSensor.01. This is done if the device was
         created by autocreate.
@@ -19497,7 +19607,7 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-      <li>Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)<br>
+     <li>Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)<br>
          [untested]<br>
      <ul>
        <li>C: open|closed V: on|off E: E/lx U: U/V</li>
@@ -19509,6 +19619,37 @@ EnOcean_Delete($$)
        <li>state: C: open|closed V: on|off E: E/lx U: U/V</li>
      </ul><br>
         The attr subType must be multiFuncSensor. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Dual Door Contact (EEP A5-14-07, A5-14-08)<br>
+         [untested]<br>
+     <ul>
+       <li>C: open|closed B: unlocked|locked V: on|off U: U/V</li>
+       <li>alarm: dead_sensor</li>
+       <li>block: unlocked|locked</li>
+       <li>contact: open|closed</li>
+       <li>vibration: on|off</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
+       <li>state: C: open|closed B: unlocked|locked V: on|off U: U/V</li>
+     </ul><br>
+        The attr subType must be doorContact. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Window/Door Contact (EEP A5-14-09, A5-14-0A)<br>
+         [untested]<br>
+     <ul>
+       <li>W: open|tilt|closed B: unlocked|locked V: on|off U: U/V</li>
+       <li>alarm: dead_sensor</li>
+       <li>vibration: on|off</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
+       <li>window: open|tilt|closed</li>
+       <li>state: W: open|tilt|closed V: on|off U: U/V</li>
+     </ul><br>
+        The attr subType must be windowContact. This is done if the device was
         created by autocreate.
      </li>
      <br><br>
@@ -20187,6 +20328,18 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li>Liquid Leakage Sensor (EEP D2-B0-51)<br>
+         [untested]<br>
+     <ul>
+         <li>dry</li>
+         <li>wet</li>
+         <li>state: dry|wet</li>
+     </ul><br>
+       The attr subType must be liquidLeakage.51. This is done if the device was
+       created by autocreate.
+     </li>
+     <br><br>
+
      <li>Generic Profiles<br>
      <ul>
        <li>&lt;00...64&gt;-&lt;channel name&gt;: &lt;value&gt;</li>
@@ -20203,8 +20356,8 @@ EnOcean_Delete($$)
 
     <li>RAW Command<br>
     <ul>
-       <li>RORG: 1BS|4BS|MCS|RPS|UTE|VLD</li>
-       <li>dataSent: data (Range: 1-byte hex ... 28-byte hex)</li>
+       <li>RORG: 1BS|4BS|ENC|MCS|RPS|SEC|STE|UTE|VLD</li>
+       <li>dataSent: data (Range: 1 Byte hex ... 512 Byte hex)</li>
        <li>statusSent: status (Range: 0x00 ... 0xFF)</li>
        <li>state: RORG: rorg DATA: data STATUS: status ODATA: odata</li>
     </ul><br>
