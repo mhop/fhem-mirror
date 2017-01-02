@@ -1,4 +1,4 @@
-REV 12922
+REV 12928
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2016-12-31_12:48:30 173742 ./CHANGED
+UPD 2017-01-02_07:45:02 174079 ./CHANGED
 UPD 2016-09-06_07:45:09 34605 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2016-12-31_07:45:05 128437 ./fhem.pl
@@ -62,7 +62,7 @@ UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2016-12-16_07:45:02 16858 FHEM/10_DUOFERNSTICK.pm
 UPD 2016-04-26_07:45:11 44589 FHEM/10_EIB.pm
 UPD 2016-12-12_07:45:03 22360 FHEM/10_EQ3BT.pm
-UPD 2016-12-12_07:45:03 872924 FHEM/10_EnOcean.pm
+UPD 2017-01-02_07:45:02 880477 FHEM/10_EnOcean.pm
 UPD 2016-12-03_07:45:16 18718 FHEM/10_FBDECT.pm
 UPD 2016-07-02_07:45:12 37046 FHEM/10_FRM.pm
 UPD 2016-11-30_07:45:13 31717 FHEM/10_FS20.pm
@@ -184,17 +184,17 @@ UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2016-11-09_07:45:12 22214 FHEM/36_WMBUS.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
-UPD 2017-01-01_07:45:02 7656 FHEM/37_dash_dhcp.pm
-UPD 2017-01-01_07:45:02 21513 FHEM/37_fakeRoku.pm
+UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
+UPD 2017-01-02_07:45:02 21416 FHEM/37_fakeRoku.pm
 UPD 2016-11-24_07:45:11 58652 FHEM/37_harmony.pm
-UPD 2017-01-01_07:45:02 152051 FHEM/37_plex.pm
+UPD 2017-01-02_07:45:02 151899 FHEM/37_plex.pm
 UPD 2015-10-26_07:45:11 23502 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
 UPD 2016-10-04_07:45:12 157740 FHEM/38_netatmo.pm
 UPD 2016-12-27_07:45:02 18972 FHEM/39_alexa.pm
 UPD 2016-11-23_07:45:12 2656 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
-UPD 2015-07-28_14:05:31 32406 FHEM/41_OREGON.pm
+UPD 2017-01-02_07:45:02 35009 FHEM/41_OREGON.pm
 UPD 2016-10-30_07:45:09 26034 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
 UPD 2015-07-28_14:05:31 20729 FHEM/42_SMARTMON.pm
@@ -522,9 +522,9 @@ UPD 2015-07-28_14:05:30 32034 FHEM/lib/UPnP/sonos_input_default.jpg
 UPD 2015-07-28_14:05:30 34332 FHEM/lib/UPnP/sonos_input_dock.jpg
 UPD 2015-07-28_14:05:30 19616 FHEM/lib/UPnP/sonos_input_tv.jpg
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
-UPD 2016-12-28_07:45:02 18764 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2017-01-02_07:45:02 21551 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2016-12-21_07:45:02 137622 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2016-12-28_07:45:02 60646 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2017-01-02_07:45:02 60757 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2016-11-12_07:45:11 10037 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2016-11-12_07:45:11 19817 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2016-10-23_07:45:13 13913 FHEM/msgSchema.pm
@@ -546,7 +546,7 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2016-12-31_07:45:04 2573846 docs/commandref.html
+UPD 2017-01-02_07:45:04 2575975 docs/commandref.html
 UPD 2016-12-31_07:45:05 1488635 docs/commandref_DE.html
 UPD 2016-12-14_23:15:40 68847 docs/commandref_frame.html
 UPD 2016-12-14_23:15:40 77288 docs/commandref_frame_DE.html
@@ -740,6 +740,9 @@ UPD 2015-07-28_14:05:34 2567 www/images/default/black_Steckdose.off.png
 UPD 2015-07-28_14:05:34 2983 www/images/default/black_Steckdose.on.png
 UPD 2015-07-28_14:05:34 898 www/images/default/black_down.png
 UPD 2015-07-28_14:05:34 888 www/images/default/black_up.png
+UPD 2017-01-02_07:45:02 15671 www/images/default/checkbox_checked.png
+UPD 2017-01-02_07:45:02 4938 www/images/default/checkbox_unchecked.png
+UPD 2017-01-02_07:45:02 1972 www/images/default/checkbox_unchecked.svg
 UPD 2015-07-28_14:05:34 689 www/images/default/close.png
 UPD 2015-07-28_14:05:34 406 www/images/default/closeG.png
 UPD 2015-07-28_14:05:34 829 www/images/default/dashboardicons.png
@@ -830,6 +833,9 @@ UPD 2015-07-28_14:05:34 2281 www/images/default/off.png
 UPD 2015-07-28_14:05:34 2984 www/images/default/on-for-timer.png
 UPD 2015-07-28_14:05:34 2984 www/images/default/on-till.png
 UPD 2015-07-28_14:05:34 2044 www/images/default/on.png
+UPD 2017-01-02_07:45:02 21353 www/images/default/radio_checked.png
+UPD 2017-01-02_07:45:02 16391 www/images/default/radio_unchecked.png
+UPD 2017-01-02_07:45:02 2126 www/images/default/radio_unchecked.svg
 UPD 2015-10-25_07:45:14 939 www/images/default/remotecontrol/VID1_btn_VID1.png
 UPD 2015-07-28_14:05:34 6256 www/images/default/remotecontrol/_black_btn_template.pdn
 UPD 2015-07-28_14:05:34 4702 www/images/default/remotecontrol/black_btn2_0.png
