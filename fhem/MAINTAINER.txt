@@ -182,7 +182,7 @@ FHEM/38_JawboneUp.pm         domschl              http://forum.fhem.de Sonstiges
 FHEM/39_alexa.pm             justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/39_siri.pm              justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
-FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
+FHEM/41_OREGON.pm            Sidey/Ralf9          http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
 FHEM/42_SMARTMON.pm          hexenmeister         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/42_SYSMON.pm            hexenmeister         http://forum.fhem.de Unterstuetzende Dienste

@@ -1,5 +1,6 @@
 #################################################################################
-# 41_OREGON.pm
+# $Id$
+#
 # Module for FHEM to decode Oregon sensor messages
 #
 # derived from 18_CUL-HOERMANN.pm
@@ -12,7 +13,8 @@
 # and highly recommend it.
 #
 # (c) 2010-2014 Copyright: Willi Herzig (Willi.Herzig@gmail.com)
-#
+# modified & fixes Ralf9 2015-2016 
+# fixes Sidey79 2016
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -38,7 +40,7 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$
+
 package main;
 
 use strict;
@@ -55,8 +57,8 @@ OREGON_Initialize($)
   $hash->{DefFn}     = "OREGON_Define";
   $hash->{UndefFn}   = "OREGON_Undef";
   $hash->{ParseFn}   = "OREGON_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
-
+  $hash->{AttrList}  = "IODev ignore:0,1 do_not_notify:1,0 showtime:1,0"
+                      ." $readingFnAttributes";
 }
 
 #####################################
@@ -125,29 +127,30 @@ sub OREGON_type_length_key {
 
 my %types =
   (
-   # THGR810
+   # THGR810 v3
    OREGON_type_length_key(0xfa28, 80) =>
    {
     part => 'THGR810', checksum => \&OREGON_checksum2, method => \&OREGON_common_temphydro,
    },
-   # WTGR800 Temp hydro
+   # WTGR800 Temp hydro v3
    OREGON_type_length_key(0xfab8, 80) =>
    {
     part => 'WTGR800_T', checksum => \&OREGON_checksum2, method => \&OREGON_alt_temphydro,
    },
-   # WTGR800 Anenometer
+   # WTGR800 Anenometer v3
    OREGON_type_length_key(0x1a99, 88) =>
    {
     part => 'WTGR800_A', checksum => \&OREGON_checksum4, method => \&OREGON_wtgr800_anemometer,
    },
-   # 
+   # WGR800 v3
    OREGON_type_length_key(0x1a89, 88) =>
    {
     part => 'WGR800', checksum => \&OREGON_checksum4, method => \&OREGON_wtgr800_anemometer,
    },
+   # UVN800 v3
    OREGON_type_length_key(0xda78, 72) =>
    {
-    part => 'UVN800', checksun => \&OREGON_checksum7, method => \&OREGON_uvn800,
+    part => 'UVN800', checksum => \&OREGON_checksum7, method => \&OREGON_uvn800,
    },
    OREGON_type_length_key(0xea7c, 120) =>
    {
@@ -157,8 +160,8 @@ my %types =
    {
     part => 'THWR288A', checksum => \&OREGON_checksum1, method => \&OREGON_common_temp,
    },
-   # 
-   OREGON_type_length_key(0xea4c, 68) =>
+   # THN132N
+   OREGON_type_length_key(0xea4c, 64) =>
    {
     part => 'THN132N', checksum => \&OREGON_checksum1, method => \&OREGON_common_temp,
    },
@@ -185,10 +188,10 @@ my %types =
    # BTHR918
    OREGON_type_length_key(0x5a5d, 88) =>
    {
-    part => 'BTHR918', checksum => \&OREGON_checksum5, method => \&OREGON_common_temphydrobaro,
+    part => 'BTHR918', checksum => \&OREGON_checksum5plus, method => \&OREGON_common_temphydrobaro,
    },
    # BTHR918N, BTHR968
-   OREGON_type_length_key(0x5a6d, 96) =>
+   OREGON_type_length_key(0x5a6d, 88) =>
    {
     part => 'BTHR918N', checksum => \&OREGON_checksum5, method => \&OREGON_alt_temphydrobaro,
    },
@@ -197,17 +200,8 @@ my %types =
    {
     part => 'WGR918',  checksum => \&OREGON_checksum4, method => \&OREGON_wgr918_anemometer,
    },
-   # 
-   OREGON_type_length_key(0x3a0d, 88) =>
-   {
-    part => 'WGR918',  checksum => \&OREGON_checksum4, method => \&OREGON_wgr918_anemometer,
-   },
    # RGR126, RGR682, RGR918:
    OREGON_type_length_key(0x2a1d, 80) =>
-   {
-    part => 'RGR918', checksum => \&OREGON_checksum6plus, method => \&OREGON_common_rain,
-   },
-   OREGON_type_length_key(0x2a1d, 84) =>
    {
     part => 'RGR918', checksum => \&OREGON_checksum6plus, method => \&OREGON_common_rain,
    },
@@ -231,10 +225,19 @@ my %types =
    {
     part => 'RTGR328N', checksum => \&OREGON_checksum2, method => \&OREGON_common_temphydro,
    },
-   # PCR800. Commented out until fully tested.
+   # PCR800. v3
    OREGON_type_length_key(0x2a19, 92) =>
    {
     part => 'PCR800', checksum => \&OREGON_checksum8, method => \&OREGON_rain_PCR800,
+   },
+   # THWR800 v3
+   OREGON_type_length_key(0xca48, 68) =>
+   {
+    part => 'THWR800', checksum => \&OREGON_checksum9, method => \&OREGON_common_temp,
+   },
+   OREGON_type_length_key(0x0adc, 64) =>  # masked to ?adc due to rolling code
+   {
+     part => 'RTHN318', checksum => \&OREGON_checksum1, method => \&OREGON_common_temp,
    },
   );
 
@@ -792,13 +795,19 @@ sub OREGON_rain_PCR800 {
 # CHECKSUM METHODS
 
 sub OREGON_checksum1 {
+  my $hash = $_[1];
   my $c = OREGON_hi_nibble($_[0]->[6]) + (OREGON_lo_nibble($_[0]->[7]) << 4);
   my $s = ( ( OREGON_nibble_sum(6, $_[0]) + OREGON_lo_nibble($_[0]->[6]) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum1 = $c berechnet: $s";
   $s == $c;
 }
 
 sub OREGON_checksum2 {
-  $_[0]->[8] == ((OREGON_nibble_sum(8,$_[0]) - 0xa) & 0xff);
+  my $hash = $_[1];
+  my $c = $_[0]->[8];
+  my $s = ((OREGON_nibble_sum(8,$_[0]) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum2 = $c berechnet: $s";
+  $s == $c;
 }
 
 sub OREGON_checksum3 {
@@ -813,14 +822,25 @@ sub OREGON_checksum5 {
   $_[0]->[10] == ((OREGON_nibble_sum(10,$_[0]) - 0xa) & 0xff);
 }
 
+sub OREGON_checksum5plus {
+  my $hash = $_[1];
+  my $c = ($_[0]->[10]);
+  
+  my $s = ((OREGON_nibble_sum(10,$_[0]) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum5plus = $c berechnet: $s";
+  $s == $c;
+}
+
 sub OREGON_checksum6 {
   OREGON_hi_nibble($_[0]->[8]) + (OREGON_lo_nibble($_[0]->[9]) << 4) ==
     ((OREGON_nibble_sum(8,$_[0]) - 0xa) & 0xff);
 }
 
 sub OREGON_checksum6plus {
+  my $hash = $_[1];
   my $c = OREGON_hi_nibble($_[0]->[8]) + (OREGON_lo_nibble($_[0]->[9]) << 4);
   my $s = (((OREGON_nibble_sum(8,$_[0]) + (($_[0]->[8] & 0x0f) - 0x00)) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum6plus = $c berechnet: $s";
   $s == $c;
 }
 
@@ -829,11 +849,22 @@ sub OREGON_checksum7 {
 }
 
 sub OREGON_checksum8 {
+  my $hash = $_[1];
   my $c = OREGON_hi_nibble($_[0]->[9]) + (OREGON_lo_nibble($_[0]->[10]) << 4);
-  my $s = ( ( OREGON_nibble_sum(9, $_[0]) - 0xa) & 0xff);
+  my $s = ( ( OREGON_nibble_sum(9, $_[0]) + OREGON_lo_nibble($_[0]->[9]) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum8 = $c berechnet: $s";
   $s == $c;
 }
 
+sub OREGON_checksum9 {
+  my $hash = $_[1];
+  my $c = OREGON_hi_nibble($_[0]->[6]) + (OREGON_lo_nibble($_[0]->[7]) << 4);
+  my $s = ((OREGON_nibble_sum(6,$_[0]) - 0xa) & 0xff);
+  Log3 $hash, 5, "OREGON: checksum9 = $c berechnet: $s";
+  $s == $c;
+}
+  
+  
 sub OREGON_raw {
   $_[0]->{raw} or $_[0]->{raw} = pack 'H*', $_[0]->{hex};
 }
@@ -853,10 +884,10 @@ OREGON_Parse($$)
 
   my $time = time();
   if ($time_old ==0) {
-  	Log 5, "OREGON: decoding delay=0 hex=$msg";
+  	Log3 $iohash, 5, "OREGON: decoding delay=0 hex=$msg";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "OREGON: decoding delay=$time_diff hex=$msg";
+  	Log3 $iohash, 5, "OREGON: decoding delay=$time_diff hex=$msg";
   }
   $time_old = $time;
 
@@ -870,6 +901,7 @@ OREGON_Parse($$)
   }
 
   my $bits = ord($bin_msg);
+  my $bitsMsg = $bits;
   my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   my $type1 = $rfxcom_data_array[0];
@@ -878,37 +910,45 @@ OREGON_Parse($$)
   my $type = ($type1 << 8) + $type2;
 
   my $sensor_id = unpack('H*', chr $type1) . unpack('H*', chr $type2);
-  #Log 1, "OREGON: sensor_id=$sensor_id";
 
   my $key = OREGON_type_length_key($type, $bits);
-
   my $rec = $types{$key} || $types{$key&0xfffff};
-  unless ($rec) {
-    #Log 1, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$msg'.";
-    Log 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$msg'.";
-    return "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits.\n";
+  if (!$rec) {
+     $bits -= 4;
+     $key = OREGON_type_length_key($type, $bits);
+     $rec = $types{$key} || $types{$key&0xfffff};
+     if (!$rec) {
+          $bits -= 4;
+          $key = OREGON_type_length_key($type, $bits);
+          $rec = $types{$key} || $types{$key&0xfffff};
+          if (!$rec) {
+               Log3 $iohash, 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bitsMsg message='$msg'.";
+               return "";
+          }
+     }
   }
-  
+  Log3 $iohash, 5, "OREGON: sensor_id=$sensor_id BitsMsg=$bitsMsg Bits=$bits";
+
   # test checksum as defines in %types:
   my $checksum = $rec->{checksum};
-  if ($checksum && !$checksum->(\@rfxcom_data_array) ) {
-    Log 3, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
-    return "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
+  if ($checksum && !$checksum->(\@rfxcom_data_array, $iohash) ) {
+    Log3 $iohash, 4, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
+    return "";
   }
 
   my $method = $rec->{method};
   unless ($method) {
-    Log 4, "OREGON: Possible message from Oregon part '$rec->{part}'";
-    Log 4, "OREGON: sensor_id=$sensor_id (bits=$bits)";
-    return;
+    Log3 $iohash, 4, "OREGON: Possible message from Oregon part '$rec->{part}'";
+    Log3 $iohash, 4, "OREGON: sensor_id=$sensor_id (bits=$bits)";
+    return "";
   }
 
   my @res;
 
   if (! defined(&$method)) {
-    Log 4, "OREGON: Error: Unknown function=$method. Please define it in file $0";
-    Log 4, "OREGON: sensor_id=$sensor_id (bits=$bits)\n";
-    return "OREGON: Error: Unknown function=$method. Please define it in file $0";
+    Log3 $iohash, 4, "OREGON: Error: Unknown function=$method. Please define it in file $0";
+    Log3 $iohash, 4, "OREGON: sensor_id=$sensor_id (bits=$bits)\n";
+    return "";
   } else {
     @res = $method->($rec->{part}, $longids, \@rfxcom_data_array);
   }
@@ -919,7 +959,7 @@ OREGON_Parse($$)
 
   my $def = $modules{OREGON}{defptr}{"$device_name"};
   if(!$def) {
-	Log 3, "OREGON: Unknown device $device_name, please define it";
+	Log3 $iohash, 3, "OREGON: Unknown device $device_name, please define it";
     	return "UNDEFINED $device_name OREGON $device_name";
   }
   # Use $def->{NAME}, because the device may be renamed:
@@ -933,118 +973,139 @@ OREGON_Parse($$)
   my $i;
   my $val = "";
   my $sensor = "";
+  readingsBeginUpdate($def);
+
   foreach $i (@res){
+  	
  	#print "!> i=".$i."\n";
 	#printf "%s\t",$i->{device};
 	if ($i->{type} eq "temp") { 
 			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
 			$val .= "T: ".$i->{current}." ";
-
-			$sensor = "temperature";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
+			
+			readingsBulkUpdate($def,"temperature",$i->{current});
+			
+			##$sensor = "temperature";		
+				
+			##$def->{READINGS}{$sensor}{TIME} = $tm;
+			##$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			##$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};*/
   	} 
 	elsif ($i->{type} eq "humidity") { 
 			#printf "Luftfeuchtigkeit %d%s, %s ;",$i->{current},$i->{units},$i->{string};
 			$val .= "H: ".$i->{current}." ";
+			readingsBulkUpdate($def,"humidity",$i->{current});
 
-			$sensor = "humidity";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
+			##$sensor = "humidity";			
+			##$def->{READINGS}{$sensor}{TIME} = $tm;
+			##$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			##$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
 	}
 	elsif ($i->{type} eq "battery") { 
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};
 			my @words = split(/\s+/,$i->{current});
 			$val .= "BAT: ".$words[0]." "; #use only first word
+			
+			readingsBulkUpdate($def,"battery",$i->{current});
 
-			$sensor = "battery";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			##$sensor = "battery";			
+			##$def->{READINGS}{$sensor}{TIME} = $tm;
+			##$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			##$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	elsif ($i->{type} eq "pressure") { 
 			#printf "Luftdruck %d %s, Vorhersage=%s ; ",$i->{current},$i->{units},$i->{forecast};
 			# do not add it due to problems with hms.gplot
-			#$val .= "P: ".$i->{current}."  ";
+			$val .= "P: ".$i->{current}."  ";
+			readingsBulkUpdate($def,"pressure",$i->{current});
+			readingsBulkUpdate($def,"forecast",$i->{forecast});
+			
+			#$sensor = "pressure";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 
-			$sensor = "pressure";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-
-			$sensor = "forecast";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{forecast};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{forecast};;
+			#$sensor = "forecast";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{forecast};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{forecast};;
 	}
 	elsif ($i->{type} eq "speed") { 
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
+			readingsBulkUpdate($def,"wind_speed",$i->{current});
+			readingsBulkUpdate($def,"wind_avspeed",$i->{average});
 
-			$sensor = "wind_speed";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			#$sensor = "wind_speed";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 
-			$sensor = "wind_avspeed";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{average};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{average};;
+			#$sensor = "wind_avspeed";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{average};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{average};;
 	}
 	elsif ($i->{type} eq "direction") { 
 			$val .= "WD: ".$i->{current}."  ";
 			$val .= "WDN: ".$i->{string}."  ";
+			readingsBulkUpdate($def,"wind_dir",$i->{current} . " " . $i->{string});
 
-			$sensor = "wind_dir";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current} . " " . $i->{string};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current} . " " . $i->{string};;
+			#$sensor = "wind_dir";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current} . " " . $i->{string};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current} . " " . $i->{string};;
 	}
 	elsif ($i->{type} eq "rain") { 
 			$val .= "RR: ".$i->{current}." ";
+			readingsBulkUpdate($def,"rain_rate",$i->{current});
 
-			$sensor = "rain_rate";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			#$sensor = "rain_rate";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	elsif ($i->{type} eq "train") { 
 			$val .= "TR: ".$i->{current}."  ";
+			readingsBulkUpdate($def,"rain_total",$i->{current});
 
-			$sensor = "rain_total";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			#$sensor = "rain_total";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	elsif ($i->{type} eq "flip") { 
 			#$val .= "F: ".$i->{current}." ";
+			readingsBulkUpdate($def,"rain_flip",$i->{current});
 
-			$sensor = "rain_flip";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			#$sensor = "rain_flip";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	elsif ($i->{type} eq "uv") { 
 			$val .= "UV: ".$i->{current}."  ";
 			$val .= "UVR: ".$i->{risk}."  ";
+			readingsBulkUpdate($def,"uv_val",$i->{current});
+			readingsBulkUpdate($def,"uv_risk",$i->{risk});
 
-			$sensor = "uv_val";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			#$sensor = "uv_val";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 
-			$sensor = "uv_risk";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{risk};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
+			#$sensor = "uv_risk";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{risk};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
 	}
 	elsif ($i->{type} eq "hexline") { 
-			$sensor = "hexline";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsBulkUpdate($def,"hexline",$i->{current});
+		
+			#$sensor = "hexline";			
+			#$def->{READINGS}{$sensor}{TIME} = $tm;
+			#$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			#$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	else { 
 			print "\nOREGON: Unknown: "; 
@@ -1057,32 +1118,39 @@ OREGON_Parse($$)
     # remove heading and trailing space chars from $val
     $val =~ s/^\s+|\s+$//g;
 
+    Log3 $iohash, 4, "$name decoded Oregon: $val";
+    readingsBulkUpdate($def, "state", $val);
+    
     $def->{STATE} = $val;
-    $def->{TIME} = $tm;
-    $def->{CHANGED}[$n++] = $val;
+    #$def->{TIME} = $tm;
+    #$def->{CHANGED}[$n++] = $val;
   }
+  
 
   #
   #$def->{READINGS}{state}{TIME} = $tm;
   #$def->{READINGS}{state}{VAL} = $val;
   #$def->{CHANGED}[$n++] = "state: ".$val;
+  readingsEndUpdate($def, 1);
 
-  DoTrigger($name, undef);
+  #DoTrigger($name, undef);
 
-  return $val;
+  return $name;
 }
 
 1;
 
 =pod
+=item summary    interprets Oregon sensors received by a rf receiver
+=item summary_DE interpretiert Oregon Sensoren von einem Funkempf&aumlngern
 =begin html
 
 <a name="OREGON"></a>
 <h3>OREGON</h3>
 <ul>
-  The OREGON module interprets Oregon sensor messages received by a RFXCOM receiver. You need to define a RFXCOM receiver first.
+  The OREGON module interprets Oregon sensor messages received by a RFXCOM or SIGNALduino or CUx receiver. You need to define a receiver (RFXCOM, SIGNALduino or CUx) first.
   See <a href="#RFXCOM">RFXCOM</a>.
-
+  See <a href="#SIGNALduino">SIGNALduino</a>.
   <br><br>
 
   <a name="OREGONdefine"></a>
@@ -1110,8 +1178,11 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
   <a name="OREGONattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
 </ul>
 
