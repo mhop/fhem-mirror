@@ -2437,6 +2437,7 @@ sub
 getAllSets($)
 {
   my $d = shift;
+  return "" if(!$defs{$d});      # Just safeguarding
   
   if(AttrVal("global", "apiversion", 1)> 1) {
     my @setters= getSetters($defs{$d});
