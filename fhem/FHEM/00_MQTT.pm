@@ -2,7 +2,8 @@
 #
 # fhem bridge to mqtt (see http://mqtt.org)
 #
-# Copyright (C) 2014 Norbert Truchsess
+# Copyright (C) 2017 Stephan Eisler
+# Copyright (C) 2014 - 2016 Norbert Truchsess
 #
 #     This file is part of fhem.
 #
@@ -147,7 +148,7 @@ sub Attr($$$$) {
         $hash->{timeout} = 60;
       }
       if ($main::init_done) {
-        $hash->{ping_received}=1;      
+        $hash->{ping_received}=1;
         Timer($hash);
       };
       last;
@@ -157,8 +158,14 @@ sub Attr($$$$) {
 
 sub Start($) {
   my $hash = shift;
-  my ($dev) = split("[ \t]+", $hash->{DEF});
+  my ($dev,$username,$password) = split("[ \t]+", $hash->{DEF});
   $hash->{DeviceName} = $dev;
+  if(defined($username) && $username ne "") {
+    $hash->{username} = $username;
+  }
+  if(defined($password) && $password ne "") {
+    $hash->{password} = $password;
+  }
   DevIo_CloseDev($hash);
   return DevIo_OpenDev($hash, 0, "MQTT::Init");
 }
@@ -201,11 +208,11 @@ sub Read {
   return undef unless $buf;
   $hash->{buf} .= $buf;
   while (my $mqtt = Net::MQTT::Message->new_from_bytes($hash->{buf},1)) {
-    
+
     my $message_type = $mqtt->message_type();
-  
+
     Log3($name,5,"MQTT $name message received: ".$mqtt->string());
-  
+
     MESSAGE_TYPE: {
       $message_type == MQTT_CONNACK and do {
         readingsSingleUpdate($hash,"connection","connected",1);
@@ -217,7 +224,7 @@ sub Read {
         }
         last;
       };
-  
+
       $message_type == MQTT_PUBLISH and do {
         my $topic = $mqtt->topic();
         GP_ForallClients($hash,sub {
@@ -242,7 +249,7 @@ sub Read {
         }
         last;
       };
-  
+
       $message_type == MQTT_PUBACK and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -255,7 +262,7 @@ sub Read {
         delete $hash->{messages}->{$message_id}; #QoS Level 1: at_least_once handling
         last;
       };
-  
+
       $message_type == MQTT_PUBREC and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -267,7 +274,7 @@ sub Read {
         send_message($hash, message_type => MQTT_PUBREL, message_id => $message_id); #QoS Level 2: exactly_once handling
         last;
       };
-  
+
       $message_type == MQTT_PUBREL and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -281,7 +288,7 @@ sub Read {
         delete $hash->{messages}->{$message_id};
         last;
       };
-  
+
       $message_type == MQTT_PUBCOMP and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -294,7 +301,7 @@ sub Read {
         delete $hash->{messages}->{$message_id}; #QoS Level 2: exactly_once handling
         last;
       };
-  
+
       $message_type == MQTT_SUBACK and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -307,7 +314,7 @@ sub Read {
         delete $hash->{messages}->{$message_id}; #QoS Level 1: at_least_once handling
         last;
       };
-  
+
       $message_type == MQTT_UNSUBACK and do {
         my $message_id = $mqtt->message_id();
         GP_ForallClients($hash,sub {
@@ -320,13 +327,13 @@ sub Read {
         delete $hash->{messages}->{$message_id}; #QoS Level 1: at_least_once handling
         last;
       };
-  
+
       $message_type == MQTT_PINGRESP and do {
         $hash->{ping_received} = 1;
         readingsSingleUpdate($hash,"connection","active",1);
         last;
       };
-  
+
       Log3($hash->{NAME},4,"MQTT::Read '$hash->{NAME}' unexpected message type '".message_type_string($message_type)."'");
     }
   }
@@ -335,7 +342,7 @@ sub Read {
 
 sub send_connect($) {
   my $hash = shift;
-  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout});
+  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $hash->{username}, password => $hash->{password});
 };
 
 sub send_publish($@) {
@@ -463,7 +470,7 @@ sub client_attr($$$$$) {
     };
     $attribute eq "retain" and do {
       if ($command eq "set") {
-        $client->{retain} = $value; 
+        $client->{retain} = $value;
       } else {
         $client->{retain} = 0;
       }
@@ -513,6 +520,7 @@ sub client_stop($) {
 1;
 
 =pod
+=item summary    connects fhem to MQTT
 =begin html
 
 <a name="MQTT"></a>
@@ -525,7 +533,7 @@ sub client_stop($) {
   <a name="MQTTdefine"></a>
   <p><b>Define</b></p>
   <ul>
-    <p><code>define &lt;name&gt; MQTT &lt;ip:port&gt;</code></p>
+    <p><code>define &lt;name&gt; MQTT &lt;ip:port&gt; [&lt;username&gt;] [&lt;password&gt;]</code></p>
     <p>Specifies the MQTT device.</p>
   </ul>
   <a name="MQTTset"></a>
