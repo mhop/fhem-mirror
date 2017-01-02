@@ -1,29 +1,25 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="audio_x5F_sound">
-	<g>
-		<g>
-			<path style="fill:#FFFFFF;" d="M139.333,119.667c0,43,0,86,0,129c0,6.448,10,6.448,10,0c0-43,0-86,0-129
-				C149.333,113.218,139.333,113.218,139.333,119.667L139.333,119.667z"/>
-		</g>
-	</g>
-	<g>
-		<g>
-			<path style="fill:#FFFFFF;" d="M255.333,107.667c0,38.333,0,76.667,0,115c0,6.448,10,6.448,10,0c0-38.333,0-76.667,0-115
-				C265.333,101.218,255.333,101.218,255.333,107.667L255.333,107.667z"/>
-		</g>
-	</g>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M260.328,105.063
-		c0.697,3.087-1.239,6.158-4.327,6.858l-102.062,23.09c-3.088,0.697-6.158-1.24-6.857-4.329l-2.741-12.117
-		c-0.698-3.088,1.239-6.158,4.327-6.857l102.061-23.09c3.088-0.698,6.16,1.239,6.858,4.327L260.328,105.063z"/>
-	
-		<ellipse transform="matrix(0.9638 -0.2667 0.2667 0.9638 -62.8719 41.3291)" style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" cx="120.739" cy="252.161" rx="23.486" ry="15.492"/>
-	
-		<ellipse transform="matrix(0.9638 -0.2667 0.2667 0.9638 -52.7686 71.7339)" style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" cx="237.739" cy="230.161" rx="23.486" ry="15.492"/>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="468pt" height="513pt" viewBox="0 0 468 513"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,513) scale(0.202597,-0.202597)"
+fill="#000000" stroke="none">
+<path d="M1455 2385 c-796 -182 -755 -171 -783 -198 -54 -50 -52 -15 -52 -865
+l0 -790 -61 19 c-73 23 -154 24 -234 4 -246 -63 -384 -260 -292 -418 49 -84
+142 -128 272 -129 197 -2 377 106 433 259 22 60 22 66 22 787 l0 726 37 0 c28
+0 1252 270 1346 296 16 5 17 -29 17 -619 l0 -625 -47 14 c-25 8 -78 14 -117
+14 -284 -1 -512 -233 -413 -421 97 -184 432 -188 623 -7 102 96 94 17 94 977
+0 805 -1 843 -20 928 -33 144 -64 184 -149 189 -32 2 -242 -42 -676 -141z
+m690 -60 c9 -41 15 -83 13 -92 -2 -14 -129 -45 -682 -170 -373 -85 -680 -152
+-682 -150 -8 8 -38 167 -32 172 4 4 1313 306 1359 314 4 1 15 -33 24 -74z
+m-35 -1620 c104 -54 62 -167 -89 -239 -58 -27 -77 -31 -151 -31 -94 0 -142 19
+-169 66 -39 69 60 175 199 214 65 18 165 13 210 -10z m-1573 -286 c49 -18 73
+-49 73 -91 0 -113 -226 -220 -379 -178 -150 40 -108 189 75 260 55 22 185 27
+231 9z"/>
 </g>
 </svg>

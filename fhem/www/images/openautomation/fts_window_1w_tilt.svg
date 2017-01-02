@@ -1,25 +1,24 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="fts_x5F_window_x5F_1w_x5F_tilt">
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M267.826,263.303c0,3.91-3.156,7.082-7.05,7.082
-		l-157.885,0.021c-3.894,0-7.05-3.171-7.05-7.083v-157.5c0-3.911,3.156-7.083,7.05-7.083l157.885-0.021
-		c3.894,0,7.05,3.172,7.05,7.083V263.303z"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M267.826,103.208c0,2.485-2.711,4.5-6.053,4.5
-		l-159.88,0.021c-3.342,0-6.052-2.015-6.052-4.5v-9c0-2.485,2.71-4.5,6.052-4.5l159.88-0.021c3.342,0,6.053,2.015,6.053,4.5V103.208
-		z"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M265.732,265.178
-		c0.584,2.887-1.629,5.228-4.942,5.228H103.457c-3.313,0-6.474-2.341-7.058-5.228L75.24,130.633
-		c-0.584-2.887,1.628-5.228,4.942-5.228h157.333c3.313,0,6.474,2.34,7.058,5.228L265.732,265.178z"/>
-	<g>
-		<g>
-			<path style="fill:#FFFFFF;" d="M247.194,199.667c2.213,0,4.426,0,6.639,0c2.726,0,5-2.274,5-5s-2.274-5-5-5
-				c-2.213,0-4.426,0-6.639,0c-2.726,0-5,2.274-5,5S244.469,199.667,247.194,199.667L247.194,199.667z"/>
-		</g>
-	</g>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="468pt" height="442pt" viewBox="0 0 468 442"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,442) scale(0.173333,-0.173333)"
+fill="#000000" stroke="none">
+<path d="M344 2521 c-62 -38 -64 -46 -64 -258 l0 -193 -87 0 c-107 0 -149 -18
+-176 -73 l-19 -37 141 -903 c78 -496 144 -916 146 -933 7 -40 69 -102 109
+-109 17 -3 520 -4 1118 -3 1079 3 1087 3 1115 24 15 11 38 40 51 64 l22 44 0
+1143 c0 1259 3 1193 -62 1233 -33 20 -47 20 -1148 20 -1080 0 -1116 -1 -1146
+-19z m2215 -998 l-1 -648 -83 520 c-45 286 -86 535 -90 553 -10 46 -59 99
+-103 112 -24 6 -362 10 -954 10 l-918 0 0 50 0 50 1075 0 1075 0 -1 -647z
+m-2280 -15 c0 -238 -2 -428 -5 -423 -4 10 -134 829 -134 846 0 5 32 9 70 9
+l70 0 -1 -432z m1961 422 c11 -7 31 -112 76 -392 l60 -383 -30 -7 c-87 -19
+-65 -138 25 -138 16 0 29 -3 29 -7 1 -5 31 -200 68 -435 l68 -428 -1053 0
+c-1030 0 -1053 0 -1063 19 -7 13 -10 312 -10 900 l0 881 908 0 c547 0 913 -4
+922 -10z"/>
 </g>
 </svg>

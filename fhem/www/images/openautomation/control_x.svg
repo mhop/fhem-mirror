@@ -1,18 +1,26 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="control_x5F_x">
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M184.648,165.393L96.25,76.993
-		c-2.892-2.892-7.582-2.892-10.473,0l-8.728,8.728c-2.893,2.893-2.893,7.581,0,10.474l84.857,84.857"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M177.594,196.74l87.399,87.399
-		c2.892,2.891,7.581,2.891,10.474,0l8.727-8.729c2.894-2.893,2.894-7.582,0-10.474l-83.877-83.878"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M181.121,200.268L97.25,284.139
-		c-2.892,2.891-7.581,2.891-10.473,0l-8.728-8.728c-2.893-2.893-2.893-7.582,0-10.474l87.381-87.381"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M181.121,161.865l84.872-84.872
-		c2.892-2.892,7.581-2.892,10.474,0l8.728,8.728c2.893,2.893,2.893,7.581,0,10.474l-88.396,88.396"/>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="468pt" height="468pt" viewBox="0 0 468 468"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,468) scale(0.158108,-0.158108)"
+fill="#000000" stroke="none">
+<path d="M189 2921 c-52 -33 -150 -134 -173 -178 -20 -39 -21 -93 -2 -136 8
+-18 251 -268 565 -582 l551 -550 -549 -550 c-590 -591 -580 -580 -566 -668 6
+-35 21 -56 94 -130 47 -49 98 -95 113 -103 32 -17 111 -18 141 -3 12 6 268
+257 570 558 l547 546 548 -546 c301 -301 557 -552 569 -558 31 -15 109 -14
+141 3 33 18 175 162 192 194 15 30 15 98 0 137 -7 18 -234 253 -555 575 l-545
+545 554 555 c610 611 594 591 566 682 -14 50 -155 202 -207 224 -39 17 -91 18
+-130 3 -15 -5 -277 -258 -580 -562 l-553 -552 -547 547 c-302 300 -562 553
+-580 562 -51 25 -112 21 -164 -13z m698 -693 l593 -593 593 593 c325 325 596
+592 602 592 16 0 145 -133 145 -150 0 -8 -266 -281 -591 -606 l-590 -591 585
+-583 c322 -321 586 -591 586 -599 0 -20 -130 -151 -150 -151 -8 0 -278 263
+-600 585 l-585 585 -585 -585 c-322 -322 -589 -585 -595 -585 -16 0 -145 133
+-145 150 0 8 262 278 583 598 l584 583 -594 592 c-326 326 -593 598 -593 606
+0 19 132 151 151 151 7 0 280 -267 606 -592z"/>
 </g>
 </svg>

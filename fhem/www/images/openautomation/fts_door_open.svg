@@ -1,23 +1,23 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="fts_x5F_door_x5F_open">
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M238.607,265.46c0,3.147-2.506,6.14-5.598,6.685
-		l-85.813,15.131c-3.091,0.545-5.596-1.563-5.596-4.71V97.713c0-3.146,2.505-6.139,5.596-6.684l85.813-15.131
-		c3.092-0.545,5.598,1.564,5.598,4.71V265.46z"/>
-	<g>
-		<g>
-			<path style="fill:#FFFFFF;" d="M144.777,194.453c3.08-0.543,6.159-1.087,9.238-1.63c2.687-0.474,4.163-3.712,3.492-6.15
-				c-0.773-2.811-3.469-3.966-6.15-3.492c-3.08,0.543-6.159,1.087-9.238,1.63c-2.687,0.474-4.163,3.712-3.492,6.15
-				C139.399,193.771,142.096,194.927,144.777,194.453L144.777,194.453z"/>
-		</g>
-	</g>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M238.607,265.698
-		c0,3.147-2.936,5.698-6.557,5.698H131.528c-3.621,0-6.556-2.551-6.556-5.698V80.846c0-3.146,2.936-5.697,6.556-5.697h100.523
-		c3.621,0,6.557,2.551,6.557,5.697V265.698z"/>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="362pt" height="648pt" viewBox="0 0 362 648"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,648) scale(0.218919,-0.218919)"
+fill="#000000" stroke="none">
+<path d="M90 2938 c-24 -13 -53 -36 -64 -51 -21 -28 -21 -32 -21 -1295 0
+-1256 0 -1267 20 -1302 28 -46 73 -71 145 -77 l60 -6 0 -63 c0 -53 4 -67 26
+-93 51 -61 39 -62 693 53 400 71 604 111 625 124 17 10 41 36 53 58 l23 39 0
+1260 c0 1425 7 1309 -80 1353 l-44 22 -696 0 -696 0 -44 -22z m480 -154 c-102
+-18 -200 -36 -219 -39 -19 -4 -51 -23 -75 -45 l-41 -39 -3 -1155 -2 -1156 -45
+0 -45 0 0 1235 0 1235 308 -1 307 -1 -185 -34z m948 -1201 l-3 -1228 -577 -3
+-578 -2 0 479 0 479 52 7 c89 12 124 70 73 121 -23 23 -31 25 -75 19 l-50 -7
+0 575 c0 450 3 578 13 584 13 8 1075 200 1120 202 l27 1 -2 -1227z m-948
+-1409 c-102 -18 -191 -34 -197 -34 -8 0 -13 14 -13 35 l0 35 198 -1 197 -1
+-185 -34z"/>
 </g>
 </svg>

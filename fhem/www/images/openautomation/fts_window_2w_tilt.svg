@@ -1,44 +1,25 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="fts_x5F_window_x5F_2w_x5F_tilt">
-	<path style="display:none;fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M287,250.284
-		c0,3.894-3.156,7.05-7.05,7.05H82.55c-3.894,0-7.05-3.156-7.05-7.05V123.383c0-3.893,3.156-7.05,7.05-7.05h197.4
-		c3.894,0,7.05,3.157,7.05,7.05V250.284z"/>
-	<g style="display:none;">
-		<g style="display:inline;">
-			<path style="fill:#FFFFFF;" d="M174.833,191.669c1.583-0.001,3.167-0.001,4.75-0.002c2.726-0.001,5-2.273,5-5
-				c0-2.725-2.274-5.001-5-5c-1.583,0.001-3.167,0.001-4.75,0.002c-2.726,0.001-5,2.273-5,5
-				C169.833,189.394,172.107,191.67,174.833,191.669L174.833,191.669z"/>
-		</g>
-	</g>
-	
-		<line style="display:none;fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" x1="180.484" y1="116.667" x2="180.484" y2="253.842"/>
-	<path style="display:none;fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M287.333,120.167
-		c0,2.485-2.712,4.5-6.058,4.5H81.39c-3.345,0-6.057-2.015-6.057-4.5v-9c0-2.485,2.712-4.5,6.057-4.5h199.885
-		c3.346,0,6.058,2.015,6.058,4.5V120.167z"/>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M285.412,251.773
-		c0.585,2.887-1.628,5.227-4.941,5.227h-94.333c-3.313,0-6.474-2.34-7.058-5.227L157.92,147.228
-		c-0.584-2.887,1.628-5.228,4.942-5.228h94.333c3.313,0,6.474,2.34,7.059,5.228L285.412,251.773z"/>
-	<g>
-		<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M286.816,250.303
-			c0,3.91-3.156,7.082-7.049,7.082l-197.885,0.021c-3.894,0-7.05-3.171-7.05-7.083v-127.5c0-3.911,3.156-7.083,7.05-7.083
-			l197.885-0.021c3.893,0,7.049,3.172,7.049,7.083V250.303z"/>
-		<g>
-			<g>
-				<path style="fill:#FFFFFF;" d="M174.52,191.584c2.104,0,4.208,0,6.313,0c2.726,0,5-2.274,5-5s-2.274-5-5-5
-					c-2.104,0-4.208,0-6.313,0c-2.726,0-5,2.274-5,5S171.794,191.584,174.52,191.584L174.52,191.584z"/>
-			</g>
-		</g>
-		
-			<line style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" x1="180.824" y1="116.583" x2="180.824" y2="253.758"/>
-		<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M286.816,120.208c0,2.485-2.709,4.5-6.052,4.5
-			l-199.88,0.021c-3.342,0-6.052-2.015-6.052-4.5v-9c0-2.485,2.71-4.5,6.052-4.5l199.88-0.021c3.343,0,6.052,2.015,6.052,4.5
-			V120.208z"/>
-	</g>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="468pt" height="340pt" viewBox="0 0 468 340"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,340) scale(0.158644,-0.158644)"
+fill="#000000" stroke="none">
+<path d="M74 2120 c-81 -40 -75 35 -72 -1052 3 -958 3 -967 24 -994 11 -15 33
+-37 48 -48 27 -21 29 -21 1400 -21 l1373 0 37 29 c70 53 66 -6 66 1055 l0 959
+-27 33 c-53 63 35 59 -1450 59 -1346 0 -1358 0 -1399 -20z m1336 -404 l0 -44
+-114 -4 c-132 -4 -161 -17 -184 -84 -13 -37 -6 -76 127 -733 78 -382 141 -698
+141 -701 0 -4 -272 -11 -604 -15 -446 -5 -609 -4 -625 4 l-21 12 0 804 0 805
+640 0 640 0 0 -44z m1409 -468 c0 -311 -4 -501 -9 -484 -5 16 -44 203 -86 414
+-81 401 -87 422 -147 466 -28 21 -39 21 -533 24 l-504 3 0 44 0 45 640 0 640
+0 -1 -512z m-1409 58 l0 -224 -22 -5 c-13 -2 -30 -7 -39 -11 -14 -6 -22 24
+-58 206 -23 117 -45 223 -48 236 -5 22 -3 22 81 22 l86 0 0 -224z m1112 189
+c4 -16 68 -328 141 -692 l134 -663 -628 0 -629 0 0 695 0 695 487 -2 487 -3 8
+-30z m-1112 -668 c0 -61 -2 -108 -4 -106 -4 4 -46 205 -46 219 0 4 11 5 25 2
+25 -4 25 -5 25 -115z"/>
 </g>
 </svg>

@@ -1,34 +1,25 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
-	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
-<g id="fts_x5F_door_x5F_slide_x5F_2w">
-	<g>
-		<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M257.191,280.931
-			c0,3.406-2.713,6.167-6.059,6.167h-57.891c-3.346,0-6.058-2.761-6.058-6.167V93.834c0-3.406,2.712-6.167,6.058-6.167h57.891
-			c3.346,0,6.059,2.761,6.059,6.167V280.931z"/>
-		<g>
-			<g>
-				<path style="fill:#FFFFFF;" d="M189.185,185.686c3.333,0,6.667,0,10,0c6.448,0,6.448-10,0-10c-3.333,0-6.667,0-10,0
-					C182.736,175.685,182.736,185.686,189.185,185.686L189.185,185.686z"/>
-			</g>
-		</g>
-	</g>
-	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M286.854,80.667c0-3.314,0.313-6-3-6H77.521
-		c-3.313,0-3,2.686-3,6v0.667c0,3.313-0.313,6,3,6h206.333c3.313,0,3-2.687,3-6V80.667z"/>
-	<g>
-		<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M105.184,280.931
-			c0,3.406,2.712,6.167,6.058,6.167h57.89c3.346,0,6.058-2.761,6.058-6.167V93.834c0-3.406-2.712-6.167-6.058-6.167h-57.89
-			c-3.346,0-6.058,2.761-6.058,6.167V280.931z"/>
-		<g>
-			<g>
-				<path style="fill:#FFFFFF;" d="M173.19,175.685c-3.333,0-6.667,0-10,0c-6.449,0-6.449,10,0,10c3.333,0,6.667,0,10,0
-					C179.639,185.686,179.639,175.685,173.19,175.685L173.19,175.685z"/>
-			</g>
-		</g>
-	</g>
-</g>
-<g id="Ebene_1">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="468pt" height="468pt" viewBox="0 0 468 468"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+</metadata>
+<g transform="translate(0,468) scale(0.157576,-0.157576)"
+fill="#000000" stroke="none">
+<path d="M40 2932 c-50 -50 -53 -184 -5 -240 l23 -27 176 -3 176 -3 2 -1279
+c3 -1274 3 -1279 24 -1306 11 -15 33 -37 48 -48 27 -20 39 -21 461 -21 422 0
+434 1 461 21 15 11 37 33 48 48 21 27 21 32 24 1307 1 834 6 1279 12 1279 7 0
+10 -435 10 -1256 0 -932 3 -1267 12 -1296 15 -52 66 -95 120 -103 24 -3 222
+-5 440 -3 382 3 398 4 424 24 15 11 37 33 48 48 21 27 21 32 24 1307 l2 1279
+156 0 c217 0 234 11 234 161 0 76 -2 82 -29 110 l-29 29 -1417 0 -1417 0 -28
+-28z m2790 -117 c0 -13 -156 -15 -1345 -15 -1189 0 -1345 2 -1345 15 0 13 156
+15 1345 15 1189 0 1345 -2 1345 -15z m-1490 -710 l0 -555 -59 0 c-62 0 -90
+-15 -92 -48 -4 -61 19 -82 93 -82 l58 0 0 -640 0 -640 -395 0 -395 0 0 1260 0
+1260 395 0 395 0 0 -555z m1090 -705 l0 -1260 -395 0 -395 0 0 640 0 640 59 0
+c82 0 117 38 89 97 -12 26 -18 28 -81 31 l-67 3 0 548 c0 301 3 551 7 554 3 4
+181 7 395 7 l388 0 0 -1260z"/>
 </g>
 </svg>
