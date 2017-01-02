@@ -35,7 +35,7 @@ SE_DoSet(@)
 {
   my $hash = $defs{$_[0]};
   $hash->{InSetExtensions} = 1;
-  DoSet(@_);
+  AnalyzeCommand($hash->{CL}, "set ".join(" ", @_)); # cmdalias (Forum #63896)
   delete $hash->{InSetExtensions};
 }
 
