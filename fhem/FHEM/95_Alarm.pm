@@ -33,6 +33,7 @@ use strict;
 use warnings;
 use vars qw(%defs);		        # FHEM device/button definitions
 use vars qw(%intAt);		    # FHEM at definitions
+use vars qw($FW_ME);
 
 #########################
 # Global variables
@@ -40,7 +41,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.82";
+my $alarmversion    = "2.83";
 
 #########################################################################################
 #
@@ -717,7 +718,7 @@ sub Alarm_Html($)
     my $showhelper = ($lockstate eq "unlocked") ? 1 : 0; 
 
     #--
-    $ret .= "<script type=\"text/javascript\" src=\"/fhem/pgm2/alarm.js\"></script><script type=\"text/javascript\">\n";
+    $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/alarm.js\"></script><script type=\"text/javascript\">\n";
     $ret .= "var alarmno = ".$alarmno.";\n";
     for( my $k=0;$k<$alarmno;$k++ ){
       $ret .= "ah.setItem('l".$k."s','".AttrVal($name, "level".$k."start", 0)."');\n"

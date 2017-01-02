@@ -39,9 +39,11 @@ use vars qw($FW_RET);           # Returned data (html)
 use vars qw($FW_RETTYPE);       # image/png or the like
 use vars qw($FW_wname);         # Web instance
 
+use Time::Local;
+
 #########################
 # Global variables
-my $postmeversion  = "1.6";
+my $postmeversion  = "2.0";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -63,7 +65,8 @@ sub PostMe_Initialize ($) {
   $hash->{UndefFn}     = "PostMe_Undef";  
   $hash->{InitFn}      = "PostMe_Init";  
   $hash->{AttrFn}      = "PostMe_Attr";
-  $hash->{AttrList}    = "postmeTTSDev postmeTTSFun postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 ".$readingFnAttributes;		
+  $hash->{AttrList}    = "postmeTTSFun postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec ".
+                         "postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 listseparator ".$readingFnAttributes;		
   
   $hash->{FW_detailFn}  = "PostMe_detailFn";
     	 
@@ -82,19 +85,19 @@ sub PostMe_Initialize ($) {
 #########################################################################################
 
 sub PostMe_Define ($$) {
- my ($hash, $def) = @_;
- my @a = split("[ \t][ \t]*", $def);
- my $now = time();
- my $devname = $hash->{NAME}; 
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+  my $now = time();
+  my $devname = $hash->{NAME}; 
  
- $modules{PostMe}{defptr}{$a[0]} = $hash;
-  
- readingsBeginUpdate($hash);
- readingsBulkUpdate($hash,"state","Initialized");
- readingsEndUpdate($hash,1); 
- InternalTimer(gettimeofday()+2, "PostMe_Init", $hash,0);
+  $modules{PostMe}{defptr}{$a[0]} = $hash;
 
- return undef;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"state","Initialized");
+  readingsEndUpdate($hash,1); 
+  InternalTimer(gettimeofday()+2, "PostMe_Init", $hash,0);
+
+  return undef;
 }
 
 #########################################################################################
@@ -122,7 +125,7 @@ sub PostMe_Undef ($$) {
 #########################################################################################
 
 sub PostMe_Attr($$$) {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my ($cmd, $listname, $attrName, $attrVal) = @_;
   return;  
 }
 
@@ -139,7 +142,7 @@ sub PostMe_Init($) {
    my $devname = $hash->{NAME};
    my $now = time();
    my $err = 0; 
-    
+   
    #-- current number of PostMes
    my $cnop = ReadingsVal($devname,"postmeCnt",0);
    my @std  = split(',',AttrVal("$devname","postmeStd",undef));
@@ -161,15 +164,6 @@ sub PostMe_Init($) {
      PostMe_Create($hash,$std[$i]);
    }
    readingsSingleUpdate($hash,"state","OK",1);
-   
-   #temporary solution
-   if( AttrVal("$devname","postmeTTSDev",undef) ){
-     Log 1,"[PostMe] REMOVE OBSOLETE ATTRIBUTE postmeTTSDev !!!";
-     readingsSingleUpdate($hash,"state","REMOVE OBSOLETE ATTRIBUTE postmeTTSDev !!!",1);
-   }else{
-     readingsSingleUpdate($hash,"state","OK",1);
-   }
-   
 }
  
 #########################################################################################
@@ -177,12 +171,12 @@ sub PostMe_Init($) {
 # PostMe_Check - Check, if a PostMe exists with this name and return its number
 # 
 # Parameter hash = ash of device addressed
-#           name = name of PostMe
+#           listname = name of PostMe
 #
 #########################################################################################
 
 sub PostMe_Check($$) {
-   my ($hash,$name) = @_;
+   my ($hash,$listname) = @_;
    my $devname = $hash->{NAME};
    my ($loop,$res); 
    
@@ -192,10 +186,10 @@ sub PostMe_Check($$) {
    for( $loop=1;$loop<=$cnop;$loop++){
      $res = ReadingsVal($devname, sprintf("postme%02dName",$loop), undef);
      last 
-       if($res eq $name);
+       if($res eq $listname);
    }
    #-- no PostMe with this name
-   if( $res ne $name ){
+   if( $res ne $listname ){
      return undef;
    }else{
      return $loop;
@@ -207,16 +201,16 @@ sub PostMe_Check($$) {
 # PostMe_Create - Create a new PostMe
 # 
 # Parameter hash = hash of device addressed
-#           name = name of PostMe
+#           listname = name of PostMe
 #
 #########################################################################################
 
 sub PostMe_Create($$) {
-   my ($hash,$name) = @_;
+   my ($hash,$listname) = @_;
    my $devname = $hash->{NAME}; 
    
-   if( PostMe_Check($hash,$name) ){
-     my $mga = "Error, a PostMe named $name does already exist";
+   if( PostMe_Check($hash,$listname) ){
+     my $mga = "Error, a PostMe named $listname does already exist";
      Log 1,"[PostMe_Create] $mga";
      return "$mga";
    }
@@ -226,12 +220,12 @@ sub PostMe_Create($$) {
    $cnop++;
    
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash, sprintf("postme%02dName",$cnop),$name);
+   readingsBulkUpdate($hash, sprintf("postme%02dName",$cnop),$listname);
    readingsBulkUpdate($hash, sprintf("postme%02dCont",$cnop),"");
    readingsBulkUpdate($hash, "postmeCnt",$cnop);
    readingsEndUpdate($hash,1); 
  
-   Log3 $devname,3,"[PostMe] Added a new PostMe named $name";
+   Log3 $devname,3,"[PostMe] Added a new PostMe named $listname";
    return undef;
 }
 
@@ -240,25 +234,25 @@ sub PostMe_Create($$) {
 # PostMe_Delete - Delete an existing PostMe
 # 
 # Parameter hash = hash of device addressed
-#           name = name of PostMe
+#           listname = name of PostMe
 #
 #########################################################################################
 
 sub PostMe_Delete($$) {
-   my ($hash,$name) = @_;
+   my ($hash,$listname) = @_;
    my $devname = $hash->{NAME}; 
    my $loop;
    
-   if( index(AttrVal("$devname","postmeStd",""),$name) != -1){
-     my $mga = "Error, the PostMe named $name is a standard PostMe and cannot be deleted";
+   if( index(AttrVal("$devname","postmeStd",""),$listname) != -1){
+     my $mga = "Error, the PostMe named $listname is a standard PostMe and cannot be deleted";
      Log 1,"[PostMe_Delete] $mga";
      return "$mga";
    }
    
-   my $pmn=PostMe_Check($hash,$name);
+   my $pmn=PostMe_Check($hash,$listname);
    
    if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
+     my $mga = "Error, a PostMe named $listname does not exist";
      Log 1,"[PostMe_Delete] $mga";
      return "$mga";
    }
@@ -281,7 +275,7 @@ sub PostMe_Delete($$) {
    fhem("deletereading $devname ".sprintf("postme%02dName",$cnop+1));
    fhem("deletereading $devname ".sprintf("postme%02dCont",$cnop+1));
 
-   Log3 $devname,3,"[PostMe] Deleted PostMe named $name";
+   Log3 $devname,3,"[PostMe] Deleted PostMe named $listname";
    return undef;
  }
 
@@ -290,26 +284,26 @@ sub PostMe_Delete($$) {
 # PostMe_Rename - Renames an existing PostMe
 # 
 # Parameter hash = hash of device addressed
-#           name = name of PostMe
+#           listname = name of PostMe
 #           newname = newname of PostMe
 #
 #########################################################################################
 
 sub PostMe_Rename($$$) {
-   my ($hash,$name,$newname) = @_;
+   my ($hash,$listname,$newname) = @_;
    my $devname = $hash->{NAME}; 
    my $loop;
    
-   if( index(AttrVal("$devname","postmeStd",""),$name) != -1){
-     my $mga = "Error, the PostMe named $name is a standard PostMe and cannot be renamed";
+   if( index(AttrVal("$devname","postmeStd",""),$listname) != -1){
+     my $mga = "Error, the PostMe named $listname is a standard PostMe and cannot be renamed";
      Log 1,"[PostMe_Rename] $mga";
      return "$mga";
    }
    
-   my $pmn=PostMe_Check($hash,$name);
+   my $pmn=PostMe_Check($hash,$listname);
    
    if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
+     my $mga = "Error, a PostMe named $listname does not exist";
      Log 1,"[PostMe_Rename] $mga";
      return "$mga";
    }
@@ -324,7 +318,7 @@ sub PostMe_Rename($$$) {
    
    readingsSingleUpdate($hash,sprintf("postme%02dName",$pmn),$newname,1);
    
-   Log3 $devname,3,"[PostMe] Renamed PostMe named $name into $newname";
+   Log3 $devname,3,"[PostMe] Renamed PostMe named $listname into $newname";
    return undef;
 }
 
@@ -337,13 +331,13 @@ sub PostMe_Rename($$$) {
 #########################################################################################
 
 sub PostMe_Add($$@) {
-   my ($hash,$name,@args) = @_;
+   my ($hash,$listname,@args) = @_;
    my $devname = $hash->{NAME}; 
    
-   my $pmn=PostMe_Check($hash,$name);
+   my $pmn=PostMe_Check($hash,$listname);
    
    if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
+     my $mga = "Error, a PostMe named $listname does not exist";
      Log 1,"[PostMe_Add] $mga";
      return "$mga";
    }
@@ -357,42 +351,151 @@ sub PostMe_Add($$@) {
    my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
    my $ind  = index($old,$item);
    if( $ind >= 0 ){
-     my $mga = "Error, item $item is already present in PostMe $name";
+     my $mga = "Error, item $item is already present in PostMe $listname";
      Log 1,"[PostMe_Add] $mga";
      return "$mga"; 
    }
-   $old    .= ","
+   $old    .= AttrVal($devname,"listseparator",',')
      if($old ne "");
    #-- TODO: META DATA MISSING
    readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),$old.$item,1);
 
-   Log3 $devname,3,"[Postme] Added item $item to PostMe named $name";
+   Log3 $devname,3,"[Postme] Added item $item to PostMe named $listname";
+   return undef;
+ }
+ 
+#########################################################################################
+#
+# PostMe_Remove - Remove something from a PostMe
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
+
+sub PostMe_Remove($$@) {
+   my ($hash,$listname,@args) = @_;
+   my $devname = $hash->{NAME}; 
+   
+   my $pmn=PostMe_Check($hash,$listname);
+   
+   if( !$pmn ){
+     my $mga = "Error, a PostMe named $listname does not exist";
+     Log 1,"[PostMe_Remove] $mga";
+     return "$mga";
+   }
+   my $raw = join(' ',@args);
+   my $listsep = AttrVal($devname,"listseparator",',');
+   
+   #-- remove meta data
+   my $item = $raw;
+   $item =~ s/\[.*\]//g;
+   
+   #-- get old content
+   my $new  = "";
+   my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
+   my @lines= split($listsep,$old);
+      
+   #-- item may be of type item\d\d
+   if( $item =~ /item(\d+)/ ){
+     $item = $lines[$1];
+   }
+   
+   #-- check old content
+   my $ind  = index($old,$item);
+   if( $ind < 0 ){
+     my $mga = "Error, item $item is not present in PostMe $listname";
+     Log 1,"[PostMe_Remove] $mga";
+     return "$mga";
+   }
+   
+   #-- item may be a short version of the real entry
+   for( my $loop=0;$loop<int(@lines);$loop++){
+     $ind  = index($lines[$loop],$item);
+     #-- cleanup reminders
+     if( $ind >= 0 ){
+       my $line = $lines[$loop];
+       my $itex = $line;
+       my $meta = $line;
+       $itex    =~ s/\s*\[.*//;
+       #-- only if attributes present
+       if( $line =~ /.*\[.*\].*/){
+         $meta =~ s/.*\[//;
+         $meta =~ s/\]//;
+         my @lines2 = split('" ',$meta);
+         for( my $loop2=0;$loop2<int(@lines2);$loop2++){
+           my $attr = $lines2[$loop2];
+           $attr   =~ /(.*)="(.*)/;
+           $attr   = $1;
+           my $val = $2;
+           PostMe_cleanSpecial($hash,$listname,$itex,$attr);
+         }
+       } 
+     #-- different item
+     }else{
+       $new  .= $lines[$loop].$listsep;
+     }  
+   }
+   $new =~ s/$listsep$listsep/$listsep/;
+   $new =~ s/^$listsep//;
+   $new =~ s/$listsep$//;
+   
+   readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),$new,1);
+
+   Log3 $devname,3,"[Postme] Removed item $item from PostMe named $listname";
    return undef;
  }
 
 #########################################################################################
 #
-# PostMe_Modify - Modify something from a PostMe
+# PostMe_Clear - clear a PostMe
+# 
+# Parameter hash = hash of device addressed
+#           name = name of PostMe
+#
+#########################################################################################
+
+sub PostMe_Clear($$) {
+   my ($hash,$listname) = @_;
+   my $devname = $hash->{NAME}; 
+   
+   my $pmn=PostMe_Check($hash,$listname);
+   
+   if( !$pmn ){
+     my $mga = "Error, a PostMe named $listname does not exist";
+     Log 1,"[PostMe_Clear] $mga";
+     return "$mga";
+   }
+   PostMe_Special($hash,$listname,1);
+   readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),"",1 );
+   
+   Log3 $devname,3,"[PostMe_Clear] Cleared PostMe named $listname";
+   return undef;
+ }
+
+#########################################################################################
+#
+# PostMe_Modify - Annotate an item from a PostMe with meta data
 # 
 # Parameter hash = hash of device addressed
 #
 #########################################################################################
 
 sub PostMe_Modify($$@) {
-   my ($hash,$name,@args) = @_;
+   my ($hash,$listname,@args) = @_;
    my $devname = $hash->{NAME}; 
    
-   my $pmn=PostMe_Check($hash,$name);
+   my $pmn=PostMe_Check($hash,$listname);
    
    if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
+     my $mga = "Error, a PostMe named $listname does not exist";
      Log 1,"[PostMe_Remove] $mga";
      return "$mga";
    }
+   my $listsep = AttrVal($devname,"listseparator",',');
    #-- difficult to separate item from new meta data. For now, first term is the item,
    #   second term is the attribute and remaining terms are the value
-   my $item = @args[0];
-   my $attr = @args[1];
+   my $item = $args[0];
+   my $attr = $args[1];
    splice(@args,0,2);
    my $val  = join(' ',@args);
    
@@ -400,19 +503,19 @@ sub PostMe_Modify($$@) {
    my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
    my $ind  = index($old,$item);
    if( $ind < 0 ){
-     my $mga = "Error, item $item is not present in PostMe $name";
+     my $mga = "Error, item $item is not present in PostMe $listname";
      Log 1,"[PostMe_Remove] $mga";
      return "$mga";
    }
    #-- item 
-   my @lines = split(',',$old);
+   my @lines = split($listsep,$old);
    my $new   = "";
    for( my $loop=0;$loop<int(@lines);$loop++){
      $old  = $lines[$loop];
      $ind  = index($old,$item);
      #-- different item
      if( $ind < 0 ){
-       $new  .= $old.',';
+       $new  .= $old.$listsep;
      #-- correct item
      }elsif( $ind == 0 ){
        #-- item may be a short version of the real entry, or may consist of several words
@@ -422,7 +525,9 @@ sub PostMe_Modify($$@) {
          if( $fullitem ne $item );
        $new .= $item.' [';
        #-- no attributes present so far
-       if( $old !~ /.*\[.*\].*/ ){
+       if( ($old !~ /.*\[.*\].*/) && ($val) ){
+         PostMe_cleanSpecial($hash,$listname,$item,$attr);
+         PostMe_procSpecial($hash,$listname,$item,$attr,$val);
          $new .= $attr.'="'.$val.'"';
        #-- attributes present already
        }else{
@@ -431,6 +536,8 @@ sub PostMe_Modify($$@) {
          #-- particular attribute not yet present
          if( index($old,$attr) < 0){
            if( $val ){
+             PostMe_cleanSpecial($hash,$listname,$item,$attr);
+             PostMe_procSpecial($hash,$listname,$item,$attr,$val);
              $new .= $old.' '.$attr.'="'.$val.'"'
            } 
          #-- particular attribute already present        
@@ -445,6 +552,8 @@ sub PostMe_Modify($$@) {
              }else{
                #-- overwrite, if val ist given
                if( $val ){
+                 PostMe_cleanSpecial($hash,$listname,$item,$attr);
+                 PostMe_procSpecial($hash,$listname,$item,$attr,$val);
                  $new .= $attr.'="'.$val.'" ';
                #-- remove, if no val is given
                }
@@ -452,7 +561,7 @@ sub PostMe_Modify($$@) {
            }  
          }  
        }  
-       $new .= '],'; 
+       $new .= ']'.$listsep; 
      } 
    }
    #-- correction of sloppy formatting above
@@ -460,90 +569,224 @@ sub PostMe_Modify($$@) {
    $new =~ s/\s\]/\]/g;
    $new =~ s/\[\s/\[/g;
    $new =~ s/""/"/g;
-   $new =~ s/,$//g;
+   $new =~ s/$listsep$//g;
    
    readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),$new,1);
 
-   Log3 $devname,3,"[Postme] Modified item $item in PostMe named $name";
+   Log3 $devname,3,"[Postme] Modified item $item in PostMe named $listname";
    return undef;
+}
+ 
+########################################################################################
+#
+# PostMe_Special - process all special annotations of a PostMe
+# 
+# Parameter hash     = hash of device addressed
+#           listanem = name of the PostMe
+#           clean    = 0 normal processing, = 1 clean all reminders
+#
+#########################################################################################
+
+sub PostMe_Special($$$) {
+   my ($hash,$listname,$clean) = @_;
+   my $devname = $hash->{NAME}; 
+   
+   my $pmn=PostMe_Check($hash,$listname);
+   
+   if( !$pmn ){
+     my $mga = "Error, a PostMe named $listname does not exist";
+     Log 1,"[PostMe_Special] $mga";
+     return "$mga";
+   }
+   my $listsep = AttrVal($devname,"listseparator",',');
+   
+   #-- check content
+   my $cont  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
+   
+   #-- item 
+   my @lines = split($listsep,$cont);
+   for( my $loop=0;$loop<int(@lines);$loop++){
+     my $line = $lines[$loop];
+     my $item = $line;
+     my $meta = $line;
+     $item    =~ s/\s*\[.*//;
+     #-- only if attributes present
+     if( $line =~ /.*\[.*\].*/){
+       $meta =~ s/.*\[//;
+       $meta =~ s/\]//;
+       my @lines2 = split('" ',$meta);
+       for( my $loop2=0;$loop2<int(@lines2);$loop2++){
+         my $attr = $lines2[$loop2];
+         $attr   =~ /(.*)="(.*)/;
+         $attr   = $1;
+         my $val = $2;
+         PostMe_cleanSpecial($hash,$listname,$item,$attr);
+         PostMe_procSpecial($hash,$listname,$item,$attr,$val)
+           if( $clean==0 ); 
+       }
+     }
+   }      
+ }
+ 
+#########################################################################################
+#
+# PostMe_procSpecial - process special annotations
+# Parameter hash = hash of device addressed
+#           name = name of the PostMe
+#           item = item content
+#           attr = attribute name
+#           val  = attribute value
+#
+#########################################################################################
+
+sub PostMe_procSpecial($$$$$){
+  my($hash,$listname,$item,$attr,$val) =@_;
+  my $devname=$hash->{NAME};
+  
+  #-- get the number of this list
+  my $pmn = PostMe_Check($hash,$listname);
+  if( !$pmn ){
+    my $mga = "Error, a PostMe named $listname does not exist";
+    Log 1,"[PostMe_procSpecial] $mga";
+    return "$mga";
+  }
+  
+  if( $attr eq "at" ){
+    my ($timeraw,$year,$mon,$day,$hour,$min,$sec,$delta,$deltah,$deltam,$repeat);
+    my ($secn,$minn,$hourn,$dayn,$monn,$yearn) = localtime(time);
+    
+    my $str = "{";
+    if( $val =~ /((\d\d\:\d\d)|(\d\d\:\d\d\:\d\d)|(\d\d\d\d-\d\d-\d\dT\d\d\:\d\d\:\d\d))(\-(\d\d:\d\d)(P(\d+))?)/ ){
+      $timeraw = $1;
+      $delta   = $6;
+      $repeat  = ($8)?$8:1;
+      $timeraw =~ /((\d\d\d\d)-(\d\d)-(\d\d)T)?(\d\d)\:(\d\d)\:?(\d\d)?/;
+      #($year,$mon,$day,$hour,$min,$sec) = ($2,$3-1,$4,$5,$6,$7);
+      $year =($2)?$2  : $yearn+1900;
+      $mon  =($3)?$3-1: $monn;
+      $mon  = ( ($mon>=0)&&($mon<=11) )? $mon:0;
+      $day  =($4)?$4  : $dayn;
+      $day  = ( ($day>=1)&&($day<=31) )? $day:0;
+      $hour =($5)?$5  : $hourn;
+      $hour = ( ($hour>=0)&&($hour<=23) )? $hour:0;
+      $min  =($6)?$6  : $minn;
+      $min  = ( ($min>=0)&&($min<=59) )? $min:0;
+      $sec  =($7)?$7  : "00";
+      $sec  = ( ($sec>=0)&&($sec<=59) )? $sec:0;
+            
+      $delta =~ /(\d\d):(\d\d)/;
+      ($deltah,$deltam)=($1,$2);
+      
+      my $deltas = min(3600*$deltah+60*$deltam,86400);
+      $repeat = ( ($repeat>=0)&&($repeat<=10) )? $repeat:0;
+     
+      my $ftime = timelocal($sec,$min,$hour,$day,$mon,$year);
+      my $ftimel= localtime($ftime);
+      #-- determine send strings
+      my $mrcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
+      my $mfun  = AttrVal($devname,"postmeMailFun",undef);
+      if( $mrcpt && $mfun ){ 
+         $str  .= "$mfun('$mrcpt','$listname','$item => $ftimel');;";
+      }
+      
+      my $trcpt = AttrVal($devname,sprintf("postme%02dMsgRec",$pmn),undef);
+      my $tfun  = AttrVal($devname,"postmeMsgFun",undef);
+      if( $trcpt && $tfun ){ 
+         $str  .= "$tfun('$trcpt','$listname','$item => $ftimel');;";
+      }
+      $str .="}";
+                                                                                                                                     
+      #-- define name for timer     
+      my $safename = PostMe_safeItem($hash,$listname,$item,"at");
+      fhem("define ".$safename."_00 at $ftime $str");
+      fhem("attr ".$safename."_00 room hidden");
+     
+      if( $delta ){
+        for(my $i=1;$i<=$repeat;$i++){
+          my $stime = $ftime-$i*$deltas;
+          my $sname = $safename.sprintf("_%02d",$i);
+          fhem("define ".$sname." at $stime $str");
+          fhem("attr   ".$sname." room hidden");
+        }
+      }
+    }  
+  }elsif( $attr eq "notify" ){
+    return
+      if( !$val);
+    my $str = "{";
+    #-- determine send strings
+    my $mrcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
+    my $mfun  = AttrVal($devname,"postmeMailFun",undef);
+    if( $mrcpt && $mfun ){ 
+       $str  .= "$mfun('$mrcpt','$listname','$item');;";
+    }
+      
+    my $trcpt = AttrVal($devname,sprintf("postme%02dMsgRec",$pmn),undef);
+    my $tfun  = AttrVal($devname,"postmeMsgFun",undef);
+    if( $trcpt && $tfun ){ 
+       $str  .= "$tfun('$trcpt','$listname','$item');;";
+    }
+    $str .="}";
+                                                                                                                                     
+    #-- define name for notify     
+    my $safename = PostMe_safeItem($hash,$listname,$item,"notify");
+    fhem("define ".$safename." notify $val $str");
+    fhem("attr ".$safename." room hidden");
+  
+  } 
 }
 
 #########################################################################################
 #
-# PostMe_Remove - Remove something from a PostMe
-# 
+# PostMe_cleanSpecial - process special annotations by cleaning leftover procedures
 # Parameter hash = hash of device addressed
+#           name = name of the PostMe
+#           item = item content
+#           attr = attribute name
 #
 #########################################################################################
 
-sub PostMe_Remove($$@) {
-   my ($hash,$name,@args) = @_;
-   my $devname = $hash->{NAME}; 
-   
-   my $pmn=PostMe_Check($hash,$name);
-   
-   if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
-     Log 1,"[PostMe_Remove] $mga";
-     return "$mga";
-   }
-   my $raw = join(' ',@args);
-   #-- remove meta data
-   my $item = $raw;
-   $item =~ s/\[.*\]//g;
-   #-- check old content
-   my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
-   my $ind  = index($old,$item);
-   if( $ind < 0 ){
-     my $mga = "Error, item $item is not present in PostMe $name";
-     Log 1,"[PostMe_Remove] $mga";
-     return "$mga";
-   }
-   #-- item may be a short version of the real entry
-   my @lines= split(',',$old);
-   my $new  = "";
-   for( my $loop=0;$loop<int(@lines);$loop++){
-     $ind  = index($lines[$loop],$item);
-     if( $ind < 0 ){
-       $new  .= $lines[$loop].',';
-     }  
-   }
-   $new =~ s/,,/,/;
-   $new =~ s/^,//;
-   $new =~ s/,$//;
-   
-   readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),$new,1);
-
-   Log3 $devname,3,"[Postme] Removed item $item from PostMe named $name";
-   return undef;
- }
-
+sub PostMe_cleanSpecial($$$$){
+  my($hash,$listname,$item,$attr) =@_;
+  my $devname=$hash->{NAME};
+  
+  if( $attr eq "at" ){
+    #-- define name for timer     
+    my $safename = PostMe_safeItem($hash,$listname,$item,"at");
+    fhem("delete ".$safename.".*");
+  }elsif( $attr eq "notify" ){
+    #-- define name for notify     
+    my $safename = PostMe_safeItem($hash,$listname,$item,"notify");
+    fhem("delete ".$safename.".*");
+  }  
+} 
+  
 #########################################################################################
 #
-# PostMe_Clear - clear a PostMe
-# 
+# PostMe_safeItem - transform an item content into a FHEM name
 # Parameter hash = hash of device addressed
-#           name = name of PostMe
+#           name = name of the PostMe
+#           item = item content
+#           attr = attribute name
 #
 #########################################################################################
 
-sub PostMe_Clear($$) {
-   my ($hash,$name) = @_;
-   my $devname = $hash->{NAME}; 
-   
-   my $pmn=PostMe_Check($hash,$name);
-   
-   if( !$pmn ){
-     my $mga = "Error, a PostMe named $name does not exist";
-     Log 1,"[PostMe_Clear] $mga";
-     return "$mga";
-   }
-   
-   readingsSingleUpdate($hash, sprintf("postme%02dCont",$pmn),"",1 );
-   
-   Log3 $devname,3,"[PostMe] Cleared PostMe named $name";
-   return undef;
- }
+sub PostMe_safeItem($$$$){
+  my($hash,$listname,$item,$attr) =@_;
+  my $devname=$hash->{NAME};
+  
+  my $safeitem=join('_',split(' ',$item));
+  $safeitem = substr($safeitem,0,4);
+  $safeitem =~ tr/äöüÄÖÜß'/a_o_u_A_O_U_S__/;
+  
+  my $safelist=join('_',split(' ',$listname));
+  $safelist = substr($safelist,0,4);
+  $safelist =~ tr/äöüÄÖÜß'/a_o_u_A_O_U_S__/;
+  
+  my $safeattr = substr($attr,0,2);
+  
+  return $devname."rem_".$safelist."_".$safeitem."_".$safeattr;
+}
 
 #########################################################################################
 #
@@ -555,23 +798,23 @@ sub PostMe_Clear($$) {
 #########################################################################################
 
 sub PostMe_LineIn($$) {
-   my ($hash,$line) = @_;
-   my $devname = $hash->{NAME}; 
+  my ($hash,$line) = @_;
+  my $devname = $hash->{NAME}; 
    
- }
+  }
 
 #########################################################################################
 #
 # PostMe_LineOut - format a single PostMe line for output
 # 
-# Parameter hash   = hash of device addressed
-#           line   = raw data in the form item [att1="val1" att2="val2"]
+# Parameter line   = raw data in the form item [att1="val1" att2="val2"] 
+#                    (multiple items separated by comma)
 #           format = 0 - item only
 #
 #########################################################################################
 
-sub PostMe_LineOut($$$) {
-   my ($hash,$line,$format) = @_;
+sub PostMe_LineOut($$$$) {
+   my ($hash,$listname,$line,$format) = @_;
    my $devname = $hash->{NAME}; 
    my ($i,$line2,$item,$meat,$new,@lines,%meta);
    
@@ -592,8 +835,14 @@ sub PostMe_LineOut($$$) {
      return $item;
    
    #-- formats >= 10 for all items in a PostMe
-   }elsif( $format >= 10){
-     my @lines = split(',',$line);
+   }elsif( $format >= 10){    
+     my $listsep = AttrVal($devname,"listseparator",',');
+     my @lines = split($listsep,$line);
+     
+     #-- format 13, return array
+     return \@lines
+       if( $format==14 ); 
+     
      my $new   = "";
      my $item;
      my $meat;
@@ -619,11 +868,11 @@ sub PostMe_LineOut($$$) {
          $meat = "";
          $item =~ s/\s*$//;
        }
-       #-- plain format, item only
+       #-- format 10: plain format, item only
        $new .= $item.','
          if( $format == 10);
          
-       #-- meta data in brackets
+       #-- format 11: meta data in brackets
        if( $format == 11){
          if( $meat ne "" ){
            $new .= $item.'('.$meat.'),';
@@ -631,6 +880,10 @@ sub PostMe_LineOut($$$) {
            $new .= $item.',';
          }
        }
+         
+       #-- format 13: Telegram format item w indexing
+       $new .= '('.$item.sprintf(':%sitem%02d) ',$listname,$loop)
+         if( $format == 13);
          
        #-- json format by hand
        if( $format == 15 ){
@@ -654,6 +907,72 @@ sub PostMe_LineOut($$$) {
 
 #########################################################################################
 #
+# PostMe_tgi - format a single PostMe as inline keyboard for telegram (items w. indexing)
+# 
+# Parameter devname  = device name
+#           listname = list name
+#
+#########################################################################################
+
+sub PostMe_tgi($$) {
+  my ($devname,$listname) = @_;
+  my $pmn;
+  my $res = "";
+  my $hash = $defs{$devname};
+  if( !$hash ){
+    my $mga = "Error, a PostMe device named $devname does not exist";
+    Log 1,"[PostMe_tgi] $mga";
+    return "$mga";
+  }
+
+  #Log 1,"[PostMe_Get] with name=$listname key=$key args=@args";
+    
+  $pmn = PostMe_Check($hash,$listname);
+  if( !$pmn ){
+    my $mga = "Error, a PostMe named $listname does not exist";
+    Log 1,"[PostMe_tgi] $mga";
+    return "$mga";
+  }
+
+  $res = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""),13);
+  $res.= " ".$listname;
+  return $res;
+}
+
+
+#########################################################################################
+#
+# PostMe_tgj - format a single PostMe as simple array
+# 
+# Parameter devname  = device name
+#           listname = list name
+#
+###########################################################################k##############
+
+sub PostMe_tgj($$) {
+  my ($devname,$listname) = @_;
+  my $pmn;
+  my $hash = $defs{$devname};
+  if( !$hash ){
+    my $mga = "Error, a PostMe device named $devname does not exist";
+    Log 1,"[PostMe_tgk] $mga";
+    return "$mga";
+  }
+
+  #Log 1,"[PostMe_Get] with name=$listname key=$key args=@args";
+    
+  $pmn = PostMe_Check($hash,$listname);
+  if( !$pmn ){
+    my $mga = "Error, a PostMe named $listname does not exist";
+    Log 1,"[PostMe_tgk] $mga";
+    return "$mga";
+  }
+  my @ret=PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""),14);
+  return \@ret;
+}
+
+#########################################################################################
+#
 # PostMe_Set - Implements the Set function
 # 
 # Parameter hash = hash of device addressed
@@ -661,7 +980,7 @@ sub PostMe_LineOut($$$) {
 #########################################################################################
 
 sub PostMe_Set($@) {
-  my ( $hash, $name, $key, @args ) = @_;
+  my ( $hash, $devname, $key, @args ) = @_;
 
   #-- for the selector: which values are possible
   if ($key eq "?"){
@@ -672,29 +991,28 @@ sub PostMe_Set($@) {
     return "Unknown argument $key, choose one of " .join(" ",@cmds);
   }
   
-  my $value = shift @args; 
-  #Log 1,"[PostMe_Set] called with key ".$key." and value $value ".join(' ',@args);
+  my $listname = shift @args; 
   
   if( $key eq "create"){
-    PostMe_Create($hash,$value);
+    PostMe_Create($hash,$listname);
   
   }elsif( $key eq "delete"){
-    PostMe_Delete($hash,$value);
+    PostMe_Delete($hash,$listname);
       
   }elsif( $key eq "rename"){
-    PostMe_Rename($hash,$value,@args[0]);
+    PostMe_Rename($hash,$listname,@args[0]);
   
   }elsif( $key eq "add"){
-    PostMe_Add($hash,$value,@args);
+    PostMe_Add($hash,$listname,@args);
 
   }elsif( $key eq "modify"){
-    PostMe_Modify($hash,$value,@args);
+    PostMe_Modify($hash,$listname,@args);
 
   }elsif( $key eq "remove"){
-    PostMe_Remove($hash,$value,@args);
+    PostMe_Remove($hash,$listname,@args);
   
   }elsif( $key eq "clear"){
-    PostMe_Clear($hash,$value);
+    PostMe_Clear($hash,$listname);
   }
 }
 
@@ -707,12 +1025,9 @@ sub PostMe_Set($@) {
 #########################################################################################
 
 sub PostMe_Get($$$@) {
-  my ($hash, $name, $key, @args) = @_;
+  my ($hash, $devname, $key, @args) = @_;
   my $pmn;
   my $res = "";
-  my $devname = $hash->{NAME};
-   
-  #Log 1,"[PostMe_Get] with name=$name key=$key args=@args";
  
   my $hasMail = defined(AttrVal($devname,"postmeMailFun",undef)) ? 1 : 0;
   my $hasMsgr = defined(AttrVal($devname,"postmeMsgFun",undef)) ? 1 : 0;
@@ -731,7 +1046,7 @@ sub PostMe_Get($$$@) {
           if( $i >1);
        $pml .= ReadingsVal($devname, sprintf("postme%02dName",$i),"");
     } 
-    my @cmds = ("version:noArg","all:noArg","list:".$pml);
+    my @cmds = ("version:noArg","all:noArg","allspecial","list:".$pml,"special:".$pml);
     $res = "Unknown argument $key choose one of ".join(" ",@cmds);
     $res.= " mail:".$pml
       if($hasMail);
@@ -744,17 +1059,16 @@ sub PostMe_Get($$$@) {
     return $res;
   }
   
-  #Log 1,"[PostMe_Get] with key=$key";
+  my $listname = @args[0];
     
   if ($key eq "version") {
     return "PostMe.version => $postmeversion";
    
    #-- list one PostMe
-  } elsif( ($key eq "list")||($key eq "JSON")||($key eq "mail")||($key eq "message")||($key eq "TTS") ){
-   
-    $pmn = PostMe_Check($hash,$args[0]);
+  } elsif( ($key eq "list")||($key eq "special")||($key eq "JSON")||($key eq "mail")||($key eq "message")||($key eq "TTS") ){    
+    $pmn = PostMe_Check($hash,$listname);
     if( !$pmn ){
-      my $mga = "Error, a PostMe named $name does not exist";
+      my $mga = "Error, a PostMe named $listname does not exist";
       Log 1,"[PostMe_Get] $mga";
       return "$mga";
     }
@@ -762,27 +1076,29 @@ sub PostMe_Get($$$@) {
     if( $key eq "list" ){
       $res = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
       $res .= ": ";
-      $res .= PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"")."\n",10);
+      $res .= PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"")."\n",10);
       return $res;
-      
+    
+    ##-- list
+    }elsif( $key eq "special" ){
+      PostMe_Special($hash,$listname,0);
+     
     ##-- JSON
     }elsif( $key eq "JSON" ){
-      my $line = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
-      $res = PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""),15);
-      return '{"'.$line.'": ['.$res.']}';
+      $res = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""),15);
+      return '{"'.$listname.'": ['.$res.']}';
     
     ##-- send by mail
     }elsif( $key eq "mail" ){
       my $rcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
-      my $sbjt = ReadingsVal($devname, sprintf("postme%02dName",$pmn),undef);
-      my $text = PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
+      my $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
       my $fun  = AttrVal($devname,"postmeMailFun",undef);
       
-      if( $rcpt && $sbjt && $text && $fun ){ 
+      if( $rcpt && $text && $fun ){ 
         my $ref = \&$fun;
-        &$ref($rcpt,$sbjt,$text);
+        &$ref($rcpt,$listname,$text);
       }
-      my $mga = "$sbjt sent by mail";
+      my $mga = "$listname sent by mail";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
@@ -790,30 +1106,29 @@ sub PostMe_Get($$$@) {
     ##-- send by instant messenger
     }elsif( $key eq "message" ){
       my $rcpt = AttrVal($devname,sprintf("postme%02dMsgRec",$pmn),undef);
-      my $sbjt = ReadingsVal($devname, sprintf("postme%02dName",$pmn),undef);
-      my $text = PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
+      my $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
+      $text =~ s/,/,\n/g;
       my $fun  = AttrVal($devname,"postmeMsgFun",undef);
       
-      if( $rcpt && $sbjt && $text && $fun ){      
+      if( $rcpt && $text && $fun ){      
         my $ref = \&$fun;
-        &$ref($rcpt,$sbjt,$text);
+        &$ref($rcpt,$listname,$text);
       }
-      my $mga = "$sbjt sent by messenger";
+      my $mga = "$listname sent by messenger";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
       
     ##-- speak as TTS
     }elsif( $key eq "TTS" ){
-      my $sbjt = ReadingsVal($devname, sprintf("postme%02dName",$pmn),undef);
-      my $text = $sbjt.": ".PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
+      my $text = $listname.": ".PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
       my $fun  = AttrVal($devname,"postmeTTSFun",undef);
       
-      if( $sbjt && $text && $fun ){
+      if( $text && $fun ){
         my $ref = \&$fun;
         &$ref($text);
       }
-      my $mga = "$sbjt spoken by TTS";
+      my $mga = "$listname spoken by TTS";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
@@ -826,11 +1141,21 @@ sub PostMe_Get($$$@) {
    
     for( my $loop=1;$loop<=$cnop;$loop++){
       $res .= ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
-      $res .= ": ".PostMe_LineOut($hash,ReadingsVal($devname, sprintf("postme%02dCont",$loop),"")."\n",10);
+      $res .= ": ".PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$loop),"")."\n",10);
       $res .= "\n";
     }
     return $res;
-  } 
+  #-- process all PostMe special annotations
+  } elsif ($key eq "allspecial") {
+    #-- current number of PostMes
+    my $cnop = ReadingsVal($devname,"postmeCnt",0);
+   
+    for( my $loop=1;$loop<=$cnop;$loop++){
+      $listname = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+      PostMe_Special($hash,$listname,0);
+    }
+    return $res;
+  }
 }
 
 #########################################################################################
@@ -901,8 +1226,8 @@ sub PostMe_detailFn(){
            '<input type="submit" name="cmd.get'.$pmname.'" value="get" class="get"/><div class="get downText">&nbsp;'.$pmname.'&nbsp;</div>'.
            '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;" '.
            'onchange="dc2(this.selectedIndex)">'.
-           '<option selected="selected" value="list">list</option><option value="mail">mail</option><option value="message">message</option><option value="TTS">TTS</option>'.
-           '<option value="JSON">JSON</option><option value="all">all</option><option value="version">version</option>'.
+           '<option selected="selected" value="list">list</option><option value="special">special</option><option value="mail">mail</option><option value="message">message</option><option value="TTS">TTS</option>'.
+           '<option value="JSON">JSON</option><option value="all">all</option><option value="allspecial">allspecial</option><<option value="version">version</option>'.
            '</select>'.
            '<select type="hidden" id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
            '</form></td></tr></table>';
@@ -924,8 +1249,8 @@ sub PostMe_widget($) {
   my $type   = $FW_webArgs{type};
   $type = "show"
     if( !$type);
-  my $devname= $FW_webArgs{postit};
-  my $name   = $FW_webArgs{name};
+  my $devname  = $FW_webArgs{postit};
+  my $listname = $FW_webArgs{name};
   my $pmn;
   my $res = "";
 
@@ -958,9 +1283,9 @@ sub PostMe_widget($) {
       #-- this is for the selector
       $res .= '<div id="postme" class="postmeclass">';    
       for( my $loop=1;$loop<=$cnop;$loop++){
-        my $name = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
-        my $sel  = sprintf("sel%02d",$loop);
-        $res .= '<div id="'.$sel.'"><img src="'.$icon.'"/>'.$name.'</div><br/>';
+        my $name2 = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+        my $sel   = sprintf("sel%02d",$loop);
+        $res .= '<div id="'.$sel.'"><img src="'.$icon.'"/>'.$name2.'</div><br/>';
       };
       $res .= '</div>';
       
@@ -978,14 +1303,14 @@ sub PostMe_widget($) {
       
       #-- this is the scripting for the connection selector-dialog
       for( my $loop=1;$loop<=$cnop;$loop++){
-        my $name = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+        my $name2 = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
         my $sel  = sprintf("sel%02d",$loop);
         if( $click == 0){
-          $res .=         '$("#'.$sel.'").mouseover(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name.'",';
+          $res .=         '$("#'.$sel.'").mouseover(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name2.'",';
           $res .=                                          'function(){dlg1.dialog("open")})});';
           $res .=         '$("#'.$sel.'").mouseout(function(){dlg1.dialog("close")});';
         }else{
-          $res .=         '$("#'.$sel.'").click(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name.'",';
+          $res .=         '$("#'.$sel.'").click(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name2.'",';
           $res .=                                          'function(){dlg1.dialog("open")})});';
         }
       }
@@ -999,13 +1324,13 @@ sub PostMe_widget($) {
       $res .= $css;
       $res .= '<div class="postmeclass">';
       for( my $loop=1;$loop<=$cnop;$loop++){
-        my $name = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+        my $name2 = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
         if( $click == 0){
-          $res .= '<div onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
-          $res .= 'onmouseout="postit.close()"><img src="'.$icon.'"/>'.$name.'</div><br/>';
+          $res .= '<div onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name2.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
+          $res .= 'onmouseout="postit.close()"><img src="'.$icon.'"/>'.$name2.'</div><br/>';
         }else{
-          $res .= '<div onclick="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');">';
-          $res .= '<img src="'.$icon.'"/>'.$name.'</div><br/>';
+          $res .= '<div onclick="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name2.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');">';
+          $res .= '<img src="'.$icon.'"/>'.$name2.'</div><br/>';
         }
       }
       FW_pO $res.'</div>';
@@ -1016,10 +1341,10 @@ sub PostMe_widget($) {
       $FW_RET="";
       FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100px" height="100px">';
       for( my $loop=1;$loop<=$cnop;$loop++){
-        my $name = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
+        my $name2 = ReadingsVal($devname, sprintf("postme%02dName",$loop),"");
         $res.=  sprintf('<text x="10" y="%02d" fill="blue" style="font-family:Helvetica;font-size:12px;font-weight:bold" ',10+15*$loop);
-        $res.=  'onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
-        $res.=  'onmouseout="postit.close()">'.$name.'</text>';
+        $res.=  'onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name2.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
+        $res.=  'onmouseout="postit.close()">'.$name2.'</text>';
         $res.= <g>
       }
       FW_pO $res.'</svg>';
@@ -1028,14 +1353,14 @@ sub PostMe_widget($) {
   }
   
   #-- PostMe name
-  if( !$name ){
+  if( !$listname ){
     Log 1,"[PostMe_widget] Error, web argument name=... is missing";
     return undef;
   }
 
-  $pmn = PostMe_Check($hash,$name);
+  $pmn = PostMe_Check($hash,$listname);
   if( !$pmn ){
-    Log 1,"[PostMe_widget] Error, a PostMe named $name does not exist";
+    Log 1,"[PostMe_widget] Error, a PostMe named $listname does not exist";
     return undef;
   }
   
@@ -1044,7 +1369,6 @@ sub PostMe_widget($) {
   #-- jQuery rendering
     if( $style eq "jQuery"){
     
-      my $name = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
       my $sel  = sprintf("sel%02d",$pmn);
       
       $FW_RETTYPE = "text/html";
@@ -1056,7 +1380,7 @@ sub PostMe_widget($) {
       
       #-- this is for the selector
       $res .= '<div id="postme" class="postmeclass">';    
-      $res .= '<div id="'.$sel.'"><img src="'.$icon.'"/>'.$name.'</div><br/>';
+      $res .= '<div id="'.$sel.'"><img src="'.$icon.'"/>'.$listname.'</div><br/>';
       $res .= '</div>';
       
       #-- this is the scripting for the dialog box
@@ -1073,11 +1397,11 @@ sub PostMe_widget($) {
       
       #-- this is the scripting for the connection selector-dialog
       if( $click == 0){
-        $res .=         '$("#'.$sel.'").mouseover(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name.'",';
+        $res .=         '$("#'.$sel.'").mouseover(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$listname.'",';
         $res .=                                          'function(){dlg1.dialog("open")})});';
         $res .=         '$("#'.$sel.'").mouseout(function(){dlg1.dialog("close")});';
       }else{
-        $res .=         '$("#'.$sel.'").click(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$name.'",';
+        $res .=         '$("#'.$sel.'").click(function(){dlg1.load("/fhem/PostMe_widget?postit='.$devname.'&name='.$listname.'",';
         $res .=                                          'function(){dlg1.dialog("open")})});';
       }
       $res .= '</script>';
@@ -1089,24 +1413,22 @@ sub PostMe_widget($) {
       $FW_RET="";
       $res .= $css;
       $res .= '<div class="postmeclass">';
-      my $name = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
       if( $click == 0){
-        $res.=  '<div onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
+        $res.=  '<div onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$listname.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
         $res.=  'onmouseout="postit.close()">';
       }else{
-        $res.=  '<div     onclick="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');">';
+        $res.=  '<div     onclick="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$listname.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');">';
       }
-      FW_pO $res.'<img src="'.$icon.'"/>'.$name.'</div>';
+      FW_pO $res.'<img src="'.$icon.'"/>'.$listname.'</div>';
      
     #-- SVG rendering
     }else{
       $FW_RETTYPE = "image/svg+xml";
       $FW_RET="";
       FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100px" height="100px">';
-      my $name = ReadingsVal($devname, sprintf("postme%02dName",$pmn),"");
       $res.=  '<text x="10" y="10" fill="blue" style="font-family:Helvetica;font-size:12px;font-weight:bold" ';
-      $res.=  'onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$name.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
-      $res.=  'onmouseout="postit.close()">'.$name.'</text>';
+      $res.=  'onmouseover="postit=window.open(\'PostMe_widget?postit='.$devname.'&amp;name='.$listname.'\',\'postit\',\'height=200,width=200,top=400,left=400,menubar=no,toolbar=no,titlebar=no\');" ';
+      $res.=  'onmouseout="postit.close()">'.$listname.'</text>';
       FW_pO $res.'</svg>';
     }
     return ($FW_RETTYPE, $FW_RET);
@@ -1114,9 +1436,9 @@ sub PostMe_widget($) {
   
   ################################################## default (type missing) => content of a single postme
   
-  my @lines=split(',',ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""));
+  my @lines=split(AttrVal($devname,"listseparator",','),ReadingsVal($devname, sprintf("postme%02dCont",$pmn),""));
   if( !(int(@lines)>0) ){
-    #Log 1,"[PostMe_widget] Asking to display empty PostMe $name";
+    #Log 1,"[PostMe_widget] Asking to display empty PostMe $listname";
     return undef;
   }
 
@@ -1126,10 +1448,10 @@ sub PostMe_widget($) {
       $FW_RET="";
       $res .= $css;
       $res .= '<div class="postmeclass2" style="width:200px">';
-      $res .= '<b>'.$name.'</b><br/>';
+      $res .= '<b>'.$listname.'</b><br/>';
       for (my $i=0;$i<int(@lines);$i++){
         #--special for meta data
-        my $line=PostMe_LineOut($hash,$lines[$i],0);
+        my $line=PostMe_LineOut($hash,$listname,$lines[$i],0);
         $res.=  $line.'<br/>';
       }
       FW_pO $res.'</div>';
@@ -1141,10 +1463,10 @@ sub PostMe_widget($) {
       FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100px" height="100px">';
 
       $res =  '<text x="10" y="10" fill="blue" style="font-family:Helvetica;font-size:12px;font-weight:bold">';
-      $res.=  $name.'</text>';   
+      $res.=  $listname.'</text>';   
       for (my $i=0;$i<int(@lines);$i++){
         $res.=  sprintf('<text x="10" y="%02d" fill="blue" style="font-family:Helvetica;font-size:10px">',25+$i*12);
-        $res.=  PostMe_LineOut($hash,$lines[$i],0);
+        $res.=  PostMe_LineOut($hash,$listname,$lines[$i],0);
         $res.=  '</text>';
       }
       FW_pO $res.'</svg>';
@@ -1171,19 +1493,38 @@ sub PostMe_widget($) {
             <br />Defines the PostMe system, &lt;postit&gt; is an arbitrary name for the system. </p>
         <a name="PostMeusage"></a>
         <h4>Usage</h4>
-        See http://www.fhemwiki.de/wiki/Modul_PostMe
-        
-        An arbitrary number of lists may be added to the system with the <i>create</i> command as
-        <code>set &lt;postit&gt; create &lt;name&gt;</code>
+        See <a href="http://www.fhemwiki.de/wiki/Modul_PostMe">Wiki documentation</a>
+        <br/>
+        An arbitrary number of lists may be added to the system with the <i>create</i> command.<br/>
         List items may consist of one or more words, and are added/removed by the <i>add</i> and 
-        <i>remove</i>  command. 
-        Attention: A comma "," is the separator for list items.
-        <code>set &lt;postit&gt; add &lt;name&gt; &lt;some text, but careful with commas&gt;</code>
-        
-        Special meta data for items may be included in the items by using "[" and "]"; characters, e.g.
-        <code>set &lt;postit&gt; add &lt;name&gt; &lt;item&gt; [&lt;attribute1&gt;="&lt;data1&gt;" ...</code>
-        These attribute-value pairs may be added, modified and removed with the <i>modify</i> command 
-        
+        <i>remove</i>  command, but no separator characters are allowed in one item<br/> 
+        Attention: A comma "," is the <i>default</i> separator for list items, see attributes below.</br/>
+        <p/>
+        Meta data for items (=annotations)may be included in the items by using "[" and "]"; characters, e.g.<br/>
+        <code>set &lt;postit&gt; add &lt;name&gt; &lt;item&gt; [&lt;attribute1&gt;="&lt;data1&gt;" ...</code><br/>
+        These attribute-value pairs may be added, modified and removed with the <i>modify</i> command. 
+        <p/>
+        <b>Special annotations</b> will be evaluated further, either on creation or manually by executing the commands<br/>
+        <code>get &lt;postit&gt; special &lt;name&gt;</code> resp. <code>get &lt;postit&gt; allspecial</code>
+        <ul>
+          <li>The attribute <i>at="&lt;timespec/datespec&gt;"</i>, when given a timespec/datespec value, will result in a single or multiple
+          reminding messages for this item. The syntax for this timespec/datespec value is<br/>
+          <code>(&lt;HH:MM&gt;|&lt;HH:MM:SS&gt;|&lt;YYYY-MM-DD&gt;T&lt;HH:MM:SS&gt;)[-&lt;HH:MM&gt;[P&lt;number&gt;]]</code>
+          <br/>
+          The first part is the time/date specification when the item is <i>due</i>. 
+          <br/>The second optional part beginning with a "-"-sign
+          denotes how much time befor this date you want to be alerted. 
+          <br/>The third optional part beginning with a "P" character 
+          allows to specify a &lt;number&gt; of periodic reminders, the period given by the second part.<br/>
+          Processing this attribute means, that several <i>at</i> devices will be set up in the room <i>hidden</i> 
+          that are triggered when at the specified times.
+          See documentation in Wiki for examples.
+       </li>
+          <li>The attribute <i>notify="&lt;eventspec&gt;"</i>, when given an eventspec value, will result in a single or multiple
+          reminding messages for this item.<br/>
+          Processing this attribute means, that a <i>notify</i> device will be set up in the room <i>hidden</i> 
+          that is triggered when the event is detected.</li> 
+        </ul>
         The sticky notes may be integrated into any Web page by simply embedding the following tags
            <ul>
            <li> <code>&lt;embed src="/fhem/PostMe_widget?type=pins&amp;postit=&lt;postit&gt;"/&gt;</code> <br/>
@@ -1191,7 +1532,9 @@ sub PostMe_widget($) {
            <li> <code>&lt;embed src="/fhem/PostMe_widget?type=pin&amp;postit=&lt;postit&gt;&amp;name=&lt;name&gt;"/&gt;</code> <br/>
            to produce an interactive entry for PostMe &lt;name&gt;from system &lt;postit&gt;</li>
            </ul>
-           
+        <br/>   
+        The module provides interface routines that may be called from your own Perl programs, see documentation in the Wiki.
+        <br/>    
         <a name="PostMeset"></a>     
         <h4>Set</h4>
         <ul>
@@ -1206,8 +1549,9 @@ sub PostMe_widget($) {
             <li><code>set &lt;postit&gt; modify &lt;name&gt; &lt;item&gt; &lt;attribute&gt; &lt;data&gt;</code>
                 <br />adds/modifies/removes and attribute-value-pair &lt;attribute&gt;="&lt;data&gt;" to the item &lt;item&gt; on the sticky note named &lt;name&gt;<br/>
                 adding, if this attribute is not yet present; modification, if it is present - &lt;data&gt; will then be overwritten; removal, if no &lt;data&gt; is given</li>
-            <li><code>set &lt;postit&gt; remove &lt;name&gt; &lt;item&gt;</code>
-                <br />removes from the sticky note named &lt;name&gt; an item &lt;item&gt;</li>
+            <li><code>set &lt;postit&gt; remove &lt;name&gt; &lt;item&gt;</code><br />
+                <code>set &lt;postit&gt; remove &lt;name&gt; item&lt;number&gt;</code>
+                <br />removes from the sticky note named &lt;name&gt; an item &lt;item&gt; or the one numbered &lt;number&gt; (starting at 0)</li>
             <li><code>set &lt;postit&gt; clear &lt;name&gt;</code>
                 <br />clears the sticky note named &lt;name&gt; from all items </li>
           
@@ -1217,12 +1561,16 @@ sub PostMe_widget($) {
         <ul>
             <li><code>get &lt;postit&gt; list &lt;name&gt;</code>
                 <br />Show the sticky note named &lt;name&gt; and its content</li>
+            <li><code>get &lt;postit&gt; special &lt;name&gt;</code>
+                <br />Process the special annotations (see above) of the sticky note named &lt;name&gt;</li>
             <li><code>get &lt;postit&gt; mail &lt;name&gt;</code>
                 <br />Send the sticky note named &lt;name&gt; and its content via eMail to a predefined
-                recipient (e.g. sticky note <postme01Name> is sent to <postme01MailRec>). </li>
+                recipient (e.g. sticky note &lt;postme01Name&gt; is sent to &lt;postme01MailRec&gt;).<br/> The mailing
+                subroutine <postmeMsgFun> is called with three parameters for recipient, subject
+                and text.  </li>
             <li><code>get &lt;postit&gt; message &lt;name&gt;</code>
                 <br />Send the sticky note named &lt;name&gt; and its content via instant messenger to a predefined
-                recipient (e.g. sticky note <postme01Name> is sent to <postme01MsgRec>). The messenger 
+                recipient (e.g. sticky note &lt;postme01Name&gt; is sent to &lt;postme01MsgRec&gt;).<br/> The messenger 
                 subroutine <postmeMsgFun> is called with three parameters for recipient, subject
                 and text. </li>
             <li><code>get &lt;postit&gt; TTS &lt;name&gt;</code>
@@ -1232,6 +1580,8 @@ sub PostMe_widget($) {
                 <br />Return the sticky note named &lt;name&gt; in JSON format</li>       
             <li><code>get &lt;postit&gt; all</code>
                 <br />Show all sticky notes and their content</li>
+            <li><code>get &lt;postit&gt; allspecial</code>
+                <br />Process the special annotations (see above) of all sticky notes</li>
             <li><code>get &lt;postit&gt; version</code>
                 <br />Display the version of the module</li>
         </ul>
@@ -1249,6 +1599,8 @@ sub PostMe_widget($) {
                 <br />If jQuery, embedded sticky notes will produce jQuery code (default) <br/>
                       If HTML, embedded sticky notes will produce HTML code <br/>
                       If SVG, embedded sticky notes will produce SVG code</li>
+             <li><code>attr &lt;postit&gt; listseparator &lt;character&gt;</code>
+                <br />Character used to separate list items (default ',')</li>
             </ul>
             Note, that in the parameters sent to the following functions, ":" serves as separator between list name and items, 
             and "," serves as separator between items. They may be exchanged with simple regular expression operations.
