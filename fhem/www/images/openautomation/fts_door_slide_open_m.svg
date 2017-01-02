@@ -1,23 +1,27 @@
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="468pt" height="470pt" viewBox="0 0 468 470"
- preserveAspectRatio="xMidYMid meet">
-<metadata>
-Created by potrace 1.8, written by Peter Selinger 2001-2007
-</metadata>
-<g transform="translate(0,470) scale(0.158108,-0.158108)"
-fill="#000000" stroke="none">
-<path d="M36 2931 c-56 -58 -45 -214 17 -251 28 -17 51 -20 170 -20 l137 0 0
--1270 c0 -1380 -3 -1296 55 -1350 l27 -25 672 -3 672 -2 35 22 c74 50 69 -55
-69 1361 l0 1267 380 0 380 0 2 -1286 3 -1285 42 -40 c39 -36 47 -39 99 -39 65
-0 106 20 134 65 18 30 19 80 21 1435 l1 1404 -26 23 -27 23 -1418 0 -1417 0
--28 -29z m2784 -116 c0 -13 -156 -15 -1340 -15 -1184 0 -1340 2 -1340 15 0 13
-156 15 1340 15 1184 0 1340 -2 1340 -15z m-1070 -704 l0 -549 -61 -4 c-69 -5
--89 -21 -89 -72 0 -48 24 -66 92 -66 l58 0 0 -640 0 -640 -627 2 -628 3 -3
-1245 c-1 685 0 1251 3 1258 3 9 139 12 630 12 l625 0 0 -549z m1070 -711 c0
--1253 0 -1260 -20 -1260 -20 0 -20 7 -20 1260 0 1253 0 1260 20 1260 20 0 20
--7 20 -1260z"/>
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
+	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
+<g id="fts_x5F_door_x5F_slide_x5F_open_x5F_m">
+	<g>
+		<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M101.184,280.931
+			c0,3.406,2.712,6.167,6.058,6.167h92.891c3.346,0,6.058-2.761,6.058-6.167V93.834c0-3.406-2.712-6.167-6.058-6.167h-92.891
+			c-3.346,0-6.058,2.761-6.058,6.167V280.931z"/>
+		<g>
+			<g>
+				<path style="fill:#FFFFFF;" d="M204.19,175.685c-3.333,0-6.667,0-10,0c-6.448,0-6.448,10,0,10c3.333,0,6.667,0,10,0
+					C210.639,185.686,210.639,175.685,204.19,175.685L204.19,175.685z"/>
+			</g>
+		</g>
+	</g>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M74.521,80.667c0-3.314-0.313-6,3-6h206.333
+		c3.314,0,3,2.686,3,6v0.667c0,3.313,0.314,6-3,6H77.521c-3.313,0-3-2.687-3-6V80.667z"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M276.851,287.098h3.444
+		c3.346,0,6.059-2.761,6.059-6.168V80.834c0-3.406-2.713-6.167-6.059-6.167h-3.111"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M282.851,287.098h-3.444
+		c-3.346,0-6.059-2.761-6.059-6.168V87.333"/>
+</g>
+<g id="Ebene_1">
 </g>
 </svg>

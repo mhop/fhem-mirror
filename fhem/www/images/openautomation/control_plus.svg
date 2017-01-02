@@ -1,22 +1,21 @@
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="468pt" height="474pt" viewBox="0 0 468 474"
- preserveAspectRatio="xMidYMid meet">
-<metadata>
-Created by potrace 1.8, written by Peter Selinger 2001-2007
-</metadata>
-<g transform="translate(0,474) scale(0.200000,-0.200000)"
-fill="#000000" stroke="none">
-<path d="M1002 2354 c-18 -9 -43 -31 -55 -48 -22 -31 -22 -35 -25 -458 l-3
--428 -397 0 c-444 0 -443 0 -490 -70 -22 -33 -23 -42 -20 -177 l3 -143 38 -37
-37 -38 415 -3 415 -3 0 -422 c0 -403 1 -423 20 -455 37 -61 70 -72 210 -72
-150 0 182 12 218 80 22 44 22 49 22 457 l0 413 424 0 c422 0 423 0 456 23 57
-39 70 76 70 206 0 143 -19 192 -84 222 -38 17 -73 19 -453 19 l-413 0 0 418
-c0 459 0 460 -63 506 -25 18 -45 21 -160 24 -107 2 -138 -1 -165 -14z m258
--599 l0 -475 470 0 470 0 0 -100 0 -100 -475 0 -475 0 0 -475 0 -476 -97 3
--98 3 0 473 0 472 -457 0 -458 0 0 100 0 100 457 2 458 3 -4 473 -3 472 106 0
-106 0 0 -475z"/>
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="361px"
+	 height="361px" viewBox="0 0 361 361" style="enable-background:new 0 0 361 361;" xml:space="preserve">
+<g id="control_x5F_plus">
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M173.333,193.667H105.5c-3.313,0-6-2.687-6-6
+		v-13.333c0-3.313,2.687-6,6-6h67.833"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M167.833,193.667"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M188.666,168.333h70.167c3.313,0,6,2.687,6,6
+		v13.333c0,3.313-2.687,6-6,6h-70.417"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M193.166,168.333"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M167.833,168.333"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M193.354,193.354v65.666c0,3.314-2.686,6-6,6
+		h-13.333c-3.313,0-6-2.686-5.75-5.916v-65.666"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:10;stroke-miterlimit:10;" d="M168.271,168.521v-65.666c0-3.313,2.687-6,6-6
+		h13.333c3.313,0,6,2.687,6,6v65.666"/>
+</g>
+<g id="Ebene_1">
 </g>
 </svg>
