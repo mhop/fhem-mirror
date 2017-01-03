@@ -1166,12 +1166,12 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
 $culHmRegModel{"HM-RC-Sec4-2"}          = 
 $culHmRegModel{"HM-RC-Key4-2"}          = $culHmRegModel{"HM-RC-4-2"};
 
-$culHmRegModel{"Schueco_263-131"}       = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
+$culHmRegModel{"Schueco_263-131"}       =                                   #rf_s_1conf_644
+$culHmRegModel{"HM-LC-Bl1PBU-FM"}       = $culHmRegModel{"HM-LC-Sw1PBU-FM"};
 
 $culHmRegModel{"HM-SEC-WDS-2"}          = $culHmRegModel{"HM-SEC-WDS"};
 $culHmRegModel{"Roto_ZEL-STG-RM-FDK"}   = $culHmRegModel{"HM-SEC-RHS"};
                                         
-$culHmRegModel{"HM-LC-Sw1PBU-FM"}       = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
                                         
                                         
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"}   = $culHmRegModel{"HM-CC-TC"};
