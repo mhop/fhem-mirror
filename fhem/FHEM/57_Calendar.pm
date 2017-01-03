@@ -1555,7 +1555,7 @@ sub Calendar_Initialize($) {
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
   $hash->{NotifyFn}= "Calendar_Notify";
-  $hash->{AttrList}=  "hideOlderThan hideLaterThan onCreateEvent $readingFnAttributes";
+  $hash->{AttrList}=  "hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
 }
 
 
@@ -1712,6 +1712,10 @@ sub Calendar_Get($@) {
   }
   
   if($cmd eq "events") {
+  
+    # see https://forum.fhem.de/index.php/topic,46608.msg397309.html#msg397309 for ideas
+    # get myCalendar events filter:mode=alarm|start|upcoming format=custom:{ sprintf("...") } select:series=next,max=8,from=-3d,to=10d
+    # attr myCalendar defaultFormat <format>
   
     my @texts;
     my @events= Calendar_GetEvents($hash, $t, undef, undef);
@@ -2082,6 +2086,19 @@ sub Calendar_GetUpdate($$$) {
   
   if($type eq "url") { 
   
+    my $SSLVerify= AttrVal($name, "SSLVerify", undef);
+    my $SSLArgs= { };
+    if(defined($SSLVerify)) {
+      eval "use IO::Socket::SSL";
+      if($@) {
+        Log3 $hash, 2, $@;
+      } else {
+        my $SSLVerifyMode= eval("$SSLVerify ? SSL_VERIFY_PEER : SSL_VERIFY_NONE");
+        Log3 $hash, 5, "SSL verify mode set to $SSLVerifyMode";
+        $SSLArgs= { SSL_verify_mode => $SSLVerifyMode };
+      }
+    }
+  
     HttpUtils_NonblockingGet({
       url => $url,
       hideurl => 1,
@@ -2090,6 +2107,7 @@ sub Calendar_GetUpdate($$$) {
       timeout => 30, 
       type => 'caldata',
       removeall => $removeall,
+      sslargs => $SSLArgs,
       t => $t,
       callback => \&Calendar_ProcessUpdate,
     });
@@ -2745,6 +2763,14 @@ sub CalendarAsHtml($;$) {
         calendar event that is created. See section <a href="#CalendarPlugIns">Plug-ins</a> below.
     </li><p>
         
+    <li><code>SSLVerify</code><br>
+    
+        This attribute sets the verification mode for the peer certificate for connections secured by
+        SSL. Set attribute either to 0 for SSL_VERIFY_NONE (no certificate verification) or
+        to 1 for SSL_VERIFY_PEER (certificate verification). Disabling verification is useful
+        for local calendar installations (e.g. OwnCloud, NextCloud) without valid SSL certificate.
+    </li><p>
+        
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -3121,7 +3147,17 @@ sub CalendarAsHtml($;$) {
         Weitere Informationen unter <a href="#CalendarPlugIns">Plug-ins</a> im Text.
     </li><p>
         
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <li><code>SSLVerify</code><br>
+    
+        Dieses Attribut setzt die Art der &Uuml;berpruuml;fung des Zertifikats des Partners
+        bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r 
+        SSL_VERIFY_NONE (keine &Uuml;berpr&uuml;fung des Zertifikats) oder auf 1 f&uuml;r
+        SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
+        ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud) 
+        ohne g&uuml;tiges SSL-Zertifikat.
+    </li><p>
+        
+<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 

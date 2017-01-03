@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 57_Calender: new attribute SSLVerify
   - feature: 00_MQTT: Added username password (optional).
   - feature: 41_OREGON: support event-min-interval, event-on-change-reading,
                         etc. Changed module to new log function
