@@ -1063,7 +1063,7 @@ sub MPD_get_artist_info ($$)
      if (!open (FILE , "www/$cache/".$hash->{'.artist'}.".xml"))
      {
       Log3 $name, 2, "$name, error reading ".$hash->{'.artist'}.".xml : $!";
-      $hash->{'.xml'} = 0;
+      $hash->{XML} = 0;
      }
      else 
      {
