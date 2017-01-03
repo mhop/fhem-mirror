@@ -2407,6 +2407,7 @@ sub
 FW_iconName($)
 {
   my ($oname)= @_;
+  return undef if(!defined($oname));
   my $name = $oname;
   $name =~ s/@.*//;
   foreach my $pe (@FW_iconDirs) {
