@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.32   - 03.01.17
 # Version 1.31   - 30.12.16
 # Version 1.3    - 14.12.16
 # Version 1.2    - 10.04.16
@@ -215,10 +216,10 @@ sub MPD_Define($$)
 
   $attr{$name}{devStateIcon} = 'play:rc_PLAY:stop stop:rc_STOP:play pause:rc_PAUSE:pause error:icoBlitz' unless (exists($attr{$name}{devStateIcon}));
   $attr{$name}{icon}         = 'it_radio' unless (exists($attr{$name}{icon})); 
-  $attr{$name}{titleSplit}   = '1' unless (exists($attr{$name}{titleSplit}));
-  $attr{$name}{player}       = 'mpd' unless (exists($attr{$name}{player}));
-  $attr{$name}{loadPlaylists} = '1'  unless (exists($attr{$name}{loadPlaylists}));
-  $attr{$name}{cache}        = 'lfm'  unless (exists($attr{$name}{cache}));
+  $attr{$name}{titleSplit}   = '1'        unless (exists($attr{$name}{titleSplit}));
+  $attr{$name}{player}       = 'mpd'      unless (exists($attr{$name}{player}));
+  $attr{$name}{loadPlaylists} = '1'       unless (exists($attr{$name}{loadPlaylists}));
+  #$attr{$name}{cache}        = 'lfm'      unless (exists($attr{$name}{cache}));
   #$attr{$name}{loadMusic}     = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
 
   RemoveInternalTimer($hash);
@@ -296,8 +297,6 @@ sub MPD_Attr (@)
     }
     $attr{$name}{cache} = $attrVal;
    }
- 
-
  }
  elsif ($cmd eq "del")
  {
@@ -325,16 +324,16 @@ sub MPD_ClearReadings($)
      readingsBulkUpdate($hash,"albumartistsort","");
      readingsBulkUpdate($hash,"artistsort","");
     }
-    readingsBulkUpdate($hash,"albumartist","");
-    readingsBulkUpdate($hash,"album","");
-    readingsBulkUpdate($hash,"artist","");
+    #readingsBulkUpdate($hash,"albumartist","");
+    readingsBulkUpdate($hash,"Album","");
+    readingsBulkUpdate($hash,"Artist","");
     readingsBulkUpdate($hash,"file","");
-    readingsBulkUpdate($hash,"genre","");
-    readingsBulkUpdate($hash,"last-modified","");
-    readingsBulkUpdate($hash,"title","");
-    readingsBulkUpdate($hash,"name","");
-    readingsBulkUpdate($hash,"date","");
-    readingsBulkUpdate($hash,"track","");
+    readingsBulkUpdate($hash,"Genre","");
+    readingsBulkUpdate($hash,"Last-Modified","");
+    readingsBulkUpdate($hash,"Title","");
+    readingsBulkUpdate($hash,"Name","");
+    readingsBulkUpdate($hash,"Date","");
+    readingsBulkUpdate($hash,"Track","");
     readingsBulkUpdate($hash,"playlistname","");
     #readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer", "");
     #readingsBulkUpdate($hash,"artist_image_html","");
@@ -492,9 +491,14 @@ sub MPD_Set($@)
 
    MPD_ClearReadings($hash);
    $hash->{".music"}    = "";
+   my $old_list = $hash->{".playlist"};
    $hash->{".playlist"} = $subcmd; # interne Playlisten Verwaltung
    readingsSingleUpdate($hash,"playlistname",$subcmd,1);
    $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$subcmd\"\nplay\n".cle);
+   if ($old_list ne $hash->{".playlist"})
+   {
+    MPD_NewPlaylist($hash,mpd_cmd($hash, "i|playlistinfo|x|"));
+   }
  }
 
  if ($cmd eq "playfile")
@@ -597,6 +601,7 @@ sub MPD_Get($@)
   return format_get_output("Playlist Info",mpd_cmd($hash, "i|playlistinfo|x")) if ($cmd eq "playlistinfo");
   return "$name get with unknown argument $cmd, choose one of " . join(" ", sort keys %gets); 
 }
+
 
 sub format_get_output($$)
 {
@@ -702,7 +707,7 @@ sub mpd_cmd($$)
   {
     my $cmd = $_;
     print $sock "$cmd\r\n";
-    Log3 $name, 5 , "$name, send-> $cmd";
+    Log3 $name, 5 , "$name, mpd_cmd[1] -> $cmd";
  
     while (<$sock>) 
     {
@@ -715,29 +720,29 @@ sub mpd_cmd($$)
 
      if ($b && defined($c)) # ist das ein Reading ?
       { 
-        $b = lc($b);
+        #$b = lc($b);
         if ($b eq "volume") { $hash->{".volume"} = $c; }  # Sonderfall volume
     
-        $artist = $c if ($b eq "artist");
+        $artist = $c if ($b eq "Artist");
 
-        if ($b eq "title")
+        if ($b eq "Title")
         {
          $sp = index($c, " - ");
          if (AttrVal($name, "titleSplit", 1) && ($sp>0)) # wer nicht mag solls eben abschalten
           {
             $artist = substr($c,0,$sp);
-            readingsBulkUpdate($hash,"artist",$artist);
-            readingsBulkUpdate($hash,"title",substr($c,$sp+3));
+            readingsBulkUpdate($hash,"Artist",$artist);
+            readingsBulkUpdate($hash,"Title",substr($c,$sp+3));
           }
-          else { readingsBulkUpdate($hash,"title",$c); } # kein Titel Split
+          else { readingsBulkUpdate($hash,"Title",$c); } # kein Titel Split
         }
-        elsif ($b eq "time")
-        {
+        #elsif ($b eq "time")
+        #{
          # fix für doppeltes time Reading 
          # https://forum.fhem.de/index.php/topic,18517.msg539676.html#msg539676
-         if (index($c,":") == -1) {$b = "songtime";}
-         readingsBulkUpdate($hash,$b,$c);
-        }
+         #if (index($c,":") == -1) {$b = "songtime";}
+         #readingsBulkUpdate($hash,$b,$c);
+        #}
 
         else { readingsBulkUpdate($hash,$b,$c); } # irgendwas aber kein Titel
       } # defined $c
@@ -752,6 +757,7 @@ sub mpd_cmd($$)
  else
  { # start internes cmd
   print $sock $commands[1]."\r\n";
+  Log3 $name, 5 , "$name, mpd_cmd[2] -> ".$commands[1];
   my $d;
   while (<$sock>) 
    {
@@ -763,17 +769,17 @@ sub mpd_cmd($$)
 
      if    (($b eq "file" )     && ($commands[2] eq "music"))     {$hash->{".musiclist"} .= $c; } # Titelliste füllen
      elsif (($b eq "playlist" ) && ($commands[2] eq "playlists")) {$hash->{".playlists"} .= $c; } # Playliste füllen
-     if ($commands[2] eq "x") { $output .= $_; }
+
+     if ($commands[2] eq "x") { $output .= $_; } 
    } # while
 
    if (defined($commands[3])) 
    { 
-     $output =~s/Title:/title:/g;
-     $output =~s/Id:/id:/g;
-     $output =~s/Name:/name:/g;
-     $output =~s/Pos:/pos:/g;
-     $output =~s/: / : /g;
-
+     #$output =~s/Title:/title:/g;
+     #$output =~s/Id:/id:/g;
+     #$output =~s/Name:/name:/g;
+     #$output =~s/Pos:/pos:/g;
+     #$output =~s/: / : /g;
      my @arr = split("\n",$output); 
      @arr = sort(@arr);
      $output = join("\n",@arr);
@@ -790,7 +796,7 @@ sub mpd_cmd($$)
   my $plists = $hash->{".playlists"}; 
   $plists =~ tr/\n/\:/; # Tablet UI will diese Art der Liste
   readingsSingleUpdate($hash,"playlistcollection", $plists,1);
-  Log3 $name ,4 ,"$name, ".$hash->{READINGS}{"playlistcollection"}{VAL};
+  Log3 $name ,5 ,"$name, ".$hash->{READINGS}{"playlistcollection"}{VAL};
  }
 
  return $output; # falls es einen gibt , wenn nicht - auch gut ;)
@@ -1015,8 +1021,18 @@ sub MPD_watch_idle($)
    delete $hash->{helper}{RUNNING_PID};
    delete $hash->{IPID};
    InternalTimer(gettimeofday()+2, "MPD_try_idle", $hash, 0);
+   return;
   }
-  else { Log3 $name, 5 , $name.", idle PID ".$hash->{IPID}." found"; }
+  else 
+  { 
+    Log3 $name, 5 , $name.", idle PID ".$hash->{IPID}." found";
+    if (($hash->{READINGS}{"presence"}{VAL} eq "present") && ($hash->{STATE} eq "play")) 
+    {
+     # Wichtig um das Readings elapsed aktuell zu halten (TabletUI)
+     mpd_cmd($hash, "status");
+     readingsSingleUpdate($hash,"playlistname",$hash->{".playlist"},1) if ($hash->{READINGS}{"playlistname"}{VAL} ne $hash->{".playlist"});
+    }
+  }
 
   InternalTimer(gettimeofday()+$waits, "MPD_watch_idle", $hash, 0);
   return;
@@ -1047,6 +1063,7 @@ sub MPD_get_artist_info ($$)
      if (!open (FILE , "www/$cache/".$hash->{'.artist'}.".xml"))
      {
       Log3 $name, 2, "$name, error reading ".$hash->{'.artist'}.".xml : $!";
+      $hash->{'.xml'} = 0;
      }
      else 
      {
@@ -1085,19 +1102,23 @@ sub MPD_lfm_artist_info(@)
      # xml lokal speichern ?
      if (-e "www/$cache/".$hash->{'.artist'}.".xml")
      {
-      # Log3 $name ,5,"$name, artist ".$hash->{'.artist'}." already exist";
+       Log3 $name ,5,"$name, artist ".$hash->{'.artist'}." already exist";
+       $hash->{XML} = 1;
      }
      else
      {
       if (!open (FILE , ">"."www/$cache/".$hash->{'.artist'}.".xml"))
        {
-         Log3 $name, 2, "$name, error saving ".$hash->{'.artist'}.".xml : $!";
-         $hash->{'.artist'} = "";
+         Log3 $name, 2, "$name, error saving ".$hash->{'.artist'}.".xml : ".$!;
+         $hash->{XML} = 0;
+         #$hash->{'.artist'} = "";
+         #return;
        }
         else 
         {
          print FILE $data;
          close(FILE);
+         $hash->{XML} = 1;
         }
      }
     }
@@ -1121,7 +1142,7 @@ sub MPD_lfm_artist_info(@)
     }
 
 
-      if (!$cache) # cache verwenden ?
+      if (!$cache || !$hash->{XML}) # cache verwenden ?
       {
       if (exists $xml->{'artist'}->{'image'}[$size]->{'content'})
       {
@@ -1210,8 +1231,8 @@ sub MPD_lfm_artist_image(@)
     
         if (!open(FILE, "> www/$cache/$fname"))
         {
+         Log3 $name, 2, "$name, error saving image $fname : ".$!;
          MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot"," ");
-         Log3 $name, 2, "$name, error saving image $fname : $!";
          return undef;
         }
         binmode(FILE);
@@ -1226,6 +1247,76 @@ sub MPD_lfm_artist_image(@)
     unlink ("www/$cache/".$hash->{'.artist'}.".xml");
     MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot","");
     return undef;
+}
+
+
+sub MPD_NewPlaylist($$)
+{
+  my ($hash, $list) = @_;
+  my $name  = $hash->{NAME};
+  
+  Log3 $name,5,"$name, new Playlist in -> $list";
+
+  $list =~ s/"/\\"/g;
+  $list = "\n".$list;  
+  my @artist   = ($list=~/\nArtist:\s(.*)\n/g);
+  my @title    = ($list=~/\nTitle:\s(.*)\n/g);
+  my @album    = ($list=~/\nAlbum:\s(.*)\n/g);
+  my @time     = ($list=~/\nTime:\s(.*)\n/g);
+  my @file     = ($list=~/\nfile:\s(.*)\n/g);
+  my @track    = ($list=~/\nTrack:\s(.*)\n/g);
+  my @albumUri = ($list=~/\nX-AlbumUri:\s(.*)\n/g);  # von Mopidy ?
+  my $ret = '[';
+  my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 1 } );
+  my $lastUri = '';
+  my $url;
+
+  for my $i (0 .. $#artist)
+  {
+     if (defined($albumUri[$i]))
+     {
+     if ( $lastUri ne $albumUri[$i]) 
+     {
+       my $response = $ua->get("https://embed.spotify.com/oembed/?url=".$albumUri[$i]);
+       my $data = '';
+       if ( $response->is_success ) 
+       {
+         $data = $response->decoded_content;
+         $url = decode_json( $data );
+         $lastUri = $url->{'thumbnail_url'};
+       }
+     }
+     } # vesuchen wir es mit Last.fm
+     elsif (AttrVal($name,"image_size",-1) > -1 && (AttrVal($name,"cache","") ne ""))
+     {
+      my $cache = AttrVal($name,"cache","");
+      my $size  = AttrVal($name,"image_size",0);
+      if (-e "www/$cache/".urlEncode($artist[$i])."_".$size.".png")
+            { $lastUri = "/fhem/www/".$cache."/".urlEncode($artist[$i])."_".$size.".png"; }
+      else  { $lastUri = "/fhem/icons/1px-spacer"; }
+     }
+     else  { $lastUri = "/fhem/icons/1px-spacer"; }
+
+     $ret .= '{"Artist":"'.$artist[$i].'",';
+     $ret .= '"Title":';
+     $ret .= (defined($title[$i])) ? '"'.$title[$i].'",' : '"",';
+     $ret .= '"Album":';
+     $ret .= (defined($album[$i])) ? '"'.$album[$i].'",' : '"",';
+     $ret .= '"Time":';
+     $ret .= (defined($time[$i])) ? '"'.$time[$i].'",' : '"",';
+     $ret .= '"File":"'.$file[$i].'",';
+     $ret .= '"Track":';
+     $ret .= (defined($track[$i])) ? '"'.$track[$i].'",' : '"",';
+     $ret .= '"Cover":"'.$lastUri.'"}';
+     $ret .= ',' if ($i<$#artist); 
+  }
+  
+  $ret .= ']';
+  $ret =~ s/;//g;
+  $ret =~ s/\\n//g;
+  Log3 $name,5,"$name, new Playlist out -> $ret";
+  readingsSingleUpdate($hash,"playlistinfo",$ret,1);
+  return;  
 }
 
 
@@ -1358,16 +1449,16 @@ sub MPD_summaryFn($$$$) {
         my $album  = "";
         my $file   = (defined($hash->{READINGS}{"file"}{VAL})) ? $hash->{READINGS}{"file"}{VAL}."&nbsp;<br />" : "";
 
-        if (defined($hash->{READINGS}{"title"}{VAL}))  
-        { $title  = ($hash->{READINGS}{"title"}{VAL} ne "" ) ? $hash->{READINGS}{"title"}{VAL}."&nbsp;<br />" : "";}
-        if (defined($hash->{READINGS}{"artist"}{VAL}))
-        { $artist = ($hash->{READINGS}{"artist"}{VAL} ne "") ? $hash->{READINGS}{"artist"}{VAL}."&nbsp;<br />": "";}
+        if (defined($hash->{READINGS}{"Title"}{VAL}))  
+        { $title  = ($hash->{READINGS}{"Title"}{VAL} ne "" ) ? $hash->{READINGS}{"Title"}{VAL}."&nbsp;<br />" : "";}
+        if (defined($hash->{READINGS}{"Artist"}{VAL}))
+        { $artist = ($hash->{READINGS}{"Artist"}{VAL} ne "") ? $hash->{READINGS}{"Artist"}{VAL}."&nbsp;<br />": "";}
 
-        if (defined($hash->{READINGS}{"album"}{VAL}))
-        { $album = ($hash->{READINGS}{"album"}{VAL} ne "") ? $hash->{READINGS}{"album"}{VAL}."&nbsp;" : "";}
+        if (defined($hash->{READINGS}{"Album"}{VAL}))
+        { $album = ($hash->{READINGS}{"Album"}{VAL} ne "") ? $hash->{READINGS}{"Album"}{VAL}."&nbsp;" : "";}
 
-        if (defined($hash->{READINGS}{"name"}{VAL}))
-        { $rname  = ($hash->{READINGS}{"name"}{VAL} ne "")   ? $hash->{READINGS}{"name"}{VAL}."&nbsp;<br />"  : ""; }
+        if (defined($hash->{READINGS}{"Name"}{VAL}))
+        { $rname  = ($hash->{READINGS}{"Name"}{VAL} ne "")   ? $hash->{READINGS}{"Name"}{VAL}."&nbsp;<br />"  : ""; }
 
 	$html  ="<table><tr><td>$txt</td><td>";
          if (($playlists) && $hash->{".sPlayL"})
@@ -1598,7 +1689,8 @@ Modul requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
     wenn im abgespielten Titel die Interpreten Information nicht verf&uuml;gbar ist (sehr oft bei Radio-Streams default 1)<br>
     Liegen keine Titelangaben vor wird die Ausgabe durch den Namen der Radiostation ersetzt</li>
     <li>timeout (default 1) => Timeoutwert in Sekunden für die Verbindung fhem-mpd</li>
-    <li>waits (default 60) => Wartezeit in Sekunden bis zum Start eines neuen Idle Prozess im Fehlerfall</li>
+    <li>waits (default 60) => &Uuml;berwachungszeit in Sekunden f&uuml;r den Idle Prozess. In Verbindung mit refresh_song der Aktualisierungs Intervall für die aktuellen Songparamter,<br>
+       (z.B. um den Fortschrittsbalken bei TabletUI aktuell zu halten) </li>
     <li>stateMusic 1|0 => zeige Musikliste als DropDown im Webfrontend</li>
     <li>statePlaylists 1|0 => zeige Playlisten als DropDown im Webfrontend</li>
     <li>player  mpd|mopidy|forked-daapd (default mpd) => welcher Player wird gesteuert<br>
@@ -1617,11 +1709,21 @@ Modul requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
    <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die XML und PNG Dateien<br>
    <b>Wichtig</b> : Der User unter dem der fhem Prozess ausgef&uuml;hrt wird (default fhem) muss Lese und Schreibrechte in diesem Verzeichniss haben !<br>
    Das Verzeichnis sollte auch unterhalb von www liegen, damit der fhem Webserver direkten Zugriff auf die Bilder hat.</li>
+  
    </ul>
   <br>
   <b>Readings</b>
   <ul>
-    alle MPD internen Werte
+    - alle MPD internen Werte<br>
+    - vom Modul direkt errzeugte Readings :<br>
+    playlistinfo : (TabletUI Medialist)<br>
+    playlistcollection : (TabletUI)<br>
+    playlistname : (TabletUI)<br> 
+    artist_image : (bei Nutzung von Last.fm)<br>
+    artist_image_html : (bei Nutzung von Last.fm)<br>
+    artist_content : (bei Nutzung von Last.fm)<br>
+    artist_summary : (bei Nutzung von Last.fm)<br>
+
   </ul>
 </ul>
 =end html_DE
