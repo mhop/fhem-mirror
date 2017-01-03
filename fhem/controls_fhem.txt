@@ -1,4 +1,4 @@
-REV 12928
+REV 12940
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-01-02_07:45:02 174079 ./CHANGED
+UPD 2017-01-03_07:45:02 174137 ./CHANGED
 UPD 2016-09-06_07:45:09 34605 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2016-12-31_07:45:05 128437 ./fhem.pl
+UPD 2017-01-03_07:45:05 128490 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2016-11-28_07:45:12 58010 FHEM/00_CUL.pm
 UPD 2016-10-03_07:45:13 15319 FHEM/00_FBAHA.pm
@@ -36,7 +36,7 @@ UPD 2015-07-28_14:05:31 3551 FHEM/00_HXB.pm
 UPD 2016-12-24_07:45:02 49526 FHEM/00_KM271.pm
 UPD 2016-08-19_14:49:02 3718 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
-UPD 2016-01-09_07:45:12 15712 FHEM/00_MQTT.pm
+UPD 2017-01-03_07:45:02 16048 FHEM/00_MQTT.pm
 UPD 2015-10-03_07:45:11 15183 FHEM/00_MYSENSORS.pm
 UPD 2016-08-23_07:45:12 25513 FHEM/00_NetzerI2C.pm
 UPD 2016-03-21_07:45:15 80101 FHEM/00_OWX.pm
@@ -351,11 +351,11 @@ UPD 2016-12-31_07:45:02 224696 FHEM/93_DbRep.pm
 UPD 2016-08-19_14:49:02 14958 FHEM/93_FHEM2FHEM.pm
 UPD 2016-12-14_23:15:40 65406 FHEM/93_PWMR.pm
 UPD 2016-11-18_07:45:11 41024 FHEM/94_PWM.pm
-UPD 2016-12-10_08:10:21 41442 FHEM/95_Alarm.pm
+UPD 2017-01-03_07:45:02 41463 FHEM/95_Alarm.pm
 UPD 2016-10-04_07:45:12 57237 FHEM/95_Dashboard.pm
 UPD 2016-05-16_07:45:13 62236 FHEM/95_FLOORPLAN.pm
 UPD 2015-07-28_14:05:31 11755 FHEM/95_PachLog.pm
-UPD 2016-12-22_07:45:02 48583 FHEM/95_PostMe.pm
+UPD 2017-01-03_07:45:02 62312 FHEM/95_PostMe.pm
 UPD 2016-12-31_07:45:02 16005 FHEM/95_holiday.pm
 UPD 2016-02-05_07:45:11 21301 FHEM/95_remotecontrol.pm
 UPD 2016-08-19_14:49:02 16596 FHEM/96_allowed.pm
@@ -396,14 +396,14 @@ UPD 2015-07-28_14:05:31 36167 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2016-12-28_07:45:02 25052 FHEM/98_Verkehrsinfo.pm
 UPD 2016-01-23_07:45:13 15736 FHEM/98_WOL.pm
-UPD 2016-12-30_07:45:02 51101 FHEM/98_WeekdayTimer.pm
+UPD 2017-01-03_07:45:02 50504 FHEM/98_WeekdayTimer.pm
 UPD 2016-08-19_14:49:02 3840 FHEM/98_XmlList.pm
 UPD 2016-12-19_07:45:02 7508 FHEM/98_apptime.pm
 UPD 2016-08-19_14:49:02 32240 FHEM/98_autocreate.pm
 UPD 2016-11-15_07:45:10 9880 FHEM/98_average.pm
 UPD 2016-08-19_14:49:02 6874 FHEM/98_backup.pm
 UPD 2015-07-28_14:05:31 9431 FHEM/98_cloneDummy.pm
-UPD 2016-10-03_07:45:13 3735 FHEM/98_cmdalias.pm
+UPD 2017-01-03_07:45:02 3765 FHEM/98_cmdalias.pm
 UPD 2016-08-20_07:45:12 20887 FHEM/98_configdb.pm
 UPD 2016-09-24_07:45:10 1998 FHEM/98_copy.pm
 UPD 2016-08-20_07:45:12 1200 FHEM/98_count.pm
@@ -449,7 +449,7 @@ UPD 2016-10-23_07:45:13 66353 FHEM/RESIDENTStk.pm
 UPD 2016-01-13_07:45:13 1191 FHEM/RTypes.pm
 UPD 2015-07-28_14:05:31 7121 FHEM/SHC_datafields.pm
 UPD 2015-07-28_14:05:31 11758 FHEM/SHC_parser.pm
-UPD 2016-11-30_07:45:13 5399 FHEM/SetExtensions.pm
+UPD 2017-01-03_07:45:02 5465 FHEM/SetExtensions.pm
 UPD 2016-03-27_07:45:09 7465 FHEM/SubProcess.pm
 UPD 2016-08-07_07:45:11 6899 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
@@ -546,7 +546,7 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-01-02_07:45:04 2575975 docs/commandref.html
+UPD 2017-01-03_07:45:04 2578607 docs/commandref.html
 UPD 2016-12-31_07:45:05 1488635 docs/commandref_DE.html
 UPD 2016-12-14_23:15:40 68847 docs/commandref_frame.html
 UPD 2016-12-14_23:15:40 77288 docs/commandref_frame_DE.html
@@ -740,9 +740,6 @@ UPD 2015-07-28_14:05:34 2567 www/images/default/black_Steckdose.off.png
 UPD 2015-07-28_14:05:34 2983 www/images/default/black_Steckdose.on.png
 UPD 2015-07-28_14:05:34 898 www/images/default/black_down.png
 UPD 2015-07-28_14:05:34 888 www/images/default/black_up.png
-UPD 2017-01-02_07:45:02 15671 www/images/default/checkbox_checked.png
-UPD 2017-01-02_07:45:02 4938 www/images/default/checkbox_unchecked.png
-UPD 2017-01-02_07:45:02 1972 www/images/default/checkbox_unchecked.svg
 UPD 2015-07-28_14:05:34 689 www/images/default/close.png
 UPD 2015-07-28_14:05:34 406 www/images/default/closeG.png
 UPD 2015-07-28_14:05:34 829 www/images/default/dashboardicons.png
@@ -833,9 +830,6 @@ UPD 2015-07-28_14:05:34 2281 www/images/default/off.png
 UPD 2015-07-28_14:05:34 2984 www/images/default/on-for-timer.png
 UPD 2015-07-28_14:05:34 2984 www/images/default/on-till.png
 UPD 2015-07-28_14:05:34 2044 www/images/default/on.png
-UPD 2017-01-02_07:45:02 21353 www/images/default/radio_checked.png
-UPD 2017-01-02_07:45:02 16391 www/images/default/radio_unchecked.png
-UPD 2017-01-02_07:45:02 2126 www/images/default/radio_unchecked.svg
 UPD 2015-10-25_07:45:14 939 www/images/default/remotecontrol/VID1_btn_VID1.png
 UPD 2015-07-28_14:05:34 6256 www/images/default/remotecontrol/_black_btn_template.pdn
 UPD 2015-07-28_14:05:34 4702 www/images/default/remotecontrol/black_btn2_0.png
@@ -1086,11 +1080,14 @@ UPD 2015-07-28_14:05:32 7712 www/images/fhemSVG/building_carport_socket.svg
 UPD 2015-07-28_14:05:32 3695 www/images/fhemSVG/building_outside.svg
 UPD 2015-07-28_14:05:32 2546 www/images/fhemSVG/building_security.svg
 UPD 2015-08-14_07:45:11 2737 www/images/fhemSVG/car.svg
+UPD 2017-01-03_07:45:02 3132 www/images/fhemSVG/checkbox_checked.svg
+UPD 2017-01-03_07:45:02 1972 www/images/fhemSVG/checkbox_unchecked.svg
 UPD 2015-07-28_14:05:32 5818 www/images/fhemSVG/christmas_tree.svg
 UPD 2015-07-28_14:05:32 9449 www/images/fhemSVG/cul.svg
 UPD 2015-07-28_14:05:32 12083 www/images/fhemSVG/cul_868.svg
 UPD 2015-07-28_14:05:32 7562 www/images/fhemSVG/cul_cul.svg
 UPD 2015-07-28_14:05:32 6093 www/images/fhemSVG/cul_usb.svg
+UPD 2017-01-03_07:45:02 6958 www/images/fhemSVG/cul_wlan.svg
 UPD 2015-07-28_14:05:32 4825 www/images/fhemSVG/day_night.svg
 UPD 2015-07-28_14:05:32 15419 www/images/fhemSVG/dog_silhouette.svg
 UPD 2015-07-28_14:05:32 2935 www/images/fhemSVG/dreambox.svg
@@ -1213,6 +1210,8 @@ UPD 2015-07-28_14:05:32 2323 www/images/fhemSVG/motion_detector.svg
 UPD 2015-07-28_14:05:32 3642 www/images/fhemSVG/muelltonne.svg
 UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
+UPD 2017-01-03_07:45:02 2504 www/images/fhemSVG/radio_checked.svg
+UPD 2017-01-03_07:45:02 2126 www/images/fhemSVG/radio_unchecked.svg
 UPD 2015-07-28_14:05:32 3701 www/images/fhemSVG/rc_0.svg
 UPD 2015-07-28_14:05:32 2830 www/images/fhemSVG/rc_1.svg
 UPD 2015-07-28_14:05:32 3591 www/images/fhemSVG/rc_2.svg
