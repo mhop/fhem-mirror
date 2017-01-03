@@ -299,6 +299,10 @@ sub CUL_HM_updateConfig($){
           elsif ($defs{$io}->{TYPE} eq "HMUARTLGW") {
             CallFn($io,"WriteFn",$defs{$io},undef,"writeAesKey:${io}");
           }
+          elsif ($defs{$io}->{TYPE} =~ m/^(TSCUL|TSSTACKED)$/
+                && eval "defined(&TSCUL_WriteAesKeyHM)"){
+            TSCUL_WriteAesKeyHM($io); # noansi: for TSCUL
+          }
         }
       }
     }
@@ -875,11 +879,15 @@ sub CUL_HM_Attr(@) {#################################
     if ($init_done){
       foreach my $io (split ",",AttrVal($name,"IOList","")) {
         next if(!$defs{$io});
-        if($defs{$io}->{TYPE} eq "HMLAN" && eval "defined(&HMLAN_writeAesKey)"){
+        if    ($defs{$io}->{TYPE} eq "HMLAN" && eval "defined(&HMLAN_writeAesKey)"){
           HMLAN_writeAesKey($io);
         }
         elsif ($defs{$io}->{TYPE} eq "HMUARTLGW") {
           CallFn($io,"WriteFn",$defs{$io},undef,"writeAesKey:${io}");
+        }
+        elsif (   $defs{$io}->{TYPE} =~ m/^(TSCUL|TSSTACKED)$/
+               && eval "defined(&TSCUL_WriteAesKeyHM)"){
+          TSCUL_WriteAesKeyHM($io); # noansi: for TSCUL
         }
       }
     }
@@ -2073,7 +2081,7 @@ sub CUL_HM_Parse($$) {#########################################################
           $mh{devH}->{helper}{PONtest} = 0;
         }
       }
-      elsif($mh{st} eq "rgb"){
+      elsif ($mh{st} eq "rgb"){
         if ($mh{chn} == 2){
           push @evtEt,[$mh{cHash},1,"color:$val"]; # duplicate to color - necessary for "colorpicker"
           push @evtEt,[$mh{cHash},1,"rgb:".(($val==100)?("FFFFFF"):(Color::hsv2hex($val/100,1,1)))];
@@ -2892,6 +2900,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }  
   
   my $repeat;
+  $devHlpr->{supp_Pair_Rep} = 0 if ($mhp->{mTp} ne "00"); # noansi: reset pairing suppress flag as we got something different from device 
   if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
     my $reply;
     my $success;
@@ -2969,8 +2978,11 @@ sub CUL_HM_parseCommon(@){#####################################################
 
       if (AttrVal($mhp->{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" &&
           defined($aesKeyNbr)) {
+        if ($mhp->{devH}{IODev}{TYPE} =~ m/^(TSCUL|TSSTACKED)$/) { #nonsi: for TSCUL
+          return "AES"; # noansi: TSCUL did it, now the normal ACK is expected
+        }
         if ($cryptFunc == 1 &&                    #AES is available
-	        $devHlpr->{prt}{rspWait}{cmd}){       #There is a previously executed command
+          $devHlpr->{prt}{rspWait}{cmd}){       #There is a previously executed command
           my (undef, %keys) = CUL_HM_getKeys($mhp->{devH});
         
           my $kNo = hex($aesKeyNbr) / 2;
@@ -2992,10 +3004,10 @@ sub CUL_HM_parseCommon(@){#####################################################
                            ." should send $devHlpr->{AESreqAck} to authenticate";
             $response = $response ^ pack("H*", substr($devHlpr->{prt}{rspWait}{cmd}, 24));
             $response = $cipher->encrypt(substr($response, 0, 16));
-        
-           CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
-           $reply = "AES";
-           $repeat = 1;#prevent stop for messagenumber match
+
+            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
+            $reply = "AES";
+            $repeat = 1;#prevent stop for messagenumber match
           }
         } 
         elsif ($cryptFunc != 1){                     #AES is not available
@@ -3004,7 +3016,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         } 
       }
       else {
-        $reply = "done";
+        return "done";
       }
     }
     else{                    #ACK
@@ -3051,13 +3063,16 @@ sub CUL_HM_parseCommon(@){#####################################################
     #not with HMLAN/USB
     #my $aesKey = $p;
     push @evtEt,[$mhp->{devH},1,"aesReqTo:".$mhp->{dstH}{NAME}] if (defined $mhp->{dstH});
-    $ret = "done";    
+    $ret = "done";
   }
 
   elsif($mhp->{mTp} eq "00"){######################################
-    if (InternalVal($mhp->{devN},"lastMsg","") =~ m/t:00/){# repeated
+    if ($devHlpr->{supp_Pair_Rep}){# repeated  # Change noansi, don`t let the user press pair button forever if first pair try failed
+      $devHlpr->{supp_Pair_Rep} = 0; # noansi: reset flag, suppress only once not to lockup if device answer is not received
       return "done";  # suppress handling of a repeated pair request
     }
+    $devHlpr->{supp_Pair_Rep} = 1; # noansi: suppress next handling of a repeated pair request (if nothing else arrives in between from device)
+
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
@@ -3114,7 +3129,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $respRemoved = 1;#force command stack processing
     }
 
-    $devHlpr->{HM_CMDNR} += 20;  # force new setting. Send will take care of module 255
+    $devHlpr->{HM_CMDNR} += 0x27;  # force new setting. Send will take care of module 255
     $ret = "done";
   }
   elsif($mhp->{mTp} eq "10"){######################################
@@ -3179,11 +3194,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
-        $ret = "done";
       }
-      else{#response without request - discard
-        $ret = "done";
-      }
+      $ret = "done";
     }
     elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==============
       my $mNoInt = hex($mhp->{mNo}); 
@@ -3233,16 +3245,12 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($mhp->{cHash},$list,$peer);
-          $ret = "done";
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
-          $ret = "done";
         }
       }
-      else{#response without request - discard
-        $ret = "done";
-      }
+      $ret = "done";
     }
     elsif($mhp->{mStp} eq "04"){ #ParamChange===================================
       my($peerID,$list,$data) = ($1,$2,$3,$4) if($mhp->{p} =~ m/^04..(........)(..)(.*)/);
@@ -5885,7 +5893,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           }
           CUL_HM_qAutoRead($peerHash->{NAME},3);
         }
-      $devHash = CUL_HM_getDeviceHash($peerHash); # Exchange the hash, as the switch is always alive.
+        $devHash = CUL_HM_getDeviceHash($peerHash); # Exchange the hash, as the switch is always alive.
       }
     }
     return ("",1) if ($target && $target eq "remote");#Nothing for actor
@@ -6448,9 +6456,9 @@ sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
   my $to = gettimeofday() + (($mHsh->{rspWait}{Pending})?rand(20)/10+4:
                                                          rand(40)/10+1);
   InternalTimer($to,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
- }
+}
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
- #setup repeatTimer and cmdStackControll
+  #setup repeatTimer and cmdStackControll
   my ($hash,$cmd) =  @_;
   return if($hash->{helper}{prt}{sProc} == 3);#not relevant while FW update
   my (undef,$mNo,$mFlg,$mTp,$src,$dst,$chn,$sTp,$dat) = 
@@ -7834,11 +7842,9 @@ sub CUL_HM_convTemp($) {########################
   return sprintf("%02X", $val*2);
 }
 sub CUL_HM_decodeTime16($) {####################
-  my $x = shift;
-  my $v = hex($x);
+  my $v = hex(shift);
   my $m = int($v>>5);
   my $e = $v & 0x1f;
-  my $mul = 0.1;
   return (2**$e)*$m*0.1;
 }
 sub CUL_HM_secSince2000() {#####################
@@ -8597,10 +8603,12 @@ sub CUL_HM_UpdtCentral($){
   
   foreach my $ioN(split",",AttrVal($name,"IOList","")){# set parameter in IO
     next if (!$defs{$ioN});
-    if (  $defs{$ioN}{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){;
+    my $t = $defs{$ioN}{TYPE};
+    if (   $t =~ m/^(HMLAN|HMUARTLGW)$/){
+      ; # nothing special to do on device
     }
-    elsif(($defs{$ioN}{TYPE} eq "CUL")||($defs{$ioN}{TYPE} eq "STACKABLE_CC")){
-      CommandAttr(undef, "$ioN rfmode HomeMatic") 
+    elsif( $t =~ m/^(CUL|TSCUL|TSSTACKED|STACKABLE_CC)$/){ # nonsi: required for usage of TSCUL/TSSTACKED !!!
+      CommandAttr(undef, "$ioN rfmode HomeMatic")          # set device to HomeMatic mode
             if (AttrVal($ioN,"rfmode","") ne "HomeMatic");
     }
     else {
@@ -8703,7 +8711,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
   # not assigned thru CCU - try normal
   my $dIo = AttrVal($hash->{NAME},"IODev","");
   if ($defs{$dIo}){
-    if($dIo ne $hash->{IODev}->{NAME}){
+    if(!defined($hash->{IODev}->{NAME}) || ($dIo ne $hash->{IODev}->{NAME})){
       $hash->{IODev} = $defs{$dIo};
     }
   }
@@ -9684,6 +9692,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
              <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
              <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
              <li><B>stop</B> - stop motion (blind) or dim ramp</li>
+             <li><B>old</B> - switch back to old value after a change. Dimmer only.</li>
              <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>.<br>
                     Optional ontime and ramptime could be given for dimmer.<br>
                     ontime may be time in seconds. It may also be entered as end-time in format hh:mm:ss
@@ -11068,6 +11077,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B>stop</B> - Stopt Bewegung (Rollo) oder Dimmerrampe</li>
+            <li><B>old</B> - schaltet auf den vorigen Wert zurück. Nur dimmer. </li>
             <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - setzt Aktor auf gew&uuml;nschten <B>absolut Wert</B>.<br>
               Optional k&ouml;nnen f&uuml;r Dimmer "ontime" und "ramptime" angegeben werden.<br>
               "Ontime" kann dabei in Sekunden angegeben werden. Kann auch als Endzeit angegeben werden im Format hh:mm:ss
