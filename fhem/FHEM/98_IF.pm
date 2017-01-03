@@ -204,6 +204,7 @@ ParseCommandsIf($)
   my $parsedCmd="";
   my $pos=0;
   $tailBlock =~ s/;/;;/g;
+  my $sleep;
   while ($tailBlock ne "") {
     if ($tailBlock=~ /^\s*\{/) { # perl block
       ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\{\}]'); 
@@ -240,20 +241,34 @@ ParseCommandsIf($)
           $currentBlock=$tailBlock;
           $tailBlock="";
         }
-        if ($currentBlock =~ /[^\s]/g) { 
-          $currentBlock =~ s/'/\\'/g;
-          ($currentBlock,$err)=ReplaceAllReadingsIf($currentBlock,1);
-          return ($currentBlock,$err) if ($err);
-          ($currentBlock,$err)=EvalAllIf($currentBlock);
-          $currentBlock =~ s/;/;;/g;
-          return ($currentBlock,$err) if ($err);
-          $parsedCmd.="fhem('".$currentBlock."')";
-          $parsedCmd.=";;" if ($tailBlock);
-        } else {
-         $parsedCmd.=";;" if ($tailBlock);
-        }
+		if ($currentBlock =~ /[^\s]/g) { 
+		  $currentBlock =~ s/'/\\'/g;
+		  ($currentBlock,$err)=ReplaceAllReadingsIf($currentBlock,1);
+		  return ($currentBlock,$err) if ($err);
+		  ($currentBlock,$err)=EvalAllIf($currentBlock);
+		  $currentBlock =~ s/;/;;/g;
+		  return ($currentBlock,$err) if ($err);
+		  if ($sleep) {
+		    $parsedCmd.=$currentBlock;
+		    if ($tailBlock) {
+			  $parsedCmd.=";;" 
+			} else {
+			  $parsedCmd.="')"
+			}
+          } elsif ($currentBlock =~ /^\s*sleep/) {
+		    $sleep=1;
+		    $parsedCmd.="fhem('".$currentBlock.";;";
+			$parsedCmd.="')" if !($tailBlock);
+	        } else {
+		      $parsedCmd.="fhem('".$currentBlock."')";
+			  $parsedCmd.=";;" if ($tailBlock);
+	        }
+		} else {
+		 $parsedCmd.=";;" if ($tailBlock);
+		}
     }
   }
+  
   return($parsedCmd,"");
 }
 
@@ -336,6 +351,8 @@ CommandIF($$)
 1;
 
 =pod
+=item summary    FHEM IF-command  
+=item summary_DE FHEM IF-Befehl
 =begin html
 
 <a name="IF"></a>
@@ -432,6 +449,10 @@ CommandIF($$)
   The comma can be combined as a separator between the FHEM commands with double semicolon, eg:<br>
   <br>
   <code>define check at *10:00 IF ([indoor] eq "on") (set lamp1 on,define a_test at +00:10 set lampe2 on;;set lampe3 off;;set temp desired 20)<br></code>
+  <br>
+  sleep can be used with comma, it is not blocking:<br>
+  <br>
+  <code>define check at *10:00 IF ([indoor] eq "on") (sleep 2,set lampe1 on,sleep 3,set lampe2 on)</code><br>
   <br>
   Time-dependent switch: In the period 20:00 to 22:00 clock the light should go off when it was on and I leave the room:<br>
   <br>
@@ -557,6 +578,10 @@ CommandIF($$)
   Das Komma als Trennzeichen zwischen den FHEM-Befehlen lässt sich mit ;; kombinieren, z. B.:<br>
   <br>
   <code>define check at *10:00 IF ([indoor] eq "on") (set lamp1 on,define a_test at +00:10 set lampe2 on;;set lampe3 off;;set temp desired 20)<br></code>
+  <br>
+  sleep kann mit Komma verwendet werden, dabei wirkt das sleep nicht blockierend:<br>
+  <br>
+  <code>define check at *10:00 IF ([indoor] eq "on") (sleep 2,set lampe1 on,sleep 3,set lampe2 on)</code><br>
   <br>
   Zeitabhängig schalten: In der Zeit zwischen 20:00 und 22:00 Uhr soll das Licht ausgehen, wenn es an war und ich den Raum verlasse:<br>
   <br>
