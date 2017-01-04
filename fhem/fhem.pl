@@ -1384,6 +1384,7 @@ GetAllReadings($)
      $val ne "" &&
      $val ne "???") {
     $val =~ s/;/;;/g;
+    $val =~ s/([ \t])/sprintf("\\%03o",ord($1))/eg if($val =~ m/^[ \t]*$/);
     $val =~ s/\n/\\\n/g;
     push @ret, "setstate $d $val";
   }
@@ -2748,6 +2749,7 @@ CommandSetstate($$)
       # The timestamp is not the correct one, but we do not store a timestamp
       # for this reading.
       my $tn = TimeNow();
+      $a[1] =~ s/\\(...)/chr(oct($1))/ge if($a[1] =~ m/^(\\011|\\040)+$/);
       $oldvalue{$sdev}{TIME} = $tn;
       $oldvalue{$sdev}{VAL} = ($init_done ? $d->{STATE} : $a[1]);
 
