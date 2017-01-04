@@ -336,6 +336,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
         # Locative.app
         if ( defined $webArgs->{trigger} ) {
+            Log3 $name, 5, "GEOFANCY $name: detected data format: Locative.app";
             $id     = $webArgs->{id};
             $entry  = $webArgs->{trigger};
             $lat    = $webArgs->{latitude};
@@ -351,6 +352,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
         # Geofency.app
         elsif ( defined $webArgs->{entry} ) {
+            Log3 $name, 5, "GEOFANCY $name: detected data format: Geofency.app";
             $id      = $webArgs->{id};
             $locName = $webArgs->{name};
             $entry   = $webArgs->{entry};
@@ -364,6 +366,8 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
         # SMART Geofences.app
         elsif ( defined $webArgs->{type} ) {
+            Log3 $name, 5,
+              "GEOFANCY $name: detected data format: SMART Geofences.app";
             $id      = $webArgs->{name};
             $locName = $webArgs->{name};
             $entry   = $webArgs->{type};
