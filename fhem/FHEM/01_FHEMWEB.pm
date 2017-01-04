@@ -328,7 +328,6 @@ FW_Read($$)
     }
   }
 
-
   if(!$reread) {
     # Data from HTTP Client
     my $buf;
@@ -422,15 +421,25 @@ FW_Read($$)
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
 
-  if( $method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i ) {
-    use Digest::SHA1 qw(sha1_base64);
+  if($method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i ) {
+
+    my $shastr = eval {
+      require Digest::SHA1;
+      Digest::SHA1::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
+                                "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    };
+    if($@) {
+      Log3 $FW_wname, 1, $@;
+      Log3 $FW_wname, 1, "$FW_wname: Can't load Digest::SHA, no websocket";
+      $attr{$FW_wname}{longpoll} = 1;
+      return -1;
+    }
+
     TcpServer_WriteBlocking($FW_chash,
        "HTTP/1.1 101 Switching Protocols\r\n" .
        "Upgrade: websocket\r\n" .
        "Connection: Upgrade\r\n" .
-       "Sec-WebSocket-Accept:".
-       sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
-                    "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")."=\r\n" .
+       "Sec-WebSocket-Accept:$shastr=\r\n".
        "\r\n" );
     $FW_chash->{websocket} = 1;
 
