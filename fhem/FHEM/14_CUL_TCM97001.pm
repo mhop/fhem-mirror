@@ -235,8 +235,8 @@ sub checkValues {
   if (!defined($humidy)) {
     $humidy = 50;
   }
-  if ($temp < 60 && $temp > -30
-      && $humidy > 0 && $humidy < 100) {
+  if ($temp <= 60 && $temp >= -30
+      && $humidy >= 0 && $humidy <= 100) {
     return TRUE;
   }
   return FALSE;
@@ -791,6 +791,14 @@ CUL_TCM97001_Parse($$)
       $temp = $temp / 10;
       $humidity = (hex($a[6].$a[7]) & 0x0FE) >> 1; # only the first 7 bits are the humidity
 
+      if ($humidity > 100) {
+        # HH - Workaround
+        $humidity = 100;
+      } elsif ($humidity < 20) {
+        # LL - Workaround
+        $humidity = 20;
+      }
+
       if (checkValues($temp, $humidity)) {
         $channel = ((hex($a[2])) & 0x3) + 1;
         $batbit  = ((hex($a[2]) & 0x8) != 0x8);
@@ -819,9 +827,7 @@ CUL_TCM97001_Parse($$)
             Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
-        if ($humidity >= 20) {
-          $hashumidity = TRUE;
-        }
+        $hashumidity = TRUE;
         $hasbatcheck = TRUE;  
         $haschannel = TRUE;   
         $hasmode = TRUE;  
