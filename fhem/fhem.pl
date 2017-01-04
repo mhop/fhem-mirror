@@ -4496,10 +4496,14 @@ notifyRegexpChanged($$)
     $hash->{NOTIFYDEV} = $dev;
 
   } elsif($re =~ m/\|/ && $re =~ /^\(?([^().+*?\[\]\\]+)\)?$/) { # Regexp Wizard
-    my @list = split(/\|/, $1);                                  # Forum #54536
-    @list = map { m/^([^:]*)(?::.*)?$/ ? $1 : "" } @list;
-    $hash->{NOTIFYDEV} = join(",", @list) if(@list && @list <= 5);
-    delete($hash->{NOTIFYDEV}) if(@list && @list > 5);
+    my @list2 = split(/\|/, $1);                                 # Forum #54536
+    my @list = grep { m/./ }                                     # Forum #62369
+               map  { (m/^([^:]*)(?::.*)?$/ && $defs{$1}) ? $1 : "" } @list2;
+    if(@list && @list <= 5 && int(@list) == int(@list2)) {
+      $hash->{NOTIFYDEV} = join(",", @list);
+    } else {
+      delete($hash->{NOTIFYDEV});
+    }
 
   } else {
     delete($hash->{NOTIFYDEV}); # when called by modify

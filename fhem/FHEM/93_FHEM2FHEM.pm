@@ -156,7 +156,6 @@ FHEM2FHEM_Read($)
       Log3 $name, 4, "$name: $rmsg";
 
       if(!$defs{$name}) {
-        #LoadModule($type); Why do we need this line?
         $defs{$name}{NAME}  = $name;
         $defs{$name}{TYPE}  = $type;
         $defs{$name}{STATE} = $msg;
@@ -166,7 +165,11 @@ FHEM2FHEM_Read($)
         delete($defs{$name});
 
       } else {
-        DoTrigger($name, $msg);
+        if($msg =~ m/^([^:]*): (.*)$/) {
+          readingsSingleUpdate($defs{$name}, $1, $2, 1);
+        } else {
+          DoTrigger($name, $msg);
+        }
 
       }
 
@@ -362,8 +365,10 @@ FHEM2FHEM_Set($@)
     FHEM. It is possible to create a device with the same name on both FHEM
     instances, but if both of them receive the same event (e.g. because both
     of them have a CUL attached), then all associated FileLogs/notifys will be
-    triggered twice.  </li>
-
+    triggered twice.<br>
+    If the remote device is created with the same name locally (e.g. as dummy),
+    then the local readings are also updated.
+    </li>
   <li>RAW<br>
     By using this type the local FHEM will receive raw events from the remote
     FHEM device <i>devicename</i>, just like if it would be attached to the
@@ -456,7 +461,11 @@ FHEM2FHEM_Set($@)
     angesprochen werden.  Auf beiden FHEM-Installationen k&ouml;nnen
     Ger&auml;te gleichen Namens angelegt werden, aber wenn beide dasselbe
     Ereignis empfangen (z.B. wenn an beiden Installationen CULs angeschlossen
-    sind), werden alle FileLogs und notifys doppelt ausgel&ouml;st.  </li>
+    sind), werden alle FileLogs und notifys doppelt ausgel&ouml;st.<br>
+    Falls man lokal Ger&auml;te mit dem gleichen Namen (z.Bsp. als dummy)
+    angelegt hat, dann werden die Readings von dem lokalen Ger&auml;t
+    aktualisiert.
+    </li>
 
    <li>RAW<br>
     Bei diesem Verbindungstyp werden unaufbereitete Ereignisse (raw messages)
