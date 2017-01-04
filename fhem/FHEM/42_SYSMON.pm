@@ -867,7 +867,7 @@ SYSMON_Update($;$)
   if( AttrVal($name, "disable", "") eq "1" )
   {
     #SYSMON_Log($hash, 5, "disabled");
-    $hash->{STATE} = "Inactive";
+    #$hash->{STATE} = "Inactive";
   } else {
     # Beim ersten mal alles aktualisieren!
     if(!$hash->{helper}{u_first_mark}) {
@@ -889,7 +889,7 @@ SYSMON_Update($;$)
       }
     
       SYSMON_updateReadings($hash,$map);
-      $hash->{STATE} = "Active";
+      #$hash->{STATE} = "Active";
     } else {
       # blocking call
       if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) ) {
@@ -1048,7 +1048,7 @@ sub SYSMON_blockingFinish($) {
   }
   
   SYSMON_updateReadings($hash,$map);
-  $hash->{STATE} = "Active";
+  #$hash->{STATE} = "Active";
 }
 
 sub SYSMON_updateReadings($$) {
