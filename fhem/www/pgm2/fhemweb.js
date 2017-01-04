@@ -54,7 +54,7 @@ FW_jqueryReadyFn()
 {
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
-  if($("body").attr("longpoll"))
+  if($("body").attr("longpoll") != "0")
     setTimeout("FW_longpoll()", 100);
 
   $("a").each(function() { FW_replaceLink(this); })
