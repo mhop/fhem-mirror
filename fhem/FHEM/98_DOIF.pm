@@ -74,7 +74,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:1,0 setList readingList ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all setList:textField-long readingList ".$readingFnAttributes;
 }
 
 
@@ -676,7 +676,7 @@ sub ReplaceAllReadingsDoIf($$$$)
     }
     $cmd.=$beginning.$block;
   }
-  return ($definition,"no trigger in condition") if ($condition >=0 and $event == 0);
+  #return ($definition,"no trigger in condition") if ($condition >=0 and $event == 0);
   return ($cmd,"");
 }
 
@@ -866,6 +866,7 @@ DOIF_time
   my $begin=$hash->{realtime}{$b};
   my $end=$hash->{realtime}{$e};
   my $err;
+  return 0 if ($begin eq $end);
   ($days,$err)=ReplaceAllReadingsDoIf($hash,$days,-1,1);
   if ($err) {
     my $errmsg="error in days: $err";
@@ -1273,24 +1274,33 @@ DOIF_Trigger ($$)
   my $ret;
   my $err;
   my $doelse=0;
-  my $event;
+  my $event="$device";
   my $pn=$hash->{NAME};
   my $max_cond=keys %{$hash->{condition}};
   my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
   my $j;
   my @triggerEvents;
+  if (AttrVal($pn, "checkall", 0) =~ "1|all|timer" and $device eq "") {
+    for ($j=0; $j<$hash->{helper}{last_timer};$j++) {
+      if ($hash->{timer}{$j}==1) {
+        $timerNr=$j; #first timer
+        last;
+      }
+    }
+  }
   for (my $i=0; $i<$max_cond;$i++) {
     if ($device eq "") {# timer
-      next if (!defined ($hash->{timers}{$i}));
       my $found=0;
-      foreach $j (split(" ",$hash->{timers}{$i})) {
-        if ($hash->{timer}{$j} == 1) {
-          $found=1;
-          $timerNr=$j;
-          last;
-        }  
+      if (defined ($hash->{timers}{$i})) {
+        foreach $j (split(" ",$hash->{timers}{$i})) {
+          if ($hash->{timer}{$j} == 1) {
+            $found=1;
+            $timerNr=$j;
+            last;
+          }  
+        }
       }
-      next if (!$found);
+      next if (!$found and AttrVal($pn, "checkall", 0) !~ "1|all|timer");
       $event="timer_".($timerNr+1);
       @triggerEvents=($event);
       $hash->{helper}{triggerEvents}=\@triggerEvents;
@@ -1298,7 +1308,7 @@ DOIF_Trigger ($$)
       $hash->{helper}{event}=$event;
     } else { #event
       if (!CheckRegexpDoIf($hash, $device, $hash->{helper}{triggerEvents}, $i)) { 
-        if (!AttrVal($pn, "checkall", 0)) {
+        if (AttrVal($pn, "checkall", 0) !~ "1|all|event") {
           next if (!defined ($hash->{devices}{$i}));
           next if ($hash->{devices}{$i} !~ / $device /);
           next if (AttrVal($pn, "checkReadingEvent", 0) and !CheckReadingDoIf ($hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1))
@@ -1373,8 +1383,15 @@ DOIF_Notify($$)
         DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
+	if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate ($hash,"state",AttrVal($pn,"initialize",0));
+		readingsBulkUpdate ($hash,"cmd_nr","0");
+		readingsBulkUpdate ($hash,"cmd",0);
+		readingsEndUpdate($hash, 0);
+    }
   }
-  
+ 
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
     for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
     { if (AttrVal($pn, "checkReadingEvent", 0) and CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)
@@ -1441,16 +1458,29 @@ DOIF_TimerTrigger ($)
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
   my $ret;
+  my ($now, $microseconds) = gettimeofday();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
   $hash->{helper}{cur_cmd_nr}="timer $localtime" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
   #$hash->{helper}{cur_cmd_nr}="timer $localtime";
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
     if ($hash->{localtime}{$j} == $localtime) {
+      if (defined ($hash->{interval}{$j})) {
+        if ($hash->{interval}{$j} != -1) {
+          if ($hash->{realtime}{$j} eq $hash->{realtime}{$hash->{interval}{$j}}) {
+            $hash->{timer}{$hash->{interval}{$j}}=0;
+            next;
+          }
+        }
+      }
       $hash->{timer}{$j}=1;
+      if (!DOIF_time_once($hash,$j,$wday,$hash->{days}{$j})) {#check days
+        $hash->{timer}{$j}=0;
+      }
     }
   }
   $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled"); 
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
-    if ($hash->{timer}{$j} == 1) {
+    if ($hash->{localtime}{$j} == $localtime) {
       $hash->{timer}{$j}=0;
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
@@ -1927,12 +1957,6 @@ DOIF_Attr(@)
       #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
       readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
       $hash->{helper}{sleeptimer}=-1;
-  } elsif($a[0] eq "set" && $a[2] eq "initialize") {
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate ($hash,"state",$a[3]);
-    readingsBulkUpdate ($hash,"cmd_nr","0");
-    readingsBulkUpdate ($hash,"cmd",0);
-    readingsEndUpdate($hash, 1);
   } elsif($a[0] eq "del" && $a[2] eq "repeatsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
   } elsif($a[0] eq "del" && $a[2] eq "waitsame") {
@@ -1987,7 +2011,7 @@ DOIF_Set($@)
 
       my $setList = AttrVal($pn, "setList", " ");
       $setList =~ s/\n/ /g;
-      return "unknown argument ? for $pn, choose one of disable initialize enable $setList" if($arg eq "?");
+      return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $setList" if($arg eq "?");
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
       eval {
@@ -2001,7 +2025,7 @@ DOIF_Set($@)
       return if($doRet);
 
 
-      return "unknown argument $arg for $pn, choose one of disable initialize enable $setList";
+      return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg $setList";
   } 
 
   return $ret;
@@ -2150,6 +2174,8 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
   <a href="#DOIF_Initialisieren_des_Moduls">Initialisieren des Moduls</a><br>
   <a href="#DOIF_Weitere_Anwendungsbeispiele">Weitere Anwendungsbeispiele</a><br>
   <a href="#DOIF_Zu_beachten">Zu beachten</a><br>
+  <a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
+  <a href="https://forum.fhem.de/index.php/board,73.0.html">DOIF im FHEM-Forum</a><br>
   <a href="#DOIF_Kurzreferenz">Kurzreferenz</a><br>
 <!-- Vorlage Inhaltsübersicht und Sprungmarke-->
   <a href="#DOIF_"></a><br>
@@ -2158,7 +2184,7 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
 <!--&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>-->
 </ul>
   <a name="DOIF_Attribute"></a>
-  <b>Attribute</b><br>
+  <a href="#DOIF_Attribute_kurz"><b>Attribute</b></a><br>
   <ul>
   <a href="#DOIF_cmdpause">cmdpause</a> &nbsp;
   <a href="#DOIF_cmdState">cmdState</a> &nbsp;
@@ -2310,25 +2336,50 @@ Loggen aller Ereignisse in FHEM<br>
 <br>
 attr di_all_events do always<br></code>
 <br>
-Fenster offen Meldung<br>
+"Fenster offen"-Meldung<br>
 <br>
-<code>define di_window_open (["^window_:opened"]) (set Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600)<br>
+<code>define di_window_open (["^window_:open"]) (set Pushover msg 'alarm' 'open windows $DEVICE' '' 2 'persistent' 30 3600)<br>
 <br>
 attr di_window_open do always</code><br>
 <br>
-Hier werden alle Fenster, die mit dem Device-Namen "window_" beginnen auf "opened" im Event überwacht.<br>
+Hier werden alle Fenster, die mit dem Device-Namen "window_" beginnen auf "open" im Event überwacht.<br>
+<br>
+Verzögerte "Fenster offen"-Meldung<br>
+<br>
+<code>define di_window_open DOIF ["^window_:open|tilted"])<br>
+  (defmod at_$DEVICE at +00:05 set send window $DEVICE open)<br>
+DOELSEIF (["^window_:closed"])<br>
+  (delete at_$DEVICE)<br>
+<br>
+attr di_window_open do always</code><br>
+<br>
+Alternative mit sleep<br>
+<br>
+<code>define di_window_open DOIF ["^window_:open|tilted"])<br>
+  (sleep 300 $DEVICE quiet;set send window $DEVICE open)<br>
+DOELSEIF (["^window_:closed"])<br>
+  (cancel $DEVICE quiet)<br>
+<br>
+attr di_window_open do always</code><br>
+<br>
+In den obigen beiden Beispielen ist eine Verzögerung über das Attribut wait nicht sinnvoll, da pro Fenster ein eigener Timer (hier mit Hilfe von at/sleep) gesetzt werden muss.<br>
 <br>
 Batteriewarnung per E-Mail verschicken<br>
 <br>
-<code>define Battery dummy<br>
-<br>
-define di_battery DOIF ([":battery: low"] and [?Battery:$DEVICE] ne "low")<br>
-  <ol>({DebianMail('yourname@gmail.com', 'FHEM - battery warning from device: $DEVICE')}, setreading Battery $DEVICE low)</ol>
-DOELSEIF ([":battery: ok"] and [?Battery:$DEVICE] ne "ok")<br>
-  <ol>(setreading Battery $DEVICE ok)</ol>
+<code>define di_battery DOIF ([":battery: low"] and [?$SELF:B_$DEVICE] ne "low")<br>
+  <ol>({DebianMail('yourname@gmail.com', 'FHEM - battery warning from device: $DEVICE')}, setreading $SELF B_$DEVICE low)</ol>
+DOELSEIF ([":battery: ok"] and [?$SELF:B_$DEVICE] ne "ok")<br>
+  <ol>(setreading $SELF B_$DEVICE ok)</ol>
 <br>  
-attr di_battery do always<br>
-attr di_battery notexist "novalue"<br></code>
+attr di_battery do always</code><br>
+<br>
+Eine aktuelle Übersicht aller Batterie-Stati entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
+<br>
+
+
+
+
+
 <br>
 Allgemeine Ereignistrigger können ebenfalls so definiert werden, dass sie nicht nur wahr zum Triggerzeitpunkt und sonst nicht wahr sind,
  sondern Inhalte des Ereignisses zurückliefern. Initiiert wird dieses Verhalten durch die Angabe eines Default-Wertes.<br>
@@ -2624,9 +2675,9 @@ Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Be
 <br>
 Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu keiner Triggerung des Moduls, sie dienen lediglich der Abfrage.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Licht soll zwischen 06:00 und 10:00 angehen, getriggert wird nur durch den Taster nicht um 06:00 bzw. 10:00 Uhr<br>
+<u>Anwendungsbeispiel</u>: Licht soll zwischen 06:00 und 10:00 angehen, getriggert wird nur durch den Taster nicht um 06:00 bzw. 10:00 Uhr und nicht durch das Device Home<br>
 <br>
-<code>define di_motion DOIF ([?06:00-10:00] and [button])(set lamp on-for-timer 600)<br>
+<code>define di_motion DOIF ([?06:00-10:00] and [button] and [?Home] eq "present")(set lamp on-for-timer 600)<br>
 attr di_motion do always</code><br>
 <br>
 <a name="DOIF_Nutzung_von_Readings_Stati_oder_Internals_im_Ausfuehrungsteil"></a>
@@ -2997,8 +3048,14 @@ Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich festste
 <b>Alle Bedingungen prüfen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Bei der Abarbeitung der Bedingungen, werden nur die Bedingungen überprüft,
-die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten. Mit dem Attribut <b>checkall 1</b> lässt sich das Verhalten so verändern,
+die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten. Mit dem Attribut <b>checkall</b> lässt sich das Verhalten so verändern,
 dass bei einem Event-Trigger auch Bedingungen geprüft werden, die das triggernde Device nicht beinhalten.
+Folgende Parameter können angebeben werden:<br>
+<br>
+<code>checkall event</code> Es werden alle Bedingungen geprüft, wenn ein Event-Trigger auslöst.<br>
+<code>checkall timer</code> Es werden alle Bedingungen geprüft, wenn ein Timer-Trigger auslöst.<br>
+<code>checkall all&nbsp;&nbsp;</code> Es werden grundsätzlich alle Bedingungen geprüft.<br>
+<br>
 Zu beachten ist, dass bei einer wahren Bedingung die dazugehörigen Befehle ausgeführt werden und die Abarbeitung immer beendet wird -
  es wird also grundsätzlich immer nur ein Befehlszweig ausgeführt und niemals mehrere.<br>
 <br>
@@ -3216,8 +3273,14 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>error</dt>
                 <dd>Enthält Fehlermeldungen oder R&uuml;ckgabewerte von Befehlen, siehe <a href="http://www.fhemwiki.de/wiki/DOIF/Tools_und_Fehlersuche#Besonderheit_des_Error-Reading">Besonderheit des Error-Reading</a></dd>
 </br>
+        <dt>last_cmd</dt>
+                <dd>letzter Status</dd>
+</br>
         <dt>matched_event_c&lt;lfd. Nr. der Bedingung&gt;_&lt;lfd. Nr. des Events&gt;</dt>
                 <dd>Wert, der mit dem Regul&auml;ren Ausdruck &uuml;bereinstimmt</dd>
+</br>
+        <dt>mode</dt>
+                <dd>der Modus, in dem sich DOIF befindet: &lt;disabled|enable&gt;</dd>
 </br>
         <dt>state</dt>
                 <dd>Status des DOIF nach Befehlsausf&uuml;hrung, Voreinstellung: cmd_&lt;Nr. des Befehlszweiges&gt;&lang;_&lt;Nr. der Befehlssequenz&gt;&rang;</dd>
@@ -3229,7 +3292,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>Angabe des aktuellen Wait-Timers</dd>
 </br>
   <a name="DOIF_Benutzerreadings"></a>
-        <dt>[A-Z]_&lt;readingname&gt;</dt>
+        <dt>&lt;A-Z&gt;_&lt;readingname&gt;</dt>
                 <dd>Readings, die mit einem Großbuchstaben und nachfolgendem Unterstrich beginnen, sind für User reserviert und werden auch zuk&uuml;nftig nicht vom Modul selbst benutzt.</dd>
 </dl>
 </br>
@@ -3333,6 +3396,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </br>
 </ul>
 
+<a name="DOIF_Attribute_kurz"></a>
 <u>Attribute</u>
 <ul>
 <dl>
@@ -3387,8 +3451,12 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a href="#DOIF_disable">Ger&auml;t vollst&auml;ndig deaktivieren</a> <code><b>attr</b> &lt;name&gt; <b>disable </b>&lt;<b>0</b>|<b>1</b>&gt;</code></dt>
                 <dd>1 deaktiviert das Modul vollst&auml;ndig, 0 aktiviert es.</dd>
 </br>
-        <dt><a href="#DOIF_checkall">Alle Bedingungen pr&uuml;fen</a> <code><b>attr</b> &lt;name&gt; <b>checkall </b>&lt;<b>0</b>|<b>1</b>&gt;</code></dt>
-                <dd>1 Alle Bedingungen werden geprüft und die Befehle der ersten wahren Bedingung ausgeführt, 0 Standartverhalten</dd>
+        <dt><a href="#DOIF_checkall">Alle Bedingungen pr&uuml;fen</a> <code><b>attr</b> &lt;name&gt; <b>checkall </b>&lt;<b>event</b>|<b>timer</b>|<b>all</b>&gt;</code></dt>
+                <dd><code>event</code> Alle Bedingungen werden geprüft, wenn ein Event-Trigger (Ereignisauslöser) auslöst.<br>
+                    <code>timer</code> Alle Bedingungen werden geprüft, wenn ein Timer-Trigger (Zeitauslöser) auslöst.<br>
+                    <code>all&nbsp;&nbsp;</code> Alle Bedingungen werden gepr&uuml;ft.<br>
+                    Die Befehle nach der ersten wahren Bedingung werden ausgef&uuml;hrt.
+                </dd>
 </br>
         <dt><a href="#DOIF_addStateEvent">Eindeutige Statuserkennung</a> <code><b>attr</b> &lt;name&gt; <b>addStateEvent </b>&lt;<b>0</b>|<b>ungleich Null</b>&gt;</code></dt>
                 <dd>fügt einem Ger&auml;testatus-Event "state:" hinzu. ungleich Null aktiviert, 0 deaktiviert, siehe auch <a href="#addStateEvent">addStateEvent</a></dd>
