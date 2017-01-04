@@ -313,7 +313,7 @@ if (\$EVTPART0 eq \"stop\") {\
 #fhem \"sleep 1.0;; set Sonos_Bathroom RemoveMember Sonos_Bathroom\";;\
 \
 ## Group Bedroom's and Bathroom's Sonos devices with Bedroom as master\
-#fhem \"sleep 2.0;; set Sonos_Bedroom AddMember Sonos_Bathroom;; set Sonos_Bedroom:FILTER=Shuffle!=1 Shuffle 1;; set Sonos_Bedroom,Sonos_Bathroom:FILTER=Volume!=12 Volume 12\";;\
+#fhem \"sleep 2.0;; set Sonos_Bedroom AddMember Sonos_Bathroom;; set Sonos_Bedroom:FILTER=Shuffle!=1 Shuffle 1;; set Sonos_Bedroom:FILTER=Volume!=12,Sonos_Bathroom:FILTER=Volume!=12 Volume 12\";;\
 \
 ## Start music from playlist\
 #fhem \"sleep 3.0;; set Sonos_Bedroom StartFavourite Evening%%20Chill\";;\
