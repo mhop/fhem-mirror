@@ -131,7 +131,7 @@ CUL_Initialize($)
     addvaltrigger
     connectCommand
     do_not_notify:1,0
-    dummy:1,0 " .
+    dummy:1,0
     hmId longids 
     hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger 
     model:CUL,CUN,CUNO,SCC,nanoCUL
