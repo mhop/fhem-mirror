@@ -8,24 +8,39 @@ var mustScroll = 1;
 log("Console is opening");
 
 function
-consUpdate()
+consUpdate(evt)
 {
-  if(consConn.readyState == 4) {
-    FW_errmsg("Connection lost, trying a reconnect every 5 seconds.");
-    setTimeout(consFill, 5000);
-    return; // some problem connecting
-  }
+  var errstr = "Connection lost, trying a reconnect every 5 seconds.";
+  var new_content = "";
 
-  if(consConn.readyState != 3)
-    return;
-  var len = consConn.responseText.length;
-  
-  if (consLastIndex == len) // No new data
-    return; 
- 
-  var new_content = consConn.responseText.substring(consLastIndex, len);
-  consLastIndex = len;
-  
+  if(evt.target instanceof WebSocket) {
+    if(evt.type == 'close') {
+      FW_errmsg(errstr, 4900);
+      consConn.close();
+      consConn = undefined;
+      setTimeout(consFill, 5000);
+      return;
+    }
+    new_content = evt.data;
+    consLastIndex = 0;
+
+  } else {
+    if(consConn.readyState == 4) {
+      FW_errmsg(errstr, 4900);
+      setTimeout(consFill, 5000);
+      return;
+    }
+
+    if(consConn.readyState != 3)
+      return;
+
+    var len = consConn.responseText.length;
+    if (consLastIndex == len) // No new data
+      return; 
+   
+    new_content = consConn.responseText.substring(consLastIndex, len);
+    consLastIndex = len;
+  }
   log("Console Rcvd: "+new_content);
   if(new_content.indexOf('<') != 0)
     new_content = new_content.replace(/ /g, "&nbsp;");
@@ -41,18 +56,41 @@ consFill()
 {
   FW_errmsg("");
 
-  if(consConn) {
-    consConn.onreadystatechange = undefined;
-    consConn.abort();
+  if(FW_pollConn) {
+    if($("body").attr("longpoll") == "websocket") {
+      FW_pollConn.close();
+    } else {
+      FW_pollConn.abort();
+    }
+    FW_pollConn = undefined;
   }
-  consConn = new XMLHttpRequest();
-  var query = document.location.pathname+"?XHR=1"+
+
+  var query = "?XHR=1"+
        "&inform=type=raw;withLog="+withLog+";filter="+consFilter+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
-  consConn.open("GET", query, true);
-  consConn.onreadystatechange = consUpdate;
-  consConn.send(null);
+
+  if($("body").attr("longpoll") == "websocket") {
+    if(consConn) {
+      consConn.close();
+    }
+    consConn = new WebSocket((location+query).replace(/^http/i, "ws"));
+    consConn.onclose = 
+    consConn.onerror = 
+    consConn.onmessage = consUpdate;
+
+  } else {
+    if(consConn) {
+      consConn.onreadystatechange = undefined;
+      consConn.abort();
+    }
+    consConn = new XMLHttpRequest();
+    consConn.open("GET", location.pathname+query, true);
+    consConn.onreadystatechange = consUpdate;
+    consConn.send(null);
+
+  }
+
   consLastIndex = 0;
   if(oldFilter != consFilter)  // only clear, when filter changes
     $("#console").html("");

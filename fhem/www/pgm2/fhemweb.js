@@ -670,24 +670,41 @@ var FW_longpollOffset = 0;
 var FW_leaving;
 
 function
-FW_doUpdate()
+FW_doUpdate(evt)
 {
-  if(FW_pollConn.readyState == 4 && !FW_leaving) {
-    if(FW_pollConn.status == "401") {
-      location.reload();
+  var errstr = "Connection lost, trying a reconnect every 5 seconds.";
+  var input="";
+
+  if(evt.target instanceof WebSocket) {
+    if(evt.type == 'close') {
+      FW_errmsg(errstr, 4900);
+      FW_pollConn.close();
+      FW_pollConn = undefined;
+      setTimeout(FW_longpoll, 5000);
       return;
     }
-    FW_errmsg("Connection lost, trying a reconnect every 5 seconds.", 4900);
-    setTimeout(FW_longpoll, 5000);
-    return; // some problem connecting
+    input = evt.data;
+    FW_longpollOffset = 0;
+
+  } else {
+    if(FW_pollConn.readyState == 4 && !FW_leaving) {
+      if(FW_pollConn.status == "401") {
+        location.reload();
+        return;
+      }
+      FW_errmsg(errstr, 4900);
+      setTimeout(FW_longpoll, 5000);
+      return;
+    }
+
+    if(FW_pollConn.readyState != 3)
+      return;
+
+    input = FW_pollConn.responseText;
   }
 
-  if(FW_pollConn.readyState != 3)
-    return;
-
-  var input = FW_pollConn.responseText;
   var devs = new Array();
-  if(input.length <= FW_longpollOffset)
+  if(!input || input.length <= FW_longpollOffset)
     return;
 
   FW_serverLastMsg = (new Date()).getTime()/1000;
@@ -757,7 +774,6 @@ FW_longpoll()
     FW_pollConn.abort();
   }
 
-  FW_pollConn = new XMLHttpRequest();
   FW_leaving = 0;
 
   // Build the notify filter for the backend
@@ -809,14 +825,25 @@ FW_longpoll()
   if(FW_serverGenerated)
     since = FW_serverLastMsg + (FW_serverGenerated-FW_serverFirstMsg);
 
-  var query = location.pathname+"?XHR=1"+
+  var query = "?XHR=1"+
               "&inform=type=status;filter="+filter+";since="+since+";fmt=JSON"+
               '&fw_id='+$("body").attr('fw_id')+
               "&timestamp="+new Date().getTime();
   query = addcsrf(query);
-  FW_pollConn.open("GET", query, true);
-  FW_pollConn.onreadystatechange = FW_doUpdate;
-  FW_pollConn.send(null);
+
+  if($("body").attr("longpoll") == "websocket") {
+    FW_pollConn = new WebSocket((location+query).replace(/^http/i, "ws"));
+    FW_pollConn.onclose = 
+    FW_pollConn.onerror = 
+    FW_pollConn.onmessage = FW_doUpdate;
+
+  } else {
+    FW_pollConn = new XMLHttpRequest();
+    FW_pollConn.open("GET", location.pathname+query, true);
+    FW_pollConn.onreadystatechange = FW_doUpdate;
+    FW_pollConn.send(null);
+
+  }
 
   log("Longpoll with filter "+filter);
 }

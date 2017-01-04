@@ -11,6 +11,7 @@ use Time::HiRes qw(gettimeofday);
 #########################
 # Forward declaration
 sub FW_IconURL($);
+sub FW_addToWritebuffer($$@);
 sub FW_answerCall($);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
@@ -156,7 +157,7 @@ FHEMWEB_Initialize($)
     hiddengroup
     hiddenroom
     iconPath
-    longpoll:0,1
+    longpoll:0,1,websocket
     longpollSVG:1,0
     menuEntries
     mainInputLength
@@ -376,7 +377,6 @@ FW_Read($$)
                        } @FW_httpheader;
   delete($hash->{HDR});
 
-  $FW_userAgent = $FW_httpheader{"User-Agent"};
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headerlines = (AttrVal($FW_wname, "CORS", 0) ?
               (($#origin<0) ? "": "Access-Control-Allow-".$origin[0]."\r\n").
@@ -422,6 +422,25 @@ FW_Read($$)
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
 
+  if( $method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i ) {
+    use Digest::SHA1 qw(sha1_base64);
+    TcpServer_WriteBlocking($FW_chash,
+       "HTTP/1.1 101 Switching Protocols\r\n" .
+       "Upgrade: websocket\r\n" .
+       "Connection: Upgrade\r\n" .
+       "Sec-WebSocket-Accept:".
+       sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
+                    "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")."=\r\n" .
+       "\r\n" );
+    $FW_chash->{websocket} = 1;
+
+    my $me = $FW_chash;
+    my ($cmd, $cmddev) = FW_digestCgi($arg);
+    FW_initInform($me, 0) if($FW_inform);
+    return -1;
+  }
+
+  $FW_userAgent = $FW_httpheader{"User-Agent"};
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
@@ -482,7 +501,7 @@ FW_Read($$)
                 ("Expires: ".FmtDateTimeRFC1123($now+900)."\r\n") : "");
   Log3 $FW_wname, 4,
         "name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
-  if( ! addToWritebuffer($hash,
+  if( ! FW_addToWritebuffer($hash,
            "HTTP/1.1 200 OK\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
@@ -494,6 +513,77 @@ FW_Read($$)
     FW_closeConn($hash);
     delete($defs{$name});
   } 
+}
+
+sub
+FW_initInform($$)
+{
+  my ($me, $longpoll) = @_;
+
+  if($FW_inform =~ /type=/) {
+    foreach my $kv (split(";", $FW_inform)) {
+      my ($key,$value) = split("=", $kv, 2);
+      $me->{inform}{$key} = $value;
+    }
+
+  } else {                     # Compatibility mode
+    $me->{inform}{type}   = ($FW_room ? "status" : "raw");
+    $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
+  }
+  my $filter = $me->{inform}{filter};
+  $filter = "NAME=.*" if($filter eq "room=all");
+  $filter = "room!=.+" if($filter eq "room=Unsorted");
+
+  my %h = map { $_ => 1 } devspec2array($filter);
+  $h{global} = 1 if( $me->{inform}{addglobal} );
+  $h{"#FHEMWEB:$FW_wname"} = 1;
+  $me->{inform}{devices} = \%h;
+  %FW_visibleDeviceHash = FW_visibleDevices();
+
+  # NTFY_ORDER is larger than the normal order (50-)
+  $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
+  %ntfyHash = ();
+  $me->{inform}{since} = time()-5
+      if(!defined($me->{inform}{since}) || $me->{inform}{since} !~ m/^\d+$/);
+
+  if($longpoll) {
+    my $sinceTimestamp = FmtDateTime($me->{inform}{since});
+    TcpServer_WriteBlocking($me,
+       "HTTP/1.1 200 OK\r\n".
+       $FW_headerlines.
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
+       FW_roomStatesForInform($me, $sinceTimestamp));
+  }
+
+  if($FW_id && $defs{$FW_wname}{asyncOutput}) {
+    my $data = $defs{$FW_wname}{asyncOutput}{$FW_id};
+    if($data) {
+      FW_addToWritebuffer($me, $data."\n");
+      delete $defs{$FW_wname}{asyncOutput}{$FW_id};
+    }
+  }
+  if($me->{inform}{withLog}) {
+    $logInform{$me->{NAME}} = "FW_logInform";
+  } else {
+    delete($logInform{$me->{NAME}});
+  }
+}
+
+
+sub
+FW_addToWritebuffer($$@)
+{
+  my ($hash, $txt, $callback, $nolimit) = @_;
+
+  if( $hash->{websocket} ) {
+    my $len = length($txt);
+    if( $len < 126 ) {
+      $txt = chr(0x81) . chr(0xFF) . chr($len) . $txt;
+    } else {
+      $txt = chr(0x81) . chr(0x7E) . pack( 'n', $len ) . $txt;
+    }
+  }
+  return addToWritebuffer($hash, $txt, $callback, $nolimit);
 }
 
 sub
@@ -524,7 +614,7 @@ FW_AsyncOutput($$)
     next if( $chash->{TYPE} ne 'FHEMWEB' );
     next if( !$chash->{inform} );
     next if( !$chash->{FW_ID} || $chash->{FW_ID} ne $hash->{FW_ID} );
-    addToWritebuffer($chash, $data."\n");
+    FW_addToWritebuffer($chash, $data."\n");
     $found = 1;
     last;
   }
@@ -670,51 +760,7 @@ FW_answerCall($)
   }
 
   if($FW_inform) {      # Longpoll header
-    if($FW_inform =~ /type=/) {
-      foreach my $kv (split(";", $FW_inform)) {
-        my ($key,$value) = split("=", $kv, 2);
-        $me->{inform}{$key} = $value;
-      }
-
-    } else {                     # Compatibility mode
-      $me->{inform}{type}   = ($FW_room ? "status" : "raw");
-      $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
-    }
-    my $filter = $me->{inform}{filter};
-    $filter = "NAME=.*" if($filter eq "room=all");
-    $filter = "room!=.+" if($filter eq "room=Unsorted");
-
-    my %h = map { $_ => 1 } devspec2array($filter);
-    $h{global} = 1 if( $me->{inform}{addglobal} );
-    $h{"#FHEMWEB:$FW_wname"} = 1;
-    $me->{inform}{devices} = \%h;
-    %FW_visibleDeviceHash = FW_visibleDevices();
-
-    # NTFY_ORDER is larger than the normal order (50-)
-    $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
-    %ntfyHash = ();
-    $me->{inform}{since} = time()-5
-        if(!defined($me->{inform}{since}) || $me->{inform}{since} !~ m/^\d+$/);
-    my $sinceTimestamp = FmtDateTime($me->{inform}{since});
-    TcpServer_WriteBlocking($me,
-       "HTTP/1.1 200 OK\r\n".
-       $FW_headerlines.
-       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
-       FW_roomStatesForInform($me, $sinceTimestamp));
-
-    if($FW_id && $defs{$FW_wname}{asyncOutput}) {
-      my $data = $defs{$FW_wname}{asyncOutput}{$FW_id};
-      if($data) {
-        addToWritebuffer($me, $data."\n");
-        delete $defs{$FW_wname}{asyncOutput}{$FW_id};
-      }
-    }
-    if($me->{inform}{withLog}) {
-      $logInform{$me->{NAME}} = "FW_logInform";
-    } else {
-      delete($logInform{$me->{NAME}});
-    }
-
+    FW_initInform($me, 1);
     return -1;
   }
 
@@ -871,7 +917,7 @@ FW_answerCall($)
 
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
-  my $lp  = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
+  my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
   $FW_id = $FW_chash->{NR} if( !$FW_id );
   FW_pO "</head>\n<body name=\"$t\" fw_id=\"$FW_id\" $gen $lp $csrf>";
 
@@ -2575,7 +2621,7 @@ FW_logInform($$)
     return;
   }
   $msg = FW_htmlEscape($msg);
-  if(!addToWritebuffer($ntfy, "<div class='fhemlog'>$msg</div>") ){
+  if(!FW_addToWritebuffer($ntfy, "<div class='fhemlog'>$msg</div>") ){
     TcpServer_Close($ntfy);
     delete $logInform{$me};
     delete $defs{$me};
@@ -2596,7 +2642,7 @@ FW_Notify($$)
     my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
     my $data = FW_longpollInfo($h->{fmt},
         "#FHEMWEB:$ntfy->{NAME}","\$('#saveCheck').css('visibility','$vs')","");
-    addToWritebuffer($ntfy, $data."\n");
+    FW_addToWritebuffer($ntfy, $data."\n");
 
     if($dev->{CHANGED}) {
       $dn = $1 if($dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
@@ -2614,7 +2660,7 @@ FW_Notify($$)
     my $data = $3;
     return if( $2 && $ntfy->{PEER} !~ m/$2/ );
     $data = FW_longpollInfo($h->{fmt}, "#FHEMWEB:$ntfy->{NAME}",$data,"");
-    addToWritebuffer($ntfy, $data."\n");
+    FW_addToWritebuffer($ntfy, $data."\n");
     return;
   }
 
@@ -2687,7 +2733,8 @@ FW_Notify($$)
   }
 
   if(@data){
-    if(!addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n") ){
+    if(!FW_addToWritebuffer($ntfy,
+                join("\n", map { s/\n/ /gm; $_ } @data)."\n") ){
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
       TcpServer_Close($ntfy);
@@ -2714,7 +2761,7 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
             !$ntfy->{inform}{devices}{$dev} ||
             $ntfy->{inform}{type} ne "status");
     next if($filter && $ntfy->{inform}{filter} !~ m/$filter/);
-    if(!addToWritebuffer($ntfy, 
+    if(!FW_addToWritebuffer($ntfy, 
         FW_longpollInfo($ntfy->{inform}{fmt}, @_)."\n")) {
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
