@@ -4463,7 +4463,9 @@ sub
 createNtfyHash()
 {
   my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
-                 grep { $defs{$_}{NTFY_ORDER} } keys %defs;
+                 grep { $defs{$_}{NTFY_ORDER} && 
+                        $defs{$_}{TYPE} && 
+                        $modules{$defs{$_}{TYPE}}{NotifyFn} } keys %defs;
   foreach my $d (@ntfyList) {
     if($defs{$d}{NOTIFYDEV}) {
       foreach my $nd (devspec2array($defs{$d}{NOTIFYDEV})) {
@@ -4492,16 +4494,16 @@ notifyRegexpChanged($$)
   my ($hash, $re) = @_;
 
   my $dev;
-  $dev = $1 if($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/);
+  $dev = $1 if($re =~ m/^\(?([^:]*)\)?$/ || $re =~ m/^\(?([^:]*):(.*)\)?$/);
 
   if($dev && defined($defs{$dev}) && $re !~ m/\|/) { # Forum #36663
     $hash->{NOTIFYDEV} = $dev;
 
-  } elsif($re =~ m/\|/ && $re =~ /^\(?([^().+*?\[\]\\]+)\)?$/) { # Regexp Wizard
-    my @list2 = split(/\|/, $1);                                 # Forum #54536
+  } elsif($re =~ m/\|/) {                                        # Regexp Wizard
+    my @list2 = split(/\|/, $re);                                # Forum #54536
     my @list = grep { m/./ }                                     # Forum #62369
-               map  { (m/^([^:]*)(?::.*)?$/ && $defs{$1}) ? $1 : "" } @list2;
-    if(@list && @list <= 5 && int(@list) == int(@list2)) {
+               map  { (m/^\(?([^:]*)(?::.*)?\)?$/ && $defs{$1}) ? $1:""} @list2;
+    if(@list && @list <= 10 && int(@list) == int(@list2)) {
       $hash->{NOTIFYDEV} = join(",", @list);
     } else {
       delete($hash->{NOTIFYDEV});
