@@ -732,7 +732,7 @@ sub ElectricityCalculator_Notify($$)
 			my $ElectricityCalcMeterYearMonth=0;
 			if (($ElectricityCountReadingTimestampCurrentMon - $attr{$ElectricityCalcName}{MonthOfAnnualReading} + 1) < 1)
 			{
-				$ElectricityCalcMeterYearMonth  = 12 + $ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading};
+				$ElectricityCalcMeterYearMonth  = 13 + $ElectricityCountReadingTimestampCurrentMon  - $attr{$ElectricityCalcName}{MonthOfAnnualReading};
 			}
 			else
 			{
