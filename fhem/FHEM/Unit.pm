@@ -2872,7 +2872,7 @@ sub replaceTemplate ($$$$;$) {
         && defined( $odesc->{value}{$lang} ) );
 
     return $value
-      if ( !defined($value) || $value eq "" );
+      if ( !defined($value) || $value eq "" || !defined( $odesc->{rtype} ) );
 
     # clone
     my $desc;
