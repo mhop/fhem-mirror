@@ -89,6 +89,7 @@ $FW_formmethod = "post";
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
+my $FW_use_sha = 0;
 my $FW_activateInform = 0;
 my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
@@ -214,6 +215,7 @@ FHEMWEB_Initialize($)
       FW_readIcons($pe);
     }
   }
+
 }
 
 #####################################
@@ -352,6 +354,36 @@ FW_Read($$)
     }
   }
 
+  if($hash->{websocket}) { # Work in Progress (Forum #59713)
+    my $fin  = (ord(substr($hash->{BUF},0,1)) & 0x80)?1:0;
+    my $op   = (ord(substr($hash->{BUF},0,1)) & 0x0F);
+    my $mask = (ord(substr($hash->{BUF},1,1)) & 0x80)?1:0;
+    my $len  = (ord(substr($hash->{BUF},1,1)) & 0x7F);
+    my $i = 2;
+
+    if( $len == 126 ) {
+      $len = unpack( 'n', substr($hash->{BUF},$i,2) );
+      $i += 2;
+    } elsif( $len == 127 ) {
+      $len = unpack( 'q', substr($hash->{BUF},$i,8) );
+      $i += 8;
+    }
+
+    if( $mask ) {
+      $mask = substr($hash->{BUF},$i,4);
+      $i += 4;
+    }
+
+    my $data = substr($hash->{BUF}, $i, $len);
+    #for( my $i = 0; $i < $len; $i++ ) {
+    #  substr( $data, $i, 1, substr( $data, $i, 1, ) ^ substr($mask, $i% , 1) );
+    #}
+    #Log 1, "Received via websocket: ".unpack("H*",$data);
+    return;
+  }
+
+
+
   if(!$hash->{HDR}) {
     return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
@@ -421,19 +453,11 @@ FW_Read($$)
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
 
-  if($method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i ) {
+  if($method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i && 
+     $FW_use_sha) {
 
-    my $shastr = eval {
-      require Digest::SHA1;
-      Digest::SHA1::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
+    my $shastr = Digest::SHA1::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
                                 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-    };
-    if($@) {
-      Log3 $FW_wname, 1, $@;
-      Log3 $FW_wname, 1, "$FW_wname: Can't load Digest::SHA, no websocket";
-      $attr{$FW_wname}{longpoll} = 1;
-      return -1;
-    }
 
     TcpServer_WriteBlocking($FW_chash,
        "HTTP/1.1 101 Switching Protocols\r\n" .
@@ -587,9 +611,9 @@ FW_addToWritebuffer($$@)
   if( $hash->{websocket} ) {
     my $len = length($txt);
     if( $len < 126 ) {
-      $txt = chr(0x81) . chr(0xFF) . chr($len) . $txt;
+      $txt = chr(0x81) . chr($len) . $txt;
     } else {
-      $txt = chr(0x81) . chr(0x7E) . pack( 'n', $len ) . $txt;
+      $txt = chr(0x81) . chr(0x7E) . pack('n', $len) . $txt;
     }
   }
   return addToWritebuffer($hash, $txt, $callback, $nolimit);
@@ -2402,6 +2426,15 @@ FW_Attr(@)
     delete($hash->{CSRFTOKEN});
   }
 
+  if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
+    eval { require Digest::SHA1; };
+    if($@) {
+      Log3 $FW_wname, 1, $@;
+      return "$devName: Can't load Digest::SHA, no websocket";
+      return -1;
+    }
+    $FW_use_sha = 1;
+  }
 
   return $retMsg;
 }
