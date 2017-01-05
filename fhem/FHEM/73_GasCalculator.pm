@@ -694,7 +694,7 @@ sub GasCalculator_Notify($$)
 			my $GasCalcMeterYearMonth=0;
 			if (($GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading} + 1) < 1)
 			{
-				$GasCalcMeterYearMonth  = 12 + $GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading};
+				$GasCalcMeterYearMonth  = 13 + $GasCountReadingTimestampCurrentMon - $attr{$GasCalcName}{MonthOfAnnualReading};
 			}
 			else
 			{
