@@ -528,7 +528,7 @@ sub ElectricityCalculator_Notify($$)
 		### If not: save value and quit loop
 		else
 		{
-			### Write current electric Energy as previous Voulume for future use in the ElectricityCalc-Device
+			### Write current electric Energy as previous Value for future use in the ElectricityCalc-Device
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
@@ -665,7 +665,7 @@ sub ElectricityCalculator_Notify($$)
 				}
 
 				### Check whether the current value is the first one of the calendar year
-				if ($ElectricityCountReadingTimestampCurrentYear < $ElectricityCountReadingTimestampPreviousYear)
+				if ($ElectricityCountReadingTimestampCurrentYear > $ElectricityCountReadingTimestampPreviousYear)
 				{
 					### Create Log entries for debugging
 					Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - First reading of calendar year detected";
