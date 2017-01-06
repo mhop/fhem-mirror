@@ -101,6 +101,7 @@ my %hueModels = (
  'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color light'             ,subType => 'colordimmer', },
  'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
  'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+ 'Classic B40 TW'   => {name => 'LIGHTIFY Classic B40 tunable white'   ,type => 'Color temperature light' ,subType => 'ctdimmer', },
  'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color temperature light' ,subType => 'ctdimmer', },
  'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch', },
  'Plug 01'          => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch', },
