@@ -47,6 +47,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $sccMods = "STACKABLE_CC:TSSTACKED"; # for noansi
 my $culNameRe = "^(CUL|TSCUL)\$";
+my $culLikeRe = "^(CUL|TSCUL|STACKABLE_CC|TSSTACKED)\$";
 
 my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
                        ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
@@ -188,7 +189,7 @@ CUL_Define($$)
     my $x = $1;
     foreach my $d (keys %defs) {
       next if($d eq $name);
-      if($defs{$d}{TYPE} =~ m/$culNameRe/) {
+      if($defs{$d}{TYPE} =~ m/$culLikeRe/) {
         if(uc($defs{$d}{FHTID}) =~ m/^$x/) {
           my $m = "$name: Cannot define multiple CULs with identical ".
                         "first two digits ($x)";
@@ -1138,12 +1139,10 @@ sub
 CUL_prefix($$$)
 {
   my ($isadd, $hash, $msg) = @_;
-  my $t = $hash->{TYPE};
-  while($t !~ m/$culNameRe/) {
+  while($hash && $hash->{TYPE} !~ m/$culNameRe/) {
     $msg = CallFn($hash->{NAME}, $isadd ? "AddPrefix":"DelPrefix", $hash, $msg);
     $hash = $hash->{IODev};
     last if(!$hash);
-    $t = $hash->{TYPE};
   }
   return ($hash, $msg);
 }
