@@ -36,7 +36,7 @@ FHEM/00_SIGNALduino.pm       Sidey           	  http://forum.fhem.de Sonstige Sy
 FHEM/00_SONOS.pm             Reinerlein           http://forum.fhem.de Multimedia
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Heizungssteuerung/Raumklima
-FHEM/00_TUL.pm               hotmaz               http://forum.fhem.de KNX/EIB
+FHEM/00_TUL.pm               andi291              http://forum.fhem.de KNX/EIB
 FHEM/00_ZWDongle.pm          rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
 FHEM/02_FRAMEBUFFER.pm       kaihs                http://forum.fhem.de Frontends
