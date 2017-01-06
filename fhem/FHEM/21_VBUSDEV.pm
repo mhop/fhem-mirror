@@ -1242,7 +1242,7 @@ sub VBUSDEV_ParsePayload($@) {
 1;
 
 =pod
-=item helper
+=item device
 =item summary    connects to the VBUSIF Dev and fetches data from specific model 
 =item summary_DE verbindet sich mit einem VBUSIF Dev und holt Daten von einem spez. Modell
 =begin html
