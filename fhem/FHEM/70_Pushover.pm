@@ -1817,22 +1817,22 @@ sub Pushover_CGI() {
     <li>
         <a href="#readingFnAttributes">readingFnAttributes</a>
     </li>
-    <li><a name="callbackUrl"></a><code>callbackUrl</code><br>
+    <li><a name="PushoverAttrcallbackUrl"></a><code>callbackUrl</code><br>
         Setzt die Callback URL, um Nachrichten mit Emergency Priorit&auml;t zu best&auml;tigen.
     </li>
-    <li><a name="timestamp"></a><code>timestamp</code><br>
+    <li><a name="PushoverAttrtimestamp"></a><code>timestamp</code><br>
         Sende den Unix-Zeitstempel mit jeder Nachricht.
     </li>
     <li><a name="title"></a><code>title</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde.
     </li>
-    <li><a name="device"></a><code>device</code><br>
+    <li><a name="PushoverAttrdevice"></a><code>device</code><br>
         Wird beim Senden als Ger&auml;tename verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, bzw. leer sein, dann wird an alle Ger&auml;te gesendet.
     </li>
-    <li><a name="priority"></a><code>priority</code><br>
+    <li><a name="PushoverAttrpriority"></a><code>priority</code><br>
         Wird beim Senden als Priorit&auml;t verwendet, sofern diese nicht als Aufrufargument angegeben wurde. Zul&auml;ssige Werte sind -1 = leise / 0 = normale Priorit&auml;t / 1 = hohe Priorit&auml;t
     </li>
-    <li><a name="sound"></a><code>sound</code><br>
+    <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
     </li>
   </ul>
