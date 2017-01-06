@@ -42,6 +42,7 @@ sub LaCrosseGateway_Initialize($) {
                            ." kvp:dispatch,readings,both"
                            ." ownSensors:dispatch,readings,both"
                            ." mode:USB,WiFi,Cable"
+                           ." usbFlashCommand"
                            ." $readingFnAttributes";
 
 }
@@ -68,7 +69,11 @@ sub LaCrosseGateway_Define($$) {
 
   $hash->{Clients} = $clients;
   $hash->{MatchList} = \%matchList;
+  $hash->{TIMEOUT} = 0.5;
 
+  if( !defined( $attr{$name}{usbFlashCommand} ) ) {
+    $attr{$name}{usbFlashCommand} = "./FHEM/firmware/esptool.py -b 921600 -p [PORT] write_flash -ff 80m -fm dio -fs 4MB-c1 0x00000 [BINFILE] > [LOGFILE]"
+  }
   if($dev eq "none") {
     Log3 $name, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
@@ -133,32 +138,68 @@ sub LaCrosseGateway_Set($@) {
     $log .= "flashing LaCrosseGateway $name\n";
     $log .= "hex file: $hexFile\n";
 
-    eval "use LWP::UserAgent";
-    return "\nERROR: Please install LWP::UserAgent" if($@);
+    if(AttrVal($name, "mode", "WiFi") eq "WiFi") {
+      eval "use LWP::UserAgent";
+      return "\nERROR: Please install LWP::UserAgent" if($@);
 
-    eval "use HTTP::Request::Common";
-    return "\nERROR: Please install HTTP::Request::Common" if($@);
+      eval "use HTTP::Request::Common";
+      return "\nERROR: Please install HTTP::Request::Common" if($@);
 
-    $log .= "Mode is LaCrosseGateway OTA-update\n";
-    DevIo_CloseDev($hash);
-    readingsSingleUpdate($hash, "state", "disconnected", 1);
-    $log .= "$name closed\n";
+      $log .= "Mode is LaCrosseGateway OTA-update\n";
+      DevIo_CloseDev($hash);
+      readingsSingleUpdate($hash, "state", "disconnected", 1);
+      $log .= "$name closed\n";
 
-    my @spl = split(':', $hash->{DeviceName});
-    my $targetIP = $spl[0];
-    my $targetURL = "http://" . $targetIP . "/ota/firmware.bin";
-    $log .= "target: $targetURL\n";
+      my @spl = split(':', $hash->{DeviceName});
+      my $targetIP = $spl[0];
+      my $targetURL = "http://" . $targetIP . "/ota/firmware.bin";
+      $log .= "target: $targetURL\n";
 
-    my $request = POST($targetURL, Content_Type => 'multipart/form-data', Content => [ file => [$hexFile, "firmware.bin"] ]);
-    my $userAgent = LWP::UserAgent->new;
-    $userAgent->timeout(60);
-    my $response = $userAgent->request($request);
-    if ($response->is_success) {
-      $log .= "\n\nSketch reports:\n";
-      $log .= $response->decoded_content;
+      my $request = POST($targetURL, Content_Type => 'multipart/form-data', Content => [ file => [$hexFile, "firmware.bin"] ]);
+      my $userAgent = LWP::UserAgent->new;
+      $userAgent->timeout(60);
+      my $response = $userAgent->request($request);
+      if ($response->is_success) {
+        $log .= "\n\nSketch reports:\n";
+        $log .= $response->decoded_content;
+      }
+      else {
+        $log .= "\nERROR: " . $response->code . " " . $response->decoded_content;
+      }
     }
     else {
-      $log .= "\nERROR: " . $response->code . " " . $response->decoded_content;
+      $log .= "Mode is LaCrosseGateway USB-update\n";
+      my $usbFlashCommand = AttrVal($name, "usbFlashCommand", "");
+
+      if ($usbFlashCommand ne "") {
+        if (-e $logFile) {
+          unlink $logFile;
+        }
+
+        my $command = $usbFlashCommand;
+        $command =~ s/\Q[PORT]\E/$port/g;
+        $command =~ s/\Q[BINFILE]\E/$hexFile/g;
+        $command =~ s/\Q[LOGFILE]\E/$logFile/g;
+
+        $log .= "command: $command\n\n";
+        `$command`;
+
+        local $/ = undef;
+        if (-e $logFile) {
+          open FILE, $logFile;
+          my $logText = <FILE>;
+          close FILE;
+          $log .= "--- esptool ---------------------------------------------------------------------------------\n";
+          $log .= $logText;
+          $log .= "--- esptool ---------------------------------------------------------------------------------\n\n";
+        }
+        else {
+          $log .= "WARNING: esptool created no log file\n\n";
+        }
+      }
+      else {
+        $log .= "\n\nNo usbFlashCommand found. Please define this attribute.\n\n";
+      }
     }
 
     LaCrosseGateway_Connect($hash);
@@ -215,7 +256,19 @@ sub LaCrosseGateway_Set($@) {
     return LaCrosseGateway_Connect($hash);
   }
   elsif ($cmd eq "reboot") {
-    LaCrosseGateway_SimpleWrite($hash, "8377e\n");
+    if(AttrVal($name, "mode", "WiFi") eq "WiFi") {
+      LaCrosseGateway_SimpleWrite($hash, "8377e\n");
+    }
+    else {
+      my $po = $hash->{USBDev};
+      $po->rts_active(0);
+      $po->dtr_active(0);
+      select undef, undef, undef, 0.01;
+      $po->rts_active(1);
+      $po->dtr_active(1);
+    }
+
+
   }
   elsif ($cmd eq "parse") {
     LaCrosseGateway_Parse($hash, $hash, $name, $arg);
@@ -395,6 +448,10 @@ sub LaCrosseGateway_Parse($$$$) {
 
   next if (!$msg || length($msg) < 1);
   return if ($msg =~ m/^\*\*\*CLEARLOG/);
+
+  return if ($msg =~ m/[^\x20-\x7E]/);
+
+
 
   if ($msg =~ m/^LGW/) {
     if ($msg =~ /ALIVE/) {
