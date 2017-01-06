@@ -259,7 +259,7 @@ sub VBUSIF_DecodePayload($@)
 1;
 
 =pod
-=item helper
+=item device
 =item summary    connects to the RESOL VBUS LAN or Serial Port adapter 
 =item summary_DE verbindet sich mit einem RESOL VBUS LAN oder Seriell Adapter
 =begin html
