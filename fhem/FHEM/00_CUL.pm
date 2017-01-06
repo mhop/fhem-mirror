@@ -45,14 +45,17 @@ my %sets = (
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
+my $sccMods = "STACKABLE_CC:TSSTACKED"; # for noansi
+my $culNameRe = "^(CUL|TSCUL)\$";
+
 my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
                        ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
                        ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:UNIRoll:SOMFY: ".
-                       ":STACKABLE_CC:CUL_RFR::CUL_TCM97001:CUL_REDIRECT:";
-my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:";
-my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
-my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:STACKABLE_CC:";
-my $clientsKOPP_FC   = ":KOPP_FC:HMS:CUL_IR:STACKABLE_CC:";
+                       ":$sccMods:CUL_RFR::CUL_TCM97001:CUL_REDIRECT:";
+my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:$sccMods:";
+my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:$sccMods:";
+my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:$sccMods:";
+my $clientsKOPP_FC   = ":KOPP_FC:HMS:CUL_IR:$sccMods:";
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -76,6 +79,7 @@ my %matchListSlowRF = (
     "J:SOMFY"     => "^Y[r|t|s]:?[A-F0-9]+",
     "K:CUL_TCM97001"  => "^s[A-F0-9]+",
     "L:CUL_REDIRECT"  => "^o+",
+    "M:TSSTACKED"=>"^\\*",
 );
 
 my %matchListHomeMatic = (
@@ -83,6 +87,7 @@ my %matchListHomeMatic = (
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
+    "M:TSSTACKED"=>"^\\*",
 );
 
 my %matchListMAX = (
@@ -90,6 +95,7 @@ my %matchListMAX = (
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
+    "M:TSSTACKED"=>"^\\*",
 );
 
 my %matchListWMBus = (
@@ -97,6 +103,7 @@ my %matchListWMBus = (
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
+    "M:TSSTACKED"=>"^\\*",
 );
 
 my %matchListKOPP_FC = (
@@ -104,6 +111,7 @@ my %matchListKOPP_FC = (
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
+    "M:TSSTACKED"=>"^\\*",
 );
 
 
@@ -180,7 +188,7 @@ CUL_Define($$)
     my $x = $1;
     foreach my $d (keys %defs) {
       next if($d eq $name);
-      if($defs{$d}{TYPE} eq "CUL") {
+      if($defs{$d}{TYPE} =~ m/$culNameRe/) {
         if(uc($defs{$d}{FHTID}) =~ m/^$x/) {
           my $m = "$name: Cannot define multiple CULs with identical ".
                         "first two digits ($x)";
@@ -1131,7 +1139,7 @@ CUL_prefix($$$)
 {
   my ($isadd, $hash, $msg) = @_;
   my $t = $hash->{TYPE};
-  while($t ne "CUL") {
+  while($t !~ m/$culNameRe/) {
     $msg = CallFn($hash->{NAME}, $isadd ? "AddPrefix":"DelPrefix", $hash, $msg);
     $hash = $hash->{IODev};
     last if(!$hash);

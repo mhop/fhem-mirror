@@ -46,7 +46,7 @@ STACKABLE_CC_Define($$)
 
   my $io = $defs{$a[2]};
   return "$a[2] is not a CUL/STACKABLE_CC"
-    if(!$io || !($io->{TYPE} eq "CUL" || $io->{TYPE} eq "STACKABLE_CC"));
+    if(!$io || $io->{TYPE} !~ m/^(CUL|TSCUL|STACKABLE_CC|TSSTACKED)$/);
 
   return "$io->{NAME} has alread a stacked device: $io->{STACKED}"
     if($io->{STACKED});
