@@ -1633,12 +1633,12 @@ sub Pushover_CGI() {
     Update <a href="https://pushover.net/api/glances">Pushover's glances</a> on Apple Watch.<br>
     The following options may be used to adjust message content and delivery behavior:<br>
     <br>
-    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A description of the data being shown, such as "Widgets Sold".<br>
-    <code><b>text</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - The main line of data, used on most screens. Using this option takes precedence; non-option text content will be discarded.<br>
-    <code><b>subtext</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A second line of data.<br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A description of the data being shown, such as "Widgets Sold".<br>
+    <code><b>text</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - The main line of data, used on most screens. Using this option takes precedence; non-option text content will be discarded.<br>
+    <code><b>subtext</b>&nbsp;</code> - type: text(100 characters) - A second line of data.<br>
     <code><b>count</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(may be negative) - Shown on smaller screens; useful for simple counts.<br>
-    <code><b>percent</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(0-100) - Shown on some screens as a progress bar/circle.<br>
-    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Your user's device name to send the message directly to that device, rather than all of the user's devices (multiple devices may be separated by a comma). May also be set to a specific User or Group Key. To address a specific device for a specific User/Group, use User/Group Key first and add device name separated by colon.<br>
+    <code><b>percent</b>&nbsp;</code> - type: integer(0-100) - Shown on some screens as a progress bar/circle.<br>
+    <code><b>device</b>&nbsp;&nbsp;</code> - type: text - Your user's device name to send the message directly to that device, rather than all of the user's devices (multiple devices may be separated by a comma). May also be set to a specific User or Group Key. To address a specific device for a specific User/Group, use User/Group Key first and add device name separated by colon.<br>
     <br>
   </ul></ul>
   <br>
@@ -1795,12 +1795,12 @@ sub Pushover_CGI() {
     Aktualisiert die <a href="https://pushover.net/api/glances">Pushover glances</a> auf einer Apple Watch.<br>
     Die folgenden Optionen k&ouml;nnen genutzt werden, um den Nachrichteninhalt und die Zustellung zu beeinflussen::<br>
     <br>
-    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Eine Beschreibung der Daten, die angezeigt werden, beispielsweise "Verkaufte Dinge".<br>
-    <code><b>text</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Textzeile, die in den meisten Ansichten verwendet wird. Die Nutzung dieser Option hat Vorrang; Text au&szlig;erhalb wird verworfen.<br>
-    <code><b>subtext</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Eine zweite Zeile mit Text.<br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Eine Beschreibung der Daten, die angezeigt werden, beispielsweise "Verkaufte Dinge".<br>
+    <code><b>text</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Textzeile, die in den meisten Ansichten verwendet wird. Die Nutzung dieser Option hat Vorrang; Text au&szlig;erhalb wird verworfen.<br>
+    <code><b>subtext</b>&nbsp;</code> - type: text(100 characters) - Eine zweite Zeile mit Text.<br>
     <code><b>count</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(may be negative) - Wird auf kleineren Ansichten dargestellt; n&uuml;tzlich f&uuml;r einfache Z&auml;hlerst&auml;nde.<br>
-    <code><b>percent</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(0-100) - Wird bei einigen Ansichten als Fortschrittsbalken/-kreis angezeigt.<br>
-    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein selbst vergebener Ger&auml;tename, um die Nachricht direkt an dieses Ger&auml;t zu senden anstatt an alle Ger&auml;te gleichzeitig (mehrere Ger&auml;te k&ouml;nnen mit Komma getrennt angegeben werden). Hier kann auch explizit ein User oder Group Key angegeben werden. Um gezielt ein Ger&auml;t einer/s speziellen User/Group anzusprechen, zuerst den User/Group Key angeben, gefolgt vom Ger&auml;tenamen und einem Doppelpunkt als Trennzeichen.<br>
+    <code><b>percent</b>&nbsp;</code> - type: integer(0-100) - Wird bei einigen Ansichten als Fortschrittsbalken/-kreis angezeigt.<br>
+    <code><b>device</b>&nbsp;&nbsp;</code> - Typ: Text - Dein selbst vergebener Ger&auml;tename, um die Nachricht direkt an dieses Ger&auml;t zu senden anstatt an alle Ger&auml;te gleichzeitig (mehrere Ger&auml;te k&ouml;nnen mit Komma getrennt angegeben werden). Hier kann auch explizit ein User oder Group Key angegeben werden. Um gezielt ein Ger&auml;t einer/s speziellen User/Group anzusprechen, zuerst den User/Group Key angeben, gefolgt vom Ger&auml;tenamen und einem Doppelpunkt als Trennzeichen.<br>
     <br>
   </ul></ul>
   <br>
