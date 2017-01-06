@@ -408,7 +408,7 @@ FW_Read($$)
                        } @FW_httpheader;
   delete($hash->{HDR});
 
-  my @origin = grep /Origin/, @FW_httpheader;
+  my @origin = grep /Origin/i, @FW_httpheader;
   $FW_headerlines = (AttrVal($FW_wname, "CORS", 0) ?
               (($#origin<0) ? "": "Access-Control-Allow-".$origin[0]."\r\n").
               "Access-Control-Allow-Methods: GET OPTIONS\r\n".
