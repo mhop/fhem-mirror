@@ -30,6 +30,11 @@
 #               because a serial Modbus device is defined afterwards
 #   2016-06-18  added documentation for alignTime and enableControlSet (implemented in the base module 98_Modbus.pm)
 #   2016-07-07  added documentatoin for nextOpenDelay
+#   2016-10-02  fixed typo in documentation (showget has to be showGet)
+#   2016-11-26  added missing documentation pieces
+#   2016-12-18  documentation added
+#   2016-12-24  documentation added
+#   2017-01-02  allowShortResponses documented
 #
 
 package main;
@@ -58,6 +63,9 @@ ModbusAttr_Initialize($)
 1;
 
 =pod
+=item device
+=item summary module for devices with Modbus Interface
+=item summary_DE Modul für Geräte mit Modbus-Interface
 =begin html
 
 <a name="ModbusAttr"></a>
@@ -68,7 +76,7 @@ ModbusAttr_Initialize($)
     <b>Prerequisites</b>
     <ul>
         <li>
-          This module requires the basic Modbus module which itsef DevIO which again requires Device::SerialPort or Win32::SerialPort module.
+          This module requires the basic Modbus module which itsef requires DevIO which again requires Device::SerialPort or Win32::SerialPort module if you connect devices to a serial port.
         </li>
     </ul>
     <br>
@@ -78,15 +86,17 @@ ModbusAttr_Initialize($)
     <ul>
         <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; &lt;Interval&gt;</code><br>
         or<br>
-        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; &lt;Interval&gt; &lt;Address:Port&gt; &lt;RTU|TCP&gt;</code><br>
+        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; &lt;Interval&gt; &lt;Address:Port&gt; &lt;RTU|ASCII|TCP&gt;</code><br>
         <br>
-        The module connects to the Modbus device with Modbus Id &lt;Id&gt; through an already defined modbus device 
-        or directly through Modbus TCP or Modbus RTU over TCP and actively requests data from that device every &lt;Interval&gt; seconds <br>
+        The module connects to the Modbus device with Modbus Id &lt;Id&gt; through an already defined serial modbus device (RS232 or RS485) or directly through Modbus TCP or Modbus RTU or ASCII over TCP and actively requests data from that device every &lt;Interval&gt; seconds <br>
         <br>
         Examples:<br>
         <br>
         <ul><code>define WP ModbusAttr 1 60</code></ul><br>
-        to go through a serial interface managed by an already defined basic modbus device.<br>
+        to go through a serial interface managed by an already defined basic modbus device. The protocol defaults to Modbus RTU<br>
+        or <br>
+        <ul><code>define WP ModbusAttr 20 0 ASCII</code></ul><br>
+        to go through a serial interface managed by an already defined basic modbus device with Modbus ASCII. Use Modbus Id 20 and don't query the device in a defined interval. Instead individual SET / GET options have to be used for communication.<br>
         or <br>
         <ul><code>define WP ModbusAttr 5 60 192.168.1.122:504 TCP</code></ul><br>
         to talk Modbus TCP <br>
@@ -144,7 +154,7 @@ ModbusAttr_Initialize($)
         
         <code>attr PWP obj-h258-reading Temp_Wasser_Aus</code> defines a reading with the name Temp_Wasser_Aus that is read from the Modbus holding register at address 258.<br>
         With the attribute ending on <code>-expr</code> you can define a perl expression to do some conversion or calculation on the raw value read from the device. 
-        In the above example the raw value has to be devided by 10 to get the real value.<br><br>
+        In the above example the raw value has to be devided by 10 to get the real value. If the raw value is also the final value then no <code>-expr</code> attribute is necessary. <br><br>
         
         An object attribute ending on <code>-set</code> creates a fhem set option. 
         In the above example the reading Temp_Soll can be changed to 12 degrees by the user with the fhem command <code>set PWP Temp_Soll 12</code><br>
@@ -165,7 +175,36 @@ ModbusAttr_Initialize($)
     <b>Set-Commands</b><br>
     <ul>
         are created based on the attributes defining the data objects.<br>
-        Every object for which an attribute like <code>obj-xy-set</code> is set to 1 will create a valid set option.
+        Every object for which an attribute like <code>obj-xy-set</code> is set to 1 will create a valid set option.<br>
+        Additionally the attribute <code>enableControlSet</code> enables the set options <code>interval</code>, <code>stop</code>, <code>start</code>, <code>reread</code> as well as <code>scanModbusObjects</code>, <code>scanStop</code> and <code>scanModbusIds</code> (for devices connected with RTU / ASCII over a serial line).
+        <ul>
+            <li><code>interval &lt;Interval&gt;</code></li>
+                modifies the interval that was set during define. 
+            <li><code>stop</code></li>
+                stops the interval timer that is used to automatically poll objects through modbus.
+            <li><code>start</code></li>
+                starts the interval timer that is used to automatically poll objects through modbus. If an interval is specified during the define command then the interval timer is started automatically. However if you stop it with the commend <code>set &lt;mydevice&gt; stop</code> thd you can start it again with <code>set &lt;mydevice&gt; start</code>.
+            <li><code>reread</code></li>
+                causes a read of all objects that are set to be polled in the defined interval. The interval timer is not modified.
+            <br>
+            <li><code>scanModbusObjects &lt;startObj&gt; - &lt;endObj&gt; &lt;reqLen&gt;</code></li>
+                scans the device objects and automatically creates attributes for each reply it gets. This might be useful for exploring devices without proper documentation. The following example starts a scan and queries the
+                holding registers with addresses between 100 and 120. <br>
+                <code>set MyModbusAttrDevice scanModbusObjects h100-120</code><br>
+                For each reply it gets, the module creates a reading like<br>
+                <code>scan-h100 hex=0021, len=2, string=.!, s=8448, s>=33, S=8448, S>=33</code><br>
+                len=2 means that the result did contain 2 bytes (one register), its representation as hex is 0021 and
+                the ASCII representation is .!. s, s>, S and S> are different representations with their Perl pack-code.
+            <li><code>scanModbusIds &lt;startId&gt; - &lt;endId&gt; &lt;knownObj&gt;</code></li>
+                scans for Modbus Ids on an RS485 Bus. The following set command for example starts a scan:<br>
+                <code>set Device scanModbusId 1-7 h770</code><br>
+                since many modbus devices don't reply at all if an object is requested that does not exist, scanModbusId 
+                needs the adress of an object that is known to exist.
+                If a device with Id 5 replies to a read request for holding register 770, a reading like the following will be created:<br>
+                <code>scanId-5-Response-h770 hex=0064, len=2, string=.d, s=25600, s>=100, S=25600, S>=100</code>
+            <li><code>scanStop</code></li>
+                stops any running scans.
+        </ul>
     </ul>
     <br>
     <a name="ModbusAttrGet"></a>
@@ -173,13 +212,13 @@ ModbusAttr_Initialize($)
     <ul>
         All readings are also available as Get commands. Internally a Get command triggers the corresponding 
         request to the device and then interprets the data and returns the right field value. 
-        To avoid huge option lists in FHEMWEB, the objects visible as Get in FHEMWEB can be defined by setting an attribute <code>obj-xy-showget</code> to 1. 
+        To avoid huge option lists in FHEMWEB, the objects visible as Get in FHEMWEB can be defined by setting an attribute <code>obj-xy-showGet</code> to 1. 
     </ul>
     <br>
     <a name="ModbusAttrattr"></a>
     <b>Attributes</b><br><br>
     <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
+        <li><a href="#do_not_notify">do_not_notify</a></li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br>
         <li><b>alignTime</b></li>
@@ -242,11 +281,11 @@ ModbusAttr_Initialize($)
         <li><b>obj-[cdih][1-9][0-9]*-revRegs</b></li> 
             this is only applicable to objects that span several input registers or holding registers. <br>
             when they are read then the order of the registers will be reversed before 
-            further interpretation / unpacking of the raw register string
+            further interpretation / unpacking of the raw register string. The same happens before the object is written with a set command.
         <br>
         <li><b>obj-[cdih][1-9][0-9]*-bswapRegs</b></li>
             this is applicable to objects that span several input or holding registers. <br>
-            after the registers have been read, all 16-bit values are treated big-endian and are reversed to little-endian by swapping the two 8 bit bytes. 
+            After the registers have been read and before they are writtem, all 16-bit values are treated big-endian and are reversed to little-endian by swapping the two 8 bit bytes. 
             This functionality is most likely used for reading (ASCII) strings from the device that are stored as big-endian 16-bit values. <br>
             example: original reading is "324d3130203a57577361657320722020". After applying bswapRegs, the value will be "4d3230313a2057576173736572202020"
             which will result in the ASCII string "M201: WWasser   ". Should be used with "(a*)" as -unpack value.
@@ -260,7 +299,7 @@ ModbusAttr_Initialize($)
             This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.
         <br>
         
-        <li><b>obj-[cdih][1-9][0-9]*-showget</b></li> 
+        <li><b>obj-[cdih][1-9][0-9]*-showGet</b></li> 
             every reading can also be requested by a get command. However these get commands are not automatically offered in fhemweb. 
             By specifying this attribute, the get will be visible in fhemweb.
         <br>
@@ -288,6 +327,9 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>dev-([cdih]-)*combine</b></li> 
             defines how many adjacent objects can be read in one request. If not specified, the default is 1
+        <br>
+        <li><b>dev-([cdih]-)*allowShortResponses</b></li> 
+            if set to 1 the module will accept a response with valid checksum but data lengh < lengh in header
         <br>
         <li><b>dev-([cdih]-)*defLen</b></li> 
             defines the default length for this object type. If not specified, the default is 1
@@ -332,11 +374,16 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>nextOpenDelay</b></li> 
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
-			
+        <li><b>openTimeout</b></li>     
+            timeout to be used when opening a Modbus TCP connection (defaults to 3)
+        <li><b>timeoutLogLevel</b></li> 
+            log level that is used when logging a timeout. Defaults to 3. 
+        <li><b>silentReconnect</b></li> 
+            if set to 1, then it will set the loglevel for "disconnected" and "reappeared" messages to 4 instead of 3
         <li><b>maxTimeoutsToReconnect</b></li> 
             this attribute is only valid for TCP connected devices. In such cases a disconnected device might stay undetected and lead to timeouts until the TCP connection is reopened. This attribute specifies after how many timeouts an automatic reconnect is tried.
         <li><b>disable</b></li>
-            stop communication with the device while this attribute is set to 1         
+            stop communication with the device while this attribute is set to 1. For Modbus over TCP this also closes the TCP connection.
         <br>
         </ul>
     <br>
