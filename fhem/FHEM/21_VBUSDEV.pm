@@ -1,10 +1,14 @@
+##############################################
+# $Id$
+#
 # 21_VBUSDEV.pm
-# VBUS Client Device
 #
 # (c) 2014 Arno Willig <akw@bytefeed.de>
-#
-#  2014-03-03 19:33:15Z akw 
-# $Id: 21_VBUSDEV.pm 20151015 2015-10-15 19:54:15Z pejonp $
+# (c) 2015 Frank Wurdinger <frank@wurdinger.de>
+# (c) 2015 Adrian Freihofer <adrian.freihofer gmail com>
+# (c) 2016 Tobias Faust <tobias.faust gmx net>
+# (c) 2016 Jörg (pejonp)
+##############################################  
 
 package main;
 
@@ -43,7 +47,23 @@ my %VBUS_devices = (
 			{ "offset" => 32,"name" => "Temperatur_03","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" => 34,"name" => "Temperatur_04","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			]},
-	"1060" => {"name" => "Vitosolic200_SD4", "cmd" => "0100", "fields" => [ 	
+	"1059" => {"name" => "DeltaThermHC_mini_Regler", "cmd" => "0100", "fields" => [
+      { "offset" => 0, "name" => "Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 2, "name" => "Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 4, "name" => "Temperatur_Sensor_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 6, "name" => "Temperatur_Sensor_4", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 8, "name" => "Temperatur_Sensor_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },	
+      { "offset" => 10, "name" => "Drehzahl_Relais_1", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+			{ "offset" => 11, "name" => "Drehzahl_Relais_2", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+			{ "offset" => 12, "name" => "Drehzahl_Relais_3", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+			{ "offset" => 13, "name" => "Drehzahl_Relais_4", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+     	{ "offset" => 14, "name" => "Regler_Ausgang_1", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+    	{ "offset" => 15, "name" => "Regler_Ausgang_2", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+    	{ "offset" => 16,"name" => "Systemdatum","bitSize" => 31 },
+  		{ "offset" => 20, "name" => "Fehlermaske", "bitSize" => 31, "factor" => 1 },
+  		{ "offset" => 24, "name" => "Warnungsmaske", "bitSize" => 31, "factor" => 1 },
+ 			]},
+  	"1060" => {"name" => "Vitosolic200_SD4", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "temperature_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "temperature_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "temperature_T03","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -74,10 +94,51 @@ my %VBUS_devices = (
 			{ "offset" => 58,"name" => "relaisusagemask","bitSize" => 16 },
 			{ "offset" => 60,"name" => "errormask","bitSize" => 16 },
 			{ "offset" => 62,"name" => "warningmask","bitSize" => 16 },
-			{ "offset" => 64,"name" => "controllerversion","bitSize" => 16 },
+			{ "offset" => 64,"name" => "SW-Version","bitSize" => 8,"factor" => 0.1 },
+ 			{ "offset" => 65,"name" => "Minorversion","bitSize" => 8,"factor" => 1 },
 			{ "offset" => 66,"name" => "systemtime","bitSize" => 16 },
  			]},
-	"2251" => {"name" => "DeltaSol_SL", "cmd" => "0100", "fields" => [
+  	"1065" => {"name" => "Vitosolic200_WMZ1", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "WMZ1_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "WMZ1_Ruecklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  4,"name" => "WMZ1_volumeflow","bitSize" => 15,"unit" => "l/h" },
+			{ "offset" =>  6,"name" => "WMZ1_heatquantity1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
+			{ "offset" =>  8,"name" => "WMZ1_heatquantity2","bitSize" => 16,"unit" => "kWh" },
+			{ "offset" =>  10,"name" => "WMZ1_heatquantity3","bitSize" => 16,"unit" => "MWh" },
+ 			]},
+  	"1066" => {"name" => "Vitosolic200_WMZ2", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "WMZ1_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "WMZ1_Ruecklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  4,"name" => "WMZ1_volumeflow","bitSize" => 15,"unit" => "l/h" },
+			{ "offset" =>  6,"name" => "WMZ1_heatquantity1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
+			{ "offset" =>  8,"name" => "WMZ1_heatquantity2","bitSize" => 16,"unit" => "kWh" },
+			{ "offset" =>  10,"name" => "WMZ1_heatquantity3","bitSize" => 16,"unit" => "MWh" },
+ 			]},
+   	"1140" => {"name" => "DeltaThermHC_mini_HK", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "HK_VorlaufSoll","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "HK_Betriebsstatus","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  4,"name" => "HK_Betriebsart","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  6,"name" => "HK_Brennerstarts1","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  8,"name" => "HK_Brennerstarts2","bitSize" => 8,"factor" => 1 },
+     	{ "offset" =>  10,"name" => "HK_Brennerstarts3","bitSize" => 8,"factor" => 1 },
+	   	]},
+   	"2211" => {"name" => "DeltaSol_CS_Plus", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "Temperatur_Sensor1","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "Temperatur_Sensor2","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  4,"name" => "Temperatur_Sensor3","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  6,"name" => "Temperatur_Sensor4","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  8,"name" => "Drehzahl_Relais1","bitSize" => 8, "unit" => "%" },
+			{ "offset" => 10,"name" => "Betriebsstunden_Relais1","bitSize" => 16, "unit" => "h" },
+			{ "offset" => 12,"name" => "Drehzahl_Relais2","bitSize" => 8,"unit" => "%"  },
+      { "offset" => 14,"name" => "Betriebsstunden_Relais2","bitSize" => 16, "unit" => "h" },
+      { "offset" => 16,"name" => "UnitType","bitSize" => 8 },
+      { "offset" => 16,"name" => "System","bitSize" => 16 },
+			{ "offset" => 28,"name" => "Waermemenge1","bitSize" => 8,"factor" => 1,"unit" => "Wh" },
+			{ "offset" => 29,"name" => "Waermemenge2","bitSize" => 8,"factor" => 100,"unit" => "Wh" },
+      { "offset" => 30,"name" => "Waermemenge3","bitSize" => 8,"factor" => 10000,"unit" => "Wh" },
+			{ "offset" => 31,"name" => "Waermemenge4","bitSize" => 8,"factor" => 10000000,"unit" => "Wh" },
+  		]},
+  	"2251" => {"name" => "DeltaSol_SL", "cmd" => "0100", "fields" => [
 #			{ "offset" => 0, "name" => "Systemzeit", "bitSize" => 31, "timeRef" => 1 },
 			{ "offset" => 4, "name" => "Kollektortemperatur", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 6, "name" => "Kesseltemperatur", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
@@ -124,33 +185,56 @@ my %VBUS_devices = (
 			{ "offset" => 94, "name" => "Speichermaximaltemperatur", "bitSize" => 1, "factor" => 1 },
 			{ "offset" => 95, "name" => "Neustarts", "bitSize" => 1, "factor" => 1 },
 			{ "offset" => 96, "name" => "Fehlermaske", "bitSize" => 31, "factor" => 1 },
-			]},
-	"4010" => {"name" => "WMZ", "cmd" => "0100", "fields" => [
-            { "offset" =>  0,"name" => "Heat_kWh","bitSize" => 15,"factor" => 1,"unit" => "kWh" },
-            { "offset" =>  2,"name" => "Heat_Wh","bitSize" => 15,"factor" => 1,"unit" => "Wh" },
-            { "offset" =>  4,"name" => "Flow_rate","bitSize" => 15,"factor" => 0.01,"unit" => "qm/h" },
-            { "offset" =>  6,"name" => "Power","bitSize" => 8,"factor" => 10,"unit" => "W" },
-            { "offset" =>  8,"name" => "Flow_temperature","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  10,"name" => "Return_temperature","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  12,"name" => "Heat_MWh","bitSize" => 15,"factor" => 1,"unit" => "MWh" },
-            { "offset" =>  14,"name" => "Power2","bitSize" => 8,"factor" => 2560,"unit" => "W" },
-            { "offset" =>  15,"name" => "Glycol","bitSize" => 8,"factor" => 1,"unit" => "" },
-            { "offset" =>  16,"name" => "Pressure","bitSize" => 8,"factor" => 1,"unit" => "bar" },
-            ]},
-	"4211" => {"name" => "SKSC1/2", "cmd" => "0100", "fields" => [ 	
+	  		]},
+    "2271" => {"name" => "DeltaSol_SLL", "cmd" => "0100", "fields" => [
+	      { "offset" => 0, "name" => "Systemzeit", "bitSize" => 31, "timeRef" => 1 },
+	      { "offset" => 4, "name" => "Solar_Kollektortemp", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+	      { "offset" => 6, "name" => "Solar_Kesseltemp", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+	      { "offset" => 8, "name" => "Solar_VL", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+	      { "offset" => 10, "name" => "Solar_RL", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+	      { "offset" => 12, "name" => "Tage", "bitSize" => 15, "factor" => 1, "unit" => "T" },
+	      { "offset" => 16, "name" => "Volumenstrom_V40", "bitSize" => 31, "factor" => 1, "unit" => "1/h" },
+	      { "offset" => 20, "name" => "Drehzahl1", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+	      { "offset" => 24, "name" => "Waermemenge", "bitSize" => 31, "factor" => 1, "unit" => "Wh" },
+	      { "offset" => 32, "name" => "Betriebstunden", "bitSize" => 31, "factor" => 1, "unit" => "h" },
+	      { "offset" => 44, "name" => "SW-Version", "bitSize" => 7, "factor" => 0.01 },
+	      { "offset" => 44, "name" => "Urlaubsfunktion", "bitSize" => 1, "factor" => 1 },
+	      { "offset" => 45, "name" => "Blockierschutz_1", "bitSize" => 7, "factor" => 1, "unit" => "%" },
+	      { "offset" => 69, "name" => "Speichermaximaltemperatur", "bitSize" => 1, "factor" => 1 },
+	      { "offset" => 72, "name" => "Fehlermaske", "bitSize" => 31, "factor" => 1 },
+	        ]},
+    "2272" => {"name" => "DeltaSol_SLL_WMZ1", "cmd" => "0100", "fields" => [
+	      { "offset" => 0, "name" => "Leistung_gesamt", "bitSize" => 31, "factor" => 1, "unit" => "Wh" },
+	      { "offset" => 4, "name" => "Leistung", "bitSize" => 31, "factor" => 1, "unit" => "W" },
+	      { "offset" => 8, "name" => "Leistung_heute", "bitSize" => 31, "factor" => 1, "unit" => "Wh" },
+	      { "offset" => 12, "name" => "Leistung_Woche", "bitSize" => 31, "factor" => 1, "unit" => "Wh" },
+	        ]},
+  	"4010" => {"name" => "WMZ", "cmd" => "0100", "fields" => [
+ 			{ "offset" =>  0,"name" => "Heat_kWh","bitSize" => 15,"factor" => 1,"unit" => "kWh" },
+ 			{ "offset" =>  2,"name" => "Heat_Wh","bitSize" => 15,"factor" => 1,"unit" => "Wh" },
+ 			{ "offset" =>  4,"name" => "Flow_rate","bitSize" => 15,"factor" => 0.01,"unit" => "qm/h" },
+ 			{ "offset" =>  6,"name" => "Power","bitSize" => 8,"factor" => 10,"unit" => "W" },
+ 			{ "offset" =>  8,"name" => "Flow_temperature","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+ 			{ "offset" =>  10,"name" => "Return_temperature","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+ 			{ "offset" =>  12,"name" => "Heat_MWh","bitSize" => 15,"factor" => 1,"unit" => "MWh" },
+ 			{ "offset" =>  14,"name" => "Power2","bitSize" => 8,"factor" => 2560,"unit" => "W" },
+ 			{ "offset" =>  15,"name" => "Glycol","bitSize" => 8,"factor" => 1,"unit" => "" },
+ 			{ "offset" =>  16,"name" => "Pressure","bitSize" => 8,"factor" => 1,"unit" => "bar" },
+     		]},
+  	"4211" => {"name" => "SKSC1/2", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "Temperatur_Sensor1","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "Temperatur_Sensor2","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "Temperatur_Sensor3","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  6,"name" => "Temperatur_Sensor4","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  8,"name" => "Drehzahl_Pumpe1","bitSize" => 8, "unit" => "%" },
-#			{ "offset" =>  9,"name" => "Drehzahl_Pumpe2","bitSize" => 8, "unit" => "%" },
+			{ "offset" =>  9,"name" => "Drehzahl_Pumpe2","bitSize" => 8, "unit" => "%" },
 			{ "offset" => 10,"name" => "Fehlermaske","bitSize" => 8 },
 			{ "offset" => 12,"name" => "Betriebsstunden_Pumpe1","bitSize" => 16,"factor" => 1,"unit" => "h"  },
-#			{ "offset" => 14,"name" => "Betriebsstunden_Pumpe2","bitSize" => 16,"factor" => 1,"unit" => "h"  },
-#			{ "offset" => 16,"name" => "Waermemenge1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
-#			{ "offset" => 18,"name" => "Waermemenge2","bitSize" => 16,"factor" => 1000,"unit" => "Wh" },
-#			{ "offset" => 20,"name" => "Waermemenge3","bitSize" => 16,"factor" => 1000000,"unit" => "Wh" },
-			]},
+			{ "offset" => 14,"name" => "Betriebsstunden_Pumpe2","bitSize" => 16,"factor" => 1,"unit" => "h"  },
+			{ "offset" => 16,"name" => "Waermemenge1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
+			{ "offset" => 18,"name" => "Waermemenge2","bitSize" => 16,"factor" => 1000,"unit" => "Wh" },
+			{ "offset" => 20,"name" => "Waermemenge3","bitSize" => 16,"factor" => 1000000,"unit" => "Wh" },
+  			]},
  	"4212" => {"name" => "DeltaSolC", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "temperature_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "temperature_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -166,24 +250,7 @@ my %VBUS_devices = (
 			{ "offset" => 18,"name" => "waermemenge_2","bitSize" => 16,"factor" => 1000,"unit" => "Wh" },
 			{ "offset" => 20,"name" => "waermemenge_3","bitSize" => 16,"factor" => 1000000,"unit" => "Wh" },
 			{ "offset" => 22,"name" => "systemtime","bitSize" => 15 },
- 			]},
- 	"4214" => {"name" => "Sonnenkraft_SKSC2HE", "cmd" => "0100", "dst_addr" => "0010", "fields" => [ 	
-			{ "offset" =>  0,"name" => "Temperatur_Sensor1","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			{ "offset" =>  2,"name" => "Temperatur_Sensor2","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			{ "offset" =>  4,"name" => "Temperatur_Sensor3","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			{ "offset" =>  6,"name" => "Temperatur_Sensor4","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			{ "offset" => 24,"name" => "Temperatur_VFD1",   "bitSize" => 15,"factor" => 0,1,"unit" => "°C" },
-			{ "offset" => 26,"name" => "Volumenstrom_VFD1", "bitSize" => 15,"factor" => 1  ,"unit" => "L_h" },
-			{ "offset" =>  8,"name" => "Drehzahl_Relais_1", "bitSize" =>  8,"factor" => 1  ,"unit" => "%" },
-			{ "offset" =>  9,"name" => "Drehzahl_Relais_2", "bitSize" =>  8,"factor" => 1  ,"unit" => "%" },
-			{ "offset" => 32,"name" => "Spannung"         , "bitSize" =>  8,"factor" => 0,1,"unit" => "V" },
-			{ "offset" => 10,"name" => "Fehlermaske",       "bitSize" =>  8,"factor" => 1,  "unit" => "St"  },
-			{ "offset" => 12,"name" => "Betriebsstunden_Pumpe1","bitSize" => 16,"factor" => 1,"unit" => "h"  },
-			{ "offset" => 14,"name" => "Betriebsstunden_Pumpe2","bitSize" => 16,"factor" => 1,"unit" => "h"  },
-			{ "offset" => 16,"name" => "Waermemenge1","bitSize" => 15,"factor" => 1,"unit" => "Wh" },
-			{ "offset" => 18,"name" => "Waermemenge2","bitSize" => 15,"factor" => 1000,"unit" => "Wh" },
-			{ "offset" => 20,"name" => "Waermemenge3","bitSize" => 15,"factor" => 1000000,"unit" => "Wh" },
-			]},
+ 			]},			
 	"4278" => {"name" => "DeltaSol_BS4", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Kollektortemperatur_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "SpeichertemperaturUnten_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -197,7 +264,7 @@ my %VBUS_devices = (
 			{ "offset" => 23,"name" => "Programm","bitSize" => 8,"factor" => 1 },
 			{ "offset" => 24,"name" => "sw_version","bitSize" => 16,"factor" => 0.01 },
 			]},
-	"427b" => {"name" => "DeltaSol_BS_2009", "cmd" => "0100", "fields" => [
+	"427B" => {"name" => "DeltaSol_BS_2009", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "temperature_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "temperature_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "temperature_T03","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -219,31 +286,125 @@ my %VBUS_devices = (
 			{ "offset" => 32,"name" => "sv_version","bitSize" => 16,"factor" => 0.01 },
 			{ "offset" => 34,"name" => "variant_","bitSize" => 16 },
 			]},
-    "5611" => {"name" => "DeltaTherm_FK", "cmd" => "0100", "fields" => [
-            { "offset" =>  0,"name" => "Temperatur_1","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  2,"name" => "Temperatur_2","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  4,"name" => "Temperatur_3","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  6,"name" => "Temperatur_4","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
-            { "offset" =>  8,"name" => "Drehzahl_Reais_1","bitSize" => 8,"factor" => 1,"unit" => "%" },
-            { "offset" =>  9,"name" => "Drehzahl_Reais_2","bitSize" => 8,"factor" => 1,"unit" => "%" },
-            { "offset" =>  10,"name" => "Mischer_Auf","bitSize" => 8,"factor" => 1,"unit" => "%" },
-            { "offset" =>  11,"name" => "Mischer_Zu","bitSize" => 8,"factor" => 1,"unit" => "%" },
-            { "offset" =>  12,"name" => "Datum","bitSize" => 32,"factor" => 1,"unit" => "Tage" },
-            { "offset" =>  16,"name" => "Uhrzeit","bitSize" => 16,"factor" => 1,"unit" => "h" },
-            { "offset" =>  18,"name" => "Systemmeldung","bitSize" => 8,"factor" => 1,"unit" => "m" },
+	"5251" => {"name" => "Frischwasserregler", "cmd" => "0100", "fields" => [
+            { "offset" =>  0,  "name" => "temperature_T01"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" =>  2,  "name" => "temperature_T02"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" =>  4,  "name" => "temperature_T03"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" =>  6,  "name" => "temperature_T04"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" =>  8,  "name" => "temperature_T05"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" => 10,  "name" => "temperature_T06"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" => 22,  "name" => "temperature_VFS"     , "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+            { "offset" => 36,  "name" => "Volume_flow_VFS"     , "bitSize" => 31, "factor" =>   1, "unit" => "l/h"},
+            { "offset" => 49,  "name" => "speed_R1"            , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 50,  "name" => "speed_R2"            , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 51,  "name" => "speed_R3"            , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 52,  "name" => "speed_R4"            , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 56,  "name" => "speed_PWM1"          , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 57,  "name" => "speed_PWM2"          , "bitSize" => 8 ,                  "unit" => "%"  },
+            { "offset" => 64,  "name" => "operating_hours_R1"  , "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 68,  "name" => "operating_hours_R2"  , "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 72,  "name" => "operating_hours_R3"  , "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 76,  "name" => "operating_hours_R4"  , "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 80,  "name" => "operating_hours_PWM1", "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 84,  "name" => "operating_hours_PWM2", "bitSize" => 31, "factor" =>   1, "unit" => "h"  },
+            { "offset" => 96,  "name" => "heat_amount"         , "bitSize" => 31, "factor" =>   1, "unit" => "Wh" },
+            { "offset" => 100, "name" => "error_mask"          , "bitSize" => 15                                  },
+            { "offset" => 108, "name" => "sv_version"          , "bitSize" => 15, "factor" => 0.01                },
+            { "offset" => 112, "name" => "systemtime"          , "bitSize" => 15                                  },
             ]},
-	"6521" => {"name" => "MSR65_1", "cmd" => "0100", "fields" => [
-			{ "offset" => 0, "name" => "6521_Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-			{ "offset" => 2, "name" => "6521_Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-			{ "offset" => 4, "name" => "6521_Temperatur_Sensor_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-#			{ "offset" => 8, "name" => "6521_Temperatur_Sensor_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-			]},
-	"6522" => {"name" => "MSR65_2", "cmd" => "0100", "fields" => [
-			{ "offset" => 0, "name" => "6522_Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-			{ "offset" => 2, "name" => "6522_Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-#			{ "offset" => 8, "name" => "6522_Temperatur_Sensor_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
-			]},                       
-  	"7160" => {"name" => "SKS3HE", "cmd" => "0100", "fields" => [
+   	"5400" => {"name" => "DeltaThermHC_Regler", "cmd" => "0100", "fields" => [
+    	{ "offset" => 0, "name" => "Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 2, "name" => "Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 4, "name" => "Temperatur_Sensor_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 6, "name" => "Temperatur_Sensor_4", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 8, "name" => "Temperatur_Sensor_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 10, "name" => "Temperatur_Sensor_6", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 12, "name" => "Temperatur_Sensor_7", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 14, "name" => "Temperatur_Sensor_8", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 16, "name" => "Temperatur_Sensor_9", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+    	{ "offset" => 18, "name" => "Einstrahlung_Sensor", "bitSize" => 15, "factor" => 1, "unit" => "W/qm" },
+    	{ "offset" => 20, "name" => "Temperatur_Sensor_11", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 22, "name" => "Temperatur_Sensor_12", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 24, "name" => "Volumenstrom_Sensor_1", "bitSize" => 31, "factor" => 1, "unit" => "l/h" },
+			{ "offset" => 28, "name" => "Volumenstrom_Sensor_2", "bitSize" => 31, "factor" => 1, "unit" => "l/h" },
+			{ "offset" => 32, "name" => "Volumenstrom_Sensor_3", "bitSize" => 31, "factor" => 1, "unit" => "l/h" },
+			{ "offset" => 34,"name" => "Druck_Sensor_11","bitSize" => 15,"factor" => 0.01,"unit" => "bar" },
+			{ "offset" => 36,"name" => "Druck_Sensor_12","bitSize" => 15,"factor" => 0.01,"unit" => "bar" },
+			{ "offset" => 38, "name" => "Drehzahl_Relais_1", "bitSize" => 8, "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 39, "name" => "Drehzahl_Relais_2", "bitSize" => 8, "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 40, "name" => "Drehzahl_Relais_3", "bitSize" => 8, "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 41, "name" => "Drehzahl_Relais_4", "bitSize" => 8, "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 42, "name" => "Drehzahl_Relais_5", "bitSize" => 8, "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 43, "name" => "Regler_Ausgang_1", "bitSize" => 7,  "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 44, "name" => "Regler_Ausgang_2", "bitSize" => 7,  "factor" => 1, "unit" => "%" },
+ 			{ "offset" => 45,"name" => "Systemdatum","bitSize" => 31},
+ 			{ "offset" => 49, "name" => "Fehlermaske", "bitSize" => 31, "factor" => 1 },
+  		{ "offset" => 53, "name" => "Warnungsmaske", "bitSize" => 31, "factor" => 1 },  
+   			]},
+  	"5410" => {"name" => "DeltaThermHC_HK0", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "TV_VorlaufSoll","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "TV_Betriebsstatus","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  4,"name" => "Betriebsart","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  6,"name" => "Brennerstarts1","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  8,"name" => "Brennerstarts2","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  10,"name" => "Brennerstarts3","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  12,"name" => "Brennerstarts4","bitSize" => 8,"factor" => 1 },
+    		]},
+    "5411" => {"name" => "DeltaThermHC_HK1", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "TV_VorlaufSoll","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "TV_Betriebsstatus","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  4,"name" => "Betriebsart","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  6,"name" => "Brennerstarts1","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  8,"name" => "Brennerstarts2","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  10,"name" => "Brennerstarts3","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  12,"name" => "Brennerstarts4","bitSize" => 8,"factor" => 1 },
+    		]}, 
+    "5412" => {"name" => "DeltaThermHC_HK2", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "TV_VorlaufSoll","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
+			{ "offset" =>  2,"name" => "TV_Betriebsstatus","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  4,"name" => "Betriebsart","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  6,"name" => "Brennerstarts1","bitSize" => 8,"factor" => 1 },
+			{ "offset" =>  8,"name" => "Brennerstarts2","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  10,"name" => "Brennerstarts3","bitSize" => 8,"factor" => 1 },
+ 			{ "offset" =>  12,"name" => "Brennerstarts4","bitSize" => 8,"factor" => 1 },
+    		]},        
+  	"5420" => {"name" => "DeltaThermHC_WMZ", "cmd" => "0100", "fields" => [ 	
+			{ "offset" =>  0,"name" => "Wert","bitSize" => 32,"factor" => 1,"unit" => "kWh" },
+			{ "offset" =>  4,"name" => "Leistung","bitSize" => 32,"unit" => "W" },
+			{ "offset" =>  8,"name" => "WertHeute","bitSize" => 32,"factor" => 1,"unit" => "kWh" },
+ 			{ "offset" =>  12,"name" => "WertWoche","bitSize" => 32,"factor" => 1,"unit" => "kWh" },
+    		]},   
+  	"5611" => {"name" => "DeltaTherm_FK", "cmd" => "0100", "fields" => [
+  		{ "offset" =>  0,"name" => "Temperatur_1","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+  		{ "offset" =>  2,"name" => "Temperatur_2","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+  		{ "offset" =>  4,"name" => "Temperatur_3","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+  		{ "offset" =>  6,"name" => "Temperatur_4","bitSize" => 16,"factor" => 0.1,"unit" => "°C" },
+  		{ "offset" =>  8,"name" => "Drehzahl_Reais_1","bitSize" => 8,"factor" => 1,"unit" => "%" },
+  		{ "offset" =>  9,"name" => "Drehzahl_Reais_2","bitSize" => 8,"factor" => 1,"unit" => "%" },
+  		{ "offset" =>  10,"name" => "Mischer_Auf","bitSize" => 8,"factor" => 1,"unit" => "%" },
+  		{ "offset" =>  11,"name" => "Mischer_Zu","bitSize" => 8,"factor" => 1,"unit" => "%" },
+  		{ "offset" =>  12,"name" => "Datum","bitSize" => 32,"factor" => 1,"unit" => "Tage" },
+  		{ "offset" =>  18,"name" => "Uhrzeit","bitSize" => 16,"factor" => 1,"unit" => "h" },
+  		{ "offset" =>  20,"name" => "Systemmeldung","bitSize" => 8,"factor" => 1,"unit" => "m" },
+   			]},
+   	"6521" => {"name" => "MSR65_1", "cmd" => "0200", "fields" => [
+ #  "7821" => {"name" => "MSR65_1", "cmd" => "0200", "fields" => [
+  		{ "offset" => 0, "name" => "Temperatur_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 2, "name" => "Temperatur_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 4, "name" => "Temperatur_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 6, "name" => "Temperatur_4", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+ 			{ "offset" => 8, "name" => "Temperatur_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+ 			{ "offset" => 10, "name" => "Temperatur_6", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },	
+  			]},
+   	"6522" => {"name" => "MSR65_2", "cmd" => "0100", "fields" => [
+ 			{ "offset" => 0, "name" => "Temperatur_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 2, "name" => "Temperatur_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 4, "name" => "Temperatur_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+			{ "offset" => 6, "name" => "Temperatur_4", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+ 			{ "offset" => 8, "name" => "Temperatur_5", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
+ 			{ "offset" => 10, "name" => "Temperatur_6", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },	
+  			]},  
+   	"7160" => {"name" => "SKS3HE", "cmd" => "0100", "fields" => [
 			{ "offset" => 0, "name" => "7160_Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 2, "name" => "7160_Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 4, "name" => "7160_Temperatur_Sensor_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
@@ -321,10 +482,10 @@ my %VBUS_devices = (
 			{ "offset" => 62,"name" => "Warnmaske","bitSize" => 16 },
 			{ "offset" => 64,"name" => "controllerversion","bitSize" => 16 },
 			{ "offset" => 66,"name" => "systemtime","bitSize" => 16 },
-			]},
+	  		]},
 	"7312" => {"name" => "DeltaSol_M_HKM", "cmd" => "0100", "fields" => [
 			{ "offset" => 8,"name" => "Vorlauf_Soll_Temperatur","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			]},
+  			]},
 	"7315" => {"name" => "DeltaSol_M_Volumen", "cmd" => "0100", "fields" => [
 			{ "offset" => 0,"name" => "Betriebssekunden R1","bitSize" => 15,"unit" => "s" },
 			{ "offset" => 4,"name" => "Betriebssekunden R2","bitSize" => 15,"unit" => "s" },
@@ -337,7 +498,7 @@ my %VBUS_devices = (
 			{ "offset" => 32,"name" => "Betriebssekunden R9","bitSize" => 15,"unit" => "s" },
 			{ "offset" => 36,"name" => "Volumen 1","bitSize" => 15,"unit" => "l" },
 			{ "offset" => 40,"name" => "Volumen 2","bitSize" => 15,"unit" => "l" },
-			]},
+  			]},
 	"7316" => {"name" => "DeltaSol_M_WMZ1", "cmd" => "0100", "fields" => [
 #			{ "offset" => 0,"name" => "Kollektor_Rücklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 #			{ "offset" => 2,"name" => "Kollektor_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -345,7 +506,7 @@ my %VBUS_devices = (
 			{ "offset" => 6,"name" => "Wärmemenge_1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
 			{ "offset" => 8,"name" => "Wärmemenge_2","bitSize" => 16,"unit" => "kWh" },
 			{ "offset" => 10,"name" => "Wärmemenge_3","bitSize" => 16,"unit" => "MWh" },
-			]},
+		  	]},
 	"7317" => {"name" => "DeltaSol_M_WMZ2", "cmd" => "0100", "fields" => [
 #			{ "offset" => 0,"name" => "Kollektor_Rücklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 #			{ "offset" => 2,"name" => "Kollektor_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -353,7 +514,7 @@ my %VBUS_devices = (
 			{ "offset" => 6,"name" => "Wärmemenge_1","bitSize" => 16,"factor" => 1,"unit" => "Wh" },
 			{ "offset" => 8,"name" => "Wärmemenge_2","bitSize" => 16,"unit" => "kWh" },
 			{ "offset" => 10,"name" => "Wärmemenge_3","bitSize" => 16,"unit" => "MWh" },
-			]},
+  			]},
 	"7321" => {"name" => "Vitosolic200", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "temperature_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "temperature_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -386,8 +547,9 @@ my %VBUS_devices = (
 			{ "offset" => 60,"name" => "errormask","bitSize" => 16 },
 			{ "offset" => 62,"name" => "warningmask","bitSize" => 16 },
 			{ "offset" => 64,"name" => "controllerversion","bitSize" => 16 },
-			{ "offset" => 66,"name" => "systemtime","bitSize" => 16 },
- 			]},
+			#{ "offset" => 66,"name" => "systemtime","bitSize" => 16 },
+ 			{ "offset" => 66,"name" => "systemtime","bitSize" => 15,"timeRef" => 1 },
+   		]},
 	"7326" => {"name" => "Vitosolic200_WMZ1", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "WMZ1_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "WMZ1_Ruecklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -510,7 +672,7 @@ my %VBUS_devices = (
 			{ "offset" => 120, "name" => "Errormask", "bitSize" => 16,  },
 			{ "offset" => 122, "name" => "Warningmask", "bitSize" => 16,  },
 			{ "offset" => 124, "name" => "Systemflow.Parameteraenderungen", "bitSize" => 16,  },
- 			]},
+ 			]},      
 	"7411" => {"name" => "DeltaSol_ES", "cmd" => "0100", "fields" => [
 			{ "offset" => 0, "name" => "Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 2, "name" => "Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
@@ -606,7 +768,7 @@ my %VBUS_devices = (
 			{ "offset" => 45, "name" => "Leckage", "bitSize" => 1, "bitPos" => 2 },
 			{ "offset" => 45, "name" => "ueberdruck", "bitSize" => 1, "bitPos" => 3 },
 			{ "offset" => 45, "name" => "Durchflussfehler", "bitSize" => 1, "bitPos" => 4 },
-			]},
+			]},		
 	"7721" => {"name" => "DeltaSolE_Regler", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "temperature_T01","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "temperature_T02","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -632,7 +794,7 @@ my %VBUS_devices = (
 			{ "offset" => 58,"name" => "statusHK","bitSize" => 16 },
 #			{ "offset" => 64,"name" => "controllerversion","bitSize" => 16 },
 #			{ "offset" => 66,"name" => "systemtime","bitSize" => 16 },
- 			]},
+ 			]},      
 	"7722" => {"name" => "DeltaSolE_WMZ", "cmd" => "0100", "fields" => [ 	
 			{ "offset" =>  0,"name" => "T10","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "T9","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -666,7 +828,7 @@ my %VBUS_devices = (
   			{ "offset" => 28,"name" => "heatquantity", "bitSize" => 32, "factor" => 0.001,"unit" => "kWh" },
  			]},
 	"7821" => {"name" => "Cosmo_Multi_Regler", "cmd" => "0100", "fields" => [
-			{ "offset" => 0, "name" => "Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C " },
+			{ "offset" => 0, "name" => "Temperatur_Sensor_1", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 2, "name" => "Temperatur_Sensor_2", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 4, "name" => "Temperatur_Sensor_3", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
 			{ "offset" => 6, "name" => "Temperatur_Sensor_4", "bitSize" => 15, "factor" => 0.1, "unit" => "°C" },
@@ -703,7 +865,7 @@ my %VBUS_devices = (
 			{ "offset" => 66, "name" => "Monat", "bitSize" => 7, "factor" => 1 },
 			{ "offset" => 67, "name" => "Tag", "bitSize" => 7, "factor" => 1 },
 			]},
-	"7822" => {"name" => "Cosmo_Multi_WMZ", "cmd" => "0100", "fields" => [
+  	"7822" => {"name" => "Cosmo_Multi_WMZ", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Temperatur_Vorlauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "Temperatur_Ruecklauf","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "Durchfluss_Sensor_8","bitSize" => 15,"unit" => "l/h" },
@@ -711,7 +873,7 @@ my %VBUS_devices = (
 			{ "offset" =>  8,"name" => "heatquantity2","bitSize" => 16,"factor" => 1000,"unit" => "kWh" },
 			{ "offset" =>  10,"name" => "heatquantity3","bitSize" => 16,"factor" => 1000000,"unit" => "MWh" },
 			]},
-	"7e11" => {"name" => "DeltaSol_MX_Regler", "cmd" => "0100", "fields" => [
+	"7E11" => {"name" => "DeltaSol_MX_Regler", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Temperatur_1","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "Temperatur_2","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "Temperatur_3","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -760,7 +922,7 @@ my %VBUS_devices = (
 			{ "offset" => 92,"name" => "Systemdatum","bitSize" => 31},
 			{ "offset" => 96,"name" => "Fehlermaske","bitSize" => 31},
 			]},
-	"7e12" => {"name" => "DeltaSol_MX_Module", "cmd" => "0100", "fields" => [
+	"7E12" => {"name" => "DeltaSol_MX_Module", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Temperatur_M1_S1","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "Temperatur_M1_S2","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  4,"name" => "Temperatur_M1_S3","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
@@ -791,60 +953,26 @@ my %VBUS_devices = (
 			{ "offset" =>  54,"name" => "Temperatur_M5_S4","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  56,"name" => "Temperatur_M5_S5","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  58,"name" => "Temperatur_M5_S6","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
-			]},
-	"7e21" => {"name" => "DeltaSol_MX_Heizkreis", "cmd" => "0100", "fields" => [
+			]},		
+	"7E21" => {"name" => "DeltaSol_MX_Heizkreis", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Vorlauf_Soll_Temperatur","bitSize" => 15,"factor" => 0.1,"unit" => "°C" },
 			{ "offset" =>  2,"name" => "Betriebsstatus","bitSize" => 8},
-			]},
-	"7e31" => {"name" => "DeltaSol_MX_WMZ", "cmd" => "0100", "fields" => [
+			]},		
+	"7E31" => {"name" => "DeltaSol_MX_WMZ", "cmd" => "0100", "fields" => [
 			{ "offset" =>  0,"name" => "Waermemenge","bitSize" => 31,"factor" => 1,"unit" => "Wh" },
+#      { "offset" =>  4,"name" => "Leistung","bitSize" => 31,"factor" => 1,"unit" => "W" },
 			{ "offset" =>  8,"name" => "Waermemenge_heute","bitSize" => 31,"factor" => 1,"unit" => "Wh" },
 			{ "offset" =>  12,"name" => "Waermemenge_Woche","bitSize" => 31,"factor" => 1,"unit" => "Wh" },
-			]},
+      			{ "offset" =>  16,"name" => "Gesamtvolumen","bitSize" => 31,"factor" => 1,"unit" => "Wh" },
+			]},	
 );
-
-# Example: speed R04: 30 %
-
-sub VBUSDEV_DbLog_splitFn($$) {
-	my ($event, $device) = @_;
-	my ($reading, $value, $unit) = "";
-	my @result;
-	my $hash = $defs{$device};
-
-	my @parts   = split(/: /,$event);
-  	$reading = shift @parts;
-  	$value   = join(": ", @parts);
-
-	my $code = $defs{$device}{CODE};
-	for my $field (@{$VBUS_devices{$code}->{fields}}) {
-		my $fieldname = $field->{name};
-		my $unit = $field->{unit};
-		$unit = "" unless ($unit); 
-
-		if ($fieldname eq $reading) {
-			$value =~ s/\ $unit//;
-			@result= ($reading,$value,$unit);
-			last;
-		}
-	}
-
-	if (!@result) {
-		@parts = split(/\ /, $value);
-		$unit = "";
-		if (@parts >= 2) {
-			$unit = pop(@parts);
-			$value = join(" ", @parts);
-		}
-		@result=($reading, $value, $unit);
-	}
-
-	return @result;
-}
 
 
 sub VBUSDEV_Initialize($)
 {
 	my ($hash) = @_;
+ # require "$attr{global}{modpath}/FHEM/19_VBUSIF.pm";
+
 
 	my @modellist;
 	foreach my $model (keys %VBUS_devices){
@@ -853,21 +981,18 @@ sub VBUSDEV_Initialize($)
 	# aa100051771000010a0c5100382204507e01270200571b016000057e35003822056b38223822054638220000012400000000007f42744a00007f0f513301006b0a050001016e, help me!
 
 	# Consumer
-	#$hash->{Match}		= "^aa1000.*";	# trotz Angabe wird ParseMethode auch abweichd des MatchStrings aufgerufen, WARUM?
+	$hash->{Match}		= "^aa.*";
 	$hash->{DefFn}		= "VBUSDEV_Define";
 	$hash->{UndefFn}	= "VBUSDEV_Undefine";
 	$hash->{ParseFn}	= "VBUSDEV_Parse";
-	$hash->{DbLog_splitFn} = "VBUSDEV_DbLog_splitFn";
-	$hash->{AttrList}	= "IODev ".$readingFnAttributes;
-	$hash->{AttrList}  .= " model:"  .join(",", sort @modellist);
-	$hash->{AutoCreate}	= {
-			"VBUSDEV.*" => {
-#             		GPLOT => "power4:Power,",
-	    		FILTER => "%NAME",
-	   		ATTR => "event-min-interval:.*:120 event-on-change-reading:.*"
-	 	}
+	$hash->{AttrList}	= "IODev "
+                      	."$readingFnAttributes"
+	                    ." model:"  .join(",", sort @modellist);
+	$hash->{AutoCreate}	= { "VBUSDEV.*" => { ATTR => "event-min-interval:.*:120 event-on-change-reading:.* verbose:5 ",FILTER => "%NAME"}
 		};
 }
+
+
 
 
 sub VBUSDEV_Define($$)
@@ -884,21 +1009,31 @@ sub VBUSDEV_Define($$)
 		}
 		$i++;
 	}
+  
 	return "Usage: define <name> VBUSDEV <code>"  if(@args < 3);
+  
+   $hash->{CODE} = $args[2];
+   $modules{VBUSDEV}{defptr}{ $args[2]} = $hash;
+   $hash->{STATE} = "Defined";
+      
+   my $name= $hash->{NAME};
+   return undef;
 
-	my ($name, $type, $code, $interval) = @args;
+	#my ($name, $type, $code, $interval) = @args;
 
-	$hash->{STATE} = 'Initialized';
-	$hash->{CODE} = $code;
+	#$hash->{STATE} = 'Initialized';
+	#$hash->{CODE} = $code;
 
-	AssignIoPort($hash,$iodev) if (!$hash->{IODev});
-	if(defined($hash->{IODev}->{NAME})) {
-		Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
-	} else {
-		Log3 $name, 1, "$name: no I/O device";
-	}
-	$modules{VBUSDEV}{defptr}{$code} = $hash;
-	return undef;
+	#AssignIoPort($hash,$iodev) if (!$hash->{IODev});
+	#if(defined($hash->{IODev}->{NAME})) {
+	#	Log3 $hash, 3, "VBUSDEV_Define: $name: I/O device is " . $hash->{IODev}->{NAME};
+	#} else {
+	#	Log3 $hash, 1, "VBUSDEV_Define: $name: no I/O device";
+	#}
+	#$modules{VBUSDEV}{defptr}{$code} = $hash;
+	#return undef;
+  
+  
 }
 
 sub VBUSDEV_Undefine($$)
@@ -910,8 +1045,7 @@ sub VBUSDEV_Undefine($$)
 	return undef;
 }
 
-sub VBUSDEV_Parse($$)
-{
+sub VBUSDEV_Parse($$) {
 	my ($iodev, $msg, $local) = @_;
 	my $ioName = $iodev->{NAME};
 
@@ -922,55 +1056,103 @@ sub VBUSDEV_Parse($$)
 
 	my $devtype = $VBUS_devices{$src_addr};
 	my $hash = $modules{VBUSDEV}{defptr}{$src_addr};
-	
-	Log3 $hash->{NAME}, 5, "received payload => $msg";
 
-	return "" if ($msg !~ m/^aa1000/);
+	Log3 $iodev, 5, "VBUSDEV_Parse00: ioName: ".$ioName. " DST-ADR: " . $dst_addr . " SRC-ADR: " . $src_addr;;
 
+	if ($dst_addr == "0000")
+	{
+		  Log3 $iodev, 5, "VBUSDEV_Parse01: Broadcast ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	}
+
+	if ($dst_addr == "0010")
+	{
+			Log3 $iodev, 5, "VBUSDEV_Parse02: DFA       ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	}
+
+	if ($dst_addr == "0015")
+	{
+			
+	  Log3 $iodev, 5, "VBUSDEV_Parse03: Standard-Infos ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	  return "";
+	}
+
+	if ($dst_addr == "0020")
+	{
+			Log3 $iodev, 5, "VBUSDEV_Parse04: Computer       ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	}
+
+	if ($dst_addr == "0040")
+	{
+			Log3 $iodev, 5, "VBUSDEV_Parse05: SD3 / GAx      ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	}
+
+	if ($dst_addr == "0050")
+	{
+			Log3 $iodev, 5, "VBUSDEV_Parse06: DL2      ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	}
+
+	 if ($dst_addr == "6521")
+	{
+			Log3 $iodev, 5, "VBUSDEV_Parse07: MSR65    ioName: ".$ioName. " DST-ADR: " . $dst_addr;
+	  $dst_addr = "0010";
+	  $src_addr = "6521";     
+	}
 
 	if ( defined $devtype->{dst_addr} ) {
 		if ( $devtype->{dst_addr} ne $dst_addr ) {
-			 Log3 $ioName, 3, "skip frame $devtype->{dst_addr} $dst_addr";
+			 Log3 $iodev, 5, "VBUSDEV_Parse10: $ioName : skip frame $devtype->{dst_addr} $dst_addr";
 			return "";
 		}
 	}
 
+	$hash = $modules{VBUSDEV}{defptr}{$src_addr};
 	if(!$hash) {
 		my $ret = "UNDEFINED VBUSDEV_$src_addr VBUSDEV $src_addr";
-		Log3 $ioName, 3, "$ret, please define it";
+		Log3 $hash, 3, "VBUSDEV_Parse11: $ioName : $ret, please define it";
 		DoTrigger("global", $ret);
 		return "";
 	}
 
+	Log3 $iodev, 5, "VBUSDEV_Parse12: ".$ioName. " DST-ADR: " . $dst_addr . " SRC-ADR: " . $src_addr;
+
 
 	foreach my $mod (keys %{$modules{VBUSDEV}{defptr}}) {
-		my $hash = $modules{VBUSDEV}{defptr}{"$mod"};
+		my $hash = $modules{VBUSDEV}{defptr}{"$src_addr"};
 		$attr{$hash->{NAME}}{model} = $devtype->{name};
 
+		#Log3 $iodev, 5, "VBUSDEV_Parse200 : Command " . $command . " DevTyp: ".$devtype." Model: ".$mod." MSG: " . $payload;
+		
 		my $command = substr($msg,14,2).substr($msg,12,2);
 		my $payload = substr($msg,20);
-		VBUSDEV_ParsePayload($hash, $devtype, $command, $payload);
 
+		Log3 $iodev, 5, "VBUSDEV_Parse20 : Command " . $command . " DevTyp: ".$devtype." Model: ".$mod." MSG: " . $payload;
+		#Log3 $iodev, 5, "VBUSDEV_Parse20 : Command " . $command . " DevTyp: ".$devtype." Model: ".$mod;
+		
+		VBUSDEV_ParsePayload($hash, $devtype, $command, $payload);
 		return $hash->{NAME};
 	}
+
 	return "";
 }
 
 
 
-sub VBUSDEV_ParsePayload($@)
-{
+sub VBUSDEV_ParsePayload($@) {
 	my ($hash, $devtype, $cmd, $payload) = @_;
 	my $name = $hash->{NAME};
+  	my $code = $hash->{CODE};
 	my $devname = $devtype->{name};
+	#my $devname = $devtype->{code};
 
-	return undef if ($cmd != $devtype->{cmd});
+  	Log3 $hash, 4, "$name: VBUSDEV_ParsePayLoad1: Command: ".$cmd." Code " . $code . " DevTyp: ".$devname." Name: ".$name ;
 
-	Log3 $hash->{NAME}, 5, "extract payload => $payload";
-	
+#	return undef if ($cmd != $devtype->{cmd});
+	Log3 $hash, 4, "$name: VBUSDEV_ParsePayload2: Dev: $devname CMD: $cmd  PayL: $payload";
+
+
 	readingsBeginUpdate($hash);
 
-	my $fld = $hash->{READINGS}->{"model"};
+	#my $fld = $hash->{READINGS}->{"model"};
 
 	for my $field (@{$devtype->{fields}}) {
 		my $fieldname = $field->{name};
@@ -987,6 +1169,8 @@ sub VBUSDEV_ParsePayload($@)
 		} elsif ($bitsize<=32) {
 			$val = substr($payload, $o+6,2).substr($payload, $o+4,2).substr($payload, $o+2,2).substr($payload, $o,2);
 		}
+
+		 #Log3 $hash, 4, "$name: VBUSDEV_ParsePayload3: code: " . $code ." : " . $fieldname . " = " . $val;
 
 		#Aenderung: statt: $val = hex($val); um negative Werte anzuzeigen
 		if ($bitsize == 15) {
@@ -1010,21 +1194,46 @@ sub VBUSDEV_ParsePayload($@)
 			}
 
 			my $unit = $field->{unit};
-			$unit = "" unless ($unit);
-	
-			# auf o,5 °C Runden
-			if ($unit eq "°C") {
+			if (!$unit) {
+				$unit = "";
+			}
+		# auf o,5 °C Runden
+			elsif ($unit eq "°C") {
 			 	$val =  ($val >= 0 ? ceil($val*2)/2 : floor($val*2)/2);
 			}
 		# Runden ende
-			$val = $val." ".$unit; # falls keine Unit definiert, muss valaue mit Leerzeichen enden! (siehe VBUSDEV_DbLog_splitFn)
+			my $val2 = $val." ".$unit;
+      
 			my $fld = $hash->{READINGS}->{$fieldname};
 			my $oldval = "";
-			$oldval = $fld->{VAL} if ($fld);
-
-			readingsBulkUpdate($hash,$fieldname,$val); # if ($val ne $oldval);
-		}
+			if ($fld) {
+				$oldval = $fld->{VAL};
+			}
+			readingsBulkUpdate($hash,$fieldname,$val2); # if ($val ne $oldval);
+		    #Log3 $hash, 4, "$name: VBUSDEV_ParsePayload4: code: " . $code ." : " . $fieldname . " = " . $val ." ".$unit;
+			Log3 $hash, 4, "$name: VBUSDEV_ParsePayload4: code: " . $code ." : " . $fieldname . " = " . $val2;
+     	}
 	}
+  
+		# unklar was hier gemacht wird. Bei mir wird dauernd VBUSDEV_ParsePayload6: UNDEFINED Modul ausgelöst welches
+		# das auslösen der Userreading verhindert. (readingsEndUpdate wird durch das return niemals aufgerufen)
+
+			#$code = $hash->{CODE};
+			#$code = $hash->{IODev}->{NAME} ."_". $code if( defined($hash->{IODev}->{NAME}) );
+			#my $def = $modules{VBUSDEV}{defptr}{$hash->{NAME}.".".$code};
+			#$def = $modules{VBUSDEV}{defptr}{$code} if(!$def);
+			#Log3 $hash, 4, "$name VBUSDEV_ParsePayload5: $name ($code) $$devname";  
+		  
+		    
+			#if(!$def) {
+			#	Log3 $hash, 4, '$name VBUSDEV_ParsePayload6: UNDEFINED Modul ' . $code;
+			#	return "UNDEFINED $name VBUSDEV $code";
+			#}
+		    
+			#$hash = $def;
+			#$name = $hash->{NAME};
+			#$code = $hash->{CODE};    	
+			#Log3 $hash, 4, "$name VBUSDEV_ParsePayload7: $name ($code) $devname)";  
 
 	readingsEndUpdate($hash, 1);
 
@@ -1033,22 +1242,32 @@ sub VBUSDEV_ParsePayload($@)
 1;
 
 =pod
-=item device
+=item helper
+=item summary    connects to the VBUSIF Dev and fetches data from specific model 
+=item summary_DE verbindet sich mit einem VBUSIF Dev und holt Daten von einem spez. Modell
 =begin html
 
 <a name="VBUSDEV"></a>
 <h3>VBUSDEV</h3>
 <ul>
+
+    RESOL-Adapter (USB oder LAN) Info:<br>
+    <a href="http://www.resol.de/">http://www.resol.de/</a><br><br>
+      
+    Information <a href="http://hobbyelektronik.org/w/index.php/VBus-Decoder">  http://hobbyelektronik.org/w/index.php/VBus-Decoder/</a> 
+    or github <a href="https://github.com/pejonp/vbus"> https://github.com/pejonp/vbus </a><br><br><br>
+
+
   <br />
   <a name="VBUSDEV_Define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; VBUSDEV &lt;id&gt; [&lt;interval&gt;]</code><br />
     <br />
-    Defines an micro-inverter device connected to an <a href="#ENECSYSGW">ENECSYSGW</a>.<br /><br />
+    Connects to various RESOL VBus devices<br />
     Examples:
     <ul>
-      <code>define MyVbusDevice VBUSDEV 100123456</code><br />
+      <code>define VBUSDEV_7321 VBUSDEV 7321 </code><br />
     </ul>
   </ul><br />
   <a name="VBUSDEV_Readings"></a>
@@ -1057,5 +1276,40 @@ sub VBUSDEV_ParsePayload($@)
     <li>The readings are dependant of the model of the VBUS device.</li><br />
   </ul><br />
 </ul><br />
+
 =end html
+=begin html_DE
+
+<a name="VBUSDEV"></a>
+<h3>VBUSDEV</h3>
+<ul>
+    Bei dem VBus handelt es sich um eine bidirektionale halbduplex Zweidrahtschnittstelle.<br><br>
+    
+    Notwendig ist dazu ein RESOL-Adapter (USB oder LAN), zu dem hier Informationen zu finden sind:<br>
+    <a href="http://www.resol.de/">http://www.resol.de/</a><br><br>
+      
+    Weitere Informationen hierzu findet man unter <a href="http://hobbyelektronik.org/w/index.php/VBus-Decoder">  http://hobbyelektronik.org/w/index.php/VBus-Decoder/</a> 
+    und auch auf github <a href="https://github.com/pejonp/vbus"> https://github.com/pejonp/vbus </a><br><br><br>
+
+  <br />
+  <a name="VBUSDEV_Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; VBUSDEV &lt;id&gt; [&lt;interval&gt;]</code><br />
+    <br />
+    Definition eines RESOL VBus Geraetes. Wenn das Geraet schon in der Liste hinterlegt ist, wird es automatisch angelegt.<br />
+    Beispiel:
+    <ul>
+      <code>define VBUSDEV_7321 VBUSDEV 7321 </code><br />
+    </ul>
+  </ul><br />
+  <a name="VBUSDEV_Readings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>The readings are dependant of the model of the VBUS device.</li><br />
+  </ul><br />
+  
+</ul><br />
+
+=end html_DE
 =cut

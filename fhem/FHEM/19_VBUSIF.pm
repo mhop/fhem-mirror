@@ -1,9 +1,16 @@
-# 19_VBUSIF.pm
+##############################################
+# $Id$
+#
 # VBUS LAN Adapter Device
+# 19_VBUSIF.pm
 #
 # (c) 2014 Arno Willig <akw@bytefeed.de>
 # (c) 2015 Frank Wurdinger <frank@wurdinger.de>
 # (c) 2015 Adrian Freihofer <adrian.freihofer gmail com>
+# (c) 2016 Tobias Faust <tobias.faust gmx net>
+# (c) 2016 Jörg (pejonp)
+##############################################  
+
 
 package main;
 
@@ -16,7 +23,6 @@ use Device::SerialPort;
 sub VBUSIF_Read($@);
 sub VBUSIF_Write($$$);
 sub VBUSIF_Ready($);
-
 sub VBUSIF_getDevList($$);
 
 
@@ -34,24 +40,36 @@ sub VBUSIF_Initialize($)
 
 # Normal devices
 	$hash->{DefFn}      = "VBUSIF_Define";
-	$hash->{AttrList}   = "dummy:1,0";
+	$hash->{AttrList}   = "dummy:1,0"
+                        ."$readingFnAttributes ";
+  $hash->{AutoCreate}	= { "VBUSDEF.*" => { ATTR => "event-min-interval:.*:120 event-on-change-reading:.* ",FILTER => "%NAME"} };
+  
 }
 
-
+######################################
 sub VBUSIF_Define($$)
 {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t]+", $def);
 
 	if(@a != 3) {
-		return "wrong syntax: define <name> VBUSIF [<hostname:7053> or <dev>]";
+		my $msg = "wrong syntax: define <name> VBUSIF [<hostname:7053> or <dev>]";
+    Log3 $hash, 2, $msg;
+    return $msg;
 	}
+
+#  if(@a != 3) {
+#		return "wrong syntax: define <name> VBUSIF [<hostname:7053> or <dev>]";
+#	}
+
 
 	my $name = $a[0];
 	my $dev = $a[2];
 	$hash->{Clients} = ":VBUSDEV:";
 	my %matchList = ( "1:VBUSDEV" => ".*" );
 	$hash->{MatchList} = \%matchList;
+
+ 	Log3 $hash, 4,"$name: VBUSIF_Define: $hash->{MatchList} ";
 
 	DevIo_CloseDev($hash);
 	$hash->{DeviceName} = $dev;
@@ -66,6 +84,7 @@ sub VBUSIF_Define($$)
 	return $ret;
 }
 
+###############################
 sub VBUSIF_DoInit($)
 {
 	my $hash = shift;
@@ -77,11 +96,11 @@ sub VBUSIF_DoInit($)
 		$conn->autoflush(1);
 		$conn->getline();
 		$conn->write("PASS vbus\n");
-#		$conn->write("PASS !Cs536939$\n");
 		$conn->getline();
 		$conn->write("DATA\n");
 		$conn->getline();
 	}
+    Log3 $hash, 4,"VBUSIF_DoInit ";
 	return undef;
 }
 
@@ -106,79 +125,94 @@ sub VBUSIF_Read($@)
 {
 	my ($hash, $local, $regexp) = @_;
 	my $buf = ($local ? $local : DevIo_SimpleRead($hash));
+	
 	return "" if(!defined($buf));
+	
 	my $name = $hash->{NAME};
 	$buf = unpack('H*', $buf);
 	my $data = ($hash->{PARTIAL} ? $hash->{PARTIAL} : "");
-
+	
 	Log3 $hash->{NAME}, 5, ,"received buffer: $buf";
-
 	$data .= $buf;
-
+  
 	my $msg;
+  	my $msg2;
 	my $idx;
-	$idx = index($data,"aa");
+  	my $muster = "aa";
+	$idx = index($data, $muster);
+  	Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read0: index = $data";
+	
 	if ($idx>=0) {
-		
+    	$msg2 = $data;
 		$data = substr($data,$idx); # Cut off beginning
-
-		$idx = index($data,"aa",2); # Find next message
+	  	$idx = index($data,$muster,2); # Find next message
 
 		if ($idx>0) {
 
 			$idx +=1 if (substr($data,$idx,3) eq "aaa"); # Message endet mit a
-
-			$msg = substr($data,0,$idx);  # vollstaendiges Payload
-			$data = substr($data,$idx); # erster Teil des naechsten Payloads 
-			Log3 $hash->{NAME}, 4, ,"completed Message: $msg";
-
+			
+			$msg = substr($data,0,$idx);
+			$data = substr($data,$idx);
 			my $protoVersion = substr($msg,10,2);
-
-			if ($protoVersion == "10" && length($msg)>=20) {
-				my $frameCount = hex(substr($msg,16,2));
+    		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read1: protoVersion : $protoVersion";
+      
+  	  		if ($protoVersion == "10" && length($msg)>=20) {
+			  	my $frameCount = hex(substr($msg,16,2));
 				my $headerCRC  = hex(substr($msg,18,2));
-
-				my $crc = 0;
-				for (my $j = 1; $j<=8;$j++) {
-					$crc += hex(substr($msg,$j*2,2));
-				}
+  				my $crc = 0;
+	  			for (my $j = 1; $j<=8;$j++) {
+		  			$crc += hex(substr($msg,$j*2,2));
+			  	}
 				$crc = ($crc ^ 0xff) & 0x7f;
 				if ($headerCRC != $crc) {
-					Log 3,"$name: Wrong checksum: $crc != $headerCRC";
-				} 
-				else {
-					my $len = 20+12*$frameCount; # 20 Byte Header + 12 Byte per frame
-					if ($len != length($msg) && length($msg) != 223) {
- 					   Log 4,"$name: Wrong message length: $len != ".length($msg);
+	            	Log3 $hash, 3, "$name: VBUSIF_Read2: Wrong checksum: $crc != $headerCRC";
+				} else {
+					my $len = 20+12*$frameCount;
+               		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read2a Len: ".$len." Counter: ".$frameCount;
+
+      				if ($len != length($msg)) {
+               			# Fehler bei aa1000277310000103414a7f1300071c00001401006a62023000016aaa000021732000050000000000000046a
+               			#                                                                   ^ hier wird falsch getrennt
+                  		$msg = substr($msg2,0,$len);
+                   		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read2b MSG: ".$msg;
+               		}
+               
+               		if ($len != length($msg)) {
+			     		#if ($len != length($msg) && length($msg) != 247) {
+                		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read3: Wrong message length: $len != ".length($msg);
 					} else {
-						if(length($msg) == 223) {
-							$msg = $msg."a";
+                   		Log3 $hash->{NAME}, 5,"$name:  VBUSIF_Read4: OK message length: $len : ".length($msg);
+					    if(length($msg) == 247) {
+						    $msg = $msg."a";
+                       		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read5: message + a : ".$msg;
 						}
 						my $payload = VBUSIF_DecodePayload($hash,$msg);
 						if (defined $payload) {
-							$msg = substr($msg,0,20).$payload;
-
-							$hash->{"${name}_MSGCNT"}++;
-							$hash->{"${name}_TIME"} = TimeNow();
-							$hash->{RAWMSG} = $msg;
-							my %addvals = (RAWMSG => $msg);
-							Log3 $hash->{NAME}, 4, ,"Payload ready to dispatch: $msg";
-							Dispatch($hash, $msg, \%addvals) if($init_done);
-  						}
+						    $msg = substr($msg,0,20).$payload;
+                     		Log3 $hash, 4,"$name: VBUSIF_Read6 MSG: ".$msg." Payload: ".$payload;
+					        $hash->{"${name}_MSGCNT"}++;
+					        $hash->{"${name}_TIME"} = TimeNow();
+				        	$hash->{RAWMSG} = $msg;
+					        my %addvals = (RAWMSG => $msg);
+					        Dispatch($hash, $msg, \%addvals) if($init_done);
+	  					}
 					}
-				}
-
-			}
+        		}
+   			}
+      
 			if ($protoVersion == "20") {
-#				my $command    = substr($msg,14,2).substr($msg,12,2);
-#				my $dataPntId  = substr($msg,16,4);
-#				my $dataPntVal = substr($msg,20,8);
-#				my $septet     = substr($msg,28,2);
-#				my $checksum   = substr($msg,30,2);
+				my $command    = substr($msg,14,2).substr($msg,12,2);
+				my $dataPntId  = substr($msg,16,4);
+				my $dataPntVal = substr($msg,20,8);
+				my $septet     = substr($msg,28,2);
+				my $checksum   = substr($msg,30,2);
+        		
+        		Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read7: protoVersion : $protoVersion";
 #				TODO use septet
 #				TODO validate checksum
 #				TODO Understand protocol
 			}
+	      	Log3 $hash->{NAME}, 5,"$name: VBUSIF_Read8: raus ";
 		}
 	}
 
@@ -215,7 +249,7 @@ sub VBUSIF_DecodePayload($@)
 		}
 
 		if ($crc != $frameCRC) {
-		   Log 3,"$name: Wrong checksum: $crc != $frameCRC";
+		   Log3 $hash, 4,"$name: VBUSIF_DecodePayload0: Wrong checksum: $crc != $frameCRC";
 			return undef;
 		}
 	}
@@ -225,7 +259,9 @@ sub VBUSIF_DecodePayload($@)
 1;
 
 =pod
-=item device
+=item helper
+=item summary    connects to the RESOL VBUS LAN or Serial Port adapter 
+=item summary_DE verbindet sich mit einem RESOL VBUS LAN oder Seriell Adapter
 =begin html
 
 <a name="VBUSIF"></a>
@@ -235,7 +271,7 @@ sub VBUSIF_DecodePayload($@)
   It serves as the "physical" counterpart to the <a href="#VBUSDevice">VBUSDevice</a>
   devices.
   <br /><br />
-  <a name="VBUSdefine"></a>
+  <a name="VBUSIF_Define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; VBUS &lt;device&gt;</code>
@@ -243,17 +279,19 @@ sub VBUSIF_DecodePayload($@)
   <br />
   &lt;device&gt; is a &lt;host&gt;:&lt;port&gt; combination, where
   &lt;host&gt; is the address of the RESOL LAN Adapter and &lt;port&gt; 7053.
-  <br /><br />
+  <br />
+  Please note: the password of RESOL Device must be unchanged at &lt;host&gt;
+  <br />
   Examples:
   <ul>
-    <code>define vbus VBUSLAN 192.168.1.69:7053</code>
-     <br /><br />
-	<code>define vbus VBUSIF /dev/ttyS0</code>
+    <code>define vbus VBUSIF 192.168.1.69:7053</code>
+    </ul>
+    <ul>
+    <code>define vbus VBUSIF  /dev/ttyS0</code>
   </ul>
   </ul>
   <br />
 </ul>
 
 =end html
-
 =cut

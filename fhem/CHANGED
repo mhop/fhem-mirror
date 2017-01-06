@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     19_VBUSIF: new Device to connect an RESOL VBUS Device
+  - new:     21_VBUSDEV: new locical Device to connect to different 
+             Resol and compatible VBUS Devices via VBUSIF.pm
   - bugfix:  73_GasCalculator: Reset for calendar year fixed
   - bugfix:  73_ElectricityCalculator: Reset for calendar year fixed
   - bugfix:  14_CUL_TCM97001: fix HH humidy for GT_WT_02

@@ -715,3 +715,9 @@
 
 - Sun Dez 11 2016 (mschub)
   - adding new module 98_Verkehrsinfo.pm
+
+- Fr Jan 06 2017 (Tobias)
+  - adding new module: 19_VBUSIF: new Device to connect an RESOL VBUS Device
+  - adding new module: 21_VBUSDEV: new locical Device to connect to different
+             Resol and compatible VBUS Devices via VBUSIF.pm
+

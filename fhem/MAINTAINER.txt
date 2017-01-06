@@ -92,6 +92,7 @@ FHEM/14_SD_WS09.pm           Sidey/pejonp         http://forum.fhem.de Sonstige 
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
+FHEM/19_VBUSIF.pm            Tobias/pejonp        http://forum.fhem.de Sonstige Systeme
 FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/20_FRM_ROTENC.pm        ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme
@@ -108,6 +109,7 @@ FHEM/20_ROOMMATE.pm          loredo               http://forum.fhem.de Automatis
 FHEM/20_GUEST.pm             loredo               http://forum.fhem.de Automatisierung
 FHEM/20_N4HBUS.pm            okoerber             http://forum.fhem.de Sonstige Systeme
 FHEM/21_N4HMODULE.pm         okoerber             http://forum.fhem.de Sonstige Systeme
+FHEM/21_VBUSDEV.pm           Tobias/pejonp        http://forum.fhem.de Sonstige Systeme
 FHEM/21_OWAD.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWCOUNT.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWID.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
@@ -324,7 +326,7 @@ FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/89_HEATRONIC.pm         heikoranft           http://forum.fhem.de Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/14_SIGNALduino_un.pm    Sidey79			  http://forum.fhem.de Sonstige Systeme
+FHEM/14_SIGNALduino_un.pm    Sidey 		  http://forum.fhem.de Sonstige Systeme
 FHEM/91_eventTypes.pm        rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
 FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/91_sequence.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
