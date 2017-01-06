@@ -1,5 +1,4 @@
-
-################################################################
+############################################################################################################################
 # $Id$
 #
 # 93_DbLog.pm
@@ -11,13 +10,45 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-################################################################
+############################################################################################################################
+#  Versions History done by DS_Starter:
+#
+# 2.8.2      06.01.2017       commandref maintained to cover new functions
+# 2.8.1      05.01.2017       use Time::HiRes qw(gettimeofday tv_interval), bugfix $hash->{HELPER}{RUNNING_PID}
+# 2.8        03.01.2017       attr asyncMode, you have a choice to use blocking (as V2.5) or non-blocking asynchronous
+#                             with caching, attr showproctime
+# 2.7        02.01.2017       initial release non-blocking using BlockingCall
+# 2.6        02.01.2017       asynchron writing to DB using cache, attr syncInterval, set listCache
+# 2.5        29.12.2016       commandref maintained to cover new attributes, attr "excludeDevs" and "verbose4Devs" now
+#                             accepting Regex 
+# 2.4.4      28.12.2016       Attribut "excludeDevs" to exclude devices from db-logging (only if $hash->{NOTIFYDEV} eq ".*")
+# 2.4.3      28.12.2016       function DbLog_Log: changed separators of @row_array -> better splitting
+# 2.4.2      28.12.2016       Attribut "verbose4Devs" to restrict verbose4 loggings of specific devices 
+# 2.4.1      27.12.2016       DbLog_Push: improved update/insert into current, analyze execute_array -> ArrayTupleStatus
+# 2.4        24.12.2016       some improvements of verbose 4 logging
+# 2.3.1      23.12.2016       fix due to https://forum.fhem.de/index.php/topic,62998.msg545541.html#msg545541
+# 2.3        22.12.2016       fix eval{} in DbLog_Log
+# 2.2        21.12.2016       set DbLogType only to "History" if attr DbLogType not set
+# 2.1        21.12.2016       use execute_array in DbLog_Push
+# 2.0        19.12.2016       some improvements DbLog_Log
+# 1.9.3      17.12.2016       $hash->{NOTIFYDEV} added to process only events from devices are in Regex
+# 1.9.2      17.12.2016       some improvemnts DbLog_Log, DbLog_Push
+# 1.9.1      16.12.2016       DbLog_Log no using encode_base64
+# 1.9        16.12.2016       DbLog_Push changed to use deviceEvents
+# 1.8.1      16.12.2016       DbLog_Push changed
+# 1.8        15.12.2016       bugfix of don't logging all received events
+# 1.7.1      15.12.2016       attr procedure of "disabled" changed
+
 
 package main;
 use strict;
 use warnings;
 use DBI;
 use Data::Dumper;
+use Blocking;
+use Time::HiRes qw(gettimeofday tv_interval);
+
+my $DbLogVersion = "2.8.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -43,10 +74,15 @@ sub DbLog_Initialize($)
   $hash->{SVG_regexpFn}     = "DbLog_regexpFn";
   $hash->{ShutdownFn}       = "DbLog_Shutdown";
   $hash->{AttrList}         = "disable:0,1 ".
-           "DbLogType:Current,History,Current/History ".
-           "shutdownWait ".
-           "suppressUndef:0,1 ".
-           "DbLogSelectionMode:Exclude,Include,Exclude/Include";
+                              "DbLogType:Current,History,Current/History ".
+                              "shutdownWait ".
+                              "suppressUndef:0,1 ".
+		                      "verbose4Devs ".
+							  "excludeDevs ".
+							  "syncInterval ".
+							  "showproctime:1,0 ".
+							  "asyncMode:1,0 ".
+                              "DbLogSelectionMode:Exclude,Include,Exclude/Include";
 
   # Das Attribut DbLogSelectionMode legt fest, wie die Device-Spezifischen Atrribute 
   # DbLogExclude und DbLogInclude behandelt werden sollen.
@@ -76,17 +112,28 @@ sub DbLog_Define($@)
 
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
-
-  my $regexp = $a[3];
+  
+  $hash->{CONFIGURATION} = $a[2];
+  my $regexp             = $a[3];
 
   eval { "Hallo" =~ m/^$regexp$/ };
   return "Bad regexp: $@" if($@);
-  $hash->{REGEXP} = $regexp;
-
-  $hash->{CONFIGURATION}= $a[2];
+  
+  $hash->{REGEXP}     = $regexp;
+  $hash->{VERSION}    = $DbLogVersion;
+  $hash->{MODE}       = "synchronous";   # Standardmode
+  
+  # nur Events dieser Devices an NotifyFn weiterleiten
+  my $dn = (split(":", $regexp))[0];
+  $dn =~ tr/[()]//d;
+  $dn =~ s/\|/,/g;
+  $hash->{NOTIFYDEV}  = $dn; 
 
   #remember PID for plotfork
   $hash->{PID} = $$;
+  
+  # CacheIndex für Events zum asynchronen Schreiben in DB
+  $hash->{cache}{index} = 0;
 
   # read configuration data
   my $ret = _DbLog_readCfg($hash);
@@ -95,7 +142,9 @@ sub DbLog_Define($@)
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
   eval { DbLog_Connect($hash); };
 
-  return undef;
+  DbLog_execmemcache($hash);
+  
+return undef;
 }
 
 ################################################################
@@ -103,16 +152,19 @@ sub DbLog_Undef($$) {
   my ($hash, $name) = @_;
 
   my $dbh= $hash->{DBH};
+  BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
   $dbh->disconnect() if(defined($dbh));
+  RemoveInternalTimer($hash);
   
-  return undef;
+return undef;
 }
 
 ################################################################
 sub DbLog_Shutdown($) {  
   my ($hash) = @_;
-  
   my $name = $hash->{NAME};
+  
+  DbLog_execmemcache($hash);
   my $shutdownWait = AttrVal($name,"shutdownWait",undef);
   if(defined($shutdownWait)) {
     Log3($name, 2, "DbLog $name waiting for shutdown");
@@ -128,27 +180,63 @@ sub DbLog_Shutdown($) {
 # DbLog-Instanz aufgerufen
 #
 ################################################################
-sub DbLog_Attr(@)
-{
-  my @a = @_;
+sub DbLog_Attr(@) {
+  my($cmd,$name,$aName,$aVal) = @_;
+  # my @a = @_;
+  my $hash = $defs{$name};
   my $do = 0;
 
-  if($a[0] eq "set" && $a[2] eq "disable") {
-    $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
+  if($cmd eq "set") {
+      if ($aName eq "syncInterval") {
+          unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aVal is not valid. Use only figures 1-9 !";}
+      }
   }
-  $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
-  return if(!$do);
+  
+  if($aName eq "asyncMode") {
+      if ($cmd eq "set" && $aVal) {
+          $hash->{MODE} = "asynchronous";
+		  InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
+      } else {
+	      $hash->{MODE} = "synchronous";
+          delete($defs{$name}{READINGS}{NextSync});
+	      delete($defs{$name}{READINGS}{background_processing_time});
+	      delete($defs{$name}{READINGS}{sql_processing_time});
+		  DbLog_execmemcache($hash);
+	  }
+  }
+  
+  if($aName eq "showproctime") {
+      if ($cmd ne "set" || !$aVal) {
+		  delete($defs{$name}{READINGS}{background_processing_time});
+		  delete($defs{$name}{READINGS}{sql_processing_time});
+	  }
+  }
+  
+  if ($aName eq "disable") {
+      if($cmd eq "set") {
+          $do = ($aVal) ? 1 : 0;
+      }
+      $do = 0 if($cmd eq "del");
+      my $val   = ($do == 1 ?  "disabled" : "active");
+      
+	  # letzter CacheSync vor disablen
+	  DbLog_execmemcache($hash) if($do == 1);
+	  
+      readingsSingleUpdate($hash, "state", $val, 1);
+        
+      if ($do == 0) {
+          InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
+      }
+  }
 
-  $defs{$a[1]}{STATE} = ($do == 1 ? "disabled" : "active");
-
-  return undef;
+return undef;
 }
 
 ################################################################
 sub DbLog_Set($@) {
     my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand";
+	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand listCache:noArg";
 	return $usage if(int(@a) < 2);
 	my $dbh = $hash->{DBH};
 	my $ret;
@@ -191,6 +279,13 @@ sub DbLog_Set($@) {
         DbLog_Connect($hash);
         $ret = "Rereadcfg executed.";
     }
+	elsif ($a[1] eq 'listCache') {
+	    my $cache;
+	    foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
+            $cache .= $key." => ".$hash->{cache}{memcache}{$key}."\n"; 			
+		}
+	    return $cache;
+	}
     elsif ($a[1] eq 'count') {
         if ( !$dbh || not $dbh->ping ) {
             Log3($name, 1, "DbLog $name: DBLog_Set - count - DB Session dead, try to reopen now !");
@@ -289,7 +384,6 @@ sub DbLog_ParseEvent($$$)
 
   my $dtype = $defs{$device}{TYPE};
   
-
   if($modules{$dtype}{DbLog_splitFn}) {
     # let the module do the job!
 
@@ -556,77 +650,349 @@ sub DbLog_ParseEvent($$$)
   return @result;
 }
 
-################################################################
-# Schreibroutine Einfügen Werte in DB
+##################################################################################################################
 #
-# param1: hash
-# param2: DbLogType -> Current oder History oder Current/History
-# param4: Timestamp
-# param5: Device
-# param6: Type
-# param7: Event
-# param8: Reading
-# param9: Value
-# param10: Unit
+# Hauptroutine zum Loggen. Wird bei jedem Eventchange
+# aufgerufen
 #
-################################################################
-sub DbLog_Push(@) {
-  my ($hash, $DbLogType, $timestamp, $device, $type, $event, $reading, $value, $unit) = @_;
-  my $dbh= $hash->{DBH};
-  my $name = $hash->{NAME};
-  
-  $dbh->{RaiseError} = 1; 
-  $dbh->{PrintError} = 0;
+##################################################################################################################
+# Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
+# Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
+# Beispiele:
+# $hash->{NOTIFYDEV} = "global";
+# $hash->{NOTIFYDEV} = "global,Definition_A,Definition_B";
 
+sub DbLog_Log($$) {
+  # $hash is my entry, $dev_hash is the entry of the changed device
+  my ($hash, $dev_hash) = @_;
+  my $name     = $hash->{NAME};
+  my $dev_name = $dev_hash->{NAME};
+  my $dev_type = uc($dev_hash->{TYPE});
+  my $async    = AttrVal($name, "asyncMode", undef);
+
+  return if(IsDisabled($name) || $init_done != 1);
+
+  my $events = deviceEvents($dev_hash,0);  
+  return if(!$events);
+  
+  my $lcdev    = lc($dev_name);
+  
+  # verbose4 Logs nur für Devices in Attr "verbose4Devs"
+  my $vb4show  = 0;
+  my @vb4devs  = split(",", AttrVal($name, "verbose4Devs", ""));
+  if (!@vb4devs) {
+      $vb4show = 1;
+  } else {
+      foreach (@vb4devs) {
+	      if($dev_name =~ m/$_/i) {
+		      $vb4show = 1;
+			  last;
+		  }
+	  }
+	  Log3 $name, 4, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
+  }
+  
+  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn $hash->{NOTIFYDEV} = .*)
+  if($hash->{NOTIFYDEV} eq ".*") {
+      my @exdevs  = split(",", AttrVal($name, "excludeDevs", ""));
+	  if(@exdevs) {
+	      foreach (@exdevs) {
+		      if($dev_name =~ m/$_/i) {
+	              Log3 $name, 4, "DbLog $name -> Device: $dev_name excluded from database logging due to attribute \"excludeDevs\" restrictions" if($vb4show);
+	              return;
+		      }
+		  }
+	  }
+  }
+  
+  my $re                 = $hash->{REGEXP};
+  my $max                = int(@{$events});
+  my @row_array;
+  my ($event,$reading,$value,$unit);
+  my $timestamp          = TimeNow();                                    # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+  my $now                = gettimeofday();                               # get timestamp in seconds since epoch
+  my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
+  my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
+  my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");  
+  
+  if($vb4show) {
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+      Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+      Log3 $name, 4, "DbLog $name -> amount of events received: $max for device: $dev_name";
+  }
+  
+  #one Transaction
+  eval {  
+      foreach $event (@{$events}) {
+          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show);
+          $event = "" if(!defined($event));  
+	  
+	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
+			  
+              my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
+			  $reading = $r[0];
+              $value   = $r[1];
+              $unit    = $r[2];
+              if(!defined $reading) {$reading = "";}
+              if(!defined $value) {$value = "";}
+              if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
+
+              #Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
+              #entsprechend unterschiedlich vorbelegt sein.
+              #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
+              my $DoIt = 0;
+              $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
+          
+		      if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {
+                  # Bsp: "(temperature|humidity):300 battery:3600"
+                  my @v1 = split(/,/, $DbLogExclude);
+              
+			      for (my $i=0; $i<int(@v1); $i++) {
+                      my @v2 = split(/:/, $v1[$i]);
+                      $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
+                  
+				      if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+                          #Regexp matcht und MinIntervall ist angegeben
+                          my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
+                          my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
+                          $lt = 0 if(!$lt);
+                          $lv = "" if(!$lv);
+
+                          if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                              # innerhalb MinIntervall und LastValue=Value
+                              $DoIt = 0;
+                          }
+                      }
+                  }
+              }
+        
+		      #Hier ggf. zusaetlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
+              #Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
+              if($DoIt == 0) {
+                  if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
+                      my @v1 = split(/,/, $DbLogInclude);
+              
+			          for (my $i=0; $i<int(@v1); $i++) {
+                          my @v2 = split(/:/, $v1[$i]);
+                          $DoIt = 1 if($reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp
+                  
+				          if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+                              #Regexp matcht und MinIntervall ist angegeben
+                              my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
+                              my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
+                              $lt = 0 if(!$lt);
+                              $lv = "" if(!$lv);
+       
+                              if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                                  # innerhalb MinIntervall und LastValue=Value
+                                  $DoIt = 0;
+                              }
+                          }
+                      }
+                  }
+              }
+              next if($DoIt == 0);
+		
+	    	  if ($DoIt) {
+                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
+                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
+			  
+	              if ($hash->{DBMODEL} ne 'SQLITE') {
+                      # Daten auf maximale Länge beschneiden
+                      $dev_name = substr($dev_name,0, $columns{DEVICE});
+                      $dev_type = substr($dev_type,0, $columns{TYPE});
+                      $event    = substr($event,0, $columns{EVENT});
+                      $reading  = substr($reading,0, $columns{READING});
+                      $value    = substr($value,0, $columns{VALUE});
+                      $unit     = substr($unit,0, $columns{UNIT});
+                  }
+  
+			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
+				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event to memcache - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
+				                          if($vb4show);	
+                  
+				  if($async) {
+				      # asynchoner non-blocking Mode
+					  # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+					  $hash->{cache}{index}++;
+				      my $index = $hash->{cache}{index};
+				      $hash->{cache}{memcache}{$index} = $row;
+				  } else {
+				      # synchoner Mode
+				      push(@row_array, $row);		
+				  }  
+              }									   
+          }
+      }
+  }; 
+  if($async) {    
+      # asynchoner non-blocking Mode
+      my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
+  } else {
+      if(@row_array) {
+	      # synchoner Mode
+          my $error = DbLog_Push($hash, $vb4show, @row_array);
+          Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
+          readingsSingleUpdate($hash, "state", $error, 1) if($error);
+		  readingsSingleUpdate($hash, "state", "connected", 0) if(!$error);
+      }
+  }
+return;
+}
+
+#################################################################################################
+#
+# Schreibroutine Einfügen Werte in DB im Synchronmode 
+#
+#################################################################################################
+sub DbLog_Push(@) {
+  my ($hash, $vb4show, @row_array) = @_;
+  my $dbh        = $hash->{DBH};
+  my $name       = $hash->{NAME};
+  my $DbLogType  = AttrVal($name, "DbLogType", "History");
+  my $error = 0;
+  my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
+    
   eval {
     if ( !$dbh || not $dbh->ping ) {
       #### DB Session dead, try to reopen now !
       DbLog_Connect($hash);
     }  
   };
+  
   if ($@) {
 	Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	return $dbh->{RaiseError};
-  }
-  
-  if ($hash->{DBMODEL} ne 'SQLITE') {
-      # Daten auf maximale laenge beschneiden
-      $device   = substr($device,0, $columns{DEVICE});
-      $type     = substr($type,0, $columns{TYPE});
-      $event    = substr($event,0, $columns{EVENT});
-      $reading  = substr($reading,0, $columns{READING});
-      $value    = substr($value,0, $columns{VALUE});
-      $unit     = substr($unit,0, $columns{UNIT});
+	return $@;
   }
 
-  $dbh->begin_work();
+  $dbh->{RaiseError} = 1; 
+  $dbh->{PrintError} = 0;
   
-  my $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(history) );
-  my $sth_ic = $dbh->prepare_cached("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(current) );
-  my $sth_uc = $dbh->prepare_cached("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)") if (lc($DbLogType) =~ m(current) );
-
-  Log3 $hash->{NAME}, 5, "DbLog: logging of Device: $device , Type: $type , Event: $event , Reading: $reading , Value: $value , Unit: $unit";
-
+  my (@timestamp,@device,@type,@event,@reading,@value,@unit);
+  my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
+  my ($sth_ih,$sth_ic,$sth_uc);
+  no warnings 'uninitialized';
+  
+  my $ceti = $#row_array+1;
+  
+  foreach my $row (@row_array) {
+      my @a = split("\\|",$row);
+	  push(@timestamp, "$a[0]"); 
+	  push(@device, "$a[1]");   
+	  push(@type, "$a[2]");  
+	  push(@event, "$a[3]");  
+	  push(@reading, "$a[4]"); 
+	  push(@value, "$a[5]"); 
+	  push(@unit, "$a[6]"); 
+	  Log3 $hash->{NAME}, 4, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]"
+							 if($vb4show);
+  }	  
+  use warnings;
+	
+  if (lc($DbLogType) =~ m(history)) {
+      # for insert history
+	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+      $sth_ih->bind_param_array(1, [@timestamp]);
+      $sth_ih->bind_param_array(2, [@device]);
+      $sth_ih->bind_param_array(3, [@type]);
+      $sth_ih->bind_param_array(4, [@event]);
+      $sth_ih->bind_param_array(5, [@reading]);
+      $sth_ih->bind_param_array(6, [@value]);
+      $sth_ih->bind_param_array(7, [@unit]);
+  }
+  
+  if (lc($DbLogType) =~ m(current) ) {
+      # for insert current
+	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  
+	  # for update current
+	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+	  $sth_uc->bind_param_array(1, [@timestamp]);
+      $sth_uc->bind_param_array(2, [@type]);
+      $sth_uc->bind_param_array(3, [@event]);
+      $sth_uc->bind_param_array(4, [@value]);
+      $sth_uc->bind_param_array(5, [@unit]);
+      $sth_uc->bind_param_array(6, [@device]);
+      $sth_uc->bind_param_array(7, [@reading]);
+  }
+  
+  my ($tuples, $rows);
   eval {
-    # insert into history
-    if (lc($DbLogType) =~ m(history) ) {
-      my $rv_ih = $sth_ih->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
-    }
-
-    # update or insert current
-    if (lc($DbLogType) =~ m(current) ) {
-      my $rv_uc = $sth_uc->execute(($timestamp, $type, $event, $value, $unit, $device, $reading));
-      if ($rv_uc == 0) {
-        my $rv_ic = $sth_ic->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
+      $dbh->begin_work();  # begin_work in eval -> avoid crash if issue:  begin_work failed: Turning off AutoCommit failed
+      # insert into history
+      if (lc($DbLogType) =~ m(history) ) {
+          ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+		  if($tuples && $rows == $ceti) {
+		      Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events successfully inserted into table history" if($vb4show);
+		  } else {
+		      $error = "Failed to insert events into history. See logfile";
+		      for my $tuple (0..$#row_array) {
+			      my $status = $tuple_status[$tuple];
+				  $status = 0 if($status eq "0E0");
+				  next if($status);         # $status ist "1" wenn insert ok
+				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]" if($vb4show);
+			  }
+		  }
       }
-    }
+
+      # update or insert current
+      if (lc($DbLogType) =~ m(current) ) {
+          ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+		  if($tuples && $rows == $ceti) {
+		      Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events successfully updated in table current" if($vb4show);
+		  } else {
+		      $doins = 1;
+			  $ceti = 0;
+			  for my $tuple (0..$#device) {
+			      my $status = $tuple_status[$tuple];
+				  $status = 0 if($status eq "0E0");
+				  next if($status);         # $status ist "1" wenn update ok
+				  $ceti++;
+				  Log3 $hash->{NAME}, 4, "DbLog $name -> Failed to update in current, try to insert: $device[$tuple], $reading[$tuple], Status = $status" if($vb4show);
+				  push(@timestamp_cur, "$timestamp[$tuple]"); 
+	              push(@device_cur, "$device[$tuple]");   
+	              push(@type_cur, "$type[$tuple]");  
+	              push(@event_cur, "$event[$tuple]");  
+	              push(@reading_cur, "$reading[$tuple]"); 
+	              push(@value_cur, "$value[$tuple]"); 
+	              push(@unit_cur, "$unit[$tuple]");
+		      }
+		  }
+		  
+		  if ($doins) {
+		      # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
+		      $sth_ic->bind_param_array(1, [@timestamp_cur]);
+              $sth_ic->bind_param_array(2, [@device_cur]);
+              $sth_ic->bind_param_array(3, [@type_cur]);
+              $sth_ic->bind_param_array(4, [@event_cur]);
+              $sth_ic->bind_param_array(5, [@reading_cur]);
+              $sth_ic->bind_param_array(6, [@value_cur]);
+              $sth_ic->bind_param_array(7, [@unit_cur]);
+              
+			  ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+			  
+			  if($tuples && $rows == $ceti) {
+		          Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events successfully inserted into table current" if($vb4show);
+		      } else {
+		          $error = "Failed to insert events into history. See logfile";
+				  for my $tuple (0..$#device_cur) {
+			          my $status = $tuple_status[$tuple];
+				      $status = 0 if($status eq "0E0");
+				      next if($status);         # $status ist "1" wenn insert ok
+				      Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into current: $device_cur[$tuple], $reading_cur[$tuple], Status = $status" if($vb4show);
+				  }
+		      }
+          }
+
+	  }
   };
 
-  
   if ($@) {
-    Log3 $hash->{NAME}, 2, "DbLog: Failed to insert new readings into database: $@";
+    Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
     $dbh->rollback();
-    # reconnect
+	$error = $@;
     $dbh->disconnect();  
     DbLog_Connect($hash);
   }
@@ -636,123 +1002,340 @@ sub DbLog_Push(@) {
     $dbh->{PrintError} = 1;
   }
 
-return $dbh->{RaiseError};
+return $error;
 }
 
-################################################################
+#################################################################################################
 #
-# Hauptroutine zum Loggen. Wird bei jedem Eventchange
-# aufgerufen
+# MemCache auswerten und Schreibroutine asynchron und non-blocking aufrufen
 #
-################################################################
-sub DbLog_Log($$) {
-  # Log is my entry, Dev is the entry of the changed device
-  my ($hash, $dev) = @_;
-
-  Log3 $hash->{NAME}, 5, "Notify from Device: ".$dev->{NAME}." recieved";
-
-  return undef if($hash->{STATE} eq "disabled");
-
-  # name and type required for parsing
-  my $n= $dev->{NAME};
-  my $t= uc($dev->{TYPE});
-
-  # timestamp in SQL format YYYY-MM-DD hh:mm:ss
-  #my ($sec,$min,$hr,$day,$mon,$yr,$wday,$yday,$isdst)= localtime(time);
-  #my $ts= sprintf("%04d-%02d-%02d %02d:%02d:%02d", $yr+1900,$mon+1,$day,$hr,$min,$sec);
-
-  my $re = $hash->{REGEXP};
-  my $max = int(@{$dev->{CHANGED}});
-  my $ts_0 = TimeNow();
-  my $now = gettimeofday(); # get timestamp in seconds since epoch
-  my $DbLogExclude = AttrVal($dev->{NAME}, "DbLogExclude", undef);
-  my $DbLogInclude = AttrVal($dev->{NAME}, "DbLogInclude",undef);
-  my $DbLogSelectionMode=AttrVal($hash->{NAME},"DbLogSelectionMode","Exclude");  
-  my $DbLogType = AttrVal($hash->{NAME}, "DbLogType", "Current/History");
-      
-  #one Transaction
-  eval {    
-    for (my $i = 0; $i < $max; $i++) {
-      my $s = $dev->{CHANGED}[$i];
-      $s = "" if(!defined($s));
-      if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
-        my $ts = $ts_0;
-        $ts = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
-        # $ts is in SQL format YYYY-MM-DD hh:mm:ss
-    
-        my @r= DbLog_ParseEvent($n, $t, $s);
-        my $reading= $r[0];
-        my $value= $r[1];
-        my $unit= $r[2];
-        if(!defined $reading) { $reading= ""; }
-        if(!defined $value) { $value= ""; }
-        if(!defined $unit || $unit eq "") {
-          $unit = AttrVal("$n", "unit", "");
-        }
-
-
-        #Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
-        #entsprechend unterschiedlich vorbelegt sein.
-        #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
-        my $DoIt = 0;
-        $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
-        if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {
-          # Bsp: "(temperature|humidity):300 battery:3600"
-          my @v1 = split(/,/, $DbLogExclude);
-          for (my $i=0; $i<int(@v1); $i++) {
-            my @v2 = split(/:/, $v1[$i]);
-            $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
-            if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
-              #Regexp matcht und MinIntervall ist angegeben
-              my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
-              my $lv = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-              $lt = 0 if(!$lt);
-              $lv = "" if(!$lv);
-
-              if(($now-$lt < $v2[1]) && ($lv eq $value)) {
-                # innerhalb MinIntervall und LastValue=Value
-                $DoIt = 0;
-              }
-            }
-          }
-        }
-        #Hier ggf. zusaetlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
-        #Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
-        if($DoIt == 0) {
-                if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
-                  my @v1 = split(/,/, $DbLogInclude);
-                  for (my $i=0; $i<int(@v1); $i++) {
-                        my @v2 = split(/:/, $v1[$i]);
-                        $DoIt = 1 if($reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp
-                        if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
-                          #Regexp matcht und MinIntervall ist angegeben
-                          my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
-                          my $lv = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-                          $lt = 0 if(!$lt);
-                          $lv = "" if(!$lv);
-       
-                          if(($now-$lt < $v2[1]) && ($lv eq $value)) {
-                                # innerhalb MinIntervall und LastValue=Value
-                                $DoIt = 0;
-                          }
-                        }
-                  }
-                }
-        }
-
-        next if($DoIt == 0);
-
-        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
-        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
-
-        DbLog_Push($hash, $DbLogType, $ts, $n, $t, $s, $reading, $value, $unit)
-
-      }
-    } 
-  };
+#################################################################################################
+sub DbLog_execmemcache ($) {
+  my ($hash) = @_;
+  my $name       = $hash->{NAME}; 
+  my $syncival   = AttrVal($name, "syncInterval", 30);
+  my $async      = AttrVal($name, "asyncMode", undef);
+  my $dbconn     = $hash->{dbconn};
+  my $dbuser     = $hash->{dbuser};
+  my $dbpassword = $attr{"sec$name"}{secret};
+  my $timeout    = 60;
+  my $state      = "connected";  
+  my (@row_array,$memcount,$dbh);
   
-  return "";
+  RemoveInternalTimer($hash, "DbLog_execmemcache");
+	
+  if($init_done != 1) {
+      InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
+	  return;
+  }
+  if(!$async || IsDisabled($name)) {
+	  return;
+  }
+	
+  # nur Verbindungstest, DbLog_PushAsyncDone hat eigene Verbindungsroutine
+  eval {
+    $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });
+  }; 
+  
+  if ($@) {
+      Log3($name, 3, "DbLog $name: Error DBLog_execmemcache - $@");
+	  $state = $@;
+  } else {
+      # Testverbindung abbauen
+      $dbh->disconnect(); 
+	  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+	
+	  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
+	      Log3 $name, 5, "DbLog $name -> ################################################################";
+          Log3 $name, 5, "DbLog $name -> ###              New database processing cycle               ###";
+          Log3 $name, 5, "DbLog $name -> ################################################################";
+	      Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains $memcount entries to process";
+		
+		  
+		  foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
+		      Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: $hash->{cache}{memcache}{$key}";
+			  push(@row_array, delete($hash->{cache}{memcache}{$key})); 
+		  }
+
+		  my $rowlist = join('§', @row_array);
+		  $rowlist = encode_base64($rowlist,"");
+		  $hash->{HELPER}{RUNNING_PID} = BlockingCall (
+		                                     "DbLog_PushAsync", 
+		                                     "$name|$rowlist", 
+					                         "DbLog_PushAsyncDone", 
+									         $timeout, 
+									         "DbLog_PushAsyncAborted", 
+									         $hash );
+
+          Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
+      } else {
+	      if($hash->{HELPER}{RUNNING_PID}) {
+		      $state = "old BlockingCall is running - resync at NextSync";
+		  }
+	  }
+  }
+  
+  $memcount = scalar(keys%{$hash->{cache}{memcache}});
+  
+  my $nextsync = gettimeofday()+$syncival;
+  my $nsdt     = FmtDateTime($nextsync);
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "CacheUsage", $memcount);
+  readingsBulkUpdate($hash, "NextSync", $nsdt);
+  readingsBulkUpdate($hash, "state", $state);
+  readingsEndUpdate($hash, 1);
+
+  InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
+
+return;
 }
+
+#################################################################################################
+#
+# Schreibroutine Einfügen Werte in DB asynchron non-blocking
+#
+#################################################################################################
+sub DbLog_PushAsync(@) {
+  my ($string) = @_;
+  my ($name,$rowlist) = split("\\|", $string);
+  my $hash        = $defs{$name};
+  my $dbconn      = $hash->{dbconn};
+  my $dbuser      = $hash->{dbuser};
+  my $dbpassword  = $attr{"sec$name"}{secret};
+  my $DbLogType   = AttrVal($name, "DbLogType", "History");
+  my $error = 0;
+  my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
+  my $dbh;
+  
+  Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsync");
+  
+  # Background-Startzeit
+  my $bst = [gettimeofday];
+  
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+  
+  if ($@) {
+      $error = encode_base64($@,"");
+      Log3 ($name, 2, "DbLog $name - Error: $@");
+      Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
+      return "$name|$error|0|$rowlist";
+  }
+  
+  $rowlist = decode_base64($rowlist);
+  my @row_array = split('§', $rowlist);
+  
+  my (@timestamp,@device,@type,@event,@reading,@value,@unit);
+  my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
+  my ($sth_ih,$sth_ic,$sth_uc);
+  no warnings 'uninitialized';
+  
+  my $ceti = $#row_array+1;
+  
+  foreach my $row (@row_array) {
+      my @a = split("\\|",$row);
+	  push(@timestamp, "$a[0]"); 
+	  push(@device, "$a[1]");   
+	  push(@type, "$a[2]");  
+	  push(@event, "$a[3]");  
+	  push(@reading, "$a[4]"); 
+	  push(@value, "$a[5]"); 
+	  push(@unit, "$a[6]"); 
+	  Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
+  }	  
+  use warnings;
+	
+  if (lc($DbLogType) =~ m(history)) {
+      # for insert history
+	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+      $sth_ih->bind_param_array(1, [@timestamp]);
+      $sth_ih->bind_param_array(2, [@device]);
+      $sth_ih->bind_param_array(3, [@type]);
+      $sth_ih->bind_param_array(4, [@event]);
+      $sth_ih->bind_param_array(5, [@reading]);
+      $sth_ih->bind_param_array(6, [@value]);
+      $sth_ih->bind_param_array(7, [@unit]);
+  }
+  
+  if (lc($DbLogType) =~ m(current) ) {
+      # for insert current
+	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  
+	  # for update current
+	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+	  $sth_uc->bind_param_array(1, [@timestamp]);
+      $sth_uc->bind_param_array(2, [@type]);
+      $sth_uc->bind_param_array(3, [@event]);
+      $sth_uc->bind_param_array(4, [@value]);
+      $sth_uc->bind_param_array(5, [@unit]);
+      $sth_uc->bind_param_array(6, [@device]);
+      $sth_uc->bind_param_array(7, [@reading]);
+  }
+
+  # SQL-Startzeit
+  my $st = [gettimeofday];
+  
+  my ($tuples, $rows);
+  eval {
+      $dbh->begin_work();  # begin_work in eval -> avoid crash if issue:  begin_work failed: Turning off AutoCommit failed
+      # insert into history
+      if (lc($DbLogType) =~ m(history) ) {
+          ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+		  if($tuples && $rows == $ceti) {
+		      Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events successfully inserted into table history";
+		  } else {
+		      $error = "Failed to insert events into history. See logfile";
+		      for my $tuple (0..$#row_array) {
+			      my $status = $tuple_status[$tuple];
+				  $status = 0 if($status eq "0E0");
+				  next if($status);         # $status ist "1" wenn insert ok
+				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]";
+			  }
+		  }
+      }
+
+      # update or insert current
+      if (lc($DbLogType) =~ m(current) ) {
+          ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+		  if($tuples && $rows == $ceti) {
+		      Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events successfully updated in table current";
+		  } else {
+		      $doins = 1;
+			  $ceti = 0;
+			  for my $tuple (0..$#device) {
+			      my $status = $tuple_status[$tuple];
+				  $status = 0 if($status eq "0E0");
+				  next if($status);         # $status ist "1" wenn update ok
+				  $ceti++;
+				  Log3 $hash->{NAME}, 5, "DbLog $name -> Failed to update in current, try to insert: $device[$tuple], $reading[$tuple], Status = $status";
+				  push(@timestamp_cur, "$timestamp[$tuple]"); 
+	              push(@device_cur, "$device[$tuple]");   
+	              push(@type_cur, "$type[$tuple]");  
+	              push(@event_cur, "$event[$tuple]");  
+	              push(@reading_cur, "$reading[$tuple]"); 
+	              push(@value_cur, "$value[$tuple]"); 
+	              push(@unit_cur, "$unit[$tuple]");
+		      }
+		  }
+		  
+		  if ($doins) {
+		      # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
+		      $sth_ic->bind_param_array(1, [@timestamp_cur]);
+              $sth_ic->bind_param_array(2, [@device_cur]);
+              $sth_ic->bind_param_array(3, [@type_cur]);
+              $sth_ic->bind_param_array(4, [@event_cur]);
+              $sth_ic->bind_param_array(5, [@reading_cur]);
+              $sth_ic->bind_param_array(6, [@value_cur]);
+              $sth_ic->bind_param_array(7, [@unit_cur]);
+              
+			  ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \my @tuple_status } );
+			  
+			  if($tuples && $rows == $ceti) {
+		          Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events successfully inserted into table current";
+		      } else {
+		          $error = "Failed to insert events into history. See logfile";
+				  for my $tuple (0..$#device_cur) {
+			          my $status = $tuple_status[$tuple];
+				      $status = 0 if($status eq "0E0");
+				      next if($status);         # $status ist "1" wenn insert ok
+				      Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into current: $device_cur[$tuple], $reading_cur[$tuple], Status = $status";
+				  }
+		      }
+          }
+
+	  }
+  };
+
+  if ($@) {
+    Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
+    $dbh->rollback();
+	$error = $@;
+    $dbh->disconnect();  
+  }
+  else {
+    $dbh->commit();
+	$dbh->disconnect(); 
+  }
+  # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);
+
+  $error = encode_base64($@,"");
+  Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
+
+  # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);
+
+  $rt = $rt.",".$brt;
+ 
+return "$name|$error|$rt|0";
+}
+
+#############################################################################################
+#         Auswertung non-blocking asynchron DbLog_PushAsync
+#############################################################################################
+sub DbLog_PushAsyncDone ($) {
+ my ($string)   = @_;
+ my @a          = split("\\|",$string);
+ my $name       = $a[0];
+ my $hash       = $defs{$name};
+ my $state      = $a[1]?decode_base64($a[1]):"connected";
+ my $bt         = $a[2];
+ my ($rt,$brt)  = split(",", $bt);
+ my $rowlist    = $a[3];
+ my $asyncmode  = AttrVal($name, "asyncMode", undef);
+ my $memcount;
+
+ if($rowlist) {
+     $rowlist = decode_base64($rowlist);
+     my @row_array = split('§', $rowlist);
+	 
+	 #one Transaction
+     eval { 
+	   foreach my $row (@row_array) {
+	       # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+		   $hash->{cache}{index}++;
+		   my $index = $hash->{cache}{index};
+		   $hash->{cache}{memcache}{$index} = $row;
+	   }
+	   $memcount = scalar(keys%{$hash->{cache}{memcache}});
+       readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
+	 };
+  }
+ 
+ Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsyncDone");
+ $state = "disabled" if(IsDisabled($name));
+ 
+ readingsBeginUpdate($hash);
+ readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
+ readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+ readingsBulkUpdate($hash, "state", $state, 1);
+ readingsEndUpdate($hash, 1);
+ 
+ if(!$asyncmode) {
+     delete($defs{$name}{READINGS}{NextSync});
+	 delete($defs{$name}{READINGS}{background_processing_time});
+	 delete($defs{$name}{READINGS}{sql_processing_time});
+ }
+ 
+ delete $hash->{HELPER}{RUNNING_PID};
+ Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished");
+ 
+return;
+ 
+}
+ 
+#############################################################################################
+#           Abbruchroutine Timeout non-blocking asynchron DbLog_PushAsync
+#############################################################################################
+sub DbLog_PushAsyncAborted($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  Log3 ($name, 2, "DbLog $name -> $hash->{HELPER}{RUNNING_PID}{fn} timed out");
+  readingsSingleUpdate($hash, "state", "Database access timeout", 1);
+  delete $hash->{HELPER}{RUNNING_PID};
+}
+
 
 ################################################################
 #
@@ -842,7 +1425,7 @@ sub DbLog_Connect($)
   my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
   
   if(!$dbh) {
-    RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash, "DbLog_Connect");
     Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
     readingsSingleUpdate($hash, 'state', 'disconnected', 1);
     InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
@@ -873,17 +1456,13 @@ sub DbLog_Connect($)
   my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
   
   if(!$dbh) {
-    RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash, "DbLog_Connect");
     Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
     InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
     Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
   }
 
-#  if(!$dbhf) {
-#   Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
-#    return 0;
-#  }
   Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBHF}= $dbhf;
 
@@ -2060,6 +2639,8 @@ sub dbReadings($@) {
 
 =pod
 =item helper
+=item summary    logs events into a database
+=item summary_DE loggt Events in eine Datenbank
 =begin html
 
 <a name="DbLog"></a>
@@ -2087,12 +2668,14 @@ sub dbReadings($@) {
 
     <code>&lt;regexp&gt;</code> is the same as in <a href="../docs/commandref.html#FileLog">FileLog</a>.
     <br><br>
-    Sample code to create a MySQL/PostgreSQL database is in
+    Sample code to create a MySQL/PostgreSQL/SQLite database is in
     <code>&lt;DBType&gt;_create.sql</code>.
     The database contains two tables: <code>current</code> and
     <code>history</code>. The latter contains all events whereas the former only
-    contains the last event for any given reading and device.
-    The columns have the following meaning:
+    contains the last event for any given reading and device. (see also <a href="#DbLogattr">attribute</a> DbLogType)
+	
+    The columns have the following meaning: <br><br>
+	
     <ol>
       <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
       <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
@@ -2106,6 +2689,8 @@ sub dbReadings($@) {
                       e.g. <code>71</code></li>
       <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
     </ol>
+	<br>
+	
     The content of VALUE is optimized for automated post-processing, e.g.
     <code>yes</code> is translated to <code>1</code>
     <br><br>
@@ -2132,6 +2717,9 @@ sub dbReadings($@) {
     <code>set &lt;name&gt; rereadcfg </code><br/><br/>
       <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
       Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.</ul><br/>
+	  
+    <code>set &lt;name&gt; listCache </code><br><br>
+      <ul>If DbLog is set to asynchronous mode (attribute asyncMode=1), you can use that command to list the events are cached in memory.</ul><br>
 
     <code>set &lt;name&gt; count </code><br/><br/>
       <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
@@ -2339,79 +2927,180 @@ sub dbReadings($@) {
       </ul>
     <br><br>
   </ul>
+  
   <a name="DbLogattr"></a>
   <b>Attributes</b> 
-  <ul><b>shutdownWait</b>
-    <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
-      causes fhem shutdown to wait n seconds for pending database commit<br/>
+
+  <ul><b>asyncMode</b>
+    <ul>
+	  <code>attr &lt;device&gt; asyncMode [1|0]
+	  </code><br>
+	  
+      This attribute determines the operation mode of DbLog. If asynchronous mode is on (asyncMode=1), the events which should be saved 
+	  at first will be cached in memory. After synchronisation time cycle (attribute syncInterval) the cached events get saved into
+	  the database with bulk insert.
+	  If the database isn't available, the events will be cached in memeory furthermore, and tried to save into database again after 
+	  the next synchronisation time cycle if the database is available. <br>
+	  In synchronous mode (normal mode) the events won't be cached im memory and get saved into database immediately. If the database isn't
+	  available the events are get lost. <br>
     </ul>
-  </ul><br/>
+  </ul>
+  <br>
+  
+  <ul><b>DbLogType</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; DbLogType [Current|History|Current/History]
+	   </code><br>
+	 
+       This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set, 
+	   the table <i>history</i> will be used as default.  <br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>DbLogSelectionMode</b>
-    <ul><code>attr &lt;device&gt; DbLogSelectionMode <Exclude|Include|Exclude/Include></code><br/>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; DbLogSelectionMode [Exclude|Include|Exclude/Include]
+	  </code><br>
+	  
       Thise DbLog-Device-Attribute specifies how the device specific Attributes DbLogExclude and DbLogInclude are handled.
-         If this Attribute is missing it defaults to "Exclude".
+      If this Attribute is missing it defaults to "Exclude".
          <ul>
-               <li>Exclude: DbLog behaves just as usual. This means everything specified in the regex in DEF will be logged by default and anything excluded
-                       via the DbLogExclude attribute will not be logged</li>
-               <li>Include: Nothing will be logged, except the readings specified via regex in the DbLogInclude attribute
-               </li>
-               <li>Exclude/Include: Just almost the same as Exclude, but if the reading matches the DbLogExclude attribute, then
+            <li>Exclude: DbLog behaves just as usual. This means everything specified in the regex in DEF will be logged by default and anything excluded
+                         via the DbLogExclude attribute will not be logged</li>
+            <li>Include: Nothing will be logged, except the readings specified via regex in the DbLogInclude attribute </li>
+            <li>Exclude/Include: Just almost the same as Exclude, but if the reading matches the DbLogExclude attribute, then
                        it will further be checked against the regex in DbLogInclude whicht may possibly re-include the already 
-                       excluded reading.
-               </li>
+                       excluded reading. </li>
          </ul>
-         <br/>
     </ul>
-  </ul><br/>
-       See also DbLogSelectionMode-Attribute of DbLog-Device which takes influence on 
-       on how DbLogExclude and DbLogInclude are handled
+  </ul>
+  <br>
+
   <ul><b>DbLogInclude</b>
-    <br>
     <ul>
       <code>
-      set &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
-      </code>
-    </ul>
-    A new Attribute DbLogInclude will be propagated
-    to all Devices if DBLog is used. DbLogInclude works just like DbLogExclude but 
-       to include matching readings.
-       See also DbLogSelectionMode-Attribute of DbLog-Device which takes influence on 
-       on how DbLogExclude and DbLogInclude are handled
-    <br>
-    <b>Example</b>
-    <ul>
+      attr &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
+      </code><br>
+	  
+      A new Attribute DbLogInclude will be propagated
+      to all Devices if DBLog is used. DbLogInclude works just like DbLogExclude but 
+      to include matching readings.
+      See also DbLogSelectionMode-Attribute of DbLog-Device which takes influence on 
+      on how DbLogExclude and DbLogInclude are handled. <br>
+	
+	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code>
       <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
-  </ul><br>
+  </ul>
+  <br>
+  
   <ul><b>DbLogExclude</b>
-    <br>
     <ul>
       <code>
-      set &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
-      </code>
-    </ul>
-    A new Attribute DbLogExclude will be propagated
-    to all Devices if DBLog is used. DbLogExclude will work as regexp to exclude 
-    defined readings to log. Each individual regexp-group are separated by comma. 
-    If a MinInterval is set, the logentry is dropped if the 
-    defined interval is not reached and value vs. lastvalue is eqal .
-    <br>
-    <b>Example</b>
-    <ul>
+      attr &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      </code><br>
+	  
+      A new Attribute DbLogExclude will be propagated to all Devices if DBLog is used. 
+	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by comma. 
+      If a MinInterval is set, the logentry is dropped if the defined interval is not reached and value vs. lastvalue is eqal. <br>
+    
+	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code>
       <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
-  </ul><br>
-    <ul><b>suppressUndef</b>
-      <ul><code>attr &lt;device&gt; ignoreUndef <n></code><br/>
-        suppresses all undef values when returning data from the DB via get<br/>
-      </ul>
-      <b>Example</b>
-      <ul>
-        <code>#DbLog eMeter:power:::$val=($val>1500)?undef:$val</code>
-      </ul>
-  </ul><br/>
+  </ul>
+  <br>
+
+  <ul><b>excludeDevs</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; excludeDevs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   </code><br>
+      
+	   The devices "device1", "device2" up to "device.." will be excluded from logging into database. This attribute will only be evaluated
+	   if in DbLog-define ".*:.." (that means all devices should be logged) is set. Thereby devices can be excluded explicitly instead of
+	   include all relevant devices (devices want to log into database) in the DbLog-define (e.g. by string (device1|device2|device..):.* and so on).  
+	   The devices to exclude are evaluated as Regex. <br>
+	   
+	   <b>Example</b> <br>
+       <code>
+	   attr &lt;device&gt; excludeDevs global,Log.*,Cam.*
+	   </code><br>
+	   # The devices global respectively devices starting with "Log" or "Cam" are excluded from database logging. <br>
+     </ul>
+  </ul>
+  <br>
+
+  <ul><b>shutdownWait</b>
+    <ul>
+	  <code>attr &lt;device&gt; shutdownWait <n>
+	  </code><br>
+      causes fhem shutdown to wait n seconds for pending database commit<br/>
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>showproctime</b>
+    <ul>
+	  <code>attr &lt;device&gt; [1|0]
+	  </code><br>
+	  
+      If set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated 
+	  for a single sql-statement, but the summary of all sql-statements necessary for within an executed DbLog-function in background. 
+	  The reading "background_processing_time" shows the used total time in background.  <br>
+    </ul>
+  </ul>
+  <br>
+
+  <ul><b>syncInterval</b>
+    <ul>
+	  <code>attr &lt;device&gt; syncInterval &lt;n&gt;
+	  </code><br>
+	  
+      If DbLog is set to asynchronous operation mode (attribute asyncMode=1), with this attribute you can setup the interval in seconds
+      used for storage the in memory cached events into the database. THe default value is 30 seconds. <br>
+	  
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>suppressUndef</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; ignoreUndef <n>
+	  </code><br>
+      suppresses all undef values when returning data from the DB via get <br>
+
+	  <b>Example</b> <br>
+      <code>#DbLog eMeter:power:::$val=($val>1500)?undef:$val</code>
+    </ul>
+  </ul>
+  <br>
+
+  <ul><b>verbose4Devs</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   </code><br>
+      
+	   If verbose level 4 is used, only output of devices set in this attribute will be reported in FHEM central logfile. If this attribute
+	   isn't set, output of all relevant devices will be reported if using verbose level 4.
+	   The given devices are evaluated as Regex. <br>
+	   
+	  <b>Example</b> <br>
+      <code>
+	  attr &lt;device&gt; verbose4Devs sys.*,.*5000.*,Cam.*,global
+	  </code><br>
+	  # The devices starting with "sys", "Cam" respectively devices are containing "5000" in its name and the device "global" will be reported in FHEM
+	  central Logfile if verbose=4 is set. <br>
+     </ul>
+  </ul>
+  <br>
+
 </ul>
 
 =end html
@@ -2444,14 +3133,15 @@ sub dbReadings($@) {
 
     <code>&lt;regexp&gt;</code> ist identisch wie <a href="../docs/commandref.html#FileLog">FileLog</a>.
     <br><br>
-    Ein Beispielcode zum Erstellen einer MySQL/PostGreSQL Datenbak ist in
+    Ein Beispielcode zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbak ist in
     <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> zu finden.
     Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und
-    <code>history</code>. Die Tabelle <code>current</code> enth&auml;lt den letzten Stand
+    <code>history</code>. Die Tabelle <code>current</code> enthält den letzten Stand
     pro Device und Reading. In der Tabelle <code>history</code> sind alle
-    Events historisch gespeichert.
+    Events historisch gespeichert. (siehe auch <a href="#DbLogattr">Attribut</a> DbLogType)
 
-    Die Tabellenspalten haben folgende Bedeutung:
+    Die Tabellenspalten haben folgende Bedeutung: <br><br>
+	
     <ol>
       <li>TIMESTAMP: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code></li>
       <li>DEVICE: name des Devices, z.B. <code>Wetterstation</code></li>
@@ -2465,7 +3155,9 @@ sub dbReadings($@) {
                       z.B. <code>71</code></li>
       <li>UNIT: Einheit, ermittelt aus dem Event, z.B. <code>%</code></li>
     </ol>
-    Der Wert des Readings ist optimiert f&ouml;r eine automatisierte Nachverarbeitung
+	<br>
+	
+    Der Wert des Readings ist optimiert für eine automatisierte Nachverarbeitung
     z.B. <code>yes</code> ist transformiert nach <code>1</code>
     <br><br>
     Die gespeicherten Werte k&ouml;nnen mittels GET Funktion angezeigt werden:
@@ -2485,19 +3177,23 @@ sub dbReadings($@) {
   <b>Set</b> 
   <ul>
     <code>set &lt;name&gt; reopen </code><br/><br/>
-      <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
       Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
 
     <code>set &lt;name&gt; rereadcfg </code><br/><br/>
-      <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
       Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.<br/>
-      Zwischen dem Schlie&szlig;en der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
+      Zwischen dem Schließen der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
+	  
+    <code>set &lt;name&gt; listCache </code><br><br>
+      <ul>Wenn DbLog im asynchronen Modus betrieben wird (Attribut asyncMode=1), können mit diesem Befehl die im Speicher gecachten Events 
+	  angezeigt werden.</ul><br>
 
     <code>set &lt;name&gt; count </code><br/><br/>
-      <ul>Z&auml;hlt die Datens&auml;tze in den Tabellen current und history und schreibt die Ergebnisse in die Readings countCurrent und countHistory.</ul><br/>
+      <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings countCurrent und countHistory.</ul><br/>
 
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
-      <ul>L&ouml;scht Datens&auml;tze, die &auml;lter sind als &lt;n&gt; Tage. Die Anzahl der gel&ouml;schten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
+      <ul>Löscht Datensätze, die älter sind als &lt;n&gt; Tage. Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
 
     <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br/><br/>
       <ul>Reduziert historische Datensaetze, die aelter sind als &lt;n&gt; Tage auf einen Eintrag pro Stunde (den ersten) je device & reading.<br/>
@@ -2545,6 +3241,7 @@ sub dbReadings($@) {
           <li>-: identisch wie "history"</li>
         </ul> 
       </li>
+	  
       <li>&lt;out&gt;<br>
         Ein Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
         Dieser Parameter ist per default immer auf <code>-</code> zu setzen um die
@@ -2557,10 +3254,12 @@ sub dbReadings($@) {
           <li>-: default</li>
         </ul>
       </li>
+	  
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat oder ein Teilstring davon zu benutzen:<br>
         <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+		
       <li>&lt;column_spec&gt;<br>
         F&ouml;r jede column_spec Gruppe wird ein Datenset zur&ouml;ckgegeben welches
         durch einen Kommentar getrennt wird. Dieser Kommentar repr&auml;sentiert
@@ -2617,6 +3316,7 @@ sub dbReadings($@) {
                   nicht f&ouml;r eine Folgeberechnung verwendet.</li>
             </li>
         </ul></li>
+		
       </ul>
     <br><br>
     <b>Beispiele:</b>
@@ -2642,7 +3342,7 @@ sub dbReadings($@) {
     <br><br>
   </ul>
 
-  <b>Get</b> f&ouml;r die Nutzung von webcharts
+  <b>Get</b> für die Nutzung von webcharts
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </code>
@@ -2716,84 +3416,183 @@ sub dbReadings($@) {
 
   <a name="DbLogattr"></a>
   <b>Attribute</b>
-  <ul><b>shutdownWait</b>
-     <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
-      fhem wartet waehrend des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
+
+  <ul><b>asyncMode</b>
+    <ul>
+	  <code>attr &lt;device&gt; asyncMode [1|0]
+	  </code><br>
+	  
+      Dieses Attribut stellt den Arbeitsmodus von DbLog ein. Wenn asyncMode=1, werden die zu speichernden Events zunächst in Speicher
+	  gecacht. Nach Ablauf der Synchronisationszeit (Attribut syncInterval) werden die gecachten Events im Block in die Datenbank geschrieben.
+	  Ist die Datenbank nicht verfügbar, werden die Events weiterhin im Speicher gehalten und nach Ablauf des Syncintervalls in die Datenbank
+	  geschrieben falls sie dann verfügbar ist. <br>
+	  Im synchronen Modus (Normalmodus) werden die Events nicht gecacht und sofort in die Datenbank geschrieben. Ist die Datenbank nicht 
+	  verfügbar gehen sie verloren.<br>
     </ul>
-  </ul><br/>
+  </ul>
+  <br>
+  
+  <ul><b>DbLogType</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; DbLogType [Current|History|Current/History]
+	   </code><br>
+	 
+       Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
+       per default die Tabelle <i>history</i> verwendet.  <br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>DbLogSelectionMode</b>
-    <ul><code>attr &lt;device&gt; DbLogSelectionMode <Exclude|Include|Exclude/Include></code><br/>
-      Dieses, fuer DbLog-Devices spezifische Attribut beeinflußt, wie die Device-spezifischen Attributes
-         DbLogExclude und DbLogInclude (s.u.) ausgewertet werden.<br>
-         Fehlt dieses Attribut wird dafuer "Exclude" als Default angenommen.<br>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; DbLogSelectionMode [Exclude|Include|Exclude/Include]
+	  </code><br>
+      
+	  Dieses, fuer DbLog-Devices spezifische Attribut beeinflußt, wie die Device-spezifischen Attributes
+      DbLogExclude und DbLogInclude (s.u.) ausgewertet werden.<br>
+      Fehlt dieses Attribut, wird dafuer "Exclude" als Default angenommen. <br>
    
-         <ul>
-               <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
-               was ueber die RegExp in DbLogExclude ausgeschlossen wird<br>
-               Das Attribut DbLogInclude wird in diesem Fall nicht beruecksichtigt</li>
-               <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird.<br>
-                       Das Attribut DbLogExclude wird in diesem Fall nicht beruecksichtigt, ebenso wenig, wie
-                       die regex im DEF.
-               </li>
-               <li>Exclude/Include: Funktioniert im Wesentlichen, wie "Exclude", nur das sowohl DbLogExclude, als auch DbLogInclude
-                       geprueft werden: Readings, die durch DbLogExclude zwar ausgeschlossen wurden, mit DbLogInclude aber wiederum eingeschlossen wwrden,
-                       werden somit dennoch geloggt.
-               </li>
-         </ul>
-         <br/>
+      <ul>
+        <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
+                     was ueber die RegExp in DbLogExclude ausgeschlossen wird<br>
+                     Das Attribut DbLogInclude wird in diesem Fall nicht beruecksichtigt</li>
+        <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird.<br>
+                     Das Attribut DbLogExclude wird in diesem Fall ebenso wenig beruecksichtigt wie die Regex im DEF. </li>
+        <li>Exclude/Include: Funktioniert im Wesentlichen wie "Exclude", nur das sowohl DbLogExclude als auch DbLogInclude
+                             geprueft werden. Readings die durch DbLogExclude zwar ausgeschlossen wurden, mit DbLogInclude aber wiederum eingeschlossen werden,
+                             werden somit dennoch geloggt. </li>
+      </ul>
     </ul>
-  </ul><br/>
-       Siehe dazu auch das DbLog-Device-Spezifische Attribut DbLogSelectionMode, das beeinflußt wie
-       DbLogExclude und DbLogInclude ausgewertet werden.
+  </ul>
+  <br>
   
   <ul><b>DbLogInclude</b>
     <ul>
       <code>
-      set &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
-      </code>
-    </ul>
-    <br>
-    Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogInclude</i>
-    propagiert. DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass eben
-       readings mit diesen RegExp in das Logging eingeschlossen werden koennen, statt ausgeschlossen.
-       Siehe dazu auch das DbLog-Device-Spezifische Attribut DbLogSelectionMode, das beeinflußt wie
-       DbLogExclude und DbLogInclude ausgewertet werden.
-    <br>
-    <b>Beispiele</b>
-    <ul>
+      attr &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
+      </code><br>
+      
+	  Wenn DbLog genutzt wird, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
+	  DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass eben readings mit diesen RegExp 
+	  in das Logging eingeschlossen werden koennen, statt ausgeschlossen.
+      Siehe dazu auch das DbLog-Device-Spezifische Attribut DbLogSelectionMode, das beeinflußt wie
+      DbLogExclude und DbLogInclude ausgewertet werden. <br>
+
+	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code>
       <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
-  </ul><br>
+  </ul>
+  <br>
+  
   <ul><b>DbLogExclude</b>
     <ul>
       <code>
-      set &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
-      </code>
-    </ul>
-    <br>
-    Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i>
-    propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schliesst die 
-    damit matchenden Readings von einem Logging aus. Einzelne Regexp werden durch 
-    Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
-    dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des 
-    Readings sich nicht ver&auml;ndert hat.
-    <br>
-    <b>Beispiele</b>
-    <ul>
+      attr &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      </code><br>
+    
+      Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i> propagiert. 
+	  Der Wert des Attributes wird als Regexp ausgewertet und schliesst die damit matchenden Readings von einem Logging aus. 
+	  Einzelne Regexp werden durch Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
+      dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des Readings sich nicht verändert hat. <br>
+    
+	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code>
       <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
-  </ul><br>
-  <ul><b>suppressUndef</b>
-    <ul><code>attr &lt;device&gt; ignoreUndef <n></code><br/>
-        Unterdrueckt alle undef Werte die durch eine Get-Anfrage zb. Plot aus der Datenbank selektiert werden<br/>
-    </ul>
-    <b>Beispiel</b>
+  </ul>
+  <br>
+  
+  <ul><b>excludeDevs</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; excludeDevs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   </code><br>
+      
+	   Die Devices "device1", "device2" bis "device.." werden vom Logging in der Datenbank ausgeschlossen. Diese Attribut wirkt nur wenn
+       im Define des DbLog-Devices ".*:.." (d.h. alle Devices werden geloggt) angegeben wurde. Dadurch können Devices explizit ausgeschlossen
+	   werden anstatt alle zu loggenden Devices im Define einzuschließen (z.B. durch den String (device1|device2|device..):.* usw.). 
+	   Die auszuschließenden Devices werden als Regex ausgewertet. <br>
+	   
+	  <b>Beispiel</b> <br>
+      <code>
+	  attr &lt;device&gt; excludeDevs global,Log.*,Cam.*
+	  </code><br>
+	  # Es werden die Devices global bzw. Devices beginnend mit "Log" oder "Cam" vom Datenbanklogging ausgeschlossen. <br>
+     </ul>
+  </ul>
+  <br>
+
+  <ul><b>shutdownWait</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; shutdownWait <n>
+	   </code><br>
+	   
+       FHEM wartet während des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>showproctime</b>
     <ul>
+	  <code>attr &lt;device&gt; showproctime [1|0]
+	  </code><br>
+	  
+      Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der
+	  durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der
+	  jeweiligen Funktion betrachtet. Das Reading "background_processing_time" zeigt die im Kindprozess BlockingCall verbrauchte Zeit.<br>
+	  
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>syncInterval</b>
+    <ul>
+	  <code>attr &lt;device&gt; syncInterval &lt;n&gt;
+	  </code><br>
+	  
+      Wenn DbLog im asynchronen Modus betrieben wird (Attribut asyncMode=1), wird mit diesem Attribut das Intervall in Sekunden zur Speicherung
+	  der im Speicher gecachten Events in die Datenbank eingestellt. Der Defaultwert ist 30 Sekunden. <br>
+	  
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>suppressUndef</b>
+    <ul>
+	  <code>attr &lt;device&gt; ignoreUndef <n>
+	  </code><br>
+      Unterdrueckt alle undef Werte die durch eine Get-Anfrage zb. Plot aus der Datenbank selektiert werden <br>
+
+	  <b>Beispiel</b> <br>
       <code>#DbLog eMeter:power:::$val=($val>1500)?undef:$val</code>
     </ul>
-  </ul><br/>
+  </ul>
+  <br>
+
+  <ul><b>verbose4Devs</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   </code><br>
+      
+	   Mit verbose Level 4 werden nur Ausgaben bezüglich der in diesem Attribut aufgeführten Devices im Logfile protokolliert. Ohne dieses 
+       Attribut werden mit verbose 4 Ausgaben aller relevanten Devices im Logfile protokolliert.
+	   Die angegebenen Devices werden als Regex ausgewertet. <br>
+	   
+	  <b>Beispiel</b> <br>
+      <code>
+	  attr &lt;device&gt; verbose4Devs sys.*,.*5000.*,Cam.*,global
+	  </code><br>
+	  # Es werden Devices beginnend mit "sys", "Cam" bzw. Devices die "5000" enthalten und das Device "global" protokolliert falls verbose=4
+	  eingestellt ist. <br>
+     </ul>
+  </ul>
+  <br>
+  
 </ul>
 
 =end html_DE
