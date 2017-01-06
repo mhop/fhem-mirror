@@ -17,35 +17,7 @@
 #
 ###############################################################################
 #
-# Definition:
-# define <name> Pushover <token> <user> [<infix>]
-#
-# Example:
-# define Pushover1 Pushover 12345 6789
-# define Pushover1 Pushover 12345 6789 pushCallback1
-#
-#
-# You can send messages via the following command:
-# set <Pushover_device> msg ['title'] '<msg>' ['<device>' <priority> '<sound>' [<retry> <expire> ['<url_title>' '<action>']]]
-#
-# Examples:
-# set Pushover1 msg 'This is a text.'
-# set Pushover1 msg 'Title' 'This is a text.'
-# set Pushover1 msg 'Title' 'This is a text.' '' 0 ''
-# set Pushover1 msg 'Emergency' 'Security issue in living room.' '' 2 'siren' 30 3600
-# set Pushover1 msg 'Hint' 'This is a reminder to do something' '' 0 '' '' 3600 'Click here for action' 'set device something'
-#
-# Explantation:
-#
-# For the first and the second example the corresponding device attributes for the
-# missing arguments must be set with valid values (see attributes section)
-#
-# If device is empty, the message will be sent to all devices.
-# If sound is empty, the default setting in the app will be used.
-# If priority is higher or equal 2, retry and expire must be defined.
-#
-#
-# For further documentation of these parameters:
+# Also see API documentation:
 # https://pushover.net/api
 
 package main;
@@ -68,7 +40,7 @@ sub Pushover_Initialize($$) {
     $hash->{UndefFn} = "Pushover_Undefine";
     $hash->{SetFn}   = "Pushover_Set";
     $hash->{AttrList} =
-"disable:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,-1,-2 callbackUrl "
+"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,-1,-2 callbackUrl "
       . $readingFnAttributes;
 
     # a priority value of 2 is not predifined as for this also a value for
@@ -183,7 +155,7 @@ sub Pushover_Set($@) {
     }
 
     return "Unable to send message: Device is disabled"
-      if ( AttrVal( $name, "disable", 0 ) == 1 );
+      if ( IsDisabled($name) );
 
     return "Unable to send message: User key is invalid"
       if ( ReadingsVal( $name, "userState", "valid" ) eq "invalid" );
@@ -1058,7 +1030,7 @@ sub Pushover_SetMessage {
         }
         else {
             return
-"Syntax: $name msg ['<title>'] '<msg>' ['<device>' <priority> '<sound>' "
+"Syntax: $name msg ['<title>'] '<text>' ['<device>' <priority> '<sound>' "
               . "[<retry> <expire> ['<url_title>' '<action>']]]";
         }
     }
@@ -1079,18 +1051,40 @@ sub Pushover_SetMessage2 ($$$$) {
       $h->{device} ? $h->{device} : AttrVal( $hash->{NAME}, "device", "" );
 
     # message only
-    $values{message} = join ' ', @$a if ( $cmd eq "msg" );
+    if ( $cmd eq "msg" ) {
+        if ( defined( $h->{message} ) ) {
+            $values{message} = $h->{message};
+        }
+        elsif ( defined( $h->{text} ) ) {
+            $values{message} = $h->{text};
+        }
+        else {
+            $values{message} = join ' ', @$a;
+        }
+    }
     $values{priority} =
       $h->{priority} ? $h->{priority} : AttrVal( $hash->{NAME}, "priority", 0 );
     $values{sound} =
       $h->{sound} ? $h->{sound} : AttrVal( $hash->{NAME}, "sound", "" );
+    $values{timestamp} = $h->{timestamp} ? $h->{timestamp} : undef;
     $values{retry}     = $h->{retry}     ? $h->{retry}     : "";
     $values{expire}    = $h->{expire}    ? $h->{expire}    : "";
     $values{url_title} = $h->{url_title} ? $h->{url_title} : "";
-    $values{action}    = $h->{action}    ? $h->{action}    : "";
+    $values{action} =
+      $h->{action} ? $h->{action} : ( $h->{url} ? $h->{url} : "" );
 
     # glances only
-    $values{text} = join ' ', @$a if ( $cmd eq "glance" );
+    if ( $cmd eq "glance" ) {
+        if ( defined( $h->{text} ) ) {
+            $values{text} = $h->{text};
+        }
+        elsif ( defined( $h->{message} ) ) {
+            $values{text} = $h->{message};
+        }
+        else {
+            $values{text} = join ' ', @$a;
+        }
+    }
     $values{subtext} = $h->{subtext} ? $h->{subtext} : undef;
     $values{count}   = $h->{count}   ? $h->{count}   : undef;
     $values{percent} = $h->{percent} ? $h->{percent} : undef;
@@ -1249,7 +1243,10 @@ sub Pushover_SetMessage2 ($$$$) {
             }
         }
 
-        if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
+        if ( $values{timestamp} ne "" ) {
+            $body .= "&timestamp=" . $values{timestamp};
+        }
+        elsif ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
             $body .= "&timestamp=" . int( time() );
         }
 
@@ -1355,8 +1352,7 @@ sub Pushover_SetMessage2 ($$$$) {
         # There was a problem with the arguments, so tell the user the
         # correct usage of the 'set msg' command
         return
-"Syntax: $name msg <msg> [ title='<title>' device='<device>' priority='<priority>' sound='<sound>' "
-          . "retry='<retry>' expire='<expire>' url_title='<url_title>' action='<action>' ]";
+"Syntax: $name msg <text> [ option1=<value> option2='<value with space>' ... ]";
     }
 }
 
@@ -1547,8 +1543,8 @@ sub Pushover_CGI() {
   <ul>
     <code>define &lt;name&gt; Pushover &lt;token&gt; &lt;user&gt; [&lt;infix&gt;]</code><br>
     <br>
-    You have to create an account to get the user key.<br>
-    And you have to create an application to get the API token.<br>
+    You have to <a href="https://pushover.net/login">create an account</a> to get the user key.<br>
+    And you have to <a href="https://pushover.net/apps/build">create an application</a> to get the API token.<br>
     <br>
     Attribute infix is optional to define FHEMWEB uri name for Pushover API callback function.<br>
     Callback URL may be set using attribute callbackUrl (see below).<br>
@@ -1565,7 +1561,42 @@ sub Pushover_CGI() {
   <br>
   <a name="PushoverSet"></a>
   <b>Set</b>
-  <ul>
+  <ul><b>msg</b><ul>
+    <code>set &lt;Pushover_device&gt; msg &lt;text&gt; [&lt;option1&gt;=&lt;value&gt; &lt;option2&gt;="&lt;value with space in it&gt;" ...]</code>
+    <br>
+    <br>
+    The following options may be used to adjust message content and delivery behavior:<br>
+    <br>
+    <code><b>message</b>&nbsp;&nbsp;&nbsp;</code> - type: text - Your message text. Using this option takes precedence; non-option text content will be discarded.<br>
+    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Your user's device name to send the message directly to that device, rather than all of the user's devices (multiple devices may be separated by a comma). May also be set to a specific User or Group Key. To address a specific device for a specific User/Group, use User/Group Key first and add device name separated by colon.<br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Your message's title, otherwise your Pushover API app's name is used.<br>
+    <code><b>action</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Either a FHEM command to run when user taps link or a <a href="https://pushover.net/api#urls">supplementary URL</a> to show with your message.<br>
+    <code><b>url_title</b>&nbsp;</code> - type: text - A title for your FHEM command or supplementary URL, otherwise just the URL is shown.<br>
+    <code><b>priority</b>&nbsp;&nbsp;</code> - type: integer - Send as -2 to generate no notification/alert, -1 to always send as a quiet notification, 1 to display as <a href="https://pushover.net/api#priority">high-priority</a> and bypass the user's quiet hours, or 2 to also require confirmation from the user.<br>
+    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority >= 2.<br>
+    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority >= 2.<br>
+    <code><b>timestamp</b>&nbsp;</code> - type: integer - A Unix timestamp of your message's date and time to display to the user, rather than the time your message is received by the Pushover servers. Takes precendence over attribute timestamp=1.<br>
+    <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  The name of one of the <a href="https://pushover.net/api#sounds">sounds</a> supported by device clients to override the user's default sound choice.<br>
+    <br>
+    Examples:
+    <ul>
+      <code>set Pushover1 msg My first Pushover message.</code><br>
+      <code>set Pushover1 msg My second Pushover message.\nThis time with two lines.</code><br>
+      <code>set Pushover1 msg "Another Pushover message in double quotes."</code><br>
+      <code>set Pushover1 msg 'Another Pushover message in single quotes.'</code><br>
+      <code>set Pushover1 msg message="Pushover message using explicit option for text content." This part of the text will be ignored.</code><br>
+      <code>set Pushover1 msg This is a message with a title. title="This is a subject"</code><br>
+      <code>set Pushover1 msg title="This is a subject, too!" This is another message with a title set at the beginning of the command.</code><br>
+      <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security issue in living room.</code><br>
+      <code>set Pushover1 msg title=Link Have a look to this website: url_title="Open" action="http://fhem.de/" expire=3600</code><br>
+      <code>set Pushover1 msg title=Hint expire=3600 This is a reminder to do something. Action will expire in 1h. url_title="Click here for action" action="set device something"</code><br>
+      <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security issue in living room. sound=siren url_title="Click here for action" action="set device something"</code><br>
+    </ul>
+    <br>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>msg</b> <u>(deprecated format)</u><ul>
     <code>set &lt;Pushover_device&gt; msg [title] &lt;msg&gt; [&lt;device&gt; &lt;priority&gt; &lt;sound&gt; [&lt;retry&gt; &lt;expire&gt; [&lt;url_title&gt; &lt;action&gt;]]]</code>
     <br>
     <br>
@@ -1591,39 +1622,58 @@ sub Pushover_CGI() {
       </li>
       <li>If priority is higher or equal 2, retry and expire must be defined.
       </li>
-      <li>For further documentation of these parameters have a look at the <a href="https://pushover.net/api">Pushover API</a>.
-      </li>
     </ul>
-  </ul>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>glance</b><ul>
+    <code>set &lt;Pushover_device&gt; glance [&lt;text&gt;] [&lt;option1&gt;=&lt;value&gt; &lt;option2&gt;="&lt;value with space in it&gt;" ...]</code>
+    <br>
+    <br>
+    Update <a href="https://pushover.net/api/glances">Pushover's glances</a> on Apple Watch.<br>
+    The following options may be used to adjust message content and delivery behavior:<br>
+    <br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A description of the data being shown, such as "Widgets Sold".<br>
+    <code><b>text</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - The main line of data, used on most screens. Using this option takes precedence; non-option text content will be discarded.<br>
+    <code><b>subtext</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - A second line of data.<br>
+    <code><b>count</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(may be negative) - Shown on smaller screens; useful for simple counts.<br>
+    <code><b>percent</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(0-100) - Shown on some screens as a progress bar/circle.<br>
+    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Your user's device name to send the message directly to that device, rather than all of the user's devices (multiple devices may be separated by a comma). May also be set to a specific User or Group Key. To address a specific device for a specific User/Group, use User/Group Key first and add device name separated by colon.<br>
+    <br>
+  </ul></ul>
   <br>
   <b>Get</b> <ul>N/A</ul><br>
   <a name="PushoverAttr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="callbackUrl"></a>
-    <li>callbackUrl<br>
+    <li>
+        <a href="#do_not_notify">do_not_notify</a>
+    </li>
+    <li>
+        <a href="#disabledForIntervals">disabledForIntervals</a>
+    </li>
+    <li>
+        <a href="#readingFnAttributes">readingFnAttributes</a>
+    </li>
+    <li>
+        <a name="PushoverAttrcallbackUrl"></a><code>callbackUrl</code><br>
         Set the callback URL to be used to acknowledge messages with emergency priority or supplementary URLs.
-    </li><br>
-    <a name="timestamp"></a>
-    <li>timestamp<br>
+    </li>
+    <li><a name="PushoverAttrtimestamp"></a><code>timestamp</code><br>
         Send the unix timestamp with each message.
-    </li><br>
-    <a name="title"></a>
-    <li>title<br>
+    </li>
+    <li><a name="PushoverAttrtitle"></a><code>title</code><br>
         Will be used as title if title is not specified as an argument.
-    </li><br>
-    <a name="device"></a>
-    <li>device<br>
+    </li>
+    <li><a name="PushoverAttrdevice"></a><code>device</code><br>
         Will be used for the device name if device is not specified as an argument. If left blank, the message will be sent to all devices.
-    </li><br>
-    <a name="priority"></a>
-    <li>priority<br>
+    </li>
+    <li><a name="PushoverAttrpriority"></a><code>priority</code><br>
         Will be used as priority value if priority is not specified as an argument. Valid values are -1 = silent / 0 = normal priority / 1 = high priority
-    </li><br>
-    <a name="sound"></a>
-    <li>sound<br>
+    </li>
+    <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Will be used as the default sound if sound argument is missing. If left blank the adjusted sound of the app will be used. 
-    </li><br>
+    </li>
   </ul>
   <br>
   <a name="PushoverEvents"></a>
@@ -1655,8 +1705,8 @@ sub Pushover_CGI() {
   <ul>
     <code>define &lt;name&gt; Pushover &lt;token&gt; &lt;user&gt; [&lt;infix&gt;]</code><br>
     <br>
-    Du musst einen Account erstellen, um den User Key zu bekommen.<br>
-    Und du musst eine Anwendung erstellen, um einen API APP_TOKEN zu bekommen.<br>
+    Du musst einen <a href="https://pushover.net/login">Account erstellen</a>, um den User Key zu bekommen.<br>
+    Und du musst <a href="https://pushover.net/apps/build">eine Anwendung erstellen</a>, um einen API APP_TOKEN zu bekommen.<br>
     <br>
     Das Attribut infix ist optional, um einen FHEMWEB uri Namen f&uuml;r die Pushover API Callback Funktion zu definieren.<br>
     Die Callback URL Callback URL kann dann mit dem Attribut callbackUrl gesetzt werden (siehe unten).<br>
@@ -1673,7 +1723,42 @@ sub Pushover_CGI() {
   <br>
   <a name="PushoverSet"></a>
   <b>Set</b>
-  <ul>
+  <ul><b>msg</b><ul>
+    <code>set &lt;Pushover_device&gt; msg &lt;text&gt; [&lt;option1&gt;=&lt;value&gt; &lt;option2&gt;="&lt;value with space in it&gt;" ...]</code>
+    <br>
+    <br>
+    Die folgenden Optionen k&ouml;nnen genutzt werden, um den Nachrichteninhalt und die Zustellung zu beeinflussen::<br>
+    <br>
+    <code><b>message</b>&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein Nachrichtentext. Die Nutzung dieser Option hat Vorrang; Text au&szlig;erhalb wird verworfen.<br>
+    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein selbst vergebener Ger&auml;tename, um die Nachricht direkt an dieses Ger&auml;t zu senden anstatt an alle Ger&auml;te gleichzeitig (mehrere Ger&auml;te k&ouml;nnen mit Komma getrennt angegeben werden). Hier kann auch explizit ein User oder Group Key angegeben werden. Um gezielt ein Ger&auml;t einer/s speziellen User/Group anzusprechen, zuerst den User/Group Key angeben, gefolgt vom Ger&auml;tenamen und einem Doppelpunkt als Trennzeichen.<br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein Nachrichten Titel, andernfalls wird der App Name wie in der Pushover API festgelegt verwendet.<br>
+    <code><b>action</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Entweder ein auszuf&uuml;hrendes FHEM Kommando, wenn der Empf&auml;nger den Link anklickt oder eine <a href="https://pushover.net/api#urls">supplementary URL</a>, die mit der Nachricht zusammen angezeigt werden soll.<br>
+    <code><b>url_title</b>&nbsp;</code> - Typ: Text - Ein Titel f&uuml;r das FHEM Kommando oder die supplementary URL, andernfalls wird die URL direkt angezeigt.<br>
+    <code><b>priority</b>&nbsp;&nbsp;</code> - Type: Integer - Sende mit -2, um keine/n Benachrichtigung/Alarm zu generieren. Sende mit -1, um immer eine lautlose Benachrichtigung zu senden. Sende mit 1, um die Nachricht mit <a href="https://pushover.net/api#priority">hoher Priorit&auml;t</a> anzuzeigen und die Ruhezeiten des Empf&auml;ngers zu umgehen. Oder sende mit 2, um zus&auml;tzlich eine Best&auml;tigung des Empf&auml;ngers anzufordern.<br>
+    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t >= 2.<br>
+    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t >= 2.<br>
+    <code><b>timestamp</b>&nbsp;</code> - Type: Integer - Ein Unix Zeitstempfel mit Datum und Uhrzeit deiner Nachricht, die dem Empf&auml;nger statt der Uhrzeit des Einganges auf den Pushover Servern angezeigt wird. Hat Vorrang bei gesetztem Attribut timestamp=1.<br>
+    <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Der Name eines vom Empf&auml;ngerger&auml;t unterst&uuml;tzten <a href="https://pushover.net/api#sounds">Klangs</a>, um den vom Empf&auml;nger ausgew&auml;hlten Klang zu &uuml;berschreiben.<br>
+    <br>
+    Beispiele:
+    <ul>
+      <code>set Pushover1 msg Meine erste Pushover Nachricht.</code><br>
+      <code>set Pushover1 msg Meine zweite Pushover Nachricht.\nDiesmal mit zwei Zeilen.</code><br>
+      <code>set Pushover1 msg "Eine andere Pushover Nachricht in doppelten Anf&auml;hrungszeichen."</code><br>
+      <code>set Pushover1 msg 'Eine andere Pushover Nachricht in einfachen Anf&auml;hrungszeichen.'</code><br>
+      <code>set Pushover1 msg message="Pushover Nachricht, die die explizite Nachrichten Option f&uuml;r den Textinhalt verwendet." Dieser Teil des Textes wird ignoriert.</code><br>
+      <code>set Pushover1 msg Dies ist eine Nachricht mit einem Titel. title="Dies ist ein Betreff"</code><br>
+      <code>set Pushover1 msg title="Dies ist auch ein Betreff!" Dies ist eine weitere Nachricht mit einem Titel, der am Anfang des Kommandos gesetzt ist.</code><br>
+      <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer.</code><br>
+      <code>set Pushover1 msg title=Link Schau dir mal diese Website an: url_title="&Ouml;ffnen" action="http://fhem.de/" expire=3600</code><br>
+      <code>set Pushover1 msg title=Hinweis expire=3600 Dies ist eine Erinnerung, um etwas zu tun. Der Link verliert in 1h seine G&uuml;ltigkeit. url_title="Hier klicken, um den Befehl auszuf&uuml;hren" action="set device something"</code><br>
+      <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer. sound=siren url_title="Hier klicken, um den Befehl auszuf&uuml;hren" action="set device something"</code><br>
+    </ul>
+    <br>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>msg</b> <u>(veraltetes Format)</u><ul>
 	<code>set &lt;Pushover_device&gt; msg [title] &lt;msg&gt; [&lt;device&gt; &lt;priority&gt; &lt;sound&gt; [&lt;retry&gt; &lt;expire&gt; [&lt;url_title&gt; &lt;action&gt;]]]</code>
     <br>
     <br>
@@ -1699,39 +1784,57 @@ sub Pushover_CGI() {
       </li>
       <li>Wenn die Priorit&auml;t h&ouml;her oder gleich 2 ist m&uuml;ssen retry und expire definiert sein.
       </li>
-      <li>F&uuml;r weiterf&uuml;hrende Dokumentation &uuml;ber diese Parameter lies Dir die <a href="https://pushover.net/api">Pushover API</a> durch.
-      </li>
     </ul>
-  </ul>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>glance</b><ul>
+    <code>set &lt;Pushover_device&gt; glance [&lt;text&gt;] [&lt;option1&gt;=&lt;value&gt; &lt;option2&gt;="&lt;value with space in it&gt;" ...]</code>
+    <br>
+    <br>
+    Aktualisiert die <a href="https://pushover.net/api/glances">Pushover glances</a> auf einer Apple Watch.<br>
+    Die folgenden Optionen k&ouml;nnen genutzt werden, um den Nachrichteninhalt und die Zustellung zu beeinflussen::<br>
+    <br>
+    <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Eine Beschreibung der Daten, die angezeigt werden, beispielsweise "Verkaufte Dinge".<br>
+    <code><b>text</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Textzeile, die in den meisten Ansichten verwendet wird. Die Nutzung dieser Option hat Vorrang; Text au&szlig;erhalb wird verworfen.<br>
+    <code><b>subtext</b>&nbsp;&nbsp;&nbsp;</code> - type: text(100 characters) - Eine zweite Zeile mit Text.<br>
+    <code><b>count</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(may be negative) - Wird auf kleineren Ansichten dargestellt; n&uuml;tzlich f&uuml;r einfache Z&auml;hlerst&auml;nde.<br>
+    <code><b>percent</b>&nbsp;&nbsp;&nbsp;</code> - type: integer(0-100) - Wird bei einigen Ansichten als Fortschrittsbalken/-kreis angezeigt.<br>
+    <code><b>device</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein selbst vergebener Ger&auml;tename, um die Nachricht direkt an dieses Ger&auml;t zu senden anstatt an alle Ger&auml;te gleichzeitig (mehrere Ger&auml;te k&ouml;nnen mit Komma getrennt angegeben werden). Hier kann auch explizit ein User oder Group Key angegeben werden. Um gezielt ein Ger&auml;t einer/s speziellen User/Group anzusprechen, zuerst den User/Group Key angeben, gefolgt vom Ger&auml;tenamen und einem Doppelpunkt als Trennzeichen.<br>
+    <br>
+  </ul></ul>
   <br>
   <b>Get</b> <ul>N/A</ul><br>
   <a name="PushoverAttr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="callbackUrl"></a>
-    <li>callbackUrl<br>
+    <li>
+        <a href="#do_not_notify">do_not_notify</a>
+    </li>
+    <li>
+        <a href="#disabledForIntervals">disabledForIntervals</a>
+    </li>
+    <li>
+        <a href="#readingFnAttributes">readingFnAttributes</a>
+    </li>
+    <li><a name="callbackUrl"></a><code>callbackUrl</code><br>
         Setzt die Callback URL, um Nachrichten mit Emergency Priorit&auml;t zu best&auml;tigen.
-    </li><br>
-    <a name="timestamp"></a>
-    <li>timestamp<br>
+    </li>
+    <li><a name="timestamp"></a><code>timestamp</code><br>
         Sende den Unix-Zeitstempel mit jeder Nachricht.
-    </li><br>
-    <a name="title"></a>
-    <li>title<br>
+    </li>
+    <li><a name="title"></a><code>title</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde.
-    </li><br>
-    <a name="device"></a>
-    <li>device<br>
+    </li>
+    <li><a name="device"></a><code>device</code><br>
         Wird beim Senden als Ger&auml;tename verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, bzw. leer sein, dann wird an alle Ger&auml;te gesendet.
-    </li><br>
-    <a name="priority"></a>
-    <li>priority<br>
+    </li>
+    <li><a name="priority"></a><code>priority</code><br>
         Wird beim Senden als Priorit&auml;t verwendet, sofern diese nicht als Aufrufargument angegeben wurde. Zul&auml;ssige Werte sind -1 = leise / 0 = normale Priorit&auml;t / 1 = hohe Priorit&auml;t
-    </li><br>
-    <a name="sound"></a>
-    <li>sound<br>
+    </li>
+    <li><a name="sound"></a><code>sound</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
-    </li><br>
+    </li>
   </ul>
   <br>
   <a name="PushoverEvents"></a>
