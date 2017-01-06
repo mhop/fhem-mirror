@@ -456,7 +456,7 @@ FW_Read($$)
   if($method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i && 
      $FW_use_sha) {
 
-    my $shastr = Digest::SHA1::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
+    my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
                                 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
     TcpServer_WriteBlocking($FW_chash,
@@ -2427,7 +2427,7 @@ FW_Attr(@)
   }
 
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
-    eval { require Digest::SHA1; };
+    eval { require Digest::SHA; };
     if($@) {
       Log3 $FW_wname, 1, $@;
       return "$devName: Can't load Digest::SHA, no websocket";
