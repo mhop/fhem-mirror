@@ -530,7 +530,7 @@ CUL_ReadAnswer($$$$)
   my ($hash, $arg, $anydata, $regexp) = @_;
   my $ohash = $hash;
 
-  while($hash->{TYPE} ne "CUL") {   # Look for the first "real" CUL
+  while($hash && $hash->{TYPE} !~ m/$culNameRe/) {
     $hash = $hash->{IODev};
   }
   return ("No FD", undef)
