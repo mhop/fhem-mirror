@@ -47,7 +47,6 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $sccMods = "STACKABLE_CC:TSSTACKED"; # for noansi
 my $culNameRe = "^(CUL|TSCUL)\$";
-my $culLikeRe = "^(CUL|TSCUL|STACKABLE_CC|TSSTACKED)\$";
 
 my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
                        ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
@@ -189,7 +188,7 @@ CUL_Define($$)
     my $x = $1;
     foreach my $d (keys %defs) {
       next if($d eq $name);
-      if($defs{$d}{TYPE} =~ m/$culLikeRe/) {
+      if($defs{$d}{TYPE} =~ m/$culNameRe/) {
         if(uc($defs{$d}{FHTID}) =~ m/^$x/) {
           my $m = "$name: Cannot define multiple CULs with identical ".
                         "first two digits ($x)";
