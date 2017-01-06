@@ -748,11 +748,46 @@ sub Wunderground_Hash2Readings($$;$) {
                 $reading .= $r . "_." if ( $r && $r ne "" );
                 $reading .= $cr;
                 my $value = $h->{$k};
-                $value = "" if ( !defined($value) || $value eq "NA" );
+                $value = "" if ( !defined($value) || $value =~ m/^n\/?a$/i );
+
+                if ( $reading eq "icon" || $reading eq "icon_url" ) {
+                    my $sunrise = ReadingsVal( $hash->{NAME}, "sunrise", 0 );
+                    my $sunset  = ReadingsVal( $hash->{NAME}, "sunset",  0 );
+                    $sunrise = time_str2num("1970-01-01 $sunrise:00")
+                      if ($sunrise);
+                    $sunset = time_str2num("1970-01-01 $sunset:00")
+                      if ($sunset);
+                    my (
+                        $second,     $minute,    $hour,
+                        $dayOfMonth, $month,     $yearOffset,
+                        $dayOfWeek,  $dayOfYear, $daylightSavings
+                    ) = localtime();
+                    my $currentTime = ( ( $hour * 3600 ) + ( $minute * 60 ) );
+
+                    # for icon and icon_url, make sure to add nt_ prefix
+                    # during the night
+                    if (   ( $currentTime > 43200 && $currentTime >= $sunset )
+                        || ( $currentTime <= 43200 && $currentTime < $sunrise )
+                      )
+                    {
+                        $value = "nt_" . $value if ( $reading eq "icon" );
+                        $value = $1 . "nt_" . $2 . $3
+                          if ( $reading eq "icon_url"
+                            && $value =~ /^(.*\/)([A-Za-z0-9]+)(\.[a-z]+)$/ );
+                    }
+
+                    # for icon and icon_url, make sure to remove nt_ prefix
+                    # during the daytime
+                    else {
+                        $value =~ s/^nt_//  if ( $reading eq "icon" );
+                        $value =~ s/\/nt_// if ( $reading eq "icon_url" );
+                    }
+                }
 
                 $value = "0"
-                  if ( $reading =~ /^wind(Gust|Speed).*$/
-                    && $value eq "-9999" );
+                  if ( $reading =~ /^wind_(gust|speed).*$/
+                    && looks_like_number($value)
+                    && $value < 0 );
 
                 $value =~ s/^(\d+)%$/$1/;
 
