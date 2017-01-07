@@ -1423,11 +1423,13 @@ my $rtypes = {
     },
 
     pct => {
-        ref_base => 25,
-        format   => '%i',
-        symbol   => chr(0x0025),
-        suffix   => 'pct',
-        txt      => {
+        ref_base  => 25,
+        format    => '%i',
+        symbol    => chr(0x0025),
+        suffix    => 'pct',
+        tmpl      => '%value%' . chr(0x202F) . '%symbol%',
+        tmpl_long => '%value% %txt%',
+        txt       => {
             de => 'Prozent',
             en => 'percent',
         },
