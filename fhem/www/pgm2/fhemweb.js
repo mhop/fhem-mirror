@@ -1,12 +1,14 @@
 "use strict";
 
+// $Id$
+
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
 var FW_serverLastMsg = FW_serverFirstMsg;
 var FW_isIE = (navigator.appVersion.indexOf("MSIE") > 0);
 var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
 var FW_scripts = {}, FW_links = {};
-var FW_docReady = false;
+var FW_docReady = false, FW_longpollType;
 var FW_root = "/fhem";  // root
 var embedLoadRetry = 100;
 
@@ -54,6 +56,7 @@ FW_jqueryReadyFn()
 {
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
+  FW_longpollType = $("body").attr("longpoll");
   if($("body").attr("longpoll") != "0")
     setTimeout("FW_longpoll()", 100);
 
@@ -676,7 +679,7 @@ FW_doUpdate(evt)
   var input="";
 
   if(evt.target instanceof WebSocket) {
-    if(evt.type == 'close') {
+    if(evt.type == 'close' && !FW_leaving) {
       FW_errmsg(errstr, 4900);
       FW_pollConn.close();
       FW_pollConn = undefined;
@@ -771,7 +774,11 @@ FW_longpoll()
   FW_longpollOffset = 0;
   if(FW_pollConn) {
     FW_leaving = 1;
-    FW_pollConn.abort();
+    if(FW_longpollType == "websocket")
+      FW_pollConn.close();
+    else
+      FW_pollConn.abort();
+    FW_pollConn = undefined;
   }
 
   FW_leaving = 0;
@@ -831,7 +838,7 @@ FW_longpoll()
               "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
-  if($("body").attr("longpoll") == "websocket") {
+  if(FW_longpollType == "websocket") {
     FW_pollConn = new WebSocket((location+query).replace(/^http/i, "ws"));
     FW_pollConn.onclose = 
     FW_pollConn.onerror = 
@@ -845,7 +852,8 @@ FW_longpoll()
 
   }
 
-  log("Longpoll with filter "+filter);
+  log("Inform-channel opened ("+(FW_longpollType == 1 ? "HTTP":FW_longpollType )
+                        +") with filter "+filter);
 }
 
 /*************** LONGPOLL END **************/
