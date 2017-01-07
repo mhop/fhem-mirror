@@ -180,7 +180,7 @@ my %zwave_class = (
   THERMOSTAT_MODE          => { id => '40',
     set   => { tmOff       => "0100",
                tmHeating   => "0101",
-               tmCooling   => "010b",
+               tmEnergySaveHeating => "010b",
                tmManual    => "011f" },
     get   => { thermostatMode => "02" },
     parse => { "03400300"  => "thermostatMode:off",
@@ -189,7 +189,7 @@ my %zwave_class = (
                "0340031f"  => "thermostatMode:manual",
                "03400100"  => "thermostatMode:setTmOff",
                "03400101"  => "thermostatMode:setTmHeating",
-               "0340010b"  => "thermostatMode:setTmCooling",
+               "0340010b"  => "thermostatMode:setTmEnergySaveHeating",
                "0340011f"  => "thermostatMode:setTmManual",
                } } ,
   PREPAYMENT_ENCAPSULATION => { id => '41' },
@@ -5270,10 +5270,11 @@ s2Hex($)
 
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
-  <li>tmCooling</li>
+  <li>tmEnergySaveHeating</li>
   <li>tmHeating</li>
   <li>tmManual<br>
-    set the thermostat mode to off, cooling, heating or manual.
+    set the thermostat mode to off, heating but saving energy, heating or
+    manual.
     </li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
