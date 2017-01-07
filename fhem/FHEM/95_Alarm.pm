@@ -41,7 +41,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.83";
+my $alarmversion    = "2.84";
 
 #########################################################################################
 #
@@ -309,6 +309,8 @@ sub Alarm_Exec($$$$$){
    #Log3 $hash,1,"[Alarm $level] Exec called with dev $dev evt $evt act $act]";
    return 
      if ($dev eq 'global');
+   return 
+     if (!$level);
 
    #-- raising the alarm 
    if( $act eq "on" ){
@@ -354,8 +356,8 @@ sub Alarm_Exec($$$$$){
                  $mga =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
               }
               #-- readings
-              readingsSingleUpdate( $hash, "level".$level,$dev,0 );
-              readingsSingleUpdate( $hash, "short", $mga, 0);
+              readingsSingleUpdate( $hash, "level".$level,$dev,1 );
+              readingsSingleUpdate( $hash, "short", $mga, 1);
               $msg = Alarm_getstate($hash)." ".$mga;
               readingsSingleUpdate( $hash, "state", $msg, 1 );
               $msg = "[Alarm $level] raised from device $dev with event $evt";
@@ -400,8 +402,8 @@ sub Alarm_Exec($$$$$){
          fhem($cmd)
            if( $cmd );
          #-- readings - arm status does not change
-         readingsSingleUpdate( $hash, "level".$level,"armed",0 );
-         $mga = " Level $level canceled";
+         readingsSingleUpdate( $hash, "level".$level,"canceled",1);
+         readingsSingleUpdate( $hash, "level".$level,"armed",1);
          readingsSingleUpdate( $hash, "short", "", 0);
          $mga = Alarm_getstate($hash)." ".$mga;
          readingsSingleUpdate( $hash, "state", $mga, 1 );
@@ -442,7 +444,7 @@ sub Alarm_Arm($$$$$){
       my $cmdact  = AttrVal($name, "armact", 0);
       if( ($xdl eq '')|($xdl eq '0:00')|($xdl eq '00:00') ){
          CommandAttr(undef,$name.' level'.$level.'xec armed');
-         readingsSingleUpdate( $hash, "level".$level,"armed",0 );
+         readingsSingleUpdate( $hash, "level".$level,"armed",1 );
          #--transform commands from fhem to perl level
          my @cmdactarr = split(/;/,$cmdact);
          my $cmdactf;
@@ -491,7 +493,7 @@ sub Alarm_Arm($$$$$){
          if( defined $defs{'alarm'.$level.'.arm.dly'});
       CommandAttr (undef,$name.' level'.$level.'xec disarmed');
       Alarm_Exec($name,$level,"program","disarm","cancel");
-      readingsSingleUpdate( $hash, "level".$level,"disarmed",0 );
+      readingsSingleUpdate( $hash, "level".$level,"disarmed",1 );
       #--
       $msg = "[Alarm $level] disarmed from alarmSensor $dev with event $evt";
       $cmd = AttrVal($name, "disarmact", 0);

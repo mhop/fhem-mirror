@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.8";
+my $version = "2.0alpha4";
 
 #-- these we may get on request
 my %gets = (
@@ -74,7 +74,7 @@ sub DoorPi_Initialize ($) {
 
   $hash->{AttrList}= "verbose ".
                      "language:de,en ringcmd ".
-                     "doorbutton dooropencmd doorlockcmd doorunlockcmd dooropendly ".
+                     "doorbutton dooropencmd dooropendly doorlockcmd doorunlockcmd doorlockreading ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
                      "snapshotbutton streambutton ".
                      "dashlightbutton iconpic iconaudio ".
@@ -114,6 +114,7 @@ sub DoorPi_Define($$) {
     
   @{$hash->{DATA}} = ();
   @{$hash->{HELPER}->{CMDS}} = ();
+  $hash->{DELAYED} = "";
   
   $modules{DoorPi}{defptr}{$a[0]} = $hash;
 
@@ -126,8 +127,9 @@ sub DoorPi_Define($$) {
   readingsBulkUpdate($hash,"door","Unknown");
   readingsEndUpdate($hash,1); 
      
-  DoorPi_GetConfig($hash);
-  DoorPi_GetHistory($hash);
+  InternalTimer(gettimeofday() + 5, "DoorPi_GetConfig", $hash,1);
+  InternalTimer(gettimeofday() + 10, "DoorPi_GetLockstate", $hash,1);
+  InternalTimer(gettimeofday() + 10, "DoorPi_GetHistory", $hash,1);
   $init_done = $oid;
   
   return undef;
@@ -144,16 +146,13 @@ sub DoorPi_Define($$) {
 sub DoorPi_Undef ($) {
   my ($hash) = @_;
   delete($modules{DoorPi}{defptr}{NAME});
-  #RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash);
   return undef;
 }
 
 #######################################################################################
 #
 # DoorPi_Attr - Set one attribute value
-#
-#  Parameter hash = hash of device addressed
-#            a = argument array
 #
 ########################################################################################
 
@@ -223,7 +222,7 @@ sub DoorPi_Set ($@) {
   my ($hash, @a) = @_;
   #-- if only hash as parameter, this is acting as timer callback
   if( !@a ){
-    Log 1,"[DoorPi_Set] delayed action started with ".$hash->{DELAYED};
+    Log 5,"[DoorPi_Set] delayed action started with ".$hash->{DELAYED};
     if( $hash->{DELAYED} eq "light"){
       @a=($hash->{NAME},"light","off");
     }elsif( $hash->{DELAYED} eq "door_time"){
@@ -238,7 +237,7 @@ sub DoorPi_Set ($@) {
   #-- commands
   my $door     = AttrVal($name, "doorbutton", "door");
   my $doorsubs = "opened";
-    $doorsubs   .= ",locked"
+    $doorsubs .= ",locked"
     if(AttrVal($name, "doorlockcmd",undef));
   $doorsubs   .= ",unlocked"
     if(AttrVal($name, "doorunlockcmd",undef));
@@ -258,7 +257,7 @@ sub DoorPi_Set ($@) {
   #-- for the selector: which values are possible
   if ($a[0] eq "?"){
     $newkeys = join(" ",@{ $hash->{HELPER}->{CMDS} });
-    #Log 1,"=====> newkeys before subs $newkeys";
+    #Log3 $name, 1,"=====> newkeys before subs $newkeys";
     $newkeys =~ s/$door/$door:$doorsubs/;                 # FHEMWEB sugar
     $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;  # FHEMWEB sugar
     $newkeys =~ s/$dashlight/$dashlight:on,off/;          # FHEMWEB sugar
@@ -267,13 +266,13 @@ sub DoorPi_Set ($@) {
     $newkeys =~ s/button(\d\d?)/button$1:noArg/g;         # FHEMWEB sugar
     $newkeys =~ s/purge/purge:noArg/;                     # FHEMWEB sugar
     $newkeys =~ s/target/target:$tsubs2/;                 # FHEMWEB sugar
-    #Log 1,"=====> newkeys after subs $newkeys";
+    #Log3 $name, 1,"=====> newkeys after subs $newkeys";
     return $newkeys;
   }
   
   $key   = shift @a;
   $value = shift @a; 
-  #Log 1,"[DoorPi_Set] called with key ".$key." and value ".$value;
+  #Log3 $name, 1,"[DoorPi_Set] called with key ".$key." and value ".$value;
   
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
     if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
@@ -288,6 +287,13 @@ sub DoorPi_Set ($@) {
     #-- alive
     }elsif( $value eq "alive" ){
       readingsSingleUpdate($hash,"state","alive",1);
+      DoorPi_GetLockstate($hash);
+    #-- sabotage
+    }elsif( $value eq "sabotage" ){
+    #-- wrong id
+    }elsif( $value eq "wrongid" ){
+    #-- movement
+    }elsif( $value eq "movement" ){
     #-- call start
     }elsif( $value =~ "start.*" ){
       readingsSingleUpdate($hash,"call","started",1);
@@ -321,7 +327,7 @@ sub DoorPi_Set ($@) {
       InternalTimer(gettimeofday()+5, "DoorPi_inform", $hash,0);
       readingsSingleUpdate($hash,"call","dismissed",1);
     }else{
-      Log 1,"[DoorPi] unknown command set ... call $value";
+      Log3 $name, 1,"[DoorPi] unknown command set ... call $value";
     }   
   #-- target for the call
   }elsif( $key eq "target" ){
@@ -330,122 +336,17 @@ sub DoorPi_Set ($@) {
         readingsSingleUpdate($hash,"call_target",AttrVal($name, "target$value",undef),1);
         DoorPi_Cmd($hash,"gettarget");
       }else{
-        Log 1,"[DoorPi_Set] Error: target$value attribute not set";
+        Log3 $name, 1,"[DoorPi_Set] Error: target$value attribute not set";
         return;
       }
     }else{
-      Log 1,"[DoorPi_Set] Error: attribute target$value does not exist";
+      Log3 $name, 1,"[DoorPi_Set] Error: attribute target$value does not exist";
       return;
     }
     
   #-- door commands
   }elsif( ($key eq "$door")||($key eq "door") ){
-    my $lockstate = ReadingsVal($name,"lockstate",undef);
-    
-    #-- from FHEM: door opening, forward to DoorPi
-    if( $value eq "opened" ){
-      if( $lockstate eq "unlocked" ){
-        if( $hash->{DELAYED} eq "door_event"){
-          fhem("delete dooropendelay");
-          $hash->{DELAYED} = "";
-        } 
-        $v=DoorPi_Cmd($hash,"dooropen");
-        Log 1,"[DoorPi_Set] sent dooropen command to DoorPi";
-        if(AttrVal($name, "dooropencmd",undef)){
-          fhem(AttrVal($name, "dooropencmd",undef));
-        }
-        readingsSingleUpdate($hash,$door,"opened",1);
-      }else{
-        Log3 $name, 1,"[DoorPi_Set] opening of door not possible, is locked";
-      }
-      
-    #-- from DoorPi: door has to be unlocked if necessary
-    }elsif( $value eq "unlockandopen" ){
-    
-       #-- unlocking the door now, delayed opening
-       if( $lockstate eq "locked" ){
-         if( AttrVal($name, "doorunlockcmd",undef) ){
-           fhem(AttrVal($name, "doorunlockcmd",undef));
-           Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi and executed FHEM doorunlock command";
-           readingsSingleUpdate($hash,"lockstate","unlocked",1);
-           readingsSingleUpdate($hash,$door,"unlocked",1);
-           $v=DoorPi_Cmd($hash,"doorunlocked");           
-           my $dly=AttrVal($name, "dooropendly",5);
-           #-- delay by fixed number of seconds
-           if( $dly =~ /\d+/ ){       
-             $hash->{DELAYED} = "door_time";
-             InternalTimer(gettimeofday() + $dly, "DoorPi_Set", $hash,1);
-           #-- delay by event
-           }else{
-             $hash->{DELAYED} = "door_event";
-             fhem(" define dooropendelay notify $dly set $name $door opened");
-           }
-         }else{
-          Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi, but no FHEM doorunlock command";
-         }
-       
-       #-- no unlocking necessary, immediate door opening
-       }elsif( $lockstate eq "unlocked" ){
-         Log3 $name,5,"[DoorPi_Set] received unlockandopen command from DoorPi, but is already unlocked";
-         $v=DoorPi_Cmd($hash,"dooropen");
-     
-       #-- error message 
-       }else{
-         Log3 $name, 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but uncertain lockstate";
-         return;
-       }
-       
-    #-- from DoorPi: door has to be locked if necessary
-    }elsif( $value eq "softlock" ){
-       
-       #-- locking the door now
-       if( $lockstate eq "unlocked" ){
-         if( AttrVal($name, "doorlockcmd",undef) ){
-           fhem(AttrVal($name, "doorlockcmd",undef));
-           Log 1,"[DoorPi_Set] received softlock command from DoorPi and executed FHEM doorlock command";
-           readingsSingleUpdate($hash,"lockstate","locked",1);
-           readingsSingleUpdate($hash,$door,"locked",1);
-           $v=DoorPi_Cmd($hash,"doorlocked");
-         }else{
-           Log 1,"[DoorPi_Set] received softlock command from DoorPi, but no FHEM doorlock command";
-         }
-       }elsif( $lockstate eq "locked" ){
-         Log 1,"[DoorPi_Set] received softlock command from DoorPi, but is already locked";
-       }else{
-         #-- error message
-         Log 1,"[DoorPi_Set] received softlock command from DoorPi, but uncertain lockstate";
-         return;
-       }
-       
-    #-- from FHEM: unlocking the door
-    }elsif( $value eq "unlocked" ){
-      #-- careful here - 
-      #   a third parameter indicates that the door is already unlocked
-      #   because the command has been issued by the lock itself
-      if( (AttrVal($name, "doorunlockcmd",undef)) && (!$a[0]) ){
-        fhem(AttrVal($name, "doorunlockcmd",undef));
-        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and executed FHEM doorunlock command";
-      }else{
-        #Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed FHEM doorunlock command";
-      }
-      readingsSingleUpdate($hash,"lockstate","unlocked",1);
-      readingsSingleUpdate($hash,$door,"unlocked",1);
-      $v=DoorPi_Cmd($hash,"doorunlocked");
-      
-    #-- from FHEM: locking the door
-    }elsif( $value eq "locked" ){
-       #-- careful here - 
-       #   a third parameter indicates that the door is already unlocked
-       if( (AttrVal($name, "doorlockcmd",undef)) && (!$a[0]) ){
-        fhem(AttrVal($name, "doorlockcmd",undef));
-        Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and executed extra FHEM doorlock command";
-      }else{
-        #Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and NOT executed extra FHEM doorlock command";
-      }
-      readingsSingleUpdate($hash,"lockstate","locked",1);
-      readingsSingleUpdate($hash,$door,"locked",1);
-      $v=DoorPi_Cmd($hash,"doorlocked");
-    }
+    DoorPi_Door($hash,$value,$a[0]);
     
   #-- snapshot
   }elsif( $key eq "$snapshot" ){
@@ -515,6 +416,195 @@ sub DoorPi_Set ($@) {
 
 #######################################################################################
 #
+# DoorPi_Door - complicated sequence to perform locking and unlocking
+#
+# Parameter hash 
+#
+#######################################################################################
+
+sub DoorPi_Door {
+
+  my ($hash,$cmd,$param) = @_;
+ 
+  my $fhemcmd;
+  my $v;
+  
+  my $name      = $hash->{NAME};
+  my $door      = AttrVal($name, "doorbutton", "door");
+  my $lockstate = DoorPi_GetLockstate($hash);
+  
+  #-- BRANCH 1: opened from FHEM, door opening, forward to DoorPi 
+  if( (($cmd) && ($cmd eq "opened")) || ((!$cmd) && ($hash->{DELAYED} =~ /^open.*/)) ){
+    $hash->{DELAYED} = "";
+    #-- doit
+    $v=DoorPi_Cmd($hash,"dooropen");
+    Log3 $name, 1,"[DoorPi_Door 1] sent 'dooropen' command to DoorPi";
+    readingsSingleUpdate($hash,$door,"opened",1);
+    #-- extra fhem command
+    $fhemcmd = AttrVal($name, "dooropencmd",undef);
+    fhem($fhemcmd)
+      if($fhemcmd);
+   
+  #-- BRANCH 2: unlockandopen from DoorPi: door has to be unlocked if necessary
+  }elsif( $cmd eq "unlockandopen" ){
+    #-- unlocking the door now, delayed opening
+    if( $lockstate =~ /^locked.*/ ){
+      Log3 $name, 1,"[DoorPi_Door] BRANCH 2.1 cmd=$cmd lockstate=$lockstate";
+      $fhemcmd=AttrVal($name, "doorunlockcmd",undef);
+      #-- check for undefined doorunlockcmd
+      if( !$fhemcmd ){
+        Log3 $name,5,"[DoorPi_Door 2.1] 'unlockandopen' command from DoorPi, but no FHEM doorunlock command defined";
+        return
+      }
+      #--doit
+      $v=DoorPi_Cmd($hash,"doorunlocked"); 
+      Log3 $name, 1,"[DoorPi_Door 2.1] sent 'doorunlocked' command to DoorPi";
+      fhem($fhemcmd); 
+      readingsSingleUpdate($hash,$door,"unlocked",1);
+      readingsSingleUpdate($hash,"lockstate","unlocked (pending)",1);        
+       
+      my $dly=AttrVal($name, "dooropendly",7);
+      #-- delay by fixed number of seconds. lockstate will change then !
+      if( $dly =~ /\d+/ ){       
+        $hash->{DELAYED} = "open_time";
+        InternalTimer(gettimeofday() + $dly, "DoorPi_Door", $hash,0);
+      #-- delay by event
+      }else{
+        $hash->{DELAYED} = "open_event";
+        fhem(" define dooropendelay notify $dly set $name $door opened");   
+      }
+    #-- no unlocking, seems to be unlocked already
+    }elsif ($lockstate =~ /^unlocked.*/){
+      Log3 $name, 1,"[DoorPi_Door] BRANCH 2.2 cmd=$cmd lockstate=$lockstate";
+      #-- doit
+      $v=DoorPi_Cmd($hash,"dooropen");
+      Log3 $name, 1,"[DoorPi_Door 2.2] sent 'dooropen' command to DoorPi";       
+      readingsSingleUpdate($hash,$door,"opened",1);
+      #-- extra fhem command
+      $fhemcmd = AttrVal($name, "dooropencmd",undef);
+      fhem($fhemcmd)
+        if($fhemcmd);
+    #-- error message 
+    }else{
+      Log3 $name, 1,"[DoorPi_Door 2.3] 'unlockandopen' command from DoorPi ignored, because current lockstate=$lockstate";
+      return;
+    }
+   
+  #-- BRANCH 3: softlock from DoorPi: door has to be locked if necessary
+  }elsif( $cmd eq "softlock" ){  
+   #-- ignoring because hardlock has been issued before
+    if( $hash->{DELAYED} eq "hardlock" ){
+      Log3 $name, 1,"[DoorPi_Door] BRANCH 3.2 cmd=$cmd lockstate=$lockstate";
+      Log3 $name, 1,"[DoorPi_Door 3.2] 'softlock' command from DoorPi ignored, because following a hardlock";
+      $hash->{DELAYED} = "";
+    #-- locking the door now
+    }elsif( $lockstate =~ /^unlocked.*/ ){
+      Log3 $name, 1,"[DoorPi_Door] BRANCH 3.1 cmd=$cmd lockstate=$lockstate";
+      $fhemcmd=AttrVal($name, "doorlockcmd",undef);
+      #-- check for undefined doorlockcmd
+      if( !$fhemcmd ){
+        Log3 $name,5,"[DoorPi_Door 3.1] 'softlock' command from DoorPi, but no FHEM doorlock command defined";           
+        return
+      }
+      #-- doit   
+      $v=DoorPi_Cmd($hash,"doorlocked");
+      Log3 $name, 1,"[DoorPi_Door 3.1] sent 'doorlocked' command to DoorPi";
+      fhem($fhemcmd); 
+      readingsSingleUpdate($hash,$door,"locked",1);
+      readingsSingleUpdate($hash,"lockstate","locked (pending)",1);
+    #-- error message 
+    }else{
+      Log3 $name, 1,"[DoorPi_Door 3.2] 'softlock' command from DoorPi ignored, because current lockstate=$lockstate";
+      return;
+    }
+       
+  #-- BRANCH 4.1: unlocked command from FHEM
+  }elsif( $cmd eq "unlocked" ){
+    Log3 $name, 1,"[DoorPi_Door] BRANCH 4.1 cmd=$cmd lockstate=$lockstate";
+    #-- careful here - 
+    #   a third parameter indicates that the door is already unlocked
+    #   because the command has been issued by the lock itself
+    $fhemcmd=AttrVal($name, "doorunlockcmd",undef);
+    #-- check for undefined doorunlockcmd    
+    if( !$fhemcmd ){
+      Log3 $name,5,"[DoorPi_Door 4.1] 'unlocked' command from FHEM, but no FHEM doorunlock command defined";           
+      return
+    }
+    #-- doit
+    $v=DoorPi_Cmd($hash,"doorunlocked");
+    Log3 $name, 1,"[DoorPi_Door 4.1] sent 'doorunlocked' command to DoorPi";
+    if( !$param ){
+      fhem($fhemcmd); 
+    }else{
+       Log3 $name, 1,"[DoorPi_Door 4.1] 'unlocked' command from FHEM ignored, because param=$param";
+    }
+    readingsSingleUpdate($hash,$door,"unlocked",1);
+    readingsSingleUpdate($hash,"lockstate","unlocked (pending)",1)
+    
+  #-- BRANCH 4.2: locked command from FHEM
+  }elsif( $cmd eq "locked" ){
+    Log3 $name, 1,"[DoorPi_Door] BRANCH 4.2 cmd=$cmd lockstate=$lockstate";
+    #-- careful here - 
+    #   a third parameter indicates that the door is already unlocked
+    #   because the command has been issued by the lock itself
+    $fhemcmd=AttrVal($name, "doorlockcmd",undef);
+    #-- check for undefined doorlockcmd    
+    if( !$fhemcmd ){
+      Log3 $name,5,"[DoorPi_Door 4.2] 'locked' command from FHEM, but no FHEM doorlock command defined";           
+      return
+    }
+    #-- doit
+    $v=DoorPi_Cmd($hash,"doorlocked");
+    Log3 $name, 1,"[DoorPi_Door 4.2] sent 'doorlocked' command to DoorPi";
+    if( !$param ){
+      #--- 'softlock' will follow from DoorPi, needs to be ignored
+      $hash->{DELAYED} = "hardlock";
+      fhem($fhemcmd); 
+    }else{
+       Log3 $name, 1,"[DoorPi_Door 4.2] 'locked' command from FHEM ignored, because param=$param";
+    }
+    readingsSingleUpdate($hash,$door,"locked",1);
+    readingsSingleUpdate($hash,"lockstate","locked (pending)",1)
+  }else{
+    Log3 $name, 1,"[DoorPi_Door] with invalid arguments $hash $cmd";
+  }
+}
+
+#######################################################################################
+#
+# DoorPi_GetLockstate - determine the lockstate of the door
+#
+# Parameter hash 
+#
+#######################################################################################
+
+sub DoorPi_GetLockstate($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $ret;
+  
+  my $dev = AttrVal($name,"doorlockreading",undef);
+  if( !$dev ){
+    $ret = "unknown(1)";
+  }else{    
+    my ($devn,$readn) = split(/:/,$dev,2);
+    if( !$devn || !$readn ){
+      $ret = "unknown(1)";
+    }else{
+      $ret = ReadingsVal($devn,$readn,"unknown(3)");
+    }
+  }
+  if( $ret =~ /^locked.*/){
+    DoorPi_Cmd($hash,"locked");
+  }elsif( $ret =~ /^unlocked.*/){
+    DoorPi_Cmd($hash,"unlocked");
+  } 
+  readingsSingleUpdate($hash,"lockstate",$ret,1);
+  return $ret;
+}
+
+#######################################################################################
+#
 # DoorPi_GetConfig - acts as callable program DoorPi_GetConfig($hash)
 #                    and as callback program  DoorPi_GetConfig($hash,$err,$status)
 #
@@ -529,27 +619,27 @@ sub DoorPi_GetConfig {
   
   #-- get configuration from doorpi
   if ( !$hash ){
-    Log 1,"[DoorPi_GetConfig] called without hash";
+    Log3 $name, 1,"[DoorPi_GetConfig] called without hash";
     return undef;
   }elsif ( $hash && !$err && !$status ){
     $url    = "http://".$hash->{TCPIP}."/status?module=config";
-    #Log 1,"[DoorPi_GetConfig] called with only hash => Issue a non-blocking call to $url";  
+    #Log3 $name, 5,"[DoorPi_GetConfig] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback => sub($$$){ DoorPi_GetConfig($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err ){
-    Log 1,"[DoorPi_GetConfig] has error $err";
+    Log3 $name, 1,"[DoorPi_GetConfig] has error $err";
     readingsSingleUpdate($hash,"config",$err,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  #Log 1,"[DoorPi_GetConfig] has obtained data";
+  #Log3 $name, 1,"[DoorPi_GetConfig] has obtained data";
  
   #-- test if this is valid JSON
   if( !is_valid_json($status) ){
-    Log 1,"[DoorPi_GetConfig] but data is invalid";
+    Log3 $name, 1,"[DoorPi_GetConfig] but data is invalid";
     readingsSingleUpdate($hash,"config","invalid data",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -568,7 +658,7 @@ sub DoorPi_GetConfig {
   }
   
   if($fskey){
-    Log 1,"[DoorPi_GetConfig] virtual keyboard is named defined as \"$fskey\"";
+    Log3 $name, 1,"[DoorPi_GetConfig] virtual keyboard is named defined as \"$fskey\"";
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
     
@@ -620,39 +710,44 @@ sub DoorPi_GetConfig {
       }elsif($key =~ /gettarget/){
         if( !AttrVal($name,"target0",undef) && !AttrVal($name,"target1",undef) &&
             !AttrVal($name,"target2",undef) && !AttrVal($name,"target3",undef) ){
-           Log 1,"[DoorPi_GetConfig] Warning: No attribute named \"target[0|1|2|3]\" defined";
+           Log3 $name, 1,"[DoorPi_GetConfig] Warning: No attribute named \"target[0|1|2|3]\" defined";
         } else {
           push(@{ $hash->{HELPER}->{CMDS}},"target");
           $gtt = 1;
         }
-      #-- one of the possible other commands
+      #-- one of the possible other commands,
       }else{
         push(@{ $hash->{HELPER}->{CMDS}},$key)
       }
     }
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."on\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."on\" defined"
       if( $son==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."off\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."off\" defined"
       if( $soff==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$snapshot."\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$snapshot."\" defined"
       if( $snon==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
       if( $loff==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."on\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."on\" defined"
       if( $lon==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
       if( $loff==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."on\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."on\" defined"
       if( $don==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."off\" defined"
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."off\" defined"
       if( $doff==0 ); 
     
   }else{
-    Log 1,"[DoorPi_GetConfig] Warning: No keyboard \"filesystem\" defined";
+    Log3 $name, 1,"[DoorPi_GetConfig] Warning: No keyboard \"filesystem\" defined";
   };
   
   $hash->{HELPER}->{wwwpath} = $jhash0->{"config"}->{"DoorPiWeb"}->{"www"};
-   
+  
+  #-- temporary way to reset the Arduino in the lock
+  DoorPi_Cmd($hash,"doorlocked"); 
+  DoorPi_Cmd($hash,"doorunlocked"); 
+  $hash->{DELAYED} = "";
+  
   #-- put into READINGS
   readingsSingleUpdate($hash,"state","initialized",1);
   readingsSingleUpdate($hash,"config","ok",1);
@@ -675,27 +770,27 @@ sub DoorPi_GetLastSnapshot {
   
   #-- get configuration from doorpi
   if ( !$hash ){
-    Log 1,"[DoorPi_GetLastSnapshot] called without hash";
+    Log3 $name, 1,"[DoorPi_GetLastSnapshot] called without hash";
     return undef;
   }elsif ( $hash && !$err && !$status ){
     $url    = "http://".$hash->{TCPIP}."/status?module=config";
-    #Log 1,"[DoorPi_GetLastSnapshot] called with only hash => Issue a non-blocking call to $url";  
+    #Log3 $name, 1,"[DoorPi_GetLastSnapshot] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback => sub($$$){ DoorPi_GetLastSnapshot($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err ){
-    Log 1,"[DoorPi_GetLastSnapshot] has error $err";
+    Log3 $name, 1,"[DoorPi_GetLastSnapshot] has error $err";
     readingsSingleUpdate($hash,"snapshot",$err,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  Log 1,"[DoorPi_GetLastSnapshot] has obtained data";
+  Log3 $name, 5,"[DoorPi_GetLastSnapshot] has obtained data";
  
   #-- test if this is valid JSON
   if( !is_valid_json($status) ){
-    Log 1,"[DoorPi_GetLastSnapshot] but data is invalid";
+    Log3 $name, 1,"[DoorPi_GetLastSnapshot] but data is invalid";
     readingsSingleUpdate($hash,"snapshot","invalid data",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -710,7 +805,7 @@ sub DoorPi_GetLastSnapshot {
   $url = "http://".$hash->{TCPIP}."/";
   $lastsnap =~ s/\/home\/doorpi\/records\//$url/;
   
-  Log 1,"[DoorPi_GetLastSnapshot] returns $lastsnap";
+  Log3 $name, 5,"[DoorPi_GetLastSnapshot] returns $lastsnap";
    
   #-- put into READINGS
   readingsSingleUpdate($hash,"snapshot",$lastsnap,1);
@@ -733,52 +828,52 @@ sub DoorPi_GetHistory {
   my $url;
   my $state= $hash->{READINGS}{state}{VAL};
     if( ( $state ne "initialized") && ($state ne "alive") ){
-    Log 1,"[DoorPi_GetHistory] cannot be called, no connection";
+    Log3 $name, 1,"[DoorPi_GetHistory] cannot be called, no connection";
     return
   }
   
   #-- obtain call history and snapshot history from doorpi
   if ( !$hash ){
-    Log 1,"[DoorPi_GetHistory] called without hash";
+    Log3 $name, 1,"[DoorPi_GetHistory] called without hash";
     return undef;
   }elsif ( $hash && !$err1 && !$status1 && !$err2 && !$status2 ){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_event&name=OnCallStateChange&value=1000";
-    #Log 1,"[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
+    #Log3 $name,5, "[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback => sub($$$){ DoorPi_GetHistory($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err1 && !$status1 && !$err2 && !$status2 ){
-    Log 1,"[DoorPi_GetHistory] has error $err1";
+    Log3 $name, 1,"[DoorPi_GetHistory] has error $err1";
     readingsSingleUpdate($hash,"call_history",$err1,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }elsif ( $hash && !$err1 && $status1 && !$err2 && !$status2 ){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_snapshot";
-    #Log 1,"[DoorPi_GetHistory] called with hash and data from first call => Issue a non-blocking call to $url";  
+    #Log3 $name,5, "[DoorPi_GetHistory] called with hash and data from first call => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback => sub($$$){ DoorPi_GetHistory($hash,$err1,$status1,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && !$err1 && $status1 && $err2){
-    Log 1,"[DoorPi_GetHistory] has error2 $err2";
+    Log3 $name, 1,"[DoorPi_GetHistory] has error2 $err2";
     readingsSingleUpdate($hash,"call_history",$err2,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }
-  #Log 1,"[DoorPi_GetHistory] has obtained data in two calls";
+  #Log3 $name, 1,"[DoorPi_GetHistory] has obtained data in two calls";
 
   #-- test if this is valid JSON
   if( !is_valid_json($status1) ){
-    Log 1,"[DoorPi_GetHistory] but data from first call is invalid";
+    Log3 $name,1 ,"[DoorPi_GetHistory] but data from first call is invalid";
     readingsSingleUpdate($hash,"call_history","invalid data 1st call",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
   if( !is_valid_json($status2) ){
-    Log 1,"[DoorPi_GetHistory] but data from second call is invalid";
+    Log3 $name, 1,"[DoorPi_GetHistory] but data from second call is invalid";
     readingsSingleUpdate($hash,"call_history","invalid data 2nd call",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -791,12 +886,12 @@ sub DoorPi_GetHistory {
   #-- decode call history
   if(ref($jhash0->{"history_event"}) ne 'ARRAY'){
      my $mga="Warning - has found an empty event history";
-     Log 1,"[DoorPi_GetHistory] ".$mga;
+     Log3 $name,2,"[DoorPi_GetHistory] ".$mga;
      return $mga
   }
   if(ref($khash0->{"history_snapshot"}) ne 'ARRAY'){
      my $mga="Warning - has found an empty snapshot history";
-     Log 1,"[DoorPi_GetHistory] ".$mga;
+     Log3 $name, 2,"[DoorPi_GetHistory] ".$mga;
      return $mga
   }
   my @history_event    = ($jhash0)?@{$jhash0->{"history_event"}}:();
@@ -807,7 +902,7 @@ sub DoorPi_GetHistory {
   @{$hash->{DATA}} = ();
   my ($event,$jhash1,$jhash2,$call_state,$call_state2,$callstart,$callend,$calletime,$calletarget,$callstime,$callstarget,$callsnap,$callrecord,$callstring);
   
-  Log 1,"[DoorPi_GetHistory] found ".int(@history_event)." events";
+  Log3 $name,3,"[DoorPi_GetHistory] found ".int(@history_event)." events";
   
   #-- going backward through the calls
   my $i=0;
@@ -846,7 +941,7 @@ sub DoorPi_GetHistory {
         } until( ($j > 5) || ($call_state2 == 18) || ($i+$j >= int(@history_event))  );
         
         my $call_pattern = join("-",@call_states);
-        #Log 1,"[DoorPi_GetHistory] Pattern for call is $call_pattern, proceeding with event no. ".($i+$j); 
+        #Log3 $name, 1,"[DoorPi_GetHistory] Pattern for call is $call_pattern, proceeding with event no. ".($i+$j); 
         
         if( $call_pattern =~ /1(3|8)\-.*\-2/ ){
           $callend = "ok(2)";
@@ -859,7 +954,7 @@ sub DoorPi_GetHistory {
         }
         
         if( $calletarget ne $callstarget){
-           Log 1,"[DoorPi_GetHistory] Found error in call history of target $calletarget";
+           Log3 $name, 1,"[DoorPi_GetHistory] Found error in call history of target $calletarget";
         }
         
         #-- Format values
@@ -909,7 +1004,7 @@ sub DoorPi_GetHistory {
               }
            }
            if( $found == 0 ){
-              Log 1,"[DoorPi_GetHistory] No snapshot found with $snapshot";
+              Log3 $name, 1,"[DoorPi_GetHistory] No snapshot found with $snapshot";
            }
         }
              
@@ -932,11 +1027,11 @@ sub DoorPi_GetHistory {
               }
            }
            if( $found == 0 ){
-              Log 1,"[DoorPi_GetHistory] No record found with $record";
+              Log3 $name, 1,"[DoorPi_GetHistory] No record found with $record";
            }
         }
                 
-        #Log 1,"$snapshot $record";
+        #Log3 $name, 1,"$snapshot $record";
         
         #-- store this
         push(@{ $hash->{DATA}}, [$state,$timestamp,$number,$result,$duration,$snapshot,$record] );
@@ -955,8 +1050,6 @@ sub DoorPi_GetHistory {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"call_listed",int(@{ $hash->{DATA}}));
   readingsBulkUpdate($hash,"call_history","ok");
-  #readingsBulkUpdate($hash,$dashlight,$dashlightstate);
-  #readingsBulkUpdate($hash,$light,$lightstate);
   readingsEndUpdate($hash,1); 
   return undef;
 }
@@ -978,7 +1071,7 @@ sub DoorPi_GetHistory {
   my $state = $hash->{READINGS}{state}{VAL};
   
   if( ($state ne "initialized") && ($state ne "alive") ){
-    Log 1,"[DoorPi_Cmd] cannot be called, no connection";
+    Log3 $name, 1,"[DoorPi_Cmd] cannot be called, no connection";
     return
   }
     
@@ -986,22 +1079,22 @@ sub DoorPi_GetHistory {
      $url    = "http://".$hash->{TCPIP}."/control/trigger_event?".
                "event_name=OnKeyPressed_".$hash->{HELPER}->{vkeyboard}.".".
                $cmd."&event_source=doorpi.keyboard.from_filesystem";
-     #Log 1,"[DoorPi_Cmd] called with only hash => Issue a non-blocking call to $url";  
+     #Log3 $name, 5,"[DoorPi_Cmd] called with only hash => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ DoorPi_Cmd($hash,$cmd,$_[1],$_[2]) }
      });
      return undef;
   }elsif ( $hash && $err ){
-    Log 1,"[DoorPi_Cmd] has error $err";
+    Log3 $name, 1,"[DoorPi_Cmd] has error $err";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  #Log 1,"[DoorPi_Cmd] has obtained data $data";
+  #Log3 $name, 1,"[DoorPi_Cmd] has obtained data $data";
  
   #-- test if this is valid JSON
   if( !is_valid_json($data) ){
-    Log 1,"[DoorPi_Cmd] invalid data";
+    Log3 $name,1,"[DoorPi_Cmd] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
@@ -1032,25 +1125,25 @@ sub DoorPi_PurgeDB {
   
   #-- purge doorpi database
   if ( !$hash ){
-    Log 1,"[DoorPi_PurgeDB] called without hash";
+    Log3 $name, 1,"[DoorPi_PurgeDB] called without hash";
     return undef;
   }elsif ( $hash && !$err && !$status){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_event&name=purge&value=1.0";
-    # 1,"[DoorPi_PurgeDB] called with only hash => Issue a non-blocking call to $url";  
+    #Log3 $name, 5,"[DoorPi_PurgeDB] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
-      url      => $url,
+      url      => $url, 
       callback => sub($$$){ DoorPi_PurgeDB($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err ){
-    Log 1,"[DoorPi_PurgeDB] has error $err";
+    Log3 $name, 1,"[DoorPi_PurgeDB] has error $err";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  #Log 1,"[DoorPi_PurgeDB] has obtained data $status";
+  #Log3 $name, 1,"[DoorPi_PurgeDB] has obtained data $status";
   #-- test if this is valid JSON
   if( !is_valid_json($status) ){
-    Log 1,"[DoorPi_PurgeDB] invalid data";
+    Log3 $name, 1,"[DoorPi_PurgeDB] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
@@ -1131,11 +1224,11 @@ sub DoorPi_inform($){
   my $name = $hash->{NAME};
   my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
       
-  Log3 $name, 1, "[Doorpi_inform]- inform all FHEMWEB clients";
+  Log3 $name, 5, "[DoorPi_inform] inform all FHEMWEB clients";
   my $count = 0;
         
   foreach my $line (DoorPi_list($hash,1)){
-    #Log 1,"[Doorpi_Set] - informing $name";
+    #Log3 $name, 1,"[Doorpi_Set] - informing $name";
     FW_directNotify($name, $line, 1);
     $count++;
   }
@@ -1419,6 +1512,10 @@ sub DoorPi_list($;$){
         Door locking and unlocking is executed by FHEM only. After an unlocking action, the following 
         opening action will be delayed either by a fixed number of seconds or by waiting for an event.
         <ul>
+            <li><a name="doorpi_doorlockreading"><code>attr &lt;DoorPi-Device&gt; doorlockreading
+                        &lt;string&gt;:&lt;string&gt;</code></a>
+                <br />combination of FHEM &lt;devicename&gt::&lt;reading&gt; parameters 
+                        to determine the state of the door lock (no default)</li>
             <li><a name="doorpi_doorlockcmd"><code>attr &lt;DoorPi-Device&gt; doorlockcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command for door locking action (no default)</li>
