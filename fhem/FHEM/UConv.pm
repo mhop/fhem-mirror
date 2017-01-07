@@ -442,6 +442,8 @@ sub values2weathercondition($$$$$) {
         $condition = "cloudy";
     }
 
+    $condition = "nt_" . $condition if ( !$isday );
+
     return $condition;
 }
 
