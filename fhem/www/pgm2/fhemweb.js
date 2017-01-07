@@ -672,19 +672,29 @@ FW_rawDef()
 var FW_pollConn;
 var FW_longpollOffset = 0;
 var FW_leaving;
+var FW_lastDataTime=0;
 
 function
 FW_doUpdate(evt)
 {
   var errstr = "Connection lost, trying a reconnect every 5 seconds.";
   var input="";
+  var retryTime = 5000;
+  var now = new Date()/1000;
+
+  // iOS closes HTTP after 60s idle, websocket after 240s idle
+  if(now-FW_lastDataTime > 59) {
+    errstr="";
+    retryTime = 100;
+  }
+  FW_lastDataTime = now;
 
   if(evt.target instanceof WebSocket) {
     if(evt.type == 'close' && !FW_leaving) {
-      FW_errmsg(errstr, 4900);
+      FW_errmsg(errstr, retryTime-100);
       FW_pollConn.close();
       FW_pollConn = undefined;
-      setTimeout(FW_longpoll, 5000);
+      setTimeout(FW_longpoll, retryTime);
       return;
     }
     input = evt.data;
@@ -696,8 +706,8 @@ FW_doUpdate(evt)
         location.reload();
         return;
       }
-      FW_errmsg(errstr, 4900);
-      setTimeout(FW_longpoll, 5000);
+      FW_errmsg(errstr, retryTime-100);
+      setTimeout(FW_longpoll, retryTime);
       return;
     }
 
@@ -1411,8 +1421,8 @@ loadScript(sname, callback, force)
     }
     script.onload = function(){
       scriptLoaded();
-      if(FW_isiOS)
-        FW_longpoll();
+      // if(FW_isiOS)           // Fixed in the maintime/not needed with 10.2
+      //   FW_longpoll();
     }
   }
   h.appendChild(script);
@@ -1456,3 +1466,10 @@ scriptAttribute(sname)
   return ua;
 }
 /*************** SCRIPT LOAD FUNCTIONS END **************/
+
+function print_call_stack() {
+  var stack = new Error().stack;
+  console.log("PRINTING CALL STACK");
+  console.log( stack );
+}
+
