@@ -1,6 +1,6 @@
 "use strict";
 
-// $Id$
+var version="$Id: fhemweb.js 12993 2017-01-07 07:22:56Z rudolfkoenig";
 
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
@@ -54,10 +54,11 @@ FW_replaceWidgets(parent)
 function
 FW_jqueryReadyFn()
 {
+  log(version);
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
   FW_longpollType = $("body").attr("longpoll");
-  if($("body").attr("longpoll") != "0")
+  if(FW_longpollType != "0")
     setTimeout("FW_longpoll()", 100);
 
   $("a").each(function() { FW_replaceLink(this); })
