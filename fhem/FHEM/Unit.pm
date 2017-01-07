@@ -1281,10 +1281,13 @@ my $rtypes = {
     condition_weather => {
         ref_base => 900,
         txt      => {
-            de => [ 'klar',  'sonnig ', 'bewölkt', 'Regen' ],
-            en => [ 'clear', 'sunny',   'cloudy',   'rain' ],
+            de => [ 'klar',  'sonnig', 'bewölkt', 'Regen' ],
+            en => [ 'clear', 'sunny',  'cloudy',   'rain' ],
         },
-        scope => [ '^(clear|0)$', '^(sunny|1)$', '^(cloudy|2)$', '^(rain|3)$' ],
+        scope => [
+            '^((nt_)?clear|nt_sunny|0)$', '^(sunny|1)$',
+            '^((nt_)?cloudy|2)$',         '^((nt_)?rain|3)$'
+        ],
         rtype_description => {
             de => 'Wetterbedingung',
             en => 'weather condition',
