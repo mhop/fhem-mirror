@@ -541,6 +541,7 @@ use vars qw(%zwave_parseHook);
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
                            "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
+                           "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
                            "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
                            "0115-0100-0102" => "ZME_KFOB" );
@@ -556,6 +557,12 @@ our %zwave_deviceSpecial;
       parse => { "0891010f260303(..)(..)" =>
                   'sprintf("position:Blind %d Slat %d",hex($1),hex($2))',
                  "0891010f260302(..)00" =>'"position:".hex($1)' } } },
+
+   Fibaro_FGS223 => {
+     ASSOCIATION => {
+       init => {ORDER=>50, CMD => '"set $NAME associationDel 1 $CTRLID"'} },
+     MULTI_CHANNEL_ASSOCIATION => {
+       init => {ORDER=>51, CMD => '"set $NAME mcaAdd 1 0 $CTRLID 1"'} } },
 
    Philio_PSE02 => {
      ALARM => {
