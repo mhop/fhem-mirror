@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 07/2016
-my $thzversion = "0.153";
+my $thzversion = "0.154";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -236,7 +236,7 @@ my %parsinghash = (
 	      [" actualPower_Qc: ",	5, 8, "n.a.", 1],	[" actualPower_Pel: ",		5, 8, "n.a.", 1],
 	      [" collectorTemp: ",	4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
-  "FCtime" => [["Weekday: ", 4, 1,  "weekday", 1],		[" Hour: ",	6, 2, "hex", 1],
+  "FCtime" => [["Weekday: ", 5, 1,  "weekday", 1],		[" Hour: ",	6, 2, "hex", 1],
 	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
 	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
