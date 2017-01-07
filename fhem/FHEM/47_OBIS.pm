@@ -307,7 +307,7 @@ sub OBIS_trySMLdecode($$)
 #	    		my $telegramm = $&;
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
       			Log3 $hash, 5,"OBIS: Telegram=$msg";
-      			Log 3,Dumper(@list);
+#      			Log 3,Dumper(@list);
       			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		if ($line eq '255-255:255.255.255*255(') {
