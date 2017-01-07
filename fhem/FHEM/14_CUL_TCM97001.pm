@@ -159,6 +159,7 @@ sub checkCRC {
 #
 sub checkCRCKW9010 {
   my $msg = shift;
+  Log3 "CUL_TCM97001", 5 , "crc calc for: $msg";
   my @a = split("", $msg);
   my $bitReverse = undef;
   my $x = undef;
@@ -173,6 +174,8 @@ sub checkCRCKW9010 {
 
   my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
             +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
+  Log3 "CUL_TCM97001", 5 , "calc crc is: $CRC";
+  Log3 "CUL_TCM97001", 5 , "ref crc is :".hex($aReverse[8]);
   if ($CRC == hex($aReverse[8])) {
       return TRUE;
   }
@@ -1030,8 +1033,8 @@ CUL_TCM97001_Parse($$)
 
 
     
-    if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
-  #if (checkCRCKW9010($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
+    #if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
+    if (checkCRCKW9010($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
         # Re: Tchibo Wetterstation 433 MHz - KW9010
         # See also http://forum.arduino.cc/index.php?PHPSESSID=ffoeoe9qeuv7rf4fh0d637hd74&topic=136836.msg1536416#msg1536416
         #                 /------------------------------------- Random ID part one      
@@ -1056,9 +1059,10 @@ CUL_TCM97001_Parse($$)
         my $bitReverse = undef;
         my $x = undef;
         foreach $x (@a) {
-           my $bin3=sprintf("%024b",hex($x));
-           $bitReverse = $bitReverse . substr(reverse($bin3),0,4); 
+		    $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 
         }
+        Log3 $hash, 5 , "KW9010 CRC Matched: ($bitReverse)";
+        
         my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
 
         #Split reversed a again
@@ -1073,10 +1077,12 @@ CUL_TCM97001_Parse($$)
            # positive temp
            $temp = (hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256)/10;
         }
-        $humidity = hex($aReverse[7]).hex($aReverse[6]) - 156;
+        $humidity = hex($aReverse[7].$aReverse[6]) - 156;
         
 
         if (checkValues($temp, $humidity)) {
+            Log3 $hash, 5 , "KW9010 values are matching";
+            
             $batbit = (hex($a[2]) & 0x8) >> 3;
             #$mode = (hex($a[2]) & 0x4) >> 2; 
             $channel = ((hex($a[1])) & 0xC) >> 2;
@@ -1111,6 +1117,8 @@ CUL_TCM97001_Parse($$)
             
             $readedModel=$model;
         } else {
+       		Log3 $hash, 5 , "KW9010 t:$temp / h:$humidity mismatch";
+       		
             $name = "Unknown";
         }
     } 
