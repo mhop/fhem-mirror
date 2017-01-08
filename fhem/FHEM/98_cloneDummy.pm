@@ -16,6 +16,12 @@
 # attr <name> cloneIgnore <reading1,reading2,...,readingX>
 # attr <name> addStateEvent 1 (0 ist Vorgabe)
 #
+################################################################################
+#
+# 2017-01-08 (betateilchen)
+#            changed: do not use NOTIFYDEFV
+#            fixed:   set $rval in _state instead of $reading
+#            added:   new attribute deleteBeforeUpdate
 #
 ################################################################################
 
@@ -34,6 +40,7 @@ sub cloneDummy_Initialize($) {
   $hash->{NotifyFn}  = "cloneDummy_Notify";
   $hash->{AttrList}  = "cloneIgnore "
                        ."addStateEvent:0,1 "
+                       ."deleteBeforeUpdate:0,1 "
                        .$readingFnAttributes;
 }
 
@@ -51,8 +58,13 @@ sub cloneDummy_Define($$) {
   if($a[0] eq $a[2]);
 
   my $hn = $hash->{NAME};
-  $hash->{NOTIFYDEV} = $a[2];
-  $hash->{NOTIFYSTATE} = $a[3] if(defined($a[3]));
+  # do some cleanup in case of "modify DEF"
+  delete $hash->{READINGS};
+  delete $hash->{NDEV}   if (defined($hash->{NDEV}));
+  delete $hash->{NSTATE} if (defined($hash->{NSTATE}));
+
+  $hash->{NDEV} = $a[2];
+  $hash->{NSTATE} = $a[3] if(defined($a[3]));
   $attr{$hn}{stateFormat} = "_state" if(defined($a[3]));
   readingsSingleUpdate($hash,'state','defined',1);
   Log3($hash,4,"cloneDummy: $a[0] defined for source $a[2]");
@@ -64,34 +76,38 @@ sub cloneDummy_Define($$) {
 ################################################################################
 sub cloneDummy_Notify($$) {
   my ($hash, $dev) = @_;
-  my $dn      = $dev->{NAME};                                                   # Devicename
-  my $hn      = $hash->{NAME};                                                  # Quellname
-  my $hs      = "";                                                             # optionales reading fuer STATE
-  my $events = deviceEvents($dev, AttrVal($hn, "addStateEvent", 0));            # Quellevents
-  my $max = int(@{$events});							# Anzahl Quellevents
-  if(defined($hash->{NOTIFYSTATE})) {
-    $hs = $hash->{NOTIFYSTATE};
+  my $dn      = $dev->{NAME};                                         # Devicename
+  my $hn      = $hash->{NAME};                                        # Quellname
+  my $hs      = "";
+
+  return if ($dn ne $hash->{NDEV});                                   # nothing to do!
+  
+  my $events = deviceEvents($dev, AttrVal($hn, "addStateEvent", 0));  # Quellevents
+  my $max = int(@{$events});							              # Anzahl Quellevents
+
+  if(defined($hash->{NSTATE})) {
+    $hs = $hash->{NSTATE};
   }
 
-  readingsSingleUpdate($hash,"state", "active",1);
+  delete $hash->{READINGS} if(AttrVal($hn,'deleteBeforeUpdate',0));
+  
   readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,'state', 'active');
 
   for(my $i=0;$i<$max;$i++){
-    my $reading = $events->[$i];                                                # Quellevents in einzelne Readings ueberfuehren
+    my $reading = $events->[$i];                                                # Quellevents vereinzeln
     $reading = "" if(!defined($reading));
     Log3($hash,4, "cloneDummy: $hash D: $dn R: $reading");
-    my ($rname,$rval) = split(/ /,$reading,2);                                  # zerlegen des Quellevents in Name und Wert
+    my ($rname,$rval) = split(/ /,$reading,2);                                  # zerlegen in Name und Wert
     $rname = substr($rname,0,length($rname)-1);
-    my %check = map { $_ => 1 } split(/,/,AttrVal($hn,'cloneIgnore',''));       # vorbereitung cloneIgnore
-    my ($isdup, $idx) = CheckDuplicate("", "$hn: $reading", undef);             # vorbereitung doppelte Readings entfernen
-
-    if ($isdup) {                                                               # doppelte Readings filtern
+    my %check = map { $_ => 1 } split(/,/,AttrVal($hn,'cloneIgnore',''));       # Vorbereitung cloneIgnore
+    my ($isdup, undef) = CheckDuplicate("", "$hn: $reading", undef);            # Vorbereitung Duplikate entfernen
+    if ($isdup) {                                                               # Duplikate filtern
       Log3 $hash, 4, "cloneDummy: drop duplicate <$dn> <$hn> <$reading> ***";
     } else {
       Log3 $hash, 4, "cloneDummy: publish unique <$dn> <$hn> <$reading>";
-
       if (($hs ne "") && ($rname eq $hs) ){                                     # Reading in _state einsetzen
-        readingsBulkUpdate($hash,"_state", $reading);
+        readingsBulkUpdate($hash,"_state", $rval);
       }
       unless (exists ($check{$rname})) {                                        # zu ignorierende Reading filtern
         readingsBulkUpdate($hash, $rname, $rval);
@@ -158,9 +174,12 @@ sub cloneDummy_Notify($$) {
     <br>When paremeter in Modul is set to 1 the originalstate of the original Device will be STATE
         (Momentarily not possible in Connection with FHEM2FHEM)</li>
     <br>
-        <li>cloneIgnore
+    <li>cloneIgnore
     <br>- comma separated list of readingnames that will NOT be generated.<br>
-        Usefull to prevent truncated readingnames coming from state events.</li>
+        Useful to prevent truncated readingnames coming from state events.</li>
+    <br>
+    <li>deleteBeforeUpdate<br>
+        If set to 1, all readings will be deleted befor update.</li>
     <br>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul>
@@ -229,7 +248,9 @@ sub cloneDummy_Notify($$) {
         Eine durch Kommata getrennte Liste der readings, die cloneDummy nicht in eigene readings
         umwandelt</li>
     <br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>deleteBeforeUpdate<br>
+        Ist dieses Attribut auf 1 gesetzt, werden alle readings zuerst gelöscht, bevor neue Readings geschrieben werden.</li>
+    <br>    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul>
   <br>
   <b>Wichtig: Es müssen unterschiedliche Namen für &lt;name&gt; und &lt;Quelldevice&gt; verwendet

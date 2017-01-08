@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_cloneDummy.pm
+             changed: do not use NOTIFYDEFV
+             fixed:   set $rval in _state instead of $reading
+             added:   new attribute deleteBeforeUpdate
   - bugfix:  73_NUKIBridge/74_NUKIDevice fix lockState with App Bridge
   - bugfix:  14_CUL_TCM97001: fix KW9010 sensor
   - feature: 70_Pushover: add new msg set syntax and introduce
