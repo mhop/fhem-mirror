@@ -184,7 +184,7 @@ my %zwave_class = (
                tmManual    => "011f" },
     get   => { thermostatMode => "02" },
     parse => { "03400300"  => "thermostatMode:off",
-               "0340030b"  => "thermostatMode:cooling",
+               "0340030b"  => "thermostatMode:energySaveHeating",
                "03400301"  => "thermostatMode:heating",
                "0340031f"  => "thermostatMode:manual",
                "03400100"  => "thermostatMode:setTmOff",
