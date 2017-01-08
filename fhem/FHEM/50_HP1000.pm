@@ -82,6 +82,7 @@ sub HP1000_Initialize($) {
 "wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
+    # Unit.pm support
     $hash->{readingsDesc} = {
         'Activity'            => { rtype => 'oknok', },
         'UV'                  => { rtype => 'uvi', },
@@ -152,6 +153,19 @@ sub HP1000_Initialize($) {
         'wind_speed_mps'       => { rtype => 'mps',  formula_symbol => 'W', },
         'wind_speed_mps_avg2m' => { rtype => 'mps',  formula_symbol => 'W', },
         'wu_state' => { rtype => 'oknok', },
+    };
+
+    # 98_powerMap.pm support
+    $hash->{powerMap} = {
+        map => {
+            Activity => {
+                'dead'  => 0,
+                'alive' => 5,
+            },
+            state => {
+                '*' => 5,
+            },
+        }
     };
 }
 
