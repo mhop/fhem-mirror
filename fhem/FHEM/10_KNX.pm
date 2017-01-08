@@ -22,6 +22,7 @@
 # ABU 20161126 fixed doku
 # ABU 20161127 adjusted dpt-16-sending, added dpt16.001
 # ABU 20161129 fixed get-mechanism
+# ABU 20170106 corrected doku for time, finetuned dpt9-regex, added dpt 7.001 7.012 9.007 9.008, , added mod for extended adressing (thx to its2bit)
 
 package main;
 
@@ -63,7 +64,10 @@ my $id = 'C';
 
 #regex patterns
 my $PAT_GAD = qr/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/;
-my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
+#old syntax
+#my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
+#new syntax for extended adressing
+my $PAT_GAD_HEX = qr/^[0-9a-f]{5}$/;
 my $PAT_GNO = qr/[gG][1-9][0-9]?/;
 
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
@@ -96,8 +100,10 @@ my %dpttypes = (
 
 	# 2-Octet unsigned Value 
 	"dpt7" 			=> {CODE=>"dpt7", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},
+	"dpt7.001" 			=> {CODE=>"dpt7", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},
 	"dpt7.005" 		=> {CODE=>"dpt7", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},
 	"dpt7.006" 		=> {CODE=>"dpt7", UNIT=>"m", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},
+	"dpt7.012" 		=> {CODE=>"dpt7", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},	
 	"dpt7.013" 		=> {CODE=>"dpt7", UNIT=>"lux", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>0, MAX=>65535},
 
 	# 2-Octet signed Value 
@@ -107,18 +113,20 @@ my %dpttypes = (
 	"dpt8.011" 		=> {CODE=>"dpt8", UNIT=>"&deg;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>-32768, MAX=>32768},
 
 	# 2-Octet Float value
-	"dpt9"	 		=> {CODE=>"dpt9", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},
-	"dpt9.001"	 	=> {CODE=>"dpt9", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.004"	 	=> {CODE=>"dpt9", UNIT=>"lux", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.006"	 	=> {CODE=>"dpt9", UNIT=>"Pa", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.005"	 	=> {CODE=>"dpt9", UNIT=>"m/s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},		
-	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.026"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.028"	 	=> {CODE=>"dpt9", UNIT=>"km/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},		
+	"dpt9"	 		=> {CODE=>"dpt9", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},
+	"dpt9.001"	 	=> {CODE=>"dpt9", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.004"	 	=> {CODE=>"dpt9", UNIT=>"lux", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.006"	 	=> {CODE=>"dpt9", UNIT=>"Pa", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.005"	 	=> {CODE=>"dpt9", UNIT=>"m/s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.007"	 	=> {CODE=>"dpt9", UNIT=>"%", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.008"	 	=> {CODE=>"dpt9", UNIT=>"ppm", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},		
+	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.026"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.028"	 	=> {CODE=>"dpt9", UNIT=>"km/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{0,}/, MIN=>-670760, MAX=>670760},		
   
 	# Time of Day
 	"dpt10"			=> {CODE=>"dpt10", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9]))|([nN][oO][wW])/, MIN=>undef, MAX=>undef},
@@ -244,7 +252,11 @@ KNX_Define($$) {
 		}
 				
 		#convert to string, if supplied in Hex
+		#old syntax
 		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{4}$/i);
+		#new syntax for extended adressing
+		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{5}$/i);
+
 		$groupc = KNX_nameToHex ($group);
 		
 		Log3 ($name, 5, "define $name: found GAD: $group, NO: $gno, HEX: $groupc, DPT: $model");
@@ -731,7 +743,11 @@ KNX_Parse($$) {
 	#we will also take reply telegrams into account, 
 	#as they will be sent if the status is asked from bus 	
 	#split message into parts
-	$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
+
+	#old syntax
+	#$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
+	#new syntax for extended adressing
+	$msg =~ m/^$id(.{5})(.{1})(.{5})(.*)$/;
 	my $src = $1;
 	my $cmd = $2;
 	my $dest = $3;
@@ -883,10 +899,16 @@ sub
 KNX_hexToName ($)
 {
 	my $v = shift;
-  
-	my $p1 = hex(substr($v,0,1));
-	my $p2 = hex(substr($v,1,1));
-	my $p3 = hex(substr($v,2,2));
+	
+	#old syntax
+	#my $p1 = hex(substr($v,0,1));
+	#my $p2 = hex(substr($v,1,1));
+	#my $p3 = hex(substr($v,2,2));
+
+	#new syntax for extended adressing
+	my $p1 = hex(substr($v,0,2));
+	my $p2 = hex(substr($v,2,1));
+	my $p3 = hex(substr($v,3,2));
   
 	my $r = sprintf("%d/%d/%d", $p1,$p2,$p3);
 	
@@ -903,7 +925,10 @@ KNX_nameToHex ($)
 
 	if($v =~ /^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{1,3})$/) 
 	{
+		#old syntax
 		$r = sprintf("%01x%01x%02x",$1,$2,$3);
+		#new syntax for extended adressing
+		my $r = sprintf("%02x%01x%02x",$1,$2,$3);
 	}
 	#elsif($v =~ /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{1,3})$/) 
 	#{
@@ -1622,18 +1647,16 @@ sub KNX_getCmdList ($$$)
 	<p>The current date and time can be sent to the bus by the following settings:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
-	  attr timedev eventMap /value now:now/
       attr timedev webCmd now
       
       define datedev KNX 0/0/8:dpt11
-	  attr datedev eventMap /value now:now/
       attr datedev webCmd now
       
       # send every midnight the new date
-      define dateset at *00:00:00 set datedev value now
+      define dateset at *00:00:00 set datedev now
       
       # send every hour the current time
-      define timeset at +*01:00:00 set timedev value now
+      define timeset at +*01:00:00 set timedev now
 	</pre>	
   </ul>
  
@@ -1755,8 +1778,10 @@ sub KNX_getCmdList ($$$)
 	dpt6 -127..+127<br>
 	dpt6.001 0..100	%<br>
 	dpt7 0..65535<br>
+	dpt7.001 0..65535 s<br>
 	dpt7.005 0..65535 s<br>
 	dpt7.005 0..65535 m<br>	
+	dpt7.012 0..65535 mA<br>	
 	dpt7.013 0..65535 lux<br>
 	dpt8 -32768..32768<br>
 	dpt8.005 -32768..32768 s<br>
@@ -1765,8 +1790,10 @@ sub KNX_getCmdList ($$$)
 	dpt9 -670760.0..+670760.0<br>
 	dpt9.001 -670760.0..+670760.0 &deg;<br>
 	dpt9.004 -670760.0..+670760.0 lux<br>
-	dpt9.006 -670760.0..+670760.0 Pa<br>
-	dpt9.005 -670760.0..+670760.0 m/s<br>
+	dpt9.005 -670760.0..+670760.0 m/s<br>	
+	dpt9.006 -670760.0..+670760.0 Pa<br>	
+	dpt9.007 -670760.0..+670760.0 %<br>
+	dpt9.008 -670760.0..+670760.0 ppm<br>	
 	dpt9.009 -670760.0..+670760.0 m³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
 	dpt9.021 -670760.0..+670760.0 mA<br>	
@@ -1884,18 +1911,16 @@ sub KNX_getCmdList ($$$)
 	<p>Aktuelle Uhrzeit / Datum k&ouml;nnen wie folgt auf den Bus gelegt werden:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
-	  attr timedev eventMap /value now:now/
       attr timedev webCmd now
       
       define datedev KNX 0/0/8:dpt11
-	  attr datedev eventMap /value now:now/
       attr datedev webCmd now
       
       # send every midnight the new date
-      define dateset at *00:00:00 set datedev value now
+      define dateset at *00:00:00 set datedev now
       
       # send every hour the current time
-      define timeset at +*01:00:00 set timedev value now
+      define timeset at +*01:00:00 set timedev now
 	</pre>	
   </ul>
  
@@ -2017,8 +2042,10 @@ sub KNX_getCmdList ($$$)
 	dpt6 -127..+127<br>
 	dpt6.001 0..100	%<br>
 	dpt7 0..65535<br>
+	dpt7.001 0..65535 <br>
 	dpt7.005 0..65535 s<br>
-	dpt7.006 0..65535 m<br>	
+	dpt7.006 0..65535 m<br>
+	dpt7.012 0..65535 mA<br>	
 	dpt7.013 0..65535 lux<br>
 	dpt8 -32768..32768<br>
 	dpt8.005 -32768..32768 s<br>
@@ -2027,8 +2054,10 @@ sub KNX_getCmdList ($$$)
 	dpt9 -670760.0..+670760.0<br>
 	dpt9.001 -670760.0..+670760.0 &deg;<br>
 	dpt9.004 -670760.0..+670760.0 lux<br>
+	dpt9.005 -670760.0..+670760.0 m/s<br>	
 	dpt9.006 -670760.0..+670760.0 Pa<br>
-	dpt9.005 -670760.0..+670760.0 m/s<br>
+	dpt9.007 -670760.0..+670760.0 %<br>
+	dpt9.008 -670760.0..+670760.0 ppm<br>
 	dpt9.009 -670760.0..+670760.0 m³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
 	dpt9.021 -670760.0..+670760.0 mA<br>	
