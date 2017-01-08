@@ -11,6 +11,7 @@
 # ABU 20160516 added log entry for non-compatibility of tul
 # ABU 20160613 changed log entry for startup
 # ABU 20161108 added knxd. Added doku as well. Added summary. Treat it like eibd. See thread #58375
+# ABU 20170102 fixed write-mechanism, added mod for extended adressing (thx to its2bit)
 
 package main;
 
@@ -203,7 +204,7 @@ TUL_Write($$$)
 	return if(!defined($fn));
 	
 	#Discard message, if not set to backward-compatibility
-	if ((AttrVal($name, "useEIB", 0) =~ m/0/) and ($fn =~ m/^B/))
+	if ((AttrVal($name, "useEIB", 0) =~ m/0/) and ($fn =~ m/\^B/))
 	{
 		Log3 ($name, 0, "EIB is no longer supported. Message discarded.");
 		return;
@@ -406,7 +407,7 @@ TUL_SimpleRead($)
 	$buf .= $dst;
 	$buf .= $data;
   
-	Log(4,"SimpleRead: $buf\n");
+	Log(3,"SimpleRead: $buf\n");
   
 	return $buf;
 }
@@ -651,11 +652,17 @@ sub tul_addr2hex
 	my $b = $_[1];  # 1 if local (group) address, else physical address
     my $str ;
     if ($b == 1) 
-	{ # logical address used
-        $str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
+	{ 
+		#logical address used
+		#old, short-syntax
+        #$str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
+		#extended adress-range
+		$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
     }
-    else { # physical address used
-        $str = sprintf "%01x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+    else 
+	{ 
+		#physical address used
+		$str = sprintf "%02x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
     }
     return $str;
 }
