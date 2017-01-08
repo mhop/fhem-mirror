@@ -1,8 +1,4 @@
 ﻿# $Id$
-
-#
-# interims check-in with some bugfixes (betateilchen) 2017-01-07
-#
 ################################################################################
 # 98_cloneDummy
 # Von Joachim Herold
@@ -37,7 +33,6 @@ sub cloneDummy_Initialize($) {
   $hash->{DefFn}     = "cloneDummy_Define";
   $hash->{NotifyFn}  = "cloneDummy_Notify";
   $hash->{AttrList}  = "cloneIgnore "
-                       ."deleteBeforeUpdate:0,1 "
                        ."addStateEvent:0,1 "
                        .$readingFnAttributes;
 }
@@ -56,9 +51,8 @@ sub cloneDummy_Define($$) {
   if($a[0] eq $a[2]);
 
   my $hn = $hash->{NAME};
-  $hash->{NOTIFYDEV} = '.*';
-#  $hash->{NOTIFYDEV} = $a[2];
-#  $hash->{NOTIFYSTATE} = $a[3] if(defined($a[3]));
+  $hash->{NOTIFYDEV} = $a[2];
+  $hash->{NOTIFYSTATE} = $a[3] if(defined($a[3]));
   $attr{$hn}{stateFormat} = "_state" if(defined($a[3]));
   readingsSingleUpdate($hash,'state','defined',1);
   Log3($hash,4,"cloneDummy: $a[0] defined for source $a[2]");
@@ -79,8 +73,7 @@ sub cloneDummy_Notify($$) {
     $hs = $hash->{NOTIFYSTATE};
   }
 
-  CommandDeleteReading(undef,"$hn .*") if(AttrVal($hn,'deleteBeforeUpdate',0));
-
+  readingsSingleUpdate($hash,"state", "active",1);
   readingsBeginUpdate($hash);
 
   for(my $i=0;$i<$max;$i++){
@@ -106,7 +99,7 @@ sub cloneDummy_Notify($$) {
     }
   }
 
-#  readingsEndUpdate($hash, 1);
+  readingsEndUpdate($hash, 1);
 
   return;
 }
@@ -114,6 +107,7 @@ sub cloneDummy_Notify($$) {
 1;
 
 =pod
+=item helper
 =item summary    clone a device and its readings
 =item summary_DE klont ein device und seine readings
 =begin html
@@ -167,9 +161,6 @@ sub cloneDummy_Notify($$) {
         <li>cloneIgnore
     <br>- comma separated list of readingnames that will NOT be generated.<br>
         Usefull to prevent truncated readingnames coming from state events.</li>
-    <br>
-    <li>deleteBeforeUpdate<br>
-        If set to 1, all readings will be deleted befor update.</li>
     <br>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul>
@@ -237,9 +228,6 @@ sub cloneDummy_Notify($$) {
     <li>clonIgnore<br>
         Eine durch Kommata getrennte Liste der readings, die cloneDummy nicht in eigene readings
         umwandelt</li>
-    <br>
-    <li>deleteBeforeUpdate<br>
-        Ist dieses Attribut auf 1 gesetzt, werden alle readings zuerst gelöscht, bevor neue Readings geschrieben werden.</li>
     <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul>
