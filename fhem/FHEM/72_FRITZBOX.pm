@@ -193,6 +193,7 @@ sub FRITZBOX_Initialize($)
                 ."telnetUser "
                 ."telnetTimeOut "
                 ."useGuiHack:0,1 "
+                ."userTickets "
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
                 
@@ -1289,6 +1290,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&GSM_NetworkState=gsm:settings/NetworkState";
    $queryStr .= "&GSM_AcT=gsm:settings/AcT";
    $queryStr .= "&UMTS_enabled=umts:settings/enabled"; 
+   $queryStr .= "&userTicket=userticket:settings/ticket/list(id)";
    # $queryStr .= "&GSM_MaxUL=gsm:settings/MaxUL";
    # $queryStr .= "&GSM_MaxDL=gsm:settings/MaxDL";
    # $queryStr .= "&GSM_CurrentUL=gsm:settings/CurrentUL";
@@ -1554,7 +1556,20 @@ sub FRITZBOX_Readout_Run_Web($)
       }
    }
 
-# Diversity
+# user ticket (extension of online time)
+   if ( ref $result->{userTicket} eq 'ARRAY' ) {
+      $runNo=1;
+      my $maxTickets = AttrVal( $name, "userTickets",  1 );
+      $rName = "userTicket01";
+      foreach ( @{ $result->{userTicket} } ) {
+         last     if $runNo > $maxTickets;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $_->{id};
+         $runNo++;
+         $rName = sprintf ("userTicket%02d",$runNo);
+      }
+   }
+
+   # Diversity
    $runNo=1;
    $rName = "diversity1";
    foreach ( @{ $result->{diversity} } ) {
