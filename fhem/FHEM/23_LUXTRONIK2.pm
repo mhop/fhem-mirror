@@ -74,6 +74,7 @@ LUXTRONIK2_Initialize($)
 
   $hash->{DefFn}    = "LUXTRONIK2_Define";
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
+  $hash->{GetFn}    = "LUXTRONIK2_Get";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
   $hash->{AttrFn}   = "LUXTRONIK2_Attr";
   $hash->{AttrList} = "disable:0,1 ".
@@ -268,7 +269,12 @@ LUXTRONIK2_Set($$@)
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'returnTemperatureHyst'
-            || $cmd eq 'returnTemperatureSetBack')) {
+            || $cmd eq 'returnTemperatureSetBack'
+            || $cmd eq 'heatingCurveEndPoint'
+            || $cmd eq 'heatingCurveOffset'
+            || $cmd eq 'heatSourceDefrostAirEnd'
+            || $cmd eq 'heatSourceDefrostAirThreshold')) {
+
       Log3 $name, 3, "set $name $cmd $val";
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
@@ -290,6 +296,8 @@ LUXTRONIK2_Set($$@)
   my $list = "statusRequest:noArg"
           ." activeTariff:0,1,2,3,4,5,6,7,8,9"
           ." boostHotWater"
+          ." heatingCurveEndPoint"
+          ." heatingCurveOffset"
           ." hotWaterCircPumpDeaerate:on,off"
           ." hotWaterTemperatureTarget "
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
@@ -302,6 +310,43 @@ LUXTRONIK2_Set($$@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
+sub ########################################
+LUXTRONIK2_Get($$@)
+{
+  my ($hash, $name, $cmd, @val ) = @_;
+  my $resultStr = "";
+  
+   if($cmd eq 'heatingCurveParameter') {
+      # Log3 $name, 3, "get $name $cmd";
+      if (int @val !=4 ) {
+         my $msg = "Wrong number of parameter (".int @val.")in get $name $cmd";
+         Log3 $name, 3, $msg;
+         return $msg;
+      }
+      else {
+         return LUXTRONIK2_calcHeatingCurveParameter ( $hash, $val[0], $val[1], $val[2], $val[3]);
+      }
+   }
+   elsif($cmd eq 'heatingCurveReturnTemperature') {
+      # Log3 $name, 3, "get $name $cmd";
+      if (int @val !=1) {
+         my $msg = "Wrong number of parameter (".int @val.")in get $name $cmd";
+         Log3 $name, 3, $msg;
+         return $msg;
+      }
+      else {
+         my $heatingCurveEndPoint = $hash->{READINGS}{heatingCurveEndPoint}{VAL};
+         my $heatingCurveOffset = $hash->{READINGS}{heatingCurveOffset}{VAL};
+         return LUXTRONIK2_getHeatingCurveReturnTemperature ( $hash, $val[0], $heatingCurveEndPoint, $heatingCurveOffset);
+      }
+   }
+
+   my $list = "heatingCurveParameter "
+            . "heatingCurveReturnTemperature ";
+   
+          
+  return "Unknown argument $cmd, choose one of $list";
+}
 
 sub ########################################
 LUXTRONIK2_GetUpdate($)
@@ -658,8 +703,15 @@ LUXTRONIK2_DoUpdate($)
    $return_str .= "|". ($heatpump_visibility[47]==1 ? $heatpump_values[37] : "no");
   # 68 - returnTempHyst
    $return_str .= "|". ($heatpump_visibility[93]==1 ? $heatpump_parameters[88] : "no");
+  # 69 - Heating curve end point
+   $return_str .= "|". ($heatpump_visibility[207]==1 ? $heatpump_parameters[11] : "no");
+  # 70 - Heating curve parallel offset
+   $return_str .= "|". ($heatpump_visibility[207]==1 ? $heatpump_parameters[12] : "no");
+  # 71 - heatSourcedefrostAirThreshold
+   $return_str .= "|". ($heatpump_visibility[97]==1 ? $heatpump_parameters[44] : "no");
+  # 72 - heatSourcedefrostAirEnd
+   $return_str .= "|". ($heatpump_visibility[105]==1 ? $heatpump_parameters[98] : "no");
 
-   
    return $return_str;
 }
 
@@ -886,8 +938,9 @@ LUXTRONIK2_UpdateDone($)
         $opStateHeatPump3Txt = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." C "; 
      }
       elsif ($opStateHeatPump3==7) { 
-         if ($compressor1==1) {$opStateHeatPump3Txt = "Abtauen (Kreisumkehr)";}
-         else {$opStateHeatPump3Txt = "Luftabtauen";}
+         if ( $defrostValve==1 ) {$opStateHeatPump3Txt = "Abtauen (Kreisumkehr)";}
+         elsif ( $compressor1==0 && $heatSourceMotor==1 ) {$opStateHeatPump3Txt = "Luftabtauen";}
+         else {$opStateHeatPump3Txt = "Abtauen";}
       }
       $opStateHeatPump3Txt = "unbekannt (".$opStateHeatPump3.")" unless $opStateHeatPump3Txt;
      readingsBulkUpdate($hash,"opStateHeatPump3",$opStateHeatPump3Txt);
@@ -955,6 +1008,8 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "heatingLimit",$a[11]?"on":"off");
      readingsBulkUpdate( $hash, "thresholdHeatingLimit", $thresholdHeatingLimit);
      readingsBulkUpdate( $hash, "thresholdTemperatureSetBack", $thresholdTemperatureSetBack); 
+     if ($a[69] !~ /no/) {readingsBulkUpdate( $hash, "heatingCurveEndPoint",LUXTRONIK2_CalcTemp($a[69]));}
+     if ($a[70] !~ /no/) {readingsBulkUpdate( $hash, "heatingCurveOffset",LUXTRONIK2_CalcTemp($a[70]));}
      readingsBulkUpdate( $hash, "hotWaterTemperature", $hotWaterTemperature);
      readingsBulkUpdate( $hash, "hotWaterTemperatureTarget",$hotWaterTemperatureTarget);
      readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
@@ -967,7 +1022,10 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
      readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
      readingsBulkUpdate( $hash, "heatSourceMotor",$heatSourceMotor?"on":"off");
+     if ($a[71] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostAirThreshold",LUXTRONIK2_CalcTemp($a[71]));}
+     if ($a[72] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostAirEnd",LUXTRONIK2_CalcTemp($a[72]));}
      if ($a[66] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostTimer",$a[66]);}
+     readingsBulkUpdate( $hash, "compressor1",$compressor1?"on":"off");
      readingsBulkUpdate( $hash, "hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
      if ($a[55] !~ /no/) {readingsBulkUpdate( $hash, "mixer1FlowTemperature",LUXTRONIK2_CalcTemp($a[55]));}
      if ($a[56] !~ /no/) {readingsBulkUpdate( $hash, "mixer1TargetTemperature",LUXTRONIK2_CalcTemp($a[56]));}
@@ -1055,22 +1113,24 @@ LUXTRONIK2_UpdateDone($)
       # $defrostValve = $a[67]; #AVout
       # $hotWaterBoilerValve = $a[9]; #BUP
       # $heatingSystemCircPump = $a[27]; #HUP
-      # 0=Heizen, 1=keine Anforderung, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
+      # 0=Heizen, 1=keine Anforderung, 3=Schaltspielzeit, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung
+      my $lastHeatingCycle = ReadingsVal($name, "heatingCycle", "");
       if ( $opStateHeatPump3 == 0 ) {
          readingsBulkUpdate($hash, "heatingCycle", "running");
       }
-      elsif ( $opStateHeatPump3 > 1 && ReadingsVal($name, "heatingCycle", "") eq "running") {
+      elsif ( $opStateHeatPump3 > 1 && $lastHeatingCycle eq "running") {
          readingsBulkUpdate($hash, "heatingCycle", "paused");
       }
-      elsif ( $opStateHeatPump3 == 1 && ReadingsVal($name, "heatingCycle", "") eq "running") {
+      elsif ( $opStateHeatPump3 == 1 && $lastHeatingCycle eq "running") {
          readingsBulkUpdate($hash, "heatingCycle", "finished");
       }
-      elsif ( $opStateHeatPump3 == 1 && ReadingsVal($name, "heatingCycle", "") eq "paused") {
-         if ( $returnTemperature-$returnTemperatureTarget >= $returnTempHyst ) { readingsBulkUpdate($hash, "heatingCycle", "finished"); }
-         else { readingsBulkUpdate($hash, "heatingCycle", "discontinued"); }
+      elsif ( $opStateHeatPump3 =~ /1|3/ && $lastHeatingCycle ne "finished" && $returnTemperature-$returnTemperatureTarget >= $returnTempHyst ) {
+         readingsBulkUpdate($hash, "heatingCycle", "finished");
       }
-    
-     
+      elsif ( $opStateHeatPump3 == 1 && $lastHeatingCycle eq "paused") { 
+         readingsBulkUpdate($hash, "heatingCycle", "discontinued"); 
+      }
+         
       readingsEndUpdate($hash,1);
      
      $hash->{helper}{fetched_calc_values} = $a[44];
@@ -1147,8 +1207,8 @@ sub LUXTRONIK2_FormatDuration($)
   return $returnstr;
 }
 
-sub ########################################
-LUXTRONIK2_SetParameter($$$)
+########################################
+sub LUXTRONIK2_SetParameter ($$$)
 {
   my ($hash, $parameterName, $realValue) = @_;
   my $setParameter = 0;
@@ -1172,11 +1232,55 @@ LUXTRONIK2_SetParameter($$$)
     #limit temperature range
     $realValue = 30 if( $realValue < 30 );
     $realValue = 65 if( $realValue > 65 );
-    #Allow only integer temperature or with decimal .5
-    $setValue = int($realValue * 2) * 5;
+    #Allow only integer temperatures with decimal .1
+    $setValue = int($realValue * 10);
     $realValue = $setValue / 10;
   }
   
+  elsif ($parameterName eq "heatingCurveEndPoint") {
+     #parameter number
+    $setParameter = 11;
+    #limit temperature range
+    $realValue = 20 if( $realValue < 20.0 );
+    $realValue = 70 if( $realValue > 70.0 );
+    #Allow only integer temperatures
+    $setValue = int($realValue * 10);
+    $realValue = $setValue / 10;
+  }
+  
+  elsif ($parameterName eq "heatingCurveOffset") {
+     #parameter number
+    $setParameter = 12;
+    #limit temperature range
+    $realValue = 5 if( $realValue < 5.0 );
+    $realValue = 35 if( $realValue > 35.0 );
+    #Allow only integer temperatures
+    $setValue = int($realValue * 10);
+    $realValue = $setValue / 10;
+  }
+  
+  elsif ($parameterName eq "heatSourceDefrostAirEnd") {
+     #parameter number
+    $setParameter = 98;
+    #limit temperature range
+    $realValue = 1 if( $realValue < 1.0 );
+    $realValue = 24 if( $realValue > 24.0 );
+    #Allow only integer temperatures
+    $setValue = int($realValue * 10);
+    $realValue = $setValue / 10;
+  }
+
+  elsif ($parameterName eq "heatSourceDefrostAirThreshold") {
+     #parameter number
+    $setParameter = 44;
+    #limit temperature range
+    $realValue = 1.5 if( $realValue < 1.5 );
+    $realValue = 20 if( $realValue > 20.0 );
+    #Allow only integer temperatures
+    $setValue = int($realValue * 10);
+    $realValue = $setValue / 10;
+  }
+
   elsif ($parameterName eq "opModeHotWater") {
     if (! exists($opMode{$realValue})) {
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
@@ -1270,8 +1374,8 @@ LUXTRONIK2_SetParameter($$$)
   
 }
 
-sub ########################################
-LUXTRONIK2_synchronizeClock (@)
+########################################
+sub LUXTRONIK2_synchronizeClock (@)
 {
   my ($hash,$maxDelta) = @_;
   my $host = $hash->{HOST};
@@ -1353,6 +1457,74 @@ sub LUXTRONIK2_boostHotWater_Start ($$)
    }
    
 }
+
+######################################## 
+sub LUXTRONIK2_calcHeatingCurveParameter ($$$$$)
+{ my ($hash, $aussen_1, $rtSoll_1, $aussen_2, $rtSoll_2) = @_;
+
+   if ($aussen_1 > $aussen_2) {
+      my $temp= $aussen_1;  
+      $aussen_1=$aussen_2; 
+      $aussen_2=$temp;
+      $temp= $rtSoll_1;  
+      $rtSoll_1=$rtSoll_2; 
+      $rtSoll_2=$temp;
+   }
+
+   my $endPoint_Ist = $hash->{READINGS}{heatingCurveEndPoint}{VAL};
+   my $endPoint = $endPoint_Ist;
+   my $offset_Ist = $hash->{READINGS}{heatingCurveOffset}{VAL};
+   my $offset = $offset_Ist;
+   my $rtIst_1 = LUXTRONIK2_getHeatingCurveReturnTemperature ( $hash, $aussen_1, $endPoint, $offset);
+   my $rtIst_2 = LUXTRONIK2_getHeatingCurveReturnTemperature ( $hash, $aussen_2, $endPoint, $offset);
+   my $delta_1; my $delta_2;  
+   my $msg;  my $i;
+
+   #get Heizung heatingCurveParameter 0 27 10 25
+
+   for ( $i=0; $i<1000; $i++ ) {
+      $delta_1 = LUXTRONIK2_getHeatingCurveReturnTemperature ( $hash, $aussen_1, $endPoint, $offset) - $rtSoll_1;
+      $delta_1 = int(10.0 * $delta_1 + 0.5) / 10.0;
+      $delta_2 = LUXTRONIK2_getHeatingCurveReturnTemperature ( $hash, $aussen_2, $endPoint, $offset) - $rtSoll_2;
+      $delta_2 = int(10.0 * $delta_2 + 0.5) / 10.0;
+
+      $msg = "Calculate loop $i: hcEndPoint=$endPoint, hcOffset=$offset, delta($aussen_1)=$delta_1, delta($aussen_2)=$delta_2)\n";
+      LUXTRONIK2_Log $hash, 4, $msg;
+      last     if $delta_1 == 0 && $delta_2 == 0;
+     
+      if ($delta_2 > 0) {
+         $offset -= 0.1;
+      }
+      elsif ($delta_2 < 0) {
+         $offset += 0.1;
+      }
+      elsif ($delta_1 > 0) {
+         $endPoint -= 0.1;
+      }
+      elsif ($delta_1 < 0) {
+         $endPoint += 0.1;
+      }
+      $endPoint = int(10.0 * $endPoint + 0.5) / 10.0;
+      $offset = int(10.0 * $offset + 0.5) / 10.0;
+   }
+   LUXTRONIK2_Log $hash, 3, "Heating-Curve-Parameter calculated in $i loops.";
+   $msg = "New Values: heatingCurveEndPoint=$endPoint heatingCurveOffset=$offset\n";
+   $msg .= "Old Values: heatingCurveEndPoint=$endPoint_Ist heatingCurveOffset=$offset_Ist\n\n";
+   $msg .= "New Heating-Curve: returnTemp($aussen_1)=".($delta_1+$rtSoll_1)." and returnTemp($aussen_2)=".($delta_2+$rtSoll_2)."\n";
+   $msg .= "Old Heating-Curve: returnTemp($aussen_1)=".($rtIst_1)." and returnTemp($aussen_2)=".($rtIst_2)."\n";
+   $msg .= "calculated in $i loops\n";
+   return $msg;
+}
+
+######################################## 
+sub LUXTRONIK2_getHeatingCurveReturnTemperature ($$$$)
+{ my ($hash, $aussen, $endPoint, $offset) = @_;
+    LUXTRONIK2_Log $hash, 5, "Calculate return-temperature at $aussen with heating curve ($endPoint, $offset)";
+    my $result = $offset + ($endPoint - 20.0) * ($offset - $aussen) / (20.0 - ($aussen - $offset) / 2);
+    $result = int(10.0 * $result + 0.5) / 10.0;
+    return $result;
+}
+
 
 ######################################## 
 sub LUXTRONIK2_checkFirmware ($) 
