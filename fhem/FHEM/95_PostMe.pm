@@ -43,7 +43,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.0";
+my $postmeversion  = "2.01";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -525,8 +525,8 @@ sub PostMe_Modify($$@) {
          if( $fullitem ne $item );
        $new .= $item.' [';
        #-- no attributes present so far
-       if( ($old !~ /.*\[.*\].*/) && ($val) ){
-         PostMe_cleanSpecial($hash,$listname,$item,$attr);
+       if( ($old !~ /.*\[.*\].*/) && ($val) ){ 
+         #PostMe_cleanSpecial($hash,$listname,$item,$attr);
          PostMe_procSpecial($hash,$listname,$item,$attr,$val);
          $new .= $attr.'="'.$val.'"';
        #-- attributes present already
@@ -536,7 +536,7 @@ sub PostMe_Modify($$@) {
          #-- particular attribute not yet present
          if( index($old,$attr) < 0){
            if( $val ){
-             PostMe_cleanSpecial($hash,$listname,$item,$attr);
+             #PostMe_cleanSpecial($hash,$listname,$item,$attr);
              PostMe_procSpecial($hash,$listname,$item,$attr,$val);
              $new .= $old.' '.$attr.'="'.$val.'"'
            } 
@@ -558,7 +558,7 @@ sub PostMe_Modify($$@) {
                #-- remove, if no val is given
                }
              }
-           }  
+           } 
          }  
        }  
        $new .= ']'.$listsep; 
