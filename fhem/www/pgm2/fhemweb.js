@@ -689,7 +689,8 @@ FW_doUpdate(evt)
   }
   FW_lastDataTime = now;
 
-  if(evt.target instanceof WebSocket) {
+  // Websocket starts with Android 4.4, and IE10
+  if(typeof WebSocket == "function" &&  evt.target instanceof WebSocket) {
     if(evt.type == 'close' && !FW_leaving) {
       FW_errmsg(errstr, retryTime-100);
       FW_pollConn.close();
@@ -849,7 +850,7 @@ FW_longpoll()
               "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
-  if(FW_longpollType == "websocket") {
+  if(typeof WebSocket == "function" && FW_longpollType == "websocket") {
     FW_pollConn = new WebSocket((location+query).replace(/^http/i, "ws"));
     FW_pollConn.onclose = 
     FW_pollConn.onerror = 
