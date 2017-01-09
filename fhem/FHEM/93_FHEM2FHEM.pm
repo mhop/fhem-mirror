@@ -31,7 +31,8 @@ FHEM2FHEM_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "dummy:1,0 disable:0,1 disabledForIntervals";
+  $hash->{AttrList}= "dummy:1,0 disable:0,1 ".
+                     "disabledForIntervals excludeEvents eventOnly:1,0";
 }
 
 #####################################
@@ -138,6 +139,7 @@ FHEM2FHEM_Read($)
   }
 
   return if(IsDisabled($name));
+  my $excl = AttrVal($name, "excludeEvents", undef);
 
   my $data = $hash->{PARTIAL};
   #Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
@@ -149,26 +151,31 @@ FHEM2FHEM_Read($)
     $rmsg =~ s/\r//;
 
     if($hash->{informType} eq "LOG") {
-      my ($type, $name, $msg) = split(" ", $rmsg, 3);
+      my ($type, $rname, $msg) = split(" ", $rmsg, 3);
       next if(!defined($msg)); # Bogus data
       my $re = $hash->{regexp};
-      next if($re && !($name =~ m/^$re$/ || "$name:$msg" =~ m/^$re$/));
-      Log3 $name, 4, "$name: $rmsg";
+      next if($re && !($rname =~ m/^$re$/ || "$rname:$msg" =~ m/^$re$/));
+      next if($excl && ($rname =~ m/^$excl$/ || "$rname:$msg" =~ m/^$excl$/));
+      Log3 $name, 4, "$rname: $rmsg";
 
-      if(!$defs{$name}) {
-        $defs{$name}{NAME}  = $name;
-        $defs{$name}{TYPE}  = $type;
-        $defs{$name}{STATE} = $msg;
-        $defs{$name}{FAKEDEVICE} = 1; # Avoid set/attr/delete/etc in notify
-        $defs{$name}{TEMPORARY} = 1;  # Do not save it
-        DoTrigger($name, $msg);
-        delete($defs{$name});
+      if(!$defs{$rname}) {
+        $defs{$rname}{NAME}  = $rname;
+        $defs{$rname}{TYPE}  = $type;
+        $defs{$rname}{STATE} = $msg;
+        $defs{$rname}{FAKEDEVICE} = 1; # Avoid set/attr/delete/etc in notify
+        $defs{$rname}{TEMPORARY} = 1;  # Do not save it
+        DoTrigger($rname, $msg);
+        delete($defs{$rname});
 
       } else {
-        if($msg =~ m/^([^:]*): (.*)$/) {
-          readingsSingleUpdate($defs{$name}, $1, $2, 1);
+        if(AttrVal($name,"eventOnly",0)) {
+          DoTrigger($rname, $msg);
         } else {
-          DoTrigger($name, $msg);
+          if($msg =~ m/^([^:]*): (.*)$/) {
+            readingsSingleUpdate($defs{$rname}, $1, $2, 1);
+          } else {
+            readingsSingleUpdate($defs{$rname}, "state", $msg, 1);
+          }
         }
 
       }
@@ -416,6 +423,13 @@ FHEM2FHEM_Set($@)
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <li><a name="#eventOnly">eventOnly</a><br>
+      if set, generate only events, do not set corresponding readings.
+      This is a compatibility feature, available only for LOG-Mode.
+      </li>
+    <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
+      do not publish events matching &lt;regexp&gt;
+      </li>
   </ul>
 
 </ul>
@@ -517,6 +531,14 @@ FHEM2FHEM_Set($@)
      <li><a href="#dummy">dummy</a></li>
       <li><a href="#disable">disable</a></li>
       <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+      <li><a name="#eventOnly">eventOnly</a><br>
+        falls gesetzt, werden nur die Events generiert, und es wird kein
+        Reading aktualisiert. Ist nur im LOG-Mode aktiv.
+        </li>
+      <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
+        die auf das &lt;regexp&gt; zutreffende Events werden nicht
+        bereitgestellt.
+        </li>
    </ul>
 
 </ul>
