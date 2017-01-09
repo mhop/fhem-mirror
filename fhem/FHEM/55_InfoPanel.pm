@@ -143,6 +143,7 @@ sub InfoPanel_Initialize($) {
     $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
     $hash->{AttrList}  = "autoreread:1,0 useViewPort:1,0 bgcolor refresh size ";
+    $hash->{AttrList} .= "mobileApp:none,apple,other ";
     $hash->{AttrList} .= "title noscript showTime:1,0 ";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
 
@@ -1385,10 +1386,13 @@ sub btIP_returnHTML {
   my $refresh = AttrVal($name, 'refresh', 60);
      $refresh = ($refresh && $refresh < 59) ? 60 : $refresh; 
   my $title   = AttrVal($name, 'title', $name);
-  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";  
+  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1.0, maximum-scale=1.0\"/>";  
   $viewport = AttrVal($name,"useViewPort",1) ? $viewport : "";
+  my $webApp  = "";
+     $webApp = "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"/>" if (AttrVal($name,'mobileApp','none') eq 'apple');
+     $webApp = "<meta name=\"mobile-web-app-capable\" content=\"yes\"/>"       if (AttrVal($name,'mobileApp','none') eq 'other');
   my $gen     = 'generated="'.(time()-1).'"';  
-  my $code    = btIP_HTMLHead($name,$title,$viewport,$refresh);
+  my $code    = btIP_HTMLHead($name,$title,$viewport,$webApp,$refresh);
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\" ".
             "$gen longpoll=\"1\" longpollfilter=\"room=all\" >\n".
@@ -1401,7 +1405,7 @@ sub btIP_returnHTML {
 }
 
 sub btIP_HTMLHead {
-  my ($name,$title,$viewport,$refresh) = @_;
+  my ($name,$title,$viewport,$webApp,$refresh) = @_;
   my $doctype = '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
                 '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
                 '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
@@ -1410,7 +1414,7 @@ sub btIP_HTMLHead {
   my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>" : "";
   my $scripts = btIP_getScript($name);
   my $meta    = "<meta charset=\"UTF-8\">";
-  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta\n$r\n$viewport\n$scripts</head>\n";
+  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta\n$r\n$viewport\n$webApp\n$scripts</head>\n";
   return $code;
 }
 
@@ -1572,6 +1576,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 		<li><b>size</b> - The dimensions of the picture in the format
             <code>&lt;width&gt;x&lt;height&gt;</code></li>
 		<li><b>useViewPort</b> - add viewport meta tag to fit mobile displays</li>
+		<li><b>mobileApp</b> - add support for mobile fullscreen experience</li>
 		<li><b>title</b> - webpage title to be shown in Browser</li>
 		<br/>
 		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
