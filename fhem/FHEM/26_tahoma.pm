@@ -36,6 +36,7 @@
 # 2016-11-15 V 0207 BLOCKING=0 can be used, all calls asynchron, attribut levelInvert inverts RollerShutter position
 # 2016-11-29 V 0208 HttpUtils used instead of LWP::UserAgent, BLOCKING=0 set as default, umlaut can be used in Tahoma names
 # 2016-12-15 V 0209 perl warnings during startup and login eliminated
+# 2017-01-08 V 0210 tahoma_cancelExecutions: cancel command added
 
 package main;
 
@@ -88,7 +89,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0209";
+  my $ModuleVersion = "0210";
   
   my $subtype;
   my $name = $a[0];
@@ -684,7 +685,7 @@ sub tahoma_applyRequest($$$)
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
-    hash => $hash->{IODev},
+    hash => $hash,
     page => 'apply',
     data => tahoma_encode_utf8($data),
     callback => \&tahoma_dispatch,
@@ -708,9 +709,45 @@ sub tahoma_scheduleActionGroup($$)
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
-    hash => $hash->{IODev},
+    hash => $hash,
     page => 'scheduleActionGroup',
     subpage => '?oid='.$hash->{oid}.'&delay='.$delay,
+    callback => \&tahoma_dispatch,
+    nonblocking => 1,
+  });
+}
+
+sub tahoma_cancelExecutions($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_cancelExecutions";
+
+  my $subpage = '';
+  if (defined($hash->{IODev}))
+  {
+    if (defined($hash->{inExecId}) && (length $hash->{inExecId} > 20))
+    {
+      $subpage = '?execId='.$hash->{inExecId};
+    }
+    elsif (defined($hash->{inTriggerId}) && (length $hash->{inTriggerId} > 20))
+    {
+      $subpage = '?triggerId='.$hash->{inTriggerId};
+    }
+    else
+    {
+      Log3 $name, 3, "$name: tahoma_cancelExecutions failed - no valid execId or triggerId found";
+      return;
+    }
+  }
+  Log3 $name, 3, "$name: tahoma_cancelExecutions subpage=$subpage";
+
+  tahoma_UserAgent_NonblockingGet({
+    timeout => 10,
+    noshutdown => 1,
+    hash => $hash,
+    page => 'cancelExecutions',
+    subpage => $subpage,
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -721,6 +758,9 @@ sub tahoma_dispatch($$$)
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+  my $hashIn = $hash;
+  
+  $hash = $hash->{IODev} if (defined($hash->{IODev}));
   
   $hash->{request_active} = 0;
   
@@ -758,7 +798,7 @@ sub tahoma_dispatch($$$)
     if( $param->{page} eq 'getEvents' ) {
       tahoma_parseGetEvents($hash,$json);
     } elsif( $param->{page} eq 'apply' ) {
-      tahoma_parseApplyRequest($hash,$json);
+      tahoma_parseApplyRequest($hashIn,$json);
     } elsif( $param->{page} eq 'getSetup' ) {
       tahoma_parseGetSetup($hash,$json);
     } elsif( $param->{page} eq 'refreshAllStates' ) {
@@ -774,7 +814,9 @@ sub tahoma_dispatch($$$)
     } elsif( $param->{page} eq 'getCurrentExecutions' ) {
       tahoma_parseGetCurrentExecutions($hash,$json);
     } elsif( $param->{page} eq 'scheduleActionGroup' ) {
-      tahoma_parseScheduleActionGroup($hash,$json);
+      tahoma_parseScheduleActionGroup($hashIn,$json);
+    } elsif( $param->{page} eq 'cancelExecutions' ) {
+      tahoma_parseCancelExecutions($hash,$json);
     }
   }
 }
@@ -857,7 +899,7 @@ sub tahoma_defineCommands($)
       $devname = "tahoma_". $fid;
       $define = "$devname tahoma DEVICE $id";
       if( defined $device->{definition}{commands}[0]{commandName} ) {
-        my $commandlist = "dim:slider,0,1,100";
+        my $commandlist = "dim:slider,0,1,100 cancel:noArg";
         foreach my $command (@{$device->{definition}{commands}}) {
           $commandlist .= " " . $command->{commandName};
           $commandlist .= ":noArg" if ($command->{nparams} == 0);
@@ -929,6 +971,28 @@ sub tahoma_parseGetEvents($$)
           readingsEndUpdate($d,1);
         }
       }
+      elsif( defined($devices->{name}) && (defined($devices->{execId}) || defined($devices->{triggerId})) )
+      {
+        foreach my $module (keys %{$modules{$hash->{TYPE}}{defptr}})
+        {
+          my $def = $modules{$hash->{TYPE}}{defptr}{"$module"};
+          if (defined($def->{inExecId}) && ($def->{inExecId} eq $devices->{execId}))
+          {
+            if ($devices->{name} eq 'ExecutionStateChangedEvent')
+            {
+              $def->{inExecState} = $devices->{newState};
+              $def->{inExecId} = 'finished' if ($devices->{newState} == 4);
+              $def->{inExecId} = 'canceled' if ($devices->{newState} == 5);
+            }
+          }
+          elsif (defined($def->{inTriggerId}) && ($def->{inTriggerId} eq $devices->{triggerId}))
+          {
+            $def->{inTriggerState} = $devices->{name};
+            $def->{inTriggerId} = 'finished' if ($devices->{name} eq '4');
+            $def->{inTriggerId} = 'canceled' if ($devices->{name} eq '5');
+          }
+        }
+      }
     }
   }
   
@@ -939,10 +1003,15 @@ sub tahoma_parseApplyRequest($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseApplyRequest";
-  if (defined($json->{applyResponse}{apply}{execId})) {
-    $hash->{InExecId} = $json->{applyResponse}{apply}{execId};
+  $hash->{inExecState} = 0;
+  if (defined($json->{execId})) {
+    $hash->{inExecId} = $json->{execId};
   } else {
-    $hash->{InExecId} = "undefined";
+    $hash->{inExecId} = "undefined";
+  }
+  if (defined($json->{events}) && defined($hash->{IODev}))
+  {
+    tahoma_parseGetEvents($hash->{IODev},$json->{events})
   }
 }
 
@@ -1076,6 +1145,26 @@ sub tahoma_parseScheduleActionGroup($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseScheduleActionGroup";
+  if (defined $json->{actionGroup})
+  {
+    $hash->{inTriggerState} = 0;
+    if (defined($json->{actionGroup}[0]{triggerId})) {
+      $hash->{inTriggerId} = $json->{actionGroup}[0]{triggerId};
+    } else {
+      $hash->{inTriggerId} = "undefined";
+    }
+  }
+  if (defined($json->{events}) && defined($hash->{IODev}))
+  {
+    tahoma_parseGetEvents($hash->{IODev},$json->{events})
+  }
+}
+
+sub tahoma_parseCancelExecutions($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_parseCancelExecutions";
 }
 
 sub tahoma_Get($$@)
@@ -1128,12 +1217,17 @@ sub tahoma_Set($$@)
   my $list = "";
   if( $hash->{SUBTYPE} eq "DEVICE" ||
       $hash->{SUBTYPE} eq "PLACE" ) {
-    $list = "dim:slider,0,1,100 setClosure open:noArg close:noArg my:noArg stop:noArg";
+    $list = "dim:slider,0,1,100 setClosure open:noArg close:noArg my:noArg stop:noArg cancel:noArg";
     $list = $hash->{COMMANDS} if (defined $hash->{COMMANDS});
+
+    if( $cmd eq "cancel" ) {
+      tahoma_cancelExecutions($hash);
+      return undef;
+    }
 
     $cmd = "setClosure" if( $cmd eq "dim" );
     
-   my @commands = split(" ",$list);
+    my @commands = split(" ",$list);
     foreach my $command (@commands)
     {
       if( $cmd eq (split(":",$command))[0])
@@ -1145,7 +1239,7 @@ sub tahoma_Set($$@)
   }
   
   if( $hash->{SUBTYPE} eq "SCENE") {
-    $list = "start:noArg startAt";
+    $list = "start:noArg startAt cancel:noArg";
 
     if( $cmd eq "start" ) {
       tahoma_scheduleActionGroup($hash,0);
@@ -1156,8 +1250,22 @@ sub tahoma_Set($$@)
       tahoma_scheduleActionGroup($hash,$val);
       return undef;
     }
+    
+    if( $cmd eq "cancel" ) {
+      tahoma_cancelExecutions($hash);
+      return undef;
+    }
   }
-  
+
+  if( $hash->{SUBTYPE} eq "ACCOUNT") {
+    $list = "cancel:noArg";
+
+    if( $cmd eq "cancel" ) {
+      tahoma_cancelExecutions($hash);
+      return undef;
+    }
+  }
+    
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -1208,6 +1316,7 @@ sub tahoma_UserAgent_NonblockingGet($)
 {
 	my ($param) = @_;
   my ($hash) = $param->{hash};
+  $hash = $hash->{IODev} if (defined ($hash->{IODev}));
 
   my $name = $hash->{NAME};
   Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
@@ -1218,7 +1327,7 @@ sub tahoma_UserAgent_NonblockingGet($)
   $param->{compress} = 1;
   $param->{keepalive} = 1;
   $param->{url} = $hash->{url} . $param->{page};
-  $param->{url} .= $param->{subPage} if ($param->{subPage});
+  $param->{url} .= $param->{subpage} if ($param->{subpage});
   
   $hash->{request_active} = 1;
   $hash->{request_time} = time;
