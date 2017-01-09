@@ -1258,7 +1258,9 @@ FileLog_regexpFn($$)
 
         If this attribute is not set, but nrarchive is set, then nrarchive old
         logfiles are kept along the current one while older ones are moved to
-        archivedir (or deleted if archivedir is not set).  <br>
+        archivedir (or deleted if archivedir is not set).<br>
+        Note: "old" means here the first ones in the alphabetically soreted
+        list. <br>
 
         Note: setting these attributes for the global instance will effect the
         <a href="#logfile">FHEM logfile</a> only.
@@ -1570,6 +1572,8 @@ FileLog_regexpFn($$)
         werden nrarchive viele Logfiles im aktuellen Verzeichnis gelassen, und
         &auml;ltere Dateien in das Archivverzeichnis (archivedir) verschoben
         (oder gel&ouml;scht, falls kein archivedir gesetzt wurde).<br>
+        Achtung: "&auml;ltere Dateien" sind die, die in der alphabetisch
+        sortierten Liste oben sind.<br>
 		
         Hinweis: Werden diese Attribute als global instance gesetzt, hat das
         auschlie&szlig;lich auf das <a href="#logfile">FHEM logfile</a>
