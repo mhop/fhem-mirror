@@ -70,7 +70,8 @@ watchdog_Define($$)
   }
 
   InternalTimer(1, sub($){
-    my $re = ($re1 eq "." ? "" : $re1)."|".($re2 eq "SAME" ? $re1 : $re2);
+    my $re = ($re1 eq "." ? "" : $re1).
+             (($re2 eq "SAME" || $re2 eq $re1) ? "" : "|$re2");
     notifyRegexpChanged($watchdog, $re);
   }, $watchdog, 0);
 
