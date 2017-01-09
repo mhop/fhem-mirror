@@ -3,7 +3,7 @@
 # Creates the FHEM file from the raw data
 
 # Usage: zwavealliance.images.parse downloaddir
-# Downloaddir is willed with the following script:
+# Downloaddir is filled with the following script:
 # i=1
 # while test $i -lt 2063
 # do
