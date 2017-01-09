@@ -32,6 +32,12 @@ window.onbeforeunload = function(e)
   return undefined;
 }
 
+window.onerror = function(errMsg, url, lineno)
+{
+  FW_okDialog(lineno+": "+errMsg);
+}
+
+
 function
 FW_replaceWidgets(parent)
 {
