@@ -134,7 +134,17 @@ sub TPLinkHS110_Get($$)
 		$socket->close();
 		unless( defined $retval) { return undef; }
 		$rdata = decrypt(substr($rdata,4));
-		my $realtimejson = decode_json($rdata);
+		my $realtimejson;
+		if (length($rdata)==0) {
+			Log3 $hash, 1, "TPLinkHS110: $name: Received zero bytes of realtime data. Cannot process realtime data";
+			return;
+		}
+		eval {
+			$realtimejson = decode_json($rdata);
+		} or do {
+			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			return;
+		};
 		foreach my $key2 (sort keys %{$realtimejson->{'emeter'}->{'get_realtime'}}) {
 			readingsBulkUpdate($hash, $key2, $realtimejson->{'emeter'}->{'get_realtime'}->{$key2});
 		}
@@ -168,7 +178,7 @@ sub TPLinkHS110_Get($$)
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
 			1;
 		} or do {
-			Log3 $hash, 3, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
 		};
 	}
 	readingsEndUpdate($hash, 1);
