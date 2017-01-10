@@ -12,6 +12,7 @@
 # ABU 20160613 changed log entry for startup
 # ABU 20161108 added knxd. Added doku as well. Added summary. Treat it like eibd. See thread #58375
 # ABU 20170102 fixed write-mechanism, added mod for extended adressing (thx to its2bit)
+# ABU 20170110 removed mod for extended adressing
 
 package main;
 
@@ -407,7 +408,7 @@ TUL_SimpleRead($)
 	$buf .= $dst;
 	$buf .= $data;
   
-	Log(3,"SimpleRead: $buf\n");
+	Log(4,"SimpleRead: $buf\n");
   
 	return $buf;
 }
@@ -655,14 +656,14 @@ sub tul_addr2hex
 	{ 
 		#logical address used
 		#old, short-syntax
-        #$str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
+        $str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
 		#extended adress-range
-		$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
+		#$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
     }
     else 
 	{ 
 		#physical address used
-		$str = sprintf "%02x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+        $str = sprintf "%01x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
     }
     return $str;
 }
