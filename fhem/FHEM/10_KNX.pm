@@ -23,6 +23,7 @@
 # ABU 20161127 adjusted dpt-16-sending, added dpt16.001
 # ABU 20161129 fixed get-mechanism
 # ABU 20170106 corrected doku for time, finetuned dpt9-regex, added dpt 7.001 7.012 9.007 9.008, , added mod for extended adressing (thx to its2bit)
+# ABU 20170110 removed mod for extended adressing
 
 package main;
 
@@ -65,9 +66,10 @@ my $id = 'C';
 #regex patterns
 my $PAT_GAD = qr/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/;
 #old syntax
-#my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
+my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
 #new syntax for extended adressing
-my $PAT_GAD_HEX = qr/^[0-9a-f]{5}$/;
+#removed, seems to be broken
+#my $PAT_GAD_HEX = qr/^[0-9a-f]{5}$/;
 my $PAT_GNO = qr/[gG][1-9][0-9]?/;
 
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
@@ -255,7 +257,7 @@ KNX_Define($$) {
 		#old syntax
 		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{4}$/i);
 		#new syntax for extended adressing
-		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{5}$/i);
+		#$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{5}$/i);
 
 		$groupc = KNX_nameToHex ($group);
 		
@@ -745,9 +747,10 @@ KNX_Parse($$) {
 	#split message into parts
 
 	#old syntax
-	#$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
+	$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
 	#new syntax for extended adressing
-	$msg =~ m/^$id(.{5})(.{1})(.{5})(.*)$/;
+	#removed, seems to be broken
+	#$msg =~ m/^$id(.{5})(.{1})(.{5})(.*)$/;
 	my $src = $1;
 	my $cmd = $2;
 	my $dest = $3;
@@ -901,14 +904,15 @@ KNX_hexToName ($)
 	my $v = shift;
 	
 	#old syntax
-	#my $p1 = hex(substr($v,0,1));
-	#my $p2 = hex(substr($v,1,1));
-	#my $p3 = hex(substr($v,2,2));
+	my $p1 = hex(substr($v,0,1));
+	my $p2 = hex(substr($v,1,1));
+	my $p3 = hex(substr($v,2,2));
 
 	#new syntax for extended adressing
-	my $p1 = hex(substr($v,0,2));
-	my $p2 = hex(substr($v,2,1));
-	my $p3 = hex(substr($v,3,2));
+	#removed, seems to be broken
+	#my $p1 = hex(substr($v,0,2));
+	#my $p2 = hex(substr($v,2,1));
+	#my $p3 = hex(substr($v,3,2));
   
 	my $r = sprintf("%d/%d/%d", $p1,$p2,$p3);
 	
@@ -928,7 +932,8 @@ KNX_nameToHex ($)
 		#old syntax
 		$r = sprintf("%01x%01x%02x",$1,$2,$3);
 		#new syntax for extended adressing
-		my $r = sprintf("%02x%01x%02x",$1,$2,$3);
+		#removed, seems to be broken
+		#$r = sprintf("%02x%01x%02x",$1,$2,$3);
 	}
 	#elsif($v =~ /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{1,3})$/) 
 	#{
