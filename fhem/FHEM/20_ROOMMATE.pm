@@ -50,7 +50,7 @@ sub ROOMMATE_Initialize($) {
     $hash->{NotifyFn} = "ROOMMATE_Notify";
     $hash->{UndefFn}  = "ROOMMATE_Undefine";
     $hash->{AttrList} =
-"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice rr_geofenceUUIDs "
+"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice rr_geofenceUUIDs rr_presenceDevices "
       . $readingFnAttributes;
 }
 
@@ -248,9 +248,9 @@ sub ROOMMATE_Notify($$) {
     # process child notifies
     elsif ( $devName ne $hashName ) {
         my @registeredWakeupdevs =
-          split( /,/, $attr{$hashName}{rr_wakeupDevice} )
-          if ( defined( $attr{$hashName}{rr_wakeupDevice} )
-            && $attr{$hashName}{rr_wakeupDevice} ne "" );
+          split( ',', AttrVal( $hashName, "rr_wakeupDevice", "" ) );
+        my @presenceDevices =
+          split( ',', AttrVal( $hashName, "rr_presenceDevices", "" ) );
 
         # if we have registered wakeup devices
         if (@registeredWakeupdevs) {
@@ -290,6 +290,41 @@ sub ROOMMATE_Notify($$) {
 
                     last;
                 }
+            }
+        }
+
+        # process PRESENCE
+        elsif (@presenceDevices) {
+            my $counter = {
+                absent  => 0,
+                present => 0,
+            };
+
+            foreach (@presenceDevices) {
+                next unless ( $_ eq $devName );
+                my $presenceState =
+                  ReadingsVal( $_, "presence", ReadingsVal( $_, "state", "" ) );
+                next
+                  unless ( $presenceState =~
+/^((absent|disappeared|unavailable)|(present|appeared|available|))$/i
+                  );
+
+                $counter->{absent}++  if ($2);
+                $counter->{present}++ if ($3);
+                last;
+            }
+
+            if ( $counter->{absent} && !$counter->{present} ) {
+                Log3 $hashName, 4,
+                  "ROOMMATE $hashName: "
+                  . "Syncing status with $devName = absent";
+                fhem "set $hashName:FILTER=presence=present absent";
+            }
+            elsif ( !$counter->{absent} && $counter->{present} ) {
+                Log3 $hashName, 4,
+                  "ROOMMATE $hashName: "
+                  . "Syncing status with $devName = present";
+                fhem "set $hashName:FILTER=presence=absent home";
             }
         }
     }
@@ -1398,6 +1433,9 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_passPresenceTo</b> - synchronize presence state with other ROOMMATE or GUEST devices; separte devices by space
           </li>
           <li>
+            <b>rr_presenceDevices</b> - take over presence state from any other FHEM device. Separate more than one device with comma meaning ALL of them need to be either present or absent to trigger update of this ROOMMATE device.
+          </li>
+          <li>
             <b>rr_realname</b> - whenever ROOMMATE wants to use the realname it uses the value of attribute alias or group; defaults to group
           </li>
           <li>
@@ -1694,6 +1732,9 @@ sub ROOMMATE_StartInternalTimers($$) {
           </li>
           <li>
             <b>rr_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen ROOMMATE oder GUEST Devices; mehrere Devices durch Leerzeichen trennen
+          </li>
+          <li>
+            <b>rr_presenceDevices</b> - &uuml;bernehmen des presence Status von einem anderen FHEM Device. Bei mehreren Devices diese mit Komma trennen, um ein Update des ROOMMATE Devices auszul&ouml;sen, sobald ALLE Devices entweder absent oder present sind.
           </li>
           <li>
             <b>rr_realname</b> - wo immer ROOMMATE den richtigen Namen verwenden m&ouml;chte nutzt es den Wert des Attributs alias oder group; Standard ist group

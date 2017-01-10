@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 20_ROOMMATE,20_GUEST: introduce new attribute r*_presenceDevices
+                                   to allow easy status synchronisation with
+                                   other FHEM devices (e.g. PRESENCE module)
   - bugfix:  93_DbLog.pm: is now version 2.8.6, some small bugfixes
              (thanks a lot to DS_Starter)
   - update:  55_InfoPanel.pm: attribute mobileApp added

@@ -50,7 +50,7 @@ sub GUEST_Initialize($) {
     $hash->{NotifyFn} = "GUEST_Notify";
     $hash->{UndefFn}  = "GUEST_Undefine";
     $hash->{AttrList} =
-"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 rg_wakeupDevice rg_geofenceUUIDs "
+"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 rg_wakeupDevice rg_geofenceUUIDs rg_presenceDevices "
       . $readingFnAttributes;
 }
 
@@ -243,9 +243,9 @@ sub GUEST_Notify($$) {
     # process child notifies
     elsif ( $devName ne $hashName ) {
         my @registeredWakeupdevs =
-          split( /,/, $attr{$hashName}{rg_wakeupDevice} )
-          if ( defined( $attr{$hashName}{rg_wakeupDevice} )
-            && $attr{$hashName}{rg_wakeupDevice} ne "" );
+          split( ',', AttrVal( $hashName, "rg_wakeupDevice", "" ) );
+        my @presenceDevices =
+          split( ',', AttrVal( $hashName, "rg_presenceDevices", "" ) );
 
         # if we have registered wakeup devices
         if (@registeredWakeupdevs) {
@@ -285,6 +285,39 @@ sub GUEST_Notify($$) {
 
                     last;
                 }
+            }
+        }
+
+        # process PRESENCE
+        elsif (@presenceDevices) {
+            my $counter = {
+                absent  => 0,
+                present => 0,
+            };
+
+            foreach (@presenceDevices) {
+                next unless ( $_ eq $devName );
+                my $presenceState =
+                  ReadingsVal( $_, "presence", ReadingsVal( $_, "state", "" ) );
+                next
+                  unless ( $presenceState =~
+/^((absent|disappeared|unavailable)|(present|appeared|available|))$/i
+                  );
+
+                $counter->{absent}++  if ($2);
+                $counter->{present}++ if ($3);
+                last;
+            }
+
+            if ( $counter->{absent} && !$counter->{present} ) {
+                Log3 $hashName, 4,
+                  "GUEST $hashName: Syncing status with $devName = absent";
+                fhem "set $hashName:FILTER=presence=present absent";
+            }
+            elsif ( !$counter->{absent} && $counter->{present} ) {
+                Log3 $hashName, 4,
+                  "GUEST $hashName: Syncing status with $devName = present";
+                fhem "set $hashName:FILTER=presence=absent home";
             }
         }
     }
@@ -1410,6 +1443,9 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_passPresenceTo</b> - synchronize presence state with other GUEST or GUEST devices; separte devices by space
           </li>
           <li>
+            <b>rg_presenceDevices</b> - take over presence state from any other FHEM device. Separate more than one device with comma meaning ALL of them need to be either present or absent to trigger update of this ROOMMATE device.
+          </li>
+          <li>
             <b>rg_realname</b> - whenever GUEST wants to use the realname it uses the value of attribute alias or group; defaults to group
           </li>
           <li>
@@ -1706,6 +1742,9 @@ sub GUEST_StartInternalTimers($$) {
           </li>
           <li>
             <b>rg_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen GUEST oder ROOMMATE Devices; mehrere Devices durch Leerzeichen trennen
+          </li>
+          <li>
+            <b>rg_presenceDevices</b> - &uuml;bernehmen des presence Status von einem anderen FHEM Device. Bei mehreren Devices diese mit Komma trennen, um ein Update des GUEST Devices auszul&ouml;sen, sobald ALLE Devices entweder absent oder present sind.
           </li>
           <li>
             <b>rg_realname</b> - wo immer GUEST den richtigen Namen verwenden m&ouml;chte nutzt es den Wert des Attributs alias oder group; Standard ist group
