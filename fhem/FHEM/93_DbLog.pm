@@ -13,6 +13,8 @@
 ############################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.8.8      10.01.2017       connection check in Get added, avoid warning "commit/rollback ineffective with AutoCommit enabled"
+# 2.8.7      10.01.2017       bugfix no dropdown list in SVG if asynchronous mode activated (func DbLog_sampleDataFn)
 # 2.8.6      09.01.2017       Workaround for Warning begin_work failed: Turning off AutoCommit failed, start new timer of
 #                             DbLog_execmemcache after reducelog
 # 2.8.5      08.01.2017       attr syncEvents, cacheEvents added to minimize events
@@ -53,7 +55,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.8.6";
+my $DbLogVersion = "2.8.8";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -855,8 +857,11 @@ sub DbLog_Log($$) {
 	      # synchoner Mode
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
-          readingsSingleUpdate($hash, "state", $error, 1) if($error);
-		  readingsSingleUpdate($hash, "state", "connected", 0) if(!$error);
+		  if($error) {
+              readingsSingleUpdate($hash, "state", $error, 1);
+		  } else {
+		      readingsSingleUpdate($hash, "state", "connected", 0);
+		  }
       }
   }
 return;
@@ -1011,13 +1016,13 @@ sub DbLog_Push(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbh->rollback();
+    $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
     $dbh->disconnect();  
     DbLog_Connect($hash);
   }
   else {
-    $dbh->commit();
+    $dbh->commit() if(!$dbh->{AutoCommit});
     $dbh->{RaiseError} = 0; 
     $dbh->{PrintError} = 1;
   }
@@ -1055,7 +1060,7 @@ sub DbLog_execmemcache ($) {
 	
   # nur Verbindungstest, DbLog_PushAsyncDone hat eigene Verbindungsroutine
   eval {
-    $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });
+    $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });
   }; 
   
   if ($@) {
@@ -1146,7 +1151,7 @@ sub DbLog_PushAsync(@) {
   # Background-Startzeit
   my $bst = [gettimeofday];
   
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
   
   if ($@) {
       $error = encode_base64($@,"");
@@ -1281,12 +1286,12 @@ sub DbLog_PushAsync(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbh->rollback();
+    $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
     $dbh->disconnect();  
   }
   else {
-    $dbh->commit();
+    $dbh->commit() if(!$dbh->{AutoCommit});
 	$dbh->disconnect(); 
   }
   # SQL-Laufzeit ermitteln
@@ -1500,7 +1505,11 @@ sub DbLog_Connect($)
     Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
   }
-
+  
+#  if(!$dbhf) {
+#   Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
+#    return 0;
+#  }
   Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBHF}= $dbhf;
 
@@ -1564,7 +1573,13 @@ DbLog_Get($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
-
+  
+  my $dbh  = $hash->{DBH};
+  if ( !$dbh || not $dbh->ping ) {
+      #### DB Session dead, try to reopen now !
+      DbLog_Connect($hash);
+  }  
+  
   return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
@@ -1636,7 +1651,7 @@ DbLog_Get($@)
     return "Can't connect to database." if(!DbLog_Connect($hash));
   }
 
-  my $dbh = $hash->{DBH};
+   $dbh = $hash->{DBH};
   
   if ( !$dbh || not $dbh->ping ) {
       Log3($name, 1, "DbLog $name: DBLog_Get - DB Session dead, try to reopen now !");
@@ -2603,6 +2618,16 @@ DbLog_sampleDataFn($$$$$)
   my @example;
   my @colregs;
   my $counter;
+  
+  # Fix keine Vorschlagswerte aus Current im asynchronen Mode
+  my $hash = $defs{$dlName};
+  my $dbh  = $defs{$dlName}{DBH};
+  eval {
+    if ( !$dbh || not $dbh->ping ) {
+      #### DB Session dead, try to reopen now !
+      DbLog_Connect($hash);
+    }  
+  };
 
   my $currentPresent = AttrVal($dlName,'DbLogType','Current');
   if($currentPresent =~ m/Current/) {
@@ -3002,7 +3027,8 @@ sub dbReadings($@) {
 	   </code><br>
 	 
        This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set, 
-	   the table <i>history</i> will be used as default.  <br>
+	   the table <i>history</i> will be used as default. NOTE: The current-table has to be used to get a Device:Reading-DropDown
+       list when a SVG-Plot will be created. <br>
      </ul>
   </ul>
   <br>
@@ -3518,7 +3544,8 @@ sub dbReadings($@) {
 	   </code><br>
 	 
        Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
-       per default die Tabelle <i>history</i> verwendet.  <br>
+       per default die Tabelle <i>history</i> verwendet. HINWEIS: Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDown
+       Liste bei der Erstellung eines SVG-Plots zu erhalten.   <br>
      </ul>
   </ul>
   <br>
