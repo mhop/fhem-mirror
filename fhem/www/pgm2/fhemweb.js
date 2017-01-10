@@ -34,7 +34,8 @@ window.onbeforeunload = function(e)
 
 window.onerror = function(errMsg, url, lineno)
 {
-  FW_okDialog(lineno+": "+errMsg);
+  url = url.replace(/.*\//,'');
+  FW_okDialog(url+" line "+lineno+":<br>"+errMsg);
 }
 
 
