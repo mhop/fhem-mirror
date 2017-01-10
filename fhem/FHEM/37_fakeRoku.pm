@@ -1,4 +1,3 @@
-
 # $Id$
 
 package main;
@@ -40,7 +39,7 @@ fakeRoku_Initialize($)
   #$hash->{SetFn}    = "fakeRoku_Set";
   #$hash->{GetFn}    = "fakeRoku_Get";
   $hash->{AttrFn}   = "fakeRoku_Attr";
-  $hash->{AttrList} = "disable:1,0 favourites fhemIP httpPort";
+  $hash->{AttrList} = "disable:1,0 favourites fhemIP httpPort reusePort:1,0";
 }
 
 #####################################
@@ -179,7 +178,8 @@ fakeRoku_startDiscovery($)
 
   if( 1 ) {
     # respond to multicast client discovery messages
-    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>1900, ReuseAddr=>1, ReusePort=>defined(&SO_REUSEPORT)?1:0) ) {
+    $hash->{reusePort} = AttrVal($name, 'reusePort', defined(&SO_REUSEPORT)?1:0)?1:0;
+    if( my $socket = IO::Socket::Multicast->new(Proto=>'udp', LocalPort=>1900, ReuseAddr=>1, ReusePort=>$hash->{reusePort} ) ) {
       $socket->mcast_add('239.255.255.250');
 
       my $chash = fakeRoku_newChash( $hash, $socket,
@@ -369,6 +369,15 @@ fakeRoku_Attr($$$)
 
     fakeRoku_startDiscovery($hash);
     fakeRoku_startListener($hash);
+
+  } elsif( $attrName eq 'reusePort' ) {
+    if( $cmd eq "set" ) {
+      $attr{$name}{$attrName} = $attrVal;
+    } else {
+      delete $attr{$name}{$attrName};
+    }
+
+    fakeRoku_startDiscovery($hash);
   }
 
 
@@ -836,6 +845,10 @@ Log 1, "!!!!!!!!!!";
     <li>fhemIP<br>
       overwrites autodetected local ip used in advertising</li>
     <li>httpPort</li>
+    <li>reusePort<br>
+      not set -> set ReusePort on multicast socket if SO_REUSEPORT flag ist known. should work in most cases. </li>
+      0 -> don't set ReusePort on multicast socket<br>
+      1 -> set ReusePort on multicast socket<br>
   </ul>
 
 </ul><br>
