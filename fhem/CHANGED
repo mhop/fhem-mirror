@@ -1,9 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog.pm: is now version 2.8.6, some small bugfixes
+             (thanks a lot to DS_Starter)
   - update:  55_InfoPanel.pm: attribute mobileApp added
                               to support fullscreen experience
   - update:  98_cloneDummy.pm
-             changed: do not use NOTIFYDEFV
+             changed: do not use NOTIFYDEV
              fixed:   set $rval in _state instead of $reading
              added:   new attribute deleteBeforeUpdate
   - bugfix:  73_NUKIBridge/74_NUKIDevice fix lockState with App Bridge

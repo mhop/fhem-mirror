@@ -13,6 +13,11 @@
 ############################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.8.6      09.01.2017       Workaround for Warning begin_work failed: Turning off AutoCommit failed, start new timer of
+#                             DbLog_execmemcache after reducelog
+# 2.8.5      08.01.2017       attr syncEvents, cacheEvents added to minimize events
+# 2.8.4      08.01.2017       $readingFnAttributes added
+# 2.8.3      08.01.2017       set NOTIFYDEV changed to use notifyRegexpChanged (Forum msg555619), attr noNotifyDev added
 # 2.8.2      06.01.2017       commandref maintained to cover new functions
 # 2.8.1      05.01.2017       use Time::HiRes qw(gettimeofday tv_interval), bugfix $hash->{HELPER}{RUNNING_PID}
 # 2.8        03.01.2017       attr asyncMode, you have a choice to use blocking (as V2.5) or non-blocking asynchronous
@@ -48,7 +53,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.8.2";
+my $DbLogVersion = "2.8.6";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -80,9 +85,13 @@ sub DbLog_Initialize($)
 		                      "verbose4Devs ".
 							  "excludeDevs ".
 							  "syncInterval ".
+							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
 							  "asyncMode:1,0 ".
-                              "DbLogSelectionMode:Exclude,Include,Exclude/Include";
+							  "cacheEvents:1,0 ".
+							  "syncEvents:1,0 ".
+                              "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
+							  $readingFnAttributes;
 
   # Das Attribut DbLogSelectionMode legt fest, wie die Device-Spezifischen Atrribute 
   # DbLogExclude und DbLogInclude behandelt werden sollen.
@@ -124,11 +133,8 @@ sub DbLog_Define($@)
   $hash->{MODE}       = "synchronous";   # Standardmode
   
   # nur Events dieser Devices an NotifyFn weiterleiten
-  my $dn = (split(":", $regexp))[0];
-  $dn =~ tr/[()]//d;
-  $dn =~ s/\|/,/g;
-  $hash->{NOTIFYDEV}  = $dn; 
-
+  notifyRegexpChanged($hash, $regexp);
+  
   #remember PID for plotfork
   $hash->{PID} = $$;
   
@@ -212,6 +218,15 @@ sub DbLog_Attr(@) {
 	  }
   }
   
+  if($aName eq "noNotifyDev") {
+      my $regexp = $hash->{REGEXP};
+      if ($cmd eq "set" && $aVal) {
+	      delete($hash->{NOTIFYDEV});
+	  } else {
+	      notifyRegexpChanged($hash, $regexp);  
+	  }
+  }
+  
   if ($aName eq "disable") {
       if($cmd eq "set") {
           $do = ($aVal) ? 1 : 0;
@@ -249,6 +264,7 @@ sub DbLog_Set($@) {
         else {
             if (defined $a[2] && $a[2] =~ /^\d+$/) {
                 $ret = DbLog_reduceLog($hash,@a);
+				InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
             } else {
                 Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
                 $ret = "reduceLog error, no <days> given.";
@@ -692,8 +708,8 @@ sub DbLog_Log($$) {
 	  Log3 $name, 4, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
   }
   
-  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn $hash->{NOTIFYDEV} = .*)
-  if($hash->{NOTIFYDEV} eq ".*") {
+  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV} oder $hash->{NOTIFYDEV} = .*)
+  if(!$hash->{NOTIFYDEV} || $hash->{NOTIFYDEV} eq ".*") {
       my @exdevs  = split(",", AttrVal($name, "excludeDevs", ""));
 	  if(@exdevs) {
 	      foreach (@exdevs) {
@@ -829,7 +845,11 @@ sub DbLog_Log($$) {
   if($async) {    
       # asynchoner non-blocking Mode
       my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
-      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
+	  if(AttrVal($name, "cacheEvents", undef)) {
+          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+	  } else {
+	      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+	  }
   } else {
       if(@row_array) {
 	      # synchoner Mode
@@ -918,9 +938,9 @@ sub DbLog_Push(@) {
       $sth_uc->bind_param_array(7, [@reading]);
   }
   
+  eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
   my ($tuples, $rows);
   eval {
-      $dbh->begin_work();  # begin_work in eval -> avoid crash if issue:  begin_work failed: Turning off AutoCommit failed
       # insert into history
       if (lc($DbLogType) =~ m(history) ) {
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
@@ -1019,7 +1039,8 @@ sub DbLog_execmemcache ($) {
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   my $timeout    = 60;
-  my $state      = "connected";  
+  my $state      = "connected";
+  my $error      = 0;  
   my (@row_array,$memcount,$dbh);
   
   RemoveInternalTimer($hash, "DbLog_execmemcache");
@@ -1039,7 +1060,7 @@ sub DbLog_execmemcache ($) {
   
   if ($@) {
       Log3($name, 3, "DbLog $name: Error DBLog_execmemcache - $@");
-	  $state = $@;
+	  $error = $@;
   } else {
       # Testverbindung abbauen
       $dbh->disconnect(); 
@@ -1070,7 +1091,7 @@ sub DbLog_execmemcache ($) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
       } else {
 	      if($hash->{HELPER}{RUNNING_PID}) {
-		      $state = "old BlockingCall is running - resync at NextSync";
+		      $error = "old BlockingCall is running - resync at NextSync";
 		  }
 	  }
   }
@@ -1079,13 +1100,25 @@ sub DbLog_execmemcache ($) {
   
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime($nextsync);
-  
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "CacheUsage", $memcount);
-  readingsBulkUpdate($hash, "NextSync", $nsdt);
-  readingsBulkUpdate($hash, "state", $state);
-  readingsEndUpdate($hash, 1);
 
+  if(AttrVal($name, "cacheEvents", undef)) {
+      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+  } else {
+	  readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+  }
+	  
+  if(AttrVal($name, "syncEvents", undef)) {
+      readingsSingleUpdate($hash, "NextSync", $nsdt, 1); 
+  } else {
+      readingsSingleUpdate($hash, "NextSync", $nsdt, 0); 
+  }
+  
+  if($error) {
+      readingsSingleUpdate($hash, "state", $error, 1);
+  } else {
+      readingsSingleUpdate($hash, "state", $state, 0);
+  }
+  
   InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
 
 return;
@@ -1175,9 +1208,9 @@ sub DbLog_PushAsync(@) {
   # SQL-Startzeit
   my $st = [gettimeofday];
   
+  eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
   my ($tuples, $rows);
   eval {
-      $dbh->begin_work();  # begin_work in eval -> avoid crash if issue:  begin_work failed: Turning off AutoCommit failed
       # insert into history
       if (lc($DbLogType) =~ m(history) ) {
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
@@ -1278,11 +1311,12 @@ sub DbLog_PushAsyncDone ($) {
  my @a          = split("\\|",$string);
  my $name       = $a[0];
  my $hash       = $defs{$name};
- my $state      = $a[1]?decode_base64($a[1]):"connected";
+ my $error      = $a[1]?decode_base64($a[1]):0;
  my $bt         = $a[2];
  my ($rt,$brt)  = split(",", $bt);
  my $rowlist    = $a[3];
  my $asyncmode  = AttrVal($name, "asyncMode", undef);
+ my $state      = "connected";
  my $memcount;
 
  if($rowlist) {
@@ -1298,18 +1332,22 @@ sub DbLog_PushAsyncDone ($) {
 		   $hash->{cache}{memcache}{$index} = $row;
 	   }
 	   $memcount = scalar(keys%{$hash->{cache}{memcache}});
-       readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
 	 };
   }
- 
+	  
  Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsyncDone");
  $state = "disabled" if(IsDisabled($name));
  
  readingsBeginUpdate($hash);
  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
- readingsBulkUpdate($hash, "state", $state, 1);
  readingsEndUpdate($hash, 1);
+ 
+  if($error) {
+      readingsSingleUpdate($hash, "state", $error, 1);
+  } else {
+      readingsSingleUpdate($hash, "state", $state, 0);
+  } 
  
  if(!$asyncmode) {
      delete($defs{$name}{READINGS}{NextSync});
@@ -2946,6 +2984,16 @@ sub dbReadings($@) {
     </ul>
   </ul>
   <br>
+
+  <ul><b>cacheEvents</b>
+    <ul>
+	  <code>attr &lt;device&gt; cacheEvents [1|0]
+	  </code><br>
+	  
+      events of reading cacheEvents will be created. <br>
+    </ul>
+  </ul>
+  <br>
   
   <ul><b>DbLogType</b>
      <ul>
@@ -3032,6 +3080,27 @@ sub dbReadings($@) {
 	   </code><br>
 	   # The devices global respectively devices starting with "Log" or "Cam" are excluded from database logging. <br>
      </ul>
+  </ul>
+  <br>
+  
+  <ul><b>noNotifyDev</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; noNotifyDev [1|0]
+	   </code><br>
+	   
+       Enforces that NOTIFYDEV won't set and hence won't used. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>syncEvents</b>
+    <ul>
+	  <code>attr &lt;device&gt; syncEvents [1|0]
+	  </code><br>
+	  
+      events of reading syncEvents will be created. <br>
+    </ul>
   </ul>
   <br>
 
@@ -3431,6 +3500,16 @@ sub dbReadings($@) {
     </ul>
   </ul>
   <br>
+
+  <ul><b>cacheEvents</b>
+    <ul>
+	  <code>attr &lt;device&gt; cacheEvents [1|0]
+	  </code><br>
+	  
+      es werden Events für Reading cacheEvents erzeugt. <br>
+    </ul>
+  </ul>
+  <br>
   
   <ul><b>DbLogType</b>
      <ul>
@@ -3536,6 +3615,17 @@ sub dbReadings($@) {
   </ul>
   <br>
   
+  <ul><b>noNotifyDev</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; noNotifyDev [1|0]
+	   </code><br>
+	   
+       Erzwingt dass NOTIFYDEV nicht gesetzt und somit nicht verwendet wird .<br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>showproctime</b>
     <ul>
 	  <code>attr &lt;device&gt; showproctime [1|0]
@@ -3545,6 +3635,16 @@ sub dbReadings($@) {
 	  durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der
 	  jeweiligen Funktion betrachtet. Das Reading "background_processing_time" zeigt die im Kindprozess BlockingCall verbrauchte Zeit.<br>
 	  
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>syncEvents</b>
+    <ul>
+	  <code>attr &lt;device&gt; syncEvents [1|0]
+	  </code><br>
+	  
+      es werden Events für Reading NextSync erzeugt. <br>
     </ul>
   </ul>
   <br>
