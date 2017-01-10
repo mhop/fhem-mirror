@@ -3,16 +3,13 @@
 use strict;
 use warnings;
 
-# Details in Forum #35416
-
 if(@ARGV != 0) {
   print "Usage:\n".
     "  git clone https://github.com/jeedom/plugin-openzwave".
     "  cd plugin-openzwave/core/config".
     "  gzip -d < <fhem>/FHEM/lib/zwave_pepperlinks.csv.gz > zwave_pepperlinks.csv\n".
     "  perl <fhem>/contrib/zwave_jeedomconvert.pl\n".
-    "  diff zwave_pepperlinks.csv zwave_pepperlinks.csv.NEW\n".
-    "  upload shown *.jpg files to fhem.de/deviceimages\n".
+    "  copy *.jpg to fhem.de/deviceimages/zwave\n".
     "  gzip < zwave_pepperlinks.csv.NEW > <fhem>/FHEM/lib/zwave_pepperlinks.csv.gz\n".
     "  rm *.jpg\n";
   exit 1;
@@ -29,7 +26,7 @@ while(my $l = <F1>) {
 }
 close(F1);
 
-open(F1, "find devices -name *.jpg -print|") || die("Cant start find: $!\n");
+open(F1, "find devices -name \\*.jpg -print|") || die("Cant start find: $!\n");
 while(my $l = <F1>) {
   chomp($l);
   next if($l !~ m,/(\d+)\.(\d+)\.(\d+)_(.*)$,);
@@ -39,7 +36,7 @@ while(my $l = <F1>) {
   $file =~ s/ /_/g;
   print "WARNING: bogus filename $file\n" if($file =~ m/^[^0-9A-Za-z.]+$/);
   $m{$i}{P} = $file;
-  symlink($l, $file);
+  `cp "$l" $file`;
 }
 close(F1);
 
