@@ -402,21 +402,18 @@ sub Pushover_ReceiveCommand($$$) {
         if ( $param->{httpheader} =~ m/X-Limit-App-Limit:[\s\t]*(.*)[\s\t\n]*/ )
         {
             $apiLimit = $1;
-            readingsBulkUpdate( $hash, "apiLimit", $1 )
-              if ( ReadingsVal( $name, "apiLimit", "" ) ne $1 );
+            readingsBulkUpdateIfChanged( $hash, "apiLimit", $1 ),;
         }
         if ( $param->{httpheader} =~
             m/X-Limit-App-Remaining:[\s\t]*(.*)[\s\t\n]*/ )
         {
             $apiRemaining = $1;
-            readingsBulkUpdate( $hash, "apiRemaining", $1 )
-              if ( ReadingsVal( $name, "apiRemaining", "" ) ne $1 );
+            readingsBulkUpdateIfChanged( $hash, "apiRemaining", $1 );
         }
         if ( $param->{httpheader} =~ m/X-Limit-App-Reset:[\s\t]*(.*)[\s\t\n]*/ )
         {
             $apiReset = $1;
-            readingsBulkUpdate( $hash, "apiReset", $1 )
-              if ( ReadingsVal( $name, "apiReset", "" ) ne $1 );
+            readingsBulkUpdateIfChanged( $hash, "apiReset", $1 );
         }
 
         # Server error
@@ -449,28 +446,22 @@ sub Pushover_ReceiveCommand($$$) {
 
             if ( ref($return) eq "HASH" && defined( $return->{token} ) ) {
                 $state = "unauthorized";
-                readingsBulkUpdate( $hash, "tokenState", $return->{token} )
-                  if (
-                    ReadingsVal( $name, "tokenState", "" ) ne $return->{token}
-                  );
+                readingsBulkUpdate( $hash, "tokenState", $return->{token} );
             }
             elsif ( ref($return) ne "HASH" && $return =~ m/"token":"invalid"/ )
             {
                 $state = "unauthorized";
-                readingsBulkUpdate( $hash, "tokenState", "invalid" )
-                  if ( ReadingsVal( $name, "tokenState", "" ) ne "invalid" );
+                readingsBulkUpdate( $hash, "tokenState", "invalid" );
             }
             else {
-                readingsBulkUpdate( $hash, "tokenState", "valid" )
-                  if ( ReadingsVal( $name, "tokenState", "" ) ne "valid" );
+                readingsBulkUpdateIfChanged( $hash, "tokenState", "valid" );
             }
 
             if ( ref($return) eq "HASH" && defined( $return->{user} ) ) {
 
                 $state = "unauthorized" if ( !defined( $values->{USER_KEY} ) );
                 readingsBulkUpdate( $hash, "userState", $return->{user} )
-                  if ( ReadingsVal( $name, "userState", "" ) ne $return->{user}
-                    && !defined( $values->{USER_KEY} ) );
+                  if ( !defined( $values->{USER_KEY} ) );
 
                 $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} } =
                     "USERKEY "
@@ -484,8 +475,7 @@ sub Pushover_ReceiveCommand($$$) {
 
                 $state = "unauthorized" if ( !defined( $values->{USER_KEY} ) );
                 readingsBulkUpdate( $hash, "userState", "invalid" )
-                  if ( ReadingsVal( $name, "userState", "" ) ne "invalid"
-                    && !defined( $values->{USER_KEY} ) );
+                  if ( !defined( $values->{USER_KEY} ) );
 
                 $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} } =
                     "USERKEY "
@@ -497,9 +487,8 @@ sub Pushover_ReceiveCommand($$$) {
             }
             else {
 
-                readingsBulkUpdate( $hash, "userState", "valid" )
-                  if ( ReadingsVal( $name, "userState", "" ) ne "valid"
-                    && !defined( $values->{USER_KEY} ) );
+                readingsBulkUpdateIfChanged( $hash, "userState", "valid" )
+                  if ( !defined( $values->{USER_KEY} ) );
 
                 delete $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} }
                   if (
@@ -515,12 +504,10 @@ sub Pushover_ReceiveCommand($$$) {
         else {
             $state = "limited" if ( $apiRemaining < 1 );
 
-            readingsBulkUpdate( $hash, "tokenState", "valid" )
-              if ( ReadingsVal( $name, "tokenState", "" ) ne "valid"
-                && !defined( $values->{USER_KEY} ) );
-            readingsBulkUpdate( $hash, "userState", "valid" )
-              if ( ReadingsVal( $name, "userState", "" ) ne "valid"
-                && !defined( $values->{USER_KEY} ) );
+            readingsBulkUpdateIfChanged( $hash, "tokenState", "valid" )
+              if ( !defined( $values->{USER_KEY} ) );
+            readingsBulkUpdateIfChanged( $hash, "userState", "valid" )
+              if ( !defined( $values->{USER_KEY} ) );
         }
 
         # messages.json
@@ -627,10 +614,8 @@ sub Pushover_ReceiveCommand($$$) {
                   if ( defined( $return->{devices} ) );
                 $group = $return->{group} if ( defined( $return->{group} ) );
 
-                readingsBulkUpdate( $hash, "devices", $devices )
-                  if ( ReadingsVal( $name, "devices", "" ) ne $devices );
-                readingsBulkUpdate( $hash, "group", $group )
-                  if ( ReadingsVal( $name, "group", "" ) ne $group );
+                readingsBulkUpdateIfChanged( $hash, "devices", $devices );
+                readingsBulkUpdateIfChanged( $hash, "group",   $group );
             }
         }
 
@@ -643,13 +628,11 @@ sub Pushover_ReceiveCommand($$$) {
     $available = 1
       if ( $param->{code} ne "429"
         && ( $state eq "connected" || $state eq "error" ) );
-    readingsBulkUpdate( $hash, "available", $available )
-      if ( ReadingsVal( $name, "available", "" ) ne $available );
+    readingsBulkUpdateIfChanged( $hash, "available", $available );
 
     # Set reading for state
     #
-    readingsBulkUpdate( $hash, "state", $state )
-      if ( ReadingsVal( $name, "state", "" ) ne $state );
+    readingsBulkUpdateIfChanged( $hash, "state", $state );
 
     # credentials validation loop
     #
