@@ -274,9 +274,9 @@ sub ROOMMATE_Notify($$) {
 
                 # if this is a notification of a registered sub dummy device
                 # of one of our wakeup devices
-                if (   defined( $attr{$wakeupDev}{wakeupResetSwitcher} )
-                    && $attr{$wakeupDev}{wakeupResetSwitcher} eq $devName
-                    && $defs{$devName}{TYPE} eq "dummy" )
+                if (
+                    AttrVal( $wakeupDev, "wakeupResetSwitcher", "" ) eq $devName
+                    && $dev->{TYPE} eq "dummy" )
                 {
 
                     # Some previous notify deleted the array.
@@ -294,14 +294,14 @@ sub ROOMMATE_Notify($$) {
         }
 
         # process PRESENCE
-        elsif (@presenceDevices) {
+        if ( @presenceDevices && $devName ~~ @presenceDevices ) {
+
             my $counter = {
                 absent  => 0,
                 present => 0,
             };
 
-            foreach (@presenceDevices) {
-                next unless ( $_ eq $devName );
+            for (@presenceDevices) {
                 my $presenceState =
                   ReadingsVal( $_, "presence", ReadingsVal( $_, "state", "" ) );
                 next
@@ -311,7 +311,6 @@ sub ROOMMATE_Notify($$) {
 
                 $counter->{absent}++  if ($2);
                 $counter->{present}++ if ($3);
-                last;
             }
 
             if ( $counter->{absent} && !$counter->{present} ) {
