@@ -46,7 +46,7 @@ use JSON;
 
 use HttpUtils;
 
-my $version = "0.4.4";
+my $version = "0.4.5";
 
 
 
@@ -126,7 +126,7 @@ sub NUKIBridge_Define($$) {
     if( $init_done ) {
         NUKIBridge_firstRun($hash) if( ($hash->{HOST}) and ($hash->{TOKEN}) );
     } else {
-        InternalTimer( gettimeofday()+15, "NUKIBridge_firstRun", $hash, 0 ) if( ($hash->{HOST}) and ($hash->{TOKEN}) );
+        InternalTimer( gettimeofday()+15, 'NUKIBridge_firstRun', $hash, 0 ) if( ($hash->{HOST}) and ($hash->{TOKEN}) );
     }
 
     $modules{NUKIBridge}{defptr}{$hash->{HOST}} = $hash;
@@ -164,7 +164,7 @@ sub NUKIBridge_Attr(@) {
 
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            NUKIBridge_GetCheckBridgeAlive($hash);
+            InternalTimer( gettimeofday()+5, 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
             Log3 $name, 3, "NUKIBridge ($name) - enabled";
         }
     }
@@ -177,7 +177,7 @@ sub NUKIBridge_Attr(@) {
 
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            NUKIBridge_GetCheckBridgeAlive($hash);
+            InternalTimer( gettimeofday()+5, 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
             Log3 $name, 3, "NUKIBridge ($name) - delete disabledForIntervals";
         }
     }
@@ -237,11 +237,10 @@ sub NUKIBridge_Set($@) {
 
     } else {
         my  $list = ""; 
-        $list .= "info:noArg autocreate:noArg ";
-        $list .= "clearLog:noArg fwUpdate:noArg reboot:noArg callbackRemove:0,1,2" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
+        $list .= "info:noArg autocreate:noArg callbackRemove:0,1,2 ";
+        $list .= "clearLog:noArg fwUpdate:noArg reboot:noArg" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
         return "Unknown argument $cmd, choose one of $list";
     }
-
 }
 
 sub NUKIBridge_Get($@) {
@@ -261,10 +260,10 @@ sub NUKIBridge_Get($@) {
         
     } else {
         my $list = "";
-        $list .= "logFile:noArg callbackList:noArg" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
+        $list .= "callbackList:noArg ";
+        $list .= "logFile:noArg" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
         return "Unknown argument $cmd, choose one of $list";
     }
-
 }
 
 sub NUKIBridge_GetCheckBridgeAlive($) {
@@ -277,9 +276,9 @@ sub NUKIBridge_GetCheckBridgeAlive($) {
     
     if( !IsDisabled($name) ) {
 
-        NUKIBridge_Call($hash,$hash,"info",undef,undef);
+        NUKIBridge_Call($hash,$hash,'info',undef,undef);
     
-        InternalTimer( gettimeofday()+15+int(rand(15)), "NUKIBridge_GetCheckBridgeAlive", $hash, 1 );
+        InternalTimer( gettimeofday()+15+int(rand(15)), 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
         Log3 $name, 4, "NUKIBridge ($name) - Call InternalTimer for NUKIBridge_GetCheckBridgeAlive";
     }
 }
@@ -291,8 +290,8 @@ sub NUKIBridge_firstRun($) {
     
     
     RemoveInternalTimer($hash);
-    NUKIBridge_Call($hash,$hash,"list",undef,undef) if( !IsDisabled($name) );
-    NUKIBridge_GetCheckBridgeAlive($hash);
+    NUKIBridge_Call($hash,$hash,'list',undef,undef) if( !IsDisabled($name) );
+    InternalTimer( gettimeofday()+15, 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
 
     return undef;
 }
@@ -455,7 +454,7 @@ sub NUKIBridge_ResponseProcessing($$$) {
         NUKIBridge_InfoProcessing($hash,$decode_json);
     
     } else {
-        Log3 $name, 5, "NUKIDevice ($name) - Rückgabe Path nicht korrekt: $json";
+        Log3 $name, 5, "NUKIBridge ($name) - Rückgabe Path nicht korrekt: $json";
         return;
     }
     
@@ -559,11 +558,11 @@ sub NUKIBridge_getLogfile($) {
     
     my $decode_json = NUKIBridge_CallBlocking($hash,"log",undef);
     
-    Log3 $name, 4, "NUKIBridge ($name) - Log Daten werden geholt und aufbereitet";
+    Log3 $name, 4, "NUKIBridge ($name) - Log data are collected and processed";
     
     
     if( ref($decode_json) eq "ARRAY" and scalar(@{$decode_json}) > 0 ) {
-        Log3 $name, 4, "NUKIBridge ($name) - Tabelle mit Logdaten wird aufgebaut";
+        Log3 $name, 4, "NUKIBridge ($name) - created Table with log file";
     
         my $ret = '<html><table width=100%><tr><td>';
         $ret .= '<table class="block wide">';
@@ -610,10 +609,10 @@ sub NUKIBridge_getCallbackList($) {
     
     my $decode_json = NUKIBridge_CallBlocking($hash,"callback/list",undef);
     
-    Log3 $name, 4, "NUKIBridge ($name) - Callback Daten werden geholt und aufbereitet";
+    Log3 $name, 4, "NUKIBridge ($name) - Callback data is collected and processed";
     
     if( ref($decode_json->{callbacks}) eq "ARRAY" and scalar(@{$decode_json->{callbacks}}) > 0 ) {
-        Log3 $name, 4, "NUKIBridge ($name) - Tabelle mit Logdaten wird aufgebaut";
+        Log3 $name, 4, "NUKIBridge ($name) - created Table with log file";
     
         my $ret = '<html><table width=100%><tr><td>';
 
@@ -639,7 +638,7 @@ sub NUKIBridge_getCallbackList($) {
         return $ret;
     }
     
-    return "Keine Callback Daten vorhanden oder Fehler bei der Verarbeitung";
+    return "No callback data available or error during processing";
 }
 
 sub NUKIBridge_CallBlocking($$$) {
@@ -682,7 +681,7 @@ sub NUKIBridge_CallBlocking($$$) {
     return undef if( !$decode_json );
     
     Log3 $name, 5, "NUKIBridge ($name) - Data: $data";
-    Log3 $name, 4, "NUKIBridge ($name) - Blocking HTTP Abfrage beendet";
+    Log3 $name, 4, "NUKIBridge ($name) - Blocking HTTP Query finished";
     return ($decode_json);
 }
 
@@ -690,8 +689,6 @@ sub NUKIBridge_CallBlocking($$$) {
 
 
 1;
-
-
 
 
 =pod

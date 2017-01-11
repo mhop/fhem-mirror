@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  73_NUKIBridge, 74_NUKIDevice
+             set Commands are filtered by Attributs,better check alive function
+             Callback/Webhook support for software bridge
   - bugfix:  93_DbLog.pm: is now version 2.8.8, no dropdown list in SVG in 
                           asynchronous mode, minor fixes
   - feature: 20_ROOMMATE,20_GUEST: introduce new attribute r*_presenceDevices
