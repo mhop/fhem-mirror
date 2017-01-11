@@ -370,6 +370,8 @@ FW_svgUpdateDevs(devs)
   // if matches, refresh the SVG by removing and readding the embed tag
   var embArr = document.getElementsByTagName("embed");
   for(var i = 0; i < embArr.length; i++) {
+    if(typeof embArr[i].getSVGDocument != "function")
+      continue;
     var svg = embArr[i].getSVGDocument();
     if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
       continue;
