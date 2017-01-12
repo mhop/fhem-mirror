@@ -41,7 +41,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.84";
+my $alarmversion    = "2.85";
 
 #########################################################################################
 #
@@ -310,7 +310,7 @@ sub Alarm_Exec($$$$$){
    return 
      if ($dev eq 'global');
    return 
-     if (!$level);
+     if (!defined($level));
 
    #-- raising the alarm 
    if( $act eq "on" ){
