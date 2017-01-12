@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  contrib/Widgets/DateTimePicker/fhemweb_datetime.js: 
+             - added set parameter to ID to differentiate datetime widgets
   - new   :  74_XiaomiFlowerSens, to retrieves data from a Xiaomi Flower Monitor
   - update:  73_NUKIBridge, 74_NUKIDevice
              set Commands are filtered by Attributs,better check alive function

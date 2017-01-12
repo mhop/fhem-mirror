@@ -7,9 +7,11 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
 {
   if(!vArr.length || vArr[0] != "datetime" || (params && params.length))
     return undefined;
-   
+  
+  var widgetId = "datetimepicker-"+devName+"-"+set;
+  
   var newEl = $("<div style='display:inline-block'>").get(0);
-  $(newEl).append('<input type="text" id="datetimepicker'+devName+'" onfocus="blur();" >');
+  $(newEl).append('<input type="text" id="'+widgetId+'" onfocus="blur();" >');
   var inp = $(newEl).find("input");
   if(elName)
     $(inp).attr("name", elName);
@@ -39,7 +41,7 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
        format:"d.m.Y H:i",
        onClose: function(current_time,$input){
                     console.log("set data");
-                    $('#datetimepicker'+devName).blur();
+                    $("#"+widgetId).blur();
                 ;}
       };
 
@@ -99,7 +101,7 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
     loadScript("pgm2/jquery.datetimepicker.js");
     
     $(newEl).click(function(){
-      $('#datetimepicker'+devName).datetimepicker(options);   
+      $("#"+widgetId).datetimepicker(options);   
   });
   }
 
