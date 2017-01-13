@@ -170,7 +170,7 @@ sub MPD_updateConfig($)
 	MPD_ClearReadings($hash); # beim Starten etwas aufräumen
         MPD_Outputs_Status($hash);
         mpd_cmd($hash, clb.cle);
-        MPD_NewPlaylist($hash,mpd_cmd($hash,"i|playlistinfo|x"));
+        #MPD_NewPlaylist($hash,mpd_cmd($hash,"i|playlistinfo|x"));
 
         if ($hash->{".volume"} eq "0")
         { # ist Mute aktiv oder soll sie mit Absicht 0 sein ?
@@ -567,7 +567,8 @@ sub MPD_Set($@)
    $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$subcmd\"\nplay\n".cle);
    #if ($old_list ne $hash->{".playlist"})
    #{
-    MPD_NewPlaylist($hash,mpd_cmd($hash, "i|playlistinfo|x|"));
+    # brauchen wir das hier wirklich noch ? 
+    #MPD_NewPlaylist($hash,mpd_cmd($hash, "i|playlistinfo|x|"));
    #}
  }
 
@@ -715,7 +716,7 @@ sub mpd_cmd($$)
  my $album;
  my $name_ = "";
  my $title = "";
- my $exot;
+ my $exot  = "";
  my $rawTitle;
  my $name      = $hash->{NAME};
  my $playlists = $hash->{".playlists"};
@@ -813,7 +814,7 @@ sub mpd_cmd($$)
          $title = $c;
          $c =~ s/\+\+\+//; # +++ = Tickermeldungen
          $c =~ s/feat./ \/ /; 
-         $c .= " - ".$exot if ($exot ne ""); # Sonderfall Bayern 3
+         $c .= " - ".$exot if (defined($exot) && ($exot  ne "")); # Sonderfall Bayern 3
 
          $sp = index($c, " - ");
      
@@ -835,7 +836,7 @@ sub mpd_cmd($$)
 
   readingsEndUpdate($hash, 1 );
 
-  if (AttrVal($name, "image_size", 0) > -1) 
+  if (AttrVal($name, "image_size", -1) > -1) 
   {
    
    MPD_get_artist_info($hash, urlEncode($artist)) if ($artist);
@@ -1471,7 +1472,7 @@ sub MPD_lfm_artist_image(@)
     my $hash  = $param->{hash};
     my $name  = $hash->{NAME};
     my $cache = AttrVal($name,"cache","");
-    my $size  = AttrVal($name,"image_size",1);
+    my $size  = AttrVal($name,"image_size",0);
 
     my $hw="width='32' height='32'";
     $hw="width='64' height='64'"   if ($size == 1);
@@ -1516,7 +1517,7 @@ sub MPD_lfm_album_image(@)
     my $artist= $hash->{'.artist'};
     my $album = $hash->{'.album'};
     my $cache = AttrVal($name,"cache","");
-    my $size  = AttrVal($name,"image_size",1);
+    my $size  = AttrVal($name,"image_size",0);
 
     my $hw="width='32' height='32'";
     $hw="width='64' height='64'"   if ($size == 1);
@@ -1964,6 +1965,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     playlistinfo : (TabletUI Medialist)<br>
     playlistcollection : (TabletUI)<br>
     playlistname : (TabletUI)<br> 
+    rawTitle : Title information without changes from the modul
   </ul>
 </ul>
 =end html
@@ -2078,7 +2080,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
   <b>Readings</b>
   <ul>
     - alle MPD internen Werte<br>
-    - vom Modul direkt errzeugte Readings :<br>
+    - vom Modul direkt erzeugte Readings :<br>
     playlistinfo : (TabletUI Medialist)<br>
     playlistcollection : (TabletUI)<br>
     playlistname : (TabletUI)<br> 
@@ -2088,7 +2090,11 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     album_image_html : (bei Nutzung von Last.fm)<br>
     artist_content : (bei Nutzung von Last.fm)<br>
     artist_summary : (bei Nutzung von Last.fm)<br>
-    currentTrackProvider : Radio / Bibliothek<br>
+    playlistinfo : (z.B. f&uuml;r die TabletUI Medialist)<br>
+    playlistcollection : (TabletUI)<br>
+    playlistname : (TabletUI)<br> 
+    currentTrackProvider : Radio / Bibliothek - Unterscheidung Radio Stream oder lokale Datei<br>
+    rawTitle : Title Information ohne Ver&auml;nderungen durch das Modul
   </ul>
 </ul>
 =end html_DE
