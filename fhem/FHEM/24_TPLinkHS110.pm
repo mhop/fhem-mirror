@@ -170,6 +170,9 @@ sub TPLinkHS110_Get($$)
 			foreach my $key (sort keys @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}}) {
 				foreach my $key2 ($json->{'emeter'}->{'get_daystat'}->{'day_list'}[$key]) {
 					$total = $total+ $key2->{'energy'};
+					if ($key2->{'day'} == $mday) {
+						readingsBulkUpdate($hash, "daily_total", sprintf("%.3f", $key2->{'energy'}));
+					}
 				}
 			}
 			my $count=1;
