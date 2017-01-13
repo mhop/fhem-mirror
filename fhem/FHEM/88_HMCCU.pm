@@ -1985,9 +1985,9 @@ sub HMCCU_UpdateClientReading ($@)
  		foreach my $rn (@readings) {
 			HMCCU_BulkUpdate ($ch, $rn, $value, $cvalue) if ($rn ne '');
 		}
-		HMCCU_BulkUpdate ($ch, 'control', $value, $cvalue)
+		HMCCU_BulkUpdate ($ch, 'control', $fvalue, $cvalue)
 			if ($cd ne '' && $dpt eq $cd && $chn eq $cc);
-		HMCCU_BulkUpdate ($ch, 'state', $value, $cvalue)
+		HMCCU_BulkUpdate ($ch, 'state', $fvalue, $cvalue)
 			if ($dpt eq $st && ($sc eq '' || $sc eq $chn));
 		my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($cn, undef);
 		HMCCU_BulkUpdate ($ch, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
@@ -3809,9 +3809,9 @@ sub HMCCU_UpdateSingleReading ($$$$$)
 	foreach my $rn (@$readings) {
 		HMCCU_BulkUpdate ($hash, $rn, $value, $cvalue) if ($rn ne '');
 	}
-	HMCCU_BulkUpdate ($hash, 'control', $value, $cvalue)
+	HMCCU_BulkUpdate ($hash, 'control', $fvalue, $cvalue)
 		if ($cd ne '' && $dpt eq $cd && $chn eq $cc);
-	HMCCU_BulkUpdate ($hash, 'state', $value, $cvalue)
+	HMCCU_BulkUpdate ($hash, 'state', $fvalue, $cvalue)
 		if ($dpt eq $sd && ($sc eq '' || $sc eq $chn));
 	my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
 	HMCCU_BulkUpdate ($hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
@@ -4263,9 +4263,9 @@ sub HMCCU_UpdateDeviceReadings ($$)
 		foreach my $rn (@readings) {
 			HMCCU_BulkUpdate ($cl_hash, $rn, $value, $cvalue) if ($rn ne '');
 		}
-		HMCCU_BulkUpdate ($cl_hash, 'control', $value, $cvalue)
+		HMCCU_BulkUpdate ($cl_hash, 'control', $fvalue, $cvalue)
 			if ($cd ne '' && $adrtoks[2] eq $cd && $chn eq $cc);
-		HMCCU_BulkUpdate ($cl_hash, "state", $value, $cvalue)
+		HMCCU_BulkUpdate ($cl_hash, "state", $fvalue, $cvalue)
 			if (($adrtoks[2] eq $sd) && ($sc eq '' || $sc eq $chn));
 		$uc++;
 	}
@@ -4389,9 +4389,9 @@ foreach (sChannel, sChnList.Split(",")) {
 					HMCCU_BulkUpdate ($hash, $rn, $value, $cvalue);
 					$result .= $rn.'='.$cvalue."\n";
 				}
-				HMCCU_BulkUpdate ($hash, 'control', $value, $cvalue)
+				HMCCU_BulkUpdate ($hash, 'control', $fvalue, $cvalue)
 					if ($cd ne '' && $adrtoks[2] eq $cd && $chn eq $cc);
-				HMCCU_BulkUpdate ($hash, 'state', $value, $cvalue)
+				HMCCU_BulkUpdate ($hash, 'state', $fvalue, $cvalue)
 					if (($adrtoks[2] eq $sd) && ($sc eq '' || $sc eq $chn));
 			}
 			$value = $cvalue;

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU.pm: fixed attribute substexcl
   - update:  88_HMCCU.pm: new version 3.7
   - bugfix:  contrib/Widgets/DateTimePicker/fhemweb_datetime.js: 
              - added set parameter to ID to differentiate datetime widgets
