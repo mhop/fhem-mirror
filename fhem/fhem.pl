@@ -49,6 +49,7 @@ sub AnalyzePerlCommand($$;$);
 sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub CallFn(@);
+sub CallInstanceFn(@);
 sub CheckDuplicate($$@);
 sub Debug($);
 sub DoSet(@);
@@ -3317,13 +3318,8 @@ CallInstanceFn(@)
     Log 0, "Strange call for nonexistent $d: $n";
     return undef;
   }
-  if(!$defs{$d}{TYPE}) {
-    Log 0, "Strange call for typeless $d: $n";
-    return undef;
-  }
-  my $fn = $defs{$d}{$n} ? $defs{$d}{$n} : 
-          ($defs{$d}{".$n"} ? $defs{$d}{".$n"} : $modules{$defs{$d}{TYPE}}{$n});
-  return "" if(!$fn);
+  my $fn = $defs{$d}{$n} ? $defs{$d}{$n} : $defs{$d}{".$n"};
+  return CallFn($d, $n, @_) if(!$fn);
   if(wantarray) {
     no strict "refs";
     my @ret = &{$fn}(@_);
