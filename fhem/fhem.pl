@@ -3305,6 +3305,39 @@ CallFn(@)
 }
 
 #####################################
+# Alternative to CallFn with optional functions in $defs, Forum #64741
+sub
+CallInstanceFn(@)
+{
+  my $d = shift;
+  my $n = shift;
+
+  if(!$d || !$defs{$d}) {
+    $d = "<undefined>" if(!defined($d));
+    Log 0, "Strange call for nonexistent $d: $n";
+    return undef;
+  }
+  if(!$defs{$d}{TYPE}) {
+    Log 0, "Strange call for typeless $d: $n";
+    return undef;
+  }
+  my $fn = $defs{$d}{$n} ? $defs{$d}{$n} : 
+          ($defs{$d}{".$n"} ? $defs{$d}{".$n"} : $modules{$defs{$d}{TYPE}}{$n});
+  return "" if(!$fn);
+  if(wantarray) {
+    no strict "refs";
+    my @ret = &{$fn}(@_);
+    use strict "refs";
+    return @ret;
+  } else {
+    no strict "refs";
+    my $ret = &{$fn}(@_);
+    use strict "refs";
+    return $ret;
+  }
+}
+
+#####################################
 # Used from perl oneliners inside of scripts
 sub
 fhem($@)
