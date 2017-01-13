@@ -4,14 +4,14 @@
 #
 #  $Id$
 #
-#  Version 3.6
+#  Version 3.7
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
 #####################################################################
 #
 #  define <name> HMCCUDEV {<ccudev>|virtual} [<statechannel>] [readonly] [defaults]
-#     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}]
+#     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}] [iodev=<iodevname>]
 #
 #  set <name> clear [<regexp>]
 #  set <name> config [<channel-number>] <parameter>=<value> [...]
@@ -34,7 +34,7 @@
 #  get <name> update
 #
 #  attr <name> ccuackstate { 0 | 1 }
-#  attr <name> ccuflags { nochn0, trace }
+#  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address[lc] | name[lc] | datapoint[lc] }
@@ -44,11 +44,12 @@
 #  attr <name> ccuverify { 0 | 1 | 2}
 #  attr <name> controldatapoint <channel-number>.<datapoint>
 #  attr <name> disable { 0 | 1 }
+#  attr <name> hmstatevals <subst-rule>[;...]
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint [<channel-number>.]<datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substexcl <reading-expr>
-#  attr <name> substitute <regexp1>:<subtext1>[,...]
+#  attr <name> substitute <subst-rule>[;...]
 #
 #####################################################################
 #  Requires module 88_HMCCU
@@ -80,8 +81,9 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{SetFn} = "HMCCUDEV_Set";
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
+	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 hmstatevals statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
 }
 
 #####################################
@@ -90,110 +92,96 @@ sub HMCCUDEV_Initialize ($)
 
 sub HMCCUDEV_Define ($@)
 {
-	my ($hash, $def) = @_;
+	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
-	my @a = split("[ \t][ \t]*", $def);
+	
+	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] " .
+		"['readonly'] ['defaults'] [iodev={iodev-name}] [{groupexp=regexp|group={device|channel}[,...]]";
+	return $usage if (@$a < 3);
 
-	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] ['readonly'] ['defaults'] [{groupexp=regexp|group={device|channel}[,...]]";
-	return $usage if (@a < 3);
-
-	my $devname = shift @a;
-	my $devtype = shift @a;
-	my $devspec = shift @a;
+	my $devname = shift @$a;
+	my $devtype = shift @$a;
+	my $devspec = shift @$a;
+	my $gdcount = 0;
 
 	my $hmccu_hash = undef;
-
-	if ($devspec ne 'virtual') {
-		return "Invalid or unknown CCU device name or address" if (!HMCCU_IsValidDevice ($devspec));
-	}
 	
+	# IO device can be set by command line parameter iodev
+	if (exists ($h->{iodev})) {
+		$hmccu_hash = $defs{$h->{iodev}} if (exists ($defs{$h->{iodev}}));
+	}
+
 	if ($devspec eq 'virtual') {
 		# Virtual device FHEM only
+		$hmccu_hash = HMCCU_GetHash (0);
+		return "Cannot detect IO device" if (!defined ($hmccu_hash));
+	
 		my $no = 0;
 		foreach my $d (sort keys %defs) {
 			my $ch = $defs{$d};
-			$hmccu_hash = $ch if ($ch->{TYPE} eq 'HMCCU' && !defined ($hmccu_hash));
+			next if (!exists ($ch->{TYPE}));
 			next if ($ch->{TYPE} ne 'HMCCUDEV');
 			next if ($d eq $name);
 			next if ($ch->{ccuif} ne 'VirtualDevices' || $ch->{ccuname} ne 'none');
 			$no++;
 		}
-		return "No IO device found" if (!defined ($hmccu_hash));
 		$hash->{ccuif} = "VirtualDevices";
 		$hash->{ccuaddr} = sprintf ("VIR%07d", $no+1);
 		$hash->{ccuname} = "none";
-	}
-	elsif (HMCCU_IsDevAddr ($devspec, 1)) {
-		# CCU Device address with interface
-		my ($i, $add) = split ('\.', $devspec);
-		$hash->{ccuif} = $i;
-		$hash->{ccuaddr} = $add;
-		$hash->{ccuname} = HMCCU_GetDeviceName ($add, '');
-	}
-	elsif (HMCCU_IsDevAddr ($devspec, 0)) {
-		# CCU Device address without interface
-		$hash->{ccuaddr} = $devspec;
-		$hash->{ccuname} = HMCCU_GetDeviceName ($devspec, '');
-		$hash->{ccuif} = HMCCU_GetDeviceInterface ($hash->{ccuaddr}, 'BidCos-RF');
-	}
-	else {
-		# CCU Device or channel name
-		$hash->{ccuname} = $devspec;
-		my ($add, $chn) = HMCCU_GetAddress ($devspec, '', '');
-		return "Channel name not allowed" if ($chn ne '');
-		$hash->{ccuaddr} = $add;
-		$hash->{ccuif} = HMCCU_GetDeviceInterface ($hash->{ccuaddr}, 'BidCos-RF');
-	}
-
-	return "CCU device address not found for $devspec" if ($hash->{ccuaddr} eq '');
-	return "CCU device name not found for $devspec" if ($hash->{ccuname} eq '');
-
-	$hash->{ccutype} = HMCCU_GetDeviceType ($hash->{ccuaddr}, '');
-	$hash->{channels} = HMCCU_GetDeviceChannels ($hash->{ccuaddr});
-
-	if ($hash->{ccuif} eq "VirtualDevices" && $hash->{ccuname} eq 'none') {
 		$hash->{statevals} = 'readonly';
 	}
 	else {
+		$hmccu_hash = HMCCU_FindIODevice ($devspec) if (!defined ($hmccu_hash));
+		return "Cannot detect IO device" if (!defined ($hmccu_hash));
+		
+		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
+		return "Invalid or unknown CCU device name or address: $devspec" if (!defined ($da));
+		
+		$hash->{ccuif} = $di;
+		$hash->{ccuaddr} = $da;
+		$hash->{ccuname} = $dn;
+		$hash->{ccutype} = $dt;
+		$hash->{channels} = $dc;
 		$hash->{statevals} = 'devstate';
 	}
 
 	# Parse optional command line parameters
-	my $arg = shift @a;
-	while (defined ($arg)) {
+	foreach my $arg (@$a) {
 		if ($arg eq 'readonly') {
 			$hash->{statevals} = $arg;
 		}
 		elsif ($arg eq 'defaults') {
 			HMCCU_SetDefaults ($hash);
 		}
-		elsif ($arg =~ /^groupexp=/ && $hash->{ccuif} eq "VirtualDevices") {
-			my ($g, $gdev) = split ("=", $arg);
-			return $usage if (!defined ($gdev));
-			my @devlist;
-			my $cnt = HMCCU_GetMatchingDevices ($hmccu_hash, $gdev, 'dev', \@devlist);
-			return "No matching CCU devices found" if ($cnt == 0);
-			$hash->{ccugroup} = shift @devlist;
-			foreach my $gd (@devlist) {
-				$hash->{ccugroup} .= ",".$gd;
-			}
+		elsif ($arg =~ /^[0-9]+$/) {
+			$attr{$name}{statechannel} = $arg;
 		}
-		elsif ($arg =~ /^group=/ && $hash->{ccuif} eq "VirtualDevices") {
-			my ($g, $gdev) = split ("=", $arg);
-			return $usage if (!defined ($gdev));
-			my @gdevlist = split (",", $gdev);
+		else {
+			return $usage;
+		}
+	}
+
+	# Parse group options
+	if ($hash->{ccuif} eq "VirtualDevices") {
+		if (exists ($h->{groupexp}) && $hash->{ccuif} eq "VirtualDevices") {
+			my @devlist;
+			$gdcount = HMCCU_GetMatchingDevices ($hmccu_hash, $h->{groupexp}, 'dev', \@devlist);
+			return "No matching CCU devices found" if ($gdcount == 0);
+			$hash->{ccugroup} = join (',', @devlist);
+		}
+		elsif (exists ($h->{group}) && $hash->{ccuif} eq "VirtualDevices") {
+			my @gdevlist = split (",", $h->{group});
 			$hash->{ccugroup} = '' if (@gdevlist > 0);
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
-				return "Invalid device or channel $gd"
-				   if (!HMCCU_IsValidDevice ($gd));
+				return "Invalid device or channel $gd" if (!HMCCU_IsValidDevice ($hmccu_hash, $gd));
 
 				if (HMCCU_IsDevAddr ($gd, 0) || HMCCU_IsChnAddr ($gd, 1)) {
 					$gdo = $gd;
 				}
 				else {
-					($gda, $gdc) = HMCCU_GetAddress ($gd, '', '');
+					($gda, $gdc) = HMCCU_GetAddress ($hmccu_hash, $gd, '', '');
 					$gdo = $gda;
 					$gdo .= ':'.$gdc if ($gdc ne '');
 				}
@@ -204,22 +192,15 @@ sub HMCCUDEV_Define ($@)
 				else {
 					$hash->{ccugroup} = $gdo;
 				}
+				
+				$gdcount++;
 			}
 		}
-		elsif ($arg =~ /^[0-9]+$/) {
-			$attr{$name}{statechannel} = $arg;
-		}
-		else {
-			return $usage;
-		}
-		$arg = shift @a;
+
+		return "No devices in group" if ($hash->{ccuif} eq "VirtualDevices" && $gdcount == 0);
 	}
-
-	return "No devices in group" if ($hash->{ccuif} eq "VirtualDevices" && (
-	   !exists ($hash->{ccugroup}) || $hash->{ccugroup} eq ''));
-
-	# Inform HMCCU device about client device
-	AssignIoPort ($hash);
+	
+	AssignIoPort ($hash, $hmccu_hash->{NAME});
 
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
 	$hash->{ccudevstate} = 'Active';
@@ -267,27 +248,31 @@ sub HMCCUDEV_Attr ($@)
 
 sub HMCCUDEV_Set ($@)
 {
-	my ($hash, @a) = @_;
-	my $name = shift @a;
-	my $opt = shift @a;
+	my ($hash, $a, $h) = @_;
+	my $name = shift @$a;
+	my $opt = shift @$a;
 
+	# Valid commands for read only devices
 	my $rocmds = "clear config defaults:noArg";
 
-	return HMCCU_SetError ($hash, -3) if (!exists ($hash->{IODev}));
-	return undef
-		if ($hash->{statevals} eq 'readonly' && $opt ne '?' && $opt ne 'clear' && $opt ne 'config' &&
-			$opt ne 'defaults');
+	# Get I/O device
+	my $hmccu_hash = HMCCU_GetHash ($hash);
+	return HMCCU_SetError ($hash, -3) if (!defined ($hmccu_hash));
+	my $hmccu_name = $hmccu_hash->{NAME};
 
+	# Handle read only and disabled devices
+	return undef if ($hash->{statevals} eq 'readonly' && $opt ne '?'
+		&& $opt !~ /^(clear|config|defaults)$/);
 	my $disable = AttrVal ($name, "disable", 0);
-	return undef if ($disable == 1);	
+	return undef if ($disable == 1);
 
-	my $hmccu_hash = $hash->{IODev};
-	my $hmccu_name = $hash->{IODev}->{NAME};
+	# Check if CCU is busy
 	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUDEV: CCU busy";
 	}
 
+	# Get parameters of current device
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
@@ -298,8 +283,8 @@ sub HMCCUDEV_Set ($@)
 	my $rc;
 
 	if ($opt eq 'datapoint') {
-		my $objname = shift @a;
-		my $objvalue = shift @a;
+		my $objname = shift @$a;
+		my $objvalue = shift @$a;
 
 		return HMCCU_SetError ($hash, "Usage: set $name datapoint [{channel-number}.]{datapoint} {value}")
 			if (!defined ($objname) || !defined ($objvalue));
@@ -331,7 +316,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, -14) if ($cd eq '');
 		return HMCCU_SetError ($hash, -7) if ($cc >= $hash->{channels});
 
-		my $objvalue = shift @a;
+		my $objvalue = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined ($objvalue));
 		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2));	
 
@@ -347,7 +332,7 @@ sub HMCCUDEV_Set ($@)
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
-		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @a;
+		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @$a;
 
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');		
 		return HMCCU_SetError ($hash, -13) if ($sd eq '');		
@@ -409,12 +394,12 @@ sub HMCCUDEV_Set ($@)
 		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "LEVEL", 2));
 
 		my $objname = '';
-		my $objvalue = shift @a;
+		my $objvalue = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: set $name pct {value} [{ontime} [{ramptime}]]")
 			if (!defined ($objvalue));
 		
-		my $timespec = shift @a;
-		my $ramptime = shift @a;
+		my $timespec = shift @$a;
+		my $ramptime = shift @$a;
 
 		# Set on time
 		if (defined ($timespec)) {
@@ -458,7 +443,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type")
 		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "ON_TIME", 2));
 
-		my $timespec = shift @a;
+		my $timespec = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: set $name $opt {ontime-spec}")
 			if (!defined ($timespec));
 			
@@ -482,7 +467,7 @@ sub HMCCUDEV_Set ($@)
 		return undef;
 	}
 	elsif ($opt eq 'clear') {
-		my $rnexp = shift @a;
+		my $rnexp = shift @$a;
 		$rnexp = '.*' if (!defined ($rnexp));
 		my @readlist = keys %{$hash->{READINGS}};
 		foreach my $rd (@readlist) {
@@ -491,16 +476,16 @@ sub HMCCUDEV_Set ($@)
 	}
 	elsif ($opt eq 'config') {
 		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]")
-		   if (@a < 1);
+		   if (scalar (keys %{$h}) < 1);
 		my $objname = $ccuaddr;
 		
 		# Channel number is optional because parameter can be related to device or channel
-		if ($a[0] =~ /^([0-9]{1,2})$/) {
+		if (scalar (@$a) > 0) && $$a[0] =~ /^([0-9]{1,2})$/) {
 			return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
 			$objname .= ':'.$1;
 		}
 
-		my $rc = HMCCU_RPCSetConfig ($hash, $objname, \@a);
+		my $rc = HMCCU_RPCSetConfig ($hash, $objname, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		HMCCU_SetState ($hash, "OK");
@@ -544,21 +529,26 @@ sub HMCCUDEV_Set ($@)
 
 sub HMCCUDEV_Get ($@)
 {
-	my ($hash, @a) = @_;
-	my $name = shift @a;
-	my $opt = shift @a;
+	my ($hash, $a, $h) = @_;
+	my $name = shift @$a;
+	my $opt = shift @$a;
 
-	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	# Get I/O device
+	my $hmccu_hash = HMCCU_GetHash ($hash);
+	return HMCCU_SetError ($hash, -3) if (!defined ($hmccu_hash));
+	my $hmccu_name = $hmccu_hash->{NAME};
 
+	# Handle disabled devices
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);	
 
-	my $hmccu_hash = $hash->{IODev};
+	# Check if CCU is busy
 	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUDEV: CCU busy";
 	}
 
+	# Get parameters of current device
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
@@ -584,7 +574,7 @@ sub HMCCUDEV_Get ($@)
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'datapoint') {
-		my $objname = shift @a;
+		my $objname = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: get $name datapoint [{channel-number}.]{datapoint}")
 			if (!defined ($objname));
 
@@ -609,7 +599,7 @@ sub HMCCUDEV_Get ($@)
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'update') {
-		my $ccuget = shift @a;
+		my $ccuget = shift @$a;
 		$ccuget = 'Attr' if (!defined ($ccuget));
 		if ($ccuget !~ /^(Attr|State|Value)$/) {
 			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
@@ -632,7 +622,7 @@ sub HMCCUDEV_Get ($@)
 		return undef;
 	}
 	elsif ($opt eq 'deviceinfo') {
-		my $ccuget = shift @a;
+		my $ccuget = shift @$a;
 		$ccuget = 'Attr' if (!defined ($ccuget));
 		if ($ccuget !~ /^(Attr|State|Value)$/) {
 			return HMCCU_SetError ($hash, "Usage: get $name deviceinfo [{'State'|'Value'}]");
@@ -644,12 +634,12 @@ sub HMCCUDEV_Get ($@)
 	elsif ($opt eq 'config') {
 		my $channel = undef;
 		my $ccuobj = $ccuaddr;
-		my $par = shift @a;
+		my $par = shift @$a;
 		if (defined ($par)) {
 			if ($par =~ /^([0-9]{1,2})$/) {
 				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
 				$ccuobj .= ':'.$1;
-				$par = shift @a;
+				$par = shift @$a;
 			}
 		}
 		$par = '.*' if (!defined ($par));
@@ -662,12 +652,12 @@ sub HMCCUDEV_Get ($@)
 	elsif ($opt eq 'configlist') {
 		my $channel = undef;
 		my $ccuobj = $ccuaddr;
-		my $par = shift @a;
+		my $par = shift @$a;
 		if (defined ($par)) {
 			if ($par =~ /^([0-9]{1,2})$/) {
 				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
 				$ccuobj .= ':'.$1;
-				$par = shift @a;
+				$par = shift @$a;
 			}
 		}
 		$par = '.*' if (!defined ($par));
@@ -680,7 +670,7 @@ sub HMCCUDEV_Get ($@)
 	elsif ($opt eq 'configdesc') {
 		my $channel = undef;
 		my $ccuobj = $ccuaddr;
-		my $par = shift @a;
+		my $par = shift @$a;
 		if (defined ($par)) {
 			if ($par =~ /^([0-9]{1,2})$/) {
 				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
@@ -735,7 +725,8 @@ sub HMCCUDEV_Get ($@)
    <b>Define</b><br/><br/>
    <ul>
       <code>define &lt;name&gt; HMCCUDEV {&lt;device&gt; | 'virtual'} [&lt;statechannel&gt;]
-      [readonly] [defaults] [{group={device|channel}[,...]|groupexp=regexp]</code>
+      [readonly] [defaults] [{group={device|channel}[,...]|groupexp=regexp] 
+      [iodev=&lt;iodev-name&gt;]</code>
       <br/><br/>
       If option 'readonly' is specified no set command will be available. With option 'defaults'
       some default attributes depending on CCU device type will be set. Default attributes are only
@@ -896,7 +887,7 @@ sub HMCCUDEV_Get ($@)
       <li><b>ccuackstate {<u>0</u> | 1}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
-      <li><b>ccuflags {nochn0, trace}</b><br/>
+      <li><b>ccuflags {altread, nochn0, trace}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>
@@ -928,6 +919,9 @@ sub HMCCUDEV_Get ($@)
       <li><b>disable {<u>0</u> | 1}</b><br/>
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
+		<li><b>hmstatevals &lt;subst-rule&gt;[;...]</b><br/>
+         <a href="#HMCCUCHNattr">see HMCCUCHN</a>
+		</li><br/>
       <li><b>statechannel &lt;channel-number&gt;</b><br/>
          Channel for setting device state by devstate command. Deprecated, use attribute
          'statedatapoint' instead.
