@@ -1,16 +1,24 @@
 "use strict";
-var svgNS = "http://www.w3.org/2000/svg";
-var svg_initialized={}, lastHidden;
-var svg_db, svg_dbtbl = "SVG_KEYVALUE", svg_pastedata;
+
+if(!svgNS) {
+  var svgNS = "http://www.w3.org/2000/svg";
+  var svg_initialized={}, lastHidden;
+  var svg_db, svg_dbtbl = "SVG_KEYVALUE", svg_pastedata, svgCounter=0;
+}
 
 function
 svg_initDb(nextFn)
 {
   if(window.indexedDB == undefined)
     return;
-  var dbreq = indexedDB.open("FHEM", 1)
+  var dbreq = indexedDB.open("FHEM", 1);
   dbreq.onsuccess = function(op) { svg_db = op.target.result; nextFn() }
-  dbreq.onerror   = function(op) { log("indexedDB.open Error: " + op.message); }
+  dbreq.onerror   = function(op) {
+    var oldfn = window.onerror;
+    window.onerror = undefined; // stupid FireFox private mode (Forum #64541)
+    log("indexedDB.open Error: " + op.message);
+    setTimeout(function(){window.onerror = oldfn;}, 100);
+  }
   dbreq.onupgradeneeded = function(op) {
     svg_db = op.target.result;
     svg_db.createObjectStore(svg_dbtbl, { keyPath:"key" });
@@ -353,6 +361,8 @@ svg_init(par)    // also called directly from perl, in race condition
 }
 
 $(document).ready(function(){
+  if(svgCounter++ > 0)  // if svg.js is included twice, e.g. by Dashboard
+    return;
   svg_init();                          // <embed><svg>
   svg_initDb(function(){
     svg_load("svg_pastedata", function(val) {svg_pastedata = val} );
