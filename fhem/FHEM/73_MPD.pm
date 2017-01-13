@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.41   - 12.01.17 add rawTitle 
 # Version 1.4    - 11.01.17 add mute, ctp, seekcur, Fix LWP:: , album cover
 # Version 1.32   - 03.01.17
 # Version 1.31   - 30.12.16
@@ -412,10 +413,16 @@ sub MPD_Set($@)
  if ($cmd eq "stop")    
   { 
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer",1);
-   readingsBulkUpdate($hash,"artist_image_html","",1);
-   readingsBulkUpdate($hash,"album_image","/fhem/icons/1px-spacer",1);
-   readingsBulkUpdate($hash,"album_image_html","",1);
+   readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer");
+   readingsBulkUpdate($hash,"artist_image_html","");
+   readingsBulkUpdate($hash,"album_image","/fhem/icons/1px-spacer");
+   readingsBulkUpdate($hash,"album_image_html","");
+   readingsBulkUpdate($hash,"audio","");
+   readingsBulkUpdate($hash,"bitrate","");
+   readingsBulkUpdate($hash,"rawTitle","");
+   readingsBulkUpdate($hash,"Album","");
+   readingsBulkUpdate($hash,"Track","");
+   readingsBulkUpdate($hash,"elapsed","");
    readingsEndUpdate($hash, 1);
    $ret = mpd_cmd($hash, clb."stop\n".cle);   
    return $ret; 
@@ -708,6 +715,8 @@ sub mpd_cmd($$)
  my $album;
  my $name_ = "";
  my $title = "";
+ my $exot;
+ my $rawTitle;
  my $name      = $hash->{NAME};
  my $playlists = $hash->{".playlists"};
 
@@ -784,11 +793,11 @@ sub mpd_cmd($$)
      last if $_ =~ /^OK/;    # end of output.
      Log3 $name, 5 , "$name, rec: ".$_;
 
-     ($b , $c) = split(": " , $_);
-
+     ($b , $c , $exot) = split(": " , $_);
+     
      if ($b && defined($c)) # ist das ein Reading ?
       { 
-        #$b = lc($b);
+;
         if ($b eq "volume") { $hash->{".volume"} = $c; }  # Sonderfall volume
     
         $artist = $c if ($b eq "Artist");
@@ -797,8 +806,17 @@ sub mpd_cmd($$)
 
         if ($b eq "Title")
         {
+         $rawTitle = $_;
+         $rawTitle =~ s/Title: //;
+         readingsBulkUpdate($hash,"rawTitle",$rawTitle);
+
          $title = $c;
+         $c =~ s/\+\+\+//; # +++ = Tickermeldungen
+         $c =~ s/feat./ \/ /; 
+         $c .= " - ".$exot if ($exot ne ""); # Sonderfall Bayern 3
+
          $sp = index($c, " - ");
+     
          if (AttrVal($name, "titleSplit", 1) && ($sp>0)) # wer nicht mag solls eben abschalten
           {
             $artist = substr($c,0,$sp);
@@ -1563,6 +1581,9 @@ sub MPD_NewPlaylist($$)
   # Radiostream ohne Artist ?
   if (!@artist && @title && AttrVal($name, "titleSplit", 1))
   {
+     $title[0] =~ s/: / - /;
+     $title[0] =~ s/\+\+\+//;
+     $title[0] =~ s/feat./ \/ /;
      my  $sp = index($title[0], " - ");
      if ($sp>0) 
       {
