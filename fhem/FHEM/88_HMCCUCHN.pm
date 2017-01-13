@@ -407,7 +407,7 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($opt eq 'config') {
 		return HMCCU_SetError ($hash, "Usage: set $name config {parameter}={value} [...]")
-			if (scalar (keys %{$h}) < 1);
+			if ((scalar keys %{$h}) < 1);
 
 		my $rc = HMCCU_RPCSetConfig ($hash, $ccuaddr, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);

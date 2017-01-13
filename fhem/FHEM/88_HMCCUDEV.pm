@@ -475,12 +475,11 @@ sub HMCCUDEV_Set ($@)
 		}
 	}
 	elsif ($opt eq 'config') {
-		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]")
-		   if (scalar (keys %{$h}) < 1);
+		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]") if ((scalar keys %{$h}) < 1);
 		my $objname = $ccuaddr;
 		
 		# Channel number is optional because parameter can be related to device or channel
-		if (scalar (@$a) > 0) && $$a[0] =~ /^([0-9]{1,2})$/) {
+		if ((scalar @$a) > 0 && $$a[0] =~ /^([0-9]{1,2})$/) {
 			return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
 			$objname .= ':'.$1;
 		}
