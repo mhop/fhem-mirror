@@ -13,7 +13,7 @@ consUpdate(evt)
   var errstr = "Connection lost, trying a reconnect every 5 seconds.";
   var new_content = "";
 
-  if(evt.target instanceof WebSocket) {
+  if(typeof WebSocket == "function" && evt && evt.target instanceof WebSocket) {
     if(evt.type == 'close') {
       FW_errmsg(errstr, 4900);
       consConn.close();
@@ -58,8 +58,10 @@ consFill()
 
   if(FW_pollConn) {
     if($("body").attr("longpoll") == "websocket") {
+      FW_pollConn.onclose = undefined;
       FW_pollConn.close();
     } else {
+      FW_pollConn.onreadystatechange = undefined;
       FW_pollConn.abort();
     }
     FW_pollConn = undefined;
