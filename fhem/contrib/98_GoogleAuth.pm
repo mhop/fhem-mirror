@@ -1,4 +1,4 @@
-$Id$
+# $Id$
 
 package main;
 use strict;
@@ -20,9 +20,15 @@ sub GoogleAuth_Initialize($) {
   $hash->{DeleteFn}	    = "GoogleAuth_Delete";
   $hash->{SetFn}        = "GoogleAuth_Set";
   $hash->{GetFn}        = "GoogleAuth_Get";
+  $hash->{detailFn}     = "GoogleAuth_Detail";
 #  $hash->{AttrFn}   = "GoogleAuth_Attr";
   $hash->{AttrList} = "ga_qrsize ".
                       "$readingFnAttributes";
+}
+
+sub GoogleAuth_Detail {
+#Debug "detailFn called";
+return;
 }
 
 sub GoogleAuth_Define($$) {
