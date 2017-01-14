@@ -13,6 +13,11 @@
 ############################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.9.1      14.01.2017       changed DbLog_ParseEvent to CallInstanceFn, renamed flushCache to purgeCache,
+#                             renamed syncCache to commitCache, attr cacheEvents changed to 0,1,2
+# 2.9        11.01.2017       changed DbLog_ParseEvent to CallFn
+# 2.8.9      11.01.2017       own $dbhp (new DbLog_ConnectPush) for synchronous logging, delete $hash->{HELPER}{RUNNING_PID} 
+#                             if DEAD, add func flushCache, syncCache
 # 2.8.8      10.01.2017       connection check in Get added, avoid warning "commit/rollback ineffective with AutoCommit enabled"
 # 2.8.7      10.01.2017       bugfix no dropdown list in SVG if asynchronous mode activated (func DbLog_sampleDataFn)
 # 2.8.6      09.01.2017       Workaround for Warning begin_work failed: Turning off AutoCommit failed, start new timer of
@@ -55,7 +60,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.8.8";
+my $DbLogVersion = "2.9.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -80,7 +85,7 @@ sub DbLog_Initialize($)
   $hash->{AttrFn}           = "DbLog_Attr";
   $hash->{SVG_regexpFn}     = "DbLog_regexpFn";
   $hash->{ShutdownFn}       = "DbLog_Shutdown";
-  $hash->{AttrList}         = "disable:0,1 ".
+  $hash->{AttrList}         = "disable:1,0 ".
                               "DbLogType:Current,History,Current/History ".
                               "shutdownWait ".
                               "suppressUndef:0,1 ".
@@ -90,7 +95,7 @@ sub DbLog_Initialize($)
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
 							  "asyncMode:1,0 ".
-							  "cacheEvents:1,0 ".
+							  "cacheEvents:2,1,0 ".
 							  "syncEvents:1,0 ".
                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
 							  $readingFnAttributes;
@@ -149,6 +154,7 @@ sub DbLog_Define($@)
 
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
   eval { DbLog_Connect($hash); };
+  eval { DbLog_ConnectPush($hash); };
 
   DbLog_execmemcache($hash);
   
@@ -207,6 +213,7 @@ sub DbLog_Attr(@) {
       } else {
 	      $hash->{MODE} = "synchronous";
           delete($defs{$name}{READINGS}{NextSync});
+		  delete($defs{$name}{READINGS}{CacheUsage});
 	      delete($defs{$name}{READINGS}{background_processing_time});
 	      delete($defs{$name}{READINGS}{sql_processing_time});
 		  DbLog_execmemcache($hash);
@@ -253,7 +260,8 @@ return undef;
 sub DbLog_Set($@) {
     my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand listCache:noArg";
+	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand 
+	             listCache:noArg purgeCache:noArg commitCache:noArg";
 	return $usage if(int(@a) < 2);
 	my $dbh = $hash->{DBH};
 	my $ret;
@@ -297,6 +305,13 @@ sub DbLog_Set($@) {
         DbLog_Connect($hash);
         $ret = "Rereadcfg executed.";
     }
+	elsif ($a[1] eq 'purgeCache') {
+	    delete $hash->{cache};
+        readingsSingleUpdate($hash, 'CacheUsage', 0, 1);		
+	}
+	elsif ($a[1] eq 'commitCache') {
+	    DbLog_execmemcache($hash);		
+	}
 	elsif ($a[1] eq 'listCache') {
 	    my $cache;
 	    foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
@@ -400,18 +415,11 @@ sub DbLog_ParseEvent($$$)
   my $value;
   my $unit;
 
-  my $dtype = $defs{$device}{TYPE};
-  
-  if($modules{$dtype}{DbLog_splitFn}) {
-    # let the module do the job!
-
-    Log3 $device, 5, "DbLog_ParseEvent calling external DbLog_splitFn for type: $dtype , device: $device";
-    no strict "refs";
-    ($reading,$value,$unit) = 
-        &{$modules{$dtype}{DbLog_splitFn}}($event, $device);
-    use strict "refs";
-    @result= ($reading,$value,$unit);
-    return @result;
+  # Splitfunktion der Eventquelle aufrufen
+  ($reading, $value, $unit) = CallInstanceFn($device, "DbLog_splitFn", $event, $device);
+  # undef bedeutet, Modul stellt keine DbLog_splitFn bereit
+  if($reading) {
+      return ($reading, $value, $unit);
   }
 
   # split the event into reading, value and unit
@@ -827,7 +835,7 @@ sub DbLog_Log($$) {
                   }
   
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
-				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event to memcache - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
+				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
 				                          if($vb4show);	
                   
 				  if($async) {
@@ -836,6 +844,14 @@ sub DbLog_Log($$) {
 					  $hash->{cache}{index}++;
 				      my $index = $hash->{cache}{index};
 				      $hash->{cache}{memcache}{$index} = $row;
+					  
+					  my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+	                  if(AttrVal($name, "cacheEvents", undef) && AttrVal($name, "cacheEvents", undef) == 1) {
+                          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+	                  } else {
+	                      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+	                  }
+					  
 				  } else {
 				      # synchoner Mode
 				      push(@row_array, $row);		
@@ -844,15 +860,7 @@ sub DbLog_Log($$) {
           }
       }
   }; 
-  if($async) {    
-      # asynchoner non-blocking Mode
-      my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
-	  if(AttrVal($name, "cacheEvents", undef)) {
-          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
-	  } else {
-	      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
-	  }
-  } else {
+  if(!$async) {    
       if(@row_array) {
 	      # synchoner Mode
           my $error = DbLog_Push($hash, $vb4show, @row_array);
@@ -874,26 +882,28 @@ return;
 #################################################################################################
 sub DbLog_Push(@) {
   my ($hash, $vb4show, @row_array) = @_;
-  my $dbh        = $hash->{DBH};
+  my $dbhp       = $hash->{DBHP};
   my $name       = $hash->{NAME};
   my $DbLogType  = AttrVal($name, "DbLogType", "History");
   my $error = 0;
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
     
   eval {
-    if ( !$dbh || not $dbh->ping ) {
+    if ( !$dbhp || not $dbhp->ping ) {
       #### DB Session dead, try to reopen now !
-      DbLog_Connect($hash);
+      DbLog_ConnectPush($hash);
     }  
   };
   
   if ($@) {
-	Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	return $@;
+      Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	  return $@;
+  } else {
+      $dbhp = $hash->{DBHP};
   }
 
-  $dbh->{RaiseError} = 1; 
-  $dbh->{PrintError} = 0;
+  $dbhp->{RaiseError} = 1; 
+  $dbhp->{PrintError} = 0;
   
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
   my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
@@ -918,7 +928,7 @@ sub DbLog_Push(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # for insert history
-	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  $sth_ih = $dbhp->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
       $sth_ih->bind_param_array(1, [@timestamp]);
       $sth_ih->bind_param_array(2, [@device]);
       $sth_ih->bind_param_array(3, [@type]);
@@ -930,10 +940,10 @@ sub DbLog_Push(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # for insert current
-	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  $sth_ic = $dbhp->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	  
 	  # for update current
-	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+	  $sth_uc = $dbhp->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
 	  $sth_uc->bind_param_array(1, [@timestamp]);
       $sth_uc->bind_param_array(2, [@type]);
       $sth_uc->bind_param_array(3, [@event]);
@@ -943,7 +953,7 @@ sub DbLog_Push(@) {
       $sth_uc->bind_param_array(7, [@reading]);
   }
   
-  eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
+  eval {$dbhp->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
   my ($tuples, $rows);
   eval {
       # insert into history
@@ -957,7 +967,7 @@ sub DbLog_Push(@) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]" if($vb4show);
+				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]";
 			  }
 		  }
       }
@@ -1016,15 +1026,13 @@ sub DbLog_Push(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbh->rollback() if(!$dbh->{AutoCommit});
+    $dbhp->rollback() if(!$dbhp->{AutoCommit});
 	$error = $@;
-    $dbh->disconnect();  
-    DbLog_Connect($hash);
   }
   else {
-    $dbh->commit() if(!$dbh->{AutoCommit});
-    $dbh->{RaiseError} = 0; 
-    $dbh->{PrintError} = 1;
+    $dbhp->commit() if(!$dbhp->{AutoCommit});
+    $dbhp->{RaiseError} = 0; 
+    $dbhp->{PrintError} = 1;
   }
 
 return $error;
@@ -1057,8 +1065,13 @@ sub DbLog_execmemcache ($) {
   if(!$async || IsDisabled($name)) {
 	  return;
   }
-	
-  # nur Verbindungstest, DbLog_PushAsyncDone hat eigene Verbindungsroutine
+  
+  # tote PID löschen
+  if($hash->{HELPER}{RUNNING_PID} && $hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {
+      delete $hash->{HELPER}{RUNNING_PID};
+  }
+  
+  # nur Verbindungstest, DbLog_PushAsync hat eigene Verbindungsroutine
   eval {
     $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });
   }; 
@@ -1070,6 +1083,12 @@ sub DbLog_execmemcache ($) {
       # Testverbindung abbauen
       $dbh->disconnect(); 
 	  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+	  
+      if(AttrVal($name, "cacheEvents", undef) && AttrVal($name, "cacheEvents", undef) == 2) {
+          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+      } else {
+	      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+      }
 	
 	  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
 	      Log3 $name, 5, "DbLog $name -> ################################################################";
@@ -1101,16 +1120,10 @@ sub DbLog_execmemcache ($) {
 	  }
   }
   
-  $memcount = scalar(keys%{$hash->{cache}{memcache}});
+  # $memcount = scalar(keys%{$hash->{cache}{memcache}});
   
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime($nextsync);
-
-  if(AttrVal($name, "cacheEvents", undef)) {
-      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
-  } else {
-	  readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
-  }
 	  
   if(AttrVal($name, "syncEvents", undef)) {
       readingsSingleUpdate($hash, "NextSync", $nsdt, 1); 
@@ -1343,10 +1356,15 @@ sub DbLog_PushAsyncDone ($) {
  Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsyncDone");
  $state = "disabled" if(IsDisabled($name));
  
- readingsBeginUpdate($hash);
- readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
- readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
- readingsEndUpdate($hash, 1);
+ $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+ readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
+ 
+ if(AttrVal($name, "showproctime", undef)) {
+     readingsBeginUpdate($hash);
+     readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
+     readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
+     readingsEndUpdate($hash, 1);
+ }
  
   if($error) {
       readingsSingleUpdate($hash, "state", $error, 1);
@@ -1481,15 +1499,16 @@ sub DbLog_Connect($)
 
   $hash->{DBH}= $dbh;
   
-  if ($hash->{DBMODEL} eq "SQLITE") {
-    $dbh->do("PRAGMA temp_store=MEMORY");
-    $dbh->do("PRAGMA synchronous=NORMAL");
-    $dbh->do("PRAGMA journal_mode=WAL");
-    $dbh->do("PRAGMA cache_size=4000");
-    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
-  }
+# nach sub DbLog_ConnectPush verschoben
+#  if ($hash->{DBMODEL} eq "SQLITE") {
+#    $dbh->do("PRAGMA temp_store=MEMORY");
+#    $dbh->do("PRAGMA synchronous=NORMAL");
+#    $dbh->do("PRAGMA journal_mode=WAL");
+#    $dbh->do("PRAGMA cache_size=4000");
+#    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+#    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+#    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+#  }
 
   # no webfrontend connection for plotfork
   return 1 if( $hash->{PID} != $$ );
@@ -1513,6 +1532,44 @@ sub DbLog_Connect($)
   Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBHF}= $dbhf;
 
+  return 1;
+}
+
+sub DbLog_ConnectPush($) {
+  # own $dbhp for synchronous logging
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  my $dbconn     = $hash->{dbconn};
+  my $dbuser     = $hash->{dbuser};
+  my $dbpassword = $attr{"sec$name"}{secret};
+  
+  Log3 $hash->{NAME}, 3, "Creating Push-Handle to database $dbconn with user $dbuser";
+  my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
+  
+  if(!$dbhp) {
+    RemoveInternalTimer($hash, "DbLog_ConnectPush");
+    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
+    readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+    InternalTimer(time+5, 'DbLog_ConnectPush', $hash, 0);
+    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
+    return 0;
+  }
+
+  Log3 $hash->{NAME}, 3, "Push-Handle to db $dbconn created";
+  readingsSingleUpdate($hash, 'state', 'connected', 1);
+
+  $hash->{DBHP}= $dbhp;
+  
+  if ($hash->{DBMODEL} eq "SQLITE") {
+    $dbhp->do("PRAGMA temp_store=MEMORY");
+    $dbhp->do("PRAGMA synchronous=NORMAL");
+    $dbhp->do("PRAGMA journal_mode=WAL");
+    $dbhp->do("PRAGMA cache_size=4000");
+    $dbhp->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbhp->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbhp->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+  }
+ 
   return 1;
 }
 
@@ -2723,6 +2780,10 @@ sub dbReadings($@) {
     to avoid storing the password in the main configuration file and to have it
     visible in the output of the <a href="../docs/commandref.html#list">list</a> command.
     <br><br>
+	
+	DbLog distinguishes between the synchronous (default) and asynchronous logmode. The logmode is adjustable by the  
+	<a href="#DbLogattr">attribute</a> asyncMode.
+    <br><br>
 
     The modules <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code>
     need to be installed (use <code>cpan -i &lt;module&gt;</code>
@@ -2774,6 +2835,12 @@ sub dbReadings($@) {
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
+    <code>set &lt;name&gt; commitCache </code><br><br>
+      <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the cached data in memory will be written into the database 
+	  and subsequently the cache will be cleared. Thereby the internal timer for the asynchronous mode Modus will be set new.
+      The command can be usefull in case of you want to write the cached data manually or e.g. by an AT-device on a defined 
+	  point of time into the database. </ul><br>
+	  
     <code>set &lt;name&gt; reopen </code><br/><br/>
       <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.</ul><br/>
 
@@ -2790,6 +2857,10 @@ sub dbReadings($@) {
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
       <ul>Delete records from history older than &lt;n&gt; days. Number of deleted record will be written into reading lastRowsDeleted.</ul><br/>
 
+    <code>set &lt;name&gt; purgeCache </code><br><br>
+      <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the in memory cached data will be deleted. 
+      With this command data won't be written from cache into the database. </ul><br>
+	  
     <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br/><br/>
       <ul>Reduce records older than &lt;n&gt; days to one record each hour (the 1st) per device & reading.<br/>
             CAUTION: It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 'history'!<br/>
@@ -2999,7 +3070,7 @@ sub dbReadings($@) {
 	  <code>attr &lt;device&gt; asyncMode [1|0]
 	  </code><br>
 	  
-      This attribute determines the operation mode of DbLog. If asynchronous mode is on (asyncMode=1), the events which should be saved 
+      This attribute determines the operation mode of DbLog. If asynchronous mode is active (asyncMode=1), the events which should be saved 
 	  at first will be cached in memory. After synchronisation time cycle (attribute syncInterval) the cached events get saved into
 	  the database with bulk insert.
 	  If the database isn't available, the events will be cached in memeory furthermore, and tried to save into database again after 
@@ -3012,10 +3083,14 @@ sub dbReadings($@) {
 
   <ul><b>cacheEvents</b>
     <ul>
-	  <code>attr &lt;device&gt; cacheEvents [1|0]
+	  <code>attr &lt;device&gt; cacheEvents [2|1|0]
 	  </code><br>
-	  
-      events of reading cacheEvents will be created. <br>
+	  <ul>
+      <li>cacheEvents=1: creates events of reading CacheUsage at point of time when a new dataset has been added to the cache. </li>
+	  <li>cacheEvents=2: creates events of reading CacheUsage at point of time when in aychronous mode a new write cycle to the 
+	                     database starts. In that moment CacheUsage contains the amount of datasets which will be written to 
+						 the database. </li><br>
+	  </ul>
     </ul>
   </ul>
   <br>
@@ -3027,8 +3102,8 @@ sub dbReadings($@) {
 	   </code><br>
 	 
        This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set, 
-	   the table <i>history</i> will be used as default. NOTE: The current-table has to be used to get a Device:Reading-DropDown
-       list when a SVG-Plot will be created. <br>
+	   the table <i>history</i> will be used as default. <br>
+	   <b>NOTE:</b> The current-table has to be used to get a Device:Reading-DropDown list when a SVG-Plot will be created. <br>
      </ul>
   </ul>
   <br>
@@ -3216,13 +3291,17 @@ sub dbReadings($@) {
     definiert in <code>&lt;configfilename&gt;</code>. (Vergleiche
     Beipspielkonfigurationsdatei in <code>contrib/dblog/db.conf</code>).<br>
     Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort
-    nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu m&ouml;ssen.
-    Ansonsten w&auml;re es mittels des <a href="../docs/commandref.html#list">list</a>
+    nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
+    Ansonsten wäre es mittels des <a href="../docs/commandref.html#list">list</a>
     Befehls einfach auslesbar.
     <br><br>
+	
+	DbLog unterscheidet den synchronen (Default) und asynchronen Logmodus. Der Logmodus ist über das 
+	<a href="#DbLogattr">Attribut</a> asyncMode einstellbar.
+    <br><br>
 
-    Die Perl-Module <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code>
-    m&ouml;ssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
+    Die Perl-Module <code>DBI</code> und <code>DBD::&lt;dbtype&gt;</code>
+    müssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
     falls die eigene Distribution diese nicht schon mitbringt).
     <br><br>
 
@@ -3271,6 +3350,12 @@ sub dbReadings($@) {
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
+    <code>set &lt;name&gt; commitCache </code><br><br>
+      <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten in die Datenbank geschrieben 
+	  und danach der Cache geleert. Der interne Timer des asynchronen Modus wird dabei neu gesetzt.
+      Der Befehl kann nützlich sein um manuell oder z.B. über ein AT den Cacheinhalt zu einem definierten Zeitpunkt in die 
+	  Datenbank zu schreiben. </ul><br>
+	  
     <code>set &lt;name&gt; reopen </code><br/><br/>
       <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
       Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
@@ -3290,6 +3375,10 @@ sub dbReadings($@) {
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
       <ul>Löscht Datensätze, die älter sind als &lt;n&gt; Tage. Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
 
+    <code>set &lt;name&gt; purgeCache </code><br><br>
+      <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten gelöscht. 
+      Es werden keine Daten aus dem Cache in die Datenbank geschrieben. </ul><br>
+	  
     <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br/><br/>
       <ul>Reduziert historische Datensaetze, die aelter sind als &lt;n&gt; Tage auf einen Eintrag pro Stunde (den ersten) je device & reading.<br/>
           ACHTUNG: Es wird dringend empfohlen zu überprüfen ob der standard INDEX 'Search_Idx' in der Tabelle 'history' existiert! <br/>
@@ -3517,7 +3606,7 @@ sub dbReadings($@) {
 	  <code>attr &lt;device&gt; asyncMode [1|0]
 	  </code><br>
 	  
-      Dieses Attribut stellt den Arbeitsmodus von DbLog ein. Wenn asyncMode=1, werden die zu speichernden Events zunächst in Speicher
+      Dieses Attribut stellt den Arbeitsmodus von DbLog ein. Im asynchronen Modus (asyncMode=1), werden die zu speichernden Events zunächst in Speicher
 	  gecacht. Nach Ablauf der Synchronisationszeit (Attribut syncInterval) werden die gecachten Events im Block in die Datenbank geschrieben.
 	  Ist die Datenbank nicht verfügbar, werden die Events weiterhin im Speicher gehalten und nach Ablauf des Syncintervalls in die Datenbank
 	  geschrieben falls sie dann verfügbar ist. <br>
@@ -3529,10 +3618,14 @@ sub dbReadings($@) {
 
   <ul><b>cacheEvents</b>
     <ul>
-	  <code>attr &lt;device&gt; cacheEvents [1|0]
+	  <code>attr &lt;device&gt; cacheEvents [2|1|0]
 	  </code><br>
-	  
-      es werden Events für Reading cacheEvents erzeugt. <br>
+	  <ul>
+      <li>cacheEvents=1: es werden Events für das Reading CacheUsage erzeugt wenn ein Event zum Cache hinzugefügt wurde. </li>
+	  <li>cacheEvents=2: es werden Events für das Reading CacheUsage erzeugt wenn im asynchronen Mode der Schreibzyklus in die 
+	                     Datenbank beginnt. CacheUsage enthält zu diesem Zeitpunkt die Anzahl der in die Datenbank zu schreibenden
+						 Datensätze. </li><br>
+	  </ul>
     </ul>
   </ul>
   <br>
@@ -3544,8 +3637,9 @@ sub dbReadings($@) {
 	   </code><br>
 	 
        Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
-       per default die Tabelle <i>history</i> verwendet. HINWEIS: Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDown
-       Liste bei der Erstellung eines SVG-Plots zu erhalten.   <br>
+       per default die Tabelle <i>history</i> verwendet. <br>
+	   <b>HINWEIS:</b> Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDownliste zur Erstellung eines 
+	   SVG-Plots zu erhalten.   <br>
      </ul>
   </ul>
   <br>

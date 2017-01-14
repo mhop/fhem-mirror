@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog.pm: Version is now 2.9.1, "MySQL Server has gone",
+                          new commands purgeCache, commitCache
   - bugfix:  74_XiaomiFlowerSens: fix disableForInterval Bug
   - bugfix:  88_HMCCU.pm: fixed attribute substexcl
   - update:  88_HMCCU.pm: new version 3.7
