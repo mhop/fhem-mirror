@@ -1,6 +1,6 @@
 "use strict";
 
-var version="$Id: fhemweb.js 12993 2017-01-07 07:22:56Z rudolfkoenig$";
+var version="$Id$";
 
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
