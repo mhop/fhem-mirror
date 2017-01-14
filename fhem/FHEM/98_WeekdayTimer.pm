@@ -983,7 +983,12 @@ sub WeekdayTimer_Device_Schalten($$$) {
   if ($command && !$disabled && $activeTimer 
     && $aktParam ne $newParam 
     ) {
-    $newParam =~ s/:/ /;
+    $newParam =~ s/\\:/|/g;
+    Log3 $hash, 3, "newParam------------>$newParam";
+    $newParam =~ s/:/ /g;
+    Log3 $hash, 3, "newParam------------>$newParam";
+    $newParam =~ s/\|/:/g;
+    Log3 $hash, 3, "newParam------------>$newParam";
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
     $command= EvalSpecials($command, %specials);
