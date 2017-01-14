@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2016 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2016-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.10";
+my $version = "0.2.11";
 
 
 
@@ -129,7 +129,6 @@ sub XiaomiFlowerSens_Attr(@) {
 	
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            InternalTimer( gettimeofday()+int(rand(30)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
         }
     }
@@ -142,7 +141,6 @@ sub XiaomiFlowerSens_Attr(@) {
 	
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            InternalTimer( gettimeofday()+int(rand(30)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
         }
     }
@@ -200,11 +198,11 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
         
         XiaomiFlowerSens($hash);
         
-        InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
-        
     } else {
         readingsSingleUpdate ( $hash, "state", "disabled", 1 );
     }
+    
+    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
 }
