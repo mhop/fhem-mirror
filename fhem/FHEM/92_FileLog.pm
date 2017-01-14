@@ -256,7 +256,8 @@ FileLog_Set($@)
   my $me = $hash->{NAME};
 
   return "no set argument specified" if(int(@a) < 2);
-  my %sets = (reopen=>0, absorb=>1, addRegexpPart=>2, removeRegexpPart=>1);
+  my %sets = (reopen=>0, clear=>0, absorb=>1, addRegexpPart=>2, 
+              removeRegexpPart=>1);
   
   my $cmd = $a[1];
   if(!defined($sets{$cmd})) {
@@ -267,12 +268,16 @@ FileLog_Set($@)
   }
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
 
-  if($cmd eq "reopen") {
+  if(($cmd eq "reopen") or ($cmd eq "clear")) {
     if(!FileLog_Switch($hash)) { # No rename, reopen anyway
       my $fh = $hash->{FH};
       my $cn = $hash->{currentlogfile};
       $fh->close();
-      $fh = new IO::File(">>$cn");
+      if($cmd eq "clear") {
+        $fh = new IO::File(">$cn");
+      } else {
+        $fh = new IO::File(">>$cn");
+      }
       return "Can't open $cn" if(!defined($fh));
       $hash->{FH} = $fh;
     }
@@ -1137,6 +1142,11 @@ FileLog_regexpFn($$)
         logfile.
       </ul>
       </li>
+    <li>clear
+      <ul>
+        Clears and reopens the logfile.
+      </ul>
+      </li>
     <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
       <ul>
         add a regexp part, which is constructed as device:regexp.  The parts
@@ -1431,6 +1441,10 @@ FileLog_regexpFn($$)
       <ul>
         Erneutes &Ouml;ffnen eines FileLogs nach h&auml;ndischen
         &Auml;nderungen in dieser Datei.
+      </ul></li>
+    <li>clear
+      <ul>
+        L&ouml;schen und erneutes &Ouml;ffnen eines FileLogs.
       </ul></li>
     <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
       <ul>
