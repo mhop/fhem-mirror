@@ -147,8 +147,8 @@ FHEMWEB_Initialize($)
     basicAuthMsg
     closeConn:1,0
     column
-    confirmDelete
-    confirmJSError
+    confirmDelete:0,1
+    confirmJSError:0,1
     defaultRoom
     deviceOverview:always,iconOnly,onClick,never
     editConfig:1,0

@@ -698,7 +698,7 @@ FW_doUpdate(evt)
   FW_lastDataTime = now;
 
   // Websocket starts with Android 4.4, and IE10
-  if(typeof WebSocket == "function" &&  evt.target instanceof WebSocket) {
+  if(typeof WebSocket == "function" && evt && evt.target instanceof WebSocket) {
     if(evt.type == 'close' && !FW_leaving) {
       FW_errmsg(errstr, retryTime-100);
       FW_pollConn.close();
