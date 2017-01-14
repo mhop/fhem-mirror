@@ -35,7 +35,8 @@ window.onbeforeunload = function(e)
 window.onerror = function(errMsg, url, lineno)
 {
   url = url.replace(/.*\//,'');
-  FW_okDialog(url+" line "+lineno+":<br>"+errMsg);
+  if($("div#content").attr("data-confirmJSError") != 0)
+    FW_okDialog(url+" line "+lineno+":<br>"+errMsg);
 }
 
 

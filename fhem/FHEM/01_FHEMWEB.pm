@@ -148,6 +148,7 @@ FHEMWEB_Initialize($)
     closeConn:1,0
     column
     confirmDelete
+    confirmJSError
     defaultRoom
     deviceOverview:always,iconOnly,onClick,never
     editConfig:1,0
@@ -1262,9 +1263,10 @@ FW_doDetail($)
   my $h = $defs{$d};
   my $t = $h->{TYPE};
   $t = "MISSING" if(!defined($t));
-  my $cd = AttrVal($FW_wname, "confirmDelete", 1);
-  FW_pO "<div id=\"content\" data-confirmDelete=\"$cd\" ".
-                            "data-webName=\"$FW_wname\">";
+  FW_pO "<div id=\"content\" ".
+        "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
+        "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+        "data-webName='$FW_wname'>";
 
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
     my $webCmd = AttrVal($d, "webCmd", undef);
@@ -3207,6 +3209,13 @@ FW_widgetOverride($$)
         </li>
         <br> 
 
+    <a name="confirmJSError"></a>
+    <li>confirmJSError<br>
+        JavaScript errors are reported in a dialog as default.
+        Set this attribute to 0 to disable the reporting.
+        </li>
+        <br> 
+
     <a name="CORS"></a>
     <li>CORS<br>
         If set to 1, FHEMWEB will supply a "Cross origin resource sharing"
@@ -3941,6 +3950,14 @@ FW_widgetOverride($$)
     <li>confirmDelete<br>
         L&ouml;schaktionen weden mit einem Dialog best&auml;tigt.
         Falls dieses Attribut auf 0 gesetzt ist, entf&auml;llt das.
+        </li>
+        <br> 
+
+    <a name="confirmJSError"></a>
+    <li>confirmJSError<br>
+        JavaScript Fehler werden per Voreinstellung in einem Dialog gemeldet.
+        Durch setzen dieses Attributes auf 0 werden solche Fehler nicht 
+        gemeldet.
         </li>
         <br> 
 
