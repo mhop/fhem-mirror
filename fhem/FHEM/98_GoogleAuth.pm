@@ -63,6 +63,8 @@
 #              added:   FW_summaryFn
 #              added:   commandref documentation EN
 #
+# 2017-01-15 - published to FHEM
+#
 =cut
 
 package main;

@@ -391,6 +391,7 @@ FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        http://forum.fhem.
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_GoogleAuth.pm        betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
 FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends/SVG Plots logProxy
