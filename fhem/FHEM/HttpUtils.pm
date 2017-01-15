@@ -254,6 +254,8 @@ HttpUtils_Connect($)
           HttpUtils_Close($hash);
           return $hash->{callback}($hash, $err, "") ;
         }
+        return $hash->{callback}($hash, "Closed conn / parallel call?", "")
+                if(!$hash->{conn});
         my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
         if(!$ret) {
           if($!{EINPROGRESS} || int($!)==10035 ||
