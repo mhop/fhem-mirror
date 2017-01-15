@@ -65,7 +65,7 @@
 #
 # 2017-01-15 - published to FHEM
 #              fixed:   problem on iOS if label contains spaces
-#              added:   issuer=FHEM
+#              added:   issuer=FHEM in qr-code
 #
 =cut
 
@@ -306,7 +306,8 @@ sub gAuth($$) {
   <a name="GoogleAuthattr"></a>
   <b>Attributes</b><br/><br/>
   <ul>
-    <li><b>ga_labelName</b> - disables automatic layout reread after edit if set to 1</li>
+    <li><b>ga_labelName</b> - define a Name to identify PassCode inside the app.<br/>
+        <b>Do not use any special characters,</b> except SPACE, in this attribute!</li>
     <li><b>ga_qrSize</b> - select image size of qr code</li>
     <li><b>ga_showKey</b> - show key for manual use if set to 1</li>
     <li><b>ga_showLink</b> - show link to qr code if set to 1</li>
