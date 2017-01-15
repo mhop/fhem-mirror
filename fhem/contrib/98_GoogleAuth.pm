@@ -89,6 +89,7 @@ sub GoogleAuth_Get($$@) {
     Log3($hash,4,"googleAuth $name: possible: ".join ' ',@possible);
 
     my $result = (grep /^$given_token$/, @possible) ? 1 : -1;
+    readingsSingleUpdate($hash,'lastResult',$result,0);    
     Log3($hash,4,"googleAuth $name: result: $result");
     return $result;
   }
