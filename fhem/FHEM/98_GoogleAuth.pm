@@ -136,13 +136,11 @@ sub GoogleAuth_Set($$@) {
 }
 
 sub GoogleAuth_Get($$@) {
-  my ($hash, $name, $cmd, @args) = @_;
+  my ($hash, $name, $cmd, $given_token) = @_;
   my $usage = "Unknown argument, choose one of check";
 
   if ($cmd eq "check") {
-    my $given_token = shift @args;
     return "Token missing!" unless (defined($given_token) && $given_token);
-
     $given_token   = _ga_make_token_6($given_token);
     Log3($hash,4,"googleAuth $name: given: $given_token");
 
