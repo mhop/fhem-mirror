@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
-use FHEM::UConv;
+use UConv;
 use Data::Dumper;
 use utf8;
 use Encode qw(encode_utf8 decode_utf8);
