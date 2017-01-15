@@ -1,5 +1,18 @@
 # $Id$
 
+=pod
+#
+# Development history
+#
+# 2017-01-15 - first check in to ./contrib
+# 2017-01-15 - added: direct QR display after set
+#              added: attribute ga_qrSize
+#              added: FW_detailFn
+#              added: attribute ga_labelName
+#              added: reading lastCheck
+#
+=cut
+
 package main;
 use strict;
 use warnings;
@@ -21,7 +34,7 @@ sub GoogleAuth_Initialize($) {
   $hash->{GetFn}        = "GoogleAuth_Get";
   $hash->{FW_detailFn}  = "GoogleAuth_Detail";
 #  $hash->{AttrFn}   = "GoogleAuth_Attr";
-  $hash->{AttrList} = "ga_qrsize ".
+  $hash->{AttrList} = "ga_qrSize ".
                       "ga_labelName ".
                       "$readingFnAttributes";
 }
@@ -57,7 +70,7 @@ sub GoogleAuth_Set($$@) {
     setKeyValue("googleAuth$name",$secret_base32); # write to fhem keystore
 
     my $label  = AttrVal($name,'ga_labelName',"FHEM Authentication $name");
-    my $qrsize = AttrVal($name,'ga_qrsize','200x200');
+    my $qrsize = AttrVal($name,'ga_qrSize','200x200');
     my $url    = "otpauth://totp/$label?secret=$secret_base32";
     my $qr_url = "https://chart.googleapis.com/chart?cht=qr&chs=$qrsize"."&chl=".uri_escape($url);
 
