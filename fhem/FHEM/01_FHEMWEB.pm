@@ -11,6 +11,7 @@ use Time::HiRes qw(gettimeofday);
 #########################
 # Forward declaration
 sub FW_IconURL($);
+sub FW_addContent(;$);
 sub FW_addToWritebuffer($$@);
 sub FW_answerCall($);
 sub FW_dev2image($;$);
@@ -976,7 +977,7 @@ FW_answerCall($)
       $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
     }
 
-    FW_pO "<div id=\"content\">";
+    FW_addContent();
     if($FW_ss) {
       FW_pO "<div class=\"tiny\">$FW_cmdret</div>";
     } else {
@@ -1007,12 +1008,22 @@ FW_answerCall($)
       my $motd = AttrVal("global","motd","none");
       if($motd ne "none") {
         $motd =~ s/\n/<br>/g;
-        FW_pO "<div id=\"content\">$motd</div>";
+        FW_addContent('>$motd</div');
       }
     }
   }
   FW_pO "</body></html>";
   return 0;
+}
+
+sub
+FW_addContent(;$)
+{
+  my $add = ($_[0] ? " $_[0]" : "");
+  FW_pO "<div id='content' ".
+        "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
+        "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+        "data-webName='$FW_wname'$add>";
 }
 
 sub
@@ -1263,10 +1274,7 @@ FW_doDetail($)
   my $h = $defs{$d};
   my $t = $h->{TYPE};
   $t = "MISSING" if(!defined($t));
-  FW_pO "<div id=\"content\" ".
-        "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
-        "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
-        "data-webName='$FW_wname'>";
+  FW_addContent();
 
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
     my $webCmd = AttrVal($d, "webCmd", undef);
@@ -1673,7 +1681,7 @@ FW_showRoom()
 
   FW_pO "<form method=\"$FW_formmethod\" ".  # Why do we need a form here?
                 "action=\"$FW_ME\" autocomplete=\"off\">";
-  FW_pO "<div id=\"content\" room=\"$FW_room\">";
+  FW_addContent("room='$FW_room'");
   FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
 
   # array of all device names in the room (exception weblinks without group
@@ -2010,11 +2018,11 @@ FW_style($$)
 
   return if(!Authorized($FW_chash, "cmd", $a[0]));
 
-  my $start = "<div id=\"content\"><table><tr><td>";
+  my $start = '><table><tr><td';
   my $end   = "</td></tr></table></div>";
   
   if($a[1] eq "list") {
-    FW_pO $start;
+    FW_addContent($start);
     FW_pO "$msg<br><br>" if($msg);
 
     $attr{global}{configfile} =~ m,([^/]*)$,;
@@ -2045,7 +2053,8 @@ FW_style($$)
   } elsif($a[1] eq "select") {
     my @fl = grep { $_ !~ m/(floorplan|dashboard)/ }
                         FW_fileList("$FW_cssdir/.*style.css");
-    FW_pO "$start<table class=\"block fileList\">";
+    FW_addContent($start);
+    FW_pO "<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
       next if($file =~ m/svg_/);
@@ -2066,7 +2075,8 @@ FW_style($$)
     }
     $FW_styleStamp = time();
     $FW_RET =~ s,/style.css\?v=\d+,/style.css?v=$FW_styleStamp,;
-    FW_pO "${start}Reload the page in the browser.$end";
+    FW_addContent($start);
+    FW_pO "Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
     my $fileName = $a[2]; 
@@ -2077,7 +2087,7 @@ FW_style($$)
     my $filePath = FW_fileNameToPath($fileName);
     my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType});
     if($err) {
-      FW_pO "<div id=\"content\">$err</div>";
+      FW_addContent(">$err</div");
       return;
     }
     $data = join("\n", @content);
@@ -2089,7 +2099,7 @@ FW_style($$)
                         "" : "readonly");
 
     my $ncols = $FW_ss ? 40 : 80;
-    FW_pO "<div id=\"content\">";
+    FW_addContent();
     FW_pO "<form method=\"$FW_formmethod\">";
     if($readOnly) {
       FW_pO "You can enable saving this file by setting the editConfig ";
@@ -2130,7 +2140,7 @@ FW_style($$)
     }
 
     if($err) {
-      FW_pO "<div id=\"content\">$filePath: $!</div>";
+      FW_addContent(">$filePath: $!</div");
       return;
     }
     my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
@@ -2162,7 +2172,7 @@ FW_style($$)
   } elsif($a[1] eq "eventMonitor") {
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
           "</script>";
-    FW_pO "<div id=\"content\">";
+    FW_addContent();
     my $filter = $a[2] ? ($a[2] eq "log" ? "global" : $a[2]) : ".*";
     FW_pO "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span class='fhemlog'>FHEM log ".
@@ -2193,7 +2203,7 @@ FW_iconTable($$$$)
     }
   }
 
-  FW_pO "<div id=\"content\">";
+  FW_addContent();
   FW_pO "<form method=\"$FW_formmethod\">";
   if($textfield) {
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
