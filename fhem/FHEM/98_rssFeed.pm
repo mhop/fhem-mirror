@@ -259,6 +259,9 @@ rssFeed_Define($$)
   my $url=shift@a;
   my $interval=shift @a;
 
+  #setting restrictions for event notifications
+  $hash->{NOTIFYDEV}="global";
+
   if (defined($interval)) {
   	#if interval defined, make sure its a valid number
 	#and is at least 5 minutes (seconds)
@@ -309,8 +312,9 @@ rssFeed_Define($$)
 	  my $attEncoding=AttrVal($hash->{NAME},"rfEncode",undef);
 	  $attr{$hash->{NAME}}{rfEncode}=$defaultEncoding if (!$attEncoding);
   }
-  
+
   return undef;
+  
 }
 
 sub 
