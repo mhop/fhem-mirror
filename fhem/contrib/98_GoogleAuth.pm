@@ -1,16 +1,57 @@
 # $Id$
 
+# License & technical informations
 =pod
 #
+################################################################
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#
+#  Homepage:  http://www.fhem.de
+#
+################################################################
+#
+# Module 98_GoogleAuth.pm
+# written by pandabaer_de, revised by betateilchen
+#
+# based on informations from this website
+# https://blog.darkpan.com/article/6/Perl-and-Google-Authenticator.html
+#
+# requires additional perl modules
+# Convert::Base32 Authen::OATH Crypt::URandom
+#
+# on Debian systems, use apt-get to install appropriate packages
+# libconvert-base32-perl libauthen-oath-perl libcrypt-urandom-perl
+#
+################################################################
+#
+=cut
+
 # Development history
+=pod
 #
 # 2017-01-15 - first commit to ./contrib
+#
 # 2017-01-15 - added:   direct QR display after set
 #              added:   attribute ga_qrSize
 #              added:   FW_detailFn
 #              added:   attribute ga_labelName
 #              added:   reading lastCheck
-#
 #              removed: reading qr_url
 #              added:   show link to qrcode and key for manual use
 #                       in device details
@@ -19,14 +60,14 @@
 #              added:   attribute ga_showKey
 #                       attribute ga_showLink
 #              added:   function gAuth(<device>,<token>) for easy use
+#              added:   FW_summaryFn
+#              added:   commandref documentation EN
 #
 =cut
 
 package main;
 use strict;
 use warnings;
-
-## apt-get install libconvert-base32-perl libauthen-oath-perl libcrypt-urandom-perl
 
 use Convert::Base32;
 use Authen::OATH;
@@ -42,7 +83,9 @@ sub GoogleAuth_Initialize($) {
   $hash->{SetFn}        = "GoogleAuth_Set";
   $hash->{GetFn}        = "GoogleAuth_Get";
   $hash->{FW_detailFn}  = "GoogleAuth_Detail";
+  $hash->{FW_summaryFn} = "GoogleAuth_Detail";
 #  $hash->{AttrFn}   = "GoogleAuth_Attr";
+
   $hash->{AttrList} = "ga_labelName ".
                       "ga_qrSize:100x100,200x200,300x300,400x400 ".
                       "ga_showKey:0,1 ".
@@ -120,8 +163,6 @@ sub GoogleAuth_Detail($@) {
   my ($FW_wname, $name, $room, $pageHash) = @_;
   my $qr_url = _ga_make_url($name);
   my $secret_base32 = getKeyValue("googleAuth$name"); # read from fhem keystore
-
-#  my $qr_url = ReadingsVal($d,'qr_url',undef);
   return unless defined($qr_url);
   my $ret  = "<table>";
      $ret .= "<tr><td rowspan=2><a href=\"$qr_url\"><img src=\"$qr_url\"><\/a></td>";
@@ -134,7 +175,13 @@ sub GoogleAuth_Detail($@) {
   return $ret;
 }
 
-
+sub GoogleAuth_Summary($$$$) {
+  my ($FW_wname, $name, $room, $pageHash) = @_;
+  my $qr_url = _ga_make_url($name);
+  my $secret_base32 = getKeyValue("googleAuth$name"); # read from fhem keystore
+  return unless defined($qr_url);
+  return "<img src=\"$qr_url\">";
+}
 
 # helper functions
 sub _ga_make_url($) {
@@ -166,15 +213,121 @@ sub gAuth($$) {
 
 =pod
 =item helper
-=item summary    Module to use GoogleAuthnticator
+=item summary    Module to use GoogleAuthenticator
 =item summary_DE Modul zur Nutzung von GoogleAuthenticator
 =begin html
 
-<a name="GoogleAuthenticator"></a>
-<h3>GoogleAuthenticator</h3>
+<a name="GoogleAuth"></a>
+<h3>GoogleAuth</h3>
+
 <ul>
-  Module to use GoogleAuthenticator.<br><br>
+  GoogleAuthenticator provides two-factor-authentication using one-time-passwords (token).<br/>
+  These tokens are generated using the mobile app „Google Authenticator“ for example on a smartphone.<br/>
+  See <a href="https://en.wikipedia.org/wiki/Google_Authenticator">https://en.wikipedia.org/wiki/Google_Authenticator</a>
+  for more informations.<br/>
+  <br/>
+  <br/>
+  <b>Prerequesits</b><br/>
+  <br/>
+
+  <li>The fhem implementation of the Google Authenticator is credited to the following publication:<br/>
+  <a href="https://blog.darkpan.com/article/6/Perl-and-Google-Authenticator.html">https://blog.darkpan.com/article/6/Perl-and-Google-Authenticator.html</a></li>
+  <br/>
+
+  <li>Module uses following additional Perl modules:<br/>
+  <br/>
+  <ul><code>Convert::Base32 Authen::OATH Crypt::URandom</code></ul>
+  <br/>
+  If not already installed in your environment, please install them using appropriate commands from your environment.<br/>
+  <br/>
+  Package installation in debian environments:<br/>
+  <br/>
+  <ul><code>apt-get install libconvert-base32-perl libauthen-oath-perl libcrypt-urandom-perl</code></ul></li>
+  <br/>
+  <br/>
+  
+  <a name="GoogleAuthdefine"></a>
+  <b>Define</b><br/><br/>
+  <ul>
+    <code>define &lt;name&gt; GoogleAuth</code><br/>
+    <br/>
+    Example:<br/><br/>
+    <ul><code>define googleAuth GoogleAuth</code><br/></ul>
+  </ul>
+  <br/>
+  <br/>
+
+  <a name="GoogleAuthset"></a>
+  <b>Set Commands</b><br/><br/>
+  <ul>
+    <li><code>set &lt;name&gt; new</code><br/>
+    <br/>
+    Generates a new secret key and displays the corresponding QR image.<br/>
+    Using the photo function of the Google Authenticator app,<br/>
+    this QR image can be used to transfer the secret key to the app.
+    </li>
+    <br/>
+    <li><code>set &lt;name&gt; revoke</code><br/>
+    <br/>
+    Remove existing key.<br/>
+    <b>You can not create a new key before</b> an existing key was deleted.<br/>
+    </li>
+  </ul>
+  <br/>
+  <br/>
+
+  <a name="GoogleAuthget"></a>
+  <b>Get Commands</b><br/><br/>
+  <ul>
+    <li><code>get &lt;name&gt; check &lt;token&gt;</code><br/>
+    <br/>
+    Check the validity of a given token; return value is 1 for a valid token, otherwise -1.<br/>
+    <ul>
+    <li>Token always consists of six numerical digits and will change every 30 seconds.</li>
+    <li>Token is valid it it matches one of three tokens calculated by FHEM<br/>
+    using three timestamps: -30 seconds, now and +30 seconds.</li>
+    </ul>
+    <br/>
+    </li>
+    <li><code>gAuth(&lt;name&gt;,&lt;token&gt;)</code><br/>
+    <br/>
+    For easy use in your own functions you can call function gAuth(),<br/>
+    which will return same result codes as the "get" command.
+    </li>
+  </ul>
+  <br/>
+  <br/>
+
+  <a name="GoogleAuthattr"></a>
+  <b>Attributes</b><br/><br/>
+  <ul>
+    <li><b>ga_labelName</b> - disables automatic layout reread after edit if set to 1</li>
+    <li><b>ga_qrSize</b> - select image size of qr code</li>
+    <li><b>ga_showKey</b> - show key for manual use if set to 1</li>
+    <li><b>ga_showLink</b> - show link to qr code if set to 1</li>
+  </ul>
+  <br/>
+  <br/>
+
+  <a name="GoogleAuthreadings"></a>
+  <b>Generated Readings/Events</b><br/><br/>
+  <ul>
+    <li><b>lastResult</b> - contains result from last token check</li>
+    <li><b>state</b> - "active" if a key is set, otherwise "defined"</li>
+  </ul>
+  <br/>
+  <br/>
+
 </ul>
-<br>
 =end html
+=begin html_DE
+
+<a name="GoogleAuth"></a>
+<h3>GoogleAuth</h3>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='commandref.html#GoogleAuth'>GoogleAuth</a><br/>
+</ul>
+=end html_DE
+
 =cut
