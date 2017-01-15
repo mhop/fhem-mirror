@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.42   - 15.01.17 add Cover and playlist_json
 # Version 1.41   - 12.01.17 add rawTitle 
 # Version 1.4    - 11.01.17 add mute, ctp, seekcur, Fix LWP:: , album cover
 # Version 1.32   - 03.01.17
@@ -92,6 +93,8 @@ use constant clb => "command_list_begin\n";
 use constant cle => "status\nstats\ncurrentsong\ncommand_list_end";
 use constant lfm_artist => "http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&autocorrect=1&api_key=";
 use constant lfm_album  => "http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=";
+
+my @Cover;
 
 ###################################
 
@@ -166,7 +169,7 @@ sub MPD_updateConfig($)
 		readingsSingleUpdate($hash,"state","disabled",1);
 		return undef;
 	}
-
+        
 	MPD_ClearReadings($hash); # beim Starten etwas aufräumen
         MPD_Outputs_Status($hash);
         mpd_cmd($hash, clb.cle);
@@ -206,13 +209,13 @@ sub MPD_updateConfig($)
 	    { 
 		$error = mpd_cmd($hash, "i|listall|music");
 		Log3 $name,3,"$name, error loading music -> $error" if ($error);
-		readingsSingleUpdate($hash,"error",$error,1) if ($error);
+		readingsSingleUpdate($hash,"last_error",$error,1) if ($error);
 	    }
 	    if ((AttrVal($name, "loadPlaylists", "1") eq "1") && !$error)
 	    {
 		$error = mpd_cmd($hash, "i|lsinfo|playlists");
 		Log3 $name,3,"$name, error loading playlists -> $error" if ($error);
-		readingsSingleUpdate($hash,"error",$error,1) if ($error);
+		readingsSingleUpdate($hash,"last_error",$error,1) if ($error);
 	    }  
   
 	}
@@ -236,6 +239,7 @@ sub MPD_Define($$)
   
   Log3 $name,3,"$name, Device defined.";
   readingsSingleUpdate($hash,"state","defined",1);
+  readingsSingleUpdate($hash,"playlist_json","",0);
 
   $attr{$name}{devStateIcon} = 'play:rc_PLAY:stop stop:rc_STOP:play pause:rc_PAUSE:pause error:icoBlitz' unless (exists($attr{$name}{devStateIcon}));
   $attr{$name}{icon}         = 'it_radio' unless (exists($attr{$name}{icon})); 
@@ -244,6 +248,9 @@ sub MPD_Define($$)
   $attr{$name}{loadPlaylists} = '1'       unless (exists($attr{$name}{loadPlaylists}));
   #$attr{$name}{cache}        = 'lfm'      unless (exists($attr{$name}{cache}));
   #$attr{$name}{loadMusic}     = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
+
+  DevIo_CloseDev($hash);
+  $hash->{DeviceName} = $hash->{HOST}.":".$hash->{PORT};
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "MPD_updateConfig", $hash, 0);
@@ -357,7 +364,7 @@ sub MPD_ClearReadings($)
     readingsBulkUpdate($hash,"Name","");
     readingsBulkUpdate($hash,"Date","");
     readingsBulkUpdate($hash,"Track","");
-    readingsBulkUpdate($hash,"playlistname","");
+    readingsBulkUpdate($hash,"Cover","");
     readingsBulkUpdate($hash,"artist_summary","")  if (AttrVal($hash->{NAME}, "artist_summary",""));
     readingsBulkUpdate($hash,"artist_content","")  if (AttrVal($hash->{NAME}, "artist_content",""));
     readingsEndUpdate($hash, 1);
@@ -422,6 +429,7 @@ sub MPD_Set($@)
    readingsBulkUpdate($hash,"rawTitle","");
    readingsBulkUpdate($hash,"Album","");
    readingsBulkUpdate($hash,"Track","");
+   readingsBulkUpdate($hash,"Cover","");
    readingsBulkUpdate($hash,"elapsed","");
    readingsEndUpdate($hash, 1);
    $ret = mpd_cmd($hash, clb."stop\n".cle);   
@@ -439,6 +447,7 @@ sub MPD_Set($@)
      readingsBulkUpdate($hash,"artist_image_html","",1);
      readingsBulkUpdate($hash,"album_image","/fhem/icons/1px-spacer",1);
      readingsBulkUpdate($hash,"album_image_html","",1);
+     readingsBulkUpdate($hash,"Cover","",1);
      readingsEndUpdate($hash, 1);
      $ret = mpd_cmd($hash, clb."stop\n".cle);
     }
@@ -558,6 +567,7 @@ sub MPD_Set($@)
  if ($cmd eq "playlist") 
  {
    return "$name : no name !" if (!$subcmd);
+   my $error;
 
    MPD_ClearReadings($hash);
    $hash->{".music"}    = "";
@@ -570,6 +580,41 @@ sub MPD_Set($@)
     # brauchen wir das hier wirklich noch ? 
     #MPD_NewPlaylist($hash,mpd_cmd($hash, "i|playlistinfo|x|"));
    #}
+   # 
+   my $json = ReadingsVal($name,"playlist_json","");
+ 
+   if ($json ne "")
+   {
+    eval "use JSON qw( decode_json )";
+    if($@)
+    {
+     $error = "please install JSON to decode playlist_json";  
+     Log3 $name, 3,"$name, $error"; 
+     readingsSingleUpdate($hash,"last_error",$error,1);
+     return $error;
+    }
+    else
+    {
+     undef(@Cover);
+     my $result;
+     eval {
+           $result = decode_json($json);
+           1;
+          } or do 
+          {
+            $error = "invalid playlist_json: $json";
+            Log3 $name, 3, "$name, $error";
+            readingsSingleUpdate($hash,"last_error",$error,1);
+            return $error;
+          };
+     foreach (@$result) 
+     { 
+      push(@Cover, $_->{'Cover'}); 
+      Log3 $name, 5, "$name, Cover : ".$_->{'Cover'}; 
+     }
+    }
+   }
+  return $ret;
  }
 
  if ($cmd eq "playfile")
@@ -600,7 +645,7 @@ sub MPD_Set($@)
    mpd_cmd($hash, clb.cle) if ($subcmd ne "playlist"); 
 
    shift @arr;
-   MPD_NewPlaylist($hash,join ("\n", @arr));
+   MPD_NewPlaylist($hash,join ("\n", @arr)) if (ReadingsVal($name,"playlist_json","") eq "");
   return undef;
  }
 
@@ -736,7 +781,7 @@ sub mpd_cmd($$)
  { 
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"state","error");
-  readingsBulkUpdate($hash,"error",$!);
+  readingsBulkUpdate($hash,"last_error",$!);
   readingsBulkUpdate($hash,"presence","absent"); # MPD ist wohl tot :(
   readingsEndUpdate($hash, 1 );
   Log3 $name, 2 , "$name, cmd error : ".$!;
@@ -768,7 +813,7 @@ sub mpd_cmd($$)
   {
     print $sock "close\n";
     close($sock);
-    readingsSingleUpdate($hash,"error",$_,1);
+    readingsSingleUpdate($hash,"last_error",$_,1);
     return "password auth failed : ".$_ ;
   }
  }
@@ -836,12 +881,17 @@ sub mpd_cmd($$)
 
   readingsEndUpdate($hash, 1 );
 
-  if (AttrVal($name, "image_size", -1) > -1) 
+  if ((AttrVal($name, "image_size", -1) > -1) && (ReadingsVal($name,"playlist_json","") ne "")) 
   {
    
    MPD_get_artist_info($hash, urlEncode($artist)) if ($artist);
    MPD_get_album_info($hash,  urlEncode($album))  if ($album);
-  } 
+  }
+  elsif (ReadingsVal($name,"playlist_json","") ne "")
+  {
+   my $pos = ReadingsNum($name,"Pos",-1);
+   readingsSingleUpdate($hash,"Cover",$Cover[$pos],1) if($pos > -1);
+  }
  } # Ende der Ausgabe Readings und Internals, ab jetzt folgt nur noch Bildschirmausgabe
  else
  { # start internes cmd
@@ -1058,7 +1108,7 @@ sub MPD_IdleDone($)
 
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"state","error");
-  readingsBulkUpdate($hash,"error",$ret);
+  readingsBulkUpdate($hash,"last_error",$ret);
   readingsBulkUpdate($hash,"presence","absent"); 
   readingsEndUpdate($hash, 1 );
 
@@ -1163,7 +1213,9 @@ sub MPD_get_artist_info ($$)
      Log3 $name ,4,"$name, artist file ".$hash->{'.artist'}.".xml already exist";
      if (!open (FILE , "www/$cache/".$hash->{'.artist'}.".xml"))
      {
-      Log3 $name, 2, "$name, error reading ".$hash->{'.artist'}.".xml : $!";
+      my $error = "error reading ".$hash->{'.artist'}.".xml : ".$!;
+      Log3 $name, 2, "$name, $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
       $hash->{XML} = 0;
      }
      else 
@@ -1207,7 +1259,9 @@ sub MPD_get_album_info ($$)
      Log3 $name ,4,"$name, album file $fname already exist";
      if (!open (FILE , $fname))
      {
-      Log3 $name, 2, "$name, error reading $fname : $!";
+      my $error = "error reading $fname : $!";
+      Log3 $name, 2, "$name, $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
       $hash->{XML} = 0;
      }
      else 
@@ -1254,7 +1308,9 @@ sub MPD_lfm_artist_info(@)
      {
       if (!open (FILE , ">"."www/$cache/".$hash->{'.artist'}.".xml"))
        {
-         Log3 $name, 2, "$name, error saving ".$hash->{'.artist'}.".xml : ".$!;
+         my $error = "error saving ".$hash->{'.artist'}.".xml : ".$!;
+         Log3 $name, 2, "$name, $error";
+         readingsSingleUpdate($hash,"last_error",$error,1);
          $hash->{XML} = 0;
          #$hash->{'.artist'} = "";
          #return;
@@ -1294,8 +1350,9 @@ sub MPD_lfm_artist_info(@)
        if (index($xml->{'artist'}->{'image'}[$size]->{'content'},"http") < 0)
        {
          MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot","");
-
-         Log3 $name,1,"$name, falsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         my $error = "falsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         readingsSingleUpdate($hash,"last_error",$error,1);
+         Log3 $name,1,"$name, $error";
          return undef;
        }
         MPD_artist_image($hash,$xml->{'artist'}->{'image'}[$size]->{'content'},$hw);
@@ -1377,7 +1434,9 @@ sub MPD_lfm_album_info(@)
      {
       if (!open (FILE , "> ".$fname))
        {
-         Log3 $name, 2, "$name, error saving $fname : ".$!;
+         my $error = "error saving $fname : ".$!;
+         readingsSingleUpdate($hash,"last_error",$error,1);
+         Log3 $name, 2, "$name, $error";
        }
         else 
         {
@@ -1402,7 +1461,9 @@ sub MPD_lfm_album_info(@)
        if (index($xml->{'album'}->{'image'}[$size]->{'content'},"http") < 0)
        {
          MPD_album_image($hash,"/fhem/icons/10px-kreis-rot","");
-         Log3 $name,1,"$name, falsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         my $error = "alsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         readingsSingleUpdate($hash,"last_error",$error,1);
+         Log3 $name,1,"$name, $error";
          return undef;
        }
         MPD_album_image($hash,$xml->{'album'}->{'image'}[$size]->{'content'},$hw);
@@ -1483,7 +1544,9 @@ sub MPD_lfm_artist_image(@)
  
     if($err ne "")          
     {
-        Log3 $name, 3, "$name, error while requesting ".$param->{url}." - $err";
+        my $error = "error while requesting ".$param->{url}." - $err";
+        readingsSingleUpdate($hash,"last_error",$error,1);
+        Log3 $name, 3, "$name, $error";
     }
      elsif(($data ne "") && ($data =~ /PNG/i))                                                   
     {
@@ -1518,17 +1581,21 @@ sub MPD_lfm_album_image(@)
     my $album = $hash->{'.album'};
     my $cache = AttrVal($name,"cache","");
     my $size  = AttrVal($name,"image_size",0);
-
     my $hw="width='32' height='32'";
+    my $error;
+
     $hw="width='64' height='64'"   if ($size == 1);
     $hw="width='174' height='174'" if ($size == 2);
     $hw="width='300' height='300'" if ($size == 3);
+  
 
     my $fname = $artist."_".$album."_".$size.$hash->{'.suffix'};
  
     if($err ne "")          
     {
-        Log3 $name, 3, "$name, error while requesting ".$param->{url}." - $err";
+        $error = "error while requesting ".$param->{url}." - $err";
+        readingsSingleUpdate($hash,"last_error",$error,1);
+        Log3 $name, 3, "$name, $error";
     }
      elsif(($data ne "") && ($data =~ /PNG/i))                                                   
     {
@@ -1536,7 +1603,9 @@ sub MPD_lfm_album_image(@)
     
         if (!open(FILE, "> www/".$cache."/".$fname))
         {
-         Log3 $name, 2, "$name, error saving image $fname : ".$!;
+         $error = "error saving image $fname : ".$!;
+         readingsSingleUpdate($hash,"last_error",$error,1);
+         Log3 $name, 2, "$name, $error";
          MPD_album_image($hash,"/fhem/icons/10px-kreis-rot"," ");
          return undef;
         }
@@ -1578,6 +1647,8 @@ sub MPD_NewPlaylist($$)
   my $ret = '[';
   my $lastUri = '';
   my $url;
+  my $error;
+  my $lastcover; 
 
   # Radiostream ohne Artist ?
   if (!@artist && @title && AttrVal($name, "titleSplit", 1))
@@ -1596,51 +1667,84 @@ sub MPD_NewPlaylist($$)
 
   for my $i (0 .. $#artist)
   {
-     if (defined($albumUri[$i]))
-     {
+    $lastcover = "nan"; # default
+
+    if (defined($albumUri[$i]))
+    {
      if ( $lastUri ne $albumUri[$i]) 
      {
+       $lastUri   = $albumUri[$i];
        eval "use LWP::UserAgent";
-        if($@)
+       if($@)
         {
-         Log3 $name,3,"$name, please install LWP::UserAgent to get album cover from spotify.com"; 
-         readingsSingleUpdate($hash,"playlistinfo","ERROR: Please install LWP::UserAgent",1);
-         return;
+         $error = "please install LWP::UserAgent to get album cover from spotify.com";
+         Log3 $name,3,"$name, $error";
+         readingsBeginUpdate($hash); 
+         readingsBulkUpdate($hash,"playlistinfo","");
+         readingsBulkUpdate($hash,"last_error",$error);
+         readingsEndUpdate($hash,1);
         }
-       my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 1 } );
-       my $response = $ua->get("https://embed.spotify.com/oembed/?url=".$albumUri[$i]);
-       my $data = '';
-       if ( $response->is_success ) 
-       {
-         $data = $response->decoded_content;
-         $url = decode_json( $data );
-         $lastUri = $url->{'thumbnail_url'};
-       }
-     }
-     } # vesuchen wir es mit Last.fm
+        else
+        {    
+         eval "use JSON qw( decode_json )";
+         if($@)
+         {
+          $error = "please install JSON to decode cover";  
+          Log3 $name, 3,"$name, $error"; 
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"last_error",$error);
+          readingsBulkUpdate($hash,"playlistinfo","");
+          readingsEndUpdate($hash,1);
+         }
+         else 
+         {
+          my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 1 } );
+          my $response = $ua->get("https://embed.spotify.com/oembed/?url=".$albumUri[$i]);
+          my $data = '';
+          if ( $response->is_success ) 
+          {
+            $data = $response->decoded_content;
+            eval 
+            {
+             $url = decode_json( $data );
+             $lastcover = $url->{'thumbnail_url'};
+             1;
+            } or do 
+            {
+             $error = "invalid JSON: $data";
+             Log3 $name, 3, "$name, $error";
+             readingsBeginUpdate($hash);
+             readingsBulkUpdate($hash,"last_error",$error);
+             readingsBulkUpdate($hash,"playlistinfo","");
+             readingsEndUpdate($hash,1);
+            }
+           } # sucess 
+         } # JSON 
+        } # LWP
+      } #$lastUri ne $albumUri[$i]
+     } # defined($albumUri[$i]), vesuchen wir es mit Last.fm
      elsif (AttrVal($name,"image_size",-1) > -1 && (AttrVal($name,"cache","") ne ""))
      {
       my $cache = AttrVal($name,"cache","");
       my $size  = AttrVal($name,"image_size",0);
       if (-e "www/$cache/".urlEncode($artist[$i])."_".$size.".png")
-            { $lastUri = "/fhem/www/".$cache."/".urlEncode($artist[$i])."_".$size.".png"; }
-      else  { $lastUri = "/fhem/icons/1px-spacer"; }
+            { $lastcover = "/fhem/www/".$cache."/".urlEncode($artist[$i])."_".$size.".png"; }
      }
-     else  { $lastUri = "/fhem/icons/1px-spacer"; }
 
-     $ret .= '{"Artist":"'.$artist[$i].'",';
-     $ret .= '"Title":';
-     $ret .= (defined($title[$i])) ? '"'.$title[$i].'",' : '"",';
-     $ret .= '"Album":';
-     $ret .= (defined($album[$i])) ? '"'.$album[$i].'",' : '"",';
-     $ret .= '"Time":';
-     $ret .= (defined($time[$i])) ? '"'.$time[$i].'",' : '"",';
-     $ret .= '"File":';
-     $ret .= (defined($file[$i])) ? '"'.$file[$i].'",' : '"",';
-     $ret .= '"Track":';
-     $ret .= (defined($track[$i])) ? '"'.$track[$i].'",' : '"",';
-     $ret .= '"Cover":"'.$lastUri.'"}';
-     $ret .= ',' if ($i<$#artist); 
+
+   $ret .= '{"Artist":"'.$artist[$i].'",';
+   $ret .= '"Title":';
+   $ret .= (defined($title[$i])) ? '"'.$title[$i].'",' : '"",';
+   $ret .= '"Album":';
+   $ret .= (defined($album[$i])) ? '"'.$album[$i].'",' : '"",';
+   $ret .= '"Time":';
+   $ret .= (defined($time[$i])) ? '"'.$time[$i].'",' : '"",';
+   $ret .= '"File":';
+   $ret .= (defined($file[$i])) ? '"'.$file[$i].'",' : '"",';
+   $ret .= '"Track":';
+   $ret .= (defined($track[$i])) ? '"'.$track[$i].'",' : '"",';
+   $ret .= '"Cover":"'.$lastcover.'"}';
+   $ret .= ',' if ($i<$#artist); 
   }
   
   $ret .= ']';
@@ -1847,6 +1951,7 @@ sub MPD_summaryFn($$$$) {
         $html .= "</td></tr></table>";
 	return $html;	
 }
+
 
 
 1;
