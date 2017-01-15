@@ -16,19 +16,13 @@ sub GoogleAuth_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}        = "GoogleAuth_Define";
-  $hash->{UndefFn}      = "GoogleAuth_Undefine";
   $hash->{DeleteFn}	    = "GoogleAuth_Delete";
   $hash->{SetFn}        = "GoogleAuth_Set";
   $hash->{GetFn}        = "GoogleAuth_Get";
-  $hash->{detailFn}     = "GoogleAuth_Detail";
+  $hash->{FW_detailFn}  = "GoogleAuth_Detail";
 #  $hash->{AttrFn}   = "GoogleAuth_Attr";
   $hash->{AttrList} = "ga_qrsize ".
                       "$readingFnAttributes";
-}
-
-sub GoogleAuth_Detail {
-#Debug "detailFn called";
-return;
 }
 
 sub GoogleAuth_Define($$) {
@@ -37,19 +31,8 @@ sub GoogleAuth_Define($$) {
   my @a = split("[ \t][ \t]*", $def);
   return "Usage: Use Google Authenticator"  if(@a != 2);
 
-## ich würde keine Prüfung auf bereits vorhandene GA machen,
-## es kann durchaus Fälle geben, in denen man mehr als 1 Schlüssel definieren möchte
-
-#  my $d = $modules{$hash->{TYPE}}{defptr};
-#  return "$hash->{TYPE} device already defined as $d->{NAME}." if( defined($d) );
   Log3($hash,4,"googleAuth $name: defined");
   readingsSingleUpdate($hash,'state','defined',1);
-  return undef;
-}
-
-sub GoogleAuth_Undefine($$) {
-  my ($hash, $arg) = @_;
-  delete $modules{$hash->{TYPE}}{defptr};
   return undef;
 }
 
@@ -73,15 +56,13 @@ sub GoogleAuth_Set($$@) {
     setKeyValue("googleAuth$name",$secret_base32); # write to fhem keystore
 
     my $label  = "FHEM%20Authentication%20$name";
-    my $qrsize = AttrVal("$name",'ga_qrsize','200x200');
+    my $qrsize = AttrVal($name,'ga_qrsize','200x200');
     my $url    = "otpauth://totp/$label?secret=$secret_base32";
     my $qr_url = "https://chart.googleapis.com/chart?cht=qr&chs=$qrsize"."&chl=".uri_escape($url);
 
-    readingsSingleUpdate($hash,'qr_url',$qr_url,1);
-    my $ret = "<html><a href=\"$qr_url\"><img src=\"$qr_url\" ><\/a></html>";
-    return $ret;
- ;
-
+    readingsSingleUpdate($hash,'qr_url',$qr_url,0);
+    readingsSingleUpdate($hash,'state','active',1);
+    return undef;
   }
   return $usage;
 }
@@ -112,6 +93,18 @@ sub GoogleAuth_Get($$@) {
   }
   return $usage;
 }
+
+sub GoogleAuth_Detail($@) {
+  my ($FW_wname, $d, $room, $pageHash) = @_;
+  my $qr_url = ReadingsVal($d,'qr_url',undef);
+  return unless defined($qr_url);
+  my $ret = "<a href=\"$qr_url\"><img src=\"$qr_url\"><\/a><br>";
+  return $ret;
+}
+
+
+
+# helper functions
 
 sub _ga_make_token_6($) {
   my $token = shift;
