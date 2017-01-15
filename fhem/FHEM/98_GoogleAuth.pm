@@ -189,6 +189,7 @@ sub GoogleAuth_Summary($$$$) {
 sub _ga_make_url($) {
   my ($name)        = @_;
   my $label         = AttrVal($name,'ga_labelName',"FHEM Authentication $name");
+     $label        =~ s/\s/\%20/g;
   my $qrsize        = AttrVal($name,'ga_qrSize','200x200');
   my $secret_base32 = getKeyValue("googleAuth$name");
   return undef unless defined($secret_base32);
