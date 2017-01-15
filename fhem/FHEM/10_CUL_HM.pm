@@ -1138,6 +1138,13 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     return;
   }
+  
+  if (   !defined $mh{devH}->{IODev}
+      || !defined $mh{devH}->{IODev}{NAME}){
+    Log3 $mh{devH},1,"CUL_HM $mh{devN} error: no IO deviced!!! correkt it";
+    $mh{devH}->{IODev} = $iohash;
+  }
+
   $respRemoved = 0;  #set to 'no response in this message' at start
   $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
   $mh{shash}  = $mh{devH};                # source hash - will be redirected to channel if applicable
@@ -1148,11 +1155,55 @@ sub CUL_HM_Parse($$) {#########################################################
     return (CUL_HM_pushEvnts(),$mh{devN},@entities);
   }
 
+
+
+
+   #----------CUL aesCommReq handling---------
+  if (   AttrVal($mh{devN},"aesCommReq",0) #aesCommReq enabled for device
+      && $mh{devH}{IODev}{NAME} ne $mh{ioName} #message not received on assigned IO
+      && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
+ 
+    my $oldIo = $mh{devH}{IODev}{NAME};
+    CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
+    if (   $mh{devH}{IODev}{NAME} ne $mh{ioName} #current IO not selected as new IO
+        || AttrVal($mh{devH}{IODev}{NAME},"rfmode","") ne "HomeMatic" #new IO is not CUL
+        || AttrVal($oldIo,"rfmode","") ne "HomeMatic") { #old IO is not CUL
+      Log3 $mh{devH},5,"CUL_HM ignoring message for ${oldIo} received on $mh{ioName}";
+      #Do not process message further, the assigned IO has to handle it
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
+      return (CUL_HM_pushEvnts(),$mh{devN});
+    }
+  }
+  
+
+
+
+
+
   #----------CUL aesCommReq handling---------
-  if (   AttrVal($mh{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" # $mh{devH}->{IODev}->{TYPE} eq "CUL"
+  my $aComReq = AttrVal($mh{devN},"aesCommReq",0);
+  my $dRfMode = AttrVal($mh{devH}{IODev}{NAME},"rfmode","");
+  my $dIoOk   = ($mh{devH}{IODev}{NAME} eq $mh{ioName}) ? 1 : 0;
+  if (   $aComReq                  #aesCommReq enabled for device
+      && !$dIoOk                   #message not received on assigned IO
+      && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
+ 
+    my $oldIo = $mh{devH}{IODev}{NAME};
+    CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
+    if (   !$dIoOk                                       #current IO not selected as new IO
+        || $dRfMode ne "HomeMatic"                       #new IO is not CUL
+        || AttrVal($oldIo,"rfmode","") ne "HomeMatic") { #old IO is not CUL
+      Log3 $mh{devH},5,"CUL_HM ignoring message for ${oldIo} received on $mh{ioName}";
+      #Do not process message further, the assigned IO has to handle it
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
+      return (CUL_HM_pushEvnts(),$mh{devN});
+    }
+  }
+  if (   $dRfMode eq "HomeMatic"   # $mh{devH}->{IODev}->{TYPE} eq "CUL"
+      && $dIoOk                    #message received on assigned IO
       && $cryptFunc == 1 
       && $ioId eq $mh{dst}
-      && AttrVal($mh{devN},"aesCommReq",0)) { #aesCommReq enabled for device
+      && $aComReq) {               #aesCommReq enabled for device
 
     if ($mh{devH}->{helper}{aesCommRq}{msgStat}) {
       #----------Message was already handled, pass on result---------
@@ -3980,7 +4031,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   my $id = CUL_HM_IoId($defs{$devName});
-  if(length($id) != 6 ){# have to try to find an O
+  if(length($id) != 6 ){# have to try to find an IO
     CUL_HM_assignIO($defs{$devName});
     $id = CUL_HM_IoId($defs{$devName});
     return "no IO device identified" if(length($id) != 6 );
@@ -5801,8 +5852,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 
     
-    if ($set eq "unset"){$set = 0;$cmdB ="02";}
-    else                {$set = 1;$cmdB ="01";}
+    if ($set eq "unset"){$set = 0; $cmdB ="02";}
+    else                {$set = 1; $cmdB ="01";}
 
     my (@b,$nrCh2Pair);
     $b[1] = ($roleD) ?(($single eq "single")?$bNo : ($bNo*2 - 1))
@@ -5847,7 +5898,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           my $bStr = sprintf("%02X",$b[$i]);
           CUL_HM_PushCmdStack($hash,
                  "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}$pCh[$i]00");
-          CUL_HM_pushConfig($hash,$id, $dst,$b[$i],$peerDst,hex($pCh[$i]),4,$burst)
+#                       my ($hash,$src,$dst,$chn  ,$peerAddr,$peerChn     ,$list,$content,$prep) = @_;
+          CUL_HM_pushConfig($hash,$id, $dst,$b[$i],$peerDst ,hex($pCh[$i]),4    ,$burst)
                    if($burst && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
         }
