@@ -64,6 +64,8 @@
 #              added:   commandref documentation EN
 #
 # 2017-01-15 - published to FHEM
+#              fixed:   problem on iOS if label contains spaces
+#              added:   issuer=FHEM
 #
 =cut
 
@@ -193,7 +195,7 @@ sub _ga_make_url($) {
   my $qrsize        = AttrVal($name,'ga_qrSize','200x200');
   my $secret_base32 = getKeyValue("googleAuth$name");
   return undef unless defined($secret_base32);
-  my $url           = "otpauth://totp/$label?secret=$secret_base32";
+  my $url           = "otpauth://totp/$label?secret=$secret_base32&issuer=FHEM";
   my $qr_url        = "https://chart.googleapis.com/chart?cht=qr&chs=$qrsize"."&chl=";
      $qr_url       .= uri_escape($url);
   return $qr_url;
