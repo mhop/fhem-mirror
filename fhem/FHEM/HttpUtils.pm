@@ -69,6 +69,7 @@ HttpUtils_Close($)
   delete($hash->{hu_sslAdded});
   delete($hash->{hu_filecount});
   delete($hash->{hu_blocking});
+  delete($hash->{hu_portSfx});
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
 }
@@ -238,6 +239,7 @@ HttpUtils_Connect($)
   } else {
     $port = ($hash->{protocol} eq "https" ? 443: 80);
   }
+  $hash->{hu_portSfx} = ($port =~ m/^(80|443)$/ ? "" : ":$port");
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
   $hash->{auth} = "$user:$pwd" if($authstring);
@@ -380,7 +382,7 @@ HttpUtils_Connect2($)
 
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
   my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
-  $hdr .= "Host: $hash->{host}\r\n";
+  $hdr .= "Host: $hash->{host}$hash->{hu_portSfx}\r\n";
   $hdr .= "User-Agent: fhem\r\n"
         if(!$hash->{header} || $hash->{header} !~ "User-Agent:");
   $hdr .= "Accept-Encoding: gzip,deflate\r\n" if($hash->{compress});
