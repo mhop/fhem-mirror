@@ -661,7 +661,7 @@ OWServer_Set($@)
   <br><br>
 
 
-  <a name="OWDeviceattr"></a>
+  <a name="OWServerattr"></a>
   <b>Attributes</b>
   <ul>
     <li>nonblocking<br>
@@ -804,7 +804,7 @@ OWServer_Set($@)
   </ul>
   <p>
 
-  <a name="OWDeviceattr"></a>
+  <a name="OWServerattr"></a>
   <b>Attribute</b>
   <ul>
     <li>nonblocking<br>

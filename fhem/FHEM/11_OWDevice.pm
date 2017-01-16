@@ -374,7 +374,7 @@ OWDevice_Initialize($)
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model ".  
+  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model cstrings ".
                        "resolution:9,10,11,12 ".
                        $readingFnAttributes;
 }
@@ -465,7 +465,8 @@ OWDevice_ReadValue($$) {
         #Debug "$path => $value; $msec";  
         if($interface ne "id") {
           if(defined($value)) {
-            $value= trim($value) if(AttrVal($hash,"trimvalues",1));
+            $value=~ s/\0.*$//g  if(AttrVal($hash->{NAME},"cstrings",0));
+            $value= trim($value) if(AttrVal($hash->{NAME},"trimvalues",1));
           } else {
             Log3 $hash, 3, $hash->{NAME} . ": reading $reading did not return a value";
           }
@@ -886,6 +887,7 @@ OWDevice_InitValues($)
        belong to it, then continue with the next OWServer and the attached OWDevices, and so on. 	 
     </li>
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
+    <li>cstrings: interprets reading as C-style string, i.e. stops reading on the first zero byte. Default is 0 (off).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li>model: preset with device type, e.g. DS18S20.</li>
@@ -1044,6 +1046,7 @@ OWDevice_InitValues($)
         nächste OWServer-Instanz, gefolgt von den zugehörigen OWDevice-Geräten, usw.   
     </li>
     <li>trimvalues: Entfernt voran- und nachgestellte Leerzeichen aus den readings. Standartwert ist 1 (ein).</li>
+    <li>cstrings: Interpretiert die readings als C-String, d.h. h&ouml;rt mit dem ersten 0-Byte zu lesen auf. Standardwert ist 0 (off).</li>
     <li>polls: Eine per Komma getrennte Liste der abzurufenden readings. Mit diesem Attribut unterdrückt man alle standartmäßig abgerufenen readings und ersetzt sie durch die eigene Zusammenstellung.</li>
     <li>interfaces: Ersetzt die durch dieses Gerät erzeugten Interfaces.</li>
     <li>model: Angabe des Gerätetyps, z.B.: DS18S20.</li>
