@@ -721,3 +721,5 @@
   - adding new module: 21_VBUSDEV: new locical Device to connect to different
              Resol and compatible VBUS Devices via VBUSIF.pm
 
+- Mon Jan 16 2017 (loredo)
+  - adding new module 98_powerMap
