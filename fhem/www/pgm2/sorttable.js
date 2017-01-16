@@ -5,6 +5,8 @@
 **              resorting after fhemweb longpoll updates
 */
 
+var version="$Id$";
+
 /*
   SortTable
   version 2
@@ -190,7 +192,11 @@ sorttable = {
   doSort: function(table, column, reverse) {
     if( typeof column !== 'object' ) {
       if( table === undefined ) {
-        console.log( 'reSort: no table given' );
+        console.log( 'doSort: no table given' );
+        return;
+      }
+      if( table.tHead === undefined ) {
+        console.log( 'doSort: table has no heading' );
         return;
       }
 
@@ -204,7 +210,7 @@ sorttable = {
         }
 
         if( column === undefined ) {
-          console.log( 'reSort: no current column' );
+          console.log( 'doSort: no current column' );
           return;
         }
       }
