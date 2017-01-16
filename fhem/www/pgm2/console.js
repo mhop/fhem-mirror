@@ -41,6 +41,8 @@ consUpdate(evt)
     new_content = consConn.responseText.substring(consLastIndex, len);
     consLastIndex = len;
   }
+  if(new_content == undefined || new_content.length == 0)
+    return;
   log("Console Rcvd: "+new_content);
   if(new_content.indexOf('<') != 0)
     new_content = new_content.replace(/ /g, "&nbsp;");

@@ -275,7 +275,7 @@ FW_Define($$)
   InternalTimer(1, sub(){
     if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
       my ($x,$y) = gettimeofday();
-      $hash->{CSRFTOKEN} = rand($y)*rand($x);
+      $hash->{CSRFTOKEN} = "fhem_".(rand($y)*rand($x));
     }
   }, $hash, 0);
 
