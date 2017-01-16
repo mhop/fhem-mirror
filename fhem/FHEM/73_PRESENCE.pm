@@ -54,6 +54,8 @@ PRESENCE_Initialize($)
                        "bluetooth_hci_device ".
                        "absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                        "presenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+                       "absenceTimeout ".
+                       "presenceTimeout ".
                        "powerCmd ".$readingFnAttributes;
 
 }
@@ -168,9 +170,26 @@ PRESENCE_Define($$)
 
             $hash->{DeviceName} = $dev;
         }
+        elsif($a[2] eq "event")
+        {
+            return "missing arguments for mode event. You need to provide two event regexp" unless(defined($a[4]));
+            
+            eval { qr/^$a[3]$/ };
+            return "invalid absent regexp: $@" if($@);
+
+            eval { qr/^$a[4]$/ };
+            return "invalid present regexp: $@" if($@);
+            
+            $hash->{MODE} = "event";
+            $hash->{EVENT_ABSENT} = $a[3];
+            $hash->{EVENT_PRESENT} = $a[4];
+            $hash->{STATE} = "Initialized";
+            
+            InternalTimer(gettimeofday(), "PRESENCE_setNotfiyDev", $hash);
+        }
         else
         {
-            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, lan-bluetooth, local-bluetooth, fritzbox, shellscript or function";
+            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, lan-bluetooth, local-bluetooth, fritzbox, shellscript, function or event";
             Log 2, "PRESENCE ($name) - ".$msg;
             return $msg
         }
@@ -218,7 +237,6 @@ PRESENCE_Define($$)
     return undef;
 }
 
-
 #####################################
 sub
 PRESENCE_Undef($$)
@@ -236,7 +254,7 @@ PRESENCE_Undef($$)
     return undef;
 }
 
-
+#####################################
 sub
 PRESENCE_Notify($$)
 {
@@ -245,9 +263,13 @@ PRESENCE_Notify($$)
     return undef if(!defined($hash) or !defined($dev));
 
     my $name = $hash->{NAME};
+    my $dev_name = $dev->{NAME};
+    
+    return undef if(!defined($dev_name) or !defined($name));
+    
     my $events = deviceEvents($dev,0);
     
-    if($dev->{NAME} eq "global" and grep(m/^(?:DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG)$/, @{$events}))
+    if($dev_name eq "global" and grep(m/^(?:DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG)$/, @{$events}))
     {
         if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
         {
@@ -262,9 +284,35 @@ PRESENCE_Notify($$)
             return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
         }
     }
+    elsif($hash->{MODE} eq "event")
+    {
+        return undef if($hash->{helper}{DISABLED});
+        
+        my $re_present = $hash->{EVENT_PRESENT};
+        my $re_absent = $hash->{EVENT_ABSENT};
+        
+        Log3 $name, 5, "PRESENCE ($name) - processing events from $dev_name";
+        foreach my $event (@{$events})
+        {
+            if($dev_name =~ m/^$re_present$/ or "$dev_name:$event" =~ m/^$re_present$/) 
+            {
+                Log3 $name, 5, "PRESENCE ($name) - $dev_name:$event matched present regexp";
+                readingsBeginUpdate($hash);
+                PRESENCE_ProcessState($hash, "present");
+                readingsEndUpdate($hash, 1);
+            }
+            elsif($dev_name =~ m/^$re_absent$/ or "$dev_name:$event" =~ m/^$re_absent$/) 
+            {
+                Log3 $name, 5, "PRESENCE ($name) - $dev_name:$event matched absent regexp";
+                readingsBeginUpdate($hash);
+                PRESENCE_ProcessState($hash, "absent");
+                readingsEndUpdate($hash, 1);
+            }
+        }
+    }
 }
 
-
+#####################################
 sub
 PRESENCE_Set($@)
 {
@@ -413,15 +461,35 @@ PRESENCE_Attr(@)
             return "powerOnFn contains no value";
         }
     }
-    elsif($a[0] eq "set" and $a[2] eq "absenceThreshold" and not $a[3] =~ /^\d+$/)
+    elsif($a[0] eq "set" and $a[2] eq "absenceThreshold")
     {
-        return "absenceThreshold must be a valid integer number";
+        return $a[2]." must be a valid integer number" if($a[3] !~ /^\d+$/);
+        return $a[2]." is not applicable for mode 'event'" if($hash->{MODE} eq "event");
     }
-    elsif($a[0] eq "set" and $a[2] eq "presenceThreshold" and not $a[3] =~ /^\d+$/)
+    elsif($a[0] eq "set" and $a[2] eq "presenceThreshold")
     {
-        return "presenceThreshold must be a valid integer number";
+        return $a[2]." must be a valid integer number" if($a[3] !~ /^\d+$/);
+        return $a[2]." is not applicable for mode 'event'" if($hash->{MODE} eq "event");
     }
-
+    elsif($a[0] eq "set" and $a[2] eq "absenceTimeout")
+    {
+        return $a[2]." is only applicable for mode 'event'" if($hash->{MODE} ne "event");
+    
+        if($a[3] !~ /^\d?\d(?::\d\d){0,2}$/)
+        {
+            return "not a valid time frame value. See commandref for the correct syntax.";
+        }
+    }
+    elsif($a[0] eq "set" and $a[2] eq "presenceTimeout")
+    {
+        return $a[2]." is only applicable for mode 'event'" if($hash->{MODE} ne "event");
+    
+        if($a[3] !~ /^\d?\d(?::\d\d){0,2}$/)
+        {
+            return "not a valid time frame value. See commandref for the correct syntax.";
+        }
+    }
+    
     return undef;
 }
 
@@ -524,26 +592,7 @@ PRESENCE_Read($)
     readingsEndUpdate($hash, 1);
 }
 
-sub
-PRESENCE_DoInit($)
-{
-    my ($hash) = @_;
-
-    if(not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
-    {
-        readingsSingleUpdate($hash, "state", "active",0);
-        $hash->{helper}{CURRENT_TIMEOUT} = "normal";
-        DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
-    }
-    else
-    {
-        readingsSingleUpdate($hash, "state", "disabled",0);
-    }
-
-    return undef;
-}
-
-
+#####################################
 sub
 PRESENCE_Ready($)
 {
@@ -552,12 +601,14 @@ PRESENCE_Ready($)
     return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
 }
 
+
 ##########################################################################################################################
 #
-# 
 #  Functions for local testing with Blocking.pm to ensure a smooth FHEM processing
 #
-#
+##########################################################################################################################
+
+#####################################
 sub PRESENCE_StartLocalScan($;$)
 {
     my ($hash, $local) = @_;
@@ -639,8 +690,8 @@ sub PRESENCE_StartLocalScan($;$)
     }
 }
 
-sub
-PRESENCE_DoLocalPingScan($)
+#####################################
+sub PRESENCE_DoLocalPingScan($)
 {
 
     my ($string) = @_;
@@ -704,8 +755,8 @@ PRESENCE_DoLocalPingScan($)
     return $return;
 }
 
-sub 
-PRESENCE_ExecuteFritzBoxCMD($$)
+#####################################
+sub PRESENCE_ExecuteFritzBoxCMD($$)
 {
 
     my ($name, $cmd) = @_;
@@ -732,8 +783,8 @@ PRESENCE_ExecuteFritzBoxCMD($$)
     return $status;
 }
 
-sub
-PRESENCE_DoLocalFritzBoxScan($)
+#####################################
+sub PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
     my ($name, $device, $local, $speedcheck) = split("\\|", $string);
@@ -838,9 +889,8 @@ PRESENCE_DoLocalFritzBoxScan($)
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "|").($speedcheck == 1 and defined($speed) ? "|$speed" : "");
 }
 
-
-sub
-PRESENCE_DoLocalBluetoothScan($)
+#####################################
+sub PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
     my ($name, $device, $local, $btdevice) = split("\\|", $string);
@@ -913,8 +963,8 @@ PRESENCE_DoLocalBluetoothScan($)
     return $return;
 }
 
-sub
-PRESENCE_DoLocalShellScriptScan($)
+#####################################
+sub PRESENCE_DoLocalShellScriptScan($)
 {
 
     my ($string) = @_;
@@ -957,9 +1007,8 @@ PRESENCE_DoLocalShellScriptScan($)
     return $return;
 }
 
-
-sub
-PRESENCE_DoLocalFunctionScan($)
+#####################################
+sub PRESENCE_DoLocalFunctionScan($)
 {
 
     my ($string) = @_;
@@ -1000,8 +1049,8 @@ PRESENCE_DoLocalFunctionScan($)
     return $return;
 }
 
-sub
-PRESENCE_ProcessLocalScan($)
+#####################################
+sub PRESENCE_ProcessLocalScan($)
 {
     my ($string) = @_;
 
@@ -1075,12 +1124,12 @@ PRESENCE_ProcessLocalScan($)
         Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
         
         RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash) unless($hash->{helper}{DISABLED});
     }
 }
 
-sub
-PRESENCE_ProcessAbortedScan($)
+#####################################
+sub PRESENCE_ProcessAbortedScan($)
 {
 
     my ($hash) = @_;
@@ -1113,55 +1162,188 @@ PRESENCE_ProcessAbortedScan($)
     readingsSingleUpdate($hash, "state", "timeout",1);
 }
 
-sub
-PRESENCE_ProcessState($$)
+##########################################################################################################################
+#
+#  Helper Functions
+#
+##########################################################################################################################
+
+
+#####################################
+sub PRESENCE_DoInit($)
+{
+    my ($hash) = @_;
+
+    if(not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
+    {
+        readingsSingleUpdate($hash, "state", "active",0);
+        $hash->{helper}{CURRENT_TIMEOUT} = "normal";
+        DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
+    }
+    else
+    {
+        readingsSingleUpdate($hash, "state", "disabled",0);
+    }
+
+    return undef;
+}
+
+#####################################
+sub PRESENCE_calculateThreshold($)
+{
+    my ($value) = @_;
+ 
+    if(defined($value) and $value ne "")
+    {
+        if($value =~ /^(\d?\d):(\d\d)$/)
+        {
+            $value = $1 * 60 + $2;
+        }        
+        elsif($value =~ /^(\d?\d):(\d\d):(\d\d)$/)
+        {
+            $value = $1 * 3600 + $2 * 60 + $3;
+        }       
+        elsif($value !~ /^\d?\d+$/)
+        {
+            $value = 0;
+        }
+    }
+    else
+    {
+        $value = 0;
+    }
+
+    return $value;
+}
+
+#####################################
+sub PRESENCE_ThresholdTrigger($)
+{
+    my ($hash) = @_;
+    
+    if($hash->{helper}{DISABLED})
+    {
+        delete($hash->{helper}{NEW_STATE});
+        return undef;
+    }
+    
+    if($hash->{helper}{NEW_STATE})
+    {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged($hash, "state", $hash->{helper}{NEW_STATE});
+        readingsBulkUpdateIfChanged($hash, "presence", $hash->{helper}{NEW_STATE});
+        readingsEndUpdate($hash, 1);
+        
+        $hash->{helper}{CURRENT_STATE} =  $hash->{helper}{NEW_STATE};
+         
+        delete($hash->{helper}{NEW_STATE});
+    }
+}
+
+#####################################
+sub PRESENCE_ProcessState($$)
 {
     my ($hash, $state) = @_;
     my $name = $hash->{NAME};
+    
+    my $current_state = $hash->{helper}{CURRENT_STATE} ? $hash->{helper}{CURRENT_STATE} : "";
+    my $new_state = $hash->{helper}{NEW_STATE} ? $hash->{helper}{NEW_STATE} : "";
+    
     my $absenceThreshold = AttrVal($name, "absenceThreshold", 1);
     my $presenceThreshold = AttrVal($name, "presenceThreshold", 1);
     
+    my $absenceTimeout = PRESENCE_calculateThreshold(AttrVal($name, "absenceTimeout", ""));
+    my $presenceTimeout = PRESENCE_calculateThreshold(AttrVal($name, "presenceTimeout", ""));
+    
     if($state eq "absent")
     {
+        RemoveInternalTimer($hash, "PRESENCE_ThresholdTrigger");
+    
         my $count = ($hash->{helper}{ABSENT_COUNT} ? $hash->{helper}{ABSENT_COUNT} : 0);
     
-        if(++$count >= $absenceThreshold)
+        if($hash->{MODE} eq "event")
         {
-            readingsBulkUpdate($hash, "state", "absent");
-            readingsBulkUpdate($hash, "presence", "absent");
+            if($absenceTimeout > 0 and $current_state ne "absent" and $new_state ne "absent")
+            {
+                readingsBulkUpdate($hash, "state", "maybe absent");
+                readingsBulkUpdate($hash, "presence", "maybe absent");
+                $hash->{helper}{NEW_STATE} = "absent";
+                InternalTimer(gettimeofday()+$absenceTimeout, "PRESENCE_ThresholdTrigger", $hash);
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "state", "absent");
+                readingsBulkUpdate($hash, "presence", "absent");
+                
+                $hash->{helper}{CURRENT_STATE} = "absent";
+                delete($hash->{helper}{NEW_STATE});
+            }
         }
         else
         {
-            $hash->{helper}{ABSENT_COUNT} = $count;
-            
-            readingsBulkUpdate($hash, "state", "maybe absent");
-            readingsBulkUpdate($hash, "presence", "maybe absent");
+            if(++$count >= $absenceThreshold)
+            {
+                readingsBulkUpdate($hash, "state", "absent");
+                readingsBulkUpdate($hash, "presence", "absent");
 
-            Log3 $name, 4, "PRESENCE ($name) - device is absent after $count check".($count == 1 ? "" : "s").". ".($absenceThreshold-$count)." check".(($absenceThreshold-$count) == 1 ? "" : "s")." left before going absent";
+            }
+            else
+            {
+                $hash->{helper}{ABSENT_COUNT} = $count;
+                
+                readingsBulkUpdate($hash, "state", "maybe absent");
+                readingsBulkUpdate($hash, "presence", "maybe absent");
+
+                Log3 $name, 4, "PRESENCE ($name) - device is absent after $count check".($count == 1 ? "" : "s").". ".($absenceThreshold-$count)." check".(($absenceThreshold-$count) == 1 ? "" : "s")." left before going absent";
+            }
         }
         
-        delete($hash->{helper}{PRESENT_COUNT}) if(exists($hash->{helper}{PRESENT_COUNT}));
+        delete($hash->{helper}{PRESENT_COUNT});
     }
     elsif($state eq "present")
     {
+        RemoveInternalTimer($hash, "PRESENCE_ThresholdTrigger");
         my $count = ($hash->{helper}{PRESENT_COUNT} ? $hash->{helper}{PRESENT_COUNT} : 0);
     
-        if(++$count >= $presenceThreshold)
+        if($hash->{MODE} eq "event")
         {
-            readingsBulkUpdate($hash, "state", "present");
-            readingsBulkUpdate($hash, "presence", "present");
+            if($presenceTimeout > 0 and  $current_state ne "present" and $new_state ne "present")
+            {
+                readingsBulkUpdate($hash, "state", "maybe present");
+                readingsBulkUpdate($hash, "presence", "maybe present");
+                $hash->{helper}{NEW_STATE} = "present";
+                InternalTimer(gettimeofday()+$presenceTimeout, "PRESENCE_ThresholdTrigger", $hash);
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "state", "present");
+                readingsBulkUpdate($hash, "presence", "present");
+                
+                $hash->{helper}{CURRENT_STATE} = "present";
+                delete($hash->{helper}{NEW_STATE});
+            }
         }
         else
         {
-            $hash->{helper}{PRESENT_COUNT} = $count;
-            
-            readingsBulkUpdate($hash, "state", "maybe present");
-            readingsBulkUpdate($hash, "presence", "maybe present");
+            if(++$count >= $presenceThreshold)
+            {
+                readingsBulkUpdate($hash, "state", "present");
+                readingsBulkUpdate($hash, "presence", "present");
+                
+                $hash->{helper}{CURRENT_STATE} = "present";
+            }
+            else
+            {
+                $hash->{helper}{PRESENT_COUNT} = $count;
+                
+                readingsBulkUpdate($hash, "state", "maybe present");
+                readingsBulkUpdate($hash, "presence", "maybe present");
 
-            Log3 $name, 4, "PRESENCE ($name) - device is present after $count check".($count == 1 ? "" : "s").". ".($presenceThreshold-$count)." check".(($presenceThreshold-$count) == 1 ? "" : "s")." left before going present";
+                Log3 $name, 4, "PRESENCE ($name) - device is present after $count check".($count == 1 ? "" : "s").". ".($presenceThreshold-$count)." check".(($presenceThreshold-$count) == 1 ? "" : "s")." left before going present";
+            }
         }
-
-        delete($hash->{helper}{ABSENT_COUNT}) if(exists($hash->{helper}{ABSENT_COUNT}));
+        
+        delete($hash->{helper}{ABSENT_COUNT});
     }
     else
     {
@@ -1169,6 +1351,7 @@ PRESENCE_ProcessState($$)
     }
 }
 
+#####################################
 sub PRESENCE_ProcessAddonData($$)
 {
     my ($hash, $data) = @_;
@@ -1182,6 +1365,15 @@ sub PRESENCE_ProcessAddonData($$)
     
     return undef;
 }
+
+#####################################
+sub PRESENCE_setNotfiyDev($)
+{
+    my ($hash) = @_;
+    
+    notifyRegexpChanged($hash,"(global|".$hash->{EVENT_PRESENT}."|".$hash->{EVENT_ABSENT}.")");
+}
+
 1;
 
 =pod
@@ -1197,12 +1389,13 @@ sub PRESENCE_ProcessAddonData($$)
   <br><br>
   This module provides several operational modes to serve your needs. These are:<br><br>
   <ul>
-  <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN</li>
-  <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)</li>
-  <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby</li>
-  <li><b>function</b> - A presence check by using your own perl function which returns a presence state</li>
-  <li><b>shellscript</b> - A presence check by using an self-written script or binary which returns a presence state</li>
-  <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
+  <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN.</li>
+  <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!).</li>
+  <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby.</li>
+  <li><b>function</b> - A presence check by using your own perl function which returns a presence state.</li>
+  <li><b>shellscript</b> - A presence check by using an self-written script or binary which returns a presence state.</li>
+  <li><b>event</b> - A presence check by listening to FHEM events of other definitions.</li>
+  <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance.</li>
   </ul>
   <br>
   Each mode can be optionally configured with a specific check interval and a present check interval.<br><br>
@@ -1249,9 +1442,16 @@ sub PRESENCE_ProcessAddonData($$)
     The shell must return 0 (absent) or 1 (present) on <u>console (STDOUT)</u>. Any other values will be treated as an error<br><br>
     <u>Example</u><br><br>
     <code>define iPhone PRESENCE shellscript "/opt/check_device.sh iPhone"</code><br><br>
+    <b>Mode: event</b><br><br>
+    <code>define &lt;name&gt; PRESENCE evemt &lt;absent-regexp&gt; &lt;present-regexp&gt;</code><br>
+    <br>
+    Listens for events of other FHEM definitions to determine a presence state. You must provide two event regexp's in the same style as for the <a href="#notify">notify</a> module.<br><br>
+    If an event matches one of the provides regexps, the presence state will be changed.<br><br>
+    <u>Example</u><br><br>
+    <code>define Presence_John PRESENCE event Door_Switch:off Door_Switch:on</code><br><br>
     <b>Mode: lan-bluetooth</b><br><br>
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
-     The given device will be checked for presence status.<br>
+    The given device will be checked for presence status.<br>
     <br>
     <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;bluetooth-address&gt; &lt;ip-address&gt;[:port]  [ &lt;check-interval&gt; ]</code><br>
     <br>
@@ -1409,16 +1609,30 @@ Options:
     If this attribute is activated, an active check will be disabled.<br><br>
     Possible values: 0 => not disabled , 1 => disabled<br>
     Default Value is 0 (not disabled)<br><br>
-    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li><br>
+    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li><br> <i>(Not in Mode "event" applicable)</i><br>
     The number of checks that have to result in "absent" before the state of the PRESENCE definition is changed to "absent".
     This can be used to verify the absence of a device with multiple check runs before the state is finally changed to "absent".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
     Default Value is 1 (no absence verification)<br><br>
-    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li><br>
+    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li><br> <i>(Not in Mode "event" applicable)</i><br>
     The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".
-    This can be used to verify the presence of a device with multiple check runs before the state is finally changed to "present".
+    This can be used to verify the permanent presence of a device with multiple check runs before the state is finally changed to "present".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe present" during the presence verification.<br><br>
     Default Value is 1 (no presence verification)<br><br>
+    <li><a name="PRESENCE_absenceTimeout">absenceTimeout</a></li><br> <i>(Only in Mode "event" applicable)</i><br>
+    The timeout after receiving an "absent" event, before the state of the PRESENCE definition is switched to "absent".
+    This can be used to verify the permanent absence by waiting a specific time frame to not receive an "present" event.
+    If this timeout is reached with no "present" event received in the meantime, the presence state will finally be set to "absent".
+    The timeout is given in HH:MM:SS format, where hours and minutes are optional.
+    If this attribute is set to a valid value, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
+    Default Value is 0 (no absence verification)<br><br>
+    <li><a name="PRESENCE_presenceTimeout">presenceTimeout</a></li><br> <i>(Only in Mode "event" applicable)</i><br>
+    The timeout after receiving an "present" event, before the state of the PRESENCE definition is switched to "present".
+    This can be used to verify the permanent presence by waiting a specific time frame to not receive an "absent" event.
+    If this timeout is reached with no "absent" event received in the meantime, the presence state will finally be set to "present".
+    The timeout is given in HH:MM:SS format, where hours and minutes are optional.
+    If this attribute is set to a valid value, the reading state and presence will be set to "maybe present" during the presence verification.<br><br>
+    Default Value is 0 (no presence verification)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in Mode "ping" applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
@@ -1489,6 +1703,7 @@ Options:
   <li><b>local-bluetooth</b> - Eine Erkennung auf Basis von Bluetooth-Abfragen durch den FHEM Server. Das Ger&auml;t muss dabei in Empfangsreichweite sein, aber nicht sichtbar sein</li>
   <li><b>function</b> - Eine Erkennung mithilfe einer selbst geschriebenen Perl-Funktion, welche den Anwesenheitsstatus ermittelt.</li>
   <li><b>shellscript</b> - Eine Erkennung mithilfe eines selbst geschriebenen Skriptes oder Programm (egal in welcher Sprache).</li>
+  <li><b>event</b> - Eine Erkennung basierend auf Events einer anderen Definition in FHEM. </li>
   <li><b>lan-bluetooth</b> - Eine Erkennung durch Bluetooth-Abfragen via Netzwerk (LAN/WLAN) in ein oder mehreren R&auml;umen</li>
   </ul>
   <br>
@@ -1536,6 +1751,14 @@ Options:
     Der Aufruf dieses Skriptes muss eine 0 (Abwesend) oder 1 (Anwesend) auf der <u>Kommandozeile (STDOUT)</u> ausgeben. Alle anderen Werte/Ausgaben werden als Fehler behandelt.<br><br>
     <u>Beispiel</u><br><br>
     <code>define iPhone PRESENCE shellscript "/opt/check_device.sh iPhone"</code><br><br>
+    <b>Mode: event</b><br><br>
+    <code>define &lt;name&gt; PRESENCE event &lt;Abwesend-Regexp&gt; &lt;Anwesend-Regexp&gt;</code><br>
+    <br>
+    Lauscht auf Events von anderen Definitionen innerhalb von FHEM um die Anwesenheit darzustellen. 
+    Die regul&auml;ren Ausdr&uuml;cke f&uuml;r An- und Abwesenheit entsprechen dabei der Syntax von <a href="#notify">notify</a>.<br><br>
+    Sobald innerhalb von FHEM ein Event gefeuert wird, welches auf die Abwesend-Regexp bzw. Anwesend-Regexp passt, wird der Status entsprechend in PRESENCE gesetzt.<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define Anwesenheit PRESENCE event Tuerschalter:off Tuerschalter:on</code><br><br>
     <b>Modus: lan-bluetooth</b><br><br>
     Pr&uuml;ft ein Bluetooth-Ger&auml;t auf Anwesenheit &uuml;ber Netzwerk mit Hilfe von presenced oder collectord. Diese k&ouml;nnen auf jeder Maschine installiert werden,
     welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
@@ -1699,18 +1922,30 @@ Options:
     Wenn dieses Attribut aktiviert ist, wird die Anwesenheitserkennung nicht mehr durchgef&uuml;hrt.<br><br>
     M&ouml;gliche Werte: 0 => Erkennung durchf&uuml;hren , 1 => Keine Erkennungen durchf&uuml;hren<br>
     Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
-    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li>
+    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li> <i>(Nicht im Modus "event" anwendbar)</i><br>
     Die Anzahl an Checks, welche in "absent" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "absent" wechselt.
     Mit dieser Funktion kann man die Abwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "absent" ge&auml;ndert wird.
     Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe absent" gesetzt,
     bis der Status final auf "absent" wechselt.<br><br>
     Standardwert ist 1 (keine Abwesenheitsverifizierung)<br><br>
-    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li>
+    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li> <i>(Nicht im Modus "event" anwendbar)</i><br>
     Die Anzahl an Checks, welche in "present" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "present" wechselt.
     Mit dieser Funktion kann man die Anwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "present" ge&auml;ndert wird.
     Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe present" gesetzt,
     bis der Status final auf "present" wechselt.<br><br>
     Standardwert ist 1 (keine Anwesenheitsverifizierung)<br><br>
+    <li><a name="PRESENCE_absenceTimeout">absenceTimeout</a></li> <i>(Nur im Modus "event" anwendbar)</i><br>
+    Die Dauer, die nach einem "absent"-Event gewartet werden soll, bis der Status der PRESENCE-Definition tats&auml;chlich auf "absent" ge&auml;ndert werden soll.
+    Die Dauer kann dabei im Format HH:MM:SS angegeben werden, wobei Stunden und Minuten optional sind.
+    Wenn dieses Attribut auf einen g&uuml;ltigen Wert gesetzt ist, werden die Readings "state" und "presence" bei einem "absent"-Event zun&auml;chst auf den Wert "maybe absent" gesetzt.
+    Sobald das parametrisierte Zeitfenster um ist, wird der Status final auf "absent" gesetzt.<br><br>
+    Standardwert ist 0 Sekunden (keine Statusverz&ouml;gerung)<br><br>
+    <li><a name="PRESENCE_presenceTimeout">presenceTimeout</a></li> <i>(Nur im Modus "event" anwendbar)</i><br>
+    Die Dauer, die nach einem "present"-Event gewartet werden soll, bis der Status der PRESENCE-Definition tats&auml;chlich auf "present" ge&auml;ndert werden soll.
+    Die Dauer kann dabei im Format HH:MM:SS angegeben werden, wobei Stunden und Minuten optional sind.
+    Wenn dieses Attribut auf einen g&uuml;ltigen Wert gesetzt ist, werden die Readings "state" und "presence" bei einem "present"-Event zun&auml;chst auf den Wert "maybe present" gesetzt.
+    Sobald das parametrisierte Zeitfenster um ist, wird der Status final auf "present" gesetzt.<br><br>
+    Standardwert ist 0 Sekunden (keine Statusverz&ouml;gerung)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
     Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
     Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
