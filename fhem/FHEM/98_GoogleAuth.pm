@@ -67,6 +67,9 @@
 #              fixed:   problem on iOS if label contains spaces
 #              added:   issuer=FHEM in qr-code
 #
+# 2017-01-16 - added:   attributes ga_showQR, ga_strictCheck
+#              removed: FW_summaryFn (not really useful)
+#
 =cut
 
 package main;
@@ -87,13 +90,11 @@ sub GoogleAuth_Initialize($) {
   $hash->{SetFn}        = "GoogleAuth_Set";
   $hash->{GetFn}        = "GoogleAuth_Get";
   $hash->{FW_detailFn}  = "GoogleAuth_Detail";
-  $hash->{FW_summaryFn} = "GoogleAuth_Detail";
-#  $hash->{AttrFn}   = "GoogleAuth_Attr";
 
   $hash->{AttrList} = "ga_labelName ".
                       "ga_qrSize:100x100,200x200,300x300,400x400 ".
-                      "ga_showKey:0,1 ".
-                      "ga_showLink:0,1 ".
+                      "ga_showKey:0,1 ga_showLink:0,1 ga_showQR:1,0 ".
+                      "ga_strictCheck:0,1 ".
                       "$readingFnAttributes";
 }
 
@@ -150,7 +151,12 @@ sub GoogleAuth_Get($$@) {
     Log3($hash,5,"googleAuth $name: secret_bytes=$secret_base32");
            
 	my $oath     = Authen::OATH->new;
-    my @possible = map { _ga_make_token_6($oath->totp($secret_base32, $_)) } time-30, time, time+30;
+    my @possible;
+    if (AttrVal($name,'ga_strictCheck',0) == 1) {
+      @possible    = _ga_make_token_6($oath->totp($secret_base32));
+    } else {
+      @possible    = map { _ga_make_token_6($oath->totp($secret_base32, $_)) } time-30, time, time+30;
+    }      
     Log3($hash,4,"googleAuth $name: possible: ".join ' ',@possible);
 
     my $result = (grep /^$given_token$/, @possible) ? 1 : -1;
@@ -167,7 +173,10 @@ sub GoogleAuth_Detail($@) {
   my $secret_base32 = getKeyValue("googleAuth$name"); # read from fhem keystore
   return unless defined($qr_url);
   my $ret  = "<table>";
-     $ret .= "<tr><td rowspan=2><a href=\"$qr_url\"><img src=\"$qr_url\"><\/a></td>";
+     $ret .= "<tr><td rowspan=2>";
+     $ret .= "<a href=\"$qr_url\"><img src=\"$qr_url\"><\/a>"
+       if AttrVal($name,'ga_showQR',1);
+     $ret .= "</td>";
      $ret .= "<td><br>&nbsp;<a href=\"$qr_url\">Link to QR code<\/a><\/td>"
        if AttrVal($name,'ga_showLink',0);
      $ret .= "</tr>";
@@ -177,13 +186,6 @@ sub GoogleAuth_Detail($@) {
   return $ret;
 }
 
-sub GoogleAuth_Summary($$$$) {
-  my ($FW_wname, $name, $room, $pageHash) = @_;
-  my $qr_url = _ga_make_url($name);
-  my $secret_base32 = getKeyValue("googleAuth$name"); # read from fhem keystore
-  return unless defined($qr_url);
-  return "<img src=\"$qr_url\">";
-}
 
 # helper functions
 sub _ga_make_url($) {
@@ -288,7 +290,8 @@ sub gAuth($$) {
     <ul>
     <li>Token always consists of six numerical digits and will change every 30 seconds.</li>
     <li>Token is valid it it matches one of three tokens calculated by FHEM<br/>
-    using three timestamps: -30 seconds, now and +30 seconds.</li>
+    using three timestamps: -30 seconds, now and +30 seconds.<br/>
+    This behavior can be changed by attribute ga_strictCheck.</li>
     </ul>
     <br/>
     </li>
@@ -309,6 +312,10 @@ sub gAuth($$) {
     <li><b>ga_qrSize</b> - select image size of qr code</li>
     <li><b>ga_showKey</b> - show key for manual use if set to 1</li>
     <li><b>ga_showLink</b> - show link to qr code if set to 1</li>
+    <li><b>ga_showQR</b> - show qr code if set to 1</li>
+    <li><b>ga_strictCheck</b><br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AttrVal = 1 : check given token against one token<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AttrVal = 0 : check given token against three tokens(default)</li>
   </ul>
   <br/>
   <br/>
