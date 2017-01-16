@@ -1,4 +1,6 @@
 
+var version="$Id$";
+
 FW_widgets['uzsuToggle'] = {
   createFn:FW_uzsuToggleCreate,
 };

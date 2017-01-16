@@ -1,4 +1,6 @@
 
+var version="$Id$";
+
 //$(document).ready(FW_readingsGroupReadyFn);
 $(FW_readingsGroupReadyFn);
 

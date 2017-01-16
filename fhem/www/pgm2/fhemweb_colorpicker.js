@@ -1,4 +1,6 @@
 
+var version="$Id$";
+
 //TODO: realtime picker
 //
 FW_widgets['colorpicker'] = {

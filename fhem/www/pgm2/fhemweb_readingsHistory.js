@@ -1,4 +1,6 @@
 
+var version="$Id$";
+
 function
 FW_readingsHistoryUpdateLine(d){
 
