@@ -82,10 +82,10 @@ sub powerMap_Define($$) {
     my $TYPE = $hash->{TYPE};
     my $d    = $modules{$TYPE}{defptr};
 
-    return "Usage: define <name> powerMap" if ($rest);
-    return "powerMap device already defined as $d->{NAME}" if ( defined($d) );
+    return "Usage: define <name> $TYPE" if ($rest);
+    return "$TYPE device already defined as $d->{NAME}" if ( defined($d) );
 
-    my $interval = AttrVal( $name, "powerMap_interval", 900 );
+    my $interval = AttrVal( $name, $TYPE . "_interval", 900 );
     $interval = 900 unless ( looks_like_number($interval) );
     $interval = 30 if ( $interval < 30 );
 
@@ -105,7 +105,7 @@ sub powerMap_Undefine($$) {
 
     # search for devices with user defined
     # powerMap support to be terminated
-    my @slaves = devspec2array("a:powerMap=.+");
+    my @slaves = devspec2array("a:$TYPE=.+");
 
     # search for loaded modules with direct
     # powerMap support to be terminated
@@ -141,6 +141,7 @@ sub powerMap_Get($@) {
 
     return "Missing argument" if ( @a < 2 );
 
+    my $TYPE     = $hash->{TYPE};
     my $name     = shift @a;
     my $argument = shift @a;
     my $value    = join( " ", @a ) if (@a);
@@ -581,10 +582,10 @@ sub powerMap_Get($@) {
       unless ( exists( $powerMap_gets{$argument} ) );
 
     if ( $argument eq "devices" ) {
-        my @devices = devspec2array("powerMap=.+");
+        my @devices = devspec2array("$TYPE=.+");
         return @devices
           ? join( "\n", sort(@devices) )
-          : "no devices with powerMap attribute defined";
+          : "no devices with $TYPE attribute defined";
     }
 
     return;
@@ -593,6 +594,7 @@ sub powerMap_Get($@) {
 sub powerMap_Attr(@) {
     my ( $cmd, $name, $attribute, $value ) = @_;
     my $hash = $defs{$name};
+    my $TYPE = $hash->{TYPE};
 
     if ( $attribute eq "disable" ) {
         readingsSingleUpdate( $hash, "state", "disabled", 1 )
@@ -603,7 +605,7 @@ sub powerMap_Attr(@) {
 
     return if ( IsDisabled($name) );
 
-    if ( $attribute eq "powerMap_interval" ) {
+    if ( $attribute eq $TYPE . "_interval" ) {
         my $interval = $cmd eq "set" ? $value : 900;
         $interval = 900 unless ( looks_like_number($interval) );
         $interval = 30 if ( $interval < 30 );
@@ -628,14 +630,14 @@ sub powerMap_Notify($$) {
         or $name eq $dev    # do not process own events
         or powerMap_AttrVal( $name, $dev, "noPower", 0 )
         or (    !$modules{ $defs{$dev}{TYPE} }{$TYPE}
-            and !$defs{$dev}{'.powerMap'}
+            and !$defs{$dev}{$TYPE}
             and $dev ne "global" )
       );
 
     my $events = deviceEvents( $dev_hash, 1 );
     return unless ($events);
 
-    Log3 $name, 5, "powerMap: Entering powerMap_Notify() for $dev";
+    Log3 $name, 5, "$TYPE: Entering powerMap_Notify() for $dev";
 
     # global events
     if ( $dev eq "global" ) {
@@ -648,14 +650,15 @@ sub powerMap_Notify($$) {
                 # search for devices with user defined
                 # powerMap support to be initialized
                 my @slaves =
-                  devspec2array("a:powerMap=.+:FILTER=powerMap_noEnergy!=1");
+                  devspec2array( "a:$TYPE=.+:FILTER=$TYPE" . "_noEnergy!=1" );
 
                 # search for loaded modules with direct
                 # powerMap support to be initialized
                 foreach ( keys %modules ) {
                     if ( defined( $modules{$_}{$TYPE} ) ) {
                         my @instances =
-                          devspec2array("TYPE=$_:FILTER=powerMap_noEnergy!=1");
+                          devspec2array(
+                            "TYPE=$_:FILTER=$TYPE" . "_noEnergy!=1" );
                         push @slaves, @instances;
                     }
                 }
@@ -664,7 +667,7 @@ sub powerMap_Notify($$) {
                 # powerMap support to be initialized
                 foreach ( keys %defs ) {
                     push( @slaves, $_ )
-                      if ( defined( $defs{$_}{'.powerMap'} ) );
+                      if ( defined( $defs{$_}{$TYPE} ) );
                 }
 
                 # initialize or terminate powerMap for each device
@@ -673,22 +676,22 @@ sub powerMap_Notify($$) {
                     next
                       unless ( $event_prefix eq "SHUTDOWN"
                         or powerMap_load( $name, $_ ) );
-                    Log3 $name, 4, "powerMap: $event_prefix for $_";
+                    Log3 $name, 4, "$TYPE: $event_prefix for $_";
                 }
             }
 
             # device attribute changed
             elsif ( $event =~
-                m/^(ATTR|DELETEATTR)\s(.*)\s(powerMap[a-zA-Z_]*)(\s+(.*))?/ )
+                m/^(ATTR|DELETEATTR)\s(.*)\s($TYPE[a-zA-Z_]*)(\s+(.*))?/ )
             {
                 next unless ( powerMap_load( $name, $2 ) );
-                Log3 $name, 4, "powerMap: UPDATED for $2";
+                Log3 $name, 4, "$TYPE: UPDATED for $2";
             }
 
             # device was newly defined, renamed or got deleted
             elsif ( $event =~ m/^(DEFINED|RENAMED|DELETED)\s(.*)/ ) {
                 next unless ( powerMap_load( $name, $2 ) );
-                Log3 $name, 4, "powerMap: INITIALIZED for $2";
+                Log3 $name, 4, "$TYPE: INITIALIZED for $2";
             }
         }
 
@@ -731,7 +734,7 @@ sub powerMap_Notify($$) {
 sub powerMap_AttrVal($$$$) {
     my ( $p, $d, $n, $default ) = @_;
     my $TYPE = $defs{$p}{TYPE};
-    Log3 $p, 6, "powerMap: Entering powerMap_AttrVal() for $d";
+    Log3 $p, 6, "$TYPE: Entering powerMap_AttrVal() for $d";
 
     return $default if ( !$TYPE );
 
@@ -811,14 +814,14 @@ sub powerMap_load($$) {
     my $dev_hash = $defs{$dev};
     my $TYPE     = $defs{$name}{TYPE};
 
-    Log3 $name, 5, "powerMap: Entering powerMap_load() for $dev";
+    Log3 $name, 5, "$TYPE: Entering powerMap_load() for $dev";
 
     unless ($dev_hash) {
         RemoveInternalTimer("$name|$dev");
         return;
     }
 
-    my $powerMap = AttrVal( $dev, "powerMap", undef );
+    my $powerMap = AttrVal( $dev, $TYPE, undef );
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
     my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
 
@@ -832,21 +835,21 @@ sub powerMap_load($$) {
         or $dev_hash->{'.DbLog_splitFn'} )
     {
         Log3 $name, 5,
-            "powerMap: $dev has defined it's own DbLog_splitFn; "
+            "$TYPE: $dev has defined it's own DbLog_splitFn; "
           . "won't enable unit support with DbLog but rather "
           . "let this to the module itself";
     }
     else {
-        Log3 $name, 4, "powerMap: Enabled unit support for $dev";
+        Log3 $name, 4, "$TYPE: Enabled unit support for $dev";
         $dev_hash->{'.DbLog_splitFn'} = "Unit_DbLog_split";
     }
 
     # restore original powerMap from module
-    if (    defined( $dev_hash->{'.powerMap'}{map} )
-        and defined( $dev_hash->{'.powerMap'}{'map.module'} ) )
+    if (    defined( $dev_hash->{$TYPE}{map} )
+        and defined( $dev_hash->{$TYPE}{'map.module'} ) )
     {
         Log3 $dev, 5,
-          "powerMap $dev: Updated device hash with module mapping table";
+          "$TYPE $dev: Updated device hash with module mapping table";
 
         delete $dev_hash->{$TYPE}{map};
         $dev_hash->{$TYPE}{map} = $dev_hash->{$TYPE}{'map.module'};
@@ -867,18 +870,17 @@ sub powerMap_load($$) {
         my $map = eval $powerMap;
         if ($@) {
             Log3 $dev, 3,
-              "powerMap $dev: Unable to evaluate attribute powerMap: " . $@;
+              "$TYPE $dev: Unable to evaluate attribute $TYPE: " . $@;
         }
         elsif ( ref($map) ne "HASH" ) {
             Log3 $dev, 3,
-              "powerMap $dev: Attribute powerMap was "
-              . "not defined in HASH format";
+              "$TYPE $dev: Attribute $TYPE was " . "not defined in HASH format";
         }
         else {
             # backup any pre-existing definitions from module
             if ( defined( $dev_hash->{$TYPE}{map} ) ) {
                 Log3 $dev, 4,
-                  "powerMap $dev: Updated device hash with user mapping table";
+                  "$TYPE $dev: Updated device hash with user mapping table";
 
                 $dev_hash->{$TYPE}{'map.module'} =
                   $dev_hash->{$TYPE}{map};
@@ -886,7 +888,7 @@ sub powerMap_load($$) {
             }
             else {
                 Log3 $dev, 4,
-                  "powerMap $dev: Updated device hash with mapping table";
+                  "$TYPE $dev: Updated device hash with mapping table";
             }
 
             $dev_hash->{$TYPE}{map} = $map;
@@ -894,7 +896,7 @@ sub powerMap_load($$) {
         }
     }
     else {
-        Log3 $dev, 3, "powerMap $dev: Illegal format for attribute powerMap";
+        Log3 $dev, 3, "$TYPE $dev: Illegal format for attribute $TYPE";
     }
 
     return 0;
@@ -913,8 +915,6 @@ sub powerMap_power($$$) {
       );
 
     return unless ( defined($powerMap) and ref($powerMap) eq "HASH" );
-
-    #    Log3 $name, 5, "powerMap: Entering powerMap_power() for $dev";
 
     if ( $event =~ /^([A-Za-z\d_\.\-\/]+):\s+(.*)$/ ) {
         my ( $reading, $val ) = ( $1, $2 );
@@ -946,8 +946,8 @@ sub powerMap_power($$$) {
             return;
         }
 
-        Log3 $name, 5, "powerMap: Entering powerMap_power() for $dev:$reading";
-        Log3 $dev,  5, "powerMap $dev: $reading: val=$val num=$num";
+        Log3 $name, 5, "$TYPE: Entering powerMap_power() for $dev:$reading";
+        Log3 $dev,  5, "$TYPE $dev: $reading: val=$val num=$num";
 
         # direct assigned power consumption (value)
         if ( defined( $powerMap->{$reading}{$val} ) ) {
@@ -980,7 +980,7 @@ sub powerMap_power($$$) {
 
             if ($val2) {
                 Log3 $dev, 5,
-                  "powerMap $dev: Interpolating power value between "
+                  "$TYPE $dev: Interpolating power value between "
                   . "$powerMap->{$reading}{$val1} and $powerMap->{$reading}{$val2}";
 
                 my $y1 = $powerMap->{$reading}{$val1};
@@ -1005,7 +1005,7 @@ sub powerMap_power($$$) {
                 $power = $powerMap->{$reading}{'*'};
             }
             else {
-                Log3 $dev, 3, "powerMap $dev: Power value interpolation failed";
+                Log3 $dev, 3, "$TYPE $dev: Power value interpolation failed";
             }
         }
 
@@ -1021,10 +1021,11 @@ sub powerMap_energy($$;$) {
     my ( $name, $dev, $P1 ) = @_;
     my $hash     = $defs{$name};
     my $dev_hash = $defs{$dev};
+    my $TYPE     = $hash->{TYPE};
     my $rname_e  = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
     my $rname_p  = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
 
-    Log3 $name, 5, "powerMap: Entering powerMap_energy() for $dev";
+    Log3 $name, 5, "$TYPE: Entering powerMap_energy() for $dev";
 
     my $E0 = ReadingsVal( $dev, $rname_e, 0 );
     my $P0 = ReadingsVal( $dev, $rname_p, 0 );
@@ -1035,7 +1036,7 @@ sub powerMap_energy($$;$) {
     my $E1 = $E0 + $DE;
 
     Log3( $dev, 4,
-            "powerMap $dev: energy calculation results:\n"
+            "$TYPE $dev: energy calculation results:\n"
           . "  energyOld : $E0 Wh\n"
           . "  powerOld  : $P0 W\n"
           . "  power     : $P1 W\n"
@@ -1062,7 +1063,7 @@ sub powerMap_update($;$) {
     return
       unless ( !IsDisabled($name) and defined($hash) and defined($dev_hash) );
 
-    Log3 $name, 5, "powerMap: Entering powerMap_update() for $dev";
+    Log3 $name, 5, "$TYPE: Entering powerMap_update() for $dev";
 
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
     my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
@@ -1088,7 +1089,7 @@ sub powerMap_update($;$) {
             $dev_hash->{pM_update} = FmtDateTime($next);
 
             Log3 $dev, 5,
-                "powerMap $dev: next update in "
+                "$TYPE $dev: next update in "
               . $dev_hash->{pM_interval}
               . " s at "
               . $dev_hash->{pM_update};
@@ -1096,7 +1097,7 @@ sub powerMap_update($;$) {
             InternalTimer( $next, "powerMap_update", "$name|$dev" );
         }
         else {
-            Log3 $dev, 5, "powerMap $dev: no power consumption, update paused";
+            Log3 $dev, 5, "$TYPE $dev: no power consumption, update paused";
         }
     }
 
