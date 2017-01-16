@@ -25,8 +25,12 @@
 ############################################################################
 #
 # Changelog:
+# 2017-01-16, v2.2
+# Feature: Quelle http://www.radiosaw.de/verkehrsmeldungen added
+#
 # 2016-12-26, v2.1
 # Bugfix:  update state with readings update
+# CHANGE:  remove requirement perl-module json
 # CHANGE:  update commandref with link to readingFn-Attributen
 #
 # Changelog:
@@ -139,7 +143,8 @@ sub Verkehrsinfo_Define($$) {
 	
 	# check if the url is ok
 	if ($hash->{url} !~ /verkehrsinfo\.de\/httpsmobil\/index\.php/ &&
-	$hash->{url} !~ /hessenschau\.de\/verkehr\/index\.html/){
+	$hash->{url} !~ /hessenschau\.de\/verkehr\/index\.html/ &&
+	$hash->{url} !~ /radiosaw/){
 		my $returnmsg = "Diese URL wird nicht unterstützt. Bitte schauen Sie in die Modulbeschreibung.";
 		Log3 $hash->{name}, 1, $returnmsg;
 		return $returnmsg;
@@ -157,6 +162,10 @@ sub Verkehrsinfo_Define($$) {
 	}
 	elsif ($hash->{url} =~ /hessenschau.de/i) {
 		readingsSingleUpdate( $hash, "zone", "Hessen", 1 );
+	}
+	elsif ($hash->{url} =~ /radiosaw/i) {
+		readingsSingleUpdate( $hash, "zone", "SAW", 1 );
+		$hash->{url} = 'http://www.radiosaw.de/verkehrsmeldungen';
 	}
 	
 	InternalTimer(gettimeofday()+4, "Verkehrsinfo_GetUpdate", $hash, 0);
@@ -244,7 +253,8 @@ sub Verkehrsinfo_Set($@) {
 
 	if ($opt eq "update"){
 		Verkehrsinfo_GetUpdate($hash);
-		return "Update is runing";
+		#return "Update is runing";
+		return undef;
 	}	
 }
 
@@ -281,6 +291,7 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 	
 	my $headline;
 	my @toc;
+	my @toc2;
 	my $message = '';
 	my $message_zone = '';
 	my $message_head = '';
@@ -382,6 +393,107 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 					else{
 						Log3 $hash, 3, "Verkehrsinfo: ($name) Verkehrsinfo_HttpNbUpdateData DataNodeElements not found";
 					}
+				}
+			}
+		}
+		
+		
+		##################
+		# radiosaw.de
+		##################
+		elsif ($hash->{url} =~ /radiosaw.de/i) {
+			
+			$message_zone = ' für SAW';
+			
+			# part one meldungen
+			$tree->parse_content($content);
+			@toc = $tree->findnodes('//div[contains(@id, "block-system-main")]/div/div[2]/div[2]/div/div/div');
+			# part two baustellen
+			@toc2 = $tree->findnodes('//div[contains(@id, "block-system-main")]/div/div[3]/div[1]/div/div[1]/div/div[2]/div/div/div/ul/li');
+			push (@toc, @toc2);
+			for my $el ( Verkehrsinfo_hf_orderby($orderby, @toc) ) {
+				if (grep(!/$filterexclude/i, $el->as_trimmed_text) && grep(/$filterinclude/i, $el->as_trimmed_text)){
+				
+					if ($el->as_trimmed_text =~ /^Aktuelle Baustelle/){
+
+						my $tmp = $el->as_HTML;
+						$tmp =~ s/<br \/>-+<br \/>/\|/g;
+						$tmp =~ s/<br \/>/###/g;
+						
+						my $subtree = HTML::TreeBuilder->new;
+						$subtree->parse_content($tmp);
+
+						my @tmp2 = split(/\|/, $subtree->as_trimmed_text);
+						shift @tmp2;
+						
+						for my $sel ( @tmp2 ){
+							
+							$dataarray->{"e_".$i."_road"} = ((split(/\s/, $sel))[0] =~ /^.[0-9]+/) ? (split(/\s/, $sel))[0] : '-';
+							$dataarray->{"e_".$i."_head"} = (split(/\###/, $sel))[0];
+							
+							$dataarray->{"e_".$i."_msg"}  = $sel;
+							$dataarray->{"e_".$i."_msg"}  =~ s/^.*?###//;
+							$dataarray->{"e_".$i."_msg"}  =~ s/###/ /g;
+							
+							$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
+							$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
+							$message .= $dataarray->{"e_".$i."_msg"};
+							$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
+							
+							$i++;
+						}
+						$i--;
+					}
+					elsif ($el->findnodes('../li')->[0]){
+						if (exists $el->findnodes('strong')->[0]){
+							$dataarray->{"e_".$i."_road"} = ((split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text .' -'))[1] =~ /^[0-9]+/) ? (split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text))[0] . ' ' . (split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text))[1] : '-';
+							$dataarray->{"e_".$i."_head"} = $el->findnodes('strong')->[0]->as_trimmed_text;
+							$dataarray->{"e_".$i."_msg"}  = $el->as_trimmed_text;
+							$dataarray->{"e_".$i."_msg"} =~ s/\(/_ko_/g;
+							$dataarray->{"e_".$i."_msg"} =~ s/\)/_kc_/g;
+							my $tmp = $el->findnodes('strong')->[0]->as_trimmed_text;
+							$tmp =~ s/\(/_ko_/g;
+							$tmp =~ s/\)/_kc_/g;
+							$dataarray->{"e_".$i."_msg"}  =~ s/$tmp//;
+						}
+						else{
+							$dataarray->{"e_".$i."_road"} = '-';
+							$dataarray->{"e_".$i."_head"} = '-';
+							$dataarray->{"e_".$i."_msg"}  = $el->as_trimmed_text;
+						}
+						$dataarray->{"e_".$i."_msg"} =~ s/_ko_/\(/g;
+						$dataarray->{"e_".$i."_msg"} =~ s/_kc_/\)/g;
+						
+						$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
+						$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
+						$message .= $dataarray->{"e_".$i."_msg"};
+						$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
+						
+						$i++;
+					}
+					else {						
+						my $tmp = $el->as_HTML;
+						$tmp =~ s/<br \/>/###/g;
+						
+						my $subtree = HTML::TreeBuilder->new;
+						$subtree->parse_content($tmp);
+
+						my $anz = scalar(split(/\###/, $subtree->as_trimmed_text));
+						$dataarray->{"e_".$i."_road"} = ((split(/\s/, $subtree->as_trimmed_text))[0] =~ /^.[0-9]+/) ? (split(/\s/, $subtree->as_trimmed_text))[0] : '-';
+						$dataarray->{"e_".$i."_head"} = ($anz == 2) ? (split(/\###/, $subtree->as_trimmed_text))[0] : '-';
+						$dataarray->{"e_".$i."_msg"}  = ($anz == 2) ? (split(/\###/, $subtree->as_trimmed_text))[1] : $subtree->as_trimmed_text;
+						
+						$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
+						$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
+						$message .= $dataarray->{"e_".$i."_msg"};
+						$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
+						
+						$i++;					
+					}
+
+					# else{
+						# Log3 $hash, 3, "Verkehrsinfo: ($name) Verkehrsinfo_HttpNbUpdateData DataNodeElements not found";
+					# }
 				}
 			}
 		}
@@ -510,6 +622,9 @@ sub Verkehrsinfo_hf_orderby ($@) {
     <br><br>
 		<li>Hessenschau.de</li>
 		Here is no configuration necessary, the URL http://hessenschau.de/verkehr/index.html will be used as a parameter.
+	<br><br>
+		<li>RadioSAW.de</li>
+		Here is no configuration necessary, the keyword radiosaw will be used as a parameter.
 	</ul>
     <br><br>
 	
@@ -586,7 +701,7 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Messages will be sorted by relevance by reference to the string.<br>
 				The sort supports regular expressions.<br>
 				Multiple searching keywords can be seperated with the pipe "|".<br><br></li>
-			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de)<br>
+			<li><i>msg_format [ road | head | both ]</i> (only Verkehrsinfo.de and RadioSAW.de)<br>
 				Using this parameter you can format the output, regarding streets, direction or both.<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
@@ -633,6 +748,9 @@ sub Verkehrsinfo_hf_orderby ($@) {
     <br><br>
 		<li>Hessenschau.de</li>
 		Hier ist keine Konfiguration notwendig, man verwendet die URL http://hessenschau.de/verkehr/index.html als Parameter.
+	<br><br>
+		<li>RadioSAW.de</li>
+		Hier ist keine Konfiguration notwendig, man verwendet als Parameter radiosaw.
 	</ul>
     <br><br>
 	
@@ -712,7 +830,7 @@ sub Verkehrsinfo_hf_orderby ($@) {
 				Anhand von Zeichefolgen wird eine Sortierung der Meldungen nach Relevanz vorgenommen.<br>
 				Die Sortierung unterstützt Regulärer Ausdrücke.<br>
 				Mehrer Suchbegriffe können mit einer Pipe "|" getrennt werden.<br><br></li>
-			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de)<br>
+			<li><i>msg_format [ road | head | both ]</i> (Nur Verkehrsinfo.de und RadioSAW.de)<br>
 				Über diesen Parameter kann die Meldung formatiert werden nach Strasse, Richtung oder beides<br><br></li>
 			<li><i><a href="#readingFnAttributes">readingFnAttributes</a></i><br><br></li>
         </ul>
