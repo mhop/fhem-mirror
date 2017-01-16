@@ -31,11 +31,11 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 # Default attributes for Homematic devices of type HMCCUCHN
 #
 %HMCCU_CHN_DEFAULTS = (
-	"HM-Sec-SCo|HM-Sec-SC|HMIP-SWDO" => {
+	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
 	_channels        => "1",
-	ccureadingfilter => "STATE",
-	hmstatevals      => "ERROR,SABOTAGE!1:sabotage",
+	ccureadingfilter => "(SABOTAGE|STATE)",
+	hmstatevals      => "ERROR!7:sabotage;SABOTAGE!1:sabotage",
 	statedatapoint   => "STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
 	},
@@ -239,10 +239,10 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 # Default attributes for Homematic devices of type HMCCUDEV
 #
 %HMCCU_DEV_DEFAULTS = (
-	"HM-Sec-SCo|HM-Sec-SC|HMIP-SWDO" => {
+	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
 	ccureadingfilter => "(SABOTAGE|STATE)",
-	hmstatevals      => "ERROR,SABOTAGE!1:sabotage",
+	hmstatevals      => "ERROR!7:sabotage;SABOTAGE!1:sabotage",
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
 	},
@@ -432,7 +432,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	webCmd           => "control:Boost:Auto:Manual:Holiday:on:off",
 	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
-	"HMIP-WTH|HMIP-WTH-2" => {
+	"HmIP-WTH|HmIP-WTH-2" => {
 	_description     => "Wandthermostat HM-IP",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
 	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
@@ -490,7 +490,13 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	ccureadingfilter => "STATE",
 	hmstatevals      => "ERROR_ALARM_TEST!1:alarm_test_failed;ERROR_SMOKE_CHAMBER!1:degraded_smoke_chamber",
 	statedatapoint   => "1.STATE",
-	substitute       => "ERROR_ALARM_TEST!0:no,1:failed;ERROR_SMOKE_CHAMBER!0:no,1:degraded"
+	substitute       => "STATE!(0|false):ok,(1|true):alarm;ERROR_ALARM_TEST!0:no,1:failed;ERROR_SMOKE_CHAMBER!0:no,1:degraded"
+	},
+	"HM-Sec-SD-2-Team" => {
+	_description     => "Rauchmeldergruppe",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "1.STATE",
+	substitute       => "STATE!(0|false):ok,(1|true):alarm"
 	},
 	"HM-Sec-SFA-SM" => {
 	_description     => "Alarmsirene",
@@ -508,6 +514,21 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statedatapoint   => "4.ARMSTATE",
 	statevals        => "disarmed:0,extsens-armed:1,allsens-armed:2,alarm-blocked:3",
 	substitute       => "ERROR_SABOTAGE!(0|false):no,(1|true):yes;ARMSTATE!0:disarmed,1:extsens_armed,2:allsens_armed,3:alarm_blocked"
+	},
+	"HM-LC-RGBW-WM" => {
+	_description     => "Funk-RGBW-Controller",
+	ccureadingfilter => "(COLOR|PROGRAM|LEVEL)",
+	ccureadingname   => "2.COLOR:+color,3.PROGRAM:+prog",
+	controldatapoint => "1.LEVEL",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	eventMap         => "/datapoint 3.PROGRAM :prog/datapoint 2.COLOR :color/",
+	statedatapoint   => "1.LEVEL",
+	statevals        => "on:100,off:0",
+	stripnumber      => 1,
+	substexcl        => "control",
+	substitute       => "LEVEL!#0-0:off,#1-100:on",
+	webCmd           => "control:color:prog:on:off",
+	widgetOverride   => "control:slider,0,1,100 prog:0,1,2,3,4,5,6 color:colorpicker,HUE,0,1,100"
 	},
 	"WS550|WS888|WS550Tech|WS550LCB|WS550LCW|HM-WDC7000" => {
 	_description     => "Wetterstation",
