@@ -1008,7 +1008,7 @@ FW_answerCall($)
       my $motd = AttrVal("global","motd","none");
       if($motd ne "none") {
         $motd =~ s/\n/<br>/g;
-        FW_addContent('>$motd</div');
+        FW_addContent(">$motd</div");
       }
     }
   }
