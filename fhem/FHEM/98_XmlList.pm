@@ -47,6 +47,8 @@ CommandXmlList($$)
   my $lt = "";
   my %filter;
 
+  $cl->{contenttype} = "application/xml; charset=utf-8" if($cl);
+
   my @arr = devspec2array($param ? $param : ".*", $cl); # for Authorize
   map { $filter{$_} = 1 } @arr;
 

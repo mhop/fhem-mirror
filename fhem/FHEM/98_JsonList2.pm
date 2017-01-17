@@ -70,6 +70,8 @@ CommandJsonList2($$)
   my $si = AttrVal("global", "showInternalValues", 0);
   my $attr;
 
+  $cl->{contenttype} = "application/json; charset=utf-8" if($cl);
+
   if($param) {
     my @arg = split(" ", $param);
     $attr = $arg[1];

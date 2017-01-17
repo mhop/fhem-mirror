@@ -820,7 +820,9 @@ FW_answerCall($)
   #If we are in XHR or json mode, execute the command directly
   if($FW_XHR || $FW_jsonp) {
     $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : undef;
-    $FW_RETTYPE = "text/plain; charset=$FW_encoding";
+    $FW_RETTYPE = $FW_chash->{contenttype} ?
+        $FW_chash->{contenttype} : "text/plain; charset=$FW_encoding";
+    delete($FW_chash->{contenttype});
 
     if($FW_jsonp) {
       $FW_cmdret =~ s/'/\\'/g;
