@@ -879,6 +879,7 @@ FW_longpoll()
   } else {
     FW_pollConn = new XMLHttpRequest();
     FW_pollConn.open("GET", location.pathname+query, true);
+    FW_pollConn.overrideMimeType("application/json");
     FW_pollConn.onreadystatechange = FW_doUpdate;
     FW_pollConn.send(null);
 

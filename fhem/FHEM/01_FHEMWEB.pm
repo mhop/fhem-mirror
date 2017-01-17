@@ -413,17 +413,18 @@ FW_Read($$)
   my @origin = grep /Origin/i, @FW_httpheader;
   $FW_headerlines = (AttrVal($FW_wname, "CORS", 0) ?
               (($#origin<0) ? "": "Access-Control-Allow-".$origin[0]."\r\n").
-              "Access-Control-Allow-Methods: GET OPTIONS\r\n".
+              "Access-Control-Allow-Methods: GET POST OPTIONS\r\n".
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
               "Access-Control-Allow-Credentials: true\r\n".
               "Access-Control-Max-Age:86400\r\n" : "");
 
-  #############################
-  # Handle OPTIONS Request. Just reeturn headers and don't process any further.
+  #########################
+  # Return 200 for OPTIONS or 405 for unsupported method
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
   if($method !~ m/^(GET|POST)$/i){
+    my $retCode = ($method eq "OPTIONS") ? 200 : 405;
     TcpServer_WriteBlocking($FW_chash,
-      "HTTP/1.1 200 OK\r\n" .
+      "HTTP/1.1 $retCode OK\r\n" .
       $FW_headerlines.
       "Content-Length: 0\r\n\r\n");
     delete $hash->{CONTENT_LENGTH};
@@ -1566,7 +1567,7 @@ FW_roomOverview($)
 
         if($l1 eq "Save config") {
           $l1 .= '</a> <a id="saveCheck" class="changed" style="visibility:'.
-                      (int(@structChangeHist) ? 'visible' : 'hidden').'">?</a>';
+                      (int(@structChangeHist) ? 'visible' : 'hidden').'">?';
         }
 
         # Force external browser if FHEMWEB is installed as an offline app.
