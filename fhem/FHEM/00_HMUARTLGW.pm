@@ -8,7 +8,6 @@
 #
 # TODO:
 # - Filter out "A112" from CUL_HM and synthesize response
-# - Hide crypto state from list so it can be binary
 
 package main;
 
@@ -181,7 +180,7 @@ sub HMUARTLGW_DoInit($)
 
 	$hash->{CNT} = 0x00;
 	delete($hash->{DEVCNT});
-	delete($hash->{crypto});
+	delete($hash->{'.crypto'});
 	delete($hash->{keepAlive});
 	delete($hash->{Helper});
 	delete($hash->{AssignedPeerCnt});
@@ -376,11 +375,11 @@ sub HMUARTLGW_LGW_Init($)
 				my($s,$us) = gettimeofday();
 				my $myiv = sprintf("%08x%06x%s", ($s & 0xffffffff), ($us & 0xffffff), scalar(reverse(substr($2, 14)))); #FIXME...
 				my $key = Digest::MD5::md5($lgwPw);
-				$hash->{crypto}{cipher} = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
-				$hash->{crypto}{encrypt}{keystream} = '';
-				$hash->{crypto}{encrypt}{ciphertext} = $2;
-				$hash->{crypto}{decrypt}{keystream} = '';
-				$hash->{crypto}{decrypt}{ciphertext} = $myiv;
+				$hash->{'.crypto'}{cipher} = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
+				$hash->{'.crypto'}{encrypt}{keystream} = '';
+				$hash->{'.crypto'}{encrypt}{ciphertext} = pack("H*", $2);
+				$hash->{'.crypto'}{decrypt}{keystream} = '';
+				$hash->{'.crypto'}{decrypt}{ciphertext} = pack("H*", $myiv);
 
 				$msg = "V%02x,${myiv}\r\n";
 			}
@@ -1320,7 +1319,7 @@ sub HMUARTLGW_Read($)
 	my $buf = DevIo_SimpleRead($hash);
 	return "" if (!defined($buf));
 
-	$buf = HMUARTLGW_decrypt($hash, $buf) if ($hash->{crypto});
+	$buf = HMUARTLGW_decrypt($hash, $buf) if ($hash->{'.crypto'});
 
 	Log3($hash, 5, "HMUARTLGW ${name} read raw (".length($buf)."): ".unpack("H*", $buf));
 
@@ -1570,7 +1569,7 @@ sub HMUARTLGW_StartInit($)
 
 	if ($hash->{LGW_Init}) {
 		if ($hash->{LGW_Init} >= 10) {
-			Log3($hash, 1, "HMUARTLGW ${name} LGW init did not complete after 10s".($hash->{crypto}?", probably wrong password":""));
+			Log3($hash, 1, "HMUARTLGW ${name} LGW init did not complete after 10s".($hash->{'.crypto'}?", probably wrong password":""));
 			HMUARTLGW_Reopen($hash);
 			return;
 		}
@@ -2092,7 +2091,7 @@ sub HMUARTLGW_send_frame($$)
 		$escaped .= chr(ord($byte) & 0x7f);
 	}
 
-	$escaped = HMUARTLGW_encrypt($hash, $escaped) if ($hash->{crypto});
+	$escaped = HMUARTLGW_encrypt($hash, $escaped) if ($hash->{'.crypto'});
 
 	my $sendtime = scalar(gettimeofday());
 	DevIo_SimpleWrite($hash, $escaped, 0);
@@ -2111,11 +2110,11 @@ sub HMUARTLGW_sendAscii($$)
 	$logmsg =~ s/\r\n$//;
 	Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
 	     "HMUARTLGW ${name} send (".length($logmsg)."): ". $logmsg);
-	$msg = HMUARTLGW_encrypt($hash, $msg) if ($hash->{crypto} && !($msg =~ m/^V/));
+	$msg = HMUARTLGW_encrypt($hash, $msg) if ($hash->{'.crypto'} && !($msg =~ m/^V/));
 
 	$hash->{CNT} = ($hash->{CNT} + 1) & 0xff;
 
-	DevIo_SimpleWrite($hash, $msg, ($hash->{crypto} && !($msg =~ m/^V/))? 0 : 2);
+	DevIo_SimpleWrite($hash, $msg, ($hash->{'.crypto'} && !($msg =~ m/^V/))? 0 : 2);
 }
 
 sub HMUARTLGW_crc16($;$)
@@ -2143,29 +2142,25 @@ sub HMUARTLGW_encrypt($$)
 	my ($hash, $plaintext) = @_;
 	my $ciphertext = '';
 
-	my $ks = pack("H*", $hash->{crypto}{encrypt}{keystream});
-	my $ct = pack("H*", $hash->{crypto}{encrypt}{ciphertext});
-
 	while(length($plaintext)) {
-		if(length($ks)) {
+		if(length($hash->{'.crypto'}{encrypt}{keystream})) {
 			my $len = length($plaintext);
 
-			$len = length($ks) if (length($ks) < $len);
+			$len = length($hash->{'.crypto'}{encrypt}{keystream})
+				if (length($hash->{'.crypto'}{encrypt}{keystream}) < $len);
 
 			my $ppart = substr($plaintext, 0, $len, '');
-			my $kpart = substr($ks, 0, $len, '');
+			my $kpart = substr($hash->{'.crypto'}{encrypt}{keystream}, 0, $len, '');
 
-			$ct .= $ppart ^ $kpart;
+			$hash->{'.crypto'}{encrypt}{ciphertext} .= $ppart ^ $kpart;
 
 			$ciphertext .= $ppart ^ $kpart;
 		} else {
-			$ks = $hash->{crypto}{cipher}->encrypt($ct);
-			$ct='';
+			$hash->{'.crypto'}{encrypt}{keystream} =
+				$hash->{'.crypto'}{cipher}->encrypt($hash->{'.crypto'}{encrypt}{ciphertext});
+			$hash->{'.crypto'}{encrypt}{ciphertext} = '';
 		}
 	}
-
-	$hash->{crypto}{encrypt}{keystream} = unpack("H*", $ks);
-	$hash->{crypto}{encrypt}{ciphertext} = unpack("H*", $ct);
 
 	$ciphertext;
 }
@@ -2175,29 +2170,25 @@ sub HMUARTLGW_decrypt($$)
 	my ($hash, $ciphertext) = @_;
 	my $plaintext = '';
 
-	my $ks = pack("H*", $hash->{crypto}{decrypt}{keystream});
-	my $ct = pack("H*", $hash->{crypto}{decrypt}{ciphertext});
-
 	while(length($ciphertext)) {
-		if(length($ks)) {
+		if(length($hash->{'.crypto'}{decrypt}{keystream})) {
 			my $len = length($ciphertext);
 
-			$len = length($ks) if (length($ks) < $len);
+			$len = length($hash->{'.crypto'}{decrypt}{keystream})
+				if (length($hash->{'.crypto'}{decrypt}{keystream}) < $len);
 
 			my $cpart = substr($ciphertext, 0, $len, '');
-			my $kpart = substr($ks, 0, $len, '');
+			my $kpart = substr($hash->{'.crypto'}{decrypt}{keystream}, 0, $len, '');
 
-			$ct .= $cpart;
+			$hash->{'.crypto'}{decrypt}{ciphertext} .= $cpart;
 
 			$plaintext .= $cpart ^ $kpart;
 		} else {
-			$ks = $hash->{crypto}{cipher}->encrypt($ct);
-			$ct='';
+			$hash->{'.crypto'}{decrypt}{keystream} =
+				$hash->{'.crypto'}{cipher}->encrypt($hash->{'.crypto'}{decrypt}{ciphertext});
+			$hash->{'.crypto'}{decrypt}{ciphertext} = '';
 		}
 	}
-
-	$hash->{crypto}{decrypt}{keystream} = unpack("H*", $ks);
-	$hash->{crypto}{decrypt}{ciphertext} = unpack("H*", $ct);
 
 	$plaintext;
 }
