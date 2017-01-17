@@ -418,6 +418,18 @@ FW_Read($$)
               "Access-Control-Allow-Credentials: true\r\n".
               "Access-Control-Max-Age:86400\r\n" : "");
 
+  #############################
+  # Handle OPTIONS Request. Just reeturn headers and don't process any further.
+  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
+  if($method !~ m/^(GET|POST)$/i){
+    TcpServer_WriteBlocking($FW_chash,
+      "HTTP/1.1 200 OK\r\n" .
+      $FW_headerlines.
+      "Content-Length: 0\r\n\r\n");
+    delete $hash->{CONTENT_LENGTH};
+    FW_Read($hash, 1) if($hash->{BUF});
+    return;
+  }
 
   #############################
   # AUTH
@@ -450,7 +462,6 @@ FW_Read($$)
   #############################
 
   my $now = time();
-  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
   $arg .= "&".$POSTdata if($POSTdata);
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
