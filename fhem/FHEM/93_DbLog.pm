@@ -13,6 +13,8 @@
 ############################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.9.2      16.01.2017       new bugfix for SQLite issue SVGs, DbLog_Log changed to $dev_hash->{CHANGETIME}, DbLog_Push 
+#                             changed (db handle new separated)
 # 2.9.1      14.01.2017       changed DbLog_ParseEvent to CallInstanceFn, renamed flushCache to purgeCache,
 #                             renamed syncCache to commitCache, attr cacheEvents changed to 0,1,2
 # 2.9        11.01.2017       changed DbLog_ParseEvent to CallFn
@@ -60,7 +62,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.9.1";
+my $DbLogVersion = "2.9.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -154,7 +156,10 @@ sub DbLog_Define($@)
 
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
   eval { DbLog_Connect($hash); };
-  eval { DbLog_ConnectPush($hash); };
+  if($hash->{DBMODEL} eq "MYSQL") {
+      # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
+      eval { DbLog_ConnectPush($hash); };
+  }
 
   DbLog_execmemcache($hash);
   
@@ -415,7 +420,7 @@ sub DbLog_ParseEvent($$$)
   my $value;
   my $unit;
 
-  # Splitfunktion der Eventquelle aufrufen
+  # Splitfunktion der Eventquelle aufrufen (ab 2.9.1)
   ($reading, $value, $unit) = CallInstanceFn($device, "DbLog_splitFn", $event, $device);
   # undef bedeutet, Modul stellt keine DbLog_splitFn bereit
   if($reading) {
@@ -735,7 +740,7 @@ sub DbLog_Log($$) {
   my $max                = int(@{$events});
   my @row_array;
   my ($event,$reading,$value,$unit);
-  my $timestamp          = TimeNow();                                    # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+  my $ts_0               = TimeNow();                                    # timestamp in SQL format YYYY-MM-DD hh:mm:ss
   my $now                = gettimeofday();                               # get timestamp in seconds since epoch
   my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
   my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
@@ -750,12 +755,15 @@ sub DbLog_Log($$) {
   
   #one Transaction
   eval {  
-      foreach $event (@{$events}) {
+      for (my $i = 0; $i < $max; $i++) {
+	      my $event = $dev_hash->{CHANGED}[$i];
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show);
           $event = "" if(!defined($event));  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
-			  
+			  my $timestamp = $ts_0;
+              $timestamp = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
+              
               my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
 			  $reading = $r[0];
               $value   = $r[1];
@@ -882,28 +890,44 @@ return;
 #################################################################################################
 sub DbLog_Push(@) {
   my ($hash, $vb4show, @row_array) = @_;
-  my $dbhp       = $hash->{DBHP};
   my $name       = $hash->{NAME};
   my $DbLogType  = AttrVal($name, "DbLogType", "History");
   my $error = 0;
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
-    
-  eval {
-    if ( !$dbhp || not $dbhp->ping ) {
-      #### DB Session dead, try to reopen now !
-      DbLog_ConnectPush($hash);
-    }  
-  };
+  my $dbh;
   
-  if ($@) {
-      Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	  return $@;
-  } else {
-      $dbhp = $hash->{DBHP};
+  # Unterscheidung der db-handle zur Vermeidung "MySQL-Server has gone"
+  if($hash->{DBMODEL} ne "MYSQL") {
+      $dbh = $hash->{DBH};
+      eval {
+        if ( !$dbh || not $dbh->ping ) {
+            #### DB Session dead, try to reopen now !
+            DbLog_Connect($hash);
+        }  
+     };
+	 if ($@) {
+	     Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	     return $@;
+     }
+  } 
+  if($hash->{DBMODEL} eq "MYSQL") {
+      $dbh = $hash->{DBHP};
+      eval {
+        if ( !$dbh || not $dbh->ping ) {
+            #### DB Session dead, try to reopen now !
+            DbLog_ConnectPush($hash);
+        }  
+      };
+      if ($@) {
+          Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	      return $@;
+      } else {
+          $dbh = $hash->{DBHP};
+      } 
   }
-
-  $dbhp->{RaiseError} = 1; 
-  $dbhp->{PrintError} = 0;
+  
+  $dbh->{RaiseError} = 1; 
+  $dbh->{PrintError} = 0;
   
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
   my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
@@ -928,7 +952,7 @@ sub DbLog_Push(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # for insert history
-	  $sth_ih = $dbhp->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
       $sth_ih->bind_param_array(1, [@timestamp]);
       $sth_ih->bind_param_array(2, [@device]);
       $sth_ih->bind_param_array(3, [@type]);
@@ -940,10 +964,10 @@ sub DbLog_Push(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # for insert current
-	  $sth_ic = $dbhp->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	  
 	  # for update current
-	  $sth_uc = $dbhp->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
 	  $sth_uc->bind_param_array(1, [@timestamp]);
       $sth_uc->bind_param_array(2, [@type]);
       $sth_uc->bind_param_array(3, [@event]);
@@ -953,7 +977,7 @@ sub DbLog_Push(@) {
       $sth_uc->bind_param_array(7, [@reading]);
   }
   
-  eval {$dbhp->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
+  eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
   my ($tuples, $rows);
   eval {
       # insert into history
@@ -967,7 +991,7 @@ sub DbLog_Push(@) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]";
+				  Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into history: $device[$tuple], $event[$tuple]" if($vb4show);
 			  }
 		  }
       }
@@ -1026,13 +1050,15 @@ sub DbLog_Push(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbhp->rollback() if(!$dbhp->{AutoCommit});
+    $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
+    $dbh->disconnect();  
+    DbLog_Connect($hash);
   }
   else {
-    $dbhp->commit() if(!$dbhp->{AutoCommit});
-    $dbhp->{RaiseError} = 0; 
-    $dbhp->{PrintError} = 1;
+    $dbh->commit() if(!$dbh->{AutoCommit});
+    $dbh->{RaiseError} = 0; 
+    $dbh->{PrintError} = 1;
   }
 
 return $error;
@@ -1499,16 +1525,15 @@ sub DbLog_Connect($)
 
   $hash->{DBH}= $dbh;
   
-# nach sub DbLog_ConnectPush verschoben
-#  if ($hash->{DBMODEL} eq "SQLITE") {
-#    $dbh->do("PRAGMA temp_store=MEMORY");
-#    $dbh->do("PRAGMA synchronous=NORMAL");
-#    $dbh->do("PRAGMA journal_mode=WAL");
-#    $dbh->do("PRAGMA cache_size=4000");
-#    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-#    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-#    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
-#  }
+  if ($hash->{DBMODEL} eq "SQLITE") {
+    $dbh->do("PRAGMA temp_store=MEMORY");
+    $dbh->do("PRAGMA synchronous=NORMAL");
+    $dbh->do("PRAGMA journal_mode=WAL");
+    $dbh->do("PRAGMA cache_size=4000");
+    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+  }
 
   # no webfrontend connection for plotfork
   return 1 if( $hash->{PID} != $$ );
@@ -1559,16 +1584,6 @@ sub DbLog_ConnectPush($) {
   readingsSingleUpdate($hash, 'state', 'connected', 1);
 
   $hash->{DBHP}= $dbhp;
-  
-  if ($hash->{DBMODEL} eq "SQLITE") {
-    $dbhp->do("PRAGMA temp_store=MEMORY");
-    $dbhp->do("PRAGMA synchronous=NORMAL");
-    $dbhp->do("PRAGMA journal_mode=WAL");
-    $dbhp->do("PRAGMA cache_size=4000");
-    $dbhp->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbhp->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbhp->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
-  }
  
   return 1;
 }

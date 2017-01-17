@@ -1,5 +1,14 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog: its now version 2.9.2 (thanks to DS_Starter)
+               new bugfix for SQLite issue SVGs, DbLog_Log changed to 
+                 $dev_hash->{CHANGETIME}, DbLog_Push
+               changed (db handle new separated)
+               changed DbLog_ParseEvent to CallInstanceFn, 
+               renamed flushCache to purgeCache,
+               renamed syncCache to commitCache, 
+               attr cacheEvents changed to 0,1,2
+               changed DbLog_ParseEvent to CallFn
   - change:  73_PRESENCE: new collectord package to support RSSI selection
   - feature: 73_NUKIBridge,74_NUKIDevice: add NUKIDevice Readings rssi paired
   - feature: 73_PRESENCE: 
