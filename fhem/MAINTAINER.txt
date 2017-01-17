@@ -352,6 +352,7 @@ FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_DLNARenderer.pm      dominikkarall        http://forum.fhem.de Multimedia
 FHEM/98_DOIF.pm              damian-s             http://forum.fhem.de Automatisierung/DOIF
+FHEM/98_DOIFtools.pm         Ellert               http://forum.fhem.de Automatisierung/DOIF
 FHEM/98_EDIPLUG.pm           Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
