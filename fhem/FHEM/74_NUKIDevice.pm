@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2016 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2016-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -33,7 +33,25 @@ use warnings;
 use JSON;
 
 
-my $version = "0.4.5";
+my $version = "0.4.7";
+
+
+
+
+# Declare functions
+sub NUKIDevice_Initialize($);
+sub NUKIDevice_Define($$);
+sub NUKIDevice_Undef($$);
+sub NUKIDevice_Attr(@);
+sub NUKIDevice_addExtension($$$);
+sub NUKIDevice_removeExtension($);
+sub NUKIDevice_Set($$@);
+sub NUKIDevice_GetUpdate($);
+sub NUKIDevice_ReadFromNUKIBridge($@);
+sub NUKIDevice_Parse($$);
+sub NUKIDevice_WriteReadings($$);
+sub NUKIDevice_CGI();
+
 
 
 
@@ -96,10 +114,10 @@ sub NUKIDevice_Define($$) {
     
     if(defined($hash->{IODev}->{NAME})) {
     
-        Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+        Log3 $name, 3, "NUKIDevice ($name) - I/O device is " . $hash->{IODev}->{NAME};
     } else {
     
-        Log3 $name, 1, "$name: no I/O device";
+        Log3 $name, 1, "NUKIDevice ($name) - no I/O device";
     }
     
     $iodev = $hash->{IODev}->{NAME};
@@ -338,7 +356,7 @@ sub NUKIDevice_ReadFromNUKIBridge($@) {
         !$iohash->{TYPE} ||
         !$modules{$iohash->{TYPE}} ||
         !$modules{$iohash->{TYPE}}{ReadFn}) {
-        Log3 $name, 3, "No I/O device or ReadFn found for $name";
+        Log3 $name, 3, "NUKIDevice ($name) - No I/O device or ReadFn found for $name";
         return;
     }
 
@@ -379,6 +397,12 @@ sub NUKIDevice_Parse($$) {
         if( $result eq 404 ) {
             readingsSingleUpdate( $hash, "state", "nukiId is not known", 1 );
             Log3 $name, 3, "NUKIDevice ($name) - nukiId is not known";
+            return;
+        }
+        
+        if( $result eq 503 ) {
+            readingsSingleUpdate( $hash, "state", "smartlock is offline", 1 );
+            Log3 $name, 3, "NUKIDevice ($name) - smartlock is offline";
             return;
         }
     }
@@ -455,6 +479,10 @@ sub NUKIDevice_WriteReadings($$) {
         readingsBulkUpdate( $hash, "state", $decode_json->{stateName} );
         readingsBulkUpdate( $hash, "battery", $battery );
         readingsBulkUpdate( $hash, "success", $decode_json->{success} );
+        
+        readingsBulkUpdate( $hash, "name", $decode_json->{name} );
+        readingsBulkUpdate( $hash, "rssi", $decode_json->{rssi} );
+        readingsBulkUpdate( $hash, "paired", $decode_json->{paired} );
     
         Log3 $name, 5, "NUKIDevice ($name) - readings set for $name";
     }

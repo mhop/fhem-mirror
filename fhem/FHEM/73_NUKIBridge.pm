@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2016 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2016-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -46,7 +46,7 @@ use JSON;
 
 use HttpUtils;
 
-my $version = "0.4.5";
+my $version = "0.4.7";
 
 
 
@@ -57,6 +57,29 @@ my %lockActions = (
     'locknGo'               => 4,
     'locknGoWithUnlatch'    => 5
 );
+
+
+# Declare functions
+sub NUKIBridge_Initialize ($);
+sub NUKIBridge_Define ($$);
+sub NUKIBridge_Undef ($$);
+sub NUKIBridge_Read($@);
+sub NUKIBridge_Attr(@);
+sub NUKIBridge_Set($@);
+sub NUKIBridge_Get($@);
+sub NUKIBridge_GetCheckBridgeAlive($);
+sub NUKIBridge_firstRun($);
+sub NUKIBridge_Call($$$$$);
+sub NUKIBridge_Distribution($$$);
+sub NUKIBridge_ResponseProcessing($$$);
+sub NUKIBridge_Autocreate($$;$);
+sub NUKIBridge_InfoProcessing($$);
+sub NUKIBridge_getLogfile($);
+sub NUKIBridge_getCallbackList($);
+sub NUKIBridge_CallBlocking($$$);
+
+
+
 
 
 sub NUKIBridge_Initialize($) {
@@ -164,7 +187,6 @@ sub NUKIBridge_Attr(@) {
 
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            InternalTimer( gettimeofday()+5, 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
             Log3 $name, 3, "NUKIBridge ($name) - enabled";
         }
     }
@@ -177,7 +199,6 @@ sub NUKIBridge_Attr(@) {
 
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
-            InternalTimer( gettimeofday()+5, 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
             Log3 $name, 3, "NUKIBridge ($name) - delete disabledForIntervals";
         }
     }
@@ -278,9 +299,12 @@ sub NUKIBridge_GetCheckBridgeAlive($) {
 
         NUKIBridge_Call($hash,$hash,'info',undef,undef);
     
-        InternalTimer( gettimeofday()+15+int(rand(15)), 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
-        Log3 $name, 4, "NUKIBridge ($name) - Call InternalTimer for NUKIBridge_GetCheckBridgeAlive";
+        Log3 $name, 4, "NUKIBridge ($name) - run NUKIBridge_Call";
     }
+    
+    InternalTimer( gettimeofday()+15+int(rand(15)), 'NUKIBridge_GetCheckBridgeAlive', $hash, 1 );
+    
+    Log3 $name, 4, "NUKIBridge ($name) - Call InternalTimer for NUKIBridge_GetCheckBridgeAlive";
 }
 
 sub NUKIBridge_firstRun($) {
@@ -361,6 +385,13 @@ sub NUKIBridge_Distribution($$$) {
     }
 
     if( $json eq "" and exists( $param->{code} ) and $param->{code} ne 200 ) {
+    
+        if( $param->{code} eq 503 ) {
+            NUKIDevice_Parse($param->{chash},$param->{code}) if( $hash != $param->{chash} );
+            Log3 $name, 4, "NUKIBridge ($name) - smartlock is offline";
+            readingsEndUpdate( $hash, 1 );
+            return "received http code ".$param->{code}.": smartlock is offline";
+        }
         
         readingsBulkUpdate( $hash, "lastError", "Internal error, " .$param->{code} );
         Log3 $name, 4, "NUKIBridge ($name) - received http code " .$param->{code}." without any data after requesting";
@@ -377,7 +408,8 @@ sub NUKIBridge_Distribution($$$) {
         
         ###### Fehler bei Antwort auf Anfrage eines logischen Devices ######
         NUKIDevice_Parse($param->{chash},$param->{code}) if( $param->{code} eq 404 );
-        NUKIDevice_Parse($param->{chash},$param->{code}) if( $param->{code} eq 400 and $hash != $param->{chash} );       
+        NUKIDevice_Parse($param->{chash},$param->{code}) if( $param->{code} eq 400 and $hash != $param->{chash} );
+        
         
         
         Log3 $name, 4, "NUKIBridge ($name) - invalid API token" if( $param->{code} eq 401 );
@@ -403,8 +435,11 @@ sub NUKIBridge_Distribution($$$) {
     }
     
     if( $hash == $param->{chash} ) {
-    
-        #$json = '[{"nukiId": 1,"name": "Home","lastKnownState": {"state": 1,"stateName": "locked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}},{"nukiId": 2,"name": "Grandma","lastKnownState": {"state": 3,"stateName": "unlocked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}}]' if( $param->{endpoint} eq "list" ); # zum testen da ich kein Nuki Smartlock habe
+        
+        # zum testen da ich kein Nuki Smartlock habe
+        #$json = '[{"nukiId": 1,"name": "Home","lastKnownState": {"state": 1,"stateName": "locked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}},{"nukiId": 2,"name": "Grandma","lastKnownState": {"state": 3,"stateName": "unlocked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}}]' if( $param->{endpoint} eq "list" );
+        
+        #$json= '{"bridgeType":2,"ids":{"serverId":142667440},"versions":{"appVersion":"0.2.14"},"uptime":1527,"currentTime":"2017-01-17T04:55:58Z","serverConnected":true,"scanResults":[{"nukiId": 1,"name": "Home","rssi": -87,"paired": true},{"nukiId": 2,"name": "Grandma","rssi": -93,"paired": false}]}';
         
         NUKIBridge_ResponseProcessing($hash,$json,$param->{endpoint});
         
@@ -531,6 +566,12 @@ sub NUKIBridge_InfoProcessing($$) {
     my ($hash,$decode_json)     = @_;
     my $name                    = $hash->{NAME};
     
+    my $nukiId;
+    my $scanResults;
+    my %response_hash;
+    my $dname;
+    my $dhash;
+    
     my %bridgeType = (
         '1' =>  'Hardware',
         '2' =>  'Software'
@@ -548,6 +589,27 @@ sub NUKIBridge_InfoProcessing($$) {
     readingsBulkUpdate($hash,"currentTime",$decode_json->{currentTime});
     readingsBulkUpdate($hash,"serverConnected",$decode_json->{serverConnected});
     readingsEndUpdate($hash,1);
+    
+    
+    foreach $scanResults (@{$decode_json->{scanResults}}) {
+        if( ref($scanResults) eq "HASH" ) {
+            if ( defined( $modules{NUKIDevice}{defptr} ) ) {
+                while ( my ( $key, $value ) = each %{ $modules{NUKIDevice}{defptr} } ) {
+
+                    $dhash = $modules{NUKIDevice}{defptr}{$key};
+                    $dname = $dhash->{NAME};
+                    $nukiId = InternalVal( $dname, "NUKIID", undef );
+                    next if ( !$nukiId or $nukiId ne $scanResults->{nukiId} );
+
+                    Log3 $name, 4, "NUKIDevice ($dname) - Received scanResults for matching NukiID $nukiId at device $dname";
+            
+                    %response_hash = ('name'=>$scanResults->{name}, 'rssi'=>$scanResults->{rssi},'paired'=>$scanResults->{paired});
+            
+                    NUKIDevice_Parse($dhash,encode_json \%response_hash);
+                }
+            }
+        }
+    }
 }
 
 sub NUKIBridge_getLogfile($) {
@@ -684,6 +746,9 @@ sub NUKIBridge_CallBlocking($$$) {
     Log3 $name, 4, "NUKIBridge ($name) - Blocking HTTP Query finished";
     return ($decode_json);
 }
+
+
+
 
 
 
