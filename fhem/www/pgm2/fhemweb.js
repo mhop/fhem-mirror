@@ -741,6 +741,12 @@ FW_doUpdate(evt)
     log("Rcvd: "+(l.length>132 ? l.substring(0,132)+"...("+l.length+")":l));
     if(!l.length)
       continue;
+    if(l.indexOf("<")== 0) {  // HTML returned by proxy, if FHEM behind is dead
+      FW_closeConn();
+      FW_errmsg(errstr, retryTime-100);
+      setTimeout(FW_longpoll, retryTime);
+      return;
+    }
     var d = JSON.parse(l);
     if(d.length != 3)
       continue;
@@ -789,19 +795,25 @@ FW_doUpdate(evt)
 }
 
 function
+FW_closeConn()
+{
+  FW_leaving = 1;
+  if(!FW_pollConn)
+    return;
+  if(typeof FW_pollConn.close ==  "function")
+    FW_pollConn.close();
+  else if(typeof FW_pollConn.abort ==  "function")
+    FW_pollConn.abort();
+  FW_pollConn = undefined;
+}
+
+function
 FW_longpoll()
 {
-  FW_longpollOffset = 0;
-  if(FW_pollConn) {
-    FW_leaving = 1;
-    if(FW_longpollType == "websocket")
-      FW_pollConn.close();
-    else
-      FW_pollConn.abort();
-    FW_pollConn = undefined;
-  }
+  FW_closeConn();
 
   FW_leaving = 0;
+  FW_longpollOffset = 0;
 
   // Build the notify filter for the backend
   var filter = $("body").attr("longpollfilter");
