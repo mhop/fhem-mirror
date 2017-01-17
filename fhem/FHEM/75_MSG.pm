@@ -1608,43 +1608,37 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                 $routeStatus = "UNDEFINED";
                             }
                             elsif ( $type[$i] ne "mail"
-                                && AttrVal( $gatewayDev, "disable", "0" ) eq
-                                "1" )
+                                && IsDisabled($gatewayDev) )
                             {
                                 $routeStatus = "DISABLED";
                             }
                             elsif (
                                 $type[$i] ne "mail"
                                 && (
-                                    ReadingsVal( $gatewayDev, "power", "on" )
-                                    eq "off"
-                                    || ReadingsVal( $gatewayDev, "presence",
-                                        "present" ) eq "absent"
-                                    || ReadingsVal( $gatewayDev, "presence",
-                                        "appeared" ) eq "disappeared"
+                                    ReadingsVal( $gatewayDev, "presence",
+                                        "present" ) =~
+m/^(0|absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     || ReadingsVal( $gatewayDev, "state",
-                                        "present" ) eq "absent"
-                                    || ReadingsVal( $gatewayDev, "state",
-                                        "connected" ) eq "unauthorized"
-                                    || ReadingsVal( $gatewayDev, "state",
-                                        "connected" ) eq "disconnected"
-                                    || ReadingsVal( $gatewayDev, "state",
-                                        "reachable" ) eq "unreachable"
-                                    || ReadingsVal(
-                                        $gatewayDev, "available", "1"
-                                    ) eq "0"
+                                        "present" ) =~
+m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
+                                    || (   $defs{$gatewayDev}{STATE}
+                                        && $defs{$gatewayDev}{STATE} =~
+m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
+                                    )
                                     || ReadingsVal( $gatewayDev, "available",
-                                        "yes" ) eq "no"
-                                    || ReadingsVal(
-                                        $gatewayDev, "reachable", "1"
-                                    ) eq "0"
+                                        "yes" ) =~ m/^(0|no)$/i
                                     || ReadingsVal( $gatewayDev, "reachable",
-                                        "yes" ) eq "no"
-
+                                        "yes" ) =~ m/^(0|no)$/i
                                 )
                               )
                             {
                                 $routeStatus = "UNAVAILABLE";
+                            }
+                            elsif ( $type[$i] eq "screen"
+                                && ReadingsVal( $gatewayDev, "power", "on" ) =~
+                                m/^(0|off)$/i )
+                            {
+                                $routeStatus = "OFF";
                             }
                             elsif ($type[$i] eq "audio"
                                 && $annState ne "long"
