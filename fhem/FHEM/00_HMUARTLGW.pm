@@ -2386,7 +2386,13 @@ sub HMUARTLGW_getVerbLvl($$$$) {
   </ul>
   <br>
   <a name="HMUARTLGW_get"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <p><b>Get</b></p>
+  <ul>
+    <li>assignIDs<br>
+        Returns the HomeMatic devices currently assigned to this IO-device.
+        </li>
+  </ul>
+  <br>
   <a name="HMUARTLGW_attr"></a>
   <b>Attributes</b>
   <ul>
@@ -2438,4 +2444,149 @@ sub HMUARTLGW_getVerbLvl($$$$) {
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="HMUARTLGW"></a>
+<h3>HMUARTLGW</h3>
+<ul>
+  Das Modul HMUARTLGW erm&ouml;glicht die Anbindung des eQ-3 HomeMatic Wireless
+  LAN Gateways (HM-LGW-O-TW-W-EU) und des eQ-3 HomeMatic UART Moduls
+  (HM-MOD-UART), welches Teil des HomeMatic-Moduls f&uuml;r den Raspberry Pi
+  (HM-MOD-RPI-PCB) ist.<br>
+
+  <br><br>
+
+  <a name="HMUARTLGHW_define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HMUARTLGW &lt;device&gt;</code><br><br>
+    Der Parameter &lt;device&gt; h&auml;ngt vom eingesetzten Ger&auml;tetyp ab:
+    <ul>
+      <li>HM-MOD-UART: &lt;device&gt; ist die zu benutzende serielle
+          Schnittstelle. Die Baudrate ist fest auf 115200 eingestellt und muss
+          nicht angegeben werden.<br>
+          Falls der HM-MOD-UART &uuml;ber einen Seriell-zu-Ethernet-Konverter
+          mit dem Netzwerk verbunden ist, muss die Definition in einem
+          an URLs angelehnten Format geschehen
+          (<code>uart://ip:port</code>).</li>
+      <li>HM-LGW-O-TW-W-EU: &lt;device&gt; gibt die IP-Adresse oder den
+          Hostnamen des Gateways an, optional gefolgt von einem Doppelpunkt
+          und der Portnummer des BidCos-Ports (Default falls nicht angegeben:
+          2000).</li>
+    </ul>
+    <br><br>
+    Beispiele:<br>
+    <ul>
+      <li>Lokaler HM-MOD-UART an der Schnittstelle <code>/dev/ttyAMA0</code>:<br>
+          <code>define myHmUART HMUARTLGW /dev/ttyAMA0</code><br>&nbsp;</li>
+      <li>LAN Gateway mit der IP-Adresse <code>192.168.42.23</code>:<br>
+          <code>define myHmLGW HMUARTLGW 192.168.42.23</code><br>&nbsp;</li>
+      <li>Entfernter HM-MOD-UART unter Verwendung von <code>socat</code> auf einem Raspberry Pi:<br>
+          <code>define myRemoteHmUART HMUARTLGW uart://192.168.42.23:12345</code><br><br>
+          Entfernter Raspberry Pi:<br><code>$ socat TCP4-LISTEN:12345,fork,reuseaddr /dev/ttyAMA0,raw,echo=0,b115200</code></li>
+    </ul>
+  </ul>
+  <br>
+  <a name="HMUARTLGW_set"></a>
+  <p><b>Set</b></p>
+  <ul>
+    <li>close<br>
+        Schlie&szlig;t die Verbindung zum Ger&auml;t.
+        </li>
+    <li><a href="#hmPairForSec">hmPairForSec</a></li>
+    <li><a href="#hmPairSerial">hmPairSerial</a></li>
+    <li>open<br>
+        &Ouml;ffnet die Verbindung zum Ger&auml;t und initialisiert es.
+        </li>
+    <li>reopen<br>
+        Schli&szlig;t und &ouml;ffnet die Verbindung zum Ger&auml;t und re-initialisiert es.
+        </li>
+    <li>restart<br>
+        Rebootet das Ger&auml;t.
+        </li>
+    <li>updateCoPro &lt;/path/to/firmware.eq3&gt;<br>
+        Aktualisierung der Koprozessor-Firmware (Reading D-firmware) mit der
+        angegebenen Datei. Quelle f&uuml;r Firmware-Images (Version 1.4.1,
+        offizielles eQ-3 Repository):<br>
+        <ul>
+            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a></li>
+            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a><br>
+            Bitte zus&auml;tzlich sicherstellen, dass die Version der
+            D-LANfirmware mindestens 1.1.5 betr&auml;gt. Um auf diese Version
+            zu aktualisieren k&ouml;nnen die eQ-3 CLI Tools (siehe Wiki) oder
+            der eQ-3 Netfinder genutzt werden. Das passende Image ist:
+            <a href="https://github.com/eq-3/occu/raw/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/hm-lgw-o-tw-w-eu_update.eq3">hm-lgw-o-tw-w-eu_update.eq3</a><br>
+            <b>Die Datei hm-lgw-o-tw-w-eu_update.eq3 nicht mit updateCoPro flashen!</b></li>
+        </ul>
+        </li>
+  </ul>
+  <br>
+  <a name="HMUARTLGW_get"></a>
+  <p><b>Get</b></p>
+  <ul>
+    <li>assignIDs<br>
+        Gibt die aktuell diesem IO-Ger&auml;t zugeordneten HomeMatic-Ger&auml;te
+        zur&uuml;ck.
+        </li>
+  </ul>
+  <br>
+  <a name="HMUARTLGW_attr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>csmaCa<br>
+        Aktiviert oder deaktiviert CSMA/CA (Carrier sense multiple access with
+        collision avoidance), auch bekannt als Listen-Before-Talk.<br>
+        Default: 0 (deaktiviert)
+        </li>
+    <li>dummy<br>
+        Erm&ouml;glicht die Definition des Ger&auml;ts ohne jegliche Interaktion
+        mit einem physikalischen Ger&auml;t.<br>
+        Default: nicht gesetzt
+        </li>
+    <li>dutyCycle<br>
+        Aktiviert oder deaktiviert die &Uuml;berpr&uuml;fung des Arbeitszyklus
+        (1%-Regel) durch das Sendemodul.<br>
+        Die Abschaltung dieser Funktion kann in verschiedenen L&auml;ndern gegen
+        das Gesetz verstossen, weshalb zuerst die Situation anhand lokaler
+        Richtlinien zu pr&uuml;fen ist!<br>
+        Default: 1 (aktiviert)
+        </li>
+    <li><a href="#hmId">hmId</a></li>
+    <li><a name="HMLANhmKey">hmKey</a></li>
+    <li><a name="HMLANhmKey2">hmKey2</a></li>
+    <li><a name="HMLANhmKey3">hmKey3</a></li>
+    <li>lgwPw<br>
+        AES-Passwort f&uuml;r das eQ-3 HomeMatic Wireless LAN Gateway. Das initiale
+        Passwort befindet sich auf der R&uuml;ckseite des Ger&auml;ts, kann aber
+        durch den Benutzer ge&auml;ndert werden. Falls die AES gesicherte
+        Kommunikation aktiviert ist (Auslieferungszustand), muss dieses Attribut
+        auf den richtigen Wert gesetzt werden, da ansonsten keine Kommunikation
+        m&ouml;glich ist. Zus&auml;tzlich muss das Perl-Modul Crypt::Rijndael
+        (stellt den AES-Algorithmus bereit) installiert sein.
+        </li>
+    <li>logIDs<br>
+        Aktiviert die gezielte Erzeugung von Log-Nachrichten. Der Parameter ist
+        eine durch Komma getrennte Liste an HMIds oder HM Ger&auml;te-/Kanalnamen,
+        deren Nachrichten aufgezeichnet werden sollen.<br>
+        <ul>
+            <li><i>all</i>: Zeichnet die Rohnachrichten aller HMIds auf</li>
+            <li><i>sys</i>: Zeichnet Systemnachrichten (z.B. Keep-Alive) auf</li>
+        </ul>
+        Um alle m&ouml;glichen Nachrichten aufzuzeichnen, kann <i>all,sys</i>
+        genutzt werden.
+        </li>
+    <li>qLen<br>
+        Maximale Anzahl an Kommandos in der internen Warteschlange des
+        HMUARTLGW-Moduls. Neue Kommandos werden verworfen, wenn die Warteschlange
+        gef&uuml;llt ist.<br>
+        Default: 20
+        </li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
