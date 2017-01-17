@@ -4187,6 +4187,7 @@ readingsBulkUpdate($$$@)
   if(!defined($hash->{".updateTimestamp"})) {
     Log 1, "readingsUpdate($name,$reading,$value) missed to call ".
                 "readingsBeginUpdate first.";
+    stacktrace();
     return;
   }
 
