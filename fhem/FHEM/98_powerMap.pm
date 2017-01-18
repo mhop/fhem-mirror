@@ -41,15 +41,465 @@ sub powerMap_Initialize($);
 
 sub powerMap_Define($$);
 sub powerMap_Undefine($$);
+sub powerMap_Set($@);
 sub powerMap_Get($@);
 sub powerMap_Attr(@);
 sub powerMap_Notify($$);
 
 sub powerMap_AttrVal($$$$);
-sub powerMap_load($$);
+sub powerMap_load($$;$);
+sub powerMap_unload($$);
+sub powerMap_FindPowerMaps(;$);
 sub powerMap_power($$$);
 sub powerMap_energy($$;$);
 sub powerMap_update($;$);
+
+# module hashes ################################################################
+my %powerMap_tmpl = (
+
+    # Format example for devices w/ model support:
+    #
+    # '<TYPE>' => {
+    #     '(<INTERNAL>|<Attribute>)' => {
+    #         '<VAL of INTERNAL or Attribute>' => {
+    #
+    #             # This is the actual powerMap definition
+    #             '<Reading>' => {
+    #                 '<VAL>' => '<Watt>',
+    #             },
+    #         },
+    #     },
+    # },
+
+    # Format example for devices w/o model support:
+    #
+    # '<TYPE>' => {
+    #
+    #     # This is the actual powerMap definition
+    #     '<Reading>' => {
+    #         '<VAL>' => '<Watt>',
+    #     },
+    # },
+
+    # Format example for mapping table and user attributes:
+    #
+    # '<TYPE>' => {
+    #   'attribute1' => 'value1',
+    #   'attribute2' => 'value2',
+    #
+    #   # This is the actual powerMap definition
+    #   'map' => {
+    #       '<Reading>' => {
+    #           '<VAL>' => '<Watt>',
+    #       },
+    #   },
+    # },
+
+    FS20 => {
+        state => {
+            0   => 0.5,
+            100 => 60,
+        },
+    },
+
+    HMCCU => {
+        state => {
+            '*' => 7.5,
+        },
+    },
+
+    HMCCUCHN => "HMCCUDEV",
+
+    HMCCUDEV => {
+        ccutype => {
+            'HM-LC-Dim1TPBU-FM' => {
+                stateHM => {
+                    unreachable => 0,
+                    working     => 101,
+                    up          => 101,
+                    down        => 101,
+                    0           => 1.0,
+                    100         => 101,
+                },
+            },
+            'HM-LC-Dim1T-FM' => {
+                stateHM => {
+                    unreachable => 0,
+                    working     => 23.5,
+                    up          => 23.5,
+                    down        => 23.5,
+                    0           => 1.0,
+                    100         => 23.5,
+                },
+            },
+            'HM-LC-Sw2-PB-FM' => {
+                stateHM => {
+                    unreachable => 0,
+                    off         => 0.25,
+                    on          => 100.25,
+                },
+            },
+            'HM-LC-Bl1PBU-FM' => {
+                stateHM => {
+                    unreachable => 0,
+                    working     => 121,
+                    up          => 121,
+                    down        => 121,
+                    '*'         => 0.5,
+                },
+            },
+            'HM-LC-Bl1-SM' => {
+                stateHM => {
+                    unreachable => 0,
+                    working     => 121,
+                    up          => 121,
+                    down        => 121,
+                    '*'         => 0.4,
+                },
+            },
+        },
+    },
+
+    HUEBridge => {
+        modelid => {
+            BSB001 => {
+                state => {
+                    0   => 0,
+                    '*' => 1.669,
+                },
+            },
+
+            BSB002 => {
+                state => {
+                    0   => 0,
+                    '*' => 1.669,
+                },
+            },
+        },
+    },
+
+    HUEDevice => {
+        modelid => {
+
+            # Hue Bulb
+            LCT001 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    100         => 8.5,
+                },
+            },
+
+            # Hue Spot BR30
+            LCT002 => {},
+
+            # Hue Spot GU10
+            LCT003 => {},
+
+            # Hue Bulb V2
+            LCT007 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    100         => 10,
+                },
+            },
+
+            # Hue Bulb V3
+            LCT010 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    100         => 10,
+                },
+            },
+
+            # Hue BR30
+            LCT011 => {},
+
+            # Hue Bulb V3
+            LCT014 => {},
+
+            # Living Colors G2
+            LLC001 => {},
+
+            # Living Colors Bloom
+            LLC005 => {},
+
+            # Living Colors Gen3 Iris
+            LLC006 => {},
+
+            # Living Colors Gen3 Bloom
+            LLC007 => {},
+
+            # Living Colors Iris
+            LLC010 => {},
+
+            # Living Colors Bloom
+            LLC011 => {},
+
+            # Living Colors Bloom
+            LLC012 => {},
+
+            # Disney Living Colors
+            LLC013 => {},
+
+            # Living Colors Aura
+            LLC014 => {},
+
+            # Hue Go
+            LLC020 => {},
+
+            # Hue LightStrip
+            LST001 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    100         => 12,
+                },
+            },
+
+            # Hue LightStrip Plus
+            LST002 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    100         => 20.5,
+                },
+            },
+
+            # Living Whites Bulb
+            LWB001 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    10          => 1.2,
+                    20          => 1.7,
+                    30          => 1.9,
+                    40          => 2.3,
+                    50          => 2.7,
+                    60          => 3.4,
+                    70          => 4.7,
+                    80          => 5.9,
+                    90          => 7.5,
+                    100         => 9.2,
+                },
+            },
+
+            # Living Whites Bulb
+            LWB003 => {
+                state => {
+                    unreachable => 0,
+                    0           => 0.4,
+                    10          => 1.2,
+                    20          => 1.7,
+                    30          => 1.9,
+                    40          => 2.3,
+                    50          => 2.7,
+                    60          => 3.4,
+                    70          => 4.7,
+                    80          => 5.9,
+                    90          => 7.5,
+                    100         => 9.2,
+                },
+            },
+
+            # Hue Lux
+            LWB004 => {},
+
+            # Hue Lux
+            LWB006 => {},
+
+            # Hue Lux
+            LWB007 => {},
+
+            # Hue A19 White Ambience
+            LTW001 => {},
+
+            # Hue A19 White Ambience
+            LTW004 => {},
+
+            # Hue GU10 White Ambience
+            LTW013 => {},
+
+            # Hue GU10 White Ambience
+            LTW014 => {},
+
+            # Color Light Module
+            LLM001 => {},
+
+            # Color Temperature Module
+            LLM010 => {},
+
+            # Color Temperature Module
+            LLM011 => {},
+
+            # Color Temperature Module
+            LLM012 => {},
+
+            # LivingWhites Outlet
+            LWL001 => {},
+
+            # Hue Dimmer Switch
+            RWL020 => {},
+
+            # Hue Dimmer Switch
+            RWL021 => {},
+
+            # Hue Tap
+            ZGPSWITCH => {},
+
+            # dresden elektronik FLS-H lp
+            'FLS-H3' => {},
+
+            # dresden elektronik FLS-PP lp
+            'FLS-PP3' => {},
+
+            # LIGHTIFY Flex RGBW
+            'Flex RGBW' => {},
+
+            # LIGHTIFY Classic A60 RGBW
+            'Classic A60 RGBW' => {},
+
+            # LIGHTIFY Gardenspot Mini RGB
+            'Gardenspot RGB' => {},
+
+            # LIGHTIFY Surface light tunable white
+            'Surface Light TW' => {},
+
+            # LIGHTIFY Classic A60 tunable white
+            'Classic A60 TW' => {},
+
+            # LIGHTIFY Classic B40 tunable white
+            'Classic B40 TW' => {},
+
+            # LIGHTIFY PAR16 50 tunable white
+            'PAR16 50 TW' => {},
+
+            # LIGHTIFY Plug
+            'Plug - LIGHTIFY' => {},
+
+            # LIGHTIFY Plug
+            'Plug 01' => {},
+
+            # Busch-Jaeger ZigBee Light Link Relais
+            'RM01' => {},
+
+            # Busch-Jaeger ZigBee Light Link Dimmer
+            'DM01' => {},
+        },
+    },
+
+    netatmo => {
+        model => {
+            NAMain => {
+                temperature => {
+                    '*' => 5,
+                },
+            },
+        },
+    },
+
+    ONKYO_AVR => {
+        model => {
+            'TX-NR626' => {
+                stateAV => {
+                    absent => 0,
+                    off    => 0,
+                    muted  => 85,
+                    '*'    => 140,
+                },
+            },
+        },
+    },
+
+    ONKYO_AVR_ZONE => {
+        stateAV => {
+            off   => 0,
+            muted => 10,
+            '*'   => 20,
+        },
+    },
+
+    PHTV => {
+        model => {
+            '55PFL8008S/12' => {
+                stateAV => {
+                    absent => 0,
+                    off    => 0.1,
+                    '*'    => 90,
+                },
+            },
+        },
+    },
+
+    THINKINGCLEANER => {
+        model => {
+            Roomba_700_Series => {
+                presence => {
+                    absent => 0,
+                },
+                deviceStatus => {
+                    base         => 0.1,
+                    plug         => 0.1,
+                    base_recon   => 33,
+                    plug_recon   => 33,
+                    base_full    => 33,
+                    plug_full    => 33,
+                    base_trickle => 5,
+                    plug_trickle => 5,
+                    base_wait    => 0.1,
+                    plug_wait    => 0.1,
+                    '*'          => 0,
+                },
+            },
+        },
+    },
+
+    SONOSPLAYER => {
+        model => {
+            Sonos_S6 => {
+                stateAV => {
+                    disappeared => 0,
+                    off         => 2.2,
+                    mute        => 2.2,
+                    pause       => 2.2,
+                    on          => 14.5,
+                },
+            },
+
+            Sonos_S5 => {
+                stateAV => {
+                    disappeared => 0,
+                    off         => 8.3,
+                    mute        => 8.3,
+                    pause       => 8.3,
+                    on          => 14.5,
+                },
+            },
+
+            Sonos_S3 => {
+                stateAV => {
+                    disappeared => 0,
+                    off         => 4.4,
+                    mute        => 4.4,
+                    pause       => 4.4,
+                    on          => 11.3,
+                },
+            },
+
+            Sonos_S1 => {
+                stateAV => {
+                    disappeared => 0,
+                    off         => 3.8,
+                    mute        => 3.8,
+                    pause       => 3.8,
+                    on          => 5.2,
+                },
+            },
+        },
+    },
+);
 
 # initialize ###################################################################
 sub powerMap_Initialize($) {
@@ -58,11 +508,10 @@ sub powerMap_Initialize($) {
 
     $hash->{DefFn}    = $TYPE . "_Define";
     $hash->{UndefFn}  = $TYPE . "_Undefine";
+    $hash->{SetFn}    = $TYPE . "_Set";
     $hash->{GetFn}    = $TYPE . "_Get";
     $hash->{AttrFn}   = $TYPE . "_Attr";
     $hash->{NotifyFn} = $TYPE . "_Notify";
-
-    $hash->{NotifyOrderPrefix} = "10-";    # Want to be called before the rest
 
     $hash->{AttrList} =
       "disable:1,0 " . $TYPE . "_gridV:230,110 " . $readingFnAttributes;
@@ -103,37 +552,78 @@ sub powerMap_Undefine($$) {
 
     delete $modules{$TYPE}{defptr};
 
-    # search for devices with user defined
-    # powerMap support to be terminated
-    my @slaves = devspec2array("a:$TYPE=.+");
-
-    # search for loaded modules with direct
-    # powerMap support to be terminated
-    foreach ( keys %modules ) {
-        if ( defined( $modules{$_}{$TYPE} ) ) {
-            my @instances = devspec2array("TYPE=$_");
-            push @slaves, @instances;
-        }
-    }
-
-    # search for devices with direct
-    # powerMap support to be terminated
-    foreach ( keys %defs ) {
-        push( @slaves, $_ )
-          if ( defined( $defs{$_}{$TYPE} ) );
-    }
-
     # terminate powerMap for each device
-    foreach (@slaves) {
-        next if ( $_ eq "global" or $_ eq $name );
+    foreach ( devspec2array("i:pM_update=.+") ) {
         RemoveInternalTimer("$name|$_");
-        delete $defs{$_}{pM_update}
-          if ( defined( $defs{$_}{pM_update} ) );
-        delete $defs{$_}{pM_interval}
-          if ( defined( $defs{$_}{pM_interval} ) );
+        delete $defs{$_}{pM_update};
+        delete $defs{$_}{pM_interval};
     }
 
     return;
+}
+
+sub powerMap_Set($@) {
+    my ( $hash, @a ) = @_;
+
+    return "Missing argument" if ( @a < 2 );
+
+    my $TYPE     = $hash->{TYPE};
+    my $name     = shift @a;
+    my $argument = shift @a;
+    my $value    = join( " ", @a ) if (@a);
+
+    my $assign;
+    my $maps = powerMap_FindPowerMaps();
+    foreach ( sort keys %{$maps} ) {
+        $assign .= "," if ($assign);
+        $assign .= $_;
+    }
+
+    my %powerMap_sets = ( "assign" => "assign:$assign", );
+
+    return "Unknown argument $argument, choose one of "
+      . join( " ", values %powerMap_sets )
+      unless ( exists( $powerMap_sets{$argument} ) );
+
+    my $ret;
+
+    if ( $argument eq "devices" ) {
+        my @devices = devspec2array("$TYPE=.+");
+        return @devices
+          ? join( "\n", sort(@devices) )
+          : "no devices with $TYPE attribute defined";
+    }
+
+    elsif ( $argument eq "assign" ) {
+        my @devices = devspec2array($value);
+        return "No matching device found." unless (@devices);
+
+        foreach my $d (@devices) {
+            next unless ( exists( $maps->{$d}{map} ) );
+
+            # write attributes
+            $Data::Dumper::Terse    = 1;
+            $Data::Dumper::Deepcopy = 1;
+            $Data::Dumper::Sortkeys = 1;
+
+            foreach ( sort keys %{ $maps->{$d} } ) {
+                my $n = $_;
+                $n = $TYPE if ( $_ eq "map" );
+                $n = $TYPE . "_" . $_ unless ( $n =~ /^$TYPE/ );
+
+                my $txt = $maps->{$d}{$_};
+                $txt = Dumper( $maps->{$d}{$_} ) if ( $_ eq "map" );
+                $ret .= CommandAttr( undef, "$d $n $txt" );
+                $ret .= "$d - Added attribute $n\n" if ( @devices > 1 );
+            }
+
+            $Data::Dumper::Terse    = 0;
+            $Data::Dumper::Deepcopy = 0;
+            $Data::Dumper::Sortkeys = 0;
+        }
+    }
+
+    return $ret;
 }
 
 sub powerMap_Get($@) {
@@ -146,435 +636,6 @@ sub powerMap_Get($@) {
     my $argument = shift @a;
     my $value    = join( " ", @a ) if (@a);
 
-    my %powerMap_tmpl = (
-
-        # Format example for devices w/ model support:
-        #
-        # '<TYPE>' => {
-        #     '(<INTERNAL>|<Attribute>)' => {
-        #         '<VAL of INTERNAL or Attribute>' => {
-        #
-        #             # This is the actual powerMap definition
-        #             '<Reading>' => {
-        #                 '<VAL>' => '<Watt>',
-        #             },
-        #         },
-        #     },
-        # },
-
-        # Format example for devices w/o model support:
-        #
-        # '<TYPE>' => {
-        #
-        #     # This is the actual powerMap definition
-        #     '<Reading>' => {
-        #         '<VAL>' => '<Watt>',
-        #     },
-        # },
-
-        FS20 => {
-            state => {
-                0   => 0.5,
-                100 => 60,
-            },
-        },
-
-        netatmo => {
-            model => {
-                NAMain => {
-                    temperature => {
-                        '*' => 5,
-                    },
-                },
-            },
-        },
-
-        ONKYO_AVR => {
-            model => {
-                'TX-NR626' => {
-                    stateAV => {
-                        absent => 0,
-                        off    => 0,
-                        muted  => 85,
-                        '*'    => 140,
-                    },
-                },
-            },
-        },
-
-        ONKYO_AVR_ZONE => {
-            stateAV => {
-                off   => 0,
-                muted => 10,
-                '*'   => 20,
-            },
-        },
-
-        PHTV => {
-            model => {
-                '55PFL8008S/12' => {
-                    stateAV => {
-                        absent => 0,
-                        off    => 0.1,
-                        '*'    => 90,
-                    },
-                },
-            },
-        },
-
-        HUEBridge => {
-            model => {
-                BSB001 => {
-                    state => {
-                        0   => 0,
-                        '*' => 1.669,
-                    },
-                },
-
-                BSB002 => {
-                    state => {
-                        0   => 0,
-                        '*' => 1.669,
-                    },
-                },
-            },
-        },
-
-        THINKINGCLEANER => {
-            model => {
-                Roomba_700_Series => {
-                    presence => {
-                        absent => 0,
-                    },
-                    deviceStatus => {
-                        base         => 0.1,
-                        plug         => 0.1,
-                        base_recon   => 33,
-                        plug_recon   => 33,
-                        base_full    => 33,
-                        plug_full    => 33,
-                        base_trickle => 5,
-                        plug_trickle => 5,
-                        base_wait    => 0.1,
-                        plug_wait    => 0.1,
-                        '*'          => 0,
-                    },
-                },
-            },
-        },
-
-        HMCCU => {
-            state => {
-                '*' => 7.5,
-            },
-        },
-
-        HMCCUDEV => {
-            ccutype => {
-                'HM-LC-Dim1TPBU-FM' => {
-                    stateHM => {
-                        unreachable => 0,
-                        working     => 101,
-                        up          => 101,
-                        down        => 101,
-                        0           => 1.0,
-                        100         => 101,
-                    },
-                },
-                'HM-LC-Dim1T-FM' => {
-                    stateHM => {
-                        unreachable => 0,
-                        working     => 23.5,
-                        up          => 23.5,
-                        down        => 23.5,
-                        0           => 1.0,
-                        100         => 23.5,
-                    },
-                },
-                'HM-LC-Sw2-PB-FM' => {
-                    stateHM => {
-                        unreachable => 0,
-                        off         => 0.25,
-                        on          => 100.25,
-                    },
-                },
-                'HM-LC-Bl1PBU-FM' => {
-                    stateHM => {
-                        unreachable => 0,
-                        working     => 121,
-                        up          => 121,
-                        down        => 121,
-                        '*'         => 0.5,
-                    },
-                },
-                'HM-LC-Bl1-SM' => {
-                    stateHM => {
-                        unreachable => 0,
-                        working     => 121,
-                        up          => 121,
-                        down        => 121,
-                        '*'         => 0.4,
-                    },
-                },
-            },
-        },
-
-        HUEDevice => {
-            model => {
-
-                # Hue Bulb
-                LCT001 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        100         => 8.5,
-                    },
-                },
-
-                # Hue Spot BR30
-                LCT002 => {},
-
-                # Hue Spot GU10
-                LCT003 => {},
-
-                # Hue Bulb V2
-                LCT007 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        100         => 10,
-                    },
-                },
-
-                # Hue Bulb V3
-                LCT010 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        100         => 10,
-                    },
-                },
-
-                # Hue BR30
-                LCT011 => {},
-
-                # Hue Bulb V3
-                LCT014 => {},
-
-                # Living Colors G2
-                LLC001 => {},
-
-                # Living Colors Bloom
-                LLC005 => {},
-
-                # Living Colors Gen3 Iris
-                LLC006 => {},
-
-                # Living Colors Gen3 Bloom
-                LLC007 => {},
-
-                # Living Colors Iris
-                LLC010 => {},
-
-                # Living Colors Bloom
-                LLC011 => {},
-
-                # Living Colors Bloom
-                LLC012 => {},
-
-                # Disney Living Colors
-                LLC013 => {},
-
-                # Living Colors Aura
-                LLC014 => {},
-
-                # Hue Go
-                LLC020 => {},
-
-                # Hue LightStrip
-                LST001 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        100         => 12,
-                    },
-                },
-
-                # Hue LightStrip Plus
-                LST002 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        100         => 20.5,
-                    },
-                },
-
-                # Living Whites Bulb
-                LWB001 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        10          => 1.2,
-                        20          => 1.7,
-                        30          => 1.9,
-                        40          => 2.3,
-                        50          => 2.7,
-                        60          => 3.4,
-                        70          => 4.7,
-                        80          => 5.9,
-                        90          => 7.5,
-                        100         => 9.2,
-                    },
-                },
-
-                # Living Whites Bulb
-                LWB003 => {
-                    state => {
-                        unreachable => 0,
-                        0           => 0.4,
-                        10          => 1.2,
-                        20          => 1.7,
-                        30          => 1.9,
-                        40          => 2.3,
-                        50          => 2.7,
-                        60          => 3.4,
-                        70          => 4.7,
-                        80          => 5.9,
-                        90          => 7.5,
-                        100         => 9.2,
-                    },
-                },
-
-                # Hue Lux
-                LWB004 => {},
-
-                # Hue Lux
-                LWB006 => {},
-
-                # Hue Lux
-                LWB007 => {},
-
-                # Hue A19 White Ambience
-                LTW001 => {},
-
-                # Hue A19 White Ambience
-                LTW004 => {},
-
-                # Hue GU10 White Ambience
-                LTW013 => {},
-
-                # Hue GU10 White Ambience
-                LTW014 => {},
-
-                # Color Light Module
-                LLM001 => {},
-
-                # Color Temperature Module
-                LLM010 => {},
-
-                # Color Temperature Module
-                LLM011 => {},
-
-                # Color Temperature Module
-                LLM012 => {},
-
-                # LivingWhites Outlet
-                LWL001 => {},
-
-                # Hue Dimmer Switch
-                RWL020 => {},
-
-                # Hue Dimmer Switch
-                RWL021 => {},
-
-                # Hue Tap
-                ZGPSWITCH => {},
-
-                # dresden elektronik FLS-H lp
-                'FLS-H3' => {},
-
-                # dresden elektronik FLS-PP lp
-                'FLS-PP3' => {},
-
-                # LIGHTIFY Flex RGBW
-                'Flex RGBW' => {},
-
-                # LIGHTIFY Classic A60 RGBW
-                'Classic A60 RGBW' => {},
-
-                # LIGHTIFY Gardenspot Mini RGB
-                'Gardenspot RGB' => {},
-
-                # LIGHTIFY Surface light tunable white
-                'Surface Light TW' => {},
-
-                # LIGHTIFY Classic A60 tunable white
-                'Classic A60 TW' => {},
-
-                # LIGHTIFY Classic B40 tunable white
-                'Classic B40 TW' => {},
-
-                # LIGHTIFY PAR16 50 tunable white
-                'PAR16 50 TW' => {},
-
-                # LIGHTIFY Plug
-                'Plug - LIGHTIFY' => {},
-
-                # LIGHTIFY Plug
-                'Plug 01' => {},
-
-                # Busch-Jaeger ZigBee Light Link Relais
-                'RM01' => {},
-
-                # Busch-Jaeger ZigBee Light Link Dimmer
-                'DM01' => {},
-            },
-        },
-
-        SONOSPLAYER => {
-            model => {
-                Sonos_S6 => {
-                    stateAV => {
-                        disappeared => 0,
-                        off         => 2.2,
-                        mute        => 2.2,
-                        pause       => 2.2,
-                        on          => 14.5,
-                    },
-                },
-
-                Sonos_S5 => {
-                    stateAV => {
-                        disappeared => 0,
-                        off         => 8.3,
-                        mute        => 8.3,
-                        pause       => 8.3,
-                        on          => 14.5,
-                    },
-                },
-
-                Sonos_S3 => {
-                    stateAV => {
-                        disappeared => 0,
-                        off         => 4.4,
-                        mute        => 4.4,
-                        pause       => 4.4,
-                        on          => 11.3,
-                    },
-                },
-
-                Sonos_S1 => {
-                    stateAV => {
-                        disappeared => 0,
-                        off         => 3.8,
-                        mute        => 3.8,
-                        pause       => 3.8,
-                        on          => 5.2,
-                    },
-                },
-            },
-        },
-    );
     my %powerMap_gets = ( "devices" => "devices:noArg", );
 
     return "Unknown argument $argument, choose one of "
@@ -582,7 +643,7 @@ sub powerMap_Get($@) {
       unless ( exists( $powerMap_gets{$argument} ) );
 
     if ( $argument eq "devices" ) {
-        my @devices = devspec2array("$TYPE=.+");
+        my @devices = devspec2array("i:$TYPE=.+");
         return @devices
           ? join( "\n", sort(@devices) )
           : "no devices with $TYPE attribute defined";
@@ -670,6 +731,10 @@ sub powerMap_Notify($$) {
                       if ( defined( $defs{$_}{$TYPE} ) );
                 }
 
+                # remove duplicates
+                my %h = map { $_ => 1 } @slaves;
+                @slaves = keys %h;
+
                 # initialize or terminate powerMap for each device
                 foreach (@slaves) {
                     next if ( $_ eq "global" or $_ eq $name );
@@ -678,6 +743,11 @@ sub powerMap_Notify($$) {
                         or powerMap_load( $name, $_ ) );
                     Log3 $name, 4, "$TYPE: $event_prefix for $_";
                 }
+            }
+
+            # device attribute deleted
+            elsif ( $event =~ m/^(DELETEATTR)\s(.*)\s($TYPE)(\s+(.*))?/ ) {
+                powerMap_unload( $name, $2 );
             }
 
             # device attribute changed
@@ -747,39 +817,39 @@ sub powerMap_AttrVal($$$$) {
     # device INTERNAL
     #
 
-    # HASH format
+    # $defs{device}{TYPE}{attribute}
     return $defs{$d}{$TYPE}{$n}
       if ( $d
         && defined( $defs{$d} )
         && defined( $defs{$d}{$TYPE} )
         && defined( $defs{$d}{$TYPE}{$n} ) );
 
-    # HASH format with dot prefix
+    # $defs{device}{.TYPE}{attribute}
     return $defs{$d}{".$TYPE"}{$n}
       if ( $d
         && defined( $defs{$d} )
         && defined( $defs{$d}{".$TYPE"} )
         && defined( $defs{$d}{".$TYPE"}{$n} ) );
 
-    # name format with TYPE underscore prefix
+    # $defs{device}{TYPE_attribute}
     return $defs{$d}{ $TYPE . "_" . $n }
       if ( $d
         && defined( $defs{$d} )
         && defined( $defs{$d}{ $TYPE . "_" . $n } ) );
 
-    # name format
+    # $defs{device}{attribute}
     return $defs{$d}{$n}
       if ( $d
         && defined( $defs{$d} )
         && defined( $defs{$d}{$n} ) );
 
-    # name format with dot TYPE underscore prefix
+    # $defs{device}{.TYPE_attribute}
     return $defs{$d}{ "." . $TYPE . "_" . $n }
       if ( $d
         && defined( $defs{$d} )
         && defined( $defs{$d}{ "." . $TYPE . "_" . $n } ) );
 
-    # name format with dot prefix
+    # $defs{device}{.attribute}
     return $defs{$d}{".$n"}
       if ( $d
         && defined( $defs{$d} )
@@ -790,14 +860,14 @@ sub powerMap_AttrVal($$$$) {
 
     my $t = $defs{$d}{TYPE};
 
-    # HASH format
+    # $modules{module}{TYPE}{attribute}
     return $modules{$t}{$TYPE}{$n}
       if ( $t
         && defined( $modules{$t} )
         && defined( $modules{$t}{$TYPE} )
         && defined( $modules{$t}{$TYPE}{$n} ) );
 
-    # HASH format with TYPE underscore prefix
+    # $modules{module}{TYPE}{TYPE_attribute}
     return $modules{$t}{$TYPE}{ $TYPE . "_" . $n }
       if ( $t
         && defined( $modules{$t} )
@@ -809,8 +879,8 @@ sub powerMap_AttrVal($$$$) {
     return AttrVal( $p, $TYPE . "_" . $n, AttrVal( $p, $n, $default ) );
 }
 
-sub powerMap_load($$) {
-    my ( $name, $dev ) = @_;
+sub powerMap_load($$;$) {
+    my ( $name, $dev, $unload ) = @_;
     my $dev_hash = $defs{$dev};
     my $TYPE     = $defs{$name}{TYPE};
 
@@ -818,10 +888,14 @@ sub powerMap_load($$) {
 
     unless ($dev_hash) {
         RemoveInternalTimer("$name|$dev");
+        delete $dev_hash->{pM_update}
+          if ( defined( $dev_hash->{pM_update} ) );
+        delete $dev_hash->{pM_interval}
+          if ( defined( $dev_hash->{pM_interval} ) );
         return;
     }
 
-    my $powerMap = AttrVal( $dev, $TYPE, undef );
+    my $powerMap = $unload ? undef : AttrVal( $dev, $TYPE, undef );
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
     my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
 
@@ -856,10 +930,21 @@ sub powerMap_load($$) {
         delete $dev_hash->{$TYPE}{'map.module'};
     }
 
+    # delete device specific map
+    elsif ( $unload && defined( $dev_hash->{$TYPE}{map} ) ) {
+        delete $dev_hash->{$TYPE}{map};
+    }
+
     unless ($powerMap) {
         return powerMap_update("$name|$dev")
           if ( defined( $dev_hash->{$TYPE}{map} )
             || defined( $modules{ $dev_hash->{TYPE} }{$TYPE}{map} ) );
+
+        RemoveInternalTimer("$name|$dev");
+        delete $dev_hash->{pM_update}
+          if ( defined( $dev_hash->{pM_update} ) );
+        delete $dev_hash->{pM_interval}
+          if ( defined( $dev_hash->{pM_interval} ) );
         return;
     }
 
@@ -874,7 +959,7 @@ sub powerMap_load($$) {
         }
         elsif ( ref($map) ne "HASH" ) {
             Log3 $dev, 3,
-              "$TYPE $dev: Attribute $TYPE was " . "not defined in HASH format";
+              "$TYPE $dev: Attribute $TYPE was not defined in HASH format";
         }
         else {
             # backup any pre-existing definitions from module
@@ -900,6 +985,161 @@ sub powerMap_load($$) {
     }
 
     return 0;
+}
+
+sub powerMap_unload($$) {
+    my ( $n, $d ) = @_;
+    return powerMap_load( $n, $d, 1 );
+}
+
+sub powerMap_FindPowerMaps(;$) {
+    my ($device) = @_;
+
+    my %maps;
+
+    # collect all active definitions
+    unless ($device) {
+        foreach ( devspec2array("i:TYPE=.*:FILTER=powerMap=.+") ) {
+            $maps{$_}{map} = $defs{$_}{powerMap}{map}
+              if ( $defs{$_}{powerMap}{map}
+                && ref( $defs{$_}{powerMap}{map} ) eq "HASH"
+                && keys %{ $defs{$_}{powerMap}{map} } );
+        }
+    }
+
+    # add templates from modules
+    foreach my $TYPE ( keys %modules ) {
+        next unless ( $modules{$TYPE}{powerMap} );
+        my $t            = $modules{$TYPE}{powerMap};
+        my $modelSupport = 0;
+
+        # modules w/ model support
+        unless ( $t->{map} ) {
+            foreach my $a ( keys %{$t} ) {
+                next unless ( ref( $t->{$a} ) eq "HASH" );
+
+                foreach my $m ( keys %{ $t->{$a} } ) {
+                    next
+                      unless ( ref( $t->{$a}{$m} ) eq "HASH"
+                        && !$t->{$a}{map} );
+
+                    $modelSupport = 1;
+
+                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$a=$m") ) {
+                        next if ( $maps{$_} );
+
+                        if ( $t->{$a}{$m}{map} ) {
+                            next unless ( keys %{ $t->{$a}{$m}{map} } );
+                            $maps{$_} = $t->{$a}{$m};
+                        }
+                        else {
+                            next unless ( keys %{ $t->{$a}{$m} } );
+                            $maps{$_}{map} = $t->{$a}{$m};
+                        }
+                    }
+                }
+            }
+        }
+
+        # modules w/o model support
+        unless ($modelSupport) {
+            foreach ( devspec2array("TYPE=$TYPE") ) {
+                next if ( $maps{$_} );
+
+                if ( $t->{map} ) {
+                    next unless ( keys %{ $t->{map} } );
+                    $maps{$_} = $t;
+                }
+                else {
+                    next unless ( keys %{$t} );
+                    $maps{$_}{map} = $t;
+                }
+            }
+        }
+    }
+
+    unless ( $device && $device =~ /^MODULE:/ ) {
+
+        # find possible template for each Fhem device
+        foreach my $TYPE ( keys %powerMap_tmpl ) {
+            next unless ( $modules{$TYPE} );
+
+            my $t = $powerMap_tmpl{$TYPE};
+            $t = $powerMap_tmpl{ $powerMap_tmpl{$TYPE} }
+              if ( !ref( $powerMap_tmpl{$TYPE} )
+                && $powerMap_tmpl{ $powerMap_tmpl{$TYPE} } );
+
+            my $modelSupport = 0;
+
+            # modules w/ model support
+            foreach my $a ( keys %{$t} ) {
+                next unless ( $t->{$a} );
+
+                foreach my $m ( keys %{ $t->{$a} } ) {
+                    next
+                      unless ( ref( $t->{$a}{$m} ) eq "HASH"
+                        && !$t->{$a}{map} );
+
+                    $modelSupport = 1;
+
+                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$a=$m") ) {
+                        next if ( $maps{$_} );
+
+                        if ( $t->{$a}{$m}{map} ) {
+                            next unless ( keys %{ $t->{$a}{$m}{map} } );
+                            $maps{$_} = $t->{$a}{$m};
+                        }
+                        else {
+                            next unless ( keys %{ $t->{$a}{$m} } );
+                            $maps{$_}{map} = $t->{$a}{$m};
+                        }
+                    }
+                }
+            }
+
+            # modules w/o model support
+            unless ($modelSupport) {
+                foreach ( devspec2array("TYPE=$TYPE") ) {
+                    next if ( $maps{$_} );
+
+                    if ( $t->{map} ) {
+                        next unless ( keys %{ $t->{map} } );
+                        $maps{$_} = $t;
+                    }
+                    else {
+                        next unless ( keys %{$t} );
+                        $maps{$_}{map} = $t;
+                    }
+                }
+            }
+        }
+
+        # filter devices where no reading exists
+        foreach my $d ( keys %maps ) {
+            if ( !$maps{$d}{map} || ref( $maps{$d}{map} ) ne "HASH" ) {
+                delete $maps{$d};
+                next;
+            }
+
+            my $verified = 0;
+            foreach ( keys %{ $maps{$d}{map} } ) {
+                if ( ReadingsVal( $d, $_, undef ) ) {
+                    $verified = 1;
+                    last;
+                }
+            }
+
+            delete $maps{$d} unless ($verified);
+        }
+    }
+
+    if ( $device && $device =~ /^MODULE:(.*)$/ ) {
+        return if ( !$maps{$1} );
+        return \$maps{$1};
+    }
+    return if ( $device && !$maps{$device} );
+    return \$maps{$device} if ($device);
+    return \%maps;
 }
 
 sub powerMap_power($$$) {
@@ -942,9 +1182,7 @@ sub powerMap_power($$$) {
             and looks_like_number( $valueAliases->{ lc($val) } ) );
 
         # no power consumption defined for this reading
-        if ( !defined( $powerMap->{$reading} ) ) {
-            return;
-        }
+        return unless ( defined( $powerMap->{$reading} ) );
 
         Log3 $name, 5, "$TYPE: Entering powerMap_power() for $dev:$reading";
         Log3 $dev,  5, "$TYPE $dev: $reading: val=$val num=$num";
@@ -956,8 +1194,8 @@ sub powerMap_power($$$) {
 
         # valueAliases mapping
         elsif ( defined( $valueAliases->{ lc($val) } )
-            and defined( $powerMap->{$reading}{ $valueAliases->{ lc($val) } } )
-          )
+            and
+            defined( $powerMap->{$reading}{ $valueAliases->{ lc($val) } } ) )
         {
             $power = $powerMap->{$reading}{ $valueAliases->{ lc($val) } };
         }
@@ -1128,7 +1366,7 @@ sub powerMap_update($;$) {
     powerMap will help to determine current power consumption and calculates
     energy consumption either when power changes or within regular interval.<br>
     These new values may be used to collect energy consumption for devices w/o
-    power meter (e.g. fridge, lightning or FHEM server) and for further processing
+    power meter (e.g. fridge, lighting or FHEM server) and for further processing
     using module <a href="#ElectricityCalculator">ElectricityCalculator</a>.
     <br>
     <a name="powerMapdefine"></a>
@@ -1136,6 +1374,15 @@ sub powerMap_update($;$) {
     <ul>
       <code>define &lt;name&gt; powerMap</code><br>
       You may only define one single instance of powerMap.
+    </ul><br>
+    <a name="powerMapset"></a>
+    <b>Set</b>
+    <ul>
+      <li>
+        <code>assign <a href="#devspec">&lt;devspec&gt;</a></code><br>
+        Adds pre-defined powerMap attributes to one or more devices
+        for further customization.
+      </li>
     </ul><br>
     <a name="powerMapget"></a>
     <b>Get</b>
@@ -1288,6 +1535,15 @@ sub powerMap_update($;$) {
     <ul>
       <code>define &lt;name&gt; powerMap</code><br>
       Es kann immer nur eine powerMap Instanz definiert sein.
+    </ul><br>
+    <a name="powerMapset"></a>
+    <b>Set</b>
+    <ul>
+      <li>
+        <code>assign <a href="#devspec">&lt;devspec&gt;</a></code><br>
+        Weist einem oder mehreren Ger&auml;ten vordefinierte powerMap Attribute zu,
+        um diese anschlie&szlig;end anpassen zu k&ouml;nnen.
+      </li>
     </ul><br>
     <a name="powerMapget"></a>
     <b>Get</b>
