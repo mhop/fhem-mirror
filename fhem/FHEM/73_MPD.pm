@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.43   - 18.01.17 add channelUp and channelDown
 # Version 1.42   - 15.01.17 add Cover and playlist_json
 # Version 1.41   - 12.01.17 add rawTitle 
 # Version 1.4    - 11.01.17 add mute, ctp, seekcur, Fix LWP:: , album cover
@@ -87,6 +88,8 @@ my %sets = (
 	"clear_readings:noArg"  => "",
         "mute:on,off,toggle"    => "",
         "seekcur"               => "",
+        "channelUp:noArg"       => "",
+        "channelDown:noArg"     => "",
 	);
 
 use constant clb => "command_list_begin\n";
@@ -109,7 +112,7 @@ sub MPD_Initialize($)
 	$hash->{UndefFn}      = "MPD_Undef";
 	$hash->{ShutdownFn}   = "MPD_Undef";
 	$hash->{AttrFn}       = "MPD_Attr";
-	$hash->{AttrList}     = "disable:0,1 password loadMusic:0,1 loadPlaylists:0,1 volumeStep:1,2,5,10 titleSplit:1,0 timeout waits stateMusic:0,1 statePlaylists:0,1 lastfm_api_key image_size:-1,0,1,2,3 cache artist_summary:0,1 artist_content:0,1 player:mpd,mopidy,forked-daapd ".$readingFnAttributes;
+	$hash->{AttrList}     = "disable:0,1 password loadMusic:0,1 loadPlaylists:0,1 volumeStep:1,2,5,10 titleSplit:1,0 timeout waits stateMusic:0,1 statePlaylists:0,1 lastfm_api_key image_size:-1,0,1,2,3 cache artist_summary:0,1 artist_content:0,1 player:mpd,mopidy,forked-daapd unknown_artist_image ".$readingFnAttributes;
 	$hash->{FW_summaryFn} = "MPD_summaryFn";
 }
 
@@ -140,6 +143,8 @@ sub MPD_updateConfig($)
         $hash->{".artist"}       = "";
         $hash->{".album"}        = "";
         $hash->{".playlist_crc"} = 0;
+        $hash->{helper}{playlistcollection}{val} = -1;
+
 	$hash->{".password"} = AttrVal($name, "password", "");
 	$hash->{TIMEOUT}     = AttrVal($name, "timeout", 2);
 	$hash->{".sMusicL"}  = AttrVal($name, "stateMusic", 1);
@@ -171,9 +176,16 @@ sub MPD_updateConfig($)
 	}
         
 	MPD_ClearReadings($hash); # beim Starten etwas aufräumen
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"playlist_json","");
+        readingsBulkUpdate($hash,"playlist_num","-1");
+        readingsBulkUpdate($hash,"playlistname","");
+        readingsBulkUpdate($hash,"playlistinfo","");
+        readingsBulkUpdate($hash,"playlistcollection","");
+        readingsEndUpdate($hash,0);
+
         MPD_Outputs_Status($hash);
         mpd_cmd($hash, clb.cle);
-        #MPD_NewPlaylist($hash,mpd_cmd($hash,"i|playlistinfo|x"));
 
         if ($hash->{".volume"} eq "0")
         { # ist Mute aktiv oder soll sie mit Absicht 0 sein ?
@@ -239,17 +251,19 @@ sub MPD_Define($$)
   
   Log3 $name,3,"$name, Device defined.";
   readingsSingleUpdate($hash,"state","defined",1);
-  readingsSingleUpdate($hash,"playlist_json","",0);
+  
 
   $attr{$name}{devStateIcon} = 'play:rc_PLAY:stop stop:rc_STOP:play pause:rc_PAUSE:pause error:icoBlitz' unless (exists($attr{$name}{devStateIcon}));
   $attr{$name}{icon}         = 'it_radio' unless (exists($attr{$name}{icon})); 
   $attr{$name}{titleSplit}   = '1'        unless (exists($attr{$name}{titleSplit}));
   $attr{$name}{player}       = 'mpd'      unless (exists($attr{$name}{player}));
-  $attr{$name}{loadPlaylists} = '1'       unless (exists($attr{$name}{loadPlaylists}));
-  #$attr{$name}{cache}        = 'lfm'      unless (exists($attr{$name}{cache}));
-  #$attr{$name}{loadMusic}     = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
+  $attr{$name}{loadPlaylists}= '1'       unless (exists($attr{$name}{loadPlaylists}));
+  $attr{$name}{unknown_artist_image}  = '/fhem/icons/1px-spacer'  unless (exists($attr{$name}{unknown_artist_image}));
+  #$attr{$name}{cache}       = 'lfm'      unless (exists($attr{$name}{cache}));
+  #$attr{$name}{loadMusic}   = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
 
-  DevIo_CloseDev($hash);
+  #DevIo_CloseDev($hash); das wird irgendwann auch mal kommen ... :)
+
   $hash->{DeviceName} = $hash->{HOST}.":".$hash->{PORT};
 
   RemoveInternalTimer($hash);
@@ -420,9 +434,9 @@ sub MPD_Set($@)
  if ($cmd eq "stop")    
   { 
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer");
+   readingsBulkUpdate($hash,"artist_image",AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"));
    readingsBulkUpdate($hash,"artist_image_html","");
-   readingsBulkUpdate($hash,"album_image","/fhem/icons/1px-spacer");
+   readingsBulkUpdate($hash,"album_image",AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"));
    readingsBulkUpdate($hash,"album_image_html","");
    readingsBulkUpdate($hash,"audio","");
    readingsBulkUpdate($hash,"bitrate","");
@@ -443,11 +457,11 @@ sub MPD_Set($@)
     if  ($hash->{STATE} eq "play")
     { 
      readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash,"artist_image","/fhem/icons/1px-spacer",1);
-     readingsBulkUpdate($hash,"artist_image_html","",1);
-     readingsBulkUpdate($hash,"album_image","/fhem/icons/1px-spacer",1);
-     readingsBulkUpdate($hash,"album_image_html","",1);
-     readingsBulkUpdate($hash,"Cover","",1);
+     readingsBulkUpdate($hash,"artist_image",AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"));
+     readingsBulkUpdate($hash,"artist_image_html","");
+     readingsBulkUpdate($hash,"album_image",AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"));
+     readingsBulkUpdate($hash,"album_image_html","");
+     readingsBulkUpdate($hash,"Cover","");
      readingsEndUpdate($hash, 1);
      $ret = mpd_cmd($hash, clb."stop\n".cle);
     }
@@ -455,23 +469,25 @@ sub MPD_Set($@)
 
  if ($cmd eq "previous")
  { 
-    if (defined($hash->{READINGS}{"song"}{VAL}) > 0)
+    if (ReadingsNum($name,"song",0) > 0)
     {
      MPD_ClearReadings($hash);
-     $ret = mpd_cmd($hash, clb."previous\n".cle); 
+     return mpd_cmd($hash, clb."previous\n".cle); 
     } 
     else { return undef; }
  }
  
  if ($cmd eq "next")
  { 
-  if ($hash->{READINGS}{"nextsong"}{VAL} != $hash->{READINGS}{"song"}{VAL})
+  if (ReadingsNum($name,"nextsong",0) != ReadingsNum($name,"song",0))
+  #if ($hash->{READINGS}{"nextsong"}{VAL} != $hash->{READINGS}{"song"}{VAL})
    {
     MPD_ClearReadings($hash);
-    $ret = mpd_cmd($hash, clb."next\n".cle);
+    return mpd_cmd($hash, clb."next\n".cle);
    } 
    else { return undef; } 
  }
+
 
  if ($cmd eq "random")  
   { 
@@ -541,6 +557,7 @@ sub MPD_Set($@)
 
  if ($cmd eq "seekcur") 
   {
+   $subcmd--; $subcmd++; # sicherstellen das subcmd numerisch ist    
    $ret = mpd_cmd($hash,clb."seekcur $subcmd\n".cle); # ungetestet !
   }
 
@@ -564,23 +581,47 @@ sub MPD_Set($@)
  # den Rest als ein String
  $subcmd = join(" ",@a);
 
+ if ($cmd eq "channelUp")
+ { 
+    my $i = ReadingsNum($name,"playlist_num",-1);
+    $i++;
+    if ($i <= $hash->{helper}{playlistcollection}{val})
+    { 
+     $cmd = "playlist"; 
+     $subcmd = $hash->{helper}{playlistcollection}{$i};
+    }
+ }
+
+ if ($cmd eq "channelDown")
+ { 
+    my $i = ReadingsNum($name,"playlist_num",0);
+    $i--;
+    if ($i > -1)
+    {
+     $cmd = "playlist"; 
+     $subcmd = $hash->{helper}{playlistcollection}{$i};
+    }
+ }
+
  if ($cmd eq "playlist") 
  {
    return "$name : no name !" if (!$subcmd);
    my $error;
+   my $nr = -1;
 
    MPD_ClearReadings($hash);
    $hash->{".music"}    = "";
-   #my $old_list = $hash->{".playlist"};
+ 
    $hash->{".playlist"} = $subcmd; # interne Playlisten Verwaltung
    readingsSingleUpdate($hash,"playlistname",$subcmd,1);
    $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$subcmd\"\nplay\n".cle);
-   #if ($old_list ne $hash->{".playlist"})
-   #{
-    # brauchen wir das hier wirklich noch ? 
-    #MPD_NewPlaylist($hash,mpd_cmd($hash, "i|playlistinfo|x|"));
-   #}
-   # 
+   # welche Listen Nr ?
+   for (my $i=0; $i <= $hash->{helper}{playlistcollection}{val}; $i++)
+   {
+    $nr = $i if ($hash->{helper}{playlistcollection}{$i} eq $subcmd);
+   }
+   readingsSingleUpdate($hash,"playlist_num",$nr,1) if ($nr > -1);
+
    my $json = ReadingsVal($name,"playlist_json","");
  
    if ($json ne "")
@@ -645,7 +686,7 @@ sub MPD_Set($@)
    mpd_cmd($hash, clb.cle) if ($subcmd ne "playlist"); 
 
    shift @arr;
-   MPD_NewPlaylist($hash,join ("\n", @arr)) if (ReadingsVal($name,"playlist_json","") eq "");
+   MPD_NewPlaylist($hash,join ("\n", @arr));# if ((ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio") || (ReadingsVal($name,"playlist_json","") eq ""));
   return undef;
  }
 
@@ -763,8 +804,8 @@ sub mpd_cmd($$)
  my $title = "";
  my $exot  = "";
  my $rawTitle;
- my $name      = $hash->{NAME};
- my $playlists = $hash->{".playlists"};
+ my $name       = $hash->{NAME};
+ my $old_plists = $hash->{".playlists"};
 
 
  $hash->{VERSION}   = undef;
@@ -881,16 +922,16 @@ sub mpd_cmd($$)
 
   readingsEndUpdate($hash, 1 );
 
-  if ((AttrVal($name, "image_size", -1) > -1) && (ReadingsVal($name,"playlist_json","") ne "")) 
+  if (AttrVal($name, "image_size", -1) > -1)  
   {
    
    MPD_get_artist_info($hash, urlEncode($artist)) if ($artist);
    MPD_get_album_info($hash,  urlEncode($album))  if ($album);
   }
-  elsif (ReadingsVal($name,"playlist_json","") ne "")
+  if (ReadingsVal($name,"playlist_json","") ne "")
   {
    my $pos = ReadingsNum($name,"Pos",-1);
-   readingsSingleUpdate($hash,"Cover",$Cover[$pos],1) if($pos > -1);
+   readingsSingleUpdate($hash,"Cover",$Cover[$pos],1) if($pos > -1) && defined($Cover[$pos]);
   }
  } # Ende der Ausgabe Readings und Internals, ab jetzt folgt nur noch Bildschirmausgabe
  else
@@ -924,13 +965,21 @@ sub mpd_cmd($$)
  print $sock "close\n";
  close($sock); 
 
- if ($hash->{".playlists"} ne $playlists) # haben sich sich die Listen geändert ?
+ if ($hash->{".playlists"} ne $old_plists) # haben sich sich die Listen geändert ?
  {
   $hash->{".playlists"} =~ s/\n+\z//;
-  my $plists = $hash->{".playlists"}; 
-  $plists =~ tr/\n/\:/; # Tablet UI will diese Art der Liste
-  readingsSingleUpdate($hash,"playlistcollection", $plists,1);
-  Log3 $name ,5 ,"$name, ".$hash->{READINGS}{"playlistcollection"}{VAL};
+  $old_plists = $hash->{".playlists"};
+  my @arr     = split("\n",$old_plists);
+  my $i       = 0 ;; 
+  foreach (@arr)
+  {
+   $hash->{helper}{playlistcollection}{$i} = $_;
+   $i++;
+  }
+  $hash->{helper}{playlistcollection}{val} = $i-1;
+  $old_plists =~ tr/\n/\:/; # TabletUI will diese Art der Liste
+  readingsSingleUpdate($hash,"playlistcollection", $old_plists,1);
+  Log3 $name ,5 ,"$name, new playlistcollection -> $old_plists";
  }
 
  return $output; # falls es einen gibt , wenn nicht - auch gut ;)
@@ -1141,7 +1190,9 @@ sub MPD_try_idle($)
   }
   else 
   {
-    Log3 $name, 4 , $name.", Idle Start failed, waiting $waits seconds for next try";
+    my $error = "Idle Start failed, waiting $waits seconds for next try";
+    Log3 $name, 4 , "$name, $error";
+    readingsSingleUpdate($hash,"last_error",$error,1);
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$waits, "MPD_try_idle", $hash, 0);
     return 0;
@@ -1174,7 +1225,10 @@ sub MPD_watch_idle($)
   else 
   { 
     Log3 $name, 5 , $name.", idle PID ".$hash->{IPID}." found";
-    if (($hash->{READINGS}{"presence"}{VAL} eq "present") && ($hash->{STATE} eq "play")) 
+    if ((ReadingsVal($name,"presence","") eq "present") && 
+        ($hash->{STATE} eq "play") &&
+        (ReadingsVal($name,"currentTrackProvider","") ne "Radio")
+       ) 
     {
      # Wichtig um das Readings elapsed aktuell zu halten (TabletUI)
      mpd_cmd($hash, "status");
@@ -1192,9 +1246,7 @@ sub MPD_get_artist_info ($$)
     my ($hash, $artist) = @_;
     my $name = $hash->{NAME};
     return undef if (($hash->{'.artist'} eq $artist) || ($artist eq ""));
-    #my $playlistinfo  = ReadingsVal($hash,"playlistinfo","");
-    #Log3 $name,3,"$name play :".ReadingsVal($hash,"playlistinfo","");
-    #MPD_NewPlaylist($hash,mpd_cmd($hash,"i|playlistinfo|x")) if (!$playlistinfo || ($playlistinfo eq "[]"));
+
     $hash->{'.artist'} = $artist;
     my $data;
     my $cache = AttrVal($name,"cache",""); # default
@@ -1273,6 +1325,7 @@ sub MPD_get_album_info ($$)
     }
     else # xml von lastfm holen 
     { 
+      $fname = $artist."_".$album.".xml";
       Log3 $name ,4,"$name, new album $fname , getting file from lastfm";
       HttpUtils_NonblockingGet($param); 
     }
@@ -1667,7 +1720,7 @@ sub MPD_NewPlaylist($$)
 
   for my $i (0 .. $#artist)
   {
-    $lastcover = "nan"; # default
+    $lastcover = AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"); # default 
 
     if (defined($albumUri[$i]))
     {
@@ -2010,6 +2063,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     mpdCMD (cmd) => send a command to MPD Server ( <a href='http://www.musicpd.org/doc/protocol/'>MPD Command Ref</a> )<br>
     mute => on,off,toggle<br>
     seekcur (time)<br>
+    channelUp => <br>
+    channelDown => <br>
    </ul>
   <br>
   <a name="MPDget"></a>
@@ -2055,6 +2110,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
       attr rg_artist room MPD
      </pre></li>
       <li>cache (default lfm => /fhem/www/lfm) store artist image and album cover in a local directory</li>
+      <li>unknown_artist_image => show this image if no other image is avalible (default : /fhem/icons/1px-spacer)</li>
   </ul>
   <br>
   <b>Readings</b>
@@ -2069,7 +2125,9 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     currentTrackProvider : Radio / Bibliothek<br>
     playlistinfo : (TabletUI Medialist)<br>
     playlistcollection : (TabletUI)<br>
-    playlistname : (TabletUI)<br> 
+    playlistname : (TabletUI) current playlist name<br> 
+    playlist_num : current playlist number<br>
+    playlist_json : (Medialist Modul)<br>
     rawTitle : Title information without changes from the modul
   </ul>
 </ul>
@@ -2127,7 +2185,9 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     IdleNow => sendet das Kommando idle zum MPD und wartet auf Ereignisse<br>
     clear_readings => l&ouml;scht sehr viele Readings<br>
     mute => on,off,toggle<br>
-    seekcur (zeit) => nicht vor MPD Version 0.20
+    seekcur (zeit) => nicht vor MPD Version 0.20<br>
+    channelUp => <br>
+    channelDown => <br>
    </ul>
   <br>
   <a name="MPDget"></a>
@@ -2179,7 +2239,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
    <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die XML und PNG Dateien<br>
    <b>Wichtig</b> : Der User unter dem der fhem Prozess ausgef&uuml;hrt wird (default fhem) muss Lese und Schreibrechte in diesem Verzeichniss haben !<br>
    Das Verzeichnis sollte auch unterhalb von www liegen, damit der fhem Webserver direkten Zugriff auf die Bilder hat.</li>
-  
+   <li>unknown_artist_image => Ersatzimage wenn kein anderes Image zur Verf&uuml;gung steht (default : /fhem/icons/1px-spacer)</li>
    </ul>
   <br>
   <b>Readings</b>
@@ -2196,8 +2256,11 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     artist_content : (bei Nutzung von Last.fm)<br>
     artist_summary : (bei Nutzung von Last.fm)<br>
     playlistinfo : (z.B. f&uuml;r die TabletUI Medialist)<br>
-    playlistcollection : (TabletUI)<br>
-    playlistname : (TabletUI)<br> 
+    playlistcollection : (TabletUI) Liste der Playlisten<br>
+    playlistname : (TabletUI) Name der aktuellen Playliste aus playlistcollection<br> 
+    playlist_num : Playlisten Nr. (0 .. n) der aktuellen Playliste aus playlistcollection 
+    playlist_json : (notwendig f&uuml; das Medialist Modul)<br>
+    Cover : Cover Bild zum aktuellen Song aus playlist_json<br> 
     currentTrackProvider : Radio / Bibliothek - Unterscheidung Radio Stream oder lokale Datei<br>
     rawTitle : Title Information ohne Ver&auml;nderungen durch das Modul
   </ul>
