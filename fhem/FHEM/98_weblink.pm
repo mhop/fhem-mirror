@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
+use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use IO::File;
 
 #####################################
@@ -114,15 +115,15 @@ weblink_FwFn($$$$)
     my @lines = split(" ", $link);
     my $row = 1;
     $ret = "<table>";
-    $ret .= "<tr><td><div class='devType'><a href='/fhem?detail=$d'>"
+    $ret .= "<tr><td><div class='devType'><a href='$FW_ME?detail=$d'>"
                 . AttrVal($d, "alias", $d)."</a></div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\">";
     foreach my $line (@lines) {
       my @args = split(":", $line, 3);
 
       $ret .= "<tr class='".(($row++&1)?"odd":"even")."'>";
-      $ret .= "<td><a href='/fhem?cmd=$args[2]'><div class='col1'>".
-                "<img src='/fhem/icons/$args[0]' width='19' height='19' ".
+      $ret .= "<td><a href='$FW_ME?cmd=$args[2]'><div class='col1'>".
+                "<img src='$FW_ME/icons/$args[0]' width='19' height='19' ".
                 "align='center' alt='$args[0]' title='$args[0]'>".
                 "$args[1]</div></a></td></td>";
       $ret .= "</tr>";
