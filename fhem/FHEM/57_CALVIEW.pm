@@ -297,6 +297,10 @@ sub CALVIEW_Notify($$)
 <ul><code>set myView update</code></ul>
 <ul>this will manually update all readings from the given CALENDAR Devices</ul>
 <b>Attribute</b>
+<li>datestyle<br>
+        not set  - the default, disables displaying readings bdatetimeiso / edatetimeiso<br>
+		ISO8601  - enables readings bdatetimeiso / edatetimeiso (start and end time of term ISO8601 formated like 2017-02-27T00:00:00)
+</li><br>
 <li>disable<br>
         0 / not set - internal notify function enabled (default) <br>
 		1 - disable the internal notify-function of CALVIEW wich is triggered when one of the given CALENDAR devices has updated
@@ -338,6 +342,10 @@ sub CALVIEW_Notify($$)
 <ul><code>set &lt;Name&gt; update</code></ul>
 <ul><code>set myView update</code></ul><br>
 <b>Attributes</b>
+<li>datestyle<br>
+        nicht gesetzt - Standard, Readings bdatetimeiso / edatetimeiso werden nicht gezeigt<br>
+		ISO8601  - aktiviert die readings bdatetimeiso / edatetimeiso (zeigen Terminstart und Ende im ISO8601 Format zB. 2017-02-27T00:00:00)
+</li><br>
 <li>disable<br>
         0 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard) <br>
 		1 - deaktiviert die interne Notify-Funktion welche ausgelöst wird wenn sich einer der Kalender aktualisiert hat
