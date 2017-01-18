@@ -19,7 +19,8 @@ sub CALVIEW_Initialize($)
 	$hash->{UndefFn} = "CALVIEW_Undef";	
 	$hash->{SetFn}   = "CALVIEW_Set";
 	$hash->{NotifyFn}	= "CALVIEW_Notify";	
-	$hash->{AttrList} = "disable:0,1 " .
+	$hash->{AttrList} = "datestyle:ISO8601 " .
+						"disable:0,1 " .
 						"do_not_notify:1,0 " .
 						"isbirthday:1,0 " .						
 						"maxreadings " .
@@ -100,20 +101,25 @@ sub CALVIEW_GetUpdate($){
 		my @tempstart=split(/\s+/,$item->[0]);
 		my @tempend=split(/\s+/,$item->[2]);
 		my ($D,$M,$Y)=split(/\./,$tempstart[0]);
+		my ($eD,$eM,$eY)=split(/\./,$tempend[0]);
 		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
 		#replace the "\," with ","
 		if(length($item->[1]) > 0){ $item->[1] =~ s/\\,/,/g; }
 		if( defined($item->[4]) && length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; }
 		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; }
+		my $isostarttime = $Y."-".$M."-".$D."T".$tempstart[1];
+		my $isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
+			bdatetimeiso => $isostarttime,
 			summary => $item->[1],
 			source => $item->[3],
 			location => $item->[4],
 			description => $item->[5],
 			edate => $tempend[0],
 			etime => $tempend[1],
+			edatetimeiso => $isoendtime,
 			btimestamp => $bts[0],
 			mode => $item->[6]};	
 	}
@@ -142,6 +148,7 @@ sub CALVIEW_GetUpdate($){
 			if($isbday == 1 ){ readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_age", $age);}
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdate", $termin->{bdate});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_btime", $termin->{btime});
+			if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edatetimeiso", $termin->{edatetimeiso});}
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
@@ -153,7 +160,8 @@ sub CALVIEW_GetUpdate($){
 			if ($date eq $termin->{bdate} ){
 				if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_age", $age);}
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime}); 
+				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime});
+				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $todaycounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $todaycounter)."_edatetimiso", $termin->{edatetimeiso});}
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
@@ -168,6 +176,7 @@ sub CALVIEW_GetUpdate($){
 				if($isbday == 1 ){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $counter)."_age", $age);}
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdate", "morgen"); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
+				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $tomorrowcounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $tomorrowcounter)."_edatetimeiso", $termin->{edatetimeiso});}
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
