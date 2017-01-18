@@ -4528,7 +4528,8 @@ notifyRegexpChanged($$)
              map  { (m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/ && 
                      ($defs{$1} || devspec2array($1) ne $1)) ? $1 : ""} @list2;
   if(@list && int(@list) == int(@list2)) {
-    @list = keys { map { $_ => 1} @list }; # remove duplicates
+    my %h = map { $_ => 1 } @list;
+    @list = keys %h; # remove duplicates
     $hash->{NOTIFYDEV} = join(",", @list);
   } else {
     delete($hash->{NOTIFYDEV});
