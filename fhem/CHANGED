@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: uninitialized value renmode if role is Agent
   - update:  DOIFtools:documentation
   - new:     98_DOIFtools: tools for DOIF
   - bugfix:  93_DbLog: its now version 2.9.2 (thanks to DS_Starter)

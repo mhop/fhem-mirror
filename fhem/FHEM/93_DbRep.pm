@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.10.2       16.01.2017       bugfix uninitialized value $renmode if RenameAgent
 # 4.10.1       30.11.2016       bugfix importFromFile format problem if UNIT-field wasn't set
 # 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
 # 4.9          23.12.2016       function readingRename added
@@ -169,7 +170,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.10.1";
+my $DbRepVersion = "4.10.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -625,8 +626,9 @@ sub DbRep_Notify($$) {
          
          # DEVICE innerhalb angeschlossener Datenbank umbenennen
          Log3 ($myName, 4, "DbRep Agent $myName - Evt RENAMED rec - old device: $evl[1], new device: $evl[2] -> start deviceRename in DB: $own_hash->{DATABASE} ");
-         $own_hash->{HELPER}{OLDDEV} = $evl[1];
-         $own_hash->{HELPER}{NEWDEV} = $evl[2];
+         $own_hash->{HELPER}{OLDDEV}  = $evl[1];
+         $own_hash->{HELPER}{NEWDEV}  = $evl[2];
+		 $own_hash->{HELPER}{RENMODE} = "devren";
          sqlexec($own_hash,"deviceRename");
          
          # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
