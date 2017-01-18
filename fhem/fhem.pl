@@ -4523,24 +4523,15 @@ notifyRegexpChanged($$)
 {
   my ($hash, $re) = @_;
 
-  my $dev;
-  $dev = $1 if($re =~ m/^\(?([^:]*)\)?$/ || $re =~ m/^\(?([^:]*):(.*)\)?$/);
-
-  if($dev && defined($defs{$dev}) && $re !~ m/\|/) { # Forum #36663
-    $hash->{NOTIFYDEV} = $dev;
-
-  } elsif($re =~ m/\|/) {                                        # Regexp Wizard
-    my @list2 = split(/\|/, $re);                                # Forum #54536
-    my @list = grep { m/./ }                                     # Forum #62369
-               map  { (m/^\(?([^:]*)(?::.*)?\)?$/ && $defs{$1}) ? $1:""} @list2;
-    if(@list && @list <= 10 && int(@list) == int(@list2)) {
-      $hash->{NOTIFYDEV} = join(",", @list);
-    } else {
-      delete($hash->{NOTIFYDEV});
-    }
-
+  my @list2 = split(/\|/, $re);
+  my @list = grep { m/./ }                                     # Forum #62369
+             map  { (m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/ && 
+                     ($defs{$1} || devspec2array($1) ne $1)) ? $1 : ""} @list2;
+  if(@list && int(@list) == int(@list2)) {
+    @list = keys { map { $_ => 1} @list }; # remove duplicates
+    $hash->{NOTIFYDEV} = join(",", @list);
   } else {
-    delete($hash->{NOTIFYDEV}); # when called by modify
+    delete($hash->{NOTIFYDEV});
   }
   %ntfyHash = ();
 }
