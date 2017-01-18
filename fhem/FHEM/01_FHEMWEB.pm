@@ -422,9 +422,9 @@ FW_Read($$)
   # Return 200 for OPTIONS or 405 for unsupported method
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
   if($method !~ m/^(GET|POST)$/i){
-    my $retCode = ($method eq "OPTIONS") ? 200 : 405;
+    my $retCode = ($method eq "OPTIONS") ? "200 OK" : "405 Method Not Allowed";
     TcpServer_WriteBlocking($FW_chash,
-      "HTTP/1.1 $retCode OK\r\n" .
+      "HTTP/1.1 $retCode\r\n" .
       $FW_headerlines.
       "Content-Length: 0\r\n\r\n");
     delete $hash->{CONTENT_LENGTH};
