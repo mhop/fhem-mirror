@@ -180,9 +180,9 @@ allowed_Attr(@)
   if($attrName eq "disable") {
     readingsSingleUpdate($hash, "state", $set ? "disabled" : "active", 1);
     if($set) {
-      $hash->{disable} = 1;
+      $hash->{disabled} = 1;
     } else {
-      delete($hash->{disable});
+      delete($hash->{disabled});
     }
 
   } elsif($attrName eq "allowedCommands" ||     # hoping for some speedup
