@@ -707,7 +707,7 @@ while (1) {
           CommandDelete(undef, $hash->{NAME});
 
         } else {
-          if($ret == length($wb)) {
+          if($ret >= length($wb)) { # for the > see Forum #29963
             delete($hash->{$wbName});
             if($hash->{WBCallback}) {
               no strict "refs";
