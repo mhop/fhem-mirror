@@ -1716,6 +1716,9 @@ sub HMUARTLGW_Set($@)
 	} elsif ($cmd eq "reopen") {
 		HMUARTLGW_Reopen($hash);
 	} elsif ($cmd eq "close") {
+		#switch to bootloader to stop the module from interfering
+		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS)
+			if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
 		HMUARTLGW_Undefine($hash, $name);
 		readingsSingleUpdate($hash, "state", "closed", 1);
 		$hash->{XmitOpen} = 0;
@@ -1845,6 +1848,9 @@ sub HMUARTLGW_Attr(@)
 	} elsif ($aName eq "dummy") {
 		if ($cmd eq "set") {
 			if (!defined($attr{$name}{$aName})) {
+				#switch to bootloader to stop the module from interfering
+				HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS)
+					if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
 				HMUARTLGW_Undefine($hash, $name);
 				readingsSingleUpdate($hash, "state", "dummy", 1);
 				HMUARTLGW_updateCondition($hash);
