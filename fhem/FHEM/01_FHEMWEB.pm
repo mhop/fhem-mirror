@@ -467,8 +467,9 @@ FW_Read($$)
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
 
-  if($method eq 'GET' && $FW_httpheader{Connection} =~ /Upgrade/i && 
-     $FW_use_sha) {
+     
+  if($FW_use_sha && $method eq 'GET' &&
+     $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i) {
 
     my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
                                 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
