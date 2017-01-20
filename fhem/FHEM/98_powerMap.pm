@@ -50,7 +50,7 @@ sub powerMap_AttrVal($$$$);
 sub powerMap_load($$;$);
 sub powerMap_unload($$);
 sub powerMap_FindPowerMaps(;$);
-sub powerMap_power($$$);
+sub powerMap_power($$$;$);
 sub powerMap_energy($$;$);
 sub powerMap_update($;$);
 
@@ -421,6 +421,21 @@ my %powerMap_tmpl = (
         },
     },
 
+    Panstamp => {
+        'Pumpe_Heizkreis' => {
+            'off' => "0,Pumpe_Boiler,Brenner",
+            'on'  => "30,Pumpe_Boiler,Brenner",
+        },
+        'Pumpe_Boiler' => {
+            'off' => "0,Pumpe_Heizkreis,Brenner",
+            'on'  => "30,Pumpe_Heizkreis,Brenner",
+        },
+        'Brenner' => {
+            'off' => "0,Pumpe_Heizkreis,Pumpe_Boiler",
+            'on'  => "40,Pumpe_Heizkreis,Pumpe_Boiler",
+        },
+    },
+
     PHTV => {
         model => {
             '55PFL8008S/12' => {
@@ -428,29 +443,6 @@ my %powerMap_tmpl = (
                     absent => 0,
                     off    => 0.1,
                     '*'    => 90,
-                },
-            },
-        },
-    },
-
-    THINKINGCLEANER => {
-        model => {
-            Roomba_700_Series => {
-                presence => {
-                    absent => 0,
-                },
-                deviceStatus => {
-                    base         => 0.1,
-                    plug         => 0.1,
-                    base_recon   => 33,
-                    plug_recon   => 33,
-                    base_full    => 33,
-                    plug_full    => 33,
-                    base_trickle => 5,
-                    plug_trickle => 5,
-                    base_wait    => 0.1,
-                    plug_wait    => 0.1,
-                    '*'          => 0,
                 },
             },
         },
@@ -495,6 +487,29 @@ my %powerMap_tmpl = (
                     mute        => 3.8,
                     pause       => 3.8,
                     on          => 5.2,
+                },
+            },
+        },
+    },
+
+    THINKINGCLEANER => {
+        model => {
+            Roomba_700_Series => {
+                presence => {
+                    absent => 0,
+                },
+                deviceStatus => {
+                    base         => 0.1,
+                    plug         => 0.1,
+                    base_recon   => 33,
+                    plug_recon   => 33,
+                    base_full    => 33,
+                    plug_full    => 33,
+                    base_trickle => 5,
+                    plug_trickle => 5,
+                    base_wait    => 0.1,
+                    plug_wait    => 0.1,
+                    '*'          => 0,
                 },
             },
         },
@@ -599,7 +614,9 @@ sub powerMap_Set($@) {
         return "No matching device found." unless (@devices);
 
         foreach my $d (@devices) {
-            next unless ( exists( $maps->{$d}{map} ) );
+            next
+              unless ( ref( $maps->{$d}{map} ) eq "HASH"
+                && keys %{ $maps->{$d}{map} } );
 
             # write attributes
             $Data::Dumper::Terse    = 1;
@@ -719,7 +736,7 @@ sub powerMap_Notify($$) {
                     if ( defined( $modules{$_}{$TYPE} ) ) {
                         my @instances =
                           devspec2array(
-                            "TYPE=$_:FILTER=$TYPE" . "_noEnergy!=1" );
+                            "a:TYPE=$_:FILTER=$TYPE" . "_noEnergy!=1" );
                         push @slaves, @instances;
                     }
                 }
@@ -1142,8 +1159,8 @@ sub powerMap_FindPowerMaps(;$) {
     return \%maps;
 }
 
-sub powerMap_power($$$) {
-    my ( $name, $dev, $event ) = @_;
+sub powerMap_power($$$;$) {
+    my ( $name, $dev, $event, $loop ) = @_;
     my $hash  = $defs{$name};
     my $TYPE  = $hash->{TYPE};
     my $power = 0;
@@ -1218,12 +1235,20 @@ sub powerMap_power($$$) {
 
             if ($val2) {
                 Log3 $dev, 5,
-                  "$TYPE $dev: Interpolating power value between "
-                  . "$powerMap->{$reading}{$val1} and $powerMap->{$reading}{$val2}";
+                  "$TYPE $dev: $reading: Interpolating power value "
+                  . "between $val1 and $val2";
 
                 my $y1 = $powerMap->{$reading}{$val1};
+                $y1 =~ s/^([-\.\d]+)(.*)/$1/g;
+                my $y1t = $2;
+                $y1 = 0 unless ( looks_like_number($y1) );
+
                 my $y2 = $powerMap->{$reading}{$val2};
-                my $m  = ( ($y2) - ($y1) ) / ( ($val2) - ($val1) );
+                $y2 =~ s/^([-\.\d]+)(.*)/$1/g;
+                my $y2t = $2;
+                $y2 = 0 unless ( looks_like_number($y2) );
+
+                my $m = ( ($y2) - ($y1) ) / ( ($val2) - ($val1) );
                 my $b =
                   ( ( ($val2) * ($y1) ) - ( ($val1) * ($y2) ) ) /
                   ( ($val2) - ($val1) );
@@ -1238,6 +1263,13 @@ sub powerMap_power($$$) {
                 else {
                     $power = ( ($m) * ($num) ) + ($b);
                 }
+
+                if ( !$loop && $power - $y1 < $y2 - $power ) {
+                    $power .= $y1t;
+                }
+                elsif ( !$loop ) {
+                    $power .= $y2t;
+                }
             }
             elsif ( defined( $powerMap->{$reading}{'*'} ) ) {
                 $power = $powerMap->{$reading}{'*'};
@@ -1250,8 +1282,33 @@ sub powerMap_power($$$) {
         elsif ( defined( $powerMap->{$reading}{'*'} ) ) {
             $power = $powerMap->{$reading}{'*'};
         }
+
+        # consider additional readings if desired
+        unless ( looks_like_number($power) ) {
+            my $sum = 0;
+            my $rlist = join( ",", keys %{$powerMap} );
+            $power =~ s/\*/$rlist/;
+
+            foreach ( split( ",", $power ) ) {
+                next if ( $reading eq $_ );
+
+                if ( looks_like_number($_) ) {
+                    $sum += $_;
+                    last if ($loop);
+                }
+                elsif ( defined( $powerMap->{$_} ) && !$loop ) {
+                    Log3 $dev, 1, "$TYPE $dev: $_: Adding to total";
+                    my $ret = powerMap_power( $name, $dev,
+                        "$_: " . ReadingsVal( $dev, $_, "" ), 1 );
+                    $sum += $ret if ( looks_like_number($ret) );
+                }
+            }
+
+            $power = $sum;
+        }
     }
 
+    return "?" unless ( looks_like_number($power) );
     return $power;
 }
 
@@ -1269,6 +1326,7 @@ sub powerMap_energy($$;$) {
     my $P0 = ReadingsVal( $dev, $rname_p, 0 );
     $P0 = 0   unless ( looks_like_number($P0) );
     $P1 = $P0 unless ( defined($P1) );
+    $P1 = 0   unless ( looks_like_number($P1) );
     my $Dt = ReadingsAge( $dev, $rname_e, 0 ) / 3600;
     my $DE = $P0 * $Dt;
     my $E1 = $E0 + $DE;
@@ -1475,6 +1533,10 @@ sub powerMap_update($;$) {
         If the value cannot be interpreted in any way, 0 power consumption will be assumed.<br>
         Explicitly set definitions in powerMap attribute always get precedence.<br>
         <br>
+        In case several power values need to be summarized, the name of other readings may be added after
+        number value, separated by comma. The current status of that reading will then be considered for
+        the total power calculcation. To consider all readings known to powerMap, just as an *.
+        <br>
         Example for FS20 socket:
         <ul>
           <code><pre>
@@ -1638,6 +1700,12 @@ sub powerMap_update($;$) {
         Au&szlig;erdem werden "off" und "on" automatisch als 0 respektive 100 interpretiert.<br>
         Nicht interpretierbare Werte f&uuml;hren dazu, dass eine Leistungsaufnahme von 0 angenommen wird.<br>
         Explizit in powerMap enthaltene Definitionen haben immer vorrang.<br>
+        <br>
+        F&uuml;r den Fall, dass mehrere Verbrauchswerte addiert werden sollen, kann der Name von anderen
+        Readings direkt hinter dem eigentliche Wert mit einem Komma abgetrennt angegeben werden.
+        Der aktuelle Status dieses Readings wird dann bei der Berechnung des Gesamtverbrauchs ebenfalls
+        ber&uumL;cksichtigt. Sollen alle in powerMap bekannten Readings ber&uuml;cksichtigt werden, kann
+        auch einfach ein * angegeben werden.
         <br>
         Beispiel f&uuml;r einen FS20 Stecker:
         <ul>
