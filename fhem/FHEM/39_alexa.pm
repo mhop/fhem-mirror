@@ -399,9 +399,17 @@ Log 1, Dumper $characteristicsOfIntent;
         my @parts = split( /,/, $remainder );
         my $utterance = $parts[$#parts];
 
-        push @{$schema->{intents}}, {intent => "FHEM${intent}Intent", };
+        my $intent_name = "FHEM${intent}Intent";
+        if( $intent =~ m/^(set|get|attr)\s/ ) {
+          $intent_name = "FHEM${1}Intent";
+        } elsif( $intent =~ m/^{.*}$/ ) {
+          $intent_name = 'FHEMperlCodeInent';
+        }
+        #$intent_name =~ s/ //g;
 
-        $samples .= "\nFHEM${intent}Intent $utterance";
+        push @{$schema->{intents}}, {intent => $intent_name, };
+
+        $samples .= "\n$intent_name $utterance";
       }
       $samples .= "\n";
     }
