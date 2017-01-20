@@ -17,7 +17,6 @@
 #
 ###############################################
 
-
 package main;
 use strict;
 use warnings;
@@ -62,7 +61,7 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsMyShortcuts DOIFtoolsMenuEntry:1,0 disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsMyShortcuts DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 disabledForIntervals ".$oldAttr;
 }
 
 
@@ -253,11 +252,16 @@ sub DOIFtools_Notify($$) {
       $hash->{DEF} = "associated DOIF: ".join(" ",sort @doifList);
       readingsSingleUpdate($hash,"DOIF_version",fhem("version 98_DOIF.pm noheader",1),0);
     }
-    # get DOIF version and FHEM revision
+    # get DOIF version, FHEM revision and default values
     if ($sn eq "global" and $event =~ "INITIALIZED|MODIFIED $pn") {
       readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"DOIF_version",fhem("version 98_DOIF.pm noheader",1));
         readingsBulkUpdate($hash,"FHEM_revision",fhem("version revision noheader",1));
+        readingsBulkUpdate($hash,"sourceAttribute","readingList") unless ReadingsVal($pn,"sourceAttribute","");
+        readingsBulkUpdate($hash,"recording_target_duration",0) unless ReadingsVal($pn,"recording_target_duration","0");
+        readingsBulkUpdate($hash,"doStatistics","disabled") unless ReadingsVal($pn,"doStatistics","");
+        readingsBulkUpdate($hash,".eM", ReadingsVal($pn,".eM","off"));
+        readingsBulkUpdate($hash,"statisticsDeviceFilterRegex", ".*") unless ReadingsVal($pn,"statisticsDeviceFilterRegex","");
       readingsEndUpdate($hash,0);
       $defs{$pn}{VERSION} = fhem("version 98_DOIFtools.pm noheader",1);
       DOIFtoolsSetNotifyDev($hash,1,1);
@@ -283,13 +287,14 @@ sub DOIFtools_Notify($$) {
       $modules{DOIF}->{FW_deviceOverview} = 1;
     }
     # Statistics event recording
-    if (ReadingsVal($pn,"doStatistics","disabled") eq "enabled" and !IsDisabled($pn) and $sn ne "global" and ReadingsVal($pn,"statisticHours",0) <= ReadingsVal($pn,"recording_target_duration",0))  {
-      readingsSingleUpdate($hash,"stat_$sn",ReadingsVal($pn,"stat_$sn",0)+1,0);
+    if (ReadingsVal($pn,"doStatistics","disabled") eq "enabled" and !IsDisabled($pn) and $sn ne "global" and (ReadingsVal($pn,"statisticHours",0) <= ReadingsVal($pn,"recording_target_duration",0) or !ReadingsVal($pn,"recording_target_duration",0)))  {
+      my $st = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? ".stat_" : "stat_";
+      readingsSingleUpdate($hash,"$st$sn",ReadingsVal($pn,"$st$sn",0)+1,0);
     }
   }
   #statistics time counter updating 
   if (ReadingsVal($pn,"doStatistics","disabled") eq "enabled" and !IsDisabled($pn) and $sn ne "global")  {
-    if (ReadingsVal($pn,"statisticHours",0) <= ReadingsVal($pn,"recording_target_duration",0) or ReadingsVal($pn,"recording_target_duration",0) == 0) {
+    if (!ReadingsVal($pn,"recording_target_duration",0) or ReadingsVal($pn,"statisticHours",0) <= ReadingsVal($pn,"recording_target_duration",0)) {
     my $t = gettimeofday();
     my $te = ReadingsVal($pn,".te",gettimeofday()) + $t - ReadingsVal($pn,".t0",gettimeofday());
     my $tH = int($te*100/3600 +.5)/100;
@@ -300,7 +305,10 @@ sub DOIFtools_Notify($$) {
     readingsEndUpdate($hash,0);
     } else {
       DOIFtoolsSetNotifyDev($hash,1,0);
-      readingsSingleUpdate($hash,"doStatistics","disabled",0);
+    readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash,"Action","event recording target duration reached");
+      readingsBulkUpdate($hash,"doStatistics","disabled");
+    readingsEndUpdate($hash,0);
     }
   }
   return undef;
@@ -457,7 +465,7 @@ sub DOIFtoolsCheckDOIF {
   $ret .= "<li><b>sleep</b> is not recommended in DOIF, use attribute <b>wait</b> for (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">delay</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
   $ret .= "<li>replace <b>[</b>name<b>:?</b>regex<b>]</b> by <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">avoid old syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
 
-  $ret .= "<li>the first command after <b>DOELSE</b> seems to be a condition indicated by <b>$2</b>, check it.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
+  $ret .= "<li>the first <b>command</b> after <b>DOELSE</b> seems to be a <b>condition</b> indicated by <b>$2</b>, check it.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
   my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
   my @sub0 = ();
   my @tmp = ();
@@ -468,11 +476,23 @@ sub DOIFtoolsCheckDOIF {
     }
     foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
       if ($defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
-        $ret .= "<li>Timer in condition and wait timer for commands in the same DOIF branch.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
+        $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
         last;
       }
     }
   }
+  my $wait = AttrVal($tn,"wait","");
+  if ($wait) {
+    $ret .= "<li>At least one <b>indirect timer</b> in attribute <b>wait</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n" 
+        if($wait =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3); 
+  }
+  foreach my $key (sort keys %{$defs{$tn}{time}}) {
+    if ($defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
+      $ret .= "<li>At least one <b>indirect timer</b> in <b>condition</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n";
+      last;
+    }
+  }
+
   $ret = $ret ? "$tn\n<ul>$ret</ul> " : "";
   return $ret;
 }
@@ -511,11 +531,6 @@ sub DOIFtools_Define($$$)
   }
   $hash->{STATE} = "initialized";
   $hash->{logfile} = AttrVal("global","logdir","./log/")."$hash->{TYPE}Log-%Y-%j.log";
-  readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"sourceAttribute","readingList") unless ReadingsVal($pn,"sourceAttribute","");
-    readingsBulkUpdate($hash,"doStatistics","disabled") unless ReadingsVal($pn,"doStatistics","");
-    readingsBulkUpdate($hash,".eM", ReadingsVal($pn,".eM","off"));
-  readingsEndUpdate($hash, 0);
   DOIFtoolsCounterReset($pn);
   return undef;
 }
@@ -529,7 +544,7 @@ sub DOIFtools_Attr(@)
   my $value = (defined $a[3]) ? $a[3] : "";
   my $hash = $defs{$pn};
   my $ret="";
-  if ($attr eq "DOIFtoolsEventMonitorInDOIF") {
+  if ($init_done and $attr eq "DOIFtoolsEventMonitorInDOIF") {
     if (!defined $modules{DOIF}->{FW_detailFn} and $cmd eq "set" and $value) {
         $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
         readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
@@ -538,13 +553,13 @@ sub DOIFtools_Attr(@)
         delete $modules{DOIF}->{FW_detailFn};
         $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,"DOIFtools_dO","");
     }
-  } elsif ($attr eq "DOIFtoolsMenuEntry") {
+  } elsif ($init_done and $attr eq "DOIFtoolsMenuEntry") {
     if ($cmd eq "set" and $value) {
       if (!(AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,\/fhem\?detail\=DOIFtools\,)/)) {
         CommandAttr(undef, "$FW_wname menuEntries DOIFtools,/fhem?detail=DOIFtools,".AttrVal($FW_wname, "menuEntries",""));
         CommandSave(undef, undef);
       }
-    } elsif ($cmd eq "del" or !$value) {
+    } elsif ($init_done and $cmd eq "del" or !$value) {
       if (AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,\/fhem\?detail\=DOIFtools\,)/) {
         my $me = AttrVal($FW_wname, "menuEntries","");
         $me =~ s/DOIFtools\,\/fhem\?detail\=DOIFtools\,//;
@@ -553,6 +568,22 @@ sub DOIFtools_Attr(@)
       }
     
     }
+  } elsif ($init_done and $attr eq "DOIFtoolsHideStatReadings") {
+      DOIFtoolsSetNotifyDev($hash,1,0);
+      readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Action","event recording stopped");
+        readingsBulkUpdate($hash,"doStatistics","disabled");
+        readingsBulkUpdate($hash,"statisticHours","0.00");
+        readingsBulkUpdate($hash,".t0",gettimeofday());
+        readingsBulkUpdate($hash,".te",0);
+      readingsEndUpdate($hash,0);
+      foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
+        delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
+      }
+  } elsif ($init_done and $cmd eq "set" and 
+           $attr =~ m/^(executeDefinition|executeSave|target_room|target_group|readingsPrefix|eventMonitorInDOIF)$/) {
+    $ret .= "\n$1 is an old attribute name use a new one beginning with DOIFtools...";
+    return $ret;
   }
   return undef;
 }
@@ -564,6 +595,9 @@ sub DOIFtools_Undef
   if (devspec2array("TYPE=DOIFtools") <=1 and defined($modules{DOIF}->{FW_detailFn}) and $modules{DOIF}->{FW_detailFn} eq "DOIFtools_eM") {
       delete $modules{DOIF}->{FW_detailFn};
       $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,"DOIFtools_dO","");
+  }
+  if (AttrVal($pn,"DOIFtoolsMenuEntry","")) {
+    CommandDeleteAttr(undef, "$pn DOIFtoolsMenuEntry");
   }
   RemoveInternalTimer($pn,"DOIFtoolsCounterReset");
   return undef;
@@ -580,8 +614,9 @@ sub DOIFtools_Set($@)
   my @doifList = devspec2array("TYPE=DOIF");
   my @ntL =();
   my $dL = join(",",sort @doifList);
-
+  my $st = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? ".stat_" : "stat_";
   my %types = ();
+
   foreach my $d (keys %defs ) {
     next if(IsIgnored($d));
     my $t = $defs{$d}{TYPE};
@@ -602,7 +637,6 @@ sub DOIFtools_Set($@)
           push @ret, $ret if($ret);
         }
         $ret = join("\n", @ret);
-        Log3 $pn, 3, $ret if($ret);
         return $ret;
       } else {
         return "no reading selected.";
@@ -611,19 +645,24 @@ sub DOIFtools_Set($@)
       if ($value eq "deleted") {
         DOIFtoolsSetNotifyDev($hash,1,0);
         readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"Action","event recording stopped");
           readingsBulkUpdate($hash,"doStatistics","disabled");
           readingsBulkUpdate($hash,"statisticHours","0.00");
           readingsBulkUpdate($hash,".t0",gettimeofday());
           readingsBulkUpdate($hash,".te",0);
         readingsEndUpdate($hash,0);
         foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
-          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^stat_");
+          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
         }
       } elsif ($value eq "disabled") {
-        readingsSingleUpdate($hash,"doStatistics","disabled",0);
+        readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"Action","event recording paused");
+          readingsBulkUpdate($hash,"doStatistics","disabled");
+        readingsEndUpdate($hash,0);
         DOIFtoolsSetNotifyDev($hash,1,0);
       } elsif ($value eq "enabled") {
         readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"Action","<html><div style=\"color:red;\" >recording events</div></html>");
           readingsBulkUpdate($hash,"doStatistics","enabled");
           readingsBulkUpdate($hash,".t0",gettimeofday());
         readingsEndUpdate($hash,0);
@@ -639,15 +678,13 @@ sub DOIFtools_Set($@)
           readingsBulkUpdate($hash,"statisticHours","0.00");
         readingsEndUpdate($hash,0);
         foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
-          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^stat_");
+          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
         }
         DOIFtoolsSetNotifyDev($hash,1,0);
   } elsif ($arg eq "recording_target_duration") {
         $value =~ m/(\d+)/;
         readingsSingleUpdate($hash,"recording_target_duration",$1 ? $1 : 0,0);
   } elsif ($arg eq "specialLog") {
-        $hash->{helper}{counter}{1} = 0;
-        $hash->{helper}{counter}{2} = 0;
         if ($value) {
           readingsSingleUpdate($hash,"specialLog",1,0);
           DOIFtoolsSetNotifyDev($hash,1,1);
@@ -655,6 +692,16 @@ sub DOIFtools_Set($@)
           readingsSingleUpdate($hash,"specialLog",0,0);
           DOIFtoolsSetNotifyDev($hash,0,1);
         }
+  } elsif ($arg eq "statisticsDeviceFilterRegex") {
+      $ret = "Bad regexp: starting with *" if($value =~ m/^\*/);
+      eval { "Hallo" =~ m/^$value$/ };
+      $ret .= "\nBad regexp: $@" if($@);
+      if ($ret or !$value) {
+        readingsSingleUpdate($hash,"statisticsDeviceFilterRegex", ".*",0);
+        return "$ret\nRegexp is set to: .*";
+      } else {
+        readingsSingleUpdate($hash,"statisticsDeviceFilterRegex", $value,0);
+      }
   } else {
       if (ReadingsVal($pn,"targetDOIF","")) {
         my $tn = ReadingsVal($pn,"targetDOIF","");
@@ -663,9 +710,9 @@ sub DOIFtools_Set($@)
           push @rL, $key if ($key !~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
         }
         my $rL = join(",",@rL);
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL deleteReadingsInTargetDOIF:multiple-strict,$rL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 ";
+        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL deleteReadingsInTargetDOIF:multiple-strict,$rL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 statisticsDeviceFilterRegex ";
       } else {
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 ";
+        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 statisticsDeviceFilterRegex";
       }
   }
 return $ret;
@@ -749,9 +796,12 @@ sub DOIFtools_Get($@)
       return $ret;
   } elsif ($arg eq "statisticsReport") {
       # event statistics
+      my $regex = ReadingsVal($pn,"statisticsDeviceFilterRegex",".*");
       my $evtsum = 0;
       my $typsum = 0;
       my $allattr = "";
+      my $rx = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? "\.stat_" : "stat_";
+
       $ret = "<b>".sprintf("%-17s","TYPE").sprintf("%-25s","Name").sprintf("%-12s","Anzahl").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Begrenzung</a>")."</b>\n";
       $ret .= sprintf("%-17s","").sprintf("%-25s","").sprintf("%-12s","Events").sprintf("%-8s","1/h").sprintf("%-12s","event-on...")."\n";
       $ret .= sprintf("-"x76)."\n";
@@ -762,7 +812,7 @@ sub DOIFtools_Get($@)
         $typsum = 0;
         $t=0;
         foreach my $key (sort keys %{$defs{$pn}->{READINGS}}) {
-          if ($key =~ m/^stat_(.*)/ and $defs{$1}->{TYPE} eq $typ) {
+          if ($key =~ m/^$rx($regex)/ and $defs{$1}->{TYPE} eq $typ) {
               $evtsum += $hash->{READINGS}{$key}{VAL};
               $typsum += $hash->{READINGS}{$key}{VAL};
               $allattr = " ".join(" ",keys %{$attr{$1}});
@@ -951,19 +1001,22 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>set &lt;name&gt; statisticsTYPEs &lt;List of TYPE used for statistics generation&gt;</code><br>
         <b>statisticsTYPEs</b> setzt eine Liste von TYPE für die Statistikdaten erfasst werden, bestehende Statistikdaten werden gelöscht. <b>Default, ""</b>.<br>
         <br>
+        <code>set &lt;name&gt; statisticsDeviceFilterRegex &lt;regular expression as device filter&gt;</code><br>
+        <b>statisticsDeviceFilterRegex</b> setzt einen Filter auf Gerätenamen, nur die gefilterten Geräte werden im Bericht ausgewertet. <b>Default, ".*"</b>.<br>
+        <br>
         <code>set &lt;name&gt; specialLog &lt;0|1&gt;</code><br>
         <b>specialLog</b> <b>1</b> DOIF-Listing bei Status und Wait-Timer Aktualisierung im Debug-Logfile. <b>Default, 0</b>.<br>
         <br>
         <code>set &lt;name&gt; doStatistics &lt;enabled|disabled|deleted&gt;</code><br>
-        <b>doStatistics</b> <b>deleted</b> setzt die Statistik zurück und löscht alle <i>stat_</i> Readings.<br>
-            <b>disabled</b> pausiert die Statistikdatenerfassung.<br>
-            <b>enabled</b> startet die Statistikdatenerfassung.<br>
+        <b>doStatistics</b><br>
+            &emsp;<b>deleted</b> setzt die Statistik zurück und löscht alle <i>stat_</i> Readings.<br>
+            &emsp;<b>disabled</b> pausiert die Statistikdatenerfassung.<br>
+            &emsp;<b>enabled</b> startet die Statistikdatenerfassung.<br>
         <br>
         <code>set &lt;name&gt; recording_target_duration &lt;hours&gt;</code><br>
         <b>recording_target_duration</b> gibt an wie lange Daten erfasst werden sollen. <b>Default, 0</b> die Dauer ist nicht begrenzt.<br>
         <br>
     </ul>
-</br>
 
 <a name="DOIFtoolsGet"></a>
 <b>Get</b>
@@ -988,7 +1041,6 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <b>runningTimerInDOIF</b> zeigt eine Liste der laufenden Timer. Damit kann entschieden werden, ob bei einem Neustart wichtige Timer gelöscht werden und der Neustart ggf. verschoben werden sollte.<br>
         <br>
     </ul>
-</br>
 
 <a name="DOIFtoolsAttribute"></a>
 <b>Attribute</b><br>
@@ -1014,6 +1066,9 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>attr &lt;name&gt; DOIFtoolsHideModulShortcuts &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulShortcuts</b> <b>1</b>, verstecken der DOIFtools Shortcuts. <b>Default 0</b>.<br>
         <br>
+        <code>attr &lt;name&gt; DOIFtoolsHideStatReadings &lt;0|1&gt;</code><br>
+        <b>DOIFtoolsHideStatReadings</b> <b>1</b>, verstecken der <i>stat_</i> Readings. Das Ändern des Attributs löscht eine bestehende Event-Aufzeichnung. <b>Default 0</b>.<br>
+        <br>
         <code>attr &lt;name&gt; DOIFtoolsMyShortcuts &lt;shortcut name&gt,&lt;command&gt;, ...</code><br>
         <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <a href="#menuEntries">menuEntries</a>.<br>
         Zusätzlich gilt, wenn ein Eintrag mit ## beginnt und mit ,, endet, wird er als HTML interpretiert.<br>
@@ -1032,6 +1087,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <ul>
     DOIFtools erzeugt bei der Aktualisierung von Readings keine Events, daher muss die Seite im Browser aktualisiert werden, um aktuelle Werte zu sehen.<br>
     <br>
+    <li><b>Action</b> zeigt den Status der Event-Aufzeichnung an.</li>
     <li><b>DOIF_version</b> zeigt die Version des DOIF an.</li>
     <li><b>FHEM_revision</b> zeigt die Revision von FHEM an.</li>
     <li><b>doStatistics</b> zeigt den Status der Statistikerzeugung an</li>
@@ -1041,6 +1097,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li><b>statisticHours</b> zeigt die kumulierte Zeit für den Status <i>enabled</i> an, während der, Statistikdaten erfasst werden.</li>
     <li><b>statisticsTYPEs</b> zeigt eine Liste von <i>TYPE</i> an, für deren Geräte die Statistik erzeugt wird.</li>
     <li><b>specialLog</b> zeigt an ob DOIF-Listing im Log eingeschaltet ist.</li>
+    <li><b>statisticsDeviceFilterRegex</b> zeigt den aktuellen Gerätefilterausdruck an.</li>
     </ul>
 </br>
 <a name="DOIFtoolsLinks"></a>

@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update: 98_DOIFtools.pm: improved Attribute handling, help corrections
+            new attribute DOIFtoolsHideStatReadings hides _stat Readings
+            new device filter regex for report generation
+            checkDOIF checks if timer referring DOIF's name have default values
   - feature: 98_powerMap: introduce pre-defined powerMap templates
                           for several FHEM modules
   - bugfix:  93_DbRep: uninitialized value renmode if role is Agent
