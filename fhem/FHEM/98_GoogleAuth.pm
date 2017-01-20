@@ -1,7 +1,7 @@
 # $Id$
 
 # License & technical informations
-=pod
+=for comment
 #
 ################################################################
 #
@@ -43,7 +43,7 @@
 =cut
 
 # Development history
-=pod
+=for comment
 #
 # 2017-01-15 - first commit to ./contrib
 #
@@ -289,7 +289,7 @@ sub gAuth($$) {
     Check the validity of a given token; return value is 1 for a valid token, otherwise -1.<br/>
     <ul>
     <li>Token always consists of six numerical digits and will change every 30 seconds.</li>
-    <li>Token is valid it it matches one of three tokens calculated by FHEM<br/>
+    <li>Token is valid if it matches one of three tokens calculated by FHEM<br/>
     using three timestamps: -30 seconds, now and +30 seconds.<br/>
     This behavior can be changed by attribute ga_strictCheck.</li>
     </ul>
