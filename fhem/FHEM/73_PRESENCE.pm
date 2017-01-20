@@ -271,6 +271,12 @@ PRESENCE_Notify($$)
     
     if($dev_name eq "global" and grep(m/^(?:DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG)$/, @{$events}))
     {
+        if(grep(m/^(?:INITIALIZED|REREADCFG)$/, @{$events}))
+        {
+            $hash->{helper}{ABSENT_COUNT} = int(ReadingsVal($name, ".absenceThresholdCounter", 0));
+            $hash->{helper}{PRESENT_COUNT} = int(ReadingsVal($name, ".presenceThresholdCounter", 0));
+        }
+    
         if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
         {
             delete $hash->{helper}{RUNNING_PID} if(defined($hash->{helper}{RUNNING_PID}));
@@ -1283,14 +1289,15 @@ sub PRESENCE_ProcessState($$)
         {
             if(++$count >= $absenceThreshold)
             {
+                readingsBulkUpdate($hash, ".absenceThresholdCounter", 0);
                 readingsBulkUpdate($hash, "state", "absent");
                 readingsBulkUpdate($hash, "presence", "absent");
-
             }
             else
             {
                 $hash->{helper}{ABSENT_COUNT} = $count;
                 
+                readingsBulkUpdate($hash, ".absenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe absent");
                 readingsBulkUpdate($hash, "presence", "maybe absent");
 
@@ -1327,6 +1334,7 @@ sub PRESENCE_ProcessState($$)
         {
             if(++$count >= $presenceThreshold)
             {
+                readingsBulkUpdate($hash, ".presenceThresholdCounter", "0");
                 readingsBulkUpdate($hash, "state", "present");
                 readingsBulkUpdate($hash, "presence", "present");
                 
@@ -1336,6 +1344,7 @@ sub PRESENCE_ProcessState($$)
             {
                 $hash->{helper}{PRESENT_COUNT} = $count;
                 
+                readingsBulkUpdate($hash, ".presenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe present");
                 readingsBulkUpdate($hash, "presence", "maybe present");
 
