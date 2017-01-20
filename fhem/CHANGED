@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:    96_Snapcast.pm: New module to control a snapcast server
   - update: 98_DOIFtools.pm: improved Attribute handling, help corrections
             new attribute DOIFtoolsHideStatReadings hides _stat Readings
             new device filter regex for report generation
