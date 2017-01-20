@@ -9,6 +9,7 @@ use IO::File;
 # This block is only needed when FileLog is loaded bevore FHEMWEB
 sub FW_pO(@);
 sub FW_pH(@);
+sub FW_addContent(;$);
 use vars qw($FW_ME);      # webname (default is fhem)
 use vars qw($FW_RET);     # Returned data (html)
 use vars qw($FW_RETTYPE); 
@@ -486,7 +487,7 @@ FileLog_logWrapper($)
   my $ret = "";
 
   if(!$d || !$type || !$file) {
-    FW_pO '<div id="content">FileLog_logWrapper: bad arguments</div>';
+    FW_addContent(">FileLog_logWrapper: bad arguments</div");
     return 0;
   }
 
@@ -497,7 +498,7 @@ FileLog_logWrapper($)
         if($path =~ m/%/ && $attr{global}{logdir});
     $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
 
-    FW_pO "<div id=\"content\">";
+    FW_addContent();
     FW_pO "<div class=\"tiny\">" if($FW_ss);
     FW_pO "<pre class=\"log\">";
     my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
@@ -509,7 +510,7 @@ FileLog_logWrapper($)
     }
 
     if(!open(FH, $path)) {
-      FW_pO "<div id=\"content\">$path: $!</div></body></html>";
+      FW_addContent(">$path: $!</div></body></html");
       return 0;
     }
     my $cnt = join("", reverse <FH>);
@@ -522,7 +523,7 @@ FileLog_logWrapper($)
   } else {
     FileLog_loadSVG();
     FW_pO "<script type='text/javascript' src='$FW_ME/pgm2/svg.js'></script>";
-    FW_pO "<div id=\"content\">";
+    FW_addContent();
     FW_pO "<br>";
     if(AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
       FW_pO SVG_zoomLink("$cmd;zoom=-1", "Zoom-in", "zoom in");
