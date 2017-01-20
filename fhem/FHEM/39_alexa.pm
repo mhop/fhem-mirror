@@ -403,7 +403,7 @@ Log 1, Dumper $characteristicsOfIntent;
         if( $intent =~ m/^(set|get|attr)\s/ ) {
           $intent_name = "FHEM${1}Intent";
         } elsif( $intent =~ m/^{.*}$/ ) {
-          $intent_name = 'FHEMperlCodeInent';
+          $intent_name = 'FHEMperlCodeIntent';
         }
         #$intent_name =~ s/ //g;
 
