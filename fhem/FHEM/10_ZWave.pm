@@ -4569,7 +4569,7 @@ ZWave_Parse($$@)
 
   if(!$hash) {
     if(!$baseHash) {
-      Log3 $ioName, 4, "ZWave: unknown message $msg";
+      Log3 $ioName, 4, "ZWave: unknown message $msg for ID $id";
       return "";
     }
     # autocreate the device when pressing the remote button (Forum #43261)

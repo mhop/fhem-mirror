@@ -69,6 +69,7 @@ readingsChangeExec($$)
   return if(!$events);
   my $max = int(@{$events});
 
+  my $matched=0;
   for (my $i = 0; $i < $max; $i++) {
     my $EVENT = $events->[$i];
     next if(!defined($EVENT) || $EVENT !~ m/^([^ ]+): (.+)/);
@@ -76,6 +77,7 @@ readingsChangeExec($$)
     next if($rg !~ m/$re->[1]/ || !$dev->{READINGS}{$rg});
 
     Log3 $SELF, 5, "Changing $NAME:$rg $val via $SELF";
+    $matched++;
     if($rc->{".isPerl"}) {
       eval "\$val =~ s/$re->[2]/$re->[3]/ge";
     } else {
@@ -84,6 +86,7 @@ readingsChangeExec($$)
     $events->[$i] = "$rg: $val";
     $dev->{READINGS}{$rg}{VAL} = $val;
   }
+  evalStateFormat($dev) if($matched);
   return undef;
 }
 
@@ -116,7 +119,16 @@ readingsChangeExec($$)
     &lt;device&gt;, &lt;readingName&gt; and &lt;toReplace&gt; are regular
     expressions, and are not allowed to contain whitespace.
     If replaceWith is enclosed in {}, then the content will be executed as a
-    perl expression for each match.
+    perl expression for each match.<br>
+    Notes:<ul>
+      <li>after a Reading is set by a module, first the event-* attributes are
+        evaluated, then userReadings, then stateFormat, then the
+        readingsChange definitions (in alphabetical order), and after this the
+        notifies, FileLogs, etc. again in alphabetical order.</li>
+      <li>if stateFormat for the matched device is set, then it will be
+        executed multiple times: once before the readingsChange, and once for
+        every matching readingsChange.</li>
+    </ul>
     <br><br>
 
     Examples:
