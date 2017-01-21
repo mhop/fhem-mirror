@@ -247,7 +247,7 @@ telnet_Read($)
     if(!defined($hash->{Authenticated})) {
       syswrite($hash->{CD}, sprintf("%c%c%c\r\n", 255, 252, 1)); # WONT ECHO
 
-      if(Authenticate($hash, $cmd) == 1) {
+      if(Authenticate($hash, $cmd) != 2) {
         $hash->{Authenticated} = 1;
         next;
       } else {

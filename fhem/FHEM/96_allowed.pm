@@ -99,8 +99,8 @@ allowed_Authenticate($$$$)
     
     # Check for Cookie in headers if no basicAuth header is set
     my $authcookie;
-    if ( ( ! $secret ) && ( $FW_httpheader->{Cookie} ) ) {
-      if ( AttrVal($aName, "basicAuthExpiry", 0)) {  
+    if (!$secret && $FW_httpheader->{Cookie}) {
+      if(AttrVal($aName, "basicAuthExpiry", 0)) {
         my $cookie = "; ".$FW_httpheader->{Cookie}.";"; 
         $authcookie = $1 if ( $cookie =~ /; AuthToken=([^;]+);/ ); 
         $secret = $authcookie;
@@ -120,18 +120,11 @@ allowed_Authenticate($$$$)
       }
     }
 
-    # Add Cookie header ONLY if 
-    #   authentication with basic auth was succesful 
-    #   (meaning if no or wrong authcookie set)
-    if ( ( $pwok ) &&  
-         ( ( ! defined($authcookie) ) || ( $secret ne $authcookie ) ) ) {
-      # no cookie set but authorization succesful
-      # check if cookie should be set --> Cookie Attribute != 0 
-      my $time = int(AttrVal($aName, "basicAuthExpiry", 0));
+    # Add Cookie header ONLY if authentication with basicAuth was succesful 
+    if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
+      my $time = AttrVal($aName, "basicAuthExpiry", 0);
       if ( $time ) {
-        # time specified in days until next expiry (but timestamp is in seconds)
-        $time *= 86400;
-        $time += time();
+        $time = int($time*86400+time());
         # generate timestamp according to RFC-1130 in Expires
         my $expires = "Expires=".FmtDateTimeRFC1123($time);
         # set header with expiry
