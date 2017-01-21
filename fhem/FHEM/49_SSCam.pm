@@ -1,6 +1,6 @@
-##########################################################################################################
+#########################################################################################################################
 # $Id$
-##########################################################################################################
+#########################################################################################################################
 #       49_SSCam.pm
 #
 #       (c) 2015-2016 by Heiko Maaz
@@ -24,9 +24,11 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.# 
 #
-##########################################################################################################
+#########################################################################################################################
 #  Versions History:
 #
+# 1.40   21.01.2017    downgrade of API apicammaxver in SVS 8.0.0
+# 1.39   20.01.2017    compatibility to SVS 8.0.0, Version in Internals, execute getsvsinfo after set credentials
 # 1.37   10.10.2016    bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23)
 #                      (Forum: #msg501709)
 # 1.36   18.09.2016    bugfix of get presets, get patrols of zoom-cams without pan/tilt
@@ -154,6 +156,8 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
+my $SSCamVersion = "1.40";
+
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
   100 => "Unknown error",
@@ -253,6 +257,7 @@ sub SSCam_Define {
   $hash->{SERVERADDR}       = $serveraddr;
   $hash->{SERVERPORT}       = $serverport;
   $hash->{CAMNAME}          = $camname;
+  $hash->{VERSION}          = $SSCamVersion;
  
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -460,6 +465,7 @@ sub SSCam_Set {
             return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
                         
             ($success) = setcredentials($hash,$prop,$prop1);
+			getsvsinfo($hash) if($hash->{CREDENTIALS});
             return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
         }
         elsif ($opt eq "expmode") 
@@ -2174,6 +2180,8 @@ sub login_nonbl ($) {
                         if (AttrVal($name, "simu_SVSversion", undef)) {
                             Log3($name, 4, "$name - SVS version $actvs will be simulated");
                             if ($actvs =~ /^71/) {
+                                $apicammaxver = 8;
+                                Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
                                 $apiauthmaxver = 4;
                                 Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
                                 $apiextrecmaxver = 2;
@@ -2181,6 +2189,8 @@ sub login_nonbl ($) {
                                 $apiptzmaxver    = 4;
                                 Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
                             } elsif ($actvs =~ /^72/) {
+                                $apicammaxver = 8;
+                                Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
                                 $apiauthmaxver = 6;
                                 Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
                                 $apiextrecmaxver = 3;
@@ -2193,19 +2203,12 @@ sub login_nonbl ($) {
                         } 
                         Log3($name, 4, "$name - ------- End of simulation section -------");  
                         
-                     # Workarounds für bestimmte SVS-Versionen
+                        # Downgrades für nicht kompatible API-Versionen
                         Log3($name, 4, "$name - ------- Begin of adaption section -------");
-                        if ($actvs =~ /^72/) {
-                            Log3($name, 4, "$name - SVS version $actvs will be adapted to 71xxxx");
-                        #    $apiauthmaxver = 4;
-                        #    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                        #    $apiextrecmaxver = 2;
-                        #    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                            $apiptzmaxver    = 4;
-                            Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-                        } else {
-                            Log3($name, 4, "$name - no adaptions done !");
-                        } 
+                        $apiptzmaxver    = 4;
+                        Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+                        $apicammaxver = 8;
+                        Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
                         Log3($name, 4, "$name - ------- End of adaption section -------");
        
                         # ermittelte Werte in $hash einfügen
@@ -2473,7 +2476,7 @@ sub camop_nonbl ($) {
    my $camname           = $hash->{CAMNAME};
    my $apicam            = $hash->{HELPER}{APICAM};
    my $apicampath        = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};
+   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};  
    my $apiextrec         = $hash->{HELPER}{APIEXTREC};
    my $apiextrecpath     = $hash->{HELPER}{APIEXTRECPATH};
    my $apiextrecmaxver   = $hash->{HELPER}{APIEXTRECMAXVER};
@@ -2558,13 +2561,17 @@ sub camop_nonbl ($) {
              %allcams = ();
              while ($i < $camcount) 
                  {
-                 $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
+                 if ($apicammaxver <= 8) {
+				     $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
+				 } else {
+				     $n = $data->{'data'}->{'cameras'}->[$i]->{'newName'};  # Änderung ab SVS 8.0.0
+				 }
                  $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
                  $allcams{"$n"} = "$id";
                  $i += 1;
                  }
              
-             # Ist der gesuchte Kameraname im Hash enhalten (in SS eingerichtet ?)
+             # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
              if (exists($allcams{$camname})) 
              {
                  $camid = $allcams{$camname};
@@ -2647,7 +2654,7 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "gopreset")
    {
-      # Presets werden abgerufen
+      # Preset wird angefahren
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
    }
