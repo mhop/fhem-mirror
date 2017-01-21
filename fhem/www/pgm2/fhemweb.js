@@ -223,10 +223,30 @@ FW_jqueryReadyFn()
         });
     });
 
+  $("[name=icon-filter]").on("change keyup paste", function() {
+    clearTimeout($.data(this, 'delayTimer'));
+    var wait = setTimeout(FW_filterIcons, 300);
+    $(this).data('delayTimer', wait);
+  });
 
   FW_smallScreenCommands();
   FW_inlineModify();
   FW_rawDef();
+}
+
+function
+FW_filterIcons()
+{
+  var icons = $('.dist[title]');
+  icons.show();
+
+  var filterText = $('[name=icon-filter]').val();
+  if (filterText != '') {
+    var re = RegExp(filterText,"i");
+    icons.filter(function() {
+      return !re.test(this.title);
+    }).hide();
+  }
 }
 
 function

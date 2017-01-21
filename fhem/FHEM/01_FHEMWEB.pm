@@ -2220,6 +2220,7 @@ FW_iconTable($$$$)
 
   FW_addContent();
   FW_pO "<form method=\"$FW_formmethod\">";
+  FW_pO "Filter:&nbsp;".FW_textfieldv("icon-filter",20,"iconTable","")."<br>";
   if($textfield) {
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
   }
