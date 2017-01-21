@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.7
+#  Version 3.8
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -38,7 +38,7 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingfilter <datapoint-expr>
 #  attr <name> ccureadingformat { name[lc] | address[lc] | datapoint[lc] }
-#  attr <name> ccureadingname <oldname>:<newname>[,...]
+#  attr <name> ccureadingname <oldname>:<newname>[;...]
 #  attr <name> ccuverify { 0 | 1 | 2 }
 #  attr <name> controldatapoint <datapoint>
 #  attr <name> disable { 0 | 1 }
@@ -506,6 +506,17 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return undef;
 	}
+	elsif ($opt eq 'deviceinfo') {
+		my $ccuget = shift @$a;
+		$ccuget = 'Attr' if (!defined ($ccuget));
+		if ($ccuget !~ /^(Attr|State|Value)$/) {
+			return HMCCU_SetError ($hash, "Usage: get $name deviceinfo [{'State'|'Value'}]");
+		}
+		my ($a, $c) = split(":", $hash->{ccuaddr});
+		$result = HMCCU_GetDeviceInfo ($hash, $a, $ccuget);
+		return HMCCU_SetError ($hash, -2) if ($result eq '');
+		return HMCCU_FormatDeviceInfo ($result);
+	}
 	elsif ($opt eq 'config') {
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
@@ -542,7 +553,7 @@ sub HMCCUCHN_Get ($@)
 		my @valuelist;
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
 		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
-		$retmsg .= " update:noArg config configlist configdesc:noArg";
+		$retmsg .= " update:noArg deviceinfo config configlist configdesc:noArg";
 		
 		return $retmsg;
 	}
@@ -724,6 +735,9 @@ sub HMCCUCHN_SetError ($$)
       <li><b>get &lt;name&gt; defaults</b><br/>
       	Display default attributes for CCU device type.
       </li><br/>
+      <li><b>get &lt;name&gt; deviceinfo [{State | <u>Value</u>}]</b><br/>
+         Display all channels and datapoints of device with datapoint values and types.
+      </li><br/>
       <li><b>get &lt;name&gt; devstate</b><br/>
          Get state of CCU device. Default datapoint STATE can be changed by setting
          attribute 'statedatapoint'. Command will fail if state datapoint does not exist in
@@ -760,7 +774,7 @@ sub HMCCUCHN_SetError ($$)
       <li><b>ccureadings {0 | <u>1</u>}</b><br/>
          If set to 1 values read from CCU will be stored as readings. Default is 1.
       </li><br/>
-      <li><b>ccureadingfilter &lt;filter-rule[,...]&gt;</b><br/>
+      <li><b>ccureadingfilter &lt;filter-rule[;...]&gt;</b><br/>
          Only datapoints matching specified expression are stored as readings.<br/>
          Syntax for <i>filter-rule</i> is: [&lt;channel-name&gt;!]&lt;RegExp&gt;<br/>
          If <i>channel-name</i> is specified the following rule applies only to this channel.
@@ -774,7 +788,7 @@ sub HMCCUCHN_SetError ($$)
          channel-name.datapoint. If set to 'datapoint' format is channel-number.datapoint. With
          suffix 'lc' reading names are converted to lowercase.
       </li><br/>
-      <li><b>ccureadingname &lt;old-readingname-expr&gt;:[+]&lt;new-readingname&gt;[,...]</b><br/>
+      <li><b>ccureadingname &lt;old-readingname-expr&gt;:[+]&lt;new-readingname&gt;[;...]</b><br/>
          Set alternative or additional reading names or group readings. Only part of old reading
          name matching <i>old-readingname-exptr</i> is substituted by <i>new-readingname</i>.
          If <i>new-readingname</i> is preceded by '+' an additional reading is created. If 

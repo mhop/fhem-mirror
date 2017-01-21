@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.7
+#  Version 3.8
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -17,6 +17,7 @@
 #  define <name> HMCCU <hostname_or_ip_of_ccu>
 #
 #  set <name> cleardefaults
+#  set <name> defaults
 #  set <name> execute <ccu_program>
 #  set <name> importdefaults <filename>
 #  set <name> hmscript <hm_script_file>
@@ -42,6 +43,9 @@
 #
 #  attr <name> ccuackstate { 0 | 1 }
 #  attr <name> ccuaggregate <rules>
+#  attr <name> ccudef-readingfilter <filter_rule>
+#  attr <name> ccudef-readingname <rules>
+#  attr <name> ccudef-substitute <subst_rule>
 #  attr <name> ccudefaults <filename>
 #  attr <name> ccuflags { intrpc,extrpc,dptnocheck,noagg }
 #  attr <name> ccuget { State | Value }
@@ -61,7 +65,6 @@
 #  attr <name> stripchar <character>
 #  attr <name> stripnumber { 0 | 1 | 2 }
 #  attr <name> substitute <subst_rule>
-#  attr <name> substdefaults <subst_rule>
 #
 #  filter_rule := [channel-regexp!]datapoint-regexp[,...]
 #  subst_rule := [[channel.]datapoint[,...]!]<regexp>:<subtext>[,...][;...]
@@ -99,7 +102,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.7';
+my $HMCCU_VERSION = '3.8';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_PORT = (
@@ -133,9 +136,6 @@ my %rpceventargs = (
 	"SL", 2,
 	"ST", 10
 );
-
-# Default datapoint value substitution
-my $HMCCU_SUBST_DEFAULTS = "LOWBAT,LOW_BAT,UNREACH!(0|false):no,(1|true):yes";
 
 # Datapoint operations
 my $HMCCU_OPER_READ  = 1;
@@ -195,6 +195,7 @@ sub HMCCU_Substitute ($$$$$);
 sub HMCCU_SubstRule ($$$);
 sub HMCCU_UpdateClients ($$$$);
 sub HMCCU_UpdateClientReading ($@);
+sub HMCCU_AddDevices ($$);
 sub HMCCU_DeleteDevices ($$);
 sub HMCCU_RPCRegisterCallback ($);
 sub HMCCU_RPCDeRegisterCallback ($);
@@ -220,6 +221,8 @@ sub HMCCU_GetHash ($@);
 sub HMCCU_GetAttribute ($$$$);
 sub HMCCU_GetDatapointCount ($$$);
 sub HMCCU_GetSpecialDatapoints ($$$$$);
+sub HMCCU_GetAttrReadingFormat ($$);
+sub HMCCU_GetAttrSubstitute ($$);
 sub HMCCU_IsValidDevice ($$);
 sub HMCCU_GetCCUDeviceParam ($$);
 sub HMCCU_GetValidDatapoints ($$$$$);
@@ -294,7 +297,7 @@ sub HMCCU_Initialize ($)
 	$hash->{ShutdownFn} = "HMCCU_Shutdown";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,2000,2001,2003,2010,9292 rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute substdefaults ccutrace ccuget:Value,State ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:textField-long ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,2000,2001,2003,2010,9292 rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccutrace ccuget:Value,State ". $readingFnAttributes;
 }
 
 ##################################################
@@ -578,7 +581,7 @@ sub HMCCU_FindDefaults ($$)
 				if ($ccutype =~ /^($deftype)$/ && grep { $_ eq $chn} @chnlst);
 		}
 	}
-	elsif ($type eq 'HMCCUDEV') {
+	elsif ($type eq 'HMCCUDEV' || $type eq 'HMCCU') {
 		if ($common) {
 			return \%{$HMCCU_CUST_DEV_DEFAULTS{COMMON}} if (exists ($HMCCU_CUST_DEV_DEFAULTS{COMMON}));
 			return \%{$HMCCU_DEV_DEFAULTS->{COMMON}} if (exists ($HMCCU_DEV_DEFAULTS->{COMMON}));
@@ -920,7 +923,7 @@ sub HMCCU_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "var execute hmscript cleardefaults:noArg importdefaults rpcserver:on,off,restart";
+	my $options = "var execute hmscript cleardefaults:noArg defaults:noArg importdefaults rpcserver:on,off,restart";
 	my $host = $hash->{host};
 
 	if ($opt ne 'rpcserver' && HMCCU_IsRPCStateBlocking ($hash)) {
@@ -932,11 +935,9 @@ sub HMCCU_Set ($@)
 	my $stripchar = AttrVal ($name, "stripchar", '');
 #	my ($sc, $statedatapoint, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 #	my $statevals = AttrVal ($name, "statevals", '');
-	my $ccureadings = AttrVal ($name, "ccureadings", 'name');
-	my $readingformat = AttrVal ($name, "ccureadingformat", 'name');
-	my $substitute = AttrVal ($name, "substitute", $HMCCU_SUBST_DEFAULTS);
-	my $substdefaults = AttrVal ($name, "substdefaults", $HMCCU_SUBST_DEFAULTS);
-	$substitute .= ";$substdefaults" if ($substitute ne $HMCCU_SUBST_DEFAULTS);
+	my $ccureadings = AttrVal ($name, "ccureadings", 1);
+	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hash);
 
 	if ($opt eq 'var') {
 		my $objname = shift @$a;
@@ -974,11 +975,12 @@ sub HMCCU_Set ($@)
 	}
 	elsif ($opt eq 'hmscript') {
 		my $scrfile = shift @$a;
+		my $dump = shift @$a;
 		my $script;
 		my $response;
 
-		return HMCCU_SetError ($hash, "Usage: set $name hmscript {scriptfile}")
-			if (!defined ($scrfile));
+		return HMCCU_SetError ($hash, "Usage: set $name hmscript {scriptfile} [dump] [parname=value [...]]")
+			if (!defined ($scrfile) || (defined ($dump) && $dump ne 'dump'));
 			
 		if (open (SCRFILE, "<$scrfile")) {
 			my @lines = <SCRFILE>;
@@ -989,6 +991,12 @@ sub HMCCU_Set ($@)
 			return HMCCU_SetError ($hash, -16);
 		}
 
+		# Replace variables
+		foreach my $svar (keys %{$h}) {
+			next if ($script !~ /\$$svar/);
+			$script =~ s/\$$svar/$h->{$svar}/g;
+		}
+		
 		$response = HMCCU_HMScript ($hash, $script);
 		return HMCCU_SetError ($hash, -2) if ($response eq '');
 
@@ -1012,12 +1020,12 @@ sub HMCCU_Set ($@)
 			}
 		}
 
-		return undef;
+		return defined ($dump) ? $response : undef;
 	}
 	elsif ($opt eq 'rpcserver') {
 		my $action = shift @$a;
 
-		return HMCCU_SetError ($hash, "Usage: set $name rpcserver {on|off}")
+		return HMCCU_SetError ($hash, "Usage: set $name rpcserver {on|off|restart}")
 		   if (!defined ($action) || $action !~ /^(on|off|restart)$/);
 		   
 		if ($action eq 'on') {
@@ -1046,6 +1054,11 @@ sub HMCCU_Set ($@)
 			DoTrigger ($name, "RPC server restarting");
 		}
 		
+		return HMCCU_SetState ($hash, "OK");
+	}
+	elsif ($opt eq 'defaults') {
+		my $rc = HMCCU_SetDefaults ($hash);
+		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'cleardefaults') {
@@ -1092,7 +1105,7 @@ sub HMCCU_Get ($@)
 		return "HMCCU: CCU busy, choose one of rpcstate:noArg";
 	}
 
-	my $ccureadingformat = AttrVal ($name, "ccureadingformat", 'name');
+	my $ccureadingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
 	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 	my $parfile = AttrVal ($name, "parfile", '');
 #	my ($sc, $statedatapoint, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
@@ -1403,6 +1416,7 @@ sub HMCCU_ParseObject ($$$)
 
 	if ($object =~ /^(.+?)\.([\*]*[A-Z]{3}[0-9]{7}):([0-9]{1,2})\.(.+)$/ ||
 		$object =~ /^(.+?)\.([0-9A-F]{12,14}):([0-9]{1,2})\.(.+)$/ ||
+		$object =~ /^(.+?)\.(OL-.+):([0-9]{1,2})\.(.+)$/ ||
 		$object =~ /^(.+?)\.(BidCoS-RF):([0-9]{1,2})\.(.+)$/) {
 		#
 		# Interface.Address:Channel.Datapoint [30=11110]
@@ -1412,6 +1426,7 @@ sub HMCCU_ParseObject ($$$)
 	}
 	elsif ($object =~ /^(.+)\.([\*]*[A-Z]{3}[0-9]{7}):([0-9]{1,2})$/ ||
 		$object =~ /^(.+)\.([0-9A-F]{12,14}):([0-9]{1,2})$/ ||
+		$object =~ /^(.+)\.(OL-.+):([0-9]{1,2})$/ ||
 		$object =~ /^(.+)\.(BidCoS-RF):([0-9]{1,2})$/) {
 		#
 		# Interface.Address:Channel [26=11010]
@@ -1421,6 +1436,7 @@ sub HMCCU_ParseObject ($$$)
 	}
 	elsif ($object =~ /^([\*]*[A-Z]{3}[0-9]{7}):([0-9]){1,2}\.(.+)$/ ||
 		$object =~ /^([0-9A-F]{12,14}):([0-9]{1,2})\.(.+)$/ ||
+		$object =~ /^(OL-.+):([0-9]{1,2})\.(.+)$/ ||
 		$object =~ /^(BidCoS-RF):([0-9]{1,2})\.(.+)$/) {
 		#
 		# Address:Channel.Datapoint [14=01110]
@@ -1430,6 +1446,7 @@ sub HMCCU_ParseObject ($$$)
 	}
 	elsif ($object =~ /^([\*]*[A-Z]{3}[0-9]{7}):([0-9]{1,2})$/ ||
 		$object =~ /^([0-9A-Z]{12,14}):([0-9]{1,2})$/ ||
+		$object =~ /^(OL-.+):([0-9]{1,2})$/ ||
 		$object =~ /^(BidCoS-RF):([0-9]{1,2})$/) {
 		#
 		# Address:Channel [10=01010]
@@ -1439,6 +1456,7 @@ sub HMCCU_ParseObject ($$$)
 	}
 	elsif ($object =~ /^([\*]*[A-Z]{3}[0-9]{7})$/ ||
 		$object =~ /^([0-9A-Z]{12,14})$/ ||
+		$object =~ /^(OL-.+)$/ ||
 		$object eq 'BidCoS') {
 		#
 		# Address
@@ -1500,15 +1518,15 @@ sub HMCCU_FilterReading ($$$)
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return 1 if (!defined ($hmccu_hash));
 	
-	my $rf = AttrVal ($name, 'ccureadingfilter', '.*');
 	my $cf = AttrVal ($name, 'ccuflags', 'null');
-
-	return 1 if ($rf eq '.*');
-	return 1 if ($cf !~ /nohmstate/ && $dpt =~ /(^UNREACH|^LOWBAT|^LOW_BAT|^ERROR|^FAULT)/);
+	my $grf = AttrVal ($hmccu_hash->{NAME}, 'ccudef-readingfilter', '');
+	my $rf = AttrVal ($name, 'ccureadingfilter', $grf);
+	$rf .= ";".$grf if ($rf ne $grf && $grf ne '.*' && $grf ne '');
 
 	my $chnnam = HMCCU_IsChnAddr ($chn, 0) ? HMCCU_GetChannelName ($hmccu_hash, $chn, '') : $chn;
+	Log3 $name, 2, "HMCCU: FilterReading: dpt=$dpt chnname=$chnnam rf=$rf" if ($cf =~ /trace/);
 
-	my @rules = split (",", $rf);
+	my @rules = split (';', $rf);
 	foreach my $r (@rules) {
 		my ($c, $f) = split ("!", $r);
 		if (defined ($f) && $chnnam ne '') {
@@ -1565,9 +1583,11 @@ sub HMCCU_GetReadingName ($$$$$$$)
 	my @rnlist;
 
 	Log3 $name, 1, "HMCCU: ChannelNo undefined: Addr=".$a if (!defined ($c));
-	
-	$rf = AttrVal ($name, 'ccureadingformat', 'name') if (!defined ($rf));
-	my $sr = AttrVal ($name, 'ccureadingname', '');
+
+	$rf = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash) if (!defined ($rf));
+	my $gsr = AttrVal ($hmccu_hash->{NAME}, 'ccudef-readingname', '');
+	my $sr = AttrVal ($name, 'ccureadingname', $gsr);
+	$sr .= ";".$gsr if ($sr ne $gsr && $gsr ne '');
 	
 	# Datapoint is mandatory
 	return '' if ($d eq '');
@@ -1613,7 +1633,7 @@ sub HMCCU_GetReadingName ($$$$$$$)
 	
 	# Rename and/or add reading names
 	if ($sr ne '') {
-		my @rules = split (',', $sr);
+		my @rules = split (';', $sr);
 		foreach my $rr (@rules) {
 			my ($rold, $rnew) = split (':', $rr);
 			next if (!defined ($rnew));
@@ -1924,6 +1944,8 @@ sub HMCCU_UpdateClientReading ($@)
 		Log3 $name, 2, "HMCCU: $fnc Address $address not valid";
 		return 0;
 	}
+	
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	# Update reading in matching client devices
 	foreach my $d (keys %defs) {
@@ -1956,45 +1978,65 @@ sub HMCCU_UpdateClientReading ($@)
 		# Get attributes of client device
 		my $dis = AttrVal ($cn, 'disable', 0);
 		my $upd = AttrVal ($cn, 'ccureadings', 1);
-		my $crf = AttrVal ($cn, 'ccureadingformat', 'name');
-		my $substitute = AttrVal ($cn, 'substitute', $HMCCU_SUBST_DEFAULTS);
-		my $substdefaults = AttrVal ($name, "substdefaults", $HMCCU_SUBST_DEFAULTS);
-		$substitute .= ";$substdefaults" if ($substitute ne $HMCCU_SUBST_DEFAULTS);
-		my $substexcl = AttrVal ($cn, 'substexcl', '');
+		my $crf = HMCCU_GetAttrReadingFormat ($ch, $hash);
+		my $substitute = HMCCU_GetAttrSubstitute ($ch, $hash);
 		my ($sc, $st, $cc, $cd) = HMCCU_GetSpecialDatapoints ($ch, '', 'STATE', '', '');
 		last if ($upd == 0 || $dis == 1);
-		next if (!HMCCU_FilterReading ($ch, $chnadd, $dpt));
 
 		Log3 $name, 2, "HMCCU: $fnc device=$cn, devadd=$devadd, chnadd=$chnadd, dpt=$dpt, value=$value"
 			if ($cf =~ /trace/);
-
-		my @readings = HMCCU_GetReadingName ($ch, '', $devadd, $chn, $dpt, '', $crf);
-
-		# Client substitute attribute has priority
-		my $svalue = HMCCU_ScaleValue ($ch, $dpt, $value, 0);	
-		my $fvalue = HMCCU_FormatReadingValue ($ch, $svalue);
-		my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chn, $dpt);
-
-		Log3 $name, 2, "HMCCU: $fnc device=$cn, readings=".join(',', @readings).
-			", orgvalue=$value value=$cvalue" if ($cf =~ /trace/);
 
 		$ch->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
 		
 		# Update datapoint reading and control/state readings
  		readingsBeginUpdate ($ch);
- 		foreach my $rn (@readings) {
-			HMCCU_BulkUpdate ($ch, $rn, $value, $cvalue) if ($rn ne '');
+ 		
+		if (HMCCU_FilterReading ($ch, $chnadd, $dpt)) {
+			my @readings = HMCCU_GetReadingName ($ch, '', $devadd, $chn, $dpt, '', $crf);
+			my $svalue = HMCCU_ScaleValue ($ch, $dpt, $value, 0);	
+			my $fvalue = HMCCU_FormatReadingValue ($ch, $svalue);
+			my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chn, $dpt);
+			
+			Log3 $name, 2, "HMCCU: $fnc device=$cn, readings=".join(',', @readings).
+				", orgvalue=$value value=$cvalue" if ($cf =~ /trace/);
+
+			foreach my $rn (@readings) {
+				HMCCU_BulkUpdate ($ch, $rn, $value, $cvalue) if ($rn ne '');
+			}
+			HMCCU_BulkUpdate ($ch, 'control', $fvalue, $cvalue)
+				if ($cd ne '' && $dpt eq $cd && $chn eq $cc);
+			HMCCU_BulkUpdate ($ch, 'state', $fvalue, $cvalue)
+				if ($dpt eq $st && ($sc eq '' || $sc eq $chn));
 		}
-		HMCCU_BulkUpdate ($ch, 'control', $fvalue, $cvalue)
-			if ($cd ne '' && $dpt eq $cd && $chn eq $cc);
-		HMCCU_BulkUpdate ($ch, 'state', $fvalue, $cvalue)
-			if ($dpt eq $st && ($sc eq '' || $sc eq $chn));
-		my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($cn, undef);
-		HMCCU_BulkUpdate ($ch, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+		
+		if ($ccuflags !~ /nohmstate/) {
+			my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($cn, undef);
+			HMCCU_BulkUpdate ($ch, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+		}
+		
 		readingsEndUpdate ($ch, 1);
 	}
 
 	return 1;
+}
+
+####################################################
+# Update existing devices
+####################################################
+
+sub HMCCU_AddDevices ($$)
+{
+	my ($hash, $devlist) = @_;
+	
+	foreach my $a (@$devlist) {
+		foreach my $d (keys %defs) {
+			my $ch = $defs{$d};
+			next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
+			next if ($ch->{TYPE} ne 'HMCCUCHN');
+			$ch->{chntype} = defined ($hash->{hmccu}{dev}{$a}{chntype}) ?
+				$hash->{hmccu}{dev}{$a}{chntype} : "unknown";
+		}
+	}
 }
 
 ####################################################
@@ -3186,11 +3228,13 @@ sub HMCCU_IsChnAddr ($$)
 	if ($f) {
 		return ($id =~ /^.+\.[\*]*[A-Z]{3}[0-9]{7}:[0-9]{1,2}$/ ||
 		   $id =~ /^.+\.[0-9A-F]{12,14}:[0-9]{1,2}$/ ||
+		   $id =~ /^.+\.OL-.+:[0-9]{1,2}$/ ||
 		   $id =~ /^.+\.BidCoS-RF:[0-9]{1,2}$/) ? 1 : 0;
 	}
 	else {
 		return ($id =~ /^[\*]*[A-Z]{3}[0-9]{7}:[0-9]{1,2}$/ ||
 		   $id =~ /^[0-9A-F]{12,14}:[0-9]{1,2}$/ ||
+		   $id =~ /^OL-.+:[0-9]{1,2}$/ ||
 		   $id =~ /^BidCoS-RF:[0-9]{1,2}$/) ? 1 : 0;
 	}
 }
@@ -3207,11 +3251,13 @@ sub HMCCU_IsDevAddr ($$)
 	if ($f) {
 		return ($id =~ /^.+\.[\*]*[A-Z]{3}[0-9]{7}$/ ||
 		   $id =~ /^.+\.[0-9A-F]{12,14}$/ ||
+		   $id =~ /^.+\.OL-.+$/ ||
 		   $id =~ /^.+\.BidCoS-RF$/) ? 1 : 0;
 	}
 	else {
 		return ($id =~ /^[\*]*[A-Z]{3}[0-9]{7}$/ ||
 		   $id =~ /^[0-9A-F]{12,14}$/ ||
+		   $id =~ /^OL-.+$/ ||
 		   $id eq 'BidCoS-RF') ? 1 : 0;
 	}
 }
@@ -3402,6 +3448,49 @@ sub HMCCU_GetSpecialDatapoints ($$$$$)
 	return ($sc, $sd, $cc, $cd);
 }
 
+######################################################################
+# Get reading format considering default attribute
+# ccudef-readingformat defined in I/O device.
+# Default reading format for virtual groups is always 'name'.
+######################################################################
+
+sub HMCCU_GetAttrReadingFormat ($$)
+{
+	my ($clhash, $iohash) = @_;
+	
+	my $clname = $clhash->{NAME};
+	my $ioname = $iohash->{NAME};
+	my $rfdef = '';
+	
+	if (exists ($clhash->{ccutype}) && $clhash->{ccutype} =~ /^HM-CC-VG/) {
+		$rfdef = 'name';
+	}
+	else {
+		$rfdef = AttrVal ($ioname, 'ccudef-readingformat', 'datapoint');
+	}
+	
+	return  AttrVal ($clname, 'ccureadingformat', $rfdef);
+}
+
+######################################################################
+# Get attributes substitute and substexcl considering default
+# attribute ccudef-substitute defined in I/O device.
+######################################################################
+
+sub HMCCU_GetAttrSubstitute ($$)
+{
+	my ($clhash, $iohash) = @_;
+	
+	my $clname = $clhash->{NAME};
+	my $ioname = $iohash->{NAME};
+
+	my $substdef = AttrVal ($ioname, 'ccudef-substitute', '');
+	my $subst = AttrVal ($clname, 'substitute', $substdef);
+	$subst .= ";$substdef" if ($subst ne $substdef && $substdef ne '');
+	
+	return $subst;
+}
+
 ####################################################
 # Clear RPC queue
 ####################################################
@@ -3434,8 +3523,6 @@ sub HMCCU_ProcessEvent ($$)
 	
 	return undef if (!defined ($event) || $event eq '');
 
-	my $rf = AttrVal ($name, 'ccureadingformat', 'name');
-
 	my @t = split (/\|/, $event);
 	my $tc = scalar (@t);
 
@@ -3467,7 +3554,6 @@ sub HMCCU_ProcessEvent ($$)
 		#
 		return undef if ($tc != 4 || !HMCCU_IsChnAddr ($t[1], 0));
 		my ($add, $chn) = split (/:/, $t[1]);
-#		my $reading = HMCCU_GetReadingName ($hash, '', $add, $chn, $t[2], '', $rf);
 		HMCCU_UpdateClientReading ($hash, $add, $chn, $t[2], $t[3], 'rpcevent');
 		return ($t[0], $add, $chn, '', $t[3]);
 	}
@@ -3558,9 +3644,9 @@ sub HMCCU_ProcessEvent ($$)
 		#
 		# CCU device added, deleted or readded
 		# Input:  {ND,DD,RA}|Address
-		# Output: {ND,DD,RA}, DevAdd
+		# Output: {ND,DD,RA}, DevAdd, [ChnType]
 		#
-		return ($t[0], $t[1]);
+		return ($t[0], $t[1], $t[2]);
 	}
 	elsif ($t[0] eq 'UD') {
 		#
@@ -3645,7 +3731,9 @@ sub HMCCU_ReadRPCQueue ($)
 					last if ($eventno == $maxevents);
 				}
 				elsif ($et eq 'ND') {
+					push (@newdevices, $par[0]);
 					$newcount++ if (!exists ($hash->{hmccu}{dev}{$par[0]}));
+					$hash->{hmccu}{dev}{$par[0]}{chntype} = $par[1];
 				}
 				elsif ($et eq 'DD') {
 					push (@deldevices, $par[0]);
@@ -3687,6 +3775,7 @@ sub HMCCU_ReadRPCQueue ($)
 	}
 
 	# CCU devices added
+	HMCCU_AddDevices ($hash, \@newdevices) if (scalar @newdevices > 0);
 	if ($newcount > 0) {
 		$hash->{NewDevices} += $newcount;
 		DoTrigger ($name, "$newcount devices added in CCU");
@@ -3715,7 +3804,12 @@ sub HMCCU_ReadRPCQueue ($)
 
 	if ($f == 2 && $nhm_pids == 0) {
 		# All RPC servers terminated and restart flag set
-		return if (HMCCU_StartExtRPCServer ($hash));
+		if ($ccuflags =~ /extrpc/) {
+			return if (HMCCU_StartExtRPCServer ($hash));
+		}
+		else {
+			return if (HMCCU_StartIntRPCServer ($hash));
+		}
 		Log3 $name, 0, "HMCCU: Restart of RPC server failed";
 	}
 
@@ -3748,12 +3842,12 @@ sub HMCCU_ReadRPCQueue ($)
 }
 
 ####################################################
-# Execute Homematic script on CCU
+# Execute Homematic script on CCU.
+# Parameters: hostname, script-code
 ####################################################
 
 sub HMCCU_HMScript ($$)
 {
-	# Hostname, Script-Code
 	my ($hash, $hmscript) = @_;
 	my $name = $hash->{NAME};
 	my $host = $hash->{host};
@@ -3787,25 +3881,25 @@ sub HMCCU_UpdateSingleReading ($$$$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return $value if (!defined ($hmccu_hash));
-
-	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
-	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $disable = AttrVal ($name, 'disable', 0);
-	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
-	my $substitute = AttrVal ($name, "substitute", $HMCCU_SUBST_DEFAULTS);
-	my $substdefaults = AttrVal ($hmccu_hash->{NAME}, "substdefaults", $HMCCU_SUBST_DEFAULTS);
-	$substitute .= ";$substdefaults" if ($substitute ne $HMCCU_SUBST_DEFAULTS);
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 	
+	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
+	my $disable = AttrVal ($name, 'disable', 0);
 	return $value if ($ccureadings == 0 || $disable == 1);
 
+	my $hmccuflags = AttrVal ($hmccu_hash->{NAME}, 'ccuflags', 'null');
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hmccu_hash);
+	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
+	
+	$hash->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
+	
 	my $svalue = HMCCU_ScaleValue ($hash, $dpt, $value, 0);	
 	my $fvalue = HMCCU_FormatReadingValue ($hash, $svalue);
 	my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chn, $dpt);
 
-	$hash->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
-	
 	readingsBeginUpdate ($hash);
+	
 	foreach my $rn (@$readings) {
 		HMCCU_BulkUpdate ($hash, $rn, $value, $cvalue) if ($rn ne '');
 	}
@@ -3813,8 +3907,12 @@ sub HMCCU_UpdateSingleReading ($$$$$)
 		if ($cd ne '' && $dpt eq $cd && $chn eq $cc);
 	HMCCU_BulkUpdate ($hash, 'state', $fvalue, $cvalue)
 		if ($dpt eq $sd && ($sc eq '' || $sc eq $chn));
-	my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
-	HMCCU_BulkUpdate ($hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+		
+	if ($hmccuflags !~ /nohmstate/) {
+		my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
+		HMCCU_BulkUpdate ($hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+	}
+	
 	readingsEndUpdate ($hash, 1);
 	
 	return $cvalue;
@@ -3851,8 +3949,7 @@ sub HMCCU_GetDatapoint ($@)
 	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
-	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
-	my $substitute = AttrVal ($name, 'substitute', '');
+	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
 	   $hash, '', 'STATE', '', '');
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
@@ -3914,7 +4011,7 @@ sub HMCCU_SetDatapoint ($$$)
 	my $name = $hmccu_hash->{NAME};
 	my $cdname = $hash->{NAME};
 	
-	my $readingformat = AttrVal ($cdname, 'ccureadingformat', 'name');
+	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my $ccuflags = AttrVal ($cdname, 'ccuflags', 'null');
 	my $ccuverify = AttrVal ($cdname, 'ccuverify', 0); 
 
@@ -4218,23 +4315,22 @@ if (odev) {
 sub HMCCU_UpdateDeviceReadings ($$)
 {
 	my ($cl_hash, $dp) = @_;
-	my $name = $cl_hash->{NAME};
+	my $cn = $cl_hash->{NAME};
 
 	my $uc = 0;
 
 	my $hmccu_hash = HMCCU_GetHash ($cl_hash);
 	return 0 if (!defined ($hmccu_hash));
 
-	my $cn = $cl_hash->{NAME};
 	my $disable = AttrVal ($cn, 'disable', 0);
 	return 0 if ($disable == 1);
 	my $ccureadings = AttrVal ($cn, 'ccureadings', 1);
 	return -6 if ($ccureadings == 0);
+	
+	my $hmccuflags = AttrVal ($hmccu_hash->{NAME}, 'ccuflags', 'null');
 	my $ccuflags = AttrVal ($cn, 'ccuflags', 'null');
-	my $readingformat = AttrVal ($cn, 'ccureadingformat', 'name');
-	my $substitute = AttrVal ($cn, "substitute", $HMCCU_SUBST_DEFAULTS);
-	my $substdefaults = AttrVal ($hmccu_hash->{NAME}, "substdefaults", $HMCCU_SUBST_DEFAULTS);
-	$substitute .= ";$substdefaults" if ($substitute ne $HMCCU_SUBST_DEFAULTS);
+	my $readingformat = HMCCU_GetAttrReadingFormat ($cl_hash, $hmccu_hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($cl_hash, $hmccu_hash);
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($cl_hash, '', 'STATE', '', '');
 
 	readingsBeginUpdate ($cl_hash);
@@ -4249,31 +4345,34 @@ sub HMCCU_UpdateDeviceReadings ($$)
                  
 		my ($add, $chn) = split /:/, $adrtoks[1];
 		my $dpt = $adrtoks[2];
-		next if (!HMCCU_FilterReading ($cl_hash, $adrtoks[1], $dpt));
-		my @readings = HMCCU_GetReadingName ($cl_hash, $adrtoks[0], $add, $chn, $dpt,
-		   $dpdata[0], $readingformat);
-                 
 		my $value = (defined ($dpdata[2]) && $dpdata[2] ne '') ? $dpdata[2] : 'N/A';
-		my $svalue = HMCCU_ScaleValue ($cl_hash, $dpt, $value, 0);	
-		my $fvalue = HMCCU_FormatReadingValue ($cl_hash, $svalue);
-		my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chn, $dpt);
-
+                 
 		$cl_hash->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
-		
-		foreach my $rn (@readings) {
-			HMCCU_BulkUpdate ($cl_hash, $rn, $value, $cvalue) if ($rn ne '');
+
+		if (HMCCU_FilterReading ($cl_hash, $adrtoks[1], $dpt)) {		
+			my @readings = HMCCU_GetReadingName ($cl_hash, $adrtoks[0], $add, $chn, $dpt,
+				$dpdata[0], $readingformat);
+			my $svalue = HMCCU_ScaleValue ($cl_hash, $dpt, $value, 0);	
+			my $fvalue = HMCCU_FormatReadingValue ($cl_hash, $svalue);
+			my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chn, $dpt);
+
+			foreach my $rn (@readings) {
+				HMCCU_BulkUpdate ($cl_hash, $rn, $value, $cvalue) if ($rn ne '');
+			}
+			HMCCU_BulkUpdate ($cl_hash, 'control', $fvalue, $cvalue)
+				if ($cd ne '' && $adrtoks[2] eq $cd && $chn eq $cc);
+			HMCCU_BulkUpdate ($cl_hash, "state", $fvalue, $cvalue)
+				if (($adrtoks[2] eq $sd) && ($sc eq '' || $sc eq $chn));
+			$uc++;
 		}
-		HMCCU_BulkUpdate ($cl_hash, 'control', $fvalue, $cvalue)
-			if ($cd ne '' && $adrtoks[2] eq $cd && $chn eq $cc);
-		HMCCU_BulkUpdate ($cl_hash, "state", $fvalue, $cvalue)
-			if (($adrtoks[2] eq $sd) && ($sc eq '' || $sc eq $chn));
-		$uc++;
 	}
 
 	# Get HomeMatic state
-	my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
-	HMCCU_BulkUpdate ($cl_hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
-
+	if ($hmccuflags !~ /nohmstate/) {
+		my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($cn, undef);
+		HMCCU_BulkUpdate ($cl_hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+	}
+	
 	readingsEndUpdate ($cl_hash, 1);
 
 	return $uc;
@@ -4305,6 +4404,7 @@ sub HMCCU_GetChannel ($$)
 	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 	my $type_hash = $type eq 'HMCCU' ? $hmccu_hash : $hash;
 
+	my $hmccuflags = AttrVal ($hmccu_hash->{NAME}, 'ccuflags', 'null');
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
@@ -4374,12 +4474,12 @@ foreach (sChannel, sChnList.Split(",")) {
 			HMCCU_UpdateClientReading ($hmccu_hash, $add, $chn, $dpt, $value);
 		}
 		else {
+			$hash->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
+
 			$value = HMCCU_ScaleValue ($hash, $dpt, $dpdata[2], 0);	
 			my $fvalue = HMCCU_FormatReadingValue ($hash, $value);
 			my $cvalue = HMCCU_Substitute ($fvalue, $chnpars{$dpdata[0]}{sub}, 0, $chn, $dpt);
 			
-			$hash->{hmccu}{dp}{"$chn.$dpt"}{VAL} = $value;
-
 			my @readings = HMCCU_GetReadingName ($type_hash, $adrtoks[0], $add, $chn, $dpt,
 		   	$dpdata[0], $readingformat);
 			
@@ -4400,9 +4500,11 @@ foreach (sChannel, sChnList.Split(",")) {
 		$count++;
 	}
 
-	my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
-	HMCCU_BulkUpdate ($hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
-
+	if ($hmccuflags !~ /nohmstate/) {
+		my ($hms_chn, $hms_dpt, $hms_val) = HMCCU_GetHMState ($name, undef);
+		HMCCU_BulkUpdate ($hash, 'hmstate', $hms_val, $hms_val) if (defined ($hms_val));
+	}
+	
 	readingsEndUpdate ($hash, 1) if ($type ne 'HMCCU' && $ccureadings);
 
 	return ($count, $result);
@@ -4422,14 +4524,14 @@ sub HMCCU_RPCGetConfig ($$$$)
 	my $addr;
 	my $result = '';
 
-	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
-	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
-	my $substitute = AttrVal ($name, 'substitute', '');
-
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $result) if (!defined ($hmccu_hash));
 	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 
+	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
+	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hmccu_hash);
+	
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_FULLADDR);
 	return (-1, '') if (!($flags & $HMCCU_FLAG_ADDRESS));
@@ -4676,7 +4778,7 @@ sub HMCCU_QueueDeq ($)
 # Determine Homematic state of device.
 #
 # Considered datapoints (sorted by priority):
-#   UNREACH, ERROR.*, FAULT_REPORTING, LOWBAT/LOW_BAT
+#   UNREACH, ERROR.*, FAULT_REPORTING, SABOTAGE, LOWBAT/LOW_BAT
 #
 # Return (channelno, datapoint, value)
 ######################################################################
@@ -4699,7 +4801,7 @@ sub HMCCU_GetHMState ($$)
 	return @hmstate if (!exists ($clhash->{hmccu}{dp}));
 	
 	# Priority of datapoints
-	my @dpprio = ('UNREACH', 'ERROR', 'FAULT', 'LOWBAT');
+	my @dpprio = ('UNREACH', 'ERROR', 'FAULT', 'SABOTAGE', 'LOWBAT');
 	
 	# Combine datapoints: LOW_BAT => LOWBAT, ERROR.* => ERROR, FAULT.* => FAULT
 	my $dpsub = "^LOW_BAT:LOWBAT,^ERROR_.*:ERROR,^FAULT_REPORTING:FAULT";
@@ -4721,7 +4823,7 @@ sub HMCCU_GetHMState ($$)
 		my $v = $clhash->{hmccu}{dp}{$dp}{VAL};
 
 		next if (!defined ($d));
-		if ($d =~ /^(UNREACH|LOWBAT|LOW_BAT|ERROR.*|FAULT_REPORTING)$/) {
+		if ($d =~ /^(UNREACH|LOWBAT|LOW_BAT|ERROR.*|FAULT_REPORTING|SABOTAGE)$/) {
 			my $edp = $1;
 
 			# Combine datapoints
@@ -5349,18 +5451,24 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
 		<li><b>set &lt;name&gt; cleardefaults</b><br/>
 			Clear default attributes imported from file.
 		</li><br/>
+		<li><b>set &lt;name&gt; defaults</b><br/>
+		   Set default attributes for I/O device.
+		</li><br/>
       <li><b>set &lt;name&gt; execute &lt;program&gt;</b><br/>
          Execute a CCU program.
          <br/><br/>
          Example:<br/>
          <code>set d_ccu execute PR-TEST</code>
       </li><br/>
-      <li><b>set &lt;name&gt; hmscript &lt;script-file&gt;</b><br/>
-         Execute Homematic script on CCU. If output of script contains lines in format
-         Object=Value readings in corresponding FHEM devices will be set (if exist).
-         <i>Object</i> can be the name of a CCU system variable or a valid channel and
-         datapoint specification. Readings for system variables are set in the I/O
-         device. Datapoint related readings are set in client devices.
+      <li><b>set &lt;name&gt; hmscript &lt;script-file&gt; [dump] [&lt;parname&gt;=&lt;value&gt; 
+         [...]]</b><br/>
+         Execute Homematic script on CCU. If script code contains parameter in format $parname
+         they are substituted by corresponding command line parameters <i>parname</i>.<br/>
+         If output of script contains lines in format Object=Value readings in existing
+         corresponding FHEM devices will be set. <i>Object</i> can be the name of a CCU system
+         variable or a valid channel and datapoint specification. Readings for system variables
+         are set in the I/O device. Datapoint related readings are set in client devices. If option
+         'dump' is specified the result of script execution is displayed in FHEM web interface.
       </li><br/>
       <li><b>set &lt;name&gt; importdefaults &lt;filename&gt;</b><br/>
       	Import default attributes from file.
@@ -5496,6 +5604,24 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
       	Example: Find devices with low batteries<br/>
       	name=battery,filter:name=.*,read:(LOWBAT|LOW_BAT),if:any=yes,else:no,prefix:batt_,coll:NAME<br/>
       </li><br/>
+      <li><b>ccudef-readingfilter &lt;filter-rule[;...]&gt;</b><br/>
+         Set global reading/datapoint filter. This filter is added to the filter specified by
+         client device attribute 'ccureadingfilter'.
+      </li><br/>
+      <li><b>ccudef-readingformat {name | address | <u>datapoint</u> | namelc | addresslc |
+		   datapointlc}</b><br/>
+		   Set global reading format. This format is the default for all readings except readings
+		   of virtual device groups.
+		</li><br/>
+      <li><b>ccudef-readingname &lt;old-readingname-expr&gt;:[+]&lt;new-readingname&gt;
+         [;...]</b><br/>
+         Set global rules for reading name substitution. These rules are added to the rules
+         specified by client device attribute 'ccureadingname'.
+      </li><br/>
+      <li><b>ccudef-substitute &lt;subst-rule&gt;[;...]</b><br/>
+         Set global substitution rules for datapoint value. These rules are added to the rules
+         specified by client device attribute 'substitute'.
+      </li><br/>
       <li><b>ccudefaults &lt;filename&gt;</b><br/>
       	Load default attributes for HMCCUCHN and HMCCUDEV devices from specified file. Best
       	practice for creating a custom default attribute file is by exporting predefined default
@@ -5537,7 +5663,7 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
          <ul>
          <li>2000 = Wired components</li>
          <li>2001 = BidCos-RF (wireless 868 MHz components with BidCos protocol)</li>
-         <li>2003 = Homegear</li>
+         <li>2003 = Homegear (experimental)</li>
          <li>2010 = HM-IP (wireless 868 MHz components with IPv6 protocol)</li>
          <li>9292 = CCU group devices (especially heating groups)</li>
          </ul>
@@ -5563,10 +5689,6 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
       	The value ccu-number is only relevant if more than one CCU is connected to FHEM.
       	Example: If <i>base-port</i> is 5000, protocol is BidCos (rpc-port 2001) and only
       	one CCU is connected the resulting RPC server port is 5000+2001+(10*0) = 7001.
-      </li><br/>
-      <li><b>substdefault &lt;subst-rule&gt;</b><br/>
-      	Specify default substitution rule(s). Accepts same syntax as attribute 'substitute'.
-      	Global default for all client devices is "LOWBAT,LOW_BAT,UNREACH!(0|false):no,(1|true):yes".
       </li><br/>
       <li><b>substitute &lt;subst-rule&gt;:&lt;substext&gt;[,...]</b><br/>
          Define substitions for datapoint values. Syntax of <i>subst-rule</i> is<br/><br/>

@@ -4,17 +4,17 @@
 #
 #  $Id$
 #
-#  Version 3.7
+#  Version 3.8
 #
 #  Configuration parameters for Homematic devices.
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
-#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR* and FAULT* must not be
-#  specified in ccureadingfilter. They are always stored as readings.
+#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR*, SABOTAGE and FAULT* must
+#  not be specified in ccureadingfilter. They are always stored as readings.
 #  Datapoints LOWBAT, LOW_BAT and UNREACH must not be specified in
-#  substitute because they are substituted by default. See attribute
-#  substdefaults in module HMCCU.
+#  substitute because they are substituted by default.
+#  See attributes ccudef-readingname and ccudef-substitute in module HMCCU.
 #
 #########################################################################
 
@@ -34,7 +34,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
 	_channels        => "1",
-	ccureadingfilter => "(SABOTAGE|STATE)",
+	ccureadingfilter => "STATE",
 	hmstatevals      => "ERROR!7:sabotage;SABOTAGE!1:sabotage",
 	statedatapoint   => "STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
@@ -224,6 +224,13 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statedatapoint   => "STATE",
 	substitute       => "STATE!0:dry,1:wet,2:water"	
 	},
+	"HM-WDS30-OT2-SM|HM-WDS30-OT2-SM-2" => {
+	_description     => "Temperaturdifferenz-Sensor",
+	_channels        => "1,2,3,4,5",
+	ccureadingfilter => "TEMPERATURE",
+	statedatapoint   => "TEMPERATURE",
+	stripnumber      => 1
+	},
 	"HM-OU-LED16|HM-OU-X" => {
 	_description     => "Statusanzeige 16 Kanal LED",
 	_channels        => "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
@@ -239,9 +246,16 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 # Default attributes for Homematic devices of type HMCCUDEV
 #
 %HMCCU_DEV_DEFAULTS = (
+   "CCU2" => {
+   _description     => "HomeMatic CCU2",
+   "ccudef-readingfilter" => '^(LOW_?BAT|UNREACH)$',
+   "ccudef-readingformat" => 'datapoint',
+   "ccudef-readingname"   => '^(.+\.)?AES_KEY$:sign;^(.+\.)?LOW_?BAT$:battery;^(.+\.)?UNREACH$:Activity;^(.+\.)?TEMPERATURE$:+measured-temp;^(.+\.)?SET_TEMPERATURE$:+desired-temp;^(.+\.)?HUMIDITY$:+humidity;^(.+\.)?LEVEL$:+pct;^(.+\.)?CONTROL_MODE$:+controlMode',
+   "ccudef-substitute"    => 'AES_KEY!(0|false):off,(1|true):on;LOWBAT,LOW_BAT!(0|false):ok,(1|true):low;UNREACH!(0|false):alive,(1|true):dead;MOTION!(0|false):noMotion,(1|true):motion;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!0:false,1:true;INHIBIT!(0|false):unlocked,(1|true):locked'
+   },
 	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
-	ccureadingfilter => "(SABOTAGE|STATE)",
+	ccureadingfilter => "STATE",
 	hmstatevals      => "ERROR!7:sabotage;SABOTAGE!1:sabotage",
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
@@ -508,7 +522,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	"HM-Sec-Sir-WM" => {
 	_description     => "Funk-Innensirene",
 	ccureadingfilter => "STATE",
-	ccureadingname   => "1.STATE:STATE_SENSOR1,2.STATE:STATE_SENSOR2,3.STATE:STATE_PANIC",
+	ccureadingname   => "1.STATE:STATE_SENSOR1;2.STATE:STATE_SENSOR2;3.STATE:STATE_PANIC",
 	eventMap         => "/datapoint 3.STATE true:panic/",
 	hmstatevals      => "ERROR_SABOTAGE!1:sabotage",
 	statedatapoint   => "4.ARMSTATE",
@@ -518,7 +532,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	"HM-LC-RGBW-WM" => {
 	_description     => "Funk-RGBW-Controller",
 	ccureadingfilter => "(COLOR|PROGRAM|LEVEL)",
-	ccureadingname   => "2.COLOR:+color,3.PROGRAM:+prog",
+	ccureadingname   => "2.COLOR:+color;3.PROGRAM:+prog",
 	controldatapoint => "1.LEVEL",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	eventMap         => "/datapoint 3.PROGRAM :prog/datapoint 2.COLOR :color/",
@@ -541,6 +555,11 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	ccureadingfilter => "STATE",
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!0:dry,1:wet,2:water"	
+	},
+	"HM-WDS30-OT2-SM|HM-WDS30-OT2-SM-2" => {
+	_description     => "Temperaturdifferenz-Sensor",
+	ccureadingfilter => "TEMPERATURE",
+	stripnumber      => 1
 	},
 	"HM-OU-CF-Pl|HM-OU-CFM-Pl|HM-OU-CFM-TW" => {
 	_description     => "Funk-Gong mit Signalleuchte mit/ohne Batterie und Speicher",
