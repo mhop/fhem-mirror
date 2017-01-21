@@ -1111,7 +1111,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         }
  ,"HM-SEC-SD-2"       =>{ devRepeatCntMax =>1}
  ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
- ,"HM-LC-AO-SM"       =>{ voltage_0       =>1,voltage_100     =>1,relayDelay      =>1}
  ,"HM-LC-Ja1PBU-FM"   =>{ refRunTimeSlats =>1,posSaveTime     =>1}
 );
 
