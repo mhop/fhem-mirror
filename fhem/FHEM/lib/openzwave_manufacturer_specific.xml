@@ -216,6 +216,7 @@
 		<Product type="0001" id="0011" name="Metering Plug MT02646" config="devolo/mt02646.xml"/>
 		<Product type="0002" id="000e" name="Door/Window Contact MT02648" config="philio/pst02-1c.xml"/>
                 <Product type="0002" id="0020" name="Temperature and Humidity sensor MT:2755" config="philio/phpat02.xml"/>
+                <Product type="0004" id="000a" name="Siren" config="devolo/siren.xml"/>
 		<Product type="0100" id="0101" name="Scene Switch MT2652"/>
 		<Product type="2004" id="04a4" name="Smoke Detector MT02651"/>
 	</Manufacturer>
