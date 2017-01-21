@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiFlowerSens 0.4.1, bugfix new error handling
   - update:  88_HMCCU: version 3.8
   - feature: 74_XiaomiFlowerSens 0.4.0, better error handling
   - change:  73_PRESENCE: store threshold counter in state file for restarts
