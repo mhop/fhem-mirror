@@ -211,22 +211,27 @@ sub HMtemplate_Notify(@){######################################################
 sub HMtemplate_GetFn($@) {#####################################################
   my ($hash,$name,$cmd,@a) = @_;
   my $ret;
-  
 
   $cmd = "?" if(!$cmd);# by default print options
   #------------ statistics ---------------
-  if   ($cmd eq "usage"){##print protocol-events-------------------------
-    my ($type) = @a;
-    my $tN = InternalVal($name,"tpl_Name",undef);
-    return "template not defined" if (!$tN || ! defined $culHmTpl->{$tN});
-    $ret = HMinfo_templateUsg("","",$tN);
-  }  
+  if($cmd eq "defineCmd"){##print protocol-events-------------------------
+    my ($tN) = @a;
+    return "template not given" if(!defined $tN);
+    return "template unknown $tN" if(!defined $culHmTpl->{$tN});
 
+    return "set hm templateDef $tN "
+            .join(":",split(" ",$culHmTpl->{$tN}{p}))
+            ." \"$culHmTpl->{$tN}{t}\""
+            ." ".join(" ",map{$_.=":".$culHmTpl->{$tN}{reg}{$_}} keys %{$culHmTpl->{$tN}{reg}})
+            ;
+  }  
   else{
-    my @cmdLst =     
-           ( "usage"
-           );
-            
+    my @cmdLst = ( "defineCmd"
+                 );
+
+    my $tList = ":".join(",",sort keys%{$culHmTpl});
+    $_ .=$tList foreach(grep/^(defineCmd)$/,@cmdLst);
+           
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
   return $ret;
@@ -471,7 +476,7 @@ sub HMtemplate_save($$)  {#
 }
 sub HMtemplate_init(@)  {#
   my $name = shift;
-  return if(!defined $defs{$name});
+  return if(!defined $name || !defined $defs{$name});
   my $hash = $defs{$name};
   delete $hash->{$_}      foreach(grep /^tpl_/,keys %{$hash});
   delete $attr{$name}{$_} foreach(grep /^Reg_/,keys %{$attr{$name}});#clean the settings  
