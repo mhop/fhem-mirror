@@ -1789,14 +1789,16 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                             my $loopMsg = $msg;
                             if ( $catchall == 1 ) {
-                                $loopTitle = "Fw: $loopTitle" if ($loopTitle);
+                                $loopTitle = "Fw: $loopTitle"
+                                  if ( $loopTitle
+                                    && $type[$i] !~ /^(audio|screen)$/ );
                                 $loopMsg = "Forwarded Message: $loopMsg"
                                   if ( !$loopTitle );
                                 if ( $type[$i] eq "mail" ) {
                                     $loopMsg .=
 "\n\n-- \nMail catched from device $device";
                                 }
-                                else {
+                                elsif ( $type[$i] !~ /^(audio|screen)$/ ) {
                                     $loopMsg .=
                                       " ### (Catched from device $device)";
                                 }
