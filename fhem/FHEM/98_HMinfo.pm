@@ -189,23 +189,26 @@ sub HMinfo_Attr(@) {###########################################################
 }
 
 sub HMinfo_Notify(@){##########################################################
-  my ($ntfy, $dev) = @_;
+  my ($hash, $dev) = @_;
+  my $name = $hash->{NAME};
   return "" if ($dev->{NAME} ne "global");
 
-  my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
+  my $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
   return undef if(!$events); # Some previous notify deleted the array.
 
   #we need to init the templist if HMInfo is in use
-  my $cfgFn  = AttrVal($ntfy->{NAME},"configTempFile","tempList.cfg");
+  my $cfgFn  = AttrVal($name,"configTempFile","tempList.cfg");
   HMinfo_listOfTempTemplates() if (grep /(FILEWRITE.*$cfgFn|INITIALIZED)/,@{$events});
 
-  return undef if (grep !/INITIALIZED/,@{$events});
-
-  HMinfo_SetFn($ntfy,$ntfy->{NAME},"loadConfig") 
-       if (  grep (/INITIALIZED/,@{$events})
-           && (substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0));
-  
-  #delete $modules{HMinfo}{NotifyFn};
+  if (grep /(SAVE|SHUTDOWN)/,@{$events}){# also save configuration
+    HMinfo_archConfig($hash,$name,"","");
+  }
+  if (grep /INITIALIZED/,@{$events}){
+    HMinfo_SetFn($hash,$name,"loadConfig") 
+         if (  grep (/INITIALIZED/,@{$events})
+             && (substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0));
+    
+  }
   return undef;
 }
 sub HMinfo_status($){##########################################################
@@ -436,7 +439,7 @@ sub HMinfo_regCheck(@) { ######################################################
           || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
     }
-    if ($ehash->{helper}{shadowReg}){
+    if ($ehash->{helper}{shadowReg} && ref($ehash->{helper}{shadowReg}) eq 'HASH'){
       foreach my $rl (keys %{$ehash->{helper}{shadowReg}}){
         my $pre =  (CUL_HM_getAttrInt($eName,"expert") & 0x02)?"":".";#raw register on
 
