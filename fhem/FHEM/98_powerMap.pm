@@ -25,8 +25,6 @@
 #
 ################################################################################
 # TODO
-# - help users setting powerMap attribute using internal hash database or
-#   by copying from $defs{$name}{powerMap}
 # - document how to include powerMap for other module maintainers
 #   (see 50_HP1000)
 #
@@ -47,9 +45,9 @@ sub powerMap_Attr(@);
 sub powerMap_Notify($$);
 
 sub powerMap_AttrVal($$$$);
-sub powerMap_load($$;$);
+sub powerMap_load($$;$$);
 sub powerMap_unload($$);
-sub powerMap_FindPowerMaps(;$);
+sub powerMap_findPowerMaps(;$);
 sub powerMap_power($$$;$);
 sub powerMap_energy($$;$);
 sub powerMap_update($;$);
@@ -588,7 +586,7 @@ sub powerMap_Set($@) {
     my $value    = join( " ", @a ) if (@a);
 
     my $assign;
-    my $maps = powerMap_FindPowerMaps();
+    my $maps = powerMap_findPowerMaps();
     foreach ( sort keys %{$maps} ) {
         $assign .= "," if ($assign);
         $assign .= $_;
@@ -602,14 +600,7 @@ sub powerMap_Set($@) {
 
     my $ret;
 
-    if ( $argument eq "devices" ) {
-        my @devices = devspec2array("$TYPE=.+");
-        return @devices
-          ? join( "\n", sort(@devices) )
-          : "no devices with $TYPE attribute defined";
-    }
-
-    elsif ( $argument eq "assign" ) {
+    if ( $argument eq "assign" ) {
         my @devices = devspec2array($value);
         return "No matching device found." unless (@devices);
 
@@ -659,14 +650,16 @@ sub powerMap_Get($@) {
       . join( " ", values %powerMap_gets )
       unless ( exists( $powerMap_gets{$argument} ) );
 
+    my $ret;
+
     if ( $argument eq "devices" ) {
-        my @devices = devspec2array("i:$TYPE=.+");
-        return @devices
-          ? join( "\n", sort(@devices) )
-          : "no devices with $TYPE attribute defined";
+        my $pmdevs = powerMap_findPowerMaps(":PM_ENABLED");
+        return keys %{$pmdevs}
+          ? join( "\n", sort keys %{$pmdevs} )
+          : "No powerMap enabled devices found.";
     }
 
-    return;
+    return $ret;
 }
 
 sub powerMap_Attr(@) {
@@ -722,43 +715,21 @@ sub powerMap_Notify($$) {
         foreach my $event ( @{$events} ) {
             next unless ( defined($event) );
 
-            if ( $event =~ m/^(INITIALIZED|SHUTDOWN)$/ ) {
-                my $event_prefix = $1;
-
-                # search for devices with user defined
-                # powerMap support to be initialized
-                my @slaves =
-                  devspec2array( "a:$TYPE=.+:FILTER=$TYPE" . "_noEnergy!=1" );
-
-                # search for loaded modules with direct
-                # powerMap support to be initialized
-                foreach ( keys %modules ) {
-                    if ( defined( $modules{$_}{$TYPE} ) ) {
-                        my @instances =
-                          devspec2array(
-                            "a:TYPE=$_:FILTER=$TYPE" . "_noEnergy!=1" );
-                        push @slaves, @instances;
-                    }
-                }
-
-                # search for devices with direct
-                # powerMap support to be initialized
-                foreach ( keys %defs ) {
-                    push( @slaves, $_ )
-                      if ( defined( $defs{$_}{$TYPE} ) );
-                }
-
-                # remove duplicates
-                my %h = map { $_ => 1 } @slaves;
-                @slaves = keys %h;
-
-                # initialize or terminate powerMap for each device
-                foreach (@slaves) {
-                    next if ( $_ eq "global" or $_ eq $name );
+            # initialize or terminate powerMap for each device
+            if ( $event =~ /^(INITIALIZED|SHUTDOWN)$/ ) {
+                foreach ( keys %{ powerMap_findPowerMaps(":PM_$1") } ) {
                     next
-                      unless ( $event_prefix eq "SHUTDOWN"
-                        or powerMap_load( $name, $_ ) );
-                    Log3 $name, 4, "$TYPE: $event_prefix for $_";
+                      if ( $_ eq "global"
+                        or $_ eq $name
+                        or
+                        powerMap_AttrVal( $name, $_, $TYPE . "_noEnergy", 0 ) );
+
+                    powerMap_update("$name|$dev") if ( $1 eq "SHUTDOWN" );
+
+                    next
+                      unless ( $1 eq "SHUTDOWN"
+                        || powerMap_load( $name, $_, undef, 1 ) );
+                    Log3 $name, 4, "$TYPE: $1 for $_";
                 }
             }
 
@@ -896,8 +867,8 @@ sub powerMap_AttrVal($$$$) {
     return AttrVal( $p, $TYPE . "_" . $n, AttrVal( $p, $n, $default ) );
 }
 
-sub powerMap_load($$;$) {
-    my ( $name, $dev, $unload ) = @_;
+sub powerMap_load($$;$$) {
+    my ( $name, $dev, $unload, $modSupport ) = @_;
     my $dev_hash = $defs{$dev};
     my $TYPE     = $defs{$name}{TYPE};
 
@@ -954,8 +925,7 @@ sub powerMap_load($$;$) {
 
     unless ($powerMap) {
         return powerMap_update("$name|$dev")
-          if ( defined( $dev_hash->{$TYPE}{map} )
-            || defined( $modules{ $dev_hash->{TYPE} }{$TYPE}{map} ) );
+          if ($modSupport);
 
         RemoveInternalTimer("$name|$dev");
         delete $dev_hash->{pM_update}
@@ -1009,23 +979,42 @@ sub powerMap_unload($$) {
     return powerMap_load( $n, $d, 1 );
 }
 
-sub powerMap_FindPowerMaps(;$) {
+sub powerMap_findPowerMaps(;$) {
     my ($device) = @_;
-
     my %maps;
 
-    # collect all active definitions
-    unless ($device) {
-        foreach ( devspec2array("i:TYPE=.*:FILTER=powerMap=.+") ) {
+    # directly return any existing device specific definition
+    if ( $device && $device !~ /^:/ ) {
+        return {}
+          unless ( defined( $defs{$device} )
+            && defined( $defs{$device}{TYPE} ) );
+
+        return $defs{$device}{powerMap}{map}
+          if ( $defs{$device}{powerMap}{map}
+            && ref( $defs{$device}{powerMap}{map} ) eq "HASH"
+            && keys %{ $defs{$device}{powerMap}{map} } );
+    }
+
+    # get all devices with direct powerMap definitions
+    else {
+        foreach ( devspec2array("i:powerMap=.+") ) {
             $maps{$_}{map} = $defs{$_}{powerMap}{map}
               if ( $defs{$_}{powerMap}{map}
                 && ref( $defs{$_}{powerMap}{map} ) eq "HASH"
                 && keys %{ $defs{$_}{powerMap}{map} } );
         }
+
+        if ( $device && $device eq ":PM_INITIALIZED" ) {
+            foreach ( devspec2array("a:powerMap=.+") ) {
+                $maps{$_}{map} = $_ if ( !$maps{$_}{map} );
+            }
+        }
     }
 
-    # add templates from modules
-    foreach my $TYPE ( keys %modules ) {
+    # search templates from modules
+    foreach my $TYPE ( $device
+        && $device !~ /^:/ ? $defs{$device}{TYPE} : keys %modules )
+    {
         next unless ( $modules{$TYPE}{powerMap} );
         my $t            = $modules{$TYPE}{powerMap};
         my $modelSupport = 0;
@@ -1075,9 +1064,8 @@ sub powerMap_FindPowerMaps(;$) {
         }
     }
 
-    unless ( $device && $device =~ /^MODULE:/ ) {
-
-        # find possible template for each Fhem device
+    # find possible template for each Fhem device
+    unless ($device) {
         foreach my $TYPE ( keys %powerMap_tmpl ) {
             next unless ( $modules{$TYPE} );
 
@@ -1130,8 +1118,10 @@ sub powerMap_FindPowerMaps(;$) {
                 }
             }
         }
+    }
 
-        # filter devices where no reading exists
+    # filter devices where no reading exists
+    unless ( $device && $device eq ":PM_INITIALIZED" ) {
         foreach my $d ( keys %maps ) {
             if ( !$maps{$d}{map} || ref( $maps{$d}{map} ) ne "HASH" ) {
                 delete $maps{$d};
@@ -1150,26 +1140,18 @@ sub powerMap_FindPowerMaps(;$) {
         }
     }
 
-    if ( $device && $device =~ /^MODULE:(.*)$/ ) {
-        return if ( !$maps{$1} );
-        return \$maps{$1};
-    }
-    return if ( $device && !$maps{$device} );
-    return \$maps{$device} if ($device);
+    return {}
+      if ( $device && $device !~ /^:/ && !defined( $maps{$device} ) );
+    return \$maps{$device} if ( $device && $device !~ /^:/ );
     return \%maps;
 }
 
 sub powerMap_power($$$;$) {
     my ( $name, $dev, $event, $loop ) = @_;
-    my $hash  = $defs{$name};
-    my $TYPE  = $hash->{TYPE};
-    my $power = 0;
-    my $powerMap =
-      $defs{$dev}{$TYPE}{map} ? $defs{$dev}{$TYPE}{map}
-      : (
-          $defs{$dev}{$TYPE}{map} ? $defs{$dev}{$TYPE}{map}
-        : $modules{ $defs{$dev}{TYPE} }{$TYPE}{map}
-      );
+    my $hash     = $defs{$name};
+    my $TYPE     = $hash->{TYPE};
+    my $power    = 0;
+    my $powerMap = powerMap_findPowerMaps($dev);
 
     return unless ( defined($powerMap) and ref($powerMap) eq "HASH" );
 
@@ -1535,7 +1517,7 @@ sub powerMap_update($;$) {
         <br>
         In case several power values need to be summarized, the name of other readings may be added after
         number value, separated by comma. The current status of that reading will then be considered for
-        the total power calculcation. To consider all readings known to powerMap, just as an *.
+        the total power calculcation. To consider all readings known to powerMap, just as an *.<br>
         <br>
         Example for FS20 socket:
         <ul>
@@ -1705,7 +1687,7 @@ sub powerMap_update($;$) {
         Readings direkt hinter dem eigentliche Wert mit einem Komma abgetrennt angegeben werden.
         Der aktuelle Status dieses Readings wird dann bei der Berechnung des Gesamtverbrauchs ebenfalls
         ber&uumL;cksichtigt. Sollen alle in powerMap bekannten Readings ber&uuml;cksichtigt werden, kann
-        auch einfach ein * angegeben werden.
+        auch einfach ein * angegeben werden.<br>
         <br>
         Beispiel f&uuml;r einen FS20 Stecker:
         <ul>
