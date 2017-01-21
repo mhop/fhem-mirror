@@ -539,7 +539,8 @@ my %zwave_cmdArgs = (
 use vars qw(%zwave_parseHook);
 #my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
-my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
+my %zwave_modelIdAlias = ( "0175-0004-000a" => "devolo_Siren",
+                           "010f-0301-1001" => "Fibaro_FGRM222",
                            "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
                            "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
@@ -549,6 +550,19 @@ my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
 # Patching certain devices.
 our %zwave_deviceSpecial;
 %zwave_deviceSpecial = (
+   devolo_Siren => {
+     ALARM => {
+      set => { alarmSmokeOn    =>"050000000001010000",
+               alarmEmergencyOn=>"050000000007010000",
+               alarmFireOn     =>"05000000000a020000",
+               alarmAmbulanceOn=>"05000000000a030000",
+               alarmPoliceOn   =>"05000000000a010000",
+               alarmSilentOn   =>"05000000000afe0000",
+               alarmDoorchimeOn=>"050000000006160000",
+               alarmArmOn      =>"050000000006030000",
+               alarmDisarmOn   =>"050000000006040000",
+               alarmBeepOn     =>"05000000000a050000" } } },
+
    Fibaro_FGRM222 => {
      MANUFACTURER_PROPRIETARY => {
       set   => { positionSlat=>"010f26010100%02x",
