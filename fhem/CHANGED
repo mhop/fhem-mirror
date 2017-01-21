@@ -1,12 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - change: 73_PRESENCE: store threshold counter in state file for restarts
+  - feature: 74_XiaomiFlowerSens 0.4.0, better error handling
+  - change:  73_PRESENCE: store threshold counter in state file for restarts
   - feature: 98_DOIFtools.pm: new report filter for event rate
-  - new:    96_Snapcast.pm: New module to control a snapcast server
-  - update: 98_DOIFtools.pm: improved Attribute handling, help corrections
-            new attribute DOIFtoolsHideStatReadings hides _stat Readings
-            new device filter regex for report generation
-            checkDOIF checks if timer referring DOIF's name have default values
+  - new:     96_Snapcast.pm: New module to control a snapcast server
+  - update:  98_DOIFtools.pm: improved Attribute handling, help corrections
+             new attribute DOIFtoolsHideStatReadings hides _stat Readings
+             new device filter regex for report generation
+             checkDOIF checks if timer referring DOIF's name have default values
   - feature: 98_powerMap: introduce pre-defined powerMap templates
                           for several FHEM modules
   - bugfix:  93_DbRep: uninitialized value renmode if role is Agent

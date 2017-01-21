@@ -35,8 +35,27 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.11";
+my $version = "0.4.0";
 
+
+
+
+# Declare functions
+sub XiaomiFlowerSens_Initialize($);
+sub XiaomiFlowerSens_Define($$);
+sub XiaomiFlowerSens_Undef($$);
+sub XiaomiFlowerSens_Attr(@);
+sub XiaomiFlowerSens_stateRequest($);
+sub XiaomiFlowerSens_stateRequestTimer($);
+sub XiaomiFlowerSens_Set($$@);
+sub XiaomiFlowerSens($);
+sub XiaomiFlowerSens_Run($);
+sub XiaomiFlowerSens_gattCharRead($$$);
+sub XiaomiFlowerSens_readBatFW($$);
+sub XiaomiFlowerSens_forRun_encodeJSON($$);
+sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$);
+sub XiaomiFlowerSens_Done($);
+sub XiaomiFlowerSens_Aborted($);
 
 
 
@@ -243,7 +262,7 @@ sub XiaomiFlowerSens($) {
         
     my $response_encode = XiaomiFlowerSens_forRun_encodeJSON($mac,$wfr);
         
-    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_Run", $name."|".$response_encode, "XiaomiFlowerSens_Done", 15, "XiaomiFlowerSens_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_Run", $name."|".$response_encode, "XiaomiFlowerSens_Done", 30, "XiaomiFlowerSens_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - Starte Blocking Call";
     
     readingsSingleUpdate ( $hash, "state", "call data", 1 ) if( ReadingsVal($name, "state", 0) eq "active" );
@@ -288,18 +307,30 @@ sub XiaomiFlowerSens_gattCharRead($$$) {
     
     
     my $loop = 0;
+    my $wresp;
+    my @readData;
+    
     while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         printf "\n(Sub XiaomiFlowerSens_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
         sleep 0.5;
         $loop++;
     }
     
-    #printf "\n\nSub XiaomiFlowerSens - WriteForRead: $wfr";
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
-    my $wresp       = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
-    #printf "\nSub XiaomiFlowerSens - WriteResponse: $wresp\n\n";
+    if($wfr == 1) {
+        
+        do {
+            $wresp       = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
+            $loop++;
+            
+        } while( ($loop < 10) and (not defined($wresp)) );
+    }
     
-    my @readData        = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35));
+    do {
+        @readData        = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>/dev/null));
+        $loop++;
+    
+    } while( ($loop < 10) and (not defined($readData[0])) );
     
     return (undef,undef,undef,undef)
     unless( defined($readData[0]) );
