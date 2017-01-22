@@ -720,6 +720,27 @@ logProxy_xy2Plot($)
 
   return ($ret,$min,$max,$last);
 }
+#create plot data from xy-file
+#assume colums separated by whitespace and x,y pairs separated by comma
+sub
+logProxy_xyFile2Plot($$$)
+{
+  my ($filename, $column, $regex)= @_;
+  my @array;
+
+  if (open(F, "<$filename")) {
+    while(<F>) {
+          chomp;
+          if(/$regex/) {
+            my @a= split(/\s/,$_);
+            my @p= split(",", $a[$column-1]);
+            push @array, \@p;
+          }
+    }
+    close(F);
+  }
+  return logProxy_xy2Plot(\@array);
+}
 #create plot data from date-y-array
 sub
 logProxy_values2Plot($)
@@ -1382,6 +1403,9 @@ logProxy_Get($@)
           the following list: hour,qday,day,week,month,year and the values representing the step with for the zoom level.</li>
         <li>logProxy_xy2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
           of xy-cordinate pairs as the data to be plotted.</li>
+        <li>logProxy_xyFile2Plot($filename,$column,$regex) is a sample implementation of a function that will accept a filename,
+            a column number and a regular expression. The requested column in all lines in the file that match the regular expression
+            needs to be in the format x,y to indicate the xy-cordinate pairs as the data to be plotted.</li>
         <li>logProxy_values2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
           of date-y-cordinate pairs as the data to be plotted.</li>
         <li>The perl expressions have access to $from and $to for the begining and end of the plot range and also to the
