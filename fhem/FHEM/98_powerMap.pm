@@ -47,8 +47,8 @@ sub powerMap_Notify($$);
 sub powerMap_AttrVal($$$$);
 sub powerMap_load($$;$$);
 sub powerMap_unload($$);
-sub powerMap_findPowerMaps(;$);
-sub powerMap_verifyEventChain($$);
+sub powerMap_findPowerMaps($;$);
+sub powerMap_verifyEventChain($$$);
 sub powerMap_power($$$;$);
 sub powerMap_energy($$;$);
 sub powerMap_update($;$);
@@ -545,7 +545,12 @@ sub powerMap_Initialize($) {
     $hash->{NotifyFn} = $TYPE . "_Notify";
 
     $hash->{AttrList} =
-      "disable:1,0 " . $TYPE . "_gridV:230,110 " . $readingFnAttributes;
+        "disable:1,0 "
+      . $TYPE
+      . "_gridV:230,110 "
+      . $TYPE
+      . "_eventChainWarnOnly:1,0 "
+      . $readingFnAttributes;
 
     addToAttrList( $TYPE . "_noEnergy:1,0" );
     addToAttrList( $TYPE . "_noPower:1,0" );
@@ -604,7 +609,7 @@ sub powerMap_Set($@) {
     my $value    = join( " ", @a ) if (@a);
 
     my $assign;
-    my $maps = powerMap_findPowerMaps();
+    my $maps = powerMap_findPowerMaps($name);
     foreach ( sort keys %{$maps} ) {
         $assign .= "," if ($assign);
         $assign .= $_;
@@ -671,7 +676,7 @@ sub powerMap_Get($@) {
     my $ret;
 
     if ( $argument eq "devices" ) {
-        my $pmdevs = powerMap_findPowerMaps(":PM_ENABLED");
+        my $pmdevs = powerMap_findPowerMaps( $name, ":PM_ENABLED" );
         return keys %{$pmdevs}
           ? join( "\n", sort keys %{$pmdevs} )
           : "No powerMap enabled devices found.";
@@ -735,7 +740,8 @@ sub powerMap_Notify($$) {
 
             # initialize or terminate powerMap for each device
             if ( $event =~ /^(INITIALIZED|SHUTDOWN)$/ ) {
-                foreach ( keys %{ powerMap_findPowerMaps(":PM_$1") } ) {
+                foreach ( keys %{ powerMap_findPowerMaps( $name, ":PM_$1" ) } )
+                {
                     next
                       if ( $_ eq "global"
                         or $_ eq $name
@@ -982,6 +988,7 @@ sub powerMap_load($$;$$) {
             }
 
             $dev_hash->{$TYPE}{map} = $map;
+            powerMap_verifyEventChain( $name, $dev, $map );
             return powerMap_update("$name|$dev");
         }
     }
@@ -997,22 +1004,25 @@ sub powerMap_unload($$) {
     return powerMap_load( $n, $d, 1 );
 }
 
-sub powerMap_findPowerMaps(;$) {
-    my ($device) = @_;
+sub powerMap_findPowerMaps($;$) {
+    my ( $name, $dev ) = @_;
     my %maps;
 
     # directly return any existing device specific definition
-    if ( $device && $device !~ /^:/ ) {
+    if ( $dev && $dev !~ /^:/ ) {
         return {}
-          unless ( defined( $defs{$device} )
-            && defined( $defs{$device}{TYPE} ) );
+          unless ( defined( $defs{$dev} )
+            && defined( $defs{$dev}{TYPE} ) );
 
-        return $defs{$device}{powerMap}{map}
-          if ( $defs{$device}{powerMap}{map}
-            && ref( $defs{$device}{powerMap}{map} ) eq "HASH"
-            && keys %{ $defs{$device}{powerMap}{map} }
-            && powerMap_verifyEventChain( $device,
-                $defs{$device}{powerMap}{map} ) );
+        return $defs{$dev}{powerMap}{map}
+          if (
+               $defs{$dev}{powerMap}{map}
+            && ref( $defs{$dev}{powerMap}{map} ) eq "HASH"
+            && keys %{ $defs{$dev}{powerMap}{map} }
+            && powerMap_verifyEventChain(
+                $name, $dev, $defs{$dev}{powerMap}{map}
+            )
+          );
     }
 
     # get all devices with direct powerMap definitions
@@ -1024,16 +1034,18 @@ sub powerMap_findPowerMaps(;$) {
                 && keys %{ $defs{$_}{powerMap}{map} } );
         }
 
-        if ( $device && $device eq ":PM_INITIALIZED" ) {
+        # during initialization, also find devices where we
+        # need to load their custom attribute into the hash
+        if ( $dev && $dev eq ":PM_INITIALIZED" ) {
             foreach ( devspec2array("a:powerMap=.+") ) {
-                $maps{$_}{map} = $_ if ( !$maps{$_}{map} );
+                $maps{$_}{map} = {} if ( !$maps{$_}{map} );
             }
         }
     }
 
     # search templates from modules
-    foreach my $TYPE ( $device
-        && $device !~ /^:/ ? $defs{$device}{TYPE} : keys %modules )
+    foreach
+      my $TYPE ( $dev && $dev !~ /^:/ ? $defs{$dev}{TYPE} : keys %modules )
     {
         next unless ( $modules{$TYPE}{powerMap} );
         my $t            = $modules{$TYPE}{powerMap};
@@ -1085,7 +1097,7 @@ sub powerMap_findPowerMaps(;$) {
     }
 
     # find possible template for each Fhem device
-    unless ($device) {
+    unless ($dev) {
         foreach my $TYPE ( keys %powerMap_tmpl ) {
             next unless ( $modules{$TYPE} );
 
@@ -1143,7 +1155,7 @@ sub powerMap_findPowerMaps(;$) {
     foreach my $d ( keys %maps ) {
 
         # filter devices where no reading exists
-        unless ( $device && $device eq ":PM_INITIALIZED" ) {
+        unless ( $dev && $dev eq ":PM_INITIALIZED" ) {
             if ( !$maps{$d}{map} || ref( $maps{$d}{map} ) ne "HASH" ) {
                 delete $maps{$d};
                 next;
@@ -1160,18 +1172,20 @@ sub powerMap_findPowerMaps(;$) {
             delete $maps{$d} unless ($verified);
         }
 
-        powerMap_verifyEventChain( $d, $maps{$d}{map} );
+        powerMap_verifyEventChain( $name, $d, $maps{$d}{map} );
     }
 
     return {}
-      if ( $device && $device !~ /^:/ && !defined( $maps{$device} ) );
-    return \$maps{$device} if ( $device && $device !~ /^:/ );
+      if ( $dev && $dev !~ /^:/ && !defined( $maps{$dev} ) );
+    return \$maps{$dev} if ( $dev && $dev !~ /^:/ );
     return \%maps;
 }
 
-sub powerMap_verifyEventChain ($$) {
-    my ( $dev, $map ) = @_;
+sub powerMap_verifyEventChain($$$) {
+    my ( $name, $dev, $map ) = @_;
+    my $TYPE = $defs{$name}{TYPE};
     my %filter;
+    return 0 unless ( ref($map) eq "HASH" );
 
     my $attrminint = AttrVal( $dev, "event-min-interval", undef );
     if ($attrminint) {
@@ -1236,8 +1250,9 @@ sub powerMap_verifyEventChain ($$) {
                     && grep( $reading =~ m/^$_$/, @{ $filter{attrtocr} } ) )
                 {
                     Log3 $dev, 2,
-                      "powerMap $dev: Attribute timestamp-on-change-reading "
-                      . "is not compatible when using powerMap with reading '$reading'";
+                        "$TYPE $dev: WARNING - Attribute "
+                      . "timestamp-on-change-reading is not compatible "
+                      . "when using $TYPE with reading '$reading'";
                 }
             }
         }
@@ -1250,8 +1265,9 @@ sub powerMap_verifyEventChain ($$) {
         } @{ $filter{attrminint} };
         if (@v) {
             Log3 $dev, 2,
-              "powerMap $dev: Attribute event-min-interval is not compatible "
-              . "when using powerMap with reading '$reading'";
+                "$TYPE $dev: WARNING - Attribute "
+              . "event-min-interval is not compatible "
+              . "when using $TYPE with reading '$reading'";
         }
 
         # verify aggregator
@@ -1262,19 +1278,29 @@ sub powerMap_verifyEventChain ($$) {
         } @{ $filter{attraggr} };
         if (@v2) {
             Log3 $dev, 2,
-              "powerMap $dev: Attribute event-aggregator is not compatible "
-              . "when using powerMap with reading '$reading'";
+                "$TYPE $dev: WARNING - Attribute "
+              . "event-aggregator is not compatible "
+              . "when using $TYPE with reading '$reading'";
         }
 
     }
 
     if ( $leocr ne "" ) {
-        Log3 $dev, 2,
-          "powerMap $dev: Attribute event-on-change-reading adjusted "
-          . "to fulfill event chain for reading(s) '$leocr'";
-        $attreocr .= "," if ($attreocr);
-        $attreocr .= $leocr;
-        CommandAttr( undef, "$dev event-on-change-reading $attreocr" );
+        if ( powerMap_AttrVal( $name, $dev, "eventChainWarnOnly", 0 ) ) {
+            Log3 $dev, 2,
+                "$TYPE $dev: ERROR: Broken event chain - Attributes "
+              . "event-on-change-reading or event-on-update-reading "
+              . "need to contain reading(s) '$leocr'";
+        }
+        else {
+            Log3 $dev, 2,
+                "$TYPE $dev: NOTE - Attribute "
+              . "event-on-change-reading adjusted "
+              . "to fulfill event chain for reading(s) '$leocr'";
+            $attreocr .= "," if ($attreocr);
+            $attreocr .= $leocr;
+            CommandAttr( undef, "$dev event-on-change-reading $attreocr" );
+        }
     }
 
     return 1;
@@ -1285,7 +1311,7 @@ sub powerMap_power($$$;$) {
     my $hash     = $defs{$name};
     my $TYPE     = $hash->{TYPE};
     my $power    = 0;
-    my $powerMap = powerMap_findPowerMaps($dev);
+    my $powerMap = powerMap_findPowerMaps( $name, $dev );
 
     return unless ( defined($powerMap) and ref($powerMap) eq "HASH" );
 
@@ -1597,6 +1623,13 @@ sub powerMap_update($;$) {
         No readings will be created or calculated by this module.
       </li><br>
       <li>
+        <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
+        When set, event chain will NOT be repaired automatically if readings
+        were found to be required for powerMap but their events are currently
+        suppressed because they are either missing from attributes event-on-change-reading
+        or event-on-update-reading. Instead, manual intervention is required.
+      </li><br>
+      <li>
         <code>powerMap_interval &lt;seconds&gt;</code><br>
         Interval in seconds to calculate energy.<br>
         Default value is 900 seconds.
@@ -1651,7 +1684,7 @@ sub powerMap_update($;$) {
         <br>
         In case several power values need to be summarized, the name of other readings may be added after
         number value, separated by comma. The current status of that reading will then be considered for
-        the total power calculcation. To consider all readings known to powerMap, just as an *.<br>
+        total power calculcation. To consider all readings powerMap knows, just add an *.<br>
         <br>
         Example for FS20 socket:
         <ul>
@@ -1667,11 +1700,6 @@ sub powerMap_update($;$) {
           <code><pre>
           'state' =&gt; {
             'unreachable' =&gt; 0,
-            'off' =&gt; 0.4,
-            'on' =&gt; 9.2,
-          },
-          
-          'pct' =&gt; {
             '0' =&gt; 0.4,
             '10' =&gt; 1.2,
             '20' =&gt; 1.7,
@@ -1762,6 +1790,21 @@ sub powerMap_update($;$) {
         Es werden keine Readings mehr durch das Modul erzeugt oder berechnet.
       </li><br>
       <li>
+        <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
+        Sofern gesetzt, wird die Ereigniskette NICHT automatisch repariert, falls
+        Readings zwar als f&uuml;r powerMap notwendig identifiziert wurden, ihre
+        Events jedoch derzeit dadurch unterdr&uuml;ckt werden, weil sie nicht in
+        einem der Attribute event-on-change-reading oder event-on-update-reading
+        enthalten sind. Stattdessen ist ein manueller Eingriff erforderlich.
+      </li><br>
+      <li>
+        <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
+        When set, event chain will NOT be repaired automatically if readings
+        were found to be required for powerMap but their events are currently
+        suppressed because they are either missing from attributes event-on-change-reading
+        or event-on-update-reading. Instead, manual intervention is required.
+      </li><br>
+      <li>
         <code>powerMap_interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden, in dem neue Werte f&uuml;r die Energie berechnet
         werden.<br>
@@ -1837,11 +1880,6 @@ sub powerMap_update($;$) {
           <code><pre>
           'state' =&gt; {
             'unreachable' =&gt; 0,
-            'off' =&gt; 0.4,
-            'on' =&gt; 9.2,
-          },
-          
-          'pct' =&gt; {
             '0' =&gt; 0.4,
             '10' =&gt; 1.2,
             '20' =&gt; 1.7,
