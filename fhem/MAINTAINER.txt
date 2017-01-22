@@ -110,14 +110,15 @@ FHEM/20_GUEST.pm             loredo               http://forum.fhem.de Automatis
 FHEM/20_N4HBUS.pm            okoerber             http://forum.fhem.de Sonstige Systeme
 FHEM/21_N4HMODULE.pm         okoerber             http://forum.fhem.de Sonstige Systeme
 FHEM/21_VBUSDEV.pm           Tobias/pejonp        http://forum.fhem.de Sonstige Systeme
-FHEM/21_OWAD.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
-FHEM/21_OWCOUNT.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
-FHEM/21_OWID.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
-FHEM/21_OWLCD.pm             pahenning/ntruchsess http://forum.fhem.de 1Wire
-FHEM/21_OWMULTI.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
-FHEM/21_OWSWITCH.pm          pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWAD.pm              pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWCOUNT.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWID.pm              pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWLCD.pm             pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWMULTI.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWSWITCH.pm          pahenning            http://forum.fhem.de 1Wire
 FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (deprecated)
-FHEM/21_OWTHERM.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWTHERM.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWVAR.pm             pahenning            http://forum.fhem.de 1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           http://forum.fhem.de Multimedia
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
@@ -277,6 +278,7 @@ FHEM/70_Pushover.pm          loredo               http://forum.fhem.de Unterstue
 FHEM/70_PushNotifier.pm      xusader              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushalot.pm          Talkabout            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushsafer.pm         markusbloch          http://forum.fhem.de Unterstuetzende Dienste
+FHEM/70_DoorPi.pm            pahenning            http://forum.fhem.de Automatisierung
 FHEM/71_ONKYO_AVR_ZONE.pm    loredo               http://forum.fhem.de Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
@@ -337,6 +339,8 @@ FHEM/93_DbLog.pm             Tobias               http://forum.fhem.de Automatis
 FHEM/93_DbRep.pm             DS_Starter           http://forum.fhem.de Sonstiges
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends/FLOORPLAN
+FHEM/95_Alarm.pm             pahenning            http://forum.fhem.de Unterstützende Dienste
+FHEM/95_PostMe.pm            pahenning            http://forum.fhem.de Unterstützende Dienste
 FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
