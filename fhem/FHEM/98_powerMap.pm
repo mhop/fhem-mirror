@@ -1798,13 +1798,6 @@ sub powerMap_update($;$) {
         enthalten sind. Stattdessen ist ein manueller Eingriff erforderlich.
       </li><br>
       <li>
-        <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
-        When set, event chain will NOT be repaired automatically if readings
-        were found to be required for powerMap but their events are currently
-        suppressed because they are either missing from attributes event-on-change-reading
-        or event-on-update-reading. Instead, manual intervention is required.
-      </li><br>
-      <li>
         <code>powerMap_interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden, in dem neue Werte f&uuml;r die Energie berechnet
         werden.<br>
