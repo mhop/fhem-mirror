@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_powerMap: default value for reading pM_power was renamed to
+                          pM_consumption to circumvent overlapping of commonly
+                          used reading 'power' where it is normally used as
+                          boolean.
   - update:  93_DbLog: its now version 2.10.4, some improvements and new 
                        attributes
   - update:  74_XiaomiFlowerSens: 0.6.0 rewrite subroutinen for better handling

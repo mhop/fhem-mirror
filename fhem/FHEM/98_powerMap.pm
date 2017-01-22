@@ -111,6 +111,11 @@ my %powerMap_tmpl = (
     #   },
     # },
 
+    # TYPE alias to mirror values
+    #
+    # '<TYPE1>' => '<TYPE2>',
+    #
+
     FS20 => {
         state => {
             0   => 0.5,
@@ -177,32 +182,46 @@ my %powerMap_tmpl = (
     },
 
     HUEBridge => {
+        model   => 'modelid',
         modelid => {
             BSB001 => {
-                state => {
-                    0   => 0,
-                    '*' => 1.669,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        0   => 0,
+                        '*' => 1.669,
+                    },
                 },
             },
 
             BSB002 => {
-                state => {
-                    0   => 0,
-                    '*' => 1.669,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        0   => 0,
+                        '*' => 1.669,
+                    },
                 },
             },
         },
     },
 
     HUEDevice => {
+        model   => 'modelid',
         modelid => {
 
             # Hue Bulb
             LCT001 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    100         => 8.5,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        100         => 8.5,
+                    },
                 },
             },
 
@@ -214,19 +233,27 @@ my %powerMap_tmpl = (
 
             # Hue Bulb V2
             LCT007 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    100         => 10,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        100         => 10,
+                    },
                 },
             },
 
             # Hue Bulb V3
             LCT010 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    100         => 10,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        100         => 10,
+                    },
                 },
             },
 
@@ -268,55 +295,71 @@ my %powerMap_tmpl = (
 
             # Hue LightStrip
             LST001 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    100         => 12,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        100         => 12,
+                    },
                 },
             },
 
             # Hue LightStrip Plus
             LST002 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    100         => 20.5,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        100         => 20.5,
+                    },
                 },
             },
 
             # Living Whites Bulb
             LWB001 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    10          => 1.2,
-                    20          => 1.7,
-                    30          => 1.9,
-                    40          => 2.3,
-                    50          => 2.7,
-                    60          => 3.4,
-                    70          => 4.7,
-                    80          => 5.9,
-                    90          => 7.5,
-                    100         => 9.2,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        10          => 1.2,
+                        20          => 1.7,
+                        30          => 1.9,
+                        40          => 2.3,
+                        50          => 2.7,
+                        60          => 3.4,
+                        70          => 4.7,
+                        80          => 5.9,
+                        90          => 7.5,
+                        100         => 9.2,
+                    },
                 },
             },
 
             # Living Whites Bulb
             LWB003 => {
-                state => {
-                    unreachable => 0,
-                    0           => 0.4,
-                    10          => 1.2,
-                    20          => 1.7,
-                    30          => 1.9,
-                    40          => 2.3,
-                    50          => 2.7,
-                    60          => 3.4,
-                    70          => 4.7,
-                    80          => 5.9,
-                    90          => 7.5,
-                    100         => 9.2,
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    state => {
+                        unreachable => 0,
+                        0           => 0.4,
+                        10          => 1.2,
+                        20          => 1.7,
+                        30          => 1.9,
+                        40          => 2.3,
+                        50          => 2.7,
+                        60          => 3.4,
+                        70          => 4.7,
+                        80          => 5.9,
+                        90          => 7.5,
+                        100         => 9.2,
+                    },
                 },
             },
 
@@ -416,27 +459,6 @@ my %powerMap_tmpl = (
         },
     },
 
-    ONKYO_AVR => {
-        model => {
-            'TX-NR626' => {
-                stateAV => {
-                    absent => 0,
-                    off    => 0,
-                    muted  => 85,
-                    '*'    => 140,
-                },
-            },
-        },
-    },
-
-    ONKYO_AVR_ZONE => {
-        stateAV => {
-            off   => 0,
-            muted => 10,
-            '*'   => 20,
-        },
-    },
-
     Panstamp => {
         'Pumpe_Heizkreis' => {
             'off' => "0,Pumpe_Boiler,Brenner",
@@ -449,18 +471,6 @@ my %powerMap_tmpl = (
         'Brenner' => {
             'off' => "0,Pumpe_Heizkreis,Pumpe_Boiler",
             'on'  => "40,Pumpe_Heizkreis,Pumpe_Boiler",
-        },
-    },
-
-    PHTV => {
-        model => {
-            '55PFL8008S/12' => {
-                stateAV => {
-                    absent => 0,
-                    off    => 0.1,
-                    '*'    => 90,
-                },
-            },
         },
     },
 
@@ -503,29 +513,6 @@ my %powerMap_tmpl = (
                     mute        => 3.8,
                     pause       => 3.8,
                     on          => 5.2,
-                },
-            },
-        },
-    },
-
-    THINKINGCLEANER => {
-        model => {
-            Roomba_700_Series => {
-                presence => {
-                    absent => 0,
-                },
-                deviceStatus => {
-                    base         => 0.1,
-                    plug         => 0.1,
-                    base_recon   => 33,
-                    plug_recon   => 33,
-                    base_full    => 33,
-                    plug_full    => 33,
-                    base_trickle => 5,
-                    plug_trickle => 5,
-                    base_wait    => 0.1,
-                    plug_wait    => 0.1,
-                    '*'          => 0,
                 },
             },
         },
@@ -770,8 +757,13 @@ sub powerMap_Notify($$) {
                 Log3 $name, 4, "$TYPE: UPDATED for $2";
             }
 
-            # device was newly defined, renamed or got deleted
-            elsif ( $event =~ m/^(DEFINED|RENAMED|DELETED)\s(.*)/ ) {
+            # device was deleted
+            elsif ( $event =~ m/^(DELETED)\s(.*)/ ) {
+                powerMap_unload( $name, $2 );
+            }
+
+            # device was newly defined, modified or renamed
+            elsif ( $event =~ m/^(DEFINED|MODIFIED|RENAMED)\s(.*)/ ) {
                 next unless ( powerMap_load( $name, $2 ) );
                 Log3 $name, 4, "$TYPE: INITIALIZED for $2";
             }
@@ -781,7 +773,7 @@ sub powerMap_Notify($$) {
     }
 
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
-    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
+    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_consumption" );
 
     my $powerRecalcDone;
 
@@ -909,7 +901,7 @@ sub powerMap_load($$;$$) {
 
     my $powerMap = $unload ? undef : AttrVal( $dev, $TYPE, undef );
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
-    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
+    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_consumption" );
 
     # Support for Unit.pm
     $dev_hash->{readingsDesc}{$rname_e} = { rtype => 'whr', };
@@ -1047,32 +1039,43 @@ sub powerMap_findPowerMaps($;$) {
     foreach
       my $TYPE ( $dev && $dev !~ /^:/ ? $defs{$dev}{TYPE} : keys %modules )
     {
-        next unless ( $modules{$TYPE}{powerMap} );
+        next
+          unless ( $modules{$TYPE}{powerMap}
+            && keys %{ $modules{$TYPE}{powerMap} } );
         my $t            = $modules{$TYPE}{powerMap};
         my $modelSupport = 0;
 
         # modules w/ model support
         unless ( $t->{map} ) {
-            foreach my $a ( keys %{$t} ) {
-                next unless ( ref( $t->{$a} ) eq "HASH" );
+            foreach my $ta ( keys %{$t} ) {
+                my $a = $t->{$ta};
+                $a = $t->{ $t->{$ta} }
+                  if ( !ref( $t->{$ta} )
+                    && $t->{ $t->{$ta} } );
 
-                foreach my $m ( keys %{ $t->{$a} } ) {
-                    next
-                      unless ( ref( $t->{$a}{$m} ) eq "HASH"
-                        && !$t->{$a}{map} );
+                next unless ( ref($a) eq "HASH" && !$a->{map} );
+
+                foreach my $tm ( keys %{$a} ) {
+
+                    my $m = $a->{$tm};
+                    $m = $a->{ $a->{$tm} }
+                      if ( !ref( $a->{$tm} )
+                        && $a->{ $a->{$tm} } );
+
+                    next unless ( ref($m) eq "HASH" );
 
                     $modelSupport = 1;
 
-                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$a=$m") ) {
+                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$ta=$tm") ) {
                         next if ( $maps{$_} );
 
-                        if ( $t->{$a}{$m}{map} ) {
-                            next unless ( keys %{ $t->{$a}{$m}{map} } );
-                            $maps{$_} = $t->{$a}{$m};
+                        if ( $m->{map} ) {
+                            next unless ( keys %{ $m->{map} } );
+                            $maps{$_} = $m;
                         }
                         else {
-                            next unless ( keys %{ $t->{$a}{$m} } );
-                            $maps{$_}{map} = $t->{$a}{$m};
+                            next unless ( keys %{$m} );
+                            $maps{$_}{map} = $m;
                         }
                     }
                 }
@@ -1109,26 +1112,32 @@ sub powerMap_findPowerMaps($;$) {
             my $modelSupport = 0;
 
             # modules w/ model support
-            foreach my $a ( keys %{$t} ) {
-                next unless ( $t->{$a} );
+            foreach my $ta ( keys %{$t} ) {
 
-                foreach my $m ( keys %{ $t->{$a} } ) {
+                my $a = $t->{$ta};
+                $a = $t->{ $t->{$ta} }
+                  if ( !ref( $t->{$ta} )
+                    && $t->{ $t->{$ta} } );
+
+                next unless ( ref($a) eq "HASH" );
+
+                foreach my $m ( keys %{$a} ) {
                     next
-                      unless ( ref( $t->{$a}{$m} ) eq "HASH"
-                        && !$t->{$a}{map} );
+                      unless ( ref( $a->{$m} ) eq "HASH"
+                        && !$a->{map} );
 
                     $modelSupport = 1;
 
-                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$a=$m") ) {
+                    foreach ( devspec2array("TYPE=$TYPE:FILTER=$ta=$m") ) {
                         next if ( $maps{$_} );
 
-                        if ( $t->{$a}{$m}{map} ) {
-                            next unless ( keys %{ $t->{$a}{$m}{map} } );
-                            $maps{$_} = $t->{$a}{$m};
+                        if ( $a->{$m}{map} ) {
+                            next unless ( keys %{ $a->{$m}{map} } );
+                            $maps{$_} = $a->{$m};
                         }
                         else {
-                            next unless ( keys %{ $t->{$a}{$m} } );
-                            $maps{$_}{map} = $t->{$a}{$m};
+                            next unless ( keys %{ $a->{$m} } );
+                            $maps{$_}{map} = $a->{$m};
                         }
                     }
                 }
@@ -1177,7 +1186,7 @@ sub powerMap_findPowerMaps($;$) {
 
     return {}
       if ( $dev && $dev !~ /^:/ && !defined( $maps{$dev} ) );
-    return \$maps{$dev} if ( $dev && $dev !~ /^:/ );
+    return $maps{$dev}{map} if ( $dev && $dev !~ /^:/ );
     return \%maps;
 }
 
@@ -1460,7 +1469,7 @@ sub powerMap_energy($$;$) {
     my $dev_hash = $defs{$dev};
     my $TYPE     = $hash->{TYPE};
     my $rname_e  = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
-    my $rname_p  = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
+    my $rname_p  = powerMap_AttrVal( $name, $dev, "rname_P", "pM_consumption" );
 
     Log3 $name, 5, "$TYPE: Entering powerMap_energy() for $dev";
 
@@ -1504,7 +1513,7 @@ sub powerMap_update($;$) {
     Log3 $name, 5, "$TYPE: Entering powerMap_update() for $dev";
 
     my $rname_e = powerMap_AttrVal( $name, $dev, "rname_E", "pM_energy" );
-    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_power" );
+    my $rname_p = powerMap_AttrVal( $name, $dev, "rname_P", "pM_consumption" );
 
     readingsBeginUpdate($dev_hash);
 
@@ -1610,7 +1619,7 @@ sub powerMap_update($;$) {
           energy for the very first time.
         </li><br>
         <li>
-          <code>pM_power</code><br>
+          <code>pM_consumption</code><br>
           Current power consumption of device in W.
         </li>
       </ul><br>
@@ -1651,7 +1660,7 @@ sub powerMap_update($;$) {
       <li>
         <code>powerMap_rname_P</code><br>
         Sets reading name for power consumption.<br>
-        Default value is 'pM_power'.
+        Default value is 'pM_consumption'.
       </li><br>
       <li>
         <code>powerMap<pre>
@@ -1777,7 +1786,7 @@ sub powerMap_update($;$) {
           Ger&auml;t erstmalig Energie verbraucht hat.
         </li><br>
         <li>
-          <code>pM_power</code><br>
+          <code>pM_consumption</code><br>
           Die aktuelle Leistungsaufnahme des Ger&auml;tes in W.
         </li>
       </ul><br>
@@ -1822,7 +1831,7 @@ sub powerMap_update($;$) {
         <code>powerMap_rname_P</code><br>
         Definiert den Reading Namen, in dem die aktuelle Leistungsaufnahme
         des Ger&auml;tes gespeichert wird.<br>
-        Der Vorgabewert ist 'pM_power'.
+        Der Vorgabewert ist 'pM_consumption'.
       </li><br>
       <li>
         <code>powerMap<pre>
