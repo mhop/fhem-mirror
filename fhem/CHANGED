@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_mark: new command mark added 
+                      to mark devices TEMPORARY or VOLATILE
   - bufix:   00_MQTT: fixed delete MQTT device
                       added setKeyValue/getKeyValue for username and password
   - changed: 49_SSCAM: compatibility to SVS 8.0.0
