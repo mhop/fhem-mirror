@@ -91,6 +91,24 @@ sub ONKYO_AVR_Initialize($) {
     #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
     #    $data{RC_layout}{ONKYO_AVR}     = "ONKYO_AVR_RClayout";
     $data{RC_makenotify}{ONKYO_AVR} = "ONKYO_AVR_RCmakenotify";
+
+    # 98_powerMap.pm support
+    $hash->{powerMap} = {
+        model => {
+            'TX-NR626' => {
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    stateAV => {
+                        absent => 0,
+                        off    => 0,
+                        muted  => 85,
+                        '*'    => 140,
+                    },
+                },
+            },
+        },
+    };
 }
 
 sub ONKYO_AVR_addExtension($$$) {

@@ -61,6 +61,35 @@ sub THINKINGCLEANER_Initialize($) {
 "disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg "
       . $readingFnAttributes;
 
+    # 98_powerMap.pm support
+    $hash->{powerMap} = {
+        model   => 'modelid',    # fallback to attribute
+        modelid => {
+            'Roomba_700_Series' => {
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    presence => {
+                        absent => 0,
+                    },
+                    deviceStatus => {
+                        base         => 0.1,
+                        plug         => 0.1,
+                        base_recon   => 33,
+                        plug_recon   => 33,
+                        base_full    => 33,
+                        plug_full    => 33,
+                        base_trickle => 5,
+                        plug_trickle => 5,
+                        base_wait    => 0.1,
+                        plug_wait    => 0.1,
+                        '*'          => 0,
+                    },
+                },
+            },
+        },
+    };
+
     return;
 }
 
@@ -1265,7 +1294,7 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
                                 next;
                             }
                             elsif ( $r2 eq "modelnr" ) {
-                                $hash->{MODEL} =
+                                $hash->{modelid} =
                                   "Roomba_" . $return->{$r}{$r2} . "_Series";
                                 $attr{$name}{model} =
                                   "Roomba_" . $return->{$r}{$r2} . "_Series";

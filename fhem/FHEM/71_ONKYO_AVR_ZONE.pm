@@ -74,6 +74,19 @@ sub ONKYO_AVR_ZONE_Initialize($) {
     #    $data{RC_layout}{ONKYO_AVR_ZONE}     = "ONKYO_AVR_ZONE_RClayout";
     $data{RC_makenotify}{ONKYO_AVR_ZONE} = "ONKYO_AVR_RCmakenotify";
 
+    # 98_powerMap.pm support
+    $hash->{powerMap} = {
+        rname_E => 'energy',
+        rname_P => 'consumption',
+        map     => {
+            stateAV => {
+                off   => 0,
+                muted => 10,
+                '*'   => 20,
+            },
+        },
+    };
+
     $hash->{parseParams} = 1;
 }
 

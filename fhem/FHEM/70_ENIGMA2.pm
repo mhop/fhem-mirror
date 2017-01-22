@@ -61,7 +61,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField model wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -85,6 +85,24 @@ sub ENIGMA2_Initialize($) {
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo_SVG}  = "ENIGMA2_RClayout_VUplusUltimo_SVG";
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo}  = "ENIGMA2_RClayout_VUplusUltimo";
     $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
+
+    # 98_powerMap.pm support
+    $hash->{powerMap} = {
+        model   => 'modelid',    # fallback to attribute
+        modelid => {
+            'SOLO_SE' => {
+                rname_E => 'energy',
+                rname_P => 'consumption',
+                map     => {
+                    stateAV => {
+                        absent => 0.5,
+                        off    => 12,
+                        '*'    => 13,
+                    },
+                },
+            },
+        },
+    };
 
     return;
 }
@@ -1433,7 +1451,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         {
                             my $model = ReadingsVal( $name, "model", "" );
                             $model =~ s/\s/_/g;
-                            $hash->{model} = $model;
+                            $hash->{modelid} = uc($model);
+                            $attr{$name}{model} = uc($model);
                         }
                     }
 

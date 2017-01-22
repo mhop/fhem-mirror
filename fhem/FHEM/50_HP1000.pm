@@ -167,7 +167,7 @@ sub HP1000_Initialize($) {
             state => {
                 '*' => 5,
             },
-        }
+        },
     };
 }
 
