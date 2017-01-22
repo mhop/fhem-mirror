@@ -691,7 +691,7 @@ EnOcean_Initialize($)
                       "switchHysteresis switchType:direction,universal,channel,central " .
                       "teachMethod:1BS,4BS,confirm,GP,RPS,smartAck,STE,UTE temperatureRefDev " .
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
-                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:30,60,3600,86400 updateState:default,yes,no " .
+                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:10,20,30,40,60,120,180,240,3600,86400 updateState:default,yes,no " .
                       "uteResponseRequest:yes,no " .
                       "wakeUpCycle:" . join(",", keys %wakeUpCycle) . " " .
                       $readingFnAttributes;
@@ -8987,7 +8987,10 @@ sub EnOcean_Parse($$)
         InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{motionTimer}, 0);
         InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
       }
-      push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
+      if (!exists($hash->{helper}{lastVoltage}) || $hash->{helper}{lastVoltage} != $db[3]) {
+        push @event, "3:battery:" . ($db[3] * 0.02 > 2.8 ? "ok" : "low");
+        $hash->{helper}{lastVoltage} = $db[3];
+      }
       push @event, "3:button:" . ($db[0] & 4 ? "released" : "pressed") if ($manufID eq "7FF");
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
@@ -12800,7 +12803,7 @@ sub EnOcean_Attr(@)
   } elsif ($attrName eq "trackerWakeUpCycle") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^30|60|3600|86400$/) {
+    } elsif ($attrVal !~ m/^10|20|30|40|60|120|180|240|3600|86400$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -18561,7 +18564,7 @@ EnOcean_Delete($$)
       The Room Control Panel Kieback & Peter RBW322-FTL supports only [roomCtrlMode] = comfort.<br>
       timeProgram is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a> t/s, [wakeUpCycle] = 30 s, 60 s, 3600, 86400 s, 30 s is default.<br>
+    <li><a name="EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a> t/s, [wakeUpCycle] =10 s, 20 s, 30 s, 40 s, 60 s, 120 s, 180 s, 240 s, 3600, 86400 s, 30 s is default.<br>
       Transmission cycle of the tracker.
     </li>
     <li><a name="EnOcean_updateState">updateState</a> default|yes|no, [updateState] = default is default.<br>
@@ -18924,7 +18927,7 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-      <li>PioTek-Tracker (EEP A5-07-01)<br>
+      <li>Eltako/PioTek-Tracker TF-TTB (EEP A5-07-01)<br>
      <ul>
        <li>on|off</li>
        <li>battery: ok|low</li>
