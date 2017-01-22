@@ -62,9 +62,8 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 disabledForIntervals ".$oldAttr;
 }
-
 
 sub DOIFtools_dO ($$$$){return "";}
 # FW_detailFn for DOIF injecting event monitor
@@ -72,8 +71,8 @@ sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $ret = "";
   # Event Monitor
-  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM on\">on</a>&nbsp;&nbsp;";
-  $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM off\">off</a>";
+  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
+  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
   $ret .= "</div>";
 
   my $a = "";
@@ -170,8 +169,8 @@ sub DOIFtools_fhemwebFn($$$$) {
   $ret .= "</table>";
   }
   # Event Monitor
-  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM on\">on</a>&nbsp;&nbsp;";
-  $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM off\">off</a>&nbsp;&nbsp;";
+  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
+  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
   $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
     $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
@@ -191,7 +190,64 @@ sub DOIFtools_fhemwebFn($$$$) {
       }
     }
   }
-  $ret .= "</div>";
+  if (!AttrVal($d, "DOIFtoolsHideGetSet", 0)) {
+      $ret .= "<br><br>";
+      my $a1 = ReadingsVal($d,"doStatistics", "disabled") =~ "disabled|deleted" ? "enabled" : "disabled"; 
+      my $a2 = ReadingsVal($d,"specialLog", 0) ? 0 : 1; 
+      # set doStatistics enabled/disabled
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
+      <div class=\"set downText\">&nbsp;doStatistics $a1&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
+      <input name=\"val.set$d\" value=\"doStatistics $a1\" type=\"hidden\">
+      </div></form>";
+      # set doStatistics deleted
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
+      <div class=\"set downText\">&nbsp;doStatistics deleted&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
+      <input name=\"val.set$d\" value=\"doStatistics deleted\" type=\"hidden\">
+      </div></form>";
+      # set specialLog 0/1
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
+      <div class=\"set downText\">&nbsp;specialLog $a2&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
+      <input name=\"val.set$d\" value=\"specialLog $a2\" type=\"hidden\">
+      </div></form>";
+      $ret .= "<br><br>";
+      # get statisticsReport
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
+      <div class=\"get downText\">&nbsp;statisticsReport&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-statisticsReport\">
+      <input name=\"val.get$d\" value=\"statisticsReport\" type=\"hidden\">
+      </div></form>";
+      # get checkDOIF
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
+      <div class=\"get downText\">&nbsp;checkDOIF&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-checkDOIF\">
+      <input name=\"val.get$d\" value=\"checkDOIF\" type=\"hidden\">
+      </div></form>";
+      # get runningTimerInDOIF
+      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">
+      <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
+      <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
+      <div class=\"get downText\">&nbsp;runningTimerInDOIF&emsp;</div>
+      <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-runningTimerInDOIF\">
+      <input name=\"val.get$d\" value=\"runningTimerInDOIF\" type=\"hidden\">
+      </div></form>";
+  }
+  $ret .= "</div><br>";
   my $a = "";
   if (ReadingsVal($d,".eM","off") eq "on") {
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
@@ -707,6 +763,7 @@ sub DOIFtools_Set($@)
         readingsSingleUpdate($hash,"statisticsDeviceFilterRegex", $value,0);
       }
   } else {
+      my $hardcoded = "doStatistics:disabled,enabled,deleted specialLog:0,1";
       if (ReadingsVal($pn,"targetDOIF","")) {
         my $tn = ReadingsVal($pn,"targetDOIF","");
         my @rL = ();
@@ -714,9 +771,9 @@ sub DOIFtools_Set($@)
           push @rL, $key if ($key !~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
         }
         my $rL = join(",",@rL);
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL deleteReadingsInTargetDOIF:multiple-strict,$rL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 statisticsDeviceFilterRegex statisticsShowRate_ge";
+        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL sourceAttribute:readingList targetDOIF:$dL deleteReadingsInTargetDOIF:multiple-strict,$rL recording_target_duration:0,1,6,12,24,168 statisticsDeviceFilterRegex statisticsShowRate_ge ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
       } else {
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL doStatistics:disabled,enabled,deleted sourceAttribute:readingList targetDOIF:$dL recording_target_duration:0,1,6,12,24,168 specialLog:0,1 statisticsDeviceFilterRegex statisticsShowRate_ge";
+        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL sourceAttribute:readingList targetDOIF:$dL recording_target_duration:0,1,6,12,24,168 statisticsDeviceFilterRegex statisticsShowRate_ge ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
       }
   }
 return $ret;
@@ -846,6 +903,10 @@ sub DOIFtools_Get($@)
       $ret .= sprintf("%43s","Events/Gerät: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
       fhem("count",1) =~ m/(\d+)/;
       $ret .= sprintf("%43s","Geräte total: ").sprintf("%-10s","$1\n\n");
+      $ret .= sprintf("%43s","<u>Filter</u>\n");
+      $ret .= sprintf("%42s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
+      $ret .= sprintf("%35s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
+      $ret .= sprintf("%35s","Rate: ").sprintf("%-10s","&gt;= ".ReadingsVal($pn,"statisticsShowRate_ge","0")."\n\n");
       $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x71)."</div>";
       # attibute statistics
       $ret .= "<b>".sprintf("%-30s","gesetzte Attribute in DOIF").sprintf("%-12s","Anzahl")."</b>\n";
@@ -895,7 +956,8 @@ sub DOIFtools_Get($@)
       return $ret;
       
   } else {
-      return "unknown argument $arg for $pn, choose one of checkDOIF:noArg statisticsReport:noArg readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL runningTimerInDOIF:noArg ";
+      my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",1) ? $hardcoded :"");
   } 
 
   return $ret;
@@ -1075,6 +1137,9 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsEventMonitorInDOIF &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEventMonitorInDOIF</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF ermöglicht. <b>Default 0</b>, kein Zugriff auf den Event-Monitor im DOIF.<br>
+        <br>
+        <code>attr &lt;name&gt; DOIFtoolsHideGetSet &lt;0|1&gt;</code><br>
+        <b>DOIFtoolsHideModulGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsHideModulShortcuts &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulShortcuts</b> <b>1</b>, verstecken der DOIFtools Shortcuts. <b>Default 0</b>.<br>

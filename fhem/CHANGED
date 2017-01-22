@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update: 98_DOIFtools.pm: filter mentioned in event report
+            Event monitor toggles instead on/off
+            some shortcuts for get and set commands, hideable by attribute
   - new:     98_mark: new command mark added 
                       to mark devices TEMPORARY or VOLATILE
   - bufix:   00_MQTT: fixed delete MQTT device
