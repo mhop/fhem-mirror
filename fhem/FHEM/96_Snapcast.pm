@@ -503,16 +503,15 @@ sub Snapcast_setClient($$$$){
 		$param="id";
 		if($value eq "next"){ # just switch to the next stream, if last stream, jump to first one. This way streams can be cycled with a button press
 			my $totalstreams=ReadingsVal($name,"streams","");
-			my $currentstream = ReadingsVal($name,"clients_".$cnumber."_stream","");
+      my $currentstream = ReadingsVal($name,"clients_".$id."_stream","");
+      Log3 $name,3,"SNAP: Current Stream $currentstream";
 			$currentstream = Snapcast_getStreamNumber($hash,$currentstream);
-			
+      Log3 $name,3,"SNAP: Current Stream $currentstream";
 			my $newstream = $currentstream+1;
 			$newstream=1 unless $newstream <= $totalstreams;
-			while(AttrVal($name, 'streamnext', 'all') eq 'playing' && ReadingsVal($name,"streams_".$newstream."_status","") ne "playing" && $newstream!=$currentstream ) {
-				$newstream++;
-				$newstream=1 unless $newstream <= $totalstreams;
-			}
+      Log3 $name,3,"SNAP: New Stream $currentstream";
 			$value=ReadingsVal($name,"streams_".$newstream."_id","");
+      Log3 $name,3,"SNAP: Value $value";
 		}
 	}
   if($param eq "mute" && (not (defined($value)) || $value eq '')){
