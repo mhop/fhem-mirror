@@ -67,6 +67,23 @@ my %powerMap_tmpl = (
     #             },
     #         },
     #     },
+    #
+    #
+    #     # This is w/ user attributes
+    #
+    #     '(<INTERNAL>|<Attribute>)' => {
+    #         '<VAL of INTERNAL or Attribute>' => {
+    #             'attribute1' => 'value1',
+    #             'attribute2' => 'value2',
+    #
+    #             # This is the actual powerMap definition
+    #             'map' => {
+    #                 '<Reading>' => {
+    #                   '<VAL>' => '<Watt>',
+    #                 },
+    #             },
+    #         },
+    #     },
     # },
 
     # Format example for devices w/o model support:
@@ -106,7 +123,7 @@ my %powerMap_tmpl = (
         },
     },
 
-    HMCCUCHN => "HMCCUDEV",
+    HMCCUCHN => "HMCCUDEV",    # alias / forward to other TYPE
 
     HMCCUDEV => {
         ccutype => {
@@ -992,7 +1009,9 @@ sub powerMap_findPowerMaps(;$) {
         return $defs{$device}{powerMap}{map}
           if ( $defs{$device}{powerMap}{map}
             && ref( $defs{$device}{powerMap}{map} ) eq "HASH"
-            && keys %{ $defs{$device}{powerMap}{map} } );
+            && keys %{ $defs{$device}{powerMap}{map} }
+            && powerMap_verifyEventChain( $device,
+                $defs{$device}{powerMap}{map} ) );
     }
 
     # get all devices with direct powerMap definitions
@@ -1120,9 +1139,10 @@ sub powerMap_findPowerMaps(;$) {
         }
     }
 
-    # filter devices where no reading exists
-    unless ( $device && $device eq ":PM_INITIALIZED" ) {
-        foreach my $d ( keys %maps ) {
+    foreach my $d ( keys %maps ) {
+
+        # filter devices where no reading exists
+        unless ( $device && $device eq ":PM_INITIALIZED" ) {
             if ( !$maps{$d}{map} || ref( $maps{$d}{map} ) ne "HASH" ) {
                 delete $maps{$d};
                 next;
@@ -1138,12 +1158,125 @@ sub powerMap_findPowerMaps(;$) {
 
             delete $maps{$d} unless ($verified);
         }
+
+        powerMap_verifyEventChain( $d, $maps{$d}{map} );
     }
 
     return {}
       if ( $device && $device !~ /^:/ && !defined( $maps{$device} ) );
     return \$maps{$device} if ( $device && $device !~ /^:/ );
     return \%maps;
+}
+
+sub powerMap_verifyEventChain ($$) {
+    my ( $dev, $map ) = @_;
+    my %filter;
+
+    my $attrminint = AttrVal( $dev, "event-min-interval", undef );
+    if ($attrminint) {
+        my @a = split( /,/, $attrminint );
+        $filter{attrminint} = \@a;
+    }
+
+    my $attraggr = AttrVal( $dev, "event-aggregator", undef );
+    if ($attraggr) {
+        my @a = split( /,/, $attraggr );
+        $filter{attraggr} = \@a;
+    }
+
+    my $attreocr = AttrVal( $dev, "event-on-change-reading", undef );
+    if ($attreocr) {
+        my @a = split( /,/, $attreocr );
+        $filter{attreocr} = \@a;
+    }
+
+    my $attreour = AttrVal( $dev, "event-on-update-reading", undef );
+    if ($attreour) {
+        my @a = split( /,/, $attreour );
+        $filter{attreour} = \@a;
+    }
+
+    my $attrtocr = AttrVal( $dev, "timestamp-on-change-reading", undef );
+    if ($attrtocr) {
+        my @a = split( /,/, $attrtocr );
+        $filter{attrtocr} = \@a;
+    }
+
+    return 1 unless ( keys %filter );
+
+    my $leocr = "";
+    foreach my $reading ( keys %{$map} ) {
+
+        # verify reocr + reour
+        if ( $filter{attreocr} || $filter{attreour} ) {
+            my $eocr = $filter{attreocr}
+              && (
+                my @eocrv = grep {
+                    my $l = $_;
+                    $l =~ s/:.*//;
+                    ( $reading =~ m/^$l$/ ) ? $_ : undef
+                } @{ $filter{attreocr} }
+              );
+            my $eour = $filter{attreour}
+              && grep( $reading =~ m/^$_$/, @{ $filter{attreour} } );
+
+            unless ($eour) {
+                if (
+                    !$eocr
+                    || ( $eocrv[0] =~ m/.*:(.*)/
+                        && ( !looks_like_number($1) || $1 > 0 ) )
+                  )
+                {
+                    $leocr .= "," if ( $leocr ne "" );
+                    $leocr .= $reading;
+                }
+
+                if ( $filter{attrtocr}
+                    && grep( $reading =~ m/^$_$/, @{ $filter{attrtocr} } ) )
+                {
+                    Log3 $dev, 2,
+                      "powerMap $dev: Attribute timestamp-on-change-reading "
+                      . "is not compatible when using powerMap with reading '$reading'";
+                }
+            }
+        }
+
+        # verify min-interval
+        my @v = grep {
+            my $l = $_;
+            $l =~ s/:.*//;
+            ( $reading =~ m/^$l$/ ) ? $_ : undef
+        } @{ $filter{attrminint} };
+        if (@v) {
+            Log3 $dev, 2,
+              "powerMap $dev: Attribute event-min-interval is not compatible "
+              . "when using powerMap with reading '$reading'";
+        }
+
+        # verify aggregator
+        my @v2 = grep {
+            my $l = $_;
+            $l =~ s/:.*//;
+            ( $reading =~ m/^$l$/ ) ? $_ : undef
+        } @{ $filter{attraggr} };
+        if (@v2) {
+            Log3 $dev, 2,
+              "powerMap $dev: Attribute event-aggregator is not compatible "
+              . "when using powerMap with reading '$reading'";
+        }
+
+    }
+
+    if ( $leocr ne "" ) {
+        Log3 $dev, 2,
+          "powerMap $dev: Attribute event-on-change-reading adjusted "
+          . "to fulfill event chain for reading(s) '$leocr'";
+        $attreocr .= "," if ($attreocr);
+        $attreocr .= $leocr;
+        CommandAttr( undef, "$dev event-on-change-reading $attreocr" );
+    }
+
+    return 1;
 }
 
 sub powerMap_power($$$;$) {
