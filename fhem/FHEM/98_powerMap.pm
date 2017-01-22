@@ -48,6 +48,7 @@ sub powerMap_AttrVal($$$$);
 sub powerMap_load($$;$$);
 sub powerMap_unload($$);
 sub powerMap_findPowerMaps(;$);
+sub powerMap_verifyEventChain($$);
 sub powerMap_power($$$;$);
 sub powerMap_energy($$;$);
 sub powerMap_update($;$);
