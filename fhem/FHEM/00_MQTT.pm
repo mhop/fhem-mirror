@@ -87,6 +87,8 @@ BEGIN {GP_Import(qw(
   AttrVal
   Log3
   AssignIoPort
+  getKeyValue
+  setKeyValue
   ))};
 
 sub Define($$) {
@@ -97,6 +99,18 @@ sub Define($$) {
   $hash->{timeout} = 60;
   $hash->{messages} = {};
 
+  my ($host,$username,$password) = split("[ \t]+", $hash->{DEF});
+  $hash->{DeviceName} = $host;
+  
+  my $name = $hash->{NAME};
+  my $user = getKeyValue($name."_user");
+  my $pass = getKeyValue($name."_pass");
+
+  setKeyValue($name."_user",$username) unless(defined($user));
+  setKeyValue($name."_pass",$password) unless(defined($pass));
+
+  $hash->{DEF} = $host;
+
   if ($main::init_done) {
     return Start($hash);
   } else {
@@ -105,7 +119,12 @@ sub Define($$) {
 }
 
 sub Undef($) {
-  Stop(shift);
+  my $hash = shift;
+  Stop($hash);
+  my $name = $hash->{NAME};
+  setKeyValue($name."_user",undef);
+  setKeyValue($name."_pass",undef);
+  return undef;
 }
 
 sub Set($@) {
@@ -158,14 +177,6 @@ sub Attr($$$$) {
 
 sub Start($) {
   my $hash = shift;
-  my ($dev,$username,$password) = split("[ \t]+", $hash->{DEF});
-  $hash->{DeviceName} = $dev;
-  if(defined($username) && $username ne "") {
-    $hash->{username} = $username;
-  }
-  if(defined($password) && $password ne "") {
-    $hash->{password} = $password;
-  }
   DevIo_CloseDev($hash);
   return DevIo_OpenDev($hash, 0, "MQTT::Init");
 }
@@ -181,6 +192,16 @@ sub Stop($) {
 sub Ready($) {
   my $hash = shift;
   return DevIo_OpenDev($hash, 1, "MQTT::Init") if($hash->{STATE} eq "disconnected");
+}
+
+sub Rename() {
+  my ($new,$old) = @_;
+  setKeyValue($new."_user",getKeyValue($old."_user"));
+  setKeyValue($new."_pass",getKeyValue($old."_pass"));
+	
+  setKeyValue($old."_user",undef);
+  setKeyValue($old."_pass",undef);
+  return undef;
 }
 
 sub Init($) {
@@ -342,7 +363,10 @@ sub Read {
 
 sub send_connect($) {
   my $hash = shift;
-  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $hash->{username}, password => $hash->{password});
+  my $name = $hash->{NAME};
+  my $user = getKeyValue($name."_user");
+  my $pass = getKeyValue($name."_pass");
+  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass);
 };
 
 sub send_publish($@) {
