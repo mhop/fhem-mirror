@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  93_DbLog: its now version 2.10.4, some improvements and new 
+                       attributes
   - update:  74_XiaomiFlowerSens: 0.6.0 rewrite subroutinen for better handling
   - bugfix:  88_HMCCU.pm: fixed default attributes
   - update:  98_DOIFtools.pm: filter mentioned in event report

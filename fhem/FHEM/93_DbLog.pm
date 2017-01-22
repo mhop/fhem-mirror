@@ -1,4 +1,4 @@
-############################################################################################################################
+################################################################################################################################
 # $Id$
 #
 # 93_DbLog.pm
@@ -10,9 +10,16 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-############################################################################################################################
+################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.10.4     22.01.2017       new sub setinternalcols, new attributes colEvent, colReading, colValue
+# 2.10.3     21.01.2017       query of cacheEvents changed, attr timeout adjustable
+# 2.10.2     19.01.2017       DbLog_reduceLog now use DbLog_ConnectNewDBH -> makes start of DbLog_reduceLog stable
+# 2.10.1     19.01.2017       commandref edited, cache events don't get lost even if other errors than "db not available" occure  
+# 2.10       18.10.2017       new attribute cacheLimit, showNotifyTime
+# 2.9.3      17.01.2017       new sub DbLog_ConnectNewDBH (own new dbh for separate use in functions except logging functions),
+#                             DbLog_sampleDataFn, dbReadings now use DbLog_ConnectNewDBH
 # 2.9.2      16.01.2017       new bugfix for SQLite issue SVGs, DbLog_Log changed to $dev_hash->{CHANGETIME}, DbLog_Push 
 #                             changed (db handle new separated)
 # 2.9.1      14.01.2017       changed DbLog_ParseEvent to CallInstanceFn, renamed flushCache to purgeCache,
@@ -62,7 +69,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.9.2";
+my $DbLogVersion = "2.10.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -87,7 +94,10 @@ sub DbLog_Initialize($)
   $hash->{AttrFn}           = "DbLog_Attr";
   $hash->{SVG_regexpFn}     = "DbLog_regexpFn";
   $hash->{ShutdownFn}       = "DbLog_Shutdown";
-  $hash->{AttrList}         = "disable:1,0 ".
+  $hash->{AttrList}         = "colEvent ".
+                              "colReading ".
+							  "colValue ".
+                              "disable:1,0 ".
                               "DbLogType:Current,History,Current/History ".
                               "shutdownWait ".
                               "suppressUndef:0,1 ".
@@ -98,7 +108,10 @@ sub DbLog_Initialize($)
 							  "showproctime:1,0 ".
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
+							  "cacheLimit ".
 							  "syncEvents:1,0 ".
+							  "showNotifyTime:1,0 ".
+							  "timeout " .
                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
 							  $readingFnAttributes;
 
@@ -153,6 +166,9 @@ sub DbLog_Define($@)
   # read configuration data
   my $ret = _DbLog_readCfg($hash);
   return $ret if ($ret); # return on error while reading configuration
+  
+  # set used COLUMNS in Internals
+  setinternalcols($hash);
 
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
   eval { DbLog_Connect($hash); };
@@ -206,9 +222,16 @@ sub DbLog_Attr(@) {
   my $do = 0;
 
   if($cmd eq "set") {
-      if ($aName eq "syncInterval") {
-          unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aVal is not valid. Use only figures 1-9 !";}
+      if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "timeout") {
+          unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
       }
+  }
+  
+  if($aName eq "colEvent" || $aName eq "colReading" || $aName eq "colValue") {
+      if ($cmd eq "set" && $aVal) {
+          unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
+	  }
+	  InternalTimer(gettimeofday()+2, "setinternalcols", $hash, 0);
   }
   
   if($aName eq "asyncMode") {
@@ -229,6 +252,12 @@ sub DbLog_Attr(@) {
       if ($cmd ne "set" || !$aVal) {
 		  delete($defs{$name}{READINGS}{background_processing_time});
 		  delete($defs{$name}{READINGS}{sql_processing_time});
+	  }
+  }
+  
+  if($aName eq "showNotifyTime") {
+      if ($cmd ne "set" || !$aVal) {
+		  delete($defs{$name}{READINGS}{notify_processing_time});
 	  }
   }
   
@@ -272,18 +301,12 @@ sub DbLog_Set($@) {
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
-        if ( !$dbh || not $dbh->ping ) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - reduceLog - DB Session dead, try to reopen now !");
-            DbLog_Connect($hash);
-        }    
-        else {
-            if (defined $a[2] && $a[2] =~ /^\d+$/) {
-                $ret = DbLog_reduceLog($hash,@a);
-				InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
-            } else {
-                Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
-                $ret = "reduceLog error, no <days> given.";
-           }
+        if (defined $a[2] && $a[2] =~ /^\d+$/) {
+            $ret = DbLog_reduceLog($hash,@a);
+			InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
+        } else {
+            Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
+            $ret = "reduceLog error, no <days> given.";
         }
     }
     elsif ($a[1] eq 'reopen') {
@@ -293,8 +316,11 @@ sub DbLog_Set($@) {
             $dbh->commit() if(!$dbh->{AutoCommit});
             $dbh->disconnect();
         }
-        
         DbLog_Connect($hash);
+		if($hash->{DBMODEL} eq "MYSQL") {
+            # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
+            DbLog_ConnectPush($hash);
+        }
         $ret = "Reopen executed.";
     }
     elsif ($a[1] eq 'rereadcfg') {
@@ -304,10 +330,13 @@ sub DbLog_Set($@) {
             $dbh->commit() if(!$dbh->{AutoCommit});
             $dbh->disconnect();
         }
-        
         $ret = _DbLog_readCfg($hash);
         return $ret if $ret;
         DbLog_Connect($hash);
+		if($hash->{DBMODEL} eq "MYSQL") {
+            # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
+            DbLog_ConnectPush($hash);
+        }
         $ret = "Rereadcfg executed.";
     }
 	elsif ($a[1] eq 'purgeCache') {
@@ -700,9 +729,15 @@ sub DbLog_Log($$) {
   my $dev_name = $dev_hash->{NAME};
   my $dev_type = uc($dev_hash->{TYPE});
   my $async    = AttrVal($name, "asyncMode", undef);
+  my $clim     = AttrVal($name, "cacheLimit", 500);
+  my $ce       = AttrVal($name, "cacheEvents", 0);
+  my $net;
 
   return if(IsDisabled($name) || $init_done != 1);
 
+  # Notify-Routine Startzeit
+  my $nst = [gettimeofday];
+  
   my $events = deviceEvents($dev_hash,0);  
   return if(!$events);
   
@@ -854,17 +889,23 @@ sub DbLog_Log($$) {
 				      $hash->{cache}{memcache}{$index} = $row;
 					  
 					  my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
-	                  if(AttrVal($name, "cacheEvents", undef) && AttrVal($name, "cacheEvents", undef) == 1) {
-                          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+	                  if($ce == 1) {
+                          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	                  } else {
-	                      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+	                      readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
 	                  }
-					  
+					  # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
+					  if($memcount >= $clim) {
+					      Log3 $hash->{NAME}, 5, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
+					      DbLog_execmemcache($hash);
+					  }
+					  # Notify-Routine Laufzeit ermitteln
+                      $net = tv_interval($nst);
 				  } else {
 				      # synchoner Mode
 				      push(@row_array, $row);		
 				  }  
-              }									   
+              }		  
           }
       }
   }; 
@@ -878,7 +919,12 @@ sub DbLog_Log($$) {
 		  } else {
 		      readingsSingleUpdate($hash, "state", "connected", 0);
 		  }
+		  # Notify-Routine Laufzeit ermitteln
+          $net = tv_interval($nst);
       }
+  }
+  if($net && AttrVal($name, "showNotifyTime", undef)) {
+      readingsSingleUpdate($hash, "notify_processing_time", sprintf("%.4f",$net), 1);
   }
 return;
 }
@@ -908,7 +954,9 @@ sub DbLog_Push(@) {
 	 if ($@) {
 	     Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
 	     return $@;
-     }
+     } else {
+	     $dbh = $hash->{DBH};
+	 }
   } 
   if($hash->{DBMODEL} eq "MYSQL") {
       $dbh = $hash->{DBHP};
@@ -1073,11 +1121,13 @@ sub DbLog_execmemcache ($) {
   my ($hash) = @_;
   my $name       = $hash->{NAME}; 
   my $syncival   = AttrVal($name, "syncInterval", 30);
+  my $clim       = AttrVal($name, "cacheLimit", 500);
   my $async      = AttrVal($name, "asyncMode", undef);
+  my $ce         = AttrVal($name, "cacheEvents", 0);
+  my $timeout    = AttrVal($name, "timeout", 120);
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
-  my $timeout    = 60;
   my $state      = "connected";
   my $error      = 0;  
   my (@row_array,$memcount,$dbh);
@@ -1108,12 +1158,12 @@ sub DbLog_execmemcache ($) {
   } else {
       # Testverbindung abbauen
       $dbh->disconnect(); 
-	  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
 	  
-      if(AttrVal($name, "cacheEvents", undef) && AttrVal($name, "cacheEvents", undef) == 2) {
-          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1) 
+	  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+      if($ce == 2) {
+          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
       } else {
-	      readingsSingleUpdate($hash, "CacheUsage", $memcount, 0) 
+	      readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
       }
 	
 	  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
@@ -1152,9 +1202,9 @@ sub DbLog_execmemcache ($) {
   my $nsdt     = FmtDateTime($nextsync);
 	  
   if(AttrVal($name, "syncEvents", undef)) {
-      readingsSingleUpdate($hash, "NextSync", $nsdt, 1); 
+      readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", 1); 
   } else {
-      readingsSingleUpdate($hash, "NextSync", $nsdt, 0); 
+      readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", 0); 
   }
   
   if($error) {
@@ -1181,9 +1231,10 @@ sub DbLog_PushAsync(@) {
   my $dbuser      = $hash->{dbuser};
   my $dbpassword  = $attr{"sec$name"}{secret};
   my $DbLogType   = AttrVal($name, "DbLogType", "History");
-  my $error = 0;
-  my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
+  my $error       = 0;
+  my $doins       = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
   my $dbh;
+  my $rowlback    = 0;  # Eventliste für Rückgabe wenn Fehler
   
   Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsync");
   
@@ -1199,8 +1250,8 @@ sub DbLog_PushAsync(@) {
       return "$name|$error|0|$rowlist";
   }
   
-  $rowlist = decode_base64($rowlist);
-  my @row_array = split('§', $rowlist);
+  my $rowldec = decode_base64($rowlist);
+  my @row_array = split('§', $rowldec);
   
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
   my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
@@ -1224,8 +1275,15 @@ sub DbLog_PushAsync(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # for insert history
-	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-      $sth_ih->bind_param_array(1, [@timestamp]);
+	  eval { $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      if ($@) {
+	      # Eventliste zurückgeben wenn z.B. disk I/O error (SQLITE)
+          $error = encode_base64($@,"");
+          Log3 ($name, 2, "DbLog $name - Error: $@");
+          Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
+          return "$name|$error|0|$rowlist";
+      }
+	  $sth_ih->bind_param_array(1, [@timestamp]);
       $sth_ih->bind_param_array(2, [@device]);
       $sth_ih->bind_param_array(3, [@type]);
       $sth_ih->bind_param_array(4, [@event]);
@@ -1236,8 +1294,14 @@ sub DbLog_PushAsync(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # for insert current
-	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-	  
+	  eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+	  if ($@) {
+	      # Eventliste zurückgeben wenn z.B. disk I/O error (SQLITE)
+          $error = encode_base64($@,"");
+          Log3 ($name, 2, "DbLog $name - Error: $@");
+          Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
+          return "$name|$error|0|$rowlist";
+      }
 	  # for update current
 	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
 	  $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1327,7 +1391,8 @@ sub DbLog_PushAsync(@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
     $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
-    $dbh->disconnect();  
+    $dbh->disconnect(); 
+    $rowlback = $rowlist;	
   }
   else {
     $dbh->commit() if(!$dbh->{AutoCommit});
@@ -1344,7 +1409,7 @@ sub DbLog_PushAsync(@) {
 
   $rt = $rt.",".$brt;
  
-return "$name|$error|$rt|0";
+return "$name|$error|$rt|$rowlback";
 }
 
 #############################################################################################
@@ -1385,7 +1450,7 @@ sub DbLog_PushAsyncDone ($) {
  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
  readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
  
- if(AttrVal($name, "showproctime", undef)) {
+ if(AttrVal($name, "showproctime", undef) && $bt) {
      readingsBeginUpdate($hash);
      readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
      readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
@@ -1402,6 +1467,7 @@ sub DbLog_PushAsyncDone ($) {
      delete($defs{$name}{READINGS}{NextSync});
 	 delete($defs{$name}{READINGS}{background_processing_time});
 	 delete($defs{$name}{READINGS}{sql_processing_time});
+	 delete($defs{$name}{READINGS}{CacheUsage});
  }
  
  delete $hash->{HELPER}{RUNNING_PID};
@@ -1586,6 +1652,28 @@ sub DbLog_ConnectPush($) {
   $hash->{DBHP}= $dbhp;
  
   return 1;
+}
+
+sub DbLog_ConnectNewDBH($) {
+  # new dbh for every use (except DbLog_Push..)
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  my $dbconn     = $hash->{dbconn};
+  my $dbuser     = $hash->{dbuser};
+  my $dbpassword = $attr{"sec$name"}{secret};
+  my $dbh;
+ 
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 }); };
+  
+  if($@) {
+    Log3($name, 2, "DbLog $name: - $@");
+  }
+  
+  if($dbh) {
+      return $dbh;
+  } else {
+      return 0;
+  }
 }
 
 ################################################################
@@ -2164,8 +2252,10 @@ DbLog_Get($@)
 sub DbLog_reduceLog($@) {
     my ($hash,@a) = @_;
     my ($ret,$cmd,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
-    my ($dbh,$name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{DBH},$hash->{NAME},time(),99,0,0,0,0,0,0);
-    
+    my ($name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{NAME},time(),99,0,0,0,0,0,0);
+    my $dbh = DbLog_ConnectNewDBH($hash);
+    return if(!$dbh);
+  
     if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
         ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
         @excludeRegex = split(',',$filter);
@@ -2368,7 +2458,7 @@ sub DbLog_reduceLog($@) {
         readingsSingleUpdate($hash, 'lastReduceLogResult', $result ,1);
         $ret = "reduceLog executed. $result";
     }
-
+    $dbh->disconnect(); 
     return $ret;
 }
 
@@ -2690,22 +2780,14 @@ DbLog_sampleDataFn($$$$$)
   my @example;
   my @colregs;
   my $counter;
-  
-  # Fix keine Vorschlagswerte aus Current im asynchronen Mode
-  my $hash = $defs{$dlName};
-  my $dbh  = $defs{$dlName}{DBH};
-  eval {
-    if ( !$dbh || not $dbh->ping ) {
-      #### DB Session dead, try to reopen now !
-      DbLog_Connect($hash);
-    }  
-  };
-
   my $currentPresent = AttrVal($dlName,'DbLogType','Current');
+  
+  my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
+  return if(!$dbhf);
+  
   if($currentPresent =~ m/Current/) {
   # Table Current present, use it for sample data
 
-    my $dbhf = $defs{$dlName}{DBHF};
     my $query = "select device,reading,value from current where device <> '' order by device,reading";
     my $sth = $dbhf->prepare( $query );  
     $sth->execute();
@@ -2714,6 +2796,7 @@ DbLog_sampleDataFn($$$$$)
       push (@example, join (" ",@line)) if($counter <= 8); # show max 8 examples
       push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
     }
+	$dbhf->disconnect(); 
     my $cols = join(",", sort @colregs);
 
     $max = 8 if($max > 8);
@@ -2753,7 +2836,10 @@ DbLog_sampleDataFn($$$$$)
 #
 sub dbReadings($@) {
   my($hash,@a) = @_;
-  my $dbhf= $hash->{DBHF};
+  
+  my $dbhf = DbLog_ConnectNewDBH($hash);
+  return if(!$dbhf);
+  
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
   my $DbLogType = AttrVal($a[0],'DbLogType','current');
   my $query;
@@ -2763,11 +2849,33 @@ sub dbReadings($@) {
     $query = "select VALUE,TIMESTAMP from history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
   }
   my ($reading,$timestamp) = $dbhf->selectrow_array($query);
+  $dbhf->disconnect(); 
+  
   $reading = (defined($reading)) ? $reading : $a[4];
   $timestamp = (defined($timestamp)) ? $timestamp : $a[4];
   return $reading   if $a[1] eq 'ReadingsVal';
   return $timestamp if $a[1] eq 'ReadingsTimestamp';
   return "Syntax error: $a[1]";
+}
+
+################################################################
+# benutzte DB-Feldlängen zur Info in Internalos setzen
+################################################################
+sub setinternalcols ($){
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  
+  $columns{EVENT}   = AttrVal($name, "colEvent", 512);
+  $columns{READING} = AttrVal($name, "colReading", 64);
+  $columns{VALUE}   = AttrVal($name, "colValue", 128);
+  
+  $hash->{COLUMNS} = "field length used for Device: $columns{DEVICE}, 
+                     Type: $columns{TYPE}, 
+					 Event: $columns{EVENT}, 
+					 Reading: $columns{READING}, 
+					 Value: $columns{VALUE}, 
+					 Unit: $columns{UNIT}";
+return;
 }
 
 1;
@@ -3086,10 +3194,12 @@ sub dbReadings($@) {
 	  </code><br>
 	  
       This attribute determines the operation mode of DbLog. If asynchronous mode is active (asyncMode=1), the events which should be saved 
-	  at first will be cached in memory. After synchronisation time cycle (attribute syncInterval) the cached events get saved into
-	  the database with bulk insert.
+	  at first will be cached in memory. After synchronisation time cycle (attribute syncInterval), or if the count limit of datasets in cache 
+	  is reached (attribute cacheLimit), the cached events get saved into the database using bulk insert.
 	  If the database isn't available, the events will be cached in memeory furthermore, and tried to save into database again after 
 	  the next synchronisation time cycle if the database is available. <br>
+	  In asynchronous mode the data insert into database will be executed non-blocking by a background process. 
+	  You can adjust the timeout value for this background process by attribute "timeout" (default 120s). <br>
 	  In synchronous mode (normal mode) the events won't be cached im memory and get saved into database immediately. If the database isn't
 	  available the events are get lost. <br>
     </ul>
@@ -3107,6 +3217,55 @@ sub dbReadings($@) {
 						 the database. </li><br>
 	  </ul>
     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>cacheLimit</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; cacheLimit &lt;n&gt; 
+	   </code><br>
+	 
+       In asynchronous logging mode the content of cache will be written into the database and cleared if the number &lt;n&gt; datasets
+	   in cache has reached (default: 500). Thereby the timer of asynchronous logging mode will be set new to the value of 
+	   attribute "syncInterval". <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colEvent</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colEvent &lt;n&gt; 
+	   </code><br>
+	 
+	   The field length of database field EVENT will be adjusted. By this attribute the default value in the DbLog-device can be
+	   adjusted if the field length in the databse was changed nanually. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colReading</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colReading &lt;n&gt; 
+	   </code><br>
+	 
+	   The field length of database field READING will be adjusted. By this attribute the default value in the DbLog-device can be
+	   adjusted if the field length in the databse was changed nanually. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colValue</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colValue &lt;n&gt; 
+	   </code><br>
+	 
+	   The field length of database field VALUE will be adjusted. By this attribute the default value in the DbLog-device can be
+	   adjusted if the field length in the databse was changed nanually. <br>
+     </ul>
   </ul>
   <br>
   
@@ -3146,7 +3305,7 @@ sub dbReadings($@) {
   <ul><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
       A new Attribute DbLogInclude will be propagated
@@ -3156,7 +3315,7 @@ sub dbReadings($@) {
       on how DbLogExclude and DbLogInclude are handled. <br>
 	
 	  <b>Example</b> <br>
-      <code>attr MyDevice1 DbLogInclude .*</code>
+      <code>attr MyDevice1 DbLogInclude .*</code> <br>
       <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul>
@@ -3165,7 +3324,7 @@ sub dbReadings($@) {
   <ul><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
       A new Attribute DbLogExclude will be propagated to all Devices if DBLog is used. 
@@ -3173,7 +3332,7 @@ sub dbReadings($@) {
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached and value vs. lastvalue is eqal. <br>
     
 	  <b>Example</b> <br>
-      <code>attr MyDevice1 DbLogExclude .*</code>
+      <code>attr MyDevice1 DbLogExclude .*</code> <br>
       <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul>
@@ -3241,6 +3400,20 @@ sub dbReadings($@) {
   </ul>
   <br>
 
+  <ul><b>showNotifyTime</b>
+    <ul>
+	  <code>attr &lt;device&gt; showNotifyTime [1|0]
+	  </code><br>
+	  
+	  If set, 
+      Wenn gesetzt,  the reading "notify_processing_time" shows the required execution time (in seconds) in the DbLog 
+	  Notify-function. This attribute is practical for performance analyses and helps to determine the differences of time
+      required when the operation mode was switched from synchronous to the asynchronous mode. <br>
+	  
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>syncInterval</b>
     <ul>
 	  <code>attr &lt;device&gt; syncInterval &lt;n&gt;
@@ -3266,6 +3439,17 @@ sub dbReadings($@) {
   </ul>
   <br>
 
+  <ul><b>timeout</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; timeout <n>
+	  </code><br>
+      setup timeout of the write cycle into database in asynchronous mode (default 120s) <br>
+
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>verbose4Devs</b>
      <ul>
 	   <code>
@@ -3622,9 +3806,12 @@ sub dbReadings($@) {
 	  </code><br>
 	  
       Dieses Attribut stellt den Arbeitsmodus von DbLog ein. Im asynchronen Modus (asyncMode=1), werden die zu speichernden Events zunächst in Speicher
-	  gecacht. Nach Ablauf der Synchronisationszeit (Attribut syncInterval) werden die gecachten Events im Block in die Datenbank geschrieben.
+	  gecacht. Nach Ablauf der Synchronisationszeit (Attribut syncInterval) oder bei Erreichen der maximalen Anzahl der Datensätze im Cache
+	  (Attribut cacheLimit) werden die gecachten Events im Block in die Datenbank geschrieben.
 	  Ist die Datenbank nicht verfügbar, werden die Events weiterhin im Speicher gehalten und nach Ablauf des Syncintervalls in die Datenbank
 	  geschrieben falls sie dann verfügbar ist. <br>
+	  Im asynchronen Mode werden die Daten nicht blockierend mit einem separaten Hintergrundprozess in die Datenbank geschrieben.
+	  Det Timeout-Wert für diesen Hintergrundprozess kann mit dem Attribut "timeout" (Default 120s) eingestellt werden.
 	  Im synchronen Modus (Normalmodus) werden die Events nicht gecacht und sofort in die Datenbank geschrieben. Ist die Datenbank nicht 
 	  verfügbar gehen sie verloren.<br>
     </ul>
@@ -3642,6 +3829,55 @@ sub dbReadings($@) {
 						 Datensätze. </li><br>
 	  </ul>
     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>cacheLimit</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; cacheLimit &lt;n&gt; 
+	   </code><br>
+	 
+       Im asynchronen Logmodus wird der Cache in die Datenbank weggeschrieben und geleert wenn die Anzahl &lt;n&gt; Datensätze
+       im Cache erreicht ist (Default: 500). Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
+       gesetzt. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colEvent</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colEvent &lt;n&gt; 
+	   </code><br>
+	 
+	   Die Feldlänge für das DB-Feld EVENT wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colReading</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colReading &lt;n&gt; 
+	   </code><br>
+	 
+	   Die Feldlänge für das DB-Feld READING wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>colValue</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; colValue &lt;n&gt; 
+	   </code><br>
+	 
+	   Die Feldlänge für das DB-Feld VALUE wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+     </ul>
   </ul>
   <br>
   
@@ -3686,7 +3922,7 @@ sub dbReadings($@) {
   <ul><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval [regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
       
 	  Wenn DbLog genutzt wird, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
@@ -3696,7 +3932,7 @@ sub dbReadings($@) {
       DbLogExclude und DbLogInclude ausgewertet werden. <br>
 
 	  <b>Beispiel</b> <br>
-      <code>attr MyDevice1 DbLogInclude .*</code>
+      <code>attr MyDevice1 DbLogInclude .*</code> <br>
       <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul>
@@ -3705,7 +3941,7 @@ sub dbReadings($@) {
   <ul><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
     
       Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i> propagiert. 
@@ -3714,7 +3950,7 @@ sub dbReadings($@) {
       dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des Readings sich nicht verändert hat. <br>
     
 	  <b>Beispiel</b> <br>
-      <code>attr MyDevice1 DbLogExclude .*</code>
+      <code>attr MyDevice1 DbLogExclude .*</code> <br>
       <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul>
@@ -3775,6 +4011,19 @@ sub dbReadings($@) {
   </ul>
   <br>
   
+  <ul><b>showNotifyTime</b>
+    <ul>
+	  <code>attr &lt;device&gt; showNotifyTime [1|0]
+	  </code><br>
+	  
+      Wenn gesetzt, zeigt das Reading "notify_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die 
+	  Abarbeitung der DbLog Notify-Funktion. Das Attribut ist für Performance Analysen geeignet und hilft auch die Unterschiede
+	  im Zeitbedarf bei der Umschaltung des synchronen in den asynchronen Modus festzustellen. <br>
+	  
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>syncEvents</b>
     <ul>
 	  <code>attr &lt;device&gt; syncEvents [1|0]
@@ -3805,6 +4054,17 @@ sub dbReadings($@) {
 
 	  <b>Beispiel</b> <br>
       <code>#DbLog eMeter:power:::$val=($val>1500)?undef:$val</code>
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>timeout</b>
+    <ul>
+	  <code>
+	  attr &lt;device&gt; timeout <n>
+	  </code><br>
+      Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 120s). <br>
+
     </ul>
   </ul>
   <br>
