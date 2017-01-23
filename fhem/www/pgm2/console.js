@@ -198,21 +198,19 @@ consAddRegexpPart()
               'div.evt label { display:block; margin-left:2em; }\n'+
               'div.evt input { float:left; }\n'+
               '</style>\n';
-    txt += "<div>addRegexpPart</div><br>";
+    txt += "Extend the regular expression of the device<br>";
+    txt += "<select id='evtDev'></select><br><br>";
     txt += "<div class='evt'>"+
            "<input type='radio' name='evtType' id='rdEx' checked/>"+
-           "<label>as exactly this event:<br>"+re1+"</label></div><br>";
+           "<label>with exactly this event:<br>"+re1+"</label></div><br>";
     if(re1 != re2)
       txt += "<div class='evt'>"+
              "<input type='radio' name='evtType' id='rdNum'/>"+
              "<label>with any number matching:<br>"+re2+"</label></div><br>";
-    txt += "Device to add: ";
-    txt += "<select id='evtDev'></select>";
 
     $('body').append('<div id="addReP" style="display:none">'+txt+'</div>');
     $('#addReP').dialog(
-      { modal:true, closeOnEscape:true, 
-        maxWidth:$(window).width()*3/4, maxHeight:$(window).height()*3/4,
+      { modal:true, closeOnEscape:true, width:"auto",
         close:function(){ $('#addReP').remove(); },
         buttons:[
         { text:"Cancel", click:function(){ $(this).dialog('close'); }},
