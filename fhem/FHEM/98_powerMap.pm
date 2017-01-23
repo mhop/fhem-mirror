@@ -217,10 +217,13 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        100 => 8.5,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        100         => 8.5,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -236,10 +239,13 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        100 => 10,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        100         => 10,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -249,10 +255,13 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        100 => 8.5,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        100         => 10,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -298,10 +307,13 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        100 => 12,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        100         => 12,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -311,10 +323,13 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        100 => 20.5,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        100         => 20.5,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -324,19 +339,22 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        10  => 1.2,
+                        20  => 1.7,
+                        30  => 1.9,
+                        40  => 2.3,
+                        50  => 2.7,
+                        60  => 3.4,
+                        70  => 4.7,
+                        80  => 5.9,
+                        90  => 7.5,
+                        100 => 9.2,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        10          => 1.2,
-                        20          => 1.7,
-                        30          => 1.9,
-                        40          => 2.3,
-                        50          => 2.7,
-                        60          => 3.4,
-                        70          => 4.7,
-                        80          => 5.9,
-                        90          => 7.5,
-                        100         => 9.2,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -346,19 +364,22 @@ my %powerMap_tmpl = (
                 rname_E => 'energy',
                 rname_P => 'consumption',
                 map     => {
+                    pct => {
+                        0   => 0.4,
+                        10  => 1.2,
+                        20  => 1.7,
+                        30  => 1.9,
+                        40  => 2.3,
+                        50  => 2.7,
+                        60  => 3.4,
+                        70  => 4.7,
+                        80  => 5.9,
+                        90  => 7.5,
+                        100 => 9.2,
+                    },
                     state => {
                         unreachable => 0,
-                        0           => 0.4,
-                        10          => 1.2,
-                        20          => 1.7,
-                        30          => 1.9,
-                        40          => 2.3,
-                        50          => 2.7,
-                        60          => 3.4,
-                        70          => 4.7,
-                        80          => 5.9,
-                        90          => 7.5,
-                        100         => 9.2,
+                        '*'         => 'pct',
                     },
                 },
             },
@@ -1707,8 +1728,7 @@ sub powerMap_update($;$) {
         Example for HUE white light bulb:
         <ul>
           <code><pre>
-          'state' =&gt; {
-            'unreachable' =&gt; 0,
+          'pct' =&gt; {
             '0' =&gt; 0.4,
             '10' =&gt; 1.2,
             '20' =&gt; 1.7,
@@ -1720,6 +1740,10 @@ sub powerMap_update($;$) {
             '80' =&gt; 5.9,
             '90' =&gt; 7.5,
             '100' =&gt; 9.2,
+          },
+          'state' =&gt; {
+            'unreachable' =&gt; 0,
+            '*' =&gt; 'pct',
           },
           </pre></code><br>
         </ul>
@@ -1880,8 +1904,7 @@ sub powerMap_update($;$) {
         Beispiel f&uuml;r eine HUE white Gl&uuml;hlampe:
         <ul>
           <code><pre>
-          'state' =&gt; {
-            'unreachable' =&gt; 0,
+          'pct' =&gt; {
             '0' =&gt; 0.4,
             '10' =&gt; 1.2,
             '20' =&gt; 1.7,
@@ -1893,6 +1916,10 @@ sub powerMap_update($;$) {
             '80' =&gt; 5.9,
             '90' =&gt; 7.5,
             '100' =&gt; 9.2,
+          },
+          'state' =&gt; {
+            'unreachable' =&gt; 0,
+            '*' =&gt; 'pct',
           },
           </pre></code><br>
         </ul>
