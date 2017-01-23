@@ -155,8 +155,11 @@ notify_Set($@)
   my %sets = (addRegexpPart=>2, removeRegexpPart=>1, inactive=>0, active=>0);
   
   my $cmd = $a[1];
-  return "Unknown argument $cmd, choose one of " # No dropdown in FHEMWEB
-    if(!defined($sets{$cmd}));
+  if(!defined($sets{$cmd})) {
+    my $ret ="Unknown argument $cmd, choose one of ".join(" ", sort keys %sets);
+    $ret =~ s/active/active:noArg/g;
+    return $ret;
+  }
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
 
   if($cmd eq "addRegexpPart") {

@@ -155,19 +155,86 @@ consStart()
   
   $("#console").scroll(function() { // autoscroll check
     
-     if($("#console")[0].scrollHeight - $("#console").scrollTop() <=
-        $("#console").outerHeight() + 2) { 
-       if(!mustScroll) {
-         mustScroll = 1;
-         log("Console autoscroll restarted");
-       }
-     } else {
+    if($("#console")[0].scrollHeight - $("#console").scrollTop() <=
+       $("#console").outerHeight() + 2) { 
+      if(!mustScroll) {
+        mustScroll = 1;
+        log("Console autoscroll restarted");
+      }
+    } else {
       if(mustScroll) {
         mustScroll = 0;  
         log("Console autoscroll stopped");
       }
-     }
-   });
+    }
+  });
+  consAddRegexpPart();
 }
 
+function
+consAddRegexpPart()
+{
+  $("<button style='margin-left:1em' id='addRegexpPart'>"+
+    "addRegexpPart</button>").insertAfter("button#eventReset");
+
+  $("button#addRegexpPart").click(function(){
+    // get selection, build regexp from event
+    var txt = window.getSelection().toString();
+    var hlp = "Please highlight exactly one complete event line";
+    if(!txt)
+      return FW_okDialog(hlp);
+    var re=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s(.*)([\r\n]*)?$/;
+    var ret = txt.match(re);
+    if(!ret)
+      return FW_okDialog(hlp);
+    var dev=ret[3], evt=ret[4];
+    evt = evt.replace(/\s/g, ".");
+    re1 = dev+" "+evt;
+    evt = evt.replace(/\b-?\d*\.?\d+\b/g, '.*').replace(/\.\* \.\*/g, '.*');
+    re2 = dev+" "+evt;
+
+    // build dialog
+    var txt = '<style type="text/css">\n'+
+              'div.evt label { display:block; margin-left:2em; }\n'+
+              'div.evt input { float:left; }\n'+
+              '</style>\n';
+    txt += "<div>addRegexpPart</div><br>";
+    txt += "<div class='evt'>"+
+           "<input type='radio' name='evtType' id='rdEx' checked/>"+
+           "<label>as exactly this event:<br>"+re1+"</label></div><br>";
+    if(re1 != re2)
+      txt += "<div class='evt'>"+
+             "<input type='radio' name='evtType' id='rdNum'/>"+
+             "<label>with any number matching:<br>"+re2+"</label></div><br>";
+    txt += "Device to add: ";
+    txt += "<select id='evtDev'></select>";
+
+    $('body').append('<div id="addReP" style="display:none">'+txt+'</div>');
+    $('#addReP').dialog(
+      { modal:true, closeOnEscape:true, 
+        maxWidth:$(window).width()*3/4, maxHeight:$(window).height()*3/4,
+        close:function(){ $('#addReP').remove(); },
+        buttons:[
+        { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+        { text:"OK", click:function(){
+          var dev = $("select#evtDev").val();
+          var cmd = "set "+dev+" addRegexpPart "+
+              ($('input[name=evtType]:checked').attr("id")=='rdEx' ? re1 : re2);
+          FW_cmd(FW_root+"?cmd="+cmd+"&XHR=1");
+          $(this).dialog('close');
+          location = FW_root+'?detail='+dev;
+        }}]
+     });
+
+    FW_cmd(FW_root+"?cmd=jsonlist2&XHR=1", function(data){
+      var devList = JSON.parse(data);
+      for(var i1=0; i1<devList.Results.length; i1++) {
+        var dev = devList.Results[i1];
+        if(dev.PossibleSets.indexOf("addRegexpPart") >= 0)
+          $("select#evtDev").append('<option>'+dev.Name+'</option>');
+      }
+    });
+  });
+}
+  
 window.onload = consStart;
