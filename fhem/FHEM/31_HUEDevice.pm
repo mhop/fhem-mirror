@@ -141,6 +141,7 @@ my %dim_values = (
 );
 
 
+my $HUEDevice_hasDataDumper = 1;
 
 sub HUEDevice_Initialize($)
 {
@@ -169,6 +170,9 @@ sub HUEDevice_Initialize($)
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
 
   FHEM_colorpickerInit();
+
+  eval "use Data::Dumper";
+  $HUEDevice_hasDataDumper = 0 if($@);
 }
 
 sub
@@ -1060,12 +1064,16 @@ HUEDevice_Parse($$)
   my $name = $hash->{NAME};
 
   if( ref($result) ne "HASH" ) {
-    Log3 $name, 2, "$name: got wrong status message for $name: $result";
+    if( ref($result) && $HUEDevice_hasDataDumper) {
+      Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
+    } else {
+      Log3 $name, 2, "$name: got wrong status message for $name: $result";
+    }
     return undef;
   }
 
   Log3 $name, 4, "parse status message for $name";
-  #Log3 $name, 5, Dumper $result;
+  Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
 
   $hash->{name} = $result->{name} if( defined($result->{name}) );
   $hash->{type} = $result->{type} if( defined($result->{type}) );
@@ -1207,7 +1215,7 @@ HUEDevice_Parse($$)
       return undef if( $hash->{lastupdated} && $hash->{lastupdated} eq $lastupdated );
 
       Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}";
-      Log3 $name, 5, "$name: ". Dumper $result;
+      Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
 
       $hash->{lastupdated} = $lastupdated;
 
