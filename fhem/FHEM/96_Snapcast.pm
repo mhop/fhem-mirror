@@ -614,19 +614,21 @@ sub Snapcast_getVolumeConstraint{
 
   foreach my $c (@constraints){
     my ($cname,$list)= split(/\|/,$c);
+    Log3 $name,3,"SNAP cname: $cname, list: $list";
     if($cname eq $phase){
       my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time+86400);
+      my $tomorrow=sprintf("%04d",1900+$year)."-".sprintf("%02d",$mon+1)."-".sprintf("%02d",$mday)." ";
       $list =~ s/^\s+//; # get rid of whitespaces
       $list =~ s/\s+$//; 
       my @listelements=split(" ", $list);
-      my $mindiff=time_str2num("$mday-$mon-$year 24:00:00"); # initialize mindiff with the remaining lenght of the day
+      my $mindiff=time_str2num($tomorrow."23:59:00"); # eine Tageslänge
       for(my $i=0;$i<@listelements/2;$i++){
-        my $diff=abstime2rel($listelements[$i*2].":00"); # whats the time difference between now the time given in the definition
-        if(time_str2num("$mday-$mon-$year ".$diff)<$mindiff){$mindiff=time_str2num($diff);$value=$listelements[1+($i*2)];} #  we are looking for the entry with the shortest time difference
+          my $diff=abstime2rel($listelements[$i*2].":00"); # wie lange sind wir weg von der SChaltzeit?
+          if(time_str2num($tomorrow.$diff)<$mindiff){$mindiff=time_str2num($tomorrow.$diff);$value=$listelements[1+($i*2)];} # wir suchen die kleinste relative Zeit
       }
     }
    }
-   Log3 $name,3,"Snapcast $name reducing volume to $value";
+  readingsSingleUpdate($hash,"maxvol",$value,1);
   return $value; # der aktuelle Auto-Wert wird zurückgegeben
 }
 
