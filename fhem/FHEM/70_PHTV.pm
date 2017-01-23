@@ -1533,7 +1533,7 @@ sub PHTV_SendCommand($$;$$$) {
 
     # add missing port if required
     if ( $address !~ m/^(.+):([0-9]+)$/ ) {
-        $address .= ":1925";
+        $address .= ":1925" if ( $protoV <= 5 );
         $address .= ":1926" if ( $protoV > 5 );
     }
 
