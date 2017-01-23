@@ -1255,8 +1255,9 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
-   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,speedrx,rssi)"; # WLAN devices, fw=6.69 speedrx ersetzt speed_rx #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)   
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,port,guest,name,mac,active,online,wlan,speed)"; # LAN devices, fw=6.69 port ersetzt ethernet_port
+   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices
+   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)   
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,guest,name,mac,active,online,wlan,speed)"; # LAN devices, fw=6.69 port ersetzt ethernet_port
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
    #landevice:settings/landevice/list(name,ip,mac,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)   #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
@@ -1325,6 +1326,19 @@ sub FRITZBOX_Readout_Run_Web($)
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
    }
+
+   # gets WLAN speed and LAN-Port, !!! copes with fw>=6.69 !!!
+   $queryStr="";
+   for ( my $i= 0; $i< int @{$result->{wlanList}} ;$i++ ) {
+      $queryStr .= "&wlanlist$i=wlan:settings/wlanlist$i/speed_rx"; 
+   }
+   for ( my $i= 0; $i< int @{$result->{lanDevice}} ;$i++ ) {
+      $queryStr .= "&landevice$i=wlan:settings/landevice$i/ethernet_port"; 
+   }
+   my $result_lan = FRITZBOX_Web_Query( $hash, $queryStr) ;
+   
+   
+   
    
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -1393,21 +1407,26 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radioCount", $runNo;
 
-# Create WLAN-List if 
+# Create WLAN-List
    my %wlanList;
+   #to keep compatibility with firmware <= v3.67
    if ( ref $result->{wlanList} eq 'ARRAY' ) {
+
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
          $wlanList{$mac}{speed} = $_->{speed};
-         $wlanList{$mac}{speed_rx} = $_->{speed_rx};
-         $wlanList{$mac}{speed_rx} = $_->{speedrx} if $_->{speedrx} ne "";
+         $wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
          $wlanList{$mac}{rssi} = $_->{rssi};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $wlanList{$mac}{speed_rx};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
+         $queryStr .= "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx)"
       }
+
    }
+   # ethernet_port,
+   
 # Create LanDevice list and delete inactive devices
    my %oldLanDevice;
    #collect current mac-readings (to delete the ones that are inactive or disappeared)
@@ -1438,8 +1457,7 @@ sub FRITZBOX_Readout_Run_Web($)
             if ( $_->{ethernet} == 1 ) {
                $dName .= " (";
                $dName .= "g"         if $_->{guest};
-               $dName .= "LAN" . $_->{ethernet_port}  if $_->{ethernet_port} ne "";
-               $dName .= "LAN" . $_->{port}  if $_->{port} ne "";
+               $dName .= "LAN" . $result_lan->{$_->{_node}};
                $dName .= ", 1 Gbit/s"    if $_->{speed} == 1000;
                $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
                $dName .= ")";
