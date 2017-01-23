@@ -158,7 +158,7 @@ sub CALVIEW_GetUpdate($){
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
 			#wenn termin heute today readings anlegen
 			if ($date eq $termin->{bdate} ){
-				if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_age", $age);}
+				if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_age", $age);}
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime});
 				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edatetimiso", $termin->{edatetimeiso});}
@@ -173,7 +173,7 @@ sub CALVIEW_GetUpdate($){
 			}
 			#wenn termin morgen tomorrow readings anlegen
 			elsif ($datenext eq $termin->{bdate}){
-				if($isbday == 1 ){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $counter)."_age", $age);}
+				if($isbday == 1 ){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_age", $age);}
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdate", "morgen"); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
 				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edatetimeiso", $termin->{edatetimeiso});}
