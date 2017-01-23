@@ -193,12 +193,10 @@ sub Snapcast_Set($@) {
         my $client = $hash->{STATUS}->{clients}->{"$i"}->{host}->{mac};
 				$client=~s/\://g;
         my $res = Snapcast_setClient($hash,$client,$opt,$value);
-        Log3 $name,3,"SNAP SetClient $client, $opt, $value";
 				readingsSingleUpdate($hash,"lastError",$res,1) if defined ($res);
       }
 			return undef;
 		}
-		Log3 $name,2,"SetClient $hash, $client, $opt, $value";
     my $res = Snapcast_setClient($hash,$client,$opt,$value);
 		readingsSingleUpdate($hash,"lastError",$res,1) if defined ($res);
 		return undef;
@@ -210,7 +208,6 @@ sub Snapcast_Read($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $buf;
-  Log3 $name,5,"SNAP. Read";
   $buf = DevIo_SimpleRead($hash);
     return "" if ( !defined($buf) );
   $buf = $hash->{PARTIAL} . $buf;
@@ -504,14 +501,10 @@ sub Snapcast_setClient($$$$){
 		if($value eq "next"){ # just switch to the next stream, if last stream, jump to first one. This way streams can be cycled with a button press
 			my $totalstreams=ReadingsVal($name,"streams","");
       my $currentstream = ReadingsVal($name,"clients_".$id."_stream","");
-      Log3 $name,3,"SNAP: Current Stream $currentstream";
 			$currentstream = Snapcast_getStreamNumber($hash,$currentstream);
-      Log3 $name,3,"SNAP: Current Stream $currentstream";
 			my $newstream = $currentstream+1;
 			$newstream=1 unless $newstream <= $totalstreams;
-      Log3 $name,3,"SNAP: New Stream $currentstream";
 			$value=ReadingsVal($name,"streams_".$newstream."_id","");
-      Log3 $name,3,"SNAP: Value $value";
 		}
 	}
   if($param eq "mute" && (not (defined($value)) || $value eq '')){
@@ -588,7 +581,6 @@ sub Snapcast_getStreamNumber($$){
 sub Snapcast_getId($$){
 	my ($hash,$client) = @_;
   my $name = $hash->{NAME};
-  Log3 $name,3,"getId $client";
 	if($client=~/^([0-9a-f]{2}([:-]|$)){6}$/i){ # client is already a MAC
 		for(my $i=1;$i<=ReadingsVal($name,"clients",1);$i++){
       if ($client eq $hash->{STATUS}->{clients}->{"$i"}->{host}->{mac}) {
