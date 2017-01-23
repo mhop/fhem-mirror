@@ -1745,7 +1745,8 @@ FW_showRoom()
       FW_pO "<tr><td>";
       FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
-      foreach my $d (sort { $sortIndex{$a} cmp $sortIndex{$b} } keys %{$group{$g}}) {
+      foreach my $d (sort { $sortIndex{$a} cmp $sortIndex{$b} }
+                     keys %{$group{$g}}) {
         my $type = $defs{$d}{TYPE};
         $extPage{group} = $g;
 
@@ -1757,7 +1758,7 @@ FW_showRoom()
     }
     FW_pO "</table></td>" if($maxc != -1); # Column
   }
-  FW_pO "</tr>";
+  FW_pO "</tr>" if($maxc != -1);
 
   FW_pO "</table><br>";
 
