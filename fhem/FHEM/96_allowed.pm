@@ -108,13 +108,14 @@ allowed_Authenticate($$$$)
     }
     
     my $pwok = ($secret && $secret eq $basicAuth);      # Base64
+    my ($user, $password);
     if($secret && $basicAuth =~ m/^{.*}$/) {
       eval "use MIME::Base64";
       if($@) {
         Log3 $aName, 1, $@;
 
       } else {
-        my ($user, $password) = split(":", decode_base64($secret));
+        ($user, $password) = split(":", decode_base64($secret));
         $pwok = eval $basicAuth;
         Log3 $aName, 1, "basicAuth expression: $@" if($@);
       }
@@ -126,10 +127,17 @@ allowed_Authenticate($$$$)
       if ( $time ) {
         $time = int($time*86400+time());
         # generate timestamp according to RFC-1130 in Expires
-        my $expires = "Expires=".FmtDateTimeRFC1123($time);
+        my $expires = FmtDateTimeRFC1123($time);
+
+        readigsBeginUpdate($me);
+        readingsBulkUpdate($me,'lastAuthUser', $user, 1);
+        readingsBulkUpdate($me,'lastAuthExpires', $time, 1);
+        readingsBulkUpdate($me,'lastAuthExpiresFmt', $expires, 1);
+        readigsEndUpdate($me, 1);
+
         # set header with expiry
         $cl->{".httpAuthHeader"} = "Set-Cookie: AuthToken=".$secret.
-                "; Path=/ ; ".$expires."\r\n" ;
+                "; Path=/ ; Expires=$expires\r\n" ;
       }
     } 
 
