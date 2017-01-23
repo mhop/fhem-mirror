@@ -248,7 +248,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 %HMCCU_DEV_DEFAULTS = (
    "CCU2" => {
    _description     => "HomeMatic CCU2",
-   "ccudef-readingfilter" => '^(LOW_?BAT|UNREACH)$',
+   "ccudef-readingfilter" => '.*',
    "ccudef-readingformat" => 'datapoint',
    "ccudef-readingname"   => '^(.+\.)?AES_KEY$:sign;^(.+\.)?LOW_?BAT$:battery;^(.+\.)?BATTERY_STATE$:batteryLevel;^(.+\.)?UNREACH$:Activity;^(.+\.)?TEMPERATURE$:+temperature;^(.+\.)?SET_TEMPERATURE$:+desired-temp;^(.+\.)?HUMIDITY$:+humidity;^(.+\.)?LEVEL$:+pct;^(.+\.)?CONTROL_MODE$:+controlMode',
    "ccudef-substitute"    => 'AES_KEY!(0|false):off,(1|true):on;LOWBAT,LOW_BAT!(0|false):ok,(1|true):low;UNREACH!(0|false):alive,(1|true):dead;MOTION!(0|false):noMotion,(1|true):motion;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!0:false,1:true;INHIBIT!(0|false):unlocked,(1|true):locked'
