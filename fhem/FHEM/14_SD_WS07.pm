@@ -151,6 +151,8 @@ SD_WS07_Parse($$)
 	
 	my $hash = $def;
 	$name = $hash->{NAME};
+	return "" if(IsIgnored($name));
+	
 	Log3 $name, 4, "SD_WS07: $name ($rawData)";  
 
 	if (!defined(AttrVal($hash->{NAME},"event-min-interval",undef)))
