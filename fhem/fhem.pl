@@ -3202,7 +3202,6 @@ DoTrigger($$@)
   }
 
   my $max = int(@{$hash->{CHANGED}});
-  Log 5, "Triggering $dev ($max changes)";
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
   my $now = TimeNow();
 
@@ -3225,6 +3224,7 @@ DoTrigger($$@)
       $ret .= " $n:$r" if($r);
     }
     delete($hash->{NTFY_TRIGGERTIME});
+    Log 5, "End notify loop for $dev";
 
     ################
     # Inform
@@ -4492,6 +4492,7 @@ addToWritebuffer($$@)
 sub
 createNtfyHash()
 {
+  Log 5, "createNotifyHash";
   my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                  grep { $defs{$_}{NTFY_ORDER} && 
                         $defs{$_}{TYPE} && 
