@@ -4274,9 +4274,11 @@ sub setKeyValAttr($$$$$) {
 
     # write attribute
     $Data::Dumper::Terse    = 1;
+    $Data::Dumper::Deepcopy = 1;
     $Data::Dumper::Sortkeys = 1;
     my $txt = Dumper( $d->{$attribute} );
     $Data::Dumper::Terse    = 0;
+    $Data::Dumper::Deepcopy = 0;
     $Data::Dumper::Sortkeys = 0;
     $txt =~ s/(=>\s*\{|['"],?)\s*\n\s*/$1 /gsm;
     CommandAttr( undef, "$name $attribute $txt" );
@@ -4372,7 +4374,7 @@ sub Unit_DbLog_split($$) {
         $unit    = defined($3) ? $3 : "";
     }
 
-    if ( !looks_like_number($value) ) {
+    unless ( defined($value) && looks_like_number($value) ) {
         Unit_Log3( $name, $reading, undef, 10,
 "Unit_DbLog_split $name: Ignoring event $event: value $value does not look like a number"
         );
