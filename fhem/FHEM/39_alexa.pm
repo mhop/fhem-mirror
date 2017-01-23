@@ -391,6 +391,7 @@ Log 1, Dumper $characteristicsOfIntent;
     }
 
     if( my $entries = AttrVal( $name, 'fhemIntents', undef ) ) {
+      my %intents;
       foreach my $entry ( split( /\n/, $entries ) ) {
         next if( !$entry );
         next if( $entry =~ /^#/ );
@@ -402,10 +403,21 @@ Log 1, Dumper $characteristicsOfIntent;
         my $intent_name = "FHEM${intent}Intent";
         if( $intent =~ m/^(set|get|attr)\s/ ) {
           $intent_name = "FHEM${1}Intent";
+          my $i = 1;
+          while( defined($intents{$intent_name}) ) {
+            $intent_name = "FHEM${1}Intent".chr(65+$i);
+            ++$i;
+          }
         } elsif( $intent =~ m/^{.*}$/ ) {
           $intent_name = 'FHEMperlCodeIntent';
+          my $i = 1;
+          while( defined($intents{$intent_name}) ) {
+            $intent_name = "FHEMperlCodeIntent".chr(65+$i);
+            ++$i;
+          }
         }
-        #$intent_name =~ s/ //g;
+        $intent_name =~ s/ //g;
+        $intents{$intent_name} = $intent;
 
         push @{$schema->{intents}}, {intent => $intent_name, };
 
