@@ -875,8 +875,8 @@ sub DOIFtools_Get($@)
         $typsum = 0;
         $t=0;
         foreach my $key (sort keys %{$defs{$pn}->{READINGS}}) {
-          $rate = ($te ? int($hash->{READINGS}{$key}{VAL}/$te + 0.5) : 0) if ($key =~ m/^$rx($regex)/ and $defs{$1}->{TYPE} eq $typ);
-          if ($key =~ m/^$rx($regex)/ and $defs{$1}->{TYPE} eq $typ and $rate >= ReadingsNum($pn,"statisticsShowRate_ge",0)) {
+          $rate = ($te ? int($hash->{READINGS}{$key}{VAL}/$te + 0.5) : 0) if ($key =~ m/^$rx($regex)/ and defined($defs{$1}) and $defs{$1}->{TYPE} eq $typ);
+          if ($key =~ m/^$rx($regex)/ and defined($defs{$1}) and $defs{$1}->{TYPE} eq $typ and $rate >= ReadingsNum($pn,"statisticsShowRate_ge",0)) {
               $evtsum += $hash->{READINGS}{$key}{VAL};
               $typsum += $hash->{READINGS}{$key}{VAL};
               $allattr = " ".join(" ",keys %{$attr{$1}});

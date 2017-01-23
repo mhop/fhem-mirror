@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_DOIFtools.pm: fixed Error: >name< has no TYPE, but following
+                keys: >< which occurs during a statistics report generation if
+                devices are deleted during event recording before
   - bugfix:  HMCCUConf.pm: changed default value of ccudef-readingfilter
   - update:  10_IT: send EV1527 command for switch, change some log level
   - change:  98_powerMap: default value for reading pM_power was renamed to
