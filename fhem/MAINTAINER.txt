@@ -408,6 +408,7 @@ FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_ping                 mattwire             http://forum.fhem.de Sonstiges
 FHEM/98_powerMap             loredo               http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_QRCode.pm            Benni                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            http://forum.fhem.de Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_rssFeed.pm           Benni                http://forum.fhem.de Unterstuetzende Dienste
