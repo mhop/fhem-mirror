@@ -623,19 +623,20 @@ ZWave_Initialize($)
   my @attrList = qw(
     IODev
     WNMI_delay
-    noWakeupForApplicationUpdate:1,0
     classes
     do_not_notify:1,0
     dummy:1,0
+    eventForRaw
     extendedAlarmReadings:0,1,2
     ignore:1,0
+    ignoreDupMsg:1,0
+    neighborListPos
     noExplorerFrames:1,0
-    eventForRaw
+    noWakeupForApplicationUpdate:1,0
     secure_classes
     showtime:1,0
     vclasses
     zwaveRoute
-    neighborListPos
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
@@ -4634,11 +4635,24 @@ ZWave_Parse($$@)
     }
   }
 
-  if($arg =~ m/^028407/) { # wakeup:notification
+  if($arg =~ m/^028407/) { # wakeup:notification (WUN)
+    if($hash->{ignoreDupMsg} && $hash->{wakeupAlive}) { # Ignore 2nd WUN
+      Log3 $name, 3, "$name: ignore duplicate WUN";
+      return ""
+    }
     ZWave_wakeupTimer($baseHash, 1);
     ZWave_processSendStack($baseHash, "next");
 
   } else {
+    if($hash->{ignoreDupMsg} && $callbackid ne "00") {
+      my $hp = hex($callbackid);
+      if($zwave_cbid2dev{$hp}) {
+        delete $zwave_cbid2dev{$hp};
+      } else {
+        Log3 $name, 3, "$name: ignore duplicate answer $event[0]";
+        return "";
+      }
+    }
     ZWave_processSendStack($baseHash, "msg", $arg)
       if(!ZWave_isWakeUp($hash) || $hash->{wakeupAlive});
 
@@ -4715,6 +4729,14 @@ ZWave_Attr(@)
     }
     return ZWave_computeRoute($devName, $param) if($init_done);
     InternalTimer(1, "ZWave_computeRoute", "TYPE=ZWave", 0);
+    return undef;
+
+  } elsif($attrName eq "ignoreDupMsg") {
+    if($type eq "del") {
+      delete $hash->{ignoreDupMsg};
+    } else {
+      $hash->{ignoreDupMsg} = (defined($param) ? $param : 1);
+    }
     return undef;
 
   } elsif($attrName eq "vclasses") {
@@ -5832,12 +5854,17 @@ s2Hex($)
       </li>
 
     <li><a href="#ignore">ignore</a></li>
+    <li><a name="ignoreDupMsg">ignoreDupMsg</a><br>
+      Experimental: if set (to 1), ignore duplicate wakeup messages, or
+      multiple responses to a single get due to missing lowlevel ACK.
+      </li>
     <li><a href="#neighborListPos">neighborListPos</a></li>
-    <li><a href="#noExplorerFrames">noExplorerFrames</a><br>
+    <li><a name="noExplorerFrames">noExplorerFrames</a><br>
       turn off the use of Explorer Frames
       </li>
 
-    <li><a href="#noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a><br>
+    <li><a name="noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a>
+        <br>
       some devices (notable the Aeotec Multisensor 6) are only awake after an
       APPLICATION UPDATE telegram for a very short time. If this attribute is
       set (recommended for the Aeotec Multisensor 6), the WakeUp-Stack is not
