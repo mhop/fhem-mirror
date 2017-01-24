@@ -1469,7 +1469,7 @@ sub powerMap_power($$$;$) {
                     last if ($loop);
                 }
                 elsif ( defined( $powerMap->{$_} ) && !$loop ) {
-                    Log3 $dev, 1, "$TYPE $dev: $_: Adding to total";
+                    Log3 $dev, 5, "$TYPE $dev: $_: Adding to total";
                     my $ret = powerMap_power( $name, $dev,
                         "$_: " . ReadingsVal( $dev, $_, "" ), 1 );
                     $sum += $ret if ( looks_like_number($ret) );
