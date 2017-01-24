@@ -37,6 +37,11 @@
 # 2016-11-29 V 0208 HttpUtils used instead of LWP::UserAgent, BLOCKING=0 set as default, umlaut can be used in Tahoma names
 # 2016-12-15 V 0209 perl warnings during startup and login eliminated
 # 2017-01-08 V 0210 tahoma_cancelExecutions: cancel command added
+# 2017-01-10 V 0211 tahoma_getStates: read all states based on table {setup}{devices}[n]{definition}{states}
+# 2017-01-24 V 0212 tahoma_getStates: read all states recovered
+# 2017-01-24 V 0212 start scene with launchActionGroup so cancel is working on scenes now
+# 2017-01-24 V 0212 Attribut interval used to disable or enable refreshAllstates
+# 2017-01-24 V 0212 Setup changes recognized for reading places
 
 package main;
 
@@ -89,7 +94,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0210";
+  my $ModuleVersion = "0212";
   
   my $subtype;
   my $name = $a[0];
@@ -102,7 +107,7 @@ sub tahoma_Define($$)
     $hash->{device} = $device;
     $hash->{fid} = $fid;
 
-    $hash->{INTERVAL} = 2;
+    $hash->{INTERVAL} = 0;
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
     return "device $device already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
@@ -152,8 +157,8 @@ sub tahoma_Define($$)
     $hash->{username} = $username;
     $hash->{password} = $password;
     $hash->{BLOCKING} = 0;
-    $hash->{INTERVAL} = 2;
-	$hash->{VERSION} = $ModuleVersion;
+    $hash->{INTERVAL} = 0;
+    $hash->{VERSION} = $ModuleVersion;
 
   } else {
     return "Usage: define <name> tahoma device\
@@ -213,7 +218,7 @@ sub tahoma_login($)
   $hash->{startup_done} = undef;
   $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/json/";
   $hash->{url} = $attr{$name}{url} if (defined $attr{$name}{url});
-  $hash->{userAgent} = "TaHoma/7845 CFNetwork/758.3.15 Darwin/15.4.0";
+  $hash->{userAgent} = "TaHoma/7980 CFNetwork/758.5.3 Darwin/15.6.0";
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
   $hash->{HTTPCookies} = undef;
@@ -233,9 +238,11 @@ sub tahoma_login($)
 my @startup_pages = ( 'getEndUser',
                       'getSetup',
                       'getActionGroups',
-                      #'getWeekPlanning',
+                      #'/../../enduserAPI/setup/interactiveNotifications',
+                      #'/../../enduserAPI/setup/interactiveNotifications/history',
                       #'getCalendarDayList',
                       #'getCalendarRuleList',
+                      #'/../../enduserAPI/conditionGroups',
                       #'getScheduledExecutions',
                       #'getHistory',
                       #'getSetupTriggers',
@@ -243,7 +250,14 @@ my @startup_pages = ( 'getEndUser',
                       #'getSetupOptions',
                       #'getAvailableProtocolsType',
                       #'getActiveProtocolsType',
+                      #'getSetupQuota?quotaId=smsCredit',
+                      #'getSetupDawnAndDuskTimes',
                       '../../enduserAPI/setup/gateways',
+                      #'../../enduserAPI/setup/gateways',
+                      #'../../enduserAPI/setup/subscribe/notification/apple/com.somfy.iPhoneTaHoma',
+                      #'../../enduserAPI/setup/subscribe/notification/devices/tahoma',
+                      #'/../../enduserAPI/setup/subscribe/notification/apple/com.somfy.iPhoneTaHoma',
+                      #'../../enduserAPI/setup/subscribe/notification/devices/tahoma',
                       'getCurrentExecutions',
                       'refreshAllStates' );
 
@@ -353,11 +367,11 @@ sub tahoma_readStatusTimer($)
     $timeinfo = "tahoma_startup";
     if ( $hash->{startup_done} ) {
       tahoma_getStates($hash) ;
-      $hash->{refreshStateTimer} = $seconds + 300;
+      $hash->{refreshStateTimer} = $seconds + $hash->{INTERVAL};
       $timeinfo = "tahoma_getStates";
     }
   }
-  elsif( $seconds < $hash->{refreshStateTimer} )
+  elsif( ($seconds < $hash->{refreshStateTimer}) || ($hash->{INTERVAL} <= 0) )
   {
     Log3 $name, 4, "$name: refreshing event";
     tahoma_getEvents($hash);
@@ -368,7 +382,7 @@ sub tahoma_readStatusTimer($)
     Log3 $name, 4, "$name: refreshing state";
     tahoma_refreshAllStates($hash);
     tahoma_getStates($hash);
-    $hash->{refreshStateTimer} = $seconds + 300;
+    $hash->{refreshStateTimer} = $seconds + $hash->{INTERVAL};
     $timeinfo = "tahoma_refreshAllStates tahoma_getStates";
   }
 
@@ -442,39 +456,11 @@ sub tahoma_initDevice($)
   }
   else
   {
-	my $device=$hash->{device};
-	$device ||= 'undefined';
+    my $device=$hash->{device};
+    $device ||= 'undefined';
     $subtype ||= 'undefined';
     Log3 $name, 3, "$name: unknown device=$device, subtype=$subtype";
   }
-
-
-  my $state_format;
-  if( $device->{states} ) {
-    delete($hash->{dataTypes});
-    delete($hash->{helper}{dataTypes});
-
-    my @reading_names = ();
-    foreach my $type (@{$device->{states}}) {
-      $hash->{dataTypes} = "" if ( !defined($hash->{dataTypes}) );
-      $hash->{dataTypes} .= "," if ( $hash->{dataTypes} );
-      $hash->{dataTypes} .= $type->{name};
-      #Log3 $name, 4, "state=$type->{name}";
-
-      push @reading_names, lc($type);
-
-      if( $type->{name} eq "core:ClosureState" ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "Closure: ClosureState";
-      } elsif( $type->{name} eq "core:OpenClosedState" ) {
-        $state_format .= " " if( $state_format );
-        $state_format .= "Closed: OpenClosedState";
-      }
-    }
-
-    $hash->{helper}{readingNames} = \@reading_names;
-  }
-  #$attr{$name}{stateFormat} = $state_format if( !defined( $attr{$name}{stateFormat} ) && defined($state_format) );
 }
 
 sub tahoma_updateDevices($)
@@ -614,10 +600,10 @@ sub tahoma_getDeviceList($$$$)
         push ( @{$deviceList}, { device => $device->{deviceURL}, class => $device->{uiClass}, levelInvert => $device->{levelInvert} } ) ;
         #print "tahoma_getDeviceList url=$device->{deviceURL} devices=".scalar @{$deviceList}."\n";
       }
-    } elsif ( defined($device->{oid}) && defined($device->{place}) ) {
+    } elsif ( defined($device->{oid}) && defined($device->{subPlaces}) ) {
       if ($device->{oid} eq $oid)
       {
-        foreach my $place (@{$device->{place}}) {
+        foreach my $place (@{$device->{subPlaces}}) {
           tahoma_getDeviceList($hash,$place->{oid},$placeClasses,$deviceList);
         }
       }
@@ -633,6 +619,16 @@ sub tahoma_checkCommand($$$$)
   if (($command eq 'setClosure') && (defined ($device->{levelInvert})))
   {
     $value = 100 - $value if ($device->{levelInvert} && ($value >= 0) && ($value <= 100));
+  }
+  if (($command eq 'setClosure') && ($value == 100) && (index($hash->{COMMANDS}," close:") > 0))
+  {
+    $command = 'close';
+    $value = '';
+  }
+  if (($command eq 'setClosure') && ($value == 0) && (index($hash->{COMMANDS}," open:") > 0))
+  {
+    $command = 'open';
+    $value = '';
   }
   return ($command,$value);
 }
@@ -664,8 +660,10 @@ sub tahoma_applyRequest($$$)
 
   my $data = '';
   $value = '' if (!defined($value));
+  my $commandChecked = $command;
+  my $valueChecked = $value;
   foreach my $device (@devices) {
-    my ($commandChecked, $valueChecked) = tahoma_checkCommand($hash,$device,$command,$value);
+    ($commandChecked, $valueChecked) = tahoma_checkCommand($hash,$device,$command,$value);
     if (defined($commandChecked) && defined($valueChecked))
     {
       $data .= ',' if substr($data, -1) eq '}';
@@ -676,8 +674,15 @@ sub tahoma_applyRequest($$$)
   return if (length $data < 20);
   
   my $dataHead = '{"label":"' . $hash->{inLabel};
-  $dataHead .= ' - Positionieren auf '.$value.' % - iPhone","actions":[' if ($command eq 'setClosure');
-  $dataHead .= ' - $command $value - iPhone","actions":[' if ($command ne 'setClosure');
+  if ($commandChecked eq 'setClosure') {
+    $dataHead .= ' - Positionieren auf '.$valueChecked.' % - iPhone","actions":[';
+  } elsif ($commandChecked eq 'close') {
+    $dataHead .= ' - Schliessen - iPhone","actions":[';
+  } elsif ($commandChecked eq 'open') {
+    $dataHead .= ' - Oeffnen - iPhone","actions":[';
+  } else {
+    $dataHead .= " - $commandChecked $valueChecked".' - iPhone","actions":[';
+  }
   $data = $dataHead . $data . ']}';
 
   Log3 $name, 3, "$name: tahoma_applyRequest data=".$data;
@@ -712,6 +717,28 @@ sub tahoma_scheduleActionGroup($$)
     hash => $hash,
     page => 'scheduleActionGroup',
     subpage => '?oid='.$hash->{oid}.'&delay='.$delay,
+    callback => \&tahoma_dispatch,
+    nonblocking => 1,
+  });
+}
+
+sub tahoma_launchActionGroup($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_launchActionGroup";
+
+  if ( !defined($hash->{IODev}) || !defined($hash->{oid}) ) {
+    Log3 $name, 3, "$name: tahoma_launchActionGroup failed - define error";
+    return;
+  }
+
+  tahoma_UserAgent_NonblockingGet({
+    timeout => 10,
+    noshutdown => 1,
+    hash => $hash,
+    page => 'launchActionGroup',
+    subpage => '?oid='.$hash->{oid},
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -815,6 +842,8 @@ sub tahoma_dispatch($$$)
       tahoma_parseGetCurrentExecutions($hash,$json);
     } elsif( $param->{page} eq 'scheduleActionGroup' ) {
       tahoma_parseScheduleActionGroup($hashIn,$json);
+    } elsif( $param->{page} eq 'launchActionGroup' ) {
+      tahoma_parseLaunchActionGroup($hashIn,$json);
     } elsif( $param->{page} eq 'cancelExecutions' ) {
       tahoma_parseCancelExecutions($hash,$json);
     }
@@ -1030,8 +1059,8 @@ sub tahoma_parseGetSetup($$)
   
   $hash->{helper}{devices} = \@devices;
 
-  if ($json->{setup}{place}) {
-    my $places = $json->{setup}{place};
+  if ($json->{setup}{rootPlace}) {
+    my $places = $json->{setup}{rootPlace};
     #Log3 $name, 4, "$name: tahoma_parseGetSetup places= " . Dumper($places);
     tahoma_parseGetSetupPlaces($hash, $places);
   }
@@ -1053,14 +1082,14 @@ sub tahoma_parseGetSetupPlaces($$)
     #Log3 $name, 4, "$name: tahoma_parseGetSetupPlaces isArray";
     foreach my $place (@{$places}) {
       push( @{$devices}, $place );
-      my $placesNext = $place->{place};
+      my $placesNext = $place->{subPlaces};
       tahoma_parseGetSetupPlaces($hash, $placesNext ) if ($placesNext);
     }
   }
   else {
     #Log3 $name, 4, "$name: tahoma_parseGetSetupPlaces isScalar";
     push( @{$devices}, $places );
-    my $placesNext = $places->{place};
+    my $placesNext = $places->{subPlaces};
     tahoma_parseGetSetupPlaces($hash, $placesNext) if ($placesNext);
   }
 
@@ -1160,6 +1189,26 @@ sub tahoma_parseScheduleActionGroup($$)
   }
 }
 
+sub tahoma_parseLaunchActionGroup($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_parseLaunchActionGroup";
+  if (defined $json->{actionGroup})
+  {
+    $hash->{inExecState} = 0;
+    if (defined($json->{actionGroup}[0]{execId})) {
+      $hash->{inExecId} = $json->{actionGroup}[0]{execId};
+    } else {
+      $hash->{inExecId} = "undefined";
+    }
+  }
+  if (defined($json->{events}) && defined($hash->{IODev}))
+  {
+    tahoma_parseGetEvents($hash->{IODev},$json->{events})
+  }
+}
+
 sub tahoma_parseCancelExecutions($$)
 {
   my($hash, $json) = @_;
@@ -1242,7 +1291,7 @@ sub tahoma_Set($$@)
     $list = "start:noArg startAt cancel:noArg";
 
     if( $cmd eq "start" ) {
-      tahoma_scheduleActionGroup($hash,0);
+      tahoma_launchActionGroup($hash);
       return undef;
     }
     
@@ -1274,13 +1323,12 @@ sub tahoma_Attr($$$)
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
   my $orig = $attrVal;
-  $attrVal = int($attrVal) if($attrName eq "interval");
-  $attrVal = 60*5 if($attrName eq "interval" && $attrVal < 60*5 && $attrVal != 0);
 
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
+    $attrVal = int($attrVal);
+    $attrVal = 60*5 if ($attrVal < 60*5 && $attrVal != 0);
     $hash->{INTERVAL} = $attrVal;
-    $hash->{INTERVAL} = 60*5 if( !$attrVal );
   } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
     RemoveInternalTimer($hash);
@@ -1301,7 +1349,6 @@ sub tahoma_Attr($$$)
     $device->{levelInvert} = $attrVal if (defined $device);
   }
   
-  
   if( $cmd eq "set" ) {
     if( $orig ne $attrVal ) {
       $attr{$name}{$attrName} = $attrVal;
@@ -1321,13 +1368,20 @@ sub tahoma_UserAgent_NonblockingGet($)
   my $name = $hash->{NAME};
   Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
 
-  #headers,343:29:4:Host,18:www.tahomalink.com,]34:16:Proxy-Connection,10:keep-alive,]36:15:Accept-Encoding,13:gzip, deflate,]53:12:Content-Type,33:application/x-www-form-urlencoded,]23:14:Content-Length,2:49,]27:15:Accept-Language,5:de-de,]15:6:Accept,3:*/*,]28:10:Connection,10:keep-alive,]62:10:User-Agent,44:TaHoma/7845 CFNetwork/758.3.15 Darwin/15.4.0,]]
+  #"User-Agent":"TaHoma/7980 CFNetwork/758.5.3 Darwin/15.6.0","Proxy-Connection":"keep-alive","Accept":"*/*","Connection":"keep-alive","Content-Length":"49","Accept-Encoding":"gzip, deflate","Content-Type":"application/x-www-form-urlencoded","Accept-Language":"de-de","Host":"www.tahomalink.com"
   $param->{header} = {'User-Agent' => $hash->{userAgent} }; #, 'Accept-Language' => "de-de", 'Accept-Encoding' => "gzip, deflate"};
   $param->{header}{Cookie} = $hash->{HTTPCookies} if ($hash->{HTTPCookies});
   $param->{compress} = 1;
   $param->{keepalive} = 1;
-  $param->{url} = $hash->{url} . $param->{page};
-  $param->{url} .= $param->{subpage} if ($param->{subpage});
+  if (index($hash->{url},'file:') == 0)
+  {
+    $param->{url} = $hash->{url} . $param->{page} . '.json';
+  }
+  else
+  {
+    $param->{url} = $hash->{url} . $param->{page};
+    $param->{url} .= $param->{subpage} if ($param->{subpage});
+  }
   
   $hash->{request_active} = 1;
   $hash->{request_time} = time;
