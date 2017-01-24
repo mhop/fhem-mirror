@@ -129,11 +129,11 @@ allowed_Authenticate($$$$)
         # generate timestamp according to RFC-1130 in Expires
         my $expires = FmtDateTimeRFC1123($time);
 
-        readigsBeginUpdate($me);
+        readingsBeginUpdate($me);
         readingsBulkUpdate($me,'lastAuthUser', $user, 1);
         readingsBulkUpdate($me,'lastAuthExpires', $time, 1);
         readingsBulkUpdate($me,'lastAuthExpiresFmt', $expires, 1);
-        readigsEndUpdate($me, 1);
+        readingsEndUpdate($me, 1);
 
         # set header with expiry
         $cl->{".httpAuthHeader"} = "Set-Cookie: AuthToken=".$secret.
