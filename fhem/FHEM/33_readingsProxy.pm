@@ -58,8 +58,7 @@ readingsProxy_updateDevices($)
 
     my @device = split(":", $param);
 
-    if( defined($defs{$device[0]})
-        && defined($defs{$device[0]}) ) {
+    if( defined($defs{$device[0]}) ) {
       $list{$device[0]} = 1;
       $hash->{DEVICE} = $device[0];
       $hash->{READING} = $device[1];
@@ -68,6 +67,11 @@ readingsProxy_updateDevices($)
     }
   }
 
+  if( $hash->{DEVICE} ) {
+    notifyRegexpChanged($hash,"(global|".$hash->{DEVICE}.")");
+  } else {
+    notifyRegexpChanged($hash,'');
+  }
   $hash->{CONTENT} = \%list;
 
   readingsProxy_update($hash, undef);
@@ -107,7 +111,7 @@ readingsProxy_update($$)
   my $DEVICE = $hash->{DEVICE};
   my $READING = $hash->{READING};
 
-  $value = ReadingsVal($DEVICE,$READING,undef) if( !defined($value) );
+  $value = ReadingsVal($DEVICE,$READING,undef) if( $DEVICE && !defined($value) );
 
   my $value_fn = AttrVal( $name, "valueFn", "" );
   if( $value_fn =~ m/^{.*}$/s ) {
@@ -172,9 +176,12 @@ readingsProxy_Notify($$)
         $hash->{DEF} =~ s/ $//;
       }
       readingsProxy_updateDevices($hash);
+
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
       readingsProxy_updateDevices($hash);
+
     } else {
+      next if( !$hash->{DEVICE} );
       next if( $dev->{NAME} ne $hash->{DEVICE} );
 
       my @parts = split(/: /,$s);
