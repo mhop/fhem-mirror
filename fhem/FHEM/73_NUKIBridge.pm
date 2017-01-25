@@ -46,7 +46,8 @@ use JSON;
 
 use HttpUtils;
 
-my $version = "0.4.7";
+my $version     = "0.6.0";
+my $bridgeapi   = "1.5";
 
 
 
@@ -135,6 +136,7 @@ sub NUKIBridge_Define($$) {
     $hash->{PORT}       = $port;
     $hash->{TOKEN}      = $token;
     $hash->{VERSION}    = $version;
+    $hash->{BRIDGEAPI}  = $bridgeapi;
     $hash->{helper}{aliveCount} = 0;
     
 
@@ -245,6 +247,11 @@ sub NUKIBridge_Set($@) {
         
         NUKIBridge_CallBlocking($hash,"clearlog",undef) if( !IsDisabled($name) );
         
+    } elsif($cmd eq 'factoryReset') {
+        return "usage: clearLog" if( @args != 0 );
+        
+        NUKIBridge_CallBlocking($hash,"factoryReset",undef) if( !IsDisabled($name) );
+        
     } elsif($cmd eq 'callbackRemove') {
         return "usage: callbackRemove" if( @args != 1 );
         my $id = "id=" . join( " ", @args );
@@ -259,7 +266,7 @@ sub NUKIBridge_Set($@) {
     } else {
         my  $list = ""; 
         $list .= "info:noArg autocreate:noArg callbackRemove:0,1,2 ";
-        $list .= "clearLog:noArg fwUpdate:noArg reboot:noArg" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
+        $list .= "clearLog:noArg fwUpdate:noArg reboot:noArg factoryReset:noArg" if( ReadingsVal($name,'bridgeType','Software') eq 'Hardware' );
         return "Unknown argument $cmd, choose one of $list";
     }
 }
@@ -439,7 +446,7 @@ sub NUKIBridge_Distribution($$$) {
         # zum testen da ich kein Nuki Smartlock habe
         #$json = '[{"nukiId": 1,"name": "Home","lastKnownState": {"state": 1,"stateName": "locked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}},{"nukiId": 2,"name": "Grandma","lastKnownState": {"state": 3,"stateName": "unlocked","batteryCritical": false,"timestamp": "2016-10-03T06:49:00+00:00"}}]' if( $param->{endpoint} eq "list" );
         
-        #$json= '{"bridgeType":2,"ids":{"serverId":142667440},"versions":{"appVersion":"0.2.14"},"uptime":1527,"currentTime":"2017-01-17T04:55:58Z","serverConnected":true,"scanResults":[{"nukiId": 1,"name": "Home","rssi": -87,"paired": true},{"nukiId": 2,"name": "Grandma","rssi": -93,"paired": false}]}';
+        #$json= '{"bridgeType":2,"ids":{"serverId":142667440},"versions":{"appVersion":"0.2.14"},"uptime":1527,"currentTime":"2017-01-17T04:55:58Z","serverConnected":true,"scanResults":[{"nukiId": 1,"name": "Home","rssi": -87,"paired": true},{"nukiId": 2,"name": "Grandma","rssi": -93,"paired": false}]}' if( $param->{endpoint} eq "info" );
         
         NUKIBridge_ResponseProcessing($hash,$json,$param->{endpoint});
         
@@ -809,10 +816,11 @@ sub NUKIBridge_CallBlocking($$$) {
   <ul>
     <li>autocreate - Prompts to re-read all Smartlocks from the bridge and if not already present in FHEM, create the autimatic.</li>
     <li>callbackRemove -  Removes a previously added callback</li>
-    <li>clearLog - Clears the log of the Bridge</li>
-    <li>fwUpdate -  Immediately checks for a new firmware update and installs it</li>
+    <li>clearLog - Clears the log of the Bridge (only hardwarebridge)</li>
+    <li>factoryReset - Performs a factory reset (only hardwarebridge)</li>
+    <li>fwUpdate -  Immediately checks for a new firmware update and installs it (only hardwarebridge)</li>
     <li>info -  Returns all Smart Locks in range and some device information of the bridge itself</li>
-    <li>reboot - reboots the bridge</li>
+    <li>reboot - reboots the bridge (only hardwarebridge)</li>
     <br>
   </ul>
   <br><br>

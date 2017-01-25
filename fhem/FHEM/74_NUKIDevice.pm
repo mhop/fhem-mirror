@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 
 
-my $version = "0.4.7";
+my $version = "0.6.0";
 
 
 
@@ -305,10 +305,14 @@ sub NUKIDevice_Set($$@) {
         
     } elsif( $cmd eq 'locknGoWithUnlatch' ) {
         $lockAction = $cmd;
+    
+    } elsif( $cmd eq 'unpair' ) {
         
+        NUKIDevice_ReadFromNUKIBridge($hash,"$cmd",undef,$hash->{NUKIID} ) if( !IsDisabled($name) );
+        return undef;
     
     } else {
-        my $list = "statusRequest:noArg unlock:noArg lock:noArg unlatch:noArg locknGo:noArg locknGoWithUnlatch:noArg";
+        my  $list = "statusRequest:noArg unlock:noArg lock:noArg unlatch:noArg locknGo:noArg locknGoWithUnlatch:noArg unpair:noArg";
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -601,6 +605,9 @@ sub NUKIDevice_CGI() {
   <ul>
     <li>state - Status of the Smartlock or error message if any error.</li>
     <li>lockState - current lock status uncalibrated, locked, unlocked, unlocked (lock ‘n’ go), unlatched, locking, unlocking, unlatching, motor blocked, undefined.</li>
+    <li>name - name of the device</li>
+    <li>paired - paired information false/true</li>
+    <li>rssi - value of rssi</li>
     <li>succes - true, false   Returns the status of the last closing command. Ok or not Ok.</li>
     <li>batteryCritical - Is the battery in a critical state? True, false</li>
     <li>battery - battery status, ok / low</li>
@@ -613,6 +620,7 @@ sub NUKIDevice_CGI() {
     <li>lock - lock</li>
     <li>unlock - unlock</li>
     <li>unlatch - unlock / open Door</li>
+    <li>unpair -  Removes the pairing with a given Smart Lock</li>
     <li>locknGo - lock when gone</li>
     <li>locknGoWithUnlatch - lock after the door has been opened</li>
     <br>
@@ -658,6 +666,9 @@ sub NUKIDevice_CGI() {
   <ul>
     <li>state - Status des Smartlock bzw. Fehlermeldung von Fehler vorhanden.</li>
     <li>lockState - aktueller Schlie&szlig;status uncalibrated, locked, unlocked, unlocked (lock ‘n’ go), unlatched, locking, unlocking, unlatching, motor blocked, undefined.</li>
+    <li>name - Name des Smart Locks</li>
+    <li>paired - pairing Status des Smart Locks</li>
+    <li>rssi - rssi Wert des Smart Locks</li>
     <li>succes - true, false Gibt des Status des letzten Schlie&szlig;befehles wieder. Geklappt oder nicht geklappt.</li>
     <li>batteryCritical - Ist die Batterie in einem kritischen Zustand? true, false</li>
     <li>battery - Status der Batterie, ok/low</li>
@@ -670,6 +681,7 @@ sub NUKIDevice_CGI() {
     <li>lock - verschlie&szlig;en</li>
     <li>unlock - aufschlie&szlig;en</li>
     <li>unlatch - entriegeln/Falle &ouml;ffnen.</li>
+    <li>unpair -  entfernt das pairing mit dem Smart Lock</li>
     <li>locknGo - verschlie&szlig;en wenn gegangen</li>
     <li>locknGoWithUnlatch - verschlie&szlig;en nach dem die Falle ge&ouml;ffnet wurde.</li>
     <br>
