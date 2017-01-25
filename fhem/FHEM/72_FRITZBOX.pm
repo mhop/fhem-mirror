@@ -1242,7 +1242,6 @@ sub FRITZBOX_Readout_Run_Web($)
    my $hash = $defs{$name};
 
    my $result;
-   my $result2;
    my $rName;
    my @roReadings;
    my %dectFonID;
@@ -1257,10 +1256,10 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
-   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices
+   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69
    #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)   
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,guest,name,mac,active,online,wlan,speed)"; # LAN devices
-   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(ip,ethernet,guest,name,mac,active,online,wlan,speed)"; # LAN devices
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,guest,name,mac,active,online,wlan,speed,UID)"; # LAN devices
+   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(ip,ethernet,guest,name,mac,active,online,wlan,speed,UID)"; # LAN devices fw>=6.69
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
    #landevice:settings/landevice/list(name,ip,mac,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)   #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
@@ -1280,6 +1279,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_tr069=tr069:settings/enabled"; # TR069
    $queryStr .= "&box_fwUpdate=updatecheck:status/update_available_hint";
    $queryStr .= "&userProfil=user:settings/user/list(name,filter_profile_UID,this_month_time,today_time,type)"; # User profiles
+   $queryStr .= "&userProfilNew=user:settings/user/list(name,type)"; # User profiles fw>=6.69
    $queryStr .= "&is_double_wlan=wlan:settings/feature_flags/DBDC"; # Box Feature
    $queryStr .= "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
    $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
@@ -1333,30 +1333,60 @@ sub FRITZBOX_Readout_Run_Web($)
    # !!! copes with fw>=6.69 !!!
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
       FRITZBOX_Log $hash, 4, "Recognized query answer of firmware >= 6.69";
-      $queryStr="";
-      # gets WLAN speed and LAN-Port for fw>=6.69
-      foreach ( @{ $result->{wlanListNew} } ) {
-         $queryStr .= "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx"; 
-      }
-      foreach ( @{ $result->{lanDeviceNew} } ) {
-         $queryStr .= "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port"; 
-      }
-      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+      my $result2;
       
-      if (defined $result2->{Error}) {
-         FRITZBOX_Log $hash, 2, "Error: ".$result2->{Error};
-         my $returnStr = "Error|" . $result2->{Error};
-         $returnStr .= "|fhem->sidTime|0"    if defined $result2->{ResetSID};
-         $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
-         return $name."|".encode_base64($returnStr,"");
+      # gets WLAN speed for fw>=6.69
+      $queryStr="";
+      foreach ( @{ $result->{wlanListNew} } ) {
+         $queryStr .= "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx"
+               if length($queryStr) < 8190 ; 
       }
+      my $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
       $result->{wlanList} = $result->{wlanListNew};
       foreach ( @{ $result->{wlanList} } ) {
          $_->{speed_rx} = $result2->{ $_->{_node} }; 
       }
+
+      # gets LAN-Port for fw>=6.69
+      $queryStr="";
+      foreach ( @{ $result->{lanDeviceNew} } ) {
+         $queryStr .= "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port"
+               if length($queryStr) < 8190 ; 
+      }
+      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
       $result->{lanDevice} = $result->{lanDeviceNew};
       foreach ( @{ $result->{lanDevice} } ) {
          $_->{ethernet_port} = $result2->{ $_->{_node} }; 
+      }
+
+      # gets userProfil-Filter_UID for fw>=6.69
+      $queryStr="";
+      foreach ( @{ $result->{userProfilNew} } ) {
+         $queryStr .= "&".$_->{_node}."_filter=user:settings/".$_->{_node}."/filter_profile_UID"
+               if length($queryStr) < 8190 ; 
+      }
+      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+      $result->{userProfil} = $result->{userProfilNew};
+      foreach ( @{ $result->{userProfil} } ) {
+         $_->{filter_profile_UID} = $result2->{ $_->{_node}."_filter" }; 
+      }
+
+      # gets userProfil-Times for fw>=6.69
+      $queryStr="";
+      foreach ( @{ $result->{userProfil} } ) {
+      # do not show data for unlimited, blocked or default access rights
+         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$_->{_node}} ) {
+            $queryStr .= "&".$_->{_node}."_month=user:settings/".$_->{_node}."/this_month_time"
+               if length($queryStr) < 8190 ; 
+            $queryStr .= "&".$_->{_node}."_today=user:settings/".$_->{_node}."/today_time"
+               if length($queryStr) < 8190 ;  
+         }
+      }
+      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+      $result->{userProfil} = $result->{userProfilNew};
+      foreach ( @{ $result->{userProfil} } ) {
+         $_->{this_month_time} = $result2->{ $_->{_node}."_month" }; 
+         $_->{today_time} = $result2->{ $_->{_node}."_today" }; 
       }
    }
    
@@ -1445,9 +1475,7 @@ sub FRITZBOX_Readout_Run_Web($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $wlanList{$mac}{speed_rx};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
       }
-
    }
-   # ethernet_port,
    
 # Create LanDevice list and delete inactive devices
    my %oldLanDevice;
@@ -1461,9 +1489,12 @@ sub FRITZBOX_Readout_Run_Web($)
    if ( ref $result->{lanDevice} eq 'ARRAY' ) {
       foreach ( @{ $result->{lanDevice} } ) {
          my $dIp = $_->{ip};
+         my $UID = $_->{UID};
          my $dName = $_->{name};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$UID", $dName;
          $landevice{$dIp}=$dName;
+         $landevice{$UID}=$dName;
       # Create a reading if a landevice is connected
          if ($_->{active} == 1) {
             my $mac = $_->{mac};
@@ -1584,8 +1615,11 @@ sub FRITZBOX_Readout_Run_Web($)
    if ( ref $result->{userProfil} eq 'ARRAY' ) {
       foreach ( @{ $result->{userProfil} } ) {
       # do not show data for unlimited, blocked or default access rights
-         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
-         {
+         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} ) {
+            if ( $_->{type} eq "1" && $_->{name} =~ /\(landev(.*)\)/ ) {
+               my $UID = "landevice".$1;
+               $_->{name} = $landevice{$UID};
+            }
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,                   $_->{name},            "deviceip";
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_thisMonthTime",  $_->{this_month_time}, "secondsintime";
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todayTime",      $_->{today_time},      "secondsintime";
