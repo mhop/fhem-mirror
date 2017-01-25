@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update: 98_DOIFtools.pm: new attribute DOIFtoolsEventOnDeleted generates
+               events for stat_ Readings before deletion
+               remove add... button in DOIFtools event monitor
   - changed: 00_SIGNALduino.pm: version 3.3.1
                  needs less cpu time for parsing messages
                  new command to query protocolids

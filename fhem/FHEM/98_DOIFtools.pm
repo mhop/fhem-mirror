@@ -42,6 +42,7 @@ sub DOIFtools_dO ($$$$);
 sub DOIFtoolsSetNotifyDev;
 sub DOIFtools_logWrapper($);
 sub DOIFtoolsCounterReset($);
+sub DOIFtoolsDeleteStatReadings;
 
 my @DOIFtools_we =();
 
@@ -62,7 +63,7 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 disabledForIntervals ".$oldAttr;
 }
 
 sub DOIFtools_dO ($$$$){return "";}
@@ -81,13 +82,23 @@ sub DOIFtools_eM($$$$) {
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
     $ret .= "<div><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
-          "&nbsp;&nbsp;<span class='fhemlog'>FHEM log ".
+          "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
     $ret .= "</div>";
+    $ret .= "<script type=\"text/javascript\">
+    function delbutton() {
+      var del = document.getElementById('addRegexpPart');
+      if (del) {
+        del.parentNode.removeChild(del);
+      }
+    }
+     var ins = document.getElementById('doiftoolsdel');
+     addEventListener ('DOMNodeInserted', delbutton, false);
+   </script>";
   }
   return $ret;
 }
@@ -254,13 +265,23 @@ sub DOIFtools_fhemwebFn($$$$) {
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
     $ret .= "<div><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
-          "&nbsp;&nbsp;<span class='fhemlog'>FHEM log ".
+          "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
     $ret .= "</div>";
+    $ret .= "<script type=\"text/javascript\">
+    function delbutton() {
+      var del = document.getElementById('addRegexpPart');
+      if (del) {
+        del.parentNode.removeChild(del);
+      }
+    }
+     var ins = document.getElementById('doiftoolsdel');
+     addEventListener ('DOMNodeInserted', delbutton, false);
+   </script>";
   }
   return $ret;
 }
@@ -575,6 +596,27 @@ sub DOIFtoolsCounterReset($) {
   InternalTimer($nt, "DOIFtoolsCounterReset", $pn, 0);
   return undef;
 }
+sub DOIFtoolsDeleteStatReadings {
+  my ($hash, @a) = @_;
+  my $pn = $hash->{NAME};
+  my $st = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? ".stat_" : "stat_";  readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"Action","event recording stopped and data deleted");
+    readingsBulkUpdate($hash,"doStatistics","disabled");
+    readingsBulkUpdate($hash,"statisticHours","0.00");
+    readingsBulkUpdate($hash,".t0",gettimeofday());
+    readingsBulkUpdate($hash,".te",0);
+  readingsEndUpdate($hash,0);
+  if (AttrVal($pn,"DOIFtoolsEventOnDeleted","")){
+    readingsBeginUpdate($hash);
+      foreach my $key (keys %{$hash->{READINGS}}) {
+        readingsBulkUpdate($hash,"stat_$1",ReadingsVal($pn,"$key",0)) if ($key =~ m/^$st(.*)/);
+      }
+    readingsEndUpdate($hash,1);
+  }
+  foreach my $key (keys %{$hash->{READINGS}}) {
+    delete $hash->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
+  }
+}
 #################################
 sub DOIFtools_Define($$$)
 {
@@ -627,16 +669,7 @@ sub DOIFtools_Attr(@)
     }
   } elsif ($init_done and $attr eq "DOIFtoolsHideStatReadings") {
       DOIFtoolsSetNotifyDev($hash,1,0);
-      readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Action","event recording stopped");
-        readingsBulkUpdate($hash,"doStatistics","disabled");
-        readingsBulkUpdate($hash,"statisticHours","0.00");
-        readingsBulkUpdate($hash,".t0",gettimeofday());
-        readingsBulkUpdate($hash,".te",0);
-      readingsEndUpdate($hash,0);
-      foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
-        delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
-      }
+      DOIFtoolsDeleteStatReadings($hash);
   } elsif ($init_done and $cmd eq "set" and 
            $attr =~ m/^(executeDefinition|executeSave|target_room|target_group|readingsPrefix|eventMonitorInDOIF)$/) {
     $ret .= "\n$1 is an old attribute name use a new one beginning with DOIFtools...";
@@ -701,16 +734,7 @@ sub DOIFtools_Set($@)
   } elsif ($arg eq "doStatistics") {
       if ($value eq "deleted") {
         DOIFtoolsSetNotifyDev($hash,1,0);
-        readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"Action","event recording stopped");
-          readingsBulkUpdate($hash,"doStatistics","disabled");
-          readingsBulkUpdate($hash,"statisticHours","0.00");
-          readingsBulkUpdate($hash,".t0",gettimeofday());
-          readingsBulkUpdate($hash,".te",0);
-        readingsEndUpdate($hash,0);
-        foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
-          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
-        }
+        DOIFtoolsDeleteStatReadings($hash);
       } elsif ($value eq "disabled") {
         readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"Action","event recording paused");
@@ -729,14 +753,8 @@ sub DOIFtools_Set($@)
         $value =~ s/\,/|/g;
         readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"statisticsTYPEs",$value);
-          readingsBulkUpdate($hash,"doStatistics","disabled");
-          readingsBulkUpdate($hash,".te",0);
-          readingsBulkUpdate($hash,".t0",gettimeofday());
-          readingsBulkUpdate($hash,"statisticHours","0.00");
         readingsEndUpdate($hash,0);
-        foreach my $key (keys %{$defs{$pn}->{READINGS}}) {
-          delete $defs{$pn}->{READINGS}{$key} if ($key =~ "^(stat_|\.stat_)");
-        }
+        DOIFtoolsDeleteStatReadings($hash);
         DOIFtoolsSetNotifyDev($hash,1,0);
   } elsif ($arg eq "recording_target_duration") {
         $value =~ m/(\d+)/;
@@ -1146,6 +1164,9 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsHideStatReadings &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideStatReadings</b> <b>1</b>, verstecken der <i>stat_</i> Readings. Das Ändern des Attributs löscht eine bestehende Event-Aufzeichnung. <b>Default 0</b>.<br>
+        <br>
+        <code>attr &lt;name&gt; DOIFtoolsEventOnDeleted &lt;0|1&gt;</code><br>
+        <b>DOIFtoolsEventOnDeleted</b> <b>1</b>, es werden Events für alle <i>stat_</i> erzeugt, bevor sie gelöscht werden. Damit könnten die erfassten Daten geloggt werden.  <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsMyShortcuts &lt;shortcut name&gt,&lt;command&gt;, ...</code><br>
         <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <a href="#menuEntries">menuEntries</a>.<br>
