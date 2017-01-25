@@ -429,6 +429,8 @@ FW_Read($$)
       "Content-Length: 0\r\n\r\n");
     delete $hash->{CONTENT_LENGTH};
     FW_Read($hash, 1) if($hash->{BUF});
+    Log 3, "$FW_cname: unsupported HTTP method $method, rejecting it."
+        if($retCode ne "200 OK");
     return;
   }
 
