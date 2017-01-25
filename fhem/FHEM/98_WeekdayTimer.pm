@@ -786,6 +786,9 @@ sub WeekdayTimer_isHeizung($) {
   
   my $dHash = $defs{$hash->{DEVICE}};                                           
   return "" if (!defined $dHash); # vorzeitiges Ende wenn das device nicht existiert
+
+  my $dType = $dHash->{TYPE};
+  return ""   if (!defined($dType) || $dType eq "dummy" );    
   
   my $dName = $dHash->{NAME};
   
