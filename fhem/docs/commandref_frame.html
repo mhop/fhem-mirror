@@ -37,12 +37,12 @@
 <h3>Contents</h3>
 <ul>
   <a href="#intro">Introduction</a><br>
-  <a href="#command">Fhem command types</a><br>
+  <a href="#command">FHEM command types</a><br>
   <a href="#devspec">Device specification</a><br>
   <a href="#attributes">Attributes</a><br>
 
   <br>
-  <b>Fhem commands</b>
+  <b>FHEM commands</b>
   <ul>
       <!-- header:command -->
       <a href="#apptime">apptime</a> &nbsp; <!-- provides information about execution times -->
@@ -121,7 +121,7 @@
 <a name="intro"></a>
 <h3>Introduction</h3>
 <ul>
-Fhem is mainly used for home automation, but it is suitable for other tasks
+FHEM is mainly used for home automation, but it is suitable for other tasks
 too, where notification, timers and logging plays an important role.<br>
 <br>
 
@@ -131,13 +131,13 @@ devices like FS20 or FHT to digest the messages for a certain device type using
 this protocol.<br>
 <br>
 
-Fhem is modular. The different devices are represented through modules which
+FHEM is modular. The different devices are represented through modules which
 implement certain functions (e.g. define, get, set). Even seemingly integral
-parts of fhem like triggers (<a href="#notify">notify</a>) and timers (<a
+parts of FHEM like triggers (<a href="#notify">notify</a>) and timers (<a
 href="#at">at</a>) are implemented this way, giving the possibility to
 replace/extend this functionality.<br> <br>
 
-Fhem is controlled through readable / ascii commands, which are specified in
+FHEM is controlled through readable / ascii commands, which are specified in
 files (e.g. the configuration file), or issued over a TCP/IP connection, either
 directly in a telnet session, with a fhem.pl in client mode or from one of the
 web frontends.<br> <br>
@@ -166,7 +166,7 @@ The web interface can be reached at
 </ul>
 <br>
 
-TCP/IP communication with fhem can either happen in a "session" (via
+TCP/IP communication with FHEM can either happen in a "session" (via
 telnet) or single client command (via fhem.pl). Example:
 <ul>
     <code>telnet &lt;fhemhost&gt; 7072<br>
@@ -183,7 +183,7 @@ telnet) or single client command (via fhem.pl). Example:
 
 
 <a name="command"></a>
-<h3>Fhem command types</h3>
+<h3>FHEM command types</h3>
 <ul>
 There are three types of commands: "fhem" commands (described in this
 document), shell commands (they must be enclosed in double quotes ") and perl
@@ -201,14 +201,14 @@ prompt:<br>
 <br>
 
 Shell commands will be executed in the background, perl expressions and
-fhem commands will be executed in the main "thread".  In order to make perl
+FHEM commands will be executed in the main "thread".  In order to make perl
 expressions easier to write, some special functions and variables are
 available. See the section <a href="#perl">Perl special</a> for a description.
-To trigger fhem commands from a shell script (this is the "other way round"),
+To trigger FHEM commands from a shell script (this is the "other way round"),
 use the client form of fhem.pl (described above).<br>
 <br>
 
-Multiple fhem commands are separated by semicolon (;). In order to use semicolon
+Multiple FHEM commands are separated by semicolon (;). In order to use semicolon
 in perl code or shell programs, they have to be escaped by the double semicolon
 (;;). See the <b>Notes</b> section of the <a href="#notify">notify</a>
 chapter on command parameters and escape rules.<br>
@@ -235,7 +235,7 @@ Don't dispair, the previous example can also be written as
 Commands can be either typed in plain, or read from a file (e.g. the
 configuration file at startup). The commands are either executed directly, or
 later if they are arguments to the <a href="#at">at</a> and <a
-href="#notify">notify</a> fhem commands.<br>
+href="#notify">notify</a> FHEM commands.<br>
 <br>
 
 A line ending with \ will be concatenated with the next one, so long lines
@@ -863,7 +863,7 @@ The following local attributes are used by a wider range of devices:
 <ul>
   <code>include &lt;filename&gt;</code> <br>
   <br>
-  Read in the file, and process every line as a fhem command. 
+  Read in the file, and process every line as a FHEM command. 
   Note: only experts should use this command.
   <br>
 </ul>
@@ -1217,7 +1217,7 @@ The following local attributes are used by a wider range of devices:
   <br><br>
   Shut down the server (after saving the <a href="#statefile">state information
   </a>). It triggers the global:SHUTDOWN event.  If the optional restart
-  parameter is specified, fhem tries to restart itself. exitValue may be
+  parameter is specified, FHEM tries to restart itself. exitValue may be
   important for start scripts.
   <br><br>
   Example:
@@ -1299,7 +1299,7 @@ The following local attributes are used by a wider range of devices:
     <li>autoload_undefined_devices<br>
         If set, automatically load the corresponding module when a message
         of this type is received. This is used by the <a href="#autocreate">
-        autocreate</a> device, to automatically create a fhem device upon
+        autocreate</a> device, to automatically create a FHEM device upon
         receiving a corresponding message.
     </li><br>
 
@@ -1323,7 +1323,7 @@ The following local attributes are used by a wider range of devices:
                 /usr/share/fhem/www"</code>
         </ul>
         Note: Your command / script has to return the string "backup done" or
-        everything else to report errors, to work properly with updatefhem!<br>
+        everything else to report errors, to work properly with update!<br>
         This Attribute is used by the <a href="#backup">backup</a> command.<br>
         Example:<br>
         <ul>
@@ -1361,7 +1361,7 @@ The following local attributes are used by a wider range of devices:
 
     <a name="configfile"></a>
     <li>configfile<br>
-        Contains the name of the fhem configuration file. If <a
+        Contains the name of the FHEM configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
     </li><br>
@@ -1444,7 +1444,7 @@ The following local attributes are used by a wider range of devices:
         or directly after the telnet logon, before displaying the fhem> prompt.
         SecurityCheck is setting motd if it is not defined upon startup, to
         avoid this set the motd value to none.  motd is also used to show
-        collected error messages upon fhem start.
+        collected error messages upon FHEM start.
     </li><br>
 
     <a name="mseclog"></a>
@@ -1688,7 +1688,7 @@ The .gplot files are also used by the <a href="#FHEMWEB">FHEMWEB</a>/SVG module
 when the <a href="#plotmode">plotmode</a> attribute is set to SVG. In this case
 only a subset of the .gnuplot attributes are used, and some lines have special
 meanings: the difference will be explained in this chapter. See also <a
-href="http://fhemwiki.de/wiki/Creating_Plots">this</a> fhemwiki entry on
+href="http://wiki.fhem.de/wiki/Creating_Plots">this</a> FHEM Wiki entry on
 creating logs.<br>
 Following is a minimal .gplot definition (valid only for plotmode SVG):<br>
 <pre>
