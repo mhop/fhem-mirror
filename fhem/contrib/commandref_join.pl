@@ -82,7 +82,7 @@ foreach my $lang (@lang) {
   if(!$suffix) { # First run: remember commands/helper module
     my $modType;
     while(my $l = <IN>) {
-      $modType = "command" if($l =~ m/>Fhem commands</);
+      $modType = "command" if($l =~ m/>FHEM commands</);
       $modType = "device"  if($l =~ m/>Devices</);
       $modType = "helper"  if($l =~ m/>Helper modules</);
       $modIdx{$1} = $modType
