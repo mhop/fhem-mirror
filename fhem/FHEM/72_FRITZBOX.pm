@@ -1334,29 +1334,46 @@ sub FRITZBOX_Readout_Run_Web($)
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
       FRITZBOX_Log $hash, 4, "Recognized query answer of firmware >= 6.69";
       my $result2;
+      my $newQueryPart; 
       
       # gets WLAN speed for fw>=6.69
       $queryStr="";
       foreach ( @{ $result->{wlanListNew} } ) {
-         $queryStr .= "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx"
-               if length($queryStr) < 8190 ; 
-      }
-      my $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
-      $result->{wlanList} = $result->{wlanListNew};
-      foreach ( @{ $result->{wlanList} } ) {
-         $_->{speed_rx} = $result2->{ $_->{_node} }; 
+         $newQueryPart = "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx";
+         if (length($queryStr.$newQueryPart) < 4050) {
+            $queryStr .= $newQueryPart;
+         }
+         else {
+            $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+            %{$result} = ( %{$result}, %{$result2 } );
+            $queryStr = $newQueryPart;
+         }
       }
 
       # gets LAN-Port for fw>=6.69
-      $queryStr="";
       foreach ( @{ $result->{lanDeviceNew} } ) {
-         $queryStr .= "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port"
-               if length($queryStr) < 8190 ; 
+         $newQueryPart = "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port";
+         if (length($queryStr.$newQueryPart) < 4050) {
+            $queryStr .= $newQueryPart;
+         }
+         else {
+            $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+            %{$result} = ( %{$result}, %{$result2 } );
+            $queryStr = $newQueryPart;
+         }
       }
+
       $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+      %{$result} = ( %{$result}, %{$result2 } );
+      
+      $result->{wlanList} = $result->{wlanListNew};
+      foreach ( @{ $result->{wlanList} } ) {
+         $_->{speed_rx} = $result->{ $_->{_node} }; 
+      }
+
       $result->{lanDevice} = $result->{lanDeviceNew};
       foreach ( @{ $result->{lanDevice} } ) {
-         $_->{ethernet_port} = $result2->{ $_->{_node} }; 
+         $_->{ethernet_port} = $result->{ $_->{_node} }; 
       }
 
       # gets userProfil-Filter_UID for fw>=6.69
@@ -1389,9 +1406,6 @@ sub FRITZBOX_Readout_Run_Web($)
          $_->{today_time} = $result2->{ $_->{_node}."_today" }; 
       }
    }
-   
-   
-   
    
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -4564,7 +4578,7 @@ sub FRITZBOX_Web_Query($$@)
    FRITZBOX_Log $hash, 5, "Request data via API luaQuery.";
    my $host = $hash->{HOST};
    my $url = 'http://' . $host . '/query.lua?sid=' . $sid . $queryStr;
-   # FRITZBOX_Log $hash, 5, "URL: $url";
+   #FRITZBOX_Log $hash, 3, "URL: $url";
    
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 180);
    my $response = $agent->get ( $url );
