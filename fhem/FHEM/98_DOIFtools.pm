@@ -89,16 +89,56 @@ sub DOIFtools_eM($$$$) {
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
     $ret .= "</div>";
-    $ret .= "<script type=\"text/javascript\">
+    $ret .= "<script type=\"text/javascript\">".<<'EOF';
+    function doiftoolsCopyToClipboard() {
+        var txtarea = document.getElementById('console');
+        var start = txtarea.selectionStart;
+        var finish = txtarea.selectionEnd;
+        var txt = txtarea.value.substring(start, finish);
+        var hlp = "Please highlight exactly one complete event line";
+        if(!txt)
+          return FW_okDialog(hlp);
+        var re = /^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
+        var ret = txt.match(re);
+        if(!ret)
+          return FW_okDialog(hlp);
+        var dev = ret[3];
+        var ret1;
+        var red ="";
+        var val ="";
+        if (ret[4]) {
+          ret1 = ret[4].match(/(.*):\s$/);
+          red = ret1[1];
+        }
+        val = ret[5];
+        val = val.replace(/\s/g, ".");
+        re1 = "["+dev+(red ? ":"+red : "")+"]";
+        re2 = "["+dev+(red ? ":"+red : "")+"] eq \""+val+"\"";
+        re3 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:")+"\"]";
+        re4 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:^")+val+"$\"]";
+
+        var txt = "Copy &amp; paste it to your DOIF definition<br><br>";
+        txt += "<div><ul>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><b>"+re1+"</b></li><br>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><b>"+re2+"</b></li><br>";
+        txt += "<li>event as <i>regular expression</i>:<br><b>"+re3+"</b></li><br>";
+        txt += "<li>event as <i>regular expression</i> with value:<br><b>"+re4+"</b></li><br>";
+        txt += "</ul></div>";
+        return FW_okDialog(txt);
+    }
+
     function delbutton() {
       var del = document.getElementById('addRegexpPart');
       if (del) {
         del.parentNode.removeChild(del);
       }
     }
-     var ins = document.getElementById('doiftoolsdel');
-     addEventListener ('DOMNodeInserted', delbutton, false);
-   </script>";
+    var ins = document.getElementById('doiftoolsdel');
+    addEventListener ('DOMNodeInserted', delbutton, false);
+    var ins = document.getElementById('console');
+    ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
+EOF
+    $ret .= "</script>";
   }
   return $ret;
 }
@@ -262,6 +302,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   my $a = "";
   if (ReadingsVal($d,".eM","off") eq "on") {
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
+    # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/doiftools.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
     $ret .= "<div><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
@@ -272,16 +313,56 @@ sub DOIFtools_fhemwebFn($$$$) {
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
     $ret .= "</div>";
-    $ret .= "<script type=\"text/javascript\">
+    $ret .= "<script type=\"text/javascript\">".<<'EOF';
+    function doiftoolsCopyToClipboard() {
+        var txtarea = document.getElementById('console');
+        var start = txtarea.selectionStart;
+        var finish = txtarea.selectionEnd;
+        var txt = txtarea.value.substring(start, finish);
+        var hlp = "Please highlight exactly one complete event line";
+        if(!txt)
+          return FW_okDialog(hlp);
+        var re = /^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
+        var ret = txt.match(re);
+        if(!ret)
+          return FW_okDialog(hlp);
+        var dev = ret[3];
+        var ret1;
+        var red ="";
+        var val ="";
+        if (ret[4]) {
+          ret1 = ret[4].match(/(.*):\s$/);
+          red = ret1[1];
+        }
+        val = ret[5];
+        val = val.replace(/\s/g, ".");
+        re1 = "["+dev+(red ? ":"+red : "")+"]";
+        re2 = "["+dev+(red ? ":"+red : "")+"] eq \""+val+"\"";
+        re3 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:")+"\"]";
+        re4 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:^")+val+"$\"]";
+
+        var txt = "Copy &amp; paste it to your DOIF definition<br><br>";
+        txt += "<div><ul>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><b>"+re1+"</b></li><br>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><b>"+re2+"</b></li><br>";
+        txt += "<li>event as <i>regular expression</i>:<br><b>"+re3+"</b></li><br>";
+        txt += "<li>event as <i>regular expression</i> with value:<br><b>"+re4+"</b></li><br>";
+        txt += "</ul></div>";
+        return FW_okDialog(txt);
+    }
+
     function delbutton() {
       var del = document.getElementById('addRegexpPart');
       if (del) {
         del.parentNode.removeChild(del);
       }
     }
-     var ins = document.getElementById('doiftoolsdel');
-     addEventListener ('DOMNodeInserted', delbutton, false);
-   </script>";
+    var ins = document.getElementById('doiftoolsdel');
+    addEventListener ('DOMNodeInserted', delbutton, false);
+    var ins = document.getElementById('console');
+    ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
+EOF
+    $ret .= "</script>";
   }
   return $ret;
 }
