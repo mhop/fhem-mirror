@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  88_HMCCU.pm: version 3.9
   - update: 98_DOIFtools.pm: marking an eventline in DOIFs event monitor
                shows different representations of the event as operand
                for DOIF definitions

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.8
+#  Version 3.9
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -33,6 +33,7 @@
 #  get <name> update
 #
 #  attr <name> ccuackstate { 0 | 1 }
+#  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
 #  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
@@ -80,7 +81,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 hmstatevals statedatapoint statevals substitute:textField-long substexcl stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long substexcl stripnumber ". $readingFnAttributes;
 }
 
 ##################################################
@@ -109,7 +110,7 @@ sub HMCCUCHN_Define ($@)
 	return "Cannot detect IO device" if (!defined ($hmccu_hash));
 
 	return "Invalid or unknown CCU channel name or address"
-		if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec));
+		if (! HMCCU_IsValidChannel ($hmccu_hash, $devspec));
 
 	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
 	return "Invalid or unknown CCU device name or address" if (!defined ($da));
@@ -760,9 +761,14 @@ sub HMCCUCHN_SetError ($$)
          If set to 1 state will be set to result of command (i.e. 'OK'). Otherwise state is only
          updated if value of state datapoint has changed.
       </li><br/>
-      <li><b>ccuflags {altread, nochn0, trace}</b><br/>
+      <li><b>ccucalculate &lt;value&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
+      	Calculate special values like dewpoint based on datapoints specified in
+      	<i>dp-list</i>. The result is stored in <i>reading</i>. The following <i>values</i>
+      	are supported:<br/>
+      	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;
+      </li><br/>
+      <li><b>ccuflags {nochn0, trace}</b><br/>
       	Control behaviour of device:<br/>
-      	altread: Create additional CUL_HM style readings.<br/>
       	nochn0: Prevent update of status channel 0 datapoints / readings.<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
@@ -842,11 +848,25 @@ sub HMCCUCHN_SetError ($$)
       	Disable client device.
       </li><br/>
 		<li><b>hmstatevals &lt;subst-rule&gt;[;...]</b><br/>
-			Define substitution rules for datapoint values stored in reading 'hmstate'. Parameter
-			<i>subst-rule</i> is equal to attribute 'substitute'. Default substitution rule is 
-			LOWBAT,LOW_BAT!1:battery_low;UNREACH!1:unreachable. The substitution rule must 
-			contain only error conditions because 'hmstate' contains only error conditions or
-			the 'state' value.
+         Define building rules and substitutions for reading hmstate. Syntax of <i>subst-rule</i>
+         is<br/>
+         [=&lt;reading&gt;;]&lt;datapoint-expr&gt;!&lt;{#n1-m1|regexp}&gt;:&lt;text&gt;[,...]
+         <br/><br/>
+         The syntax is almost the same as of attribute 'substitute', except there's no channel
+         specification possible for datapoint and parameter <i>datapoint-expr</i> is a regular
+         expression.<br/>
+         The value of the I/O device attribute 'ccudef-hmstatevals' is appended to the value of
+         this attribute. The default value of 'ccudef-hmstatevals' is
+         '^UNREACH!(1|true):unreachable;LOW_?BAT!(1|true):warn_battery'.
+         Normally one should not specify a substitution rule for the "good" value of an error
+         datapoint (i.e. 0 for UNREACH). If none of the rules is matching, reading 'hmstate' is set
+         to value of reading 'state'.<br/>
+         Parameter <i>text</i> can contain variables in format ${<i>varname</i>}. The variable
+         $value is substituted by the original datapoint value. All other variables must match
+         with a valid datapoint name or a combination of channel number and datapoint name
+         seperated by a '.'.<br/>
+         Optionally the name of the HomeMatic state reading can be specified at the beginning of
+         the attribute in format =&lt;reading&gt;;. The default reading name is 'hmstate'.
       </li><br/>
       <li><b>statedatapoint &lt;datapoint&gt;</b><br/>
          Set state datapoint used by some commands like 'set devstate'.
@@ -877,8 +897,17 @@ sub HMCCUCHN_SetError ($$)
       </li><br/>
       <li><b>substitute &lt;subst-rule&gt;[;...]</b><br/>
          Define substitutions for datapoint/reading values. Syntax of <i>subst-rule</i> is<br/><br/>
-         [[&lt;channelno.&gt;]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp1}&gt;:&lt;text1&gt;[,...]
+         [[&lt;channelno.&gt;]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp}&gt;:&lt;text&gt;[,...]
          <br/>
+         Parameter text can contain variables in format ${<i>varname</i>}. The variable $value is
+         substituted by the original datapoint value. All other variables must match with a valid
+         datapoint name or a combination of channel number and datapoint name seperated by a '.'.
+         <br/><br/>
+         Example: Substitute the value of datapoint TEMPERATURE by the string 
+         'T=<i>val</i> deg' and append current value of datapoint 1.HUMIDITY<br/>
+         <code>
+         attr my_weather substitute TEMPERATURE!.+:T=${value} deg H=${1.HUMIDITY}%
+         </code>
          If rule expression starts with a hash sign a numeric datapoint value is substituted if
          it fits in the number range n &lt;= value &lt;= m.
          <br/><br/>

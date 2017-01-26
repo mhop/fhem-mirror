@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.8
+#  Version 3.9
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -34,6 +34,7 @@
 #  get <name> update
 #
 #  attr <name> ccuackstate { 0 | 1 }
+#  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
 #  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
@@ -83,7 +84,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 hmstatevals statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
 }
 
 #####################################
@@ -134,6 +135,9 @@ sub HMCCUDEV_Define ($@)
 		$hmccu_hash = HMCCU_FindIODevice ($devspec) if (!defined ($hmccu_hash));
 		return "Cannot detect IO device" if (!defined ($hmccu_hash));
 		
+		return "Invalid or unknown CCU device name or address"
+			if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec));
+
 		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
 		return "Invalid or unknown CCU device name or address: $devspec" if (!defined ($da));
 		
@@ -886,7 +890,14 @@ sub HMCCUDEV_Get ($@)
       <li><b>ccuackstate {<u>0</u> | 1}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
-      <li><b>ccuflags {altread, nochn0, trace}</b><br/>
+      <li><b>ccucalculate &lt;value&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
+      	Calculate special values like dewpoint based on datapoints specified in
+      	<i>dp-list</i>. Datapoints in <i>dp-list</i> must be specified in format 
+      	&lt;channelno&gt;.&lt;datapoint&gt;. The result is stored in <i>reading</i>. 
+      	The following <i>values</i> are supported:<br/>
+      	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;
+      </li><br/>
+      <li><b>ccuflags {nochn0, trace}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>

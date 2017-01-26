@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.8
+#  Version 3.9
 #
 #  Configuration parameters for Homematic devices.
 #
@@ -181,6 +181,13 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statedatapoint   => "MOTION",
 	substitute       => "MOTION!(0|false):no,(1|true):yes;ERROR!0:no,1:sabotage"
 	},
+	"HmIP-SMI" => {
+	_description     => "Bewegungsmelder",
+	_channels        => "1",
+	ccureadingfilter => "(ILLUMINATION|MOTION)",
+	statedatapoint   => "MOTION",
+	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
 	"HM-Sen-LI-O" => {
 	_description     => "Lichtsensor",
 	_channels        => "1",
@@ -248,7 +255,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 %HMCCU_DEV_DEFAULTS = (
    "CCU2" => {
    _description     => "HomeMatic CCU2",
-   "ccudef-readingfilter" => '.*',
+   "ccudef-readingfilter" => '^(LOW_?BAT|UNREACH)$',
    "ccudef-readingformat" => 'datapoint',
    "ccudef-readingname"   => '^(.+\.)?AES_KEY$:sign;^(.+\.)?LOW_?BAT$:battery;^(.+\.)?BATTERY_STATE$:batteryLevel;^(.+\.)?UNREACH$:Activity;^(.+\.)?TEMPERATURE$:+temperature;^(.+\.)?SET_TEMPERATURE$:+desired-temp;^(.+\.)?HUMIDITY$:+humidity;^(.+\.)?LEVEL$:+pct;^(.+\.)?CONTROL_MODE$:+controlMode',
    "ccudef-substitute"    => 'AES_KEY!(0|false):off,(1|true):on;LOWBAT,LOW_BAT!(0|false):ok,(1|true):low;UNREACH!(0|false):alive,(1|true):dead;MOTION!(0|false):noMotion,(1|true):motion;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!0:false,1:true;INHIBIT!(0|false):unlocked,(1|true):locked'
@@ -486,6 +493,12 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	hmstatevals      => "ERROR!1:sabotage",
 	statedatapoint   => "1.MOTION",
 	substitute       => "MOTION!(0|false):no,(1|true):yes;ERROR!0:no,1:sabotage"
+	},
+	"HmIP-SMI" => {
+	_description     => "Bewegungsmelder",
+	ccureadingfilter => "(ILLUMINATION|MOTION)",
+	statedatapoint   => "1.MOTION",
+	substitute       => "MOTION!(0|false):no,(1|true):yes"
 	},
 	"HM-Sen-LI-O" => {
 	_description     => "Lichtsensor",
