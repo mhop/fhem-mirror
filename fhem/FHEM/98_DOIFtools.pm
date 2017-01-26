@@ -45,51 +45,8 @@ sub DOIFtoolsCounterReset($);
 sub DOIFtoolsDeleteStatReadings;
 
 my @DOIFtools_we =();
-
-
-#########################
-sub DOIFtools_Initialize($)
-{
-  my ($hash) = @_;
-  $hash->{DefFn}   = "DOIFtools_Define";
-  $hash->{SetFn}   = "DOIFtools_Set";
-  $hash->{GetFn}   = "DOIFtools_Get";
-  $hash->{UndefFn}  = "DOIFtools_Undef";
-  $hash->{AttrFn}   = "DOIFtools_Attr";
-  $hash->{NotifyFn} = "DOIFtools_Notify";
-  
-  $hash->{FW_detailFn} = "DOIFtools_fhemwebFn";
-
-  $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
-
-  my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 disabledForIntervals ".$oldAttr;
-}
-
-sub DOIFtools_dO ($$$$){return "";}
-# FW_detailFn for DOIF injecting event monitor
-sub DOIFtools_eM($$$$) {
-  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-  my $ret = "";
-  # Event Monitor
-  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
-  $ret .= "</div>";
-
-  my $a = "";
-  if (ReadingsVal($d,".eM","off") eq "on") {
-    $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
-    my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
-    $ret .= "<div><br>";
-    $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
-          "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
-                "<input id='eventWithLog' type='checkbox'".
-                ($a && $a eq "log" ? " checked":"")."></span>".
-          "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
-    $ret .= "<div>";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
-    $ret .= "</div>";
-    $ret .= "<script type=\"text/javascript\">".<<'EOF';
+my $DOIFtoolsJavaScript = <<'EOF';
+  <script type="text/javascript">
     function doiftoolsCopyToClipboard() {
         var txtarea = document.getElementById('console');
         var start = txtarea.selectionStart;
@@ -137,8 +94,53 @@ sub DOIFtools_eM($$$$) {
     addEventListener ('DOMNodeInserted', delbutton, false);
     var ins = document.getElementById('console');
     ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
+  </script>
 EOF
-    $ret .= "</script>";
+
+
+#########################
+sub DOIFtools_Initialize($)
+{
+  my ($hash) = @_;
+  $hash->{DefFn}   = "DOIFtools_Define";
+  $hash->{SetFn}   = "DOIFtools_Set";
+  $hash->{GetFn}   = "DOIFtools_Get";
+  $hash->{UndefFn}  = "DOIFtools_Undef";
+  $hash->{AttrFn}   = "DOIFtools_Attr";
+  $hash->{NotifyFn} = "DOIFtools_Notify";
+  
+  $hash->{FW_detailFn} = "DOIFtools_fhemwebFn";
+
+  $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
+
+  my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 disabledForIntervals ".$oldAttr;
+}
+
+sub DOIFtools_dO ($$$$){return "";}
+# FW_detailFn for DOIF injecting event monitor
+sub DOIFtools_eM($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $ret = "";
+  # Event Monitor
+  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
+  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
+  $ret .= "</div>";
+
+  my $a = "";
+  if (ReadingsVal($d,".eM","off") eq "on") {
+    $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
+    my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
+    $ret .= "<div><br>";
+    $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
+          "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
+                "<input id='eventWithLog' type='checkbox'".
+                ($a && $a eq "log" ? " checked":"")."></span>".
+          "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
+    $ret .= "<div>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
+    $ret .= "</div>";
+    $ret .= $DOIFtoolsJavaScript;
   }
   return $ret;
 }
@@ -313,56 +315,7 @@ sub DOIFtools_fhemwebFn($$$$) {
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
     $ret .= "</div>";
-    $ret .= "<script type=\"text/javascript\">".<<'EOF';
-    function doiftoolsCopyToClipboard() {
-        var txtarea = document.getElementById('console');
-        var start = txtarea.selectionStart;
-        var finish = txtarea.selectionEnd;
-        var txt = txtarea.value.substring(start, finish);
-        var hlp = "Please highlight exactly one complete event line";
-        if(!txt)
-          return FW_okDialog(hlp);
-        var re = /^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
-        var ret = txt.match(re);
-        if(!ret)
-          return FW_okDialog(hlp);
-        var dev = ret[3];
-        var ret1;
-        var red ="";
-        var val ="";
-        if (ret[4]) {
-          ret1 = ret[4].match(/(.*):\s$/);
-          red = ret1[1];
-        }
-        val = ret[5];
-        val = val.replace(/\s/g, ".");
-        re1 = "["+dev+(red ? ":"+red : "")+"]";
-        re2 = "["+dev+(red ? ":"+red : "")+"] eq \""+val+"\"";
-        re3 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:")+"\"]";
-        re4 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:^")+val+"$\"]";
-
-        var txt = "Copy &amp; paste it to your DOIF definition<br><br>";
-        txt += "<div><ul>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><b>"+re1+"</b></li><br>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><b>"+re2+"</b></li><br>";
-        txt += "<li>event as <i>regular expression</i>:<br><b>"+re3+"</b></li><br>";
-        txt += "<li>event as <i>regular expression</i> with value:<br><b>"+re4+"</b></li><br>";
-        txt += "</ul></div>";
-        return FW_okDialog(txt);
-    }
-
-    function delbutton() {
-      var del = document.getElementById('addRegexpPart');
-      if (del) {
-        del.parentNode.removeChild(del);
-      }
-    }
-    var ins = document.getElementById('doiftoolsdel');
-    addEventListener ('DOMNodeInserted', delbutton, false);
-    var ins = document.getElementById('console');
-    ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
-EOF
-    $ret .= "</script>";
+    $ret .= $DOIFtoolsJavaScript;
   }
   return $ret;
 }
@@ -783,8 +736,10 @@ sub DOIFtools_Set($@)
   my $ret = "";
   my @ret = ();
   my @doifList = devspec2array("TYPE=DOIF");
+  my @deviList = devspec2array("TYPE!=DOIF");
   my @ntL =();
   my $dL = join(",",sort @doifList);
+  my $deL = join(",",sort @deviList);
   my $st = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? ".stat_" : "stat_";
   my %types = ();
 
@@ -808,8 +763,26 @@ sub DOIFtools_Set($@)
           push @ret, $ret if($ret);
         }
         $ret = join("\n", @ret);
+        readingsSingleUpdate($hash,"targetDOIF","",0);
         return $ret;
       } else {
+        readingsSingleUpdate($hash,"targetDOIF","",0);
+        return "no reading selected.";
+      }
+  } elsif ($arg eq "targetDevice") {
+      readingsSingleUpdate($hash,"targetDevice",$value,0);
+  } elsif ($arg eq "deleteReadingsInTargetDevice") {
+      if ($value) {
+        my @i = split(",",$value);
+        foreach my $i (@i) {
+          $ret = CommandDeleteReading(undef,ReadingsVal($pn,"targetDevice","")." $i");
+          push @ret, $ret if($ret);
+        }
+        $ret = join("\n", @ret);
+        readingsSingleUpdate($hash,"targetDevice","",0);
+        return $ret;
+      } else {
+        readingsSingleUpdate($hash,"targetDevice","",0);
         return "no reading selected.";
       }
   } elsif ($arg eq "doStatistics") {
@@ -862,18 +835,28 @@ sub DOIFtools_Set($@)
         readingsSingleUpdate($hash,"statisticsDeviceFilterRegex", $value,0);
       }
   } else {
+
       my $hardcoded = "doStatistics:disabled,enabled,deleted specialLog:0,1";
+      my $retL = "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL sourceAttribute:readingList targetDOIF:$dL targetDevice:$deL recording_target_duration:0,1,6,12,24,168 statisticsDeviceFilterRegex statisticsShowRate_ge ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
+
       if (ReadingsVal($pn,"targetDOIF","")) {
         my $tn = ReadingsVal($pn,"targetDOIF","");
         my @rL = ();
         foreach my $key (keys %{$defs{$tn}->{READINGS}}) {
-          push @rL, $key if ($key !~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
+          push @rL, $key if ($key !~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode|\.eM)");
         }
-        my $rL = join(",",@rL);
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL sourceAttribute:readingList targetDOIF:$dL deleteReadingsInTargetDOIF:multiple-strict,$rL recording_target_duration:0,1,6,12,24,168 statisticsDeviceFilterRegex statisticsShowRate_ge ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
-      } else {
-        return "unknown argument $arg for $pn, choose one of statisticsTYPEs:multiple-strict,.*,$tL sourceAttribute:readingList targetDOIF:$dL recording_target_duration:0,1,6,12,24,168 statisticsDeviceFilterRegex statisticsShowRate_ge ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
+        $retL .= " deleteReadingsInTargetDOIF:multiple-strict,".join(",", sort @rL);
       }
+      if (ReadingsVal($pn,"targetDevice","")) {
+        my $tn = ReadingsVal($pn,"targetDevice","");
+        my @rL = ();
+        my $rx = ReadingsVal($pn,".debug","") ? "^(state)" : "^(state|[.])";
+        foreach my $key (keys %{$defs{$tn}->{READINGS}}) {
+          push @rL, $key if ($key !~ $rx);
+        }
+        $retL .= " deleteReadingsInTargetDevice:multiple-strict,".join(",", sort @rL);
+      }
+      return $retL;
   }
 return $ret;
 }
@@ -1056,7 +1039,7 @@ sub DOIFtools_Get($@)
       
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",1) ? $hardcoded :"");
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
   } 
 
   return $ret;
@@ -1083,6 +1066,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>navigation between device listings in logfile if opened via DOIFtools.</li>
     <li>create userReadings in DOIF devices displaying real dates for weekday restricted timer.</li>
     <li>delete user defined readings in DOIF devices with multiple choice.</li>
+    <li>delete visible readings in other devices with multiple choice, but not <i>state</i>.</li>
     <li>record statistics data about events.</li>
     <li>limitting recordig duration.</li>
     <li>generate a statistics report.</li>
@@ -1114,6 +1098,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>Navigation zwischen den DOIF-Listings im Logfile, wenn es über DOIFtools geöffnet wird.</li>
     <li>erstellen von userReadings in DOIF-Geräten zur Anzeige des realen Datums bei Wochentag behafteten Timern.</li>
     <li>löschen von benutzerdefinierten Readings in DOIF-Definitionen über eine Mehrfachauswahl.</li>
+    <li>löschen von  Readings in anderen Geräten über eine Mehrfachauswahl, nicht <i>state</i>.</li>
     <li>erfassen statistischer Daten über Events.</li>
     <li>Begrenzung der Datenaufzeichnungsdauer.</li>
     <li>erstellen eines Statistikreports.</li>
@@ -1165,6 +1150,12 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>set &lt;name&gt; targetDOIF &lt;target name&gt;</code><br>
         <b>targetDOIF</b> vor dem Löschen der Readings muss das Ziel-DOIF gesetzt werden.<br>
+        <br>
+        <code>set &lt;name&gt; deleteReadingInTargetDevice &lt;readings to delete name&gt;</code><br>
+        <b>deleteReadingInTargetDevice</b> löscht sichtbare Readings, ausser <i>state</i> im Ziel-Gerät. Bitte den Gefahrenhinweis zum Befehl <a href="https://fhem.de/commandref_DE.html#deletereading">deletereading</a> beachten!<br>
+        <br>
+        <code>set &lt;name&gt; targetDevice &lt;target name&gt;</code><br>
+        <b>targetDevice</b> vor dem Löschen der Readings muss das Ziel-Gerät gesetzt werden.<br>
         <br>
         <code>set &lt;name&gt; sourceAttribute &lt;readingList&gt; </code><br>
         <b>sourceAttribute</b> vor dem Erstellen einer ReadingsGroup muss das Attribut gesetzt werden aus dem die Readings gelesen werden, um die ReadingsGroup zu erstellen und zu beschriften. <b>Default, readingsList</b><br>
