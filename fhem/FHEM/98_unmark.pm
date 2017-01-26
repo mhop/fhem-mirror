@@ -30,14 +30,14 @@ sub CommandUnmark($$)
 1;
 
 =pod
-=item helper
+=item command
 =item summary    mark devices for TEMPORARY or VOLATILE
 =item summary_DE markiert Ger&auml;te als TEMPORARY oder VOLATILE
 =item command
 =begin html
 
 <a name="unmark"></a>
-<h3>mark</h3>
+<h3>unmark</h3>
 <ul>
   <code>unmark &lt;devspec&gt; &lt;TEMPORARY|VOLATILE&gt;</code>
   <br><br>

@@ -30,7 +30,7 @@ sub CommandMark($$)
 1;
 
 =pod
-=item helper
+=item command
 =item summary    mark devices for TEMPORARY or VOLATILE
 =item summary_DE markiert Ger&auml;te als TEMPORARY oder VOLATILE
 =item command
