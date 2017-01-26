@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.5      26.01.17 add playlist bookmarks, change XML to JSON
 # Version 1.43   - 18.01.17 add channelUp and channelDown
 # Version 1.42   - 15.01.17 add Cover and playlist_json
 # Version 1.41   - 12.01.17 add rawTitle 
@@ -51,8 +52,9 @@ use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 use IO::Socket;
 use Getopt::Std;
 use HttpUtils;
-use XML::Simple qw(:strict);
 use HTML::Entities;
+use Cwd 'abs_path';
+use JSON;
 
 sub MPD_html($);
 
@@ -63,6 +65,7 @@ my %gets = (
 	"statusRequest:noArg"  => "",
 	"currentsong:noArg"    => "",
 	"outputs:noArg"        => "",
+        "bookmarks:noArg"      => ""
 	);
 
 my %sets = (
@@ -86,17 +89,22 @@ my %sets = (
 	"IdleNow:noArg"         => "",
 	"toggle:noArg"          => "",
 	"clear_readings:noArg"  => "",
-        "mute:on,off,toggle"    => "",
-        "seekcur"               => "",
-        "channelUp:noArg"       => "",
-        "channelDown:noArg"     => "",
-	);
+	"mute:on,off,toggle"    => "",
+	"seekcur"               => "",
+	"forward:noArg"         => "",
+	"rewind:noArg"          => "",
+	"channel"               => "",
+	"channelUp:noArg"       => "",
+	"channelDown:noArg"     => "",
+ 	"save_bookmark:noArg"   => "",
+        "load_bookmark"         => "",
+         );
 
 use constant clb => "command_list_begin\n";
 use constant cle => "status\nstats\ncurrentsong\ncommand_list_end";
-use constant lfm_artist => "http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&autocorrect=1&api_key=";
-use constant lfm_album  => "http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=";
-
+use constant lfm_artist => "http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&format=json&api_key=";
+use constant lfm_album  => "http://ws.audioscrobbler.com/2.0/?method=album.getinfo&format=json&api_key=";
+                    
 my @Cover;
 
 ###################################
@@ -112,7 +120,11 @@ sub MPD_Initialize($)
 	$hash->{UndefFn}      = "MPD_Undef";
 	$hash->{ShutdownFn}   = "MPD_Undef";
 	$hash->{AttrFn}       = "MPD_Attr";
-	$hash->{AttrList}     = "disable:0,1 password loadMusic:0,1 loadPlaylists:0,1 volumeStep:1,2,5,10 titleSplit:1,0 timeout waits stateMusic:0,1 statePlaylists:0,1 lastfm_api_key image_size:-1,0,1,2,3 cache artist_summary:0,1 artist_content:0,1 player:mpd,mopidy,forked-daapd unknown_artist_image ".$readingFnAttributes;
+	$hash->{AttrList}     = "disable:0,1 password loadMusic:0,1 loadPlaylists:0,1 volumeStep:1,2,5,10 titleSplit:1,0 ".
+                                "timeout waits stateMusic:0,1 statePlaylists:0,1 lastfm_api_key image_size:-1,0,1,2,3 ".
+                                "cache artist_summary:0,1 artist_content:0,1 player:mpd,mopidy,forked-daapd ".
+                                "unknown_artist_image bookmarkDir autoBookmark:0,1 seekStepThreshold seekStep seekStepSmall ".
+                                "no_playlistcollection:0,1 ".$readingFnAttributes;
 	$hash->{FW_summaryFn} = "MPD_summaryFn";
 }
 
@@ -201,9 +213,8 @@ sub MPD_updateConfig($)
           }
         }
 
-
-        if ((AttrVal($name, "icon_size", -1) > -1) && (AttrVal($name, "cache", "") ne ""))
-        {
+         if ((AttrVal($name, "icon_size", -1) > -1) && (AttrVal($name, "cache", "") ne ""))
+         {
           my $cache = AttrVal($name, "cache", "");
           unless(-e ("./www/".$cache) or mkdir ("./www/".$cache)) 
           {
@@ -211,7 +222,8 @@ sub MPD_updateConfig($)
            Log3 $name,3,"$name, Could not create directory: www/$cache";
           }
           #else {Log3 $name,4,"$name, lastfm cache =  www/$cache";}
-        }
+         }
+        
 
 	if (MPD_try_idle($hash)) 
 	{ 
@@ -225,7 +237,8 @@ sub MPD_updateConfig($)
 	    }
 	    if ((AttrVal($name, "loadPlaylists", "1") eq "1") && !$error)
 	    {
-		$error = mpd_cmd($hash, "i|lsinfo|playlists");
+		#$error = mpd_cmd($hash, "i|lsinfo|playlists");
+                $error = mpd_cmd($hash, "i|listplaylists|playlists");
 		Log3 $name,3,"$name, error loading playlists -> $error" if ($error);
 		readingsSingleUpdate($hash,"last_error",$error,1) if ($error);
 	    }  
@@ -258,6 +271,7 @@ sub MPD_Define($$)
   $attr{$name}{titleSplit}   = '1'        unless (exists($attr{$name}{titleSplit}));
   $attr{$name}{player}       = 'mpd'      unless (exists($attr{$name}{player}));
   $attr{$name}{loadPlaylists}= '1'       unless (exists($attr{$name}{loadPlaylists}));
+
   $attr{$name}{unknown_artist_image}  = '/fhem/icons/1px-spacer'  unless (exists($attr{$name}{unknown_artist_image}));
   #$attr{$name}{cache}       = 'lfm'      unless (exists($attr{$name}{cache}));
   #$attr{$name}{loadMusic}   = '1'  unless (exists($attr{$name}{loadMusic})) && ($attr{$name}{player} ne 'mopidy');
@@ -291,6 +305,7 @@ sub MPD_Attr (@)
 
  my ($cmd, $name, $attrName, $attrVal) = @_;
  my $hash = $defs{$name};
+ my $error;
 
  if ($cmd eq "set")
  {
@@ -298,17 +313,17 @@ sub MPD_Attr (@)
    {
      if (int($attrVal) < 1) {$attrVal = 1;}
      $hash->{TIMEOUT}      = $attrVal;
-     $attr{$name}{timeout} = $attrVal;
+     $_[3] = $attrVal;
    }
    elsif ($attrName eq "password")
    {
        $hash->{".password"}   = $attrVal;
-       $attr{$name}{password} = $attrVal;
+       $_[3] = $attrVal;
    }
    elsif (($attrName eq "disable") && ($attrVal == 1))
    {
        readingsSingleUpdate($hash,"state","disabled",1);
-       $attr{$name}{disable} = $attrVal;
+       $_[3] = $attrVal;
    }
    elsif (($attrName eq "disable") && ($attrVal == 0))
    {
@@ -332,14 +347,30 @@ sub MPD_Attr (@)
        $attr{$name}{player} = $attrVal;
        $hash->{".player"}=$attrVal;
    }
+   elsif ($attrName eq "bookmarkDir")
+   {
+     my $abs_path = abs_path($attrVal);
+     unless(-e ($abs_path ) or mkdir ($abs_path ))
+     {
+      $error = "could not access or create bookmark directory $abs_path";
+      #Verzeichnis anlegen gescheitert
+      Log3 $name,3,"$name, error $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
+      return $error;
+     }
+     $_[3] = $abs_path; # Absoluten Pfad im Attribut speichern. 
+   }
    elsif ($attrName eq "cache")
    {
     unless(-e ("./www/".$attrVal) or mkdir ("./www/".$attrVal)) 
     {
-     #Verzeichnis anlegen gescheitert
-     return "Could not create directory: www/$attrVal";
+      $error = "could not access or create directory: www/$attrVal";
+      #Verzeichnis anlegen gescheitert
+      Log3 $name,3,"$name, error $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
+      return $error;
     }
-    $attr{$name}{cache} = $attrVal;
+    $_[3] = $attrVal;
    }
  }
  elsif ($cmd eq "del")
@@ -385,25 +416,12 @@ sub MPD_ClearReadings($)
     return;
 }
 
-#sub MPD_Clear_Image_Readings($)
-#{
-    #my ($hash)= @_;
-    #readingsBeginUpdate($hash);
-    #readingsBulkUpdate($hash,"artist_image","");
-    #readingsBulkUpdate($hash,"artist_image_html","");
-    #readingsBulkUpdate($hash,"album_image","");
-    #readingsBulkUpdate($hash,"album_image_html","");
-    #readingsBulkUpdate($hash,"artist_summary","");
-    #readingsBulkUpdate($hash,"artist_content","");
-    #readingsEndUpdate($hash, 1);
-    #return;
-#}
-
 sub MPD_Set($@)
 {
  my ($hash, @a)= @_;
  my $name= $hash->{NAME};
  my $ret ;
+ my $channel_cmd = 0;
  
  return join(" ", sort keys %sets) if(@a < 2);
  return undef if(IsDisabled($name));
@@ -554,11 +572,43 @@ sub MPD_Set($@)
     MPD_ClearReadings($hash);
     $ret = mpd_cmd($hash,clb."play $subcmd\n".cle); 
   }
+ 
+  if($cmd eq "forward" || $cmd eq "rewind")
+  {
+    my ($elapsed,$total) = split (":",ReadingsVal($name,"time",""));
+    $total=int($total);
+    return undef if( !defined($total) || $total <= 0);
+    my $percent = $elapsed / $total;
+    my $step = 0.01*(0.01*AttrVal($name,"seekStepThreshold",0) > $percent ? AttrVal($name,"seekStepSmall",3) : AttrVal($name,"seekStep",7));
+    $percent +=$step if $cmd eq "forward";
+    $percent -=$step if $cmd eq "rewind";
+    $percent = 0     if $percent < 0;
+    $percent = 0.99  if $percent > 0.99;
+    $cmd = "seekcur";
+    $subcmd=int($percent*$total);
+  }
 
  if ($cmd eq "seekcur") 
   {
-   $subcmd--; $subcmd++; # sicherstellen das subcmd numerisch ist    
-   $ret = mpd_cmd($hash,clb."seekcur $subcmd\n".cle); # ungetestet !
+   if (int($hash->{SUBVERSION}) < 20)
+   {
+    $ret = "command $cmd needs a MPD version of 0.20.0 or greater !";
+    Log3 $name,3,"$name,$ret";
+    readingsSingleUpdate($hash,"last_error",$ret,1);
+   }
+   else
+   {
+   if($subcmd=~/^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$/) # Matches valid time given as [[hh:]mm:]ss
+    {
+      if (defined($1) && defined($2) && defined($3) )
+      { $subcmd=$1*3600+$2*60+$3; } # Sekunden ausrechnen 
+      else { $subcmd=0; }
+    }
+   else { $subcmd--; $subcmd++; } # sicherstellen das subcmd numerisch ist     
+   if ( $subcmd > 0 )
+   { $ret = mpd_cmd($hash,clb."seekcur $subcmd\n".cle) ; } # ungetestet !
+   else { $ret = undef; }
+   }
   }
 
  if ($cmd eq "IdleNow")   
@@ -581,6 +631,117 @@ sub MPD_Set($@)
  # den Rest als ein String
  $subcmd = join(" ",@a);
 
+ if ($cmd eq "save_bookmark")
+ {
+    return "unknown playlist !" if ($hash->{".playlist"} eq "");
+    return "you can't save bookmarks on unknown playlists or radio streams !" if (ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio");
+    my $bm_dir = AttrVal($name, "bookmarkDir","");
+    return "please set attribute bookmarkDir first, saving is disabled !" if ($bm_dir eq "");
+
+    my $state;
+    $state->{playlistname} = $hash->{".playlist"}; 
+    $state->{songnumber}   = ReadingsNum($name,"Pos",0);
+    $state->{songposition} = ReadingsVal($name,"time","")=~/^(\d+):\d+$/ ? $1 : 0;  # get elapsed seconds from time reading
+
+    my $fname = $hash->{".playlist"};
+    #$fname    =~ s/[^A-Za-z0-9\-\.]//g;    # ensure to use only valid characters for filenames
+    $fname    = $bm_dir."/".$fname;
+
+    if (!open (FILE , "> ".$fname))
+    {
+      $ret = "save_bookmark error saving $fname : ".$!;
+      readingsSingleUpdate($hash,"last_error",$ret,1);
+      Log3 $name, 2, "$name, $ret";
+    }
+    else 
+    {
+      print FILE encode_json($state);
+      close(FILE);
+      Log3 $name, 4, "$name, save_bookmark ".$subcmd."saved bookmark $fname";
+    }
+   if ($ret)
+   {
+     Log3 $name, 3, "$name, $ret";
+     readingsSingleUpdate($hash,"last_error",$ret,1);
+    return $ret ;
+   }
+  }
+
+  if ($cmd eq "load_bookmark")
+  {
+    return "unknown playlist" if (($hash->{".playlist"} eq "") && ($subcmd eq ""));
+    return "you can't load bookmarks for radio streams !" if ((ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio") && ($subcmd eq ""));
+
+    my $bm_dir = AttrVal($name, "bookmarkDir","");
+    return format_get_output("Get Bookmark","attribute bookmarkDir not set, loading disabled") if ($bm_dir eq "");
+
+    my $state;
+    my $data;
+    my $fname = ($subcmd eq "") ? $hash->{".playlist"} : $subcmd;
+
+    #$fname    =~ s/[^A-Za-z0-9\-\.]//g;    # ensure to use only valid characters for filenames
+
+    $fname = $bm_dir."/".$fname;
+    if (-e $fname) # gibt es überhaupt eine Bookmark ?
+    {
+     if (!open (FILE , $fname))
+     {
+      $ret = "error reading $fname: ".$!;
+      Log3 $name, 4, "$name, $ret";
+      readingsSingleUpdate($hash,"last_error",$ret,1);
+     }
+     else 
+     {
+      while(<FILE>){ $data = $data.$_;}
+      close (FILE);
+      eval { $state = decode_json($data); 1; } or do 
+           {
+             $ret = "invalid content in playlist bookmark file";
+             Log3 $name, 2, "$name, $ret";
+             readingsSingleUpdate($hash,"last_error",$ret,1);
+           };
+     }
+     if (!$ret) # bis jetzt wohl ohne Fehler ...
+     {
+      $state->{songnumber}  += 0; # ensure it is numeric
+      $state->{songposition}+= 0;
+      # wechsele auf die neue Playliste ?
+
+      Log3 $name, 4, "$name, load_bookmark $fname - Song:".$state->{songnumber}." - Pos:".$state->{songposition};
+
+      if ($subcmd ne "")
+      {
+       $subcmd = $state->{playlistname}."|".$state->{songnumber}."|".$state->{songposition};
+       $cmd    = "playlist";
+       Log3 $name, 4, "$name, load_bookmark new cmd -> playlist ".$subcmd;
+      }
+      else
+      {
+       Log3 $name, 4, "$name, load_bookmark new cmd -> play & seekcur";
+       $ret  = mpd_cmd($hash,"play ".$state->{songnumber}); 
+       $ret .= mpd_cmd($hash,"seekcur ".$state->{songposition}) if (($state->{songposition} > 9) && (int($hash->{SUBVERSION}) > 19));
+      }
+     }
+   } else { $ret = "no bookmark $fname found"; }
+
+   if ($ret)
+   {
+    Log3 $name, 3, "$name, $ret";
+    readingsSingleUpdate($hash,"last_error",$ret,1);
+    return $ret ;
+   }
+ }
+
+ if ($cmd eq "channel")
+ { 
+    if ( $subcmd <= $hash->{helper}{playlistcollection}{val})
+    { 
+     $cmd = "playlist"; 
+     $subcmd = $hash->{helper}{playlistcollection}{$subcmd};
+     $channel_cmd = 1;
+    }
+ }
+
  if ($cmd eq "channelUp")
  { 
     my $i = ReadingsNum($name,"playlist_num",-1);
@@ -589,6 +750,7 @@ sub MPD_Set($@)
     { 
      $cmd = "playlist"; 
      $subcmd = $hash->{helper}{playlistcollection}{$i};
+     $channel_cmd = 1;
     }
  }
 
@@ -600,21 +762,37 @@ sub MPD_Set($@)
     {
      $cmd = "playlist"; 
      $subcmd = $hash->{helper}{playlistcollection}{$i};
+     $channel_cmd = 1;
     }
  }
 
  if ($cmd eq "playlist") 
  {
-   return "$name : no name !" if (!$subcmd);
+   return "$name : no playlist name !" if (!$subcmd);
+   my ($list,$song,$pos) = split("\\|",$subcmd);
+   $song = "0" if (!$song);
+   $pos  = "0" if (!$pos);
    my $error;
    my $nr = -1;
 
+   # ToDo : prüfen ob es Liste überhaupt gibt !
+
+   # nicht schön aber vermeidet den Fehler
+   # PERL WARNING: main::MPD_Set() called too early to check prototype at ./FHEM/73_MPD.pm line 771, <$fh> line 412
+   MPD_SaveBookmark($hash) if(AttrVal($name,"autoBookmark","0") eq "1");
+
    MPD_ClearReadings($hash);
    $hash->{".music"}    = "";
- 
-   $hash->{".playlist"} = $subcmd; # interne Playlisten Verwaltung
+
+   $hash->{".playlist"} = $list; # interne Playlisten Verwaltung
    readingsSingleUpdate($hash,"playlistname",$subcmd,1);
-   $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$subcmd\"\nplay\n".cle);
+   
+   $ret = mpd_cmd($hash, clb."stop\nclear\nload \"$list\"\nplay $song\n".cle);
+   if (int($pos > 9))
+   {
+     $ret .= mpd_cmd($hash,"seekcur ".$pos) if (int($hash->{SUBVERSION}) > 19);
+   }
+
    # welche Listen Nr ?
    for (my $i=0; $i <= $hash->{helper}{playlistcollection}{val}; $i++)
    {
@@ -626,16 +804,6 @@ sub MPD_Set($@)
  
    if ($json ne "")
    {
-    eval "use JSON qw( decode_json )";
-    if($@)
-    {
-     $error = "please install JSON to decode playlist_json";  
-     Log3 $name, 3,"$name, $error"; 
-     readingsSingleUpdate($hash,"last_error",$error,1);
-     return $error;
-    }
-    else
-    {
      undef(@Cover);
      my $result;
      eval {
@@ -653,7 +821,6 @@ sub MPD_Set($@)
       push(@Cover, $_->{'Cover'}); 
       Log3 $name, 5, "$name, Cover : ".$_->{'Cover'}; 
      }
-    }
    }
   return $ret;
  }
@@ -672,6 +839,9 @@ sub MPD_Set($@)
 
  }
 
+
+
+
  if ($cmd eq "updateDb")
  {
    $ret = mpd_cmd($hash, clb."rescan\n".cle);
@@ -686,7 +856,8 @@ sub MPD_Set($@)
    mpd_cmd($hash, clb.cle) if ($subcmd ne "playlist"); 
 
    shift @arr;
-   MPD_NewPlaylist($hash,join ("\n", @arr));# if ((ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio") || (ReadingsVal($name,"playlist_json","") eq ""));
+   MPD_NewPlaylist($hash,join ("\n", @arr));
+      # if ((ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio") || (ReadingsVal($name,"playlist_json","") eq ""));
   return undef;
  }
 
@@ -729,14 +900,15 @@ sub MPD_Get($@)
  if ($cmd eq "playlists")
   { 
     $hash->{".playlists"} = "";
-    mpd_cmd($hash, "i|lsinfo|playlists");
+    #mpd_cmd($hash, "i|lsinfo|playlists");
+    mpd_cmd($hash, "i|listplaylists|playlists");
     return format_get_output("Playlists",$hash->{".playlists"});
 
   }
  
  if ($cmd eq "music")         
   {
-    return "Command not supported by player mopidy !" if ($hash->{".player"} eq "mopidy");
+    return "Command is not supported by player mopidy !" if ($hash->{".player"} eq "mopidy");
     $hash->{".musiclist"} = "";
     mpd_cmd($hash, "i|listall|music"); 
     return format_get_output("Music",$hash->{".musiclist"});
@@ -750,13 +922,26 @@ sub MPD_Get($@)
     return undef;
   }
 
+  if ($cmd eq "bookmarks")
+  {
+    my $bm_dir = AttrVal($name, "bookmarkDir","");
+    return format_get_output("Get Bookmarks","attribute bookmarkDir not set !") if ($bm_dir eq "");
+
+    opendir(DIR,$bm_dir);
+    while(my $d = readdir(DIR)) {$ret .= $d."\n" if (($d ne "..") && ($d ne "."));}
+    closedir(DIR);
+
+   return format_get_output("Get Bookmarks",$ret) if($ret);
+   return undef;
+ }
+
  if ($cmd eq "outputs") 
   {  
     MPD_Outputs_Status($hash);
     return format_get_output("Outputs", $hash->{".outputs"});
   }
 
-  return format_get_output("Current Song", mpd_cmd($hash, "i|currentsong|x")) if ($cmd eq "currentsong");
+  return format_get_output("Current Song", mpd_cmd($hash, "i|currentsong|x"))  if ($cmd eq "currentsong");
   return format_get_output("Playlist Info",mpd_cmd($hash, "i|playlistinfo|x")) if ($cmd eq "playlistinfo");
   return "$name get with unknown argument $cmd, choose one of " . join(" ", sort keys %gets); 
 }
@@ -808,8 +993,9 @@ sub mpd_cmd($$)
  my $old_plists = $hash->{".playlists"};
 
 
- $hash->{VERSION}   = undef;
- $hash->{PRESENCE}  = "absent";
+ $hash->{VERSION}    = undef;
+ $hash->{SUBVERSION} = undef;
+ $hash->{PRESENCE}   = "absent";
 
 
  my $sock = IO::Socket::INET->new(
@@ -840,6 +1026,7 @@ sub mpd_cmd($$)
 
  my ($b , $c) = split("OK MPD " , $_);
  $hash->{VERSION} = $c;
+ (undef,$hash->{SUBVERSION},undef) = split("\\.",$c);
  # ok, now we're connected - let's issue the commands.
 
  if ($hash->{".password"} ne "")
@@ -978,7 +1165,7 @@ sub mpd_cmd($$)
   }
   $hash->{helper}{playlistcollection}{val} = $i-1;
   $old_plists =~ tr/\n/\:/; # TabletUI will diese Art der Liste
-  readingsSingleUpdate($hash,"playlistcollection", $old_plists,1);
+  readingsSingleUpdate($hash,"playlistcollection", $old_plists,1) if (!AttrVal($name,"no_playlistcollection",""));
   Log3 $name ,5 ,"$name, new playlistcollection -> $old_plists";
  }
 
@@ -1255,20 +1442,20 @@ sub MPD_get_artist_info ($$)
                  url      => lfm_artist.$hash->{'.apikey'}."&artist=".$artist,
                  timeout  => 5,
                  hash     => $hash,     
-		 header   => "User-Agent: Mozilla/5.0\r\nAccept: application/xml\r\nAccept-Charset: utf-8",
+		 header   => "User-Agent: Mozilla/5.0\r\nAccept: application/json\r\nAccept-Charset: utf-8",
                  method   => "GET",     
                  callback =>  \&MPD_lfm_artist_info
                 };
 
-    if ((-e "www/$cache/".$hash->{'.artist'}.".xml") && ($cache ne ""))
+    if ((-e "www/$cache/".$artist.".json") && ($cache ne ""))
     {
-     Log3 $name ,4,"$name, artist file ".$hash->{'.artist'}.".xml already exist";
-     if (!open (FILE , "www/$cache/".$hash->{'.artist'}.".xml"))
+     Log3 $name ,4,"$name, artist file ".$artist.".json already exist";
+     if (!open (FILE , "www/$cache/".$artist.".json"))
      {
-      my $error = "error reading ".$hash->{'.artist'}.".xml : ".$!;
+      my $error = "error reading ".$artist.".json : ".$!;
       Log3 $name, 2, "$name, $error";
       readingsSingleUpdate($hash,"last_error",$error,1);
-      $hash->{XML} = 0;
+      $hash->{JSON} = 0;
      }
      else 
      {
@@ -1277,16 +1464,16 @@ sub MPD_get_artist_info ($$)
       MPD_lfm_artist_info($param,"",$data,'local');
      }
     }
-    else # xml von lastfm holen 
+    else # json von lastfm holen 
     { 
-      Log3 $name ,4,"$name, new artist ".$hash->{'.artist'}." , getting file from lastfm";
+      Log3 $name ,4,"$name, new artist ".$artist." , try to get it from Last.fm";
       HttpUtils_NonblockingGet($param); 
     }
     return undef;
 }
 
 sub MPD_get_album_info ($$)
-{
+{   
     my ($hash, $album) = @_;
     my $name = $hash->{NAME};
     return undef if (($hash->{'.album'} eq $album) || ($album eq ""));
@@ -1299,12 +1486,12 @@ sub MPD_get_album_info ($$)
                  url      => lfm_album.$hash->{'.apikey'}."&album=".$album."&artist=".$artist,
                  timeout  => 5,
                  hash     => $hash,     
-		 header   => "User-Agent: Mozilla/5.0\r\nAccept: application/xml\r\nAccept-Charset: utf-8",
+		 header   => "User-Agent: Mozilla/5.0\r\nAccept: application/json\r\nAccept-Charset: utf-8",
                  method   => "GET",     
                  callback =>  \&MPD_lfm_album_info
                 };
     
-    my $fname = "www/$cache/".$artist."_".$album.".xml";
+    my $fname = "www/$cache/".$artist."_".$album.".json";
 
     if (-e $fname && ($cache ne ""))
     {
@@ -1314,7 +1501,7 @@ sub MPD_get_album_info ($$)
       my $error = "error reading $fname : $!";
       Log3 $name, 2, "$name, $error";
       readingsSingleUpdate($hash,"last_error",$error,1);
-      $hash->{XML} = 0;
+      $hash->{JSON} = 0;
      }
      else 
      {
@@ -1323,10 +1510,10 @@ sub MPD_get_album_info ($$)
       MPD_lfm_album_info($param,"",$data,'local');
      }
     }
-    else # xml von lastfm holen 
+    else # json von lastfm holen 
     { 
-      $fname = $artist."_".$album.".xml";
-      Log3 $name ,4,"$name, new album $fname , getting file from lastfm";
+      $fname = $artist."_".$album.".json";
+      Log3 $name ,4,"$name, new album $fname , try to get it from Last.fm";
       HttpUtils_NonblockingGet($param); 
     }
     return undef;
@@ -1335,94 +1522,110 @@ sub MPD_get_album_info ($$)
 sub MPD_lfm_artist_info(@)
 {
     my ($param, $err, $data, $local) = @_;
-    my $hash  = $param->{hash};
-    my $name  = $hash->{NAME};
-    my $size  = AttrVal($name,"image_size",0); # default
-    my $cache = AttrVal($name,"cache","");
+    my $hash   = $param->{hash};
+    my $name   = $hash->{NAME};
+    my $artist = $hash->{'.artist'};
+    my $size   = AttrVal($name,"image_size",0); # default
+    my $cache  = AttrVal($name,"cache","");
+    my $url;
+
     return if ($size < 0);
   
     if (!$data || $err)
     {
-     Log3 $name ,3,"$name, error getting artist info from lastfm -> $err";
+     Log3 $name ,3,"$name, error got artist info [$artist] from Last.fm -> $err";
      MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot","");
      return undef;
     }
 
-    if (!$local) {Log3 $name,4,"$name, new xml data from lastfm";}
+    if (!$local) {Log3 $name,4,"$name, new json data for $artist from Last.fm";}
     if ($cache ne "")
     {
-     # xml lokal speichern ?
-     if (-e "www/$cache/".$hash->{'.artist'}.".xml")
+     # json lokal speichern ?
+     if (-e "www/$cache/".$hash->{'.artist'}.".json")
      {
-       Log3 $name ,5,"$name, artist ".$hash->{'.artist'}." already exist";
-       $hash->{XML} = 1;
+       Log3 $name ,5,"$name, artist ".$artist." already exist";
+       $hash->{JSON} = 1;
      }
      else
      {
-      if (!open (FILE , ">"."www/$cache/".$hash->{'.artist'}.".xml"))
+      if (!open (FILE , ">"."www/$cache/".$artist.".json"))
        {
-         my $error = "error saving ".$hash->{'.artist'}.".xml : ".$!;
+         my $error = "error saving ".$artist.".json : ".$!;
          Log3 $name, 2, "$name, $error";
          readingsSingleUpdate($hash,"last_error",$error,1);
-         $hash->{XML} = 0;
-         #$hash->{'.artist'} = "";
-         #return;
+         $hash->{JSON} = 0;
        }
         else 
         {
          print FILE $data;
          close(FILE);
-         $hash->{XML} = 1;
+         $hash->{JSON} = 1;
         }
      }
     }
 
-    my $newxml = XML::Simple->new(ForceArray => ['entry', 'link'], KeyAttr => []);
-    my $xml = $newxml->XMLin($data);
+  
+    my $res;
+    eval { $res = decode_json($data); 1; } or do 
+    {
+      my $error = "invalid file content in file ".$artist.".json";
+      Log3 $name, 3, "$name, $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
+      return undef;
+    };
 
     my $hw="width='32' height='32'";
     $hw="width='64' height='64'"   if ($size == 1);
     $hw="width='174' height='174'" if ($size == 2);
     $hw="width='300' height='300'" if ($size == 3);
 
-    if ((exists $xml->{'artist'}->{'bio'}->{'summary'}) && AttrVal($name,"artist_summary",0))
+    if ((exists $res->{'artist'}->{'bio'}->{'summary'}) && AttrVal($name,"artist_summary",0))
+
     {
-     readingsSingleUpdate($hash,"artist_summary",$xml->{'artist'}->{'bio'}->{'summary'},1);
+     readingsSingleUpdate($hash,"artist_summary",$res->{'artist'}->{'bio'}->{'summary'},1);
     }
 
-    if ((exists $xml->{'artist'}->{'bio'}->{'content'}) && AttrVal($name,"artist_content",0))
+    if ((exists $res->{'artist'}->{'bio'}->{'content'}) && AttrVal($name,"artist_content",0))
     {
-     readingsSingleUpdate($hash,"artist_content",$xml->{'artist'}->{'bio'}->{'content'},1);
+     readingsSingleUpdate($hash,"artist_content",$res->{'artist'}->{'bio'}->{'content'},1);
     }
 
+    if (exists $res->{'artist'}->{'image'}[$size]->{'#text'})
+    {
+      $url = $res->{'artist'}->{'image'}[$size]->{'#text'};
+    }
 
-      if (!$cache || !$hash->{XML}) # cache verwenden ?
+    if (!$cache || !$hash->{JSON}) # cache verwenden ?
       {
-      if (exists $xml->{'artist'}->{'image'}[$size]->{'content'})
+      if ($url)
       {
-       if (index($xml->{'artist'}->{'image'}[$size]->{'content'},"http") < 0)
-       {
+       if (index($url,"http") < 0)
+        {
          MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot","");
-         my $error = "falsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         my $error = "falsche info  URL : $url";
          readingsSingleUpdate($hash,"last_error",$error,1);
          Log3 $name,1,"$name, $error";
          return undef;
+        }
+        Log3 $name,4,"$name, try to get image from $url";  
+        MPD_artist_image($hash,$url,$hw);
+      }
+
+       else
+       {
+        MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot", "");
+        Log3 $name,4,"$name, no picture on Last.fm";
        }
-        MPD_artist_image($hash,$xml->{'artist'}->{'image'}[$size]->{'content'},$hw);
-      }
-      else
-      {
-       MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot", "");
-       Log3 $name,4,"$name, unknown artist";
-      }
        return undef;
     } # kein cache verwenden
 
-   if (exists $xml->{'artist'}->{'image'}[$size]->{'content'})
+   if ($url)
    {
-    $hash->{'.suffix'} = substr($xml->{'artist'}->{'image'}[$size]->{'content'},-4);
+    $hash->{'.suffix'} = substr($url,-4);
+    if (length($hash->{'.suffix'})>3)
+    {
     my $fname = $hash->{'.artist'}."_$size".$hash->{'.suffix'};
-
 
     if (-e "www/$cache/".$fname)
     {
@@ -1431,27 +1634,28 @@ sub MPD_lfm_artist_info(@)
        return undef;
     }
 
-    Log3 $name ,4,"$name, no local artist image ".$fname." getting from lastfm";
+    Log3 $name ,4,"$name, no local artist image ".$fname." found, try to get it from Last.fm";
 
     $param = {
-        url      => $xml->{'artist'}->{'image'}[$size]->{'content'},
+        url      => $url,
         timeout  => 5,
         hash     => $hash,     
+        header   => "User-Agent: Mozilla/5.0\r\nAccept: application/json\r\nAccept-Charset: utf-8",
         method   => "GET",     
         callback =>  \&MPD_lfm_artist_image 
     };
 
     HttpUtils_NonblockingGet($param);
     MPD_artist_image($hash,"/fhem/icons/10px-kreis-gelb","");
-   }
-    else { 
-           MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot",""); 
-           Log3 $name ,4,"$name, image infos missing , delete old xml";
-           unlink ("www/$cache/".$hash->{'.artist'}.".xml");
-         } # keine Image Infos vorhanden !
-  
+    return undef;
+   }# zu kurz
+   }# gibt es nicht oder ist leer
 
-  return undef;
+   MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot",""); 
+   Log3 $name ,4,"$name, image infos missing , delete old json";
+   unlink ("www/$cache/".$artist.".json");
+   # keine Image Infos vorhanden !
+   return undef;
 }
 
 sub MPD_lfm_album_info(@)
@@ -1463,22 +1667,24 @@ sub MPD_lfm_album_info(@)
     my $album = $hash->{'.album'};
     my $size  = AttrVal($name,"image_size",0); # default
     my $cache = AttrVal($name,"cache","");
+    my $url;
+
     return if ($size < 0);
   
     if (!$data || $err)
     {
-     Log3 $name ,3,"$name, error getting album info from lastfm -> $err";
+     Log3 $name ,3,"$name, error got album info from Last.fm -> $err";
      MPD_album_image($hash,"/fhem/icons/10px-kreis-rot","");
      return undef;
     }
 
-    if (!$local) {Log3 $name,4,"$name, new xml data for $album from lastfm";}
+    if (!$local) {Log3 $name,4,"$name, new json data for $album from Last.fm";}
 
-    my $fname =  "www/$cache/".$artist."_".$album.".xml";
+    my $fname =  "www/$cache/".$artist."_".$album.".json";
 
     if ($cache ne "")
     {
-     # xml lokal speichern ?
+     # json lokal speichern ?
      if (-e $fname)
      {
        Log3 $name ,5,"$name, album $fname already exist";
@@ -1499,27 +1705,34 @@ sub MPD_lfm_album_info(@)
      }
     }
 
-    my $newxml = XML::Simple->new(ForceArray => ['entry', 'link'], KeyAttr => []);
-    my $xml = $newxml->XMLin($data);
+    my $res;
+    eval { $res = decode_json($data); 1; } or do 
+    {
+      my $error = "invalid file content in file ".$album.".json";
+      Log3 $name, 3, "$name, $error";
+      readingsSingleUpdate($hash,"last_error",$error,1);
+      return undef;
+    };
 
     my $hw="width='32' height='32'";
     $hw="width='64' height='64'"   if ($size == 1);
     $hw="width='174' height='174'" if ($size == 2);
     $hw="width='300' height='300'" if ($size == 3);
 
-      if (!$cache || !$hash->{XML}) # cache verwenden ?
+      if (!$cache || !$hash->{JSON}) # cache verwenden ?
       {
-      if (exists $xml->{'album'}->{'image'}[$size]->{'content'})
+      if (exists $res->{'album'}->{'image'}[$size]->{'#text'})
       {
-       if (index($xml->{'album'}->{'image'}[$size]->{'content'},"http") < 0)
+      $url = $res->{'album'}->{'image'}[$size]->{'#text'};
+       if (index($url,"http") < 0)
        {
          MPD_album_image($hash,"/fhem/icons/10px-kreis-rot","");
-         my $error = "alsche info  URL : ".$xml->{'artist'}->{'image'}[$size]->{'content'};
+         my $error = "falsche info  URL : $url";
          readingsSingleUpdate($hash,"last_error",$error,1);
          Log3 $name,1,"$name, $error";
          return undef;
        }
-        MPD_album_image($hash,$xml->{'album'}->{'image'}[$size]->{'content'},$hw);
+        MPD_album_image($hash,$url,$hw);
       }
       else
       {
@@ -1529,9 +1742,10 @@ sub MPD_lfm_album_info(@)
        return undef;
     } # kein cache verwenden
 
-  if (exists $xml->{'album'}->{'image'}[$size]->{'content'})
+  if (exists $res->{'album'}->{'image'}[$size]->{'#text'})
    {
-    $hash->{'.suffix'} = substr($xml->{'album'}->{'image'}[$size]->{'content'},-4);
+    $url = $res->{'album'}->{'image'}[$size]->{'#text'};
+    $hash->{'.suffix'} = substr($url,-4);
     my $fname = $artist."_".$album."_".$size.$hash->{'.suffix'};
 
     if (-e "www/".$cache."/".$fname)
@@ -1541,12 +1755,13 @@ sub MPD_lfm_album_info(@)
        return undef;
     }
 
-    Log3 $name ,4,"$name, no local album image ".$fname." getting from lastfm";
+    Log3 $name ,4,"$name, no local album image ".$fname." found, try to get it from Last.fm";
 
     $param = {
-        url      => $xml->{'album'}->{'image'}[$size]->{'content'},
+        url      => $url,
         timeout  => 5,
-        hash     => $hash,     
+        hash     => $hash,    
+        header   => "User-Agent: Mozilla/5.0\r\nAccept: application/json\r\nAccept-Charset: utf-8", 
         method   => "GET",     
         callback =>  \&MPD_lfm_album_image 
     };
@@ -1554,6 +1769,7 @@ sub MPD_lfm_album_info(@)
     HttpUtils_NonblockingGet($param);
     MPD_album_image($hash,"/fhem/icons/10px-kreis-gelb","");
    }
+ return undef;
 }
 
 
@@ -1585,6 +1801,7 @@ sub MPD_lfm_artist_image(@)
     my ($param, $err, $data) = @_;
     my $hash  = $param->{hash};
     my $name  = $hash->{NAME};
+    my $artist= $hash->{'.artist'};
     my $cache = AttrVal($name,"cache","");
     my $size  = AttrVal($name,"image_size",0);
 
@@ -1593,17 +1810,18 @@ sub MPD_lfm_artist_image(@)
     $hw="width='174' height='174'" if ($size == 2);
     $hw="width='300' height='300'" if ($size == 3);
 
-    my $fname = $hash->{'.artist'}."_$size".$hash->{'.suffix'};
- 
+    my $fname = $artist."_".$size.$hash->{'.suffix'};
+    $artist = urlDecode($artist);
+
     if($err ne "")          
     {
-        my $error = "error while requesting ".$param->{url}." - $err";
+        my $error = "error to get artist image [$artist] while requesting ".$param->{url}." - $err";
         readingsSingleUpdate($hash,"last_error",$error,1);
         Log3 $name, 3, "$name, $error";
     }
      elsif(($data ne "") && ($data =~ /PNG/i))                                                   
     {
-        Log3 $name,4,"$name, got new image from lastfm";        
+        Log3 $name,4,"$name, got new image $fname from Last.fm";        
     
         if (!open(FILE, "> www/$cache/$fname"))
         {
@@ -1619,8 +1837,10 @@ sub MPD_lfm_artist_image(@)
         return undef;
     }
 
-    Log3 $name,3,"$name, empty or invalid image from lastfm";
-    unlink ("www/$cache/".$hash->{'.artist'}.".xml");
+    Log3 $name,3,"$name, empty or invalid artist image [$artist] from Last.fm";
+    # ToDo : da nochmal genau reinsehen !
+    #system("cp www/$cache/".$hash->{'.artist'}.".json www/$cache/".$hash->{'.artist'}.".def");      
+    unlink ("www/$cache/$fname");
     MPD_artist_image($hash,"/fhem/icons/10px-kreis-rot","");
     return undef;
 }
@@ -1643,16 +1863,18 @@ sub MPD_lfm_album_image(@)
   
 
     my $fname = $artist."_".$album."_".$size.$hash->{'.suffix'};
+    $artist = urlDecode($artist);
+    $album  = urlDecode($album);
  
     if($err ne "")          
     {
-        $error = "error while requesting ".$param->{url}." - $err";
+        $error = "error to get album image [$album] for artist [$artist] while requesting ".$param->{url}." - $err";
         readingsSingleUpdate($hash,"last_error",$error,1);
         Log3 $name, 3, "$name, $error";
     }
      elsif(($data ne "") && ($data =~ /PNG/i))                                                   
     {
-        Log3 $name,4,"$name, got new image for $album from lastfm";        
+        Log3 $name,4,"$name, got new image $fname for $album from Last.fm";        
     
         if (!open(FILE, "> www/".$cache."/".$fname))
         {
@@ -1670,8 +1892,8 @@ sub MPD_lfm_album_image(@)
         return undef;
     }
 
-    Log3 $name,3,"$name, empty or invalid image for $album from lastfm";
-    unlink ("www/".$cache."/".$artist."_".$album.".xml");
+    Log3 $name,3,"$name, empty or invalid image for album [$album] from Last.fm";
+    unlink ("www/".$cache."/".$fname);
     MPD_album_image($hash,"/fhem/icons/10px-kreis-rot","");
     return undef;
 }
@@ -1739,18 +1961,18 @@ sub MPD_NewPlaylist($$)
         }
         else
         {    
-         eval "use JSON qw( decode_json )";
-         if($@)
-         {
-          $error = "please install JSON to decode cover";  
-          Log3 $name, 3,"$name, $error"; 
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"last_error",$error);
-          readingsBulkUpdate($hash,"playlistinfo","");
-          readingsEndUpdate($hash,1);
-         }
-         else 
-         {
+         #eval "use JSON qw( decode_json )";
+         #if($@)
+         #{
+          #$error = "please install JSON to decode cover";  
+          #Log3 $name, 3,"$name, $error"; 
+          #readingsBeginUpdate($hash);
+          #readingsBulkUpdate($hash,"last_error",$error);
+          #readingsBulkUpdate($hash,"playlistinfo","");
+          #readingsEndUpdate($hash,1);
+         #}
+         #else 
+         #{
           my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 1 } );
           my $response = $ua->get("https://embed.spotify.com/oembed/?url=".$albumUri[$i]);
           my $data = '';
@@ -1771,8 +1993,8 @@ sub MPD_NewPlaylist($$)
              readingsBulkUpdate($hash,"playlistinfo","");
              readingsEndUpdate($hash,1);
             }
-           } # sucess 
-         } # JSON 
+           } #  
+         #} # JSON 
         } # LWP
       } #$lastUri ne $albumUri[$i]
      } # defined($albumUri[$i]), vesuchen wir es mit Last.fm
@@ -2005,6 +2227,13 @@ sub MPD_summaryFn($$$$) {
 	return $html;	
 }
 
+sub MPD_SaveBookmark($)
+{
+ my ($hash)= @_;
+ my $name= $hash->{NAME};
+ MPD_Set($hash,$name,"save_bookmark","auto");
+ return;
+}
 
 
 1;
@@ -2020,7 +2249,7 @@ sub MPD_summaryFn($$$$) {
  FHEM module to control a MPD (or Mopidy) like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
 To install a MPD on a Raspberry Pi you will find a lot of documentation at the web e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
 FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a> ( in german )<br>
-Modul requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
+Modul requires JSON -> sudo apt-get install libjson-perl <br>
 If you are using Mopidy with Spotify support you may also need LWP::UserAgent -> sudo apt-get install libwww-perl<br>
 <ul>
  <a name="MPDdefine"></a>
@@ -2056,15 +2285,22 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     volume (%) => like MPC volume %, 0 - 100<br>
     volumeUp => inc volume ( + attr volumeStep size )<br>
     volumeDown => dec volume ( - attr volumeStep size )<br>
-    playlist (playlist name) => set playlist on MPD Server<br>
+    playlist (playlistname|songnumber|position) set playlist on MPD Server. If songnumber and/or postion not defined<br>
+    MPD starts playing with the first song at position 0<br> 
     playfile (file) => create playlist + add file to playlist + start playing<br>
     IdleNow => send Idle command to MPD and wait for events to return<br>
     reset => reset MPD Modul<br>
     mpdCMD (cmd) => send a command to MPD Server ( <a href='http://www.musicpd.org/doc/protocol/'>MPD Command Ref</a> )<br>
     mute => on,off,toggle<br>
-    seekcur (time)<br>
-    channelUp => <br>
-    channelDown => <br>
+    seekcur (time) => Format: [[hh:]mm:]ss. Not before MPD version 0.20.<br>
+    forward => jump forward in the current track as far as defined in the <i>seekStep</i> Attribute, default 7%<br>
+    rewind => jump backwards in the current track, as far as defined in the <i>seekStep</i> Attribute, default 7%<br>
+    channel (no) => loads the playlist with the given number<br>
+    channelUp => loads the next playlist<br>
+    channelDown => loads the previous playlist<br>
+    save_bookmark => saves the current state of the playlist (track number and position inside the track) for the currently loaded playlist
+    This will only work if the playlist was loaded through the module and if the attribute bookmarkDir is set. (not on radio streams !)<br>
+    load_bookmark <name> => resumes the previously saved state of the currently loaded playlist and jumps to the associated tracknumber and position inside the track<br>
    </ul>
   <br>
   <a name="MPDget"></a>
@@ -2083,6 +2319,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     statusRequest => get MPD status<br>
     currentsong => get infos from current song in playlist<br>
     outputs => get name,id,status about all MPD output devices in /etc/mpd.conf<br>
+    bookmarks => list all stored bookmarks<br>
   </ul>
   <br>
   <a name="MPDattr"></a>
@@ -2111,6 +2348,12 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
      </pre></li>
       <li>cache (default lfm => /fhem/www/lfm) store artist image and album cover in a local directory</li>
       <li>unknown_artist_image => show this image if no other image is avalible (default : /fhem/icons/1px-spacer)</li>
+      <li>bookmarkDir => set a writeable directory here to enable saving and restoring of playlist states using the set bookmark and get bookmark commands</li>
+      <li>autoBookmark => set this to 1 to enable automatic loading and saving of playlist states whenever the playlist is changed using this module</li>
+      <li>seekStep => set this to define how far the forward and rewind commands jump in the current track. Defaults to 7 if not set</li>
+      <li>seekStepSmall (default 1) => set this on top of seekStep to define a smaller step size, if the current playing position is below seekStepThreshold percent. This is useful to skip intro music, e.g. in radio plays or audiobooks.</li>
+      <li>seekStepSmallThreshold (default 0) => used to define when seekStep or seekStepSmall is applied. Defaults to 0. If set e.g. to 10, then during the first 10% of a track, forward and rewind are using the seekStepSmall value.</li>
+      <li>no_playlistcollection (default 0) => if set to 1 , dont create reading playlistcollection</li>
   </ul>
   <br>
   <b>Readings</b>
@@ -2143,7 +2386,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
   Um den MPD auf einem Raspberry Pi zu installieren finden sich im Internet zahlreiche gute Dokumentaionen 
   z.B. <a href="http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi"><b>hier</b></a><br>
   Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a><br>
-  Das Modul ben&ouml;tigt zwingend XML:Simple, installation z.B. mit <i>sudo apt-get install libxml-simple-perl</i><br>
+  Das Modul ben&ouml;tigt zwingend JSON, installation z.B. mit <i>sudo apt-get install libjson-perl</i><br>
   <a name="MPDdefine"></a>
   <b>Define</b>
   <ul>
@@ -2177,7 +2420,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     volume (%) => &auml;ndert die Lautst&auml;rke von 0 - 100%<br>
     volumeUp => Lautst&auml;rke schrittweise erh&ouml;hen , Schrittweite = ( attr volumeStep size )<br>
     volumeDown => Lautst&auml;rke schrittweise erniedrigen , Schrittweite = ( attr volumeStep size )<br>
-    playlist (playlist name) => lade Playliste <name> aus der MPD Datenbank und starte Wiedergabe mit dem ersten Titel<br>
+    playlist (name|SongNr|Position) => lade Playliste <name> aus der MPD Datenbank und starte die Wiedergabe<br>
+    Werden SongNr und/oder Position nicht mit &uuml;bergeben, startet die Wiedergabe mit dem ersten Titel (Song=0) am Anfang (Position=0)<br>
     playfile (file) => erzeugt eine MPD interne Playliste mit file als Inhalt und spielt dieses ab<br>  
     updateDb => wie MPC update, Update der MPD Datenbank<br>
     reset => reset des FHEM MPD Moduls<br>
@@ -2185,9 +2429,16 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     IdleNow => sendet das Kommando idle zum MPD und wartet auf Ereignisse<br>
     clear_readings => l&ouml;scht sehr viele Readings<br>
     mute => on,off,toggle<br>
-    seekcur (zeit) => nicht vor MPD Version 0.20<br>
-    channelUp => <br>
-    channelDown => <br>
+    seekcur (zeit) => Format: [[hh:]mm:]ss. nicht vor MPD Version 0.20<br>
+    forward => Springt im laufenden Track um einen optional per seekStep oder seekStepSmall definierten Wert nach vorne bzw. defaultm&auml;ßig um 7%. <br>
+    rewind => Springt so wie bei forward beschrieben entsprechend zur&uuml;ck. <br>
+    channel => Wechsele zur Playliste mit der angegebenen Nummer<br>
+    channelUp => wechselt zur n&auml;chsten Playliste<br>
+    channelDown => wechselt zur vorherigen Playliste<br>
+    save_bookmark => speichert den aktuellen Zustand (Tracknummer und Position innerhalb des Tracks für die gerade geladene Playliste<br>. 
+    dies sunktioniert nur, wenn die Playliste mit dem Modul geladen wurde und wenn das Attribut bookmarkDir gesetzt ist.<br>
+    load_bookmark <name> => stellt den zuletzt gespeicherten Zustand (set bookmark) der geladenen Playliste wieder her und springt zum gespeicherten Track und Position<br>
+    wird <name> zusätzlich mit übergeben wird zuvor die entsprechend Playliste geladen<br>
    </ul>
   <br>
   <a name="MPDget"></a>
@@ -2206,6 +2457,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     statusRequest => hole aktuellen MPD Status<br>
     currentsong => zeigt Informationen zum aktuellen Titel der MPD internen Playliste<br>
     outputs => zeigt Informationen der definierten MPD Ausgabe Kan&auml;le ( aus /etc/mpd.conf )<br>
+    bookmarks => zeigt eine Liste aller bisher gespeicherten Bookmarks<br>
   </ul>
   <br>
   <a name="MPDattr"></a>
@@ -2236,10 +2488,17 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
       define rg_artist readingsGroup &ltMPD name&gt:artist,artist_image_html,artist_summary
       attr rg_artist room MPD
     </pre></li>
-   <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die XML und PNG Dateien<br>
+   <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die JSON und PNG Dateien<br>
    <b>Wichtig</b> : Der User unter dem der fhem Prozess ausgef&uuml;hrt wird (default fhem) muss Lese und Schreibrechte in diesem Verzeichniss haben !<br>
    Das Verzeichnis sollte auch unterhalb von www liegen, damit der fhem Webserver direkten Zugriff auf die Bilder hat.</li>
    <li>unknown_artist_image => Ersatzimage wenn kein anderes Image zur Verf&uuml;gung steht (default : /fhem/icons/1px-spacer)</li>
+   <li>bookmarkDir => ein vom FHEM User les- und beschreibbares Verzeichnis. Wennn dieses definiert wird, ist das Speichern und Wiederherstellen von Playlistzust&auml;nden mit Hilfe von set/get bookmark m&ouml;glich</li>
+   <li>autoBookmark => wenn dies auf 1 gesetzt wird, dann werden automatisch Playlistenzust&auml;nde geladen und gespeichert, immer wenn die Playliste mit diesem Modul gewechselt wird</li>
+   <li>seekStep => wenn definiert, wird dadurch die Sprungweite von forward und rewind gesetzt. Der Wert gilt als Prozentwert. default: 7</li>
+   <li>seekStepSmall => Wenn diesem Attribut kann für den Anfang eines Tracks innerhalb der ersten per seekStepSmall definierten Prozent eine kleinere Sprungweite definiert werden,<br>
+   um so z.B. die Intromusik von H&ouml;rspielen oder H&ouml;rb&uuml;chern &uuml;berspringen zu k&ouml;nnen. default: 1</li>
+   <li>seekStepSmallThreshold => unterhalb dieses Wertes wird seekStepSmall benutzt, oberhalb seekStep default: 0 (ohne Funktion)</li>
+   <li>no_playlistcollection (default 0) => wenn auf 1 gesetzt wird das Reading playlistcollection nicht erzeugt</li> 
    </ul>
   <br>
   <b>Readings</b>
