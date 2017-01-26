@@ -636,6 +636,7 @@ ZWave_Initialize($)
     secure_classes
     showtime:1,0
     vclasses
+    useMultiCmd
     zwaveRoute
   );
   use warnings 'qw';
@@ -4102,6 +4103,8 @@ sub
 ZWave_processSendStack($$;$)
 {
   my ($hash,$ackType, $omsg) = @_;
+
+  delete($hash->{delayedProcessing});
   my $ss = $hash->{SendStack};
   if(!$ss) {
     readingsSingleUpdate($hash, "timeToAck", 
@@ -4179,6 +4182,35 @@ ZWave_processSendStack($$;$)
   }
 }
 
+# packs multiple gets into a MULTI_CMD-get, may reorder
+sub
+ZWave_packSendStack($)
+{
+  my ($hash) = @_;
+
+  my (@ns, @ms, $sfx, $cmd, $id);
+  my $ncmd = 0;
+  for my $se (@{$hash->{SendStack}}) {
+    if($se =~ m/^get:13(..)(...*)(....)$/) {
+      ($id, $cmd, $sfx) = ($1, $2, $3);
+      if($cmd =~ m/^..8f01(..)(.*)/i) { # already Multi-cmd
+        $ncmd += $1; $cmd = $2;
+      } else {
+        $ncmd++;
+      }
+      push(@ms, $cmd);
+    } else {
+      push(@ns, $se);
+    }
+  }
+  return if($ncmd < 2 || @ms < 2);
+
+  $cmd = join("", @ms);
+  push @ns, sprintf("get:13$id%02x8f01%02x%s%s",
+                     length($cmd)/2+3, $ncmd, $cmd, $sfx);
+  $hash->{SendStack} = \@ns;
+}
+
 sub
 ZWave_addToSendStack($$$)
 {
@@ -4206,6 +4238,16 @@ ZWave_addToSendStack($$$)
         "ERROR: $hash->{NAME}: cleaning commands without ack after 5s";
       delete $hash->{SendStack};
       return ZWave_addToSendStack($hash, $type, $cmd);
+    }
+  }
+  if($hash->{useMultiCmd}) {
+    ZWave_packSendStack($hash);
+    if($hash->{INTRIGGER}) { # Allow repacking of multiple gets on WUN
+      if(!$hash->{delayedProcessing}) {
+        $hash->{delayedProcessing} = 1;
+        InternalTimer(1, sub(){ZWave_processSendStack($hash, "next");}, 0);
+      }
+      return;
     }
   }
   ZWave_processSendStack($hash, "next") if(@{$ss} == 1);
@@ -4746,6 +4788,17 @@ ZWave_Attr(@)
     }
     my %h = map { split(":", $_) } split(" ", $param);
     $hash->{".vclasses"} = \%h;
+    return undef;
+
+  } elsif($attrName eq "useMultiCmd") {
+    if($type eq "del") {
+      $hash->{".vclasses"} = {};
+      return undef;
+    }
+    my $a = ($attr{$devName} ? $attr{$devName}{classes} : "");
+    return "useMultiCmd: unsupported device, see help ZWave for details"
+        if(!$a || !($a =~ m/MULTI_CMD/ && $a =~ m/WAKE_UP/));
+    $hash->{useMultiCmd} = 1;
     return undef;
   }
 
@@ -5881,6 +5934,12 @@ s2Hex($)
     <li><a name="vclasses">vclasses</a><br>
       This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
+      </li>
+
+    <li><a name="useMultiCmd">useMultiCmd</a><br>
+      Experimental: if a device supports MULTI_CMD and WAKE_UP, then pack
+      multiple get messages on the SendStack into a single MULTI_CMD to save
+      radio transmissions.
       </li>
 
     <li><a name="zwaveRoute">zwaveRoute</a><br>
