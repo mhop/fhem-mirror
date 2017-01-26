@@ -590,9 +590,9 @@ sub MPD_Set($@)
 
  if ($cmd eq "seekcur") 
   {
-   if (int($hash->{SUBVERSION}) < 20)
+   if ((int($hash->{SUBVERSION}) < 20) && (AttrVal($name,"player","mpd") eq "mpd"))
    {
-    $ret = "command $cmd needs a MPD version of 0.20.0 or greater !";
+    $ret = "command $cmd needs a MPD version of 0.20.0 or greater ! (is ".$hash->{VERSION}.")";
     Log3 $name,3,"$name,$ret";
     readingsSingleUpdate($hash,"last_error",$ret,1);
    }
@@ -600,9 +600,7 @@ sub MPD_Set($@)
    {
    if($subcmd=~/^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$/) # Matches valid time given as [[hh:]mm:]ss
     {
-      if (defined($1) && defined($2) && defined($3) )
-      { $subcmd=$1*3600+$2*60+$3; } # Sekunden ausrechnen 
-      else { $subcmd=0; }
+      $subcmd=(defined($1) ? $1 : 0)*3600+(defined($2) ? $2 : 0)*60+$3;  # Sekunden ausrechnen  
     }
    else { $subcmd--; $subcmd++; } # sicherstellen das subcmd numerisch ist     
    if ( $subcmd > 0 )
