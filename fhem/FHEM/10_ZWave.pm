@@ -624,19 +624,19 @@ ZWave_Initialize($)
     IODev
     WNMI_delay
     classes
-    do_not_notify:1,0
-    dummy:1,0
+    do_not_notify:noArg
+    dummy:noArg
     eventForRaw
     extendedAlarmReadings:0,1,2
-    ignore:1,0
-    ignoreDupMsg:1,0
+    ignore:noArg
+    ignoreDupMsg:noArg
     neighborListPos
-    noExplorerFrames:1,0
-    noWakeupForApplicationUpdate:1,0
+    noExplorerFrames:noArg
+    noWakeupForApplicationUpdate:noArg
     secure_classes
-    showtime:1,0
+    showtime:noArg
     vclasses
-    useMultiCmd
+    useMultiCmd:noArg
     zwaveRoute
   );
   use warnings 'qw';
