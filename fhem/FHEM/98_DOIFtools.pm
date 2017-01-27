@@ -522,7 +522,7 @@ sub DOIFtoolsNxTimer {
       $ret .= CommandSave(undef,undef) if (AttrVal($pn,"DOIFtoolsExecuteSave",""));
     return $ret;
     } else {
-      $ret = "A userReadings Attribute already exists, adding is not implemented, try it manually.\r\r $ret\r"; 
+      $ret = "A userReadings attribute already exists, adding is not implemented, try it manually.\r\r $ret\r"; 
       return $ret;
     }
   }
@@ -586,10 +586,12 @@ sub DOIFtoolsCheckDOIF {
       ($sub0[$i],@tmp) = SplitDoIf(",",$wait[$i]);
       $sub0[$i] =~ s/\s// if($sub0[$i]);
     }
-    foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
-      if ($defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
-        $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
-        last;
+    if (defined $defs{$tn}{timeCond}}) {
+      foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
+        if (defined($defs{$tn}{timeCond}{$key}) and $defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
+          $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
+          last;
+        }
       }
     }
   }
@@ -598,10 +600,12 @@ sub DOIFtoolsCheckDOIF {
     $ret .= "<li>At least one <b>indirect timer</b> in attribute <b>wait</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n" 
         if($wait =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3); 
   }
-  foreach my $key (sort keys %{$defs{$tn}{time}}) {
-    if ($defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
-      $ret .= "<li>At least one <b>indirect timer</b> in <b>condition</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n";
-      last;
+  if (defined $defs{$tn}{time}) {
+    foreach my $key (sort keys %{$defs{$tn}{time}}) {
+      if (defined $defs{$tn}{time}{$key} and $defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
+        $ret .= "<li>At least one <b>indirect timer</b> in <b>condition</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n";
+        last;
+      }
     }
   }
 
@@ -1139,7 +1143,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
 <br>
     <ul>
         <code>define &lt;name&gt; DOIFtools</code><br>
-        Es ist nur eine Definition pro FHEM Installation notwendig. Die Definition wird mit den vorhanden DOIF-Namen ergänzt, daher erscheinen alle DOIF-Geräte in der Liste <i>probably associated with</i>. Zusätzlich wird in jedem DOIF-Gerät in dieser Liste auf das DOIFtool verwiesen.<br>
+        Es ist nur eine Definition pro FHEM Installation möglich. Die Definition wird mit den vorhanden DOIF-Namen ergänzt, daher erscheinen alle DOIF-Geräte in der Liste <i>probably associated with</i>. Zusätzlich wird in jedem DOIF-Gerät in dieser Liste auf das DOIFtool verwiesen.<br>
         <br>
         <u>Definitionsvorschlag</u> zum Import mit <a href="https://wiki.fhem.de/wiki/DOIF/Import_von_Code_Snippets">Raw definition</a>:<br>
         <code>
