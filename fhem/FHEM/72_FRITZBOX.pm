@@ -1336,7 +1336,7 @@ sub FRITZBOX_Readout_Run_Web($)
       my $result2;
       my $newQueryPart; 
       
-      # gets WLAN speed for fw>=6.69
+    # gets WLAN speed for fw>=6.69
       $queryStr="";
       foreach ( @{ $result->{wlanListNew} } ) {
          $newQueryPart = "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx";
@@ -1350,7 +1350,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-      # gets LAN-Port for fw>=6.69
+    # gets LAN-Port for fw>=6.69
       foreach ( @{ $result->{lanDeviceNew} } ) {
          $newQueryPart = "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port";
          if (length($queryStr.$newQueryPart) < 4050) {
@@ -1363,47 +1363,43 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
+    # get missing user-fields for fw>=6.69
+      foreach ( @{ $result->{userProfilNew} } ) {
+         $newQueryPart = "&".$_->{_node}."_filter=user:settings/".$_->{_node}."/filter_profile_UID";
+         $newQueryPart .= "&".$_->{_node}."_month=user:settings/".$_->{_node}."/this_month_time";
+         $newQueryPart .= "&".$_->{_node}."_today=user:settings/".$_->{_node}."/today_time";
+         if (length($queryStr.$newQueryPart) < 4050) {
+            $queryStr .= $newQueryPart;
+         }
+         else {
+            $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+            %{$result} = ( %{$result}, %{$result2 } );
+            $queryStr = $newQueryPart;
+         }
+      }
+
+    # Final Web-Query
       $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
       %{$result} = ( %{$result}, %{$result2 } );
       
+    # create fields for wlanList-Entries (for fw>=6.69)
       $result->{wlanList} = $result->{wlanListNew};
       foreach ( @{ $result->{wlanList} } ) {
          $_->{speed_rx} = $result->{ $_->{_node} }; 
       }
 
+    # Create fields for lanDevice-Entries (for fw>=6.69)
       $result->{lanDevice} = $result->{lanDeviceNew};
       foreach ( @{ $result->{lanDevice} } ) {
          $_->{ethernet_port} = $result->{ $_->{_node} }; 
       }
 
-      # gets userProfil-Filter_UID for fw>=6.69
-      $queryStr="";
-      foreach ( @{ $result->{userProfilNew} } ) {
-         $queryStr .= "&".$_->{_node}."_filter=user:settings/".$_->{_node}."/filter_profile_UID"
-               if length($queryStr) < 8190 ; 
-      }
-      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
+    # Create fields for user-Entries (for fw>=6.69)
       $result->{userProfil} = $result->{userProfilNew};
       foreach ( @{ $result->{userProfil} } ) {
-         $_->{filter_profile_UID} = $result2->{ $_->{_node}."_filter" }; 
-      }
-
-      # gets userProfil-Times for fw>=6.69
-      $queryStr="";
-      foreach ( @{ $result->{userProfil} } ) {
-      # do not show data for unlimited, blocked or default access rights
-         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$_->{_node}} ) {
-            $queryStr .= "&".$_->{_node}."_month=user:settings/".$_->{_node}."/this_month_time"
-               if length($queryStr) < 8190 ; 
-            $queryStr .= "&".$_->{_node}."_today=user:settings/".$_->{_node}."/today_time"
-               if length($queryStr) < 8190 ;  
-         }
-      }
-      $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
-      $result->{userProfil} = $result->{userProfilNew};
-      foreach ( @{ $result->{userProfil} } ) {
-         $_->{this_month_time} = $result2->{ $_->{_node}."_month" }; 
-         $_->{today_time} = $result2->{ $_->{_node}."_today" }; 
+         $_->{filter_profile_UID} = $result->{ $_->{_node}."_filter" }; 
+         $_->{this_month_time} = $result->{ $_->{_node}."_month" }; 
+         $_->{today_time} = $result->{ $_->{_node}."_today" }; 
       }
    }
    
