@@ -1175,7 +1175,7 @@ sub CheckiTimerDoIf($$$)
   return 1 if ($itimer =~ /\[$device\]/);
   for (my $j = 0; $j < $max; $j++) {
     if ($eventa->[$j] =~ "^(.+): ") { 
-      $found = ($itimer =~ /\[$device:$1[:\]]/);
+      $found = ($itimer =~ /\[$device:$1(\]|:.+\]|,.+\])/);
       if ($found) {
         return 1;
       }
@@ -1480,8 +1480,8 @@ DOIF_TimerTrigger ($)
   }
   $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled"); 
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
+    $hash->{timer}{$j}=0;
     if ($hash->{localtime}{$j} == $localtime) {
-      $hash->{timer}{$j}=0;
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
           if ($hash->{interval}{$j} != -1) {
