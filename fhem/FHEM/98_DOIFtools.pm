@@ -586,7 +586,7 @@ sub DOIFtoolsCheckDOIF {
       ($sub0[$i],@tmp) = SplitDoIf(",",$wait[$i]);
       $sub0[$i] =~ s/\s// if($sub0[$i]);
     }
-    if (defined $defs{$tn}{timeCond}}) {
+    if (defined $defs{$tn}{timeCond}) {
       foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
         if (defined($defs{$tn}{timeCond}{$key}) and $defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
           $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
