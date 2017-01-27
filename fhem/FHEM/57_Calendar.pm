@@ -658,6 +658,8 @@ sub clear($) {
 
 package ICal::Entry;
 
+sub getNextMonthlyDateByDay($$$);
+
 sub new($$) {
   my $class= shift;
   my ($type)= @_;
