@@ -941,16 +941,28 @@ sub DOIFtools_Get($@)
       # event statistics
       my $regex = ReadingsVal($pn,"statisticsDeviceFilterRegex",".*");
       my $evtsum = 0;
+      my $evtlen = 15 + 2;
       my $rate = 0;
       my $typsum = 0;
+      my $typlen = 10 + 2;
       my $typerate = 0;
       my $allattr = "";
       my $rx = AttrVal($pn,"DOIFtoolsHideStatReadings","") ? "\.stat_" : "stat_";
-
-      $ret = "<b>".sprintf("%-17s","TYPE").sprintf("%-25s","Name").sprintf("%-12s","Anzahl").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Begrenzung</a>")."</b>\n";
-      $ret .= sprintf("%-17s","").sprintf("%-25s","").sprintf("%-12s","Events").sprintf("%-8s","1/h").sprintf("%-12s","event-on...")."\n";
-      $ret .= sprintf("-"x76)."\n";
       my $te = ReadingsVal($pn,".te",0)/3600;
+      my $compRate = ReadingsNum($pn,"statisticsShowRate_ge",0);
+      foreach my $typ ( keys %types) {
+        $typlen = length($typ)+2 > $typlen ? length($typ)+2 : $typlen;
+      }
+      foreach my $key (sort keys %{$defs{$pn}->{READINGS}}) {
+        $rate = ($te ? int($hash->{READINGS}{$key}{VAL}/$te + 0.5) : 0) if ($key =~ m/^$rx($regex)/);
+        if ($key =~ m/^$rx($regex)/ and $rate >= $compRate) {
+          $evtlen = length($1)+2 > $evtlen ? length($1)+2 : $evtlen;
+        }
+      }
+
+      $ret = "<b>".sprintf("%-".$typlen."s","TYPE").sprintf("%-".$evtlen."s","NAME").sprintf("%-12s","Anzahl").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Begrenzung</a>")."</b>\n";
+      $ret .= sprintf("%-".$typlen."s","").sprintf("%-".$evtlen."s","").sprintf("%-12s","Events").sprintf("%-8s","1/h").sprintf("%-12s","event-on...")."\n";
+      $ret .= sprintf("-"x($typlen+$evtlen+33))."\n";
       my $i = 0;
       my $t = 0;
       foreach my $typ (sort keys %types) {
@@ -958,38 +970,38 @@ sub DOIFtools_Get($@)
         $t=0;
         foreach my $key (sort keys %{$defs{$pn}->{READINGS}}) {
           $rate = ($te ? int($hash->{READINGS}{$key}{VAL}/$te + 0.5) : 0) if ($key =~ m/^$rx($regex)/ and defined($defs{$1}) and $defs{$1}->{TYPE} eq $typ);
-          if ($key =~ m/^$rx($regex)/ and defined($defs{$1}) and $defs{$1}->{TYPE} eq $typ and $rate >= ReadingsNum($pn,"statisticsShowRate_ge",0)) {
+          if ($key =~ m/^$rx($regex)/ and defined($defs{$1}) and $defs{$1}->{TYPE} eq $typ and $rate >= $compRate) {
               $evtsum += $hash->{READINGS}{$key}{VAL};
               $typsum += $hash->{READINGS}{$key}{VAL};
               $allattr = " ".join(" ",keys %{$attr{$1}});
-              $ret .= sprintf("%-17s",$typ).sprintf("%-25s",$1).sprintf("%-12s",$hash->{READINGS}{$key}{VAL}).sprintf("%-8s",$rate).sprintf("%-12s",($allattr =~ " event-on") ? "ja" : "nein")."\n";
+              $ret .= sprintf("%-".$typlen."s",$typ).sprintf("%-".$evtlen."s",$1).sprintf("%-12s",$hash->{READINGS}{$key}{VAL}).sprintf("%-8s",$rate).sprintf("%-12s",($allattr =~ " event-on") ? "ja" : "nein")."\n";
               $i++;
               $t++;
           }
         }
         if ($t) {
           $typerate = $te ? int($typsum/$te + 0.5) : 0;
-          if($typerate >= ReadingsNum($pn,"statisticsShowRate_ge",0)) {
-            $ret .= sprintf("%52s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
-            $ret .= sprintf("%42s","Summe: ").sprintf("%-10s",$typsum).sprintf("%2s","&empty;:").sprintf("%-8s",$typerate)."\n";
-            $ret .= sprintf("%43s","Geräte: ").sprintf("%-10s",$t)."\n";
-            $ret .= sprintf("%43s","Events/Gerät: ").sprintf("%-10s",int($typsum/$t + 0.5))."\n";
-            $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x71)."</div>";
+          if($typerate >= $compRate) {
+            $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
+            $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$typsum).sprintf("%2s","&empty;:").sprintf("%-8s",$typerate)."\n";
+            $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$t)."\n";
+            $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($typsum/$t + 0.5))."\n";
+            $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($typlen+$evtlen+33))."</div>";
           }
         }
       }
-      $ret .= sprintf("%52s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
-      $ret .= sprintf("%42s","Summe: ").sprintf("%-10s",$evtsum).sprintf("%2s","&empty;:").sprintf("%-8s",$te ? int($evtsum/$te + 0.5) : "")."\n";
-      $ret .= sprintf("%42s","Dauer: ").sprintf("%d:%02d",int($te),int(($te-int($te))*60+.5))."\n";
-      $ret .= sprintf("%43s","Geräte: ").sprintf("%-10s",$i)."\n";
-      $ret .= sprintf("%43s","Events/Gerät: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
+      $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
+      $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$evtsum).sprintf("%2s","&empty;:").sprintf("%-8s",$te ? int($evtsum/$te + 0.5) : "")."\n";
+      $ret .= sprintf("%".($typlen+$evtlen)."s","Dauer: ").sprintf("%d:%02d",int($te),int(($te-int($te))*60+.5))."\n";
+      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$i)."\n";
+      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
       fhem("count",1) =~ m/(\d+)/;
-      $ret .= sprintf("%43s","Geräte total: ").sprintf("%-10s","$1\n\n");
-      $ret .= sprintf("%43s","<u>Filter</u>\n");
-      $ret .= sprintf("%42s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
-      $ret .= sprintf("%35s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
-      $ret .= sprintf("%35s","Rate: ").sprintf("%-10s","&gt;= ".ReadingsVal($pn,"statisticsShowRate_ge","0")."\n\n");
-      $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x71)."</div>";
+      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte total: ").sprintf("%-10s","$1\n\n");
+      $ret .= sprintf("%".($typlen+$evtlen+1)."s","<u>Filter</u>\n");
+      $ret .= sprintf("%".($typlen+$evtlen)."s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
+      $ret .= sprintf("%".($typlen+$evtlen-7)."s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
+      $ret .= sprintf("%".($typlen+$evtlen-7)."s","Rate: ").sprintf("%-10s","&gt;= $compRate\n\n");
+      $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($typlen+$evtlen+33))."</div>";
       # attibute statistics
       $ret .= "<b>".sprintf("%-30s","gesetzte Attribute in DOIF").sprintf("%-12s","Anzahl")."</b>\n";
       $ret .= sprintf("-"x42)."\n";
@@ -1010,7 +1022,7 @@ sub DOIFtools_Get($@)
         }
       }
       foreach $i (sort keys %da) {
-        $ret .= sprintf("%-28s","$i").sprintf("%-12s","$da{$i}")."\n"; 
+        $ret .= sprintf("%-30s","$i").sprintf("%-12s","$da{$i}")."\n"; 
       }
   } elsif ($arg eq "checkDOIF") {
       my @coll = ();
@@ -1238,7 +1250,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <b>DOIFtoolsHideStatReadings</b> <b>1</b>, verstecken der <i>stat_</i> Readings. Das Ändern des Attributs löscht eine bestehende Event-Aufzeichnung. <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsEventOnDeleted &lt;0|1&gt;</code><br>
-        <b>DOIFtoolsEventOnDeleted</b> <b>1</b>, es werden Events für alle <i>stat_</i> erzeugt, bevor sie gelöscht werden. Damit könnten die erfassten Daten geloggt werden.  <b>Default 0</b>.<br>
+        <b>DOIFtoolsEventOnDeleted</b> <b>1</b>, es werden Events für alle <i>stat_</i> erzeugt, bevor sie gelöscht werden. Damit könnten die erfassten Daten geloggt werden. <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsMyShortcuts &lt;shortcut name&gt,&lt;command&gt;, ...</code><br>
         <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <a href="#menuEntries">menuEntries</a>.<br>
@@ -1269,7 +1281,8 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li><b>statisticShowRate_ge</b> zeigt die Event-Rate, ab der Geräte in die Auswertung einbezogen werden.</li>
     <li><b>statisticsDeviceFilterRegex</b> zeigt den aktuellen Gerätefilterausdruck an.</li>
     <li><b>statisticsTYPEs</b> zeigt eine Liste von <i>TYPE</i> an, für deren Geräte die Statistik erzeugt wird.</li>
-    <li><b>specialLog</b> zeigt an ob DOIF-Listing im Log eingeschaltet ist.</li>
+    <li><b>targetDOIF</b> zeigt das Ziel-DOIF, bei dem Readings gelöscht werden sollen.</li>
+    <li><b>targetDevice</b> zeigt das Ziel-Gerät, bei dem Readings gelöscht werden sollen.</li>
     </ul>
 </br>
 <a name="DOIFtoolsLinks"></a>

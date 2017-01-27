@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools.pm: dynamic column width in report
   - update:  98_DOIFtools.pm: add delete readings in other devices than DOIF
   - update:  88_HMCCU.pm: version 3.9
   - update: 98_DOIFtools.pm: marking an eventline in DOIFs event monitor
