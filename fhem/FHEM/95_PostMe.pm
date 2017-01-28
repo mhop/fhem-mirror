@@ -43,7 +43,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.01";
+my $postmeversion  = "2.03";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -65,7 +65,7 @@ sub PostMe_Initialize ($) {
   $hash->{UndefFn}     = "PostMe_Undef";  
   $hash->{InitFn}      = "PostMe_Init";  
   $hash->{AttrFn}      = "PostMe_Attr";
-  $hash->{AttrList}    = "postmeTTSFun postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec ".
+  $hash->{AttrList}    = "postmeTTSFun postmeTTSDev postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec ".
                          "postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 listseparator ".$readingFnAttributes;		
   
   $hash->{FW_detailFn}  = "PostMe_detailFn";
@@ -342,11 +342,20 @@ sub PostMe_Add($$@) {
      return "$mga";
    }
    my $raw = join(' ',@args);
+   
    #-- remove meta data
    my $item = $raw;
    $item =~ s/\[.*\]//g;
    $item =~ s/\]//g;
    $item =~ s/\[//g;
+   
+   #-- safety catch: No action when item empty
+   if( $item eq "" ){
+     my $mga = "Error, empty item given";
+     Log 1,"[PostMe_Add] $mga";
+     return "$mga";
+   }
+   
    #-- check old content
    my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
    my $ind  = index($old,$item);
@@ -389,6 +398,13 @@ sub PostMe_Remove($$@) {
    #-- remove meta data
    my $item = $raw;
    $item =~ s/\[.*\]//g;
+   
+   #-- safety catch: No action when item empty
+   if( $item eq "" ){
+     my $mga = "Error, empty item given";
+     Log 1,"[PostMe_Remove] $mga";
+     return "$mga";
+   }
    
    #-- get old content
    my $new  = "";
@@ -498,6 +514,13 @@ sub PostMe_Modify($$@) {
    my $attr = $args[1];
    splice(@args,0,2);
    my $val  = join(' ',@args);
+   
+   #-- safety catch: No action when item empty
+   if( $item eq "" ){
+     my $mga = "Error, empty item given";
+     Log 1,"[PostMe_Modify] $mga";
+     return "$mga";
+   }
    
    #-- check old content
    my $old  = ReadingsVal($devname, sprintf("postme%02dCont",$pmn),"");
@@ -1121,12 +1144,13 @@ sub PostMe_Get($$$@) {
       
     ##-- speak as TTS
     }elsif( $key eq "TTS" ){
+      my $dev  = AttrVal($devname,"postmeTTSDev",undef);
       my $text = $listname.": ".PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
       my $fun  = AttrVal($devname,"postmeTTSFun",undef);
       
       if( $text && $fun ){
         my $ref = \&$fun;
-        &$ref($text);
+        &$ref($dev,$text);
       }
       my $mga = "$listname spoken by TTS";
       readingsSingleUpdate($hash,"state",$mga,1 );
@@ -1593,7 +1617,7 @@ sub PostMe_widget($) {
             <li><code>attr &lt;postit&gt; postmeClick 1|0 (default)</code>
                 <br />If 0, embedded sticky notes will pop up on mouseover-events and vanish on mouseout-events (default).<br/>
                       If 1, embedded sticky notes will pop up on click events and vanish after closing the note</li>
-            <li><code>attr &lt;postit&gt; postmeicon &lt;string&gt;</code>
+            <li><code>attr &lt;postit&gt; postmeIcon &lt;string&gt;</code>
                 <br />Icon for display of a sticky note</li>
             <li><code>attr &lt;postit&gt; postmeStyle SVG|HTML|jQuery (default)</code>
                 <br />If jQuery, embedded sticky notes will produce jQuery code (default) <br/>
@@ -1609,14 +1633,20 @@ sub PostMe_widget($) {
                 <br />Function name for the eMail function.  This subroutine 
                 is called with three parameters for recipient, subject
                 and text.</li>
+            <li><code>attr &lt;postit&gt; postmeMailRec(01|02|...) &lt;string&gt;</code>
+                recipient addresses for the above eMail function (per PostMe).</li>
             <li><code>attr &lt;postit&gt; postmeMsgFun &lt;string&gt;</code>
                 <br />Function name for the instant messenger function.  This subroutine 
                 is called with three parameters for recipient, subject
                 and text.</li>
+             <li><code>attr &lt;postit&gt; postmeMsgRec(01|02|...) &lt;string&gt;</code>
+                recipient addresses for the above instant messenger function (per PostMe).</li>
             <li><code>attr &lt;postit&gt; postmeTTSFun &lt;string&gt;</code>
                 <br />Function name for the text-to-speech function.  This subroutine 
-                is called with only one parameter, the composite text.
+                is called with two parameters, the device name and the composite text.
                 </li>
+             <li><code>attr &lt;postit&gt; postmeTTSDev(01|02|...) &lt;string&gt;</code>
+                device name for the above TTS function.</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
