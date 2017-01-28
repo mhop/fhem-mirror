@@ -317,7 +317,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 
  ,"0101" => {name=>"HM-LC-Sw2PBU-FM"         ,alias=>"HM-LC-Sw2-FM-2"}
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
- ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw4-SM-2" }
+ ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw1-Pl-3" }
  ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim1_V:2:3"}
  ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"0106" => {name=>"HM-MOD-EM-8Bit"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
