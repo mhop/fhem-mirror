@@ -36,7 +36,7 @@ use lib '.';
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
-use Errno qw(:POSIX);
+use POSIX;
 
 ##################################################
 # Forward declarations
