@@ -9152,9 +9152,10 @@ sub CUL_HM_cleanShadowReg($){
   my $hash = $defs{$name};
   my $dirty = 0;
   foreach my $rLn (keys %{$hash->{helper}{shadowReg}}){ 
-    my $rLnP = ($hash->{helper}{expert}{raw}?"":".").$rLn;
-    if (  !$hash->{READINGS}{$rLnP} 
-        || $hash->{READINGS}{$rLnP}{VAL} eq $hash->{helper}{shadowReg}{$rLn}){   
+    my $rLnP = ($hash->{helper}{expert}{raw} ? "" : ".").$rLn;
+    if (   !$hash->{READINGS}{$rLnP}
+        || !$hash->{helper}{shadowReg}{$rLn}
+        ||  $hash->{helper}{shadowReg}{$rLn} eq $hash->{READINGS}{$rLnP}{VAL}){   
       delete $hash->{helper}{shadowReg}{$rLn};
     }
     else{
