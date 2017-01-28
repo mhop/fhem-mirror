@@ -86,7 +86,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout partial requestSeparator responseSeparator";
+  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout partial requestSeparator responseSeparator autoReopen";
 }
 
 #####################################
@@ -623,6 +623,19 @@ ECMD_Write($$$)
 {
   my ($hash,$msg,$expect) = @_;
   my $name= $hash->{NAME};
+  
+  my $lastWrite= defined($hash->{fhem}{".lastWrite"}) ? $hash->{fhem}{".lastWrite"} : 0;
+  my $now= gettimeofday();
+
+  my $autoReopen= AttrVal($name, "autoReopen", undef);
+  if(defined($autoReopen)) {
+    my ($timeout,$delay)= split(',',$autoReopen);
+    ECMD_Reopen($hash) if($now>$lastWrite+$timeout);
+    sleep($delay);
+  }
+    
+  $hash->{fhem}{".lastWrite"}= $now;
+  
   my $answer;
   my $ret= "";
   my $requestSeparator= $hash->{fhem}{".requestSeparator"};
@@ -801,6 +814,10 @@ ECMD_Write($$$)
     In order to identify the single responses from the device for each part of the command broken down by request separators, a response separator can be appended to the response to each single request. 
     The response separator is only appended to commands split by means of a
     request separator. The default is to have no response separator, i.e. responses are simply concatenated. Use a response separator that does not occur in the actual response.
+    </li>
+    <li>autoReopen &lt;timeout&gt;,&lt;delay&gt;<br>
+    If this attribute is set, the device is automatically reopened if no bytes were written for &lt;timeout&gt seconds or more. After reopening
+    FHEM waits &lt;delay&gt; seconds before writing to the device. Use the delay with care because it stalls FHEM completely.
     </li>
     <li><a href="#verbose">verbose</a></li>
   </ul>
