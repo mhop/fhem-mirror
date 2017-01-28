@@ -2160,7 +2160,8 @@ ZWave_mcCapability($$)
   my $id = $hash->{nodeIdHex};
 
   my @classes;
-  shift(@l); shift(@l); # Skip generic and specific class
+  my $genericClass  = shift(@l);
+  my $specificClass = shift(@l);
   for my $classId (@l) {
     push @classes, $zwave_id2class{lc($classId)} ?
         $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
@@ -2172,8 +2173,7 @@ ZWave_mcCapability($$)
     my $lcaps = substr($caps, 6);
     $id = hex($id);
     DoTrigger("global",
-              "UNDEFINED ZWave_$classes[0]_$id.$chid ZWave $homeId $lid $lcaps",
-              1);
+      "UNDEFINED ZWave_${genericClass}_$id.$chid ZWave $homeId $lid $lcaps", 1);
   }
 
   return "mcCapability_$chid:".join(" ", @classes);
@@ -2249,6 +2249,8 @@ ZWave_mfsParse($$$$$)
           if($config) {
             $ret = (($l =~ m/config\s*=\s*"([^"]*)"/) ? $1 : "unknown");
             ZWave_mfsAddClasses($hash, $1);
+            # execInits needs the modelId
+            setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
             ZWave_execInits($hash, 50, $ret);
             return "modelConfig:$ret";
           } else {
