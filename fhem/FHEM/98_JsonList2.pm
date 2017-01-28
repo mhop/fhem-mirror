@@ -36,12 +36,13 @@ JsonList2_dumpHash($$$$$$)
 {
   my ($arrp, $name, $h, $isReading, $si, $attr) = @_;
   my $ret = "";
+  my %filter;
+  @filter{ @$attr } = (undef) x @$attr if @$attr;
   
-  my @arr = grep { $si || $_ !~ m/^\./ } sort keys %{$h};
-  @arr = grep { !ref($h->{$_}) } @arr if(!$isReading);
-  if($attr) {
-    @arr = grep { $attr eq $_ } @arr;
-  }
+  my @arr = grep { $si || $_ !~ m/^\./ 
+                   and $isReading || !ref($h->{$_}) 
+                   and !%filter || exists $filter{$_} 
+                 } sort keys %{$h};
 
   for(my $i2=0; $i2 < @arr; $i2++) {
     my $k = $arr[$i2];
@@ -55,8 +56,7 @@ JsonList2_dumpHash($$$$$$)
     $ret .= "," if($i2 < int(@arr)-1);
     $ret .= "\n" if(int(@arr)>1);
   }
-  return if($attr && !$ret);
-  push(@{$arrp}, "    \"$name\": {".(int(@arr)>1 ? "\n" : "")."$ret    }");
+  push(@{$arrp}, "    \"$name\": {".(int(@arr)>1 ? "\n" : "")."$ret    }") if $ret;
 }
 
 #####################################
@@ -68,14 +68,13 @@ CommandJsonList2($$)
   my $ret;
   my $cnt=0;
   my $si = AttrVal("global", "showInternalValues", 0);
-  my $attr;
+  my @attr;
 
   $cl->{contenttype} = "application/json; charset=utf-8" if($cl);
 
   if($param) {
-    my @arg = split(" ", $param);
-    $attr = $arg[1];
-    @d = devspec2array($arg[0],$cl);
+    @attr = split(" ", $param);
+    @d = devspec2array(shift(@attr),$cl);
 
   } else {
     @d = devspec2array(".*", $cl);      # Needed for Authorization
@@ -96,13 +95,13 @@ CommandJsonList2($$)
     next if(!$h || !$n);
 
     my @r;
-    if(!$attr) {
+    if(!@attr) {
       push(@r,"    \"PossibleSets\":\"".JsonList2_Escape(getAllSets($n))."\"");
       push(@r,"    \"PossibleAttrs\":\"".JsonList2_Escape(getAllAttr($n))."\"");
     }
-    JsonList2_dumpHash(\@r, "Internals", $h,             0, $si, $attr);
-    JsonList2_dumpHash(\@r, "Readings",  $h->{READINGS}, 1, $si, $attr);
-    JsonList2_dumpHash(\@r, "Attributes",$attr{$d},      0, $si, $attr);
+    JsonList2_dumpHash(\@r, "Internals", $h,             0, $si, \@attr);
+    JsonList2_dumpHash(\@r, "Readings",  $h->{READINGS}, 1, $si, \@attr);
+    JsonList2_dumpHash(\@r, "Attributes",$attr{$d},      0, $si, \@attr);
 
     next if(!@r);
     $ret .= ",\n" if($cnt);
@@ -130,7 +129,7 @@ CommandJsonList2($$)
 <a name="JsonList2"></a>
 <h3>JsonList2</h3>
 <ul>
-  <code>jsonlist [&lt;devspec&gt;] [&lt;value&gt;]</code>
+  <code>jsonlist [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
   <br><br>
   This is a command, to be issued on the command line (FHEMWEB or telnet
   interface). Can also be called via HTTP by
@@ -139,7 +138,7 @@ CommandJsonList2($$)
   </ul>
   Returns an JSON tree of the internal values, readings and attributes of the
   requested definitions.<br>
-  If value is specified, then output only the corresponding internal (like DEF,
+  If valueX is specified, then output only the corresponding internal (like DEF,
   TYPE, etc), reading (actuator, measured-temp) or attribute for all devices
   from the devspec.<br><br>
   <b>Note</b>: the old command jsonlist (without the 2 as suffix) is deprecated
@@ -153,7 +152,7 @@ CommandJsonList2($$)
 <a name="JsonList2"></a>
 <h3>JsonList2</h3>
 <ul>
-  <code>jsonlist [&lt;devspec&gt;]</code>
+  <code>jsonlist [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
   <br><br>
   Dieses Befehl sollte in der FHEMWEB oder telnet Eingabezeile ausgef&uuml;hrt
   werden, kann aber auch direkt &uuml;ber HTTP abgerufen werden &uuml;ber 
@@ -163,7 +162,7 @@ CommandJsonList2($$)
   Es liefert die JSON Darstellung der internen Variablen, Readings und
   Attribute zur&uuml;ck.<br>
 
-  Wenn value angegeben ist, dann wird nur der entsprechende Internal (DEF,
+  Wenn valueX angegeben ist, dann wird nur der entsprechende Internal (DEF,
   TYPE, usw), Reading (actuator, measured-temp) oder Attribut
   zur&uuml;ckgeliefert f&uuml;r alle Ger&auml;te die in devspec angegeben sind.
   <br><br>
