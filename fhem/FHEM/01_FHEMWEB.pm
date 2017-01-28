@@ -852,6 +852,13 @@ FW_answerCall($)
       #Returns undef as FW_RETTYPE if it already sent a HTTP header
       no strict "refs";
       ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
+      if(defined($FW_RETTYPE) && $FW_RETTYPE =~ m,text/html,) {
+        my $dataAttr =
+          "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
+          "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+          "data-webName='$FW_wname '";
+        $FW_RET =~ s/<body/<body $dataAttr/;
+      }
       use strict "refs";
       return defined($FW_RETTYPE) ? 0 : -1;
     }
@@ -971,7 +978,12 @@ FW_answerCall($)
   my $gen = 'generated="'.(time()-1).'"';
   my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
   $FW_id = $FW_chash->{NR} if( !$FW_id );
-  FW_pO "</head>\n<body name=\"$t\" fw_id=\"$FW_id\" $gen $lp $csrf>";
+
+  my $dataAttr =
+    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
+    "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+    "data-webName='$FW_wname '";
+  FW_pO "</head>\n<body name='$t' fw_id='$FW_id' $gen $lp $csrf $dataAttr>";
 
   if($FW_activateInform) {
     $cmd = "style eventMonitor $FW_activateInform";
@@ -1037,10 +1049,7 @@ sub
 FW_addContent(;$)
 {
   my $add = ($_[0] ? " $_[0]" : "");
-  FW_pO "<div id='content' ".
-        "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
-        "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
-        "data-webName='$FW_wname'$add>";
+  FW_pO "<div id='content' $add>";
 }
 
 sub

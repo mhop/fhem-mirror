@@ -35,7 +35,7 @@ window.onbeforeunload = function(e)
 window.onerror = function(errMsg, url, lineno)
 {
   url = url.replace(/.*\//,'');
-  if($("div#content").attr("data-confirmJSError") != 0)
+  if($("body").attr("data-confirmJSError") != 0)
     FW_okDialog(url+" line "+lineno+":<br>"+errMsg);
 }
 
@@ -252,12 +252,12 @@ FW_filterIcons()
 function
 FW_confirmDelete()
 {
-  var d = $("div#content");
-  var cd = $(d).attr("data-confirmDelete");
+  var b = $("body");
+  var cd = $(b).attr("data-confirmDelete");
   if(!cd || cd == 0)
     return;
-  var wn = $(d).attr("data-webName");
-  $(d).find("a").each(function(){
+  var wn = $(b).attr("data-webName");
+  $("div#content").find("a").each(function(){
     var href = $(this).attr("href");
     if(!href)
       return;
