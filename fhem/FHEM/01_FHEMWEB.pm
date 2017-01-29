@@ -3374,6 +3374,9 @@ FW_widgetOverride($$)
           Styles:$FW_cssdir:^.*(css|svg)$<br>
         </code>
         </ul>
+        NOTE: The directory spec is not flexible: all .js/.css/_defs.svg files
+        come from www/pgm2 ($FW_cssdir), .gplot files from $FW_gplotdir
+        (www/gplot), everything else from $MW_dir (FHEM).
         </li><br>
 
     <a name="endPlotNow"></a>
@@ -4108,6 +4111,9 @@ FW_widgetOverride($$)
           Styles:$FW_cssdir:^.*(css|svg)$<br>
         </code>
         </ul>
+        Achtung: die Verzeichnis Angabe ist nicht flexibel: alle
+        .js/.css/_defs.svg Dateien sind in www/pgm2 ($FW_cssdir), .gplot
+        Dateien in $FW_gplotdir (www/gplot), alles andere in $MW_dir (FHEM).
         </li><br>
 
     <a name="endPlotNow"></a>
