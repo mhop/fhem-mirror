@@ -152,6 +152,11 @@ sub weekprofile_readDayProfile($@)
   
   for(my $i = 0; $i < scalar(@temps); $i+=1){
     $temps[$i] =~s/[^\d.]//g; #only numbers
+    my $tempON = AttrVal($me, "tempON", undef);
+    my $tempOFF = AttrVal($me, "tempOFF", undef);
+  
+    $temps[$i] =~s/$tempOFF/off/g if (defined($tempOFF)); # temp off
+    $temps[$i] =~s/$tempON/on/g   if (defined($tempON));  # temp on
   }
   
   for(my $i = 0; $i < scalar(@times); $i+=1){
@@ -417,7 +422,7 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 tempON tempOFF configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -1048,6 +1053,8 @@ sub weekprofile_SummaryFn()
   my $editNewpage = AttrVal($d, "widgetEditOnNewPage", 0);
   my $useTopics = AttrVal($d, "useTopics", 0);
   my $editDaysInRow = AttrVal($d, "widgetEditDaysInRow", undef);
+  my $tempON = AttrVal($d, "tempON", undef);
+  my $tempOFF = AttrVal($d, "tempOFF", undef);
   
   my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
   $editIcon = "<a name=\"$d.edit\" onclick=\"weekprofile_DoEditWeek('$d','$editNewpage')\" href=\"javascript:void(0)\">$editIcon</a>";
@@ -1059,8 +1066,10 @@ sub weekprofile_SummaryFn()
   
   my $args = "weekprofile,MODE:SHOW";
   $args .= ",USETOPICS:$useTopics";
-  $args .= ",MASTERDEV:$masterDev" if (defined($masterDev));
+  $args .= ",MASTERDEV:$masterDev"    if (defined($masterDev));
   $args .= ",DAYINROW:$editDaysInRow" if (defined($editDaysInRow));
+  $args .= ",TEMP_ON:$tempON"         if (defined($tempON));
+  $args .= ",TEMP_OFF:$tempOFF"       if (defined($tempOFF));
   
   my $curr = "";
   if (@{$hash->{PROFILES}} > 0)
@@ -1309,6 +1318,12 @@ sub weekprofile_getEditLNK_MasterDev($$)
       Enable topics.<br>
       Default: 0
     </li>
+    <li>tempON<br>
+      Temperature for 'on'. e.g. 30
+    </li>
+    <li>tempOFF<br>
+      Temperature for 'off'. e.g. 4
+    </li>
   </ul>
   
 </ul>
@@ -1454,6 +1469,12 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
     <li>useTopics<br>
       Verwendung von Topic aktivieren.
+    </li>
+    <li>tempON<br>
+      Temperature für 'on'. z.B. 30
+    </li>
+    <li>tempOFF<br>
+      Temperature für 'off'. z.B. 4
     </li>
   </ul>
   

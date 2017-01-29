@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_weekprofile: attributes for temperature 'on' and 'off'
   - feature: 98_BOSEST: NEW REQUIREMENT sox, libsox-fmt-mp3 for TTS
   - feature: 98_BOSEST: support more than 100 chars for TTS
   - bugfix:  98_BOSEST: several TTS and Spotify bugfixes

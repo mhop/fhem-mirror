@@ -545,11 +545,25 @@ function FW_weekprofileEditDay(widget,day)
     html += "<td><input type=\"text\" name=\"ENDTIME\" size=\"5\" maxlength=\"5\" align=\"center\" value=\""+endTime+"\" onblur=\"FW_weekprofileEditTime_changed(this)\"/></td>"; 
     
     //temp
+    var tempOn = widget.TEMP_ON;
+    var tempOff = widget.TEMP_OFF;
+    
+    if (tempOn == null)
+      tempOn = 30;
+    
+    if (tempOff == null)
+      tempOff = 5;
+    
     html += "<td><select name=\"TEMP\" size=\"1\" onchange=\"FW_weekprofileTemp_chached(this)\">";
-    for (var k=5; k <= 30; k+=.5)
+    for (var k=tempOff; k <= tempOn; k+=.5)
     {
         var selected = (k == temps[i]) ? "selected " : "";
-        html += "<option "+selected+"value=\""+k.toFixed(1)+"\">"+k.toFixed(1)+"</option>";
+        if (k == widget.TEMP_OFF)
+          html += "<option "+selected+"value=\"off\">off</option>";
+        else if (k == widget.TEMP_ON)
+          html += "<option "+selected+"value=\"on\">on</option>";
+        else
+          html += "<option "+selected+"value=\""+k.toFixed(1)+"\">"+k.toFixed(1)+"</option>";
     }
     html += "</select></td>";    
     //ADD-Button
@@ -787,6 +801,8 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   widget.JMPBACK = null;
   widget.MODE = 'SHOW';
   widget.USETOPICS = 0;
+  widget.TEMP_ON = null;
+  widget.TEMP_OFF = null;
 
   for (var i = 1; i < vArr.length; ++i) {
     var arg = vArr[i].split(':');
@@ -796,6 +812,8 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
       case "MASTERDEV": widget.MASTERDEV = arg[1];      break;
       case "USETOPICS": widget.USETOPICS = arg[1];      break;
       case "DAYINROW":  widget.EDIT_DAYSINROW = arg[1]; break;
+      case "TEMP_ON":   widget.TEMP_ON = parseFloat(arg[1]); break;
+      case "TEMP_OFF":  widget.TEMP_OFF = parseFloat(arg[1]);break;
     }
   }
   
