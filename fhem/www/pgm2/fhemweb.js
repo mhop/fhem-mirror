@@ -899,7 +899,8 @@ FW_longpoll()
   } else {
     FW_pollConn = new XMLHttpRequest();
     FW_pollConn.open("GET", location.pathname+query, true);
-    FW_pollConn.overrideMimeType("application/json");
+    if(FW_pollConn.overrideMimeType)    // Win 8.1, #66004
+      FW_pollConn.overrideMimeType("application/json");
     FW_pollConn.onreadystatechange = FW_doUpdate;
     FW_pollConn.send(null);
 
