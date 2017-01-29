@@ -4364,7 +4364,7 @@ sub Unit_DbLog_split($$) {
           formatReading( $name, $reading, "" );
 
         if ( defined($txt) && defined($reading) && defined($val) ) {
-            $txt =~ s/\s*$val\s*//;
+            $txt =~ s/[\s\u202F\u00A0]*$val[\s\u202F\u00A0]*//;
             $value = $val;
             if ( !looks_like_number($val) && defined($val_num) ) {
                 if ( ref($val_num) eq "ARRAY" ) {
