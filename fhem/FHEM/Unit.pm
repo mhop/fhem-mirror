@@ -3232,7 +3232,7 @@ sub replaceTemplate ($$$$;$) {
             "replaceTemplate $device $reading: RAttr txt: replacing '%$k%'" );
     }
 
-    return ($txt) if ( !wantarray );
+    return ($txt) unless (wantarray);
 
     ###############################
     # generate long text string in plural
@@ -3310,10 +3310,18 @@ sub replaceTemplate ($$$$;$) {
 
     }
 
+    my $unit =
+      $desc->{symbol} ? $desc->{symbol}
+      : (
+        $desc->{suffix} ? $desc->{suffix}
+        : ( $desc->{txt} ? $desc->{txt} : undef )
+      );
+
     $txt      = Encode::encode_utf8($txt)      if ( defined($txt) );
     $txt_long = Encode::encode_utf8($txt_long) if ( defined($txt_long) );
+    $unit     = Encode::encode_utf8($unit)     if ( defined($unit) );
 
-    return ( $txt, $txt_long );
+    return ( $txt, $txt_long, $unit );
 }
 
 sub Unit_verifyValueNumber($$) {
@@ -3841,7 +3849,7 @@ sub formatValue($$$;$$$$) {
     $desc->{value}{$lang} = $value;
     $desc->{value_num} = $value_num if ( defined($value_num) );
 
-    my ( $txt, $txt_long ) =
+    my ( $txt, $txt_long, $unit ) =
       replaceTemplate( $device, $reading, $desc, $lang, $value );
 
     $desc->{value_txt}{$lang}      = $txt;
@@ -3851,7 +3859,7 @@ sub formatValue($$$;$$$$) {
       if (!defined($txt_long)
         && defined( $desc->{value_txt_long}{$lang} ) );
 
-    return ( $txt, $txt_long, $value, $value_num ) if (wantarray);
+    return ( $txt, $txt_long, $value, $value_num, $unit ) if (wantarray);
     return $value
       if ( ( defined( $desc->{showUnits} ) && $desc->{showUnits} eq "2" )
         || AttrVal( $device, "showUnits", 1 ) eq "2" );
@@ -4352,20 +4360,28 @@ sub Unit_DbLog_split($$) {
     elsif ( $event =~ /^(.+): +(\S+) *(.*)/ ) {
         $reading = $1;
 
-        my ( $txt, $txt_long, $val, $val_num ) =
+        my ( $txt, $txt_long, $val, $val_num, $symbol ) =
           formatReading( $name, $reading, "" );
 
         if ( defined($txt) && defined($reading) && defined($val) ) {
             $txt =~ s/\s*$val\s*//;
-            $txt_long =~ s/\s*$val\s*//;
-            $value = defined($val_num) ? $val_num : $val;
-            $unit = "$txt";
+            $value = $val;
+            if ( !looks_like_number($val) && defined($val_num) ) {
+                if ( ref($val_num) eq "ARRAY" ) {
+                    $value = $val_num->[1];
+                }
+                else {
+                    $value = $val_num;
+                }
+            }
+            $unit = defined($symbol) ? $symbol : $txt;
         }
     }
 
     # general event handling
-    if (   !defined($value)
-        && $event =~ /^(.+): +(\S+) *[\[\{\(]? *([\w\°\%\^\/\\]*).*/
+    if ( !defined($value)
+        && $event =~
+/^(.+): +[\D]*(\d+\.?\d*)[\s\u202F\u00A0]*[\[\{\(]?[\s\u202F\u00A0]*([\w\°\%\^\/\\]*).*/
         && defined($1)
         && defined($2) )
     {
