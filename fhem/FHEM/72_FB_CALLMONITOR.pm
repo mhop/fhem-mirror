@@ -253,6 +253,7 @@ FB_CALLMONITOR_Set($@)
     push @sets, "rereadCache" if(defined(AttrVal($name, "reverse-search-cache-file" , undef)));
     push @sets, "rereadTextfile" if(defined(AttrVal($name, "reverse-search-text-file" , undef)));
     push @sets, "password" if($hash->{helper}{PWD_NEEDED});
+    push @sets, "reopen" if($hash->{FD});
     
     $usage = "Unknown argument ".$a[1].", choose one of ".join(" ", @sets) if(scalar @sets > 0);
     
@@ -276,6 +277,12 @@ FB_CALLMONITOR_Set($@)
         return FB_CALLMONITOR_storePassword($hash, $a[2]) if($hash->{helper}{PWD_NEEDED});
         Log3 $name, 2, "FB_CALLMONITOR ($name) - SOMEONE UNWANTED TRIED TO SET A NEW FRITZBOX PASSWORD!!!";
         return "I didn't ask for a password, so go away!!!"
+    }
+    elsif($a[1] eq "reopen")
+    {
+        DevIo_CloseDev($hash);
+        DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback);
+        return undef;
     }
     else
     {
@@ -1850,6 +1857,7 @@ sub FB_CALLMONITOR_encrypt($$)
   <a name="FB_CALLMONITOR_set"></a>
   <b>Set</b>
   <ul>
+  <li><b>reopen</b> - close and reopen the connection</li>
   <li><b>rereadCache</b> - Reloads the cache file if configured (see attribute: <a href="#FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Reloads the FritzBox phonebook (from given file, via telnet or directly if available)</li>
   <li><b>rereadTextfile</b> - Reloads the user given textfile if configured (see attribute: <a href="#FB_CALLMONITOR_reverse-search-text-file">reverse-search-text-file</a>)</li>
@@ -2003,6 +2011,7 @@ sub FB_CALLMONITOR_encrypt($$)
   <a name="FB_CALLMONITOR_set"></a>
   <b>Set-Kommandos</b>
   <ul>
+  <li><b>reopen</b> - schliesst die Verbindung zur FritzBox und &ouml;ffnet sie erneut</li>
   <li><b>rereadCache</b> - Liest den Cache aus der Datei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei, Telnet oder direkt lokal)</li>
   <li><b>rereadTextfile</b> - Liest die nutzereigene Textdatei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#FB_CALLMONITOR_reverse-search-text-file">reverse-search-text-file</a>)</li>

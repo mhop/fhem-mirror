@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not ins  - feature: 66_ECMD: new attribute autoReopen
-
+# Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: new set command "reopen"
+  - feature: 66_ECMD: new attribute autoReopen
   - update: 74_AMAD: Version 2.6.8 new feature sendSMS
   - feature: 66_ECMD: new attribute autoReopen
   - bugfix: 98_DOIFtools.pm: fixed bug from last change
