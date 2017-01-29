@@ -1,14 +1,29 @@
 #############################################################
 #
-# EQ3BT.pm (c) by Dominik Karall, 2016
+# EQ3BT.pm (c) by Dominik Karall, 2016-2017
 # dominik karall at gmail dot com
 # $Id$
 #
 # FHEM module to communicate with EQ-3 Bluetooth thermostats
 #
-# Version: 1.1.3
+# Version: 2.0.0
 #
 #############################################################
+#
+# v2.0.0 - 20170129
+# - FEATURE: use all available bluetooth interfaces to communicate
+#            with the bluetooth thermostat
+# - FEATURE: new reading bluetoothDevice (shows used hci device)
+# - CHANGE:  change maximum retries to 20
+# - FEATURE: new set function resetErrorCounters
+# - FEATURE: new set function resetConsumption (not today/yesterday)
+# - FEATURE: new reading lastChangeBy FHEM or thermostat
+#            indicates who was responsible for the last change
+# - FEATURE: support $readingFnAttributes
+# - FEATURE: add VERSION internal and log output
+# - CHANGE:  updateStatus is now 3min intervall starting from
+#            last working updateStatus
+# - BUGFIX:  do not run parallel gatttool commands for the same device
 #
 # v1.1.3 - 20161211
 # - BUGFIX:  better error handling if no notification was received
@@ -102,6 +117,7 @@
 # set tempconf       17 comfort*2 eco*2
 #
 # TODOs
+# - create virtual device (wohnzimmer)
 # - read/set eco/comfort temperature
 # - read/set tempOffset
 # - read/set windowOpen time settings
@@ -126,6 +142,7 @@ sub EQ3BT_Initialize($) {
     $hash->{GetFn}    = 'EQ3BT_Get';
     $hash->{SetFn}    = 'EQ3BT_Set';
     $hash->{AttrFn}   = 'EQ3BT_Attribute';
+    $hash->{AttrList}  = $readingFnAttributes;
     
     return undef;
 }
@@ -138,6 +155,8 @@ sub EQ3BT_Define($$) {
     my $mac;
     
     $hash->{STATE} = "initialized";
+    $hash->{VERSION} = "2.0.0";
+    Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 3) {
         return 'EQ3BT: Wrong syntax, must be define <name> EQ3BT <mac address>';
@@ -146,12 +165,29 @@ sub EQ3BT_Define($$) {
         $hash->{MAC} = $a[2];
     }
     
+    EQ3BT_updateHciDevicelist($hash);
+    
     BlockingCall("EQ3BT_pairDevice", $name."|".$hash->{MAC});
     
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+60, "EQ3BT_updateStatusWithTimer", $hash, 0);
-    InternalTimer(gettimeofday()+20, "EQ3BT_updateSystemInformationWithTimer", $hash, 0);
+    InternalTimer(gettimeofday()+60, "EQ3BT_updateStatus", $hash, 0);
+    InternalTimer(gettimeofday()+20, "EQ3BT_updateSystemInformation", $hash, 0);
     
+    return undef;
+}
+
+sub EQ3BT_updateHciDevicelist {
+    my ($hash) = @_;
+    #check for hciX devices
+    $hash->{helper}{hcidevices} = ();
+    my @btDevices = split("\n", qx(hcitool dev));
+    foreach my $btDevLine (@btDevices) {
+        if($btDevLine =~ /hci(.)/) {
+            push(@{$hash->{helper}{hcidevices}}, $1);
+        }
+    }
+    $hash->{helper}{currenthcidevice} = 0;
+    readingsSingleUpdate($hash, "bluetoothDevice", "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}], 1);
     return undef;
 }
 
@@ -184,9 +220,9 @@ sub EQ3BT_Set($@) {
     #
     my ($hash, $name, @params) = @_;
     my $workType = shift(@params);
-    my $list = "desiredTemperature:slider,4.5,0.5,29.5,1 updateStatus:noArg boost:on,off mode:manual,automatic eco:noArg comfort:noArg";
-    #my $list = "desiredTemperature:slider,5,0.5,30,1 boost daymode nightmode childlock holidaymode datetime window program";
-    
+    my $list = "desiredTemperature:slider,4.5,0.5,29.5,1 updateStatus:noArg boost:on,off mode:manual,automatic eco:noArg comfort:noArg ".
+               "resetErrorCounters:noArg resetConsumption:noArg";
+
     # check parameters for set function
     if($workType eq "?") {
         return SetExtensions($hash, $list, $name, $workType, @params);
@@ -209,6 +245,10 @@ sub EQ3BT_Set($@) {
         EQ3BT_setEco($hash);
     } elsif($workType eq "comfort") {
         EQ3BT_setComfort($hash);
+    } elsif($workType eq "resetErrorCounters") {
+        EQ3BT_setResetErrorCounters($hash);
+    } elsif($workType eq "resetConsumption") {
+        EQ3BT_setResetConsumption($hash);
     } elsif($workType eq "childlock") {
         return "EQ3BT: childlock requires on/off as additional parameter" if(int(@params) < 1);
         EQ3BT_setChildlock($hash, $params[0]);
@@ -230,6 +270,26 @@ sub EQ3BT_Set($@) {
     return undef;
 }
 
+### resetErrorCounters ###
+sub EQ3BT_setResetErrorCounters {
+    my ($hash) = @_;
+    
+    foreach my $reading (keys %{ $hash->{READINGS} }) {
+        if($reading =~ /errorCount-.*/) {
+            readingsSingleUpdate($hash, $reading, 0, 1);
+        }
+    }
+
+    return undef;
+}
+
+### resetConsumption ###
+sub EQ3BT_setResetConsumption {
+    my ($hash) = @_;
+    readingsSingleUpdate($hash, "consumption", 0, 1);
+    return undef;
+}
+
 ### updateSystemInformation ###
 sub EQ3BT_updateSystemInformation {
     my ($hash) = @_;
@@ -237,16 +297,9 @@ sub EQ3BT_updateSystemInformation {
     $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|updateSystemInformation|0x0411|00|listen", "EQ3BT_processGatttoolResult", 300, "EQ3BT_killGatttool", $hash);
 }
 
-sub EQ3BT_updateSystemInformationWithTimer {
-    my ($hash) = @_;
-    EQ3BT_updateSystemInformation($hash);
-    InternalTimer(gettimeofday()+7200+int(rand(180)), "EQ3BT_updateSystemInformation", $hash, 0);
-    return undef;
-}
-
 sub EQ3BT_updateSystemInformationSuccessful {
     my ($hash, $handle, $value) = @_;
-    
+    InternalTimer(gettimeofday()+7200+int(rand(180)), "EQ3BT_updateSystemInformation", $hash, 0);
     return undef;
 }
 
@@ -256,15 +309,13 @@ sub EQ3BT_updateSystemInformationRetry {
     return undef;
 }
 
-### updateStatus ###
-sub EQ3BT_updateStatusWithTimer {
+sub EQ3BT_updateSystemInformationFailed {
     my ($hash) = @_;
-    
-    EQ3BT_updateStatus($hash);
-    
-    InternalTimer(gettimeofday()+160+int(rand(20)), "EQ3BT_updateStatusWithTimer", $hash, 0);
+    InternalTimer(gettimeofday()+7000+int(rand(180)), "EQ3BT_updateSystemInformation", $hash, 0);
+    return undef;
 }
 
+### updateStatus ###
 sub EQ3BT_updateStatus {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -273,13 +324,19 @@ sub EQ3BT_updateStatus {
 
 sub EQ3BT_updateStatusSuccessful {
     my ($hash, $handle, $value) = @_;
-    
+    InternalTimer(gettimeofday()+140+int(rand(60)), "EQ3BT_updateStatus", $hash, 0);
     return undef;
 }
 
 sub EQ3BT_updateStatusRetry {
     my ($hash) = @_;
     EQ3BT_updateStatus($hash);
+    return undef;
+}
+
+sub EQ3BT_updateStatusFailed {
+    my ($hash, $handle, $value) = @_;
+    InternalTimer(gettimeofday()+170+int(rand(60)), "EQ3BT_updateStatus", $hash, 0);
     return undef;
 }
 
@@ -297,7 +354,7 @@ sub EQ3BT_setDesiredTemperature($$) {
 sub EQ3BT_setDesiredTemperatureSuccessful {
     my ($hash, $handle, $tempVal) = @_;
     my $temp = (hex($tempVal) - 0x4100) / 2;
-    readingsSingleUpdate($hash, "desiredTemperature", $temp, 1);
+    readingsSingleUpdate($hash, "desiredTemperature", sprintf("%.1f", $temp), 1);
     return undef;
 }
 
@@ -407,6 +464,7 @@ sub EQ3BT_execGatttool($) {
     my ($string) = @_;
     my ($name, $mac, $workType, $handle, $value, $listen) = split("\\|", $string);
     my $wait = 1;
+    my $hash = $main::defs{$name};
     
     my $gatttool = qx(which gatttool);
     chomp $gatttool;
@@ -415,25 +473,26 @@ sub EQ3BT_execGatttool($) {
         my $gtResult;
 
         while($wait) {
-            my $grepGatttool = qx(ps ax| grep \'hcitool\' | grep -v grep);
+            my $grepGatttool = qx(ps ax| grep -E \'gatttool -b $mac\' | grep -v grep);
             if(not $grepGatttool =~ /^\s*$/) {
                 #another gattool is running
-                Log3 $name, 5, "EQ3BT ($name): another hcitool process is running. waiting...";
+                Log3 $name, 5, "EQ3BT ($name): another gatttool process is running. waiting...";
                 sleep(1);
             } else {
                 $wait = 0;
             }
         }
-        
+
         if($value eq "03") {
             my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
             my $currentDate = sprintf("%02X%02X%02X%02X%02X", $year+1900-2000, $mon+1, $mday, $hour, $min);
             $value .= $currentDate;
         }
-        
-        my $cmd = "gatttool -b $mac --char-write-req --handle=$handle --value=$value";
+
+        my $hciDevice = "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}];
+        my $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
         if(defined($listen) && $listen eq "listen") {
-            $cmd = "timeout 5 ".$cmd." --listen";
+            $cmd = "timeout 15 ".$cmd." --listen";
         }
         
         #redirect stderr to stdout
@@ -478,6 +537,8 @@ sub EQ3BT_processGatttoolResult($) {
     my $value = $a[5];
     my $notification = $a[6];
     
+    delete($hash->{helper}{RUNNING_PID});
+    
     Log3 $hash, 5, "EQ3BT ($name): gatttool return string: $string";
     
     $hash->{helper}{"handle$workType"} = $handle;
@@ -489,11 +550,15 @@ sub EQ3BT_processGatttoolResult($) {
         if(defined($notification)) {
             EQ3BT_processNotification($hash, $notification);
         }
+        if($workType =~ /set.*/) {
+            readingsSingleUpdate($hash, "lastChangeBy", "FHEM", 1);
+        }
         #call WorkTypeSuccessful function
         my $call = "EQ3BT_".$workType."Successful";
-        #FIXME otherwise temperature is not set after successfull write
         no strict "refs";
-        &{$call}($hash, $handle, $value);
+        eval {
+            &{$call}($hash, $handle, $value);
+        };
         use strict "refs";
         RemoveInternalTimer($hash, "EQ3BT_".$workType."Retry");
         $hash->{helper}{"retryCounter$workType"} = 0;
@@ -501,13 +566,38 @@ sub EQ3BT_processGatttoolResult($) {
         $hash->{helper}{"retryCounter$workType"} = 0 if(!defined($hash->{helper}{"retryCounter$workType"}));
         $hash->{helper}{"retryCounter$workType"}++;
         Log3 $hash, 4, "EQ3BT ($name): $workType failed ($handle, $value, $notification)";
-        if ($hash->{helper}{"retryCounter$workType"} > 30) {
+        if ($hash->{helper}{"retryCounter$workType"} > 20) {
             my $errorCount = ReadingsVal($hash->{NAME}, "errorCount-$workType", 0);
             readingsSingleUpdate($hash, "errorCount-$workType", $errorCount+1, 1);
-            Log3 $hash, 3, "EQ3BT ($name): $workType, $handle, $value failed 30 times.";
+            Log3 $hash, 3, "EQ3BT ($name): $workType, $handle, $value failed 20 times.";
             $hash->{helper}{"retryCounter$workType"} = 0;
+            $hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}} = 0;
+            #call WorkTypeFailed function
+            my $call = "EQ3BT_".$workType."Failed";
+            no strict "refs";
+            eval {
+                &{$call}($hash, $handle, $value);
+            };
+            use strict "refs";
+            
+            #update hci devicelist
+            EQ3BT_updateHciDevicelist($hash);
         } else {
-            InternalTimer(gettimeofday()+5, "EQ3BT_".$workType."Retry", $hash, 0);
+            $hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}} = 0 if(!defined($hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}}));
+            $hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}}++;
+            if ($hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}} > 7) {
+                #reset error counter
+                $hash->{helper}{"retryCounterHci".$hash->{helper}{currenthcidevice}} = 0;
+                #use next hci device next time
+                $hash->{helper}{currenthcidevice} += 1;
+                my $maxHciDevices = @{ $hash->{helper}{hcidevices} } - 1;
+                if($hash->{helper}{currenthcidevice} > $maxHciDevices) {
+                    $hash->{helper}{currenthcidevice} = 0;
+                }
+                #update reading
+                readingsSingleUpdate($hash, "bluetoothDevice", "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}], 1);
+            }
+            InternalTimer(gettimeofday()+3+int(rand(5)), "EQ3BT_".$workType."Retry", $hash, 0);
         }
     }
     
@@ -558,29 +648,42 @@ sub EQ3BT_processNotification {
         my $consumptionTodaySecSinceLastChange = ReadingsAge($hash->{NAME}, "consumptionToday", 0);
         my $oldVal = ReadingsVal($hash->{NAME}, "valvePosition", 0);
         my $consumptionDiff = 0;
-        if($timeSinceLastChange < 300) {
+        if($timeSinceLastChange < 600) {
             $consumptionDiff += ($oldVal + $pct) / 2 * $timeSinceLastChange / 3600;
         }
-        
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "consumption", sprintf("%.3f", $consumption+$consumptionDiff));
+
         my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time);
         if($consumptionTodaySecSinceLastChange > ($hour*3600+$min*60+$sec)) {
             readingsSingleUpdate($hash, "consumptionYesterday", $consumptionToday + $consumptionDiff/2, 1);
             readingsSingleUpdate($hash, "consumptionToday", 0 + $consumptionDiff/2, 1);
         } else {
-            readingsSingleUpdate($hash, "consumptionToday", sprintf("%.3f", $consumptionToday+$consumptionDiff), 1);
+            EQ3BT_readingsSingleUpdateIfChanged($hash, "consumptionToday", sprintf("%.3f", $consumptionToday+$consumptionDiff));
         }
 
+        readingsSingleUpdate($hash, "valvePosition", $pct, 1);
+        #changes below this line will set lastchangeby
         readingsSingleUpdate($hash, "windowOpen", $wndOpen, 1);
         readingsSingleUpdate($hash, "ecoMode", $eco, 1);
         readingsSingleUpdate($hash, "battery", $batteryStr, 1);
         readingsSingleUpdate($hash, "boost", $isBoost, 1);
-        readingsSingleUpdate($hash, "consumption", sprintf("%.3f", $consumption+$consumptionDiff), 1);
         readingsSingleUpdate($hash, "mode", $modeStr, 1);
-        readingsSingleUpdate($hash, "valvePosition", $pct, 1);
-        readingsSingleUpdate($hash, "desiredTemperature", $temp, 1);
+        readingsSingleUpdate($hash, "desiredTemperature", sprintf("%.1f", $temp), 1);
     }
     
     return undef;
+}
+
+sub EQ3BT_readingsSingleUpdateIfChanged {
+  my ($hash, $reading, $value, $setLastChange) = @_;
+  my $curVal = ReadingsVal($hash->{NAME}, $reading, "");
+  
+  if($curVal ne $value) {
+      readingsSingleUpdate($hash, $reading, $value, 1);
+      if(defined($setLastChange)) {
+          readingsSingleUpdate($hash, "lastChangeBy", "Thermostat", 1);
+      }
+  }
 }
 
 sub EQ3BT_killGatttool($) {

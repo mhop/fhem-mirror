@@ -1,15 +1,35 @@
 #############################################################
 #
-# BOSEST.pm (c) by Dominik Karall, 2016
+# BOSEST.pm (c) by Dominik Karall, 2016-2017
 # dominik karall at gmail dot com
 # $Id$
 #
 # FHEM module to communicate with BOSE SoundTouch system
 # API as defined in BOSE SoundTouchAPI_WebServices_v1.0.1.pdf
 #
-# Version: 2.0.1
+# Version: 2.1.0
 #
 #############################################################
+#
+# v2.1.0 - 20170129
+# - NEW REQUIREMENT: TTS: sox, libsox-fmt-mp3 (only required for TTS)
+# - FEATURE: TTS: add 1 second silence before TTS message for speak to
+#            prevent low volume on first words
+# - FEATURE: TTS: support "unlimited" characters in TTS speak.
+#            Text is split in sentences which are afterwards
+#            merged with sox. Same sentences are downloaded
+#            only once a month to reduce requests to Google.
+# - FEATURE: TTS: remove ttsDlnaServer attribut, it will be automatically discovered
+# - BUGFIX:  TTS: support pause/stop after speak if previous state was paused/stopped
+# - BUGFIX:  TTS: fix resume after speak when spotify running
+# - BUGFIX:  TTS: fix speakChannel for spotify presets
+# - BUGFIX:  TTS: use pause on TTS instead of stop to allow proper resume
+# - BUGFIX:  TTS: improved check after TTS play to restore previous state
+# - BUGFIX:  TTS: if state was invalid before TTS it will be set to standby
+# - BUGFIX:  fix save spotify to channel_7-20
+# - BUGFIX:  fix list of arguments
+# - FEATURE: add $readingFnAttributes
+# - FEATURE: add playPause toggle command
 #
 # v2.0.1 - 20161203
 # - FEATURE: support shuffle/repeat (thx@rockyou)
@@ -201,12 +221,7 @@
 #  - change preset via /key
 #
 # TODO
-# - redesign multiroom functionality (virtual devices: represent the readings of master device
-#    and send the commands only to the master device (except volume?)
-#    automatically create group before playing
-# - support multiroom volume (check with SoundTouch app to see commands)
-# - use websocket frame ping (WS_PING) instead of websocket XML ping
-# - TTS code cleanup (group functions logically)
+# - set title/album/artist for TTS files (--comment "Title=Title..")
 # - check if Mojolicious should be used for HTTPGET/HTTPPOST
 # - ramp up/down volume support in SetExtensions
 #
@@ -238,6 +253,8 @@ use URI::Escape;
 
 my $BOSEST_GOOGLE_NOT_AVAILABLE_TEXT = "Hello, I'm sorry, but Google Translate is currently not available.";
 my $BOSEST_GOOGLE_NOT_AVAILABLE_LANG = "en";
+my $BOSEST_READ_CMDREF_TEXT = "Hello, I'm sorry, but you need to install new libraries, please read command reference.";
+my $BOSEST_READ_CMDREF_LANG = "en";
 
 sub BOSEST_Initialize($) {
     my ($hash) = @_;
@@ -247,6 +264,7 @@ sub BOSEST_Initialize($) {
     $hash->{GetFn}    = 'BOSEST_Get';
     $hash->{SetFn}    = 'BOSEST_Set';
     $hash->{AttrFn}   = 'BOSEST_Attribute';
+    $hash->{AttrList}  = $readingFnAttributes;
     
     return undef;
 }
@@ -281,6 +299,7 @@ sub BOSEST_Define($$) {
         
         #init statecheck
         $hash->{helper}{stateCheck}{enabled} = 0;
+        $hash->{helper}{stateCheck}{actionActive} = 0;
         
         #init switchSource
         $hash->{helper}{switchSource} = "";
@@ -288,11 +307,14 @@ sub BOSEST_Define($$) {
         #init speak channel functionality
         $hash->{helper}{lastSpokenChannel} = "";
         
-        foreach my $attrname (qw(channel_07 channel_08 channel_09 channel_10 channel_11
-                                channel_12 channel_13 channel_14 channel_15 channel_16
-                                channel_17 channel_18 channel_19 channel_20 ignoreDeviceIDs
-                                ttsDirectory ttsLanguage ttsSpeakOnError ttsDLNAServer ttsVolume
-                                speakChannel autoZone)) {
+        my $attrList = "channel_07 channel_08 channel_09 channel_10 channel_11 ".
+                       "channel_12 channel_13 channel_14 channel_15 channel_16 ".
+                       "channel_17 channel_18 channel_19 channel_20 ignoreDeviceIDs ".
+                       "ttsDirectory ttsLanguage ttsSpeakOnError ttsVolume ".
+                       "speakChannel autoZone";
+        my @attrListArr = split(" ", $attrList);
+        
+        foreach my $attrname (@attrListArr) {
           addToDevAttrList($name, $attrname);
         }
         
@@ -309,7 +331,7 @@ sub BOSEST_Define($$) {
     $hash->{helper}{supportedBassCmds} = "";
     
     if (int(@a) < 3) {
-        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.0.1";
+        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.1.0";
         #start discovery process 30s delayed
         InternalTimer(gettimeofday()+30, "BOSEST_startDiscoveryProcess", $hash, 0);
         
@@ -331,8 +353,6 @@ sub BOSEST_Attribute($$$$) {
             return "BOSEST: wrong format" if(!defined($value[2]));
             #update reading for channel_X
             readingsSingleUpdate($main::defs{$devName}, $attrName, $value[0], 1);
-        } elsif($attrName eq "ttsDLNAServer") {
-            BOSEST_addDLNAServer($main::defs{$devName}, $attrValue);
         }
     } elsif($mode eq "del") {
         if(substr($attrName, 0, 8) eq "channel_") {
@@ -356,18 +376,18 @@ sub BOSEST_Set($@) {
     }
     @params = @params2;
 
-    my $list = "on:noArg off:noArg power:noArg play:noArg
-                mute:on,off,toggle recent source:".$hash->{helper}{supportedSourcesCmds}."
-                shuffle:on,off
-                repeat:all,one,off
-                nextTrack:noArg prevTrack:noArg playTrack speak speakOff
-                playEverywhere:noArg stopPlayEverywhere:noArg createZone addToZone removeFromZone
-                clock:enable,disable
-                stop:noArg pause:noArg channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
-                volume:slider,0,1,100 ".$hash->{helper}{supportedBassCmds}."
-                saveChannel:07,08,09,10,11,12,13,14,15,16,17,18,19,20
-                addDLNAServer:".$hash->{helper}{dlnaServers}."
-                removeDLNAServer:".ReadingsVal($hash->{NAME}, "connectedDLNAServers", "noArg");
+    my $list = "on:noArg off:noArg power:noArg play:noArg ".
+                "playPause:noArg ".
+                "mute:on,off,toggle recent source:".$hash->{helper}{supportedSourcesCmds}.
+                "shuffle:on,off repeat:all,one,off ".
+                "nextTrack:noArg prevTrack:noArg playTrack speak speakOff ".
+                "playEverywhere:noArg stopPlayEverywhere:noArg createZone addToZone removeFromZone ".
+                "clock:enable,disable ".
+                "stop:noArg pause:noArg channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+                "volume:slider,0,1,100 ".$hash->{helper}{supportedBassCmds}." ".
+                "saveChannel:07,08,09,10,11,12,13,14,15,16,17,18,19,20 ".
+                "addDLNAServer:".$hash->{helper}{dlnaServers}." ".
+                "removeDLNAServer:".ReadingsVal($hash->{NAME}, "connectedDLNAServers", "noArg");
 
     # check parameters for set function
     #DEVELOPNEWFUNCTION-1
@@ -441,6 +461,8 @@ sub BOSEST_Set($@) {
         BOSEST_stop($hash);
     } elsif($workType eq "pause") {
         BOSEST_pause($hash);
+    } elsif($workType eq "playPause") {
+        BOSEST_playPause($hash);
     } elsif($workType eq "power") {
         BOSEST_power($hash);
     } elsif($workType eq "on") {
@@ -459,7 +481,6 @@ sub BOSEST_Set($@) {
     } elsif($workType eq "speak" or $workType eq "speakOff") {
         return "BOSEST: speak requires quoted text as additional parameters" if(int(@params) < 1);
         return "BOSEST: speak requires quoted text" if(substr($blankParams, 0, 1) ne "\"");
-        return "BOSEST: speak maximum text length is 100 characters" if(length($params[0])>100);
         if(AttrVal($hash->{NAME}, "ttsDirectory", "") eq "") {
             return "BOSEST: Please set ttsDirectory attribute first.
                             FHEM user needs permissions to write to that directory.
@@ -586,17 +607,18 @@ sub BOSEST_removeDLNAServer($$) {
 sub BOSEST_saveChannel($$) {
     my ($hash, $channel) = @_;
 
-    if(ReadingsVal($hash->{NAME}, "state", "stopped") ne "playing") {
-        return "BOSEST: No playing channel. Start a channel and save afterwards.";
+    if(ReadingsVal($hash->{NAME}, "contentItemLocation", "") eq "") {
+        return "BOSEST: No active channel.";
     }
 
-    #itemname, location, source, sourceaccount
+    #itemname, type, location, source, sourceaccount
     my $itemName = ReadingsVal($hash->{NAME}, "contentItemItemName", "");
     my $location = ReadingsVal($hash->{NAME}, "contentItemLocation", "");
+    my $type = ReadingsVal($hash->{NAME}, "contentItemType", "");
     my $source = ReadingsVal($hash->{NAME}, "contentItemSource", "");
     my $sourceAccount = ReadingsVal($hash->{NAME}, "contentItemSourceAccount", "");
 
-    fhem("attr $hash->{NAME} channel_$channel $itemName|$location|$source|$sourceAccount");
+    fhem("attr $hash->{NAME} channel_$channel $itemName|$type|$location|$source|$sourceAccount");
     return undef;
 }
 
@@ -749,6 +771,7 @@ sub BOSEST_setRecent($$) {
     
     BOSEST_setContentItem($hash,
                           $hash->{helper}{recents}{$nr}{itemName},
+                          $hash->{helper}{recents}{$nr}{type},
                           $hash->{helper}{recents}{$nr}{location},
                           $hash->{helper}{recents}{$nr}{source},
                           $hash->{helper}{recents}{$nr}{sourceAccount});
@@ -756,8 +779,10 @@ sub BOSEST_setRecent($$) {
     return undef;
 }
 
-sub BOSEST_setContentItem($$$$$) {
-    my ($hash, $itemName, $location, $source, $sourceAccount) = @_;
+sub BOSEST_setContentItem {
+    my ($hash, $itemName, $type, $location, $source, $sourceAccount) = @_;
+    
+    $type = "" if(!defined($type));
     
     my $postXml = "<ContentItem source=\"".
               $source.
@@ -765,6 +790,8 @@ sub BOSEST_setContentItem($$$$$) {
               $sourceAccount.
               "\" location=\"".
               $location.
+              "\" type=\"".
+              $type.
               "\">".
               "<itemName>".
               $itemName.
@@ -877,10 +904,13 @@ sub BOSEST_setPreset($$) {
         my $channelVal = AttrVal($hash->{NAME}, sprintf("channel_%02d", $preset), "0");
         return undef if($channelVal eq "0");
         my @channel = split("\\|", $channelVal);
+        $channel[1] = "" if(!defined($channel[1]));
+        $channel[2] = "" if(!defined($channel[2]));
         $channel[3] = "" if(!defined($channel[3]));
-        Log3 $hash, 5, "BOSEST: AttrVal: $channel[0], $channel[1], $channel[2], $channel[3]";
+        $channel[4] = "" if(!defined($channel[4]));
+        Log3 $hash, 5, "BOSEST: AttrVal: $channel[0], $channel[1], $channel[2], $channel[3], $channel[4]";
         #format: itemName|location|source|sourceAccount
-        BOSEST_setContentItem($hash, $channel[0], $channel[1], $channel[2], $channel[3]);
+        BOSEST_setContentItem($hash, $channel[0], $channel[1], $channel[2], $channel[3], $channel[4]);
     }
     return undef;
 }
@@ -888,6 +918,12 @@ sub BOSEST_setPreset($$) {
 sub BOSEST_play($) {
     my ($hash) = @_;
     BOSEST_sendKey($hash, "PLAY");
+    return undef;
+}
+
+sub BOSEST_playPause($) {
+    my ($hash) = @_;
+    BOSEST_sendKey($hash, "PLAY_PAUSE");
     return undef;
 }
 
@@ -968,6 +1004,13 @@ sub BOSEST_speak($$$$$) {
     $lang = AttrVal($hash->{NAME}, "ttsLanguage", "en") if($lang eq "");
     $volume = AttrVal($hash->{NAME}, "ttsVolume", ReadingsVal($hash->{NAME}, "volume", 20)) if($volume eq "");
     
+    my $sox = qx(which sox);
+    chomp $sox;
+    if(!-x $sox) {
+        BOSEST_playGoogleTTS($hash, $ttsDir, $BOSEST_READ_CMDREF_TEXT, $volume, $BOSEST_READ_CMDREF_LANG, $stopAfterSpeak);
+        return undef;
+    }
+    
     #download file and play
     BOSEST_playGoogleTTS($hash, $ttsDir, $text, $volume, $lang, $stopAfterSpeak);
     
@@ -980,7 +1023,9 @@ sub BOSEST_saveCurrentState($) {
     $hash->{helper}{savedState}{volume} = ReadingsVal($hash->{NAME}, "volume", 20);
     $hash->{helper}{savedState}{source} = ReadingsVal($hash->{NAME}, "source", "");
     $hash->{helper}{savedState}{bass} = ReadingsVal($hash->{NAME}, "bass", "");
+    $hash->{helper}{savedState}{playStatus} = ReadingsVal($hash->{NAME}, "playStatus", "STOP_STATE");
     $hash->{helper}{savedState}{contentItemItemName} = ReadingsVal($hash->{NAME}, "contentItemItemName", "");
+    $hash->{helper}{savedState}{contentItemType} = ReadingsVal($hash->{NAME}, "contentItemType", "");
     $hash->{helper}{savedState}{contentItemLocation} = ReadingsVal($hash->{NAME}, "contentItemLocation", "");
     $hash->{helper}{savedState}{contentItemSource} = ReadingsVal($hash->{NAME}, "contentItemSource", "");
     $hash->{helper}{savedState}{contentItemSourceAccount} = ReadingsVal($hash->{NAME}, "contentItemSourceAccount", "");
@@ -995,13 +1040,20 @@ sub BOSEST_restoreSavedState($) {
     BOSEST_setBass($hash, $hash->{helper}{savedState}{bass});
     
     #bose off when source was off
-    if($hash->{helper}{savedState}{source} eq "STANDBY") {
+    if($hash->{helper}{savedState}{source} eq "STANDBY" or $hash->{helper}{savedState}{source} eq "INVALID_SOURCE") {
         BOSEST_off($hash);
     } else {
         BOSEST_setContentItem($hash, $hash->{helper}{savedState}{contentItemItemName},
+                              $hash->{helper}{savedState}{contentItemType},
                               $hash->{helper}{savedState}{contentItemLocation},
                               $hash->{helper}{savedState}{contentItemSource},
                               $hash->{helper}{savedState}{contentItemSourceAccount});
+        
+        if($hash->{helper}{savedState}{playStatus} eq "STOP_STATE") {
+            InternalTimer(gettimeofday()+0.8, "BOSEST_stop", $hash, 0);
+        } elsif($hash->{helper}{savedState}{playStatus} eq "PAUSE_STATE") {
+            InternalTimer(gettimeofday()+0.8, "BOSEST_pause", $hash, 0);
+        }
     }
 
     return undef;
@@ -1014,6 +1066,7 @@ sub BOSEST_restoreVolumeAndOff($) {
     BOSEST_setBass($hash, $hash->{helper}{savedState}{bass});
 
     BOSEST_setContentItem($hash, $hash->{helper}{savedState}{contentItemItemName},
+                  $hash->{helper}{savedState}{contentItemType},
                   $hash->{helper}{savedState}{contentItemLocation},
                   $hash->{helper}{savedState}{contentItemSource},
                   $hash->{helper}{savedState}{contentItemSourceAccount});
@@ -1029,17 +1082,14 @@ sub BOSEST_downloadGoogleNotAvailable($) {
 
     my $md5 = md5_hex($lang.$text);
     my $filename = $ttsDir."/".$md5.".mp3";
-    if (-f $filename) {
-        #file exists already
-        return undef;
+    if (! -f $filename) {
+        BOSEST_retrieveGooglTTSFile($hash, $filename, $md5, $text, $lang);
     }
-    
-    BOSEST_downloadGoogleTTS($hash, $filename, $md5, $text, $lang);
     
     return undef;
 }
 
-sub BOSEST_downloadGoogleTTS($$$$$;$) {
+sub BOSEST_retrieveGooglTTSFile($$$$$;$) {
     my ($hash, $filename, $md5, $text, $lang, $callback) = @_;
 
     my $uri_text = uri_escape($text);
@@ -1058,22 +1108,67 @@ sub BOSEST_downloadGoogleTTS($$$$$;$) {
     return undef;
 }
 
+sub BOSEST_generateSilence {
+    my ($hash) = @_;
+    my $ttsDir = AttrVal($hash->{NAME}, "ttsDirectory", "");
+    my $silenceFile = $ttsDir."/BOSEST_silence.mp3";
+    my $soxCmd;
+    
+    if(!-f $silenceFile) {
+        #generate silence file
+        $soxCmd = "sox -n -r 24000 -c 1 $silenceFile trim 0.0 1";
+        qx($soxCmd);
+    }
+
+    return undef;
+}
+
+sub BOSEST_joinAudioFilesBlocking {
+    my ($string) = @_;
+    my ($name, $outputFile, @inputFiles) = split("\\|", $string);
+    my $ttsDir = AttrVal($name, "ttsDirectory", "");
+    my $hash = $main::defs{$name};
+    my $inputF = join(" ", map { $ttsDir."/".$_ } @inputFiles);
+    my $outputF = $ttsDir."/".$outputFile;
+    my $outputFileTmp = $ttsDir."/tmp_".$outputFile;
+    
+    BOSEST_generateSilence($hash);
+    
+    my $soxCmd = "sox $inputF $outputFileTmp";
+    Log3 $hash, 5, "SOX: $soxCmd";
+    my $soxRes = qx($soxCmd);
+    
+    qx(mv $outputFileTmp $outputF);
+    
+    return $name;
+}
+
+sub BOSEST_playMessageStringArg {
+    my ($name) = @_;
+    my $hash = $main::defs{$name};
+    
+    BOSEST_playMessage($hash, "v1_".$hash->{helper}{tts}{fulltextmd5}, $hash->{helper}{tts}{volume}, $hash->{helper}{tts}{stopAfterSpeak});
+    
+    return undef;
+}
+
 sub BOSEST_playMessage($$$$) {
     my ($hash, $trackname, $volume, $stopAfterSpeak) = @_;
+    
+    Log3 $hash, 4, "BOSEST: playMessage $trackname, $volume, $stopAfterSpeak";
     
     BOSEST_saveCurrentState($hash);
     
     if($volume ne ReadingsVal($hash->{NAME}, "volume", 0)) {
-        BOSEST_stop($hash);
+        BOSEST_pause($hash);
         BOSEST_setVolume($hash, $volume);
     }
     
     BOSEST_playTrack($hash, $trackname);
         
     $hash->{helper}{stateCheck}{enabled} = 1;
-    $hash->{helper}{stateCheck}{always} = 0;
-    #after play the speaker sets INVALID_SOURCE
-    $hash->{helper}{stateCheck}{actionSource} = "INVALID_SOURCE";
+    #after play the speaker changes contentItemItemName
+    $hash->{helper}{stateCheck}{actionContentItemItemName} = $trackname;
     #check if we need to stop after speak
     if(defined($stopAfterSpeak) && $stopAfterSpeak eq "1") {
         $hash->{helper}{stateCheck}{function} = \&BOSEST_restoreVolumeAndOff;
@@ -1110,8 +1205,71 @@ sub BOSEST_deleteOldTTSFiles {
     $err = setKeyValue("BOSEST_tts_files", join(",", @ttsFiles));
 }
 
-sub BOSEST_playGoogleTTS($$$$$$) {
+sub BOSEST_playGoogleTTS {
     my ($hash, $ttsDir, $text, $volume, $lang, $stopAfterSpeak) = @_;
+    $hash->{helper}{tts}{volume} = $volume;
+    $hash->{helper}{tts}{stopAfterSpeak} = $stopAfterSpeak;
+    $hash->{helper}{tts}{fulltextmd5} = md5_hex($lang.$text);
+    
+    my $filename = $ttsDir."/v1_".$hash->{helper}{tts}{fulltextmd5}.".mp3";
+    
+    if(-f $filename) {
+        my $timestamp = (stat($filename))->mtime(); #last modification timestamp
+        my $now = time();
+        if($now-$timestamp < 2592000) {
+            #file is not older than 30 days
+            Log3 $hash, 5, "BOSEST: File $filename found. No new download required.";
+            BOSEST_playMessageStringArg($hash->{NAME});
+            return undef;
+        }
+    }
+    
+    my @sentences = split (/(?<=[.?!])/, $text);
+    $hash->{helper}{tts}{downloads}{all} = "";
+    foreach my $sentence (@sentences) {
+        my $md5 = md5_hex($lang.$sentence);
+        $hash->{helper}{tts}{downloads}{$md5} = 0;
+        $hash->{helper}{tts}{downloads}{all} .= $md5.",";
+        BOSEST_downloadGoogleTTS($hash, $ttsDir, $sentence, $lang);
+    }
+    
+    InternalTimer(gettimeofday()+1, "BOSEST_checkTTSDownloadFinished", $hash, 0);
+    
+    return undef;
+}
+
+sub BOSEST_checkTTSDownloadFinished {
+    my ($hash) = @_;
+    
+    my @allMd5 = split(",", $hash->{helper}{tts}{downloads}{all});
+    my $msgStatus = 1;
+    foreach my $md5 (@allMd5) {
+        if($hash->{helper}{tts}{downloads}{$md5} == 10) {
+            $msgStatus = 10;
+        } elsif($hash->{helper}{tts}{downloads}{$md5} == 0) {
+            $msgStatus = 0;
+        }
+    }
+    
+    if($msgStatus == 10) {
+        if(AttrVal($hash->{NAME}, "ttsSpeakOnError", "1") eq "1") {
+            my $md5 = md5_hex($BOSEST_GOOGLE_NOT_AVAILABLE_LANG.$BOSEST_GOOGLE_NOT_AVAILABLE_TEXT);
+            BOSEST_playMessage($hash, $md5, $hash->{helper}{tts}{volume}, $hash->{helper}{tts}{stopAfterSpeak});
+        } else {
+            Log3 $hash, 3, "BOSEST: Google translate download failed.";
+        }
+    } elsif($msgStatus == 0) {
+        #check again in 1s
+        InternalTimer(gettimeofday()+1, "BOSEST_checkTTSDownloadFinished", $hash, 0);
+    } else {
+        BlockingCall("BOSEST_joinAudioFilesBlocking", $hash->{NAME}."|v1_".$hash->{helper}{tts}{fulltextmd5}.".mp3|BOSEST_silence.mp3|".join(".mp3|", @allMd5).".mp3", "BOSEST_playMessageStringArg");
+    }
+
+    return undef;
+}
+
+sub BOSEST_downloadGoogleTTS {
+    my ($hash, $ttsDir, $text, $lang) = @_;
     
     BOSEST_downloadGoogleNotAvailable($hash);
 
@@ -1123,13 +1281,12 @@ sub BOSEST_playGoogleTTS($$$$$$) {
         my $now = time();
         if($now-$timestamp < 2592000) {
             #file is not older than 30 days
-            #file exists, call play sub
-            BOSEST_playMessage($hash, $md5, $volume, $stopAfterSpeak);
+            $hash->{helper}{tts}{downloads}{$md5} = 1;
             return undef;
         }
     }
     
-    BOSEST_downloadGoogleTTS($hash, $filename, $md5, $text, $lang, sub {
+    BOSEST_retrieveGooglTTSFile($hash, $filename, $md5, $text, $lang, sub {
             my ($hash, $filename, $md5, $downloadOk) = @_;
             
             if($downloadOk) {
@@ -1141,15 +1298,10 @@ sub BOSEST_playGoogleTTS($$$$$$) {
                 }
                 $err = setKeyValue("BOSEST_tts_files", $val.$md5);
                 $err = setKeyValue($md5, gettimeofday());
-                BOSEST_playMessage($hash, $md5, $volume, $stopAfterSpeak);
+                $hash->{helper}{tts}{downloads}{$md5} = 1;
+                #add silence and play message afterwards
             } else {
-                if(AttrVal($hash->{NAME}, "ttsSpeakOnError", "1") eq "1") {
-                    $md5 = md5_hex($BOSEST_GOOGLE_NOT_AVAILABLE_LANG.$BOSEST_GOOGLE_NOT_AVAILABLE_TEXT);
-                    BOSEST_playMessage($hash, $md5, $volume, $stopAfterSpeak);
-                } else {
-                    Log3 $hash, 3, "BOSEST: Download Google Translate failed ($text).";
-                    return undef;
-                }
+                $hash->{helper}{tts}{downloads}{$md5} = 10; #download error
             }
         });
     
@@ -1185,23 +1337,35 @@ sub BOSEST_removeMusicServiceAccount($$$) {
 sub BOSEST_playTrack($$) {
     my ($hash, $trackName) = @_;
 
-    my $ttsDlnaServer = AttrVal($hash->{NAME}, "ttsDLNAServer", "");
+    my $ttsDlnaServer = $hash->{helper}{ttsdlnaserver};
+    if(defined($ttsDlnaServer) && $ttsDlnaServer ne "") {
+        Log3 $hash, 4, "BOSEST: Search for $trackName on $ttsDlnaServer";
+        if(my $xmlTrack = BOSEST_searchTrack($hash, $ttsDlnaServer, $trackName)) {
+            BOSEST_setContentItem($hash,
+                                  $xmlTrack->{itemName},
+                                  $xmlTrack->{type},
+                                  $xmlTrack->{location},
+                                  $xmlTrack->{source},
+                                  $xmlTrack->{sourceAccount});
+            return undef;
+        }
+    }
     
     foreach my $source (@{$hash->{helper}{sources}}) {
         if($source->{source} eq "STORED_MUSIC" && $source->{status} eq "READY") {
-            #skip servers which don't equal to ttsDLNAServer attribute if set
-            if($ttsDlnaServer ne "") {
-                next if($ttsDlnaServer ne $source->{content});
-            }
-            Log3 $hash, 4, "BOSEST: Search for $trackName on $source->{source}";
+            Log3 $hash, 4, "BOSEST: Search for $trackName on $source->{sourceAccount}";
             if(my $xmlTrack = BOSEST_searchTrack($hash, $source->{sourceAccount}, $trackName)) {
                 BOSEST_setContentItem($hash,
                                       $xmlTrack->{itemName},
+                                      $xmlTrack->{type},
                                       $xmlTrack->{location},
                                       $xmlTrack->{source},
                                       $xmlTrack->{sourceAccount});
+                $hash->{helper}{ttsdlnaserver} = $source->{sourceAccount};
                 last;
             }
+            #sleep 100ms, otherwise internal server error from BOSE speaker
+            select(undef, undef, undef, 0.1);
         }
     }
     
@@ -1213,7 +1377,7 @@ sub BOSEST_searchTrack($$$) {
     
     my $postXml = '<search source="STORED_MUSIC" sourceAccount="'.
                   $dlnaUid.
-                  '"><startItem>1</startItem><numItems>100</numItems><searchTerm filter="track">'.
+                  '"><startItem>1</startItem><numItems>1</numItems><searchTerm filter="track">'.
                   $trackName.
                   '</searchTerm></search>';
 
@@ -1318,7 +1482,7 @@ sub BOSEST_updateAutoZone {
 sub BOSEST_checkDoubleTap($$) {
     my ($hash, $channel) = @_;
     
-    return undef if($channel eq "");
+    return undef if($channel eq "" or $channel eq "0");
     
     if(!defined($hash->{helper}{dt_nowSelectionUpdatedTS}) or $channel ne $hash->{helper}{dt_nowSelectionUpdatedCH}) {
         $hash->{helper}{dt_nowSelectionUpdatedTS} = gettimeofday();
@@ -1428,13 +1592,16 @@ sub BOSEST_processXml($$) {
     
     if($hash->{helper}{stateCheck}{enabled}) {
         #check if state is action state
-        if(ReadingsVal($hash->{NAME}, "source", "") eq $hash->{helper}{stateCheck}{actionSource}) {
-            #call function with $hash as argument
-            $hash->{helper}{stateCheck}{function}->($hash);
-            
-            #reset if always is not enabled
-            if(!$hash->{helper}{stateCheck}{always}) {
-                $hash->{helper}{stateCheck}{enabled} = 0;
+        if(ReadingsVal($hash->{NAME}, "contentItemItemName", "") eq $hash->{helper}{stateCheck}{actionContentItemItemName}) {
+            $hash->{helper}{stateCheck}{actionActive} = 1;
+        } else {
+            if($hash->{helper}{stateCheck}{actionActive}) {
+                if(ReadingsVal($hash->{NAME}, "contentItemItemName", "") ne $hash->{helper}{stateCheck}{actionContentItemItemName}) {
+                    #call function with $hash as argument
+                    $hash->{helper}{stateCheck}{function}->($hash);
+                    $hash->{helper}{stateCheck}{enabled} = 0;
+                    $hash->{helper}{stateCheck}{actionActive} = 0;
+                }
             }
         }
     }
@@ -2318,7 +2485,7 @@ sub BOSEST_readingsSingleUpdateIfChanged {
 <ul>
   BOSEST is used to control a BOSE SoundTouch system (one or more SoundTouch 10, 20 or 30 devices)<br><br>
 	<b>Note:</b> The followig libraries  are required for this module:
-		<ul><li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li><br>
+		<ul><li>libwww-perl</li> <li>libmojolicious-perl</li> <li>libxml-simple-perl</li> <li>libnet-bonjour-perl</li> <li>libev-perl</li><li>liburi-escape-xs-perl</li><li>sox</li><li>libsox-fmt-mp3</li><br>
 		Use <b>sudo apt-get install libwww-perl libmojolicious-perl libxml-simple-perl libnet-bonjour-perl libev-perl</b> to install this libraries.<br>Please note:
 		libmojolicious-perl must be >=5.54, but under wheezy is only 2.x avaible.<br>
 		Use <b>sudo apt-get install cpanminus</b> and <b>sudo cpanm Mojolicious</b> to update to the newest version<br>
@@ -2389,7 +2556,6 @@ sub BOSEST_readingsSingleUpdateIfChanged {
          <li><code><b>speak</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use. The message to speak may have up to 100 letters</li>
          <li><code><b>speakOff</b> "message" [0...100] [+x|-x] [en|de|xx]</code> &nbsp;&nbsp;-&nbsp;&nbsp; Text to speak, optional with volume adjustment and language to use. The message to speak may have up to 100 letters. Device is switched off after speak</li>
          <li><code><b>ttsVolume</b> [0...100] [+x|-x]</code> &nbsp;&nbsp;-&nbsp;&nbsp; set the TTS volume level in percentage or change volume by ±x from current level</li>
-         <li><code><b>ttsDLNAServer</b> "DLNA Server"</code> &nbsp;&nbsp;-&nbsp;&nbsp;  set DLNA TTS server, only needed if the DLNA server is not the FHEM server, a DLNA server running on the same server as FHEM is automatically added to the BOSE library</li>
          <li><code><b>ttsDirectory</b> "directory"</code> &nbsp;&nbsp;-&nbsp;&nbsp; set DLNA TTS directory. FHEM user needs permissions to write to that directory. </li>
          <li><code><b>ttsLanguage </b> en|de|xx</code> &nbsp;&nbsp;-&nbsp;&nbsp; set default TTS language (default: en)</li>
          <li><code><b>ttsSpeakOnError</b> 0|1</code> &nbsp;&nbsp;-&nbsp;&nbsp; 0=disable to speak "not available" text</li>
