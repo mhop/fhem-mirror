@@ -43,6 +43,17 @@ sub readingsProxy_Initialize($)
 }
 
 sub
+readingsProxy_setNotfiyDev($)
+{
+  my ($hash) = @_;
+
+  if( $hash->{DEVICE} ) {
+    notifyRegexpChanged($hash,"(global|".$hash->{DEVICE}.")");
+  } else {
+    notifyRegexpChanged($hash,'');
+  }
+}
+sub
 readingsProxy_updateDevices($)
 {
   my ($hash) = @_;
@@ -67,11 +78,7 @@ readingsProxy_updateDevices($)
     }
   }
 
-  if( $hash->{DEVICE} ) {
-    notifyRegexpChanged($hash,"(global|".$hash->{DEVICE}.")");
-  } else {
-    notifyRegexpChanged($hash,'');
-  }
+  InternalTimer(gettimeofday(), "readingsProxy_setNotfiyDev", $hash);
   $hash->{CONTENT} = \%list;
 
   readingsProxy_update($hash, undef);
