@@ -22,14 +22,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.0.0
-#
-# Major Version History:
-#
-# - 1.0.0 - 2015-11-01
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -1903,6 +1895,67 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 next;
                             }
 
+                            # ReplaceSetMagic
+                            #
+                            my $replaceError;
+                            if ( $featurelevel >= 5.7 ) {
+                                my %dummy;
+                                my ( $err, @a );
+
+                                # MSG
+                                ( $err, @a ) =
+                                  ReplaceSetMagic( \%dummy, 0, ($loopMsg) );
+                                $replaceError .=
+                                  "ReplaceSetMagic failed for MSG: $err\n"
+                                  if ($err);
+                                $loopMsg = join( " ", @a )
+                                  unless ($err);
+
+                                # DEVICE
+                                ( $err, @a ) =
+                                  ReplaceSetMagic( \%dummy, 0, ($gatewayDev) );
+                                $replaceError .=
+                                  "ReplaceSetMagic failed for DEVICE: $err\n"
+                                  if ($err);
+                                $gatewayDev = join( " ", @a )
+                                  unless ($err);
+
+                                # TITLE
+                                ( $err, @a ) =
+                                  ReplaceSetMagic( \%dummy, 0, ($loopTitle) );
+                                $replaceError .=
+                                  "ReplaceSetMagic failed for TITLE: $err\n"
+                                  if ($err);
+                                $loopTitle = join( " ", @a )
+                                  unless ($err);
+
+                                # RECIPIENT
+                                if ( $subRecipient ne "" ) {
+                                    ( $err, @a ) =
+                                      ReplaceSetMagic( \%dummy, 0,
+                                        ($subRecipient) );
+                                    $replaceError .=
+                                        "ReplaceSetMagic failed "
+                                      . "for RECIPIENT: $err\n"
+                                      if ($err);
+                                    $subRecipient = join( " ", @a )
+                                      unless ($err);
+                                }
+
+                                # TERMINAL
+                                if ( $subRecipient ne "" ) {
+                                    ( $err, @a ) =
+                                      ReplaceSetMagic( \%dummy, 0,
+                                        ($termRecipient) );
+                                    $replaceError .=
+                                        "ReplaceSetMagic failed "
+                                      . "for TERMINAL: $err\n"
+                                      if ($err);
+                                    $termRecipient = join( " ", @a )
+                                      unless ($err);
+                                }
+                            }
+
                             $cmd =~ s/%DEVICE%/$gatewayDev/gi;
                             $cmd =~ s/%PRIORITY%/$loopPriority/gi;
                             $cmd =~ s/%TITLE%/$loopTitle/gi;
@@ -1972,9 +2025,25 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                                 my $error = 0;
 
+                                # ReplaceSetMagic
+                                #
+                                if ( $featurelevel >= 5.7 && !$replaceError ) {
+                                    my %dummy;
+                                    my ( $err, @a ) =
+                                      ReplaceSetMagic( \%dummy, 0, ($cmd) );
+                                    $replaceError .=
+                                      "ReplaceSetMagic failed for CMD: $err\n"
+                                      if ($err);
+                                    $cmd = join( " ", @a )
+                                      unless ($err);
+                                }
+
                                 # run command
-                                undef $@;
-                                if ( $cmd =~ s/^[ \t]*\{|\}[ \t]*$//gi ) {
+                                if ($replaceError) {
+                                    $error = 2;
+                                    $return .= $replaceError;
+                                }
+                                elsif ( $cmd =~ /^\s*\{.*\}\s*$/ ) {
                                     Log3 $logDevice, 5,
 "msg $device: $type[$i] route command (Perl): $cmd";
                                     eval $cmd;
@@ -1993,22 +2062,25 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     }
                                 }
 
-                                $routeStatus = "ERROR" if ( $error == 1 );
+                                $routeStatus = "ERROR"
+                                  if ( $error == 1 );
+                                $routeStatus = "ERROR_EVAL"
+                                  if ( $error == 2 );
 
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$loopMsg'"
                                   if ( $priorityCat ne ""
                                     && $subRecipient ne "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$loopMsg'"
                                   if ( $priorityCat eq ""
                                     && $subRecipient ne "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$loopMsg'"
                                   if ( $priorityCat ne ""
                                     && $subRecipient eq "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$loopMsg'"
                                   if ( $priorityCat eq ""
                                     && $subRecipient eq "" );
 
@@ -2033,10 +2105,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 || $routeStatus eq "UNDEFINED" )
                             {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
                                   if ( $subRecipient ne "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
                                   if ( $subRecipient eq "" );
                                 $gatewaysStatus{$gatewayDev} = $routeStatus
                                   if ( $globalDevName ne $gatewayDev );
@@ -2045,10 +2117,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             }
                             else {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
                                   if ( $subRecipient ne "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'"
+"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
                                   if ( $subRecipient eq "" );
                                 $msgSent    = 2 if ( $msgSent != 1 );
                                 $msgSentDev = 2 if ( $msgSentDev != 1 );
