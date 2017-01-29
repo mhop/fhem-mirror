@@ -4230,6 +4230,16 @@ ZWave_addToSendStack($$$)
     if($cmd =~ m/^......988[01].*/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
+      if($hash->{useMultiCmd}) {
+        ZWave_packSendStack($hash);
+        if($hash->{INTRIGGER}) { # Allow repacking of multiple gets on WUN
+          if(!$hash->{delayedProcessing}) {
+            $hash->{delayedProcessing} = 1;
+            InternalTimer(1, sub(){ZWave_processSendStack($hash, "next");}, 0);
+          }
+          return;
+        }
+      }
       return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
     }
 
@@ -4240,16 +4250,6 @@ ZWave_addToSendStack($$$)
         "ERROR: $hash->{NAME}: cleaning commands without ack after 5s";
       delete $hash->{SendStack};
       return ZWave_addToSendStack($hash, $type, $cmd);
-    }
-  }
-  if($hash->{useMultiCmd}) {
-    ZWave_packSendStack($hash);
-    if($hash->{INTRIGGER}) { # Allow repacking of multiple gets on WUN
-      if(!$hash->{delayedProcessing}) {
-        $hash->{delayedProcessing} = 1;
-        InternalTimer(1, sub(){ZWave_processSendStack($hash, "next");}, 0);
-      }
-      return;
     }
   }
   ZWave_processSendStack($hash, "next") if(@{$ss} == 1);
