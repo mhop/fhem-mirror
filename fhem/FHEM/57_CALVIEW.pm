@@ -22,11 +22,12 @@ sub CALVIEW_Initialize($)
 	$hash->{AttrList} = "datestyle:ISO8601 " .
 						"disable:0,1 " .
 						"do_not_notify:1,0 " .
+						"filterSummary:textField-long " .
 						"isbirthday:1,0 " .						
 						"maxreadings " .
 						"modes:next ".
 						"oldStyledReadings:1,0 " .
-						"yobfield:_location,_description " .
+						"yobfield:_location,_description,_summary " .
 						$readingFnAttributes; 
 }
 sub CALVIEW_Define($$){
@@ -99,7 +100,7 @@ sub CALVIEW_GetUpdate($){
 	my @termineNew;
 	foreach my $item (@termine ){
 		my @tempstart=split(/\s+/,$item->[0]);
-		my @tempend=split(/\s+/,$item->[2]);
+		my @tempend=split(/\s+/,$item->[2]);	
 		my ($D,$M,$Y)=split(/\./,$tempstart[0]);
 		my ($eD,$eM,$eY)=split(/\./,$tempend[0]);
 		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
@@ -109,10 +110,13 @@ sub CALVIEW_GetUpdate($){
 		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; }
 		my $isostarttime = $Y."-".$M."-".$D."T".$tempstart[1];
 		my $isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
+		my $eventDate = timelocal(0,0,0,$D,$M-1,$Y);
+		my $daysleft = floor(($eventDate - time) / 60 / 60 / 24 + 1);
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
 			bdatetimeiso => $isostarttime,
+			daysleft => $daysleft,
 			summary => $item->[1],
 			source => $item->[3],
 			location => $item->[4],
@@ -128,6 +132,9 @@ sub CALVIEW_GetUpdate($){
 	my $readingstyle = AttrVal($name,"oldStyledReadings",0);	
 	my $isbday = AttrVal($name,"isbirthday",0);	
 	my $yobfield = AttrVal($name,"yobfield","_description");
+	my $filterSummary = AttrVal($name,"filterSummary",".*:.*");
+	my @arrFilters = split(',' , $filterSummary );
+	
 	# sort the array by btimestamp
 	my @sdata = map  $_->[0], 
 			sort { $a->[1][0] <=> $b->[1][0] }
@@ -136,62 +143,76 @@ sub CALVIEW_GetUpdate($){
 	if($readingstyle == 0){
 		my $age = 0;
 		my @termyear;
-		for my $termin (@sdata){	
-			#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
-			if($isbday == 1 ){
-				@termyear = split(/\./,$termin->{bdate});
-				if($yobfield eq "_location" && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
-				elsif($yobfield eq "_description" && length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
-				else {$age = " "}
-			}
-			#standard reading t_[3steliger counter] anlegen
-			if($isbday == 1 ){ readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_age", $age);}
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdate", $termin->{bdate});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_btime", $termin->{btime});
-			if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edatetimeiso", $termin->{edatetimeiso});}
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_description", $termin->{description});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
-			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
-			#wenn termin heute today readings anlegen
-			if ($date eq $termin->{bdate} ){
-				if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_age", $age);}
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime});
-				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edatetimiso", $termin->{edatetimeiso});}
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_description", $termin->{description});
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
-				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
-				$todaycounter ++;
-			}
-			#wenn termin morgen tomorrow readings anlegen
-			elsif ($datenext eq $termin->{bdate}){
-				if($isbday == 1 ){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_age", $age);}
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdate", "morgen"); 
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
-				if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edatetimeiso", $termin->{edatetimeiso});}
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_description", $termin->{description});
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
-				$tomorrowcounter++;
-			}			
-			last if ($counter++ == $max);
-		};
-		for my $termin (@sdata){	
-			#check ob temin heute
+		my $validterm = 0;
+		for my $termin (@sdata){
+			#if($termin->{summary} =~ /$filterSummary/ ){
+			foreach my $filter (@arrFilters){ 
+				my @arrFilter= split(':' , $filter); 
+				my $sourceFilter = $arrFilter[0]; 
+				my $summaryFilter = $arrFilter[1]; 
+				if( $termin->{source} =~ /$sourceFilter/ && $termin->{summary} =~ /$summaryFilter/ ){ $validterm =1;}
+			};
+			if ($validterm ==1){
+					#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
+					if($isbday == 1 ){
+						@termyear = split(/\./,$termin->{bdate});
+						if($yobfield eq "_location" && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
+						elsif($yobfield eq "_description" && length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
+						elsif($yobfield eq "_summary" && length($termin->{summary}) > 0 ) {my ($byear) = $termin->{summary} =~ /(\d\d\d\d)/ ; $age = $termyear[2] -  $byear;}
+						else {$age = " "}
+					}
 
+					#standard reading t_[3steliger counter] anlegen
+					if($isbday == 1 ){ readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_age", $age);}
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdate", $termin->{bdate});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_btime", $termin->{btime});
+					if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edatetimeiso", $termin->{edatetimeiso});}
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_daysleft", $termin->{daysleft});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_description", $termin->{description});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
+					#wenn termin heute today readings anlegen
+					if ($date eq $termin->{bdate} ){
+						if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_age", $age);}
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime});
+						if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edatetimiso", $termin->{edatetimeiso});}
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_daysleft", $termin->{daysleft});						
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_description", $termin->{description});
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
+						$todaycounter ++;
+					}
+					#wenn termin morgen tomorrow readings anlegen
+					elsif ($datenext eq $termin->{bdate}){
+						if($isbday == 1 ){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_age", $age);}
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdate", "morgen"); 
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
+						if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edatetimeiso", $termin->{edatetimeiso});}
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_daysleft", $termin->{daysleft});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_description", $termin->{description});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
+						$tomorrowcounter++;
+					}			
+					last if ($counter++ == $max);
+				
+			}
+			$validterm = 0;
 		};
+
 		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)); 
 		readingsBulkUpdate($hash, "c-term", $counter-1); 
 		readingsBulkUpdate($hash, "c-tomorrow", $tomorrowcounter-1); 
@@ -304,6 +325,12 @@ sub CALVIEW_Notify($$)
 <li>disable<br>
         0 / not set - internal notify function enabled (default) <br>
 		1 - disable the internal notify-function of CALVIEW wich is triggered when one of the given CALENDAR devices has updated
+</li><br>filterSummary
+<li>filterSummary &lt;filtersouce&gt;:&lt;filtersummary&gt;[,&lt;filtersouce&gt;:&lt;filtersummary&gt;]<br>
+        not set - displays all terms (default .*:.*) <br>
+		&lt;filtersouce&gt;:&lt;filtersummary&gt;[,&lt;filtersouce&gt;:&lt;filtersummary&gt;] - CALVIEW will display term where summary matches the &lt;filtersouce&gt;:&lt;filtersummary&gt;, several filters must be separated by comma (,)
+		e.g.: 	filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Abfall:Bioabfall
+				filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Feiertage:.*,Kalender_Christian:.*,Kalender_Geburtstage:.*
 </li><br>
 <li>isbirthday<br>
         0 / not set - no age calculation (default)  <br>
@@ -322,6 +349,7 @@ sub CALVIEW_Notify($$)
 <li>yobfield<br>
 		_description  - (default) year of birth will be read from term description <br>
 		_location - year of birth will be read from term location 
+		_summary - year of birth will be read from summary (uses the first sequence of 4 digits in the string)
 </li><br>
 =end html
 
@@ -350,6 +378,14 @@ sub CALVIEW_Notify($$)
         0 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard) <br>
 		1 - deaktiviert die interne Notify-Funktion welche ausgelöst wird wenn sich einer der Kalender aktualisiert hat
 </li><br>
+<li>filterSummary &lt;filtersouce&gt;:&lt;filtersummary&gt;[,&lt;filtersouce&gt;:&lt;filtersummary&gt;]<br>
+        not set - zeigt alle Termine (Standard) <br>
+		&lt;filtersouce&gt;:&lt;filtersummary&gt;[,&lt;filtersouce&gt;:&lt;filtersummary&gt;] - CALVIEW filtert Termine die &lt;filtersquelle&gt;:&lt;filtertitel&gt; entsprechen, mehrere Filter sind durch Komma (,) zu trennen.
+		
+		zb.: 	filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Abfall:Bioabfall
+				filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Feiertage:.*,Kalender_Christian:.*,Kalender_Geburtstage:.*
+																	
+</li><br>
 <li>isbirthday<br>
         0 / nicht gesetzt - keine Altersberechnung (Standard) <br>
 		1 - aktiviert die Altersberechnung im Modul. Das Alter wird aus der in der Terminbeschreibung (description) angegebenen Jahreszahl (Geburtsjahr) berechnet.
@@ -366,7 +402,8 @@ sub CALVIEW_Notify($$)
 </li><br>
 <li>yobfield<br>
 		_description  - (der Standard) Geburtsjahr wird aus der Terminbechreibung gelesen <br>
-		_location - Geburtsjahr wird aus dem Terminort gelesen 
+		_location - Geburtsjahr wird aus dem Terminort gelesen
+		_summary - Geburtsjahr wird aus dem Termintiele gelesen (verwendet wird die erste folge von 4 Ziffern im String))
 </li><br>
 =end html_DE
 =cut
