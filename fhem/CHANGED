@@ -1,11 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not ins  - feature: 66_ECMD: new attribute autoReopen
+
+  - update: 74_AMAD: Version 2.6.8 new feature sendSMS
   - feature: 66_ECMD: new attribute autoReopen
-  - bugfix:  98_DOIFtools.pm: fixed bug from last change
-  - update:  98_DOIFtools.pm: some code rework
-  - update:  98_DOIFtools.pm: dynamic column width in report
-  - update:  98_DOIFtools.pm: add delete readings in other devices than DOIF
-  - update:  88_HMCCU.pm: version 3.9
+  - bugfix: 98_DOIFtools.pm: fixed bug from last change
+  - update: 98_DOIFtools.pm: some code rework
+  - update: 98_DOIFtools.pm: dynamic column width in report
+  - update: 98_DOIFtools.pm: add delete readings in other devices than DOIF
+  - update: 88_HMCCU.pm: version 3.9
   - update: 98_DOIFtools.pm: marking an eventline in DOIFs event monitor
                shows different representations of the event as operand
                for DOIF definitions
