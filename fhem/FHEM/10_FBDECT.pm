@@ -208,6 +208,7 @@ FBDECT_Get($@)
 
 my %fbhttp_readings = (
    absenk          => 'sprintf("night-temp:%.1f C", $val/2)',
+   batterylow      => '"batterylow:$val"',
    celsius         => 'sprintf("temperature:%.1f C (measured)", $val/10)',
    energy          => 'sprintf("energy:%d Wh", $val)',
    functionbitmask => '"FBPROP:$fbprop"',
