@@ -2402,7 +2402,7 @@ sub
 ZWave_clockSet()
 {
   my @l = localtime();
-  return ("", sprintf("04%02x%02x", ($l[6]<<5)|$l[2], $l[1]));
+  return ("", sprintf("04%02x%02x", (($l[6] ? $l[6]:7)<<5)|$l[2], $l[1]));
 }
 
 sub
