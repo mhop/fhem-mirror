@@ -1811,14 +1811,14 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             # correct message format
                             #
 
+                            # Remove Sonos Speak commands
+                            $loopMsg =~ s/(\s*\|\w+\|\s*)/\\n\\n/gi
+                              if ( $type[$i] ne "audio" );
+
                             # Replace new line with HTML break
                             # for e-mails
                             $loopMsg =~ s/\n/<br \/>\n/gi
                               if ( $type[$i] eq "mail" );
-
-                            # Remove Sonos Speak commands
-                            $loopMsg =~ s/((|(\d+)| )\|\w+\|( |))/\n\n/gi
-                              if ( $type[$i] ne "audio" );
 
                            # use command from device, global or internal default
                             my $defCmd = "";
