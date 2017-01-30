@@ -1,5 +1,7 @@
-# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+﻿# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  93_DbLog: update to version 2.11.1, solves some issues since 
+                version 2.10.4, command set ... reopen extended
   - update:  98_DOIFtools.pm: add some hints, improved logfile handling
   - bugfix:  74_XiaomiFlowerSens: 0.6.3 fix blockingDone Routine
   - feature: 75_MSG: support for ReplaceSetMagic; msg command may now be used
@@ -69,7 +71,7 @@
   - update:  98_DOIFtools.pm: improved Attribute handling, help corrections
              new attribute DOIFtoolsHideStatReadings hides _stat Readings
              new device filter regex for report generation
-             checkDOIF checks if timer referring DOIF's name have default values
+             checkDOIF checks if timer referring DOIF's name have defaultvalues
   - feature: 98_powerMap: introduce pre-defined powerMap templates
                           for several FHEM modules
   - bugfix:  93_DbRep: uninitialized value renmode if role is Agent
@@ -104,7 +106,7 @@
   - update:  88_HMCCU.pm: new version 3.7
   - bugfix:  contrib/Widgets/DateTimePicker/fhemweb_datetime.js: 
              - added set parameter to ID to differentiate datetime widgets
-  - new   :  74_XiaomiFlowerSens, to retrieves data from a Xiaomi Flower Monitor
+  - new   :  74_XiaomiFlowerSens, to retrieves data from a Xiaomi Flower Monito
   - update:  73_NUKIBridge, 74_NUKIDevice
              set Commands are filtered by Attributs,better check alive function
              Callback/Webhook support for software bridge
@@ -142,7 +144,7 @@
                         fixed THN132N message length
   - feature: 71_YAMAHA_AVR: support for dsp/straight command/reading for
              DSP-Z based models (thanks to dev0) and RX-Vx67 series
-  - feature: 10_SOMFY: new RTS commands 0x9 und 0xA (set wind_sun_9/wind_only_a)
+  - feature: 10_SOMFY: new RTS commands 0x9 und 0xA (set wind_sun_9/wind_only_a
   - bugfix:  93_DbRep: importFromFile format problem if UNIT-field wasn't set
   - feature: 98_fhemdebug, to aid "Error: >< no TYPE" debugging.
   - feature: 70_Jabber Added possibility to change componentname via 
@@ -165,7 +167,7 @@
                    waiting state for unavaliable remote Host
                  * new Attribute: TTS_noStatistcsLog to disable logging of
                    usage of cachefiles, please read Commandref carfully!
-  - bugfix:  73_GasCalculator: Monthly reading and yearly reading name alingned 
+  - bugfix:  73_GasCalculator: Monthly reading and yearly reading name alingned
   - feature: 98_TRAFFIC: reverse waypoints, integrated map for visualization
   - update:  77_UWZ: New Version 1.4.7 added headlines for weblinks
   - update:  73_NUKIBridge,74_NUKIDevice: New Version 0.4.0
@@ -177,7 +179,7 @@
   - feature: 66_ECMD, 67_ECMDDevice:
               - if split is used, the strings at which the messages are split 
                 are still part of the messages
-              - no default attributes for requestSeparator and responseSeparator
+              - no default attributes for requestSeparator and responseSeparato
               - input of raw data as perl-encoded string (for setting 
                 attributes)
               - be more verbose and explicit at loglevel 5
@@ -279,7 +281,7 @@
                         km/h and transfer unit conversions to new UConv.pm
   - feature: Pushsafer: new option "picture", "picture2" and "picture3" for
                         "message" set command to send pictures from local 
-                        filesystem or a IPCAM device. See commandref for details
+                        filesystem or a IPCAM device. See commandref for detail
   - change:  FB_CALLMONITOR: open TCP connection non-blocking,
                              shutdown connection when disabled
   - bugfix:  73_km200: Experimental keys on scalar is now forbidden
@@ -296,7 +298,7 @@
   - added:   37_dash_dhcp.pm: new module for amazon dash buttons
   - feature: 98_Hyperion: removed attribute hyperionAttrRestore
                           default attributes just being added on define
-  - added:   73_NUKIBridge,74_NUKIDevice: New Modules to control Nuki Smartlocks
+  - added:   73_NUKIBridge,74_NUKIDevice: New Modules to control Nuki Smartlock
   - feature: 98_Hyperion: new attribute hyperionAttrRestore
                           readings will always be refreshed now
   - feature: 93_DbRep: deviceRename added, new Internal DATABASE, 
@@ -340,7 +342,7 @@
   - feature: 14_SD_WS_Maverick: Supports Maverick bbq thermometer
   - feature: 14_SD_WS: Multi purpose Module to support various weather sensors.
   - feature: 01_FHEMWEB/Reading: accept Readings in <html> (Forum #58320)
-  - bugfix:  95_Dashboard: fixes an issue causing devices with interal attribute
+  - bugfix:  95_Dashboard: fixes an issue causing devices with interal attribut
                            group to not appear in the dashboard.
   - bugfix:  93_DbRep: include day before and next in calculation if Timestamp
                        is exactly 'YYYY-MM-DD 00:00:00'
@@ -650,7 +652,7 @@
   - bugfix:  10_SOMFY: removed "setlist" (obsolete) and updated loglevels
   - bugfix   49_SSCAM: "uninitialized value $lastrecstarttime",
              "uninitialized value $lastrecstoptime"
-  - feature  49_SSCAM: new attribute "videofolderMap", see commandref           
+  - feature  49_SSCAM: new attribute "videofolderMap", see commandref
   - feature  31_MilightDevice: added white "hsv" transitions, fixed RGB
   - feature  49_SSCAM: Reading "CamLastRec" added which contains Path/name
              of last recording
@@ -665,7 +667,7 @@
              invalid command, new deb packages released (see commandref)
   - bugfix:  44_TEK603: Fixed TankLevel=NO_DATA 
   - feature: LGTV_IP12: new reading "power"
-  - change:  LGTV_IP12: changed values of mute reading from true/false to on/off
+  - change:  LGTV_IP12: changed values of mute reading from true/false to on/of
   - bugfix:  30_MilightBridge: suppress protocol change message on startup
   - bugfix:  74_Unifi.pm: Changed unsupported character for AP and UC readings
                           from hash to hyphen.
@@ -739,7 +741,7 @@
   - feature: 50_TelegramBot  receive media files, send media files directly
              invocation (PNG, JPG, MP3, PDF, etc) etc (see change log in file)
   - feature: 49_SSCAM: added function "goPreset" and "goAbsPTZ" to control the
-             move of PTZ lense, refer to commandref or have a look in forum at: 
+             move of PTZ lense, refer to commandref or have a look in forum at:
              forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275 ,
              forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892
   - feature: 98_weekprofile: widget: transfer day settings to other days
@@ -886,7 +888,7 @@
   - feature: allowed module added. allowedCommands, basicAuth, password,
              globalpassword attributes moved to this module.
   - bugfix:  YAMAHA_AVR: fixing not working volumeStraight set command
-  - change:  FB_CALLLIST: start call processing only when "event:" is triggered 
+  - change:  FB_CALLLIST: start call processing only when "event:" is triggered
              by corresponding FB_CALLMONITOR device.
   - change:  FB_CALLMONITOR: default value for attr
              fritzbox-remote-phonebook-via has been changed to "tr064"
@@ -954,7 +956,7 @@
                       Add Reading Android Version
                       Add VoiceInput fo VoiceCommands
                       Bug Fixes
-                      Call ReadingsVal from Automagic HTTP Request with Response
+                      Call ReadingsVal from Automagic HTTP Request with Respons
   - feature: 89_rssFeed: New module to get data from rss news feeds 
   - feature: FB_CALLMONITOR: added attribute disabledForIntervals to specify
              specific time ranges, where FB_CALLMONITOR will be disabled
@@ -1214,7 +1216,7 @@
   - feature: 30_pilight_raw.pm: send raw codes to pilight
   - feature: 95_Dashboard: added new attribute dashboard_tabXdevices which
                supports devspec definitions for shown dashboard groups.
-               Storage of current opened tab and restore when opening dashboard.
+               Storage of current opened tab and restore when opening dashboard
                Fixed some CSS issues (text alignment, colors ...)
   - change:  SYSMON: warning (userdefined readings), reading for perl version
   - feature: 38_CO20.pm: added advanced features, retries and timeout (by
@@ -1273,7 +1275,7 @@
   - feature: 10_pilight_ctrl.pm: added disconnect
   - feature: 32_yowsup.pm: added home attribute
   - feature: readingsGroup: allow commands for attributes
-                           allow calculation with values in the rows and columns
+                           allow calculation with values in the rows and column
                             allow default mappings with { '' => <default> }
                             added setList and setFn attributes
   - added: 32_yowsup.pm: New module to send and receive WhatsApp messages
@@ -1297,7 +1299,7 @@
              state (phervier)
   - feature: 36_LaCrosse: Implemented WS 1600
   - feature: 10_IT: Add HE800 support see
-             http://forum.fhem.de/index.php/topic,36399.msg296739.html#msg296739
+            http://forum.fhem.de/index.php/topic,36399.msg296739.html#msg296739
   - bugfix:  73_km200 - Bugfix for faulty comparison method
   - bugfix:  70_PIONEERAVR: set statusRequest updates now input names
   - feature: 30_pilight_dimmer: up|down commands to change the dimlevel
@@ -1621,7 +1623,7 @@
 - 2014-11-09 (5.6)
   - bugfix: FB_CALLMONITOR: fixing race condition of missing events while 
                             performing multiple calls
-  - feature: PROPLANTA: captures weather forecast from web page www.proplanta.de
+  - feature: PROPLANTA: captures weather forecast from web pagewww.proplanta.de
   - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
   - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
@@ -1648,7 +1650,7 @@
   - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to
            mqtt
   - added: I2C_LCD: module to drive PCF8574T based LCD connected via I2C
-  - added: I2C_DS1307: module to read time and date from DS1307 connected by i2c
+  - added: I2C_DS1307: module to read time and date from DS1307 connected by i2
   - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480,
            DS9097 and FRM
   - feature FRM: work as physical IODev for I2C_XXX modules
@@ -1717,7 +1719,7 @@
   - FHEMWEB: JavaScripts and CssFiles attributes added
   - change:  avoid updating weather information on get (59_Weather.pm)
   - change:  removed noshutdown=0 for HTTP connections made in 57_Calendar.pm
-             and 59_Weather.pm to address issues when FHEM is behind a web proxy
+            and 59_Weather.pm to address issues when FHEM is behind a web proxy
   - feature: update rewritten, restore added
   - feature: enabled JavaScript in 02_RSS to support WebViewControl
   - added:   new module 36_WMBUS.pm (kaihs) Wireless M-Bus
@@ -1726,7 +1728,7 @@
   - feature: SYSMON: aded power supply informations to the text output method
   - feature: SYSMON: power supply informations (ac, usb, battery)
   - feature: added 70_PushNotifier.pm
-  - feature: 70_VIERA: Add parameter "HDMI1" - "HDMI4" for command remoteControl
+  - feature: 70_VIERA: Add parameter "HDMI1" -"HDMI4" for command remoteControl
              to select HDMI input directly. Add command "input" to select a
              HDMI port, TV or SD-Card as source
   - bugfix:  LevelSender: Version 1.0.5: Could not get compiled by the Arduino
@@ -1765,7 +1767,7 @@
   - bugfix:  70_PIONEERAVR.pm: fix for STATE if connection is lost
   - bugfix:  37_SHC.pm: Move xml file under subdir lib, otherwise it won't be
              deployed during update
-  - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
+  - bugfix:  70_PIONEERAVR.pm: player commands are now available for more input
              "play" was not in the drop down list of available set commands
              check every 120s if the data connection to the Pioneer AV
              receiver is still up check if we get a reply from the Pioneer AV
@@ -1786,10 +1788,10 @@
   - added:   89_HEATRONIC.pm (heikoranft)
   - bugfix:  duration parsing of calendar events in 57_Calendar.pm fixed
   - feature: LightScene: added followDevices attribute
-  - feature: non-blocking retrieval of data in 59_Weather.pm (Boris & herrmannj)
+  - feature: non-blocking retrieval of data in 59_Weather.pm (Boris & herrmannj
   - feature: new modules 37_SHC.pm and 37_SHCdev.pm added (rr2000)
   - feature: 36_EMT7110: added this new module
-  - feature: 36_JeeLink: added initCommands attribute and flash command (by HCS)
+  - feature: 36_JeeLink: added initCommands attribute and flash command (by HCS
   - feature: SYSMON: DECT Temperatur
   - bugfix:  SYSMON: prevent some warnings
   - change:  SYSMONremoved support for old format of filesystem reading
@@ -1981,7 +1983,7 @@
   - feature: changed 10_OWServer.pm and 11_OWDevice.pm to use
              NOTIFYDEV (justme1968)
   - feature: LightScene: added setcmd command
-  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group positioning
+  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group positionin
   - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
   - feature: LUXTRONIK2: Setting of controller parameter and internal clock
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
@@ -2011,7 +2013,7 @@
              top or bottom of the Dashboard. Dashboard is always edited out
              the Room Dashboard.
   - bugfix:  VIERA: fixed bug related to set command remoteControl
-  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old Webif versions
+  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old Webif version
   - feature: readingsGroup: process events only if visible in browser,
              allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
@@ -2106,7 +2108,7 @@
              (by ohweh&justme1968)
   - change:  PRESENCE: using ping command line utility to check presence
              on Windows based machines.
-  - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
+  - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.tx
   - feature: new module 33_readingsGroup to display a collection of readings
              from one or more devices. this will replace weblink readings.
              (by justme1968)
@@ -2210,7 +2212,7 @@
              reverse search of austrian telephone numbers
   - bugfix:  event-on-change-reading in combination with event-change-interval
   - change:  HUEDevice: allow color preset buttons in webCmd
-  - feature: SYSSTAT: allow (remote) monitoring raspberry pi on chip temperature
+  - feature: SYSSTAT: allow (remote) monitoring raspberry pi on chip temperatur
   - feature: HUEDevice: use webCmdFn for colorpicker
              added jscolor for colorpicker
   - feature: FHEMWEB: module specific summaryFn/detailFn + defineable webCmdFn
@@ -2227,7 +2229,7 @@
   - feature: updatefhem will be silently converted to update
   - feature: FHEMWEB: save button replaced with the menu entry "Save config"
   - feature: notify supports $NAME/$EVENT/$EVTPART0/etc. @/% is deprecated.
-  - feature: 93_DbLog extended to give more functions for the charting frontend.
+  - feature: 93_DbLog extended to give more functions for the charting frontend
              This includes new queries for raw table data and also statistics,
              which get sum/max/min/avg values from the database.
              Documentation has been updated.
@@ -2303,7 +2305,7 @@
   - feature: new modules 10_OWServer.pm and 11_OWDevice.pm to interface with
              OWFS
   - feature: stateFormat (readingsFn modules) and showInternalValues attributes
-  - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
+  - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWav
   - change:  BS, USF1000, ECMDDevice, Weather, dummy migrated to readingsFN
              (Boris)
   - feature: telnet client mode
@@ -2319,7 +2321,7 @@
              via the new notice command (M. Fischer)
   - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
   - feature: userReadings
-  - feature: average supports more than one value in combined readings (T:x H:y)
+  - feature: average supports more than one value in combined readings (T:x H:y
   - feature: FHEMWEB serves arbitrary files from the www directory
   - feature: FB_checkPw now works with a distinct fritzbox user
   - bugfix:  floorplan-correction for readings with longpoll. Requires local
@@ -2331,7 +2333,7 @@
               smallscreen/touchpad moved to stylesheetPrefix, menuEntries
               added, Extend devStateIcon, js setting of attr values in detail
               screen, live slider update in detail and room view
-  - feature: added support for third-party packages to 98_update.pm (M. Fischer)
+  - feature: added support for third-party packages to 98_update.pm (M. Fischer
   - feature: FBAHA/FBDECT for FRITZ!DECT devices
   - feature: event-min-interval Attribute
 
@@ -2492,7 +2494,7 @@
   - feature: Dimmer function of X10 module changed to match FS20
   - feature: allow only meaningful readings (fill level > -5%) in USF1000
   - feature: device attr links in commandref.html
-  - bugfix:  make BS known to CUL to avoid lost messages if both FHZ1300 and CUL
+  - bugfix:  make BS known to CUL to avoid lost messagesif both FHZ1300 and CUL
              are connected, adjust matching rule
   - feature: Copy&Paste in SVG
   - feature: Debian/Ubuntu Package. Install-path changes to satisfy lintian
@@ -2766,7 +2768,7 @@
   - feature: renamed fhz1000 to fhem
   - feature: added HISTORY and README.DEV
   - doc:     Added description of attribute "model".
-  - bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
+  - bugfix:  delete the pidfile when terminating. (reported by Martin and Peter
   - feature: attribute showtime in web-pgm2 (show time instead of state)
   - feature: defattr (default attribute for following defines)
   - feature: added em1010.pl to the contrib directory
@@ -2829,7 +2831,7 @@
 - 2006-12-28 (3.0)
   - bugfix:  KS300: Make the temperature negative, not the humidity
   - bugfix:  generate correct xmllist even with fhzdev none (Martin, 12.12)
-  - feature: one set command can handle multiple devices (range and enumeration)
+  - feature: one set command can handle multiple devices (range and enumeration
   - feature: new FS20 command on-till
   - feature: perl: the current state is stored in the %value hash
   - feature: perl: sunset renamed to sunset_rel, sunset_abs added (for on-till)
@@ -2865,7 +2867,7 @@
 
 - 2006-11-08 (2.8)
   - feature: store oldvalue for triggers. perl only. requested by peter.
-  - feature: inform cmd. Patch by Martin. There are many Martins around here :-)
+  - feature: inform cmd. Patch by Martin. There are many Martins around here 
   - bugfix:  XML: fix & and < and co
   - bugfix:  Accept KS300 negative temperature values
   - change:  the FS20 msg "rain-msg" is called now "activate"
@@ -3080,3 +3082,4 @@
 
 - 2005-10-27 (1.3)
   - Bugfix: multiple at commands at the same time.
+

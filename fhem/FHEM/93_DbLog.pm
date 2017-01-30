@@ -13,9 +13,18 @@
 ################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.11.1     30.01.2017       output to central logfile enhanced for DbLog_Push
+# 2.11       28.01.2017       DbLog_connect substituted by DbLog_connectPush completely
+# 2.10.8     27.01.2017       setinternalcols delayed at fhem start
+# 2.10.7     25.01.2017       $hash->{HELPER}{COLSET} in setinternalcols, DbLog_Push changed due to 
+#                             issue Turning on AutoCommit failed
+# 2.10.6     24.01.2017       DbLog_connect changed "connect_cashed" to "connect", DbLog_Get, chartQuery now uses 
+#                             DbLog_ConnectNewDBH, Attr asyncMode changed -> delete reading cacheusage reliable if mode was switched
+# 2.10.5     23.01.2017       count, userCommand, deleteOldDays now uses DbLog_ConnectNewDBH
+#                             DbLog_Push line 1107 changed
 # 2.10.4     22.01.2017       new sub setinternalcols, new attributes colEvent, colReading, colValue
 # 2.10.3     21.01.2017       query of cacheEvents changed, attr timeout adjustable
-# 2.10.2     19.01.2017       DbLog_reduceLog now use DbLog_ConnectNewDBH -> makes start of DbLog_reduceLog stable
+# 2.10.2     19.01.2017       ReduceLog now uses DbLog_ConnectNewDBH -> makes start of ReduceLog stable
 # 2.10.1     19.01.2017       commandref edited, cache events don't get lost even if other errors than "db not available" occure  
 # 2.10       18.10.2017       new attribute cacheLimit, showNotifyTime
 # 2.9.3      17.01.2017       new sub DbLog_ConnectNewDBH (own new dbh for separate use in functions except logging functions),
@@ -69,7 +78,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.10.4";
+my $DbLogVersion = "2.11.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -77,8 +86,8 @@ my %columns = ("DEVICE"  => 64,
                "READING" => 64,
                "VALUE"   => 128,
                "UNIT"    => 32
-          );
-
+              );
+					 
 sub dbReadings($@);
 
 ################################################################
@@ -167,15 +176,11 @@ sub DbLog_Define($@)
   my $ret = _DbLog_readCfg($hash);
   return $ret if ($ret); # return on error while reading configuration
   
-  # set used COLUMNS in Internals
-  setinternalcols($hash);
+  # set used COLUMNS
+  InternalTimer(gettimeofday()+2, "setinternalcols", $hash, 0);
 
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
-  eval { DbLog_Connect($hash); };
-  if($hash->{DBMODEL} eq "MYSQL") {
-      # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
-      eval { DbLog_ConnectPush($hash); };
-  }
+  DbLog_ConnectPush($hash);
 
   DbLog_execmemcache($hash);
   
@@ -186,7 +191,7 @@ return undef;
 sub DbLog_Undef($$) {
   my ($hash, $name) = @_;
 
-  my $dbh= $hash->{DBH};
+  my $dbh= $hash->{DBHP};
   BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
   $dbh->disconnect() if(defined($dbh));
   RemoveInternalTimer($hash);
@@ -231,20 +236,20 @@ sub DbLog_Attr(@) {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
 	  }
-	  InternalTimer(gettimeofday()+2, "setinternalcols", $hash, 0);
+	  InternalTimer(gettimeofday()+0.5, "setinternalcols", $hash, 0);
   }
   
   if($aName eq "asyncMode") {
       if ($cmd eq "set" && $aVal) {
           $hash->{MODE} = "asynchronous";
-		  InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
+		  InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
       } else {
 	      $hash->{MODE} = "synchronous";
           delete($defs{$name}{READINGS}{NextSync});
 		  delete($defs{$name}{READINGS}{CacheUsage});
 	      delete($defs{$name}{READINGS}{background_processing_time});
 	      delete($defs{$name}{READINGS}{sql_processing_time});
-		  DbLog_execmemcache($hash);
+		  InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
 	  }
   }
   
@@ -294,10 +299,10 @@ return undef;
 sub DbLog_Set($@) {
     my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand 
+	my $usage = "Unknown argument, choose one of reduceLog reopen rereadcfg:noArg count:noArg deleteOldDays userCommand 
 	             listCache:noArg purgeCache:noArg commitCache:noArg";
 	return $usage if(int(@a) < 2);
-	my $dbh = $hash->{DBH};
+	my $dbh = $hash->{DBHP};
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
@@ -309,22 +314,26 @@ sub DbLog_Set($@) {
             $ret = "reduceLog error, no <days> given.";
         }
     }
-    elsif ($a[1] eq 'reopen') {
-        Log3($name, 4, "DbLog $name: Reopen requested.");
-        
-        if ($dbh) {
+    elsif ($a[1] eq 'reopen') {		
+		if ($dbh) {
             $dbh->commit() if(!$dbh->{AutoCommit});
             $dbh->disconnect();
         }
-        DbLog_Connect($hash);
-		if($hash->{DBMODEL} eq "MYSQL") {
-            # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
+		if (!$a[2]) {
+		    Log3($name, 3, "DbLog $name: Reopen requested.");
             DbLog_ConnectPush($hash);
-        }
-        $ret = "Reopen executed.";
+            $ret = "Reopen executed.";
+		} else {
+			unless ($a[2] =~ /^[0-9]+$/) { return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";}
+		    # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
+            $hash->{HELPER}{REOPEN_RUNS} = 1;
+			Log3($name, 3, "DbLog $name: Connection closed. Reopen requested in $a[2] seconds.");
+			readingsSingleUpdate($hash, "state", "closed for $a[2] seconds", 1);
+            InternalTimer(gettimeofday()+$a[2], "reopen", $hash, 0);			
+		}
     }
     elsif ($a[1] eq 'rereadcfg') {
-        Log3($name, 4, "DbLog $name: Rereadcfg requested.");
+        Log3($name, 3, "DbLog $name: Rereadcfg requested.");
         
         if ($dbh) {
             $dbh->commit() if(!$dbh->{AutoCommit});
@@ -332,11 +341,7 @@ sub DbLog_Set($@) {
         }
         $ret = _DbLog_readCfg($hash);
         return $ret if $ret;
-        DbLog_Connect($hash);
-		if($hash->{DBMODEL} eq "MYSQL") {
-            # eigenes db-handle bhp für MySQL wegen Error "MySQL-Server has gone"
-            DbLog_ConnectPush($hash);
-        }
+        DbLog_ConnectPush($hash);
         $ret = "Rereadcfg executed.";
     }
 	elsif ($a[1] eq 'purgeCache') {
@@ -354,27 +359,28 @@ sub DbLog_Set($@) {
 	    return $cache;
 	}
     elsif ($a[1] eq 'count') {
-        if ( !$dbh || not $dbh->ping ) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - count - DB Session dead, try to reopen now !");
-            DbLog_Connect($hash);
-        }
-        else {
+        $dbh = DbLog_ConnectNewDBH($hash);
+        if(!$dbh) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
+			return;
+        } else {
             Log3($name, 4, "DbLog $name: Records count requested.");
             my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
             readingsSingleUpdate($hash, 'countHistory', $c ,1);
             $c = $dbh->selectrow_array('SELECT count(*) FROM current');
             readingsSingleUpdate($hash, 'countCurrent', $c ,1);
-        }
+		    $dbh->disconnect(); 
+		}
     }
     elsif ($a[1] eq 'deleteOldDays') {
         Log3($name, 4, "DbLog $name: Deletion of old records requested.");
         my ($c, $cmd);
         
-        if ( !$dbh || not $dbh->ping ) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - deleteOldDays - DB Session dead, try to reopen now !");
-            DbLog_Connect($hash);
-        }    
-        else {
+        $dbh = DbLog_ConnectNewDBH($hash);
+        if(!$dbh) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - deleteOldDays - DB connect not possible");
+			return;
+        } else {
             $cmd = "delete from history where TIMESTAMP < ";
         
             if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
@@ -389,11 +395,11 @@ sub DbLog_Set($@) {
         }
     }
     elsif ($a[1] eq 'userCommand') {
-        if ( !$dbh || not $dbh->ping ) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB Session dead, try to reopen now !");
-            DbLog_Connect($hash);
-        }
-        else {
+        $dbh = DbLog_ConnectNewDBH($hash);
+        if(!$dbh) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB connect not possible");
+			return;
+        } else {
             Log3($name, 4, "DbLog $name: userCommand execution requested.");
             my ($c, @cmd, $sql);
             @cmd = @a;
@@ -402,6 +408,7 @@ sub DbLog_Set($@) {
             readingsSingleUpdate($hash, 'userCommand', $sql, 1);
             $c = $dbh->selectrow_array($sql);
             readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+			$dbh->disconnect();
         }
     }
     else { $ret = $usage; }
@@ -733,7 +740,7 @@ sub DbLog_Log($$) {
   my $ce       = AttrVal($name, "cacheEvents", 0);
   my $net;
 
-  return if(IsDisabled($name) || $init_done != 1);
+  return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
   # Notify-Routine Startzeit
   my $nst = [gettimeofday];
@@ -869,12 +876,12 @@ sub DbLog_Log($$) {
 			  
 	              if ($hash->{DBMODEL} ne 'SQLITE') {
                       # Daten auf maximale Länge beschneiden
-                      $dev_name = substr($dev_name,0, $columns{DEVICE});
-                      $dev_type = substr($dev_type,0, $columns{TYPE});
-                      $event    = substr($event,0, $columns{EVENT});
-                      $reading  = substr($reading,0, $columns{READING});
-                      $value    = substr($value,0, $columns{VALUE});
-                      $unit     = substr($unit,0, $columns{UNIT});
+                      $dev_name = substr($dev_name,0, $hash->{HELPER}{DEVICECOL});
+                      $dev_type = substr($dev_type,0, $hash->{HELPER}{TYPECOL});
+                      $event    = substr($event,0, $hash->{HELPER}{EVENTCOL});
+                      $reading  = substr($reading,0, $hash->{HELPER}{READINGCOL});
+                      $value    = substr($value,0, $hash->{HELPER}{VALUECOL});
+                      $unit     = substr($unit,0, $hash->{HELPER}{UNITCOL});
                   }
   
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
@@ -912,6 +919,8 @@ sub DbLog_Log($$) {
   if(!$async) {    
       if(@row_array) {
 	      # synchoner Mode
+		  # return wenn "reopen" mit Ablaufzeit gestartet ist
+          return if($hash->{HELPER}{REOPEN_RUNS});		  
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
 		  if($error) {
@@ -942,37 +951,19 @@ sub DbLog_Push(@) {
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
   my $dbh;
   
-  # Unterscheidung der db-handle zur Vermeidung "MySQL-Server has gone"
-  if($hash->{DBMODEL} ne "MYSQL") {
-      $dbh = $hash->{DBH};
-      eval {
-        if ( !$dbh || not $dbh->ping ) {
-            #### DB Session dead, try to reopen now !
-            DbLog_Connect($hash);
-        }  
-     };
-	 if ($@) {
-	     Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	     return $@;
-     } else {
-	     $dbh = $hash->{DBH};
-	 }
-  } 
-  if($hash->{DBMODEL} eq "MYSQL") {
+  $dbh = $hash->{DBHP};
+  eval {
+      if ( !$dbh || not $dbh->ping ) {
+          #### DB Session dead, try to reopen now !
+          DbLog_ConnectPush($hash);
+      }  
+  };
+  if ($@) {
+      Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	  return $@;
+  } else {
       $dbh = $hash->{DBHP};
-      eval {
-        if ( !$dbh || not $dbh->ping ) {
-            #### DB Session dead, try to reopen now !
-            DbLog_ConnectPush($hash);
-        }  
-      };
-      if ($@) {
-          Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	      return $@;
-      } else {
-          $dbh = $hash->{DBHP};
-      } 
-  }
+  } 
   
   $dbh->{RaiseError} = 1; 
   $dbh->{PrintError} = 0;
@@ -1026,6 +1017,9 @@ sub DbLog_Push(@) {
   }
   
   eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
+  if ($@) {
+      Log3($name, 2, "DbLog $name -> DBLog_Push - $@");
+  }
   my ($tuples, $rows);
   eval {
       # insert into history
@@ -1098,16 +1092,19 @@ sub DbLog_Push(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
-    $dbh->disconnect();  
-    DbLog_Connect($hash);
+    eval {$dbh->rollback() if(!$dbh->{AutoCommit});}; # issue Turning on AutoCommit failed
+	if ($@) {
+      Log3($name, 2, "DbLog $name -> DBLog_Push - $@");
+    }
+  } else {
+    eval {$dbh->commit() if(!$dbh->{AutoCommit});}; # issue Turning on AutoCommit failed
+	if ($@) {
+      Log3($name, 2, "DbLog $name -> DBLog_Push - $@");
+    }
   }
-  else {
-    $dbh->commit() if(!$dbh->{AutoCommit});
-    $dbh->{RaiseError} = 0; 
-    $dbh->{PrintError} = 1;
-  }
+$dbh->{RaiseError} = 0; 
+$dbh->{PrintError} = 1;
 
 return $error;
 }
@@ -1138,7 +1135,9 @@ sub DbLog_execmemcache ($) {
       InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
 	  return;
   }
-  if(!$async || IsDisabled($name)) {
+  
+  # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchromer Mode oder wenn disabled
+  if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {
 	  return;
   }
   
@@ -1191,7 +1190,7 @@ sub DbLog_execmemcache ($) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
       } else {
 	      if($hash->{HELPER}{RUNNING_PID}) {
-		      $error = "old BlockingCall is running - resync at NextSync";
+		      $error = "Commit already running - resync at NextSync";
 		  }
 	  }
   }
@@ -1527,7 +1526,7 @@ sub DbLog_implode_datetime($$$$$$) {
 
 ################################################################
 #
-# Verbindung zur DB aufbauen
+#                  Verbindungen zur DB aufbauen
 #
 ################################################################
 sub _DbLog_readCfg($){
@@ -1566,96 +1565,45 @@ sub _DbLog_readCfg($){
 	return;
 }
 
-sub DbLog_Connect($)
-{
-  my ($hash)= @_;
-  my $name = $hash->{NAME};
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  
-  Log3 $hash->{NAME}, 3, "Connecting to database $dbconn with user $dbuser";
-  my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
-  
-  if(!$dbh) {
-    RemoveInternalTimer($hash, "DbLog_Connect");
-    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
-    readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-    InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
-    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
-    return 0;
-  }
-
-  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established for pid $$";
-  readingsSingleUpdate($hash, 'state', 'connected', 1);
-
-  $hash->{DBH}= $dbh;
-  
-  if ($hash->{DBMODEL} eq "SQLITE") {
-    $dbh->do("PRAGMA temp_store=MEMORY");
-    $dbh->do("PRAGMA synchronous=NORMAL");
-    $dbh->do("PRAGMA journal_mode=WAL");
-    $dbh->do("PRAGMA cache_size=4000");
-    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
-  }
-
-  # no webfrontend connection for plotfork
-  return 1 if( $hash->{PID} != $$ );
-  
-  # creating an own connection for the webfrontend, saved as DBHF in Hash
-  # this makes sure that the connection doesnt get lost due to other modules
-  my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
-  
-  if(!$dbh) {
-    RemoveInternalTimer($hash, "DbLog_Connect");
-    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
-    InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
-    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
-    return 0;
-  }
-  
-#  if(!$dbhf) {
-#   Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
-#    return 0;
-#  }
-  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
-  $hash->{DBHF}= $dbhf;
-
-  return 1;
-}
-
 sub DbLog_ConnectPush($) {
-  # own $dbhp for synchronous logging
+  # own $dbhp only for synchronous logging MySQL-DB
   my ($hash)= @_;
   my $name = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   
-  Log3 $hash->{NAME}, 3, "Creating Push-Handle to database $dbconn with user $dbuser";
+  Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser";
   my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
   
   if(!$dbhp) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
-    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
+    Log3 $hash->{NAME}, 4, 'DbLog $name: Trying to connect to database';
     readingsSingleUpdate($hash, 'state', 'disconnected', 1);
     InternalTimer(time+5, 'DbLog_ConnectPush', $hash, 0);
     Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
   }
 
-  Log3 $hash->{NAME}, 3, "Push-Handle to db $dbconn created";
+  Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created";
   readingsSingleUpdate($hash, 'state', 'connected', 1);
 
   $hash->{DBHP}= $dbhp;
+  
+  if ($hash->{DBMODEL} eq "SQLITE") {
+    $dbhp->do("PRAGMA temp_store=MEMORY");
+    $dbhp->do("PRAGMA synchronous=NORMAL");
+    $dbhp->do("PRAGMA journal_mode=WAL");
+    $dbhp->do("PRAGMA cache_size=4000");
+    $dbhp->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbhp->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+  }
  
   return 1;
 }
 
 sub DbLog_ConnectNewDBH($) {
-  # new dbh for every use (except DbLog_Push..)
+  # new dbh for every use (except DbLog_Push)
   my ($hash)= @_;
   my $name = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
@@ -1700,16 +1648,14 @@ sub DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
   Log3 $hash->{NAME}, 4, "Executing $sql";
-  my $dbh= $hash->{DBH};
+  my $dbh = DbLog_ConnectNewDBH($hash);
+  return if(!$dbh);
   my $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
   if(!$sth) {
     #retry
     $dbh->disconnect();
-    if(!DbLog_Connect($hash)) {
-      Log3 $hash->{NAME}, 2, "DBLog reconnect failed.";
-      return 0;
-    }
-    $dbh= $hash->{DBH};
+    $dbh = DbLog_ConnectNewDBH($hash);
+    return if(!$dbh);
     $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
     if(!$sth) {
       Log3 $hash->{NAME}, 2, "DBLog retry failed.";
@@ -1733,12 +1679,10 @@ DbLog_Get($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
+  my $dbh;
   
-  my $dbh  = $hash->{DBH};
-  if ( !$dbh || not $dbh->ping ) {
-      #### DB Session dead, try to reopen now !
-      DbLog_Connect($hash);
-  }  
+  $dbh = DbLog_ConnectNewDBH($hash);
+  return if(!$dbh); 
   
   return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
@@ -1807,17 +1751,11 @@ DbLog_Get($@)
 
   #create new connection for plotfork
   if( $hash->{PID} != $$ ) {
-    $hash->{DBH}->disconnect();
-    return "Can't connect to database." if(!DbLog_Connect($hash));
+    $dbh->disconnect(); 
+    return "Can't connect to database." if(!DbLog_ConnectNewDBH($hash));
   }
-
-   $dbh = $hash->{DBH};
-  
-  if ( !$dbh || not $dbh->ping ) {
-      Log3($name, 1, "DbLog $name: DBLog_Get - DB Session dead, try to reopen now !");
-      DbLog_Connect($hash);
-      return undef;
-  }
+  $dbh = DbLog_ConnectNewDBH($hash);
+  return if(!$dbh);
 
   #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{DBMODEL} eq "POSTGRESQL") {
@@ -2232,8 +2170,9 @@ DbLog_Get($@)
     $data{"maxdate$k"} = $maxd[$j];
   }
 
-  #cleanup plotfork connection
-  $dbh->disconnect() if( $hash->{PID} != $$ );
+  #cleanup (plotfork) connection
+  # $dbh->disconnect() if( $hash->{PID} != $$ );
+  $dbh->disconnect();
 
   if($internal) {
     $internal_data = \$retval;
@@ -2675,7 +2614,9 @@ sub chartQuery($@) {
     }
 
     my ($hash, @a) = @_;
-    my $dbhf= $hash->{DBHF};
+    # my $dbhf= $hash->{DBHF};
+	my $dbhf = DbLog_ConnectNewDBH($hash);
+    return if(!$dbhf);
 
     my $totalcount;
     
@@ -2742,13 +2683,14 @@ sub chartQuery($@) {
         }
         $jsonstring .= '}'; 
     }
+	$dbhf->disconnect();
     $jsonstring .= ']';
     if (defined $totalcount && $totalcount ne "") {
         $jsonstring .= ',"totalCount": '.$totalcount.'}';
     } else {
         $jsonstring .= '}';
     }
-    return $jsonstring;
+return $jsonstring;
 }
 
 #########################
@@ -2859,22 +2801,47 @@ sub dbReadings($@) {
 }
 
 ################################################################
-# benutzte DB-Feldlängen zur Info in Internalos setzen
+# benutzte DB-Feldlängen zur Info in Internals setzen
 ################################################################
 sub setinternalcols ($){
   my ($hash)= @_;
   my $name = $hash->{NAME};
+
+  $hash->{HELPER}{DEVICECOL}   = $columns{DEVICE};
+  $hash->{HELPER}{TYPECOL}     = $columns{TYPE};
+  $hash->{HELPER}{EVENTCOL}    = AttrVal($name, "colEvent", $columns{EVENT});
+  $hash->{HELPER}{READINGCOL}  = AttrVal($name, "colReading", $columns{READING});
+  $hash->{HELPER}{VALUECOL}    = AttrVal($name, "colValue", $columns{VALUE});
+  $hash->{HELPER}{UNITCOL}     = $columns{UNIT};
   
-  $columns{EVENT}   = AttrVal($name, "colEvent", 512);
-  $columns{READING} = AttrVal($name, "colReading", 64);
-  $columns{VALUE}   = AttrVal($name, "colValue", 128);
+  $hash->{COLUMNS} = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
+
+  # Statusbit "Columns sind gesetzt"
+  $hash->{HELPER}{COLSET} = 1;
+
+return;
+}
+
+################################################################
+# reopen DB-Connection nach Ablauf set ... reopen [n] seconds
+################################################################
+sub reopen ($){
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $async  = AttrVal($name, "asyncMode", undef);
   
-  $hash->{COLUMNS} = "field length used for Device: $columns{DEVICE}, 
-                     Type: $columns{TYPE}, 
-					 Event: $columns{EVENT}, 
-					 Reading: $columns{READING}, 
-					 Value: $columns{VALUE}, 
-					 Unit: $columns{UNIT}";
+  RemoveInternalTimer($hash, "reopen");
+  
+  if(DbLog_ConnectPush($hash)) {
+      # Statusbit "Kein Schreiben in DB erlauben" löschen
+      delete $hash->{HELPER}{REOPEN_RUNS};
+	  Log3($name, 3, "DbLog $name: Database connection reopen request finished.");
+	  readingsSingleUpdate($hash, "state", "reopened", 1);
+	  DbLog_execmemcache($hash);
+  } else {
+      InternalTimer(gettimeofday()+30, "reopen", $hash, 0);		
+  }
+   
 return;
 }
 
@@ -2964,8 +2931,11 @@ return;
       The command can be usefull in case of you want to write the cached data manually or e.g. by an AT-device on a defined 
 	  point of time into the database. </ul><br>
 	  
-    <code>set &lt;name&gt; reopen </code><br/><br/>
-      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.</ul><br/>
+    <code>set &lt;name&gt; reopen [n] </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file if no time [n] was set. <br>
+	  If optionally a delay time of [n] seconds was set, the database connection will be disconnect immediately but it was only reopened 
+	  after [n] seconds. In synchronous mode the events won't saved during that time. In asynchronous mode the events will be
+	  stored in the memory cache and saved into database after the reconnect was done. </ul><br/>
 
     <code>set &lt;name&gt; rereadcfg </code><br/><br/>
       <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
@@ -3405,8 +3375,7 @@ return;
 	  <code>attr &lt;device&gt; showNotifyTime [1|0]
 	  </code><br>
 	  
-	  If set, 
-      Wenn gesetzt,  the reading "notify_processing_time" shows the required execution time (in seconds) in the DbLog 
+	  If set, the reading "notify_processing_time" shows the required execution time (in seconds) in the DbLog 
 	  Notify-function. This attribute is practical for performance analyses and helps to determine the differences of time
       required when the operation mode was switched from synchronous to the asynchronous mode. <br>
 	  
@@ -3555,9 +3524,14 @@ return;
       Der Befehl kann nützlich sein um manuell oder z.B. über ein AT den Cacheinhalt zu einem definierten Zeitpunkt in die 
 	  Datenbank zu schreiben. </ul><br>
 	  
-    <code>set &lt;name&gt; reopen </code><br/><br/>
-      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
-      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
+    <code>set &lt;name&gt; reopen [n]</code><br/><br/>
+      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder wenn keine Zeit [n] in Sekunden angegeben wurde. 
+	  Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme. <br>
+	  Wurde eine optionale Verzögerungszeit [n] in Sekunden angegeben, wird die Verbindung zur Datenbank geschlossen und erst 
+	  nach Ablauf von [n] Sekunden wieder neu verbunden. 
+	  Im synchronen Modus werden die Events in dieser Zeit nicht gespeichert. 
+	  Im asynchronen Modus werden die Events im Cache gespeichert und nach dem Reconnect in die Datenbank geschrieben. </ul><br>
 
     <code>set &lt;name&gt; rereadcfg </code><br/><br/>
       <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
@@ -3615,9 +3589,9 @@ return;
     <br>
     <ul>
       <li>&lt;in&gt;<br>
-        Ein Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
+        Ein Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist per default immer auf <code>-</code> zu setzen.<br>
-        Folgende Auspr&auml;gungen sind zugelassen:<br>
+        Folgende Ausprägungen sind zugelassen:<br>
         <ul>
           <li>current: die aktuellen Werte aus der Tabelle "current" werden gelesen.</li>
           <li>history: die historischen Werte aus der Tabelle "history" werden gelesen.</li>
@@ -3626,13 +3600,13 @@ return;
       </li>
 	  
       <li>&lt;out&gt;<br>
-        Ein Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
+        Ein Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist per default immer auf <code>-</code> zu setzen um die
-        Ermittlung der Daten aus der Datenbank f&ouml;r die Plotgenerierung zu pr&ouml;fen.<br>
-        Folgende Auspr&auml;gungen sind zugelassen:<br>
+        Ermittlung der Daten aus der Datenbank für die Plotgenerierung zu prüfen.<br>
+        Folgende Ausprägungen sind zugelassen:<br>
         <ul>
-          <li>ALL: Es werden alle Spalten der Datenbank ausgegeben. Inclusive einer &Uuml;berschrift.</li>
-          <li>Array: Es werden alle Spalten der Datenbank als Hash ausgegeben. Alle Datens&auml;tze als Array zusammengefasst.</li>
+          <li>ALL: Es werden alle Spalten der Datenbank ausgegeben. Inclusive einer Überschrift.</li>
+          <li>Array: Es werden alle Spalten der Datenbank als Hash ausgegeben. Alle Datensätze als Array zusammengefasst.</li>
           <li>INT: intern zur Plotgenerierung verwendet</li>
           <li>-: default</li>
         </ul>
@@ -3644,8 +3618,8 @@ return;
         <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
 		
       <li>&lt;column_spec&gt;<br>
-        F&ouml;r jede column_spec Gruppe wird ein Datenset zur&ouml;ckgegeben welches
-        durch einen Kommentar getrennt wird. Dieser Kommentar repr&auml;sentiert
+        Für jede column_spec Gruppe wird ein Datenset zurückgegeben welches
+        durch einen Kommentar getrennt wird. Dieser Kommentar repräsentiert
         die column_spec.<br>
         Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt;<br>
         <ul>
@@ -3665,17 +3639,17 @@ return;
             <ul>
               <li>int<br>
                 Ermittelt den Zahlenwert ab dem Anfang der Zeichenkette aus der
-                Spalte "VALUE". Benutzt z.B. f&ouml;r Auspr&auml;gungen wie 10%.
+                Spalte "VALUE". Benutzt z.B. für Ausprägungen wie 10%.
               </li>
               <li>int&lt;digit&gt;<br>
                 Ermittelt den Zahlenwert ab dem Anfang der Zeichenkette aus der
                 Spalte "VALUE", inclusive negativen Vorzeichen und Dezimaltrenner.
-                Benutzt z.B. f&ouml;r Auspr&auml;gungen wie -5.7&deg;C.
+                Benutzt z.B. für Auspägungen wie -5.7&deg;C.
               </li>
               <li>delta-h / delta-d<br>
-                Ermittelt die relative Ver&auml;nderung eines Zahlenwertes pro Stunde
-                oder pro Tag. Wird benutzt z.B. f&ouml;r Spalten die einen
-                hochlaufenden Z&auml;hler enthalten wie im Falle f&ouml;r ein KS300 Regenz&auml;hler
+                Ermittelt die relative Veränderung eines Zahlenwertes pro Stunde
+                oder pro Tag. Wird benutzt z.B. für Spalten die einen
+                hochlaufenden Zähler enthalten wie im Falle für ein KS300 Regenzähler
                 oder dem 1-wire Modul OWCOUNT.
               </li>
               <li>delta-ts<br>
@@ -3690,12 +3664,12 @@ return;
               enthalten da diese sonst als &lt;column_spec&gt; Trennung
               interpretiert werden und alles nach dem Leerzeichen als neue
               &lt;column_spec&gt; gesehen wird.<br>
-              <b>Schl&ouml;sselw&ouml;rter</b>
-              <li>$val ist der aktuelle Wert die die Datenbank f&ouml;r ein Device/Reading ausgibt.</li>
+              <b>Schlüsselw&ouml;rter</b>
+              <li>$val ist der aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.</li>
               <li>$ts ist der aktuelle Timestamp des Logeintrages.</li>
-              <li>Wird als $val das Schl&ouml;sselwort "hide" zur&ouml;ckgegeben, so wird dieser Logeintrag nicht
+              <li>Wird als $val das Schlüsselwort "hide" zurückgegeben, so wird dieser Logeintrag nicht
                   ausgegeben, trotzdem aber f&ouml;r die Zeitraumberechnung verwendet.</li>
-              <li>Wird als $val das Schl&ouml;sselwort "ignore" zur&ouml;ckgegeben, so wird dieser Logeintrag
+              <li>Wird als $val das Schlüsselwort "ignore" zurückgegeben, so wird dieser Logeintrag
                   nicht f&ouml;r eine Folgeberechnung verwendet.</li>
             </li>
         </ul></li>
@@ -3706,20 +3680,20 @@ return;
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
-            Damit erh?lt man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
-            Achtung: bei Nutzung von Jokerzeichen auf die historyTabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
+            Damit erhält man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
+            Achtung: bei Nutzung von Jokerzeichen auf die history-Tabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012</li>
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-           gibt 1 zur&ouml;ck f&ouml;r alle Auspr&auml;gungen von on* (on|on-for-timer etc) und 0 f&ouml;r alle off*</li>
+           gibt 1 zur&ouml;ck f&ouml;r alle Ausprägungen von on* (on|on-for-timer etc) und 0 f&ouml;r alle off*</li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-           und die Ausgabe ist f&ouml;r das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
+           und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
         <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
-           Realisierung eines Betriebsstundenz&auml;hlers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
-           eintr&auml;gen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
+           Realisierung eines Betriebsstundenzählers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
+           einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
            entsprechen w&ouml;rden.</li>
       </ul>
     <br><br>
@@ -3730,17 +3704,17 @@ return;
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </code>
     <br><br>
-    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird f&ouml;r das Charting Frontend genutzt
+    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt
     <br>
 
     <ul>
       <li>&lt;name&gt;<br>
         Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.</li>
       <li>&lt;in&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
+        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist immer auf <code>-</code> zu setzen.</li>
       <li>&lt;out&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen. 
+        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen. 
         Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
       </li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
@@ -3750,32 +3724,32 @@ return;
       <li>&lt;device&gt;<br>
         Ein String, der das abzufragende Device darstellt.</li>
       <li>&lt;querytype&gt;<br>
-        Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterst&ouml;tzte Werte sind: <br>
-          <code>getreadings</code> um f&ouml;r ein bestimmtes device alle Readings zu erhalten<br>
-          <code>getdevices</code> um alle verf&ouml;gbaren devices zu erhalten<br>
-          <code>timerange</code> um Chart-Daten abzufragen. Es werden die Parameter 'xaxis', 'yaxis', 'device', 'to' und 'from' ben&ouml;tigt<br>
-          <code>savechart</code> um einen Chart unter Angabe eines 'savename' und seiner zugeh&ouml;rigen Konfiguration abzuspeichern<br>
-          <code>deletechart</code> um einen zuvor gespeicherten Chart unter Angabe einer id zu l&ouml;schen<br>
+        Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterstützte Werte sind: <br>
+          <code>getreadings</code> um für ein bestimmtes device alle Readings zu erhalten<br>
+          <code>getdevices</code> um alle verfügbaren devices zu erhalten<br>
+          <code>timerange</code> um Chart-Daten abzufragen. Es werden die Parameter 'xaxis', 'yaxis', 'device', 'to' und 'from' benötigt<br>
+          <code>savechart</code> um einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration abzuspeichern<br>
+          <code>deletechart</code> um einen zuvor gespeicherten Chart unter Angabe einer id zu löschen<br>
           <code>getcharts</code> um eine Liste aller gespeicherten Charts zu bekommen.<br>
-          <code>getTableData</code> um Daten aus der Datenbank abzufragen und in einer Tabelle darzustellen. Ben&ouml;tigt paging Parameter wie start und limit.<br>
-          <code>hourstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r eine Stunde abzufragen.<br>
-          <code>daystats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r einen Tag abzufragen.<br>
-          <code>weekstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r eine Woche abzufragen.<br>
-          <code>monthstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r einen Monat abzufragen.<br>
-          <code>yearstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r ein Jahr abzufragen.<br>
+          <code>getTableData</code> um Daten aus der Datenbank abzufragen und in einer Tabelle darzustellen. Benötigt paging Parameter wie start und limit.<br>
+          <code>hourstats</code> um Statistiken für einen Wert (yaxis) für eine Stunde abzufragen.<br>
+          <code>daystats</code> um Statistiken für einen Wert (yaxis) für einen Tag abzufragen.<br>
+          <code>weekstats</code> um Statistiken für einen Wert (yaxis) für eine Woche abzufragen.<br>
+          <code>monthstats</code> um Statistiken für einen Wert (yaxis) für einen Monat abzufragen.<br>
+          <code>yearstats</code> um Statistiken für einen Wert (yaxis) für ein Jahr abzufragen.<br>
       </li>
       <li>&lt;xaxis&gt;<br>
-        Ein String, der die X-Achse repr&auml;sentiert</li>
+        Ein String, der die X-Achse repräsentiert</li>
       <li>&lt;yaxis&gt;<br>
-         Ein String, der die Y-Achse repr&auml;sentiert</li>
+         Ein String, der die Y-Achse repräsentiert</li>
       <li>&lt;savename&gt;<br>
          Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
       <li>&lt;chartconfig&gt;<br>
-         Ein jsonstring der den zu speichernden Chart repr&auml;sentiert</li>
+         Ein jsonstring der den zu speichernden Chart repräsentiert</li>
       <li>&lt;pagingstart&gt;<br>
-         Ein Integer um den Startwert f&ouml;r die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen</li>
       <li>&lt;paginglimit&gt;<br>
-         Ein Integer um den Limitwert f&ouml;r die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen</li>
       </ul>
     <br><br>
     Beispiele:
@@ -3783,16 +3757,16 @@ return;
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
             Liefert alle gespeicherten Charts aus der Datenbank</li>
         <li><code>get logdb - webchart "" "" "" getdevices</code><br>
-            Liefert alle verf&ouml;gbaren Devices aus der Datenbank</li>
+            Liefert alle verfügbaren Devices aus der Datenbank</li>
         <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
-            Liefert alle verf&ouml;gbaren Readings aus der Datenbank unter Angabe eines Ger&auml;tes</li>
+            Liefert alle verfügbaren Readings aus der Datenbank unter Angabe eines Gerätes</li>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
             Liefert Chart-Daten, die auf folgenden Parametern basieren: 'xaxis', 'yaxis', 'device', 'to' und 'from'<br>
             Die Ausgabe erfolgt als JSON, z.B.: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
-            Speichert einen Chart unter Angabe eines 'savename' und seiner zugeh&ouml;rigen Konfiguration</li>
+            Speichert einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration</li>
         <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
-            L&ouml;scht einen zuvor gespeicherten Chart unter Angabe einer id</li>
+            Löscht einen zuvor gespeicherten Chart unter Angabe einer id</li>
       </ul>
     <br><br>
   </ul>
