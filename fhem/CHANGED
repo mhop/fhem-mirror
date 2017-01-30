@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiFlowerSens: 0.6.3 fix blockingDone Routine
   - feature: 75_MSG: support for ReplaceSetMagic; msg command may now be used
                      with texts containing [device:reading] to replace with
                      found readings
@@ -14,14 +15,14 @@
   - bugfix:  10_EQ3BT: do not run parallel gatttool commands for same dev
   - feature: FB_CALLMONITOR: new set command "reopen"
   - feature: 66_ECMD: new attribute autoReopen
-  - update: 74_AMAD: Version 2.6.8 new feature sendSMS
+  - update:  74_AMAD: Version 2.6.8 new feature sendSMS
   - feature: 66_ECMD: new attribute autoReopen
-  - bugfix: 98_DOIFtools.pm: fixed bug from last change
-  - update: 98_DOIFtools.pm: some code rework
-  - update: 98_DOIFtools.pm: dynamic column width in report
-  - update: 98_DOIFtools.pm: add delete readings in other devices than DOIF
-  - update: 88_HMCCU.pm: version 3.9
-  - update: 98_DOIFtools.pm: marking an eventline in DOIFs event monitor
+  - bugfix:  98_DOIFtools.pm: fixed bug from last change
+  - update:  98_DOIFtools.pm: some code rework
+  - update:  98_DOIFtools.pm: dynamic column width in report
+  - update:  98_DOIFtools.pm: add delete readings in other devices than DOIF
+  - update:  88_HMCCU.pm: version 3.9
+  - update:  98_DOIFtools.pm: marking an eventline in DOIFs event monitor
                shows different representations of the event as operand
                for DOIF definitions
   - update:  73_NUKIBridge/74_NUKIDevice 0.6.0 Support for API v1.5
