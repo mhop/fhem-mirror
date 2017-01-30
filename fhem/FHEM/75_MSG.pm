@@ -51,6 +51,13 @@ sub CommandMsg($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
 
+    if ( $featurelevel >= 5.7 ) {
+        my %dummy;
+        my ( $err, @a ) = ReplaceSetMagic( \%dummy, 0, ($msg) );
+        $msg = join( " ", @a )
+          unless ($err);
+    }
+
     # find existing msgConfig device or create a new instance
     my $globalDevName = "globalMsg";
     if ( defined( $modules{msgConfig}{defptr} ) ) {
@@ -455,6 +462,15 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
 
                             # lookup matching location
                             foreach (@locationDevs) {
+
+                                if ( $featurelevel >= 5.7 ) {
+                                    my %dummy;
+                                    my ( $err, @a ) =
+                                      ReplaceSetMagic( \%dummy, 0, ($_) );
+                                    $_ = join( " ", @a )
+                                      unless ($err);
+                                }
+
                                 my $lName =
                                   AttrVal( $_, "msgLocationName", "" );
                                 if ( $lName ne "" && $lName eq $deviceLocation )
@@ -462,6 +478,14 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                     $locationDev = $_;
                                     last;
                                 }
+                            }
+
+                            if ( $featurelevel >= 5.7 ) {
+                                my %dummy;
+                                my ( $err, @a ) =
+                                  ReplaceSetMagic( \%dummy, 0, ($locationDev) );
+                                $locationDev = join( " ", @a )
+                                  unless ($err);
                             }
 
                             # look for gateway device
@@ -498,6 +522,15 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                             # non-location contacts
                             if ( $gatewayDevs ne "" ) {
 
+                                if ( $featurelevel >= 5.7 ) {
+                                    my %dummy;
+                                    my ( $err, @a ) =
+                                      ReplaceSetMagic( \%dummy, 0,
+                                        ($gatewayDevs) );
+                                    $gatewayDevs = join( " ", @a )
+                                      unless ($err);
+                                }
+
                                 foreach
                                   my $gatewayDevOr ( split /\|/, $gatewayDevs )
                                 {
@@ -517,11 +550,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                             $useLocation = 2
                                               if ( $useLocation == 0 );
                                         }
-                                        elsif (
-                                            $type[$i] ne "mail"
-                                            && AttrVal( $gatewayDev, "disable",
-                                                "0" ) eq "1"
-                                          )
+                                        elsif ( $type[$i] ne "mail"
+                                            && IsDisabled($gatewayDev) )
                                         {
                                             $useLocation = 2
                                               if ( $useLocation == 0 );
@@ -529,54 +559,28 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         elsif (
                                             $type[$i] ne "mail"
                                             && (
-                                                AttrVal(
-                                                    $gatewayDev, "disable",
-                                                    "0"
-                                                ) eq "1"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "power",
-                                                    "on"
-                                                ) eq "off"
-                                                || ReadingsVal(
+                                                ReadingsVal(
                                                     $gatewayDev, "presence",
                                                     "present"
-                                                ) eq "absent"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "presence",
-                                                    "appeared"
-                                                ) eq "disappeared"
+                                                ) =~
+m/^(0|false|absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                                 || ReadingsVal(
                                                     $gatewayDev, "state",
                                                     "present"
-                                                ) eq "absent"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "state",
-                                                    "connected"
-                                                ) eq "unauthorized"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "state",
-                                                    "connected"
-                                                ) eq "disconnected"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "state",
-                                                    "reachable"
-                                                ) eq "unreachable"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "available",
-                                                    "1"
-                                                ) eq "0"
+                                                ) =~
+m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
+                                                || (   $defs{$gatewayDev}{STATE}
+                                                    && $defs{$gatewayDev}{STATE}
+                                                    =~ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
+                                                )
                                                 || ReadingsVal(
                                                     $gatewayDev, "available",
                                                     "yes"
-                                                ) eq "no"
-                                                || ReadingsVal(
-                                                    $gatewayDev, "reachable",
-                                                    "1"
-                                                ) eq "0"
+                                                ) =~ m/^(0|no|false)$/i
                                                 || ReadingsVal(
                                                     $gatewayDev, "reachable",
                                                     "yes"
-                                                ) eq "no"
+                                                ) =~ m/^(0|no|false)$/i
                                             )
                                           )
                                         {
@@ -1566,6 +1570,14 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                         )
                       );
 
+                    if ( $featurelevel >= 5.7 ) {
+                        my %dummy;
+                        my ( $err, @a ) =
+                          ReplaceSetMagic( \%dummy, 0, ($gatewayDevs) );
+                        $gatewayDevs = join( " ", @a )
+                          unless ($err);
+                    }
+
                     my %gatewaysStatus;
 
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
@@ -1609,7 +1621,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                 && (
                                     ReadingsVal( $gatewayDev, "presence",
                                         "present" ) =~
-m/^(0|absent|disappeared|unauthorized|disconnected|unreachable)$/i
+m/^(0|false|absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     || ReadingsVal( $gatewayDev, "state",
                                         "present" ) =~
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
@@ -1618,9 +1630,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     )
                                     || ReadingsVal( $gatewayDev, "available",
-                                        "yes" ) =~ m/^(0|no)$/i
+                                        "yes" ) =~ m/^(0|no|off|false)$/i
                                     || ReadingsVal( $gatewayDev, "reachable",
-                                        "yes" ) =~ m/^(0|no)$/i
+                                        "yes" ) =~ m/^(0|no|off|false)$/i
                                 )
                               )
                             {
@@ -1902,24 +1914,6 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 my %dummy;
                                 my ( $err, @a );
 
-                                # MSG
-                                ( $err, @a ) =
-                                  ReplaceSetMagic( \%dummy, 0, ($loopMsg) );
-                                $replaceError .=
-                                  "ReplaceSetMagic failed for MSG: $err\n"
-                                  if ($err);
-                                $loopMsg = join( " ", @a )
-                                  unless ($err);
-
-                                # DEVICE
-                                ( $err, @a ) =
-                                  ReplaceSetMagic( \%dummy, 0, ($gatewayDev) );
-                                $replaceError .=
-                                  "ReplaceSetMagic failed for DEVICE: $err\n"
-                                  if ($err);
-                                $gatewayDev = join( " ", @a )
-                                  unless ($err);
-
                                 # TITLE
                                 ( $err, @a ) =
                                   ReplaceSetMagic( \%dummy, 0, ($loopTitle) );
@@ -1943,7 +1937,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 }
 
                                 # TERMINAL
-                                if ( $subRecipient ne "" ) {
+                                if ( $termRecipient ne "" ) {
                                     ( $err, @a ) =
                                       ReplaceSetMagic( \%dummy, 0,
                                         ($termRecipient) );
