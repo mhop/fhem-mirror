@@ -76,10 +76,10 @@ my $DOIFtoolsJavaScript = <<'EOF';
 
         var txt = "Copy &amp; paste it to your DOIF definition<br><br>";
         txt += "<div><ul>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><b>"+re1+"</b></li><br>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><b>"+re2+"</b></li><br>";
-        txt += "<li>event as <i>regular expression</i>:<br><b>"+re3+"</b></li><br>";
-        txt += "<li>event as <i>regular expression</i> with value:<br><b>"+re4+"</b></li><br>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><code>"+re1+"</code></li><br>";
+        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><code>"+re2+"</code></li><br>";
+        txt += "<li>event as <i>regular expression</i>:<br><code>"+re3+"</code></li><br>";
+        txt += "<li>event as <i>regular expression</i> with value:<br><code>"+re4+"</code></li><br>";
         txt += "</ul></div>";
         return FW_okDialog(txt);
     }
@@ -124,7 +124,7 @@ sub DOIFtools_eM($$$$) {
   my $ret = "";
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "</div>";
 
   my $a = "";
@@ -138,7 +138,7 @@ sub DOIFtools_eM($$$$) {
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
     $ret .= "<div>";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\" ></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJavaScript;
   }
@@ -198,7 +198,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   my $ret = "";
   # Logfile Liste
   if($FW_ss && $pageHash) {
-        $ret."<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
+        $ret.= "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
                   "$defs{$d}{STATE}</div>";
   } else {
   my $row = 0;
@@ -223,7 +223,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br>Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
     $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
@@ -313,7 +313,7 @@ sub DOIFtools_fhemwebFn($$$$) {
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
     $ret .= "<div>";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\"></textarea>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\"></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJavaScript;
   }
@@ -350,7 +350,7 @@ sub DOIFtools_Notify($$) {
       $trig .= "</a><strong>\[$hash->{helper}{counter}{0}\] +++++ Listing $sn:$1 +++++</strong>\n";
       my $prev = $hash->{helper}{counter}{0} - 1;
       my $next = $hash->{helper}{counter}{0} + 1;
-      $trig .= $prev ? "<b>jump to: <a href=\"#list$prev\">prev</a>&nbsp;&nbsp;<a href=\"#list$next\">next</a> Listing</b><br>" : "<b>jump to: <a href=\"#list$next\">next</a> Listing</b><br>";
+      $trig .= $prev ? "<b>jump to: <a href=\"#list$prev\">prev</a>&nbsp;&nbsp;<a href=\"#list$next\">next</a> Listing</b><br>" : "<b>jump to: prev&nbsp;&nbsp;<a href=\"#list$next\">next</a> Listing</b><br>";
       $trig .= "DOIF-Version: ".ReadingsVal($pn,"DOIF_version","n/a")."<br>";
       $trig .= CommandList(undef,$sn);
       foreach my $itm (keys %defs) {
