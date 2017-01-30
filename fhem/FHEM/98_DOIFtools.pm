@@ -908,7 +908,9 @@ sub DOIFtools_Get($@)
       my $pnLog = "$hash->{TYPE}Log";
       push @regex, $pnLog;
       readingsSingleUpdate($hash,"doif_to_log",$value,0);
-      return unless($value);
+      readingsSingleUpdate($hash,"specialLog",0,0) if (!$value);      
+      DOIFtoolsSetNotifyDev($hash,0,1);
+      # return unless($value);
 
       foreach my $i (split(",",$value)) {
         push @regex, DOIFtoolsGetAssocDev($hash,$i);
@@ -922,6 +924,8 @@ sub DOIFtools_Get($@)
         $ret = CommandAttr(undef,"$pnLog mseclog ".AttrVal($pnLog,"mseclog","1"));
         push @ret, $ret if($ret);
         $ret = CommandAttr(undef,"$pnLog nrarchive ".AttrVal($pnLog,"nrarchive","3"));
+        push @ret, $ret if($ret);
+        $ret = CommandAttr(undef,"$pnLog disable ".($value ? "0" : "1"));
         push @ret, $ret if($ret);
         $ret = CommandSave(undef,undef) if (AttrVal($pn,"DOIFtoolsExecuteSave",""));
         push @ret, $ret if($ret);

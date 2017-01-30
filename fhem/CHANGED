@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - update:  98_DOIFtools.pm: add some hints
+  - update:  98_DOIFtools.pm: add some hints, improved logfile handling
   - bugfix:  74_XiaomiFlowerSens: 0.6.3 fix blockingDone Routine
   - feature: 75_MSG: support for ReplaceSetMagic; msg command may now be used
                      with texts containing [device:reading] to replace with
