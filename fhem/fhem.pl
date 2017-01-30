@@ -2125,7 +2125,7 @@ CommandSetReading($$)
   return "Usage: setreading <name> <reading> <value>\n$namedef" if(@a != 3);
 
   my $err;
-
+  my @b = @a;
   my @rets;
   foreach my $sdev (devspec2array($a[0],$cl)) {
 
@@ -2136,10 +2136,10 @@ CommandSetReading($$)
     my $hash = $defs{$sdev};
     if($featurelevel >= 5.7) {
       $hash->{CL} = $cl;
-      ($err, @a) = ReplaceSetMagic($hash, 3, @a);
+      ($err, @b) = ReplaceSetMagic($hash, 3, @a);
       delete($hash->{CL});
     }
-    readingsSingleUpdate($defs{$sdev}, $a[1], $a[2], 1);
+    readingsSingleUpdate($defs{$sdev}, $b[1], $b[2], 1);
   }
   return join("\n", @rets);
 }
