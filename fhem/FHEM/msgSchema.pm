@@ -119,9 +119,9 @@ my $db = {
 
         'HUEDevice' => {
             'Normal' =>
-'{ my $dev=\'%DEVICE%\'; my $state=ReadingsVal($dev,"state","off"); fhem "set $dev blink 2 1"; fhem "sleep 4.25; set $dev:FILTER=state!=$state $state"; }',
+'{ my $d=\'%DEVICE%\'; my $state=ReadingsVal($d,"state","off"); fhem "set $d blink 2 1"; fhem "sleep 4.25; set $d:FILTER=state!=$state $state"; }',
             'High' =>
-'{ my $dev=\'%DEVICE%\'; my $state=ReadingsVal($dev,"state","off"); fhem "set $dev blink 10 1"; fhem "sleep 20.25; set $dev:FILTER=state!=$state $state"; }',
+'{ my $d=\'%DEVICE%\'; my $state=ReadingsVal($d,"state","off"); fhem "set $d blink 10 1"; fhem "sleep 20.25; set $d:FILTER=state!=$state $state"; }',
             'Low' => 'set %DEVICE% alert select',
         },
 
@@ -131,11 +131,11 @@ my $db = {
 
         'fhemMsgMail' => {
             'Normal' =>
-'{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
+'{ my $d=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$d\'"); }',
             'High' =>
-'{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
+'{ my $d=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$d\'"); }',
             'Low' =>
-'{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
+'{ my $d=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$d\'"); }',
             'defaultValues' => {
                 'Normal' => {
                     'TITLE' => 'System Message',
@@ -212,11 +212,11 @@ my $db = {
 
         'Pushover' => {
             'Normal' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% %MSG%',
             'High' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% %MSG%',
             'Low' =>
-'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%:%TERMINAL%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% %MSG%',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'      => '',
@@ -344,11 +344,11 @@ my $db = {
 
         'XBMC' => {
             'Normal' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'High' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'Low' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'defaultValues' => {
                 'Normal' => {
                     'TIMEOUT'   => 8,
