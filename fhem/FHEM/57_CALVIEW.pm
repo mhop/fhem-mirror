@@ -110,7 +110,7 @@ sub CALVIEW_GetUpdate($){
 		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; }
 		my $isostarttime = $Y."-".$M."-".$D."T".$tempstart[1];
 		my $isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
-		my $eventDate = timelocal(0,0,0,$D,$M-1,$Y);
+		my $eventDate = fhemTimeLocal(0,0,0,$D,$M-1,$Y-1900);
 		my $daysleft = floor(($eventDate - time) / 60 / 60 / 24 + 1);
 		push @termineNew,{
 			bdate => $tempstart[0],
@@ -156,9 +156,9 @@ sub CALVIEW_GetUpdate($){
 					#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
 					if($isbday == 1 ){
 						@termyear = split(/\./,$termin->{bdate});
-						if($yobfield eq "_location" && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
-						elsif($yobfield eq "_description" && length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
-						elsif($yobfield eq "_summary" && length($termin->{summary}) > 0 ) {my ($byear) = $termin->{summary} =~ /(\d\d\d\d)/ ; $age = $termyear[2] -  $byear;}
+						if($yobfield eq "_location" && defined($termin->{location}) && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
+						elsif($yobfield eq "_description" && defined($termin->{description})&& length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
+						elsif($yobfield eq "_summary" && defined($termin->{summary}) && length($termin->{summary}) > 0 ) {my ($byear) = $termin->{summary} =~ /(\d\d\d\d)/ ; $age = $termyear[2] -  $byear;}
 						else {$age = " "}
 					}
 
