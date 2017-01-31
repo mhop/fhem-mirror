@@ -56,7 +56,11 @@ JsonList2_dumpHash($$$$$$)
     $ret .= "," if($i2 < int(@arr)-1);
     $ret .= "\n" if(int(@arr)>1);
   }
-  push(@{$arrp}, "    \"$name\": {".(int(@arr)>1 ? "\n" : "")."$ret    }") if $ret;
+  if(@arr > 1) {
+    push @{$arrp}, "    \"$name\": {\n$ret    }";
+  } else {
+    push @{$arrp}, "    \"$name\": { }";
+  }
 }
 
 #####################################
