@@ -45,8 +45,9 @@ sub DOIFtoolsCounterReset($);
 sub DOIFtoolsDeleteStatReadings;
 
 my @DOIFtools_we =();
-my $DOIFtoolsJavaScript = <<'EOF';
+my $DOIFtoolsJSfuncEM = <<'EOF';
   <script type="text/javascript">
+    //functions
     function doiftoolsCopyToClipboard() {
         var txtarea = document.getElementById('console');
         var start = txtarea.selectionStart;
@@ -85,11 +86,27 @@ my $DOIFtoolsJavaScript = <<'EOF';
     }
 
     function delbutton() {
+          FW_cmd(FW_root+"?cmd={my @d = devspec2array('TYPE=DOIFtools');;return $d[0] ? $d[0] : ''}&XHR=1", function(data){
+          if (data) {
+            var dn = data;
+            FW_cmd(FW_root+"?cmd={AttrVal(\""+dn+"\",\"DOIFtoolsEMbeforeReadings\",\"0\")}&XHR=1", function(data){
+              if (data == 1) {
+                var ins = document.getElementsByClassName('makeTable wide readings');
+                var del = document.getElementById('doiftoolscons');
+                if (del) {
+                  ins[0].parentNode.insertBefore(del,ins[0]);
+                }
+              }
+            });
+          }
+        });
       var del = document.getElementById('addRegexpPart');
       if (del) {
+        removeEventListener ('DOMNodeInserted', delbutton);
         del.parentNode.removeChild(del);
       }
     }
+    //execute
     var ins = document.getElementById('doiftoolsdel');
     addEventListener ('DOMNodeInserted', delbutton, false);
     var ins = document.getElementById('console');
@@ -114,13 +131,14 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 disabledForIntervals ".$oldAttr;
 }
 
 sub DOIFtools_dO ($$$$){return "";}
 # FW_detailFn for DOIF injecting event monitor
 sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my @dtn = devspec2array("TYPE=DOIFtools"); 
   my $ret = "";
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
@@ -131,16 +149,16 @@ sub DOIFtools_eM($$$$) {
   if (ReadingsVal($d,".eM","off") eq "on") {
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
+    $ret .= "<div id='doiftoolscons'>";
     $ret .= "<div><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
-    $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\" ></textarea>";
     $ret .= "</div>";
-    $ret .= $DOIFtoolsJavaScript;
+    $ret .= $DOIFtoolsJSfuncEM;
   }
   return $ret;
 }
@@ -315,7 +333,7 @@ sub DOIFtools_fhemwebFn($$$$) {
     $ret .= "<div>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\"></textarea>";
     $ret .= "</div>";
-    $ret .= $DOIFtoolsJavaScript;
+    $ret .= $DOIFtoolsJSfuncEM;
   }
   return $ret;
 }
@@ -1153,6 +1171,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>
         defmod DOIFtools DOIFtools<br>
         attr DOIFtools DOIFtoolsEventMonitorInDOIF 1<br>
+        attr DOIFtools DOIFtoolsEMbeforeReadings 1<br>
         attr DOIFtools DOIFtoolsExecuteDefinition 1<br>
         attr DOIFtools DOIFtoolsExecuteSave 1<br>
         attr DOIFtools DOIFtoolsMenuEntry 1<br>
@@ -1247,6 +1266,9 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsEventMonitorInDOIF &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEventMonitorInDOIF</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF ermöglicht. <b>Default 0</b>, kein Zugriff auf den Event-Monitor im DOIF.<br>
+        <br>
+        <code>attr &lt;name&gt; DOIFtoolsEMbeforeReadings &lt;1|0&gt;</code><br>
+        <b>DOIFtoolsEMbeforeReading</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF direkt über den Readings angezeigt. <b>Default 0</b>, anzeige des Event-Monitors über den Internals.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsHideGetSet &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>

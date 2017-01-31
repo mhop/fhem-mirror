@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: add attribute to move event monitor directly above
+                readings section in detail view of DOIF
   - update:  93_DbLog: update to version 2.11.1, solves some issues since 
                 version 2.10.4, command set ... reopen extended
   - update:  98_DOIFtools.pm: add some hints, improved logfile handling
