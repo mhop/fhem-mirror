@@ -195,7 +195,7 @@ sub TPLinkHS110_Set($$)
 	my ( $hash, @a ) = @_;
   	my $name= $hash->{NAME};
 	return "Device disabled in config" if ($attr{$name}{"disable"} eq "1");
-	return "Unknown argument $a[1], choose one of on off " if($a[1] eq "?");
+	return "Unknown argument $a[1], choose one of on off " if($a[1] ne "on" || $a[1] ne "off");
    	Log3 $hash, 3, "TPLinkHS110: $name Set <". $a[1] ."> called";
 
 	my $command;
