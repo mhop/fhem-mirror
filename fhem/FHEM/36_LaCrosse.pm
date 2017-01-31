@@ -416,6 +416,11 @@ sub LaCrosse_Parse($$) {
       || (defined($rhash->{"previousT$channel"})
       && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
       && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )) {
+      
+      # remove unwanted Battery2 readings
+      if (defined ($rhash->{READINGS}{battery2})) {
+        delete $rhash->{READINGS}{battery2}
+      }
 
       # Calculate average
       if (AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF) {
@@ -424,44 +429,42 @@ sub LaCrosse_Parse($$) {
       if (AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF) {
         $humidity = ($rhash->{"previousH$channel"} * 3 + $humidity) / 4;
       }
+      
+      # Calculate dew point
+      my $dewpoint = undef;
+      if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 && $temperature != 0xFFFF ) {
+        $dewpoint = LaCrosse_CalcDewpoint($temperature, $humidity);
+      }
 
       # Handle resolution
-      if (my $resolution = AttrVal( $rname, "resolution", 0 )) {
-        if ($temperature != 0xFFFF) {
-          $temperature = int($temperature * 10 / $resolution + 0.5) * $resolution / 10;
-        }
-        if ($humidity != 0xFF) {
-          $humidity = int($humidity * 10 / $resolution + 0.5) * $resolution / 10;
-        }
+      my $resolution = AttrVal( $rname, "resolution", 1);
+      if ($temperature != 0xFFFF) {
+        $temperature = int($temperature * 10 / $resolution + ($temperature < 0 ? -0.5 : 0.5)) * $resolution / 10
+      }
+      if ($humidity != 0xFF) {
+        $humidity = int($humidity * 10 / $resolution + ($humidity < 0 ? -0.5 : 0.5)) * $resolution / 10
+      }
+      if ($dewpoint) {
+        $dewpoint = int($dewpoint * 10 / $resolution + ($dewpoint < 0 ? -0.5 : 0.5)) * $resolution / 10
       }
 
       readingsBeginUpdate($rhash);
+
       if ($typeNumber > 0) {
         readingsBulkUpdate($rhash, "error", $error ? "1" : "0");
       }
+      
+      readingsBulkUpdate($rhash, "battery", $battery_low ? "low" : "ok");
 
-      # Battery state
-      if (defined ($rhash->{READINGS}{battery2})) {
-        delete $rhash->{READINGS}{battery2}
-      }
-      readingsBulkUpdate($rhash, "battery", $battery_low? "low" : "ok");
-
-      # Calculate dewpoint
-      my $dewpoint;
-      if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 && $temperature != 0xFFFF ) {
-        $dewpoint = LaCrosse_CalcDewpoint($temperature,$humidity);
-        $dewpoint = int($dewpoint*10 + 0.5) / 10;
-        readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
-      }
-
-      # Round and write temperature and humidity
+      # write temperature, humidity, ...
       if ($temperature != 0xFFFF) {
-        $temperature = int($temperature*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       }
-      if ($humidity && $humidity <= 99) {
-        $humidity = int($humidity*10 + 0.5) / 10;
+      if ($humidity && $humidity <= 100) {
         readingsBulkUpdate($rhash, "humidity$channel", $humidity);
+      }
+      if ($dewpoint != 0xFFFF) {
+        readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
       }
 
       # STATE
