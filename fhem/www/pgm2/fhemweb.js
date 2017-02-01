@@ -842,13 +842,14 @@ FW_longpoll()
   var retry;
   if(filter == "") {
     $("embed").each(function() {
-      if($(this.getSVGDocument()).length == 0 && !retry && 
-                        filter != ".*" && --embedLoadRetry > 0) {
+      if(FW_getSVG(this) == undefined && !retry &&
+         filter != ".*" && --embedLoadRetry > 0) {
         retry = 1;
         setTimeout(FW_longpoll, 100);
         return;
       }
-      if($(this.getSVGDocument()).find("svg[flog]").attr("flog"))
+      
+      if($(FW_getSVG(this)).find("svg[flog]").attr("flog"))
         filter=".*";
     });
     if(retry)
@@ -1510,9 +1511,19 @@ scriptAttribute(sname)
 }
 /*************** SCRIPT LOAD FUNCTIONS END **************/
 
-function print_call_stack() {
+function
+print_call_stack() {
   var stack = new Error().stack;
   console.log("PRINTING CALL STACK");
   console.log( stack );
 }
 
+function
+FW_getSVG(emb)
+{
+  if(emb.contentDocument)
+    return emb.contentDocument;
+  if(typeof emb.getSVGDocument == "function")
+    return emb.getSVGDocument();
+  return undefined;
+}

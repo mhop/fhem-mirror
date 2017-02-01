@@ -350,7 +350,7 @@ svg_init(par)    // also called directly from perl, in race condition
   $("embed").each(function(){
     var e = this;
     var src = $(e).attr("src");
-    var ed = e.getSVGDocument();
+    var ed = FW_getSVG(e);
     if(src.indexOf("SVG_showLog") < 0 || !ed)
       return;
     var sTag = $("svg", ed)[0]; // "not well-formed" warning in FireFox
@@ -380,10 +380,11 @@ FW_svgUpdateDevs(devs)
   // if matches, refresh the SVG by removing and readding the embed tag
   var embArr = document.getElementsByTagName("embed");
   for(var i = 0; i < embArr.length; i++) {
-    if(typeof embArr[i].getSVGDocument != "function")
-      continue;
-    var svg = embArr[i].getSVGDocument();
+    var svg = FW_getSVG(embArr[i]);
     if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
+      continue;
+    if(svg.contentType != "image/svg+xml" &&
+       typeof embArr[i].getSVGDocument != "function")
       continue;
     svg = svg.firstChild.nextSibling;
     var flog = svg.getAttribute("flog");
