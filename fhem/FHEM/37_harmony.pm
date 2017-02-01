@@ -511,7 +511,7 @@ harmony_Set($$@)
     my $interval = $param?$param*60:60*60;
     $interval = -1 if( $interval < 0 );
 
-    harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.engine?setsleeptimer' token=''>interval=$interval</oa>", "setsleeptimer");
+    harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.engine?setsleeptimer'>interval=$interval</oa>", "setsleeptimer");
 
     return undef;
 
