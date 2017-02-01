@@ -113,7 +113,51 @@ my $DOIFtoolsJSfuncEM = <<'EOF';
     ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
   </script>
 EOF
-
+my $DOIFtoolsJSfuncStart = <<'EOF';
+<script type="text/javascript">
+//functions
+function doiftoolsRemoveLookUp () {
+    $('#addLookUp').dialog( "close" );
+}
+function doiftoolsAddLookUp () {
+    var tn = $(this).text();
+    var target = this;
+    var txt = "Internals<table class='block wide internals' style='font-size:12px'>";
+    FW_cmd(FW_root+"?cmd=jsonlist2 "+tn+"&XHR=1", function(data){
+      var devList = JSON.parse(data);
+      var dev = devList.Results[0];
+      var row = 0;
+      for (item in dev.Internals) {
+        var cla = ((row++&1)?"odd":"even");
+        txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Internals[item].replace(/\n/g,"<br>")+"</td></tr>\n";
+      }
+      txt += "</table>Readings<table class='block wide readings' style='font-size:12px'><br>";
+      row = 0;
+      for (item in dev.Readings) {
+        var cla = ((row++&1)?"odd":"even");
+        txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Readings[item].Value+"</td><td>"+dev.Readings[item].Time+"</td></tr>\n";
+      }
+      txt += "</table>";
+        $('#addLookUp').html(txt);
+        $('#addLookUp').dialog("open");
+    });
+}
+$(document).ready(function(){
+    $('body').append('<div id="addLookUp" style="display:none"></div>');
+    $('#addLookUp').dialog({
+        width:"60%",
+        modal: false,
+        position: { at: "right"},
+        collusion: "fit fit"
+    });
+    $('#addLookUp').dialog( "close" );
+    $(".assoc").find("a:even").each(function() {
+        $(this).on("mouseover",doiftoolsAddLookUp);
+        $(this).on("mouseleave",doiftoolsRemoveLookUp);
+    });
+});
+</script>
+EOF
 
 #########################
 sub DOIFtools_Initialize($)
@@ -140,6 +184,7 @@ sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my @dtn = devspec2array("TYPE=DOIFtools"); 
   my $ret = "";
+  $ret .= $DOIFtoolsJSfuncStart;
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
   $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
@@ -214,6 +259,8 @@ sub DOIFtools_logWrapper($) {
 sub DOIFtools_fhemwebFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $ret = "";
+  # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/myfunction.js\"></script>";
+  $ret .= $DOIFtoolsJSfuncStart;
   # Logfile Liste
   if($FW_ss && $pageHash) {
         $ret.= "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
