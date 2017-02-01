@@ -21,6 +21,8 @@ my %km271_sets = (
                         OPT => ":slider,10,0.5,30,1"},
   "hk1_betriebsart" => {SET => "070065656565%02x65:0704%02x",
                         OPT => ""},
+  "hk1_aussenhalt_ab" => {SET => "07156565%02x656565:0706%02x",
+                        OPT => ":slider,-20,1,10"},
   "hk2_nachtsoll"   => {SET => "08006565%02x656565:0802%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
   "hk2_tagsoll"     => {SET => "0800656565%02x6565:0803%02x", # 0.5 celsius
@@ -29,6 +31,8 @@ my %km271_sets = (
                         OPT => ":slider,10,0.5,30,1"},
   "hk2_betriebsart" => {SET => "080065656565%02x65:0804%02x",
                         OPT => ""},
+  "hk2_aussenhalt_ab" => {SET => "08156565%02x656565:0806%02x",
+                        OPT => ":slider,-20,1,10"},
 
   "ww_soll"         => {SET => "0C07656565%02x6565:0c07%02x", # 1.0 celsius
                         OPT => ":slider,30,1,60"},
@@ -50,9 +54,10 @@ my %km271_sets = (
 
   "sommer_ab"       => {SET => "070065%02x65656565:0701%02x",
                         OPT => ":slider,9,1,31"},
-
+  "frost_ab"        => {SET => "07316565656565%02x:0707%02x",
+                        OPT => ":slider,-20,1,10"},
   "urlaub"          => {SET => "1100656565%02x6565",
-                        OPT => ":slider,0,1,99"},
+                      OPT => ":slider,0,1,99"},
 
   "logmode"         => {SET => "EE0000",
                         OPT => ":noArg"}
@@ -71,7 +76,7 @@ my %km271_gets = (
 #   t (timer - special handling), eh (error history - special handling)
 my %km271_tr = (
   "CFG_Sommer_ab"                   => "0000:1,p:-9,a:8",
-  "cFG_Sommer_ab"                   => "0701:0,p:-9,a:8",  # fake reading for internal notify
+  "cFG_Sommer_ab"                   => "0701:0,p:-9,a:8", # fake reading for internal notify
   "CFG_HK1_Nachttemperatur"         => "0000:2,d:2",
   "cFG_HK1_Nachttemperatur"         => "0702:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Tagtemperatur"           => "0000:3,d:2",
@@ -83,11 +88,14 @@ my %km271_tr = (
   "CFG_HK1_Max_Temperatur"          => "000e:2",
   "CFG_HK1_Auslegung"               => "000e:4",
   "CFG_HK1_Aufschalttemperatur"     => "0015:0,a:9",
-  "CFG_Frost_ab"                    => "0015:2,s",
+  "CFG_HK1_Aussenhalt_ab"           => "0015:2,s",
+  "cFG_HK1_Aussenhalt_ab"           => "0706:0,s",    # fake reading for internal notify
   "CFG_HK1_Absenkungsart"           => "001c:1,a:6",
   "CFG_HK1_Heizsystem"              => "001c:2,a:7",
   "CFG_HK1_Temperatur_Offset"       => "0031:3,s,d:2",
   "CFG_HK1_Fernbedienung"           => "0031:4,a:0",
+  "CFG_Frost_ab"                    => "0031:5,s",
+  "cFG_Frost_ab"                    => "0707:0,s",    # fake reading for internal notify
   "CFG_HK2_Nachttemperatur"         => "0038:2,d:2",
   "cFG_HK2_Nachttemperatur"         => "0802:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Tagtemperatur"           => "0038:3,d:2",
@@ -100,6 +108,8 @@ my %km271_tr = (
   "CFG_HK2_Auslegung"               => "0046:4",
   "CFG_HK2_Aufschalttemperatur"     => "004d:0,a:9",
   "CFG_WW_Vorrang"                  => "004d:1,a:0",
+  "CFG_HK2_Aussenhalt_ab"           => "004d:2,s",
+  "cFG_HK2_Aussenhalt_ab"           => "0806:0,s",    # fake reading for internal notify
   "CFG_HK2_Absenkungsart"           => "0054:1,a:6",
   "CFG_HK2_Heizsystem"              => "0054:2,a:7",
   "CFG_HK2_Temperatur_Offset"       => "0069:3,s,d:2",
@@ -114,9 +124,12 @@ my %km271_tr = (
   "cFG_WW_Zirkulation"              => "0c0f:0,a:11",  # fake reading for internal notify
   "CFG_Sprache"                     => "0093:0,a:3",
   "CFG_Anzeige"                     => "0093:1,a:1",
+  "CFG_Brennerart"                  => "009a:1,a:12",
   "CFG_Max_Kesseltemperatur"        => "009a:3",
   "CFG_Pumplogik"                   => "00a1:0",
   "CFG_Abgastemperaturschwelle"     => "00a1:5,p:-9,a:5",
+  "CFG_Brenner_Min_Modulation"      => "00a8:0",
+  "CFG_Brenner_Mod_Laufzeit"        => "00a8:1",
 
   "PRG_HK1_Programm"                => "0100:0,a:2",
   "CFG_Urlaubstage"                 => "0100:3",
@@ -179,7 +192,7 @@ my %km271_tr = (
   "HK2_Ausschaltoptimierung"        => "8119:0",
   "HK2_Pumpe"                       => "811a:0",
   "HK2_Mischerstellung"             => "811b:0,ne",  # great part of all messages
-  "HK2_Heizkennlinie_10_Grad"      => "811e:0",
+  "HK2_Heizkennlinie_10_Grad"       => "811e:0",
   "HK2_Heizkennlinie_0_Grad"        => "811f:0",
   "HK2_Heizkennlinie_-10_Grad"      => "8120:0",
   "WW_Betriebswerte1"               => "8424:0,bf:2",
@@ -275,7 +288,9 @@ my @km271_arrays = (
   # 10 - Brenneransteuerung
   [ "Kessel aus", "1.Stufe an", "-", "-", "2.Stufe an bzw. Modulation frei" ],
   # 11 - CFG_Zirkulation
-  [ "Aus","1","2","3","4","5","6","An" ]
+  [ "Aus","1","2","3","4","5","6","An" ],
+  # 12 - CFG_Brennerart
+  [ "-","1-stufig","2-stufig","modulierend" ]
 );
 
 # PRG_HK1_TimerXX, PRG_HK2_TimerXX
@@ -354,7 +369,7 @@ my %km271_errormsg = (
 sub
 KM271_Initialize($)
 {
-  my ($hash) = @_;
+  my $hash = shift;
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
@@ -420,7 +435,7 @@ KM271_Define($$)
 sub
 KM271_Undef($$)
 {
-  my ($hash, $arg) = @_;
+  my ($hash, $name) = @_;
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -447,7 +462,7 @@ KM271_Set($@)
   if($cmd =~ m/%/) {
     return "\"set KM271 $a[0]\" needs at least one parameter" if(@a < 2);
     $val = $a[1];
-    $numeric_val = ($val =~ m/^[.0-9]+$/);
+    $numeric_val = ($val =~ m/^-?[.0-9]+$/);
   }
 
   if($a[0] =~ m/^hk.*soll$/) {
@@ -487,10 +502,20 @@ KM271_Set($@)
   elsif($a[0] =~ m/^ww.*zirkulation$/) {
     return "Argument must be numeric (between 0 and 7)" if(!$numeric_val || $val < 0 || $val > 7);
   }
+  elsif($a[0] =~ m/^hk.*aussenhalt_ab$/) {
+    return "Argument must be numeric (between -20 and 10)" if(!$numeric_val || $val < -20 || $val > 10);
+    $val += 256 if($val < 0);
+  }
   elsif($a[0] eq 'sommer_ab') {
     return "Argument must be numeric (between 9 and 31)" if(!$numeric_val || $val < 9 || $val > 31);
 	# Two updates needed, here additionally HK2
     push @{$hash->{SENDBUFFER}}, sprintf("080065%02x65656565", $val);
+  }
+  elsif($a[0] eq 'frost_ab') {
+    return "Argument must be numeric (between -20 and 10)" if(!$numeric_val || $val < -20 || $val > 10);
+    $val += 256 if($val < 0);
+    # Two updates needed, here additionally HK2
+    push @{$hash->{SENDBUFFER}}, sprintf("08316565656565%02x", $val);
   }
   elsif($a[0] eq 'urlaub') {
     return "Argument must be numeric (between 0 and 99)" if(!$numeric_val || $val < 0 || $val > 99);
@@ -665,7 +690,7 @@ KM271_Get($@)
 sub
 KM271_Read($)
 {
-  my ($hash) = @_;
+  my $hash = shift;
   my $name = $hash->{NAME};
   my ($data, $crc);
 
@@ -825,7 +850,7 @@ KM271_Read($)
 sub
 KM271_Ready($)
 {
-  my ($hash) = @_;
+  my $hash = shift;
 
   return DevIo_OpenDev($hash, 1, undef) if($hash->{STATE} eq "disconnected");
 
@@ -862,7 +887,7 @@ KM271_Attr(@)
 sub
 KM271_DoInit($)
 {
-  my ($hash) = @_;
+  my $hash = shift;
   push @{$hash->{SENDBUFFER}}, $km271_sets{"logmode"}{SET};
   DevIo_DoSimpleRead($hash);
   DevIo_SimpleWrite($hash, "02", 1);      # STX
@@ -1057,6 +1082,12 @@ KM271_SetReading($$$$)
       <li>hk2_urlaubsoll &lt;temp&gt;<br>
           sets the temperature during holiday mode for heating circuit 2<br>
           (see above)</li>
+      <li>hk1_aussenhalt_ab &lt;temp&gt;<br>
+          sets the threshold for working mode Aussenhalt for heating circuit 1<br>
+          1.0 celsius resolution - temperature between -20 and 10 celsius</li>
+      <li>hk2_aussenhalt_ab &lt;temp&gt;<br>
+          sets the threshold for working mode Aussenhalt for heating circuit 2<br>
+          (see above)</li>
       <li>hk1_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for heating circuit 1<br>
           <ul>
@@ -1090,11 +1121,14 @@ KM271_SetReading($$$$)
           </ul></li>
       <li>sommer_ab &lt;temp&gt;<br>
           temp defines the threshold for switching between summer or winter mode of the heater<br>
-          temp must be between 9 and 31 with special meaning for<br>
+          1.0 celsius resolution - temp must be between 9 and 31 with special meaning for<br>
           <ul>
             <li> 9: fixed summer mode (only hot water and frost protection)</li>
             <li>31: fixed winter mode</li>
           </ul></li>
+      <li>frost_ab &lt;temp&gt;<br>
+          temp defines the threshold for activation of frost protection of the heater<br>
+          1.0 celsius resolution - temp must be between -20 and 10 celsius</li>
       <li>urlaub [count]<br>
           sets the duration of the holiday mode to count days<br>
           count must be between 0 and 99 with special meaning for<br>
@@ -1212,6 +1246,7 @@ KM271_SetReading($$$$)
     <li>ERR_Fehlerspeicher4</li>
     <li>ERR_Alarmstatus</li>
     <li>HK1_Ausschaltoptimierung</li>
+    <li>HK1_Aussenhalt_ab</li>
     <li>HK1_Betriebswerte1</li>
     <li>HK1_Betriebswerte2</li>
     <li>HK1_Einschaltoptimierung</li>
@@ -1225,6 +1260,7 @@ KM271_SetReading($$$$)
     <li>HK1_Vorlaufisttemperatur</li>
     <li>HK1_Vorlaufsolltemperatur</li>
     <li>HK2_Ausschaltoptimierung</li>
+    <li>HK2_Aussenhalt_ab</li>
     <li>HK2_Betriebswerte1</li>
     <li>HK2_Betriebswerte2</li>
     <li>HK2_Einschaltoptimierung</li>
