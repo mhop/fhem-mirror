@@ -463,7 +463,7 @@ sub LaCrosse_Parse($$) {
       if ($humidity && $humidity <= 100) {
         readingsBulkUpdate($rhash, "humidity$channel", $humidity);
       }
-      if ($dewpoint != 0xFFFF) {
+      if ($dewpoint) {
         readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
       }
 
