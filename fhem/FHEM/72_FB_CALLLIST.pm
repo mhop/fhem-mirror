@@ -255,7 +255,7 @@ sub FB_CALLLIST_Set($@)
         if(AttrVal($name, "create-readings", "0") eq "1")
         {
             readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash, "numberOfCalls", 0);
+            readingsBulkUpdate($hash, "numberOfCalls", 0, 1);
             
             for my $reading (keys %{$hash->{READINGS}})
             {
