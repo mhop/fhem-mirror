@@ -290,8 +290,20 @@ sub HMCCUDEV_Set ($@)
 		my $objname = shift @$a;
 		my $objvalue = shift @$a;
 
+		if ($ccutype eq 'HM-Dis-EP-WM55' && !defined ($objvalue)) {
+			$objvalue = '';
+			foreach my $t (keys %{$h}) {
+				if ($objvalue eq '') {
+					$objvalue = $t.'='.$h->{$t};
+				}
+				else {
+					$objvalue .= ','.$t.'='.$h->{$t};
+				}
+			}
+		}
+		
 		return HMCCU_SetError ($hash, "Usage: set $name datapoint [{channel-number}.]{datapoint} {value}")
-			if (!defined ($objname) || !defined ($objvalue));
+			if (!defined ($objname) || !defined ($objvalue) || $objvalue eq '');
 
 		if ($objname =~ /^([0-9]+)\..+$/) {
 			my $chn = $1;

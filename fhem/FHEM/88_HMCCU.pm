@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9
+#  Version 3.9.001
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -56,6 +56,7 @@
 #  attr <name> ccutrace {<ccudevname_exp>|<ccudevaddr_exp>}
 #  attr <name> parfile <parfile>
 #  attr <name> rpcevtimeout <seconds>
+#  attr <name> rpcinterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear }
 #  attr <name> rpcinterval <seconds>
 #  attr <name> rpcport <ccu_rpc_port>
 #  attr <name> rpcqueue <file>
@@ -103,9 +104,13 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9';
+my $HMCCU_VERSION = '3.9.001';
 
 # RPC Ports and URL extensions
+my %HMCCU_RPC_NUMPORT = (
+	2000 => 'BidCos-Wired', 2001 => 'BidCos-RF', 2010 => 'HmIP-RF', 9292 => 'VirtualDevices',
+	2003 => 'Homegear'
+);
 my %HMCCU_RPC_PORT = (
    'BidCos-Wired', 2000, 'BidCos-RF', 2001, 'HmIP-RF', 2010, 'VirtualDevices', 9292,
    'Homegear', 2003
@@ -302,7 +307,7 @@ sub HMCCU_Initialize ($)
 	$hash->{ShutdownFn} = "HMCCU_Shutdown";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults ccudef-hmstatevals:textField-long ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc  ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,2000,2001,2003,2010,9292 rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccutrace ccuget:Value,State ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults rpcinterfaces:multiple-strict,".join(',',sort keys %HMCCU_RPC_PORT)." ccudef-hmstatevals:textField-long ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc  ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT)." rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccutrace ccuget:Value,State ". $readingFnAttributes;
 }
 
 ##################################################
@@ -339,6 +344,7 @@ sub HMCCU_Define ($$)
 	$hash->{hmccu}{evtimeout} = 0;
 	$hash->{hmccu}{updatetime} = 0;
 	$hash->{hmccu}{rpccount} = 0;
+	$hash->{hmccu}{rpcports} = '2001';
 
 	readingsBeginUpdate ($hash);
 	readingsBulkUpdate ($hash, "state", "Initialized");
@@ -374,10 +380,35 @@ sub HMCCU_Attr ($@)
 			$rc = HMCCU_AggregationRules ($hash, $attrval);
 			return HMCCU_SetError ($hash, "Syntax error in attribute ccuaggregate") if ($rc == 0);
 		}
+		elsif ($attrname eq 'rpcinterfaces') {
+			my @ports = split (',', $attrval);
+			my @plist = ();
+			foreach my $p (@ports) {
+				return "Illegal RPC interface $p" if (!exists ($HMCCU_RPC_PORT{$p}));
+				push (@plist, $HMCCU_RPC_PORT{$p});
+			}
+			return "No RPC interface specified" if (scalar (@plist) == 0);
+			$hash->{hmccu}{rpcports} = join (',', @plist);
+			$attr{$name}{"rpcport"} = $hash->{hmccu}{rpcports};
+		}
+		elsif ($attrname eq 'rpcport') {
+			my @ports = split (',', $attrval);
+			my @ilist = ();
+			foreach my $p (@ports) {
+				return "Illegal RPC port $p" if (!exists ($HMCCU_RPC_NUMPORT{$p}));
+				push (@ilist, $HMCCU_RPC_NUMPORT{$p});
+			}
+			return "No RPC port specified" if (scalar (@ilist) == 0);
+			$hash->{hmccu}{rpcports} = $attrval;
+			$attr{$name}{"rpcinterfaces"} = join (',', @ilist);
+		}
 	}
 	elsif ($cmd eq 'del') {
 		if ($attrname eq 'ccuaggregate') {
 			HMCCU_AggregationRules ($hash, '');			
+		}
+		elsif ($attrname eq 'rpcport' || $attrname eq 'rpcinterfaces') {
+			$hash->{hmccu}{rpcports} = '2001';
 		}
 	}
 	
@@ -1115,7 +1146,8 @@ sub HMCCU_Get ($@)
 	my $parfile = AttrVal ($name, "parfile", '');
 #	my ($sc, $statedatapoint, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 #	my $substitute = AttrVal ($name, 'substitute', '');
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 
 	my $readname;
 	my $readaddr;
@@ -1469,7 +1501,7 @@ sub HMCCU_ParseObject ($$$)
 		$f = $HMCCU_FLAG_ADDRESS;
 		$a = $1;
 	}
-	elsif ($object =~ /^(.+?)\.(.+)$/) {
+	elsif ($object =~ /^(.+?)\.([A-Z_]+)$/) {
 		#
 		# Name.Datapoint
 		#
@@ -1668,7 +1700,7 @@ sub HMCCU_GetReadingName ($$$$$$$)
 # 0 = Preserve all digits
 # 1 = Preserve 1 digit
 # 2 = Remove trailing zeroes
-# -n = Round value to specified number of digits
+# -n = Round value to specified number of digits (-0 is valid)
 ######################################################################
 
 sub HMCCU_FormatReadingValue ($$)
@@ -1692,9 +1724,9 @@ sub HMCCU_FormatReadingValue ($$)
 	return $value;
 }
 
-##################################################################
+######################################################################
 # Set error state and write log file message
-##################################################################
+######################################################################
 
 sub HMCCU_SetError ($$)
 {
@@ -1857,8 +1889,9 @@ sub HMCCU_SubstVariables ($$)
 	foreach my $dp (keys %{$clhash->{hmccu}{dp}}) {
 		my ($chn,$dpt) = split (/\./, $dp);
 		if (defined ($clhash->{hmccu}{dp}{$dp}{VAL})) {
-			$text =~ s/\$\{$dp\}/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
-			$text =~ s/\$\{$dpt\}/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
+			my $value = HMCCU_FormatReadingValue ($clhash, $clhash->{hmccu}{dp}{$dp}{VAL});
+			$text =~ s/\$\{$dp\}/$value/g;
+			$text =~ s/\$\{$dpt\}/$value/g;
 		}
 	}
 	
@@ -2124,7 +2157,8 @@ sub HMCCU_RPCRegisterCallback ($)
 	my $serveraddr = $hash->{host};
 	my $localaddr = $hash->{hmccu}{localaddr};
 
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL2);
 	my $rpcserveraddr = AttrVal ($name, 'rpcserveraddr', $localaddr);
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
@@ -2207,7 +2241,8 @@ sub HMCCU_StartExtRPCServer ($)
 	my $modpath = AttrVal ('global', 'modpath', '/opt/fhem');
 	my $logfile = $modpath."/log/ccurpcd";
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpcserverport = AttrVal ($name, 'rpcserverport', 5400);
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL1);
 	my $verbose = AttrVal ($name, 'verbose', -1);
@@ -2339,7 +2374,8 @@ sub HMCCU_StartIntRPCServer ($)
 	
 	# Address and ports
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpcserverport = AttrVal ($name, 'rpcserverport', 5400);
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL1);
 	my @rpcportlist = split (",", $rpcport);
@@ -2450,7 +2486,8 @@ sub HMCCU_StopRPCServer ($)
 	my $pid = 0;
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 	my $serveraddr = $hash->{host};
 
 	# Deregister callback URLs in CCU
@@ -3806,7 +3843,8 @@ sub HMCCU_ReadRPCQueue ($)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', 5);
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpctimeout = AttrVal ($name, 'rpcevtimeout', 300);
 	my $maxevents = $rpcinterval*10;
 	$maxevents = 50 if ($maxevents > 50);
@@ -4987,7 +5025,7 @@ sub HMCCU_AggReadings ($$$$$)
 
 sub HMCCU_GetTimeSpec ($)
 {
-	my $ts = @_;
+	my ($ts) = @_;
 	
 	return -1 if ($ts !~ /^[0-9]{2}:[0-9]{2}$/ && $ts !~ /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/);
 	
@@ -5570,7 +5608,7 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
       For automatic update of Homematic device datapoints and FHEM readings one have to:
       <br/><br/>
       <ul>
-      <li>Define used RPC interfaces with attribute 'rpcport'</li>
+      <li>Define used RPC interfaces with attribute 'rpcinterfaces'</li>
       <li>Start RPC servers with command 'set rpcserver on'</li>
       <li>Optionally enable automatic start of RPC servers with attribute 'rpcserver'</li>
       </ul><br/>
@@ -5615,7 +5653,7 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
       </li><br/>
       <li><b>set &lt;name&gt; rpcserver {on | off | restart}</b><br/>
          Start, stop or restart RPC server(s). This command executed with option 'on'
-         will fork a RPC server process for each RPC port defined in attribute 'rpcport'.
+         will fork a RPC server process for each RPC interface defined in attribute 'rpcinterfaces'.
          Until operation is completed only a few set/get commands are available and you
          may get the error message 'CCU busy'.
       </li><br/>
@@ -5798,11 +5836,23 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
       <li><b>parfile &lt;filename&gt;</b><br/>
          Define parameter file for command 'get parfile'.
       </li><br/>
+      <li><b>rpcinterfaces &lt;interface&gt;[,...]</b><br/>
+   		Specify list of CCU RPC interfaces. HMCCU will register a RPC server for each interface.
+   		Valid interfaces are:<br/><br/>
+   		<ul>
+   		<li>BidCos-Wired (Port 2000)</li>
+   		<li>BidCos-RF (Port 2001)</li>
+   		<li>Homegear (Port 2003)</li>
+   		<li>HmIP (Port 2010)</li>
+   		<li>VirtualDevice (Port 9292)</li>
+   		</ul>
+      </li><br/>
       <li><b>rpcinterval &lt;Seconds&gt;</b><br/>
          Specifiy how often RPC queue is read. Default is 5 seconds.
       </li><br/>
       <li><b>rpcport &lt;value[,...]&gt;</b><br/>
-         Specify list of RPC ports on CCU. Default is 2001. Valid RPC ports are:<br/><br/>
+         Deprecated, use 'rpcinterfaces' instead. Specify list of RPC ports on CCU. Default is
+         2001. Valid RPC ports are:<br/><br/>
          <ul>
          <li>2000 = Wired components</li>
          <li>2001 = BidCos-RF (wireless 868 MHz components with BidCos protocol)</li>

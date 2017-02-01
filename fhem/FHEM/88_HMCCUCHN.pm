@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9
+#  Version 3.9.001
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -13,7 +13,7 @@
 #  define <name> HMCCUCHN <ccudev> [readonly] [defaults]
 #         [iodev=<iodevname>]
 #
-#  set <name> config <parameter>=<value> [...]
+#  set <name> config [device] <parameter>=<value> [...]
 #  set <name> control <value>
 #  set <name> datapoint <datapoint> <value>
 #  set <name> defaults
@@ -24,11 +24,12 @@
 #  set <name> pct <level> [{ <ontime> | 0 } [<ramptime>]]
 #  set <name> toggle
 #
-#  get <name> config [<filter-expr>]
-#  get <name> configdesc
-#  get <name> configlist
+#  get <name> config [device] [<filter-expr>]
+#  get <name> configdesc [device]
+#  get <name> configlist [device] [<filtet-expr>]
 #  get <name> datapoint <datapoint>
 #  get <name> defaults
+#  get <name> deviceinfo
 #  get <name> devstate
 #  get <name> update
 #
@@ -407,10 +408,15 @@ sub HMCCUCHN_Set ($@)
 		}
 	}
 	elsif ($opt eq 'config') {
-		return HMCCU_SetError ($hash, "Usage: set $name config {parameter}={value} [...]")
+		return HMCCU_SetError ($hash, "Usage: set $name config [device] {parameter}={value} [...]")
 			if ((scalar keys %{$h}) < 1);
 
-		my $rc = HMCCU_RPCSetConfig ($hash, $ccuaddr, $h);
+		my $ccuobj = $ccuaddr;
+		my $par = shift @$a;
+		if (defined ($par) && $par eq 'device') {
+			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
+		}
+		my $rc = HMCCU_RPCSetConfig ($hash, $ccuobj, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK");
 		return undef;
@@ -521,6 +527,12 @@ sub HMCCUCHN_Get ($@)
 	elsif ($opt eq 'config') {
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
+		if (defined ($par)) {
+			if ($par eq 'device') {
+				($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
+				$par = shift @$a;
+			}
+		}
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
@@ -530,6 +542,12 @@ sub HMCCUCHN_Get ($@)
 	elsif ($opt eq 'configlist') {
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
+		if (defined ($par)) {
+			if ($par eq 'device') {
+				($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
+				$par = shift @$a;
+			}
+		}
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
@@ -538,7 +556,11 @@ sub HMCCUCHN_Get ($@)
 	}
 	elsif ($opt eq 'configdesc') {
 		my $ccuobj = $ccuaddr;
-
+		my $par = shift @$a;
+		if (defined ($par) && $par eq 'device') {
+			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
+		}
+		
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $res;
@@ -633,10 +655,11 @@ sub HMCCUCHN_SetError ($$)
          Delete readings matching specified reading name expression. Default expression is '.*'.
          Readings 'state' and 'control' are not deleted.
       </li><br/>
-      <li><b>set &lt;name&gt; config [&lt;rpcport&gt;] &lt;parameter&gt;=&lt;value&gt;] 
+      <li><b>set &lt;name&gt; config [device] [&lt;rpcport&gt;] &lt;parameter&gt;=&lt;value&gt;]
       [...]</b><br/>
         Set config parameters of CCU channel. This is equal to setting device parameters in CCU.
-        Valid parameters can be listed by using command 'get configdesc'.
+        Valid parameters can be listed by using commands 'get configdesc' or 'get configlist'.
+        With option 'device' specified parameters are set in device instead of channel.
       </li><br/>
       <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt;</b><br/>
         Set value of a datapoint of a CCU channel. If parameter <i>value</i> contains special
@@ -719,16 +742,19 @@ sub HMCCUCHN_SetError ($$)
    <a name="HMCCUCHNget"></a>
    <b>Get</b><br/><br/>
    <ul>
-      <li><b>get &lt;name&gt; config [&lt;filter-expr&gt;]</b><br/>
+      <li><b>get &lt;name&gt; config [device] [&lt;filter-expr&gt;]</b><br/>
          Get configuration parameters of CCU channel. If attribute 'ccureadings' is 0 results
          are displayed in browser window. Parameters can be filtered by <i>filter-expr</i>.
+         Parameters to be stored as readings must be part of 'ccureadingfilter'. If option
+         'device' is specified parameters of device are read.
       </li><br/>
-      <li><b>get &lt;name&gt; configdesc</b><br/>
-         Get description of configuration parameters of CCU channel.
+      <li><b>get &lt;name&gt; configdesc [device]</b><br/>
+         Get description of configuration parameters of CCU channel or device if option 'device'
+         is specified.
       </li><br/>
-      <li><b>get &lt;name&gt; configlist [&lt;filter-expr&gt;]</b><br/>
+      <li><b>get &lt;name&gt; configlist [device] [&lt;filter-expr&gt;]</b><br/>
          Get configuration parameters of CCU channel. Parameters can be filtered by 
-         <i>filter-expr</i>.
+         <i>filter-expr</i>. With option 'device' device parameters are listed.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
          Get value of a CCU channel datapoint.
@@ -898,8 +924,9 @@ sub HMCCUCHN_SetError ($$)
       <li><b>substitute &lt;subst-rule&gt;[;...]</b><br/>
          Define substitutions for datapoint/reading values. Syntax of <i>subst-rule</i> is<br/><br/>
          [[&lt;channelno.&gt;]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp}&gt;:&lt;text&gt;[,...]
-         <br/>
-         Parameter text can contain variables in format ${<i>varname</i>}. The variable $value is
+         <br/><br/>
+         Parameter <i>text</i> can contain variables in format ${<i>varname</i>}. The variable 
+         ${value} is
          substituted by the original datapoint value. All other variables must match with a valid
          datapoint name or a combination of channel number and datapoint name seperated by a '.'.
          <br/><br/>

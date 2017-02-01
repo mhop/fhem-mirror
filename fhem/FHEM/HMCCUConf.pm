@@ -166,6 +166,21 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off"	
 	},
+	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2" => {
+	_description     => "Jalousienaktor",
+	_channels        => "1",
+	ccureadingfilter => "(LEVEL|INHIBIT|DIRECTION|WORKING)",
+	ccuscaleval      => "LEVEL:0:1:0:100",
+	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
+	controldatapoint => "LEVEL",
+	eventMap         => "/datapoint STOP true:stop/datapoint LEVEL 0:down/datapoint LEVEL 100:up/",
+	statedatapoint   => "LEVEL",
+	stripnumber      => 1,
+	substexcl        => "control",
+	substitute       => "LEVEL!#0-0:closed,#100-100:open;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!(0|false):no,(1|true):yes",
+	webCmd           => "control:up:stop:down",
+	widgetOverride   => "control:slider,0,10,100"
+	},
 	"HM-WDS40-TH-I|HM-WDS10-TH-O|HM-WDS20-TH-O|IS-WDS-TH-OD-S-R3|ASH550I|ASH550" => {
 	_description     => "Temperatur/Luftfeuchte Sensor",
 	_channels        => "1",
@@ -326,9 +341,9 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	},
 	"HMIP-PSM" => {
 	_description     => "Steckdose mit Energiemessung IP",
-	ccureadingfilter => "(STATE|CURRENT|ENERGY_COUNTER|POWER)",
+	ccureadingfilter => "(STATE|CURRENT|^ENERGY_COUNTER$|POWER)",
 	controldatapoint => "3.STATE",
-	statedatapoin    => "3.STATE",
+	statedatapoint   => "3.STATE",
 	statevals        => "on:true,off:false",
 	stripnumber      => 1,
 	substitute       => "STATE!(true|1):on,(false|0):off",
@@ -400,16 +415,16 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	substitute       => "STATE!(1|true):on,(0|false):off"
 	},
 	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2" => {
-	_description     => "Jalousieaktor",
-	ccureadingfilter => "(LEVEL|INHIBIT|DIRECTION)",
+	_description     => "Jalousienaktor",
+	ccureadingfilter => "(LEVEL|INHIBIT|DIRECTION|WORKING)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
 	controldatapoint => "1.LEVEL",
-	eventMap         => "/datapoint 1.STOP 1:stop/datapoint 1.LEVEL 0:down/datapoint 1.LEVEL 100:up/datapoint 1.STOP true:stop/",
+	eventMap         => "/datapoint 1.STOP true:stop/datapoint 1.LEVEL 0:down/datapoint 1.LEVEL 100:up/",
 	statedatapoint   => "1.LEVEL",
 	stripnumber      => 1,
 	substexcl        => "control",
-	substitute       => "LEVEL!#0-0:closed,#100-100:open;DIRECTION!0:none,1:up,2:down,3:undefined",
+	substitute       => "LEVEL!#0-0:closed,#100-100:open;DIRECTION!0:none,1:up,2:down,3:undefined;WORKING!(0|false):no,(1|true):yes",
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
 	},
@@ -590,7 +605,10 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	"HM-Dis-EP-WM55|HM-Dis-WM55" => {
 	_description     => "E-Paper Display, Display Statusanzeige",
 	ccureadingfilter => "PRESS",
-	substitute       => "PRESS_LONG,PRESS_SHORT,PRESS_CONT!(1|true):pressed,(0|false):notPressed;PRESS_LONG_RELEASE!(1|true):release"
+	eventMap         => "/datapoint 3.SUBMIT:display/",
+	substitute       => "PRESS_LONG,PRESS_SHORT,PRESS_CONT!(1|true):pressed,(0|false):notPressed;PRESS_LONG_RELEASE!(1|true):release",
+	widgetOverride   => "display:textField"
+
 	}
 );
 
