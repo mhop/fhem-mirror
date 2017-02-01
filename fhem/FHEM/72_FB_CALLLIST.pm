@@ -252,6 +252,21 @@ sub FB_CALLLIST_Set($@)
     {
         delete($hash->{helper}{DATA}) if(exists($hash->{helper}{DATA}));
         
+        if(AttrVal($name, "create-readings", "0") eq "1")
+        {
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash, "numberOfCalls", 0);
+            
+            for my $reading (keys %{$hash->{READINGS}})
+            {
+                readingsBulkUpdate($hash, $reading, "");
+            }
+            
+            readingsEndUpdate($hash, 1);
+            
+            CommandDeleteReading($hash->{CL}, $name.' \d+-.*');
+        }
+        
         # Inform all FHEMWEB clients
         FB_CALLLIST_updateFhemWebClients($hash);
         
