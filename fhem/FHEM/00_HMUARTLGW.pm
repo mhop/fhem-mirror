@@ -316,10 +316,11 @@ sub HMUARTLGW_Ready($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	my $state = ReadingsVal($name, "state", "unknown");
 
-	Log3($hash, 4, "HMUARTLGW ${name} ready: ".$hash->{STATE});
+	Log3($hash, 4, "HMUARTLGW ${name} ready: ${state}");
 
-	if ((!$hash->{lgwHash}) && $hash->{STATE} eq "disconnected") {
+	if ((!$hash->{lgwHash}) && $state eq "disconnected") {
 		#don't immediately reconnect when we just connected, delay
 		#for 5s because remote closed the connection on us
 		if (defined($hash->{LastOpen}) &&
