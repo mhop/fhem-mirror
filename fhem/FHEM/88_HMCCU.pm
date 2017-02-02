@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.001
+#  Version 3.9.002
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -104,7 +104,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.001';
+my $HMCCU_VERSION = '3.9.002';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -1848,26 +1848,23 @@ sub HMCCU_SubstRule ($$$)
 	
 	my @sub_list = split /,/,$substitutes;
 	foreach my $s (@sub_list) {
-#		my ($regexp, $text) = split /:/,$s;
 		my ($regexp, $text) = split /:/,$s,2;
 		next if (!defined ($regexp) || !defined($text));
 		if ($regexp =~ /^#([+-]?\d*\.?\d+?)\-([+-]?\d*\.?\d+?)$/) {
 			my ($mi, $ma) = ($1, $2);
-			if ($value =~ /^\d*\.?\d+?/ && $value >= $mi && $value <= $ma) {
-# 				$value = $text;
-# 				$rc = 1;
-				my $x = eval { $value =~ s/^\d*\.?\d+?/$text/ };
-				$rc = 1 if (defined ($x));				last;
+			if ($value =~ /^\d*\.?\d+?$/ && $value >= $mi && $value <= $ma) {
+				$value = $text;
+				$rc = 1;
+#				my $x = eval { $value =~ s/^\d*\.?\d+?/$text/ };
+#				$rc = 1 if (defined ($x));				last;
 			}
 		}
 		if ($mode == 0 && $value =~ /$regexp/ && $value !~ /^[+-]?\d+$/) {
-#			my $x = eval { $value =~ s/$regexp/$text/ };
 			my $x = eval { $value =~ s/$regexp/$text/ };
 			$rc = 1 if (defined ($x));
 			last;
 		}
 		elsif (($mode == 1 || $value =~/^[+-]?\d+$/) && $value =~ /^$regexp$/) {
-#			my $x = eval { $value =~ s/^$regexp$/$text/ };
 			my $x = eval { $value =~ s/^$regexp$/$text/ };
 			$rc = 1 if (defined ($x));
 			last;
@@ -4948,6 +4945,8 @@ sub HMCCU_GetHMState ($$$)
 		'^UNREACH!(1|true):unreachable;^LOW_?BAT!(1|true):warn_battery');
 	my $hmstatevals = AttrVal ($name, 'hmstatevals', $ghmstatevals);
 	$hmstatevals .= ";".$ghmstatevals if ($hmstatevals ne $ghmstatevals);
+	
+	# Get reading name
 	if ($hmstatevals =~ /^=([^;]*);/) {
 		$hmstate[0] = $1;
 		$hmstatevals =~ s/^=[^;]*;//;
@@ -4960,21 +4959,37 @@ sub HMCCU_GetHMState ($$$)
 	$hmstatevals = HMCCU_SubstVariables ($clhash, $hmstatevals);
 
 	my @rulelist = split (";", $hmstatevals);
-
-	foreach my $dp (keys %{$clhash->{hmccu}{dp}}) {
-		next if (!defined ($clhash->{hmccu}{dp}{$dp}{VAL}));
-		my ($chn, $dpt) = split (/\./, $dp);
-		my $value = $clhash->{hmccu}{dp}{$dp}{VAL};
-		
-		foreach my $rule (@rulelist) {
-			my ($dptexpr, $subst) = split ('!', $rule, 2);
-			next if (!defined ($dptexpr) || !defined ($subst));
-			next if ($dpt !~ /$dptexpr/);
-			$subst =~ s/\$\{value\}/$value/g;
-			my ($rc, $newvalue) = HMCCU_SubstRule ($value, $subst, 0);
-			return ($hmstate[0], $chn, $dpt, $newvalue) if ($rc);
+	foreach my $rule (@rulelist) {
+		my ($dptexpr, $subst) = split ('!', $rule, 2);
+		my $dp = '';
+		next if (!defined ($dptexpr) || !defined ($subst));
+		foreach my $d (keys %{$clhash->{hmccu}{dp}}) {
+			if ($d =~ /$dptexpr/) {
+				$dp = $d;
+				last;
+			}
 		}
+		next if ($dp eq '');
+		my ($chn, $dpt) = split (/\./, $dp);
+		my $value = HMCCU_FormatReadingValue ($clhash, $clhash->{hmccu}{dp}{$dp}{VAL});
+		my ($rc, $newvalue) = HMCCU_SubstRule ($value, $subst, 0);
+		return ($hmstate[0], $chn, $dpt, $newvalue) if ($rc);
 	}
+
+# 	foreach my $dp (keys %{$clhash->{hmccu}{dp}}) {
+# 		next if (!defined ($clhash->{hmccu}{dp}{$dp}{VAL}));
+# 		my ($chn, $dpt) = split (/\./, $dp);
+# 		my $value = $clhash->{hmccu}{dp}{$dp}{VAL};
+# 		
+# 		foreach my $rule (@rulelist) {
+# 			my ($dptexpr, $subst) = split ('!', $rule, 2);
+# 			next if (!defined ($dptexpr) || !defined ($subst));
+# 			next if ($dpt !~ /$dptexpr/);
+# 			$subst =~ s/\$\{value\}/$value/g;
+# 			my ($rc, $newvalue) = HMCCU_SubstRule ($value, $subst, 0);
+# 			return ($hmstate[0], $chn, $dpt, $newvalue) if ($rc);
+# 		}
+# 	}
 	
 	return @hmstate;
 }
