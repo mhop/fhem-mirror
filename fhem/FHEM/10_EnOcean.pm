@@ -10949,6 +10949,7 @@ sub EnOcean_Parse($$)
           13 => "supplyAir",
           14 => "exhaustAir"
         );
+        $ventilation = $db[13] & 15;
         $ventilation = $ventilation{$ventilation} if (exists $ventilation{$ventilation});
         push @event, "3:ventilation:$ventilation";
         push @event, "3:fireplaceSafetyMode:" . ($db[12] & 8 ? 'enabled' : 'disabled');
