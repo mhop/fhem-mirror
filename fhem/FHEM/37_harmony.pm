@@ -24,6 +24,15 @@ harmony_isFritzBox()
 
   return $harmony_isFritzBox;
 }
+sub
+harmony_decode_json($)
+{
+  my ($data) = @_;
+
+  return eval { decode_json($data) } if( harmony_isFritzBox() );
+
+  return eval { JSON->new->utf8(0)->decode($data) };
+}
 
 sub
 harmony_Initialize($)
@@ -252,10 +261,7 @@ harmony_actionOfCommand($$)
     foreach my $function (@{$group->{function}}) {
       #if( lc($function->{name}) eq $command ) {
       if( lc($function->{name}) =~ m/^$command$/ ) {
-        return decode_json($function->{action}) if( harmony_isFritzBox() );
-
-        return JSON->new->utf8(0)->decode($function->{action});
-
+        return harmony_decode_json($function->{action});
       }
     }
   }
@@ -891,6 +897,9 @@ harmony_Read($)
   $data .= $buf;
 
   #FIXME: should use real xmpp/xml parser
+  # see forum https://forum.fhem.de/index.php/topic,14163.msg575033.html#msg575033
+  $data =~ s/<iq\/>//g;
+  $data =~ s/<\/iq><iq/<\/iq>\n<iq/g;
   my @lines = split( "\n", $data );
   foreach my $line (@lines) {
     if( $line =~ m/^<(\w*)\s*([^>]*)?\/>(.*)?/ ) {
@@ -949,11 +958,7 @@ harmony_Read($)
         my $json;
         my $decoded;
         if( $cdata =~ m/^{.*}$/ ) {
-          if( harmony_isFritzBox() ) {
-            $json = decode_json($cdata);
-          } else {
-            $json = JSON->new->utf8(0)->decode($cdata);
-          }
+          $json = harmony_decode_json($cdata);
           $decoded = $json;
 
         } else {
@@ -1138,7 +1143,7 @@ harmony_Read($)
             Log3 $name, 3, "$name: unknown iq: $content";
 Log 3, Dumper $decoded;
 
-Log 3, Dumper decode_json($decoded->{resource}) if( !$json && $decoded->{resource} && $decoded->{resource} =~ m/^{.*}$/ );
+Log 3, Dumper harmony_decode_json($decoded->{resource}) if( !$json && $decoded->{resource} && $decoded->{resource} =~ m/^{.*}$/ );
 
           }
 
@@ -1370,12 +1375,7 @@ harmony_dispatch($$$)
       return undef;
     }
 
-    my $json;
-    if( harmony_isFritzBox() ) {
-      $json = decode_json($data);
-    } else {
-      $json = JSON->new->utf8(0)->decode($data);
-    }
+    my $json = harmony_decode_json($data);
 
     if( $param->{type} eq 'token' ) {
       harmony_parseToken($hash, $json);
@@ -1591,12 +1591,7 @@ harmony_Get($$@)
       foreach my $group (@{$activity->{controlGroup}}) {
         $ret .= "\t$group->{name}\n";
         foreach my $function (@{$group->{function}}) {
-          my $action;
-          if( harmony_isFritzBox() ) {
-            $action = decode_json($function->{action});
-          } else {
-            $action = JSON->new->utf8(0)->decode($function->{action});
-          }
+          my $action = harmony_decode_json($function->{action});
 
           $ret .= sprintf( "\t\t%-20s\t%s (%s)\n", $function->{name}, $function->{label}, harmony_labelOfDevice($hash, $action->{deviceId}, $action->{deviceId}) );
         }
