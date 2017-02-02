@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: improved lookup window handling for for huge content
+                add attributes section and Ok button
   - update:  98_DOIFtools: add lookup window for probably assiciated devices
                 (internals and readings) in DOIF and DOIFtools detail view
   - bugfix:  FB_CALLIST: cleanup readings on set command clear

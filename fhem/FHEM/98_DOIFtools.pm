@@ -128,6 +128,7 @@ function doiftoolsAddLookUp () {
       var dev = devList.Results[0];
       var row = 0;
       for (item in dev.Internals) {
+        if (item == "DEF") {dev.Internals[item] = "<pre>"+dev.Internals[item]+"</pre>"}
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Internals[item].replace(/\n/g,"<br>")+"</td></tr>\n";
       }
@@ -137,23 +138,41 @@ function doiftoolsAddLookUp () {
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Readings[item].Value+"</td><td>"+dev.Readings[item].Time+"</td></tr>\n";
       }
+      txt += "</table>Attributes<table class='block wide attributes' style='font-size:12px'><br>";
+      row = 0;
+      for (item in dev.Attributes) {
+        if (item.match(/(userReadings|wait|setList)/) ) {dev.Attributes[item] = "<pre>"+dev.Attributes[item]+"</pre>"}
+        var cla = ((row++&1)?"odd":"even");
+        txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Attributes[item]+"</td></tr>\n";
+      }
       txt += "</table>";
-        $('#addLookUp').html(txt);
-        $('#addLookUp').dialog("open");
+      $('#addLookUp').html(txt);
+      $('#addLookUp').dialog("open");
     });
 }
 $(document).ready(function(){
     $('body').append('<div id="addLookUp" style="display:none"></div>');
     $('#addLookUp').dialog({
         width:"60%",
+        height:"auto",
+        maxHeight:900,
         modal: false,
         position: { at: "right"},
-        collusion: "fit fit"
+        collusion: "fit fit",
+        buttons: [
+          {
+            text: "Ok",
+            style:"margin-right: 100%",
+            click: function() {
+              $( this ).dialog( "close" );
+            }
+          }
+        ]
     });
     $('#addLookUp').dialog( "close" );
     $(".assoc").find("a:even").each(function() {
         $(this).on("mouseover",doiftoolsAddLookUp);
-        $(this).on("mouseleave",doiftoolsRemoveLookUp);
+        // $(this).on("mouseleave",doiftoolsRemoveLookUp);
     });
 });
 </script>
