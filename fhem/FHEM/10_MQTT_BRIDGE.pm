@@ -2,7 +2,8 @@
 #
 # fhem bridge to mqtt (see http://mqtt.org)
 #
-# Copyright (C) 2014 Norbert Truchsess
+# Copyright (C) 2017 Stephan Eisler
+# Copyright (C) 2014 - 2016 Norbert Truchsess
 #
 #     This file is part of fhem.
 #
@@ -182,6 +183,8 @@ sub onmessage($$$) {
 1;
 
 =pod
+=item [device]
+=item summary MQTT_BRIDGE acts as a bridge in between an fhem-device and mqtt-topics
 =begin html
 
 <a name="MQTT_BRIDGE"></a>

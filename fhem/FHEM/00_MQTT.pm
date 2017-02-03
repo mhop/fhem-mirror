@@ -478,6 +478,7 @@ sub Client_Define($$) {
 
 sub Client_Undefine($) {
   client_stop(shift);
+  return undef;
 };
 
 sub client_attr($$$$$) {
@@ -544,7 +545,8 @@ sub client_stop($) {
 1;
 
 =pod
-=item summary    connects fhem to MQTT
+=item [device]
+=item summary connects fhem to MQTT
 =begin html
 
 <a name="MQTT"></a>
