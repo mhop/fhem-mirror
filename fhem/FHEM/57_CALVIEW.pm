@@ -112,11 +112,16 @@ sub CALVIEW_GetUpdate($){
 		my $isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
 		my $eventDate = fhemTimeLocal(0,0,0,$D,$M-1,$Y-1900);
 		my $daysleft = floor(($eventDate - time) / 60 / 60 / 24 + 1);
+		my $daysleft_long;
+		if( $daysleft == 0){$daysleft_long = "heute";}
+		elsif( $daysleft == 1){$daysleft_long = "morgen";}
+		else{$daysleft_long = "in ".$daysleft." Tagen";}
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
 			bdatetimeiso => $isostarttime,
 			daysleft => $daysleft,
+			daysleftLong => $daysleft_long,
 			summary => $item->[1],
 			source => $item->[3],
 			location => $item->[4],
@@ -168,6 +173,7 @@ sub CALVIEW_GetUpdate($){
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_btime", $termin->{btime});
 					if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edatetimeiso", $termin->{edatetimeiso});}
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_daysleft", $termin->{daysleft});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_daysleftLong", $termin->{daysleftLong});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
@@ -181,7 +187,8 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime});
 						if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edatetimiso", $termin->{edatetimeiso});}
-						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_daysleft", $termin->{daysleft});						
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_daysleft", $termin->{daysleft});	
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_daysleftLong", $termin->{daysleftLong});						
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
@@ -198,6 +205,7 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
 						if(AttrVal($name,"datestyle","_description") eq "ISO8601"){readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_bdatetimeiso", $termin->{bdatetimeiso});readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edatetimeiso", $termin->{edatetimeiso});}
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_daysleft", $termin->{daysleft});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_daysleftLong", $termin->{daysleftLong});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
@@ -348,7 +356,7 @@ sub CALVIEW_Notify($$)
 </li><br>
 <li>yobfield<br>
 		_description  - (default) year of birth will be read from term description <br>
-		_location - year of birth will be read from term location 
+		_location - year of birth will be read from term location <br>
 		_summary - year of birth will be read from summary (uses the first sequence of 4 digits in the string)
 </li><br>
 =end html
@@ -388,7 +396,7 @@ sub CALVIEW_Notify($$)
 </li><br>
 <li>isbirthday<br>
         0 / nicht gesetzt - keine Altersberechnung (Standard) <br>
-		1 - aktiviert die Altersberechnung im Modul. Das Alter wird aus der in der Terminbeschreibung (description) angegebenen Jahreszahl (Geburtsjahr) berechnet.
+		1 - aktiviert die Altersberechnung im Modul. Das Alter wird aus der in der Terminbeschreibung (description) angegebenen Jahreszahl (Geburtsjahr) berechnet. (siehe Attribut yobfield)
 </li><br>
 <li>maxreadings<br>
         bestimmt die Anzahl der Termine als Readings
@@ -402,7 +410,7 @@ sub CALVIEW_Notify($$)
 </li><br>
 <li>yobfield<br>
 		_description  - (der Standard) Geburtsjahr wird aus der Terminbechreibung gelesen <br>
-		_location - Geburtsjahr wird aus dem Terminort gelesen
+		_location - Geburtsjahr wird aus dem Terminort gelesen <br>
 		_summary - Geburtsjahr wird aus dem Termintiele gelesen (verwendet wird die erste folge von 4 Ziffern im String))
 </li><br>
 =end html_DE
