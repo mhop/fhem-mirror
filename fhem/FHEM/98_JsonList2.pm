@@ -34,16 +34,13 @@ JsonList2_Escape($)
 sub
 JsonList2_dumpHash($$$$$$)
 {
-  my ($arrp, $name, $h, $isReading, $si, $attr) = @_;
+  my ($arrp, $name, $h, $isReading, $showInternal, $attr) = @_;
   my $ret = "";
-  my %filter;
-  @filter{ @$attr } = (undef) x @$attr if @$attr;
+  my %filter = map { $_=>1 } @$attr if(@$attr);
   
-  my @arr = grep { $si || $_ !~ m/^\./ 
-                   and $isReading || !ref($h->{$_}) 
-                   and !%filter || exists $filter{$_} 
-                 } sort keys %{$h};
-
+  my @arr = grep { ($showInternal || $_ !~ m/^\./) &&
+                   ($isReading || !ref($h->{$_}) ) &&
+                   (!@$attr || $filter{$_}) } sort keys %{$h};
   for(my $i2=0; $i2 < @arr; $i2++) {
     my $k = $arr[$i2];
     $ret .= "      \"".JsonList2_Escape($k)."\": ";
@@ -59,7 +56,7 @@ JsonList2_dumpHash($$$$$$)
   if(@arr > 1) {
     push @{$arrp}, "    \"$name\": {\n$ret    }";
   } else {
-    push @{$arrp}, "    \"$name\": { }";
+    push @{$arrp}, "    \"$name\": {$ret }";
   }
 }
 
