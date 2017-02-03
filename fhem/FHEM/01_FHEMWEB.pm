@@ -1095,6 +1095,7 @@ FW_digestCgi($)
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
     my ($p,$v) = split("=",$pv, 2);
+    $v = "" if(!defined($v));
 
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]//g if($v && $p && $p ne "data");

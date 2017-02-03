@@ -620,7 +620,7 @@ function
 FW_rawDef()
 {
   $("div.rawDef a").each(function(){       // Help on detail window
-    var dev = FW_getLink(this).split(" ").pop();
+    var dev = FW_getLink(this).split(" ").pop().split("&")[0];
     $(this).unbind("click");
     $(this).attr("href", "#"); // Desktop: show underlined Text
     $(this).removeAttr("onclick");
@@ -891,8 +891,9 @@ FW_longpoll()
               "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
+  var loc = (""+location).replace(/\?.*/,"");
   if(typeof WebSocket == "function" && FW_longpollType == "websocket") {
-    FW_pollConn = new WebSocket((location+query).replace(/^http/i, "ws"));
+    FW_pollConn = new WebSocket((loc+query).replace(/^http/i, "ws"));
     FW_pollConn.onclose = 
     FW_pollConn.onerror = 
     FW_pollConn.onmessage = FW_doUpdate;
