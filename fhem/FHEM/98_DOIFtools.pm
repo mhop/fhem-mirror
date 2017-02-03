@@ -194,7 +194,7 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 DOIFtoolsNoLookUp:1,0 DOIFtoolsNoLookUpInDOIF:1,0 disabledForIntervals ".$oldAttr;
 }
 
 sub DOIFtools_dO ($$$$){return "";}
@@ -203,7 +203,7 @@ sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my @dtn = devspec2array("TYPE=DOIFtools"); 
   my $ret = "";
-  $ret .= $DOIFtoolsJSfuncStart;
+  $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
   $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
@@ -279,7 +279,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $ret = "";
   # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/myfunction.js\"></script>";
-  $ret .= $DOIFtoolsJSfuncStart;
+  $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($d,"DOIFtoolsNoLookUp",""));
   # Logfile Liste
   if($FW_ss && $pageHash) {
         $ret.= "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
@@ -1338,6 +1338,12 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsHideGetSet &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>
+        <br>
+        <code>attr &lt;name&gt; DOIFtoolsNoLookUp &lt;0|1&gt;</code><br>
+        <b>DOIFtoolsNoLookUp</b> <b>1</b>, es werden keine Lookup-Fenster in DOIFtools geöffnet. <b>Default 0</b>.<br>
+        <br>
+        <code>attr &lt;name&gt; DOIFtoolsNoLookUpInDOIF &lt;0|1&gt;</code><br>
+        <b>DOIFtoolsNoLookUpInDOIF</b> <b>1</b>, es werden keine Lookup-Fenster in DOIF geöffnet. <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsHideModulShortcuts &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulShortcuts</b> <b>1</b>, verstecken der DOIFtools Shortcuts. <b>Default 0</b>.<br>
