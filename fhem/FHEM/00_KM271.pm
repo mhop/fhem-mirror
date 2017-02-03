@@ -114,7 +114,7 @@ my %km271_tr = (
   "CFG_HK2_Heizsystem"              => "0054:2,a:7",
   "CFG_HK2_Temperatur_Offset"       => "0069:3,s,d:2",
   "CFG_HK2_Fernbedienung"           => "0069:4,a:0",
-  "CFG_Gebaeudeart"                 => "0070:2,p:1",
+  "CFG_Gebaeudeart"                 => "0070:2,a:13",
   "CFG_WW_Temperatur"               => "007e:3",
   "cFG_WW_Temperatur"               => "0c07:0",      # fake reading for internal notify
   "CFG_WW_Betriebsart"              => "0085:0,a:4",
@@ -124,7 +124,7 @@ my %km271_tr = (
   "cFG_WW_Zirkulation"              => "0c0f:0,a:11",  # fake reading for internal notify
   "CFG_Sprache"                     => "0093:0,a:3",
   "CFG_Anzeige"                     => "0093:1,a:1",
-  "CFG_Brennerart"                  => "009a:1,a:12",
+  "CFG_Brennerart"                  => "009a:1,p:-1,a:12",
   "CFG_Max_Kesseltemperatur"        => "009a:3",
   "CFG_Pumplogik"                   => "00a1:0",
   "CFG_Abgastemperaturschwelle"     => "00a1:5,p:-9,a:5",
@@ -290,7 +290,9 @@ my @km271_arrays = (
   # 11 - CFG_Zirkulation
   [ "Aus","1","2","3","4","5","6","An" ],
   # 12 - CFG_Brennerart
-  [ "-","1-stufig","2-stufig","modulierend" ]
+  [ "1-stufig","2-stufig","Modulierend" ],
+  # 13 - CFG_Gebaeudeart
+  [ "Leicht","Mittel","Schwer" ]
 );
 
 # PRG_HK1_TimerXX, PRG_HK2_TimerXX
@@ -837,12 +839,12 @@ KM271_Read($)
       $key = ucfirst($key);   # Hack to match the original and the fake reading
       KM271_SetReading($hash, $key, $val, $ntfy);
     }
-
-  } elsif($fn eq "0400") {
-    KM271_SetReading($hash, "NoData", $arg, 0);
-
   } elsif($all_events) {
-    KM271_SetReading($hash, "UNKNOWN_$fn", $data, 1);
+    if($fn eq "0400") {
+      KM271_SetReading($hash, "NoData", $arg, 0);
+    } else {
+      KM271_SetReading($hash, "UNKNOWN_$fn", $data, 1);
+    }
   }
 }
 
