@@ -14,9 +14,9 @@ use warnings;
 
 use Color;
 
+use DevIo;
 use JSON;
 use SetExtensions;
-use DevIo;
 
 my %Hyperion_sets =
 (
@@ -784,21 +784,10 @@ sub Hyperion_Set($@)
   if (scalar keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
-    if (!$hash->{InSetExtensions})
-    {
-      SetExtensionsCancel($hash);
-      my $at = $name."_till";
-      CommandDelete(undef,$at)
-        if ($defs{$at});
-      Log3 $name,4,"$name SetExtensionsCancel";
-    }
     Hyperion_Call($hash,\%obj);
     return undef;
   }
-  $hash->{InSetExtensions} = 1;
-  my $ret = SetExtensions($hash,$params,$name,@aa);
-  delete $hash->{InSetExtensions};
-  return $ret;
+  return SetExtensions($hash,$params,$name,@aa);
 }
 
 sub Hyperion_Attr(@)
