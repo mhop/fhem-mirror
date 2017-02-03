@@ -342,6 +342,32 @@ my $db = {
             },
         },
 
+        'KODI' => {
+            'Normal' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %KODI_ICON%"; }',
+            'High' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %KODI_ICON%"; }',
+            'Low' =>
+'{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %KODI_ICON%"; }',
+            'defaultValues' => {
+                'Normal' => {
+                    'TIMEOUT'   => 8,
+                    'TITLE'     => 'Info',
+                    'KODI_ICON' => 'info',
+                },
+                'High' => {
+                    'TIMEOUT'   => 12,
+                    'TITLE'     => 'Warning',
+                    'KODI_ICON' => 'warning',
+                },
+                'Low' => {
+                    'TIMEOUT'   => 8,
+                    'TITLE'     => 'Notice',
+                    'KODI_ICON' => '',
+                },
+            },
+        },
+
         'XBMC' => {
             'Normal' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
