@@ -69,7 +69,7 @@ sub GEOFANCY_Initialize($) {
     $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{DefFn}    = "GEOFANCY_Define";
     $hash->{UndefFn}  = "GEOFANCY_Undefine";
-    $hash->{AttrList} = "devAlias " . $readingFnAttributes;
+    $hash->{AttrList} = "devAlias disabled:0,1 " . $readingFnAttributes;
 }
 
 ###################################
@@ -193,6 +193,10 @@ sub GEOFANCY_CGI() {
         return ( "text/plain; charset=utf-8",
             "NOK No GEOFANCY device for webhook $link" )
           unless ($name);
+
+        # return error if no such device
+        return ( "text/plain; charset=utf-8", "NOK disabled" )
+          if ( IsDisabled($name) );
 
         # extract values from URI
         my $webArgs;
