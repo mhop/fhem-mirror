@@ -1894,6 +1894,8 @@ CommandDefMod($$)
                 if(int(@a) < 2);
   if($defs{$a[0]}) {
     $def = $a[2] ? "$a[0] $a[2]" : $a[0];
+    return "defmod $a[0]: Cannot change the TYPE of an existing definition"
+        if($a[1] ne $defs{$a[0]}{TYPE});
     return CommandModify($cl, $def);
   } else {
     return CommandDefine($cl, $def);
