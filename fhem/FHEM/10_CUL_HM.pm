@@ -529,7 +529,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf} = ""; # queue autoConfig requests 
     $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
     $hash->{helper}{mRssi}{mNo}  = "";
-    $hash->{helper}{HM_CMDNR}    = 1;
+    $hash->{helper}{HM_CMDNR}    = int(rand(250));# should be different from previous
     CUL_HM_prtInit ($hash);
     $hash->{helper}{io}{vccu} = "";
     $hash->{helper}{io}{prefIO} = "";
