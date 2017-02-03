@@ -784,6 +784,7 @@ sub Hyperion_Set($@)
   if (scalar keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
+    SetExtensionsCancel($hash);
     Hyperion_Call($hash,\%obj);
     return undef;
   }
