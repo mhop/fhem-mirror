@@ -25,7 +25,7 @@ alexa_Initialize($)
   $hash->{AttrFn}   = "alexa_Attr";
   $hash->{AttrList} = "alexaMapping:textField-long alexaTypes:textField-long fhemIntents:textField-long ".
                       "articles prepositions ".
-                      "alexaConfirmationLevel:2,1 alexaStatusLevel:2,1 ".
+                      "alexaConfirmationLevel:2,1,0 alexaStatusLevel:2,1 ".
                       $readingFnAttributes;
 }
 
