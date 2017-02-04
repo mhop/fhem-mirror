@@ -728,6 +728,8 @@ logProxy_xyFile2Plot($$$)
   my ($filename, $column, $regex)= @_;
   my @array;
 
+  $filename =~ s/%L/$attr{global}{logdir}/g
+    if($filename =~ m/%L/ && $attr{global}{logdir});
   if (open(F, "<$filename")) {
     while(<F>) {
           chomp;
