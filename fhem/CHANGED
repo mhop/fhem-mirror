@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 57_Calendar: avoid some warnings
   - bufix:   00_MQTT: fixed delete MQTT_DEVICE
   - update:  98_DOIFtools: suppress lookup windows in DOIF or DOIFtools
                 by attribute DOIFtoolsNoLookUp and DOIFtoolsNoLookUpInDOIF

@@ -2054,8 +2054,8 @@ sub Calendar_GetEvents($$$$) {
             if(defined($filterref)) {
                 next unless(&$filterref($event, $param));
             }
-            if(defined($t1)) { next if($event->end() < $t1); }
-            if(defined($t2)) { next if($event->start() > $t2); }
+            if(defined($t1)) { next if(defined($event->end()) && $event->end() < $t1); }
+            if(defined($t2)) { next if(defined($event->start()) && $event->start() > $t2); }
             push @result, $event;
         }
     }
