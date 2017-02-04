@@ -2077,7 +2077,8 @@ SVG_render($$$$$$$$$$)
     my $t = $conf{lTitle}[$i];
     next if( !$t );
     my $desc = "";
-    if(defined($data{"min$j"}) && $data{"min$j"} ne "undef") {
+    if(defined($data{"min$j"})     && $data{"min$j"}     ne "undef" &&
+       defined($data{"currval$j"}) && $data{"currval$j"} ne "undef") {
       $desc = sprintf("%s: Min:%g Max:%g Last:%g",
         $t, $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     }
