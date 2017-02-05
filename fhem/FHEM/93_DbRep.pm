@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016 by Heiko Maaz
+#       (c) 2016-2017 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -40,6 +40,8 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.10.3       01.02.2017       rename reading "diff-overrun_limit-" to "diff_overrun_limit_", 
+#                               collaggstr day aggregation changed back from 4.7.5 change
 # 4.10.2       16.01.2017       bugfix uninitialized value $renmode if RenameAgent
 # 4.10.1       30.11.2016       bugfix importFromFile format problem if UNIT-field wasn't set
 # 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
@@ -170,7 +172,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.10.2";
+my $DbRepVersion = "4.10.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -2111,7 +2113,7 @@ sub diffval_ParseDone($) {
   }
   readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));           
   readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "diff-overrun_limit-".$difflimit, $rowsrej) if($rowsrej);
+  readingsBulkUpdate($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
   readingsBulkUpdate($hash, "less_data_in_period", $ncpstr) if($ncpstr);
   readingsBulkUpdate($hash, "state", ($ncpstr||$rowsrej)?"Warning":"done");
   readingsEndUpdate($hash, 1);
@@ -3559,7 +3561,7 @@ sub collaggstr($$$$) {
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
              $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                                                
-             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec-1)) > $epoch_seconds_end) {
+             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
                  $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
                  $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
                  $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
@@ -4024,7 +4026,7 @@ return;
   <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated difference between two 
                                 straight sequently datasets should be commenly accepted (default = 20). <br>
                                 Hence faulty DB entries with a disproportional high difference value will be eliminated and don't tamper the result.
-                                If a threshold overrun happens, the reading "diff-overrun_limit-&lt;diffLimit&gt;" will be generated 
+                                If a threshold overrun happens, the reading "diff_overrun_limit_&lt;diffLimit&gt;" will be generated 
 								(&lt;diffLimit&gt; will be substituted with the present prest attribute value). <br>
 								The reading contains a list of relevant pair of values. Using verbose=3 this list will also be reported in the FHEM
                                 logfile. 								
@@ -4115,11 +4117,11 @@ return;
   
   <ul><ul>
   <li><b>state                      </b>  - contains the current state of evaluation. If warnings are occured (state = Warning) compare Readings
-                                            "diff-overrun_limit-&lt;diffLimit&gt;" and "less_data_in_period"  </li> <br>
+                                            "diff_overrun_limit_&lt;diffLimit&gt;" and "less_data_in_period"  </li> <br>
   <li><b>errortext                  </b>     - description about the reason of an error state </li> <br>
   <li><b>background_processing_time </b>     - the processing time spent for operations in background/forked operation </li> <br>
   <li><b>sql_processing_time        </b>     - the processing time wasted for all sql-statements used for an operation </li> <br>
-  <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - contains a list of pairs of datasets which have overrun the threshold (&lt;diffLimit&gt;) 
+  <li><b>diff_overrun_limit_&lt;diffLimit&gt;</b>  - contains a list of pairs of datasets which have overrun the threshold (&lt;diffLimit&gt;) 
                                                      of calculated difference each other determined by attribute "diffAccept" (default=20). </li> <br>
   <li><b>less_data_in_period</b>    - contains a list of time periods within only one dataset was found.  The difference calculation considers
                                             the last value of the aggregation period before the current one. Valid for function "diffValue". </li> <br>	
@@ -4510,7 +4512,7 @@ return;
   <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
                                 zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden soll (Standard ist 20). <br>
 								Damit werden fehlerhafte DB-Einträge mit einem unverhältnismäßig hohen Differenzwert von der Berechnung ausgeschlossen und 
-								verfälschen nicht das Ergebnis. Sollten Schwellenwertüberschreitungen vorkommen, wird das Reading "diff-overrun_limit-&lt;diffLimit&gt;"
+								verfälschen nicht das Ergebnis. Sollten Schwellenwertüberschreitungen vorkommen, wird das Reading "diff_overrun_limit_&lt;diffLimit&gt;"
 								erstellt. (&lt;diffLimit&gt; wird dabei durch den aktuellen Attributwert ersetzt) 
 								Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
 								</li> <br> 
@@ -4599,11 +4601,11 @@ return;
   
   <ul><ul>
   <li><b>state                      </b>  - enthält den aktuellen Status der Auswertung. Wenn Warnungen auftraten (state = Warning) vergleiche Readings
-                                            "diff-overrun_limit-&lt;diffLimit&gt;" und "less_data_in_period"  </li> <br>
+                                            "diff_overrun_limit_&lt;diffLimit&gt;" und "less_data_in_period"  </li> <br>
   <li><b>errortext                  </b>  - Grund eines Fehlerstatus </li> <br>
   <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
   <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
-  <li><b>diff-overrun_limit-&lt;diffLimit&gt;</b>  - enthält eine Liste der Wertepaare die eine durch das Attribut "diffAccept" festgelegte Differenz
+  <li><b>diff_overrun_limit_&lt;diffLimit&gt;</b>  - enthält eine Liste der Wertepaare die eine durch das Attribut "diffAccept" festgelegte Differenz
                                                      &lt;diffLimit&gt; (Standard: 20) überschreiten. Gilt für Funktion "diffValue". </li> <br>
   <li><b>less_data_in_period</b>    - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde. Die
                                             Differenzberechnung berücksichtigt den letzten Wert der Vorperiode.  Gilt für Funktion "diffValue". </li> <br>													 
