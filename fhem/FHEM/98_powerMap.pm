@@ -1398,7 +1398,7 @@ sub powerMap_power($$$;$) {
         elsif ( looks_like_number($num) ) {
             my ( $val1, $val2 );
 
-            foreach ( sort { $a <=> $b } keys( %{ $powerMap->{$reading} } ) ) {
+            foreach ( sort { $a cmp $b } keys( %{ $powerMap->{$reading} } ) ) {
                 next unless ( looks_like_number($_) );
                 $val1 = $_ if ( $_ < $num );
                 $val2 = $_ if ( $_ > $num );
