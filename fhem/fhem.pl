@@ -1864,8 +1864,8 @@ CommandModify($$)
 
   # Return a list of modules
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
-  %ntfyHash = ();
   my $hash = $defs{$a[0]};
+  %ntfyHash = () if($hash->{NTFY_ORDER});
 
   $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
@@ -4499,25 +4499,30 @@ createNtfyHash()
                  grep { $defs{$_}{NTFY_ORDER} && 
                         $defs{$_}{TYPE} && 
                         $modules{$defs{$_}{TYPE}}{NotifyFn} } keys %defs;
+  my %d2a_cache;
+  %ntfyHash = ("*" => []);
   foreach my $d (@ntfyList) {
-    if($defs{$d}{NOTIFYDEV}) {
-      foreach my $nd (devspec2array($defs{$d}{NOTIFYDEV})) {
-        $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
-      }
-    }
-  }
-  $ntfyHash{"*"} = [];
-  foreach my $d (@ntfyList) {
-    if($defs{$d}{NOTIFYDEV}) {
-      foreach my $nd (devspec2array($defs{$d}{NOTIFYDEV})) {
-        my $arr = $ntfyHash{$nd};
-        push @{$arr}, $d if(!grep /^$d$/, @{$arr});
-      }
+    my $ndl = $defs{$d}{NOTIFYDEV};
+    next if(!$ndl);
+    my @ndlarr;
+    if($d2a_cache{$ndl}) {
+      @ndlarr = @{$d2a_cache{$ndl}};
     } else {
-      foreach my $nd (keys %ntfyHash) {
-        push @{$ntfyHash{$nd}}, $d;
+      @ndlarr = devspec2array($ndl);
+      if(@ndlarr > 1) {
+        my %h = map { $_ => 1 } @ndlarr;
+        @ndlarr = keys %h;
       }
+      $d2a_cache{$ndl} = \@ndlarr;
     }
+    map { $ntfyHash{$_} = [] } @ndlarr;
+  }
+
+  my @nhk = keys %ntfyHash;
+  foreach my $d (@ntfyList) {
+    my $ndl = $defs{$d}{NOTIFYDEV};
+    my $arr = ($ndl ? $d2a_cache{$ndl} : \@nhk);
+    map { push @{$ntfyHash{$_}}, $d } @{$arr};
   }
 }
 

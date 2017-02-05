@@ -20,7 +20,6 @@ telnet_Initialize($)
   $hash->{AsyncOutputFn}  = "telnet_Output";
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
-  $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "globalpassword password prompt allowedCommands ".
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1 sslVersion";
@@ -34,6 +33,7 @@ telnet_Initialize($)
   $cmds{inform} = { Fn=>"CommandTelnetInform",
           ClientFilter => "telnet",
           Hlp=>"{on|off|log|raw|timer|status},echo all events to this client" };
+  InternalTimer(1, "telnet_SecurityCheck", $hash);
 }
 
 sub
@@ -58,11 +58,8 @@ CommandTelnetEncoding($$)
 
 #####################################
 sub
-telnet_SecurityCheck($$)
+telnet_SecurityCheck()
 {
-  my ($ntfy, $dev) = @_;
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
   my $motd = AttrVal("global", "motd", "");
   if($motd =~ "^SecurityCheck") {
     my @list1 = devspec2array("TYPE=telnet");
@@ -85,9 +82,6 @@ telnet_SecurityCheck($$)
         if(@list3);
     $attr{global}{motd} = $motd;
   }
-  delete $modules{telnet}{NotifyFn};
-  return;
-  return;
 }
 
 ##########################

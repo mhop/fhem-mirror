@@ -129,7 +129,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
+  $hash->{NotifyFn}= "FW_Notify";
   $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   no warnings 'qw';
@@ -217,16 +217,13 @@ FHEMWEB_Initialize($)
       FW_readIcons($pe);
     }
   }
-
+  InternalTimer(1, "FW_SecurityCheck", $hash);
 }
 
 #####################################
 sub
 FW_SecurityCheck($$)
 {
-  my ($ntfy, $dev) = @_;
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
   my $motd = AttrVal("global", "motd", "");
   if($motd =~ "^SecurityCheck") {
     my @list1 = devspec2array("TYPE=FHEMWEB");
@@ -247,8 +244,6 @@ FW_SecurityCheck($$)
         if(@list3);
     $attr{global}{motd} = $motd;
   }
-  $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
-  return;
 }
 
 #####################################
