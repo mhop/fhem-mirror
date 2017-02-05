@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_BRAVIA: utf-8 character handling
+                        use WOL only if device is absent (exception 2013 model)
+                        respect channel uri for tv input selection 
   - changed: 93_DbRep: V4.10.3, rename reading "diff-overrun_limit-" 
              to "diff_overrun_limit_"
   - changed: 57_Calendar: avoid some warnings

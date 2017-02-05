@@ -233,7 +233,8 @@ sub BRAVIA_Set($@) {
             readingsSingleUpdate($hash, "state", "set_on", 1);
             my $macAddr = AttrVal( $name, "macaddr", "" );
             $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
-            if ( $macAddr ne "" && $macAddr ne "-" ) {
+            if ( $macAddr ne "" && $macAddr ne "-" &&
+                ($presence eq "absent" || ReadingVal($name, "generation", "") eq "1.0.5") ) {
                 $result = BRAVIA_wake( $name, $macAddr );
                 return "wake-up command sent";
             } else {
@@ -923,7 +924,7 @@ sub BRAVIA_ReceiveCommand($$$) {
                 readingsSingleUpdate( $hash, "requestFormat", "xml", 1 )
                   if ( $service eq "getStatus" && ReadingsVal($name , "requestFormat", "") eq "" );
 
-                $return = $parser->XMLin( Encode::encode_utf8($data), KeyAttr => [ ] );
+                $return = $parser->XMLin( encode_utf8($data), KeyAttr => [ ] );
             }
 
             elsif ( $data =~ /^{/ || $data =~ /^\[/ ) {
@@ -938,7 +939,7 @@ sub BRAVIA_ReceiveCommand($$$) {
                 readingsSingleUpdate( $hash, "requestFormat", "json", 1 )
                   if ( $service eq "getStatus" && ReadingsVal($name , "requestFormat", "") eq "" );
 
-                $return = decode_json( Encode::encode_utf8($data) );
+                $return = decode_json( encode_utf8($data) );
             }
 
             elsif ( $data eq "<html><head><title>not found</title></head><body>not found</body></html>" ) {
@@ -1259,7 +1260,7 @@ sub BRAVIA_ProcessCommandData ($$) {
               } elsif ( $_->{field} eq "serviceName" ) {
                 $channelName = BRAVIA_GetNormalizedName($_->{value});
               } elsif ( $_->{field} eq "title" ) {
-                $currentTitle = Encode::decode_utf8($_->{value});
+                $currentTitle = $_->{value};
               } else {
                 readingsBulkUpdate( $hash, "ci_".$_->{field}, $_->{value} )
                     if ( ReadingsVal($name, "ci_".$_->{field}, "") ne $_->{value} );
@@ -1286,10 +1287,16 @@ sub BRAVIA_ProcessCommandData ($$) {
               } elsif ( $_ eq "title" ) {
                 $channelName = BRAVIA_GetNormalizedName($return->{result}[0]{$_});
               } elsif ( $_ eq "programTitle" ) {
-                $currentTitle = Encode::decode_utf8($return->{result}[0]{$_});
+                $currentTitle = $return->{result}[0]{$_};
               } elsif ( $_ eq "source" ) {
                 readingsBulkUpdate( $hash, "input", $return->{result}[0]{$_} )
                     if ( ReadingsVal($name, "input", "") ne $return->{result}[0]{$_} );
+              } elsif ( $_ eq "uri" ) {
+                readingsBulkUpdate( $hash, "uri", $return->{result}[0]{$_} )
+                    if ( ReadingsVal($name, "uri", "") ne $return->{result}[0]{$_} );
+                # set TV input uri to last tv-norm (tv:dvbt, tv:dvbs)
+                $hash->{helper}{device}{inputPreset}{TV}{uri} = $return->{result}[0]{$_}
+                    if (defined($hash->{helper}{device}{inputPreset}) && $return->{result}[0]{$_} =~ /tv:.*/);
               } else {
                 readingsBulkUpdate( $hash, "ci_".$_, $return->{result}[0]{$_} )
                     if ( ReadingsVal($name, "ci_".$_, "") ne $return->{result}[0]{$_} );
@@ -1380,7 +1387,7 @@ sub BRAVIA_ProcessCommandData ($$) {
                   } elsif ( $key eq "channelName" ) {
                     $channelName = BRAVIA_GetNormalizedName($_->{$key});
                   } elsif ( $key eq "title" ) {
-                    $currentTitle = Encode::decode_utf8($_->{$key});
+                    $currentTitle = $_->{$key};
                   } else {
                     readingsBulkUpdate( $hash, "ci_".$key, $_->{$key} )
                         if ( ReadingsVal($name, "ci_".$key, "") ne $_->{$key} );
@@ -1465,9 +1472,16 @@ sub BRAVIA_ProcessCommandData ($$) {
               $hash->{helper}{device}{inputPreset}{$inputName}{uri}  = $inputUri;
             }
           }
-          $hash->{helper}{device}{inputPreset}{TV}{uri}  = "tv";
+          my $tvUri = ReadingsVal($name, "uri", "tv");
+          $tvUri = "tv" if ($tvUri !~ /tv.*/);
+          $hash->{helper}{device}{inputPreset}{TV}{uri}  = $tvUri;
         }
       }
+    }
+    
+    # setPlayContent
+    elsif ( $service eq "setPlayContent" ) {
+      # nothing to do
     }
 
     # register
@@ -1780,7 +1794,9 @@ sub BRAVIA_GetModelYear($) {
         '1.0'       => "2011",
         '1.1'       => "2012",
         '1.0.4'     => "2013",
+        '1.0.5'     => "2013", #KDL42-W655A
         '2.4.0'     => "2014",
+        '3.8.0'     => "2016", #KD-55XD8505
     };
 
     if (defined( $commands->{$command})) {
