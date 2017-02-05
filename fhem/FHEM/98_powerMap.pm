@@ -134,7 +134,7 @@ my %powerMap_tmpl = (
     HMCCUDEV => {
         ccutype => {
             'HM-LC-Dim1TPBU-FM' => {
-                stateHM => {
+                hmstate => {
                     unreachable => 0,
                     working     => 101,
                     up          => 101,
@@ -144,7 +144,7 @@ my %powerMap_tmpl = (
                 },
             },
             'HM-LC-Dim1T-FM' => {
-                stateHM => {
+                hmstate => {
                     unreachable => 0,
                     working     => 23.5,
                     up          => 23.5,
@@ -154,14 +154,14 @@ my %powerMap_tmpl = (
                 },
             },
             'HM-LC-Sw2-PB-FM' => {
-                stateHM => {
+                hmstate => {
                     unreachable => 0,
                     off         => 0.25,
                     on          => 100.25,
                 },
             },
             'HM-LC-Bl1PBU-FM' => {
-                stateHM => {
+                hmstate => {
                     unreachable => 0,
                     working     => 121,
                     up          => 121,
@@ -170,7 +170,7 @@ my %powerMap_tmpl = (
                 },
             },
             'HM-LC-Bl1-SM' => {
-                stateHM => {
+                hmstate => {
                     unreachable => 0,
                     working     => 121,
                     up          => 121,
@@ -1398,7 +1398,11 @@ sub powerMap_power($$$;$) {
         elsif ( looks_like_number($num) ) {
             my ( $val1, $val2 );
 
-            foreach ( sort keys %{ $powerMap->{$reading} } ) {
+            foreach (
+                sort { $powerMap->{$reading}{$a} <=> $powerMap->{$reading}{$b} }
+                keys( %{ $powerMap->{$reading} } )
+              )
+            {
                 next unless ( looks_like_number($_) );
                 $val1 = $_ if ( $_ < $num );
                 $val2 = $_ if ( $_ > $num );
