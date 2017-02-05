@@ -69,7 +69,7 @@ sub GEOFANCY_Initialize($) {
     $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{DefFn}    = "GEOFANCY_Define";
     $hash->{UndefFn}  = "GEOFANCY_Undefine";
-    $hash->{AttrList} = "devAlias disabled:0,1 " . $readingFnAttributes;
+    $hash->{AttrList} = "devAlias disable:0,1 " . $readingFnAttributes;
 }
 
 ###################################
