@@ -55,7 +55,8 @@ sub Wunderground_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
+"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl wu_pws:1,0 wu_bestfct:1,0 stateReadings stateReadingsFormat:0,1 "
+      . "wu_features:multiple-strict,alerts,almanac,astronomy,conditions,currenthurricane,forecast,forecast10day,hourly,hourly10day "
       . $readingFnAttributes;
 
     $hash->{readingsDesc} = {
@@ -236,7 +237,11 @@ sub Wunderground_GetStatus($;$) {
     my ( $hash, $delay ) = @_;
     my $name = $hash->{NAME};
     $hash->{INTERVAL} = AttrVal( $name, "pollInterval", "300" );
+    my $bestfct = AttrVal( $name, "wu_bestfct", undef );
+    my $features =
+      AttrVal( $name, "wu_features", "astronomy,conditions,forecast" );
     my $lang = AttrVal( $name, "wu_lang", "en" );
+    my $pws  = AttrVal( $name, "wu_pws",  undef );
     my $interval = (
           $delay
         ? $delay
@@ -253,21 +258,29 @@ sub Wunderground_GetStatus($;$) {
     return
       if ( $delay || AttrVal( $name, "disable", 0 ) == 1 );
 
-    if ( $lang eq "de" ) {
-        $hash->{LANG} = "DL";
-    }
-    elsif ( $lang eq "at" ) {
-        $hash->{LANG} = "OS";
-    }
-    elsif ( $lang eq "ch" ) {
-        $hash->{LANG} = "SW";
+    my $langmap = {
+        at      => 'OS',
+        de      => 'DL',
+        'en-gb' => 'LI',
+        gb      => 'LI',
+        uk      => 'LI',
+    };
+
+    if ( defined( $langmap->{ lc($lang) } ) ) {
+        $hash->{LANG} = $langmap->{ lc($lang) };
     }
     else {
         $hash->{LANG} = uc($lang);
     }
 
-    Wunderground_SendCommand( $hash,
-        "astronomy/conditions/forecast/lang:" . $hash->{LANG} );
+    $features =~ s/,{2,}/,/g;
+    $features =~ s/\s//g;
+    $features =~ s/,/\//g;
+    $features .= "/lang:" . $hash->{LANG};
+    $features .= "/pws:$pws" if ( defined($pws) );
+    $features .= "/bestfct:$bestfct" if ( defined($bestfct) );
+
+    Wunderground_SendCommand( $hash, $features );
 
     return;
 }
@@ -324,11 +337,15 @@ sub Wunderground_Define($$$) {
     $hash->{TYPE} = "Wunderground";
 
     $hash->{API_KEY} = @$a[2];
-    $hash->{PWS_ID}  = @$a[3];
+    $hash->{QUERY}   = @$a[3];
+
+    $hash->{QUERY} = "pws:" . $hash->{QUERY}
+      if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{2,}$/ );
 
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         fhem 'attr ' . $name . ' stateReadings temp_c humidity';
         fhem 'attr ' . $name . ' stateReadingsFormat 1';
+        fhem 'attr ' . $name . ' wu_features astronomy,conditions,forecast';
     }
 
     # start the status update timer
@@ -368,16 +385,16 @@ sub Wunderground_SendCommand($$) {
     my ( $hash, $features ) = @_;
     my $name   = $hash->{NAME};
     my $apikey = $hash->{API_KEY};
-    my $pws    = $hash->{PWS_ID};
+    my $query  = $hash->{QUERY};
     my $URL =
-      "https://api.wunderground.com/api/%APIKEY%/%FEATURES%/q/PWS:%PWSID%.json";
+      "https://api.wunderground.com/api/%APIKEY%/%FEATURES%/q/%QUERY%.json";
 
     Log3 $name, 5,
       "Wunderground $name: called function Wunderground_SendCommand()";
 
     $URL =~ s/%APIKEY%/$apikey/;
     $URL =~ s/%FEATURES%/$features/;
-    $URL =~ s/%PWSID%/$pws/;
+    $URL =~ s/%QUERY%/$query/;
 
     Log3 $name, 5, "Wunderground $name: GET " . urlDecode($URL);
 
@@ -485,7 +502,8 @@ sub Wunderground_Hash2Readings($$;$) {
 
             # error
             return $h->{response}{error}{type}
-              if ( $k eq "response" && defined( $h->{response}{error}{type} ) );
+              if ( $k eq "response"
+                && defined( $h->{response}{error}{type} ) );
 
             next
               if ( $k eq "image"
@@ -566,6 +584,126 @@ sub Wunderground_Hash2Readings($$;$) {
                     $h->{moon_phase}{percentIlluminated} );
                 readingsBulkUpdate( $hash, "moon_phase",
                     $h->{moon_phase}{phaseofMoon} );
+            }
+
+            # hourly_forecast
+            elsif ($r
+                && $r =~ /^hourly_forecast(\d+)$/ )
+            {
+                my $period = $r;
+                $period =~ s/[^\d]//g;
+                $reading = "hfc" . $period . "_";
+
+                readingsBulkUpdate( $hash, $reading . "condition",
+                    $h->{conditions} );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "dewpoint_c",
+                    $h->{dewpoint}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "dewpoint_f",
+                    $h->{dewpoint}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "feelslike_c",
+                    $h->{feelslike}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "feelslike_f",
+                    $h->{feelslike}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "heatindex_c",
+                    $h->{heatindex}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "heatindex_f",
+                    $h->{heatindex}{english}
+                );
+                readingsBulkUpdate( $hash, $reading . "humidity",
+                    $h->{humidity} );
+                readingsBulkUpdate( $hash, $reading . "icon", $h->{icon} );
+                readingsBulkUpdate( $hash, $reading . "icon_url",
+                    $h->{icon_url} );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "mslp_c",
+                    $h->{mslp}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "mslp_f",
+                    $h->{mslp}{english}
+                );
+                readingsBulkUpdate( $hash, $reading . "pop", $h->{pop} );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "temp_c",
+                    $h->{temp}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "temp_f",
+                    $h->{temp}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "rain",
+                    $h->{qpf}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "rain_in",
+                    $h->{qpf}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "snow",
+                    $h->{snow}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "snow_in",
+                    $h->{snow}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "wind_direction",
+                    $h->{wdir}{degrees}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "wind_chill",
+                    $h->{windchill}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "wind_chill_f",
+                    $h->{windchill}{english}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "wind_speed",
+                    $h->{wspd}{metric}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "wind_speed_mph",
+                    $h->{wspd}{english}
+                );
+                readingsBulkUpdate( $hash, $reading . "sky", $h->{sky} );
+                readingsBulkUpdate( $hash, $reading . "UV",  $h->{uvi} );
+
+                my $time = $h->{FCTTIME}{hour} . ":" . $h->{FCTTIME}{min};
+
+                $time =~ s/^(\d):(\d\d)$/0$1:$2/;
+                readingsBulkUpdate( $hash, $reading . "time", $time );
             }
 
             # simpleforecast
@@ -737,6 +875,34 @@ sub Wunderground_Hash2Readings($$;$) {
                 $hash->{readingDesc}{"text_f$night"}{lang} = $lang if ($lang);
             }
 
+            # almanac/temp_high
+            elsif ($r
+                && $r =~ /^almanac\/temp_high(.*)$/ )
+            {
+                $reading = "almanac_high_";
+                readingsBulkUpdate( $hash,
+                    $reading . "year", $h->{recordyear} );
+                readingsBulkUpdate( $hash, $reading . "c", $h->{normal}{C} );
+                readingsBulkUpdate( $hash, $reading . "f", $h->{normal}{F} );
+                readingsBulkUpdate( $hash, $reading . "record_c",
+                    $h->{record}{C} );
+                readingsBulkUpdate( $hash, $reading . "record_f",
+                    $h->{record}{F} );
+            }
+            elsif ($r
+                && $r =~ /^almanac\/temp_low(.*)$/ )
+            {
+                $reading = "almanac_low_";
+                readingsBulkUpdate( $hash,
+                    $reading . "year", $h->{recordyear} );
+                readingsBulkUpdate( $hash, $reading . "c", $h->{normal}{C} );
+                readingsBulkUpdate( $hash, $reading . "f", $h->{normal}{F} );
+                readingsBulkUpdate( $hash, $reading . "record_c",
+                    $h->{record}{C} );
+                readingsBulkUpdate( $hash, $reading . "record_f",
+                    $h->{record}{F} );
+            }
+
             elsif ( ref( $h->{$k} ) eq "HASH" || ref( $h->{$k} ) eq "ARRAY" ) {
                 $reading .= $r . "/" if ( $r && $r ne "" );
                 $reading .= $cr;
@@ -766,8 +932,10 @@ sub Wunderground_Hash2Readings($$;$) {
 
                     # for icon and icon_url, make sure to add nt_ prefix
                     # during the night
-                    if (   ( $currentTime > 43200 && $currentTime >= $sunset )
-                        || ( $currentTime <= 43200 && $currentTime < $sunrise )
+                    if (
+                        ( $currentTime > 43200 && $currentTime >= $sunset )
+                        || (   $currentTime <= 43200
+                            && $currentTime < $sunrise )
                       )
                     {
                         $value = "nt_" . $value if ( $reading eq "icon" );
@@ -782,6 +950,10 @@ sub Wunderground_Hash2Readings($$;$) {
                         $value =~ s/^nt_//  if ( $reading eq "icon" );
                         $value =~ s/\/nt_// if ( $reading eq "icon_url" );
                     }
+                }
+
+                elsif ( $reading eq "almanac_.airport_code" ) {
+                    $reading = "almanac_airport_code";
                 }
 
                 $value = "0"
@@ -850,11 +1022,14 @@ sub Wunderground_Undefine($$$) {
   <a name="Wundergrounddefine"></a>
   <b>Define</b>
   <ul><br>
-    <code>define &lt;name&gt; Wunderground &lt;api-key&gt; &lt;pws-id&gt;</code>
+    <code>define &lt;name&gt; Wunderground &lt;api-key&gt; &lt;query&gt;</code>
     <br><br>
     Example:
     <ul><br>
-      <code>define WUweather Wunderground d123ab11bb2c3456 IBAYERNM70</code><br>
+      <code>
+      define WUweather Wunderground d123ab11bb2c3456 IBAYERNM70<br>
+      define WUweather Wunderground d123ab11bb2c3456 Germany/Berlin<br>
+      </code><br>
     </ul>
     <br>
   </ul>
@@ -868,8 +1043,11 @@ sub Wunderground_Undefine($$$) {
   <a name="Wundergroundattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>pollInterval - Set regular polling interval in seconds (defaults to 300s)</li>
-    <li>wu_lang - Set data language (default=en)</li>
+    <li>pollInterval - Set regular polling interval in seconds (default=300)</li>
+    <li>wu_bestfct - Use Weather Undergrond Best Forecast for forecast (default=1)</li>
+    <li>wu_features - One or more of the data features to be fetched (default=astronomy,conditions,forecast)</li>
+    <li>wu_lang - Returns the API response in the specified language (default=en)</li>
+    <li>wu_pws - Use personal weather stations for conditions (default=1)</li>
   </ul>
   <br><br>
 </ul>
