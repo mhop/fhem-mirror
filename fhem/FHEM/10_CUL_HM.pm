@@ -160,7 +160,9 @@ sub CUL_HM_Initialize($) {
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
                        ."peerIDs "
                        ."tempListTmpl "
-                       ."levelRange levelMap ";
+                       ."levelRange levelMap "
+                       ."cyclicMsgOffset "
+                       ;
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
                        ."expert:0_defReg,1_allReg,2_defReg+raw,3_allReg+raw,4_off,8_templ+default,12_templOnly,251_anything "
@@ -2007,11 +2009,11 @@ sub CUL_HM_Parse($$) {#########################################################
       if(   defined $mI[5]                     #message with physical level?
          && $mh{st} eq "dimmer"){
         my $pl = hex($mI[5])/2;
-        my $vDim = $mh{cHash}->{helper}{vDim};     #shortcut
+        my $vDim = $mh{cHash}->{helper}{vDim}; #shortcut
         if ($vDim->{idPhy} &&
             CUL_HM_id2Hash($vDim->{idPhy})){   #has virt chan
           RemoveInternalTimer("sUpdt:".$mh{src}.$mh{chnM});
-          if ($mh{mTp} eq "10"){                   #valid PhysLevel
+          if ($mh{mTp} eq "10"){               #valid PhysLevel
             foreach my $tmpKey ("idPhy","idV2","idV3",){#update all virtuals
               my $vh = CUL_HM_id2Hash($vDim->{$tmpKey}) if ($vDim->{$tmpKey});
               next if (!$vh || $vDim->{$tmpKey} eq $mh{src}.$mh{chnM});
@@ -5453,7 +5455,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
         else{#virtTemp || virtHum
           $hash->{helper}{vd}{typ} = 2; #virtTemp
-          $hash->{helper}{vd}{cmd} = "8670$dst"."000000";
+          $hash->{helper}{vd}{cmd} = "8470$dst"."000000";
           my $t = $hash->{helper}{vd}{vin}?$hash->{helper}{vd}{vin}:0;
           $t *=10;
           $t -= 0x8000 if ($t < 0);
@@ -6098,6 +6100,10 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     $nextTimer = (($lo+$hi)&0xff)/4 + 120;
     $nextF += $nextTimer;
   }
+  my $offset = AttrVal($name, "cyclicMsgOffset", 200) / 1000.0;
+  $nextTimer += $offset;
+  $nextF += $offset;
+
   Log3  $name,5,"CUL_HM $name m:$hashVd->{msgCnt} ->$msgCnt t:$hashVd->{next}->$nextF  M:$tn :$nextTimer";
   $hashVd->{next} = $nextF;
   $hashVd->{nextM} = $tn+$nextTimer;# new adjust if we will match
@@ -6178,7 +6184,7 @@ sub CUL_HM_weather(@) {#periodically send weather data
   my $hash = $defs{$name};
   my $dName = CUL_HM_getDeviceName($name) ;
   my $ioId = CUL_HM_IoId($defs{$dName});
-  CUL_HM_SndCmd($hash,"++8670".$ioId."00000000".$hash->{helper}{weather});
+  CUL_HM_SndCmd($hash,"++8470".$ioId."00000000".$hash->{helper}{weather});
   InternalTimer(gettimeofday()+150,"CUL_HM_weather","weather:$name",0);
 }
 sub CUL_HM_infoUpdtDevData($$$) {#autoread config
@@ -10489,6 +10495,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a name="unit">unit</a><br>
           set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
           attr KFM100 unit Liter
+          </li>
+      <li><a name="cyclicMsgOffset">cyclicMsgOffset</a><br>
+          when calculating the timestamp for sending the next cyclic message (e.g. weather or valve data) then the value of this attribute<br>
+          in milliseconds is added to the result. So adjusting this might fix problems for example when weather messages of virtual devices are not received reliably
           </li>
     </ul>  <br>
     <a name="CUL_HMparams"><b>available parameter for attribut "param"</b></a>
