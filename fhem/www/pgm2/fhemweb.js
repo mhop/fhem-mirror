@@ -889,7 +889,6 @@ FW_longpoll()
               "&inform=type=status;filter="+filter+";since="+since+";fmt=JSON"+
               '&fw_id='+$("body").attr('fw_id')+
               "&timestamp="+new Date().getTime();
-  query = addcsrf(query);
 
   var loc = (""+location).replace(/\?.*/,"");
   if(typeof WebSocket == "function" && FW_longpollType == "websocket") {
@@ -908,8 +907,8 @@ FW_longpoll()
 
   }
 
-  log("Inform-channel opened ("+(FW_longpollType == 1 ? "HTTP":FW_longpollType )
-                        +") with filter "+filter);
+  log("Inform-channel opened ("+(FW_longpollType==1 ? "HTTP":FW_longpollType)+
+                ") with filter "+filter);
 }
 
 /*************** LONGPOLL END **************/
