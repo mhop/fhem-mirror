@@ -412,6 +412,8 @@ FW_Read($$)
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
               "Access-Control-Allow-Credentials: true\r\n".
               "Access-Control-Max-Age:86400\r\n" : "");
+   $FW_headerlines .= "X-FHEM-csrfToken: $defs{$FW_wname}{CSRFTOKEN}\r\n"
+        if($defs{$FW_wname}{CSRFTOKEN});
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
