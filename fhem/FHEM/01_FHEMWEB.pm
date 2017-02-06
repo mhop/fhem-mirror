@@ -1056,7 +1056,7 @@ FW_addLinks($)
   foreach my $line (@lines) {
     $ret .= "\n" if( $ret );
     foreach my $word ( split( / /, $line ) ) {
-      $word = "<a href=\"$FW_ME$FW_subdir?detail=$word$FW_CSRF\">$word</a>"
+      $word = "<a href=\"$FW_ME$FW_subdir?detail=$word\">$word</a>"
             if( $defs{$word} );
       $ret .= "$word ";
     }
@@ -2259,7 +2259,8 @@ FW_pH(@)
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
   my $ret;
 
-  $link = ($link =~ m,^/,) ? "$link$FW_CSRF" : "$FW_ME$FW_subdir?$link$FW_CSRF";
+  $link .= $FW_CSRF if($link =~ m/cmd/);
+  $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
   
   # Using onclick, as href starts safari in a webapp.
   # Known issue: the pointer won't change
