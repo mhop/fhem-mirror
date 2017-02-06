@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.3";
+my $version = "0.6.4";
 
 
 
@@ -340,12 +340,13 @@ sub XiaomiFlowerSens_callGatttool($@) {
     my ($name,$mac,$wfr)    = @_;
     my $hci                 = ReadingsVal($name,"hciDevice","hci0");
     
-    my $loop = 0;
+    my $loop;
     my $wresp;
     my @readSensData;
     my @readBatFwData;
     
     
+    $loop = 0;
     while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
         sleep 0.5;
@@ -359,7 +360,9 @@ sub XiaomiFlowerSens_callGatttool($@) {
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
     if($wfr == 1) {
         
+        $loop = 0;
         do {
+        
             $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null) if($wfr == 1);
             $loop++;
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
@@ -370,12 +373,14 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - run gatttool";
     
+    $loop = 0;
     do {
+    
         @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
     
-    } while( $loop < 10 and $readSensData[0] =~ /connect error/ );
+    } while( $loop < 10 and not $readSensData[0] =~ /Characteristic value/ );
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData[0]: $readSensData[0]";
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData: $readSensData[1]";
@@ -385,14 +390,14 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     
     ### Read Firmware and Battery Data
-    
+    $loop = 0;
     do {
     
         @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
-        Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
         $loop++;
+        Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
     
-    } while( $loop < 10 and $readBatFwData[0] =~ /connect error/ );
+    } while( $loop < 10 and not $readSensData[0] =~ /Characteristic value/ );
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. batFwData: $readBatFwData[1]";
     
