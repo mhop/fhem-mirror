@@ -1,3 +1,6 @@
+# $Id$
+
+=for comment
 ##############################################
 #
 # 55_InfoPanel.pm written by betateilchen
@@ -58,7 +61,7 @@
 # 2016-09-04 - 12114 - added:   movecalculated
 #
 ##############################################
-# $Id$
+=cut
 
 package main;
 use strict;
