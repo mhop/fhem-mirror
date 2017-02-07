@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_Text2Speech: writing stats for checking outdated files fixed
+                             Attr TTS_noStatisticsLog now working properly
   - bugfix:  74_XiaomiFlowerSens: 0.6.4 rewrite Errorhandling
   - bugfix:  70_BRAVIA: utf-8 character handling
                         use WOL only if device is absent (exception 2013 model)

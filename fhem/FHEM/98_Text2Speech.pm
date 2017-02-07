@@ -805,7 +805,6 @@ sub Text2Speech_DoIt($) {
       if(-e $file) {
         push(@Mp3WrapFiles, $file);
         push(@Mp3WrapText, $t);
-        #Text2Speech_WriteStats($hash, 0, $file, $t);
       } else {last;}
     }
 
@@ -830,7 +829,6 @@ sub Text2Speech_DoIt($) {
 
         Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
         system($cmd);
-        #Text2Speech_WriteStats($hash, 1, $Mp3WrapFile, join(" ", @Mp3WrapText));
       } else {
         Log3 $hash->{NAME}, 2, "Text2Speech: Mp3Wrap Datei konnte nicht angelegt werden.";
       }
@@ -900,7 +898,7 @@ sub Text2Speech_Done($) {
     for(my $i=0; $i<$tts_done; $i++) { 
       push(@text, $hash->{helper}{Text2Speech}[$i]);
     }         
-    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "1"));
+    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
   }
 
   delete($hash->{helper}{RUNNING_PID});
@@ -947,13 +945,20 @@ sub Text2Speech_WriteStats($$$$){
   }
   return undef if($defs{$DbLogDev}{STATE} !~ m/(active|connected)/); # muss active sein!
 
+  my $logdevice = $hash->{NAME} ."|". $file;
   # den letzten Value von "Usage" ermitteln um dann die Statistik um 1 zu erhoehen.
-  my @LastValue = DbLog_Get($defs{$DbLogDev}, "", "current", "array", "-", "-", $hash->{NAME} ."|". $file.":Usage");
+  my @LastValue = DbLog_Get($defs{$DbLogDev}, "", "current", "array", "-", "-", $logdevice.":Usage");   
   my $NewValue = 1;
   $NewValue = $LastValue[0]{value} + 1 if($LastValue[0]);
 
-  #           DbLogHash,        DbLogTable, TIMESTAMP, DEVICE,                    TYPE,          EVENT, READING, VALUE,     UNIT
-  DbLog_Push($defs{$DbLogDev}, "Current", TimeNow(), $hash->{NAME} ."|". $file, $hash->{TYPE}, $text, "Usage", $NewValue, "");
+  my $cmd;
+  if ($NewValue == 1) {
+    $cmd = "INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (\
+           '".TimeNow()."','".$logdevice."','".$hash->{TYPE}."','".$text."','Usage','".$NewValue."','')";
+  } else {
+    $cmd = "UPDATE current SET VALUE = '".$NewValue."', TIMESTAMP = '".TimeNow()."' WHERE DEVICE ='".$logdevice."'";
+  } 
+  DbLog_ExecSQL($defs{$DbLogDev}, $cmd);
 }
 
 1;
