@@ -168,8 +168,9 @@ sub RandomTimer_Exec($) {
        Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
           . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
           . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
-        RandomTimer_setState ($hash);
+        RandomTimer_down($hash);
         RandomTimer_setActive($hash,0);
+        RandomTimer_setState ($hash);
       }
       # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
       if ($stopTimeReached) {
@@ -264,9 +265,9 @@ sub RandomTimer_Attr($$$) {
   
   if( $attrName ~~ ["disable","disableCond"] ) {
      
-     #RandomTimer_setState($hash); # funktioniert nicht, weil zu diesem Zeitpunkt der Attributwerte noch nicht gesetzt ist. 
-     RemoveInternalTimer($hash);
-     InternalTimer      (time()+1, "RandomTimer_setState", $hash, 0);       
+    # Schaltung vorziehen, damit bei einem disable abgeschaltet wird.
+    myRemoveInternalTimer("Exec", $hash);
+    myInternalTimer      ("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
   }
   return undef;
 }
