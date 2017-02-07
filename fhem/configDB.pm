@@ -1116,6 +1116,7 @@ sub _cfgDB_Filelist(;$) {
 <a name="configDB"></a>
 <h3>configDB</h3>
 	<ul>
+	pah-Link: <a href="https://forum.fhem.de/index.php?board=46.0">pah-Link</a><br/>
 	This is the core backend library for configuration from SQL database.<br/>
 	See <a href="#configdb">configdb command documentation</a> for detailed info.<br/>
 	</ul>
