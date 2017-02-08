@@ -232,9 +232,11 @@ sub BRAVIA_Set($@) {
         if ( $power eq "off" ) {
             readingsSingleUpdate($hash, "state", "set_on", 1);
             my $macAddr = AttrVal( $name, "macaddr", "" );
-            $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
+            if ($macAddr eq "") {
+              $macAddr = ReadingsVal( $name, "macAddr", "");
+            }
             if ( $macAddr ne "" && $macAddr ne "-" &&
-                ($presence eq "absent" || ReadingVal($name, "generation", "") eq "1.0.5") ) {
+                ($presence eq "absent" || ReadingsVal($name, "generation", "") eq "1.0.5") ) {
                 $result = BRAVIA_wake( $name, $macAddr );
                 return "wake-up command sent";
             } else {
