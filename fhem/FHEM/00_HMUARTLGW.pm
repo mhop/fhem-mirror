@@ -50,6 +50,9 @@ use constant {
 	HMUARTLGW_APP_SET_PREVIOUS_KEY     => "0F", #key index, 00x17 when no key
 	HMUARTLGW_APP_DEFAULT_HMID         => "10",
 
+	HMUARTLGW_DUAL_GET_APP             => "01",
+	HMUARTLGW_DUAL_CHANGE_APP          => "02",
+
 	HMUARTLGW_ACK_NACK                 => "00",
 	HMUARTLGW_ACK                      => "01",
 	HMUARTLGW_ACK_INFO                 => "02",
@@ -67,8 +70,10 @@ use constant {
 	HMUARTLGW_RECV_TRIG                => "11",
 	HMUARTLGW_RECV_TRIG_WITH_AES_OK    => "12",
 
-        HMUARTLGW_DST_OS                   => 0,
-        HMUARTLGW_DST_APP                  => 1,
+	HMUARTLGW_DST_OS                   => 0,
+	HMUARTLGW_DST_APP                  => 1,
+	HMUARTLGW_DST_DUAL                 => 254,
+	HMUARTLGW_DST_DUAL_ERR             => 255,
 
 	HMUARTLGW_STATE_NONE               => 0,
 	HMUARTLGW_STATE_QUERY_APP          => 1,
@@ -100,6 +105,7 @@ use constant {
 	HMUARTLGW_STATE_SEND_NOACK         => 101,
 	HMUARTLGW_STATE_SEND_TIMED         => 102,
 	HMUARTLGW_STATE_UPDATE_COPRO       => 200,
+	HMUARTLGW_STATE_UNSUPPORTED_FW     => 999,
 
 	HMUARTLGW_CMD_TIMEOUT              => 3,
 	HMUARTLGW_CMD_RETRY_CNT            => 3,
@@ -1061,7 +1067,44 @@ sub HMUARTLGW_Parse($$$$)
 
 	Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
 	     "HMUARTLGW ${name} recv: ".sprintf("%02X", $dst)." ${msg}, state ".$hash->{DevState})
-	    if ($dst eq HMUARTLGW_DST_OS || ($msg !~ m/^05/ && $msg !~ m/^040[3C]/));
+	    if ($dst == HMUARTLGW_DST_OS || $dst == HMUARTLGW_DST_DUAL ||
+	        $dst == HMUARTLGW_DST_DUAL_ERR || ($msg !~ m/^05/ && $msg !~ m/^040[3C]/));
+
+	#Minimally handle DualCopro-Firmware
+	if ($dst == HMUARTLGW_DST_DUAL) {
+		#2017.02.08 23:37:27.735 0: HMUARTLGW testy recv: FE 004475616C436F50726F5F417070, state 2
+		if (($msg =~ m/^00(.*)$/ || $msg =~ m/^0501(.*)$/) &&
+		    $hash->{DevState} <= HMUARTLGW_STATE_ENTER_APP) {
+			if (pack("H*", $1) eq "DualCoPro_App") {
+				$hash->{DevState} = HMUARTLGW_STATE_UNSUPPORTED_FW;
+				readingsSingleUpdate($hash, "D-firmware", "unsupported", 1);
+				HMUARTLGW_updateCondition($hash);
+				RemoveInternalTimer($hash);
+				Log3($hash, 0, "HMUARTLGW ${name} is running unsupported firmware, please install a supported version");
+			}
+		}
+
+		return;
+	}
+
+	#Re-send commands for DualCopro Firmware
+	if ($dst == HMUARTLGW_DST_DUAL_ERR) {
+		if ($hash->{DevState} == HMUARTLGW_STATE_QUERY_APP) {
+			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
+			     "HMUARTLGW ${name} Re-sending app-query for unsupported firmware");
+			HMUARTLGW_send($hash, HMUARTLGW_DUAL_GET_APP, HMUARTLGW_DST_DUAL);
+			return;
+		} elsif (defined($hash->{Helper}{AckPending}{$hash->{DEVCNT}}) &&
+		         $hash->{Helper}{AckPending}{$hash->{DEVCNT}}->{dst} == HMUARTLGW_DST_OS &&
+		         $hash->{Helper}{AckPending}{$hash->{DEVCNT}}->{cmd} eq HMUARTLGW_OS_CHANGE_APP) {
+			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
+			     "HMUARTLGW ${name} Re-sending switch to bootloader for unsupported firmare");
+			HMUARTLGW_send($hash, HMUARTLGW_DUAL_CHANGE_APP, HMUARTLGW_DST_DUAL);
+			return;
+		}
+
+		return;
+	}
 
 	if ($msg =~ m/^04/ &&
 	    $hash->{CNT} != $hash->{DEVCNT}) {
@@ -1361,7 +1404,7 @@ sub HMUARTLGW_Read($)
 			$unescaped .= $byte;
 		}
 
-		next if (length($unescaped) < 7); #len len dst cnt cmd crc crc
+		next if (length($unescaped) < 6); #len len dst cnt crc crc
 
 		(my $len) = unpack("n", substr($unescaped, 0, 2));
 
@@ -1948,6 +1991,9 @@ sub HMUARTLGW_updateCondition($)
 		$loadLvl = "suspended";
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UPDATE_COPRO) {
 		$cond = "fwupdate";
+		$loadLvl = "suspended";
+	} elsif ($hash->{DevState} == HMUARTLGW_STATE_UNSUPPORTED_FW) {
+		$cond = "unsupported firmware";
 		$loadLvl = "suspended";
 	}
 
