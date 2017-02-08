@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.4";
+my $version = "0.6.5";
 
 
 
@@ -397,7 +397,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
     
-    } while( $loop < 10 and not $readSensData[0] =~ /Characteristic value/ );
+    } while( $loop < 10 and not $readBatFwData[0] =~ /Characteristic value/ );
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. batFwData: $readBatFwData[1]";
     
