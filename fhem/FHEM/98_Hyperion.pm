@@ -90,7 +90,7 @@ sub Hyperion_Define($$)
   }
   $hash->{IP}     = $host;
   $hash->{PORT}   = $port;
-  $hash->{DeviceName} = $host.":".$port;
+  $hash->{DeviceName} = "$host:$port";
   $interval       = undef unless defined $interval;
   $interval       = 5 if ($interval && $interval < 5);
   RemoveInternalTimer($hash);
@@ -224,7 +224,7 @@ sub Hyperion_Read($)
   Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned result: $result";
   delete $hash->{PARTIAL};
   $result =~ /(\s+)?\/{2,}.*|(?:[\t ]*(?:\r?\n|\r))+/gm;
-  if ($result=~ /^\{"success":true\}$/)
+  if ($result =~ /^\{"success":true\}$/)
   {
     fhem "sleep 1; get $name statusRequest"
       if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
@@ -232,7 +232,7 @@ sub Hyperion_Read($)
   }
   elsif ($result =~ /^\{"info":\{.+\},"success":true\}$/)
   {
-    my $obj         = eval {from_json($result)};
+    my $obj         = eval {decode_json($result)};
     my $data        = $obj->{info};
     if (AttrVal($name,"hyperionVersionCheck",1) == 1)
     {
@@ -602,7 +602,7 @@ sub Hyperion_Set($@)
   {
     return "Effect $value is not available in the effect list of $name!"
       if ($value !~ /^([\w-]+)$/ || index(ReadingsVal($name,".effects",""),$value) == -1);
-    my $arg = $args[3]?eval{from_json $args[3]}:"";
+    my $arg = $args[3] ? eval{decode_json $args[3]} : "";
     my $ce  = $hash->{helper}{customeffects};
     if (!$arg && $ce)
     {
@@ -826,12 +826,12 @@ sub Hyperion_Attr(@)
         {
           foreach my $eff (@custeffs)
           {
-            push @effs,eval{from_json $eff};
+            push @effs,eval{decode_json $eff};
           }
         }
         else
         {
-          push @effs,eval{from_json $attr_value};
+          push @effs,eval{decode_json $attr_value};
         }
         $hash->{helper}{customeffects} = \@effs;
         Hyperion_Call($hash);
