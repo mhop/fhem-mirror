@@ -68,9 +68,16 @@
 #   add loopinc for looping include multiple times loopinc="<path>" <key>=( <expr> )  <keyvalues> 
 #   summary for commandref
 #   added if and loopinc to commandref
+#   add new attribute for defining special template urls templateFiles
+#   allow spaces around = and after <? for more tolerance
+#   do not require space at end of tag before ?> for more tolerance
+
+#   more tolerance on spaces around =
+#   
 #   
 ################################################################
 #TODO:
+#
 #
 # deepcopy only if new keys found
 #
@@ -94,23 +101,21 @@ my $FTUISRV_matchlink = "^\/?(([^\/]*(\/[^\/]+)*)\/?)\$";
 
 my $FTUISRV_matchtemplatefile = "^.*\.ftui\.[^\.]+\$";
 
-#my $FTUISRV_ftuimatch_header = '<\?ftui-header="([^"\?]*)"\s+([^\?]*)\?>';
-my $FTUISRV_ftuimatch_header = '<\?ftui-header="([^"\?]*)"\s+(.*?)\?>';
+my $FTUISRV_ftuimatch_header = '<\?\s*ftui-header\s*=\s*"([^"\?]*)"\s+(.*?)\?>';
 
-my $FTUISRV_ftuimatch_keysegment = '^\s*([^=\s]+)(="([^"]*)")?\s*';
+my $FTUISRV_ftuimatch_keysegment = '^\s*([^=\s]+)(\s*=\s*"([^"]*)")?\s*';
 
-my $FTUISRV_ftuimatch_keygeneric = '<\?ftui-key=([^\s]+)\s*\?>';
+my $FTUISRV_ftuimatch_keygeneric = '<\?\s*ftui-key\s*=\s*([^\s\?]+)\s*\?>';
 
-my $FTUISRV_ftuimatch_if_het = '^(.*?)<\?ftui-if=\((.*?)\)\s*\?>(.*)$';
+my $FTUISRV_ftuimatch_if_het = '^(.*?)<\?\s*ftui-if\s*=\s*\((.*?)\)\s*\?>(.*)$';
 
-my $FTUISRV_ftuimatch_else_ht = '^(.*?)<\?ftui-else\s*\?>(.*)$';
-my $FTUISRV_ftuimatch_endif_ht = '^(.*?)<\?ftui-endif\s*\?>(.*)$';
+my $FTUISRV_ftuimatch_else_ht = '^(.*?)<\?\s*ftui-else\s*\?>(.*)$';
+my $FTUISRV_ftuimatch_endif_ht = '^(.*?)<\?\s*ftui-endif\s*\?>(.*)$';
 
 
-my $FTUISRV_ftuimatch_inc_hfvt = '^(.*?)<\?ftui-inc="([^"\?]+)"\s+([^\?]*)\?>(.*?)$';
+my $FTUISRV_ftuimatch_inc_hfvt = '^(.*?)<\?\s*ftui-inc\s*=\s*"([^"\?]+)"\s+([^\?]*)\?>(.*?)$';
 
-#my $FTUISRV_ftuimatch_loopinc_hefvt = '^(.*?)<\?ftui-loopinc=\((.*?)\)\s+"([^"\?]+)"\s+([^\?]*)\?>(.*?)$';
-my $FTUISRV_ftuimatch_loopinc_hfkevt = '^(.*?)<\?ftui-loopinc="([^"\?]+)"\s+([^=\s]+)=\s*\((.+?)\)\s+([^\?]*)\?>(.*?)$';
+my $FTUISRV_ftuimatch_loopinc_hfkevt = '^(.*?)<\?\s*ftui-loopinc\s*=\s*"([^"\?]+)"\s+([^=\s]+)\s*=\s*\((.+?)\)\s+([^\?]*)\?>(.*?)$';
 
 
 #########################
@@ -167,7 +172,7 @@ FTUISRV_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}     = "FTUISRV_Define";
     $hash->{UndefFn}   = "FTUISRV_Undef";
-    $hash->{AttrList}  = "directoryindex " .
+    $hash->{AttrList}  = "directoryindex templateFiles ".
                         "readings validateFiles:0,1,2 validateResult:0,1,2 ";
     $hash->{AttrFn}    = "FTUISRV_Attr";                    
     #$hash->{SetFn}     = "FTUISRV_Set";
@@ -247,8 +252,7 @@ sub FTUISRV_CGI() {
 
 #  Debug "request= $request";
   Log3 undef, 4, "FTUISRV: Request to FTUISRV :$request:";
-  
-  
+ 
   # Match request first without trailing / in the link part 
   if($request =~ m,^(/[^/]+)(/([^\?]*)?)?(\?([^#]*))?$,) {
     my $link= $1;
@@ -265,6 +269,17 @@ sub FTUISRV_CGI() {
     # get device name
     $name= $data{FWEXT}{$link}{deviceName}; 
 
+    # check system / device loglevel
+    my $logLevel = $attr{global}{verbose};
+    $logLevel = $attr{$name}{verbose} if ( defined( $attr{$name}{verbose} ) );
+    
+#     Log3 undef, 3, "FTUISRV: Request to FTUISRV :$request:";
+    if ( 4 <= $logLevel ) {
+      if ( ( $request =~ /index.html/ ) || ( $request =~ /\/$/ ) ) {
+        Log3 $name, 4, "FTUISRV: request to FTUISRV :$request:  Header :".join("\n",@FW_httpheader).":";
+      }
+    }
+  
 #    Debug "link= ".((defined($link))?$link:"<undef>");
 #    Debug "filename= ".((defined($filename))?$filename:"<undef>");
 #    Debug "qparams= ".((defined($qparams))?$qparams:"<undef>");
@@ -821,7 +836,7 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
     my $values = $5;
     $rest = $6;
   
-    Log3 $name, 1, "$name: include loop found :$filename:   key :$key: expr:$expr:\n   inc :$incfile:   vals :$values:";
+    Log3 $name, 4, "$name: include loop found :$filename:   key :$key: expr:$expr:\n   inc :$incfile:   vals :$values:";
     return ("$name: Empty file name in loopinc :$filename:", $content) if ( length($incfile) == 0 );
 
     # Evaluate expression as command to get list of entries for loop ???
@@ -870,7 +885,7 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
       # add loopvariable with current value
       $loopincparhash->{$key} = $loopvariable;
       
-      Log3 $name, 1, "$name: start handling include (rec) :$incfile: with value $key = :$loopvariable:";
+      Log3 $name, 4, "$name: start handling include (rec) :$incfile: with value $key = :$loopvariable:";
       my $inccontent;
       my $dummy;
       ($err, $dummy, $inccontent) = FTUISRV_handletemplatefile( $name, $incfile, $loopincparhash, $validatehash );
@@ -927,7 +942,7 @@ sub FTUISRV_handletemplatefile( $$$$ ) {
   }
     
   
-  if ( $filename =~ /$FTUISRV_matchtemplatefile/ ) {
+  if ( ( $filename =~ /$FTUISRV_matchtemplatefile/ ) || ( index( ":".AttrVal($name,"templateFiles","").":", ":".$filename.":" ) != -1 ) ) {
     Log3 $name, 4, "$name: is real template :$filename:";
     $validated = 0;
 
@@ -1150,6 +1165,9 @@ sub FTUISRV_BinaryFileRead($) {
       <br>Example: <code>&lt;?ftui-header="TempHum inline" thdev thformat thtemp="temperature" ?&gt;</code>
       Headers can also use device readings in for setting default values in the form of <code>[device:reading]</code>(according to the syntax and logic used in the set command)
       <br>Example: <code>&lt;?ftui-header="TempHum inline" thdev thformat thbattery=[temphm:batteryok] thtemp="temperature" ?&gt;</code>
+      <br>
+      In the special case, where also variable content shall be used in the header part a special escaping for the closing tags for the ftui-key needs to be used. That means for the example above:
+      Example: <code>&lt;?ftui-header="TempHum inline" thdev thformat thbattery=[<ftui-key=thdev ?\>:batteryok] thtemp="temperature" ?&gt;</code>
     </li><br>
   </ul>
  
@@ -1185,7 +1203,13 @@ sub FTUISRV_BinaryFileRead($) {
       Allows basic validation of HTML content on correct opening/closing tags etc. Here the resulting content provided to the browser 
       (after parsing) are validated (setting to 1 means validation is done / 2 means also the full parsing is logged (Attention very verbose !) 
     </li> 
-  </ul>
+    <li><code>templateFiles &lt;relative paths separated by :&gt;</code><br>
+      specify specific files / urls to be handled as templates even if not containing the ftui in the filename. Multiple files can be separated by colon.
+    </li> 
+
+
+
+    </ul>
   <br><br>
 
 </ul>
