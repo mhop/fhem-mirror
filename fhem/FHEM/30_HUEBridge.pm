@@ -15,15 +15,6 @@ use Data::Dumper;
 
 use HttpUtils;
 
-my $HUEBridge_isFritzBox = undef;
-sub
-HUEBridge_isFritzBox()
-{
-  $HUEBridge_isFritzBox = int( qx( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ) )  if( !defined( $HUEBridge_isFritzBox) );
-
-  return $HUEBridge_isFritzBox;
-}
-
 sub HUEBridge_Initialize($)
 {
   my ($hash) = @_;
@@ -74,7 +65,7 @@ HUEBridge_Detect($)
 
   my $host = '';
   if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ ) {
-    my $obj = eval { from_json($ret) };
+    my $obj = eval { decode_json($ret) };
     Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
 
     if( defined($obj->[0])
@@ -1117,14 +1108,8 @@ HUEBridge_HTTP_Call($$$;$)
     return undef;
   }
 
-  my $decoded;
-  if( HUEBridge_isFritzBox() ) {
-    $decoded = eval { decode_json($ret) };
-    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
-  } else {
-    $decoded = eval { from_json($ret) };
-    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
-  }
+  my $decoded = eval { decode_json($ret) };
+  Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
 
   return HUEBridge_ProcessResponse($hash, $decoded);
 }
@@ -1183,7 +1168,7 @@ HUEBridge_HTTP_Call2($$$$;$)
       return undef;
     }
 
-    my $json = eval { from_json($data) };
+    my $json = eval { decode_json($data) };
     Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
     return undef if( !$json );
 
@@ -1233,7 +1218,7 @@ HUEBridge_dispatch($$$;$)
     my $queryAfterSet = AttrVal( $name,'queryAfterSet', 1 );
 
     if( !$json ) {
-      $json = eval { from_json($data) } if( !$json );
+      $json = eval { decode_json($data) } if( !$json );
       Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
     }
     return undef if( !$json );

@@ -4066,7 +4066,7 @@ Log 1, "!!!!!!!!!!";
         $hash->{buf} = substr($hash->{buf},$i+$len);
 
         if( $op == 0x01 ) {
-          my $obj = eval { from_json($data) };
+          my $obj = eval { decode_json($data) };
 
           if( $obj ) {
             my $phash = $hash->{phash};
