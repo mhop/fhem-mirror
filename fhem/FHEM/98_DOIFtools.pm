@@ -652,47 +652,144 @@ sub DOIFtoolsCheckDOIF {
     $tail =~ s/(##.*\n)|(##.*$)|\n/ /g;
   }
   return("") if ($tail =~ /^ *$/);
-  $ret .= "<li>replace <b>DOIF name</b> with <b>\$SELF</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">utilization of events</a>)</li>\n" if ($tail =~ m/[\[|\?]($tn)/);
-  $ret .= "<li>replace <b>ReadingsVal(...)</b> with <b>[</b>name<b>:</b>reading<b>,</b>default value<b>]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">controlling by events</a>)</li>\n" if ($tail =~ m/(ReadingsVal)/);
-  $ret .= "<li>replace <b>ReadingsNum(...)</b> with <b>[</b>name<b>:</b>reading<b>:d,</b>default value]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Filtern_nach_Zahlen\">filtering numbers</a>)</li>\n" if ($tail =~ m/(ReadingsNum)/);
-  $ret .= "<li>replace <b>InternalVal(...)</b> with <b>[</b>name<b>:</b>&amp;internal,</b>default value<b>]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">controlling by events</a>)</li>\n" if ($tail =~ m/(InternalVal)/);
-  $ret .= "<li>replace <b>$1...\")}</b> with <b>$2...</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref.html#command\">plain FHEM command</a>)</li>\n" if ($tail =~ m/(\{\s*fhem.*?\"\s*(set|get))/);
-  $ret .= "<li>replace <b>{system \"</b>&lt;shell command&gt;<b>\"}</b> with <b>\"</b>\&lt;shell command&gt;<b>\"</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref.html#command\">plain FHEM shell command, non blocking</a>)</li>\n" if ($tail =~ m/(\{\s*system.*?\})/);
-  $ret .= "<li><b>sleep</b> is not recommended in DOIF, use attribute <b>wait</b> for (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">delay</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
-  $ret .= "<li>replace <b>[</b>name<b>:?</b>regex<b>]</b> by <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">avoid old syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
+  my $DE = AttrVal("global", "language", "") eq "DE" ? 1 : 0;
+  if ($DE) {
+      $ret .= "<li>ersetze <b>DOIF name</b> durch <b>\$SELF</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">Auswertung von Events</a>)</li>\n" if ($tail =~ m/[\[|\?]($tn)/);
+      $ret .= "<li>ersetze <b>ReadingsVal(...)</b> durch <b>[</b>name<b>:</b>reading<b>,</b>default value<b>]</b>, wenn es nicht in einem <b><a href=\"https://fhem.de/commandref.html#IF\">IF-Befehl</a></b> verwendet wird, dort ist es nicht anders möglich einen Default-Wert anzugeben. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">Steuerung durch Events</a>)</li>\n" if ($tail =~ m/(ReadingsVal)/);
+      
+      $ret .= "<li>ersetze <b>ReadingsNum(...)</b> durch <b>[</b>name<b>:</b>reading<b>:d,</b>default value]</b>, wenn es nicht in einem <b><a href=\"https://fhem.de/commandref.html#IF\">IF-Befehl</a></b> verwendet wird, dort ist es nicht anders möglich einen Default-Wert anzugeben. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Filtern_nach_Zahlen\">Filtern nach Zahlen</a>)</li>\n" if ($tail =~ m/(ReadingsNum)/);
+      $ret .= "<li>ersetze <b>InternalVal(...)</b> durch <b>[</b>name<b>:</b>&amp;internal,</b>default value<b>]</b>, wenn es nicht in einem <b><a href=\"https://fhem.de/commandref.html#IF\">IF-Befehl</a></b> verwendet wird, dort ist es nicht anders möglich einen Default-Wert anzugeben. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">Steuerung durch Events</a>)</li>\n" if ($tail =~ m/(InternalVal)/);
+      $ret .= "<li>ersetze <b>$1...\")}</b> durch <b>$2...</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#command\">FHEM-Befehl</a>)</li>\n" if ($tail =~ m/(\{\s*fhem.*?\"\s*(set|get))/);
+      $ret .= "<li>ersetze <b>{system \"</b>&lt;SHELL-Befehl&gt;<b>\"}</b> durch <b>\"</b>\&lt;SHELL-Befehl&gt;<b>\"</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#command\">FHEM SHELL-Befehl, nicht blockierend</a>)</li>\n" if ($tail =~ m/(\{\s*system.*?\})/);
+      $ret .= "<li><b>sleep</b> im DOIF zu nutzen, wird nicht empfohlen, nutze das Attribut <b>wait</b> für (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">Verzögerungen</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
+      $ret .= "<li>ersetze <b>[</b>name<b>:?</b>regex<b>]</b> durch <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">Vermeidung veralteter Syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
 
-  $ret .= "<li>the first <b>command</b> after <b>DOELSE</b> seems to be a <b>condition</b> indicated by <b>$2</b>, check it.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
-  my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
-  my @sub0 = ();
-  my @tmp = ();
-  if (@wait and !AttrVal($tn,"timerWithWait","")) {
-    for (my $i = 0; $i < @wait; $i++) {
-      ($sub0[$i],@tmp) = SplitDoIf(",",$wait[$i]);
-      $sub0[$i] =~ s/\s// if($sub0[$i]);
-    }
-    if (defined $defs{$tn}{timeCond}) {
-      foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
-        if (defined($defs{$tn}{timeCond}{$key}) and $defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
-          $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
-          last;
+      $ret .= "<li>der erste <b>Befehl</b> nach <b>DOELSE</b> scheint eine  <b>Bedingung</b> zu sein, weil <b>$2</b> enthalten ist, bitte prüfen.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
+      my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
+      my @sub0 = ();
+      my @tmp = ();
+      if (@wait and !AttrVal($tn,"timerWithWait","")) {
+        for (my $i = 0; $i < @wait; $i++) {
+          ($sub0[$i],@tmp) = SplitDoIf(",",$wait[$i]);
+          $sub0[$i] =~ s/\s// if($sub0[$i]);
+        }
+        if (defined $defs{$tn}{timeCond}) {
+          foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
+            if (defined($defs{$tn}{timeCond}{$key}) and $defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
+              $ret .= "<li><b>Timer</b> in der <b>Bedingung</b> and <b>Wait-Timer</b> für <b>Befehle</b> im selben <b>DOIF-Zweig</b>.<br>Wenn ein unerwartetes Verhalten beobachtet wird, nutze das Attribut <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">Verzögerung von Timern</a>)</li>\n";
+              last;
+            }
+          }
         }
       }
-    }
-  }
-  my $wait = AttrVal($tn,"wait","");
-  if ($wait) {
-    $ret .= "<li>At least one <b>indirect timer</b> in attribute <b>wait</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n" 
-        if($wait =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3); 
-  }
-  if (defined $defs{$tn}{time}) {
-    foreach my $key (sort keys %{$defs{$tn}{time}}) {
-      if (defined $defs{$tn}{time}{$key} and $defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
-        $ret .= "<li>At least one <b>indirect timer</b> in <b>condition</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n";
-        last;
+      my $wait = AttrVal($tn,"wait","");
+      if ($wait) {
+        $ret .= "<li>Mindestens ein <b>indirekter Timer</b> im Attribut <b>wait</b> bezieht sich auf den <b>DOIF-Namen</b> ( $tn ) und hat keinen <b>Default-Wert</b>, er sollte angegeben werden.</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">Default-Wert</a>)</li>\n" 
+            if($wait =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3); 
       }
-    }
-  }
+      if (defined $defs{$tn}{time}) {
+        foreach my $key (sort keys %{$defs{$tn}{time}}) {
+          if (defined $defs{$tn}{time}{$key} and $defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
+            $ret .= "<li>Mindestens ein <b>indirekter Timer</b> in einer <b>Bedingung</b> bezieht sich auf den <b>DOIF-Namen</b> ( $tn ) und hat keinen <b>Default-Wert</b>, er sollte angegeben werden. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">Default-Wert</a>)</li>\n";
+            last;
+          }
+        }
+      }
+      
+      if (defined $defs{$tn}{devices}{all}) {
+        @tmp = ();
+        my $devi = $defs{$tn}{devices}{all};
+        $devi =~ s/^ | $//g;
+        my @devi = split(/ /,$defs{$tn}{devices}{all});
+        foreach my $key (@devi) {
+          push @tmp, $key if (defined $defs{$key} and $defs{$key}{TYPE} eq "dummy");
+        }
+        if (@tmp) {
+          my $tmp = join(" ",sort @tmp);
+          $ret .= "<li>Dummy-Geräte ( $tmp ) in der Bedingung von DOIF $tn können durch <b>benutzerdefinierte Readings des DOIF</b> ersetzt werden, wenn sie als Frontend-Elemente genutzt werden. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_setList__readingList\">readingList, setList, webCmd</a>)</li>\n";
+        }
+      }
+      
+      if (defined $defs{$tn}{do}) {
+        @tmp = ();
+        foreach my $key (keys %{$defs{$tn}{do}}) {
+          foreach my $subkey (keys %{$defs{$tn}{do}{$key}}) {
+            push @tmp, $1 if ($defs{$tn}{do}{$key}{$subkey} =~ m/set (.*?) / and defined $defs{$1} and $defs{$1}{TYPE} eq "dummy");
+          }
+        }
+        if (@tmp) {
+          my $tmp = join(" ",sort @tmp);
+          $ret .= "<li>Statt Dummys ( $tmp ) zu setzen, könnte ggf. der Status des DOIF $tn zur Anzeige im Frontend genutzt werden. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_cmdState\">DOIF-Status ersetzen</a>)</li>\n";
+        }
+      }
+  } else {
+      $ret .= "<li>replace <b>DOIF name</b> with <b>\$SELF</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">utilization of events</a>)</li>\n" if ($tail =~ m/[\[|\?]($tn)/);
+      $ret .= "<li>replace <b>ReadingsVal(...)</b> with <b>[</b>name<b>:</b>reading<b>,</b>default value<b>]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">controlling by events</a>)</li>\n" if ($tail =~ m/(ReadingsVal)/);
+      $ret .= "<li>replace <b>ReadingsNum(...)</b> with <b>[</b>name<b>:</b>reading<b>:d,</b>default value]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Filtern_nach_Zahlen\">filtering numbers</a>)</li>\n" if ($tail =~ m/(ReadingsNum)/);
+      $ret .= "<li>replace <b>InternalVal(...)</b> with <b>[</b>name<b>:</b>&amp;internal,</b>default value<b>]</b>, if not used in an <b><a href=\"https://fhem.de/commandref.html#IF\">IF command</a></b>, otherwise there is no possibility to use a default value (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung\">controlling by events</a>)</li>\n" if ($tail =~ m/(InternalVal)/);
+      $ret .= "<li>replace <b>$1...\")}</b> with <b>$2...</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref.html#command\">plain FHEM command</a>)</li>\n" if ($tail =~ m/(\{\s*fhem.*?\"\s*(set|get))/);
+      $ret .= "<li>replace <b>{system \"</b>&lt;shell command&gt;<b>\"}</b> with <b>\"</b>\&lt;shell command&gt;<b>\"</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref.html#command\">plain FHEM shell command, non blocking</a>)</li>\n" if ($tail =~ m/(\{\s*system.*?\})/);
+      $ret .= "<li><b>sleep</b> is not recommended in DOIF, use attribute <b>wait</b> for (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">delay</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
+      $ret .= "<li>replace <b>[</b>name<b>:?</b>regex<b>]</b> by <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">avoid old syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
 
+      $ret .= "<li>the first <b>command</b> after <b>DOELSE</b> seems to be a <b>condition</b> indicated by <b>$2</b>, check it.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
+      my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
+      my @sub0 = ();
+      my @tmp = ();
+      if (@wait and !AttrVal($tn,"timerWithWait","")) {
+        for (my $i = 0; $i < @wait; $i++) {
+          ($sub0[$i],@tmp) = SplitDoIf(",",$wait[$i]);
+          $sub0[$i] =~ s/\s// if($sub0[$i]);
+        }
+        if (defined $defs{$tn}{timeCond}) {
+          foreach my $key (sort keys %{$defs{$tn}{timeCond}}) {
+            if (defined($defs{$tn}{timeCond}{$key}) and $defs{$tn}{timeCond}{$key} and $sub0[$defs{$tn}{timeCond}{$key}]) {
+              $ret .= "<li><b>Timer</b> in <b>condition</b> and <b>wait timer</b> for <b>commands</b> in the same <b>DOIF branch</b>.<br>If you observe unexpected behaviour, try attribute <b>timerWithWait</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_timerWithWait\">delay of Timer</a>)</li>\n";
+              last;
+            }
+          }
+        }
+      }
+      my $wait = AttrVal($tn,"wait","");
+      if ($wait) {
+        $ret .= "<li>At least one <b>indirect timer</b> in attribute <b>wait</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n" 
+            if($wait =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3); 
+      }
+      if (defined $defs{$tn}{time}) {
+        foreach my $key (sort keys %{$defs{$tn}{time}}) {
+          if (defined $defs{$tn}{time}{$key} and $defs{$tn}{time}{$key} =~ m/(\[(\$SELF|$tn).*?(\,.*?)?\])/ and $2 and !$3) {
+            $ret .= "<li>At least one <b>indirect timer</b> in <b>condition</b> is referring <b>DOIF's name</b> ( $tn ) and has no <b>default value</b>, you should add <b>default values</b>. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_notexist\">default value</a>)</li>\n";
+            last;
+          }
+        }
+      }
+      
+      if (defined $defs{$tn}{devices}{all}) {
+        @tmp = ();
+        my $devi = $defs{$tn}{devices}{all};
+        $devi =~ s/^ | $//g;
+        my @devi = split(/ /,$defs{$tn}{devices}{all});
+        foreach my $key (@devi) {
+          push @tmp, $key if (defined $defs{$key} and $defs{$key}{TYPE} eq "dummy");
+        }
+        if (@tmp) {
+          my $tmp = join(" ",sort @tmp);
+          $ret .= "<li>dummy devices  in DOIF $tn condition could replaced by <b>user defined readings</b> in DOIF, if they are used as frontend elements. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_setList__readingList\">readingList, setList, webCmd</a>)</li>\n";
+        }
+      }
+      if (defined $defs{$tn}{do}) {
+        @tmp = ();
+        foreach my $key (keys %{$defs{$tn}{do}}) {
+          foreach my $subkey (keys %{$defs{$tn}{do}{$key}}) {
+            push @tmp, $1 if ($defs{$tn}{do}{$key}{$subkey} =~ m/set (.*?) / and defined $defs{$1} and $defs{$1}{TYPE} eq "dummy");
+          }
+        }
+        if (@tmp) {
+          my $tmp = join(" ",sort @tmp);
+          $ret .= "<li>The state of DOIF $tn could be eventually used as display element in frontend, instead of setting a dummy device ( $tmp ). (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_cmdState\">replace DOIF state</a>)</li>\n";
+        }
+      }
+  }
   $ret = $ret ? "$tn\n<ul>$ret</ul> " : "";
   return $ret;
 }
@@ -960,6 +1057,7 @@ sub DOIFtools_Get($@)
   my @doifList = devspec2array("TYPE=DOIF");
   my @ntL =();
   my $dL = join(",",sort @doifList);
+  my $DE = AttrVal("global", "language", "") eq "DE" ? 1 : 0;
 
   foreach my $i (@doifList) {
     foreach my $key (keys %{$defs{$i}{READINGS}}) {
@@ -984,6 +1082,7 @@ sub DOIFtools_Get($@)
       }
       $ret .= join("\n",@ret);
       $ret = "<b>Definition for a simple readingsGroup prepared for import with \"Raw definition\":</b>\r--->\r$ret\r<---\r\r";
+      $ret = "<b>Die Definition einer einfachen readingsGroup ist für den Import mit \"Raw definition\"</b> vorbereitet:\r--->\r$ret\r<---\r\r" if ($DE);
       Log3 $pn, 3, $ret if($ret);
       return $ret;
   } elsif ($arg eq "DOIF_to_Log") {
@@ -1018,6 +1117,7 @@ sub DOIFtools_Get($@)
         return $ret;
       } else {
         $ret = "<b>Definition for a FileLog prepared for import with \"Raw definition\":</b>\r--->\r";
+        $ret = "<b>Die FileLog-Definition ist zum Import mit \"Raw definition\"</b>vorbereitet:\r--->\r" if ($DE);
         $ret .= "defmod $pnLog FileLog ".AttrVal("global","logdir","./log/")."$pnLog-%Y-%j.log $regex\r";
         $ret .= "attr $pnLog mseclog 1\r<---\r\r";
         return $ret;
@@ -1052,7 +1152,8 @@ sub DOIFtools_Get($@)
         }
       }
 
-      $ret = "<b>".sprintf("%-".$typlen."s","TYPE").sprintf("%-".$evtlen."s","NAME").sprintf("%-12s","Anzahl").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Begrenzung</a>")."</b>\n";
+      $ret = "<b>".sprintf("%-".$typlen."s","TYPE").sprintf("%-".$evtlen."s","NAME").sprintf("%-12s","Number").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Restriction</a>")."</b>\n";
+      $ret = "<b>".sprintf("%-".$typlen."s","TYPE").sprintf("%-".$evtlen."s","NAME").sprintf("%-12s","Anzahl").sprintf("%-8s","Rate").sprintf("%-12s","<a href=\"https://wiki.fhem.de/wiki/Event#Beschr.C3.A4nken_von_Events\">Begrenzung</a>")."</b>\n" if ($DE);
       $ret .= sprintf("%-".$typlen."s","").sprintf("%-".$evtlen."s","").sprintf("%-12s","Events").sprintf("%-8s","1/h").sprintf("%-12s","event-on...")."\n";
       $ret .= sprintf("-"x($typlen+$evtlen+33))."\n";
       my $i = 0;
@@ -1066,7 +1167,7 @@ sub DOIFtools_Get($@)
               $evtsum += $hash->{READINGS}{$key}{VAL};
               $typsum += $hash->{READINGS}{$key}{VAL};
               $allattr = " ".join(" ",keys %{$attr{$1}});
-              $ret .= sprintf("%-".$typlen."s",$typ).sprintf("%-".$evtlen."s",$1).sprintf("%-12s",$hash->{READINGS}{$key}{VAL}).sprintf("%-8s",$rate).sprintf("%-12s",($allattr =~ " event-on") ? "ja" : "nein")."\n";
+              $ret .= sprintf("%-".$typlen."s",$typ).sprintf("%-".$evtlen."s",$1).sprintf("%-12s",$hash->{READINGS}{$key}{VAL}).sprintf("%-8s",$rate).sprintf("%-12s",($DE ? ($allattr =~ " event-on" ? "ja" : "nein") : ($allattr =~ " event-on" ? "yes" : "no")))."\n";
               $i++;
               $t++;
           }
@@ -1075,27 +1176,51 @@ sub DOIFtools_Get($@)
           $typerate = $te ? int($typsum/$te + 0.5) : 0;
           if($typerate >= $compRate) {
             $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
-            $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$typsum).sprintf("%2s","&empty;:").sprintf("%-8s",$typerate)."\n";
-            $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$t)."\n";
-            $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($typsum/$t + 0.5))."\n";
+            if ($DE) {
+              $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$typsum).sprintf("%2s","&empty;:").sprintf("%-8s",$typerate)."\n";
+              $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$t)."\n";
+              $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($typsum/$t + 0.5))."\n";
+            } else {
+              $ret .= sprintf("%".($typlen+$evtlen)."s","Total: ").sprintf("%-10s",$typsum).sprintf("%2s","&empty;:").sprintf("%-8s",$typerate)."\n";
+              $ret .= sprintf("%".($typlen+$evtlen)."s","Devices: ").sprintf("%-10s",$t)."\n";
+              $ret .= sprintf("%".($typlen+$evtlen)."s","Events/device: ").sprintf("%-10s",int($typsum/$t + 0.5))."\n";
+            }
             $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($typlen+$evtlen+33))."</div>";
           }
         }
       }
-      $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
-      $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$evtsum).sprintf("%2s","&empty;:").sprintf("%-8s",$te ? int($evtsum/$te + 0.5) : "")."\n";
-      $ret .= sprintf("%".($typlen+$evtlen)."s","Dauer: ").sprintf("%d:%02d",int($te),int(($te-int($te))*60+.5))."\n";
-      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$i)."\n";
-      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
-      fhem("count",1) =~ m/(\d+)/;
-      $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte total: ").sprintf("%-10s","$1\n\n");
-      $ret .= sprintf("%".($typlen+$evtlen+1)."s","<u>Filter</u>\n");
-      $ret .= sprintf("%".($typlen+$evtlen)."s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
-      $ret .= sprintf("%".($typlen+$evtlen-7)."s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
-      $ret .= sprintf("%".($typlen+$evtlen-7)."s","Rate: ").sprintf("%-10s","&gt;= $compRate\n\n");
+      if ($DE) {
+          $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Summe: ").sprintf("%-10s",$evtsum).sprintf("%2s","&empty;:").sprintf("%-8s",$te ? int($evtsum/$te + 0.5) : "")."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Dauer: ").sprintf("%d:%02d",int($te),int(($te-int($te))*60+.5))."\n";
+          $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte: ").sprintf("%-10s",$i)."\n";
+          $ret .= sprintf("%".($typlen+$evtlen+1)."s","Events/Gerät: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
+          fhem("count",1) =~ m/(\d+)/;
+          $ret .= sprintf("%".($typlen+$evtlen+1)."s","Geräte total: ").sprintf("%-10s","$1\n\n");
+          $ret .= sprintf("%".($typlen+$evtlen+1)."s","<u>Filter</u>\n");
+          $ret .= sprintf("%".($typlen+$evtlen)."s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
+          $ret .= sprintf("%".($typlen+$evtlen-7)."s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
+          $ret .= sprintf("%".($typlen+$evtlen-7)."s","Rate: ").sprintf("%-10s","&gt;= $compRate\n\n");
+      } else {
+          $ret .= sprintf("%".($typlen+$evtlen+10)."s","="x10).sprintf("%2s","  ").sprintf("="x6)."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Total: ").sprintf("%-10s",$evtsum).sprintf("%2s","&empty;:").sprintf("%-8s",$te ? int($evtsum/$te + 0.5) : "")."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Duration: ").sprintf("%d:%02d",int($te),int(($te-int($te))*60+.5))."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Devices: ").sprintf("%-10s",$i)."\n";
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Events/device: ").sprintf("%-10s",int($evtsum/$i + 0.5))."\n\n" if ($i);
+          fhem("count",1) =~ m/(\d+)/;
+          $ret .= sprintf("%".($typlen+$evtlen)."s","Devices total: ").sprintf("%-10s","$1\n\n");
+          $ret .= sprintf("%".($typlen+$evtlen+1)."s","<u>Filter</u>\n");
+          $ret .= sprintf("%".($typlen+$evtlen)."s","TYPE: ").sprintf("%-10s",ReadingsVal($pn,"statisticsTYPEs","")."\n");
+          $ret .= sprintf("%".($typlen+$evtlen-7)."s","NAME: ").sprintf("%-10s",ReadingsVal($pn,"statisticsDeviceFilterRegex",".*")."\n");
+          $ret .= sprintf("%".($typlen+$evtlen-7)."s","Rate: ").sprintf("%-10s","&gt;= $compRate\n\n");
+      }
       $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($typlen+$evtlen+33))."</div>";
       # attibute statistics
-      $ret .= "<b>".sprintf("%-30s","gesetzte Attribute in DOIF").sprintf("%-12s","Anzahl")."</b>\n";
+      if ($DE) {
+        $ret .= "<b>".sprintf("%-30s","genutzte Attribute in DOIF").sprintf("%-12s","Anzahl")."</b>\n";
+      } else {
+        $ret .= "<b>".sprintf("%-30s","used attributes in DOIF").sprintf("%-12s","Number")."</b>\n";
+      }
       $ret .= sprintf("-"x42)."\n";
       my %da = ();
       foreach my $di (@doifList) {
@@ -1124,12 +1249,16 @@ sub DOIFtools_Get($@)
         push @coll, $coll if($coll);
       }
       $ret .= join(" ",@coll);
-      $ret .= "\n<ul><li><b>DOELSIF</b> without <b>DOELSE</b> is o.k., if state changes between, the same condition becomes true again,<br>otherwise use attribute <b>do always</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">controlling by events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">behaviour without attributes</a>)</li></ul> \n" if (@coll);
+      if ($DE) {
+        $ret .= "\n<ul><li><b>DOELSIF</b> ohne <b>DOELSE</b> ist o.k., wenn der Status wechselt, bevor die selbe Bedingung wiederholt wahr wird,<br> andernfalls sollte <b>do always</b> genutzt werden (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">Steuerung durch Events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">Verhalten ohne Attribute</a>)</li></ul> \n" if (@coll);
+      } else {
+        $ret .= "\n<ul><li><b>DOELSIF</b> without <b>DOELSE</b> is o.k., if state changes between, the same condition becomes true again,<br>otherwise use attribute <b>do always</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">controlling by events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">behaviour without attributes</a>)</li></ul> \n" if (@coll);
+      }
       foreach my $di (@doifList) {
         $ret .= DOIFtoolsCheckDOIF($hash,$di);
       }
       
-      $ret = $ret ? "Found recommendation for:\n\n$ret" : "No recommendation found.";
+      $ret = $DE ? ($ret ? "Empfehlung gefunden für:\n\n$ret" : "Keine Empfehlung gefunden.") : ($ret ? "Found recommendation for:\n\n$ret" : "No recommendation found.");
       return $ret;
       
   } elsif ($arg eq "runningTimerInDOIF") {

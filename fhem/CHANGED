@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: two more checks in checkDOIF
+                output language depends now on global attribute language
+                recommedation in checkDOIF is now in german language available
   - feature: 02_FTUISRV: attribute templatefile and more tolerance on spaces
   - bugfix:  74_XiaomiFlowerSens: 0.6.5 bugfix in gatttool Routine
   - bugfix:  73_ElectricityCalculator: Power peaks due fhem Blocksge
