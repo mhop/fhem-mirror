@@ -47,7 +47,7 @@ sub WeekdayTimer_Initialize($){
   $hash->{GetFn}   = "WeekdayTimer_Get";
   $hash->{AttrFn}  = "WeekdayTimer_Attr";  
   $hash->{UpdFn}   = "WeekdayTimer_Update";
-  $hash->{AttrList}= "disable:0,1 delayedExecutionCond switchInThePast:0,1 ".
+  $hash->{AttrList}= "disable:0,1 delayedExecutionCond switchInThePast:0,1 commandTemplate ".
      $readingFnAttributes;
 }
 ################################################################################
@@ -170,6 +170,9 @@ sub WeekdayTimer_Define($$) {
   WeekdayTimer_Profile    ($hash);
   delete $hash->{VERZOEGRUNG};
   delete $hash->{VERZOEGRUNG_IDX};
+  
+  $attr{$name}{commandTemplate} =  
+     'set $NAME '. WeekdayTimer_isHeizung($hash) .' $EVENT' if (!defined $attr{$name}{commandTemplate});
   
   InternalTimer(time(), "$hash->{TYPE}_SetTimer", $hash, 0);
 
@@ -711,13 +714,14 @@ sub WeekdayTimer_Update($) {
   
  #my $sollZeit    = $myHash->{TIME};
  
-  my $setModifier = WeekdayTimer_isHeizung($hash);
-  my $isHeating = $setModifier gt "";
+ #my $setModifier = WeekdayTimer_isHeizung($hash);
+ #my $isHeating = $setModifier gt "";
 
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
-  my $newParam    = WeekdayTimer_evalAndcleanupParam($hash,$time,$hash->{profil}{$idx}{PARA}, $isHeating );
+ #my $newParam    = WeekdayTimer_evalAndcleanupParam($hash,$time,$hash->{profil}{$idx}{PARA}, $isHeating );
+  my $newParam    = $hash->{profil}{$idx}{PARA};
   
  #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
     
@@ -924,10 +928,6 @@ sub WeekdayTimer_FensterOffen ($$$) {
   delete $hash->{VERZOEGRUNG_IDX} if defined($hash->{VERZOEGRUNG_IDX});
   return 0;
 }
-#
-# delete tsxXXX; define tsxXXX WeekdayTimer tstYYY  17:55|{23} 17:56|{45} 17:57|off 17:58|{43} ; attr tsxXXX room Wohnzimmer; attr tsxXXX  verbose 5
-# delete tsxXXX; define tsxXXX WeekdayTimer tstYYY  19:07|{sprintf("%s %s %d","$NAME", "$TIME", 5)} ; attr tsxXXX room Wohnzimmer; attr tsxXXX  verbose 5
-#
 ################################################################################
 sub WeekdayTimer_evalAndcleanupParam($$$$) {
   my ($hash,$time,$param,$isHeating) = @_;
@@ -969,15 +969,21 @@ sub WeekdayTimer_Device_Schalten($$$) {
   #modifier des Zieldevices auswaehlen
   my $setModifier = WeekdayTimer_isHeizung($hash);
   
-  $command = 'set $NAME ' . $setModifier . ' $EVENT';
+  $attr{$name}{commandTemplate} =  
+     'set $NAME '. $setModifier .' $EVENT' if (!defined $attr{$name}{commandTemplate});
+
+  $command = AttrVal($hash->{NAME}, "commandTemplate", "commandTemplate not found");
   $command = $hash->{COMMAND}   if ($hash->{COMMAND} gt "");
 
   my $activeTimer = 1;
   
   my $isHeating = $setModifier gt "";
-  my $aktParam  = WeekdayTimer_evalAndcleanupParam($hash,$dummy,ReadingsVal($hash->{DEVICE}, $setModifier, ""),$isHeating);
+  my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
+     $aktParam  = sprintf("%.1f", $aktParam)   if ($isHeating && $aktParam =~ m/^[0-9]{1,3}$/i);
+     $newParam  = sprintf("%.1f", $newParam)   if ($isHeating && $newParam =~ m/^[0-9]{1,3}$/i);
+  # my $aktParam  = WeekdayTimer_evalAndcleanupParam($hash,$dummy,ReadingsVal($hash->{DEVICE}, $setModifier, ""),$isHeating);
   # newParam is already processed by evalAndcleanupParam()
-  
+
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
   my $disabled_txt = $disabled ? " " : " not";
   Log3 $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
@@ -1047,10 +1053,12 @@ sub WeekdayTimer_Attr($$$$) {
   
   my $hash = $defs{$name};
   if(       $attrName eq "disable" ) {
-     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
+    readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
+  } elsif ( $attrName eq "enable" ) {
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash}); 
   } elsif ( $attrName eq "switchInThePast" ) {
-     $attr{$name}{$attrName} = $attrVal;     
-     WeekdayTimer_SetTimerOfDay({ HASH => $hash}); 
+    $attr{$name}{$attrName} = $attrVal;     
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash}); 
   }
   return undef;
 }
@@ -1138,7 +1146,6 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
          It is possible to define $we or !$we in daylist to easily allow weekend an holiday. $we !$we are coded as 7 8, when using a numeric daylist.<br><br>
       <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}. Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br><br>
       <u>parameter:</u>the parameter to be set, using any text value like <b>on</b>, <b>off</b>, <b>dim30%</b>, <b>eco</b> or <b>comfort</b> - whatever your device understands.<br>
-     If the parameter is perl code (embraced in {}), it is evaluated automatically.<br>
     </ul>
     <p>
     <ul><b>command</b><br>
@@ -1199,13 +1206,6 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
         define wd    Weekdaytimer device de   57      09:00|19  (function("exit"))  
         define wd    Weekdaytimer device de  fr,$we   09:00|19  (function("exit"))  
         </code></pre>
-        
-       it is possible to construct the parameter as Perlcode:<p>
-        <code><pre>
-        ...   7|23:35|{getParameter(13,"this")}   7|23:36|{getParameter(14,"that")}
-        </code></pre>
-        A detailed examle can be found in Heating_Control<p>
-      
     </ul>
   </ul>
 

@@ -41,7 +41,7 @@ sub Heating_Control_Initialize($)
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
   $hash->{UpdFn}   = "Heating_Control_Update";
-  $hash->{AttrList}= "disable:0,1 delayedExecutionCond windowSensor switchInThePast:0,1 ".
+  $hash->{AttrList}= "disable:0,1 delayedExecutionCond windowSensor switchInThePast:0,1 commandTemplate ".
      $readingFnAttributes;
 }
 ################################################################################
