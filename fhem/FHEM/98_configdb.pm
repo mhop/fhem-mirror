@@ -311,7 +311,7 @@ sub _cfgDB_readConfig() {
 <a name="configdb"></a>
 <h3>configdb</h3>
 	<ul>
-		<a href="https://forum.fhem.de/index.php?board=46.0">pah-Link</a><br/><br/>
+		<a href="https://forum.fhem.de/index.php?board=46.0">Link to FHEM forum</a><br/><br/>
 		Starting with version 5079, fhem can be used with a configuration database instead of a plain text file (e.g. fhem.cfg).<br/>
 		This offers the possibility to completely waive all cfg-files, "include"-problems and so on.<br/>
 		Furthermore, configDB offers a versioning of several configuration together with the possibility to restore a former configuration.<br/>
@@ -458,9 +458,14 @@ sub _cfgDB_readConfig() {
 			<br/>
 			<code> configdb attr</code> - show all defined attributes.<br/>
 			<br/>
-			Currently, only one attribute is supported. If 'private' is set to 1 the user and password info<br/>
-			will not be shown in 'configdb info' output.<br/>
-<br/>
+			<ul>Supported attributes:</ul>
+			<br/>
+			<ul><b>deleteimported</b> if set to 1 files will always be deleted from filesystem after import to database.<br/></ul><br/>
+			<ul><b>maxversions</b> set the maximum number of configurations stored in database. <br/>
+			    The oldest version will be dropped in a "save config" if it would exceed this number.</ul><br/>
+			<ul><b>private</b> if set to 1 the user and password info will not be shown in 'configdb info' output.</ul><br/>
+			<ul><b>useCache</b> (experimental!) if set to 1 fileread from database will be cached.</ul><br/>
+			<br/>
 
 		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
 			Compare configuration dataset for device &lt;device&gt; 
