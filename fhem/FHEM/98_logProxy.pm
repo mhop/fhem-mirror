@@ -370,7 +370,7 @@ sub logProxy_isDay($) {
   my ($s,$m,$h) = localtime($sec);
   my $cur = logProxy_hms2sec( "$h:$m:$s" );
 
-  return $cur > $sr && $cur < $ss;
+  return ($cur > $sr && $cur < $ss)?1:0;
 }
 
 sub logProxy_hms2dec($){
@@ -705,20 +705,25 @@ logProxy_xy2Plot($)
   my $min = 999999;
   my $max = -999999;
   my $last;
+  my $xmin = 999999;
+  my $xmax = -999999;
 
   return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
 
   foreach my $point ( @{$array} ) {
+    my $x = $point->[0];
     my $value = $point->[1];
 
     $min = $value if( $value < $min );
     $max = $value if( $value > $max );
     $last = $value;
+    $xmin = $x if( $x < $xmin );
+    $xmax = $x if( $x > $xmax );
 
-    $ret .= ";p $point->[0] $value\n";
+    $ret .= ";p $x $value\n";
   }
 
-  return ($ret,$min,$max,$last);
+  return ($ret,$min,$max,$last,$xmin,$xmax);
 }
 #create plot data from xy-file
 #assume colums separated by whitespace and x,y pairs separated by comma
@@ -795,6 +800,8 @@ logProxy_Get($@)
     $data{"currdate$j"} = undef;
     $data{"mindate$j"} = undef;
     $data{"maxdate$j"} = undef;
+    $data{"xmin$j"} = undef;
+    $data{"xmax$j"} = undef;
 
     my @fld = split(":", $a[$i]);
 
@@ -1053,7 +1060,7 @@ logProxy_Get($@)
       $fld[1] = join( ':', @fld[1..@fld-1]);
       #my $fromsec = SVG_time_to_sec($from);
       #my $tosec   = SVG_time_to_sec($to);
-      my ($r,$min,$max,$last) = eval $fld[1];
+      my ($r,$min,$max,$last,$xmin,$xmax) = eval $fld[1];
       if( $@ ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[1]: $@";
         next;
@@ -1062,6 +1069,8 @@ logProxy_Get($@)
       $data{"min$j"} = $min;
       $data{"max$j"} = $max;
       $data{"currval$j"} = $last;
+      $data{"xmin$j"} = $xmin;
+      $data{"xmax$j"} = $xmax;
 
       $ret .= $r;
       $ret .= "#$a[$i]\n";
@@ -1220,6 +1229,8 @@ logProxy_Get($@)
     $main::data{"currdate$j"} = $data{"currdate$j"};
     $main::data{"mindate$j"} = $data{"mindate$j"};
     $main::data{"maxdate$j"} = $data{"maxdate$j"};
+    $main::data{"xmin$j"} = $data{"xmin$j"};
+    $main::data{"xmax$j"} = $data{"xmax$j"};
   }
 
 #Log 3, Dumper $ret;
