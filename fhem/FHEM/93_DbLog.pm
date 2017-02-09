@@ -13,6 +13,10 @@
 ################################################################################################################################
 #  Versions History done by DS_Starter:
 #
+# 2.11.4     03.02.2017       check of missing modules added
+# 2.11.3     01.02.2017       make errorlogging of DbLog_PushAsync more identical to DbLog_Push 
+# 2.11.2     31.01.2017       if attr colEvent, colReading, colValue is set, the limitation of fieldlength is also valid
+#                             for SQLite databases
 # 2.11.1     30.01.2017       output to central logfile enhanced for DbLog_Push
 # 2.11       28.01.2017       DbLog_connect substituted by DbLog_connectPush completely
 # 2.10.8     27.01.2017       setinternalcols delayed at fhem start
@@ -73,12 +77,12 @@
 package main;
 use strict;
 use warnings;
-use DBI;
+eval "use DBI;1" or my $DbLogMMDBI = "DBI";
 use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.11.1";
+my $DbLogVersion = "2.11.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -149,6 +153,9 @@ sub DbLog_Define($@)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
+  
+  return "Error: Perl module ".$DbLogMMDBI." is missing. 
+        Install it on Debian with: sudo apt-get install libdbi-perl" if($DbLogMMDBI);  
 
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
@@ -873,8 +880,11 @@ sub DbLog_Log($$) {
 	    	  if ($DoIt) {
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
-			  
-	              if ($hash->{DBMODEL} ne 'SQLITE') {
+			      
+				  my $colevent   = AttrVal($name, 'colEvent', undef);
+				  my $colreading = AttrVal($name, 'colReading', undef);
+				  my $colvalue   = AttrVal($name, 'colValue', undef);
+	              if ($hash->{DBMODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
                       # Daten auf maximale Länge beschneiden
                       $dev_name = substr($dev_name,0, $hash->{HELPER}{DEVICECOL});
                       $dev_type = substr($dev_type,0, $hash->{HELPER}{TYPECOL});
@@ -991,7 +1001,10 @@ sub DbLog_Push(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # for insert history
-	  $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	  eval { $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+	  if ($@) {
+	      return $@;
+      }
       $sth_ih->bind_param_array(1, [@timestamp]);
       $sth_ih->bind_param_array(2, [@device]);
       $sth_ih->bind_param_array(3, [@type]);
@@ -1003,8 +1016,10 @@ sub DbLog_Push(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # for insert current
-	  $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-	  
+	  eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+	  if ($@) {
+	      return $@;
+      }	  
 	  # for update current
 	  $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
 	  $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1316,6 +1331,9 @@ sub DbLog_PushAsync(@) {
   my $st = [gettimeofday];
   
   eval {$dbh->begin_work();};  # issue:  begin_work failed: Turning off AutoCommit failed
+  if ($@) {
+      Log3($name, 2, "DbLog $name -> DBLog_PushAsync - $@");
+  }
   my ($tuples, $rows);
   eval {
       # insert into history
@@ -1388,13 +1406,19 @@ sub DbLog_PushAsync(@) {
 
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog $name -> Error: $@";
-    $dbh->rollback() if(!$dbh->{AutoCommit});
 	$error = $@;
+    eval {$dbh->rollback() if(!$dbh->{AutoCommit});};  # issue Turning on AutoCommit failed
+	if ($@) {
+        Log3($name, 2, "DbLog $name -> DBLog_Push - $@");
+    }
     $dbh->disconnect(); 
     $rowlback = $rowlist;	
   }
   else {
-    $dbh->commit() if(!$dbh->{AutoCommit});
+    eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
+    if ($@) {
+        Log3($name, 2, "DbLog $name -> DBLog_Push - $@");
+    }
 	$dbh->disconnect(); 
   }
   # SQL-Laufzeit ermitteln
@@ -1595,8 +1619,6 @@ sub DbLog_ConnectPush($) {
     $dbhp->do("PRAGMA synchronous=NORMAL");
     $dbhp->do("PRAGMA journal_mode=WAL");
     $dbhp->do("PRAGMA cache_size=4000");
-    $dbhp->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
-    $dbhp->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
   }
  
   return 1;
@@ -1632,18 +1654,6 @@ sub DbLog_ConnectNewDBH($) {
 # param2: pointer : DBFilehandle
 # param3: string  : SQL
 ################################################################
-sub DbLog_ExecSQL1($$$)
-{
-  my ($hash,$dbh,$sql)= @_;
-
-  my $sth = $dbh->do($sql);
-  if(!$sth) {
-    Log3 $hash->{NAME}, 2, "DBLog error: " . $DBI::errstr;
-    return 0;
-  }
-  return $sth;
-}
-
 sub DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
@@ -1662,6 +1672,18 @@ sub DbLog_ExecSQL($$)
       return 0;
     }
     Log3 $hash->{NAME}, 2, "DBLog retry ok.";
+  }
+  return $sth;
+}
+
+sub DbLog_ExecSQL1($$$)
+{
+  my ($hash,$dbh,$sql)= @_;
+
+  my $sth = $dbh->do($sql);
+  if(!$sth) {
+    Log3 $hash->{NAME}, 2, "DBLog error: " . $DBI::errstr;
+    return 0;
   }
   return $sth;
 }
@@ -3210,7 +3232,10 @@ return;
 	   </code><br>
 	 
 	   The field length of database field EVENT will be adjusted. By this attribute the default value in the DbLog-device can be
-	   adjusted if the field length in the databse was changed nanually. <br>
+	   adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field  
+	   EVENT won't be filled . <br>
+	   <b>Note:</b> <br>
+	   If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
      </ul>
   </ul>
   <br>
@@ -3222,7 +3247,10 @@ return;
 	   </code><br>
 	 
 	   The field length of database field READING will be adjusted. By this attribute the default value in the DbLog-device can be
-	   adjusted if the field length in the databse was changed nanually. <br>
+	   adjusted if the field length in the databse was changed nanually. If colReading=0 is set, the database field  
+	   READING won't be filled . <br>
+	   <b>Note:</b> <br>
+	   If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
      </ul>
   </ul>
   <br>
@@ -3234,7 +3262,10 @@ return;
 	   </code><br>
 	 
 	   The field length of database field VALUE will be adjusted. By this attribute the default value in the DbLog-device can be
-	   adjusted if the field length in the databse was changed nanually. <br>
+	   adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field  
+	   VALUE won't be filled . <br>
+	   <b>Note:</b> <br>
+	   If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
      </ul>
   </ul>
   <br>
@@ -3247,7 +3278,8 @@ return;
 	 
        This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set, 
 	   the table <i>history</i> will be used as default. <br>
-	   <b>NOTE:</b> The current-table has to be used to get a Device:Reading-DropDown list when a SVG-Plot will be created. <br>
+	   <b>Note:</b> <br>
+	   The current-table has to be used to get a Device:Reading-DropDown list when a SVG-Plot will be created. <br>
      </ul>
   </ul>
   <br>
@@ -3826,7 +3858,10 @@ return;
 	   </code><br>
 	 
 	   Die Feldlänge für das DB-Feld EVENT wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colEvent=0 wird das Datenbankfeld 
+	   EVENT nicht gefüllt. <br>
+	   <b>Hinweis:</b> <br> 
+	   Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
      </ul>
   </ul>
   <br>
@@ -3838,7 +3873,10 @@ return;
 	   </code><br>
 	 
 	   Die Feldlänge für das DB-Feld READING wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colReading=0 wird das Datenbankfeld 
+	   READING nicht gefüllt. <br>
+	   <b>Hinweis:</b> <br>
+	   Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
      </ul>
   </ul>
   <br>
@@ -3850,7 +3888,10 @@ return;
 	   </code><br>
 	 
 	   Die Feldlänge für das DB-Feld VALUE wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. <br>
+	   verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colValue=0 wird das Datenbankfeld 
+	   VALUE nicht gefüllt. <br>
+	   <b>Hinweis:</b> <br>
+	   Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
      </ul>
   </ul>
   <br>
@@ -3863,7 +3904,8 @@ return;
 	 
        Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
        per default die Tabelle <i>history</i> verwendet. <br>
-	   <b>HINWEIS:</b> Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDownliste zur Erstellung eines 
+	   <b>Hinweis:</b> <br>
+	   Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDownliste zur Erstellung eines 
 	   SVG-Plots zu erhalten.   <br>
      </ul>
   </ul>

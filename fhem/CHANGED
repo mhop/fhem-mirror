@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DBLog: attributes colEvent, colReading, colValue now also
+                       valid for SQLite DB
   - update:  98_DOIFtools: two more checks in checkDOIF
                 output language depends now on global attribute language
                 recommedation in checkDOIF is now in german language available
