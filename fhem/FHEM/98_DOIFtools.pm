@@ -705,6 +705,7 @@ sub DOIFtoolsCheckDOIF {
           push @tmp, $key if (defined $defs{$key} and $defs{$key}{TYPE} eq "dummy");
         }
         if (@tmp) {
+          @tmp = keys %{{ map { $_ => 1 } @tmp}};
           my $tmp = join(" ",sort @tmp);
           $ret .= "<li>Dummy-Geräte ( $tmp ) in der Bedingung von DOIF $tn können durch <b>benutzerdefinierte Readings des DOIF</b> ersetzt werden, wenn sie als Frontend-Elemente genutzt werden. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_setList__readingList\">readingList, setList, webCmd</a>)</li>\n";
         }
@@ -718,6 +719,7 @@ sub DOIFtoolsCheckDOIF {
           }
         }
         if (@tmp) {
+          @tmp = keys %{{ map { $_ => 1 } @tmp}};
           my $tmp = join(" ",sort @tmp);
           $ret .= "<li>Statt Dummys ( $tmp ) zu setzen, könnte ggf. der Status des DOIF $tn zur Anzeige im Frontend genutzt werden. (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#https://fhem.de/commandref_DE.html#DOIF_cmdState\">DOIF-Status ersetzen</a>)</li>\n";
         }
