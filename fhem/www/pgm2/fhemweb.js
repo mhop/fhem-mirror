@@ -62,6 +62,8 @@ FW_replaceWidgets(parent)
 function
 FW_jqueryReadyFn()
 {
+  if(FW_docReady)       // loading fhemweb.js twice is hard to debug
+    return;
   log(version);
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
