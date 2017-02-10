@@ -513,7 +513,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileexport &lt;targetFilename&gt;|all</code></li><br/>
-			Exports specified fhem file from database into filesystem.<br/>
+			Exports specified file (or all files) from database into filesystem.<br/>
 			Example:<br/>
 			<br/>
 			<code>configdb fileexport FHEM/99_myUtils.pm</code><br/>
