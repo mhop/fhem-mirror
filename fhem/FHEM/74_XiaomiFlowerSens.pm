@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.5";
+my $version = "0.6.6";
 
 
 
@@ -380,13 +380,13 @@ sub XiaomiFlowerSens_callGatttool($@) {
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
     
-    } while( $loop < 10 and not $readSensData[0] =~ /Characteristic value/ );
+    } while( $loop < 10 and not $readSensData[0] =~ /^Characteristic value\/descriptor$/ );
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData[0]: $readSensData[0]";
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData: $readSensData[1]";
     
     return ($readSensData[1],undef)
-    unless( $readSensData[0] =~ /Characteristic value/ );
+    unless( $readSensData[0] =~ /^Characteristic value\/descriptor$/ );
     
     
     ### Read Firmware and Battery Data
@@ -397,12 +397,12 @@ sub XiaomiFlowerSens_callGatttool($@) {
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
     
-    } while( $loop < 10 and not $readBatFwData[0] =~ /Characteristic value/ );
+    } while( $loop < 10 and not $readBatFwData[0] =~ /^Characteristic value\/descriptor$/ );
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. batFwData: $readBatFwData[1]";
     
     return ($readBatFwData[1],undef)
-    unless( $readBatFwData[0] =~ /Characteristic value/ );
+    unless( $readBatFwData[0] =~ /^Characteristic value\/descriptor$/ );
     
     
     

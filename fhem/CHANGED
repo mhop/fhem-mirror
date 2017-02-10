@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix : 74_XiaomiFlowerSens: 0.6.6 change RegEx for Error Handling
   - feature: 93_DBLog: attributes colEvent, colReading, colValue now also
                        valid for SQLite DB
   - update:  98_DOIFtools: two more checks in checkDOIF
