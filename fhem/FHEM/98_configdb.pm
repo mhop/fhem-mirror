@@ -134,14 +134,28 @@ sub CommandConfigdb($$) {
 
 		when ('fileexport') {
 			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
-			my $filename;
-			if($param1 =~ m,^[./],) {
-				$filename = $param1;
-			} else {
-				$filename  = $attr{global}{modpath};
-				$filename .= "/$param1";
-			}
-			$ret = _cfgDB_Fileexport $filename;
+			if ($param1 ne 'all') {
+				my $filename;
+				if($param1 =~ m,^[./],) {
+					$filename = $param1;
+				} else {
+					$filename  = $attr{global}{modpath};
+					$filename .= "/$param1";
+				}
+				$ret = _cfgDB_Fileexport $filename;
+			} else { # start export all
+				my $flist    = _cfgDB_Filelist(1);
+				my @filelist = split(/\n/,$flist);
+				undef $flist;
+				foreach my $f (@filelist) {
+					Log3 (4,undef,"configDB: exporting $f");
+					my ($path,$file) = $f =~ m|^(.*[/\\])([^/\\]+?)$|;
+					$path = "/tmp/$path";
+					eval qx(mkdir -p $path) unless (-e "$path");
+					$ret .= _cfgDB_Fileexport $f; 
+					$ret .= "\n";
+				}
+			} # end export all
 		}
 
 		when ('fileimport') {
@@ -498,7 +512,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			<br/>
 <br/>
 
-		<li><code>configdb fileexport &lt;targetFilename&gt;</code></li><br/>
+		<li><code>configdb fileexport &lt;targetFilename&gt;|all</code></li><br/>
 			Exports specified fhem file from database into filesystem.<br/>
 			Example:<br/>
 			<br/>
