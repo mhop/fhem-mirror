@@ -1690,6 +1690,27 @@ FW_makeDeviceLine($$$$$)
   FW_pO "</tr>";
 }
 
+sub
+FW_sortIndex($)
+{
+  my ($d) = @_;
+  return $d if(!$attr{$d});
+
+  my $val = $attr{$d}{sortby};
+  if($val) {
+    return $val =~ m/^{.*}/ ? AnalyzePerlCommand($FW_chash, $val) : lc($val);
+  }
+
+  if($FW_room) {
+    $val = $attr{$d}{"alias_$FW_room"};
+    return $val if($val);
+  }
+
+  $val = $attr{$d}{"alias"};
+  return $val if($val);
+  return $d;
+}
+
 ########################
 # Show the overview of devices in one room
 # room can be a room, all or Unsorted
@@ -1717,7 +1738,7 @@ FW_showRoom()
     if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
       $usuallyAtEnd{$dev} = 1;
       if(!AttrVal($dev, "group", undef)) {
-        $sortIndex{$dev} = lc(AttrVal($dev,"sortby",FW_alias($dev)));
+        $sortIndex{$dev} = FW_sortIndex($dev);
         push @atEnds, $dev;
         next;
       }
@@ -1725,7 +1746,7 @@ FW_showRoom()
     next if(!$FW_types{$dev});   # FHEMWEB connection, missed due to caching
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
-      $sortIndex{$dev} = lc(AttrVal($dev,"sortby",FW_alias($dev)));
+      $sortIndex{$dev} = FW_sortIndex($dev);
       $group{$grp}{$dev} = 1;
     }
   }
@@ -3641,7 +3662,8 @@ FW_widgetOverride($$)
     <li>sortby<br>
         Take the value of this attribute when sorting the devices in the room
         overview instead of the alias, or if that is missing the devicename
-        itself.
+        itself. If the sortby value is enclosed in {} than it is evaluated as a
+        perl expression.
         </li>
         <br>
 
@@ -4370,7 +4392,9 @@ FW_widgetOverride($$)
     <li>sortby<br>
         Der Wert dieses Attributs wird zum sortieren von Ger&auml;ten in
         R&auml;umen verwendet, sonst w&auml;re es der Alias oder, wenn keiner
-        da ist, der Ger&auml;tename selbst.
+        da ist, der Ger&auml;tename selbst. Falls der Wert des sortby
+        Attributes in {} eingeschlossen ist, dann wird er als ein perl Ausdruck
+        evaluiert.
         </li><br>
 
     <a name="showUsedFiles"></a>
