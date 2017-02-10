@@ -220,6 +220,7 @@ my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
 my $cfgDB_dbtype;
+my $cfgDB_filename;
 
 %dbconfig = ();
 @config   = ();
@@ -232,6 +233,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "MYSQL";
 	} elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
 	$cfgDB_dbtype = "SQLITE";
+    (undef,$cfgDB_filename) = split(/=/,$cfgDB_dbconn);
 	} else {
 	$cfgDB_dbtype = "unknown";
 }
@@ -759,6 +761,31 @@ sub _cfgDB_Uuid() {
 	return createUniqueId();
 }
 
+sub _cfgDB_filesize_str($) {
+    my ($size) = @_;
+
+    if ($size > 1099511627776)  #   TiB: 1024 GiB
+    {
+        return sprintf("%.2f TB", $size / 1099511627776);
+    }
+    elsif ($size > 1073741824)  #   GiB: 1024 MiB
+    {
+        return sprintf("%.2f GB", $size / 1073741824);
+    }
+    elsif ($size > 1048576)     #   MiB: 1024 KiB
+    {
+        return sprintf("%.2f MB", $size / 1048576);
+    }
+    elsif ($size > 1024)        #   KiB: 1024 B
+    {
+        return sprintf("%.2f KB", $size / 1024);
+    }
+    else                        #   bytes
+    {
+        return "$size byte" . ($size == 1 ? "" : "s");
+    }
+}
+
 ##################################################
 # Additional backend functions
 # not called from fhem.pl directly
@@ -803,8 +830,12 @@ sub _cfgDB_Info() {
 	push @r, " dbtype: $cfgDB_dbtype";
 	push @r, " Unknown dbmodel type in configuration file." if $cfgDB_dbtype eq 'unknown';
 	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $cfgDB_dbtype eq 'unknown';
+	if ($cfgDB_dbtype eq "SQLITE") {
+	    my $size = -s $cfgDB_filename;
+	    $size = _cfgDB_filesize_str($size);
+		push @r, " dbsize: $size";
+	}
 	push @r, $l;
-
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sql, $sth, @line, $row);
 
@@ -913,6 +944,7 @@ sub _cfgDB_Reorg(;$$) {
 	$fhem_dbh->do("delete from fhemversions where version = -1");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info;
 }
