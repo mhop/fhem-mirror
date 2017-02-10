@@ -1698,7 +1698,12 @@ FW_sortIndex($)
 
   my $val = $attr{$d}{sortby};
   if($val) {
-    return $val =~ m/^{.*}/ ? AnalyzePerlCommand($FW_chash, $val) : lc($val);
+    if($val =~ m/^{.*}/) {
+      my %specials=("%NAME" => $d);
+      my $exec = EvalSpecials($val, %specials);
+      return AnalyzePerlCommand($FW_chash, $exec);
+    }
+    return lc($val);
   }
 
   if($FW_room) {
@@ -3663,7 +3668,7 @@ FW_widgetOverride($$)
         Take the value of this attribute when sorting the devices in the room
         overview instead of the alias, or if that is missing the devicename
         itself. If the sortby value is enclosed in {} than it is evaluated as a
-        perl expression.
+        perl expression. $NAME is set to the device name.
         </li>
         <br>
 
@@ -4394,7 +4399,7 @@ FW_widgetOverride($$)
         R&auml;umen verwendet, sonst w&auml;re es der Alias oder, wenn keiner
         da ist, der Ger&auml;tename selbst. Falls der Wert des sortby
         Attributes in {} eingeschlossen ist, dann wird er als ein perl Ausdruck
-        evaluiert.
+        evaluiert. $NAME wird auf dem Ger&auml;tenamen gesetzt.
         </li><br>
 
     <a name="showUsedFiles"></a>
