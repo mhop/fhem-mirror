@@ -783,9 +783,9 @@ FW_doUpdate(evt)
 
         } else {
           if(d[2].match(/\n/))
-            d[2] = '<pre>'+d[2]+'</pre>';
-          
-          var ma = /^<html>(.*)<\/html>$/.exec(d[2]);
+            d[2] = '<html><pre>'+d[2]+'</pre></html>';
+
+          var ma = /^<html>([\s\S]*)<\/html>$/.exec(d[2]);
           if(!d[0].match("-")) // not a reading
             $(this).html(d[2]);
           else if(ma)
