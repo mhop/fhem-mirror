@@ -134,6 +134,7 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{alertFirmware} = 0;
   $hash->{fhem}{statBoilerHeatUpStep} = 0;
   $hash->{fhem}{statBoilerCoolDownStep} = 0;
+  $hash->{fhem}{defrost}{mode}="none";
  
   $hash->{fhem}{modulVersion} = '$Date$';
        
@@ -171,7 +172,6 @@ LUXTRONIK2_Attr(@)
    
    return undef;
 }
-
 
 sub ########################################
 LUXTRONIK2_Set($$@)
@@ -362,7 +362,6 @@ LUXTRONIK2_GetUpdate($)
 
   $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
-
 
 sub ########################################
 LUXTRONIK2_DoUpdate($)
@@ -844,6 +843,7 @@ LUXTRONIK2_UpdateDone($)
    my $hotWaterTemperatureTarget = LUXTRONIK2_CalcTemp($a[25]);
    my $hotWaterTemperatureThreshold = LUXTRONIK2_CalcTemp($a[25] - $a[49]);
    my $heatSourceIN = LUXTRONIK2_CalcTemp($a[23]);
+   my $heatSourceOUT = LUXTRONIK2_CalcTemp($a[24]);
    my $thresholdHeatingLimit = LUXTRONIK2_CalcTemp($a[21]);
    my $thresholdTemperatureSetBack = LUXTRONIK2_CalcTemp($a[48]);
    my $flowTemperature = LUXTRONIK2_CalcTemp($a[15]);
@@ -987,6 +987,35 @@ LUXTRONIK2_UpdateDone($)
      }
      readingsBulkUpdate($hash,"opStateHeating",$value);
       
+   # Defrost times
+      if ($compressor1 != $heatSourceMotor) {
+         if ($hash->{fhem}{defrost}{mode} eq "none") {
+            $hash->{fhem}{defrost}{startTime} = time();
+            $hash->{fhem}{defrost}{mode} = "air"         if $heatSourceMotor;
+            $hash->{fhem}{defrost}{mode} = "reverse"     unless $heatSourceMotor;
+            $hash->{fhem}{defrost}{ambStart} = $ambientTemperature;
+            $hash->{fhem}{defrost}{hsInStart} = $heatSourceIN;
+            $hash->{fhem}{defrost}{hsOutStart} = $heatSourceOUT;
+         }
+         $hash->{fhem}{defrost}{amb} = $ambientTemperature;
+         $hash->{fhem}{defrost}{hsIn} = $heatSourceIN;
+         $hash->{fhem}{defrost}{hsOut} = $heatSourceOUT;
+      } 
+      elsif ( $hash->{fhem}{defrost}{mode} ne "none" ) {
+         my $value = "Mode: " . $hash->{fhem}{defrost}{mode} . " Time: ";
+         $value .=  strftime ( "%M:%S", localtime( time() - $hash->{fhem}{defrost}{startTime} ) ); 
+         $value .= " Amb: ".$hash->{fhem}{defrost}{ambStart} . " - ". $hash->{fhem}{defrost}{amb};
+         $value .= " hsIN: ".$hash->{fhem}{defrost}{hsInStart} . " - ". $hash->{fhem}{defrost}{hsIn};
+         #$value .= " hsOUT: ".$hash->{fhem}{defrost}{hsOutStart} . " - ". $heatSourceOUT;
+         readingsBulkUpdate( $hash, "heatSourceDefrostLast", $value);
+         $hash->{fhem}{defrost}{mode} = "none";
+         #  16 => "Durchflussueberwachung"
+         if ($opStateHeatPump3 == 16) { 
+            readingsBulkUpdate( $hash, "heatSourceDefrostLastTimeout", "Amb: ".$hash->{fhem}{defrost}{amb}." hsIN: ".$hash->{fhem}{defrost}{hsIn}." hsOUT: ".$hash->{fhem}{defrost}{hsOut});
+         }
+         
+      }
+      
    # Device and reading times, delays and durations
      $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
@@ -1019,9 +1048,9 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "returnTemperatureSetBack",LUXTRONIK2_CalcTemp($a[54]));
      if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));}
      if ($a[19] !~ /no/) {readingsBulkUpdate( $hash, "flowRate",$a[19]);}
-     readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
-     readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
-     readingsBulkUpdate( $hash, "heatSourceMotor",$heatSourceMotor?"on":"off");
+     readingsBulkUpdate( $hash, "heatSourceIN", $heatSourceIN );
+     readingsBulkUpdate( $hash, "heatSourceOUT", $heatSourceOUT );
+     readingsBulkUpdate( $hash, "heatSourceMotor", $heatSourceMotor?"on":"off");
      if ($a[71] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostAirThreshold",LUXTRONIK2_CalcTemp($a[71]));}
      if ($a[72] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostAirEnd",LUXTRONIK2_CalcTemp($a[72]));}
      if ($a[66] !~ /no/) {readingsBulkUpdate( $hash, "heatSourceDefrostTimer",$a[66]);}
@@ -1167,7 +1196,6 @@ LUXTRONIK2_UpdateDone($)
       LUXTRONIK2_Log $hash, 5, "Status = $a[1]";
    }
     $hash->{fhem}{counterRetry} = $counterRetry;
-
 }
 
 sub ########################################
@@ -1187,7 +1215,7 @@ LUXTRONIK2_CalcTemp($)
   #change unsigned into signed
   if ($temp > 2147483648) {$temp = $temp-4294967296;}
   $temp /= 10;
-  return $temp;
+  return sprintf ("%.1f", $temp);
 }
 
 ########################################
