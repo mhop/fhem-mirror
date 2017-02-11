@@ -399,7 +399,7 @@ my %zwave_class = (
   REMOTE_ASSOCIATION       => { id => '7d' },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
-    parse => { "038003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'} },
+    parse => { "0.8003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'} },
   CLOCK                    => { id => '81',
     get   => { clock           => "05" },
     set   => { clock           => 'ZWave_clockSet()' },
