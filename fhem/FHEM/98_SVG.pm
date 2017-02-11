@@ -1418,10 +1418,20 @@ SVG_render($$$$$$$$$$)
   ($off1,$off2) = ($ow-$nr_right_axis*$axis_width-$th, $y+$th);
 
 
-  my ($xmin, $xmax, $xtics);
-  if($conf{xrange} && $conf{xrange} =~ /\[(.*):(.*)\]/) {
-    $xmin = $1 if($1 ne "");
-    $xmax = $2 if($2 ne "");
+  my ($xmin, $xmax, $xtics)= (99999999, -99999999, "");
+  if(defined($conf{xrange})) {
+    my $idx= 1;
+    while(defined($data{"xmin$idx"})) {
+      $xmin= $data{"xmin$idx"} if($data{"xmin$idx"}< $xmin);
+      $xmax= $data{"xmax$idx"} if($data{"xmax$idx"}> $xmax);
+      $idx++;
+    }
+    #main::Debug "xmin= $xmin   xmax=$xmax";
+    $conf{xrange} = AnalyzeCommand(undef, $1) if($conf{xrange} =~ /^({.*})$/);
+    if($conf{xrange} =~ /\[(.*):(.*)\]/) {
+      $xmin = $1 if($1 ne "");
+      $xmax = $2 if($2 ne "");
+    }
   }
   $xtics = defined($conf{xtics}) ? $conf{xtics} : "";
 
@@ -1471,7 +1481,7 @@ SVG_render($$$$$$$$$$)
 
       } elsif( $l =~ /^;/ ) { #allow ;special lines
         if( $l =~ m/^;p (\S+)\s(\S+)/ ) {# point
-          my $xmul = $w/($xmax-$xmin) if( $conf{xrange} );
+          my $xmul = $w/($xmax-$xmin) if($xmax-$xmin > 0 );
           my $x1;
           if( $conf{xrange} ) {
             $x1 = int(($1-$xmin)*$xmul);
