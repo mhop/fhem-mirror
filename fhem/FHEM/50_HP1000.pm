@@ -1244,6 +1244,7 @@ sub HP1000_PushSrv($$) {
             noshutdown => $http_noshutdown,
             data       => undef,
             hash       => $hash,
+            httpversion => "1.1",
             callback   => \&HP1000_ReturnSrv,
         }
     );
