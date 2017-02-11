@@ -1253,6 +1253,8 @@ FileLog_regexpFn($$)
   <a name="FileLogattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
+
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
@@ -1568,6 +1570,8 @@ FileLog_regexpFn($$)
   <a name="FileLogattr"></a>
   <b>Attribute</b>
   <ul>
+    <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
+
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
@@ -1608,7 +1612,7 @@ FileLog_regexpFn($$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
-    <li><a href="#addStateEvent">addStateEvent</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <br>
 
     <a name="eventOnThreshold"></a>
