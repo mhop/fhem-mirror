@@ -1102,6 +1102,7 @@ sub THINKINGCLEANER_SendCommand($$;$$) {
                 service    => $service,
                 cmd        => $cmd,
                 type       => $type,
+                httpversion => "1.1",
                 callback   => \&THINKINGCLEANER_ReceiveCommand,
             }
         );
