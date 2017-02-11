@@ -977,6 +977,7 @@ sub ENIGMA2_SendCommand($$;$$) {
                 cmd        => $cmd,
                 type       => $type,
                 callback   => \&ENIGMA2_ReceiveCommand,
+                httpversion => "1.1",
             }
         );
 
