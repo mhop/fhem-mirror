@@ -1,4 +1,4 @@
-REV 13375
+REV 13382
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -22,7 +22,7 @@ MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
 UPD 2017-02-10_07:45:02 184441 ./CHANGED
-UPD 2017-02-10_07:45:02 34701 ./configDB.pm
+UPD 2017-02-11_07:45:02 35614 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-02-06_07:45:06 129579 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
@@ -49,7 +49,7 @@ UPD 2017-01-16_07:45:02 108257 FHEM/00_THZ.pm
 UPD 2017-01-11_07:45:02 33503 FHEM/00_TUL.pm
 UPD 2016-08-19_14:49:02 21763 FHEM/00_ZWCUL.pm
 UPD 2016-11-25_20:21:08 40802 FHEM/00_ZWDongle.pm
-UPD 2017-02-07_07:45:02 154749 FHEM/01_FHEMWEB.pm
+UPD 2017-02-11_07:45:02 155457 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-02-09_07:45:02 42236 FHEM/02_FTUISRV.pm
 UPD 2016-02-07_07:45:11 7785 FHEM/02_HTTPSRV.pm
@@ -413,7 +413,7 @@ UPD 2016-11-15_07:45:10 9880 FHEM/98_average.pm
 UPD 2016-08-19_14:49:02 6874 FHEM/98_backup.pm
 UPD 2017-01-09_07:45:02 10293 FHEM/98_cloneDummy.pm
 UPD 2017-01-03_07:45:02 3765 FHEM/98_cmdalias.pm
-UPD 2017-02-10_07:45:02 21403 FHEM/98_configdb.pm
+UPD 2017-02-11_07:45:02 21873 FHEM/98_configdb.pm
 UPD 2016-09-24_07:45:10 1998 FHEM/98_copy.pm
 UPD 2016-08-20_07:45:12 1200 FHEM/98_count.pm
 UPD 2016-01-31_07:45:12 926 FHEM/98_deletefile.pm
@@ -558,8 +558,8 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-02-10_07:45:04 2675572 docs/commandref.html
-UPD 2017-02-10_07:45:06 1556070 docs/commandref_DE.html
+UPD 2017-02-11_07:45:04 2675708 docs/commandref.html
+UPD 2017-02-11_07:45:05 1556240 docs/commandref_DE.html
 UPD 2017-01-26_07:45:03 68845 docs/commandref_frame.html
 UPD 2017-01-26_07:45:03 77286 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1830,7 +1830,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2016-07-13_07:45:14 5396 www/pgm2/defaultCommon.css
 UPD 2016-11-21_07:45:13 5294 www/pgm2/fhemdoc_modular.js
-UPD 2017-02-07_07:45:02 42662 www/pgm2/fhemweb.js
+UPD 2017-02-11_07:45:02 42743 www/pgm2/fhemweb.js
 UPD 2017-01-17_07:45:03 12466 www/pgm2/fhemweb_colorpicker.js
 UPD 2015-10-03_07:45:11 3100 www/pgm2/fhemweb_fbcalllist.js
 UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
