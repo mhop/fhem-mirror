@@ -264,6 +264,7 @@ sub Pushover_SendCommand($$;$\%) {
                 service    => $service,
                 cmd        => $cmd,
                 type       => $type,
+                httpversion => "1.1",
                 callback   => \&Pushover_ReceiveCommand,
             }
         );
