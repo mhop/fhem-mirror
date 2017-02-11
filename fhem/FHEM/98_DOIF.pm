@@ -562,11 +562,9 @@ sub ReplaceReadingEvalDoIf($$$)
   my ($block,$err,$device,$reading,$internal)=ReplaceReadingDoIf($element);
   return ($block,$err) if ($err);
   if ($eval) {
-    #if (!AttrVal($hash->{NAME},'notexist',undef)) {
-    #  return ($device,"device does not exist: $device") if(!$defs{$device});
-    #  return ($block,"reading does not exist: $device:$reading") if (defined ($reading) and !defined($defs{$device}{READINGS}{$reading}));
-    #  return ($block,"internal does not exist: $device:$internal") if (defined ($internal) and !defined($defs{$device}{$internal}));
-    #} 
+      return ("[".$element."]","") if(!$defs{$device});
+      return ("[".$element."]","") if (defined ($reading) and !defined($defs{$device}{READINGS}{$reading}));
+      return ("[".$element."]","") if (defined ($internal) and !defined($defs{$device}{$internal}));
     my $ret = eval $block;
     return($block." ",$@) if ($@);
     $block=$ret;
@@ -632,10 +630,14 @@ sub ReplaceAllReadingsDoIf($$$$)
     return ($block,$err) if ($err);
     if ($block ne "") {
       if ($block =~ /^"([^"]*)"/){
-        ($block,$err)=ReplaceEventDoIf($block);
-        return ($block,$err) if ($err);
-        AddRegexpTriggerDoIf($hash,$1,$condition);
-        $event=1;
+	    if ($condition>=0) {
+		  ($block,$err)=ReplaceEventDoIf($block);
+		  return ($block,$err) if ($err);
+		  AddRegexpTriggerDoIf($hash,$1,$condition);
+	      $event=1;
+		} else {
+           $block="[".$block."]";
+		}
       } else {
         if (substr($block,0,1) eq "?") {
           $block=substr($block,1);
@@ -1172,7 +1174,7 @@ sub CheckiTimerDoIf($$$)
   my ($device,$itimer,$eventa)=@_;
   my $max = int(@{$eventa});
   my $found;
-  return 1 if ($itimer =~ /\[$device\]/);
+  return 1 if ($itimer =~ /\[$device(\]|,.+\])/);
   for (my $j = 0; $j < $max; $j++) {
     if ($eventa->[$j] =~ "^(.+): ") { 
       $found = ($itimer =~ /\[$device:$1(\]|:.+\]|,.+\])/);
@@ -1393,9 +1395,10 @@ DOIF_Notify($$)
   }
  
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
-    for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
-    { if (AttrVal($pn, "checkReadingEvent", 0) and CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)
-      or !AttrVal($pn, "checkReadingEvent", 0) and $hash->{time}{$j} =~ /\[$dev->{NAME}(\]|:.+\]|,.+\])/) {
+    for (my $j=0; $j<$hash->{helper}{last_timer};$j++) { 
+	  if (CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)) {
+  #  { if (AttrVal($pn, "checkReadingEvent", 0) and CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)
+  #    or !AttrVal($pn, "checkReadingEvent", 0) and $hash->{time}{$j} =~ /\[$dev->{NAME}(\]|:.+\]|,.+\])/) {
         DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
@@ -2006,12 +2009,25 @@ DOIF_Set($@)
       readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
       delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
       readingsSingleUpdate ($hash,"mode","enable",1)
+  } elsif ($arg =~ /^cmd_(.*)/ ) {
+    if (ReadingsVal($pn,"mode","") ne "disabled") {
+	  if ($hash->{helper}{sleeptimer} != -1) {
+         RemoveInternalTimer($hash);
+	     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+	     $hash->{helper}{sleeptimer}=-1;
+      }
+      DOIF_cmd ($hash,$1-1,0,"set_cmd_".$1);
+	}
   } else {
-
-
       my $setList = AttrVal($pn, "setList", " ");
       $setList =~ s/\n/ /g;
-      return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $setList" if($arg eq "?");
+	  my $cmdList;
+	  my $max_cond=keys %{$hash->{condition}};
+	  $max_cond++ if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame",""))));
+	  for (my $i=0; $i <$max_cond;$i++) {
+	   $cmdList.="cmd_".($i+1).":noArg ";
+	  }
+      return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $cmdList $setList" if($arg eq "?");
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
       eval {
@@ -2023,11 +2039,8 @@ DOIF_Set($@)
         }
       };
       return if($doRet);
-
-
-      return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg $setList";
+      return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
   } 
-
   return $ret;
 }
 
@@ -2165,12 +2178,13 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
   <a href="#DOIF_selftrigger">Triggerung durch selbst ausgelöste Events</a><br>
   <a href="#DOIF_timerevent">Setzen der Timer mit Event</a><br>
   <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
-  <a href="#DOIF_setList__readingList"><b>[Neu]</b> Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
+  <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
   <a href="#DOIF_cmdState">Status des Moduls</a><br>
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
   <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
-  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
+  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>  
+  <a href="#DOIF_cmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
   <a href="#DOIF_Initialisieren_des_Moduls">Initialisieren des Moduls</a><br>
   <a href="#DOIF_Weitere_Anwendungsbeispiele">Weitere Anwendungsbeispiele</a><br>
   <a href="#DOIF_Zu_beachten">Zu beachten</a><br>
@@ -2375,11 +2389,6 @@ attr di_battery do always</code><br>
 <br>
 Eine aktuelle Übersicht aller Batterie-Stati entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
 <br>
-
-
-
-
-
 <br>
 Allgemeine Ereignistrigger können ebenfalls so definiert werden, dass sie nicht nur wahr zum Triggerzeitpunkt und sonst nicht wahr sind,
  sondern Inhalte des Ereignisses zurückliefern. Initiiert wird dieses Verhalten durch die Angabe eines Default-Wertes.<br>
@@ -2987,19 +2996,18 @@ Standardmäßig werden angegebene Readings ausgewertet, wenn irgend ein Event de
 Möchte man gezielt nur dann ein angegebenes Reading auswerten, wenn sich nur dieses ändert, so lässt sich das mit dem Attribut <code>checkReadingEvent</code> einschränken.
 Das ist insb. dann interessant, wenn ein Modul verschiedene Readings zu unterschiedlichen Zeitpunkten aktualisiert.<br>
 <br>
-<u>Beispiele</u>:<br>
+<u>Beispiel</u>:<br>
 <br>
 <code>define di_lamp DOIF ([mytwilight:light] < 3) (set lamp on) DOELSEIF ([mytwilight:light] > 3) (set lamp off)<br>
 attr di_lamp checkReadingEvent 1</code><br>
 <br>
-Ebenso gilt die Einschränkung für indirekte Timer:<br>
+Bei der Angabe von indirekten Timern wird grundsätzlich intern <code>checkReadingEvent</code> benutzt:<br>
 <br>
 <code>define di_lamp ([[mytwilight:ss_weather]]) (set lamp on)<br>
-attr di_lamp do always<br>
-attr di_lamp checkReadingEvent 1</code><br>
+attr di_lamp do always</code><br>
 <br>
-Ohne <code>checkReadingEvent</code>, würde alle fünf Minuten die Einschaltzeit der Lampe neu gesetzt werden, da das twilight-Modul regelmäßig andere Reading wie z. B. das azimuth-Reading ändert und damit Events erzeugt.
-Durch die Angabe des Attributes <code>checkReadingEvent</code> wird die Zeit nur dann neu gesetzt, wenn sich tatsächlich das Reading ss_weather ändert.<br>
+Hier braucht das Attribut <code>checkReadingEvent</code> nicht explizit gesetzt werden.
+Die Zeit wird nur dann neu gesetzt, wenn sich tatsächlich das Reading ss_weather ändert.<br>
 <br>
 <a name="DOIF_addStateEvent"></a>
 <b>Eindeutige Statuserkennung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -3151,6 +3159,26 @@ Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deakt
 Mit <code>set &lt;DOIF-modul&gt; initialize</code> wird ein mit <code>set &lt;DOIF-modul&gt; disable</code> deaktiviertes Modul wieder aktiviert.
 Das Kommando <code>set &lt;DOIF-modul&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
 in diesem Falle wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung.<br>
+<br>
+<a name="DOIF_cmd"></a>
+<b>Auführen von Befehlszweigen ohne Auswertung der Bedingung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Mit <code>set &lt;DOIF-modul&gt; cmd_&lt;nr&gt</code> lässt sich ein Befehlszweig (cmd_1, cmd_2, usw.) bedingunglos ausführen.<br>
+<br>
+Der Befehl hat folgende Eigenschaften:<br>
+<br>
+1) der set-Befehl übersteuert alle Attribute wie z. B. wait, do, usw.<br>
+2) ein laufender Wait-Timer wird unterbrochen<br>
+3) beim deaktivierten oder im Modus disable befindlichen Modul wird der set Befehl ignoriert<br>
+<br>
+<u>Anwendungsbeispiel</u>: Schaltbare Lampe über Fernbedienung und Webinterface<br>
+<br>
+<code>
+define di_lamp DOIF ([FB:"on"]) (set lamp on) DOELSEIF ([FB:"off"]) (set lamp off)<br>
+attr di_lamp cmdState on|off<br>
+attr di_lamp devStateIcon on:on:cmd_2 initialized|off:off:cmd_1<br>
+</code><br>
+Mit der Definition des Attribut <code>devStateIcon</code> führt das Anklicken des on/off-Lampen-Icons zum Ausführen des set-Kommandos cmd_1 bzw. cmd_2 und damit zum Schalten der Lampe.<br>
 <br>
 <a name="DOIF_Weitere_Anwendungsbeispiele"></a>
 <b>Weitere Anwendungsbeispiele</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -3392,6 +3420,9 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </br>
         <dt><a href="#DOIF_initialize">enable</a> <code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
                 <dd>aktiviert die Befehlsausf&uuml;hrung, im Gegensatz zur obigen Initialisierung bleibt der letzte Zustand des Moduls erhalten</dd>
+</br>
+        <dt><a href="#DOIF_cmd">cmd_&lt;nr&gt</a> <code><b> set </b>&lt;name&gt;<b> cmd_&lt;nr&gt;</b></code></dt>
+                <dd>führt ohne Auswertung der Bedingung den Befehlszweig mit der Nummer &lt;nr&gt; aus</dd>
 </dl>
 </br>
 </ul>
