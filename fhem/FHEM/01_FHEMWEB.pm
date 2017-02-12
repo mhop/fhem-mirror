@@ -20,7 +20,7 @@ sub FW_digestCgi($);
 sub FW_directNotify($@);
 sub FW_doDetail($);
 sub FW_fatal($);
-sub FW_fileList($);
+sub FW_fileList($;$);
 sub FW_htmlEscape($);
 sub FW_iconName($);
 sub FW_iconPath($);
@@ -1523,7 +1523,7 @@ FW_roomOverview($)
 
   my $lfn = "Logfile";
   if($defs{$lfn}) { # Add the current Logfile to the list if defined
-    my @l = FW_fileList($defs{$lfn}{logfile});
+    my @l = FW_fileList($defs{$lfn}{logfile},1);
     my $fn = pop @l;
     splice @list, 4,0, ("Logfile",
                       "$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn");
@@ -1837,9 +1837,9 @@ FW_parseColumns()
 #################
 # return a sorted list of actual files for a given regexp
 sub
-FW_fileList($)
+FW_fileList($;$)
 {
-  my ($fname) = @_;
+  my ($fname,$mtime) = @_;
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
   return $fname if(!$re);
@@ -1853,6 +1853,7 @@ FW_fileList($)
     push(@ret, $f);
   }
   closedir(DH);
+  return sort { (stat("$dir/$a"))[9] cmp (stat("$dir/$b"))[9] } @ret if($mtime);
   @ret = cfgDB_FW_fileList($dir,$re,@ret) if (configDBUsed());
   return sort @ret;
 }

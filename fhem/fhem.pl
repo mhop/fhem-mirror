@@ -3447,7 +3447,8 @@ HandleArchiving($;$)
   my @t = localtime;
   $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
-  my @files = sort grep {/^$file$/} readdir(DH);
+  my @files = sort { (stat("$dir/$a"))[9] cmp (stat("$dir/$b"))[9] } #66896
+              grep {/^$file$/} readdir(DH);
   closedir(DH);
 
   my $max = int(@files)-$nra;
