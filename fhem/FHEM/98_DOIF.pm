@@ -2021,7 +2021,7 @@ DOIF_Set($@)
   } else {
       my $setList = AttrVal($pn, "setList", " ");
       $setList =~ s/\n/ /g;
-	  my $cmdList;
+	  my $cmdList="";
 	  my $max_cond=keys %{$hash->{condition}};
 	  $max_cond++ if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame",""))));
 	  for (my $i=0; $i <$max_cond;$i++) {
