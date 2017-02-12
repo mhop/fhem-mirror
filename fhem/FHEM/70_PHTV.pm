@@ -446,9 +446,9 @@ sub PHTV_Set($@) {
                 return
                   "No configuration found. Please set ambiHue attributes first."
                   unless ( AttrVal( $name, "ambiHueLeft", undef )
-                    && AttrVal( $name, "ambiHueRight",  undef )
-                    && AttrVal( $name, "ambiHueTop",    undef )
-                    && AttrVal( $name, "ambiHueBottom", undef ) );
+                    || AttrVal( $name, "ambiHueRight",  undef )
+                    || AttrVal( $name, "ambiHueTop",    undef )
+                    || AttrVal( $name, "ambiHueBottom", undef ) );
 
                 # enable internal Ambilight color
                 PHTV_SendCommand( $hash, "ambilight/mode",
@@ -1596,70 +1596,48 @@ sub PHTV_ReceiveCommand($$$) {
             Log3 $name, 4, "PHTV $name: RCV $service/" . urlDecode($cmd);
         }
 
-        if ( $data ne "" ) {
-            if ( $data =~ /^{/ || $data =~ /^\[/ ) {
-                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
-                    Log3 $name, 5, "PHTV $name: RES $service\n" . $data;
-                }
-                else {
-                    Log3 $name, 5,
-                        "PHTV $name: RES $service/"
-                      . urlDecode($cmd) . "\n"
-                      . $data;
-                }
+        if ( $data =~
+m/^\s*(([{\[].*)|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head>\s*<body>\s*Ok\s*<\/body>\s*<\/html>))\s*$/i
+          )
+        {
 
-                $hash->{helper}{supportedAPIcmds}{$service} = 1
-                  unless (
-                       defined( $hash->{helper}{supportedAPIcmds}{$service} )
-                    && $service =~ /^channels\/.*/
-                    && $service =~ /^channellists\/.*/ );
+            $return = decode_json( Encode::encode_utf8($2) ) if ($2);
+            $return = "ok" if ($3);
 
-                $return = decode_json( Encode::encode_utf8($data) );
+            if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
+                Log3 $name, 5, "PHTV $name: RES $service\n" . $data;
             }
-
-            elsif ( $data eq
-                "<html><head><title>Ok</title></head><body>Ok</body></html>" )
-            {
-                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
-                    Log3 $name, 4, "PHTV $name: RES $service - ok";
-                }
-                else {
-                    Log3 $name, 4,
-                      "PHTV $name: RES $service/" . urlDecode($cmd) . " - ok";
-                }
-
-                $hash->{helper}{supportedAPIcmds}{$service} = 1
-                  unless (
-                       defined( $hash->{helper}{supportedAPIcmds}{$service} )
-                    && $service =~ /^channels\/.*/
-                    && $service =~ /^channellists\/.*/ );
-
-                $return = "ok";
-            }
-
             else {
-                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
-                    Log3 $name, 5, "PHTV $name: RES ERROR $service\n" . $data;
-                }
-                else {
-                    Log3 $name, 5,
-                        "PHTV $name: RES ERROR $service/"
-                      . urlDecode($cmd) . "\n"
-                      . $data;
-                }
-
-                unless (
-                    defined( $hash->{helper}{supportedAPIcmds}{$service} ) )
-                {
-                    $hash->{helper}{supportedAPIcmds}{$service} = 0;
-                    Log3 $name, 4,
-                        "PHTV $name: API command '"
-                      . $service
-                      . "' not supported by device.";
-                }
-
-                return undef;
+                Log3 $name, 5,
+                  "PHTV $name: RES $service/" . urlDecode($cmd) . "\n" . $data;
             }
+
+            $hash->{helper}{supportedAPIcmds}{$service} = 1
+              unless ( defined( $hash->{helper}{supportedAPIcmds}{$service} )
+                || $service =~ /^channels\/.*/
+                || $service =~ /^channellists\/.*/ );
+        }
+
+        elsif ( $data ne "" ) {
+            if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
+                Log3 $name, 5, "PHTV $name: RES ERROR $service\n" . $data;
+            }
+            else {
+                Log3 $name, 5,
+                    "PHTV $name: RES ERROR $service/"
+                  . urlDecode($cmd) . "\n"
+                  . $data;
+            }
+
+            unless ( defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
+                $hash->{helper}{supportedAPIcmds}{$service} = 0;
+                Log3 $name, 4,
+                    "PHTV $name: API command '"
+                  . $service
+                  . "' not supported by device.";
+            }
+
+            return undef;
         }
 
         #######################
@@ -1824,7 +1802,18 @@ sub PHTV_ReceiveCommand($$$) {
         # sources/current
         elsif ( $service eq "sources/current" ) {
             if ( ref($return) eq "HASH" ) {
-                $cmd = $hash->{helper}{device}{sourceName}{ $return->{id} };
+                if ( defined( $return->{id} ) ) {
+                    $return->{id} =~ s/^\s+//;
+                    $return->{id} =~ s/\s+$//;
+                    $cmd = (
+                          $hash->{helper}{device}{sourceName}{ $return->{id} }
+                        ? $hash->{helper}{device}{sourceName}{ $return->{id} }
+                        : "-"
+                    );
+                }
+                else {
+                    $cmd = "-";
+                }
 
                 # Alias handling
                 $cmd = $hash->{helper}{device}{inputAliases}{$cmd}
