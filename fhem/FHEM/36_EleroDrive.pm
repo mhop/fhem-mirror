@@ -155,7 +155,7 @@ sub EleroDrive_Set($@) {
   my $channel = $hash->{channel};
   my $iodev = $hash->{IODev}->{NAME};
   
-  my $commands=("stop:noArg moveDown:noArg moveUp:noArg moveIntermediate:noArg moveTilt:noArg refresh:noArg moveTo");
+  my $commands=("stop:noArg moveDown:noArg moveUp:noArg moveIntermediate:noArg moveTilt:noArg refresh:noArg");
   return $commands if( $cmd eq '?' || $cmd eq '');
 
   my $doRefresh = '0';
