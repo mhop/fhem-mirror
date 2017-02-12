@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.0alpha4";
+my $version = "2.0alpha8";
 
 #-- these we may get on request
 my %gets = (
@@ -72,7 +72,7 @@ sub DoorPi_Initialize ($) {
   #$hash->{NotifyFn} = "DoorPi_Notify";
   $hash->{InitFn}   = "DoorPi_Init";
 
-  $hash->{AttrList}= "verbose ".
+  $hash->{AttrList}= "verbose testjson ".
                      "language:de,en ringcmd ".
                      "doorbutton dooropencmd dooropendly doorlockcmd doorunlockcmd doorlockreading ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
@@ -127,9 +127,9 @@ sub DoorPi_Define($$) {
   readingsBulkUpdate($hash,"door","Unknown");
   readingsEndUpdate($hash,1); 
      
-  InternalTimer(gettimeofday() + 5, "DoorPi_GetConfig", $hash,1);
-  InternalTimer(gettimeofday() + 10, "DoorPi_GetLockstate", $hash,1);
-  InternalTimer(gettimeofday() + 10, "DoorPi_GetHistory", $hash,1);
+  InternalTimer(gettimeofday() + 10, "DoorPi_GetConfig", $hash,1);
+  InternalTimer(gettimeofday() + 15, "DoorPi_GetLockstate", $hash,1);
+  InternalTimer(gettimeofday() + 20, "DoorPi_GetHistory", $hash,1);
   $init_done = $oid;
   
   return undef;
@@ -287,6 +287,7 @@ sub DoorPi_Set ($@) {
     #-- alive
     }elsif( $value eq "alive" ){
       readingsSingleUpdate($hash,"state","alive",1);
+      $hash->{DELAYED} = "";
       DoorPi_GetLockstate($hash);
     #-- sabotage
     }elsif( $value eq "sabotage" ){
@@ -477,13 +478,14 @@ sub DoorPi_Door {
     }elsif ($lockstate =~ /^unlocked.*/){
       Log3 $name, 1,"[DoorPi_Door] BRANCH 2.2 cmd=$cmd lockstate=$lockstate";
       #-- doit
+      $v=DoorPi_Cmd($hash,"doorunlocked");
       $v=DoorPi_Cmd($hash,"dooropen");
-      Log3 $name, 1,"[DoorPi_Door 2.2] sent 'dooropen' command to DoorPi";       
+      Log3 $name, 1,"[DoorPi_Door 2.2] reset DoorPi to proper state and sent 'dooropen' command";       
       readingsSingleUpdate($hash,$door,"opened",1);
       #-- extra fhem command
       $fhemcmd = AttrVal($name, "dooropencmd",undef);
       fhem($fhemcmd)
-        if($fhemcmd);
+        if($fhemcmd);      
     #-- error message 
     }else{
       Log3 $name, 1,"[DoorPi_Door 2.3] 'unlockandopen' command from DoorPi ignored, because current lockstate=$lockstate";
@@ -492,7 +494,7 @@ sub DoorPi_Door {
    
   #-- BRANCH 3: softlock from DoorPi: door has to be locked if necessary
   }elsif( $cmd eq "softlock" ){  
-   #-- ignoring because hardlock has been issued before
+    #-- ignoring because hardlock has been issued before
     if( $hash->{DELAYED} eq "hardlock" ){
       Log3 $name, 1,"[DoorPi_Door] BRANCH 3.2 cmd=$cmd lockstate=$lockstate";
       Log3 $name, 1,"[DoorPi_Door 3.2] 'softlock' command from DoorPi ignored, because following a hardlock";
@@ -638,7 +640,7 @@ sub DoorPi_GetConfig {
   #Log3 $name, 1,"[DoorPi_GetConfig] has obtained data";
  
   #-- test if this is valid JSON
-  if( !is_valid_json($status) ){
+  if( (AttrVal($name,"testjson",0)==1) and !is_valid_json($status) ){
     Log3 $name, 1,"[DoorPi_GetConfig] but data is invalid";
     readingsSingleUpdate($hash,"config","invalid data",0);
     readingsSingleUpdate($hash,"state","Error",1);
@@ -658,7 +660,7 @@ sub DoorPi_GetConfig {
   }
   
   if($fskey){
-    Log3 $name, 1,"[DoorPi_GetConfig] virtual keyboard is named defined as \"$fskey\"";
+    Log3 $name, 1,"[DoorPi_GetConfig] virtual keyboard is defined as \"$fskey\"";
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
     
@@ -789,7 +791,7 @@ sub DoorPi_GetLastSnapshot {
   Log3 $name, 5,"[DoorPi_GetLastSnapshot] has obtained data";
  
   #-- test if this is valid JSON
-  if( !is_valid_json($status) ){
+  if( (AttrVal($name,"testjson",0)==1) and !is_valid_json($status) ){
     Log3 $name, 1,"[DoorPi_GetLastSnapshot] but data is invalid";
     readingsSingleUpdate($hash,"snapshot","invalid data",0);
     readingsSingleUpdate($hash,"state","Error",1);
@@ -866,17 +868,19 @@ sub DoorPi_GetHistory {
   #Log3 $name, 1,"[DoorPi_GetHistory] has obtained data in two calls";
 
   #-- test if this is valid JSON
-  if( !is_valid_json($status1) ){
-    Log3 $name,1 ,"[DoorPi_GetHistory] but data from first call is invalid";
-    readingsSingleUpdate($hash,"call_history","invalid data 1st call",0);
-    readingsSingleUpdate($hash,"state","Error",1);
-    return;
-  }
-  if( !is_valid_json($status2) ){
-    Log3 $name, 1,"[DoorPi_GetHistory] but data from second call is invalid";
-    readingsSingleUpdate($hash,"call_history","invalid data 2nd call",0);
-    readingsSingleUpdate($hash,"state","Error",1);
-    return;
+  if( AttrVal($name,"testjson",0)==1 ){
+    if(!is_valid_json($status1) ){
+      Log3 $name,1 ,"[DoorPi_GetHistory] but data from first call is invalid";
+      readingsSingleUpdate($hash,"call_history","invalid data 1st call",0);
+      readingsSingleUpdate($hash,"state","Error",1);
+      return;
+    }
+    if( !is_valid_json($status2) ){
+      Log3 $name, 1,"[DoorPi_GetHistory] but data from second call is invalid";
+      readingsSingleUpdate($hash,"call_history","invalid data 2nd call",0);
+      readingsSingleUpdate($hash,"state","Error",1);
+      return;
+    }
   }
   
   my $json  = JSON->new->utf8;
@@ -1093,7 +1097,7 @@ sub DoorPi_GetHistory {
   #Log3 $name, 1,"[DoorPi_Cmd] has obtained data $data";
  
   #-- test if this is valid JSON
-  if( !is_valid_json($data) ){
+  if( (AttrVal($name,"testjson",0)==1) and !is_valid_json($data) ){
     Log3 $name,1,"[DoorPi_Cmd] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -1142,7 +1146,7 @@ sub DoorPi_PurgeDB {
   }
   #Log3 $name, 1,"[DoorPi_PurgeDB] has obtained data $status";
   #-- test if this is valid JSON
-  if( !is_valid_json($status) ){
+  if( (AttrVal($name,"testjson",0)==1) and !is_valid_json($status) ){
     Log3 $name, 1,"[DoorPi_PurgeDB] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -1521,15 +1525,14 @@ sub DoorPi_list($;$){
                 <br />FHEM command for door locking action (no default)</li>
             <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
                         &lt;string&gt;</code></a>
-            <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
-                        &lt;string&gt;</code></a>
                 <br />FHEM command for door unlocking action (no default)</li>
             <li><a name="doorpi_dooropendly"><code>attr &lt;DoorPi-Device&gt; dooropendly
                         &lt;number&gt;|&lt;string&gt;</code></a>
                 <br />If number, delay of opening action after unlocking is given by &lt;number&gt; seconds;
                 otherwise the string will be interpreted as a regular expression for an event that 
                 has to be registered befor sending the door opening command from FHEM to DoorPi after an 
-                unlocking action.
+                unlocking action.</li>
+        </ul>
         <h5>Advanced DoorPi actions</h5>
         These actions will only be possible if they are defined in the virtual DoorPi keyboard
         <ul>
@@ -1558,10 +1561,14 @@ sub DoorPi_list($;$){
             <li><a name="doorpi_iconpic"><code>attr &lt;DoorPi-Device&gt; iconpic
                         &lt;string&gt;</code></a>
                 <br />Icon to be used in overview instead of a (slow !) miniature picture</li>
-            <li><a name="doorpi_iconaudio"><code>attr &lt;DoorPi-Device&gt; iconaudio
+            <li><a name="doorpi_iconaudio"><code>attr &lt;DoorPi-Device&gt; iconaudio70_PT8005.pm
                         &lt;string&gt;</code></a>
                 <br />Icon to be used in overview instead of a verbal link to the audio recording</li>
-         
+        </ul>
+        <h5>Other attributes</h5>
+        <ul>
+            <li><a name="#doorpi_testjson"><code>attr &lt;DoorPi-Device&gt; testjson
+                        0(default)|1</code></a><br />set to 1 if returned json has to be checked</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
          <h4>Necessary ingredients of the DoorPi configuration</h4>
