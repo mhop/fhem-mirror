@@ -44,6 +44,7 @@ sub EleroStick_Initialize($) {
                             "ChannelTimeout " .
                             "Interval " .
                             "Delay " .
+                            "DisableTimer:1,0 " .
                             "$readingFnAttributes ";
                                                      
 }
@@ -256,7 +257,7 @@ sub EleroStick_OnTimer($$) {
   
   my $timerInterval = AttrVal($name, "ChannelTimeout", 5);
   
-  if($hash->{STATE} ne "disconnected") {
+  if($hash->{STATE} ne "disconnected" && AttrVal($name, "DisableTimer", 0) ne 1) {
     if($hash->{channels}) {
       my $channels = $hash->{channels};
       
@@ -453,9 +454,8 @@ sub EleroStick_Attr(@) {
     else {
       $hash->{MatchList} = \%matchList;
     }
-  
   }
-  
+
   return undef;
 }
 
@@ -525,6 +525,16 @@ sub EleroStick_Attr(@) {
     <li>ChannelTimeout<br>
       The delay, how long the modul waits for an answer after sending a command to a drive.<br>
       Default is 5 seconds.
+    </li>
+
+    <br>
+    <li>Delay<br>
+      If something like structure send commands very fast, Delay (seconds) throttles the transmission down that the Elero-system gets time to handle each command.
+    </li>
+
+    <br>
+    <li>DisableTimer<br>
+      Disables the periodically request of the status. Should normally not be set to 1.
     </li>
 
     <br>
