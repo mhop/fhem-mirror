@@ -740,8 +740,8 @@ logProxy_xyFile2Plot($$$)
           chomp;
           if(/$regex/) {
             my @a= split(/\s/,$_);
-            my @p= split(",", $a[$column-1]);
-            push @array, \@p;
+            my @pp= split(";", $a[$column-1]);
+            map { my @p= split(",", $_); push @array, \@p; } @pp;
           }
     }
     close(F);
