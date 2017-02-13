@@ -206,7 +206,7 @@ sub DOIFtools_eM($$$$) {
   $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "</div>";
 
   my $a = "";
@@ -310,12 +310,12 @@ sub DOIFtools_fhemwebFn($$$$) {
   $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=update check\">update check</a>&nbsp;&nbsp;";
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=update\">update</a>&nbsp;&nbsp;" if(!ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=set%20update_du:FILTER=state=0%201\">update</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=shutdown restart\">shutdown restart</a>&nbsp;&nbsp;";
-    $ret .= "<a href=\"/fhem?detail=$d&amp;cmd.$d=fheminfo send\">fheminfo send</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update check\">update check</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update\">update</a>&nbsp;&nbsp;" if(!ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=set%20update_du:FILTER=state=0%201\">update</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=shutdown restart\">shutdown restart</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=fheminfo send\">fheminfo send</a>&nbsp;&nbsp;";
   }
   if (AttrVal($d,"DOIFtoolsMyShortcuts","")) {
     my @sc = split(",",AttrVal($d,"DOIFtoolsMyShortcuts",""));
@@ -332,7 +332,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       my $a1 = ReadingsVal($d,"doStatistics", "disabled") =~ "disabled|deleted" ? "enabled" : "disabled"; 
       my $a2 = ReadingsVal($d,"specialLog", 0) ? 0 : 1; 
       # set doStatistics enabled/disabled
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;doStatistics $a1&emsp;</div>
@@ -340,7 +340,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       <input name=\"val.set$d\" value=\"doStatistics $a1\" type=\"hidden\">
       </div></form>";
       # set doStatistics deleted
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;doStatistics deleted&emsp;</div>
@@ -348,7 +348,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       <input name=\"val.set$d\" value=\"doStatistics deleted\" type=\"hidden\">
       </div></form>";
       # set specialLog 0/1
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;specialLog $a2&emsp;</div>
@@ -357,7 +357,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       </div></form>";
       $ret .= "<br><br>";
       # get statisticsReport
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
@@ -366,7 +366,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       <input name=\"val.get$d\" value=\"statisticsReport\" type=\"hidden\">
       </div></form>";
       # get checkDOIF
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
@@ -375,7 +375,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       <input name=\"val.get$d\" value=\"checkDOIF\" type=\"hidden\">
       </div></form>";
       # get runningTimerInDOIF
-      $ret .= "<form method=\"post\" action=\"/fhem\" autocomplete=\"off\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
@@ -875,14 +875,14 @@ sub DOIFtools_Attr(@)
     }
   } elsif ($init_done and $attr eq "DOIFtoolsMenuEntry") {
     if ($cmd eq "set" and $value) {
-      if (!(AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,\/fhem\?detail\=DOIFtools\,)/)) {
-        CommandAttr(undef, "$FW_wname menuEntries DOIFtools,/fhem?detail=DOIFtools,".AttrVal($FW_wname, "menuEntries",""));
+      if (!(AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,$FW_ME\?detail\=DOIFtools\,)/)) {
+        CommandAttr(undef, "$FW_wname menuEntries DOIFtools,$FW_ME?detail=DOIFtools,".AttrVal($FW_wname, "menuEntries",""));
         CommandSave(undef, undef);
       }
     } elsif ($init_done and $cmd eq "del" or !$value) {
-      if (AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,\/fhem\?detail\=DOIFtools\,)/) {
+      if (AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,$FW_ME\?detail\=DOIFtools\,)/) {
         my $me = AttrVal($FW_wname, "menuEntries","");
-        $me =~ s/DOIFtools\,\/fhem\?detail\=DOIFtools\,//;
+        $me =~ s/DOIFtools\,$FW_ME\?detail\=DOIFtools\,//;
         CommandAttr(undef, "$FW_wname menuEntries $me");
         CommandSave(undef, undef);
       }
