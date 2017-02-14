@@ -562,9 +562,9 @@ sub ReplaceReadingEvalDoIf($$$)
   my ($block,$err,$device,$reading,$internal)=ReplaceReadingDoIf($element);
   return ($block,$err) if ($err);
   if ($eval) {
-      return ("[".$element."]","") if(!$defs{$device});
-      return ("[".$element."]","") if (defined ($reading) and !defined($defs{$device}{READINGS}{$reading}));
-      return ("[".$element."]","") if (defined ($internal) and !defined($defs{$device}{$internal}));
+   #   return ("[".$element."]","") if(!$defs{$device});
+   #   return ("[".$element."]","") if (defined ($reading) and !defined($defs{$device}{READINGS}{$reading}));
+   #   return ("[".$element."]","") if (defined ($internal) and !defined($defs{$device}{$internal}));
     my $ret = eval $block;
     return($block." ",$@) if ($@);
     $block=$ret;
