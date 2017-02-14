@@ -86,10 +86,15 @@ my $DOIFtoolsJSfuncEM = <<'EOF';
     }
 
     function delbutton() {
-          FW_cmd(FW_root+"?cmd={my @d = devspec2array('TYPE=DOIFtools');;return $d[0] ? $d[0] : ''}&XHR=1", function(data){
+        var r = $("head").attr("root");
+        var myFW_root = FW_root;
+        if(r)
+          myFW_root = r;
+
+        FW_cmd(myFW_root+"?cmd={my @d = devspec2array('TYPE=DOIFtools');;return $d[0] ? $d[0] : ''}&XHR=1", function(data){
           if (data) {
             var dn = data;
-            FW_cmd(FW_root+"?cmd={AttrVal(\""+dn+"\",\"DOIFtoolsEMbeforeReadings\",\"0\")}&XHR=1", function(data){
+            FW_cmd(myFW_root+"?cmd={AttrVal(\""+dn+"\",\"DOIFtoolsEMbeforeReadings\",\"0\")}&XHR=1", function(data){
               if (data == 1) {
                 var ins = document.getElementsByClassName('makeTable wide readings');
                 var del = document.getElementById('doiftoolscons');
@@ -307,7 +312,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"/fhem?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
@@ -438,7 +443,7 @@ sub DOIFtools_Notify($$) {
       $trig .= "DOIF-Version: ".ReadingsVal($pn,"DOIF_version","n/a")."<br>";
       $trig .= CommandList(undef,$sn);
       foreach my $itm (keys %defs) {
-        $trig =~ s,([\[\" ])$itm([\"\:\] ]),$1<a href="/fhem?detail=$itm">$itm</a>$2,g;
+        $trig =~ s,([\[\" ])$itm([\"\:\] ]),$1<a href="$FW_ME?detail=$itm">$itm</a>$2,g;
       }
       CommandTrigger(undef,"$hash->{TYPE}Log $trig");
     }

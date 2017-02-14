@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_DOIFtools: some more webname issues
   - bugfix:  98_DOIFtools: webname ignored
   - bugfix:  74_XiaomiFlowerSens: 0.6.8 new set command
   - feature: 23_LUXTRONIK2: new heatSourceDefrost-Readings
