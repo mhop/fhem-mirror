@@ -2668,8 +2668,6 @@ CommandAttr($$)
     if($attrName eq "IODev") {
       my $ioname = $a[2];
       $hash->{IODev} = $defs{$ioname};
-      $hash->{NR} = $devcount++
-        if($defs{$ioname}{NR} > $hash->{NR});
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($attrName eq "stateFormat" && $init_done) {
