@@ -1004,9 +1004,13 @@ DOIF_CheckCond($$)
   my $err="";
   my ($seconds, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($seconds);
+  $month++;
+  $year+=1900;
   my $week=strftime ('%W', localtime($seconds));
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $hm = sprintf("%02d:%02d", $hour, $min);
+  my $ymd = sprintf("%02d-%02d-%02d", $year, $month,$mday);
+  my $md = sprintf("%02d-%02d",$month,$mday);
   my $dev;
   my $reading;
   my $internal;
@@ -1019,8 +1023,6 @@ DOIF_CheckCond($$)
   if ($eventa) {
     $events=join(",",@{$eventa});
   }
-  $month++;
-  $year+=1900;
   if (defined ($hash->{readings}{$condition})) {
     foreach my $devReading (split(/ /,$hash->{readings}{$condition})) {
       $devReading=~ s/\$DEVICE/$hash->{helper}{triggerDev}/g if ($devReading);
@@ -3405,7 +3407,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>Perl-Variablen mit der Bedeutung [$SELF:cmd]</dd>
 </br>
         <dt>&lt;Perl-Zeitvariablen&gt;</dt>
-                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm</dd>
+                <dd>Variablen f&uuml;r Zeit- und Datumsangaben, $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd</dd>
 </dl>
 </br>
 </ul>
