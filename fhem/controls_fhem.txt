@@ -1,4 +1,4 @@
-REV 13408
+REV 13414
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-02-14_07:45:02 184599 ./CHANGED
+UPD 2017-02-15_07:45:02 184651 ./CHANGED
 UPD 2017-02-11_07:45:02 35614 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2017-02-13_07:45:05 129650 ./fhem.pl
+UPD 2017-02-15_07:45:06 129572 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-01-07_07:45:02 58179 FHEM/00_CUL.pm
 UPD 2016-10-03_07:45:13 15319 FHEM/00_FBAHA.pm
@@ -371,8 +371,8 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2016-04-08_07:45:12 46937 FHEM/98_ComfoAir.pm
 UPD 2016-09-14_07:45:12 7872 FHEM/98_CustomReadings.pm
 UPD 2016-09-19_07:45:10 59510 FHEM/98_DLNARenderer.pm
-UPD 2017-02-13_07:45:02 157558 FHEM/98_DOIF.pm
-UPD 2017-02-14_07:45:02 80561 FHEM/98_DOIFtools.pm
+UPD 2017-02-15_07:45:02 157678 FHEM/98_DOIF.pm
+UPD 2017-02-15_07:45:02 80678 FHEM/98_DOIFtools.pm
 UPD 2016-10-02_07:45:11 40324 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
 UPD 2016-01-26_07:45:12 20577 FHEM/98_FReplacer.pm
@@ -559,7 +559,7 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2017-02-14_07:45:04 2676181 docs/commandref.html
-UPD 2017-02-12_07:45:05 1557486 docs/commandref_DE.html
+UPD 2017-02-15_07:45:06 1557497 docs/commandref_DE.html
 UPD 2017-01-26_07:45:03 68845 docs/commandref_frame.html
 UPD 2017-01-26_07:45:03 77286 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
