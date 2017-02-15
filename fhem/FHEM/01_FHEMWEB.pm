@@ -527,9 +527,7 @@ FW_Read($$)
   }
 
   my $compressed = "";
-  if(($FW_RETTYPE =~ m/text/i ||
-      $FW_RETTYPE =~ m/svg/i ||
-      $FW_RETTYPE =~ m/script/i) &&
+  if($FW_RETTYPE =~ m/(text|xml|json|svg|script)/i &&
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use_zlib) {
