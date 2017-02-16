@@ -279,15 +279,19 @@ sub I2C_MCP342x_GetVoltage ($$) {
 			my $rawvolt;
 			if ($resol == 18) {
 				$rawvolt  = ($raw[0] & 0b00000011) << 16 | $raw[1] << 8 | $raw[2];
+			} elsif ($resol == 14) {
+				$rawvolt = ($raw[0] & 0b00111111) << 8 | $raw[1];
+			} elsif ($resol == 12) {
+				$rawvolt = ($raw[0] & 0b00001111) << 8 | $raw[1];
 			} else {
 				$rawvolt = $raw[0] << 8 | $raw[1];
 			}
-			#Log3 $hash, 1, "Kanal: $channel, rawvolt: $rawvolt, Aufloesung: $resol, Gain: $gain, LSB: $resols{$resol}{lsb}";
+			Log3 $hash, 4, "Kanal: $channel, rawvolt: $rawvolt, Aufloesung: $resol, Gain: $gain, LSB: $resols{$resol}{lsb}";
 			$rawvolt -= (1 << $resol) if $rawvolt >= (1 << ($resol - 1));
-			#Log3 $hash, 1, "Kanal: $channel, Unsignedrawvolt: $rawvolt";
+			Log3 $hash, 4, "Kanal: $channel, Signedrawvolt: $rawvolt";
 			
 			my $voltage = ( $rawvolt * $resols{$resol}{lsb} ) / $gain ;
-			#$voltage /= 1000000;
+			$voltage /= 1000000;														# LSB Werte in µV
 			$voltage *= AttrVal($hash->{NAME},("ch" . $channel . "factor"),"1");
 			$voltage = sprintf(
 				'%.' . AttrVal($hash->{NAME}, ('ch' . $channel . 'roundDecimal'), 3) . 'f',
@@ -295,7 +299,6 @@ sub I2C_MCP342x_GetVoltage ($$) {
 			);
 			$voltage .= " overflow" if ( $rawvolt == ( (1<<($resol-1)) - 1) || $rawvolt == (1<<($resol-1)) );
 			readingsSingleUpdate($hash,"Channel$channel", $voltage, 1);
-			#Log3 $hash, 1, "Kanal: $channel, Fertig: $voltage";
 		} else {
 			Log3  $hash, 3, $hash->{NAME} . " error, output conversion not finished";
 		}
