@@ -7032,10 +7032,13 @@ sub EnOcean_Parse($$)
 
     if ($st eq "FRW" || $st eq "smokeDetector.02") {
       # smoke detector
-      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0]) {
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || AttrVal($name, 'alarm', '') eq 'dead_sensor') {
         if ($db[0] == 0x30) {
+          push @event, "3:alarm:off";
           push @event, "3:battery:low";
+          $msg = AttrVal($name, 'state', 'off');
         } elsif ($db[0] == 0x10) {
+          push @event, "3:battery:ok";
           push @event, "3:alarm:smoke-alarm";
           $msg = "smoke-alarm";
         } elsif ($db[0] == 0) {
@@ -7047,19 +7050,19 @@ sub EnOcean_Parse($$)
         $hash->{helper}{lastEvent} = $db[0];
       }
       @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'dead_sensor', 1, 5);
       RemoveInternalTimer($hash->{helper}{alarmTimer});
-      RemoveInternalTimer($hash->{helper}{stateTimer});
       InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
-      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
 
     } elsif ($st eq "windSpeed.00") {
       # wind speed threshold detector
-      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0]) {
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || AttrVal($name, 'alarm', '') eq 'dead_sensor') {
+        push @event, "3:alarm:off";
         if ($db[0] == 0x30) {
           push @event, "3:battery:low";
+          $msg = AttrVal($name, 'state', 'off');
         } elsif ($db[0] == 0x10) {
           push @event, "3:windSpeed:on";
+          push @event, "3:battery:ok";
           $msg = "on";
         } elsif ($db[0] == 0) {
           push @event, "3:windSpeed:off";
@@ -7069,12 +7072,9 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
-      @{$hash->{helper}{windSpeedTimer}} = ($hash, 'windSpeed', 'dead_sensor', 1, 5);
-      @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'dead_sensor', 1, 5);
-      RemoveInternalTimer($hash->{helper}{windSpeedTimer});
-      RemoveInternalTimer($hash->{helper}{stateTimer});
-      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{windSpeedTimer}, 0);
-      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
+      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      RemoveInternalTimer($hash->{helper}{alarmTimer});
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
 
     } elsif ($model eq "FAE14" || $model eq "FHK14" || $model eq "FHK61") {
       # heating/cooling relay FAE14, FHK14, untested
@@ -18723,12 +18723,12 @@ EnOcean_Delete($$)
 
      <li>Wind Speed Threshold Detector (EEP F6-05-00)<br>
      <ul>
-         <li>dead_sensor</li>
          <li>on</li>
          <li>off</li>
+         <li>alarm: dead_sensor|off</li>
          <li>windSpeed: dead_sensor|on|off</li>
          <li>battery: low|ok</li>
-         <li>state: dead_sensor|on|off</li>
+         <li>state: on|off</li>
      </ul><br>
         Set attr subType to windSpeed.00 manually.
      </li>
@@ -18748,12 +18748,11 @@ EnOcean_Delete($$)
      <li>Smoke Detector (EEP F6-05-02)<br>
          [Eltako FRW]<br>
      <ul>
-         <li>dead_sensor</li>
          <li>smoke-alarm</li>
          <li>off</li>
          <li>alarm: dead_sensor|smoke-alarm|off</li>
          <li>battery: low|ok</li>
-         <li>state: dead_sensor|smoke-alarm|off</li>
+         <li>state: smoke-alarm|off</li>
      </ul><br>
         Set attr subType to smokeDetector.02 manually.
      </li>
