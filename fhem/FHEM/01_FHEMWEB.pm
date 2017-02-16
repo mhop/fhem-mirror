@@ -726,7 +726,14 @@ FW_answerCall($)
 
   my ($dir1, $dirN, $ofile) = ($1, $2, $3)
              if($arg =~ m,^$FW_ME/([^/]*)(.*/)([^/]*)$,);
-  if($arg =~ m,^$FW_ME/icons/(.*)$,) {
+  if($arg =~ m,\brobots.txt$,) {
+    Log3 $FW_wname, 1, "NOTE: $FW_wname is probed by a search engine";
+    $FW_RETTYPE = "text/plain; charset=$FW_encoding";
+    FW_pO "User-agent: *\r";
+    FW_pO "Disallow: *\r";
+    return 0;
+
+  } elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
     my ($icon,$cacheable) = (urlDecode($1), 1);
     my $iconPath = FW_iconPath($icon);
 
