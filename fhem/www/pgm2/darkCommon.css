@@ -20,3 +20,7 @@ svg.zw_nr .zwMargin { stroke:#fff; stroke-width:1px; fill:none; }
 svg.zw_nr .zwLine { stroke:#fff; stroke-width:1px; }
 svg.zw_nr .zwArrowHead { fill:#fff; stroke-width:1px; }
 svg.zw_nr { height:auto; width:auto; margin:0; }
+
+#errmsg { background-color: #000000; color: #FFFFFF;
+          position:fixed; top:0px; left:40px; z-index: 10; }
+

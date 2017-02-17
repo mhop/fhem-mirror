@@ -6,7 +6,7 @@ select   { font-family:Arial, sans-serif; font-size:16px;}
 
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;
-           position:absolute; top:0px; left:40px; z-index: 10; }
+           position:fixed; top:0px; left:40px; z-index: 10; }
 .devType { padding-top:20px; }
 a        { color:#278727; }
 img      { border-style:none; }
