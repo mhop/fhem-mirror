@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.001
+#  Version 3.9.003
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -808,11 +808,12 @@ sub HMCCUCHN_SetError ($$)
       </li><br/>
       <li><b>ccureadingfilter &lt;filter-rule[;...]&gt;</b><br/>
          Only datapoints matching specified expression are stored as readings.<br/>
-         Syntax for <i>filter-rule</i> is: [&lt;channel-name&gt;!]&lt;RegExp&gt;<br/>
+         Syntax for <i>filter-rule</i> is: [N:][&lt;channel-name&gt;!]&lt;RegExp&gt;<br/>
          If <i>channel-name</i> is specified the following rule applies only to this channel.
-         If ccuflag 'nohmstate' is not set in I/O device datapoints UNREACH, LOWBAT, LOW_BAT,
-         ERROR.* and FAULT.* are always stored as readings and must not be specified in this
-         attribute.
+         By default all datapoints will be stored as readings. Attribute ccudef-readingfilter
+         of I/O device will be checked before this attribute.<br/>
+         If a rule starts with 'N:' the filter is negated which means that a reading is 
+         stored if rule doesn't match.
       </li><br/>
       <li><b>ccureadingformat {address[lc] | name[lc] | datapoint[lc]}</b><br/>
          Set format of reading names. Default is 'name'. If set to 'address' format of reading names
