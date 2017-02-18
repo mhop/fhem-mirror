@@ -1401,16 +1401,13 @@ The following local attributes are used by a wider range of devices:
         as it is deprecated, use the Value() function instead.
     </li><br>
 
-    <a name="lastinclude"></a>
-    <li>lastinclude<br>
-        If this attribute is set, then the last command of the generated
-        configfile (see the <a href="#save">save</a> command) will be<br>
-        include &lt;lastinclude-value&gt;<br>
-        This attribute is DEPRECATED and valid for featurelevel up to 5.6, use
-        <a href="#notify">notify</a>, with the INITIALIZED event to execute
-        commands after initialization.
+    <a name="logdir"></a>
+    <li>logdir<br>
+        If set, the %L attribute in the logfile attribute (or in the FileLog
+        modules file definition) is replaced wth the value of the attribute.
+        Note: changing the value won't result in moving the files and may cause
+        other problems.
     </li><br>
-
 
     <a name="logfile"></a>
     <li>logfile<br>

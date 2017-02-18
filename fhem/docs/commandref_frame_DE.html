@@ -1492,30 +1492,26 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         Value() Funktion verwenden.
     </li><br>
 
-
-    <a name="lastinclude"></a>
-    <li>lastinclude<br>
-        Wurde dieses Attribut gesetzt, dann wird der letzte Befehl der
-        generierten Konfigurationsdatei (siehe <a href="#save">save</a> Befehl)
-        ber&uuml;cksichtigt &lt;lastinclude-value&gt;<br>
-        Dieses Attribut ist DEPRECATED und nur bis featurelevel 5.6
-        unterst&uuml;tzt, bitte benutzen Sie <a href="#notify">notify</a>, mit
-        dem&nbsp; INITIALIZED Ereignis um Befehle nach der Intialisierung
-        auszuf&uuml;hren.
+    <a name="logdir"></a>
+    <li>logdir<br>
+        Falls gesetzt, wird %L in dem logfile Attribut (oder in der Dateinamen 
+        Spezifikation des FileLog Moduls) durch den Wert des Attributes ersetzt.
+        Achtung: &auml;ndern des Wertes bewirkt nicht das Verschieben bereits
+        erstellter Dateien, und kann zu diversen Problemen f&uuml;hren.
     </li><br>
 
     <a name="logfile"></a>
     <li>logfile<br>
-        Gibt das Logfile an, in welches gespeichert werden soll.&nbsp; Sie 
-    k&ouml;nnen "-" f&uuml;r die Ausgabe in das stdout-Ger&auml;t. In diesem Fall stellt sich der Server nicht selbst in den Hintergrund.<br>
-        Der Name der Logdatei kann auch &quot;wildcards&quot; enthalten, um eine 
-    einfachere Abfolge f&uuml;r die Dateien zu erreichen. Lesen Sie bitte den 
-    Abschnitt <a href="#FileLog">FileLog</a>. F&uuml;gen Sie die Attribute
-        <code>archivecmd / archivedir / nrarchive</code> zum
-        <code>global</code> Ger&auml;t hinzu wie Sie es auch bei einem FileLog device 
-    tun k&ouml;nnten.<br>
-        Sie k&ouml;nnen den Namen der Logdatei mit&nbsp;
-        <code>{ $currlogfile }festlegen</code>.
+        Gibt das Logfile an, in welches gespeichert werden soll.&nbsp; Sie
+        k&ouml;nnen "-" f&uuml;r die Ausgabe in das stdout-Ger&auml;t. In
+        diesem Fall stellt sich der Server nicht selbst in den Hintergrund.<br>
+        Der Name der Logdatei kann auch &quot;wildcards&quot; enthalten, um
+        eine einfachere Abfolge f&uuml;r die Dateien zu erreichen. Lesen Sie
+        bitte den Abschnitt <a href="#FileLog">FileLog</a>. F&uuml;gen Sie die
+        Attribute <code>archivecmd / archivedir / nrarchive</code> zum
+        <code>global</code> Ger&auml;t hinzu wie Sie es auch bei einem FileLog
+        device tun k&ouml;nnten.<br> Sie k&ouml;nnen den Namen der Logdatei
+        mit&nbsp; <code>{ $currlogfile }festlegen</code>.
     </li><br>
 
     <a name="modpath"></a>
@@ -1530,7 +1526,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         Function mit dem Namen &lt;NAME&gt;_Initialize wird aufgerufen. Eine
         Ausnahme bilden Module die mit der Nummer 99 im Dateinamen beginnen.
         Diese sind&nbsp; enhalten PERL-Hilfsfunktionen. Die Module werden zur
-        Startzeit geladen (i.e.  modpath attribute definition time).  </li><br>
+        Startzeit geladen (i.e.  modpath attribute definition time).
+    </li><br>
 
     <a name="motd"></a>
     <li>motd<br>
