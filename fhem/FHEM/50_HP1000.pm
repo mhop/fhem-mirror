@@ -158,14 +158,14 @@ sub HP1000_Initialize($) {
     # 98_powerMap.pm support
     $hash->{powerMap} = {
         rname_E => 'energy',
-        rname_P => 'power',
+        rname_P => 'consumption',
         map     => {
             Activity => {
                 'dead'  => 0,
                 'alive' => 5,
             },
             state => {
-                '*' => 5,
+                '*' => 'Activity',
             },
         },
     };
