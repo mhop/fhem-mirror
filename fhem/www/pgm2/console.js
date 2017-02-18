@@ -175,7 +175,22 @@ function
 consAddRegexpPart()
 {
   $("<button style='margin-left:1em' id='addRegexpPart'>"+
-    "addRegexpPart</button>").insertAfter("button#eventReset");
+    "Create/Modify Device</button>").insertAfter("button#eventReset");
+
+  var knownTypes = {
+    "notify": { modify:    "set modDev addRegexpPart evtDev event",
+                createArg: "evtDev:event {}" },
+    "FileLog":{ modify:    "set modDev addRegexpPart evtDev event",
+                createArg: "./log/modDev.log evtDev:event" },
+    "watchdog":{createArg: "evtDev:event 00:15 SAME {}" },
+    "sequence":{createArg: "evtDev:event 00:15 evtDev:event" }
+  };
+
+  var modDev, devList, devHash = {};
+  var creates = [];
+  for(var t in knownTypes)
+    if(knownTypes[t].createArg)
+      creates.push(t);
 
   $("button#addRegexpPart").click(function(){
     // get selection, build regexp from event
@@ -187,50 +202,95 @@ consAddRegexpPart()
     var ret = txt.match(re);
     if(!ret)
       return FW_okDialog(hlp);
-    var dev=ret[3], evt=ret[4];
-    evt = evt.replace(/\s/g, ".");
-    re1 = dev+" "+evt;
-    evt = evt.replace(/\b-?\d*\.?\d+\b/g, '.*').replace(/\.\* \.\*/g, '.*');
-    re2 = dev+" "+evt;
 
-    // build dialog
+    var evtDev=ret[3];
+    var evt1 = ret[4].replace(/\s/g, ".")
+                     .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
+    var evt2 = evt1.replace(/\b-?\d*\.?\d+\b/g,'.*').replace(/\.\* \.\*/g,'.*');
+
+    // build the dialog
     var txt = '<style type="text/css">\n'+
               'div.evt label { display:block; margin-left:2em; }\n'+
               'div.evt input { float:left; }\n'+
               '</style>\n';
-    txt += "Extend the regular expression of the device<br>";
-    txt += "<select id='evtDev'></select><br><br>";
-    txt += "<div class='evt'>"+
-           "<input type='radio' name='evtType' id='rdEx' checked/>"+
-           "<label>with exactly this event:<br>"+re1+"</label></div><br>";
-    if(re1 != re2)
-      txt += "<div class='evt'>"+
-             "<input type='radio' name='evtType' id='rdNum'/>"+
-             "<label>with any number matching:<br>"+re2+"</label></div><br>";
 
-    $('body').append('<div id="addReP" style="display:none">'+txt+'</div>');
-    $('#addReP').dialog(
+    var inputPrf="<input type='radio' name="
+    txt += inputPrf+"'defmod' id='def' checked/><label>Create</label>"+
+           inputPrf+"'defmod' id='mod'/><label>Modify</label><br><br>"
+    txt += "<select id='modDev' style='display:none'></select>";
+    txt += "<select id='newType'><option>"+
+              creates.sort().join("</option><option>")+
+           "</select><br><br>";
+
+    if(evt1 != evt2) {
+      txt += "<div class='evt'>"+inputPrf+"'evtType' id='rdEx' checked/>"+
+             "<label>with exactly this event</div><br>";
+      txt += "<div class='evt'>"+inputPrf+"'evtType' id='rdNum'/>"+
+             "<label>with any number matching</label></div><br>";
+    }
+    txt += "<div class='evt' id='cmd'>&nbsp;</txt>";
+
+    $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
+    $('#evtCoM').dialog(
       { modal:true, closeOnEscape:true, width:"auto",
-        close:function(){ $('#addReP').remove(); },
+        close:function(){ $('#evtCoM').remove(); },
         buttons:[
         { text:"Cancel", click:function(){ $(this).dialog('close'); }},
         { text:"OK", click:function(){
-          var dev = $("select#evtDev").val();
-          var cmd = "set "+dev+" addRegexpPart "+
-              ($('input[name=evtType]:checked').attr("id")=='rdEx' ? re1 : re2);
-          FW_cmd(FW_root+"?cmd="+cmd+"&XHR=1");
+          FW_cmd(FW_root+"?cmd="+$("#evtCoM #cmd").html()+"&XHR=1");
           $(this).dialog('close');
-          location = FW_root+'?detail='+dev;
-        }}]
-     });
+          location = FW_root+'?detail='+modDev;
+        }}],
+        open:function(){
+          $("#evtCoM #newType").val("notify");
+          $("#evtCoM input,#evtCoM select").change(optChanged);
+        }
+      });
 
-    FW_cmd(FW_root+"?cmd=jsonlist2&XHR=1", function(data){
-      var devList = JSON.parse(data);
-      for(var i1=0; i1<devList.Results.length; i1++) {
-        var dev = devList.Results[i1];
-        if(dev.PossibleSets.indexOf("addRegexpPart") >= 0)
-          $("select#evtDev").append('<option>'+dev.Name+'</option>');
+    function
+    optChanged()
+    {
+      var event = evt1;
+      if(evt1 != evt2 && $("#evtCoM #rdNum").is(":checked"))
+        event = evt2;
+      var cmd;
+
+      if($("#evtCoM #def").is(":checked")) {    // define
+        $("#evtCoM #newType").show();
+        $("#evtCoM #modDev").hide();
+        var type = $("#evtCoM #newType").val(), num=1;
+        var nRe = new RegExp(evtDev+"_"+type+"_(\\d+)");
+        for(var i1=0; i1<devList.length; i1++) {
+          var m = nRe.exec(devList[i1].Name);
+          if(m && m[1] >= num)
+            num = parseInt(m[1])+1;
+        }
+        modDev = evtDev+"_"+type+"_"+num;
+        cmd = "define "+modDev+" "+type+" "+knownTypes[type].createArg;
+
+      } else {
+        $("#evtCoM #newType").hide();
+        $("#evtCoM #modDev").show();
+        modDev = $("#evtCoM #modDev").val();
+        cmd = knownTypes[devHash[modDev].Internals.TYPE].modify;
+
       }
+
+      $("#evtCoM #cmd").text(cmd
+                             .replace(/modDev/g,modDev)
+                             .replace(/evtDev/g,evtDev)
+                             .replace(/event/g,event));
+    }
+
+    FW_cmd(FW_root+"?cmd=jsonlist2 .* TYPE&XHR=1", function(data){
+      devList = JSON.parse(data).Results;
+      for(var i1=0; i1<devList.length; i1++) {
+        var dev = devList[i1], type = dev.Internals.TYPE;
+        if(knownTypes[type] && knownTypes[type].modify)
+          $("select#modDev").append('<option>'+dev.Name+'</option>');
+        devHash[dev.Name] = dev;
+      }
+      optChanged();
     });
   });
 }
