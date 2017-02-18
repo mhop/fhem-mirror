@@ -3382,7 +3382,7 @@ sub PHTV_createAuthSignature($$$) {
     </code></ul>
   <br>
   <br>
-    <i>Note:</i> If some older devices might need to have the API activated first. If you get no response from your
+    <i>Note:</i> Some older devices might need to have the API activated first. If you get no response from your
     device, try to input "5646877223" on the remote while watching TV (which spells jointspace on the digits).
     A popup might appear stating the API was successfully enabled.
   </ul>
