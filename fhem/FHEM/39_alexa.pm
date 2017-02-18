@@ -412,7 +412,11 @@ Log 1, Dumper $characteristicsOfIntent;
           $intent_name = 'FHEMperlCodeIntent';
           my $i = 1;
           while( defined($intents{$intent_name}) ) {
-            $intent_name = "FHEMperlCodeIntent".chr(65+$i);
+            if( $i < 26 ) {
+              $intent_name = "FHEMperlCodeIntent".chr(65+$i);
+            } else {
+              $intent_name = "FHEMperlCodeIntent".chr(64+int($i/26)).chr(65+$i%26);
+            }
             ++$i;
           }
         }
