@@ -319,7 +319,7 @@ sub ROOMMATE_Notify($$) {
                   . "Syncing status with $devName = absent";
                 fhem "set $hashName:FILTER=presence=present absent";
             }
-            elsif ( !$counter->{absent} && $counter->{present} ) {
+            elsif ( $counter->{present} ) {
                 Log3 $hashName, 4,
                   "ROOMMATE $hashName: "
                   . "Syncing status with $devName = present";

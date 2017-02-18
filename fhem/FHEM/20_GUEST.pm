@@ -313,7 +313,7 @@ sub GUEST_Notify($$) {
                   "GUEST $hashName: Syncing status with $devName = absent";
                 fhem "set $hashName:FILTER=presence=present absent";
             }
-            elsif ( !$counter->{absent} && $counter->{present} ) {
+            elsif ( $counter->{present} ) {
                 Log3 $hashName, 4,
                   "GUEST $hashName: Syncing status with $devName = present";
                 fhem "set $hashName:FILTER=presence=absent home";
