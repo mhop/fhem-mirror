@@ -1,4 +1,4 @@
-REV 13424
+REV 13427
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-02-17_07:45:02 184695 ./CHANGED
+UPD 2017-02-18_07:45:02 184743 ./CHANGED
 UPD 2017-02-11_07:45:02 35614 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-02-15_07:45:06 129572 ./fhem.pl
@@ -332,8 +332,8 @@ UPD 2015-07-28_14:05:31 3650 FHEM/82_M232Voltage.pm
 UPD 2016-11-30_07:45:13 29022 FHEM/86_Robonect.pm
 UPD 2015-07-28_14:05:31 17571 FHEM/87_WS2000.pm
 UPD 2015-07-28_14:05:31 4345 FHEM/88_ALL4000T.pm
-UPD 2017-02-03_07:45:02 181549 FHEM/88_HMCCU.pm
-UPD 2017-02-02_07:45:02 37124 FHEM/88_HMCCUCHN.pm
+UPD 2017-02-18_07:45:02 180460 FHEM/88_HMCCU.pm
+UPD 2017-02-18_07:45:02 37210 FHEM/88_HMCCUCHN.pm
 UPD 2017-02-02_07:45:02 34503 FHEM/88_HMCCUDEV.pm
 UPD 2015-07-28_14:05:31 5836 FHEM/88_IPWE.pm
 UPD 2016-02-05_07:45:11 8459 FHEM/88_Itach_IRDevice.pm
@@ -558,7 +558,7 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-02-17_07:45:04 2676480 docs/commandref.html
+UPD 2017-02-18_07:45:04 2676566 docs/commandref.html
 UPD 2017-02-17_07:45:05 1558009 docs/commandref_DE.html
 UPD 2017-01-26_07:45:03 68845 docs/commandref_frame.html
 UPD 2017-01-26_07:45:03 77286 docs/commandref_frame_DE.html
@@ -1815,12 +1815,12 @@ UPD 2015-07-28_14:05:34 2865 www/jscolor/hv.png
 UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2016-12-04_07:45:11 6371 www/pgm2/alarm.js
-UPD 2016-07-13_07:45:14 6194 www/pgm2/brightstyle.css
+UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
 UPD 2017-01-24_07:45:02 6822 www/pgm2/console.js
-UPD 2016-07-13_07:45:14 948 www/pgm2/darkCommon.css
+UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
-UPD 2015-07-28_14:05:34 4891 www/pgm2/darksmallscreenstyle.css
-UPD 2016-04-18_07:45:12 5748 www/pgm2/darkstyle.css
+UPD 2017-02-18_07:45:02 4808 www/pgm2/darksmallscreenstyle.css
+UPD 2017-02-18_07:45:02 5640 www/pgm2/darkstyle.css
 UPD 2015-11-22_17:53:09 2502 www/pgm2/darksvg_defs.svg
 UPD 2015-07-28_14:05:34 2808 www/pgm2/darksvg_style.css
 UPD 2015-07-28_14:05:34 30 www/pgm2/darktouchpadstyle.css
@@ -1828,7 +1828,7 @@ UPD 2016-02-12_07:45:10 41380 www/pgm2/dashboard.js
 UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
-UPD 2016-07-13_07:45:14 5396 www/pgm2/defaultCommon.css
+UPD 2017-02-18_07:45:02 5393 www/pgm2/defaultCommon.css
 UPD 2016-11-21_07:45:13 5294 www/pgm2/fhemdoc_modular.js
 UPD 2017-02-12_07:45:02 42751 www/pgm2/fhemweb.js
 UPD 2017-01-17_07:45:03 12466 www/pgm2/fhemweb_colorpicker.js
