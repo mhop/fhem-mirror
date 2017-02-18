@@ -175,6 +175,7 @@ alexa_Get($$@)
         foreach my $part (@parts) {
           my @p = split( '=', $part );
           if( $p[1] =~ m/;/ ) {
+            $p[1] =~ s/\+/ /g;
             my @values = split(';', $p[1]);
             my @values2 = grep {$_ ne ''} @values;
 
