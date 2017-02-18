@@ -37,6 +37,11 @@
 #   2014-07-24  added max queue length checking and attribute
 #   2016-01-25  Reading Namen mit Umlauten korrigiert
 #   2016-04-06  Testmode Protokollbefehle hinzugefügt
+#   2016-11-13  korrektur bei set / get / readanswer. Set liefert bei Erfolg undef statt Text
+#   2017-02-12  Doku ergänzt
+#
+#
+# Todo / Ideas:
 #
 
 package main;
@@ -61,6 +66,7 @@ sub ComfoAir_HandleSendQueue($);
 sub ComfoAir_SendAck($);
 sub ComfoAir_TimeoutSend($);
 
+my $ComfoAir_Version = '1.5 - 18.2.2017';
 
 # %parseInfo:
 # replyCode => msgHashRef
@@ -334,7 +340,8 @@ ComfoAir_Define($$)
         
     $hash->{BUSY}   = 0;    
     $hash->{EXPECT} = "";
-
+    $hash->{ModuleVersion}   = $ComfoAir_Version;
+    
     if (!defined($interval)) {
         $hash->{INTERVAL} = 0; 
         Log 1, "$name: interval is 0 or not defined - not sending requests - just listening!";
@@ -386,7 +393,8 @@ ComfoAir_Get($@)
         Log3 $name, 3, "$name: Request found in getHash created from parseInfo data";
         if ($msgHash->{request}) {
             ComfoAir_Send($hash, $msgHash->{request}, "", $msgHash->{replyCode}, 1);
-            my $result = ComfoAir_ReadAnswer($hash, $getName, $msgHash->{replyCode});
+            my ($err, $result) = ComfoAir_ReadAnswer($hash, $getName, $msgHash->{replyCode});
+            return $err if ($err);
             return $result;
         } else {
             return "Protocol doesn't provide a command to get $getName";
@@ -473,9 +481,10 @@ ComfoAir_Set($@)
         if ($setHash{$setName}{msgHash}{request}) {
             ComfoAir_Send($hash, $setHash{$setName}{msgHash}{request}, "", 
                         $setHash{$setName}{msgHash}{replyCode},1);
-            # falls ein minDelay bei Send implementiert wäre, müsste ReadAnswer optiniert werden, sonst wird der 2. send ggf nicht vor einem Timeout gesendet ...
-            my $result = ComfoAir_ReadAnswer($hash, $setName, $setHash{$setName}{msgHash}{replyCode});
-            return "$setName -> $result";
+            # falls ein minDelay bei Send implementiert wäre, müsste ReadAnswer optimiert werden, sonst wird der 2. send ggf nicht vor einem Timeout gesendet ...
+            my ($err, $result) = ComfoAir_ReadAnswer($hash, $setName, $setHash{$setName}{msgHash}{replyCode});
+            #return "$setName -> $result";
+            return $err if ($err);
         }
         return undef;
         
@@ -729,7 +738,7 @@ ComfoAir_ReadAnswer($$$)
             if ($cmd eq $expectReply) {
                 # das war's worauf wir gewartet haben
                 Log3 $name, 5, "$name: ReadAnswer done with success";
-                return ReadingsVal($name, $arg, "");
+                return (undef, ReadingsVal($name, $arg, ""));
             }
         }
         ComfoAir_HandleSendQueue("direct:".$name);
@@ -869,7 +878,8 @@ ComfoAir_HandleSendQueue($)
                 ($cmdHash{$hexcmd} ? " get " . $cmdHash{$hexcmd}{name} : "") . 
                 " code: $hexcmd" .
                 " frame: " . $hash->{LASTREQUEST} . 
-                ($entry->{EXPECT} ? " and wait for " . $entry->{EXPECT} : "");
+                ($entry->{EXPECT} ? " and wait for " . $entry->{EXPECT} : "") .
+                ", V " . $hash->{ModuleVersion};
         
             DevIo_SimpleWrite($hash, $bstring, 0);
       
@@ -907,6 +917,9 @@ ComfoAir_SendAck($)
 1;
 
 =pod
+=item device
+=item summary module for Zehnder ComfoAir, StorkAir WHR930, Wernig G90-380 and Santos 370
+=item summary_DE Modul für Zehnder ComfoAir, StorkAir WHR930, Wernig G90-380 and Santos 370
 =begin html
 
 <a name="ComfoAir"></a>
@@ -947,6 +960,7 @@ ComfoAir_SendAck($)
         The module connects to the ventialation system through the given Device and either passively listens to data that is communicated 
         between the ventialation system and its remote control device (e.g. CC Luxe) or it actively requests data from the 
         ventilation system every &lt;Interval&gt; seconds <br>
+        If &lt;Interval&gt; is set to 0 then no polling will be done and the module only listens to messages on the line.<br>
         <br>
         Example:<br>
         <br>
