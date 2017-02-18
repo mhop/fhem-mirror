@@ -132,8 +132,9 @@ sub KeyValueProtocol_Parse($$) {
       my %mappings;
       # our "Mapping" attribute has priority
       my $mappingsString = AttrVal($rname, "Mapping", "");
+      $mappingsString = InternalVal($rname, AttrVal($rname, "IODev", "") . "_Mapping", "") if (!$mappingsString);
       if ($mappingsString) {
-        %mappings = split (/[,=]/, AttrVal($rname, "Mapping", ""));
+        %mappings = split (/[,=]/, $mappingsString);
       }
       else {
         # Do we have initMessages in the IODevice?
