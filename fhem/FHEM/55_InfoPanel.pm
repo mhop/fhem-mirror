@@ -1397,7 +1397,8 @@ sub btIP_returnHTML {
   my $gen     = 'generated="'.(time()-1).'"';  
   my $code    = btIP_HTMLHead($name,$title,$viewport,$webApp,$refresh);
 
-  $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\" ".
+  my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
+  $code .=  "<body $csrf topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\" ".
             "$gen longpoll=\"1\" longpollfilter=\"room=all\" >\n".
 
             "<div id=\"svg_content\" style=\"position:absolute; top:0px; left:0px; z-index:1\" >\n".
