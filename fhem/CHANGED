@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 5.8 released
+
+- 2017-02-19 (5.8)
   - feature: 88_HMCCU: advanced reading filters
   - feature: 74_AMAD: add closeCall command
   - bugfix:  98_DOIFtools: some more webname issues
@@ -556,7 +559,6 @@
              (only for mode "local-bluetooth")
   - feature: 74_AMAD: new Feature added support for do not Disturb Mode
   - bugfix : 74_HOMBOT: check path for sshpass
->>>>>>> .r11881
   - feature: fhem_codemirror: Added new codemirrorParams:
                               keyMap, jumpToLine, jumpToLine_extraKey
   - feature: 10_pilight_ctrl: NEW: protocol oregon_21 for temperature

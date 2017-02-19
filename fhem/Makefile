@@ -1,5 +1,5 @@
-VERS=5.7
-DATE=2015-11-15
+VERS=5.8
+DATE=2017-02-19
 
 # used for nightly build
 DATEN=$(shell date +"%Y-%m-%d")
@@ -74,7 +74,7 @@ dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
                 demolog fhem.cfg.demo README_DEMO.txt\
-		FHEM configDB.pm contrib docs www webfrontend .f
+		FHEM configDB.pm contrib docs www .f
 	mkdir .f/log
 	touch .f/log/empty_file.txt
 	(cd .f; perl contrib/commandref_join.pl)
