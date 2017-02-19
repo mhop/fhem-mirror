@@ -53,7 +53,6 @@ FB_CALLMONITOR_Initialize($)
     $hash->{UndefFn}   = "FB_CALLMONITOR_Undef";
     $hash->{AttrFn}    = "FB_CALLMONITOR_Attr";
     $hash->{NotifyFn}  = "FB_CALLMONITOR_Notify";
-    $hash->{NOTIFYDEV} = "global";
     $hash->{AttrList}  = "do_not_notify:0,1 ".
                          "disable:0,1 ".
                          "disabledForIntervals ".
@@ -89,7 +88,8 @@ FB_CALLMONITOR_Define($$)
         return $msg;
     }
     
-    
+    $hash->{NOTIFYDEV} = "global";
+        
     DevIo_CloseDev($hash);
     delete($hash->{NEXT_OPEN});
     
