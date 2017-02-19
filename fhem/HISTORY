@@ -723,3 +723,6 @@
 
 - Mon Jan 16 2017 (loredo)
   - adding new module 98_powerMap
+
+- Sun Feb 19 2017 (markus-m)
+  - replaced module 32_withings with new version

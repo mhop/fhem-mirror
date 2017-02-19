@@ -1,8 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo.pm: fixed login crash, updated webhooks
+  - update:  32_withings.pm: replaced with new module
   - feature: 5.8 released
-
-- 2017-02-19 (5.8)
+  - 2017-02-19 (5.8)
   - feature: 88_HMCCU: advanced reading filters
   - feature: 74_AMAD: add closeCall command
   - bugfix:  98_DOIFtools: some more webname issues
