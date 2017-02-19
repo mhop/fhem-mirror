@@ -1592,9 +1592,9 @@ sub PHTV_ReceiveCommand($$$) {
                 $loglevel = 3;
                 readingsBulkUpdate( $hash, "state", "pairing" );
 
-                $hash->{pairing}{begin} = time();
-                $hash->{pairing}{end} =
-                  $hash->{pairing}{begin} + $return->{timeout};
+                $hash->{PAIRING_BEGIN} = time();
+                $hash->{PAIRING_END} =
+                  $hash->{PAIRING_BEGIN} + $return->{timeout};
                 $hash->{pairing}{auth_key}  = $return->{auth_key};
                 $hash->{pairing}{timeout}   = $return->{timeout};
                 $hash->{pairing}{timestamp} = $return->{timestamp};
@@ -1658,6 +1658,8 @@ sub PHTV_ReceiveCommand($$$) {
         Log3 $name, $loglevel, "PHTV $name: $log";
 
         delete $hash->{pairing};
+        delete $hash->{PAIRING_BEGIN};
+        delete $hash->{PAIRING_END};
         RemoveInternalTimer($hash);
         InternalTimer( gettimeofday() + $interval, "PHTV_GetStatus", $hash, 0 );
 
@@ -1668,8 +1670,8 @@ sub PHTV_ReceiveCommand($$$) {
     # authorization/pairing needed
     elsif ( $code == 401 ) {
         if (   defined( $hash->{pairing} )
-            && defined( $hash->{pairing}{end} )
-            && $hash->{pairing}{end} < time() )
+            && defined( $hash->{PAIRING_END} )
+            && $hash->{PAIRING_END} < time() )
         {
             readingsEndUpdate( $hash, 1 );
             return;
@@ -1699,7 +1701,9 @@ sub PHTV_ReceiveCommand($$$) {
             fhem 'attr ' . $name . ' device_id ' . $device_id;
         }
 
-        delete $hash->{pairing} if ( defined( $hash->{pairing} ) );
+        delete $hash->{pairing}       if ( defined( $hash->{pairing} ) );
+        delete $hash->{PAIRING_BEGIN} if ( defined( $hash->{PAIRING_BEGIN} ) );
+        delete $hash->{PAIRING_END}   if ( defined( $hash->{PAIRING_END} ) );
         $hash->{pairing}{request} = {
             device_name => 'fhem',
             device_os   => 'Android',
