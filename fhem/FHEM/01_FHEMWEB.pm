@@ -130,6 +130,7 @@ FHEMWEB_Initialize($)
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_Notify";
+  $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
   $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   no warnings 'qw';
@@ -217,13 +218,15 @@ FHEMWEB_Initialize($)
       FW_readIcons($pe);
     }
   }
-  InternalTimer(1, "FW_SecurityCheck", $hash);
 }
 
 #####################################
 sub
 FW_SecurityCheck($$)
 {
+  my ($ntfy, $dev) = @_;
+  return if($dev->{NAME} ne "global" ||
+            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
   my $motd = AttrVal("global", "motd", "");
   if($motd =~ "^SecurityCheck") {
     my @list1 = devspec2array("TYPE=FHEMWEB");
@@ -244,6 +247,8 @@ FW_SecurityCheck($$)
         if(@list3);
     $attr{global}{motd} = $motd;
   }
+  $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
+  return;
 }
 
 #####################################
@@ -801,7 +806,8 @@ FW_answerCall($)
     my $supplied = $FW_webArgs{fwcsrf} ? $FW_webArgs{fwcsrf} : "";
     my $want = $defs{$FW_wname}{CSRFTOKEN};
     if($supplied ne $want) {
-      Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want";
+      Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want. ".
+                         "For detals see the csrfToken FHEMWEB attribute";
       return 0;
     }
   }
