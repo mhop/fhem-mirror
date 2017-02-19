@@ -379,6 +379,11 @@ sub PHTV_Set($@) {
             },
             device => $hash->{pairing}{request}{device},
         };
+
+        return "Unable to sign pairing confirmation."
+          . " Please install Digest::SHA first."
+          unless ( defined( $hash->{pairing}{grant}{auth}{auth_signature} ) );
+
         PHTV_SendCommand( $hash, "pair/grant", $hash->{pairing}{grant} );
     }
 
@@ -1688,18 +1693,6 @@ sub PHTV_ReceiveCommand($$$) {
 
         readingsBulkUpdateIfChanged( $hash, "presence", "present" );
         readingsBulkUpdateIfChanged( $hash, "power",    "on" );
-
-        eval {
-            require Digest::SHA;
-            import Digest::SHA qw( hmac_sha1_base64 hmac_sha1_hex );
-        };
-        if ($@) {
-            readingsBulkUpdate( $hash, "state",
-                "pairing: Missing Perl module Digest::SHA" );
-            readingsEndUpdate( $hash, 1 );
-            return;
-        }
-
         readingsBulkUpdate( $hash, "state", "pairing-request" );
 
         fhem 'attr ' . $name . ' jsversion 6'
@@ -3398,12 +3391,27 @@ sub PHTV_createDeviceId() {
 ###################################
 sub PHTV_createAuthSignature($$$) {
     my ( $timestamp, $pin, $secretkey ) = @_;
-    $secretkey = decode_base64($secretkey) if ( $secretkey =~ m/.*=+$/ );
-    my $authsignature = hmac_sha1_hex( $timestamp . trim($pin), $secretkey );
+    my $base64 = 0;
+    my $authsignature;
+
+    if ( $secretkey =~ m/.*=+$/ ) {
+        $secretkey = decode_base64($secretkey);
+        $base64    = 1;
+    }
+
+    eval {
+        require Digest::SHA;
+        import Digest::SHA qw( hmac_sha1_hex );
+        $authsignature = hmac_sha1_hex( $timestamp . trim($pin), $secretkey );
+    };
+    return
+      if ($@);
+
     while ( length($authsignature) % 4 ) {
         $authsignature .= '=';
     }
-    return trim( encode_base64($authsignature) ) if ( $secretkey =~ m/.*=+$/ );
+
+    return trim( encode_base64($authsignature) ) if ($base64);
     return $authsignature;
 }
 
