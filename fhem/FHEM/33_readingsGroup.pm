@@ -651,8 +651,11 @@ readingsGroup_2html($;$)
 {
   my($hash,$extPage) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+
+  $FW_ME = "" if( !$FW_ME );
+  $FW_subdir = "" if( !$FW_subdir );
+
   return undef if( !$hash );
-  return undef if( !$FW_ME );
   return undef if( !$init_done );
 
   #if( $hash->{fhem}->{cached} && $hash->{fhem}->{lastDefChange} && $hash->{fhem}->{lastDefChange} == $lastDefChange ) {
