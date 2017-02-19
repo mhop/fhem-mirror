@@ -1580,6 +1580,8 @@ sub PHTV_ReceiveCommand($$$) {
 
     # pairing request reply
     if ( $service eq "pair/request" ) {
+        my $errtype = "TIMEOUT";
+        $errtype = "ERROR/$code" if ($code);
         my $log;
         my $loglevel = 4;
 
@@ -1605,16 +1607,16 @@ sub PHTV_ReceiveCommand($$$) {
                 $hash->{pairing}{timestamp} = $return->{timestamp};
             }
             else {
-                $log = "ERROR/$code - Pairing request failed";
-                $log .= "\n   $err"        if ($err);
-                $log .= "\n   Data:\n$err" if ($data);
+                $log = "$errtype - Pairing request failed";
+                $log .= "\n   $err"        if ( $code && $err );
+                $log .= "\n   Data:\n$err" if ( $code && $data );
                 readingsBulkUpdate( $hash, "state", "pairing request failed" );
             }
         }
         else {
-            $log = "ERROR/$code - Pairing not supported";
-            $log .= "\n   $err"        if ($err);
-            $log .= "\n   Data:\n$err" if ($data);
+            $log = "$errtype - Pairing not supported";
+            $log .= "\n   $err"        if ( $code && $err );
+            $log .= "\n   Data:\n$err" if ( $code && $data );
             readingsBulkUpdate( $hash, "state", "pairing not supported" );
         }
 
@@ -1626,6 +1628,8 @@ sub PHTV_ReceiveCommand($$$) {
 
     # pairing grant reply
     elsif ( $service eq "pair/grant" ) {
+        my $errtype = "TIMEOUT";
+        $errtype = "ERROR/$code" if ($code);
         my $log;
         my $loglevel = 4;
         my $interval = 10;
@@ -1647,16 +1651,16 @@ sub PHTV_ReceiveCommand($$$) {
                 $interval = 3;
             }
             else {
-                $log = "ERROR/$code - Pairing failed";
-                $log .= "\n   $err"        if ($err);
-                $log .= "\n   Data:\n$err" if ($data);
+                $log = "$errtype - Pairing failed";
+                $log .= "\n   $err"        if ( $code && $err );
+                $log .= "\n   Data:\n$err" if ( $code && $data );
                 readingsBulkUpdate( $hash, "state", "pairing failed" );
             }
         }
         else {
-            $log = "ERROR/$code - Pairing grant not supported";
-            $log .= "\n   $err"        if ($err);
-            $log .= "\n   Data:\n$err" if ($data);
+            $log = "$errtype - Pairing grant not supported";
+            $log .= "\n   $err"        if ( $code && $err );
+            $log .= "\n   Data:\n$err" if ( $code && $data );
             readingsBulkUpdate( $hash, "state", "pairing grant not supported" );
         }
 
