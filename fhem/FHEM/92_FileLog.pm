@@ -115,7 +115,7 @@ FileLog_Define($@)
   $hash->{logfile} = $a[2];
   $hash->{currentlogfile} = $f;
   $hash->{STATE} = "active";
-  notifyRegexpChanged($hash, $a[3]);
+  InternalTimer(0, sub(){  notifyRegexpChanged($hash, $a[3]); }, $hash);
 
   return undef;
 }

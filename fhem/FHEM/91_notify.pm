@@ -56,7 +56,7 @@ notify_Define($$)
 
   my $doTrigger = ($name !~ m/^$re$/);            # Forum #34516
   readingsSingleUpdate($hash, "state", "active", $doTrigger);
-  notifyRegexpChanged($hash, $re);
+  InternalTimer(0, sub(){  notifyRegexpChanged($hash, $re); }, $hash);
 
   return undef;
 }
