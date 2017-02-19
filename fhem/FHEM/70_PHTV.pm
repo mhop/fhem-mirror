@@ -1559,67 +1559,37 @@ sub PHTV_ReceiveCommand($$$) {
     my $name       = $hash->{NAME};
     my $service    = $param->{service};
     my $cmd        = $param->{cmd};
-    my $code       = $param->{code};
+    my $code       = $param->{code} ? $param->{code} : 0;
     my $sequential = AttrVal( $name, "sequentialQuery", 0 );
     my $protoV     = AttrVal( $name, "jsversion", 1 );
     my $device_id  = AttrVal( $name, "device_id", undef );
 
-    my $state = ReadingsVal( $name, "state", "" );
-    my $newstate;
-    my $type = ( $param->{type} ) ? $param->{type} : "";
+    my $state    = ReadingsVal( $name, "state", "" );
+    my $newstate = "absent";
+    my $type     = $param->{type} ? $param->{type} : "";
     my $return;
 
     Log3 $name, 5, "PHTV $name: called function PHTV_ReceiveCommand()";
 
     readingsBeginUpdate($hash);
 
-    # device not reachable
-    if ( $err && ( !$code || $code ne "401" ) ) {
-
-        if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
-            Log3 $name, 4, "PHTV $name: RCV TIMEOUT $service";
-        }
-        else {
-            Log3 $name, 4,
-              "PHTV $name: RCV TIMEOUT $service/" . urlDecode($cmd);
-        }
-
-        # device is not reachable or
-        # does not even support master command for audio
-        if ( $service eq "audio/volume"
-            || ( $service eq "input/key" && $type eq "off" ) )
-        {
-            $newstate = "absent";
-            readingsBulkUpdateIfChanged( $hash, "presence", "absent" );
-        }
-
-        # device behaves naughty
-        else {
-            $newstate = "on";
-
-            # because it does not seem to support the command
-            unless ( defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
-                $hash->{helper}{supportedAPIcmds}{$service} = 0;
-                Log3 $name, 4,
-                    "PHTV $name: API command '"
-                  . $service
-                  . "' not supported by device.";
-            }
-        }
-
-    }
-
     # pairing request reply
-    elsif ( $service eq "pair/request" ) {
-        if ( $data =~ m/^\s*([{\[][\s\S]+[}\]])\s*$/i ) {
+    if ( $service eq "pair/request" ) {
+        my $log;
+        my $loglevel = 4;
+
+        if ( $data && $data =~ m/^\s*([{\[][\s\S]+[}\]])\s*$/i ) {
             $return = decode_json( Encode::encode_utf8($1) ) if ($1);
 
             if (   ref($return) eq "HASH"
                 && $return->{timestamp}
                 && $return->{auth_key}
-                && $return->{timeout} )
+                && $return->{timeout}
+                && $return->{error_id}
+                && $return->{error_id} =~ m/^SUCCESS$/i )
             {
-                Log3 $name, 3, "PHTV $name: Pairing enabled";
+                $log      = "$code - Pairing enabled";
+                $loglevel = 3;
                 readingsBulkUpdate( $hash, "state", "pairing" );
 
                 $hash->{pairing}{begin} = time();
@@ -1630,15 +1600,20 @@ sub PHTV_ReceiveCommand($$$) {
                 $hash->{pairing}{timestamp} = $return->{timestamp};
             }
             else {
-                Log3 $name, 4,
-                  "PHTV $name: ERROR $code - Pairing request failed";
+                $log = "ERROR/$code - Pairing request failed";
+                $log .= "\n   $err"        if ($err);
+                $log .= "\n   Data:\n$err" if ($data);
                 readingsBulkUpdate( $hash, "state", "pairing request failed" );
             }
         }
         else {
-            Log3 $name, 4, "PHTV $name: ERROR $code - Pairing not supported";
+            $log = "ERROR/$code - Pairing not supported";
+            $log .= "\n   $err"        if ($err);
+            $log .= "\n   Data:\n$err" if ($data);
             readingsBulkUpdate( $hash, "state", "pairing not supported" );
         }
+
+        Log3 $name, $loglevel, "PHTV $name: $log";
 
         readingsEndUpdate( $hash, 1 );
         return;
@@ -1646,20 +1621,43 @@ sub PHTV_ReceiveCommand($$$) {
 
     # pairing grant reply
     elsif ( $service eq "pair/grant" ) {
-        delete $hash->{pairing};
+        my $log;
+        my $loglevel = 4;
         my $interval = 10;
 
-        if ( $code == 200 ) {
-            Log3 $name, 4, "PHTV $name: Pairing successful";
-            readingsBulkUpdate( $hash, "state", "paired" );
-            fhem 'attr ' . $name . ' auth_key ' . $hash->{pairing}{auth_key};
-            $interval = 3;
+        if ( $data && $data =~ m/^\s*([{\[][\s\S]+[}\]])\s*$/i ) {
+            $return = decode_json( Encode::encode_utf8($1) ) if ($1);
+
+            if (   ref($return) eq "HASH"
+                && $return->{error_id}
+                && $return->{error_id} =~ m/^SUCCESS$/i )
+            {
+                $log      = "$code - Pairing successful";
+                $loglevel = 3;
+                readingsBulkUpdate( $hash, "state", "paired" );
+                fhem 'attr '
+                  . $name
+                  . ' auth_key '
+                  . $hash->{pairing}{auth_key};
+                $interval = 3;
+            }
+            else {
+                $log = "ERROR/$code - Pairing failed";
+                $log .= "\n   $err"        if ($err);
+                $log .= "\n   Data:\n$err" if ($data);
+                readingsBulkUpdate( $hash, "state", "pairing failed" );
+            }
         }
         else {
-            Log3 $name, 4, "PHTV $name: ERROR $code - Pairing failed";
-            readingsBulkUpdate( $hash, "state", "pairing failed" );
+            $log = "ERROR/$code - Pairing grant not supported";
+            $log .= "\n   $err"        if ($err);
+            $log .= "\n   Data:\n$err" if ($data);
+            readingsBulkUpdate( $hash, "state", "pairing grant not supported" );
         }
 
+        Log3 $name, $loglevel, "PHTV $name: $log";
+
+        delete $hash->{pairing};
         RemoveInternalTimer($hash);
         InternalTimer( gettimeofday() + $interval, "PHTV_GetStatus", $hash, 0 );
 
@@ -1717,6 +1715,50 @@ sub PHTV_ReceiveCommand($$$) {
         return;
     }
 
+    # device error
+    elsif ( $err && ( !$code || $code ne "200" ) ) {
+        my $errtype = "TIMEOUT";
+        $errtype = "ERROR/$code" if ($code);
+
+        if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
+            Log3 $name, 4, "PHTV $name: RCV $errtype $service" . "\n   $err";
+        }
+        else {
+            Log3 $name, 4,
+                "PHTV $name: RCV $errtype $service/"
+              . urlDecode($cmd)
+              . "\n   $err";
+        }
+
+        # device is not reachable or
+        # does not even support master command for audio
+        if ( $service eq "audio/volume"
+            || ( $service eq "input/key" && $type eq "off" ) )
+        {
+            $newstate = "off" if ($code);
+            readingsBulkUpdateIfChanged( $hash, "presence", "present" )
+              if ($code);
+            readingsBulkUpdateIfChanged( $hash, "presence", "absent" )
+              unless ($code);
+        }
+
+        # device behaves naughty
+        elsif ( $code || ( $data && $data ne "" ) ) {
+            $newstate = "on";
+            readingsBulkUpdateIfChanged( $hash, "presence", "present" );
+
+            # because it does not seem to support the command
+            unless ( defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
+                $hash->{helper}{supportedAPIcmds}{$service} = 0;
+                Log3 $name, 4,
+                    "PHTV $name: API command '"
+                  . $service
+                  . "' not supported by device.";
+            }
+        }
+
+    }
+
     # data received
     elsif ($data) {
         readingsBulkUpdateIfChanged( $hash, "presence", "present" );
@@ -1751,11 +1793,11 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
 
         elsif ( $data ne "" ) {
             if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
-                Log3 $name, 5, "PHTV $name: RES ERROR $code $service\n" . $data;
+                Log3 $name, 5, "PHTV $name: RES ERROR/$code $service\n" . $data;
             }
             else {
                 Log3 $name, 5,
-                    "PHTV $name: RES ERROR $code $service/"
+                    "PHTV $name: RES ERROR/$code $service/"
                   . urlDecode($cmd) . "\n"
                   . $data;
             }
