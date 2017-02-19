@@ -360,19 +360,24 @@ sub PHTV_Set($@) {
         return "Not in pairing mode"
           unless ( defined( $hash->{pairing} )
             && defined( $hash->{pairing}{auth_key} )
-            && defined( $hash->{pairing}{timestamp} ) );
+            && defined( $hash->{pairing}{timestamp} )
+            && defined( $hash->{pairing}{request} )
+            && defined( $hash->{pairing}{request}{device} ) );
 
         readingsSingleUpdate( $hash, "state", "pairing-grant", 1 );
 
         $hash->{pairing}{grant} = {
-            auth_AppId     => 1,
-            pin            => trim( $a[2] ),
-            auth_timestamp => $hash->{pairing}{timestamp},
-            auth_signature => PHTV_createAuthSignature(
-                $hash->{pairing}{timestamp},
-                $a[2],
+            auth => {
+                auth_AppId     => 1,
+                pin            => trim( $a[2] ),
+                auth_timestamp => $hash->{pairing}{timestamp},
+                auth_signature => PHTV_createAuthSignature(
+                    $hash->{pairing}{timestamp},
+                    $a[2],
 "ZmVay1EQVFOaZhwQ4Kv81ypLAZNczV9sG4KkseXWn1NEk6cXmPKO/MCa9sryslvLCFMnNe4Z4CPXzToowvhHvA=="
-            ),
+                ),
+            },
+            device => $hash->{pairing}{request}{device},
         };
         PHTV_SendCommand( $hash, "pair/grant", $hash->{pairing}{grant} );
     }
@@ -1705,13 +1710,15 @@ sub PHTV_ReceiveCommand($$$) {
         delete $hash->{PAIRING_BEGIN} if ( defined( $hash->{PAIRING_BEGIN} ) );
         delete $hash->{PAIRING_END}   if ( defined( $hash->{PAIRING_END} ) );
         $hash->{pairing}{request} = {
-            device_name => 'fhem',
-            device_os   => 'Android',
-            app_name    => 'FHEM PHTV',
-            type        => 'native',
-            scope       => [ "read", "write", "control" ],
-            app_id      => 'org.fhem.PHTV',
-            id          => $device_id,
+            device => {
+                device_name => 'fhem',
+                device_os   => 'Android',
+                app_name    => 'FHEM PHTV',
+                type        => 'native',
+                app_id      => 'org.fhem.PHTV',
+                id          => $device_id,
+            },
+            scope => [ "read", "write", "control" ],
         };
         PHTV_SendCommand( $hash, "pair/request", $hash->{pairing}{request} );
 
@@ -3434,7 +3441,7 @@ sub PHTV_createAuthSignature($$$) {
   </ul>
   <br>
   <br>
-  
+
   <a name="PHTVset"></a>
   <b>Set </b>
   <ul>
@@ -3632,7 +3639,7 @@ sub PHTV_createAuthSignature($$$) {
 <h3>PHTV</h3>
 <ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
-Die englische Version ist hier zu finden: 
+Die englische Version ist hier zu finden:
 </ul>
 <ul>
 <a href='http://fhem.de/commandref.html#PHTV'>PHTV</a>
