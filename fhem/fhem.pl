@@ -259,7 +259,7 @@ my %sleepers;                   # list of sleepers
 $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-$featurelevel = 5.7;
+$featurelevel = 5.8;
 
 
 $modules{Global}{ORDER} = -1;
