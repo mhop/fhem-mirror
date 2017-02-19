@@ -514,7 +514,7 @@ sub withings_getSessionKey($) {
   $hash->{'.https'} = "https" if(!defined($hash->{'.https'}));
 
   my $data1;
-  if( !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{appliver}) || !defined($hash->{csrf_token}))
+  if( !defined($hash->{appliver}) || !defined($hash->{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{appliver}) || !defined($hash->{csrf_token}))
   {
     my($err0,$data0) = HttpUtils_BlockingGet({
       url => $hash->{'.https'}."://healthmate.withings.com/",
@@ -3308,17 +3308,17 @@ sub withings_weekdays2Int( $ ) {
 <a name="withings"></a>
 <h3>withings</h3>
 <ul>
-  xxx<br><br>
+  FHEM module for Withings devices.<br><br>
 
   Notes:
   <ul>
-    <li>JSON, LWP::Simple and Digest::MD5 have to be installed on the FHEM host.</li>
+    <li>JSON and Digest::SHA have to be installed on the FHEM host.</li>
   </ul><br>
 
   <a name="withings_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; withings &lt;userid&gt; &lt;publickey&gt;</code><br>
+    <code>define &lt;name&gt; withings ACCOUNT &lt;login@email&gt; &lt;password&gt;</code><br>
     <code>define &lt;name&gt; withings &lt;device&gt;</code><br>
     <br>
 
@@ -3328,23 +3328,54 @@ sub withings_weekdays2Int( $ ) {
 
     Examples:
     <ul>
-      <code>define withings withings abc@test.com myPassword</code><br>
+      <code>define withings withings ACCOUNT abc@test.com myPassword</code><br>
     </ul>
   </ul><br>
 
   <a name="withings_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>weight</li>
     <li>height</li>
+    <li>weight</li>
     <li>fatFreeMass</li>
+    <li>muscleRatio</li>
+    <li>fatMassWeight</li>
     <li>fatRatio</li>
-    <li>fatMass</li>
+    <li>boneMassWeight</li>
+    <li>boneRatio</li>
+    <li>hydration</li>
+
     <li>diastolicBloodPressure</li>
     <li>systolicBloodPressure</li>
     <li>heartPulse</li>
-    <br>
+    <li>pulseWave</li>
+    <li>spo2</li>
+
+    <li>bodyTemperature</li>
+    <li>skinTemperature</li>
+    <li>temperature</li>
+
+    <li>dailySteps</li>
+    <li>dailyDistance</li>
+    <li>dailyElevation</li>
+    <li>dailyDescent</li>
+    <li>dailyDurationLight</li>
+    <li>dailyDurationModerate</li>
+    <li>dailyDurationIntense</li>
+    <li>dailyCaloriesActive</li>
+    <li>dailyCaloriesPassive</li>
+
+    <li>sleepDurationAwake</li>
+    <li>sleepDurationLight</li>
+    <li>sleepDurationDeep</li>
+    <li>sleepDurationREM</li>
+    <li>wakeupCount</li>
+
     <li>co2</li>
+    <li>temperature</li>
+    <li>light</li>
+    <li>noise</li>
+    <li>voc</li>
     <li>battery</li>
     <li>batteryLevel</li>
   </ul><br>
