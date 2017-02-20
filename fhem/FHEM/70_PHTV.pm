@@ -1566,7 +1566,7 @@ sub PHTV_SendCommand($$;$$$) {
 
     $URL = "http://";
     $URL = "https://" if ( $protoV > 5 || $address =~ m/^.+:1926$/ );
-    $URL .= "$auth@" if($auth);
+    $URL .= "$auth@" if ($auth);
     $URL .= $address . "/" . $protoV . "/" . $service;
 
     $timeout = AttrVal( $name, "httpTimeout", AttrVal( $name, "timeout", 7 ) );
@@ -1585,6 +1585,7 @@ sub PHTV_SendCommand($$;$$$) {
             url         => $URL,
             hideauth    => 1,
             auth        => $auth,
+            digest      => 1,
             timeout     => $timeout,
             data        => $data,
             hash        => $hash,
