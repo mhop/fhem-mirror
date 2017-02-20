@@ -97,6 +97,7 @@ sub PHTV_GetStatus($;$) {
     my ( $hash, $update ) = @_;
     my $name       = $hash->{NAME};
     my $interval   = $hash->{INTERVAL};
+    my $presence   = ReadingsVal( $name, "presence", "absent" );
     my $sequential = AttrVal( $name, "sequentialQuery", 0 );
     my $querySent  = 0;
 
@@ -113,7 +114,8 @@ sub PHTV_GetStatus($;$) {
 
     # try to fetch only some information to check device availability
     if ( !$update ) {
-        PHTV_SendCommand( $hash, "audio/volume" );
+        PHTV_SendCommand( $hash, "audio/volume" ) if ( $presence eq "present" );
+        PHTV_SendCommand( $hash, "system" )       if ( $presence eq "absent" );
 
        # in case we should query the device gently, mark we already sent a query
         $querySent = 1 if $sequential;
@@ -142,6 +144,13 @@ sub PHTV_GetStatus($;$) {
 
             # Update state
             $hash->{helper}{lastFullUpdate} = time();
+        }
+
+        # read audio volume
+        if ( !$querySent && $update ) {
+            PHTV_SendCommand( $hash, "audio/volume" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
         }
 
         # read ambilight details
@@ -1433,6 +1442,8 @@ sub PHTV_Define($$) {
         fhem 'attr ' . $name
           . ' devStateIcon on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
         fhem 'attr ' . $name . ' icon it_television';
+
+        PHTV_GetStatus($hash);
     }
 
     return;
@@ -1467,8 +1478,7 @@ sub PHTV_Notify($$) {
 
             # initialize
             if ( $event =~ /^(INITIALIZED|MODIFIED)(\s(.*))?$/ ) {
-                RemoveInternalTimer($hash);
-                InternalTimer( gettimeofday() + 2, "PHTV_GetStatus", $hash, 1 );
+                PHTV_GetStatus($hash);
             }
         }
 
@@ -1557,7 +1567,7 @@ sub PHTV_SendCommand($$;$$$) {
     }
 
     # special authentication handling during pairing
-    $auth_key = undef if ( $service =~ /^pair\/.+/ );
+    $auth_key = undef if ( $service =~ /^(pair\/.+|system)/i );
     $auth_key = $hash->{pairing}{auth_key}
       if ( $service eq "pair/grant"
         && defined( $hash->{pairing} )
@@ -1784,9 +1794,9 @@ sub PHTV_ReceiveCommand($$$) {
               . "\n   $err";
         }
 
-        # device is not reachable or
-        # does not even support master command for audio
-        if ( $service eq "audio/volume"
+        # device is not reachable
+        if (   $service eq "audio/volume"
+            || $service eq "system"
             || ( $service eq "input/key" && $type eq "off" ) )
         {
             $newstate = "off" if ($code);
@@ -1872,6 +1882,14 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
         #
         $newstate = "on";
 
+        if ( ref($return) eq "HASH" ) {
+            for ( keys %{$return} ) {
+                next unless ( $_ =~ /^(.*)_encrypted$/ );
+                my $r = $1;
+                $return->{$r} = $return->{$_};
+            }
+        }
+
         # audio/volume
         if ( $service eq "audio/volume" ) {
             if ( ref($return) eq "HASH" ) {
@@ -1953,6 +1971,59 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
 
         # system
         elsif ( $service eq "system" ) {
+
+            ######### 2013 device
+            # {
+            #   "menulanguage": "English",
+            #   "name": "Loredos TV",
+            #   "country": "Germany",
+            #   "serialnumber": "ZH1D1319003420",
+            #   "softwareversion": "QF2EU-0.173.65.0",
+            #   "model": "55PFL8008S/12"
+            # }
+
+######### 2016 device
+# {
+#     "menulanguage" : "German", "name" : "NN", "country" : "Germany",
+#       "serialnumber_encrypted"
+#       : "9Ujg7qk0jWyPF7opK7RsswTePRBq6dZTCFwUIgF\/Q94=\n",
+#       "softwareversion_encrypted"
+#       : "mCOnRshweMpSjXKxwNxJ7h+5VzkcYTUeqY70o6lZyWE=\n",
+#       "model_encrypted"    : "DWxvf4moWe49A7uQOri7\/LcObzUIvy9HNxMoMMp1gdE=\n",
+#       "deviceid_encrypted" : "rkhmRw5JDPqaZ9h2yQoOdrj\/j26uyo288XumhKsG9Ck=\n",
+#       "nettvversion"       : "6.0.2", "epgsource" : "one",
+#       "api_version"        : { "Major" : 6, "Minor" : 2, "Patch" : 0 },
+#       "featuring"
+#       : {
+#         "jsonfeatures"
+#         : {
+#             "editfavorites" : [ "TVChannels",  "SatChannels" ],
+#             "recordings"    : [ "List",        "Schedule", "Manage" ],
+#             "ambilight"     : [ "LoungeLight", "Hue", "Ambilight" ],
+#             "menuitems" : ["Setup_Menu"],
+#             "textentry"
+#             : [
+#                 "context_based", "initial_string_available",
+#                 "editor_info_available"
+#             ],
+#             "applications" : [ "TV_Apps", "TV_Games", "TV_Settings" ],
+#             "pointer"      : ["not_available"],
+#             "inputkey"     : ["key"],
+#             "activities"   : ["intent"],
+#             "channels"     : ["preset_string"],
+#             "mappings"     : ["server_mapping"]
+#         },
+#         "systemfeatures"
+#         : {
+#             "tvtype"            : "consumer",
+#             "content"           : [ "dmr", "dms_tad" ],
+#             "tvsearch"          : "intent",
+#             "pairing_type"      : "digest_auth_pairing",
+#             "secured_transport" : "true"
+#         }
+#       }
+# }
+
             if ( ref($return) eq "HASH" ) {
 
                 # language
@@ -1993,10 +2064,49 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
                     $hash->{model} = uc( $return->{model} );
                     $attr{$name}{model} = uc( $return->{model} );
                 }
+
+                # epgsource
+                if ( defined( $return->{epgsource} ) ) {
+                    readingsBulkUpdateIfChanged( $hash, "epgsource",
+                        $return->{epgsource} );
+                }
+
+                # nettvversion
+                if ( defined( $return->{nettvversion} ) ) {
+                    readingsBulkUpdateIfChanged( $hash, "nettvversion",
+                        $return->{nettvversion} );
+                }
+
+                # api_version
+                if (   defined( $return->{api_version} )
+                    && defined( $return->{api_version}{Major} )
+                    && defined( $return->{api_version}{Minor} )
+                    && defined( $return->{api_version}{Patch} ) )
+                {
+                    $hash->{api_version} = $return->{api_version};
+
+                    readingsBulkUpdateIfChanged( $hash, "api_version",
+                            $return->{api_version}{Major} . "."
+                          . $return->{api_version}{Minor} . "."
+                          . $return->{api_version}{Patch} );
+
+                    fhem 'attr '
+                      . $name
+                      . ' jsversion '
+                      . $return->{api_version}{Major}
+                      if ( $protoV ne $return->{api_version}{Major} );
+                }
+
+                # featuring
+                if ( defined( $return->{featuring} ) ) {
+                    $hash->{featuring} = $return->{featuring};
+                }
+
             }
 
             # continue query cascade in case sequential query is enabled
-            PHTV_GetStatus( $hash, 1 ) if $sequential;
+            PHTV_GetStatus( $hash, 1 )
+              if ( $sequential || $state ne $newstate );
         }
 
         # sources
@@ -2127,10 +2237,10 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
                     $return->{id} =~ s/^\s+//;
                     $return->{id} =~ s/\s+$//;
                     $cmd =
-                      ( $hash->{helper}{device}{channelName}{ $return->{id} }
-                          {name} )
-                      ? $hash->{helper}{device}{channelName}{ $return->{id} }
-                      {name}
+                      ( $hash->{helper}{device}{channelName}
+                          { $return->{id} }{name} )
+                      ? $hash->{helper}{device}{channelName}
+                      { $return->{id} }{name}
                       : "-";
                 }
                 else {
@@ -3646,7 +3756,7 @@ sub PHTV_createAuthSignature($$$) {
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>drippyFactor</b> - Adds some delay in seconds after low-performance devices came up to allow more time to become responsive (default=0)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
-    <li><b>jsversion</b> - JointSpace protocol version; e.g. pre2014 devices use 1, 2014 devices use 5 and 2015 devices use 6. defaults to 1</li>
+    <li><b>jsversion</b> - JointSpace protocol version; e.g. pre2014 devices use 1, 2014 devices use 5 and >=2015 devices use 6. defaults to 1</li>
     <li><b>sequentialQuery</b> - avoid parallel queries for low-performance devices</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
   </ul></ul>
