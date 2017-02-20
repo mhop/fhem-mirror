@@ -375,6 +375,10 @@ structure_Set($@)
 
   my @devList = split("[ \t][ \t]*", $hash->{DEF});
   shift @devList;
+  if(@list > 1 && @list[$#list] eq "reverse") {
+    pop @list;
+    @devList = reverse @devList;
+  }
   foreach my $d (@devList) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
@@ -553,9 +557,13 @@ structure_Attr($@)
     Every set command is propagated to the attached devices. Exception: if an
     attached device has an attribute structexclude, and the attribute value
     matches (as a regexp) the name of the current structure.<br>
-    If the set is of the form <code>set &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code>
-    then :FILTER=&lt;filter&gt; will be appended to the device name in the propagated set for
-    the attached devices like this: <code>set <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code>
+    If the set is of the form <code>set &lt;structure&gt;
+    [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code> then
+    :FILTER=&lt;filter&gt; will be appended to the device name in the
+    propagated set for the attached devices like this: <code>set
+    <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code><br>
+    If the last set parameter is "reverse", then execute the set commands in
+    the reverse order.
   </ul>
   <br>
 
@@ -719,10 +727,14 @@ structure_Attr($@)
   <ul>
     Jedes set Kommando wird an alle Devices dieser Struktur weitergegeben.<br>
     Aussnahme: das Attribut structexclude ist in einem Device definiert und
-    dessen Attributwert matched als Regexp zum Namen der aktuellen Struktur.<br>
-    Wenn das set Kommando diese Form hat <code>set &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code>
-    wird :FILTER=&lt;filter&gt; bei der Weitergebe der set an jeden Devicenamen wie folgt angehängt:
-    <code>set <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code>
+    dessen Attributwert matched als Regexp zum Namen der aktuellen
+    Struktur.<br> Wenn das set Kommando diese Form hat <code>set
+    &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code> wird
+    :FILTER=&lt;filter&gt; bei der Weitergebe der set an jeden Devicenamen wie
+    folgt angehängt: <code>set <devN>:FILTER=&lt;filter&gt;
+    &lt;type-specific&gt;</code><br>
+    Falls der letzte Parameter reverse ist, dann werden die Befehle in der
+    umgekehrten Reihenfolge ausgef&uuml;hrt.
   </ul>
   <br>
   <a name="structureget"></a>
