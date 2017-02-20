@@ -391,7 +391,7 @@ HttpUtils_Connect2($)
                               if($httpVersion ne "1.0" && !$hash->{keepalive});
 
   $hdr .= "Authorization: Basic ".encode_base64($hash->{auth}, "")."\r\n"
-              if(defined($hash->{auth}) && 
+              if(defined($hash->{auth}) && !$hash->{digest} &&
                  !($hash->{header} &&
                    $hash->{header} =~ /^Authorization:\s*Digest/mi));
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
@@ -676,7 +676,7 @@ HttpUtils_ParseAnswer($)
 #  mandatory:
 #    url, callback
 #  optional(default):
-#    hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
+#    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
 # Example:
