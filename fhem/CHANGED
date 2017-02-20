@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - update:  98_DOIFtools: add CSRF-Token
+  - update:  98_DOIFtools: add CSRF-Token, add DOIFtoolsLogDir
   - bugfix:  38_netatmo.pm: fixed login crash, updated webhooks
   - update:  32_withings.pm: replaced with new module
   - feature: 5.8 released
