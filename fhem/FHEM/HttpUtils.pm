@@ -400,6 +400,8 @@ HttpUtils_Connect2($)
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
   }
+  Log3 $hash, 5, "HttpUtils request header:\n$hdr"
+        if($attr{global}{verbose} >= 5);
   $hdr .= "\r\n";
 
   my $s = $hash->{shutdown};
@@ -665,14 +667,8 @@ HttpUtils_ParseAnswer($)
   # Debug
   Log3 $hash, $hash->{loglevel},
        "HttpUtils $hash->{displayurl}: Got data, length: ". length($ret);
-  if(!length($ret)) {
-    Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
-         "Zero length data, header follows:";
-    for (@header) {
-      Log3 $hash, $hash->{loglevel}, "  $_";
-    }
-  }
-
+  Log3 $hash, 5, "HttpUtils response header:\n$hash->{httpheader}"
+        if($attr{global}{verbose} >= 5 && $hash->{httpheader});
   return ("", $ret);
 }
 
