@@ -41,6 +41,7 @@ sub PHTV_Set($@);
 sub PHTV_Get($@);
 sub PHTV_GetStatus($;$);
 sub PHTV_Define($$);
+sub PHTV_Notify($$);
 sub PHTV_Undefine($$);
 
 #########################
@@ -54,10 +55,11 @@ sub PHTV_Initialize($) {
 
     Log3 $hash, 5, "PHTV_Initialize: Entering";
 
-    $hash->{GetFn}   = "PHTV_Get";
-    $hash->{SetFn}   = "PHTV_Set";
-    $hash->{DefFn}   = "PHTV_Define";
-    $hash->{UndefFn} = "PHTV_Undefine";
+    $hash->{GetFn}    = "PHTV_Get";
+    $hash->{SetFn}    = "PHTV_Set";
+    $hash->{NotifyFn} = "PHTV_Notify";
+    $hash->{DefFn}    = "PHTV_Define";
+    $hash->{UndefFn}  = "PHTV_Undefine";
 
     $hash->{AttrList} =
 "disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField model wakeupCmd:textField channelsMax:slider,30,1,200 httpLoglevel:1,2,3,4,5 sslVersion device_id auth_key "
@@ -1433,11 +1435,47 @@ sub PHTV_Define($$) {
         fhem 'attr ' . $name . ' icon it_television';
     }
 
-    # start the status update timer
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 2, "PHTV_GetStatus", $hash, 1 );
-
     return;
+}
+
+sub PHTV_Notify($$) {
+    my ( $hash, $dev_hash ) = @_;
+    my $name = $hash->{NAME};
+    my $dev  = $dev_hash->{NAME};
+    my $TYPE = $hash->{TYPE};
+
+    return
+      if (
+           !$init_done
+        or IsDisabled($name)
+        or IsDisabled($dev)
+        or $name eq $dev    # do not process own events
+        or (    !$modules{ $defs{$dev}{TYPE} }{$TYPE}
+            and !$defs{$dev}{$TYPE}
+            and $dev ne "global" )
+      );
+
+    my $events = deviceEvents( $dev_hash, 1 );
+    return unless ($events);
+
+    Log3 $name, 5, "$TYPE: Entering PHTV_Notify() for $dev";
+
+    # global events
+    if ( $dev eq "global" ) {
+        foreach my $event ( @{$events} ) {
+            next unless ( defined($event) );
+
+            # initialize
+            if ( $event =~ /^(INITIALIZED|MODIFIED)(\s(.*))?$/ ) {
+                RemoveInternalTimer($hash);
+                InternalTimer( gettimeofday() + 2, "PHTV_GetStatus", $hash, 1 );
+            }
+        }
+
+        return;
+    }
+
+    return undef;
 }
 
 ############################################################################################################
@@ -1528,6 +1566,7 @@ sub PHTV_SendCommand($$;$$$) {
 
     $URL = "http://";
     $URL = "https://" if ( $protoV > 5 || $address =~ m/^.+:1926$/ );
+    $URL .= "$auth@" if($auth);
     $URL .= $address . "/" . $protoV . "/" . $service;
 
     $timeout = AttrVal( $name, "httpTimeout", AttrVal( $name, "timeout", 7 ) );
@@ -1544,6 +1583,7 @@ sub PHTV_SendCommand($$;$$$) {
     HttpUtils_NonblockingGet(
         {
             url         => $URL,
+            hideauth    => 1,
             auth        => $auth,
             timeout     => $timeout,
             data        => $data,
