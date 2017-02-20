@@ -199,6 +199,7 @@ sub DOIFtools_Initialize($)
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
+   # DOIFtoolsLogDir
   $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 DOIFtoolsNoLookUp:1,0 DOIFtoolsNoLookUpInDOIF:1,0 disabledForIntervals ".$oldAttr;
 }
 
@@ -211,7 +212,7 @@ sub DOIFtools_eM($$$$) {
   $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "</div>";
 
   my $a = "";
@@ -312,15 +313,15 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0\">toggle</a>&nbsp;&nbsp;</span>";
+  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update check\">update check</a>&nbsp;&nbsp;";
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update\">update</a>&nbsp;&nbsp;" if(!ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=set%20update_du:FILTER=state=0%201\">update</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=shutdown restart\">shutdown restart</a>&nbsp;&nbsp;";
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=fheminfo send\">fheminfo send</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm$FW_CSRF\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update check$FW_CSRF\">update check</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update$FW_CSRF\">update</a>&nbsp;&nbsp;" if(!ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=set%20update_du:FILTER=state=0%201&fwcsrf=$FW_CSRF\">update</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=shutdown restart$FW_CSRF\">shutdown restart</a>&nbsp;&nbsp;";
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=fheminfo send$FW_CSRF\">fheminfo send</a>&nbsp;&nbsp;";
   }
   if (AttrVal($d,"DOIFtoolsMyShortcuts","")) {
     my @sc = split(",",AttrVal($d,"DOIFtoolsMyShortcuts",""));
@@ -328,7 +329,7 @@ sub DOIFtools_fhemwebFn($$$$) {
       if ($sc[$i] =~ m/^\#\#(.*)/) {
         $ret .= "$1&nbsp;&nbsp;";
       } else {
-        $ret .= "<a href=\"/$sc[$i+1]\">$sc[$i]</a>&nbsp;&nbsp;" if($sc[$i] and $sc[$i+1]);
+        $ret .= "<a href=\"/$sc[$i+1]$FW_CSRF\">$sc[$i]</a>&nbsp;&nbsp;" if($sc[$i] and $sc[$i+1]);
       }
     }
   }
@@ -337,24 +338,30 @@ sub DOIFtools_fhemwebFn($$$$) {
       my $a1 = ReadingsVal($d,"doStatistics", "disabled") =~ "disabled|deleted" ? "enabled" : "disabled"; 
       my $a2 = ReadingsVal($d,"specialLog", 0) ? 0 : 1; 
       # set doStatistics enabled/disabled
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
-      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">";
+      $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+      $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;doStatistics $a1&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
       <input name=\"val.set$d\" value=\"doStatistics $a1\" type=\"hidden\">
       </div></form>";
       # set doStatistics deleted
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
-      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">";
+      $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+      $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;doStatistics deleted&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
       <input name=\"val.set$d\" value=\"doStatistics deleted\" type=\"hidden\">
       </div></form>";
       # set specialLog 0/1
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\"><input name=\"detail\" value=\"$d\" type=\"hidden\">
-      <input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
+      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      <input name=\"detail\" value=\"$d\" type=\"hidden\">";
+      $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+      $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.set$d\" value=\"set\" class=\"set\" type=\"submit\">
       <div class=\"set downText\">&nbsp;specialLog $a2&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
@@ -855,7 +862,7 @@ sub DOIFtools_Define($$$)
     return "Only one instance of DOIFtools is allowed per FHEM installation. Delete the old one first.";
   }
   $hash->{STATE} = "initialized";
-  $hash->{logfile} = AttrVal("global","logdir","./log/")."$hash->{TYPE}Log-%Y-%j.log";
+  $hash->{logfile} = AttrVal($pn,"DOIFtoolsLogDir",AttrVal("global","logdir","./log/"))."$hash->{TYPE}Log-%Y-%j.log";
   DOIFtoolsCounterReset($pn);
   return undef;
 }
@@ -893,6 +900,18 @@ sub DOIFtools_Attr(@)
       }
     
     }
+  } elsif ($init_done and $attr eq "DOIFtoolsLogDir") {
+      if ($cmd eq "set") {
+        if ($value and -d $value) {
+          $value =~ m,^(.*)/$,;
+          return "Path \"$value\" needs a final slash." if (!$1);
+          $hash->{logfile} = "$value$hash->{TYPE}Log-%Y-%j.log";
+        } else {
+          return "\"$value\" is not a valid directory";
+        }
+      } elsif ($cmd eq "del" or !$value) {
+        $hash->{logfile} = AttrVal("global","logdir","./log/")."$hash->{TYPE}Log-%Y-%j.log";
+      }
   } elsif ($init_done and $attr eq "DOIFtoolsHideStatReadings") {
       DOIFtoolsSetNotifyDev($hash,1,0);
       DOIFtoolsDeleteStatReadings($hash);
@@ -1109,7 +1128,7 @@ sub DOIFtools_Get($@)
       $regex = join("|",@regex).":.*";
       if (AttrVal($pn,"DOIFtoolsExecuteDefinition","")) {
         push @ret, "Create device <b>$pnLog</b>.\n";
-        $ret = CommandDefMod(undef,"$pnLog FileLog ".AttrVal("global","logdir","./log/")."$pnLog-%Y-%j.log $regex");
+        $ret = CommandDefMod(undef,"$pnLog FileLog ".InternalVal($pn,"logfile","./log/$pnLog-%Y-%j.log")." $regex");
         push @ret, $ret if($ret);
         $ret = CommandAttr(undef,"$pnLog mseclog ".AttrVal($pnLog,"mseclog","1"));
         push @ret, $ret if($ret);
@@ -1125,7 +1144,7 @@ sub DOIFtools_Get($@)
       } else {
         $ret = "<b>Definition for a FileLog prepared for import with \"Raw definition\":</b>\r--->\r";
         $ret = "<b>Die FileLog-Definition ist zum Import mit \"Raw definition\"</b>vorbereitet:\r--->\r" if ($DE);
-        $ret .= "defmod $pnLog FileLog ".AttrVal("global","logdir","./log/")."$pnLog-%Y-%j.log $regex\r";
+        $ret .= "defmod $pnLog FileLog ".InternalVal($pn,"logfile","./log/$pnLog-%Y-%j.log")." $regex\r";
         $ret .= "attr $pnLog mseclog 1\r<---\r\r";
         return $ret;
       }
