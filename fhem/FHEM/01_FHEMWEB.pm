@@ -94,6 +94,7 @@ my $FW_use_sha = 0;
 my $FW_activateInform = 0;
 my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
+my %FW_csrfTokenCache;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -272,12 +273,16 @@ FW_Define($$)
     exit(1);
   }
 
-  InternalTimer(1, sub(){
-    if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
-      my ($x,$y) = gettimeofday();
-      $hash->{CSRFTOKEN} = "fhem_".(rand($y)*rand($x));
-    }
-  }, $hash, 0);
+  $hash->{CSRFTOKEN} = $FW_csrfTokenCache{$name};
+  if(!defined($hash->{CSRFTOKEN})) {    # preserve over rereadcfg
+    InternalTimer(1, sub(){
+      if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
+        my ($x,$y) = gettimeofday();
+        $hash->{CSRFTOKEN} = "fhem_".(rand($y)*rand($x));
+        $FW_csrfTokenCache{$name} = $hash->{CSRFTOKEN};
+      }
+    }, $hash, 0);
+  }
 
   return $ret;
 }
@@ -2495,13 +2500,16 @@ FW_Attr(@)
 
     if($csrf eq "none") {
       delete($hash->{CSRFTOKEN});
+      delete($FW_csrfTokenCache{$devName});
     } else {
       $hash->{CSRFTOKEN} = $csrf;
+      $FW_csrfTokenCache{$devName} = $hash->{CSRFTOKEN};
     }
   }
 
   if($attrName eq "csrfToken" && $type eq "del") {
     delete($hash->{CSRFTOKEN});
+    delete($FW_csrfTokenCache{$devName});
   }
 
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
