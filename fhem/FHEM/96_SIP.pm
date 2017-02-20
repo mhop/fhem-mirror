@@ -4,6 +4,7 @@
 # 96_SIP.pm 
 # Based on FB_SIP from  werner.meines@web.de
 #
+# Forum : https://forum.fhem.de/index.php/topic,67443.0.html
 #
 ###############################################################################
 #
@@ -286,7 +287,7 @@ sub SIP_CALLStart($)
     $ua->loop( \$stopvar );
   }
 
-  $final = "unknow" if !defined($final);
+  $final = "unknown" if !defined($final);
   # $ua->cleanup;
   return $name."|1|".$final."|".$peer_hangup if defined($peer_hangup);
   return $name."|1|".$final."|".$stopvar     if defined($stopvar);
@@ -412,6 +413,17 @@ sub SIP_Set($@)
    readingsSingleUpdate($hash, "caller",$subcmd,1);
    return undef;
   }
+  elsif ($cmd eq "caller_status")
+  {
+    # die ersten beiden brauchen wir nicht mehr
+   shift @a;
+   shift @a;
+   # den Rest als ein String
+   $subcmd = join(" ",@a);
+   readingsSingleUpdate($hash, "caller_status",$subcmd,1);
+   return undef;
+  }
+
   elsif ($cmd eq "fetch")
   {
    readingsSingleUpdate($hash, "caller","fetch",1);
@@ -529,7 +541,7 @@ sub SIP_dtmf{
    $hash->{old} = $event;
    if ($hash->{dtmf} > 2)
    {
-      SIP_telnet($hash,"set $my_name dtmf_event ".$hash->{dtmf_event});
+      SIP_telnet($hash,"set $my_name dtmf_event ".$hash->{dtmf_event}."\n");
       $hash->{dtmf}       = 0;
       $hash->{dtmf_event} = "";
       $hash->{old}        ="-";
@@ -543,18 +555,23 @@ sub SIP_invite{
   my $hash         = $defs{$my_name};
   my $waittime     = AttrVal($my_name, "sip_waittime", "10");
   my $action;
-  my $i=0;
+  my $i;
 
   for($i=0; $i<$waittime; $i++) 
   {
+   SIP_telnet($hash,"set $my_name caller_status ringing\nexit\n") if (!$i);
    sleep 1;
    ######## $$$ read state of my device
    $action = SIP_telnet($hash,"get $my_name caller\n");
    Log3 $my_name, 4,  "$my_name, SIP_invite ->ringing $i : $action";
-   if ( $action eq "fetch" ) { last; }
+   if ( $action eq "fetch" ) 
+   { 
+    SIP_telnet($hash,"set $my_name caller_status fetching\nexit\n");
+    last; 
+   }
    #$call->bye();
   }
-  return;
+  return 0;
 }
 
 sub SIP_filter{
@@ -576,7 +593,7 @@ sub SIP_bye{
   my $hash    = $defs{$my_name};
   Log3 $my_name, 5,  "$my_name, SIP_bye : $event";
   #print Dumper($event);
-  SIP_telnet($hash, "set $my_name caller hangup\nexit\n");
+  SIP_telnet($hash, "set $my_name caller none\nset $my_name caller_status hangup\nexit\n") ;
   return 1;
 }
 
@@ -587,7 +604,7 @@ sub SIP_ListenDone($)
 
   my @r = split("\\|",$string);
   my $hash = $defs{$r[0]};
-  my $ret = (defined($r[1])) ? $r[1] : "unknow error";
+  my $ret = (defined($r[1])) ? $r[1] : "unknown error";
   my $name = $hash->{NAME};
 
   Log3 $name, 5,"$name, ListenDone -> $string";
