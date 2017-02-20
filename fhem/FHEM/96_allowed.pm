@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use vars qw(@FW_httpheader); # HTTP header, line by line
+my $allowed_haveSha;
 
 #####################################
 sub
@@ -15,11 +16,21 @@ allowed_Initialize($)
   $hash->{DefFn} = "allowed_Define";
   $hash->{AuthorizeFn} = "allowed_Authorize";
   $hash->{AuthenticateFn} = "allowed_Authenticate";
+  $hash->{SetFn}    = "allowed_Set";
   $hash->{AttrFn}   = "allowed_Attr";
   $hash->{AttrList} = "disable:0,1 validFor allowedCommands allowedDevices ".
                         "basicAuth basicAuthMsg password globalpassword ".
                         "basicAuthExpiry";
   $hash->{UndefFn} = "allowed_Undef";
+  $hash->{FW_detailFn} = "allowed_fhemwebFn";
+
+  eval { require Digest::SHA; };
+  if($@) {
+    Log3 $hash, 4, $@;
+    $allowed_haveSha = 0;
+  } else {
+    $allowed_haveSha = 1;
+  }
 }
 
 
@@ -38,7 +49,7 @@ allowed_Define($$)
     $hash->{devices} = \%list;
   }
   $auth_refresh = 1;
-  readingsSingleUpdate($hash, "state", "active", 0);
+  readingsSingleUpdate($hash, "state", "validFor:", 0);
   return undef;
 }
 
@@ -96,32 +107,40 @@ allowed_Authenticate($$$$)
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
     $secret =~ s/^Basic //i if($secret);
-    
+
     # Check for Cookie in headers if no basicAuth header is set
     my $authcookie;
     if (!$secret && $FW_httpheader->{Cookie}) {
       if(AttrVal($aName, "basicAuthExpiry", 0)) {
-        my $cookie = "; ".$FW_httpheader->{Cookie}.";"; 
-        $authcookie = $1 if ( $cookie =~ /; AuthToken=([^;]+);/ ); 
+        my $cookie = "; ".$FW_httpheader->{Cookie}.";";
+        $authcookie = $1 if ( $cookie =~ /; AuthToken=([^;]+);/ );
         $secret = $authcookie;
       }
     }
-    
+
     my $pwok = ($secret && $secret eq $basicAuth);      # Base64
-    my ($user, $password);
+    my ($user, $password) = split(":", decode_base64($secret)) if($secret);
+    ($user,$password) = ("","") if(!defined($user) || !defined($password));
     if($secret && $basicAuth =~ m/^{.*}$/) {
       eval "use MIME::Base64";
       if($@) {
         Log3 $aName, 1, $@;
 
       } else {
-        ($user, $password) = split(":", decode_base64($secret));
         $pwok = eval $basicAuth;
         Log3 $aName, 1, "basicAuth expression: $@" if($@);
       }
+
+    } elsif($basicAuth =~ m/^SHA256:(.{8}):(.*)$/) {
+      if($allowed_haveSha) {
+        $pwok = Digest::SHA::sha256_base64("$1:$user:$password") eq $2;
+      } else {
+        Log3 $me, 3, "Cant load Digest::SHA to decode $me->{NAME} beiscAuth";
+      }
+
     }
 
-    # Add Cookie header ONLY if authentication with basicAuth was succesful 
+    # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
       my $time = AttrVal($aName, "basicAuthExpiry", 0);
       if ( $time ) {
@@ -139,7 +158,7 @@ allowed_Authenticate($$$$)
         $cl->{".httpAuthHeader"} = "Set-Cookie: AuthToken=".$secret.
                 "; Path=/ ; Expires=$expires\r\n" ;
       }
-    } 
+    }
 
     return 1 if($pwok);
 
@@ -157,18 +176,48 @@ allowed_Authenticate($$$$)
     }
     return 0 if(!$pw);
     return 2 if(!defined($param));
+
     if($pw =~ m/^{.*}$/) {
       my $password = $param;
       my $ret = eval $pw;
       Log3 $aName, 1, "password expression: $@" if($@);
       return ($ret ? 1 : 2);
+
+    } elsif($pw =~ m/^SHA256:(.{8}):(.*)$/) {
+      if($allowed_haveSha) {
+        return (Digest::SHA::sha256_base64("$1:$param") eq $2) ? 1 : 2;
+      } else {
+        Log3 $me, 3, "Cant load Digest::SHA to decode $me->{NAME} beiscAuth";
+      }
     }
+
     return ($pw eq $param) ? 1 : 2;
   }
 
   return 0;
 }
 
+
+sub
+allowed_Set(@)
+{
+  my ($hash, @a) = @_;
+  my %sets = (globalpassword=>1, password=>1, basicAuth=>2);
+
+  return "no set argument specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of ".join(" ",sort keys %sets)
+    if(!defined($sets{$a[1]}));
+  return "$a[1] needs $sets{$a[1]} parameters"
+    if(@a-2 != $sets{$a[1]});
+
+  return "Cannot load Digest::SHA" if(!$allowed_haveSha);
+  my $plain = ($a[1] eq "basicAuth" ? "$a[2]:$a[3]" : $a[2]);
+  my ($x,$y) = gettimeofday();
+  my $salt = substr(sprintf("%08X", rand($y)*rand($x)),0,8);
+
+  CommandAttr($hash->{CL}, "$a[0] $a[1] SHA256:$salt:".
+                           Digest::SHA::sha256_base64("$salt:$plain"));
+}
 
 sub
 allowed_Attr(@)
@@ -194,9 +243,11 @@ allowed_Attr(@)
     } else {
       delete($hash->{$attrName});
     }
+    readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1)
+      if($attrName eq "validFor");
 
   } elsif(($attrName eq "basicAuth" ||
-           $attrName eq "password" || $attrName eq "globalpassword") && 
+           $attrName eq "password" || $attrName eq "globalpassword") &&
           $type eq "set") {
     foreach my $d (devspec2array("TYPE=(FHEMWEB|telnet)")) {
       delete $defs{$d}{Authenticated} if($defs{$d});
@@ -204,6 +255,29 @@ allowed_Attr(@)
   }
 
   return undef;
+}
+
+#########################
+sub
+allowed_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+
+  my $vf = $defs{$d}{validFor} ? $defs{$d}{validFor} : "";
+  my @arr = map { "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
+                   "name='$_' class='vfAttr'><label>$_</label>" }
+            grep { !$defs{$_}{SNAME} }
+            devspec2array("TYPE=(FHEMWEB|telnet)");
+  return "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
+          join("<br>",@arr)."</ul><script>var dev='$d';".<<'EOF';
+$("#vfAttr").click(function(){
+  var names=[];
+  $("input.vfAttr:checked").each(function(){names.push($(this).attr("name"))});
+  FW_cmd(FW_root+"?cmd=attr "+dev+" validFor "+names.join(",")+"&XHR=1");
+});
+</script>
+EOF
 }
 
 1;
@@ -249,7 +323,16 @@ allowed_Attr(@)
   </ul>
 
   <a name="allowedset"></a>
-  <b>Set:</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <li>basicAuth &lt;username&gt; &lt;password&gt;</li>
+    <li>password &lt;password&gt;</li>
+    <li>globalpassword &lt;password&gt;<br>
+      these commands set the corresponding attribute, by computing an SHA256
+      hash from the arguments and a salt. Note: the perl module Device::SHA is
+      needed.
+    </li>
+  </ul><br>
 
   <a name="allowedget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -305,10 +388,10 @@ allowed_Attr(@)
 
     <a name="basicAuthExpiry"></a>
     <li>basicAuthExpiry<br>
-        allow the basicAuth to be kept valid for a given number of days. 
-        So username/password as specified in basicAuth are only requested 
-        after a certain period. 
-        This is achieved by sending a cookie to the browser that will expire 
+        allow the basicAuth to be kept valid for a given number of days.
+        So username/password as specified in basicAuth are only requested
+        after a certain period.
+        This is achieved by sending a cookie to the browser that will expire
         after the given period.
         Only valid if basicAuth is set.
     </li><br>
@@ -348,8 +431,8 @@ allowed_Attr(@)
     <li>validFor<br>
         A comma separated list of frontend names. Currently supported frontends
         are all devices connected through the FHEM TCP/IP library, e.g. telnet
-        and FHEMWEB. <b>Note: changed behaviour:</b>The allowed instance is
-        only active, if this attribute is set.
+        and FHEMWEB. The allowed instance is only active, if this attribute is
+        set.
         </li>
 
   </ul>
@@ -400,7 +483,17 @@ allowed_Attr(@)
   </ul>
 
   <a name="allowedset"></a>
-  <b>Set:</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <li>basicAuth &lt;username&gt; &lt;password&gt;</li>
+    <li>password &lt;password&gt;</li>
+    <li>globalpassword &lt;password&gt;<br>
+      diese Befehle setzen das entsprechende Attribut, indem sie aus den
+      Parameter und ein Salt ein SHA256 Hashwert berechnen. Achtung: das perl
+      Modul Device::SHA wird ben&ouml;tigt.
+    </li>
+  </ul><br>
+
 
   <a name="allowedget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -497,8 +590,8 @@ allowed_Attr(@)
     <li>validFor<br>
         Komma separierte Liste von Frontend-Instanznamen.  Aktuell werden nur
         Frontends unterst&uuml;tzt, die das FHEM TCP/IP Bibliothek verwenden,
-        z.Bsp. telnet und FHEMWEB. <b>Achtung, &Auml;nderung:</b> falls nicht
-        gesetzt, ist die allowed Instanz nicht aktiv.
+        z.Bsp. telnet und FHEMWEB. Falls nicht gesetzt, ist die allowed Instanz
+        nicht aktiv.
         </li>
 
   </ul>
