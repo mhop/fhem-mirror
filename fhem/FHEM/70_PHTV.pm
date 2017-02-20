@@ -60,7 +60,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField model wakeupCmd:textField channelsMax:slider,30,1,200 device_id auth_key "
+"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField model wakeupCmd:textField channelsMax:slider,30,1,200 httpLoglevel:1,2,3,4,5 sslVersion device_id auth_key "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -1495,6 +1495,7 @@ sub PHTV_SendCommand($$;$$$) {
     my $URL;
     my $response;
     my $return;
+    my $auth;
 
     if ( defined( $hash->{helper}{supportedAPIcmds}{$service} )
         && $hash->{helper}{supportedAPIcmds}{$service} == 0 )
@@ -1523,13 +1524,13 @@ sub PHTV_SendCommand($$;$$$) {
       if ( $service eq "pair/grant"
         && defined( $hash->{pairing} )
         && defined( $hash->{pairing}{auth_key} ) );
+    $auth = "$device_id:$auth_key" if ( $device_id && $auth_key );
 
     $URL = "http://";
     $URL = "https://" if ( $protoV > 5 || $address =~ m/^.+:1926$/ );
-    $URL .= "$device_id:$auth_key@" if ( $device_id && $auth_key );
     $URL .= $address . "/" . $protoV . "/" . $service;
 
-    $timeout = AttrVal( $name, "timeout", 7 );
+    $timeout = AttrVal( $name, "httpTimeout", AttrVal( $name, "timeout", 7 ) );
     $timeout = 7 unless ( $timeout =~ /^\d+$/ );
 
     # send request via HTTP-POST method
@@ -1543,8 +1544,8 @@ sub PHTV_SendCommand($$;$$$) {
     HttpUtils_NonblockingGet(
         {
             url         => $URL,
+            auth        => $auth,
             timeout     => $timeout,
-            noshutdown  => 1,
             data        => $data,
             hash        => $hash,
             service     => $service,
@@ -1553,6 +1554,7 @@ sub PHTV_SendCommand($$;$$$) {
             timestamp   => $timestamp,
             httpversion => "1.1",
             callback    => \&PHTV_ReceiveCommand,
+            loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
             header      => {
                 'Content-Type' => 'application/json',
             },
