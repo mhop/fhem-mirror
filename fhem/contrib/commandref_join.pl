@@ -120,6 +120,7 @@ sub generateModuleCommandref($$;$)
     my $tag;
     my $suffix = ($lang eq "EN" ? "" : "_$lang");
     my %tagcount= ();
+    map { $tagcount{$_} = 0 } TAGS;
     my %llwct = (); # Last line with closed tag
     open(MOD, $mods{$mod}) || die("Cant open $mods{$mod}:$!\n");
     my $skip = 1;
@@ -146,7 +147,7 @@ sub generateModuleCommandref($$;$)
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
-          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi) if($tagcount{$tag} > 0);
           $llwct{$tag} = $line if(!$tagcount{$tag});
         }
       }

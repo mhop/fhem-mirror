@@ -85,6 +85,7 @@ foreach my $row (split("\n", $fList)) {
     my $suffix = ($lang eq "EN" ? "" : "_$lang");
     my $tag;
     my %tagcount= ();
+    map { $tagcount{$_} = 0 } TAGS;
     my %llwct = (); # Last line with closed tag
     open(MOD, "$svnlook $arg cat $repos $fName|") ||
         die("Cant svnlook cat $fName:$!\n");
@@ -121,7 +122,7 @@ foreach my $row (split("\n", $fList)) {
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
-          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi) if($tagcount{$tag} > 0);
           $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
         }
       }
