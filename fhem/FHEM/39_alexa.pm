@@ -397,6 +397,8 @@ Log 1, Dumper $characteristicsOfIntent;
         next if( !$entry );
         next if( $entry =~ /^#/ );
 
+        my $slots = [];
+
         my ($intent, $remainder) = split( /:|=/, $entry, 2 );
         my @parts = split( /,/, $remainder );
         my $utterance = $parts[$#parts];
@@ -411,20 +413,53 @@ Log 1, Dumper $characteristicsOfIntent;
           }
         } elsif( $intent =~ m/^{.*}$/ ) {
           $intent_name = 'FHEMperlCodeIntent';
+          my $nr = '';
           my $i = 1;
           while( defined($intents{$intent_name}) ) {
             if( $i < 26 ) {
-              $intent_name = "FHEMperlCodeIntent".chr(65+$i);
+              $nr = chr(65+$i);
             } else {
-              $intent_name = "FHEMperlCodeIntent".chr(64+int($i/26)).chr(65+$i%26);
+              $nr = chr(64+int($i/26)).chr(65+$i%26);
             }
             ++$i;
+            $intent_name = "FHEMperlCodeIntent$nr";
           }
+
+Log 1, $intent_name;
+        my $u = $utterance;
+        while( $u =~ /\{(.*?)\}/g ) {
+          my $slot = $1;
+          my ($name, $values) = split( /:|=/, $slot, 2 );
+
+          my $slot_name = "${intent_name}_${name}";
+          if( $values ) {
+            if( $values && $values =~ /^AMAZON/ ) {
+              push @{$slots}, { name => $slot_name, type => $values };
+            } else {
+              push @{$slots}, { name => $slot_name, type => "${intent_name}_${name}_Value" };
+              $values =~ s/\+/ /g;
+              my @values = split(';', $values );
+              $types->{"${intent_name}_${name}_Value"} = \@values if( $values[0] );
+            }
+
+            $slot =~ s/\+/\\\+/;
+            $utterance =~ s/\{$slot\}/\{$slot_name\}/;
+
+          } else {
+            push @{$slots}, { name => $name, type => "FHEM_$name" };
+
+          }
+        }
+
         }
         $intent_name =~ s/ //g;
         $intents{$intent_name} = $intent;
 
-        push @{$schema->{intents}}, {intent => $intent_name, };
+        if( @{$slots} ) {
+          push @{$schema->{intents}}, {intent => $intent_name, slots => $slots };
+        } else {
+          push @{$schema->{intents}}, {intent => $intent_name };
+        }
 
         $samples .= "\n$intent_name $utterance";
       }
