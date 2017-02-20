@@ -556,7 +556,7 @@ FW_Read($$)
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
-           $FW_RET, "FW_closeConn") ){
+           $FW_RET, "FW_closeConn", 1) ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
     TcpServer_Close( $hash );
