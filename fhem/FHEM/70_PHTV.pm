@@ -1556,6 +1556,9 @@ sub PHTV_SendCommand($$;$$$) {
             header      => {
                 'Content-Type' => 'application/json',
             },
+            sslargs => {
+                SSL_verify_mode => 0,
+            },
         }
     );
 
