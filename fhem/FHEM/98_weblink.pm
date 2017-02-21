@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_CSRF);    # CSRF Token or empty
 use IO::File;
 
 #####################################
@@ -122,7 +123,7 @@ weblink_FwFn($$$$)
       my @args = split(":", $line, 3);
 
       $ret .= "<tr class='".(($row++&1)?"odd":"even")."'>";
-      $ret .= "<td><a href='$FW_ME?cmd=$args[2]'><div class='col1'>".
+      $ret .= "<td><a href='$FW_ME?cmd=$args[2]$FW_CSRF'><div class='col1'>".
                 "<img src='$FW_ME/icons/$args[0]' width='19' height='19' ".
                 "align='center' alt='$args[0]' title='$args[0]'>".
                 "$args[1]</div></a></td></td>";
