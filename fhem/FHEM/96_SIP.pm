@@ -413,14 +413,14 @@ sub SIP_Set($@)
    readingsSingleUpdate($hash, "caller",$subcmd,1);
    return undef;
   }
-  elsif ($cmd eq "caller_status")
+  elsif ($cmd eq "caller_state")
   {
     # die ersten beiden brauchen wir nicht mehr
    shift @a;
    shift @a;
    # den Rest als ein String
    $subcmd = join(" ",@a);
-   readingsSingleUpdate($hash, "caller_status",$subcmd,1);
+   readingsSingleUpdate($hash, "caller_state",$subcmd,1);
    return undef;
   }
 
@@ -559,14 +559,14 @@ sub SIP_invite{
 
   for($i=0; $i<$waittime; $i++) 
   {
-   SIP_telnet($hash,"set $my_name caller_status ringing\nexit\n") if (!$i);
+   SIP_telnet($hash,"set $my_name caller_state ringing\nexit\n") if (!$i);
    sleep 1;
    ######## $$$ read state of my device
    $action = SIP_telnet($hash,"get $my_name caller\n");
    Log3 $my_name, 4,  "$my_name, SIP_invite ->ringing $i : $action";
    if ( $action eq "fetch" ) 
    { 
-    SIP_telnet($hash,"set $my_name caller_status fetching\nexit\n");
+    SIP_telnet($hash,"set $my_name caller_state fetching\nexit\n");
     last; 
    }
    #$call->bye();
@@ -593,7 +593,7 @@ sub SIP_bye{
   my $hash    = $defs{$my_name};
   Log3 $my_name, 5,  "$my_name, SIP_bye : $event";
   #print Dumper($event);
-  SIP_telnet($hash, "set $my_name caller none\nset $my_name caller_status hangup\nexit\n") ;
+  SIP_telnet($hash, "set $my_name caller none\nset $my_name caller_state hangup\nexit\n") ;
   return 1;
 }
 
