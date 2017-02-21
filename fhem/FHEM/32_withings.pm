@@ -117,6 +117,9 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       76 => { name => "Muscle Mass (kg)", reading => "muscleMass", }, # cardio scale
                       77 => { name => "Water Mass (kg)", reading => "waterMass", }, # cardio scale
                       78 => { name => "unknown 78", reading => "unknown78", }, # cardio scale
+                      79 => { name => "unknown 79", reading => "unknown79", }, # body scale
+                      80 => { name => "unknown 80", reading => "unknown80", }, # body scale
+                      86 => { name => "unknown 86", reading => "unknown86", }, # body scale
                       87 => { name => "Active Calories (kcal)", reading => "caloriesActive", dailyreading => "dailyCaloriesActive", }, # measures list sleepreading!
                       88 => { name => "Bone Mass (kg)", reading => "boneMassWeight", },
                       89 => { name => "unknown 89", reading => "unknown89", },
