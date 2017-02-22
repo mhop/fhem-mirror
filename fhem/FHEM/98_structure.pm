@@ -375,7 +375,7 @@ structure_Set($@)
 
   my @devList = split("[ \t][ \t]*", $hash->{DEF});
   shift @devList;
-  if(@list > 1 && @list[$#list] eq "reverse") {
+  if(@list > 1 && $list[$#list] eq "reverse") {
     pop @list;
     @devList = reverse @devList;
   }
