@@ -1,4 +1,4 @@
-REV 13479
+REV 13483
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-02-21_07:45:02 184955 ./CHANGED
+UPD 2017-02-22_07:45:02 185017 ./CHANGED
 UPD 2017-02-11_07:45:02 35614 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-02-20_07:45:05 129572 ./fhem.pl
@@ -162,7 +162,7 @@ UPD 2016-01-31_07:45:12 18305 FHEM/32_TechemWZ.pm
 UPD 2016-01-08_07:45:10 208936 FHEM/32_WifiLight.pm
 UPD 2016-10-15_07:45:13 15837 FHEM/32_mailcheck.pm
 UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
-UPD 2017-02-20_07:45:02 117351 FHEM/32_withings.pm
+UPD 2017-02-22_07:45:02 117627 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-01-22_07:45:02 4463 FHEM/33_readingsChange.pm
 UPD 2017-02-20_07:45:02 68032 FHEM/33_readingsGroup.pm
@@ -436,7 +436,7 @@ UPD 2017-02-21_07:45:02 27906 FHEM/98_structure.pm
 UPD 2017-02-20_07:45:02 20205 FHEM/98_telnet.pm
 UPD 2016-12-17_19:05:28 24320 FHEM/98_update.pm
 UPD 2016-08-20_07:45:12 7443 FHEM/98_version.pm
-UPD 2017-01-19_07:45:02 5752 FHEM/98_weblink.pm
+UPD 2017-02-22_07:45:02 5808 FHEM/98_weblink.pm
 UPD 2017-01-30_07:45:02 48254 FHEM/98_weekprofile.pm
 UPD 2016-11-02_07:45:12 14487 FHEM/99_SUNRISE_EL.pm
 UPD 2017-01-29_07:45:02 9279 FHEM/99_Utils.pm
