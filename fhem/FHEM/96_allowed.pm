@@ -360,30 +360,19 @@ EOF
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
-        request a username/password authentication for FHEMWEB access. You have
-        to set the basicAuth attribute to the Base64 encoded value of
-        &lt;user&gt;:&lt;password&gt;, e.g.:<ul>
-        # Calculate first the encoded string with the commandline program<br>
-        $ echo -n fhemuser:secret | base64<br>
-        ZmhlbXVzZXI6c2VjcmV0<br>
-        # Set the FHEM attribute<br>
-        attr allowed_WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
-        </ul>
-        You can of course use other means of base64 encoding, e.g. online
-        Base64 encoders.<br>
-
-        If the argument of basicAuth is enclosed in { }, then it will be
-        evaluated, and the $user and $password variable will be set to the
-        values entered. If the return value is true, then the password will be
-        accepted.<br>
-
-        If basicAuthMsg is set, it will be displayed in the
-        popup window when requesting the username/password.<br>
-
-        Example:<br>
+        request a username/password authentication for FHEMWEB access.
+        It can be a base64 encoded string of user:password, an SHA256 hash
+        (which should be set via the corresponding set command) or a perl
+        expression if enclosed in {}, where $user and $password are set, and
+        which returns true if accepted or false if not. Examples:
         <ul><code>
-          attr allowedWEB basicAuth { "$user:$password" eq "admin:secret" }<br>
+          attr allowed basicAuth ZmhlbXVzZXI6c2VjcmV0<br>
+          attr allowed basicAuth SHA256:F87740B5:q8dHeiClaPLaWVsR/rqkzcBhw/JvvwVi4bEwKmJc/Is<br>
+          attr allowed basicAuth {"$user:$password" eq "fhemuser:secret"}<br>
         </code></ul>
+        If basicAuthMsg is set, it will be displayed in the popup window when
+        requesting the username/password. Note: not all browsers support this
+        feature.<br>
     </li><br>
 
     <a name="basicAuthExpiry"></a>
@@ -399,20 +388,9 @@ EOF
     <a name="password"></a>
     <li>password<br>
         Specify a password for telnet instances, which has to be entered as the
-        very first string after the connection is established. If the argument
-        is enclosed in {}, then it will be evaluated, and the $password
-        variable will be set to the password entered. If the return value is
-        true, then the password will be accepted. If this parameter is
-        specified, FHEM sends telnet IAC requests to supress echo while
-        entering the password.  Also all returned lines are terminated with
-        \r\n.
-        Example:<br>
-        <ul>
-        <code>
-        attr allowed_tPort password secret<br>
-        attr allowed_tPort password {"$password" eq "secret"}
-        </code>
-        </ul>
+        very first string after the connection is established. The same rules
+        apply as for basicAuth, with the expception that there is no user to be
+        specified.<br>
         Note: if this attribute is set, you have to specify a password as the
         first argument when using fhem.pl in client mode:
         <ul>
@@ -522,31 +500,20 @@ EOF
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
-        Betrifft nur FHEMWEB Instanzen (siehe validFor): Fragt username /
-        password zur Autentifizierung ab. Es gibt mehrere Varianten:
-        <ul>
-        <li>falls das Argument <b>nicht</b> in { } eingeschlossen ist, dann wird
-          es als base64 kodiertes benutzername:passwort interpretiert.
-          Um sowas zu erzeugen kann man entweder einen der zahlreichen
-          Webdienste verwenden, oder das base64 Programm. Beispiel:
-          <ul><code>
-            $ echo -n fhemuser:secret | base64<br>
-            ZmhlbXVzZXI6c2VjcmV0<br>
-            fhem.cfg:<br>
-            attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
-          </code></ul>
-          </li>
-        <li>Werden die Argumente in { } angegeben, wird es als perl-Ausdruck
-          ausgewertet, die Variablen $user and $password werden auf die
-          eingegebenen Werte gesetzt. Falls der R&uuml;ckgabewert wahr ist,
-          wird die Anmeldung akzeptiert.
-
-          Beispiel:<br>
-          <ul><code>
-            attr allwedWEB basicAuth { "$user:$password" eq "admin:secret" }<br>
-          </code></ul>
-          </li>
-        </ul>
+        Erzwingt eine Authentifizierung mit Benutzername/Passwort f&uuml;r die
+        zugerdnete FHEMWEB Instanzen. Der Wert kann entweder das base64
+        kodierte Benutzername:Passwort sein, ein SHA256 hash (was man am besten
+        mit dem passenden set Befehl erzeugt), oder, falls er in {}
+        eingeschlossen ist, ein Perl Ausdruck. F&uuml;r Letzteres wird
+        $user und $passwort gesetzt, und muss wahr zur&uuml;ckliefern, falls
+        Benutzername und Passwort korrekt sind. Beispiele:
+        <ul><code>
+          attr allowed basicAuth ZmhlbXVzZXI6c2VjcmV0<br>
+          attr allowed basicAuth SHA256:F87740B5:q8dHeiClaPLaWVsR/rqkzcBhw/JvvwVi4bEwKmJc/Is<br>
+          attr allowed basicAuth {"$user:$password" eq "fhemuser:secret"}<br>
+        </code></ul>
+        basicAuthMsg wird (in manchen Browsern) in dem Passwort Dialog als
+        &Uuml;berschrift angezeigt.<br>
     </li><br>
 
 
@@ -554,30 +521,18 @@ EOF
     <li>password<br>
         Betrifft nur telnet Instanzen (siehe validFor): Bezeichnet ein
         Passwort, welches als allererster String eingegeben werden muss,
-        nachdem die Verbindung aufgebaut wurde. Wenn das Argument in { }
-        eingebettet ist, dann wird es als Perl-Ausdruck ausgewertet, und die
-        Variable $password mit dem eingegebenen Passwort verglichen. Ist der
-        zur&uuml;ckgegebene Wert wahr (true), wird das Passwort akzeptiert.
-        Falls dieser Parameter gesetzt wird, sendet FHEM telnet IAC Requests,
-        um ein Echo w&auml;hrend der Passworteingabe zu unterdr&uuml;cken.
-        Ebenso werden alle zur&uuml;ckgegebenen Zeilen mit \r\n abgeschlossen.
-
-        Beispiel:<br>
-        <ul>
-        <code>
-        attr allowed_tPort password secret<br>
-        attr allowed_tPort password {"$password" eq "secret"}
-        </code>
-        </ul>
-        Hinweis: Falls dieses Attribut gesetzt wird, muss als erstes Argument
-        ein Passwort angegeben werden, wenn fhem.pl im Client-mode betrieben
-        wird:
-        <ul>
-        <code>
+        nachdem die Verbindung aufgebaut wurde. F&uuml;r die Werte gelten die
+        Regeln von basicAuth, mit der Ausnahme, dass nur Passwort und kein
+        Benutzername spezifiziert wird.<br> Falls dieser Parameter gesetzt
+        wird, sendet FHEM telnet IAC Requests, um ein Echo w&auml;hrend der
+        Passworteingabe zu unterdr&uuml;cken.  Ebenso werden alle
+        zur&uuml;ckgegebenen Zeilen mit \r\n abgeschlossen.<br>
+        Falls dieses Attribut gesetzt wird, muss als erstes Argument ein
+        Passwort angegeben werden, wenn fhem.pl im Client-mode betrieben wird:
+        <ul><code>
           perl fhem.pl localhost:7072 secret "set lamp on"
-        </code>
-        </ul>
-        </li><br>
+        </code></ul>
+    </li><br>
 
     <a name="globalpassword"></a>
     <li>globalpassword<br>
