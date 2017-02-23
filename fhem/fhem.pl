@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2015
+#  (c) 2005-2017
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -3065,7 +3065,11 @@ EvalSpecials($%)
   # $EVENT will be replaced with the whole event string
   # $EVTPART<N> will be replaced with single words of an event
   my ($exec, %specials)= @_;
-  $exec = SemicolonEscape($exec);
+  if($specials{__UNIQUECMD__}) {
+    delete $specials{__UNIQUECMD__};
+  } else {
+    $exec = SemicolonEscape($exec);
+  }
 
   my $idx = 0;
   if(defined($specials{"%EVENT"})) {
@@ -4807,8 +4811,10 @@ perlSyntaxCheck($%)
   return undef if(!$psc || !$init_done);
 
   my ($arr, $hash) = parseParams($exec, ';');
+  $arr = [ $exec ] if(!@$arr); # temporary bugfix
   for my $cmd (@{$arr}) {
     next if($cmd !~ m/^\s*{/); # } for match
+    $specials{__UNIQUECMD__}=1;
     $cmd = EvalSpecials("{return undef; $cmd}", %specials);
     my $r = AnalyzePerlCommand(undef, $cmd);
     return $r if($r);
