@@ -288,11 +288,11 @@ my %zwave_class = (
   DEVICE_RESET_LOCALLY     => { id => '5a',
     parse => { "025a01"    => "deviceResetLocally:yes" } },
   CENTRAL_SCENE            => { id => '5b',
-    parse => { "055b03..00(..)" => '"cSceneSet:".hex($1)',
-               "055b03..01(..)" => '"cSceneDimEnd:".hex($1)',
-               "055b03..02(..)" => '"cSceneDim:".hex($1)',
-               "055b03..03(..)" => '"cSceneDouble:".hex($1)',
-               "055b03..0([4-6])(..)" => '"cSceneMultiple_".
+    parse => { "055b03...0(..)" => '"cSceneSet:".hex($1)',
+               "055b03...1(..)" => '"cSceneDimEnd:".hex($1)',
+               "055b03...2(..)" => '"cSceneDim:".hex($1)',
+               "055b03...3(..)" => '"cSceneDouble:".hex($1)',
+               "055b03...([4-6])(..)" => '"cSceneMultiple_".
                                                 (hex($1)-1).":".hex($2)'}  },
   IP_ASSOCIATION           => { id => '5c' },
   ANTITHEFT                => { id => '5d' },
