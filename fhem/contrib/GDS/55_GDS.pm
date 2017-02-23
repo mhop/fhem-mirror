@@ -1016,14 +1016,14 @@ sub decodeCAPData($$$){
 	while(($k, $v) = each %readings){
 		# skip update if no valid data is available
         next unless(defined($v));
-		readingsSingleUpdate($hash, $k, latin1ToUtf8($v),1); 
+		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
 	}
 
 	# convert color value to hex
 	my $r = ReadingsVal($name, 'a_'.$anum.'_eventCode_AREA_COLOR', '');
 	if(length($r)) {
 		my $v = sprintf( "%02x%02x%02x", split(" ", $r));
-		readingsSingleUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', $v,1);
+		readingsBulkUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', $v);
 	}
 	
 	readingsEndUpdate($hash, 1);
