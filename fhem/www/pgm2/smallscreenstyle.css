@@ -56,7 +56,7 @@ button.dist { margin:5px; }
 
 /* Portrait mode */
 @media all and (orientation:portrait) {
-  table.block select, table.block input { width: 0px; display: none; }
+/*table.block select, table.block input { width: 0px; display: none; } */
   table.block tr td:nth-child(n+3) { width: 0px; display: none; }
 }
 
