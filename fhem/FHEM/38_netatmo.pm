@@ -2017,14 +2017,14 @@ netatmo_dispatch($$$)
     Log3 $name, 6, Dumper($json);
 
     if( $json->{error} ) {
-      if($json->{error} =~ /invalid_grant/)
-      {
-        $hash->{status} = "invalid grant";
-        $hash->{STATE} = "LOGIN FAILED";
+      if(ref($json->{error}) ne "HASH") {
+        $hash->{STATE} = "LOGIN FAILED" if($hash->{SUBTYPE} eq "ACCOUNT");
+        $hash->{status} = $json->{error};
+        Log3 $name, 2, "$name: message error: ".$json->{error};
         return undef;
       }
 
-      $hash->{status} = $json->{error}{message};
+      $hash->{status} = $json->{error}{message} if(defined($json->{error}{message}));
       InternalTimer(gettimeofday()+1800, "netatmo_poll", $hash, 0) if($hash->{status} =~ /usage/);
 
       return undef if($hash->{status} =~ /usage/);
