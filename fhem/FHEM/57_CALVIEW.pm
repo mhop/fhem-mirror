@@ -155,7 +155,7 @@ sub CALVIEW_GetUpdate($){
 				my @arrFilter= split(':' , $filter); 
 				my $sourceFilter = $arrFilter[0]; 
 				my $summaryFilter = $arrFilter[1]; 
-				if( $termin->{source} =~ /$sourceFilter/ && $termin->{summary} =~ /$summaryFilter/ ){ $validterm =1;}
+				if( $termin->{source} =~ /$sourceFilter/i && $termin->{summary} =~ /$summaryFilter/i ){ $validterm =1;}
 			};
 			if ($validterm ==1){
 					#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
