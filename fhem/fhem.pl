@@ -1823,6 +1823,7 @@ CommandDefine($$)
   $hash{NR}    = $devcount++;
   $hash{CFGFN} = $currcfgfile
         if($currcfgfile ne AttrVal("global", "configfile", ""));
+  $hash{CL}    = $cl;
 
   # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
@@ -1836,6 +1837,7 @@ CommandDefine($$)
     delete $attr{$name};
 
   } else {
+    delete $hash{CL};
     $hash{TEMPORARY} = 1 if($temporary);
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
@@ -1869,10 +1871,12 @@ CommandModify($$)
 
   $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
+  $hash->{CL} = $cl;
   my $ret = CallFn($a[0], "DefFn", $hash,
               $modules{$hash->{TYPE}}->{parseParams} ?
               parseParams("$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]":"")):
               "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
+  delete $hash->{CL};
   if($ret) {
     $hash->{DEF} = $hash->{OLDDEF};
   } else {
@@ -2139,7 +2143,7 @@ CommandSetReading($$)
     if($featurelevel >= 5.7) {
       $hash->{CL} = $cl;
       ($err, @b) = ReplaceSetMagic($hash, 3, @a);
-      delete($hash->{CL});
+      delete $hash->{CL};
     }
     readingsSingleUpdate($defs{$sdev}, $b[1], $b[2], 1);
   }

@@ -79,8 +79,10 @@ at_Define($$)
   }
   return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
 
-  $err = perlSyntaxCheck($command, ());
-  return $err if($err);
+  if($hash->{CL}) {     # Do not check this for definition
+    $err = perlSyntaxCheck($command, ());
+    return $err if($err);
+  }
 
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
