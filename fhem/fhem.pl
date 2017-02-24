@@ -4844,6 +4844,11 @@ parseParams($;$)
     if( !defined( $value ) ) {
       $value = $key;
       $key = undef;
+
+    # the key can not start with a { -> it must be a perl expression
+    } elsif( $key =~ m/^\s*{/ ) {
+      $value = "$key = $value";
+      $key = undef;
     }
 
     #collect all parts until the closing ' or "

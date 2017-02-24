@@ -603,8 +603,11 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
 
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
-      if(resp)
+      if(resp) {
+        if(resp.indexOf("\n") >= 0)
+          resp = '<pre>'+resp+'</pre>';
         return FW_okDialog(resp);
+      }
       newDef = newDef.replace(/&/g, '&amp;')    // Same as in 01_FHEMWEB
                      .replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;');
