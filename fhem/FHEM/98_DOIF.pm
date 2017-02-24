@@ -413,6 +413,7 @@ EvalAllDoIf($$)
     return ($eval,$err) if ($err);
     if ($eval) {
       if (substr($eval,0,1) eq "(") {
+	    $eval=$1 if ($eval =~/^\((.*)\)$/);
         my $ret = eval $eval;
         return($eval." ",$@) if ($@);
         $eval=$ret;
@@ -653,9 +654,9 @@ sub ReplaceAllReadingsDoIf($$$$)
               $hash->{devices}{all} = AddItemDoIf($hash->{devices}{all},$device);
               $event=1;
             }
-            $hash->{readings}{$condition} = AddItemDoIf($hash->{readings}{$condition},"$device:$reading") if (defined ($reading));
+            $hash->{readings}{$condition} = AddItemDoIf($hash->{readings}{$condition},"$device:$reading") if (defined ($reading) and $trigger);
             $hash->{internals}{$condition} = AddItemDoIf($hash->{internals}{$condition},"$device:$internal") if (defined ($internal));
-            $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading));
+            $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading) and $trigger);
             $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
             $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
             
@@ -932,7 +933,6 @@ DOIF_SetState($$$$$)
   my @cmdState=SplitDoIf('|',$attr);
   return undef if (AttrVal($hash->{NAME},"disable",""));
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
-  
   if ($nr!=-1) {
     $cmdNr=$nr+1;
     my @cmdSubState=SplitDoIf(',',$cmdState[$nr]);
@@ -979,6 +979,7 @@ DOIF_SetState($$$$$)
   } else {
     $state=$cmd;
   }
+  
   readingsBulkUpdate($hash, "state", $state);
   readingsEndUpdate    ($hash, 1);
 }
@@ -1979,8 +1980,6 @@ DOIF_Undef
   return undef;
 }
 
-
-
 sub
 DOIF_Set($@)
 {
@@ -2020,16 +2019,21 @@ DOIF_Set($@)
       }
       DOIF_cmd ($hash,$1-1,0,"set_cmd_".$1);
 	}
-  } else {
+  } elsif ($arg eq "?") {
       my $setList = AttrVal($pn, "setList", " ");
       $setList =~ s/\n/ /g;
 	  my $cmdList="";
+	  #my @cmdState=SplitDoIf('|',AttrVal($hash->{NAME},"cmdState",""));
+      #my @cmdSubState;
 	  my $max_cond=keys %{$hash->{condition}};
 	  $max_cond++ if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame",""))));
 	  for (my $i=0; $i <$max_cond;$i++) {
+	   #@cmdSubState=SplitDoIf(',',$cmdState[$i]);
 	   $cmdList.="cmd_".($i+1).":noArg ";
+	   #$cmdList.=EvalCmdStateDoIf($hash,$cmdSubState[0]).":noArg " if defined ($cmdState[$i]);
 	  }
-      return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $cmdList $setList" if($arg eq "?");
+	  return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $cmdList $setList";
+   } else {
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
       eval {
@@ -2041,8 +2045,24 @@ DOIF_Set($@)
         }
       };
       return if($doRet);
-      return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
-  } 
+	  if (ReadingsVal($pn,"mode","") ne "disabled") {
+		  my @cmdState=SplitDoIf('|',AttrVal($hash->{NAME},"cmdState",""));
+		  my @cmdSubState;
+		  for (my $i=0; $i < @cmdState;$i++) {
+		    @cmdSubState=SplitDoIf(',',$cmdState[$i]);
+		    if ($arg eq EvalCmdStateDoIf($hash,$cmdSubState[0])) {
+			  if ($hash->{helper}{sleeptimer} != -1) {
+				RemoveInternalTimer($hash);
+				readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+				$hash->{helper}{sleeptimer}=-1;
+			  }
+			  DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($1+1));
+			  last;
+			}
+		  }
+		}
+      #return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
+    }
   return $ret;
 }
 
@@ -2137,9 +2157,9 @@ Dieses Verhalten ist sinnvoll, um zu verhindern, dass zyklisch sendende Sensoren
 <br>
 <u>Einfache Anwendungsbeispiele:</u><ol>
 <br>
-Fernbedienung (Ereignissteuerung): <code>define di_rc_tv DOIF ([remotecontol] eq "on") (set tv on) DOELSE (set tv off)</code><br>
+Fernbedienung (Ereignissteuerung): <code>define di_rc_tv DOIF ([remotecontol:"on"]) (set tv on) DOELSE (set tv off)</code><br>
 <br>
-Zeitschaltuhr (Zeitsteuerung): <code>define di_clock_radio DOIF ([06:30]) (set radio on) DOELSEIF ([08:00]) (set radio off)</code><br>
+Zeitschaltuhr (Zeitsteuerung): <code>define di_clock_radio DOIF ([06:30|8] or [08:30|7]) (set radio on) DOELSEIF ([08:00|8] or [09:30|7]) (set radio off)</code><br>
 <br>
 Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 </ol><br>
@@ -2359,6 +2379,16 @@ attr di_all_events do always<br></code>
 attr di_window_open do always</code><br>
 <br>
 Hier werden alle Fenster, die mit dem Device-Namen "window_" beginnen auf "open" im Event überwacht.<br>
+<br>
+Rollladen auf Lüften stellen<br>
+<br>
+<code>define di_air DOIF (["^window_contact_:open|tilted"]) (set {("$DEVICE"=~/^window_contact_(.*)/;"shutters_$1")} 10)<br>
+<br>
+attr di_air do always</code><br>
+<br>
+Hier werden alle Fensterkontakte, die mit dem Device-Namen "window_contact_" beginnen auf "open" oder "tilted" im Event überwacht 
+und der entsprechende Rollladen mit der gleichen Endung auf Lüften per <code>set shutters_&lt;postfix&gt; 10</code> gestellt.
+In diesem Beispiel wird die Möglichkeit genutzt bei FHEM-Befehlen Perlcode innerhalb der Klammern {(...)} einzufügen. Siehe <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
 <br>
 Verzögerte "Fenster offen"-Meldung<br>
 <br>
@@ -3177,10 +3207,22 @@ Der Befehl hat folgende Eigenschaften:<br>
 <br>
 <code>
 define di_lamp DOIF ([FB:"on"]) (set lamp on) DOELSEIF ([FB:"off"]) (set lamp off)<br>
-attr di_lamp cmdState on|off<br>
-attr di_lamp devStateIcon on:on:cmd_2 initialized|off:off:cmd_1<br>
+<br>
+attr di_lamp devStateIcon cmd_1:on:cmd_2 initialized|cmd_2:off:cmd_1<br>
 </code><br>
-Mit der Definition des Attribut <code>devStateIcon</code> führt das Anklicken des on/off-Lampen-Icons zum Ausführen des set-Kommandos cmd_1 bzw. cmd_2 und damit zum Schalten der Lampe.<br>
+Mit der Definition des Attributes <code>devStateIcon</code> führt das Anklicken des on/off-Lampensymbol zum Ausführen von set di_lamp cmd_1 bzw. set di_lamp cmd_2 und damit zum Schalten der Lampe.<br>
+<br>
+Wenn mit <code>cmdState</code> eigene Zuständsbezeichnungen definiert werden, so können diese ebenfalls per set-Befehl angegeben werden.<br>
+<br>
+<code>
+define di_lamp DOIF ([FB:"on"]) (set lamp on) DOELSEIF ([FB:"off"]) (set lamp off)<br>
+<br>
+attr di_lamp cmdState on|off<br>
+attr di_lamp setList on off<br>
+</code>
+<br>
+<code>set di_lamp on</code> entspricht hier <code>set di_lamp cmd_1</code> und <code>set di_lamp off set di_lamp cmd_2</code><br>
+Zusätzlich führt die Definition von <code>setList</code> zur Ausführung von <code>set di_lamp on/off</code> durch das Anlicken des Lampensymbols wie im vorherigen Beispiel.<br>
 <br>
 <a name="DOIF_Weitere_Anwendungsbeispiele"></a>
 <b>Weitere Anwendungsbeispiele</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
