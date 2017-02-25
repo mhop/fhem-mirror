@@ -1,6 +1,15 @@
 #!/bin/sh
 
-cd ~/debianfhemde/stable
-apt-ftparchive packages . > Packages
-apt-ftparchive release  . > Release
-gpg --batch --yes --passphrase <password> --output Release.gpg -bas Release
+# $Id$
+
+cd ~/debianfhemde/
+
+apt-ftparchive packages stable > stable/Packages
+sed -i s/stable.//g stable/Packages
+
+apt-ftparchive release  stable > stable/Release
+gpg --batch --yes --passphrase <passphrase> --output stable/Release.gpg -bas stable/Release
+
+cd ~/debianfhemde
+aws s3 sync . s3://debian.fhem.de --delete
+
