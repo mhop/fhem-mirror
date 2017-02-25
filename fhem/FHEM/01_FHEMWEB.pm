@@ -760,6 +760,10 @@ FW_answerCall($)
         FW_pO FW_makeImage($img, $img);
         return 0;
       }
+    } elsif($iconPath =~ m/\.svg$/i && $icon=~ m/@/) {
+      $FW_RETTYPE = ext2MIMEType("svg");
+      FW_pO FW_makeImage($icon, $icon);
+      return 0;
     }
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
