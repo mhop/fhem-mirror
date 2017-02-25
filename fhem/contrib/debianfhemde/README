@@ -1,0 +1,97 @@
+--------------------------------------------------------------------------------
+
+Nutzung der Skripte zur Erstellung und Pflege von http://debian.fhem.de
+
+$Id:$
+
+--------------------------------------------------------------------------------
+
+Annahmen:
+
+1. der gesamte Ordner liegt im home-Verzeichnis eines Linux Users
+2. der Linux User benötigt root-Rechte auf die Befehle rm und chown
+   Eintrag in /etc/sudoers für user debianfhemde:
+      debianfhemde     ALL = NOPASSWD: /bin/chown, /bin/rm
+   
+3. der gpg key für das Signieren wurde erstellt 
+      $ gpg --gen-key
+
+   und der öffentliche Teil wurde nach ./debianfhemde/archive.key exportiert
+      $ gpg --armor --export "<name der bei der key erzeugung angegeben wurde>" > ~/debianfhemde/archive.key
+
+   Tipp: Man sollte auch eine Widerrufsurkunde erstellen und sicher verwahren:
+	  $ gpg --output revoke.asc --gen-revoke "<name der bei der key erzeugung angegeben wurde>"
+
+--------------------------------------------------------------------------------
+
+Erstellung des stable Repository
+
+1. das aktuelle fhem.deb muss von http://fhem.de geladen werden, 
+   diese Datei kommt in das Verzeichnis ./debianfhemde/stable
+
+2. die Datei muss auch in ./debianfhemde verfügbar sein, 
+   entweder als symlink auf die Datei in stable oder als Kopie 
+   (AWS S3 unterstützt beispielsweise keine Links!)
+
+3. ./scripts/mkfhemstable muss einmalig ausgeführt werden
+
+--------------------------------------------------------------------------------
+
+Erstellung des nightly Repository
+
+1. fhem muss erstmalig manuell aus SVN nach fhem.svn ausgecheckt werden
+
+2. in ./scripts/mkfhemnightly muss am Ende des Skripts die Synchronisation geprüft und ggf. angepaßt werden
+
+3. ./scripts/mkfhemnightly einmalig ausführen, um alle benötigten Dateien initial zu erstellen
+   und um zu testen, ob der gesamte Ablauf korrekt funktioniert
+
+4. cronjob einplanen, um die Generierung täglich auszuführen 
+   (Empfehlung: morgens um 8 Uhr, damit das nightly build weitestgehend mit dem offiziellen update übereinstimmt)
+
+--------------------------------------------------------------------------------
+
+Komplette Baumstruktur:
+
+debianfhemde/
+|-- archive.key
+|-- fhem-5.8.deb
+|-- grafik
+|   |-- favicon.ico
+|   `-- fhemicon.png
+|-- html
+|   |-- default.html
+|   |-- gpg_trouble.html
+|   |-- https_trouble.html
+|   |-- manual.html
+|   |-- nightly.html
+|   `-- stable.html
+|-- index.html
+|-- nightly
+|   |-- Packages
+|   |-- Release
+|   |-- Release.gpg
+|   `-- fhem-5.8.deb
+|-- robots.txt
+|-- stable
+|   |-- Packages
+|   |-- Release
+|   |-- Release.gpg
+|   `-- fhem-5.8.deb
+`-- style
+    `-- style.css
+scripts/
+|-- mkfhemnightly
+|-- mkfhemstable
+`-- templates
+    |-- index.template
+    |-- major.shtml
+    |-- manual.template
+    |-- nightly.template
+    `-- nversion.shtml
+
+--------------------------------------------------------------------------------
+
+2017-02-25 - betateilchen
+
+--------------------------------------------------------------------------------

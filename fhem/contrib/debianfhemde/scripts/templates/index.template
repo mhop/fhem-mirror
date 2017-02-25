@@ -1,0 +1,53 @@
+<html>
+<head>
+<title>FHEM for Debian</title>
+<link rel="stylesheet" type="text/css"     href="../style/style.css"   />
+<link rel="icon"       type="image/x-icon" href="./grafik/favicon.ico" />
+<meta http-equiv="pragma" content="no-cache" />
+</head>
+
+<body>
+
+  <div id="menuScrollArea">
+    <div id="logo"></div>
+
+    <div id="menu">
+      <table><tr><td> <!-- Playing with the width -->
+      <table class="room">
+        <tr><td></td></tr>
+        <tr><td><b>Content:</b></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/default.html'">Start</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/manual.html'">Manual installation</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/stable.html'">Stable build using apt</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/nightly.html'">Nightly ==MINOR== using apt</p></td></tr>
+        <tr><td></td></tr>
+<!--        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/https_trouble.html'">https Trouble?</p></td></tr>
+        <tr><td></td></tr> -->
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/gpg_trouble.html'">gpg key Trouble</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><hr/></td></tr>
+        <tr><td><b>Links:</b></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="window.open('http://fhem.de','_blank')">FHEM Home</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="window.open('https://forum.fhem.de','_blank')">FHEM Forum</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="window.open('http://www.fhemwiki.de','_blank')">FHEM Wiki</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="window.open('https://verein.fhem.de','_blank')">FHEM Verein</p></td></tr>
+        <tr><td></td></tr>
+      </table>
+      </table>
+    </div>
+<!--    <div id="aws"></div> -->
+  </div>
+
+  <div id="right"><iframe id="rightcontent" name="rightcontent" style="border:0px;" width="100%" height="100%" src="./html/default.html"></iframe></div>
+  
+</body>
+</html>
+

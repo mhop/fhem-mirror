@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# create nightly build and transfer it to static webspace
+# (C) 2013-2017 betateilchen
+#
+
+clear
+
+# remove old version infos
+#
+rm ~/scripts/templates/nversion.shtml
+rm ~/scripts/templates/major.shtml
+
+
+# update svn repo
+#
+cd ~/fhem.svn
+svn update
+
+
+# replace version infos in various html files
+# because Amazon S3 does not support shtml
+#
+svn info | grep 'Revision' | awk '{ print $2; }'           > ~/scripts/templates/nversion.shtml
+cat Makefile |grep '^VERS=' |sed 's/VERS=//' |sed 's/\r//' > ~/scripts/templates/major.shtml
+
+cd ~/scripts
+cp templates/index.template index.html
+sed -i s/==MINOR==/`cat templates/nversion.shtml`/g index.html
+mv index.html ../debianfhemde/
+
+cp templates/nightly.template nightly.html
+sed -i s/==MAJOR==/`cat templates/major.shtml`/g    nightly.html
+sed -i s/==MINOR==/`cat templates/nversion.shtml`/g nightly.html
+mv nightly.html ../debianfhemde/html/
+B
+cp templates/manual.template manual.html
+sed -i s/==MAJOR==/`cat templates/major.shtml`/g manual.html
+mv manual.html ../debianfhemde/html/
+
+
+# build nightly deb package
+#
+cd ~/fhem.svn
+make deb
+mv fhem-5.8.deb ~/debianfhemde/nightly
+
+
+# create package informations for aptitude
+# and sign all the stuff
+#
+cd ~/debianfhemde/nightly
+apt-ftparchive packages . > Packages
+apt-ftparchive release  . > Release
+gpg --batch --yes --passphrase anton1142 --output Release.gpg -bas Release
+
+# sync to Amazon S3 Instance
+#
+cd ~/debianfhemde
+aws s3 sync . s3://debian.fhem.de --delete
+
+###
+

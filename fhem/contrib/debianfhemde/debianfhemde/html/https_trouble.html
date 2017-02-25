@@ -1,0 +1,28 @@
+<html>
+
+<head>
+<link rel="stylesheet" type="text/css" href="../style/style.css" />
+<script type="text/javascript"> 
+   if (top == self) top.location = "../index.html";
+</script>
+<meta http-equiv="pragma" content="no-cache" />
+</head>
+
+<body>
+
+    <a name="trouble"></a>
+    <h3>Having trouble when connecting apt via https?</h3>
+    <ul>
+      Try the following steps:<br/>
+      <br/>
+      <li><b>Importing repository gpg key fails (with certificate or gpg error)</b><br/></br>
+        <ul><code>wget --no-check-certificate -qO - https://debian.fhem.de/archive.key | apt-key add -</code></ul></li><br/>
+      <li><b>apt-get update fails with "no driver for https"</b><br/></br>
+        <ul><code>apt-get install apt-transport-https</code></ul></li></br>
+      <li><b>apt-get update still fails becaus of https</b><br/></br>
+        <ul><code>echo 'Acquire::https::debian.fhem.de::Verify-Peer "false";' > /etc/apt/apt.conf.d/30nohttps</code></ul></li><br/>
+    </ul>
+    <br/>
+
+</body>
+</html>

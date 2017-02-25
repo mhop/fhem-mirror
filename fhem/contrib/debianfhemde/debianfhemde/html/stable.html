@@ -1,0 +1,30 @@
+<html>
+
+<head>
+<link rel="stylesheet" type="text/css" href="../style/style.css" />
+<script type="text/javascript"> 
+   if (top == self) top.location = "../index.html";
+</script>
+<meta http-equiv="pragma" content="no-cache" />
+</head>
+
+<body>
+
+    <a name="stable"></a>
+    <h3>Use aptitude to install fhem (stable package from current release) and all dependencies</h3>
+    <ul>
+      <li>Import repository gpg key:<br/><br/>
+        <ul><code>wget -qO - http://debian.fhem.de/archive.key | apt-key add -</code></ul></li><br/>
+      <li>Add repository to /etc/apt/sources.list:<br/></br>
+        <ul><code>deb http://debian.fhem.de/stable/ /</code></ul></li><br/>
+      <li>Update your package administration:<br/></br>
+        <ul><code>apt-get update</code></ul></li></br>
+      <li>Install fhem:<br/></br>
+        <ul><code>apt-get install fhem</code></ul></li><br/>
+      <li>(optional) Remove repository from /etc/apt/sources.list:<br/></br>
+        <ul><code>#deb http://debian.fhem.de/stable/ /</code></ul></li><br/>
+    </ul>
+    <br/>
+
+</body>
+</html>

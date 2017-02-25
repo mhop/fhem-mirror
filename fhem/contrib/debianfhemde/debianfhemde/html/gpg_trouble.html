@@ -1,0 +1,43 @@
+<html>
+
+<head>
+<link rel="stylesheet" type="text/css" href="../style/style.css" />
+<script type="text/javascript">
+   if (top == self) top.location = "../index.html";
+</script>
+<meta http-equiv="pragma" content="no-cache" />
+</head>
+
+<body>
+
+    <a name="trouble"></a>
+    <h3>Having trouble in use of apt-get update?</h3>
+
+    <ul>
+      <br/>
+      If you get an error like this: GPG-Fehler:<br/>
+      <br/>
+      <b>http://debian.fhem.de/ / Release: [...]  NO_PUBKEY xxxxxxxx</b><br/>
+    </ul>
+
+    <ul>
+      Try the following steps:<br/>
+      <br/>
+      <li><b>Find the old gpg key</b><br/></br>
+        <ul><code>sudo apt-key list<br/>
+           <br/>
+           pub   2048R/<b>BF0E6825</b> 2014-10-05 [verf&auml;llt: 2024-10-02]<br/>
+uid                  "..." (betateilchen) &lt;repo@betateilchen.de&gt;</code></ul></li><br/>
+      <li><b>Delete the old key identified in previos step</b><br/></br>
+        <ul><code>sudo apt-key del <b>BF0E6825</b></code></ul></li></br>
+      <li><b>Import new gpg key</b><br/></br>
+        <ul><code>wget -qO - http://debian.fhem.de/archive.key | sudo apt-key add -</code></ul></li><br/>
+      <li><b>Check result</b><br/></br>
+        <ul><code>sudo apt-key list<br/>
+           <br/>
+pub   4096R/<b>CC0B9B66</b> 2016-12-26 [verf&auml;llt: 2021-12-25]<br/>
+uid                  betateilchen (debian.fhem.de) &lt;gpg@betateilchen.de&gt;</code></ul></li><br/></ul>
+    <br/>
+
+</body>
+</html>

@@ -1,0 +1,33 @@
+<html>
+
+<head>
+<link rel="stylesheet" type="text/css" href="../style/style.css" />
+<script type="text/javascript"> 
+   if (top == self) top.location = "../index.html";
+</script>
+<meta http-equiv="pragma" content="no-cache" />
+</head>
+
+<body>
+
+    <a name="nightly"></a>
+    <h3>Nightly builds (use it at your own risk!)</h3>
+    <ul>
+      <li>Import repository gpg key:<br/><br/>
+        <ul><code>wget -qO - http://debian.fhem.de/archive.key | apt-key add -</code></ul></li><br/>
+      <li>Add repository to /etc/apt/sources.list:<br/></br>
+        <ul><code>deb http://debian.fhem.de/nightly/ /</code></ul></li><br/>
+      <li>Update your package administration:<br/></br>
+        <ul><code>apt-get update</code></ul></li></br>
+      <li>Install fhem:<br/></br>
+        <ul><code>apt-get install fhem</code></ul></li><br/>
+      <li>You will find a special version number like<br/><br/>
+        <ul><code>Inst fhem (==MAJOR==.==MINOR==  debian.fhem.de [all])</code></ul><br/>
+	<ul>with <code>==MAJOR==</code> representing major version</ul>
+        <ul>with <code>==MINOR==</code> representing the latest SVN commit included.</ul><br/>
+      <li>(optional) Remove repository from /etc/apt/sources.list:<br/></br>
+        <ul><code>#deb http://debian.fhem.de/nightly/ /</code></ul></li><br/>
+    </ul>
+    <br/>
+</body>
+</html>

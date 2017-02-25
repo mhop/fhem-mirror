@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd ~/debianfhemde/stable
+apt-ftparchive packages . > Packages
+apt-ftparchive release  . > Release
+gpg --batch --yes --passphrase anton1142 --output Release.gpg -bas Release
