@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# $Id$
+#
 # create nightly build and transfer it to static webspace
 # (C) 2013-2017 betateilchen
 #
@@ -33,7 +35,7 @@ cp templates/nightly.template nightly.html
 sed -i s/==MAJOR==/`cat templates/major.shtml`/g    nightly.html
 sed -i s/==MINOR==/`cat templates/nversion.shtml`/g nightly.html
 mv nightly.html ../debianfhemde/html/
-B
+
 cp templates/manual.template manual.html
 sed -i s/==MAJOR==/`cat templates/major.shtml`/g manual.html
 mv manual.html ../debianfhemde/html/
@@ -43,16 +45,17 @@ mv manual.html ../debianfhemde/html/
 #
 cd ~/fhem.svn
 make deb
-mv fhem-5.8.deb ~/debianfhemde/nightly
+mv fhem-5.8.deb ~/debianfhemde/nightly/
 
 
 # create package informations for aptitude
 # and sign all the stuff
 #
-cd ~/debianfhemde/nightly
-apt-ftparchive packages . > Packages
-apt-ftparchive release  . > Release
-gpg --batch --yes --passphrase <password> --output Release.gpg -bas Release
+cd ~/debianfhemde/
+apt-ftparchive packages nightly > nightly/Packages
+sed -i s/nightly.//g nightly/Packages
+apt-ftparchive release  nightly > nightly/Release
+gpg --batch --yes --passphrase <passphrase> --output nightly/Release.gpg -bas nightly/Release
 
 # sync to Amazon S3 Instance
 #
