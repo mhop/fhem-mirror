@@ -781,11 +781,8 @@ FW_answerCall($)
     # pgm2 check is for jquery-ui images
     my $static = ($ext =~ m/(css|js|png|jpg)/i || $dir =~ m/^pgm2/);
     my $fname = ($ext ? "$file.$ext" : $file);
-    if(-r "$ldir/$fname" || $static) {  # no return for FLOORPLAN
-      $FW_RET .= "var csrfToken='$FW_CSRF';\n"    # Hack?
-        if($FW_CSRF && $fname eq "fhemdoc_modular.js");
-      return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1);
-    }
+    return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1)
+      if(-r "$ldir/$fname" || $static); # no return for FLOORPLAN
     $arg = "/$dir/$ofile";
 
   } elsif($arg =~ m/^$FW_ME(.*)/s) {

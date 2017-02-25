@@ -1,5 +1,5 @@
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
-    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={};
+    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="";
 
 
 function
@@ -21,9 +21,7 @@ fd_fC(fn, callback)
 {
   var p = location.pathname;
   var cmd = p.substr(0,p.indexOf('/doc'))+
-                '?cmd='+fn+
-                (typeof(csrfToken)!='undefined'?csrfToken:'')+
-                '&XHR=1';
+                '?cmd='+fn+csrfToken+'&XHR=1';
   var ax = $.ajax({ cache:false, url:cmd });
   ax.done(callback);
   ax.fail(function(req, stat, err) {
@@ -204,4 +202,11 @@ $(document).ready(function(){
     if(!fd_scrolled++)
       setTimeout(checkScroll, 500);
   };
+
+  $.ajax({
+      url:(location.pathname+"").replace(/\/docs.commandref.html.*/,"?XHR=1"),
+      success: function(data, textStatus, request){
+        csrfToken = request.getResponseHeader('x-fhem-csrftoken');
+        csrfToken = csrfToken ? ("&fwcsrf="+csrfToken) : "";
+      }});
 });
