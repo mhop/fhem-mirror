@@ -94,6 +94,7 @@ my $FW_use_sha = 0;
 my $FW_activateInform = 0;
 my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
+my $FW_httpRetCode = "";
 my %FW_csrfTokenCache;
 
 #########################
@@ -530,6 +531,7 @@ FW_Read($$)
     }
   }
 
+  $FW_httpRetCode = "200 OK";
   my $cacheable = FW_answerCall($arg);
   if($cacheable == -1) {
     FW_closeConn($hash);
@@ -557,7 +559,7 @@ FW_Read($$)
   Log3 $FW_wname, 4,
         "name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! FW_addToWritebuffer($hash,
-           "HTTP/1.1 200 OK\r\n" .
+           "HTTP/1.1 $FW_httpRetCode\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
@@ -810,6 +812,7 @@ FW_answerCall($)
     if($supplied ne $want) {
       Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want. ".
                          "For detals see the csrfToken FHEMWEB attribute";
+      $FW_httpRetCode = "401 Unauthorized";
       return 0;
     }
   }

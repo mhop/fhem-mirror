@@ -1,5 +1,5 @@
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
-    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="";
+    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X";
 
 
 function
@@ -19,13 +19,19 @@ fd_status(txt)
 function
 fd_fC(fn, callback)
 {
+  console.log("fd_fC:"+fn);
   var p = location.pathname;
-  var cmd = p.substr(0,p.indexOf('/doc'))+
-                '?cmd='+fn+csrfToken+'&XHR=1';
-  var ax = $.ajax({ cache:false, url:cmd });
-  ax.done(callback);
-  ax.fail(function(req, stat, err) {
-    console.log("FAIL ERR:"+err+" STAT:"+stat);
+  var cmd = p.substr(0,p.indexOf('/doc'))+'?cmd='+fn+csrfToken+'&XHR=1';
+  $.ajax({
+    url:cmd, method:'POST', cache:false, success:callback,
+    error:function(xhr, status, err) {
+      if(xhr.status == 401 && csrfToken) {
+        csrfToken = "";
+        fd_csrfRefresh(function(){fd_fC(fn, callback)});
+      } else {
+        console.log("FAIL ERR:"+xhr.status+" STAT:"+status);
+      }
+    }
   });
 }
 
@@ -151,6 +157,21 @@ loadOtherLang()
   loadOneDoc(mname, fd_loadedHash[mname]=="EN" ? "DE" : "EN");
 }
 
+function
+fd_csrfRefresh(callback)
+{
+  console.log("fd_csrfRefresh");
+  $.ajax({
+    url:location.pathname.replace(/docs.*/,'')+"?XHR=1",
+    success: function(data, textStatus, request){
+      csrfToken = request.getResponseHeader('x-fhem-csrftoken');
+      csrfToken = csrfToken ? ("&fwcsrf="+csrfToken) : "";
+      if(callback)
+        callback();
+    }
+  });
+}
+
 $(document).ready(function(){
   var p = location.pathname;
   fd_lang = p.substring(p.indexOf("commandref")+11,p.indexOf(".html"));
@@ -203,10 +224,5 @@ $(document).ready(function(){
       setTimeout(checkScroll, 500);
   };
 
-  $.ajax({
-      url:(location.pathname+"").replace(/\/docs.commandref.html.*/,"?XHR=1"),
-      success: function(data, textStatus, request){
-        csrfToken = request.getResponseHeader('x-fhem-csrftoken');
-        csrfToken = csrfToken ? ("&fwcsrf="+csrfToken) : "";
-      }});
+  fd_csrfRefresh();
 });
