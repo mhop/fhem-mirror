@@ -105,7 +105,13 @@ sub TPLinkHS110_Get($$)
 	$socket->close();
 	unless( defined $retval) { return undef; }
 	$data = decrypt(substr($data,4));
-	my $json = decode_json($data);
+	my $json;
+	eval {
+		$json = decode_json($data);
+	} or do {
+		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+		return;
+	};
 
 	Log3 $hash, 3, "TPLinkHS110: $name Get called. Relay state: $json->{'system'}->{'get_sysinfo'}->{'relay_state'}, RSSI: $json->{'system'}->{'get_sysinfo'}->{'rssi'}";
 	readingsBeginUpdate($hash);	
@@ -220,7 +226,14 @@ sub TPLinkHS110_Set($$)
 	$socket->close();
 	unless( defined $retval) { return undef; }
 	$data = decrypt(substr($data,4));
-	my $json = decode_json($data);
+	my $json;
+	eval {
+		$json = decode_json($data);
+	} or do {
+		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+		return;
+	};
+
         if ($json->{'system'}->{'set_relay_state'}->{'err_code'} eq "0") {
 		TPLinkHS110_Get($hash,"");
 		
@@ -302,9 +315,14 @@ sub TPLinkHS110_Attr {
 		$socket->close();
 		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
-		my $json = decode_json($data);
+		my $json;
+		eval {
+			$json = decode_json($data);
+		} or do {
+			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			return;
+		};
 	}
- 
 	return undef;
 }
 
