@@ -279,6 +279,7 @@ sub Wunderground_GetStatus($;$) {
     $features .= "/lang:" . $hash->{LANG};
     $features .= "/pws:$pws" if ( defined($pws) );
     $features .= "/bestfct:$bestfct" if ( defined($bestfct) );
+    $hash->{FEATURES} = $features;
 
     Wunderground_SendCommand( $hash, $features );
 
@@ -340,7 +341,7 @@ sub Wunderground_Define($$$) {
     $hash->{QUERY}   = @$a[3];
 
     $hash->{QUERY} = "pws:" . $hash->{QUERY}
-      if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{2,}$/ );
+      if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{1,}$/ );
 
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         fhem 'attr ' . $name . ' stateReadings temp_c humidity';
@@ -404,8 +405,11 @@ sub Wunderground_SendCommand($$) {
             timeout => AttrVal( $name, "timeout", "3" ),
             hash    => $hash,
             method  => "GET",
-            header =>
-"agent: FHEM-Wunderground/1.0.0\r\nUser-Agent: FHEM-Wunderground/1.0.0\r\nAccept: application/json",
+            header  => {
+                agent        => 'FHEM-Wunderground/1.0.0',
+                'User-Agent' => 'FHEM-Wunderground/1.0.0',
+                Accept       => 'application/json',
+            },
             httpversion => "1.1",
             callback    => \&Wunderground_ReceiveCommand,
         }
@@ -1027,7 +1031,8 @@ sub Wunderground_Undefine($$$) {
     Example:
     <ul><br>
       <code>
-      define WUweather Wunderground d123ab11bb2c3456 IBAYERNM70<br>
+      define WUweather Wunderground d123ab11bb2c3456 EDDF<br>
+      define WUweather Wunderground d123ab11bb2c3456 pws:IBAYERNM70<br>
       define WUweather Wunderground d123ab11bb2c3456 Germany/Berlin<br>
       </code><br>
     </ul>
