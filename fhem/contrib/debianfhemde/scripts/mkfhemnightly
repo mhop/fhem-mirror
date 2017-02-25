@@ -52,7 +52,7 @@ mv fhem-5.8.deb ~/debianfhemde/nightly
 cd ~/debianfhemde/nightly
 apt-ftparchive packages . > Packages
 apt-ftparchive release  . > Release
-gpg --batch --yes --passphrase anton1142 --output Release.gpg -bas Release
+gpg --batch --yes --passphrase <password> --output Release.gpg -bas Release
 
 # sync to Amazon S3 Instance
 #
