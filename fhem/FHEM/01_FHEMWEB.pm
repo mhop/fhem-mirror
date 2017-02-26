@@ -2708,7 +2708,7 @@ FW_longpollInfo($@)
   if($fmt && $fmt eq "JSON") {
     my @a;
     map { my $x = $_; #Forum 57377, ASCII 0-19 \ "
-          $x=~ s/([\x00-\x1f\x22\x5c\7f])/sprintf '\u%04x', ord($1)/ge;
+          $x=~ s/([\x00-\x1f\x22\x5c\x7f])/sprintf '\u%04x', ord($1)/ge;
           push @a,$x; } @_;
     return '["'.join('","', @a).'"]';
   } else {
