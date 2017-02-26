@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 06 / 2017-02-19
+# Release 07 / 2017-02-26
 
 package main;
 
@@ -154,7 +154,6 @@ netatmo_Define($$)
         $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
         $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}));
         $attr{$name}{devStateIcon} = ".*:no-icon" if( !defined($attr{$name}{devStateIcon}));
-        #$attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
 
 
       }
@@ -208,7 +207,6 @@ netatmo_Define($$)
     $hash->{INTERVAL} = 60*30 if( !$hash->{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}));
     $attr{$name}{devStateIcon} = ".*:no-icon" if( !defined($attr{$name}{devStateIcon}));
-    #$attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
 
   } elsif( ($a[2] eq "MODULE" && @a == 5 ) ) {
     $subtype = "MODULE";
@@ -353,6 +351,13 @@ netatmo_Define($$)
   } elsif( @a == 6  || ($a[2] eq "ACCOUNT" && @a == 7 ) ) {
     $subtype = "ACCOUNT";
     $hash->{network} = "ok";
+
+    delete($hash->{access_token});
+    delete($hash->{access_token_app});
+    delete($hash->{refresh_token});
+    delete($hash->{refresh_token_app});
+    delete($hash->{expires_at});
+    delete($hash->{expires_at_app});
 
     my $user = $a[@a-4];
     my $pass = $a[@a-3];
@@ -501,6 +506,7 @@ netatmo_Set($$@)
 
   my $list = "";
   $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
+  #$list .= " unban:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   $list = "home:noArg away:noArg" if ($hash->{SUBTYPE} eq "PERSON");
   $list = "empty:noArg" if ($hash->{SUBTYPE} eq "HOME");
   $list = "enable disable irmode:auto,always,never led_on_live:on,off mirror:off,on audio:on,off" if ($hash->{SUBTYPE} eq "CAMERA");
@@ -620,6 +626,11 @@ netatmo_Set($$@)
     }
     return undef;
   }
+  if( $cmd eq 'unban' )# unban:noArg
+  {
+    return netatmo_Unban($hash); 
+  }
+
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -633,7 +644,7 @@ netatmo_getToken($)
     url => "https://api.netatmo.com/oauth2/token",
     timeout => 5,
     noshutdown => 1,
-    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat read_camera access_camera read_presence access_presence read_homecoach'},
+    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat write_camera read_camera access_camera read_presence write_presence access_presence read_homecoach'},
   });
 
   netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -646,6 +657,7 @@ netatmo_getAppToken($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  #my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmMxOTNaV3hqYjIxbE9qaGhZalU0TkdRMk1tTmhNbUUzTjJVek4yTmpZelppTW1NM1pUUm1Namxs";
   my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmN6bzFObU5qTmpSaU56azBOak5oT1RrMU9HSTNOREF4TkRjeVpEbGxNREUxT0E9PQ==";
   $auth = decode_base64($auth);
 
@@ -655,7 +667,7 @@ netatmo_getAppToken($)
     timeout => 5,
     noshutdown => 1,
     header => "$auth",
-    data => {app_identifier=>'com.netatmo.netatmo', grant_type => 'password', username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password})},
+    data => {app_identifier=>'com.netatmo.camera', grant_type => 'password', password => netatmo_decrypt($hash->{helper}{password}), scope => 'write_camera read_camera access_camera read_presence write_presence access_presence read_station', username => netatmo_decrypt($hash->{helper}{username})},
   });
 
 
@@ -797,6 +809,119 @@ netatmo_connect($)
   InternalTimer(gettimeofday()+90, "netatmo_poll", $hash, 0);
 
 }
+
+sub
+netatmo_Unban($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  HttpUtils_NonblockingGet({
+    url => "https://dev.netatmo.com/",
+    timeout => 20,
+    noshutdown => 1,
+    hash => $hash,
+    type => 'unban',
+    callback => \&netatmo_parseUnban,
+  });
+
+  return undef;
+
+}
+
+sub
+netatmo_parseUnban($$$$)
+{
+  my ($param,$err,$data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  
+  #Log3 $name, 1, "$name unban\n".Dumper($param->{httpheader});
+
+  $data =~ /csrf_value: "(.*)"/;
+  my $csrf_token = $1;
+
+  # https://auth.netatmo.com/en-US/access/login?next_url=https://dev.netatmo.com/dev/myaccount
+  Log3 $name, 1, "$name unban ".$csrf_token;
+
+  HttpUtils_NonblockingGet({
+    url => "https://auth.netatmo.com/en-US/access/login?next_url=https://dev.netatmo.com/dev/myaccount",
+    timeout => 5,
+    hash => $hash,
+    ignoreredirects => 1,
+    type => 'unban',
+    header => "Cookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US",
+    data => {ci_csrf_netatmo => $csrf_token, mail => netatmo_decrypt($hash->{helper}{username}), pass => netatmo_decrypt($hash->{helper}{password}), log_submit => 'Log+in', stay_logged => 'accept'},
+    callback => \&netatmo_parseUnban2,
+  });
+    
+
+  return undef;
+}
+
+sub
+netatmo_parseUnban2($$$$)
+{
+  my ($param,$err,$data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  
+  Log3 $name, 1, "$name header\n".Dumper($param->{httpheader});
+  my $header1 = $param->{httpheader};
+  my $header2 = $param->{httpheader};
+  my $header3 = $param->{httpheader};
+  
+  $header1 =~ s/=deleted/x=deleted/g;
+  $header2 =~ s/=deleted/x=deleted/g;
+  $header3 =~ s/=deleted/x=deleted/g;
+  
+  $header1 =~ /Set-Cookie: netatmocomci_csrf_cookie_na=(.*); expires/;
+  my $csrf_token = $1;
+  $hash->{helper}{csrf_token} = $csrf_token;
+
+  $header2 =~ /Set-Cookie: netatmocomaccess_token=(.*); path/;
+  my $accesstoken = $1;
+  $accesstoken =~ s/%7C/|/g;
+  $hash->{helper}{access_token} = $accesstoken;
+
+  $header3 =~ /Set-Cookie: netatmocomrefresh_token=(.*); expires/;
+  my $refreshtoken = $1;
+  $hash->{helper}{refresh_token} = $refreshtoken;
+
+  Log3 $name, 1, "$name csrftoken ".$csrf_token;
+  Log3 $name, 1, "$name accesstoken ".$accesstoken;
+  Log3 $name, 1, "$name refreshtoken ".$refreshtoken;
+
+  my $json = '{"application_id":"'.$hash->{helper}{client_id}.'"}';
+
+  HttpUtils_NonblockingGet({
+    url => "https://dev.netatmo.com/api/unbanapp",
+    timeout => 5,
+    hash => $hash,
+    type => 'unban',
+    header => "Referer: https://dev.netatmo.com/dev/myaccount\r\nAuthorization: Bearer ".$accesstoken."\r\nContent-Type: application/json;charset=utf-8\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
+    data => $json,
+    callback => \&netatmo_parseUnban3,
+  });
+    
+
+  return undef;
+}
+
+sub
+netatmo_parseUnban3($$$$)
+{
+  my ($param,$err,$data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  
+  Log3 $name, 1, "$name header\n".Dumper($param->{httpheader});
+  Log3 $name, 1, "$name data\n".Dumper($data);
+  Log3 $name, 1, "$name err\n".Dumper($err);
+
+  return undef;
+}
+
 sub
 netatmo_initDevice($)
 {
@@ -1035,6 +1160,8 @@ netatmo_pingCamera($;$)
 
   $pingurl .= "/command/ping";
 
+  Log3 $name, 5, "$name pingCamera ".$pingurl;
+
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
       url => $pingurl,
@@ -1072,13 +1199,20 @@ netatmo_getCameraVideo($$;$)
   #my $iohash = $hash->{IODev};
   #netatmo_refreshToken($iohash, defined($iohash->{access_token}));
 
-  my $cmdurl = ReadingsVal( $name, "vpn_url", undef );
-  
-  return undef if(!defined($cmdurl));
+  my $commandurl = ReadingsVal( $name, "local_url", undef);
+  if(!defined($commandurl)) {
+    ReadingsVal( $name, "vpn_url", undef );
+  } else {
+    $local = "";
+  }
+
+  return undef if(!defined($commandurl));
 
   my $quality = AttrVal($name,"videoquality","medium");
 
-  $cmdurl .= "/vod/".$videoid."/files/".$quality."/index".$local.".m3u8";
+  $commandurl .= "/vod/".$videoid."/files/".$quality."/index".$local.".m3u8";
+
+  Log3 $name, 5, "$name getCameraVideo ".$commandurl;
 
     # HttpUtils_BlockingGet({
     #   url => $cmdurl,
@@ -1088,7 +1222,7 @@ netatmo_getCameraVideo($$;$)
     #   type => 'cameravideo',
     #   callback => \&netatmo_dispatch,
     # });
-    return $cmdurl;
+    return $commandurl;
 
 }
 
@@ -1104,13 +1238,20 @@ netatmo_getCameraLive($;$)
   #my $iohash = $hash->{IODev};
   #netatmo_refreshToken($iohash, defined($iohash->{access_token}));
 
-  my $cmdurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", undef);
+  if(!defined($commandurl)) {
+    ReadingsVal( $name, "vpn_url", undef );
+  } else {
+    $local = "";
+  }
 
-  return undef if(!defined($cmdurl));
+  return undef if(!defined($commandurl));
 
   my $quality = AttrVal($name,"videoquality","medium");
 
-  $cmdurl .= "/live/files/".$quality."/index".$local.".m3u8";
+  $commandurl .= "/live/files/".$quality."/index".$local.".m3u8";
+
+  Log3 $name, 5, "$name getCameraLive ".$commandurl;
 
     # HttpUtils_BlockingGet({
     #   url => $cmdurl,
@@ -1120,7 +1261,7 @@ netatmo_getCameraLive($;$)
     #   type => 'cameravideo',
     #   callback => \&netatmo_dispatch,
     # });
-    return $cmdurl;
+    return $commandurl;
 
 }
 
@@ -1138,6 +1279,8 @@ netatmo_getCameraTimelapse($)
   return undef if(!defined($cmdurl));
 
   $cmdurl .= "/command/dl/timelapse";
+
+  Log3 $name, 5, "$name getCameraTimelapse ".$cmdurl;
 
     # HttpUtils_BlockingGet({
     #   url => $cmdurl,
@@ -1161,10 +1304,12 @@ netatmo_getCameraSnapshot($;$)
   #my $iohash = $hash->{IODev};
   #netatmo_refreshToken($iohash, defined($iohash->{access_token}));
 
-  my $cmdurl = ReadingsVal( $name, "vpn_url", undef );
-  return undef if(!defined($cmdurl));
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
+  return undef if(!defined($commandurl));
 
-  $cmdurl .= "/live/snapshot_720.jpg";
+  $commandurl .= "/live/snapshot_720.jpg";
+
+  Log3 $name, 5, "$name getCameraSnapshot ".$commandurl;
 
     # HttpUtils_BlockingGet({
     #   url => $cmdurl,
@@ -1174,7 +1319,7 @@ netatmo_getCameraSnapshot($;$)
     #   type => 'cameravideo',
     #   callback => \&netatmo_dispatch,
     # });
-    return $cmdurl;
+    return $commandurl;
 
 }
 
@@ -1386,11 +1531,13 @@ netatmo_initHome($@)
 
   Log3 $name, 4, "$name inithome";
 
+#    url => "https://api.netatmo.com/api/gethomedata",
+#    data => \%data,
   HttpUtils_NonblockingGet({
-    url => "https://api.netatmo.com/api/gethomedata",
+    url => "https://app.netatmo.net/api/gethomesdata",
     timeout => 20,
     noshutdown => 1,
-    data => \%data,
+    header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     hash => $hash,
     type => 'gethomedata',
     callback => \&netatmo_dispatch,
@@ -1418,11 +1565,13 @@ netatmo_requestHomeReadings($@)
   #$data{"size"} = 1;#$lastupdate if( defined($lastupdate) );
   Log3 $name, 4, "$name requesthomereadings";
 
+#    url => "https://api.netatmo.com/api/gethomedata",
+#    data => \%data,
   HttpUtils_NonblockingGet({
-    url => "https://api.netatmo.com/api/gethomedata",
+    url => "https://app.netatmo.net/api/gethomesdata",
     timeout => 20,
     noshutdown => 1,
-    data => \%data,
+    header => "Content-Type: application/json\r\nAuthorization: Bearer ".$iohash->{access_token_app},
     hash => $hash,
     type => 'gethomedata',
     callback => \&netatmo_dispatch,
@@ -1550,7 +1699,7 @@ netatmo_setCamera($$$)
   return undef if(!defined($iohash->{access_token_app}));
 
 
-  my $commandurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/changestatus?status=$status&pin=$pin";
@@ -1559,6 +1708,7 @@ netatmo_setCamera($$$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1590,6 +1740,7 @@ netatmo_setCameraSetting($$$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1612,7 +1763,7 @@ netatmo_setFloodlight($$)
   #netatmo_pingCamera( $hash );
 
 
-  my $commandurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/floodlight_set_config?config=%7B%22mode%22:%22$setting%22%7D";
@@ -1621,6 +1772,7 @@ netatmo_setFloodlight($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1643,7 +1795,7 @@ netatmo_setIntensity($$)
   #netatmo_pingCamera( $hash );
 
 
-  my $commandurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/floodlight_interactive_config?intensity=$setting";
@@ -1652,6 +1804,7 @@ netatmo_setIntensity($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1675,7 +1828,7 @@ netatmo_setPresenceConfig($$)
   #netatmo_pingCamera( $hash );
 
 
-  my $commandurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/floodlight_set_config?config=%7B%22intensity%22:".ReadingsVal( $name, "intensity", 50 ).",%22night%22:%7B%22always%22:".ReadingsVal( $name, "night_always", "false" ).",%22animal%22:".ReadingsVal( $name, "night_animal", "false" ).",%22movement%22:".ReadingsVal( $name, "night_movement", "false" ).",%22person%22:".ReadingsVal( $name, "night_person", "true" ).",%22vehicle%22:".ReadingsVal( $name, "night_vehicle", "false" )."%7D%7D";
@@ -1684,6 +1837,7 @@ netatmo_setPresenceConfig($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1706,7 +1860,7 @@ netatmo_getPresenceConfig($)
   #netatmo_pingCamera( $hash );
 
 
-  my $commandurl = ReadingsVal( $name, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/floodlight_get_config";
@@ -1715,6 +1869,7 @@ netatmo_getPresenceConfig($)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -1743,7 +1898,8 @@ netatmo_setTagCalibration($$)
   #netatmo_pingCamera( $hash );
 
 
-  my $commandurl = ReadingsVal( $camerahash->{NAME}, "vpn_url", undef );
+  my $commandurl = ReadingsVal( $camerahash->{NAME}, "local_url", ReadingsVal( $camerahash->{NAME}, "vpn_url", undef ) );
+
   return undef if(!defined($commandurl));
 
   $commandurl .= "/command/dtg_cal?id=".$hash->{Tag};
@@ -1752,6 +1908,7 @@ netatmo_setTagCalibration($$)
 
   HttpUtils_NonblockingGet({
       url => $commandurl,
+      timeout => 20,
       noshutdown => 1,
       verify_hostname => 0,
       hash => $hash,
@@ -2034,7 +2191,7 @@ netatmo_dispatch($$$)
     if( $param->{type} eq 'token' ) {
       netatmo_parseToken($hash,$json);
     } elsif( $param->{type} eq 'apptoken' ) {
-        netatmo_parseAppToken($hash,$json);
+      netatmo_parseAppToken($hash,$json);
     } elsif( $param->{type} eq 'devicelist' ) {
       netatmo_parseDeviceList($hash,$json);
     } elsif( $param->{type} eq 'stationsdata' ) {
@@ -3114,7 +3271,7 @@ netatmo_parseForecast($$)
           {
             readingsBeginUpdate($hash);
             $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-            readingsBulkUpdate( $hash, "fc".$i."_day", $forecastdata->{day_locale}, 1 );
+            readingsBulkUpdate( $hash, "fc".$i."_day", encode_utf8($forecastdata->{day_locale}), 1 );
             $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
             readingsEndUpdate($hash,1);
           }
@@ -3178,13 +3335,13 @@ netatmo_parseHomeReadings($$;$)
         readingsSingleUpdate($hash, "name", encode_utf8($homedata->{name}), 1) if(defined($homedata->{name}));
 
         if( $homedata->{place} ) {
-          $hash->{country} = $homedata->{place}{country} if(defined($homedata->{place}{country}));
+          $hash->{country} = encode_utf8($homedata->{place}{country}) if(defined($homedata->{place}{country}));
           $hash->{bssid} = $homedata->{place}{bssid} if(defined($homedata->{place}{bssid}));
           $hash->{altitude} = $homedata->{place}{altitude} if(defined($homedata->{place}{altitude}));
           $hash->{city} = encode_utf8($homedata->{place}{geoip_city}) if(defined($homedata->{place}{geoip_city}));
           $hash->{city} = encode_utf8($homedata->{place}{city}) if(defined($homedata->{place}{city}));;
           $hash->{location} = $homedata->{place}{location}[1] .",". $homedata->{place}{location}[0] if(defined($homedata->{place}{location}));
-          $hash->{timezone} = $homedata->{place}{timezone} if(defined($homedata->{place}{timezone}));
+          $hash->{timezone} = encode_utf8($homedata->{place}{timezone}) if(defined($homedata->{place}{timezone}));
         }
 
         if(defined($homedata->{persons}))
@@ -3986,13 +4143,13 @@ netatmo_parseThermostatReadings($$;$)
         $hash->{syncing} = $devicedata->{syncing} if(defined($devicedata->{syncing}));
 
         if( $devicedata->{place} ) {
-          $hash->{country} = $devicedata->{place}{country};
+          $hash->{country} = encode_utf8($devicedata->{place}{country});
           $hash->{bssid} = $devicedata->{place}{bssid} if(defined($devicedata->{place}{bssid}));
           $hash->{altitude} = $devicedata->{place}{altitude} if(defined($devicedata->{place}{altitude}));
           $hash->{city} = encode_utf8($devicedata->{place}{geoip_city}) if(defined($devicedata->{place}{geoip_city}));
           $hash->{city} = encode_utf8($devicedata->{place}{city}) if(defined($devicedata->{place}{city}));;
           $hash->{location} = $devicedata->{place}{location}[1] .",". $devicedata->{place}{location}[0];
-          $hash->{timezone} = $devicedata->{place}{timezone};
+          $hash->{timezone} = encode_utf8($devicedata->{place}{timezone});
         }
 
         readingsSingleUpdate($hash, "battery", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
@@ -4037,7 +4194,7 @@ netatmo_parseThermostatReadings($$;$)
               $module->{city} = encode_utf8($moduledata->{place}{geoip_city}) if(defined($moduledata->{place}{geoip_city}));
               $module->{city} = encode_utf8($moduledata->{place}{city}) if(defined($moduledata->{place}{city}));;
               $module->{location} = $moduledata->{place}{location}[1] .",". $moduledata->{place}{location}[0];
-              $module->{timezone} = $moduledata->{place}{timezone};
+              $module->{timezone} = encode_utf8($moduledata->{place}{timezone});
             }
 
             readingsSingleUpdate($module, "battery", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
