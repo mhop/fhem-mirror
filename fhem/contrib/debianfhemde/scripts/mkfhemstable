@@ -6,7 +6,7 @@ apt-ftparchive packages stable > stable/Packages
 sed -i s/stable.//g stable/Packages
 
 apt-ftparchive release  stable > stable/Release
-gpg --batch --yes --passphrase ... --output stable/Release.gpg -bas stable/Release
+gpg --batch --yes --passphrase-file ~/.gnupg/passphrase.txt --output stable/Release.gpg -bas stable/Release
 
 cd ~/debianfhemde
 aws s3 sync . s3://debian.fhem.de --delete

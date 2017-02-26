@@ -1,13 +1,18 @@
 #!/bin/sh
 #
 # $Id$
+#
 # create nightly build and transfer it to static webspace
 # (C) 2013-2017 betateilchen
 #
+# may be called with optional parameter "quiet"
+#
+
 QUIET=$1
+
 clear
 echo "#"
-echo "# Starting package build"
+echo "# Starting FHEM package build"
 echo "#"
 
 # remove old version infos
@@ -75,7 +80,7 @@ cd ~/debianfhemde/
 apt-ftparchive packages nightly > nightly/Packages
 sed -i s/nightly.//g nightly/Packages
 apt-ftparchive release  nightly > nightly/Release
-gpg --batch --yes --passphrase ... --output nightly/Release.gpg -bas nightly/Release
+gpg --batch --yes --passphrase-file ~/.gnupg/passphrase.txt --output nightly/Release.gpg -bas nightly/Release
 
 # sync to Amazon S3 Instance
 #
