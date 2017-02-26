@@ -258,8 +258,8 @@ sub DOIFtools_logWrapper($) {
 
     FW_pO "<div id=\"content\">";
     FW_pO "<div class=\"tiny\">" if($FW_ss);
-    FW_pO "<pre class=\"log\"><b>jump to: <a name='top'></a><a href=\"#end_of_file\">the end</a> <a href=\"#listing\">first listing</a></b><br>";
-    my $suffix = "<br/><b>jump to: <a name='end_of_file'></a><a href='#top'>the top</a> <a href=\"#listing\">first listing</a></b><br/></pre>".($FW_ss ? "</div>" : "")."</div>";
+    FW_pO "<pre class=\"log\"><b>jump to: <a name='top'></a><a href=\"#end_of_file\">the end</a> <a href=\"#listing\">top listing</a></b><br>";
+    my $suffix = "<br/><b>jump to: <a name='end_of_file'></a><a href='#top'>the top</a> <a href=\"#listing\">top listing</a></b><br/></pre>".($FW_ss ? "</div>" : "")."</div>";
 
     my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
     if(!$reverseLogs) {
@@ -1296,9 +1296,13 @@ sub DOIFtools_Get($@)
       $ret = $ret ? "Found running wait_timer for:\n\n$ret" : "No running wait_timer found.";
       return $ret;
       
+  } elsif ($arg eq "SetAttrIconForDOIF") {
+      $ret .= CommandAttr(undef,"$value icon helper_doif");
+      $ret .= CommandSave(undef,undef) if (AttrVal($pn,"DOIFtoolsExecuteSave",""));
+      return $ret;
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
   } 
 
   return $ret;
@@ -1464,6 +1468,9 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         <code>get &lt;name&gt; runningTimerInDOIF</code><br>
         <b>runningTimerInDOIF</b> zeigt eine Liste der laufenden Timer. Damit kann entschieden werden, ob bei einem Neustart wichtige Timer gelöscht werden und der Neustart ggf. verschoben werden sollte.<br>
+        <br>
+        <code>get &lt;name&gt; SetAttrIconForDOIF &lt;DOIF names for setting the attribute icon to helper_doif&gt;</code><br>
+        <b>SetAttrIconForDOIF</b> setzt für die ausgewählten DOIF das Attribut <i>icon</i> auf <i>helper_doif</i>.<br>
         <br>
     </ul>
 

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: add a possibility to set the attribute icon for DOIF
+                by multiselect to helper_doif, DOIF's new icon D[:]IF
   - update:  38_netatmo.pm: API changes
   - new:     34_ESPEasy.pm: initial check in
   - bugfix:  38_netatmo.pm: fixed error crash
