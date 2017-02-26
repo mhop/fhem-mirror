@@ -71,9 +71,9 @@
 #   add new attribute for defining special template urls templateFiles
 #   allow spaces around = and after <? for more tolerance
 #   do not require space at end of tag before ?> for more tolerance
-
 #   more tolerance on spaces around =
-#   
+#   doc change on ftui-if
+
 #   
 ################################################################
 #TODO:
@@ -719,6 +719,7 @@ sub FTUISRV_handleIf( $$$ ) {
     Log3 $name, 4, "$name: FTUISRV_handleIf expr elements :".scalar(@a).":";
     Log3 $name, 4, "$name: FTUISRV_handleIf expr after setmagic :".$expr.":";
   }
+  #Debug "Expr : ".( ( $expr ) ? $then : $else ).":";
 
   # put then/else depending on expr
   $done .= ( ( $expr ) ? $then : $else );
@@ -1136,9 +1137,12 @@ sub FTUISRV_BinaryFileRead($) {
     </li><br>
 
     <li><code>&lt;?ftui-if=( expression ) ?&gt; ... [ &lt;?ftui-else ?&gt; ... ] &lt;?ftui-endif ?&gt; </code> <br>
-      IF statement: Allow the inclusion of a block depending on an expression that might again include also variables and expressions in fhem. The else block is optional and can contain a block that is included if the expression is not evaluated to true.
+      IF statement: Allow the inclusion of a block depending on an expression that might again include also variables and expressions in fhem. The else block is optional and can contain a block that is included if the expression is empty or 0 .
       <br>
       Example: <code>&lt;?ftui-if=( [tempdevice:batteryok] ) ?&gt; ... &lt;?ftui-else ?&gt; ... &lt;?ftui-endif ?&gt; </code>
+      <br>
+      Note: The expression is not automatically evaluated in perl, if this is needed there should be the set-logic for perl expressions being used 
+      Example: <code>&lt;?ftui-if=( {( ReadingsVal("tempdevice","batteryok","") eq "ok" )} ) ?&gt; ... &lt;?ftui-else ?&gt; ... &lt;?ftui-endif ?&gt; </code>
     </li><br>
 
     <li><code>&lt;?ftui-loopinc="name" loopvariable=( loop-expression ) varname1="content1" ... varnameN="contentN" ?&gt;</code> <br>
