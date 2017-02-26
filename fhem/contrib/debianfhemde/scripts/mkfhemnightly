@@ -1,66 +1,92 @@
 #!/bin/sh
 #
 # $Id$
-#
 # create nightly build and transfer it to static webspace
 # (C) 2013-2017 betateilchen
 #
-
+QUIET=$1
 clear
+echo "#"
+echo "# Starting package build"
+echo "#"
 
 # remove old version infos
 #
-rm ~/scripts/templates/nversion.shtml
-rm ~/scripts/templates/major.shtml
+#rm ~/scripts/templates/nversion.shtml
+#rm ~/scripts/templates/major.shtml
 
 
 # update svn repo
 #
 cd ~/fhem.svn
-svn update
-
+if [ "$QUIET" = "quiet" ]
+  then svn update > /dev/null
+  else svn update
+fi
 
 # replace version infos in various html files
 # because Amazon S3 does not support shtml
 #
-svn info | grep 'Revision' | awk '{ print $2; }'           > ~/scripts/templates/nversion.shtml
-cat Makefile |grep '^VERS=' |sed 's/VERS=//' |sed 's/\r//' > ~/scripts/templates/major.shtml
-
+MAJOR=`cat Makefile |grep '^VERS=' |sed 's/VERS=//' |sed 's/\r//'`
+MINOR=`svn info | grep 'Revision' | awk '{ print $2; }'`
+DATE=`date +%d.%m.%y`
+TIME=`date +%X`
+echo "# $MAJOR.$MINOR"
+echo "#"
+echo "# $DATE $TIME"
+echo "#"
+echo "# updating templates with version infos"
 cd ~/scripts
 cp templates/index.template index.html
-sed -i s/==MINOR==/`cat templates/nversion.shtml`/g index.html
+sed -i s/==MAJOR==/$MAJOR/g index.html
+sed -i s/==MINOR==/$MINOR/g index.html
+sed -i s/==DATE==/$DATE/g   index.html
+sed -i s/==TIME==/$TIME/g   index.html
 mv index.html ../debianfhemde/
-
 cp templates/nightly.template nightly.html
-sed -i s/==MAJOR==/`cat templates/major.shtml`/g    nightly.html
-sed -i s/==MINOR==/`cat templates/nversion.shtml`/g nightly.html
+sed -i s/==MAJOR==/$MAJOR/g    nightly.html
+sed -i s/==MINOR==/$MINOR/g nightly.html
 mv nightly.html ../debianfhemde/html/
-
 cp templates/manual.template manual.html
-sed -i s/==MAJOR==/`cat templates/major.shtml`/g manual.html
+sed -i s/==MAJOR==/$MAJOR/g manual.html
 mv manual.html ../debianfhemde/html/
 
 
 # build nightly deb package
 #
+echo "#"
+echo "# processing Makefile - be patient..."
+echo "#"
 cd ~/fhem.svn
-make deb
-mv fhem-5.8.deb ~/debianfhemde/nightly/
+if [ "$QUIET" = "quiet" ]
+   then make --silent deb
+   else make deb
+fi
+mv fhem-$MAJOR.deb ~/debianfhemde/nightly/
 
 
 # create package informations for aptitude
 # and sign all the stuff
 #
+echo "#"
+echo "# creating package index for aptitude"
+echo "#"
 cd ~/debianfhemde/
 apt-ftparchive packages nightly > nightly/Packages
 sed -i s/nightly.//g nightly/Packages
 apt-ftparchive release  nightly > nightly/Release
-gpg --batch --yes --passphrase <passphrase> --output nightly/Release.gpg -bas nightly/Release
+gpg --batch --yes --passphrase ... --output nightly/Release.gpg -bas nightly/Release
 
 # sync to Amazon S3 Instance
 #
+echo "# starting sync"
+echo "#"
 cd ~/debianfhemde
-aws s3 sync . s3://debian.fhem.de --delete
-
+if [ "$QUIET" = "quiet" ]
+   then aws s3 sync . s3://debian.fhem.de --delete > /dev/null
+   else aws s3 sync . s3://debian.fhem.de --delete; echo "#";
+fi
+echo "# done."
+echo "#"
 ###
 

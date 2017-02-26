@@ -1,5 +1,6 @@
 <html>
 <head>
+<!-- ==DATE== ==TIME== -->
 <title>FHEM for Debian</title>
 <link rel="stylesheet" type="text/css"     href="../style/style.css"   />
 <link rel="icon"       type="image/x-icon" href="./grafik/favicon.ico" />
@@ -23,11 +24,16 @@
         <tr><td></td></tr>
         <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/stable.html'">Stable build using apt</p></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/nightly.html'">Nightly ==MINOR== using apt</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/nightly.html'">Nightly build using apt</p></td></tr>
         <tr><td></td></tr>
 <!--        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/https_trouble.html'">https Trouble?</p></td></tr>
         <tr><td></td></tr> -->
         <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/gpg_trouble.html'">gpg key Trouble</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><hr/></td></tr>
+        <tr><td><b>Nightly build:</b></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="asmall">Rev ==MAJOR==.==MINOR==<br/>==DATE== ==TIME==</p></td></tr>
         <tr><td></td></tr>
         <tr><td><hr/></td></tr>
         <tr><td><b>Links:</b></td></tr>
@@ -43,7 +49,7 @@
       </table>
       </table>
     </div>
-<!--    <div id="aws"></div> -->
+    <div id="aws"></div>
   </div>
 
   <div id="right"><iframe id="rightcontent" name="rightcontent" style="border:0px;" width="100%" height="100%" src="./html/default.html"></iframe></div>
