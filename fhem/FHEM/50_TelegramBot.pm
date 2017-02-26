@@ -32,136 +32,6 @@
 ##############################################################################
 # 0.0 2015-09-16 Started
 # 1.0 2015-10-17 Initial SVN-Version 
-#   
-#   INTERNAL: sendIt allows providing a keyboard json
-#   Favorites sent as keyboard
-#   allow sending to contacts not in the contacts list (by giving id of user)
-#   added comment on save (statefile) for correct operation in documentation
-#   contacts changed on new contacts found
-#   saveStateOnContactChange attribute to disaloow statefile save on contact change
-#   writeStatefile on contact change
-#   make contact restore simpler --> whenever new contact found write all contacts into log with loglevel 1
-#   Do not allow shutdown as command for execution
-#   ret from command handlings logged
-#   maxReturnSize for command results
-#   limit sentMsgTxt internal to 1000 chars (even if longer texts are sent)
-#   contact reading now written in contactsupdate before statefile written
-#   documentation corrected - forum#msg350873
-#   cleanup on comments 
-#   removed old version changes to history.txt
-#   add digest readings for error
-#   attribute to reduce logging on updatepoll errors - pollingVerbose:0_None,1_Digest,2_Log - (no log, default digest log daily, log every issue)
-#   documentation for pollingverbose
-#   reset / log polling status also in case of no error
-#   removed remark on timeout of 20sec
-#   LastCommands returns keyboard with commands 
-#   added send / image command for compatibility with yowsup
-#   image not in cmd list to avoid this being first option
-#   FIX: Keyboard removed after fac execution
-#   Do not use contacts from msg since this might be NON-Telegram contact
-#   cmdReturnEmptyResult - to suppress empty results from command execution
-#   prev... Readings do not trigger events (to reduce log content)
-#   Contacts reading only changed if string is not equal
-#   Need to replace \n again with Chr10 - linefeed due to a telegram change - FORUM #msg363825
-# 1.1 2015-11-24 keyboards added, log changes and multiple smaller enhancements
-#   
-#   Prepared for allowing multiple contacts being given for msg/image commands
-#   Prepare for defaultpeer specifying multiple peers as a list
-#   Allow multiple peers specified for send/msg/image etc
-#   Remove deprecated commands messageTo sendImageTo sendPhotoTo
-#   Minor fixes on lineendings for cmd results and log messages
-#   pollingVerbose attribute checked on set
-#   allowUnknownContacts attribute added default 1
-# 1.2 2015-12-20 multiple contacts for send etc/removed depreacted messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
-#
-#   modified cmd handling in preparation for alias (and more efficient)
-#   allow alias to be defined for favorites: /aliasx=cmdx;
-#   docu for alias
-#   correction for keyboard (no abbruch)
-#   added sentMsgId on sentMsgs
-#   Also set sentMsg Id and result in Readings (when finished)
-#   add docu for new readings on sentMsg
-#   fix for checkCmdKeyword to not sent unauthorized on every message
-#   avoid unauthorized messages to be sent multiple times 
-#   added sendVoice for Voice messages
-#   added sendMedia / sendDocument for arbitrary media files
-#   specified a longer description in the doc for gaining telegramBot tokens
-#   fix: allowunknowncontacts for known contacts
-# 1.3 2016-01-02 alias for commands, new readings, support for sending media files plus fixes
-#   
-#   receiving media files is possible --> file id is stored in msgFileId / msgText starting with "received..."
-#     additional info from message (type, name, etc) is contained in msgText 
-#   added get function to return url for file ids on media messages "urlForFile"
-#     writes returned url into internal: fileUrl
-#   INT: switch command result sending to direct _sendIt call
-#   forum msg396189
-#     favorite commands can be used also to send images back if the result of the command is an image 
-#     e.g. { plotAsPng('SVG_FileLog_something') } --> returns PNG if used in favorite the result will be send as photo
-#   Forbid all commands starting with shutdown
-#   Recognize MP3 also with ID3v2 tag (2.2 / 2.3 / 2.4)
-# 1.4 2016-02-07 receive media files, send media files directly from parameter (PNG, JPG, MP3, PDF, etc)
-
-#   Retry-Preparation: store arsg in param array / delete in case of error before sending
-#   added maxRetries for Retry send with wait time 1=10s / 2=100s / 3=1000s ~ 17min / 4=10000s ~ 3h / 5=100000s ~ 30h
-#   tested Retry of send in case of errors (after finalizing message)
-#   attr returns text to avoid automatic attr setting in fhem.pl
-#   documented maxRetries
-#   fixed attributehandling to normalize and correct attribute values
-#   fix for perl "keys on reference is experimental" forum#msg417968
-#   allow confirmation for favorite commands by prefixing with question ark (?)
-#   fix contact update 
-# 1.5 2016-03-19 retry for send / confirmation 
-
-#   supergroups added now also to contacts
-#   fix for first name of contacts undefined
-#   remove stale/duplicate contacts (based on username) on update of contacts (supergroups get new ids)
-#   Allow localization outward facing messages -> templates with replacements (German as default)
-#     New attributes for visible telegram responses: 
-#       textResponseConfirm, textResponseFavorites, textResponseCommands, textResponseResult, textResponseUnauthorized
-#   descriptions for favorites can be specified (enclosed in [])
-#   descriptions are shown in favorite list and confirmation dialogue
-#   texts are converted to UTF8 also for keyboards
-#   favorite list corrected
-# 1.6 2016-04-08 text customization for replies/messages and favorite descriptions 
-
-#   Fix: contact handling failed (/ in contact names ??)
-#   Reply keyboards also for sendVoice/sendDocument ect
-#   reply msg id in sendit - new set cmd reply
-#   Fix: reset also removes retry timer 
-#   TEMP: SNAME in hash is needed for allowed (SNAME reflects if the TCPServer device name) 
-#   Remove unnecessary attribute setters
-#   added allowedCommands and doc (with modification of allowed_... device)
-#   allowedCommands only modified on the allowed_... device
-# 1.7 2016-05-05 reply set command / allowedCommands as restriction
-
-#   fix for addPar (Caption) on photos in SendIt
-#   fix for contact list UTF8 encoding on restart
-#   fix: encoding problem in some environments leading to wrong length calc in httputils (msg457443)
-#
-#   fix: Favorite description without alias name was not parsed correctly
-#   fix: Favorite alias only handled if really contains more than the /
-#   
-#   Complete rework of JSON/UTF8 code to solve timeout and encoding issues
-#   Add \t for messages texts - will be a single space in the message
-# 1.8 2016-05-05 UNicode / Umlaute handling changed, \t added 
-
-#   Add unescaping of filenames for send - this allows also spaces (%20)
-#   Attribut filenameUrlEscape allows switching on urlescaping for filenames
-#   Caption also for documents
-#   Location and venue received as message type
-#   sendLocation command
-#   add attribute for timeout on do execution (similar to polling) --> cmdTimeout - timeout in do_params / Forum msg480844
-#   fix for timeout on sent and addtl log - forum msg497239
-#   change log levels for deep encoding
-#   add summary for fhem commandref
-# 1.9 2016-10-06 urlescaped filenames / location send-receive / timeout for send 
-
-#   fix: multibot environment - localize global hashes
-#   markup - per Attribute "parseModeSend" - None / InMsg / Markdown / HTML 
-#   Log unnknown contacts and messages - msg505210
-#   replykeyboardhide - test - msg505012 - not possible to remove keyboard
-#   edit_message - msg504659 - new command msgEdit
-#   msgEdit documented
 # 2.0 2016-10-19 multibot support / markup on send text / msgEdit 
 
 #   disable_web_page_preview - attribut webPagePreview - msg506924
@@ -196,15 +66,37 @@
 #   "0" message still sent on queryanswer
 # 2.1 2016-12-25  msgForceReply, disable, keyboards in messages, inline keyboards and dialogs
 
-#   
-#   
+#   allow response for commands being sent in chats - new attribute cmdRespondChat to configure
+#   new reading msgChatId
+#   exclamation mark in favorites to allow empty results also being sent
+#   new get peerID for onverting a named peer into an id (same syntax as in msg)
+#   document get commands
+#   communication with TBot_List Module -> queryAnswer
+#   document cmdRespondChat / msgChatId
+#   "Bad Request:" or "Unauthorized" do not result in retry
+#   cleaned up done list
+#   ATTENTION: store api key in setkey value see patch from msg576714
+#   put values in chat/chatId even if no group involved (peer will be set)
+# 2.2 2016-02-26  msgChatId with peer / api key secured / communication with TBot_List
+
 #   
 #   
 #   
 ##############################################################################
 # TASKS 
 #   
+#   
+#   replyKeyboardRemove - #msg592808
+#   
+#   allow multiple commands
+#   
+#   allow comma as separator for recipients
+#   
+#   add an option to send silent messages - msg556631
+#   
 #   allow setting one time keyboard through set - how to connect to set?
+#   
+#   
 #   
 #   
 #   
@@ -255,6 +147,10 @@ sub TelegramBot_PutToUTF8( $ );
 sub TelegramBot_AttrNum($$$);
 
 sub TelegramBot_MakeKeyboard($$$@);
+sub TelegramBot_ExecuteCommand($$$$;$);
+
+sub TelegramBot_readToken($);
+sub TelegramBot_storeToken($$);
 
 #########################
 # Globals
@@ -285,6 +181,8 @@ my %sets = (
 
   "reply" => "textField",
 
+  "token" => "textField",
+
   "zDebug" => "textField"
 
 );
@@ -298,7 +196,9 @@ my %deprecatedsets = (
 my %gets = (
   "urlForFile" => "textField",
 
-  "update" => undef
+  "update" => undef,
+  
+  "peerId" => "textField",
 );
 
 my $TelegramBot_header = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0\r\nAccept: application/json\r\nAccept-Charset: utf-8";
@@ -327,10 +227,11 @@ sub TelegramBot_Initialize($) {
   $hash->{UndefFn}    = "TelegramBot_Undef";
   $hash->{StateFn}    = "TelegramBot_State";
   $hash->{GetFn}      = "TelegramBot_Get";
+  $hash->{RenameFn}   = "TelegramBot_Rename";
   $hash->{SetFn}      = "TelegramBot_Set";
   $hash->{AttrFn}     = "TelegramBot_Attr";
   $hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer ". "cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None ".
-  "cmdTimeout pollingTimeout disable queryAnswerText:textField ".
+  "cmdTimeout pollingTimeout disable queryAnswerText:textField cmdRespondChat:0,1 ".
   "allowUnknownContacts:1,0 textResponseConfirm:textField textResponseCommands:textField allowedCommands filenameUrlEscape:1,0 ". 
   "textResponseFavorites:textField textResponseResult:textField textResponseUnauthorized:textField ".
   "parseModeSend:0_None,1_Markdown,2_HTML,3_InMsg webPagePreview:1,0 ".
@@ -353,16 +254,20 @@ sub TelegramBot_Define($$) {
   my $errmsg = '';
   
   # Check parameter(s)
-  if( int(@a) != 3 ) {
-    $errmsg = "syntax error: define <name> TelegramBot <APIid> ";
+  
+  # Debug "Token : ".TelegramBot_readToken($hash);
+  
+  # If api token is given check for syntax and remove from hash
+  if ( ( int(@a) == 3 ) && ( $a[2] !~ /^([[:alnum:]]|[-:_])+[[:alnum:]]+([[:alnum:]]|[-:_])+$/ ) ) {
+    $errmsg = "specify valid API token containing only alphanumeric characters and -: characters: define <name> TelegramBot  [ <APItoken> ]";
     Log3 $name, 1, "TelegramBot $name: " . $errmsg;
     return $errmsg;
-  }
-  
-  if ( $a[2] =~ /^([[:alnum:]]|[-:_])+[[:alnum:]]+([[:alnum:]]|[-:_])+$/ ) {
-    $hash->{Token} = $a[2];
-  } else {
-    $errmsg = "specify valid API token containing only alphanumeric characters and -: characters: define <name> TelegramBot  <APItoken> ";
+  } elsif ( ( int(@a) == 2 ) && ( ! TelegramBot_readToken($hash) ) ){
+    $errmsg = "no predefined token found specify token in define: define <name> TelegramBot <APItoken>";
+    Log3 $name, 1, "TelegramBot $name: " . $errmsg;
+    return $errmsg;
+  } elsif( int(@a) > 3 || int(@a) < 2) {
+    $errmsg = "syntax error: define <name> TelegramBot [ <APIid> ]"; 
     Log3 $name, 1, "TelegramBot $name: " . $errmsg;
     return $errmsg;
   }
@@ -400,6 +305,11 @@ sub TelegramBot_Define($$) {
   $hash->{HU_UPD_PARAMS} = \%hu_upd_params;
   $hash->{HU_DO_PARAMS} = \%hu_do_params;
 
+  if (int(@a) == 3) {
+      TelegramBot_storeToken($hash, $a[2]);
+      $hash->{DEF} = undef; 
+  }
+
   TelegramBot_Setup( $hash );
 
   return $ret; 
@@ -427,6 +337,21 @@ sub TelegramBot_Undef($$)
   Log3 $name, 4, "TelegramBot_Undef $name: done ";
   return undef;
 }
+
+
+#############################################################################################
+# called when the device gets renamed,
+# in this case we then also need to rename the key in the token store
+sub TelegramBot_Rename($$) {
+    my ($new,$old) = @_;
+
+    my $index_old = "TelegramBot_" . $old . "_token";
+    my $index_new = "TelegramBot_" . $new . "_token";
+ 
+    setKeyValue($index_new, getKeyValue($index_old));
+    setKeyValue($index_old, undef);
+}
+
 
 ##############################################################################
 ##############################################################################
@@ -614,10 +539,17 @@ sub TelegramBot_Set($@)
     # for internal testing only
     Log3 $name, 5, "TelegramBot_Set $name: start debug option ";
 #    delete $hash->{sentMsgPeer};
-    $ret = TelegramBot_SendIt( $hash, AttrVal($name,'defaultPeer',undef), "abc     def\n   def    ghi", undef, 0, undef );
+#    $ret = TelegramBot_SendIt( $hash, AttrVal($name,'defaultPeer',undef), "abc     def\n   def    ghi", undef, 0, undef );
+  $hash->{HU_UPD_PARAMS}->{callback} = \&TelegramBot_Callback;
+  $hash->{HU_DO_PARAMS}->{callback} = \&TelegramBot_Callback;
 
-    
-  # BOTONLY
+  } elsif($cmd eq 'token') {
+    if ( $numberOfArgs == 2 ) {
+      $ret = TelegramBot_storeToken ( $hash, $args[0] );
+      TelegramBot_Setup( $hash );
+    } else {
+      return "TelegramBot_Set: Command $cmd no token specified or addtl parameters given";
+    }
   } elsif($cmd eq 'reset') {
     Log3 $name, 5, "TelegramBot_Set $name: reset requested ";
     TelegramBot_Setup( $hash );
@@ -692,14 +624,15 @@ sub TelegramBot_Get($@)
     $hash->{fileUrl} = "";
     
     # return URL for file id
-    my $url = $hash->{URL}."getFile?file_id=".urlEncode($arg);
+    my $url = TelegramBot_getBaseURL($hash)."getFile?file_id=".urlEncode($arg);
     my $guret = TelegramBot_DoUrlCommand( $hash, $url );
+    my $token = TelegramBot_readToken( $hash );
 
     if ( ( defined($guret) ) && ( ref($guret) eq "HASH" ) ) {
       if ( defined($guret->{file_path} ) ) {
         # URL is https://api.telegram.org/file/bot<token>/<file_path>
         my $filePath = $guret->{file_path};
-        $hash->{fileUrl} = "https://api.telegram.org/file/bot".$hash->{Token}."/".$filePath;
+        $hash->{fileUrl} = "https://api.telegram.org/file/bot".$token."/".$filePath;
         $ret = $hash->{fileUrl};
       } else {
         $ret = "urlForFile failed: no file path found";
@@ -713,7 +646,16 @@ sub TelegramBot_Get($@)
 
   } elsif ( $cmd eq "update" ) {
     $ret = TelegramBot_UpdatePoll( $hash, "doOnce" );
+
+  } elsif ( $cmd eq "peerId" ) {
+    if ( $numberOfArgs != 2 ) {
+      return "TelegramBot_Get: Command $cmd, peer specified";
+    }
+    $ret = TelegramBot_GetIdForPeer( $hash, $arg );
   }
+  
+  
+  
   
   Log3 $name, 5, "TelegramBot_Get $name: done with ".( defined($ret)?$ret:"<undef>").": ";
 
@@ -755,7 +697,7 @@ sub TelegramBot_Attr(@) {
       my @clist = split( /;/, $aVal);
 
       foreach my $cs (  @clist ) {
-        my ( $alias, $desc, $parsecmd, $needsConfirm ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
+        my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
         if ( $alias ) {
           my $alx = $alias;
           my $alcmd = $parsecmd;
@@ -823,8 +765,8 @@ sub TelegramBot_Attr(@) {
 #####################################
 #####################################
 # INTERNAL: Check against cmdkeyword given (no auth check !!!!)
-sub TelegramBot_checkCmdKeyword($$$$$) {
-  my ($hash, $mpeernorm, $mtext, $cmdKey, $needsSep ) = @_;
+sub TelegramBot_checkCmdKeyword($$$$$$) {
+  my ($hash, $mpeernorm, $mchatnorm, $mtext, $cmdKey, $needsSep ) = @_;
   my $name = $hash->{NAME};
 
   my $cmd;
@@ -850,6 +792,9 @@ sub TelegramBot_checkCmdKeyword($$$$$) {
   # validate security criteria for commands and return cmd only if succesful
   return ( undef, 1 )  if ( ! TelegramBot_checkAllowedPeer( $hash, $mpeernorm, $mtext ) );
 
+  return ( undef, 1 )  if ( ( $mchatnorm ) && ( ! TelegramBot_checkAllowedPeer( $hash, $mchatnorm, $mtext ) ) );
+
+
   return ( $cmd, 1 );
 }
     
@@ -872,27 +817,28 @@ sub TelegramBot_SplitFavoriteDef($$) {
   #   /rolladen[Liste Rolladen]=list TYPE=SOMFY
   #   /rolladen[Liste Rolladen]=list TYPE=SOMFY
   
-  my ( $alias, $desc, $parsecmd, $confirm );
+  my ( $alias, $desc, $parsecmd, $confirm, $result  );
 
-  if ( $cmd =~ /^\s*((\/[^\[=]*)?(\[([^\]]+)\])?=)?(\??)(.*?)$/ ) {
+  if ( $cmd =~ /^\s*((\/[^\[=]*)?(\[([^\]]+)\])?=)?(\??)(\!?)(.*?)$/ ) {
     $alias = $2;
     $alias = undef if ( $alias && ( $alias eq "/" ) );
     $desc = $4;
     $confirm = $5;
-    $parsecmd = $6;
+    $result = $6;
+    $parsecmd = $7;
 #    Debug "Parse 1  a:".$alias.":  d:".$desc.":  c:".$parsecmd.":";
   } else {
     Log3 $name, 1, "TelegramBot_SplitFavoriteDef invalid favorite definition :$cmd: ";
   }
   
-  return ( $alias, $desc, $parsecmd, (($confirm eq "?")?1:0) );
+  return ( $alias, $desc, $parsecmd, (($confirm eq "?")?1:0), (($result eq "!")?1:0) );
 }
     
 #####################################
 #####################################
 # INTERNAL: handle sentlast and favorites
-sub TelegramBot_SentFavorites($$$$) {
-  my ($hash, $mpeernorm, $cmd, $mid ) = @_;
+sub TelegramBot_SentFavorites($$$$$) {
+  my ($hash, $mpeernorm, $mchatnorm, $cmd, $mid ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
@@ -905,6 +851,9 @@ sub TelegramBot_SentFavorites($$$$) {
   my @clist = split( /;/, $slc);
   my $isConfirm;
   
+  my $resppeer = $mpeernorm;
+  $resppeer .= "(".$mchatnorm.")" if ( $mchatnorm ); 
+
   if ( $cmd =~ /^\s*([0-9]+)(\??)\s*=.*$/ ) {
     $cmd = $1;
     $isConfirm = ($2 eq "?")?1:0; 
@@ -918,7 +867,7 @@ sub TelegramBot_SentFavorites($$$$) {
     if ( ( $cmdId >= 0 ) && ( $cmdId < scalar( @clist ) ) ) { 
       my $ecmd = $clist[$cmdId];
       
-      my ( $alias, $desc, $parsecmd, $needsConfirm ) = TelegramBot_SplitFavoriteDef( $hash, $ecmd );
+      my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult ) = TelegramBot_SplitFavoriteDef( $hash, $ecmd );
       return "Alias could not be parsed :$ecmd:" if ( ! $parsecmd );
 
       $ecmd = $parsecmd;
@@ -949,14 +898,14 @@ sub TelegramBot_SentFavorites($$$$) {
 
         # LOCAL: External message
         $ret = encode_utf8( AttrVal( $name, 'textResponseConfirm', 'TelegramBot FHEM : $peer\n Bestätigung \n') );
-        $ret =~ s/\$peer/$mpeernorm/g;
-#        $ret = "TelegramBot FHEM : ($mpeernorm)\n Bestätigung \n";
         
-        return TelegramBot_SendIt( $hash, $mpeernorm, $ret, $jsonkb, 0 );
+        $ret =~ s/\$peer/$resppeer/g;
+        
+        return TelegramBot_SendIt( $hash, (($mchatnorm)?$mchatnorm:$mpeernorm), $ret, $jsonkb, 0 );
         
       } else {
         $ecmd = $1 if ( $ecmd =~ /^\s*\?(.*)$/ );
-        return TelegramBot_ExecuteCommand( $hash, $mpeernorm, $ecmd );
+        return TelegramBot_ExecuteCommand( $hash, $mpeernorm, $mchatnorm, $ecmd, $needsResult );
       }
     } else {
       Log3 $name, 3, "TelegramBot_SentFavorites cmd id not defined :($cmdId+1): ";
@@ -972,7 +921,7 @@ sub TelegramBot_SentFavorites($$$$) {
       
       foreach my $cs (  @clist ) {
         $cnt += 1;
-        my ( $alias, $desc, $parsecmd, $needsConfirm ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
+        my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
         if ( defined($parsecmd) ) { 
           my @tmparr = ( $fcmd.$cnt." = ".($alias?$alias." = ":"").(($desc)?$desc:$parsecmd) );
           push( @keys, \@tmparr );
@@ -987,10 +936,9 @@ sub TelegramBot_SentFavorites($$$$) {
       
       # LOCAL: External message
       $ret = AttrVal( $name, 'textResponseFavorites', 'TelegramBot FHEM : $peer\n Favoriten \n');
-      $ret =~ s/\$peer/$mpeernorm/g;
-#      $ret = "TelegramBot FHEM : ($mpeernorm)\n Favorites \n";
+      $ret =~ s/\$peer/$resppeer/g;
       
-      $ret = TelegramBot_SendIt( $hash, $mpeernorm, $ret, $jsonkb, 0 );
+      $ret = TelegramBot_SendIt( $hash, (($mchatnorm)?$mchatnorm:$mpeernorm), $ret, $jsonkb, 0 );
   
   }
   return $ret;
@@ -1001,8 +949,8 @@ sub TelegramBot_SentFavorites($$$$) {
 #####################################
 #####################################
 # INTERNAL: handle sentlast and favorites
-sub TelegramBot_SentLastCommand($$$) {
-  my ($hash, $mpeernorm, $cmd ) = @_;
+sub TelegramBot_SentLastCommand($$$$) {
+  my ($hash, $mpeernorm, $mchatnorm, $cmd ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
@@ -1027,11 +975,15 @@ sub TelegramBot_SentLastCommand($$$) {
 
   # LOCAL: External message
   $ret = AttrVal( $name, 'textResponseCommands', 'TelegramBot FHEM : $peer\n Letzte Befehle \n');
-  $ret =~ s/\$peer/$mpeernorm/g;
+  
+  my $resppeer = $mpeernorm;
+  $resppeer .= "(".$mchatnorm.")" if ( $mchatnorm );
+  
+  $ret =~ s/\$peer/$resppeer/g;
   #  $ret = "TelegramBot FHEM : $mpeernorm \n Last Commands \n";
   
   # overwrite ret with result from SendIt --> send response
-  $ret = TelegramBot_SendIt( $hash, $mpeernorm, $ret, $jsonkb, 0 );
+  $ret = TelegramBot_SendIt( $hash, (($mchatnorm)?$mchatnorm:$mpeernorm), $ret, $jsonkb, 0 );
 
 ############ OLD SentLastCommands sent as message   
 #  $ret = "TelegramBot fhem  : $mpeernorm \nLast Commands \n\n".$slc;
@@ -1046,17 +998,14 @@ sub TelegramBot_SentLastCommand($$$) {
 #####################################
 #####################################
 # INTERNAL: execute command and sent return value 
-sub TelegramBot_ReadHandleCommand($$$$) {
-  my ($hash, $mpeernorm, $cmd, $mtext ) = @_;
+sub TelegramBot_ReadHandleCommand($$$$$) {
+  my ($hash, $mpeernorm, $mchatnorm, $cmd, $mtext ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
   
   Log3 $name, 3, "TelegramBot_ReadHandleCommand $name: cmd found :".$cmd.": ";
   
-  # get human readble name for peer
-  my $pname = TelegramBot_GetFullnameForContact( $hash, $mpeernorm );
-
   Log3 $name, 5, "TelegramBot_ReadHandleCommand cmd correct peer ";
   # Either no peer defined or cmdpeer matches peer for message -> good to execute
   my $cto = AttrVal($name,'cmdTriggerOnly',"0");
@@ -1069,7 +1018,7 @@ sub TelegramBot_ReadHandleCommand($$$$) {
   # store last commands (original text)
   TelegramBot_AddStoredCommands( $hash, $mtext );
 
-  $ret = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $cmd );
+  $ret = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $mchatnorm, $cmd );
 
   return $ret;
 }
@@ -1078,11 +1027,13 @@ sub TelegramBot_ReadHandleCommand($$$$) {
 #####################################
 #####################################
 # INTERNAL: execute command and sent return value 
-sub TelegramBot_ExecuteCommand($$$) {
-  my ($hash, $mpeernorm, $cmd ) = @_;
+sub TelegramBot_ExecuteCommand($$$$;$) {
+  my ($hash, $mpeernorm, $mchatnorm, $cmd, $sentemptyresult ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
+  
+  $sentemptyresult = AttrVal($name,'cmdReturnEmptyResult',1) if ( ! $sentemptyresult );
   
   # get human readble name for peer
   my $pname = TelegramBot_GetFullnameForContact( $hash, $mpeernorm );
@@ -1134,7 +1085,7 @@ sub TelegramBot_ExecuteCommand($$$) {
 
   if ( ( ! defined( $ret ) ) || ( length( $ret) == 0 ) ) {
     $retMsg =~ s/\$result/OK/g;
-    $ret = $retMsg if ( AttrVal($name,'cmdReturnEmptyResult',1) );
+    $ret = $retMsg if ( $sentemptyresult );
   } elsif ( ! $isMediaStream ) {
     $retMsg =~ s/\$result/$ret/g;
     $ret = $retMsg;
@@ -1176,7 +1127,7 @@ sub TelegramBot_ExecuteCommand($$$) {
       $ret =~ s/\n/\\n/gm;
     }
 
-    my $peers = $mpeernorm;
+    my $peers = (($mchatnorm)?$mchatnorm:$mpeernorm);
 
     my $dpc = AttrVal($name,'defaultPeerCopy',1);
     $peers .= " ".$defpeer if ( ( $dpc ) && ( defined( $defpeer ) ) );
@@ -1221,9 +1172,9 @@ sub TelegramBot_AddStoredCommands($$) {
 #####################################
 # INTERNAL: Function to check for commands in messages 
 # Always executes and returns on first match also in case of error 
-sub Telegram_HandleCommandInMessages($$$$)
+sub Telegram_HandleCommandInMessages($$$$$)
 {
-  my ( $hash, $mpeernorm, $mtext, $mid ) = @_;
+  my ( $hash, $mpeernorm, $mchatnorm, $mtext, $mid ) = @_;
   my $name = $hash->{NAME};
 
   my $cmdRet;
@@ -1236,9 +1187,9 @@ sub Telegram_HandleCommandInMessages($$$$)
   #### Check authorization for cmd execution is done inside checkCmdKeyword
   
   # Check for cmdKeyword in msg
-  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mtext, AttrVal($name,'cmdKeyword',undef), 1 );
+  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, AttrVal($name,'cmdKeyword',undef), 1 );
   if ( defined( $cmd ) ) {
-    $cmdRet = TelegramBot_ReadHandleCommand( $hash, $mpeernorm, $cmd, $mtext );
+    $cmdRet = TelegramBot_ReadHandleCommand( $hash, $mpeernorm, $mchatnorm, $cmd, $mtext );
     Log3 $name, 4, "TelegramBot_ParseMsg $name: ReadHandleCommand returned :$cmdRet:" if ( defined($cmdRet) );
     return;
   } elsif ( $doRet ) {
@@ -1246,9 +1197,9 @@ sub Telegram_HandleCommandInMessages($$$$)
   }
   
   # Check for sentCommands Keyword in msg
-  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mtext, AttrVal($name,'cmdSentCommands',undef), 1 );
+  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, AttrVal($name,'cmdSentCommands',undef), 1 );
   if ( defined( $cmd ) ) {
-    $cmdRet = TelegramBot_SentLastCommand( $hash, $mpeernorm, $cmd );
+    $cmdRet = TelegramBot_SentLastCommand( $hash, $mpeernorm, $mchatnorm, $cmd );
     Log3 $name, 4, "TelegramBot_ParseMsg $name: SentLastCommand returned :$cmdRet:" if ( defined($cmdRet) );
     return;
   } elsif ( $doRet ) {
@@ -1256,9 +1207,9 @@ sub Telegram_HandleCommandInMessages($$$$)
   }
     
   # Check for favorites Keyword in msg
-  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mtext, AttrVal($name,'cmdFavorites',undef), 0 );
+  ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, AttrVal($name,'cmdFavorites',undef), 0 );
   if ( defined( $cmd ) ) {
-    $cmdRet = TelegramBot_SentFavorites( $hash, $mpeernorm, $cmd, $mid );
+    $cmdRet = TelegramBot_SentFavorites( $hash, $mpeernorm, $mchatnorm, $cmd, $mid );
     Log3 $name, 4, "TelegramBot_ParseMsg $name: SentFavorites returned :$cmdRet:" if ( defined($cmdRet) );
     return;
   } elsif ( $doRet ) {
@@ -1268,12 +1219,12 @@ sub Telegram_HandleCommandInMessages($$$$)
   # Check for favorite aliase in msg - execute command then
   if ( defined( $hash->{AliasCmds} ) ) {
     foreach my $aliasKey (keys %{$hash->{AliasCmds}} ) {
-      ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mtext, $aliasKey, 1 );
+      ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, $aliasKey, 1 );
       if ( defined( $cmd ) ) {
         # Build the final command from the the alias and the remainder of the message
         Log3 $name, 5, "TelegramBot_ParseMsg $name: Alias Match :$aliasKey:";
         $cmd = $hash->{AliasCmds}{$aliasKey}." ".$cmd;
-        $cmdRet = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $cmd );
+        $cmdRet = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $mchatnorm, $cmd );
         Log3 $name, 4, "TelegramBot_ParseMsg $name: ExecuteFavoriteCmd returned :$cmdRet:" if ( defined($cmdRet) );
         return;
       } elsif ( $doRet ) {
@@ -1429,18 +1380,16 @@ sub TelegramBot_SendIt($$$$$;$$)
 
     if ( ( $isMedia == 0 ) || ( $isMedia == 10 ) ) {
       if ( $isMedia == 0 ) {
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendMessage";
+        $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendMessage";
       } else {
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."editMessageText";
+        $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."editMessageText";
         $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
         $replyid = undef;
       }
       
-#      $hash->{HU_DO_PARAMS}->{url} = "http://requestb.in";
+  # DEBUG OPTION
+  #  $hash->{HU_DO_PARAMS}->{url} = "http://requestb.in/1ibjnj81" if ( $msg =~ /^ZZZ/ );
 
-      ## JVI
-#      Debug "send  org msg  :".$msg.":";
-  
       my $parseMode = TelegramBot_AttrNum($name,"parseModeSend","0" );
       if ( $parseMode == 1 ) {
         $parseMode = "Markdown";
@@ -1487,7 +1436,7 @@ sub TelegramBot_SendIt($$$$$;$$)
       $hash->{sentMsgText} = "Location: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
           (( defined( $addPar ) )?" - ".$addPar:"");
 
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendLocation";
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendLocation";
 
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "latitude", undef, $msg, 0 ) if ( ! defined( $ret ) );
 
@@ -1499,7 +1448,7 @@ sub TelegramBot_SendIt($$$$$;$$)
       $hash->{sentMsgText} = "AnswerInline: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
           (( defined( $addPar ) )?" - ".$addPar:"");
 
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."answerCallbackQuery";
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."answerCallbackQuery";
       
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "callback_query_id", undef, $addPar, 0 ) if ( ! defined( $ret ) );
 
@@ -1510,7 +1459,7 @@ sub TelegramBot_SendIt($$$$$;$$)
       $hash->{sentMsgText} = "Image: ".TelegramBot_MsgForLog($msg, ($isMedia<0) ).
           (( defined( $addPar ) )?" - ".$addPar:"");
 
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendPhoto";
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendPhoto";
 
       # add caption
       if ( defined( $addPar ) ) {
@@ -1527,7 +1476,7 @@ sub TelegramBot_SendIt($$$$$;$$)
       # Voicemsg send    == 2
       $hash->{sentMsgText} = "Voice: $msg";
 
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendVoice";
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendVoice";
 
       # add msg or file or stream
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :".
@@ -1537,7 +1486,7 @@ sub TelegramBot_SendIt($$$$$;$$)
       # Media send    == 3
       $hash->{sentMsgText} = "Document: ".TelegramBot_MsgForLog($msg, ($isMedia<0) );
 
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."sendDocument";
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendDocument";
 
       # add msg (no file)
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :$msg:";
@@ -1766,7 +1715,7 @@ sub TelegramBot_UpdatePoll($;$)
   $offset = 0 if ( ! defined($offset) );
   
   # build url 
-  my $url =  $hash->{URL}."getUpdates?offset=".$offset. ( ($timeout!=0)? "&limit=5&timeout=".$timeout : "" );
+  my $url =  TelegramBot_getBaseURL($hash)."getUpdates?offset=".$offset. ( ($timeout!=0)? "&limit=5&timeout=".$timeout : "" );
 
   $hash->{HU_UPD_PARAMS}->{url} = $url;
   $hash->{HU_UPD_PARAMS}->{timeout} = $timeout+$timeout+5;
@@ -1847,6 +1796,7 @@ sub TelegramBot_Callback($$$)
   my $name = $hash->{NAME};
 
   my $ret;
+  my $doRetry = 1;   # will be set to zero if error is found that should lead to no retry
   my $result;
   my $msgId;
   my $ll = 5;
@@ -1893,7 +1843,10 @@ sub TelegramBot_Callback($$$)
       $ret = "Callback returned no valid JSON !";
     } elsif ( ! $jo->{ok} ) {
       if ( defined( $jo->{description} ) ) {
-        $ret = "Callback returned error:".$jo->{description}.":";
+        $ret = "Callback returned error :".$jo->{description}.":";
+        $doRetry = 0 if ($jo->{description} =~ /^Bad Request\:/);
+        Debug "description :".$jo->{description}.":";
+        $doRetry = 0 if ($jo->{description} =~ /^Unauthorized/);
       } else {
         $ret = "Callback returned error without description";
       }
@@ -1997,14 +1950,14 @@ sub TelegramBot_Callback($$$)
   }
 
   $ret = "SUCCESS" if ( ! defined( $ret ) );
-  Log3 $name, $ll, "TelegramBot_Callback $name: resulted in :$ret: from ".(( defined( $param->{isPolling} ) )?"Polling":"SendIt");
+  Log3 $name, $ll, "TelegramBot_Callback $name: resulted in $ret from ".(( defined( $param->{isPolling} ) )?"Polling":"SendIt");
 
   if ( ! defined( $param->{isPolling} ) ) {
     $hash->{sentLastResult} = $ret;
 
     # handle retry
     # ret defined / args defined in params 
-    if ( ( $ret ne  "SUCCESS" ) && ( defined( $param->{args} ) ) ) {
+    if ( ( $ret ne  "SUCCESS" ) && ( $doRetry ) && ( defined( $param->{args} ) ) ) {
       my $wait = $param->{args}[5];
       
       my $maxRetries =  AttrVal($name,'maxRetries',0);
@@ -2024,7 +1977,9 @@ sub TelegramBot_Callback($$$)
 
       Log3 $name, 3, "TelegramBot_Callback $name: Reached max retries (ret: $ret) for msg ".$param->{args}[0]." : ".$param->{args}[1];
       
-    } 
+    } elsif ( ( $ret ne  "SUCCESS" ) && ( ! $doRetry ) ) {
+      Log3 $name, 3, "TelegramBot_Callback $name: No retry for (ret: $ret) for msg ".$param->{args}[0]." : ".$param->{args}[1];
+    }
     
     $hash->{sentMsgResult} = $ret;
     $hash->{sentMsgId} = ((defined($msgId))?$msgId:"");
@@ -2205,7 +2160,10 @@ sub TelegramBot_ParseMsg($$$)
     $mpeernorm =~ s/^\s+|\s+$//g;
     $mpeernorm =~ s/ /_/g;
 
-#    Log3 $name, 5, "TelegramBot_ParseMsg $name: Found message $mid from $mpeer :$mtext:";
+    my $mchatnorm = "";
+    $mchatnorm = $chatId if ( AttrVal($name,'cmdRespondChat',1) == 1 ); 
+
+    #    Log3 $name, 5, "TelegramBot_ParseMsg $name: Found message $mid from $mpeer :$mtext:";
 
     # contacts handled separately since readings are updated in here
     TelegramBot_ContactUpdate($hash, @contacts) if ( scalar(@contacts) > 0 );
@@ -2226,8 +2184,9 @@ sub TelegramBot_ParseMsg($$$)
 
     readingsBulkUpdate($hash, "msgId", $mid);        
     readingsBulkUpdate($hash, "msgPeer", TelegramBot_GetFullnameForContact( $hash, $mpeernorm ));        
-    readingsBulkUpdate($hash, "msgChat", TelegramBot_GetFullnameForChat( $hash, $chatId ) );        
     readingsBulkUpdate($hash, "msgPeerId", $mpeernorm);        
+    readingsBulkUpdate($hash, "msgChat", TelegramBot_GetFullnameForContact( $hash, ((!$chatId)?$mpeernorm:$chatId) ) );        
+    readingsBulkUpdate($hash, "msgChatId", ((!$chatId)?$mpeernorm:$chatId) );        
     readingsBulkUpdate($hash, "msgText", $mtext);
     readingsBulkUpdate($hash, "msgReplyMsgId", $replyId);        
 
@@ -2236,7 +2195,7 @@ sub TelegramBot_ParseMsg($$$)
     readingsEndUpdate($hash, 1);
     
     # COMMAND Handling (only if no fileid found
-    Telegram_HandleCommandInMessages( $hash, $mpeernorm, $mtext, $mid ) if ( ! defined( $mfileid ) );
+    Telegram_HandleCommandInMessages( $hash, $mpeernorm, $mchatnorm, $mtext, $mid ) if ( ! defined( $mfileid ) );
    
   } elsif ( scalar(@contacts) > 0 )  {
     # will also update reading
@@ -2278,6 +2237,8 @@ sub TelegramBot_ParseCallbackQuery($$$)
 
   my $imid = $callback->{inline_message_id};
   my $chat= $callback->{chat_instance};
+#  Debug "Chat :".$chat.":";
+  
   my $data = $callback->{data};
 
   my $mtext = "Callback for inline query id: $qid  from : $mpeer :  data : ".(defined($data)?$data:"<undef>");
@@ -2304,7 +2265,6 @@ sub TelegramBot_ParseCallbackQuery($$$)
 
     Log3 $name, 4, "TelegramBot_ParseCallback $name: ".$mtext;
 
-
     # contacts handled separately since readings are updated in here
     TelegramBot_ContactUpdate($hash, @contacts) if ( scalar(@contacts) > 0 );
     
@@ -2322,6 +2282,18 @@ sub TelegramBot_ParseCallbackQuery($$$)
     
     $answerData = AttrVal($name,'queryAnswerText',undef); 
     
+    # special handling for TBot_List
+    if ( defined( $data ) ) {
+      my @ltbots = devspec2array( "TYPE=TBot_List" );
+      my $ltbotresult;
+      foreach my $ltbot ( @ltbots ) {
+        $ltbotresult = fhem( "get $ltbot queryAnswer $name $mpeernorm $data" );
+        if ( defined( $ltbotresult ) ) {
+          $answerData = $ltbotresult;
+          last;
+        }
+      }
+    }
   } 
   
   # sent answer if not undef 
@@ -2431,26 +2403,30 @@ sub TelegramBot_Setup($) {
   # remove timer for retry
   RemoveInternalTimer($hash->{HU_DO_PARAMS});
   
-  $hash->{URL} = "https://api.telegram.org/bot".$hash->{Token}."/";
-
   $hash->{STATE} = "Defined";
-
-  # getMe as connectivity check and set internals accordingly
-  my $url = $hash->{URL}."getMe";
-  my $meret = TelegramBot_DoUrlCommand( $hash, $url );
-  if ( ( ! defined($meret) ) || ( ref($meret) ne "HASH" ) ) {
-    # retry on first failure
-    $meret = TelegramBot_DoUrlCommand( $hash, $url );
-  }
-
-  if ( ( defined($meret) ) && ( ref($meret) eq "HASH" ) ) {
-    $hash->{me} = TelegramBot_userObjectToString( $meret );
-    $hash->{STATE} = "Setup";
+  
+  if ( ! TelegramBot_readToken($hash) ) {
+    Log3 $name, 1, "TelegramBot_Setup $name: no valid API token found, please call \"set $name token <token>\" (once)";
+    $hash->{STATE} = "NoValidToken";
 
   } else {
-    $hash->{me} = "Failed - see log file for details";
-    $hash->{STATE} = "Failed";
-    $hash->{FAILS} = 1;
+    # getMe as connectivity check and set internals accordingly
+    my $url = TelegramBot_getBaseURL($hash)."getMe";
+    my $meret = TelegramBot_DoUrlCommand( $hash, $url );
+    if ( ( ! defined($meret) ) || ( ref($meret) ne "HASH" ) ) {
+      # retry on first failure
+      $meret = TelegramBot_DoUrlCommand( $hash, $url );
+    }
+
+    if ( ( defined($meret) ) && ( ref($meret) eq "HASH" ) ) {
+      $hash->{me} = TelegramBot_userObjectToString( $meret );
+      $hash->{STATE} = "Setup";
+
+    } else {
+      $hash->{me} = "Failed - see log file for details";
+      $hash->{STATE} = "Failed";
+      $hash->{FAILS} = 1;
+    }
   }
   
   TelegramBot_InternalContactsFromReading( $hash);
@@ -2816,6 +2792,95 @@ sub TelegramBot_checkAllowedPeer($$$) {
 ##############################################################################
 ##############################################################################
 
+#####################################
+# stores Telegram API Token 
+sub TelegramBot_getBaseURL($)
+{
+  my ($hash) = @_;
+
+  my $token = TelegramBot_readToken( $hash );
+  
+  return "https://api.telegram.org/bot".$token."/";
+}
+
+
+
+
+#####################################
+# stores Telegram API Token 
+sub TelegramBot_storeToken($$)
+{
+    my ($hash, $token) = @_;
+     
+    if ( $token !~ /^([[:alnum:]]|[-:_])+[[:alnum:]]+([[:alnum:]]|[-:_])+$/ ) {
+      return "specify valid API token containing only alphanumeric characters and -: characters";
+    }
+
+    my $index = "TelegramBot_".$hash->{NAME}."_token";
+    my $key = getUniqueId().$index;
+    
+    my $enc_pwd = "";
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    for my $char (split //, $token)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    my $err = setKeyValue($index, $enc_pwd);
+
+    return "error while saving the API token - $err" if(defined($err));
+    return "API token successfully saved";
+} # end storeToken
+
+#####################################
+# reads the Telegram API Token
+sub TelegramBot_readToken($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $index = "TelegramBot_" . $hash->{NAME} . "_token";
+   my $key = getUniqueId().$index;
+
+   my ($token, $err);
+
+   Log3 $hash, 5, "TelegramBot_readToken: Read Telegram API token from file";
+   ($err, $token) = getKeyValue($index);
+
+   if ( defined($err) ) {
+      Log3 $hash, 1, "TelegramBot_readToken: Error: unable to read API token from file: $err";
+      return "";
+   }  
+    
+   if ( defined($token) ) {
+      if ( eval "use Digest::MD5;1" ) {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+     
+      for my $char (map { pack('C', hex($_)) } ($token =~ /(..)/g)) {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+     
+      return $dec_pwd;
+   }
+   else {
+      Log3 $hash, 1, "TelegramBot_readToken: Error: No API token in file";
+      return "";
+   }
+} # end readToken
+
 
 #####################################
 #  INTERNAL: get only numeric part of a value (simple)
@@ -3085,11 +3150,28 @@ sub TelegramBot_BinaryFileWrite($$$) {
     ATTENTION: Messages that might be queued on the telegram server side (especially commands) might be then worked off afterwards immedately. 
     If in doubt it is recommened to temporarily deactivate (delete) the cmdKeyword attribute before resetting.</li>
 
+  <br>
+    <li><code>token &lt;apitoken&gt;</code><br>Specify a new APItoken to be stored for this bot
+    </li>
+
   </ul>
 
   <br><br>
 
-  <a name="TelegramBotattr"></a>
+  <a name="TelegramBotget"></a>
+  <b>Get</b>
+  <ul>
+    <li><code>urlForFile &lt;fileid&gt;</code><br>Get a URL for a file id that was returned in a message
+    </li>
+    <li><code>update </code><br>Execute a single update (instead of automatic polling) - manual polling
+    </li>
+    <li><code>peerId &lt;peer&gt;</code><br>Ask for a peerId for a given peer, the peer can be specified in the same form as in a message without the initial '@'
+    </li>
+  </ul>
+
+  <br><br>
+
+    <a name="TelegramBotattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
@@ -3146,7 +3228,14 @@ sub TelegramBot_BinaryFileWrite($$$) {
     <br>
         Examples: <code>get lights status; /light=?set lights on; /dark=set lights off; ?set heater;</code> <br>
     <br>
-    Meaning the full format for a single favorite is <code>/alias[description]=command</code> where the alias can be empty or <code>/alias=command</code> or just the <code>command</code>. In any case the command can be also prefixed with a '?'. Spaces are only allowed in the description and the command, usage of spaces in other areas might lead to wrong interpretation of the definition. Spaces and also many other characters are not supported in the alias commands by telegram, so if you want to have your favorite/alias directly recognized in then telegram app, restriction to letters, digits and underscore is required.  
+    <br>
+    Favorite commands can also be prefixed with a exclamation mark ('!') to ensure an ok-result message is sent even when the attribute cmdReturnEmptyResult is set to 0. 
+    <br>
+        Examples: <code>get lights status; /light=!set lights on; /dark=set lights off; !set heater;</code> <br>
+    <br>
+    The question mark needs to be before the exclamation mark if both are given.
+    <br>
+    Meaning the full format for a single favorite is <code>/alias[description]=command</code> where the alias can be empty or <code>/alias=command</code> or just the <code>command</code>. In any case the command can be also prefixed with a '?' or a '!' (or both). Spaces are only allowed in the description and the command, usage of spaces in other areas might lead to wrong interpretation of the definition. Spaces and also many other characters are not supported in the alias commands by telegram, so if you want to have your favorite/alias directly recognized in then telegram app, restriction to letters, digits and underscore is required.  
     </li> 
 
   <br>
@@ -3154,6 +3243,10 @@ sub TelegramBot_BinaryFileWrite($$$) {
     (specified in the form of contact id, username or full name, multiple peers to be separated by a space). 
     A message with the cmd and sender is sent to the default peer in case of another peer trying to sent messages<br>
     It is recommended to use only peer ids for this restriction to reduce spoofing risk!
+
+    </li> 
+    <li><code>cmdRespondChat &lt;1 or 0&gt;</code><br>Results / Responses from Commands will be sent to a group chat (1 = default) if originating from this chat. Otherwise responses will be sent only to the person initiating the command (personal chat) if set to value 0. <br>
+    Note: Group chats also need to be allowed as restricted Peer in cmdRestrictedPeer if this is set. 
     </li> 
     <li><code>allowUnknownContacts &lt;1 or 0&gt;</code><br>Allow new contacts to be added automatically (1 - Default) or restrict message reception only to known contacts and unknwown contacts will be ignored (0).
     </li> 
@@ -3228,6 +3321,8 @@ sub TelegramBot_BinaryFileWrite($$$) {
     For secret chats a value of -1 will be given, since the msgIds of secret messages are not part of the consecutive numbering</li> 
     <li>msgPeer &lt;text&gt;<br>The sender name of the last received message (either full name or if not available @username)</li> 
     <li>msgPeerId &lt;text&gt;<br>The sender id of the last received message</li> 
+    <li>msgChat &lt;text&gt;<br>The name of the Chat in which the last message was received (might be the peer if no group involved)</li> 
+    <li>msgChatId &lt;ID&gt;<br>The id of the chat of the last message, if not identical to the private peer chat then this value will be the peer id</li> 
     <li>msgText &lt;text&gt;<br>The last received message text is stored in this reading. Information about special messages like documents, audio, video, locations or venues will be also stored in this reading</li> 
     <li>msgFileId &lt;fileid&gt;<br>The last received message file_id (Audio, Photo, Video, Voice or other Document) is stored in this reading.</li> 
     <li>msgReplyMsgId &lt;text&gt;<br>Contains the message id of the original message, that this message was a reply to</li> 
