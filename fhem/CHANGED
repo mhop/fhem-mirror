@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     49_TBot_List.pm: initial check in 
   - feature: 42_Nextion:  attributes disable/timeout, fix for page 10
   - update:  02_FTUISRV: doc change on ftui-if
   - feature: 50_TelegramBot:  Secured: api key handled in setkey/getkey 

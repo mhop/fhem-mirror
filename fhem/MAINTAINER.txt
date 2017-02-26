@@ -212,6 +212,7 @@ FHEM/46_TRX_WEATHER.pm       wherzig              http://forum.fhem.de RFXTRX
 FHEM/47_OBIS.pm              icinger              http://forum.fhem.de Sonstige Systeme
 FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           http://forum.fhem.de Sonstiges
+FHEM/49_TBot_List.pm         viegener             http://forum.fhem.de Unterstuetzende Dienste
 FHEM/50_HP1000.pm            loredo               http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/50_TelegramBot.pm       viegener             http://forum.fhem.de Unterstuetzende Dienste
