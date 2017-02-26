@@ -297,7 +297,7 @@ my @globalAttrList = qw(
   mseclog:1,0
   nofork:1,0
   nrarchive
-  perlSyntaxCheck
+  perlSyntaxCheck:0,1
   pidfilename
   port
   restartDelay
