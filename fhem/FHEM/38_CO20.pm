@@ -8,6 +8,10 @@ package main;
 use strict;
 use warnings;
 
+$ENV{CFLAGS} = '';
+$ENV{CPPFLAGS} = '';
+$ENV{LDFLAGS} = '';
+
 use Device::USB;
 
 sub
@@ -653,6 +657,8 @@ CO20_Attr($$$)
 1;
 
 =pod
+=item device
+=item summary USB iAQ Stick
 =begin html
 
 <a name="CO20"></a>
