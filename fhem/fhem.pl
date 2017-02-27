@@ -4090,12 +4090,14 @@ readingsEndUpdate($$)
     foreach my $userReading (@{$hash->{'.userReadings'}}) {
 
       my $trigger = $userReading->{trigger};
+      my $reading= $userReading->{reading};
       if(defined($trigger)) {
-        my @fnd = grep { $_ && $_ =~ m/^$trigger$/ } @{$hash->{CHANGED}};
-        next if(!@fnd);
+        my ($trRead, $ownRead);
+        map { $trRead  = 1 if($_ && $_ =~ m/^$trigger$/);
+              $ownRead = 1 if($_ && $_ =~ m/^$reading:/); } @{$hash->{CHANGED}};
+        next if(!$trRead || $ownRead);
       }
 
-      my $reading= $userReading->{reading};
       my $modifier= $userReading->{modifier};
       my $perlCode= $userReading->{perlCode};
       my $oldvalue= $userReading->{value};
