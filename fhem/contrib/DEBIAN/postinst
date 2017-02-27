@@ -1,13 +1,19 @@
 #!/bin/bash
+# $Id$
 
 set -e
 #set -x
+
+
 
 if ! getent passwd fhem >/dev/null; then
     useradd --system --home /opt/fhem --gid dialout --shell /bin/false fhem
 fi
 
 chown -R fhem:dialout /opt/fhem
+
+# remove repository entry after first installation
+sed -i /debian.fhem.de/d /etc/apt/sources.list
 
 # set up of autostart
 # Sysvinit; upstart no longer supported
