@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9
+#  Version 3.9.001
 #
 #  Configuration parameters for Homematic devices.
 #
@@ -56,6 +56,17 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statedatapoint   => "STATE",
    statevals        => "lock:false,unlock:true",
    substitute       => "STATE!(0|false):locked,(1|true):unlocked,2:open;INHIBIT!(0|false):no,(1|true):yes;STATE_UNCERTAIN!(1|true):manual;DIRECTION!0:none,1:up,2:down,3:undefined;ERROR!0:no,1:clutch_failure,2:motor_aborted"
+	},
+	"HM-LC-Sw1-Pl-CT-R1" => {
+	_description     => "Schaltaktor mit Klemmanschluss",
+	_channels        => "1",
+	ccureadingfilter => "(STATE|WORKING)",
+	cmdIcon          => "press:general_an",
+	eventMap         => "/on-for-timer 1:press/",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(0|false):off,(1|true):on;WORKING!(0|false):no,(1|true):yes",
+	webCmd           => "press"
 	},
 	"HM-LC-Sw1-Pl-2|HMIP-PS" => {
 	_description     => "Steckdose",
@@ -307,6 +318,16 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	statevals        => "open:100,close:0",
 	stripnumber      => 1,
    substitute       => "LEVEL!-0.005:locked,#0-0:closed,#100-100:open;INHIBIT!(0|false):no,(1|true):yes;ERROR!0:no,1:motor_turn,2:motor_tilt;STATUS!0:trickle_charge,1:charge,2:discharge,3:unknown"
+	},
+	"HM-LC-Sw1-Pl-CT-R1" => {
+	_description     => "Schaltaktor mit Klemmanschluss",
+	ccureadingfilter => "(STATE|WORKING)",
+	cmdIcon          => "press:general_an",
+	eventMap         => "/on-for-timer 1:press/",
+	statedatapoint   => "1.STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(0|false):off,(1|true):on;WORKING!(0|false):no,(1|true):yes",
+	webCmd           => "press"
 	},
 	"HM-LC-Sw1-Pl-2" => {
 	_description     => "Steckdose",
