@@ -188,6 +188,7 @@ sub TPLinkHS110_Get($$)
 			1;
 		} or do {
 			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			return;
 		};
 	}
 	readingsEndUpdate($hash, 1);
