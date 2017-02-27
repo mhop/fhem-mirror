@@ -49,7 +49,7 @@ alexa_AttrDefaults($)
                                          "Saturation=verb=stelle,property=sättigung,valuePrefix=auf,values=AMAZON.NUMBER\n".
                                          "Saturation=verb=sättige,values=AMAZON.NUMBER\n\n".
 
-                                         "TargetPosition=verb=mach,articles=den,values=auf:100;zu:0\n".
+                                         "TargetPosition=verb=mach,articles=den;die,values=auf:100;zu:0\n".
                                          "TargetPosition=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=prozent\n\n".
 
                                          "TargetTemperature=verb=stelle,valuePrefix=auf,values=AMAZON.NUMBER,valueSuffix=grad\n\n".
@@ -442,7 +442,7 @@ Log 1, $intent_name;
               $types->{"${intent_name}_${name}_Value"} = \@values if( $values[0] );
             }
 
-            $slot =~ s/\+/\\\+/;
+            $slot =~ s/\+/\\\+/g;
             $utterance =~ s/\{$slot\}/\{$slot_name\}/;
 
           } else {
