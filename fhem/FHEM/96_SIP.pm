@@ -52,6 +52,7 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
+my $sip_version ="V1.3 / 27.02.17";
 my $ua;			# SIP user agent
 
 my %sets = (
@@ -59,6 +60,7 @@ my %sets = (
    "listen:noArg" => "",
    "reset:noArg"  => "",
    "fetch:noArg"  => "",
+   "password"     => ""
    );
 
 
@@ -77,10 +79,10 @@ sub SIP_Initialize($$)
                           "sip_ip ".
                           "sip_port ". 
                           "sip_user ".
-                          "sip_password ". 
                           "sip_registrar ".
                           "sip_from ".
                           "sip_audiofile ".
+                          "sip_dtmf_size:1,2,3,4 ".
                           "sip_listen:none,dtmf,wfp ". 
                           "disabled:0,1 ".$readingFnAttributes;
 }						
@@ -93,14 +95,15 @@ sub SIP_Define($$)
   my $host = hostfqdn();
   my $addr = inet_ntoa(scalar(gethostbyname($host)));
 
-  $hash->{STATE}          = "defined"; 	
+  $hash->{STATE}              = "defined"; 	
+  $hash->{VERSION}            = $sip_version;
   $attr{$name}{sip_ringtime}  = '10'        unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
-  $attr{$name}{sip_password}  = 'test'      unless (exists($attr{$name}{sip_password}));
   $attr{$name}{sip_ip}        = $addr       unless (exists($attr{$name}{sip_ip}));
   $attr{$name}{sip_port}      = '5060'      unless (exists($attr{$name}{sip_port}));
   $attr{$name}{sip_registrar} = 'fritz.box' unless (exists($attr{$name}{sip_registrar}));
   $attr{$name}{sip_listen}    = 'none'      unless (exists($attr{$name}{sip_listen}));
+  $attr{$name}{sip_dtmf_size} = '2'         unless (exists($attr{$name}{sip_dtmf_size}));
   $attr{$name}{sip_from}      = 'sip:'.$attr{$name}{sip_user}.'@'.$attr{$name}{sip_registrar} unless (exists($attr{$name}{sip_from}));
 
   RemoveInternalTimer($hash);
@@ -207,7 +210,7 @@ sub SIP_Register($$)
         domain => $registrar,
         leg => $leg,
         from => AttrVal($name,"sip_from",'sip:620@fritz.box'),
-        auth => [ AttrVal($name,"sip_user","620") , AttrVal($name,"sip_password","test") ]);
+        auth => [ AttrVal($name,"sip_user","620") , SIP_readPassword($name) ]);
   # Register agent
 
   # optional registration
@@ -257,11 +260,11 @@ sub SIP_CALLStart($)
  
   if ((substr($msg,0,1) ne "-") && $msg)
   {
-    Log3 $name,4,"$name, msg : $msg";
+    Log3 $name,4,"$name, CallStart msg : $msg";
     $call = $ua->invite( $nr,
     init_media => $ua->rtp('send_recv', $msg),
     cb_rtp_done => \$rtp_done,
-    cb_final => \$final,
+    cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
     recv_bye => \$peer_hangup,
     cb_noanswer => \$no_answer,
     asymetric_rtp => 0,
@@ -270,13 +273,13 @@ sub SIP_CALLStart($)
    else
   {
     $dtmf = (substr($msg,0,1) eq "-") ? substr($msg,1) : $dtmf; 
-    Log3 $name,4,"$name, DTMF : $dtmf";
+    Log3 $name,4,"$name, CallStart DTMF : $dtmf";
     $call = $ua->invite($nr, 
     init_media => $ua->rtp( 'recv_echo',undef,0 ),
-    cb_final => \$final,
+    cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
     cb_noanswer => \$no_answer,
     recv_bye => \$peer_hangup) || return $name."|0|invite failed ".$ua->error;
-    $call->dtmf( $dtmf, cb_final => \$rtp_done );
+    $call->dtmf( $dtmf, cb_final => \$rtp_done);
   }
 
   return "$name|0|invite call failed ".$call->error if ($call->error);
@@ -302,6 +305,24 @@ sub SIP_CALLStart($)
   Log3 $name,5,"$name, Hangup : $peer_hangup"  if defined($peer_hangup);
   Log3 $name,5,"$name, Stopvar : $stopvar"     if defined($stopvar);
   Log3 $name,5,"$name, Final : $final"         if defined($final);
+
+  if (defined($rtp_done))
+  {
+   #print Dumper($stopvar);
+   if ($rtp_done eq "OK") {return $name."|1|ok";} # kein Audio
+   else 
+   {
+     if (defined($final))
+     {
+       my $txt;
+       $txt = "canceled"  if (int($final) == 486);
+       $txt = "no answer" if (int($final) == 487);
+       $final = $txt if defined($txt);
+     }
+     else {return $name."|1|ok" if ($rtp_done !=0);}
+   }
+  }
+
 
   $final  = "unknown"      if !defined($final);
   $final .= " peer hangup" if defined($peer_hangup);
@@ -357,7 +378,18 @@ sub SIP_Set($@)
   my $subcmd;
 
   return join(" ", sort keys %sets) if ($cmd eq "?");
- 
+
+  if (($cmd eq "call") || ($cmd eq "listen"))
+  {
+   my $pwd = SIP_readPassword($name);
+   unless (defined $pwd)  
+   {
+    my $ret = "Error: no SIP user password set. Please define it with 'set $name password Your_SIP_User_Password'";
+    Log3 $name,2,"$name, $ret";
+    return $ret;
+   }
+  }
+
   if  ($cmd eq "call") 
   {
     my $nr       = (defined($a[2])) ? $a[2] : "";
@@ -441,6 +473,10 @@ sub SIP_Set($@)
    SIP_updateConfig($hash);
    return undef;
   }
+  elsif ($cmd eq "password")
+  {
+    return SIP_storePassword($name,$subcmd);
+  }
 
   # die ersten beiden brauchen wir nicht mehr
   shift @a;
@@ -514,10 +550,11 @@ sub SIP_ListenStart($)
 
  my $msg = AttrVal($name, "sip_audiofile", "");
 
- $hash->{dtmf} = 0;
+ $hash->{dtmf}       = 0;
+ $hash->{dtmf_event} = "";
+ $hash->{old}        ="-";
 
-
-$sub_dtmf = sub {
+ $sub_dtmf = sub {
   my ($event,$dur) = @_;
   Log3 $name,5,"$name : DTMF Event : $event";
   if ($event eq "#")
@@ -530,10 +567,11 @@ $sub_dtmf = sub {
   {
    
    $hash->{dtmf} ++;
+   $hash->{old} = $event;
    $hash->{dtmf_event} .= $event;
    Log3 $name,5,"$name : DTMF Total: ".$hash->{dtmf_event}." , Anz: ".$hash->{dtmf};
-   $hash->{old} = $event;
-   if ($hash->{dtmf} > 2)
+   
+   if ($hash->{dtmf} > int(AttrVal($name,"sip_dtmf_size",2)))
    {
       SIP_telnet($hash,"set $name dtmf_event ".$hash->{dtmf_event}."\n");
       $hash->{dtmf}       = 0;
@@ -542,9 +580,9 @@ $sub_dtmf = sub {
    }
   }
  return;
-};
+ };
 
-$sub_invite = sub {
+ $sub_invite = sub {
   my ($a,$b,$c,$d) = @_;
   my $waittime     = AttrVal($name, "sip_waittime", "10");
   my $action;
@@ -565,9 +603,9 @@ $sub_invite = sub {
    #$call->bye();
   }
   return 0;
-};
+ };
 
-$sub_filter = sub {
+ $sub_filter = sub {
   my ($a,$b) = @_;
   my ($caller,undef)  = split("\;", $a);
   $caller =~ s/\"//g;
@@ -578,17 +616,18 @@ $sub_filter = sub {
   SIP_telnet($hash, "set $name caller $caller\nexit\n");
   Log3 $name, 5, "$name, SIP_filter : a:$a | b:$b";
   return 1;
-};
+ };
 
-$sub_bye = sub {
+ $sub_bye = sub {
   my ($event) = @_;
   Log3 $name, 5,  "$name, SIP_bye : $event";
   #print Dumper($event);
   SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") ;
   return 1;
-};
+ };
 
 ################
+
  if (AttrVal($name,"sip_listen", "none") eq "dtmf")
  {
      $hash->{dtmf} = 0;
@@ -752,6 +791,77 @@ sub SIP_telnet($$)
  } 
  return undef;
 }
+######################################################
+# storePW & readPW Code geklaut aus 72_FRITZBOX.pm :)
+######################################################
+sub SIP_storePassword($$)
+{
+    my ($name, $password) = @_;
+    my $index = "SIP_".$name."_passwd";
+    my $key   = getUniqueId().$index;
+    my $e_pwd = "";
+    
+    if (eval "use Digest::MD5;1")
+    {
+        $key  = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $e_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+
+    my $error = setKeyValue($index, $e_pwd);
+    return "error while saving SIP user password : $error" if(defined($error));
+    return "SIP user password successfully saved in FhemUtils/uniqueID Key $index";
+} 
+
+sub SIP_readPassword($)
+{
+   my ($name) = @_;
+   my $index  = "SIP_".$name."_passwd";
+   my $key    = getUniqueId().$index;
+
+   my ($password, $error);
+
+   #Log3 $name,5,"$name, read SIP user password from FhemUtils/uniqueID Key $key";
+   ($error, $password) = getKeyValue($index);
+
+   if ( defined($error) ) 
+   {
+      Log3 $name,3, "$name, cant't read SIP user password from FhemUtils/uniqueID: $error";
+      return undef;
+   }  
+    
+   if ( defined($password) ) 
+   {
+      if (eval "use Digest::MD5;1") 
+      {
+         $key  = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+     
+      for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g)) 
+      {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+      return $dec_pwd;
+   }
+   else 
+   {
+      Log3 $name,3,"$name, no SIP user password found in FhemUtils/uniqueID";
+      return undef;
+   }
+} 
+   
+##################################### 
 
 1;
 
@@ -784,6 +894,11 @@ sub SIP_telnet($$)
   <a name="SIPset"></a>
   <b>Set</b>
   <ul>
+   <li>
+    <code>set &lt;name&gt; &lt;SIP password&gt;</code><br>
+    Stores the password for the SIP users. Without stored password the functions set call and set listen are blocked !<br>
+    IMPORTANT : if you rename the fhem Device you must set the password again!
+   </li>
    <li>
     <code>set &lt;name&gt; reset</code><br>
     Stop any listen process and initialize device.<br>
@@ -818,7 +933,7 @@ sub SIP_telnet($$)
       My sip client info, defaults to sip:620@fritz.box
       </li>
     <li><a name="#sip_ip">sip_ip</a><br>
-      IP address of my FHEM server.
+      external IP address of the FHEM server.
       </li>
     <li><a name="#sip_port">sip_port</a><br>
       Port used for sip client, defaults to 5060 and will be automatically increased by 10 if not available.
@@ -827,20 +942,20 @@ sub SIP_telnet($$)
       Hostname or IP address of the SIP server you are connecting to, defaults to fritz.box.
       </li>
     <li><a name="#sip_ringtime">sip_ringtime</a><br>
-      Ringtime for outgoing calls
+      Calltime for outgoing calls. Please dont use it now, it will be changed in a later version !
       </li>
     <li><a name="#sip_user">sip_user</a><br>
-      User name of the SIP client, defaults to 620.  
-      </li>
-    <li><a name="#sip_waits">sip_waits</a><br>
-      ...  
+      User name of the SIP client, defaults to 620.
       </li>
     <li><a name="#sip_waittime">sip_waittime</a><br>
        Maximum waiting time in state listen_for_nwfp it will wait to pick up the call.  
       </li>
+    <li><a name="#sip_dtmf_size">sip_dtmf_size</a><br>
+    1 to 4 , default is 2      ...
+    </li>
+
   </ul>
   <br>
-
 </ul>
 
 =end html
@@ -871,6 +986,11 @@ sub SIP_telnet($$)
   <b>Set</b>
   <ul>
    <li>
+    <code>set &lt;name&gt; &lt;SIP Passwort&gt;</code><br>
+    Speichert das Passwort des SIP Users. Ohne gespeichertes Passwort sind die set call und set listen Funktionen gesperrt !<br>
+    WICHTIG : wird das SIP Device umbenannt muss dieser Befehl unbedingt wiederholt werden !
+   </li>
+   <li>
     <code>set &lt;name&gt; reset</code><br>
     Stoppt laufende listen-Prozess und initalisiert das Device.<br>
    </li>
@@ -894,7 +1014,7 @@ sub SIP_telnet($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#sip_audiofile">sip_audiofile</a><br>
-      Audiofile das nach dem Command <b>fetch</b> abgespielt wird. Das Audiofile muss mit folgendem Command erzeugt werden<br>
+      Audiofile das nach dem Command <b>fetch</b> abgespielt wird. Das Audiofile kann mit dem externen Programm sox erzeugt werden :<br>
       sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.alaw<br>
       da nur das raw audio format unterstützt wird. 
 </li>
@@ -903,7 +1023,7 @@ sub SIP_telnet($$)
       Meine SIP-Client-Info. Default ist sip:620@fritz.box
       </li>
     <li><a name="#sip_ip">sip_ip</a><br>
-      Die IP-Addresse meines FHEM-Servers.
+      Die IP-Addresse des FHEM-Servers.
       </li>
     <li><a name="#sip_port">sip_port</a><br>
       Port der für den SIP-Client genutzt wird. Default ist 5060 und wird automatisch um 10 erhöht wenn der Port nicht frei ist.
@@ -917,8 +1037,8 @@ sub SIP_telnet($$)
     <li><a name="#sip_user">sip_user</a><br>
       User Name des SIP-Clients. Default ist 620.
       </li>
-    <li><a name="#sip_waits">sip_waits</a><br>
-      ...
+    <li><a name="#sip_dtmf_size">sip_dtmf_size</a><br>
+    1 bis 4 , default 2 Legt die L&auml;ge des erwartenden DTMF Events fest.
       </li>
     <li><a name="#sip_waittime">sip_waittime</a><br>
        Maximale Wartezeit im Status listen_for_wfp bis das Gespräch automatisch angenommen wird.
