@@ -609,8 +609,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
           cmd = $(div).attr("cmd");
       var sel = $(this).closest("form").find("select");
       var arg = $(sel).val();
-      var ifid = devName.replace(/\./g, '\\.');
-      if($(".dval[informid="+ifid+"-"+arg+"]").length == 0) {
+      var ifid = (devName+"-"+arg).replace(/\./g, '\\.');
+      if($(".dval[informid="+ifid+"]").length == 0) {
         console.log(this);
         $(this).unbind('click').click();// No element found to replace, reload
         return;
