@@ -39,6 +39,7 @@ package main;
 # 27.08.2013 Josch Change to Log3, loglevel removed
 # 02.10.2013 Josch check if rawreading defined (empty lines)
 # 22.10.2013 Josch update readings with readingsBulkUpdate()
+# 22.01.2017 Josch Enhancement for WS-3080
 use strict;
 use warnings;
 #use Device::SerialPort;
@@ -109,11 +110,14 @@ my %TranslatedCodes = (
     "DRPmin"  => "rel-Pressure-min-DTime",
     "DRPmax"  => "rel-Pressure-max-DTime",
     "Tendency"=> "Tendency",
-    "Forecast"=> "Forecast",
 #added for WS-0101 / WS-1080
     "WG"      => "Wind-Gust",
     "DIR"     => "Wind-Dir",
     "state"   => "State",
+#added for WS-3080
+    "IL"      => "Illuminance",
+    "UV"      => "UV-Index",
+    "ZCode"   => "Zambretti-Code",
 );
 
 # Date/Time-Records
@@ -140,6 +144,7 @@ my %TranslatedDateTimeCodes = (
     "DTRtot"   => "Rain-total-DTime",
     "DTRPmin"  => "rel-Pressure-min-DTime",
     "DTRPmax"  => "rel-Pressure-max-DTime",
+    "Forecast" => "Forecast",               # allows multiple words for forecast
 );
 
 # Time-Records (will be appended to Date-Record)
@@ -176,7 +181,7 @@ WS3600_Initialize($)
 
 # Consumer
   $hash->{DefFn}   = "WS3600_Define";
-  $hash->{AttrList}= "model:WS3600,WS2300,WS1080";
+  $hash->{AttrList}= "model:WS3600,WS2300,WS1080,WS3080";
 #  $hash->{ReadFn}  = "WS3600_Read";
   $hash->{UndefFn} = "WS3600_Undef";
 }
@@ -188,7 +193,7 @@ WS3600_Define($$)
   my ($hash, $def) = @_;
   my @a = split("\"", $def);
   my $dev;
-  my $Timer = 60;	# call every 64 seconds; normal wireless update interval
+  my $Timer = 60; # call every 64 seconds; normal wireless update interval
                   # is 128 sec, on wind >10 m/s 32 sec. 64 sec should ensure
                   # quite current data.
 
@@ -267,12 +272,10 @@ WS3600_Read($)
 
   foreach my $inputline ( @lines ) {
     $inputline =~ s/\s+$//;
-    my ($rawreading, $val, $val2) = split(/ /, $inputline);
+    my ($rawreading, $val, $val2) = split(/ /, $inputline, 3);
     if(defined($rawreading)) {
-      my $logmsg = "WS3600(Dbg): $name read $inputline|$rawreading|$val";
-         $logmsg .= "|$val2" if(defined($val2));
-      Log3 $name, 4, $logmsg;
-#      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
+      if(!defined($val2)) { $val2 = ""; }
+      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
 	    if(defined($TranslatedCodes{$rawreading})) {
 	      $reading = $TranslatedCodes{$rawreading};
               readingsBulkUpdate($hash,$reading, $val);
@@ -319,6 +322,8 @@ WS3600_Read($)
 1;
 
 =pod
+=item device
+=item summary weatherstation queried by external program
 =begin html
 
 <a name="WS3600"></a>
@@ -352,7 +357,7 @@ WS3600_Read($)
       <li>WS3600 series weather station (Europe Supplies, technotrade, etc;
         refer to <a href="http://wiki.wetterstationen.info/index.php?title=LaCrosse_WS3600">Wetterstationen.info</a>
         (german) for details on this model) with fetch3600 from the
-        toolchain <a href="http://open3600.fast-mail.nl/tiki-index.php">open3600</a>).
+        toolchain <a href="https://sourceforge.net/projects/open3600/">open3600</a>).
         Fetch3600 delivers the current readings line by line as
         reading-value-pairs. These are read periodically and translated into
         more readable names for FHEM by the module WS3600.pm. </li>
@@ -361,7 +366,7 @@ WS3600_Read($)
         because it is rather similar to the WS3600.</li>
       <li><a href="http://wiki.wetterstationen.info/index.php?title=WS1080">WS1080</a>
         (and other stations which come with the EasyWeather windows
-        application) with <a href="https://code.google.com/p/fowsr/">fowsr</a>
+        application) with <a href="https://github.com/ajauberg/fowsr/">fowsr</a>
         (version 2.0 or above)</li>
     </ul>
     <br>
@@ -460,6 +465,13 @@ DRPmax 11-09-2009
 Tendency Falling
 Forecast Cloudy</pre>
     </div>
+    The following extensions are also supported now:<br>
+    <div>
+      <pre>IL 0.0
+UV 8
+Forecast Rain at times, worse later
+ZCode U</pre>
+        </div>
     There is no expectation on the readings received from the fetch3600
     binary; so, in essence, if you have a similar setup (unsupported,
     attached weather station and a means to get it's reading into an output
@@ -497,12 +509,13 @@ Forecast Cloudy</pre>
   <a name="WS3600attr"></a> <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a>&nbsp;&nbsp;&nbsp;&nbsp; WS3600, WS2300,
-      WS1080 (not used for anything, yet)</li>
+      WS1080, WS3080 (not used for anything, yet)</li>
   </ul>
   <br>
 </ul>
 
 =end html
+=item summary_DE Wetterstation, die mittels externem Programm ausgelesen wird
 =begin html_DE
 
 <a name="WS3600"></a>
@@ -536,7 +549,7 @@ Forecast Cloudy</pre>
     <ul>
       <li>WS3600 Serie (Europe Supplies, technotrade, usw.; s.a. <a href="http://wiki.wetterstationen.info/index.php?title=LaCrosse_WS3600">Wetterstationen.info</a>
         (deutsch) für Details) in Verbindung mit fetch3600 aus dem Paket <a
-          href="http://open3600.fast-mail.nl/tiki-index.php">open3600</a>).
+          href="https://sourceforge.net/projects/open3600/">open3600</a>).
         Fetch3600 liefert die aktuellen Werte zeilenweise als
         Name-Wert-Paare. Diese werden durch FHEM zyklisch eingelesen, mit
         besser lesbaren Bezeichnungen versehen und als Readings zur
@@ -546,7 +559,7 @@ Forecast Cloudy</pre>
         (ähnlich zu open3600).</li>
       <li><a href="http://wiki.wetterstationen.info/index.php?title=WS1080">WS1080</a>
         (und andere Stationen, die mit der Windows-Software "Easy Weather"
-        ausgeliefert werden) in Verbindung mit <a href="https://code.google.com/p/fowsr/">fowsr</a>
+        ausgeliefert werden) in Verbindung mit <a href="https://github.com/ajauberg/fowsr/">fowsr</a>
         (ab Version 2.0)</li>
     </ul>
     <br>
@@ -644,6 +657,13 @@ DRPmax 11-09-2009
 Tendency Falling
 Forecast Cloudy</pre>
     </div>
+    Zusätzlich werden folgende Erweiterungen (für WS3080) unterstützt:<br>
+    <div>
+      <pre>IL 0.0
+UV 8
+Forecast Zeitweise Regen, später zunehmend
+ZCode U</pre>
+    </div>
     Welche der vorgenannten Wertepaare durch &lt;wsreaderprog&gt;&nbsp;
     geliefert werden, ist egal. Jedes bekannte wird übersetzt (z.B. <code>Ti</code>
     nach <code>Temp-inside</code>) und als Reading angezeigt, alle
@@ -679,7 +699,7 @@ Forecast Cloudy</pre>
   <a name="WS3600attr"></a> <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a>&nbsp;&nbsp;&nbsp;&nbsp; WS3600, WS2300,
-      WS1080 (z.Zt (noch) ohne Wirkung)</li>
+      WS1080, WS3080 (z.Zt (noch) ohne Wirkung)</li>
   </ul>
   <br>
 </ul>
