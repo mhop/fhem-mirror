@@ -60,6 +60,7 @@ YAMAHA_AVR_Initialize($)
                        "request-timeout:1,2,3,4,5 ".
                        "model ".
                        "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+                       "volumeMax ".
                        "volume-smooth-change:0,1 ".
                        "volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                        $readingFnAttributes;
@@ -435,6 +436,11 @@ YAMAHA_AVR_Set($@)
         else
         {
             return $usage;
+        }
+        
+        if($target_volume > YAMAHA_AVR_volume_rel2abs(AttrVal($name, "volumeMax","100")))
+        {
+            $target_volume = YAMAHA_AVR_volume_rel2abs(AttrVal($name, "volumeMax","100"));
         }
          
         # if lower than minimum (-80.5) or higher than max (16.5) set target volume to the corresponding boundary
@@ -919,14 +925,39 @@ YAMAHA_AVR_Set($@)
 sub
 YAMAHA_AVR_Attr(@)
 {
-    my @a = @_;
-    my $hash = $defs{$a[1]};
+    my ($cmd, $name, $attr, $val) = @_;
+    
+    my $hash = $defs{$name};
 
-    if($a[2] eq "disable")
+    return unless($hash);
+    
+    if($attr eq "disable")
     {
         # Start/Stop Timer according to new disabled-Value
         YAMAHA_AVR_ResetTimer($hash, 1);
     }
+    
+    if($cmd eq "set")
+    {
+        if($attr =~ /^(?:volumeMax|volumeSteps)$/)
+        {
+            if($val !~ /^\d+$/)
+            {
+                return "invalid attribute value for attribute $attr: $val";
+            }
+            
+            if($attr eq "volumeMax" and ($val < 0 or $val > 100))
+            {
+                return "value is out of range (0-100) for attribute $attr: $val";
+            }
+            
+            if($attr eq "volumeSteps" and ($val < 1))
+            {
+                return "value is out of range (1-*) for attribute $attr: $val";
+            }
+        }
+    }
+ 
 
     return undef;
 }
@@ -2395,28 +2426,36 @@ So here are some examples:
   <a name="YAMAHA_AVR_attr"></a>
   <b>Attributes</b>
   <ul>
-  
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="YAMAHA_AVR_request-timeout">request-timeout</a></li>
     Optional attribute change the response timeout in seconds for all queries to the receiver.
     <br><br>
-    Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
+    Possible values: 1-5 seconds. Default value is 4 seconds.
+    <br><br>
     <li><a name="YAMAHA_AVR_disable">disable</a></li>
     Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
     <br><br>
-    Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
+    Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.
+    <br><br>
     <li><a name="YAMAHA_AVR_volume-smooth-change">volume-smooth-change</a></li>
     Optional attribute to activate a smooth volume change.
     <br><br>
-    Possible values: 0 => off , 1 => on<br><br>
+    Possible values: 0 => off , 1 => on
+    <br><br>
     <li><a name="YAMAHA_AVR_volume-smooth-steps">volume-smooth-steps</a></li>
     Optional attribute to define the number of volume changes between the
-    current and the desired volume. Default value is 5 steps<br><br>
+    current and the desired volume. Default value is 5 steps
+    <br><br>
     <li><a name="YAMAHA_AVR_volume-steps">volumeSteps</a></li>
-    Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%<br>
-  <br>
+    Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%
+    <br><br>
+    <li><a name="YAMAHA_AVR_volume-max">volumeMax</a></li>
+    Optional attribute to set an upper limit in percentage for volume changes.
+    If the user tries to change the volume to a higher level than configured with this attribute, the volume will not exceed this limit.
+    <br><br>
+    Possible values: 0-100%. Default value is 100% (no limitation)<br><br>
   </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
@@ -2690,8 +2729,14 @@ Ein paar Beispiele:
     Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
     durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte<br><br>
     <li><a name="YAMAHA_AVR_volumeSteps">volumeSteps</a></li>
-    Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%<br>
-  <br>
+    Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%
+    <br><br>
+    <li><a name="YAMAHA_AVR_volumeMax">volumeMax</a></li>
+    Optionales Attribut, welches eine maximale Obergrenze in Prozent für die Lautst&auml;rke festlegt.
+    Wird versucht die Lautst&auml;rke auf einen h&ouml;heren Wert zu setzen, so wird die Lautst&auml;rke dennoch die konfigurierte Obergrenze nicht &uuml;berschreiten.
+    <br><br>
+    M&ouml;gliche Werte: 0-100%. Standardwert ist 100% (keine Begrenzung)
+    <br><br>
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
