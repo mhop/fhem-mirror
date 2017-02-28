@@ -52,7 +52,7 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.3 / 27.02.17";
+my $sip_version ="V1.31 / 28.02.17";
 my $ua;			# SIP user agent
 
 my %sets = (
@@ -473,10 +473,6 @@ sub SIP_Set($@)
    SIP_updateConfig($hash);
    return undef;
   }
-  elsif ($cmd eq "password")
-  {
-    return SIP_storePassword($name,$subcmd);
-  }
 
   # die ersten beiden brauchen wir nicht mehr
   shift @a;
@@ -498,6 +494,10 @@ sub SIP_Set($@)
   {
    readingsSingleUpdate($hash, "call_state",$subcmd,1);
    return undef;
+  }
+  elsif ($cmd eq "password")
+  {
+    return SIP_storePassword($name,$subcmd);
   }
 
   return "Unknown argument: $cmd, choose one of ".join(" ", sort keys %sets);
