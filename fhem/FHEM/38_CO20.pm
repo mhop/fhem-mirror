@@ -8,9 +8,11 @@ package main;
 use strict;
 use warnings;
 
-$ENV{CFLAGS} = '';
-$ENV{CPPFLAGS} = '';
-$ENV{LDFLAGS} = '';
+BEGIN {
+  $ENV{CFLAGS} = '';
+  $ENV{CPPFLAGS} = '';
+  $ENV{LDFLAGS} = '';
+}
 
 use Device::USB;
 
