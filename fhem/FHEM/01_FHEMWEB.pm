@@ -422,7 +422,8 @@ FW_Read($$)
               "Access-Control-Allow-Methods: GET POST OPTIONS\r\n".
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
               "Access-Control-Allow-Credentials: true\r\n".
-              "Access-Control-Max-Age:86400\r\n" : "");
+              "Access-Control-Max-Age:86400\r\n".
+              "Access-Control-Expose-Headers: X-FHEM-csrfToken\r\n": "");
    $FW_headerlines .= "X-FHEM-csrfToken: $defs{$FW_wname}{CSRFTOKEN}\r\n"
         if($defs{$FW_wname}{CSRFTOKEN});
 
