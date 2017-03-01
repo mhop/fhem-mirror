@@ -19,6 +19,7 @@
 # ABU 20161120 addaed encode_utf8 at json decode, tuned 0.5b repiar-stuff, added hibernate
 # ABU 20161126 added summary
 # ABU 20161129 fixed hash issues which prevents the module from loading
+# ABU 20170301 fixed hybernate-check in set
 
 package main;
 
@@ -325,7 +326,7 @@ sub Robonect_Set($@)
 	my $decodedCmd = $commands{SET_MODE}{$cmd};
 
 	#if command is hybernate, do this
-	if ($cmd = lc($HYBERNATE))
+	if ($cmd eq lc($HYBERNATE))
 	{
 		Log3 ($name, 5, "got hybernate for set-command");
 			
