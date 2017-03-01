@@ -136,6 +136,37 @@ alexa_Set($$@)
     }
 
     return undef;
+  } elsif( $cmd eq 'execute' ) {
+    my ($intent,$applicationId) = split(':', shift @args, 2 );
+    return 'usage $cmd execute <intent> [json]' if( !$intent );
+
+    my $json = join(' ',@args);
+    my $decoded = eval { decode_json($json) };
+    if( $@ ) {
+      my $msg = "json error: $@ in $json";
+      Log3 $name, 2, "$name: $msg";
+      return $msg;
+    }
+    Log3 $name, 5, "$name: \"$json\" -> ". Dumper $decoded;
+
+    my $cmd = '{Log 1, "test"; return "result";}';
+    Log3 $name, 5, "$name: cmd: $cmd";
+
+    if( ref($decoded->{slots}) eq 'HASH' ) {
+      $hash->{active} = 1;
+      my $intent = $intent;
+      $intent = "$intent:$applicationId" if( $applicationId );
+      readingsSingleUpdate($hash, 'fhemIntent', $intent, 1 );
+      my $exec = EvalSpecials($cmd, %{$decoded->{slots}});
+      Log3 $name, 5, "$name: exec: $exec";
+      my $ret = AnalyzeCommandChain($hash, $exec);
+      Log3 $name, 5, "$name: ret ". ($ret?$ret:"undefined");
+      $hash->{active} = 0;
+
+      return $ret;
+    }
+
+    return undef;
   }
 
   return "Unknown argument $cmd, choose one of $list";
@@ -426,30 +457,30 @@ Log 1, Dumper $characteristicsOfIntent;
           }
 
 Log 1, $intent_name;
-        my $u = $utterance;
-        while( $u =~ /\{(.*?)\}/g ) {
-          my $slot = $1;
-          my ($name, $values) = split( /:|=/, $slot, 2 );
+          my $u = $utterance;
+          while( $u =~ /\{(.*?)\}/g ) {
+            my $slot = $1;
+            my ($name, $values) = split( /:|=/, $slot, 2 );
 
-          my $slot_name = "${intent_name}_${name}";
-          if( $values ) {
-            if( $values && $values =~ /^AMAZON/ ) {
-              push @{$slots}, { name => $slot_name, type => $values };
+            my $slot_name = "${intent_name}_${name}";
+            if( $values ) {
+              if( $values && $values =~ /^AMAZON/ ) {
+                push @{$slots}, { name => $slot_name, type => $values };
+              } else {
+                push @{$slots}, { name => $slot_name, type => "${intent_name}_${name}_Value" };
+                $values =~ s/\+/ /g;
+                my @values = split(';', $values );
+                $types->{"${intent_name}_${name}_Value"} = \@values if( $values[0] );
+              }
+
+              $slot =~ s/\+/\\\+/g;
+              $utterance =~ s/\{$slot\}/\{$slot_name\}/;
+
             } else {
-              push @{$slots}, { name => $slot_name, type => "${intent_name}_${name}_Value" };
-              $values =~ s/\+/ /g;
-              my @values = split(';', $values );
-              $types->{"${intent_name}_${name}_Value"} = \@values if( $values[0] );
+              push @{$slots}, { name => $name, type => "FHEM_$name" };
+
             }
-
-            $slot =~ s/\+/\\\+/g;
-            $utterance =~ s/\{$slot\}/\{$slot_name\}/;
-
-          } else {
-            push @{$slots}, { name => $name, type => "FHEM_$name" };
-
           }
-        }
 
         }
         $intent_name =~ s/ //g;
