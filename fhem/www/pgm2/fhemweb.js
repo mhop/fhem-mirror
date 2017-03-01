@@ -1482,11 +1482,8 @@ loadScript(sname, callback, force)
     }
 
   } else {
-    if(FW_isiOS) {
-      FW_leaving = 1;
-      if(FW_pollConn)
-        FW_pollConn.abort();
-    }
+    if(FW_isiOS)
+     FW_closeConn();
     script.onload = function(){
       scriptLoaded();
     }
