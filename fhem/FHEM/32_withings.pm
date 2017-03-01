@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 01 / 2017-02-19
+# Release 02 / 2017-02-27
 
 package main;
 
@@ -1810,31 +1810,38 @@ sub withings_parseAggregate($$) {
       if(defined($json->{body}{series}))
       {
 
-        foreach my $series ( keys(%{$json->{body}{series}}))
+        my $series = $json->{body}->{series};
+
+        foreach my $serieskey ( keys %$series)
         {
 
-            if(defined($json->{body}{series}{$series}))
-            {
-              my $typestring = substr($series, -2);
 
-              foreach my $dayvalues ( keys ($json->{body}{series}{$series}))
+            if(defined($series->{$serieskey}))
+            {
+              my $typestring = substr($serieskey, -2);
+              my $serieshash = $json->{body}->{series}{$serieskey};
+              next if(ref($serieshash) ne "HASH");
+
+              foreach my $daykey ( keys %$serieshash)
               {
-                if(!$json->{body}{series}{$series}{$dayvalues}->{complete})
+                my $dayhash = $json->{body}->{series}{$serieskey}{$daykey};
+                next if(ref($dayhash) ne "HASH");
+
+                if(!$dayhash->{complete})
                 {
                   $unfinished = 1;
                   next;
                 }
 
-
-                my ($year,$mon,$day) = split(/[\s-]+/, $dayvalues);
+                my ($year,$mon,$day) = split(/[\s-]+/, $daykey);
                 my $timestamp = timelocal(0,0,18,$day,$mon-1,$year-1900);
-                #my $timestamp = $json->{body}{series}{$series}{$dayvalues}->{midnight};
+                #my $timestamp = $dayhash->{midnight};
                 my $reading = $measure_types{$typestring}->{dailyreading};
                 if( !defined($reading) ) {
                   Log3 $name, 1, "$name: unknown measure type: $typestring";
                   next;
                 }
-                my $value = $json->{body}{series}{$series}{$dayvalues}->{sum};
+                my $value = $dayhash->{sum};
 
                 push(@readings, [$timestamp, $reading, $value]);
               }
