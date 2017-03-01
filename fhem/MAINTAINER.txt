@@ -315,6 +315,7 @@ FHEM/80_xxLG7000.pm          markusbloch          http://forum.fhem.de Multimedi
 FHEM/81_M232Counter.pm       neubert              http://forum.fhem.de Sonstige Systeme
 FHEM/82_LGTV.pm              markusbloch          http://forum.fhem.de Multimedia
 FHEM/82_LGTV_IP12.pm         markusbloch          http://forum.fhem.de Multimedia
+FHEM/82_LGTV_WebOS.pm        CoolTux              http://forum.fhem.de Multimedia
 FHEM/82_M232Voltage.pm       neubert              http://forum.fhem.de Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
 FHEM/86_Robonect.pm          andi291              http://forum.fhem.de Sonstige Systeme

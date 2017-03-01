@@ -1,11 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
   - bugfix:  32_withings: removed experimental code
+  - new:     82_LGTV_WebOS: to control LG TV's with WebOS
   - bugfix:  42_Nextion:  restore version
   - feature: YAMAHA_AVR: new attribute volumeMax to limit the maximum volume
   - update:  70_WS3600.pm extension for UV and illuminance
   - bugfix:  38_CO20.pm: fixed Device::USB init errors
-  - update: 93_DBLog: new Version 2.13.5, supports primary key now,
+  - update:  93_DBLog: new Version 2.13.5, supports primary key now,
                       set commands clearReadings and eraseReadings,
                       non-blocking variants of count, reducelog and
                       deleteOldDays
