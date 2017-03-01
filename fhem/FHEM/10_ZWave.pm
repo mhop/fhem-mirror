@@ -637,6 +637,7 @@ ZWave_Initialize($)
     showtime:noArg
     vclasses
     useMultiCmd:noArg
+    useCRC16:noArg
     zwaveRoute
   );
   use warnings 'qw';
@@ -4096,6 +4097,17 @@ ZWave_isWakeUp($)
   return $h->{isWakeUp};
 }
 
+sub
+ZWave_addCRC16($)
+{
+  my ($msg) = @_;
+  return $msg if($msg !~ m/13(..)(..)(.*)(....)$/);
+  my ($tgt, $olen, $omsg, $sfx) = ($1, $2, $3, $4);
+  $msg = sprintf("13%s%02x5601%s%s%s", $tgt, length($omsg)/2+4,
+                 $omsg, uc(ZWave_CRC16("5601$omsg")), $sfx);
+  return $msg;
+}
+
 # stack contains type:hexcode
 # type is: set / sentset, get / sentget / sentackget
 # sentset will be discarded after ack, sentget needs ack (->sentackget) then msg
@@ -4168,6 +4180,8 @@ ZWave_processSendStack($$;$)
 
   $ss->[0] =~ m/^([^:]*?):(.*)$/;
   my ($type, $msg) = ($1, $2);
+
+  $msg = ZWave_addCRC16($msg) if($hash->{useCRC16});
   IOWrite($hash,
           $hash->{homeId}.($hash->{route}?",".$hash->{route}:""),
           "00$msg");
@@ -4584,7 +4598,7 @@ ZWave_Parse($$@)
   if($arg =~ /^..5601(.*)(....)/) { # CRC_16_ENCAP: Unwrap encapsulated command
     #Log3 $ioName, 4, "CRC FIX, MSG: ($1)"; # see Forum #23494
     my $crc16 = ZWave_CRC16("5601".$1);
-    if ($2 eq $crc16) {
+    if (lc($2) eq lc($crc16)) {
       $arg = sprintf("%02x$1", length($1)/2);
     } else {
       Log3 $ioName, 4, "$ioName CRC_16 checksum mismatch, received $2," .
@@ -4794,13 +4808,25 @@ ZWave_Attr(@)
 
   } elsif($attrName eq "useMultiCmd") {
     if($type eq "del") {
-      $hash->{".vclasses"} = {};
+      delete $hash->{useMultiCmd};
       return undef;
     }
     my $a = ($attr{$devName} ? $attr{$devName}{classes} : "");
     return "useMultiCmd: unsupported device, see help ZWave for details"
         if(!$a || !($a =~ m/MULTI_CMD/ && $a =~ m/WAKE_UP/));
     $hash->{useMultiCmd} = 1;
+    return undef;
+
+  } elsif($attrName eq "useCRC16") {
+    if($type eq "del") {
+      delete $hash->{useCRC16};
+      return undef;
+    }
+    my $a = ($attr{$devName} ? $attr{$devName}{classes} : "");
+    return "useCRC16: unsupported device, see help ZWave for details"
+        if(!$a || $a !~ m/CRC_16_ENCAP/ ||
+           ReadingsVal($devName, "SECURITY", "") eq "ENABLED");
+    $hash->{useCRC16} = 1;
     return undef;
   }
 
@@ -5936,6 +5962,12 @@ s2Hex($)
     <li><a name="vclasses">vclasses</a><br>
       This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
+      </li>
+
+    <li><a name="useCRC16">useCRC16</a><br>
+      Experimental: if a device supports CRC_16_ENCAP, then add CRC16 to the
+      command. Note: this is not available to SECURITY ENABLED devices, as
+      security has its own CRC.
       </li>
 
     <li><a name="useMultiCmd">useMultiCmd</a><br>
