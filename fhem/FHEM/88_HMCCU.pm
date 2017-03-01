@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.004
+#  Version 3.9.005
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -104,7 +104,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.004';
+my $HMCCU_VERSION = '3.9.005';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -4641,8 +4641,8 @@ sub HMCCU_RPCSetConfig ($$$)
 	my $name = $hash->{NAME};
 	my $type = $hash->{TYPE};
 
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $addr;
-	my %paramset;
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return -3 if (!defined ($hmccu_hash));
@@ -4658,23 +4658,23 @@ sub HMCCU_RPCSetConfig ($$$)
 	my $port = $HMCCU_RPC_PORT{$int};
 	my $url = "http://".$hmccu_hash->{host}.":".$port."/";
 	$url .= $HMCCU_RPC_URL{$port} if (exists ($HMCCU_RPC_URL{$port}));
-	
-	# Build param set
-# 	foreach my $pardef (@$parref) {
-# 		my ($par,$val) = split ("=", $pardef);
-# 		next if (!defined ($par) || !defined ($val));
-# 		$paramset{$par} = $val;
-# 	}
+
+	if ($ccuflags =~ /trace/) {
+		my $ps = '';
+		foreach my $p (keys %$parref) {
+			$ps .= ", ".$p."=".$parref->{$p};
+		}
+		Log3 $name, 2, "HMCCU: RPCSetConfig: addr=$addr".$ps;
+	}
 	
 	my $client = RPC::XML::Client->new ($url);
-#	my $res = $client->simple_request ("putParamset", $addr, "MASTER", \%paramset);
 	my $res = $client->simple_request ("putParamset", $addr, "MASTER", $parref);
 	if (! defined ($res)) {
 		return -5;
 	}
 	elsif (ref ($res)) {
 		if (exists ($res->{faultString})) {
-			Log3 $name, 1, "HMCCU: ".$res->{faultString};
+			Log3 $name, 1, "HMCCU: RPC request failed. ".$res->{faultString};
 			return -2;
 		}
 	}
