@@ -40,6 +40,9 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.11.1       28.02.2017       commandref completed
+# 4.11.0       18.02.2017       added [current|previous]_[month|week|day|hour]_begin and 
+#                               [current|previous]_[month|week|day|hour]_end as options of timestamp
 # 4.10.3       01.02.2017       rename reading "diff-overrun_limit-" to "diff_overrun_limit_", 
 #                               collaggstr day aggregation changed back from 4.7.5 change
 # 4.10.2       16.01.2017       bugfix uninitialized value $renmode if RenameAgent
@@ -172,7 +175,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.10.3";
+my $DbRepVersion = "4.11.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -528,15 +531,17 @@ sub DbRep_Attr($$$$) {
                          
     if ($cmd eq "set") {
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
-          
-            if ($aVal eq "current_year_begin" || $aVal eq "previous_year_begin" || $aVal eq "current_year_end" || $aVal eq "previous_year_end") {
+            my ($a,$b,$c) = split('_',$aVal);
+            if ($a =~ /^current$|^previous$/ && $b =~ /^hour$|^day$|^week$|^month$|^year$/ && $c =~ /^begin$|^end$/) {
                 delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
                 delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
                 return undef;
             }
            
             unless ($aVal =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9])|1[1-9]|2[0-3]:([0-5][0-9]):([0-5][0-9])/) 
-                {return " The Value for $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of \"current_year_begin\",\"current_year_end\", \"previous_year_begin\", \"previous_year_end\" !";}
+                {return " The Value for $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of 
+				          \"current_[year|month|day|hour]_begin\",\"current_[year|month|day|hour]_end\", 
+						  \"previous_[year|month|day|hour]_begin\", \"previous_[year|month|day|hour]_end\" !";}
            
             my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
            
@@ -769,28 +774,158 @@ sub sqlexec($$) {
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation"); 
  Log3 ($name, 4, "DbRep $name - Command: $opt"); 
-        
+
+ # year   als Jahre seit 1900 
+ # $mon   als 0..11
+ # $time = timelocal( $sec, $min, $hour, $mday, $mon, $year ); 
+ my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();     # Istzeit Ableitung
+ 
+ ###############################################################################################
  # Auswertungszeit Beginn (String)
- # dynamische Berechnung von Startdatum/zeit aus current_year_begin / previous_year_begin 
- # timestamp in SQL format YYYY-MM-DD hh:mm:ss
- my $cy = strftime "%Y", localtime;      # aktuelles Jahr
+ # dynamische Berechnung von Startdatum/zeit aus current_xxx_begin / previous_xxx_begin 
+ ###############################################################################################
  my $tsbegin;
  if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_year_begin") {
-     $tsbegin = $cy."-01-01 00:00:00";
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year));
  } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin") {
-     $tsbegin = ($cy-1)."-01-01 00:00:00";
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin") {
+     my $ryear = ($mon-1<0)?$year-1:$year;
+	 my $rmon  = ($mon-1<0)?12:$mon;
+     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin") {
+	 my $tsub = 0 if($wday == 1);         # wenn Start am "Mo" keine Korrektur
+	 $tsub = 86400 if($wday == 2);        # wenn Start am "Di" dann Korrektur -1 Tage
+	 $tsub = 172800 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -2 Tage
+	 $tsub = 259200 if($wday == 4);       # wenn Start am "Do" dann Korrektur -3 Tage
+	 $tsub = 345600 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -4 Tage
+	 $tsub = 432000 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -5 Tage
+	 $tsub = 518400 if($wday == 0);       # wenn Start am "So" dann Korrektur -6 Tage
+	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin") {
+	 my $tsub = 604800 if($wday == 1);    # wenn Start am "Mo" dann Korrektur -7 Tage
+	 $tsub = 691200 if($wday == 2);       # wenn Start am "Di" dann Korrektur -8 Tage
+	 $tsub = 777600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -9 Tage
+	 $tsub = 864000 if($wday == 4);       # wenn Start am "Do" dann Korrektur -10 Tage
+	 $tsub = 950400 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -11 Tage
+	 $tsub = 1036800 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -12 Tage
+	 $tsub = 1123200 if($wday == 0);      # wenn Start am "So" dann Korrektur -13 Tage
+	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin") {
+	 my $rmday = $mday-1;
+	 my $rmon  = $mon;
+	 my $ryear = $year;
+	 if($rmday<1) {
+	     $rmon--;
+		 if ($rmon<0) {
+		     $rmon=12;
+		     $ryear--;
+		 }
+         $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+	 }
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin") {
+     my $rhour = $hour-1;
+	 my $rmday = $mday;
+	 my $rmon  = $mon;
+	 my $ryear = $year;
+	 if($rhour<0) {
+	     $rhour = 23;
+		 $rmday = $mday-1;
+		 if($rmday<1) {
+	         $rmon--;
+		     if ($rmon<0) {
+		         $rmon=12;
+		         $ryear--;
+		     }
+			 $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+		 }
+	 }
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear));
  } else {
      $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");  
  }
  
+ #################################################################################################
  # Auswertungszeit Ende (String)
- # dynamische Berechnung von Endedatum/zeit aus current_year_begin / previous_year_begin 
- # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+ # dynamische Berechnung von Endedatum/zeit aus current_xxx_end / previous_xxx_end 
+ #################################################################################################
  my $tsend;
  if (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_year_end") {
-     $tsend = $cy."-12-31 23:59:59";
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year));
  } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
-     $tsend = ($cy-1)."-12-31 23:59:59";
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end") {
+     my $dim = $mon-2?30+($mon*3%7<4):28+!($year%4||$year%400*!($year%100));
+     $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end") {
+     my $ryear = ($mon-1<0)?$year-1:$year;
+	 my $rmon  = ($mon-1<0)?12:$mon;
+	 my $dim   = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end") {
+	 my $tadd = 518400 if($wday == 1);         # wenn Start am "Mo" dann Korrektur +6 Tage
+	 $tadd = 432000 if($wday == 2);            # wenn Start am "Di" dann Korrektur +5 Tage
+	 $tadd = 345600 if($wday == 3);            # wenn Start am "Mi" dann Korrektur +4 Tage
+	 $tadd = 259200 if($wday == 4);            # wenn Start am "Do" dann Korrektur +3 Tage
+	 $tadd = 172800 if($wday == 5);            # wenn Start am "Fr" dann Korrektur +2 Tage
+	 $tadd = 86400 if($wday == 6);             # wenn Start am "Sa" dann Korrektur +1 Tage
+	 $tadd = 0 if($wday == 0);                 # wenn Start am "So" keine Korrektur
+	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time+$tadd);
+	 $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end") {
+	 my $tsub = 86400 if($wday == 1);     # wenn Start am "Mo" dann Korrektur -1 Tage
+	 $tsub = 172800 if($wday == 2);       # wenn Start am "Di" dann Korrektur -2 Tage
+	 $tsub = 259200 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -3 Tage
+	 $tsub = 345600 if($wday == 4);       # wenn Start am "Do" dann Korrektur -4 Tage
+	 $tsub = 432000 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -5 Tage
+	 $tsub = 518400 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -6 Tage
+	 $tsub = 604800 if($wday == 0);      # wenn Start am "So" dann Korrektur -7 Tage
+	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
+	 $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end") {
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end") {
+	 my $rmday = $mday-1;
+	 my $rmon  = $mon;
+	 my $ryear = $year;
+	 if($rmday<1) {
+	     $rmon--;
+		 if ($rmon<0) {
+		     $rmon=12;
+		     $ryear--;
+		 }
+         $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+	 }
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end") {
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year));
+ } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end") {
+     my $rhour = $hour-1;
+	 my $rmday = $mday;
+	 my $rmon  = $mon;
+	 my $ryear = $year;
+	 if($rhour<0) {
+	     $rhour = 23;
+		 $rmday = $mday-1;
+		 if($rmday<1) {
+	         $rmon--;
+		     if ($rmon<0) {
+		         $rmon=12;
+		         $ryear--;
+		     }
+			 $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+		 }
+	 }
+     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)); 
  } else {
      $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time)); 
  }
@@ -2451,6 +2586,9 @@ sub insert_Push($) {
      return "$name|''|''|$err";
  }
  
+ # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+  
  my $i_timestamp = $hash->{HELPER}{I_TIMESTAMP};
  my $i_device    = $hash->{HELPER}{I_DEVICE};
  my $i_type      = $hash->{HELPER}{I_TYPE};
@@ -3621,7 +3759,6 @@ sub dsttest ($$$) {
  my $time_str = localtime($runtime+$aggsec);                   # textual time representation
  my $dst_new  = (localtime($runtime+$aggsec))[8];              # ermitteln daylight saving nächste runtime
 
-
  if ($dst != $dst_new) {
      $dstchange = 1;
  }
@@ -3653,6 +3790,28 @@ sub calcount ($$) {
 return \%ncp;
 }
 
+################################################################
+# check ob primary key genutzt wird
+################################################################
+sub DbRep_checkUsePK ($$){
+  my ($hash,$dbh) = @_;
+  my $name           = $hash->{NAME};
+  my $dbconn         = $hash->{dbloghash}{dbconn};
+  my @usepkh = 0;
+  my @usepkc = 0;
+  
+  my $db = (split("=",(split(";",$dbconn))[0]))[1];
+  eval {@usepkh = $dbh->primary_key( undef, undef, 'history' );};
+  eval {@usepkc = $dbh->primary_key( undef, undef, 'current' );};
+  my $pkh = @usepkh?join(",",@usepkh):"none";
+  my $pkc = @usepkc?join(",",@usepkc):"none";
+  $pkh =~ tr/"//d;
+  $pkc =~ tr/"//d;
+  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
+  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
+
+  return (scalar(@usepkh),scalar(@usepkc),$pkh,$pkc);
+}
 
 ####################################################################################################
 #                 Test-Sub zu Testzwecken
@@ -4087,13 +4246,29 @@ return;
   </ul></ul>
   <br>
   
-  (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" you can also use one of: <br><br>
+  (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
+  you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
                               <ul>
-                              <b>current_year_begin</b>     : set the timestamp-attribute to "&lt;current year&gt;-01-01 00:00:00" dynamically <br>
-                              <b>current_year_end</b>       : set the timestamp-attribute to "&lt;current year&gt;-12-31 23:59:59" dynamically <br>
-                              <b>previous_year_begin</b>    : set the timestamp-attribute to "&lt;previous year&gt;-01-01 00:00:00" dynamically  <br>
-                              <b>previous_year_end</b>      : set the timestamp-attribute to "&lt;previous year&gt;-12-31 23:59:59" dynamically  <br>
-                              </ul><br>
+                              <b>current_year_begin</b>     : "&lt;current year&gt;-01-01 00:00:00"         <br>
+                              <b>current_year_end</b>       : "&lt;current year&gt;-12-31 23:59:59"         <br>
+                              <b>previous_year_begin</b>    : "&lt;previous year&gt;-01-01 00:00:00"        <br>
+                              <b>previous_year_end</b>      : "&lt;previous year&gt;-12-31 23:59:59"        <br>
+                              <b>current_month_begin</b>    : "&lt;current month first day&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : "&lt;current month last day&gt; 23:59:59"     <br>
+                              <b>previous_month_begin</b>   : "&lt;previous month first day&gt; 00:00:00"   <br>
+                              <b>previous_month_end</b>     : "&lt;previous month last day&gt; 23:59:59"    <br>
+                              <b>current_week_begin</b>     : "&lt;first day of current week&gt; 00:00:00"  <br>
+                              <b>current_week_end</b>       : "&lt;last day of current week&gt; 23:59:59"   <br>
+                              <b>previous_week_begin</b>    : "&lt;first day of previous week&gt; 00:00:00" <br>
+                              <b>previous_week_end</b>      : "&lt;last day of previous week&gt; 23:59:59"  <br>
+                              <b>current_day_begin</b>      : "&lt;current day&gt; 00:00:00"                <br>
+                              <b>current_day_end</b>        : "&lt;current day&gt; 23:59:59"                <br>
+                              <b>previous_day_begin</b>     : "&lt;previous day&gt; 00:00:00"               <br>
+                              <b>previous_day_end</b>       : "&lt;previous day&gt; 23:59:59"               <br>
+                              <b>current_hour_begin</b>     : "&lt;current hour&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : "&lt;current hour&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : "&lt;previous hour&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : "&lt;previous hour&gt;:59:59"                 <br>                              </ul><br>
   
   Make sure that timestamp_begin < timestamp_end is fulfilled. <br><br>
   
@@ -4571,12 +4746,29 @@ return;
   </ul></ul>
   <br>
   
-  (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" kann ebenso eine der folgenden Eingaben verwendet werden: <br><br>
+  (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
+  kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
                               <ul>
-                              <b>current_year_begin</b>     : belegt das timestamp-Attribut dynamisch mit "&lt;aktuelles Jahr&gt;-01-01 00:00:00" <br>
-                              <b>current_year_end</b>       : belegt das timestamp-Attribut dynamisch mit "&lt;aktuelles Jahr&gt;-12-31 23:59:59" <br>
-                              <b>previous_year_begin</b>    : belegt das timestamp-Attribut dynamisch mit "&lt;voriges Jahr&gt;-01-01 00:00:00"   <br>
-                              <b>previous_year_end</b>      : belegt das timestamp-Attribut dynamisch mit "&lt;voriges Jahr&gt;-12-31 23:59:59"   <br>
+                              <b>current_year_begin</b>     : "&lt;aktuelles Jahr&gt;-01-01 00:00:00"          <br>
+                              <b>current_year_end</b>       : "&lt;aktuelles Jahr&gt;-12-31 23:59:59"          <br>
+                              <b>previous_year_begin</b>    : "&lt;vorheriges Jahr&gt;-01-01 00:00:00"         <br>
+                              <b>previous_year_end</b>      : "&lt;vorheriges Jahr&gt;-12-31 23:59:59"         <br>
+                              <b>current_month_begin</b>    : "&lt;aktueller Monat erster Tag&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : "&lt;aktueller Monat letzter Tag&gt; 23:59:59"   <br>
+                              <b>previous_month_begin</b>   : "&lt;Vormonat erster Tag&gt; 00:00:00"           <br>
+                              <b>previous_month_end</b>     : "&lt;Vormonat letzter Tag&gt; 23:59:59"          <br>
+                              <b>current_week_begin</b>     : "&lt;erster Tag der akt. Woche&gt; 00:00:00"     <br>
+                              <b>current_week_end</b>       : "&lt;letzter Tag der akt. Woche&gt; 23:59:59"    <br>
+                              <b>previous_week_begin</b>    : "&lt;erster Tag Vorwoche&gt; 00:00:00"           <br>
+                              <b>previous_week_end</b>      : "&lt;letzter Tag Vorwoche&gt; 23:59:59"          <br>
+                              <b>current_day_begin</b>      : "&lt;aktueller Tag&gt; 00:00:00"                 <br>
+                              <b>current_day_end</b>        : "&lt;aktueller Tag&gt; 23:59:59"                 <br>
+                              <b>previous_day_begin</b>     : "&lt;Vortag&gt; 00:00:00"                        <br>
+                              <b>previous_day_end</b>       : "&lt;Vortag&gt; 23:59:59"                        <br>
+                              <b>current_hour_begin</b>     : "&lt;aktuelle Stunde&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : "&lt;aktuelle Stunde&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : "&lt;vorherige Stunde&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : "&lt;vorherige Stunde&gt;:59:59"                 <br>
                               </ul><br>
   
   Natürlich sollte man immer darauf achten dass timestamp_begin < timestamp_end ist.  <br><br>

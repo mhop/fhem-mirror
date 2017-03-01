@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  93_DbRep: V4.11.1, new options for timestamp_begin,timestamp_end
+                       see commandref for details
   - update:  88_HMCCU: added tracing for RPC set config
   - bugfix:  32_withings: removed experimental code
   - new:     82_LGTV_WebOS: to control LG TV's with WebOS
