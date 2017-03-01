@@ -270,6 +270,7 @@ my @globalAttrList = qw(
   apiversion
   archivecmd
   archivedir
+  archivesort:timestamp,alphanum
   archiveCompress
   autoload_undefined_devices:1,0
   autosave:1,0
@@ -3453,8 +3454,9 @@ HandleArchiving($;$)
   my @t = localtime;
   $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
-  my @files = sort { (stat("$dir/$a"))[9] cmp (stat("$dir/$b"))[9] } #66896
-              grep {/^$file$/} readdir(DH);
+  my @files = sort grep {/^$file$/} readdir(DH);
+  @files = sort { (stat("$dir/$a"))[9] cmp (stat("$dir/$b"))[9] } @files
+        if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
   closedir(DH);
 
   my $max = int(@files)-$nra;
