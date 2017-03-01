@@ -158,7 +158,7 @@ weblink_FwFn($$$$)
     Examples:
     <ul>
       <code>
-      define homepage weblink link http://www.fhem.de<br>
+      define homepage weblink link http://fhem.de<br>
       define webcam_picture weblink image http://w.x.y.z/current.jpg<br>
       define interactive_webcam weblink iframe http://w.x.y.z/webcam.cgi<br>
       define hr weblink htmlCode &lt;hr&gt<br>

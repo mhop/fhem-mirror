@@ -904,7 +904,7 @@ FHZ_Read($)
           and replug the FHZ device. Problems with FHZ may also be related to
           long USB cables or insufficient power on the USB - use a powered hub
           to improve this particular part of such issues.
-          See <a href="http://www.fhem.de/USB.html">our USB page</a>
+          See <a href="http://fhem.de/USB.html">our USB page</a>
           for detailed USB / electromag. interference troubleshooting.</li>
       <li><code>initfull</code> issues the initialization sequence for the FHZ
           device:<br>
