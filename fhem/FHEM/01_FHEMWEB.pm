@@ -279,7 +279,7 @@ FW_Define($$)
     InternalTimer(1, sub(){
       if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
         my ($x,$y) = gettimeofday();
-        $hash->{CSRFTOKEN} = "fhem_".(rand($y)*rand($x));
+        ($defs{WEB}{CSRFTOKEN} = "csrf_".(rand($y)*rand($x))) =~s/[^a-z_0-9]//g;
         $FW_csrfTokenCache{$name} = $hash->{CSRFTOKEN};
       }
     }, $hash, 0);
@@ -425,7 +425,7 @@ FW_Read($$)
               "Access-Control-Max-Age:86400\r\n".
               "Access-Control-Expose-Headers: X-FHEM-csrfToken\r\n": "");
    $FW_headerlines .= "X-FHEM-csrfToken: $defs{$FW_wname}{CSRFTOKEN}\r\n"
-        if($defs{$FW_wname}{CSRFTOKEN});
+        if(defined($defs{$FW_wname}{CSRFTOKEN}));
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
@@ -720,7 +720,7 @@ FW_answerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
-  $FW_CSRF = ($defs{$FW_wname}{CSRFTOKEN} ?
+  $FW_CSRF = (defined($defs{$FW_wname}{CSRFTOKEN}) ?
                 "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
@@ -812,7 +812,7 @@ FW_answerCall($)
                                                 $FW_tp ? "640,160" : "800,160");
   my ($cmd, $cmddev) = FW_digestCgi($arg);
   if($cmd && $FW_CSRF) {
-    my $supplied = $FW_webArgs{fwcsrf} ? $FW_webArgs{fwcsrf} : "";
+    my $supplied = defined($FW_webArgs{fwcsrf}) ? $FW_webArgs{fwcsrf} : "";
     my $want = $defs{$FW_wname}{CSRFTOKEN};
     if($supplied ne $want) {
       Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want. ".
@@ -2500,7 +2500,7 @@ FW_Attr(@)
     my $csrf = $param[0];
     if($csrf eq "random") {
       my ($x,$y) = gettimeofday();
-      $csrf = rand($y)*rand($x);
+      ($csrf = "csrf_".(rand($y)*rand($x))) =~ s/[^a-z_0-9]//g;
     }
 
     if($csrf eq "none") {

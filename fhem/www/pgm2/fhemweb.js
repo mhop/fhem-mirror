@@ -8,7 +8,7 @@ var FW_serverLastMsg = FW_serverFirstMsg;
 var FW_isIE = (navigator.appVersion.indexOf("MSIE") > 0);
 var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
 var FW_scripts = {}, FW_links = {};
-var FW_docReady = false, FW_longpollType, FW_csrfToken;
+var FW_docReady = false, FW_longpollType, FW_csrfToken, FW_csrfOk=true;
 var FW_root = "/fhem";  // root
 var embedLoadRetry = 100;
 
@@ -367,9 +367,9 @@ log(txt)
 function
 addcsrf(arg)
 {
-  if(FW_csrfToken) {
+  if(typeof FW_csrfToken != "undefined") {
     arg = arg.replace(/&fwcsrf=[^&]*/,'');
-    arg += '&fwcsrf='+FW_csrfToken;
+    arg += '&fwcsrf='+encodeURIComponent(FW_csrfToken);
   }
   return arg;
 }
@@ -377,11 +377,14 @@ addcsrf(arg)
 function
 FW_csrfRefresh(callback)
 {
-  log("FW_csrfRefresh");
+  log("FW_csrfRefresh, last was "+(FW_csrfOk ? "ok":"bad"));
+  if(!FW_csrfOk)        // avoid endless loop
+    return;
   $.ajax({
     url:location.pathname+"?XHR=1",
     success: function(data, textStatus, request){
       FW_csrfToken = request.getResponseHeader('x-fhem-csrftoken');
+      FW_csrfOk = false;
       if(callback)
         callback();
     }
@@ -396,13 +399,14 @@ FW_cmd(arg, callback)
     url:addcsrf(arg)+'&fw_id='+$("body").attr('fw_id'),
     method:'POST',
     success: function(data, textStatus, req){
+      FW_csrfOk = true;
       if(callback)
         callback(req.responseText);
       else if(req.responseText)
         FW_errmsg(req.responseText, 5000);
     },
     error:function(xhr, status, err) {
-      if(xhr.status == 401 && FW_csrfToken) {
+      if(xhr.status == 401 && typeof FW_csrfToken != "undefined") {
         FW_csrfToken = "";
         FW_csrfRefresh(function(){FW_cmd(arg, callback)});
       }
