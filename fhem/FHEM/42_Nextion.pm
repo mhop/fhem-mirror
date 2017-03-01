@@ -52,21 +52,27 @@
 # 0.5 2016-06-30 disconnect-fix / log reduced / expectAnswer
 #   
 # 0.6 2016-10-29 available through SVN
-#
-#   Implement attributes "disable" and "timeout"
-#   reduced logging for cmd send
-#   fix for page 10 not recognized : #msg592948
-# 0.7 2017-02-26 disable/timeout, fix for page 10
-
+#   timeout on sec 1 (not 0.5) - msg554933
+#   disabled attribute and change in connections  - msg554933
 #   
-#   
+# 0.8 2016-03-01 revert changes
 #   
 ##############################################
 ##############################################
 ### TODO
 #
+#
+#   disable attribute
+#   timeout with checkalive check?
+#   init device after notify on initialized
+#
 #   react on events with commands allowing values from FHEM
 #   remove wait for answer by attribute
+#   commands 
+#     set - page x
+#     set - text elem text
+#     set - val elem val
+#     picture setting
 #   init page from fhem might sent a magic starter and finisher something like get 4711 to recognize the init command results (can be filtered away)
 #   number of pages as define (std max 0-9)
 #   add 0x65 code
@@ -153,8 +159,11 @@ Nextion_Initialize($)
   $hash->{AttrFn}     = "Nextion_Attr";
   $hash->{AttrList}   = "initPage0:textField-long initPage1:textField-long initPage2:textField-long initPage3:textField-long initPage4:textField-long ".
                         "initPage5:textField-long initPage6:textField-long initPage7:textField-long initPage8:textField-long initPage9:textField-long ".
-                        "initCommands:textField-long hasSendMe:0,1 expectAnswer:1,0 disable:0,1 timeout ".$readingFnAttributes;           
+                        "initCommands:textField-long hasSendMe:0,1 expectAnswer:1,0 disable:0,1 ".$readingFnAttributes;           
 
+  # timeout for connections - msg554933
+  $hash->{TIMEOUT} = 1;      # might be better?      0.5;       
+                        
 # Normal devices
   $hash->{DefFn}   = "Nextion_Define";
   $hash->{SetFn}   = "Nextion_Set";
@@ -182,7 +191,8 @@ Nextion_Define($$)
   $hash->{DeviceName} = $dev;
 
   return undef if($dev eq "none"); # DEBUGGING
-  my $ret = Nextion_Connect($hash);
+  
+  my $ret = Nextion_Connect( $hash );
   return $ret;
 }
 
@@ -241,7 +251,7 @@ Nextion_Set($@)
   } elsif($type eq "reopen") {
     DevIo_CloseDev($hash);
     delete $hash->{DevIoJustClosed} if($hash->{DevIoJustClosed});
-    return DevIo_OpenDev($hash, 0, "Nextion_DoInit");
+    return Nextion_Connect( $hash );
   } elsif($type eq "disconnect") {
     DevIo_CloseDev($hash);
     DevIo_setStates($hash, "disconnected"); 
@@ -268,9 +278,9 @@ sub Nextion_Attr(@) {
   return "\"Nextion_Attr: \" $name does not exist" if (!defined($hash));
 
   if (defined($aVal)) {
-    Log3 $name, 5, "Nextion_Attr $name: $cmd on $aName to $aVal";
+    Log3 $name, 5, "Nextion_Attr $name: $cmd  on $aName to $aVal";
   } else {
-    Log3 $name, 5, "Nextion_Attr $name: $cmd on $aName to <undef>";
+    Log3 $name, 5, "Nextion_Attr $name: $cmd  on $aName to <undef>";
   }
   # $cmd can be "del" or "set"
   # $name is device name
@@ -284,104 +294,72 @@ sub Nextion_Attr(@) {
       if ( $aVal !~ /^[[:digit:]]+$/ ) {
         return "\"Nextion_Attr: \" unsupported"; 
       }
-    } elsif ($aName eq 'timeout') {
-      return "Usage: attr $name $aName <checkInterval>" if($aVal && $aVal !~ m/^[0-9]{1,6}(,[0-9]{1,6})*/);
-      RemoveInternalTimer($hash, "Nextion_CheckAlive");
-      if($aVal) {
-        InternalTimer(gettimeofday()+$aVal, "Nextion_CheckAlive", $hash, 0);
-	    if ($aVal >= 10){
-	      $hash->{nextOpenDelay} = $aVal - 3;
-	    } else {
-	      $hash->{nextOpenDelay} = 10;
-	    }
-      }    
-	} elsif ($aName eq "disable") {
-      if (defined($aVal) && $aVal eq "1") {
-	    DevIo_CloseDev($hash);
-		delete $hash->{DevIoJustClosed} if($hash->{DevIoJustClosed});
-	    readingsSingleUpdate($hash, 'state', 'disabled', 0);
-      } else { 
-		readingsSingleUpdate($hash, "state", "disconnected", 0) if($hash->{STATE} eq "disabled");
-		InternalTimer(gettimeofday()+1, "Nextion_DoInit", $hash);
+
+    } elsif ($aName eq 'disable') {
+      if($aVal eq "1") {
+        DevIo_CloseDev($hash);
+        DevIo_setStates($hash, "disabled"); 
+      } else {
+        if($hash->{READINGS}{state}{VAL} eq "disabled") {
+          DevIo_setStates($hash, "disconnected"); 
+          InternalTimer(gettimeofday()+1, "Nextion_Connect", $hash, 0);
+        }
       }
     }
+    
     $_[3] = $aVal;
   
   }
-  if ($cmd eq "del") {
-    if ($aName eq 'timeout') {
-	  RemoveInternalTimer($hash, "Nextion_CheckAlive");
-	  delete ($hash->{nextOpenDelay}); 
-	}
-  }
 
   return undef;
 }
 
+  
 #####################################
 sub
-Nextion_DoInit($){
-  my ($hash) = @_;
+Nextion_Connect($;$) 
+{
+  my ($hash, $mode) = @_;
+  my $name = $hash->{NAME};
+  
+  $mode = 0 if!($mode);
+  my $enabled = AttrVal($name, "disable", "0") != "1";
+  if($enabled) {
+    my $ret = DevIo_OpenDev($hash, $mode, "Nextion_DoInit");
+    return $ret;
+  }
+  
+  return undef;
+}
+   
+  
+  
+  
+#####################################
+sub
+Nextion_DoInit($)
+{
+  my $hash = shift;
   my $name = $hash->{NAME};
 
   my $ret = undef;
-
-  RemoveInternalTimer($hash, "Nextion_CheckAlive");
-  if(!IsDisabled($name)) {
-    InternalTimer(gettimeofday() +3, "Nextion_CheckAlive", $hash, 0);
-    ### send init commands
-    my $initCmds = AttrVal( $name, "initCommands", undef ); 
+  
+  ### send init commands
+  my $initCmds = AttrVal( $name, "initCommands", undef ); 
     
-    Log3 $name, 3, "Nextion_DoInit $name: Execute initCommands :".(defined($initCmds)?$initCmds:"<undef>").":";
+  Log3 $name, 3, "Nextion_DoInit $name: Execute initCommands :".(defined($initCmds)?$initCmds:"<undef>").":";
 
-    ## ??? quick hack send on init always page 0 twice to ensure proper start
-    # Send command handles replaceSetMagic and splitting
-    $ret = Nextion_SendCommand( $hash, "page 0;page 0", 0 );
+  
+  ## ??? quick hack send on init always page 0 twice to ensure proper start
+  # Send command handles replaceSetMagic and splitting
+  $ret = Nextion_SendCommand( $hash, "page 0;page 0", 0 );
 
-    # Send command handles replaceSetMagic and splitting
-    $ret = Nextion_SendCommand( $hash, $initCmds, 0 ) if ( defined( $initCmds ) );
-  } else {
-    readingsSingleUpdate($hash, "state", "disabled", 1);
-  }
+  # Send command handles replaceSetMagic and splitting
+  $ret = Nextion_SendCommand( $hash, $initCmds, 0 ) if ( defined( $initCmds ) );
+
   return $ret;
 }
 
-#####################################
-sub
-Nextion_CheckAlive(){
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  RemoveInternalTimer($hash, "Nextion_CheckAlive");
-  my $attrVal = AttrVal($name, "timeout", undef);
-  if(defined($attrVal)) {
-    InternalTimer(gettimeofday() + $attrVal, "Nextion_CheckAlive", $hash, 0);
-    if(AttrVal($name, "disable", "0") != "1") {
-      my $ret;
-      Log3 $name, 5, "Nextion check now if Nextion is alive.";
-      my $msg = "get \"ping\"";
-      $ret = Nextion_SendCommand( $hash, $msg, 1 );
-	  if ($ret ne "Message received"){
-	    readingsSingleUpdate($hash, "state", "disconnected", 1) if($hash->{STATE} ne "disconnected");
-		DevIo_Disconnected($hash) if($hash->{STATE} ne "disconnected");
-	  }
-  	}
-  }
-  return DevIo_OpenDev($hash, 1, "Nextion_DoInit") if($hash->{STATE} eq "disconnected"); 
-}
-######################################
-sub Nextion_Connect($;$) {
-  my ($hash, $mode) = @_;
-  my $name = $hash->{NAME};
- 
-  $mode = 0 if!($mode);
-   if(!IsDisabled($name)) {
-     my $ret = undef;
-	 $ret =  DevIo_OpenDev($hash, 1, "Nextion_DoInit") if($hash->{STATE} eq "disconnected");
-	 return $ret;
-   }
-  return undef;
-}
 #####################################
 sub
 Nextion_Undef($@)
@@ -454,7 +432,7 @@ Nextion_SendSingleCommand($$$)
   my ($hash,$msg,$answer) = @_;
   my $name = $hash->{NAME};
 
-  $answer = 0 if ( ! AttrVal($name,"expectAnswer",0) and $answer != 1); 
+  $answer = 0 if ( ! AttrVal($name,"expectAnswer",0) ); 
 
   # ??? handle answer
   my $err;
@@ -471,13 +449,12 @@ Nextion_SendSingleCommand($$$)
   Log3 $name, 1, "Nextion_SendCommand Error :".$err.": " if ( defined($err) );
   Log3 $name, 4, "Nextion_SendCommand Success " if ( ! defined($err) );
   
-  # Also set sentMsg Id and result in Readings
-  if ($msg ne "get \"ping\""){
+   # Also set sentMsg Id and result in Readings
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "cmdSent", $msg);        
   readingsBulkUpdate($hash, "cmdResult", (( defined($err))?$err:"empty") );        
   readingsEndUpdate($hash, 1);
-  }
+
   return $err;
 }
 
@@ -524,35 +501,35 @@ Nextion_Read($@)
         }
 
         Log3 $name, 4, "Nextion: Received message :$msg:";
-		# Ignore CheckAlive ping
-		if ($msg ne "H70(p) H70(p) H69(i) H6e(n) H67(g)") {
-          if ( defined( ReadingsVal($name,"received",undef) ) ) {
-            if ( defined( ReadingsVal($name,"old1",undef) ) ) {
-              if ( defined( ReadingsVal($name,"old2",undef) ) ) {
-                if ( defined( ReadingsVal($name,"old3",undef) ) ) {
-                  if ( defined( ReadingsVal($name,"old4",undef) ) ) {
-                    $hash->{READINGS}{old5}{VAL} = $hash->{READINGS}{old4}{VAL};
-                    $hash->{READINGS}{old5}{TIME} = $hash->{READINGS}{old4}{TIME};
-                  }
-                  $hash->{READINGS}{old4}{VAL} = $hash->{READINGS}{old3}{VAL};
-                  $hash->{READINGS}{old4}{TIME} = $hash->{READINGS}{old3}{TIME};
-                }
-                $hash->{READINGS}{old3}{VAL} = $hash->{READINGS}{old2}{VAL};
-                $hash->{READINGS}{old3}{TIME} = $hash->{READINGS}{old2}{TIME};
-              }
-              $hash->{READINGS}{old2}{VAL} = $hash->{READINGS}{old1}{VAL};
-              $hash->{READINGS}{old2}{TIME} = $hash->{READINGS}{old1}{TIME};
-            }
-            $hash->{READINGS}{old1}{VAL} = $hash->{READINGS}{received}{VAL};
-            $hash->{READINGS}{old1}{TIME} = $hash->{READINGS}{received}{TIME};
-          }
 
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"received",$msg);
-          readingsBulkUpdate($hash,"rectext",( (defined($text)) ? $text : "" ));
-          readingsBulkUpdate($hash,"currentPage",$id) if ( ( defined( $id ) ) && ( AttrVal($name,"hasSendMe",0) ) );
-          readingsEndUpdate($hash, 1);
-		}
+        if ( defined( ReadingsVal($name,"received",undef) ) ) {
+          if ( defined( ReadingsVal($name,"old1",undef) ) ) {
+            if ( defined( ReadingsVal($name,"old2",undef) ) ) {
+              if ( defined( ReadingsVal($name,"old3",undef) ) ) {
+                if ( defined( ReadingsVal($name,"old4",undef) ) ) {
+                  $hash->{READINGS}{old5}{VAL} = $hash->{READINGS}{old4}{VAL};
+                  $hash->{READINGS}{old5}{TIME} = $hash->{READINGS}{old4}{TIME};
+                }
+                $hash->{READINGS}{old4}{VAL} = $hash->{READINGS}{old3}{VAL};
+                $hash->{READINGS}{old4}{TIME} = $hash->{READINGS}{old3}{TIME};
+              }
+              $hash->{READINGS}{old3}{VAL} = $hash->{READINGS}{old2}{VAL};
+              $hash->{READINGS}{old3}{TIME} = $hash->{READINGS}{old2}{TIME};
+            }
+            $hash->{READINGS}{old2}{VAL} = $hash->{READINGS}{old1}{VAL};
+            $hash->{READINGS}{old2}{TIME} = $hash->{READINGS}{old1}{TIME};
+          }
+          $hash->{READINGS}{old1}{VAL} = $hash->{READINGS}{received}{VAL};
+          $hash->{READINGS}{old1}{TIME} = $hash->{READINGS}{received}{TIME};
+        }
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"received",$msg);
+        readingsBulkUpdate($hash,"rectext",( (defined($text)) ? $text : "" ));
+        readingsBulkUpdate($hash,"currentPage",$id) if ( ( defined( $id ) ) && ( AttrVal($name,"hasSendMe",0) ) );
+
+        readingsEndUpdate($hash, 1);
+
       }
     } else {
       last;
@@ -646,10 +623,8 @@ sub
 Nextion_Ready($)
 {
   my ($hash) = @_;
-  my $name = $hash->{NAME};
-  
-  Nextion_Connect($hash, 1);
 
+  return Nextion_Connect( $hash, 1 ) if($hash->{STATE} eq "disconnected");
   return 0;
 }
 
@@ -731,8 +706,7 @@ Nextion_convertMsg($)
       $text .= $rest;
       $val = $rest;
     }
-  } elsif ( $raw =~ /^\x66(.)$/s ) {
-    # need to parse multiline due to issue with page 10 --> x0A
+  } elsif ( $raw =~ /^\x66(.)$/ ) {
     # page started
     $text = "page ";
     my $rest = $1;
@@ -866,13 +840,6 @@ Nextion_DecodeFromIso($)
     <li><code>expectAnswer &lt;1 or 0&gt;</code><br>Specify if an answer from display is expected. If set to zero no answer is expected at any time on a command.
     </li> 
 
-    <li><code>disable &lt;1 or 0&gt;</code><br>
-      0 = The device is enabled | 1 = The device is deactivated. 
-    </li>
-	
-    <li><code>timeout</code><br>
-      Asks the Nextion every timeout seconds if it is still alive. If there is no response it reconnects to the Nextion.<br>
-    </li>
   </ul>
 
   <br><br>

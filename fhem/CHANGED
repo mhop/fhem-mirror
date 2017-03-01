@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  42_Nextion:  restore version
   - feature: YAMAHA_AVR: new attribute volumeMax to limit the maximum volume
   - update:  70_WS3600.pm extension for UV and illuminance
   - bugfix:  38_CO20.pm: fixed Device::USB init errors
