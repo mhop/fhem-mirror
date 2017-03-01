@@ -74,11 +74,13 @@ consFill()
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
+  var loc = (""+location).replace(/\?.*/,"");
   if($("body").attr("longpoll") == "websocket") {
     if(consConn) {
       consConn.close();
     }
-    consConn = new WebSocket((location+query).replace(/^http/i, "ws"));
+    consConn = new WebSocket(loc.replace(/[&?].*/,'')
+                                .replace(/^http/i, "ws")+query);
     consConn.onclose = 
     consConn.onerror = 
     consConn.onmessage = consUpdate;
@@ -89,7 +91,7 @@ consFill()
       consConn.abort();
     }
     consConn = new XMLHttpRequest();
-    consConn.open("GET", location.pathname+query, true);
+    consConn.open("GET", loc+query, true);
     consConn.onreadystatechange = consUpdate;
     consConn.send(null);
 

@@ -920,7 +920,8 @@ FW_longpoll()
 
   var loc = (""+location).replace(/\?.*/,"");
   if(typeof WebSocket == "function" && FW_longpollType == "websocket") {
-    FW_pollConn = new WebSocket(loc.replace(/[&?].*/,'').replace(/^http/i, "ws")+query);
+    FW_pollConn = new WebSocket(loc.replace(/[&?].*/,'')
+                                   .replace(/^http/i, "ws")+query);
     FW_pollConn.onclose = 
     FW_pollConn.onerror = 
     FW_pollConn.onmessage = FW_doUpdate;
