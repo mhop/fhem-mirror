@@ -1156,12 +1156,10 @@ When data on the clients modules is set then the client module updates the inter
 <li>rack       … rack of the PLC</li>
 <li>slot       … slot of the PLC</li>
 <li>Interval   … Intervall how often the modul should check if a reading is required</li>
-</ul>
 <br>
+</ul>
 Note: For Siemens logo you should use a alternative (more simply configuration method):<br>
 define logo S7 LOGO7 10.0.0.241 
-</ul>
-</ul>
 <br>
 Note: For Siemens S5 you must use a alternative (more simply configuration method):<br>
 define logo S7 S5 /dev/tty1
@@ -1176,6 +1174,8 @@ The following attributes are supported:<br>
 <li>MaxMessageLength</li>
 <br>
 MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package
+</ul>
+</ul>
 
 =end html
 
@@ -1232,12 +1232,10 @@ When data on the clients modules is set then the client module updates the inter
 <li>rack       … rack of the PLC</li>
 <li>slot       … slot of the PLC</li>
 <li>Interval   … Intervall how often the modul should check if a reading is required</li>
-</ul>
 <br>
+</ul>
 Note: For Siemens logo you should use a alternative (more simply configuration method):<br>
 define logo S7 LOGO7 10.0.0.241 
-</ul>
-</ul>
 <br>
 Note: For Siemens S5 you must use a alternative (more simply configuration method):<br>
 define logo S7 S5 /dev/tty1
@@ -1252,6 +1250,9 @@ The following attributes are supported:<br>
 <li>MaxMessageLength</li>
 <br>
 MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package
+</ul>
+</ul>
+
 =end html_DE
 
 =cut
