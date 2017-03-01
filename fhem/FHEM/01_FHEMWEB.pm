@@ -2497,6 +2497,7 @@ FW_Attr(@)
   }
 
   if($attrName eq "csrfToken" && $type eq "set") {
+    return undef if($FW_csrfTokenCache{$devName} && !$init_done);
     my $csrf = $param[0];
     if($csrf eq "random") {
       my ($x,$y) = gettimeofday();
