@@ -25,7 +25,7 @@ fd_fC(fn, callback)
   $.ajax({
     url:cmd, method:'POST', cache:false, success:callback,
     error:function(xhr, status, err) {
-      if(xhr.status == 401 && csrfToken) {
+      if(xhr.status == 400 && csrfToken) {
         csrfToken = "";
         fd_csrfRefresh(function(){fd_fC(fn, callback)});
       } else {

@@ -817,7 +817,7 @@ FW_answerCall($)
     if($supplied ne $want) {
       Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want. ".
                          "For detals see the csrfToken FHEMWEB attribute";
-      $FW_httpRetCode = "401 Unauthorized";
+      $FW_httpRetCode = "400 Bad Request";
       return 0;
     }
   }

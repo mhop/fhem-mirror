@@ -406,7 +406,7 @@ FW_cmd(arg, callback)
         FW_errmsg(req.responseText, 5000);
     },
     error:function(xhr, status, err) {
-      if(xhr.status == 401 && typeof FW_csrfToken != "undefined") {
+      if(xhr.status == 400 && typeof FW_csrfToken != "undefined") {
         FW_csrfToken = "";
         FW_csrfRefresh(function(){FW_cmd(arg, callback)});
       }
@@ -759,7 +759,7 @@ FW_doUpdate(evt)
 
   } else {
     if(FW_pollConn.readyState == 4 && !FW_leaving) {
-      if(FW_pollConn.status == "401") {
+      if(FW_pollConn.status == "400") {
         location.reload();
         return;
       }
