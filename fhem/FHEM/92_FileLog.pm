@@ -45,7 +45,6 @@ FileLog_Initialize($)
     archiveCompress
     archivecmd
     archivedir
-    archivesort
     createGluedFile:0,1
     disable:0,1
     disabledForIntervals
@@ -1258,7 +1257,6 @@ FileLog_regexpFn($$)
 
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
-    <a name="archivesort"></a>
     <a name="nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
         When a new FileLog file is opened, the FileLog archiver wil be called.
@@ -1266,9 +1264,6 @@ FileLog_regexpFn($$)
         time-specific wildcards, see the <a href="#FileLog">FileLog</a>
         section), and there is a new entry to be written into the file.
         <br>
-
-        archivesort may be the (default) alphanum or timestamp, and specifies
-        how the last files are computed.<br>
 
         If the attribute archivecmd is specified, then it will be started as a
         shell command (no enclosing " is needed), and each % in the command
@@ -1579,7 +1574,6 @@ FileLog_regexpFn($$)
 
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
-    <a name="archivedir"></a>
     <a name="nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
         Wenn eine neue FileLog-Datei ge&ouml;ffnet wird, wird der FileLog
@@ -1588,10 +1582,6 @@ FileLog_regexpFn($$)
         Wildcards, die weiter oben unter <a href="#FileLogdefine">FileLog
         (define)</a> beschrieben werden) und gleichzeitig ein neuer Datensatz
         in diese Datei geschrieben werden muss.  <br>
-
-        archivedir kann auf dem (voreingestellten) Wert alphanum oder timestamp
-        gesetzt werden, und bestimmt die Methode f&uuml;r die
-        Reihenfolgenberechnung der Dateien.<br>
 
         Wenn das Attribut archivecmd benutzt wird, startet es als
         shell-Kommando ( eine Einbettung in " ist nicht notwendig), und jedes %
