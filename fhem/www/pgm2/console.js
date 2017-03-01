@@ -8,6 +8,18 @@ var mustScroll = 1;
 log("Console is opening");
 
 function
+cons_closeConn()
+{
+  if(!consConn)
+    return;
+  if(typeof consConn.close ==  "function")
+    consConn.close();
+  else if(typeof consConn.abort ==  "function")
+    consConn.abort();
+  consConn = undefined;
+}
+
+function
 consUpdate(evt)
 {
   var errstr = "Connection lost, trying a reconnect every 5 seconds.";
@@ -16,8 +28,7 @@ consUpdate(evt)
   if(typeof WebSocket == "function" && evt && evt.target instanceof WebSocket) {
     if(evt.type == 'close') {
       FW_errmsg(errstr, 4900);
-      consConn.close();
-      consConn = undefined;
+      cons_closeConn();
       setTimeout(consFill, 5000);
       return;
     }
@@ -58,16 +69,8 @@ consFill()
 {
   FW_errmsg("");
 
-  if(FW_pollConn) {
-    if($("body").attr("longpoll") == "websocket") {
-      FW_pollConn.onclose = undefined;
-      FW_pollConn.close();
-    } else {
-      FW_pollConn.onreadystatechange = undefined;
-      FW_pollConn.abort();
-    }
-    FW_pollConn = undefined;
-  }
+  if(FW_pollConn)
+    FW_closeConn();
 
   var query = "?XHR=1"+
        "&inform=type=raw;withLog="+withLog+";filter="+consFilter+
