@@ -1,5 +1,5 @@
 
-var version="$Id$";
+// $Id$
 
 //TODO: realtime picker
 //

@@ -1,5 +1,5 @@
 
-var version="$Id$";
+// $Id$
 
 //$(document).ready(FW_readingsGroupReadyFn);
 $(FW_readingsGroupReadyFn);

@@ -1,5 +1,5 @@
 
-var version="$Id$";
+// $Id$
 
 function
 FW_readingsHistoryUpdateLine(d){
