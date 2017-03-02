@@ -1,3 +1,6 @@
+"use strict";
+// "$Id$";
+
 var zw_visible;
 var svgns = 'xmlns="http://www.w3.org/2000/svg"';
 
@@ -132,7 +135,7 @@ zw_draw(fnRet, width, height)
     ox = o.x; oy = o.y;
   })
   .bind('drag', function(e, ui) {
-    var p = ui.position; op = ui.originalPosition;
+    var p = ui.position, op = ui.originalPosition;
     o.x = ox + (p.left-op.left);
     o.y = oy + (p.top -op.top);
     $(o.rect).attr("x", o.x);   $(o.rect).attr("y", o.y);
@@ -495,7 +498,7 @@ GM()
   this.repelMax         =0.9;  // max amount of repelling force. 
   this.paddingFactor    =2.00; // factor by which an item is enlarged while avoiding overlap
 
-  var nrItems;
+  var nrItems, items;
   var maxX, maxY, minX, minY; // bounds of drawing area
   var scaleX,scaleY;
   var cogX, cogY;
@@ -507,7 +510,7 @@ GM()
   {
     var meanW=0, meanH=0;
    
-    for (i=1;i<nrItems;i++) {
+    for(var i=1; i<nrItems; i++) {
       meanW+=items[i].width;
       meanH+=items[i].height;
     } 
@@ -610,8 +613,8 @@ GM()
 
   this.layoutItems=function()
   {
-    for(i1=0; i1<nrItems; i1++) {
-      for(i2=i1+1; i2<nrItems; i2++) {
+    for(var i1=0; i1<nrItems; i1++) {
+      for(var i2=i1+1; i2<nrItems; i2++) {
         this.adjustItemDistance(items[i1], items[i2]);
         this.repelItems        (items[i1], items[i2]);
        }
@@ -696,10 +699,9 @@ GM()
   this.meanTargetCenterDistance = function()
   {
     var r=0;
-   
-    for(i1=1; i1<nrItems; i1++) r+=this.aid[i1][0];
-    r/=(nrItems-1);
-    
+    for(var i1=1; i1<nrItems; i1++)
+      r += this.aid[i1][0];
+    r /= (nrItems-1);
     return r;
   }
 

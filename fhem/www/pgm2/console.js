@@ -1,3 +1,6 @@
+"use strict";
+// "$Id$";
+
 var consConn;
 
 var consFilter, oldFilter;

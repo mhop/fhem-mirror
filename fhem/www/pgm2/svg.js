@@ -1,4 +1,5 @@
 "use strict";
+// "$Id$";
 
 if(!svgNS) {
   var svgNS = "http://www.w3.org/2000/svg";

@@ -1,6 +1,6 @@
 "use strict";
 
-var version="$Id$";
+var FW_version="$Id$";
 
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
@@ -64,7 +64,7 @@ FW_jqueryReadyFn()
 {
   if(FW_docReady)       // loading fhemweb.js twice is hard to debug
     return;
-  log(version);
+  log(FW_version);
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
   FW_longpollType = $("body").attr("longpoll");
