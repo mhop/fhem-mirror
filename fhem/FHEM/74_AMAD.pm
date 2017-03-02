@@ -37,8 +37,31 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.6.10";
-my $flowsetversion = "2.6.10";
+my $modulversion = "2.6.11";
+my $flowsetversion = "2.6.11";
+
+
+
+
+# Declare functions
+sub AMAD_Attr(@);
+sub AMAD_checkDeviceState($);
+sub AMAD_CommBridge_Open($);
+sub AMAD_CommBridge_Read($);
+sub AMAD_decrypt($);
+sub AMAD_Define($$);
+sub AMAD_encrypt($);
+sub AMAD_GetUpdate($);
+sub AMAD_Header2Hash($);
+sub AMAD_HTTP_POST($$);
+sub AMAD_HTTP_POSTerrorHandling($$$);
+sub AMAD_Initialize($);
+sub AMAD_ResponseProcessing($$);
+sub AMAD_SelectSetCmd($$@);
+sub AMAD_Set($$@);
+sub AMAD_statusRequest($);
+sub AMAD_statusRequestErrorHandling($$$);
+sub AMAD_Undef($$);
 
 
 
@@ -47,35 +70,36 @@ sub AMAD_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}	= "AMAD_Set";
-    $hash->{DefFn}	= "AMAD_Define";
-    $hash->{UndefFn}	= "AMAD_Undef";
-    $hash->{AttrFn}	= "AMAD_Attr";
-    $hash->{ReadFn}	= "AMAD_CommBridge_Read";
+    $hash->{SetFn}      = "AMAD_Set";
+    $hash->{DefFn}      = "AMAD_Define";
+    $hash->{UndefFn}    = "AMAD_Undef";
+    $hash->{AttrFn}     = "AMAD_Attr";
+    $hash->{ReadFn}     = "AMAD_CommBridge_Read";
     
-    $hash->{AttrList} 	= "setOpenApp ".
-			  "checkActiveTask ".
-			  "setFullscreen:0,1 ".
-			  "setScreenOrientation:0,1 ".
-			  "setScreenBrightness:noArg ".
-			  "setBluetoothDevice ".
-			  "setScreenlockPIN ".
-			  "setScreenOnForTimer ".
-			  "setOpenUrlBrowser ".
-			  "setNotifySndFilePath ".
-			  "setTtsMsgSpeed ".
-			  "setUserFlowState ".
-			  "setTtsMsgLang:de,en ".
-			  "setAPSSID ".
-			  "root:0,1 ".
-			  "port ".
-			  "disable:1 ".
-			  $readingFnAttributes;
+    $hash->{AttrList}   = "setOpenApp ".
+                "checkActiveTask ".
+                "setFullscreen:0,1 ".
+                "setScreenOrientation:0,1 ".
+                "setScreenBrightness:noArg ".
+                "setBluetoothDevice ".
+                "setScreenlockPIN ".
+                "setScreenOnForTimer ".
+                "setOpenUrlBrowser ".
+                "setNotifySndFilePath ".
+                "setTtsMsgSpeed ".
+                "setUserFlowState ".
+                "setTtsMsgLang:de,en ".
+                "setAPSSID ".
+                "root:0,1 ".
+                "port ".
+                "disable:1 ".
+                $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
-	my $hash = $modules{AMAD}{defptr}{$d};
-	$hash->{VERSIONMODUL}      = $modulversion;
-	$hash->{VERSIONFLOWSET}    = $flowsetversion;
+    
+        my $hash = $modules{AMAD}{defptr}{$d};
+        $hash->{VERSIONMODUL}      = $modulversion;
+        $hash->{VERSIONFLOWSET}    = $flowsetversion;
     }
 }
 
@@ -85,6 +109,7 @@ sub AMAD_Define($$) {
     
     my @a = split( "[ \t][ \t]*", $def );
 
+    
     return "too few parameters: define <name> AMAD <HOST-IP>" if( $a[0] ne "AMADCommBridge" and @a < 2 and @a > 4 );
 
     my $name    	= $a[0];
@@ -106,39 +131,45 @@ sub AMAD_Define($$) {
 
 
     if( ! $hash->{HOST} ) {
-	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST-IP>" if( $modules{AMAD}{defptr}{BRIDGE} );
+        return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST-IP>" if( $modules{AMAD}{defptr}{BRIDGE} );
 
-	$hash->{BRIDGE} = 1;
-	$modules{AMAD}{defptr}{BRIDGE} = $hash;
-	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
-	Log3 $name, 3, "AMAD ($name) - defined Bridge with Socketport $hash->{PORT}";
-	Log3 $name, 3, "AMAD ($name) - Attention!!! By the first run, dont forget to \"set $name fhemServerIP <IP-FHEM>\"";
-	AMAD_CommBridge_Open( $hash );
+        $hash->{BRIDGE} = 1;
+        $modules{AMAD}{defptr}{BRIDGE} = $hash;
+        $attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
+    
+        Log3 $name, 3, "AMAD ($name) - defined Bridge with Socketport $hash->{PORT}";
+        Log3 $name, 3, "AMAD ($name) - Attention!!! By the first run, dont forget to \"set $name fhemServerIP <IP-FHEM>\"";
+        
+        AMAD_CommBridge_Open( $hash );
 
     } else {
-	if( ! $modules{AMAD}{defptr}{BRIDGE} && $init_done ) {
-	    CommandDefine( undef, "AMADCommBridge AMAD" );    
-	}   
+        if( ! $modules{AMAD}{defptr}{BRIDGE} && $init_done ) {
+            CommandDefine( undef, "AMADCommBridge AMAD" );    
+        }   
 
-	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and AccessPoint-SSID $hash->{APSSID}" if(  $hash->{APSSID} );
-	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and NONE AccessPoint-SSID" if( ! $hash->{APSSID} );
-	
-	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
-	readingsSingleUpdate ( $hash, "state", "initialized", 1 ) if( $hash->{HOST} );
-	readingsSingleUpdate ( $hash, "deviceState", "unknown", 1 ) if( $hash->{HOST} );
+        Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and AccessPoint-SSID $hash->{APSSID}" if(  $hash->{APSSID} );
+        Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and NONE AccessPoint-SSID" if( ! $hash->{APSSID} );
+
+        $attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
+        
+        readingsSingleUpdate ( $hash, "state", "initialized", 1 ) if( $hash->{HOST} );
+        readingsSingleUpdate ( $hash, "deviceState", "unknown", 1 ) if( $hash->{HOST} );
         
         RemoveInternalTimer($hash);
         
         
         if( $init_done ) {
+        
             AMAD_GetUpdate($hash);
+            
         } else {
+        
             InternalTimer( gettimeofday()+30, "AMAD_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) );
         }
 
-	$modules{AMAD}{defptr}{$hash->{HOST}} = $hash;
+        $modules{AMAD}{defptr}{$hash->{HOST}} = $hash;
 
-	return undef;
+        return undef;
     }
 }
 
@@ -159,7 +190,7 @@ sub AMAD_Undef($$) {
         foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
             my $hash = $modules{AMAD}{defptr}{$d};
             my $host = $hash->{HOST};
-	    
+
             return if( $host );
             my $name = $hash->{NAME};
             CommandDelete( undef, $name );
@@ -177,23 +208,26 @@ sub AMAD_Attr(@) {
     my $orig = $attrVal;
 
     if( $attrName eq "disable" ) {
-	if( $cmd eq "set" ) {
-	    if( $attrVal eq "0" ) {
-		RemoveInternalTimer( $hash );
-		InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
-		readingsSingleUpdate ( $hash, "state", "active", 1 );
-		Log3 $name, 3, "AMAD ($name) - enabled";
-	    } else {
-		readingsSingleUpdate ( $hash, "state", "disabled", 1 );
-		RemoveInternalTimer( $hash );
-		Log3 $name, 3, "AMAD ($name) - disabled";
+        if( $cmd eq "set" ) {
+            if( $attrVal eq "0" ) {
+            
+                RemoveInternalTimer( $hash );
+                InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
+                readingsSingleUpdate ( $hash, "state", "active", 1 );
+                Log3 $name, 3, "AMAD ($name) - enabled";
+            } else {
+            
+                readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+                RemoveInternalTimer( $hash );
+                Log3 $name, 3, "AMAD ($name) - disabled";
             }
             
         } else {
-	    RemoveInternalTimer( $hash );
-	    InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
-	    readingsSingleUpdate ( $hash, "state", "active", 1 );
-	    Log3 $name, 3, "AMAD ($name) - enabled";
+        
+            RemoveInternalTimer( $hash );
+            InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
+            Log3 $name, 3, "AMAD ($name) - enabled";
         }
     }
     
@@ -208,23 +242,24 @@ sub AMAD_Attr(@) {
     }
     
     elsif( $attrName eq "port" ) {
-	if( $cmd eq "set" ) {
-	    $hash->{PORT} = $attrVal;
-	    Log3 $name, 3, "AMAD ($name) - set port to $attrVal";
-	    
-	    if( $hash->{BRIDGE} ) {
+        if( $cmd eq "set" ) {
+        
+            $hash->{PORT} = $attrVal;
+            Log3 $name, 3, "AMAD ($name) - set port to $attrVal";
+
+            if( $hash->{BRIDGE} ) {
                 delete $modules{AMAD}{defptr}{BRIDGE};
                 TcpServer_Close( $hash );
                 Log3 $name, 3, "AMAD ($name) - CommBridge Port changed. CommBridge are closed and new open!";
                 
                 AMAD_CommBridge_Open( $hash );
             }
-
         } else {
-	    $hash->{PORT} = 8090;
-	    Log3 $name, 3, "AMAD ($name) - set port to default";
-	    
-	    if( $hash->{BRIDGE} ) {
+        
+            $hash->{PORT} = 8090;
+            Log3 $name, 3, "AMAD ($name) - set port to default";
+    
+            if( $hash->{BRIDGE} ) {
                 delete $modules{AMAD}{defptr}{BRIDGE};
                 TcpServer_Close( $hash );
                 Log3 $name, 3, "AMAD ($name) - CommBridge Port changed. CommBridge are closed and new open!";
@@ -235,15 +270,19 @@ sub AMAD_Attr(@) {
     }
     
     elsif( $attrName eq "setScreenlockPIN" ) {
-	if( $cmd eq "set" && $attrVal ) {
+        if( $cmd eq "set" && $attrVal ) {
+        
             $attrVal = AMAD_encrypt($attrVal);
+            
         } else {
+        
             CommandDeleteReading( undef, "$name screenLock" );
         }
     }
     
     elsif( $attrName eq "setUserFlowState" ) {
-	if( $cmd eq "del" ) {
+        if( $cmd eq "del" ) {
+        
             CommandDeleteReading( undef, "$name userFlowState" ); 
         }
         
@@ -256,6 +295,7 @@ sub AMAD_Attr(@) {
     
     if( $cmd eq "set" ) {
         if( $attrVal && $orig ne $attrVal ) {
+        
             $attr{$name}{$attrName} = $attrVal;
             return $attrName ." set to ". $attrVal if( $init_done );
         }
@@ -307,15 +347,15 @@ sub AMAD_statusRequest($) {
     my $url = "http://" . $host . ":" . $port . "/fhem-amad/deviceInfo/"; # Pfad muß so im Automagic als http request Trigger drin stehen
   
     HttpUtils_NonblockingGet(
-	{
-	    url		=> $url,
-	    timeout	=> 5,
-	    hash	=> $hash,
-	    method	=> "GET",
-	    header	=> "Connection: close\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState",
-	    doTrigger	=> 1,
-	    callback	=> \&AMAD_statusRequestErrorHandling,
-	}
+        {
+            url		=> $url,
+            timeout	=> 5,
+            hash	=> $hash,
+            method	=> "GET",
+            header	=> "Connection: close\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState",
+            doTrigger	=> 1,
+            callback	=> \&AMAD_statusRequestErrorHandling,
+        }
     );
     
     Log3 $name, 5, "AMAD ($name) - Send statusRequest with URL: \"$url\" and Header: \"fhemIP: $fhemip\r\nfhemDevice: $name\r\nactiveTask: $activetask\r\napSSID: $apssid\"";
@@ -332,127 +372,130 @@ sub AMAD_statusRequestErrorHandling($$$) {
 
     ### Begin Error Handling
     if( $hash->{helper}{infoErrorCounter} > 0 ) {
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
-	
-	if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
-	     
-	    readingsBulkUpdate( $hash, "deviceState", "offline" );
-	    readingsBulkUpdate ( $hash, "state", "AMAD Flows inactive, device set offline");
-	}
-	
-	elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
-	    
-	    $attr{$name}{disable} = 1;
-	    readingsBulkUpdate ( $hash, "state", "Unknown Error, device disabled");
-	    
-	    $hash->{helper}{infoErrorCounter} = 0;
-	    $hash->{helper}{setCmdErrorCounter} = 0;
-	    
-	    return;
-	}
-	
-	elsif( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Informations Flow on your Device is inactive, will try to reactivate";
-	}
-	
-	elsif( $hash->{helper}{infoErrorCounter} > 7 ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
-	    
-	    readingsBulkUpdate( $hash, "deviceState", "offline" );
-	    readingsBulkUpdate ( $hash, "state", "To many Errors, device set offline");
-	    $hash->{helper}{infoErrorCounter} = 0;
-	}
-	
-	elsif($hash->{helper}{infoErrorCounter} > 2 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ){
-	    
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Please check the AutomagicAPP on your Device";
-	}
-	
-	readingsEndUpdate( $hash, 1 );
+    
+        readingsBeginUpdate( $hash );
+        readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
+
+        if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
+    
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
+        
+            readingsBulkUpdate( $hash, "deviceState", "offline" );
+            readingsBulkUpdate ( $hash, "state", "AMAD Flows inactive, device set offline");
+        }
+
+        elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
+    
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
+    
+            $attr{$name}{disable} = 1;
+            readingsBulkUpdate ( $hash, "state", "Unknown Error, device disabled");
+    
+            $hash->{helper}{infoErrorCounter} = 0;
+            $hash->{helper}{setCmdErrorCounter} = 0;
+    
+            return;
+        }
+
+        elsif( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" ) {
+    
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Informations Flow on your Device is inactive, will try to reactivate";
+        }
+
+        elsif( $hash->{helper}{infoErrorCounter} > 7 ) {
+
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
+        
+            readingsBulkUpdate( $hash, "deviceState", "offline" );
+            readingsBulkUpdate ( $hash, "state", "To many Errors, device set offline");
+            $hash->{helper}{infoErrorCounter} = 0;
+        }
+    
+        elsif($hash->{helper}{infoErrorCounter} > 2 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ){
+    
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Please check the AutomagicAPP on your Device";
+        }
+
+        readingsEndUpdate( $hash, 1 );
     }
     
     if( defined( $err ) ) {
-	if( $err ne "" ) {
-	    readingsBeginUpdate( $hash );
-	    readingsBulkUpdate ( $hash, "state", "$err") if( ReadingsVal( $name, "state", 1 ) ne "initialized" );
-	    $hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
+        if( $err ne "" ) {
+        
+            readingsBeginUpdate( $hash );
+            readingsBulkUpdate ( $hash, "state", "$err") if( ReadingsVal( $name, "state", 1 ) ne "initialized" );
+            $hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
 
-	    readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
-	  
-	    if( $err =~ /timed out/ ) {
-	    
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: connect to your device is timed out. check network";
-	    }
-	    
-	    elsif( ( $err =~ /Keine Route zum Zielrechner/ ) && $hash->{helper}{infoErrorCounter} > 1 ) {
-	    
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: no route to target. bad network configuration or network is down";
-		
-	    } else {
+            readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
+    
+            if( $err =~ /timed out/ ) {
+    
+                Log3 $name, 5, "AMAD ($name) - statusRequestERROR: connect to your device is timed out. check network";
+            }
+    
+            elsif( ( $err =~ /Keine Route zum Zielrechner/ ) && $hash->{helper}{infoErrorCounter} > 1 ) {
+    
+                Log3 $name, 5, "AMAD ($name) - statusRequestERROR: no route to target. bad network configuration or network is down";
+    
+            } else {
 
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: $err";
-	    }
+                Log3 $name, 5, "AMAD ($name) - statusRequestERROR: $err";
+            }
 
-	readingsEndUpdate( $hash, 1 );
-	
-	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: AMAD_statusRequestErrorHandling: error while requesting AutomagicInfo: $err";
-	
-	return;
-	}
+            readingsEndUpdate( $hash, 1 );
+
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: AMAD_statusRequestErrorHandling: error while requesting AutomagicInfo: $err";
+
+            return;
+        }
     }
 
     if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate ( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state", 1 ) ne "initialized" );
-	$hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
     
-	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
+        readingsBeginUpdate( $hash );
+        readingsBulkUpdate ( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state", 1 ) ne "initialized" );
+        $hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
+
+        readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
     
-	if( $param->{code} ne 200 ) {
+        if( $param->{code} ne 200 ) {
 
-	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: ".$param->{code};
-	}
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: ".$param->{code};
+        }
 
-	readingsEndUpdate( $hash, 1 );
+        readingsEndUpdate( $hash, 1 );
     
-	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." without any data after requesting AMAD AutomagicInfo";
+        Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." without any data after requesting AMAD AutomagicInfo";
 
-	return;
+        return;
     }
 
     if( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {    
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state" ,0) ne "initialized" );
-	$hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
+        readingsBeginUpdate( $hash );
+        readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state" ,0) ne "initialized" );
+        $hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
 
-	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
+        readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
+
+        if( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "inactive" ) eq "inactive" ) {
+
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the informations flow on your device";
+        }
     
-	    if( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "inactive" ) eq "inactive" ) {
-
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the informations flow on your device";
-	    }
-	    
-	    elsif( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ) {
-	    
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the automagicApp on your device";
-		
-	    } else {
-
-		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: http error ".$param->{code};
-	    }
-	
-	readingsEndUpdate( $hash, 1 );
+        elsif( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ) {
     
-	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." receive Error after requesting AMAD AutomagicInfo";
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the automagicApp on your device";
+    
+        } else {
 
-	return;
+            Log3 $name, 5, "AMAD ($name) - statusRequestERROR: http error ".$param->{code};
+        }
+
+        readingsEndUpdate( $hash, 1 );
+    
+        Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." receive Error after requesting AMAD AutomagicInfo";
+
+        return;
     }
 
     ### End Error Handling
@@ -473,9 +516,11 @@ sub AMAD_ResponseProcessing($$) {
     
     my @valuestring = split( '@@@@', $data );
     my %buffer;
+    
     foreach( @valuestring ) {
-	my @values = split( '@@' , $_ );
-	$buffer{$values[0]} = $values[1];
+    
+        my @values = split( '@@' , $_ );
+        $buffer{$values[0]} = $values[1];
     }
 
 
@@ -528,10 +573,14 @@ sub AMAD_Set($$@) {
         $list .= "screenMsg ";
         $list .= "ttsMsg ";
         $list .= "volume:slider,0,1,15 ";
-        $list .= "mediaGoogleMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-        $list .= "mediaAmazonMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-        $list .= "mediaSpotifyMusic:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-        $list .= "mediaTuneinRadio:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaGoogleMusic:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaAmazonMusic:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaSpotifyMusic:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaTuneinRadio:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaAldiMusic:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaYouTube:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaVlcPlayer:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
+        $list .= "mediaAudible:play/pause,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
         $list .= "screenBrightness:slider,0,1,255 ";
         $list .= "screen:on,off,lock,unlock ";
         $list .= "screenOrientation:auto,landscape,portrait " if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
@@ -548,6 +597,7 @@ sub AMAD_Set($$@) {
         $list .= "changetoBTDevice:$btdev " if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
         $list .= "activateVoiceInput:noArg ";
         $list .= "volumeNotification:slider,0,1,7 ";
+        $list .= "volumeRingSound:slider,0,1,7 ";
         $list .= "vibrate:noArg ";
         $list .= "sendIntent ";
         $list .= "openCall ";
@@ -557,6 +607,7 @@ sub AMAD_Set($$@) {
         $list .= "doNotDisturb:never,always,alarmClockOnly,onlyImportant ";
         $list .= "userFlowState ";
         $list .= "sendSMS ";
+        $list .= "startDaydream:noArg ";
 
         if( lc $cmd eq 'screenmsg'
             || lc $cmd eq 'ttsmsg'
@@ -565,6 +616,10 @@ sub AMAD_Set($$@) {
             || lc $cmd eq 'mediaamazonmusic'
             || lc $cmd eq 'mediaspotifymusic'
             || lc $cmd eq 'mediatuneinradio'
+            || lc $cmd eq 'mediaaldimusic'
+            || lc $cmd eq 'mediayoutube'
+            || lc $cmd eq 'mediavlcplayer'
+            || lc $cmd eq 'mediaaudible'
             || lc $cmd eq 'screenbrightness'
             || lc $cmd eq 'screenorientation'
             || lc $cmd eq 'screenfullscreen'
@@ -580,6 +635,7 @@ sub AMAD_Set($$@) {
             || lc $cmd eq 'clearnotificationbar'
             || lc $cmd eq 'activatevoiceinput'
             || lc $cmd eq 'volumenotification'
+            || lc $cmd eq 'volumeringsound'
             || lc $cmd eq 'screenlock'
             || lc $cmd eq 'statusrequest'
             || lc $cmd eq 'sendsms'
@@ -590,6 +646,7 @@ sub AMAD_Set($$@) {
             || lc $cmd eq 'closecall'
             || lc $cmd eq 'donotdisturb'
             || lc $cmd eq 'userflowstate'
+            || lc $cmd eq 'startdaydream'
             || lc $cmd eq 'vibrate') {
 
             Log3 $name, 5, "AMAD ($name) - set $name $cmd ".join(" ", @val);
@@ -601,7 +658,7 @@ sub AMAD_Set($$@) {
             return "Cannot set command, FHEM Device is unknown" if( ReadingsVal( $name, "deviceState", "online" ) eq "unknown" );
             return "Cannot set command, FHEM Device is offline" if( ReadingsVal( $name, "deviceState", "online" ) eq "offline" );
         
-            return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) || ( lc $cmd eq 'activatevoiceinput' ) || ( lc $cmd eq 'vibrate' ) || ( lc $cmd eq 'currentflowsetupdate' ) || ( lc $cmd eq 'closecall' );
+            return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( (@val) or (lc $cmd eq 'activatevoiceinput') or (lc $cmd eq 'vibrate') or (lc $cmd eq 'currentflowsetupdate') or (lc $cmd eq 'closecall') or (lc $cmd eq 'startdaydream') );
         }
 
         return "Unknown argument $cmd, bearword as argument or wrong parameter(s), choose one of $list";
@@ -635,13 +692,13 @@ sub AMAD_SelectSetCmd($$@) {
 
     if( lc $cmd eq 'screenmsg' ) {
         my $msg = join( " ", @data );
-	
+
         $msg =~ s/%/%25/g;
         $msg =~ s/\s/%20/g;
-	
+
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/screenMsg?message=$msg";
         Log3 $name, 4, "AMAD ($name) - Sub AMAD_SetScreenMsg";
-	    
+    
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -650,10 +707,10 @@ sub AMAD_SelectSetCmd($$@) {
         my $msg     = join( " ", @data );
         my $speed   = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
         my $lang    = AttrVal( $name, "setTtsMsgLang","de" );
-	
+
         $msg =~ s/%/%25/g;
         $msg =~ s/\s/%20/g;    
-	
+
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".$msg."&msgspeed=".$speed."&msglang=".$lang;
     
         return AMAD_HTTP_POST( $hash,$url );
@@ -665,7 +722,7 @@ sub AMAD_SelectSetCmd($$@) {
         my ($flow,$state) = split( ":", $datas);
         
         $flow          =~ s/\s/%20/g;    
-	
+
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/flowState?flowstate=".$state."&flowname=".$flow;
     
         return AMAD_HTTP_POST( $hash,$url );
@@ -674,7 +731,7 @@ sub AMAD_SelectSetCmd($$@) {
     elsif( lc $cmd eq 'volume' ) {
     
         my $vol = join( " ", @data );
-	
+
         if( $vol =~ /^\+(.*)/ or $vol =~ /^-(.*)/ ) {
 
             if( $vol =~ /^\+(.*)/ ) {
@@ -692,7 +749,7 @@ sub AMAD_SelectSetCmd($$@) {
         }
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setVolume?volume=$vol";
-	
+
         return AMAD_HTTP_POST( $hash, $url );
     }
     
@@ -701,11 +758,20 @@ sub AMAD_SelectSetCmd($$@) {
         my $vol = join( " ", @data );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setNotifiVolume?notifivolume=$vol";
-	
+
         return AMAD_HTTP_POST( $hash, $url );
     }
     
-    elsif( lc $cmd eq 'mediagooglemusic' or lc $cmd eq 'mediaamazonmusic' or lc $cmd eq 'mediaspotifymusic' or lc $cmd eq 'mediatuneinradio' ) {
+    elsif( lc $cmd eq 'volumeringsound' ) {
+    
+        my $vol = join( " ", @data );
+
+        my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setRingSoundVolume?ringsoundvolume=$vol";
+
+        return AMAD_HTTP_POST( $hash, $url );
+    }
+    
+    elsif( lc $cmd =~ /^media/ ) {
     
         my $btn = join( " ", @data );
 
@@ -719,7 +785,7 @@ sub AMAD_SelectSetCmd($$@) {
         my $bri = join( " ", @data );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setBrightness?brightness=$bri";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -728,16 +794,16 @@ sub AMAD_SelectSetCmd($$@) {
         my $mod = join( " ", @data );
         my $scot = AttrVal( $name, "setScreenOnForTimer", undef );
         $scot = 60 if( !$scot );
-	
+
         if ($mod eq "on" || $mod eq "off") {
-            
+
             my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOnOff?screen=".$mod."&screenontime=".$scot if ($mod eq "on" || $mod eq "off");
             
             return AMAD_HTTP_POST( $hash,$url );
         }
-	
+
         elsif ($mod eq "lock" || $mod eq "unlock") {
-	
+
             return "Please set \"setScreenlockPIN\" Attribut first" if( AttrVal( $name, "setScreenlockPIN", "none" ) eq "none" );
             my $PIN = AttrVal( $name, "setScreenlockPIN", undef );
             $PIN = AMAD_decrypt($PIN);
@@ -753,14 +819,14 @@ sub AMAD_SelectSetCmd($$@) {
         my $mod = join( " ", @data );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
     elsif( lc $cmd eq 'activatevoiceinput' ) {
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setvoicecmd";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -771,7 +837,7 @@ sub AMAD_SelectSetCmd($$@) {
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenFullscreen?fullscreen=$mod";
 
         readingsSingleUpdate( $hash, $cmd, $mod, 1 );
-	
+
         return AMAD_HTTP_POST( $hash, $url );
     }
     
@@ -792,7 +858,7 @@ sub AMAD_SelectSetCmd($$@) {
         my @alarm = split( ":", $value );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setAlarm?hour=".$alarm[0]."&minute=".$alarm[1];
-	
+
         return AMAD_HTTP_POST( $hash, $url );
     }
     
@@ -801,7 +867,7 @@ sub AMAD_SelectSetCmd($$@) {
         my $timer = join( " ", @data );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setTimer?minute=$timer";
-	
+
         return AMAD_HTTP_POST( $hash, $url );
     }
     
@@ -868,9 +934,9 @@ sub AMAD_SelectSetCmd($$@) {
         my @btDevice = split( ',', $btDevices );
         my @btDeviceOne = split( /\|/, $btDevice[0] );
         my @btDeviceTwo = split( /\|/, $btDevice[1] );
-	
+
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setbtdevice?swToBtDeviceMac=".$swToBtMac[1]."&btDeviceOne=".$btDeviceOne[1]."&btDeviceTwo=".$btDeviceTwo[1];
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -886,7 +952,7 @@ sub AMAD_SelectSetCmd($$@) {
     elsif( lc $cmd eq 'vibrate' ) {
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setvibrate";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -900,7 +966,7 @@ sub AMAD_SelectSetCmd($$@) {
         $exval2 = "" if( !$exval2 );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/sendIntent?action=".$action."&exkey1=".$exkey1."&exval1=".$exval1."&exkey2=".$exkey2."&exval2=".$exval2;
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -909,7 +975,7 @@ sub AMAD_SelectSetCmd($$@) {
         my $flowname = join( " ", @data );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/installFlow?flowname=$flowname";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -920,21 +986,28 @@ sub AMAD_SelectSetCmd($$@) {
         $time = "none" if( !$time );
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/openCall?callnumber=".$callnumber."&hanguptime=".$time;
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
     elsif( lc $cmd eq 'closecall' ) {
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/closeCall";
-	
+
+        return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'startdaydream' ) {
+
+        my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/startDaydream";
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
     elsif( lc $cmd eq 'currentflowsetupdate' ) {
 
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/currentFlowsetUpdate";
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
     
@@ -946,7 +1019,7 @@ sub AMAD_SelectSetCmd($$@) {
         $smsmessage =~ s/\s/%20/g;
     
         my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/sendSms?smsmessage=".$smsmessage."&smsnumber=".$smsnumber;
-	
+
         return AMAD_HTTP_POST( $hash,$url );
     }
 
@@ -963,16 +1036,17 @@ sub AMAD_HTTP_POST($$) {
     readingsSingleUpdate( $hash, "state", "Send HTTP POST", 1 );
     
     HttpUtils_NonblockingGet(
-	{
-	    url		=> $url,
-	    timeout	=> 15,
-	    hash	=> $hash,
-	    method	=> "POST",
-	    header	=> "Connection: close",
-	    doTrigger	=> 1,
-	    callback	=> \&AMAD_HTTP_POSTerrorHandling,
-	}
+        {
+            url		=> $url,
+            timeout	=> 15,
+            hash	=> $hash,
+            method	=> "POST",
+            header	=> "Connection: close",
+            doTrigger	=> 1,
+            callback	=> \&AMAD_HTTP_POSTerrorHandling,
+        }
     );
+    
     Log3 $name, 4, "AMAD ($name) - Send HTTP POST with URL $url";
 
     readingsSingleUpdate( $hash, "state", $state, 1 );
@@ -989,114 +1063,118 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 
     ### Begin Error Handling
     if( $hash->{helper}{setCmdErrorCounter} > 2 ) {
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate( $hash, "lastSetCommandState", "statusRequest_error" );
-	
-	if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
-	     
-	    readingsBulkUpdate( $hash, "deviceState", "offline" );
-	    readingsBulkUpdate( $hash, "state", "AMAD Flows inactive, device set offline" );
-	}
-	
-	elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
-	    
-	    $attr{$name}{disable} = 1;
-	    readingsBulkUpdate( $hash, "state", "Unknown Error, device disabled" );
-	    $hash->{helper}{infoErrorCounter} = 0;
-	    $hash->{helper}{setCmdErrorCounter} = 0;
-	    
-	    return;
-	}
-	
-	elsif( ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: Flow SetCommands on your Device is inactive, will try to reactivate";
-	}
-	
-	elsif( $hash->{helper}{setCmdErrorCounter} > 9 ) {
-	    
-	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
-	    
-	    readingsBulkUpdate( $hash, "deviceState", "offline" );
-	    readingsBulkUpdate( $hash, "state", "To many Errors, device set offline" );
-	    $hash->{helper}{setCmdErrorCounter} = 0;
-	}
-	
-	elsif( $hash->{helper}{setCmdErrorCounter} > 4 && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "active" ){
-	    
-	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: Please check the AutomagicAPP on your Device";
-	}
-	
-	readingsEndUpdate( $hash, 1 );
+    
+    readingsBeginUpdate( $hash );
+    readingsBulkUpdate( $hash, "lastSetCommandState", "statusRequest_error" );
+
+        if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
+
+            readingsBulkUpdate( $hash, "deviceState", "offline" );
+            readingsBulkUpdate( $hash, "state", "AMAD Flows inactive, device set offline" );
+        }
+
+        elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
+    
+            $attr{$name}{disable} = 1;
+            readingsBulkUpdate( $hash, "state", "Unknown Error, device disabled" );
+            $hash->{helper}{infoErrorCounter} = 0;
+            $hash->{helper}{setCmdErrorCounter} = 0;
+
+            return;
+        }
+
+        elsif( ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: Flow SetCommands on your Device is inactive, will try to reactivate";
+        }
+
+        elsif( $hash->{helper}{setCmdErrorCounter} > 9 ) {
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
+    
+            readingsBulkUpdate( $hash, "deviceState", "offline" );
+            readingsBulkUpdate( $hash, "state", "To many Errors, device set offline" );
+            $hash->{helper}{setCmdErrorCounter} = 0;
+        }
+
+        elsif( $hash->{helper}{setCmdErrorCounter} > 4 && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "active" ){
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: Please check the AutomagicAPP on your Device";
+        }
+
+        readingsEndUpdate( $hash, 1 );
     }
     
     if( defined( $err ) ) {
-	if( $err ne "" ) {
-	  readingsBeginUpdate( $hash );
-	  readingsBulkUpdate( $hash, "state", $err ) if( ReadingsVal( $name, "state", 0 ) ne "initialized" );
-	  $hash->{helper}{setCmdErrorCounter} = ($hash->{helper}{setCmdErrorCounter} + 1);
-	  
-	  readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
-	  
-	  if( $err =~ /timed out/ ) {
-	  
-	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: connect to your device is timed out. check network";
-	  }
-	  
-	  elsif( $err =~ /Keine Route zum Zielrechner/ ) {
-	  
-	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: no route to target. bad network configuration or network is down";
-	      
-	  } else {
-	  
-	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: $err";
-	  }
-	  
-	  readingsEndUpdate( $hash, 1 );
-	  
-	  Log3 $name, 5, "AMAD ($name) - setCommandERROR: error while POST Command: $err";
-	  
-	  return;
-	}
+        if( $err ne "" ) {
+            readingsBeginUpdate( $hash );
+            readingsBulkUpdate( $hash, "state", $err ) if( ReadingsVal( $name, "state", 0 ) ne "initialized" );
+            $hash->{helper}{setCmdErrorCounter} = ($hash->{helper}{setCmdErrorCounter} + 1);
+    
+            readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
+    
+            if( $err =~ /timed out/ ) {
+
+                Log3 $name, 5, "AMAD ($name) - setCommandERROR: connect to your device is timed out. check network";
+            }
+    
+            elsif( $err =~ /Keine Route zum Zielrechner/ ) {
+
+                Log3 $name, 5, "AMAD ($name) - setCommandERROR: no route to target. bad network configuration or network is down";
+
+            } else {
+    
+                Log3 $name, 5, "AMAD ($name) - setCommandERROR: $err";
+            }
+    
+            readingsEndUpdate( $hash, 1 );
+
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: error while POST Command: $err";
+
+            return;
+        }
     }
  
     if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $hash, "state", 0 ) ne "initialized" );
-	
-	$hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
-
-	readingsBulkUpdate($hash, "lastSetCommandState", "setCmd_error" );
-
-	readingsEndUpdate( $hash, 1 );
     
-	Log3 $name, 5, "AMAD ($name) - setCommandERROR: received http code ".$param->{code};
+        readingsBeginUpdate( $hash );
+        readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $hash, "state", 0 ) ne "initialized" );
 
-	return;
+        $hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
+
+        readingsBulkUpdate($hash, "lastSetCommandState", "setCmd_error" );
+
+        readingsEndUpdate( $hash, 1 );
+    
+        Log3 $name, 5, "AMAD ($name) - setCommandERROR: received http code ".$param->{code};
+
+        return;
     }
         
     if( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
-	readingsBeginUpdate( $hash );
-	readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state", 0 ) ne "initialized" );
-	
-	$hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
-
-	readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
     
-	    if( $param->{code} eq 404 ) {
-	    
-		readingsBulkUpdate( $hash, "lastSetCommandError", "" );
-		Log3 $name, 5, "AMAD ($name) - setCommandERROR: setCommands flow is inactive on your device!";
-		
-	    } else {
-	    
-		Log3 $name, 5, "AMAD ($name) - setCommandERROR: http error ".$param->{code};
-	    }
-	
-	return;
+        readingsBeginUpdate( $hash );
+        readingsBulkUpdate( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state", 0 ) ne "initialized" );
+
+        $hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
+
+        readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
+    
+        if( $param->{code} eq 404 ) {
+    
+            readingsBulkUpdate( $hash, "lastSetCommandError", "" );
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: setCommands flow is inactive on your device!";
+    
+        } else {
+    
+            Log3 $name, 5, "AMAD ($name) - setCommandERROR: http error ".$param->{code};
+        }
+
+        return;
     }
     
     ### End Error Handling
@@ -1139,8 +1217,9 @@ sub AMAD_CommBridge_Open($) {
     my $ret = TcpServer_Open( $hash, $port, "global" );
     
     if( $ret && !$init_done ) {
-	Log3 $name, 3, "$ret. Exiting.";
-	exit(1);
+    
+        Log3 $name, 3, "$ret. Exiting.";
+        exit(1);
     }
     
     readingsSingleUpdate ( $hash, "state", "opened", 1 );
@@ -1319,25 +1398,25 @@ sub AMAD_CommBridge_Read($) {
     
         elsif ( $fhemcmd =~ /fhemfunc\b/ ) {
             my $fhemCmd = $data[1];
-	
+
             Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: receive fhem-function command";
-	
+
             if( $fhemCmd =~ /^{.*}$/ ) {
         
                 $response = $fhemCmd if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
             
             } else {
-	
+
                 $response = "header lines: \r\n AMADCommBridge receive no typical FHEM function\r\n FHEM to do nothing\r\n";
             }
-	
+
             $c = $hash->{CD};
             print $c "HTTP/1.1 200 OK\r\n",
                 "Content-Type: text/plain\r\n",
                 "Connection: close\r\n",
                 "Content-Length: ".length($response)."\r\n\r\n",
                 $response;
-	
+
             return;
         }
     
@@ -1530,6 +1609,11 @@ sub AMAD_decrypt($) {
     <li>mediaAmazonMusic - play/stop/next/back , controlling the amazon music media player</li>
     <li>mediaGoogleMusic - play/stop/next/back , controlling the google play music media player</li>
     <li>mediaSpotifyMusic - play/stop/next/back , controlling the spotify media player</li>
+    <li>mediaTuneinRadio - play/stop/next/back , controlling the TuneinRadio media player</li>
+    <li>mediaAldiMusic - play/stop/next/back , controlling the Aldi music media player</li>
+    <li>mediaAudible - play/stop/next/back , controlling the Audible media player</li>
+    <li>mediaYouTube - play/stop/next/back , controlling the YouTube media player</li>
+    <li>mediaVlcPlayer - play/stop/next/back , controlling the VLC media player</li>
     <li>nextAlarmTime - sets the alarm time. Only valid for the next 24 hours.</li>
     <li>notifySndFile - plays a media-file <b>which by default needs to be stored in the folder "/storage/emulated/0/Notifications/" of the Android device. You may use the attribute setNotifySndFilePath for defining a different folder.</b></li>
     <li>openCall - initial a call and hang up after optional time / set DEVICE openCall 0176354 10 call this number and hang up after 10s</li>
@@ -1537,6 +1621,7 @@ sub AMAD_decrypt($) {
     <li>screenMsg - display message on screen of Android device</li>
     <li>sendintent - send intent string <u>Example:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, first parameter contains the action, second parameter contains the extra. At most two extras can be used.</li>
     <li>sendSMS - Sends an SMS to a specific phone number. Bsp.: sendSMS Dies ist ein Test|555487263</li>
+    <li>startDaydream - start Daydream</li>
     <li>statusRequest - Get a new status report of Android device. Not all readings can be updated using a statusRequest as some readings are only updated if the value of the reading changes.</li>
     <li>timer - set a countdown timer in the "Clock" stock app. Only seconds are allowed as parameter.</li>
     <li>ttsMsg - send a message which will be played as voice message</li>
@@ -1701,12 +1786,18 @@ sub AMAD_decrypt($) {
     <li>mediaAmazonMusic - play, stop, next, back  ,steuert den Amazon Musik Mediaplayer</li>
     <li>mediaGoogleMusic - play, stop, next, back  ,steuert den Google Play Musik Mediaplayer</li>
     <li>mediaSpotifyMusic - play, stop, next, back  ,steuert den Spotify Mediaplayer</li>
+    <li>mediaTuneinRadio - play, stop, next, back  ,steuert den TuneIn Radio Mediaplayer</li>
+    <li>mediaAldiMusic - play, stop, next, back  ,steuert den Aldi Musik Mediaplayer</li>
+    <li>mediaAudible - play, stop, next, back  ,steuert den Audible Mediaplayer</li>
+    <li>mediaYouTube - play, stop, next, back  ,steuert den YouTube Mediaplayer</li>
+    <li>mediaVlcPlayer - play, stop, next, back  ,steuert den VLC Mediaplayer</li>
     <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
     <li>openCall - ruft eine Nummer an und legt optional nach X Sekunden auf / set DEVICE openCall 01736458 10 / ruft die Nummer an und beendet den Anruf nach 10s</li>
     <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255.</li>
     <li>screenMsg - versendet eine Bildschirmnachricht</li>
     <li>sendintent - sendet einen Intentstring <u>Bsp:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, der erste Befehl ist die Aktion und der zweite das Extra. Es k&ouml;nnen immer zwei Extras mitgegeben werden.</li>
     <li>sendSMS - sendet eine SMS an eine bestimmte Telefonnummer. Bsp.: sendSMS Dies ist ein Test|555487263</li>
+    <li>startDaydream - startet den Daydream</li>
     <li>statusRequest - Fordert einen neuen Statusreport beim Device an. Es k&ouml;nnen nicht von allen Readings per statusRequest die Daten geholt werden. Einige wenige geben nur bei Status&auml;nderung ihren Status wieder.</li>
     <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Sekunden angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird</li>
