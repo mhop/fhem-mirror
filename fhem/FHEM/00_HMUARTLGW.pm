@@ -146,6 +146,7 @@ sub HMUARTLGW_Initialize($)
 	$hash->{SetFn}     = "HMUARTLGW_Set";
 	$hash->{GetFn}     = "HMUARTLGW_Get";
 	$hash->{AttrFn}    = "HMUARTLGW_Attr";
+	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
 
 
 	$hash->{Clients} = ":CUL_HM:";
@@ -293,7 +294,6 @@ sub HMUARTLGW_Undefine($$;$)
 		delete($attr{$hash->{keepAlive}->{NAME}});
 		delete($defs{$hash->{keepAlive}->{NAME}});
 		delete($hash->{keepAlive});
-		$devcount--;
 	}
 
 	if (defined($hash->{FD}) && (!$noclose)) {
@@ -337,6 +337,21 @@ sub HMUARTLGW_Ready($)
 	}
 
 	return 0;
+}
+
+sub HMUARTLGW_Shutdown($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	#switch to bootloader to stop the module from interfering
+	HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS)
+		if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
+
+	DevIo_CloseDev($hash->{keepAlive}) if ($hash->{keepAlive});
+	DevIo_CloseDev($hash) if (defined($hash->{FD}));
+
+	return undef;
 }
 
 #HM-LGW communicates line-based during init
@@ -1072,7 +1087,6 @@ sub HMUARTLGW_Parse($$$$)
 
 	#Minimally handle DualCopro-Firmware
 	if ($dst == HMUARTLGW_DST_DUAL) {
-		#2017.02.08 23:37:27.735 0: HMUARTLGW testy recv: FE 004475616C436F50726F5F417070, state 2
 		if (($msg =~ m/^00(.*)$/ || $msg =~ m/^0501(.*)$/) &&
 		    $hash->{DevState} <= HMUARTLGW_STATE_ENTER_APP) {
 			if (pack("H*", $1) eq "DualCoPro_App") {
@@ -1093,14 +1107,12 @@ sub HMUARTLGW_Parse($$$$)
 			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
 			     "HMUARTLGW ${name} Re-sending app-query for unsupported firmware");
 			HMUARTLGW_send($hash, HMUARTLGW_DUAL_GET_APP, HMUARTLGW_DST_DUAL);
-			return;
 		} elsif (defined($hash->{Helper}{AckPending}{$hash->{DEVCNT}}) &&
 		         $hash->{Helper}{AckPending}{$hash->{DEVCNT}}->{dst} == HMUARTLGW_DST_OS &&
 		         $hash->{Helper}{AckPending}{$hash->{DEVCNT}}->{cmd} eq HMUARTLGW_OS_CHANGE_APP) {
 			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 4),
 			     "HMUARTLGW ${name} Re-sending switch to bootloader for unsupported firmare");
 			HMUARTLGW_send($hash, HMUARTLGW_DUAL_CHANGE_APP, HMUARTLGW_DST_DUAL);
-			return;
 		}
 
 		return;
