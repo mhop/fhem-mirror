@@ -1,5 +1,5 @@
 "use strict";
-// "$Id$";
+// $Id$
 
 var zw_visible;
 var svgns = 'xmlns="http://www.w3.org/2000/svg"';

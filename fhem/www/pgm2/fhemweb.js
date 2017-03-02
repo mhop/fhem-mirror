@@ -1,6 +1,6 @@
 "use strict";
 
-// "$Id$";
+// $Id$
 
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;

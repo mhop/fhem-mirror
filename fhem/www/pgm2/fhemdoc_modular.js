@@ -1,5 +1,5 @@
 "use strict";
-// "$Id$";
+// $Id$
 
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
     fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X";

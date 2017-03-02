@@ -1,5 +1,5 @@
 "use strict";
-// "$Id$";
+// $Id$
 
 var consConn;
 
