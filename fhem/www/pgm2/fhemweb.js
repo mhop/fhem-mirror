@@ -1,6 +1,6 @@
 "use strict";
-
-// $Id$
+var FW_version={};
+FW_version["fhemweb.js"] = "$Id$";
 
 var FW_serverGenerated;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
@@ -165,7 +165,13 @@ FW_jqueryReadyFn()
       return;
     $(this).on("submit", function(e) {
       var val = $(input).val();
-      if(val.match(/^\s*shutdown/)) {
+
+      if(val.match(/^\s*ver.*/)) {
+        e.preventDefault();
+        $(input).val("");
+        return FW_showVersion(val);
+        
+      } else if(val.match(/^\s*shutdown/)) {
         FW_cmd(FW_root+"?XHR=1&cmd="+val);
         $(input).val("");
         return false;
@@ -234,6 +240,25 @@ FW_jqueryReadyFn()
   FW_smallScreenCommands();
   FW_inlineModify();
   FW_rawDef();
+}
+
+function
+FW_showVersion(val)
+{
+  FW_cmd(FW_root+"?cmd="+encodeURIComponent(val)+"&XHR=1", function(data){
+    var list = Object.keys(FW_version);
+    list.sort();
+    for(var i1=0; i1<list.length; i1++) {
+      var ma = /\$Id: ([^ ]*) (.*) \$/.exec(FW_version[list[i1]]);
+      if(ma) {
+        if(ma[1].length < 18)
+          ma[1] = (ma[1]+"                   ").substr(0,18);
+        data += "\n"+ma[1]+"  "+ma[2];
+      }
+    }
+    FW_okDialog('<pre>'+data+'</pre>');
+  });
+  return false;
 }
 
 function

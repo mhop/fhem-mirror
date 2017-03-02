@@ -1,5 +1,5 @@
 "use strict";
-// $Id$
+FW_version["console.js"] = "$Id$";
 
 var consConn;
 
