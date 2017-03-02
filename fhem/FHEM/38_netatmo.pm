@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 07 / 2017-02-26
+# Release 08 / 2017-03-02
 
 package main;
 
@@ -4403,50 +4403,65 @@ netatmo_parsePublic($$)
         @readings_latitude = sort {$a <=> $b} @readings_latitude;
         @readings_longitude = sort {$a <=> $b} @readings_longitude;
 
-        for (my $i=0;$i<scalar(@readings_temperature)/10;$i++)
+        if(scalar(@readings_temperature) > 4) 
         {
-          pop @readings_temperature;
-          pop @readings_humidity;
-          pop @timestamps_temperature;
-          shift @readings_temperature;
-          shift @readings_humidity;
-          shift @timestamps_temperature;
+          for (my $i=0;$i<scalar(@readings_temperature)/10;$i++)
+          {
+            pop @readings_temperature;
+            pop @readings_humidity;
+            pop @timestamps_temperature;
+            shift @readings_temperature;
+            shift @readings_humidity;
+            shift @timestamps_temperature;
+          }
         }
-        for (my $i=0;$i<scalar(@readings_pressure)/10;$i++)
+        if(scalar(@readings_pressure) > 4) 
         {
-          pop @readings_pressure;
-          pop @timestamps_pressure;
-          shift @readings_pressure;
-          shift @timestamps_pressure;
+          for (my $i=0;$i<scalar(@readings_pressure)/10;$i++)
+          {
+            pop @readings_pressure;
+            pop @timestamps_pressure;
+            shift @readings_pressure;
+            shift @timestamps_pressure;
+          }
         }
-        for (my $i=0;$i<scalar(@readings_rain)/25;$i++)
+        if(scalar(@readings_rain) > 4) 
         {
-          pop @readings_rain;
-          pop @readings_rain_1;
-          pop @readings_rain_24;
-          pop @timestamps_rain;
-          shift @readings_rain;
-          shift @readings_rain_1;
-          shift @readings_rain_24;
-          shift @timestamps_rain;
+          for (my $i=0;$i<scalar(@readings_rain)/20;$i++)
+          {
+            pop @readings_rain;
+            pop @readings_rain_1;
+            pop @readings_rain_24;
+            pop @timestamps_rain;
+            shift @readings_rain;
+            shift @readings_rain_1;
+            shift @readings_rain_24;
+            shift @timestamps_rain;
+          }
         }
-        for (my $i=0;$i<scalar(@readings_wind_strength)/50;$i++)
+        if(scalar(@readings_wind_strength) > 4) 
         {
-          pop @readings_wind_strength;
-          pop @readings_gust_strength;
-          pop @timestamps_wind;
-          shift @readings_wind_strength;
-          shift @readings_gust_strength;
-          shift @timestamps_wind;
+          for (my $i=0;$i<scalar(@readings_wind_strength)/25;$i++)
+          {
+            pop @readings_wind_strength;
+            pop @readings_gust_strength;
+            pop @timestamps_wind;
+            shift @readings_wind_strength;
+            shift @readings_gust_strength;
+            shift @timestamps_wind;
+          }
         }
-        for (my $i=0;$i<2;$i++)
+        if(scalar(@readings_pressure) > 4) 
         {
-          pop @readings_altitude;
-          pop @readings_latitude;
-          pop @readings_longitude;
-          shift @readings_altitude;
-          shift @readings_latitude;
-          shift @readings_longitude;
+          for (my $i=0;$i<scalar(@readings_pressure)/20;$i++)
+          {
+            pop @readings_altitude;
+            pop @readings_latitude;
+            pop @readings_longitude;
+            shift @readings_altitude;
+            shift @readings_latitude;
+            shift @readings_longitude;
+          }
         }
 
         my $avg_temperature = 0;
@@ -4460,7 +4475,7 @@ netatmo_parsePublic($$)
         }
         my $avg_humidity = 0;
         my $min_humidity = 100;
-        my $max_humidity = 0;
+        my $max_humidity = -100;
         foreach my $val (@readings_humidity)
         {
           $avg_humidity += $val / scalar(@readings_humidity);
@@ -4474,7 +4489,7 @@ netatmo_parsePublic($$)
         }
         my $avg_pressure = 0;
         my $min_pressure = 2000;
-        my $max_pressure = 0;
+        my $max_pressure = -2000;
         foreach my $val (@readings_pressure)
         {
           $avg_pressure += $val / scalar(@readings_pressure);
@@ -4488,7 +4503,7 @@ netatmo_parsePublic($$)
         }
         my $avg_rain = 0;
         my $min_rain = 1000;
-        my $max_rain = -10;
+        my $max_rain = -1000;
         foreach my $val (@readings_rain)
         {
           $avg_rain += $val / scalar(@readings_rain);
@@ -4497,7 +4512,7 @@ netatmo_parsePublic($$)
         }
         my $avg_rain_1 = 0;
         my $min_rain_1 = 1000;
-        my $max_rain_1 = -10;
+        my $max_rain_1 = -1000;
         foreach my $val (@readings_rain_1)
         {
           $avg_rain_1 += $val / scalar(@readings_rain_1);
@@ -4506,7 +4521,7 @@ netatmo_parsePublic($$)
         }
         my $avg_rain_24 = 0;
         my $min_rain_24 = 1000;
-        my $max_rain_24 = -10;
+        my $max_rain_24 = -1000;
         foreach my $val (@readings_rain_24)
         {
           $avg_rain_24 += $val / scalar(@readings_rain_24);
@@ -4521,7 +4536,7 @@ netatmo_parsePublic($$)
 
         my $avg_wind = 0;
         my $min_wind = 100;
-        my $max_wind = -10;
+        my $max_wind = -100;
         foreach my $val (@readings_wind_strength)
         {
           $avg_wind += $val / scalar(@readings_wind_strength);
@@ -4530,7 +4545,7 @@ netatmo_parsePublic($$)
         }
         my $avg_gust = 0;
         my $min_gust = 100;
-        my $max_gust = -10;
+        my $max_gust = -100;
         foreach my $val (@readings_gust_strength)
         {
           $avg_gust += $val / scalar(@readings_gust_strength);
@@ -4569,7 +4584,7 @@ netatmo_parsePublic($$)
 
         my $avg_altitude = 0;
         my $min_altitude = 10000;
-        my $max_altitude = -1000;
+        my $max_altitude = -10000;
         foreach my $val (@readings_altitude)
         {
           $avg_altitude += $val / scalar(@readings_altitude);
