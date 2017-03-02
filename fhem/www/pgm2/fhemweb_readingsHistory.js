@@ -1,5 +1,5 @@
 
-// $Id$
+FW_version["fhemweb_readingsHistory.js"] = "$Id$";
 
 function
 FW_readingsHistoryUpdateLine(d){

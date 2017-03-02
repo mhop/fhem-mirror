@@ -1,5 +1,5 @@
 
-// $Id$
+FW_version["fhemweb_colorpicker.js"] = "$Id$";
 
 //TODO: realtime picker
 //

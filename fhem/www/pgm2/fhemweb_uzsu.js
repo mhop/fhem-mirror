@@ -1,5 +1,5 @@
 
-// $Id$
+FW_version["fhemweb_uzsu.js"] = "$Id$";
 
 FW_widgets['uzsuToggle'] = {
   createFn:FW_uzsuToggleCreate,

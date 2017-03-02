@@ -1,5 +1,5 @@
 
-// $Id$
+FW_version["fhemweb_readingsGroup.js"] = "$Id$";
 
 //$(document).ready(FW_readingsGroupReadyFn);
 $(FW_readingsGroupReadyFn);
