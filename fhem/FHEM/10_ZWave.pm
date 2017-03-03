@@ -4181,10 +4181,10 @@ ZWave_processSendStack($$;$)
   $ss->[0] =~ m/^([^:]*?):(.*)$/;
   my ($type, $msg) = ($1, $2);
 
-  $msg = ZWave_addCRC16($msg) if($hash->{useCRC16});
+  my $iomsg = ZWave_addCRC16($msg) if($hash->{useCRC16});
   IOWrite($hash,
           $hash->{homeId}.($hash->{route}?",".$hash->{route}:""),
-          "00$msg");
+          "00$iomsg");
   $ss->[0] = "sent$type:$msg";
 
   $hash->{lastMsgSent} = $now;
