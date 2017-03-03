@@ -1,4 +1,4 @@
-REV 13571
+REV 13583
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-03-02_07:45:02 186411 ./CHANGED
+UPD 2017-03-03_07:45:02 186586 ./CHANGED
 UPD 2017-02-11_07:45:02 35614 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-03-02_07:45:05 130198 ./fhem.pl
@@ -31,7 +31,7 @@ UPD 2016-10-03_07:45:13 15319 FHEM/00_FBAHA.pm
 UPD 2016-11-08_07:45:12 9125 FHEM/00_FBAHAHTTP.pm
 UPD 2017-03-02_07:45:02 27524 FHEM/00_FHZ.pm
 UPD 2016-10-17_07:45:11 58469 FHEM/00_HMLAN.pm
-UPD 2017-02-09_07:45:02 86932 FHEM/00_HMUARTLGW.pm
+UPD 2017-03-03_07:45:02 87230 FHEM/00_HMUARTLGW.pm
 UPD 2015-07-28_14:05:31 3551 FHEM/00_HXB.pm
 UPD 2017-02-04_07:45:02 51672 FHEM/00_KM271.pm
 UPD 2016-08-19_14:49:02 3718 FHEM/00_LIRC.pm
@@ -193,7 +193,7 @@ UPD 2017-02-03_07:45:02 58501 FHEM/37_harmony.pm
 UPD 2017-02-09_07:45:02 151901 FHEM/37_plex.pm
 UPD 2017-02-28_07:45:02 23619 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
-UPD 2017-02-26_07:45:02 200549 FHEM/38_netatmo.pm
+UPD 2017-03-03_07:45:02 201007 FHEM/38_netatmo.pm
 UPD 2017-03-02_07:45:02 21910 FHEM/39_alexa.pm
 UPD 2016-11-23_07:45:12 2656 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
@@ -310,7 +310,7 @@ UPD 2017-01-27_07:45:02 88049 FHEM/73_MPD.pm
 UPD 2017-01-26_07:45:03 30531 FHEM/73_NUKIBridge.pm
 UPD 2017-01-21_07:45:02 84316 FHEM/73_PRESENCE.pm
 UPD 2016-10-22_07:45:12 118240 FHEM/73_km200.pm
-UPD 2017-02-17_07:45:02 76297 FHEM/74_AMAD.pm
+UPD 2017-03-03_07:45:02 80792 FHEM/74_AMAD.pm
 UPD 2016-06-10_07:45:12 39790 FHEM/74_HOMBOT.pm
 UPD 2017-01-26_07:45:03 22528 FHEM/74_NUKIDevice.pm
 UPD 2017-02-12_07:45:02 64439 FHEM/74_THINKINGCLEANER.pm
@@ -482,7 +482,7 @@ UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_nano328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_uno.hex
 UPD 2017-01-07_07:45:02 99233 FHEM/firmware/esptool.py
-UPD 2017-02-17_07:45:02 215461 FHEM/lib/74_AMADautomagicFlowset_2.6.10.xml
+UPD 2017-03-03_07:45:02 221137 FHEM/lib/74_AMADautomagicFlowset_2.6.11.xml
 UPD 2015-07-28_14:05:30 2034 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2015-07-28_14:05:30 21217 FHEM/lib/Device/Firmata/Constants.pm
@@ -562,8 +562,8 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-03-02_07:45:04 2718754 docs/commandref.html
-UPD 2017-03-02_07:45:05 1576014 docs/commandref_DE.html
+UPD 2017-03-03_07:45:03 2719244 docs/commandref.html
+UPD 2017-03-03_07:45:04 1576501 docs/commandref_DE.html
 UPD 2017-03-02_07:45:02 68924 docs/commandref_frame.html
 UPD 2017-03-02_07:45:02 77421 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1155,6 +1155,7 @@ UPD 2015-07-28_14:05:32 10429 www/images/fhemSVG/general_aus_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 4264 www/images/fhemSVG/general_low.svg
 UPD 2015-07-28_14:05:32 3762 www/images/fhemSVG/general_ok.svg
 UPD 2017-02-26_07:45:02 20189 www/images/fhemSVG/helper_doif.svg
+UPD 2017-03-03_07:45:02 25466 www/images/fhemSVG/helper_doiftools.svg
 UPD 2015-07-28_14:05:32 15925 www/images/fhemSVG/hm-cc-rt-dn.svg
 UPD 2015-07-28_14:05:32 8594 www/images/fhemSVG/hm-dis-wm55.svg
 UPD 2017-01-17_07:45:03 14169 www/images/fhemSVG/hm-sec-win.svg
@@ -1821,7 +1822,7 @@ UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2016-12-04_07:45:11 6371 www/pgm2/alarm.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
-UPD 2017-03-02_07:45:02 8871 www/pgm2/console.js
+UPD 2017-03-03_07:45:02 8974 www/pgm2/console.js
 UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2017-02-24_07:45:02 4813 www/pgm2/darksmallscreenstyle.css
@@ -1834,15 +1835,15 @@ UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-02-18_07:45:02 5393 www/pgm2/defaultCommon.css
-UPD 2017-03-02_07:45:02 5808 www/pgm2/fhemdoc_modular.js
-UPD 2017-03-02_07:45:02 43389 www/pgm2/fhemweb.js
-UPD 2017-01-17_07:45:03 12466 www/pgm2/fhemweb_colorpicker.js
+UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
+UPD 2017-03-03_07:45:02 44045 www/pgm2/fhemweb.js
+UPD 2017-03-03_07:45:02 12493 www/pgm2/fhemweb_colorpicker.js
 UPD 2015-10-03_07:45:11 3100 www/pgm2/fhemweb_fbcalllist.js
 UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
-UPD 2017-01-17_07:45:03 4079 www/pgm2/fhemweb_readingsGroup.js
-UPD 2017-01-17_07:45:03 746 www/pgm2/fhemweb_readingsHistory.js
+UPD 2017-03-03_07:45:02 4108 www/pgm2/fhemweb_readingsGroup.js
+UPD 2017-03-03_07:45:02 777 www/pgm2/fhemweb_readingsHistory.js
 UPD 2016-04-18_07:45:12 6964 www/pgm2/fhemweb_sortable.js
-UPD 2017-01-17_07:45:03 20605 www/pgm2/fhemweb_uzsu.js
+UPD 2017-03-03_07:45:02 20625 www/pgm2/fhemweb_uzsu.js
 UPD 2017-01-30_07:45:02 27317 www/pgm2/fhemweb_weekprofile.js
 UPD 2015-07-28_14:05:34 223 www/pgm2/floorplan_click.js
 UPD 2015-07-28_14:05:34 3246 www/pgm2/floorplan_drag.js
@@ -1892,8 +1893,8 @@ UPD 2015-07-28_14:05:34 3461 www/pgm2/jquery.vticker.min.js
 UPD 2017-02-24_07:45:02 2525 www/pgm2/smallscreenstyle.css
 UPD 2017-01-17_07:45:03 18745 www/pgm2/sorttable.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
-UPD 2017-02-02_07:45:02 12078 www/pgm2/svg.js
+UPD 2017-03-03_07:45:02 12158 www/pgm2/svg.js
 UPD 2015-07-28_14:05:34 2502 www/pgm2/svg_defs.svg
 UPD 2015-07-28_14:05:34 2578 www/pgm2/svg_style.css
 UPD 2015-07-28_14:05:34 639 www/pgm2/touchpadstyle.css
-UPD 2016-11-13_07:45:11 20254 www/pgm2/zwave_neighborlist.js
+UPD 2017-03-03_07:45:02 20404 www/pgm2/zwave_neighborlist.js
