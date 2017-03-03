@@ -1,0 +1,13 @@
+# $Id$
+[Unit]
+Description=FHEM Home Automation
+
+[Service]
+Type=forking
+ExecStart=/etc/init.d/fhem start
+ExecStop=//etc/init.d/fhem stop
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
