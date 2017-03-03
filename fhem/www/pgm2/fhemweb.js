@@ -253,9 +253,9 @@ FW_showVersion(val)
     for(var i1=0; i1<list.length; i1++) {
       var ma = /\$Id: ([^ ]*) (.*) \$/.exec(FW_version[list[i1]]);
       if(ma) {
-        if(ma[1].length < 18)
-          ma[1] = (ma[1]+"                   ").substr(0,18);
-        data += "\n"+ma[1]+"  "+ma[2];
+        if(ma[1].length < 26)
+          ma[1] = (ma[1]+"                            ").substr(0,26);
+        data += "\n"+ma[1]+" "+ma[2];
       }
     }
     FW_okDialog('<pre>'+data+'</pre>');
