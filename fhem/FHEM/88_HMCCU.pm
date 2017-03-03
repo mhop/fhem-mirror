@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.005
+#  Version 3.9.006
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -104,7 +104,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.005';
+my $HMCCU_VERSION = '3.9.006';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -2025,6 +2025,7 @@ sub HMCCU_UpdateDevices ($$$)
 ######################################################################
 # Update a single client device datapoint considering
 # scaling, reading format and value substitution.
+# Return stored value.
 ######################################################################
 
 sub HMCCU_UpdateSingleDatapoint ($$$$)
@@ -2039,7 +2040,8 @@ sub HMCCU_UpdateSingleDatapoint ($$$$)
 	my ($devaddr, $chnnum) = HMCCU_SplitChnAddr ($hash->{ccuaddr});
 	$objects{$devaddr}{$chn}{$dpt} = $value;
 	
-	return HMCCU_UpdateSingleDevice ($hmccu_hash, $hash, \%objects);
+	my $rc = HMCCU_UpdateSingleDevice ($hmccu_hash, $hash, \%objects);
+	return (ref ($rc)) ? $rc->{$devaddr}{$dpt} : $value;
 }
 
 ######################################################################
@@ -2049,9 +2051,12 @@ sub HMCCU_UpdateSingleDatapoint ($$$$)
 #   {devaddr}
 #   {devaddr}{channelno}
 #   {devaddr}{channelno}{datapoint}
-#   {devaddr}{channelno}{datapoint}{value}
+#   {devaddr}{channelno}{datapoint} = value
 # If client device is virtual device group: check if group members are
 # affected by updates and update readings in virtual group device.
+# Return a hash reference with datapoints and new values:
+#   {devaddr}
+#   {devaddr}{datapoint} = value
 ######################################################################
 
 sub HMCCU_UpdateSingleDevice ($$$)
@@ -2094,6 +2099,9 @@ sub HMCCU_UpdateSingleDevice ($$$)
 		}
 	}
 
+	# Store the resulting readings
+	my %results;
+	
 	# Update datapoint readings and control/state readings
 	readingsBeginUpdate ($clthash);
 
@@ -2123,6 +2131,9 @@ sub HMCCU_UpdateSingleDevice ($$$)
 					my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chnnum, $dpt);
 					my %calcs = HMCCU_CalculateReading ($clthash, $chnnum, $dpt);
 					
+					# Store the resulting value after scaling, formatting and substitution
+					$results{$dev}{$dpt} = $cvalue;
+					
 					Log3 $ccuname, 2, "HMCCU: $fnc device=$cltname, readings=".join(',', @readings).
 						", orgvalue=$value value=$cvalue" if ($cltflags =~ /trace/);
 
@@ -2149,7 +2160,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 	
 	readingsEndUpdate ($clthash, 1);
 
-	return 1;
+	return \%results;
 }
 
 ######################################################################
@@ -2183,7 +2194,8 @@ sub HMCCU_UpdateMultipleDevices ($$)
 		# Filter devices
 		next if ($ct ne 'HMCCUDEV' && $ct ne 'HMCCUCHN');
 
-		$c++ if (HMCCU_UpdateSingleDevice ($hash, $ch, $objects));
+		my $rc = HMCCU_UpdateSingleDevice ($hash, $ch, $objects);
+		$c++ if (ref ($rc));
 	}
 
 	return $c;

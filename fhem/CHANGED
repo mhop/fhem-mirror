@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Fixed toggle bug
   - bugfix:  60_allergy.pm: fixed error handling for server replies
   - update:  38_netatmo.pm: 3 stations minimum for PUBLIC statistics
   - update:  74_AMAD: new Version 2.6.11, add startDaydream and more media
