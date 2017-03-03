@@ -3,7 +3,7 @@ FW_version["console.js"] = "$Id$";
 
 var consConn;
 
-var consFilter, oldFilter;
+var consFilter, oldFilter, consFType="";
 var consLastIndex = 0;
 var withLog = 0;
 var mustScroll = 1;
@@ -76,7 +76,7 @@ consFill()
     FW_closeConn();
 
   var query = "?XHR=1"+
-       "&inform=type=raw;withLog="+withLog+";filter="+consFilter+
+       "&inform=type=raw;withLog="+withLog+";filter="+consFilter+consFType+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
@@ -130,11 +130,16 @@ consStart()
   $("#eventFilter").click(function(evt){  // Event-Filter Dialog
     $('body').append(
       '<div id="evtfilterdlg">'+
-        '<div>Filter:</div><br>'+
-        '<div><input id="filtertext" value="'+consFilter+'"></div>'+
+        '<div>Filter (Regexp):</div><br>'+
+        '<div><input id="filtertext" value="'+consFilter+'"></div><br>'+
+        '<div>'+
+          '<input id="f" type="radio" name="x"> Match the whole line</br>'+
+          '<input id="n" type="radio" name="x"> Notify-Type: deviceName:event'+
+        '</div>'+
       '</div>');
+    $("#evtfilterdlg input#"+(consFType=="" ? "f" : "n")).prop("checked",true);
 
-    $('#evtfilterdlg').dialog({ modal:true,
+    $('#evtfilterdlg').dialog({ modal:true, width:'auto',
       position:{ my: "left top", at: "right bottom",
                  of: this, collision: "flipfit" },
       close:function(){$('#evtfilterdlg').remove();},
@@ -148,6 +153,8 @@ consStart()
             return FW_okDialog(e);
           }
           consFilter = val ? val : ".*";
+          consFType= ($("#evtfilterdlg input#n").is(":checked")) ?
+                                ";filterType=notify" : "";
           $(this).dialog('close');
           $("a#eventFilter").html(consFilter);
           consFill();

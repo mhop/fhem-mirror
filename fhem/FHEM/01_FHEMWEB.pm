@@ -131,7 +131,6 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{NotifyFn}= "FW_Notify";
   $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
   $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
@@ -2860,8 +2859,17 @@ FW_Notify($$)
       my $max = int(@{$events});
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
-        my $line = ("$tn $dt $dn ".$events->[$i]."<br>");
-        eval { push @data,$line if($line =~ m/$h->{filter}/) }
+        my $line = "$tn $dt $dn ".$events->[$i]."<br>";
+        eval { 
+          my $ok;
+          if($h->{filterType} && $h->{filterType} eq "notify") {
+            $ok = ($dn =~ m/^$h->{filter}$/ ||
+                   "$dn:$events->[$i]" =~ m/^$h->{filter}$/) ;
+          } else {
+            $ok = ($line =~ m/$h->{filter}/) ;
+          }
+          push @data,$line if($ok);
+        }
       }
     }
   }
