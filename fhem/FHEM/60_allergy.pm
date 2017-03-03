@@ -3,7 +3,7 @@
 #
 #  60_allergy.pm
 #
-#  2016 Markus Moises < vorname at nachname . de >
+#  2017 Markus Moises < vorname at nachname . de >
 #
 #  This module provides allergy forecast data
 #
@@ -36,18 +36,16 @@ sub allergy_Initialize($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  $hash->{DefFn}		=	"allergy_Define";
-  $hash->{UndefFn}	=	"allergy_Undefine";
-  $hash->{GetFn}		=	"allergy_Get";
-  $hash->{AttrList}	=	"disable:0,1 ".
-						"ignoreList ".
-						"updateIgnored:1 ".
-						"updateEmpty:1 ".
-						"levelsFormat ".
-						"weekdaysFormat ".
-						$readingFnAttributes;
-
-
+  $hash->{DefFn}        = "allergy_Define";
+  $hash->{UndefFn}      = "allergy_Undefine";
+  $hash->{GetFn}        = "allergy_Get";
+  $hash->{AttrList}     = "disable:0,1 ".
+                          "ignoreList ".
+                          "updateIgnored:1 ".
+                          "updateEmpty:1 ".
+                          "levelsFormat ".
+                          "weekdaysFormat ".
+                          $readingFnAttributes;
 }
 
 sub allergy_Define($$$) {
@@ -60,6 +58,7 @@ sub allergy_Define($$$) {
 
   $hash->{helper}{ZIPCODE} = $a[2];
   $hash->{helper}{INTERVAL} = 10800;
+  $hash->{ERROR} = 0;
 
   my $req = eval
   {
@@ -163,10 +162,14 @@ sub allergy_Parse($$$)
   if( $err )
   {
     Log3 $name, 1, "$name: URL error: ".$err;
-    $hash->{STATE} = "error";
+    my $nextupdate = gettimeofday()+( (900*$hash->{ERROR}) + 90 );
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    $hash->{STATE} = "error" if($hash->{ERROR} > 1);
+    $hash->{ERROR} = $hash->{ERROR}+1;
     return undef;
   }
 
+  $hash->{ERROR} = 0;
   Log3 $name, 5, "Received XML data ".$data;
 
   my $xml = new XML::Simple();
