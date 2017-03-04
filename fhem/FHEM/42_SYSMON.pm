@@ -22,6 +22,10 @@
 #  This copyright notice MUST APPEAR in all copies of the script!
 #
 ################################################################
+#
+# SSH support by PitpatV 
+#
+################################################################
 
 # $Id$
 
@@ -38,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.8";
+my $VERSION = "2.3";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -168,7 +172,7 @@ SYSMON_Define($$)
       my($mode, $host, $port) = split(/:/, $na[0]);
       $mode=lc($mode);
       # TODO SSH
-      if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
+      if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet' || $mode eq 'ssh')) {
         $hash->{MODE} = $mode;
         delete($hash->{HOST});
         delete($hash->{USER});
@@ -188,7 +192,7 @@ SYSMON_Define($$)
           $hash->{PORT} = lc($port);
         }
       } else {
-        return "unexpected mode. use local or telnet only."; # TODO: SSH
+        return "unexpected mode. Use local, ssh or telnet only.";
       }
       shift @na;
     } else {
@@ -1413,12 +1417,14 @@ SYSMON_obtainParameters_intern($$)
   #$rt=~s/#/[]/g;
   #$map->{SYS_TEST}=$rt;
   
+  if(defined($map)) {
   # Aktuelle Werte in ShattenHash mergen
   my %hashT = %{$map};
   #@shadow_map{ keys %hashT } = values %hashT;
   my %shadow_map;
   @shadow_map{ keys %hashT } = values %hashT;
   $hash->{helper}{shadow_map} = \%shadow_map;
+  }
 
   return $map;
 }
@@ -1462,6 +1468,7 @@ SYSMON_getValues($;@)
 sub SYSMON_getComputeStat($$$$) {
 	my ($hash, $map, $val, $name) = @_;
 	
+	if (defined($val)) {
 	my $t = ReadingsVal($hash->{NAME},$name,"$val $val $val");
 	
 	my($min, $max, $avg) = split(/ /,$t);
@@ -1474,7 +1481,7 @@ sub SYSMON_getComputeStat($$$$) {
 	$map->{$name} = $t;
 	
 	#SYSMON_Log($hash, 3, ">>>>>>>>>>>>>>>>> ".$name." => $t");
-	
+	}
 	return $map;
 }
 
@@ -1739,7 +1746,7 @@ SYSMON_getLoadAvg($$)
 }
 
 #------------------------------------------------------------------------------
-# leifert CPU Temperature (Raspberry Pi)
+# liefert CPU Temperature (Raspberry Pi)
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPUTemp_RPi($$) {
@@ -1775,7 +1782,10 @@ SYSMON_getCPUTemp_BBB($$) {
   if(!looks_like_number($val)) {return $map;}
   
   $val = int($val);
-  my $val_txt = sprintf("%.2f", $val/1000);
+  if ($val > 200) {
+    $val = $val / 1000;
+  }
+  my $val_txt = sprintf("%.2f", $val);
   $map->{+CPU_TEMP}="$val_txt";
   $map->{"cpu0_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
@@ -1948,7 +1958,7 @@ SYSMON_getCPUInfo($$) {
     foreach my $line (@aval) {
       my($key, $val) = split(/\s*:\s+/, $line);
       if(defined($key)) {
-        if($key=~m/Processor/ || $key=~m/model name/) {
+        if($key=~m/Processor/ || $key=~m/model name/ || $key=~m/system type/) {
           if($val) {
             $val = trim($val);
             $map->{+CPU_MODEL_NAME}=$val;
@@ -2662,7 +2672,7 @@ sub SYSMON_getNetworkInfo ($$$) {
   $device = $nDef;
 
   # in case of network not present get failure from stderr (2>&1)
-  my $cmd="ifconfig ".$device." 2>&1";
+  my $cmd="/sbin/ifconfig ".$device." 2>&1";
 
   #my @dataThroughput = qx($cmd);
   my @dataThroughput = SYSMON_execute($hash, $cmd);
@@ -2717,6 +2727,7 @@ sub SYSMON_getNetworkInfo ($$$) {
       }
       if(!$ip && $_=~ m/inet\s+(addr:)*(\S*)/) {
         $ip=$2;
+        SYSMON_Log ($hash, 3, "SYSMON_getNetworkInfo:ip: ".$ip);
       }
       
       if($_=~ m/inet6-(Adresse:)*\s*(\S*)\s+G.ltigkeitsbereich:Verbindung/) {
@@ -2820,7 +2831,21 @@ sub SYSMON_getNetworkInfo ($$$) {
         $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
       }
       
-      my $speed = SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && cat /sys/class/net/$nName/speed 2>/dev/null || echo not available");
+      my $speed;
+      if ($nName eq "wlan0") {
+        my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nName 2>/dev/null");
+        foreach (@iwData) {
+          if($_=~ m/Bit\sRate+(=|:)*(\S*)/) {
+            $speed=$2;
+          }
+        }
+      }
+      elsif (1 eq SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && echo 1 || echo 0")) {
+        $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed");
+      }
+      else {
+        $speed = "not available";
+      }
       if(defined($speed)) {
       	 $map->{$nName.SPEED_SUFFIX} = $speed;
       }
@@ -3602,9 +3627,9 @@ sub SYSMON_PowerAcInfo($$) {
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
-  if(defined $d_current) {$d_current/=1000;}
+  if(defined $d_current) {$d_current/=1000;} else {return $map;}
   my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
-  if(defined $d_voltage) {$d_voltage/=1000000;}
+  if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   #$map->{"power_".$type."_online"}=$d_online;
   #$map->{"power_".$type."_present"}=$d_present;
@@ -3627,9 +3652,9 @@ sub SYSMON_PowerUsbInfo($$) {
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
-  if(defined $d_current) {$d_current/=1000;}
+  if(defined $d_current) {$d_current/=1000;} else {return $map;}
   my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
-  if(defined $d_voltage) {$d_voltage/=1000000;}
+  if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   #$map->{"power_".$type."_online"}=$d_online;
   #$map->{"power_".$type."_present"}=$d_present;
@@ -3653,9 +3678,9 @@ sub SYSMON_PowerBatInfo($$) {
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
-  if(defined $d_current) {$d_current/=1000;}
+  if(defined $d_current) {$d_current/=1000;} else {return $map;}
   my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
-  if(defined $d_voltage) {$d_voltage/=1000000;}
+  if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
   if($d_present ne "1") {
@@ -3825,7 +3850,7 @@ sub SYSMON_Open_Connection($)
    #}
    
    if(!defined($pwd)) {
-     $msg="Error: no passwort provided";
+     $msg="Error: no password provided";
      SYSMON_Log($hash, 3, $msg);
      return $msg unless defined $pwd;
    }
@@ -4003,7 +4028,11 @@ sub SYSMON_Exec($$;$)
       return $line;
       #return $retVal;
    } else {
+      if ($mode eq 'ssh') {
+        return SYSMON_Exec_Ssh($hash, $cmd);
+      } else {
       return SYSMON_Exec_Local($hash, $cmd);
+   }
    }
 
 }
@@ -4118,6 +4147,56 @@ SYSMON_Exec_Local($$)
    #SYSMON_Log ($hash, 5, "Result '$result'");
    #return $result;
 }
+
+# Executed the command on the remote SSH Shell
+sub ############################################
+SYSMON_Exec_Ssh($$)
+{
+   my ($hash, $cmd) = @_;
+   
+   my $msg;
+
+   my $host = $hash->{HOST};#AttrVal( $name, "remote_host", undef );
+   if(!defined $host) {
+     $msg="Error: no remote host provided";
+     SYSMON_Log($hash, 3, $msg);
+     return $msg unless defined $host;
+   }
+   my $pwd = SYSMON_readPassword($hash);#AttrVal( $name, "remote_password", undef );
+   if(!defined($pwd)) {
+     $msg="Error: no passwort provided";
+     SYSMON_Log($hash, 3, $msg);
+     return $msg unless defined $pwd;
+   }
+   my $user = $hash->{USER};#AttrVal( $name, "remote_user", "" );
+   
+   SYSMON_Log($hash, 5, "Execute '".$cmd."' by SSH");
+   #{qx(""sshpass -p <pwd> ssh <user>\@<host> <cmd>"")}
+   my $call = "echo $pwd \| sshpass ssh ".$user."\@".$host." ".$cmd;
+   my $call_zens = "sshpass -p 'pwd' ssh ".$user."\@".$host." ".$cmd;
+   SYSMON_Log ($hash, 5, "Call: '".$call_zens."'");
+   my @result = qx($call);
+   # Arrays als solche zurueckgeben
+   if(scalar(@result)>1) {
+     SYSMON_Log ($hash, 5, "Result '".Dumper(@result)."'");
+     return @result;  
+   }
+   # Einzeiler als normale Scalars
+   my $line = $result[0];
+   
+   if(defined($line)) {
+     chomp $line;
+     SYSMON_Log ($hash, 5, "Result '$line'");
+   } else {
+     SYSMON_Log ($hash, 5, "Result undef");
+   }
+
+   return $line;
+   
+   #chomp $result;
+   #SYSMON_Log ($hash, 5, "Result '$result'");
+   #return $result;
+}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -4211,7 +4290,7 @@ sub SYSMON_Log($$$) {
          fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
       </li>
    </ul>
-   To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password &lt;password&gt;'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
+   To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password &lt;password&gt;'. For MODE parameter are 'telnet', 'ssh' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
    <br>
    <br>
    <b>Readings:</b>
@@ -4767,7 +4846,7 @@ sub SYSMON_Log($$$) {
    </ul>
    F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen.
    Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
-   Als MODE sind derzeit 'telnet' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
+   Als MODE sind derzeit 'telnet', 'ssh' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
    <br>
    <br>
    <b>Readings:</b>
