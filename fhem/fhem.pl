@@ -2852,7 +2852,7 @@ CommandSleep($$)
 
   Log 4, "sleeping for $sec";
 
-  if(@cmdList && $sec && $init_done) {
+  if(@cmdList && $init_done) {
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
              quiet        => $quiet,
@@ -2928,6 +2928,7 @@ InternalTimer($$$;$)
 {
   my ($tim, $fn, $arg, $waitIfInitNotDone) = @_;
 
+  $tim = 1 if(!$tim);
   if(!$init_done && $waitIfInitNotDone) {
     select(undef, undef, undef, $tim-gettimeofday());
     no strict "refs";
