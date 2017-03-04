@@ -330,6 +330,7 @@ my %zwave_class = (
   APPLIANCE                => { id => '64' },
   DMX                      => { id => '65' },
   BARRIER_OPERATOR         => { id => '66' },
+  ENTRY_CONTROL            => { id => '6f' },
   CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
@@ -3191,7 +3192,7 @@ ZWave_CRC16($)
       $byte &= 0xFFFF;
     }
   }
-  return sprintf "%x", $crc16;
+  return sprintf "%04x", $crc16;
 }
 
 ##############################################
@@ -4181,7 +4182,7 @@ ZWave_processSendStack($$;$)
   $ss->[0] =~ m/^([^:]*?):(.*)$/;
   my ($type, $msg) = ($1, $2);
 
-  my $iomsg = ZWave_addCRC16($msg) if($hash->{useCRC16});
+  my $iomsg = $hash->{useCRC16} ? ZWave_addCRC16($msg) : $msg;
   IOWrite($hash,
           $hash->{homeId}.($hash->{route}?",".$hash->{route}:""),
           "00$iomsg");
