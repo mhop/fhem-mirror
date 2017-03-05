@@ -35,6 +35,7 @@ require RESIDENTStk;
 sub RESIDENTS_Set($@);
 sub RESIDENTS_Define($$);
 sub RESIDENTS_Notify($$);
+sub RESIDENTS_Attr(@);
 sub RESIDENTS_Undefine($$);
 
 ###################################
@@ -46,9 +47,10 @@ sub RESIDENTS_Initialize($) {
     $hash->{SetFn}    = "RESIDENTS_Set";
     $hash->{DefFn}    = "RESIDENTS_Define";
     $hash->{NotifyFn} = "RESIDENTS_Notify";
+    $hash->{AttrFn}   = "RESIDENTS_Attr";
     $hash->{UndefFn}  = "RESIDENTS_Undefine";
     $hash->{AttrList} =
-"rgr_showAllStates:0,1 rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_wakeupDevice "
+"disable:1,0 rgr_showAllStates:0,1 rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_lang:EN,DE rgr_wakeupDevice "
       . $readingFnAttributes;
 }
 
@@ -64,10 +66,7 @@ sub RESIDENTS_Define($$) {
 
     # set default settings on first define
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-        $attr{$name}{alias} = "Residents";
-        $attr{$name}{devStateIcon} =
-'.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home .*:user_unknown:home';
-        $attr{$name}{group}  = "Home State";
+        RESIDENTS_Attr( "init", $name, "rgr_lang" );
         $attr{$name}{icon}   = "control_building_filled";
         $attr{$name}{room}   = "Residents";
         $attr{$name}{webCmd} = "state";
@@ -83,6 +82,69 @@ sub RESIDENTS_Define($$) {
     }
 
     return undef;
+}
+
+###################################
+sub RESIDENTS_Attr(@) {
+    my ( $cmd, $name, $attribute, $value ) = @_;
+    my $hash   = $defs{$name};
+    my $prefix = "rgr_";
+    return unless ($init_done);
+
+    Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Attr()";
+
+    if ( $attribute eq "disable" ) {
+        $hash->{STATE} = "disabled"
+          if ( $value and $value == 1 );
+        evalStateFormat($hash)
+          if ( $cmd eq "del" or !$value );
+    }
+
+    elsif ( $attribute eq $prefix . "lang" ) {
+        my $lang =
+          $cmd eq "set" ? uc($value) : AttrVal( "global", "language", "EN" );
+
+        # for initial define, ensure fallback to EN
+        $lang = "EN"
+          if ( $cmd eq "init" && $lang !~ /^EN|DE$/i );
+
+        if ( $lang eq "DE" ) {
+            $attr{$name}{alias} = "Bewohner"
+              if ( !defined( $attr{$name}{alias} )
+                || $attr{$name}{alias} eq "Residents" );
+            $attr{$name}{group} = "Haus Status"
+              if ( !defined( $attr{$name}{group} )
+                || $attr{$name}{group} eq "Home State" );
+            $attr{$name}{devStateIcon} =
+'.*anwesend:status_available:absent .*abwesend:status_away_1:home .*verreist:status_standby:home .*keine:control_building_empty .*bettfertig:status_night:asleep .*schläft:status_night:awoken .*aufgestanden:status_available:home .*:user_unknown:home';
+            $attr{$name}{eventMap} =
+"home:anwesend absent:abwesend gone:verreist none:keine gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+            $attr{$name}{widgetOverride} =
+              "state:anwesend,bettfertig,abwesend,verreist";
+        }
+        elsif ( $lang eq "EN" ) {
+            $attr{$name}{alias} = "Residents"
+              if ( !defined( $attr{$name}{alias} )
+                || $attr{$name}{alias} eq "Bewohner" );
+            $attr{$name}{group} = "Home State"
+              if ( !defined( $attr{$name}{group} )
+                || $attr{$name}{group} eq "Haus Status" );
+            $attr{$name}{devStateIcon} =
+'.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home .*:user_unknown:home';
+            delete $attr{$name}{eventMap}
+              if ( defined( $attr{$name}{eventMap} ) );
+            delete $attr{$name}{widgetOverride}
+              if ( defined( $attr{$name}{widgetOverride} ) );
+        }
+        else {
+            return "Unsupported language $lang";
+        }
+
+        evalStateFormat($hash);
+    }
+
+    return if ( IsDisabled($name) );
+    return;
 }
 
 ###################################
@@ -126,10 +188,11 @@ sub RESIDENTS_Notify($$) {
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
     return unless ( $devName ne $hashName );    # only foreign events
+    return if ( IsDisabled($hashName) or IsDisabled($devName) );
     return
       unless ( defined( $defs{$devName} )
         && defined( $defs{$devName}{TYPE} )
-        && $defs{$devName}{TYPE} =~ /^(ROOMMATE|GUEST|DUMMY)$/ );
+        && $defs{$devName}{TYPE} =~ /^(ROOMMATE|GUEST|dummy)$/i );
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -254,6 +317,8 @@ sub RESIDENTS_Set($@) {
     my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
     my $guests    = ( $hash->{GUESTS} ? $hash->{GUESTS} : "" );
 
+    return if ( IsDisabled($name) );
+
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Set()";
 
     return "No Argument given" if ( !defined( $a[1] ) );
@@ -363,7 +428,7 @@ sub RESIDENTS_Set($@) {
     }
 
     # addRoommate
-    elsif ( $a[1] eq "addRoommate" ) {
+    elsif ( lc( $a[1] ) eq "addroommate" ) {
         Log3 $name, 2, "RESIDENTS set $name " . $a[1] . " " . $a[2]
           if ( defined( $a[2] ) );
 
@@ -371,21 +436,28 @@ sub RESIDENTS_Set($@) {
         my $rr_name_attr;
 
         if ( $a[2] ne "" ) {
-            $rr_name = "rr_" . $a[2];
+            $rr_name = "rr_" unless ( $a[2] =~ /^rr_/ );
+            $rr_name .= $a[2];
 
             # define roommate
-            if ( !defined( $defs{$rr_name} ) ) {
-                fhem( "define " . $rr_name . " ROOMMATE " . $name );
-                if ( defined( $defs{$rr_name} ) ) {
-                    fhem "set $rr_name silentSet state home";
-                    Log3 $name, 3,
-                      "RESIDENTS $name: created new device $rr_name";
-                }
-            }
-            else {
-                return "Can't create, device $rr_name already existing.";
-            }
+            fhem( "define " . $rr_name . " ROOMMATE " . $name )
+              unless ( defined( $defs{$rr_name} ) );
 
+            if ( defined( $defs{$rr_name} ) ) {
+                return "Can't create, device $rr_name already existing."
+                  unless ( $defs{$rr_name}{TYPE} eq "ROOMMATE" );
+
+                fhem( "attr " . $rr_name . "rr_lang" . uc( $a[3] ) )
+                  if ( defined( $a[3] )
+                    && AttrVal( $rr_name, "rr_lang", "EN" ) ne uc( $a[3] ) );
+
+                $attr{$rr_name}{comment} = "Auto-created by $name"
+                  unless ( defined( $attr{$rr_name}{comment} )
+                    && $attr{$rr_name}{comment} eq "Auto-created by $name" );
+
+                fhem "set $rr_name silentSet state home";
+                Log3 $name, 3, "RESIDENTS $name: created new device $rr_name";
+            }
         }
         else {
             return "No Argument given, choose one of name ";
@@ -393,7 +465,7 @@ sub RESIDENTS_Set($@) {
     }
 
     # removeRoommate
-    elsif ( $a[1] eq "removeRoommate" ) {
+    elsif ( lc( $a[1] ) eq "removeroommate" ) {
         Log3 $name, 2, "RESIDENTS set $name " . $a[1] . " " . $a[2]
           if ( defined( $a[2] ) );
 
@@ -412,7 +484,7 @@ sub RESIDENTS_Set($@) {
     }
 
     # addGuest
-    elsif ( $a[1] eq "addGuest" ) {
+    elsif ( lc( $a[1] ) eq "addguest" ) {
         Log3 $name, 2, "RESIDENTS set $name " . $a[1] . " " . $a[2]
           if ( defined( $a[2] ) );
 
@@ -420,21 +492,28 @@ sub RESIDENTS_Set($@) {
         my $rg_name_attr;
 
         if ( $a[2] ne "" ) {
-            $rg_name = "rg_" . $a[2];
+            $rg_name = "rg_" unless ( $a[2] =~ /^rg_/ );
+            $rg_name .= $a[2];
 
             # define guest
-            if ( !defined( $defs{$rg_name} ) ) {
-                fhem( "define " . $rg_name . " GUEST " . $name );
-                if ( defined( $defs{$rg_name} ) ) {
-                    fhem "set $rg_name silentSet state none";
-                    Log3 $name, 3,
-                      "RESIDENTS $name: created new device $rg_name";
-                }
-            }
-            else {
-                return "Can't create, device $rg_name already existing.";
-            }
+            fhem( "define " . $rg_name . " GUEST " . $name )
+              unless ( defined( $defs{$rg_name} ) );
 
+            if ( defined( $defs{$rg_name} ) ) {
+                return "Can't create, device $rg_name already existing."
+                  unless ( $defs{$rg_name}{TYPE} eq "GUEST" );
+
+                fhem( "attr " . $rg_name . "rg_lang" . uc( $a[3] ) )
+                  if ( defined( $a[3] )
+                    && AttrVal( $rg_name, "rg_lang", "EN" ) ne uc( $a[3] ) );
+
+                $attr{$rg_name}{comment} = "Auto-created by $name"
+                  unless ( defined( $attr{$rg_name}{comment} )
+                    && $attr{$rg_name}{comment} eq "Auto-created by $name" );
+
+                fhem "set $rg_name silentSet state home";
+                Log3 $name, 3, "RESIDENTS $name: created new device $rg_name";
+            }
         }
         else {
             return "No Argument given, choose one of name ";
@@ -442,7 +521,7 @@ sub RESIDENTS_Set($@) {
     }
 
     # removeGuest
-    elsif ( $a[1] eq "removeGuest" ) {
+    elsif ( lc( $a[1] ) eq "removeguest" ) {
         Log3 $name, 2, "RESIDENTS set $name " . $a[1] . " " . $a[2]
           if ( defined( $a[2] ) );
 
@@ -1575,6 +1654,9 @@ sub RESIDENTS_UpdateReadings (@) {
       <ul>
         <ul>
           <li>
+            <b>rgr_lang</b> - overwrite global language setting; helps to set device attributes to translate FHEMWEB display text
+          </li>
+          <li>
             <b>rgr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0
           </li>
           <li>
@@ -1943,6 +2025,9 @@ sub RESIDENTS_UpdateReadings (@) {
       <a name="RESIDENTSattr" id="RESIDENTSattr"></a> <b>Attribute</b><br>
       <ul>
         <ul>
+          <li>
+            <b>rgr_lang</b> - &uuml;berschreibt globale Spracheinstellung; hilft beim setzen von Device Attributen, um FHEMWEB Anzeigetext zu &uuml;bersetzen
+          </li>
           <li>
             <b>rgr_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0
           </li>
