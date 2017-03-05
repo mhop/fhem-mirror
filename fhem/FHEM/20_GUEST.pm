@@ -1237,10 +1237,6 @@ sub GUEST_StartInternalTimers($$) {
           define rg_Guest GUEST rgr_Residents,rgr_Guests # to be member of resident group rgr_Residents and rgr_Guests</code>
         </ul>
       </ul><br>
-      <ul>
-        Please note the RESIDENTS group device needs to be existing before a GUEST device can become a member of it.
-      </ul><br>
-      <br>
       <br>
       <a name="GUESTset" id="GUESTset"></a> <b>Set</b>
       <ul>
@@ -1538,10 +1534,6 @@ sub GUEST_StartInternalTimers($$) {
           define rg_Guest GUEST rgr_Residents,rgr_Guests # um Mitglied der Gruppen rgr_Residents und rgr_Guests zu sein</code>
         </ul>
       </ul><br>
-      <ul>
-        Bitte beachten, dass das RESIDENTS Gruppen Device zun&auml;chst angelegt werden muss, bevor ein GUEST Objekt dort Mitglied werden kann.
-      </ul><br>
-      <br>
       <br>
       <a name="GUESTset" id="GUESTset"></a> <b>Set</b>
       <ul>

@@ -1227,9 +1227,6 @@ sub ROOMMATE_StartInternalTimers($$) {
           define rr_Alex ROOMMATE rgr_Residents,rgr_Children # Child2</code>
         </ul>
       </ul><br>
-      <ul>
-        Please note the RESIDENTS group device needs to be existing before a ROOMMATE device can become a member of it.
-      </ul><br>
       <br>
       <br>
       <a name="ROOMMATEset" id="ROOMMATEset"></a> <b>Set</b>
@@ -1528,10 +1525,6 @@ sub ROOMMATE_StartInternalTimers($$) {
           define rr_Alex ROOMMATE rgr_Residents,rgr_Children # Kind2</code>
         </ul>
       </ul><br />
-      <ul>
-        Bitte beachten, dass das RESIDENTS Gruppen Device zun&auml;chst angelegt werden muss, bevor ein ROOMMATE Objekt dort Mitglied werden kann.
-      </ul><br />
-      <br />
       <br />
       <a name="ROOMMATEset" id="ROOMMATEset"></a> <b>Set</b>
       <ul>
