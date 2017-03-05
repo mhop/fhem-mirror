@@ -179,30 +179,13 @@ sub RESIDENTS_Notify($$) {
             if ( $change !~ /:/ ) {
 
                 # get user realname
-                my $realnamesrc;
-                if ( $dev->{TYPE} eq "GUEST" ) {
-                    $realnamesrc = (
-                        defined( $attr{$devName}{rg_realname} )
-                          && $attr{$devName}{rg_realname} ne ""
-                        ? $attr{$devName}{rg_realname}
-                        : "alias"
-                    );
-                }
-                else {
-                    $realnamesrc = (
-                        defined( $attr{$devName}{rr_realname} )
-                          && $attr{$devName}{rr_realname} ne ""
-                        ? $attr{$devName}{rr_realname}
-                        : "group"
-                    );
-                }
-
-                my $realname = (
-                    defined( $attr{$devName}{$realnamesrc} )
-                      && $attr{$devName}{$realnamesrc} ne ""
-                    ? $attr{$devName}{$realnamesrc}
-                    : $devName
-                );
+                my $realname =
+                  AttrVal( $devName,
+                    AttrVal( $devName, "rr_realname", "group" ), $devName );
+                $realname =
+                  AttrVal( $devName,
+                    AttrVal( $devName, "rg_realname", "alias" ), $devName )
+                  if ( $dev->{TYPE} eq "GUEST" );
 
                 # update statistics
                 readingsBulkUpdate( $hash, "lastActivity",
@@ -266,10 +249,10 @@ sub RESIDENTS_Notify($$) {
 ###################################
 sub RESIDENTS_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name = $hash->{NAME};
-    my $state = ReadingsVal( $name, "state", "initialized" );
+    my $name      = $hash->{NAME};
+    my $state     = ReadingsVal( $name, "state", "initialized" );
     my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
-    my $guests    = ( $hash->{GUESTS}    ? $hash->{GUESTS}    : "" );
+    my $guests    = ( $hash->{GUESTS} ? $hash->{GUESTS} : "" );
 
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Set()";
 
@@ -628,7 +611,7 @@ sub RESIDENTS_UpdateReadings (@) {
 
         my $roommateName =
           AttrVal( $roommate,
-            AttrVal( $roommate, "rr_realname", "alias" ), "" );
+            AttrVal( $roommate, "rr_realname", "group" ), "" );
 
         Log3 $name, 5,
           "RESIDENTS $name: considering $roommate for state change";
