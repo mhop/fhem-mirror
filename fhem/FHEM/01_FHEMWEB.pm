@@ -2495,10 +2495,10 @@ FW_Attr(@)
     $modules{FHEMWEB}{AttrList} .= " ".join(" ",@add) if(@add);
   }
 
-  if($attrName eq "csrfToken" && $type eq "set") {
+  if($attrName eq "csrfToken") {
     return undef if($FW_csrfTokenCache{$devName} && !$init_done);
     my $csrf = $param[0];
-    if($csrf eq "random") {
+    if($type eq "del" || $csrf eq "random") {
       my ($x,$y) = gettimeofday();
       ($csrf = "csrf_".(rand($y)*rand($x))) =~ s/[^a-z_0-9]//g;
     }
@@ -2510,11 +2510,6 @@ FW_Attr(@)
       $hash->{CSRFTOKEN} = $csrf;
       $FW_csrfTokenCache{$devName} = $hash->{CSRFTOKEN};
     }
-  }
-
-  if($attrName eq "csrfToken" && $type eq "del") {
-    delete($hash->{CSRFTOKEN});
-    delete($FW_csrfTokenCache{$devName});
   }
 
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
