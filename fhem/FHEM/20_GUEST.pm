@@ -131,7 +131,9 @@ sub GUEST_Undefine($$) {
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
-        foreach ( split( /,/, $hash->{RESIDENTGROUPS} ) ) {
+        my $old = $hash->{RESIDENTGROUPS};
+        delete $hash->{RESIDENTGROUPS};
+        foreach ( split( /,/, $old ) ) {
             RESIDENTStk_findResidentSlaves( $defs{$_} )
               if ( defined( $defs{$_} ) );
         }

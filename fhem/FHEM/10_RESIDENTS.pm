@@ -60,6 +60,8 @@ sub RESIDENTS_Define($$) {
 
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Define()";
 
+    RESIDENTStk_findResidentSlaves($hash);
+
     # set default settings on first define
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         $attr{$name}{alias} = "Residents";
@@ -128,8 +130,6 @@ sub RESIDENTS_Notify($$) {
       unless ( defined( $defs{$devName} )
         && defined( $defs{$devName}{TYPE} )
         && $defs{$devName}{TYPE} =~ /^(ROOMMATE|GUEST|DUMMY)$/ );
-
-    RESIDENTStk_findResidentSlaves($hash);
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -268,14 +268,12 @@ sub RESIDENTS_Set($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
     my $state = ReadingsVal( $name, "state", "initialized" );
+    my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
+    my $guests    = ( $hash->{GUESTS}    ? $hash->{GUESTS}    : "" );
 
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Set()";
 
     return "No Argument given" if ( !defined( $a[1] ) );
-
-    RESIDENTStk_findResidentSlaves($hash);
-    my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
-    my $guests    = ( $hash->{GUESTS}    ? $hash->{GUESTS}    : "" );
 
     # depending on current FHEMWEB instance's allowedCommands,
     # restrict set commands if there is "set-user" in it
