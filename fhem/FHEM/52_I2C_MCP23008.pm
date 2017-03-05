@@ -282,18 +282,19 @@ sub I2C_MCP23008_SetRegPair {																									#set register pair for Por
 	$port{A} = $regval & 0xff;
 	#$port{B} = ( $regval >> 8 ) & 0xff;
 
-		if (defined (my $iodev = $hash->{IODev})) {
-			foreach my $reg (keys %port) {
+	if (defined (my $iodev = $hash->{IODev})) {
+		foreach my $reg (keys %port) {
 			#Log3 $hash, 1, "schreibe raus: i2cwrite|$hash->{I2C_Address}|$Registers{$regtype . $reg}|$port{$reg}|";
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  => "i2cwrite",
-				i2caddress => $hash->{I2C_Address},
-				reg => 				$Registers{$regtype . $reg},
-				data => 			$port{$reg},
+				direction  	=> "i2cwrite",
+				i2caddress 	=> $hash->{I2C_Address},
+				reg 		=> $Registers{$regtype . $reg},
+				data 		=> $port{$reg},
 				}) if (defined $hash->{I2C_Address});
-				}
+		}
+		I2C_MCP23008_Get($hash,$hash->{NAME}) if ( ($iodev->{TYPE} ne "RPII2C") && ($regtype eq "GPIO") );
 	} else {
-		return "no IODev assigned to '$hash->{NAME}'";
+		return "no IODev assigned to $hash->{NAME}";
 	}
 }
 ###############################################################################
@@ -313,7 +314,7 @@ sub I2C_MCP23008_Set($@) {
 	my $name =$a[0];
 	my $cmd = $a[1];
 	my $val = $a[2];
-	my @outports = sort(split(/,/,AttrVal($name, "OutputPorts", "")));
+	#my @outports = sort(split(/,/,AttrVal($name, "OutputPorts", "")));
 	unless (@a == 3) {
 
 	}
@@ -325,7 +326,8 @@ sub I2C_MCP23008_Set($@) {
 		my @scmd = split(",", $cmd);
 		foreach (@scmd) {
 			$_ =~ tr/P(ort|)//d;			#Nummer aus String extrahieren
-			$msg .= (defined $msg ? "," : "") . "Port" . $_ unless ( ($_) ~~ @outports );		#Pruefen ob entsprechender Port Input ist
+			#$msg .= (defined $msg ? "," : "") . "Port" . $_ unless ( ($_) ~~ @outports );		#Pruefen ob entsprechender Port Input ist
+			$msg .= (defined $msg ? "," : "") . "Port" . $_ unless ( AttrVal($name, "OutputPorts", "") =~ /$_/ );		#Pruefen ob entsprechender Port Input ist
 		}
 		return "$name error: $msg is defined as input" if $msg;
 		#Log3 $hash, 1, "$name: multitest gereinigt: @scmd";
@@ -335,7 +337,8 @@ sub I2C_MCP23008_Set($@) {
 			#foreach my $po ("A","B") {
 			foreach my $po ("A") {
 				my $bank = ($po eq "A") ? 0 : 8;	# A oder B
-				if ( ($po.$_) ~~ @scmd ) {				#->wenn aktueller Port in Liste dann neuer Wert
+				#if ( ($po.$_) ~~ @scmd ) {				#->wenn aktueller Port in Liste dann neuer Wert
+				if ( $cmd =~ /$po$_/ ) {				#->wenn aktueller Port in Liste dann neuer Wert
 					$regval += $setsP{$val} << ($bank + $_);
 				} else {													#->sonst aus dem Reading holen
 					$regval += $setsP{ReadingsVal($name,"Port".$po.$_,"off")} << ($bank + $_);		
@@ -347,7 +350,8 @@ sub I2C_MCP23008_Set($@) {
 	} else {
 		my $list = "";
 		foreach (0..7) {
-			next unless ( ("A" . $_) ~~ @outports );		#Inputs ueberspringen
+			#next unless ( ("A" . $_) ~~ @outports );		#Inputs ueberspringen
+			next unless ( AttrVal($name, "OutputPorts", "") =~ /A$_/ );		#Inputs ueberspringen
 			$list .= "PortA" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 		}
 		#foreach (0..7) {
@@ -425,7 +429,7 @@ sub I2C_MCP23008_I2CRec($@) {																									#ueber CallFn vom physical
 	} 
 	#hier noch ueberpruefen, ob Register und Daten ok
 	if ($clientmsg->{direction} && defined $clientmsg->{reg} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok" ) {
-		if ($clientmsg->{direction} eq "i2cread" && $clientmsg->{received}) { # =~ m/^[a-f0-9]{2}$/i) {
+		if ($clientmsg->{direction} eq "i2cread" && defined $clientmsg->{received}) { # =~ m/^[a-f0-9]{2}$/i) {
 			#my @rec = @{$clientmsg->{received}};							#bei uebergabe im hash als array
 			my @rec = split(" ",$clientmsg->{received});			#bei uebergabe im als skalar
 			Log3 $hash, 3, "$name: wrong amount of registers transmitted from $pname" unless (@rec == $clientmsg->{nbyte});
@@ -440,11 +444,11 @@ sub I2C_MCP23008_I2CRec($@) {																									#ueber CallFn vom physical
 		} else {
 			readingsSingleUpdate($hash,"state", "transmission error", 1);
 			Log3 $hash, 3, "$name: failurei in message from $pname";
-			Log3 $hash, 3,(defined($clientmsg->{direction}) ? 	"Direction: "		.										$clientmsg->{direction} 	: "Direction: undef").
-										(defined($clientmsg->{i2caddress}) ? 	" I2Caddress: " . sprintf("0x%.2X", $clientmsg->{i2caddress}) : " I2Caddress: undef").
-										(defined($clientmsg->{reg}) ? 				" Register: " 	. sprintf("0x%.2X", $clientmsg->{reg}) 				: " Register: undef").
-										(defined($clientmsg->{data}) ? 				" Data: " 			. sprintf("0x%.2X", $clientmsg->{data}) 			: " Data: undef").
-										(defined($clientmsg->{received}) ? 		" received: " 	. sprintf("0x%.2X", $clientmsg->{received}) 	: " received: undef");
+			Log3 $hash, 3,	(defined($clientmsg->{direction}) ? 	"Direction: "		.				$clientmsg->{direction} 	: "Direction: undef").
+							(defined($clientmsg->{i2caddress}) ? 	" I2Caddress: " . sprintf("0x%.2X", $clientmsg->{i2caddress}) 	: " I2Caddress: undef").
+							(defined($clientmsg->{reg}) ? 			" Register: " 	. sprintf("0x%.2X", $clientmsg->{reg}) 			: " Register: undef").
+							(defined($clientmsg->{data}) ? 			" Data: " 		. sprintf("0x%.2X", $clientmsg->{data}) 		: " Data: undef").
+							(defined($clientmsg->{received}) ? 		" received: " 	. sprintf("0x%.2X", $clientmsg->{received}) 	: " received: undef");
 		}
 	} else {
 		readingsSingleUpdate($hash,"state", "transmission error", 1);
