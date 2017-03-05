@@ -4872,7 +4872,7 @@ parseParams($;$)
     }
 
     #collect all parts until opening { and closing } are matched
-    if( $value =~ m/^{/ ) { # } for match
+    if( $value =~ m/^\s*{/ ) { # } for match
       my $count = 0;
       for my $i (0..length($value)-1) {
         my $c = substr($value, $i, 1);
