@@ -278,7 +278,7 @@ FW_Define($$)
     InternalTimer(1, sub(){
       if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
         my ($x,$y) = gettimeofday();
-        ($defs{$name}{CSRFTOKEN} = "csrf_".(rand($y)*rand($x))) =~s/[^a-z_0-9]//g;
+        ($defs{$name}{CSRFTOKEN}="csrf_".(rand($y)*rand($x))) =~s/[^a-z_0-9]//g;
         $FW_csrfTokenCache{$name} = $hash->{CSRFTOKEN};
       }
     }, $hash, 0);
@@ -3026,12 +3026,14 @@ sub
 FW_Get($@)
 {
   my ($hash, @a) = @_;
-  $FW_wname= $hash->{NAME};
 
   my $arg = (defined($a[1]) ? $a[1] : "");
   if($arg eq "icon") {
     return "need one icon as argument" if(int(@a) != 3);
+    my $ofn = $FW_wname;
+    $FW_wname = $hash->{NAME};
     my $icon = FW_iconPath($a[2]);
+    $FW_wname = $ofn;
     return defined($icon) ? "$FW_icondir/$icon" : "no such icon";
 
   } elsif($arg eq "pathlist") {
