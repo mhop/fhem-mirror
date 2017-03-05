@@ -1715,4 +1715,33 @@ sub RESIDENTStk_RemoveInternalTimer($$) {
     }
 }
 
+sub RESIDENTStk_findResidentSlaves($) {
+    my ($hash) = @_;
+    return unless ( ref($hash) eq "HASH" && defined( $hash->{NAME} ) );
+
+    delete $hash->{ROOMMATES};
+    foreach ( devspec2array("TYPE=ROOMMATE") ) {
+        next
+          unless (
+            defined( $defs{$_}{RESIDENTGROUPS} )
+            && grep { /^$hash->{NAME}$/ }
+            split( /,/, $defs{$_}{RESIDENTGROUPS} )
+          );
+        $hash->{ROOMMATES} .= "," if ( $hash->{ROOMMATES} );
+        $hash->{ROOMMATES} .= $_;
+    }
+
+    delete $hash->{GUESTS};
+    foreach ( devspec2array("TYPE=GUEST") ) {
+        next
+          unless (
+            defined( $defs{$_}{RESIDENTGROUPS} )
+            && grep { /^$hash->{NAME}$/ }
+            split( /,/, $defs{$_}{RESIDENTGROUPS} )
+          );
+        $hash->{GUESTS} .= "," if ( $hash->{GUESTS} );
+        $hash->{GUESTS} .= $_;
+    }
+}
+
 1;

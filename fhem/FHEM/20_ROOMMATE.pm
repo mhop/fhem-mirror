@@ -32,8 +32,6 @@ use Time::Local;
 use Data::Dumper;
 require RESIDENTStk;
 
-no if $] >= 5.017011, warnings => 'experimental';
-
 sub ROOMMATE_Set($@);
 sub ROOMMATE_Define($$);
 sub ROOMMATE_Notify($$);
@@ -70,55 +68,12 @@ sub ROOMMATE_Define($$) {
         return $msg;
     }
 
-    $hash->{TYPE} = "ROOMMATE";
-
-    my $parents = ( defined( $a[2] ) ? $a[2] : "" );
-
-    # unregister at parent objects if we get modified
-    my @registeredResidentgroups;
-    my $modified = 0;
-    if ( defined( $hash->{RESIDENTGROUPS} ) && $hash->{RESIDENTGROUPS} ne "" ) {
-        $modified = 1;
-        @registeredResidentgroups =
-          split( /,/, $hash->{RESIDENTGROUPS} );
-
-        # unregister at parent objects
-        foreach my $parent (@registeredResidentgroups) {
-            if ( defined( $defs{$parent} )
-                && $defs{$parent}{TYPE} eq "RESIDENTS" )
-            {
-                fhem("set $parent unregister $name");
-                Log3 $name, 4,
-                  "ROOMMATE $name: Unregistered at RESIDENTS device $parent";
-            }
+    $hash->{RESIDENTGROUPS} = defined( $a[2] ) ? $a[2] : "";
+    if ( defined( $hash->{RESIDENTGROUPS} ) ) {
+        foreach ( split( /,/, $hash->{RESIDENTGROUPS} ) ) {
+            RESIDENTStk_findResidentSlaves( $defs{$_} )
+              if ( defined( $defs{$_} ) );
         }
-    }
-
-    # register at parent objects
-    $hash->{RESIDENTGROUPS} = "";
-    if ( $parents ne "" ) {
-        @registeredResidentgroups = split( /,/, $parents );
-        foreach my $parent (@registeredResidentgroups) {
-            if ( !defined( $defs{$parent} ) ) {
-                Log3 $name, 3,
-"ROOMMATE $name: Unable to register at RESIDENTS device $parent (not existing)";
-                next;
-            }
-
-            if ( $defs{$parent}{TYPE} ne "RESIDENTS" ) {
-                Log3 $name, 3,
-"ROOMMATE $name: Device $parent is not a RESIDENTS device (wrong type)";
-                next;
-            }
-
-            fhem("set $parent register $name");
-            $hash->{RESIDENTGROUPS} .= $parent . ",";
-            Log3 $name, 4,
-              "ROOMMATE $name: Registered at RESIDENTS device $parent";
-        }
-    }
-    else {
-        $modified = 0;
     }
 
     # set reverse pointer
@@ -140,15 +95,15 @@ sub ROOMMATE_Define($$) {
         $attr{$name}{sortby}      = "1";
         $attr{$name}{webCmd}      = "state";
 
-        $attr{$name}{room} = $attr{ $registeredResidentgroups[0] }{room}
-          if ( @registeredResidentgroups
-            && exists( $attr{ $registeredResidentgroups[0] }{room} ) );
+        my $firstRgr = $hash->{RESIDENTGROUPS};
+        $firstRgr =~ s/,[\s\S]*$//gmi;
+        $attr{$name}{room} = $attr{$firstRgr}{room}
+          if ( exists( $attr{$firstRgr}{room} ) );
     }
 
     # trigger for modified objects
-    unless ( $modified == 0 ) {
-        readingsBulkUpdate( $hash, "state", ReadingsVal( $name, "state", "" ) );
-    }
+    readingsBulkUpdateIfChanged( $hash, "state",
+        ReadingsVal( $name, "state", "" ) );
 
     readingsEndUpdate( $hash, 1 );
 
@@ -181,18 +136,9 @@ sub ROOMMATE_Undefine($$) {
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
-        my @registeredResidentgroups =
-          split( /,/, $hash->{RESIDENTGROUPS} );
-
-        # unregister at parent objects
-        foreach my $parent (@registeredResidentgroups) {
-            if ( defined( $defs{$parent} )
-                && $defs{$parent}{TYPE} eq "RESIDENTS" )
-            {
-                fhem("set $parent unregister $name");
-                Log3 $name, 4,
-                  "ROOMMATE $name: Unregistered at RESIDENTS device $parent";
-            }
+        foreach ( split( /,/, $hash->{RESIDENTGROUPS} ) ) {
+            RESIDENTStk_findResidentSlaves( $defs{$_} )
+              if ( defined( $defs{$_} ) );
         }
     }
 
@@ -256,7 +202,7 @@ sub ROOMMATE_Notify($$) {
         if (@registeredWakeupdevs) {
 
             # if this is a notification of a registered wakeup device
-            if ( $devName ~~ @registeredWakeupdevs ) {
+            if ( grep { /^$devName$/ } @registeredWakeupdevs ) {
 
                 # Some previous notify deleted the array.
                 return
@@ -294,7 +240,7 @@ sub ROOMMATE_Notify($$) {
         }
 
         # process PRESENCE
-        if ( @presenceDevices && $devName ~~ @presenceDevices ) {
+        if ( @presenceDevices && grep { /^$devName$/ } @presenceDevices ) {
 
             my $counter = {
                 absent  => 0,

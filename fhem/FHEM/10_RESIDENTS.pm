@@ -32,8 +32,6 @@ use Time::Local;
 use Data::Dumper;
 require RESIDENTStk;
 
-no if $] >= 5.017011, warnings => 'experimental';
-
 sub RESIDENTS_Set($@);
 sub RESIDENTS_Define($$);
 sub RESIDENTS_Notify($$);
@@ -62,8 +60,6 @@ sub RESIDENTS_Define($$) {
 
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Define()";
 
-    $hash->{TYPE} = "RESIDENTS";
-
     # set default settings on first define
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
         $attr{$name}{alias} = "Residents";
@@ -90,6 +86,8 @@ sub RESIDENTS_Define($$) {
 ###################################
 sub RESIDENTS_Undefine($$) {
     my ( $hash, $name ) = @_;
+
+    RESIDENTStk_findResidentSlaves($hash);
 
     # delete child roommates
     if ( defined( $hash->{ROOMMATES} )
@@ -125,135 +123,139 @@ sub RESIDENTS_Notify($$) {
     my ( $hash, $dev ) = @_;
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
+    return unless ( $devName ne $hashName );    # only foreign events
+    return
+      unless ( defined( $defs{$devName} )
+        && defined( $defs{$devName}{TYPE} )
+        && $defs{$devName}{TYPE} =~ /^(ROOMMATE|GUEST|DUMMY)$/ );
 
-    # process child notifies
-    if ( $devName ne $hashName ) {
-        my @registeredRoommates =
-          split( /,/, $hash->{ROOMMATES} )
-          if ( defined( $hash->{ROOMMATES} )
-            && $hash->{ROOMMATES} ne "" );
+    RESIDENTStk_findResidentSlaves($hash);
 
-        my @registeredGuests =
-          split( /,/, $hash->{GUESTS} )
-          if ( defined( $hash->{GUESTS} )
-            && $hash->{GUESTS} ne "" );
+    my @registeredRoommates =
+      split( /,/, $hash->{ROOMMATES} )
+      if ( defined( $hash->{ROOMMATES} )
+        && $hash->{ROOMMATES} ne "" );
 
-        my @registeredWakeupdevs =
-          split( /,/, $attr{$hashName}{rgr_wakeupDevice} )
-          if ( defined( $attr{$hashName}{rgr_wakeupDevice} )
-            && $attr{$hashName}{rgr_wakeupDevice} ne "" );
+    my @registeredGuests =
+      split( /,/, $hash->{GUESTS} )
+      if ( defined( $hash->{GUESTS} )
+        && $hash->{GUESTS} ne "" );
 
-        # process only registered ROOMMATE or GUEST devices
-        if (   ( @registeredRoommates && $devName ~~ @registeredRoommates )
-            || ( @registeredGuests && $devName ~~ @registeredGuests ) )
-        {
+    my @registeredWakeupdevs =
+      split( /,/, $attr{$hashName}{rgr_wakeupDevice} )
+      if ( defined( $attr{$hashName}{rgr_wakeupDevice} )
+        && $attr{$hashName}{rgr_wakeupDevice} ne "" );
 
-            return
-              if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
+    # process only registered ROOMMATE or GUEST devices
+    if ( ( @registeredRoommates && grep { /^$devName$/ } @registeredRoommates )
+        || ( @registeredGuests && grep { /^$devName$/ } @registeredGuests ) )
+    {
 
-            readingsBeginUpdate($hash);
+        return
+          if ( !$dev->{CHANGED} );    # Some previous notify deleted the array.
 
-            foreach my $change ( @{ $dev->{CHANGED} } ) {
+        readingsBeginUpdate($hash);
 
-                Log3 $hash, 5,
-                  "RESIDENTS " . $hashName . ": processing change $change";
+        foreach my $change ( @{ $dev->{CHANGED} } ) {
 
-                # state changed
-                if (   $change !~ /:/
-                    || $change =~ /wayhome:/
-                    || $change =~ /wakeup:/ )
-                {
-                    Log3 $hash, 4,
-                        "RESIDENTS "
-                      . $hashName . ": "
-                      . $devName
-                      . ": notify about change to $change";
+            Log3 $hash, 5,
+              "RESIDENTS " . $hashName . ": processing change $change";
 
-                    RESIDENTS_UpdateReadings($hash);
-                }
+            # state changed
+            if (   $change !~ /:/
+                || $change =~ /wayhome:/
+                || $change =~ /wakeup:/ )
+            {
+                Log3 $hash, 4,
+                    "RESIDENTS "
+                  . $hashName . ": "
+                  . $devName
+                  . ": notify about change to $change";
 
-                # activity
-                if ( $change !~ /:/ ) {
+                RESIDENTS_UpdateReadings($hash);
+            }
 
-                    # get user realname
-                    my $realnamesrc;
-                    if ( $dev->{TYPE} eq "GUEST" ) {
-                        $realnamesrc = (
-                            defined( $attr{$devName}{rg_realname} )
-                              && $attr{$devName}{rg_realname} ne ""
-                            ? $attr{$devName}{rg_realname}
-                            : "alias"
-                        );
-                    }
-                    else {
-                        $realnamesrc = (
-                            defined( $attr{$devName}{rr_realname} )
-                              && $attr{$devName}{rr_realname} ne ""
-                            ? $attr{$devName}{rr_realname}
-                            : "group"
-                        );
-                    }
+            # activity
+            if ( $change !~ /:/ ) {
 
-                    my $realname = (
-                        defined( $attr{$devName}{$realnamesrc} )
-                          && $attr{$devName}{$realnamesrc} ne ""
-                        ? $attr{$devName}{$realnamesrc}
-                        : $devName
+                # get user realname
+                my $realnamesrc;
+                if ( $dev->{TYPE} eq "GUEST" ) {
+                    $realnamesrc = (
+                        defined( $attr{$devName}{rg_realname} )
+                          && $attr{$devName}{rg_realname} ne ""
+                        ? $attr{$devName}{rg_realname}
+                        : "alias"
                     );
-
-                    # update statistics
-                    readingsBulkUpdate( $hash, "lastActivity",
-                        ReadingsVal( $devName, "state", $change ) );
-                    readingsBulkUpdate( $hash, "lastActivityBy",    $realname );
-                    readingsBulkUpdate( $hash, "lastActivityByDev", $devName );
-
                 }
+                else {
+                    $realnamesrc = (
+                        defined( $attr{$devName}{rr_realname} )
+                          && $attr{$devName}{rr_realname} ne ""
+                        ? $attr{$devName}{rr_realname}
+                        : "group"
+                    );
+                }
+
+                my $realname = (
+                    defined( $attr{$devName}{$realnamesrc} )
+                      && $attr{$devName}{$realnamesrc} ne ""
+                    ? $attr{$devName}{$realnamesrc}
+                    : $devName
+                );
+
+                # update statistics
+                readingsBulkUpdate( $hash, "lastActivity",
+                    ReadingsVal( $devName, "state", $change ) );
+                readingsBulkUpdate( $hash, "lastActivityBy",    $realname );
+                readingsBulkUpdate( $hash, "lastActivityByDev", $devName );
 
             }
 
-            readingsEndUpdate( $hash, 1 );
+        }
+
+        readingsEndUpdate( $hash, 1 );
+
+        return;
+    }
+
+    # if we have registered wakeup devices
+    if (@registeredWakeupdevs) {
+
+        # if this is a notification of a registered wakeup device
+        if ( grep { /^$devName$/ } @registeredWakeupdevs ) {
+
+            # Some previous notify deleted the array.
+            return
+              if ( !$dev->{CHANGED} );
+
+            foreach my $change ( @{ $dev->{CHANGED} } ) {
+                RESIDENTStk_wakeupSet( $devName, $change );
+            }
 
             return;
         }
 
-        # if we have registered wakeup devices
-        if (@registeredWakeupdevs) {
+        # process sub-child notifies: *_wakeupDevice
+        foreach my $wakeupDev (@registeredWakeupdevs) {
 
-            # if this is a notification of a registered wakeup device
-            if ( $devName ~~ @registeredWakeupdevs ) {
+            # if this is a notification of a registered sub dummy device
+            # of one of our wakeup devices
+            if (   defined( $attr{$wakeupDev}{wakeupResetSwitcher} )
+                && $attr{$wakeupDev}{wakeupResetSwitcher} eq $devName
+                && $defs{$devName}{TYPE} eq "dummy" )
+            {
 
                 # Some previous notify deleted the array.
                 return
                   if ( !$dev->{CHANGED} );
 
                 foreach my $change ( @{ $dev->{CHANGED} } ) {
-                    RESIDENTStk_wakeupSet( $devName, $change );
+                    RESIDENTStk_wakeupSet( $wakeupDev, $change )
+                      if ( $change ne "off" );
                 }
 
-                return;
-            }
-
-            # process sub-child notifies: *_wakeupDevice
-            foreach my $wakeupDev (@registeredWakeupdevs) {
-
-                # if this is a notification of a registered sub dummy device
-                # of one of our wakeup devices
-                if (   defined( $attr{$wakeupDev}{wakeupResetSwitcher} )
-                    && $attr{$wakeupDev}{wakeupResetSwitcher} eq $devName
-                    && $defs{$devName}{TYPE} eq "dummy" )
-                {
-
-                    # Some previous notify deleted the array.
-                    return
-                      if ( !$dev->{CHANGED} );
-
-                    foreach my $change ( @{ $dev->{CHANGED} } ) {
-                        RESIDENTStk_wakeupSet( $wakeupDev, $change )
-                          if ( $change ne "off" );
-                    }
-
-                    last;
-                }
+                last;
             }
         }
     }
@@ -264,14 +266,16 @@ sub RESIDENTS_Notify($$) {
 ###################################
 sub RESIDENTS_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name      = $hash->{NAME};
-    my $state     = ReadingsVal( $name, "state", "initialized" );
-    my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
-    my $guests    = ( $hash->{GUESTS} ? $hash->{GUESTS} : "" );
+    my $name = $hash->{NAME};
+    my $state = ReadingsVal( $name, "state", "initialized" );
 
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Set()";
 
     return "No Argument given" if ( !defined( $a[1] ) );
+
+    RESIDENTStk_findResidentSlaves($hash);
+    my $roommates = ( $hash->{ROOMMATES} ? $hash->{ROOMMATES} : "" );
+    my $guests    = ( $hash->{GUESTS}    ? $hash->{GUESTS}    : "" );
 
     # depending on current FHEMWEB instance's allowedCommands,
     # restrict set commands if there is "set-user" in it
@@ -473,94 +477,6 @@ sub RESIDENTS_Set($@) {
         else {
             return "No Argument given, choose one of name ";
         }
-    }
-
-    # register
-    elsif ( $a[1] eq "register" ) {
-        if ( defined( $a[2] ) && $a[2] ne "" ) {
-            return "No such device " . $a[2]
-              if ( !defined( $defs{ $a[2] } ) );
-
-            # ROOMMATE
-            if ( $defs{ $a[2] }{TYPE} eq "ROOMMATE" ) {
-                Log3 $name, 4, "RESIDENTS $name: " . $a[2] . " registered";
-
-                # update readings
-                $roommates .= ( $roommates eq "" ? $a[2] : "," . $a[2] )
-                  if ( $roommates !~ /$a[2]/ );
-
-                $hash->{ROOMMATES} = $roommates;
-            }
-
-            # GUEST
-            elsif ( $defs{ $a[2] }{TYPE} eq "GUEST" ) {
-                Log3 $name, 4, "RESIDENTS $name: " . $a[2] . " registered";
-
-                # update readings
-                $guests .= ( $guests eq "" ? $a[2] : "," . $a[2] )
-                  if ( $guests !~ /$a[2]/ );
-
-                $hash->{GUESTS} = $guests;
-            }
-
-            # unsupported
-            else {
-                return "Device type is not supported.";
-            }
-
-        }
-        else {
-            return "No Argument given, choose one of ROOMMATE GUEST ";
-        }
-    }
-
-    # unregister
-    elsif ( $a[1] eq "unregister" ) {
-        if ( defined( $a[2] ) && $a[2] ne "" ) {
-            return "No such device " . $a[2]
-              if ( !defined( $defs{ $a[2] } ) );
-
-            # ROOMMATE
-            if ( $defs{ $a[2] }{TYPE} eq "ROOMMATE" ) {
-                Log3 $name, 4, "RESIDENTS $name: " . $a[2] . " unregistered";
-
-                # update readings
-                my $replace = "," . $a[2];
-                $roommates =~ s/$replace//g;
-                $replace = $a[2] . ",";
-                $roommates =~ s/^$replace//g;
-                $roommates =~ s/^$a[2]//g;
-
-                $hash->{ROOMMATES} = $roommates;
-            }
-
-            # GUEST
-            elsif ( $defs{ $a[2] }{TYPE} eq "GUEST" ) {
-                Log3 $name, 4, "RESIDENTS $name: " . $a[2] . " unregistered";
-
-                # update readings
-                my $replace = "," . $a[2];
-                $guests =~ s/$replace//g;
-                $replace = $a[2] . ",";
-                $guests =~ s/^$replace//g;
-                $guests =~ s/^$a[2]//g;
-
-                $hash->{GUESTS} = $guests;
-            }
-
-            # unsupported
-            else {
-                return "Device type is not supported.";
-            }
-
-        }
-        else {
-            return "No Argument given, choose one of ROOMMATE GUEST ";
-        }
-
-        readingsBeginUpdate($hash);
-        RESIDENTS_UpdateReadings($hash);
-        readingsEndUpdate( $hash, 1 );
     }
 
     # create
