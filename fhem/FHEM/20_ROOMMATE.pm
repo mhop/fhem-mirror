@@ -35,6 +35,7 @@ require RESIDENTStk;
 sub ROOMMATE_Set($@);
 sub ROOMMATE_Define($$);
 sub ROOMMATE_Notify($$);
+sub ROOMMATE_Attr(@);
 sub ROOMMATE_Undefine($$);
 
 ###################################
@@ -46,9 +47,10 @@ sub ROOMMATE_Initialize($) {
     $hash->{SetFn}    = "ROOMMATE_Set";
     $hash->{DefFn}    = "ROOMMATE_Define";
     $hash->{NotifyFn} = "ROOMMATE_Notify";
+    $hash->{AttrFn}   = "ROOMMATE_Attr";
     $hash->{UndefFn}  = "ROOMMATE_Undefine";
     $hash->{AttrList} =
-"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice rr_geofenceUUIDs rr_presenceDevices "
+"disable:1,0 rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:0,12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice rr_geofenceUUIDs rr_presenceDevices rr_lang:EN,DE "
       . $readingFnAttributes;
 }
 
@@ -83,13 +85,13 @@ sub ROOMMATE_Define($$) {
 
     # set default settings on first define
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        ROOMMATE_Attr( "init", $name, "rr_lang" );
+
         my $groupname = $name;
         $groupname =~ s/^rr_//;
         $attr{$name}{group} = $groupname;
 
-        $attr{$name}{alias} = "Status";
-        $attr{$name}{devStateIcon} =
-".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home";
+        $attr{$name}{alias}       = "Status";
         $attr{$name}{icon}        = "people_sensor";
         $attr{$name}{rr_realname} = "group";
         $attr{$name}{sortby}      = "1";
@@ -129,11 +131,85 @@ sub ROOMMATE_Define($$) {
 }
 
 ###################################
+sub ROOMMATE_Attr(@) {
+    my ( $cmd, $name, $attribute, $value ) = @_;
+    my $hash   = $defs{$name};
+    my $prefix = "rr_";
+    return unless ($init_done);
+
+    Log3 $name, 5, "ROOMMATE $name: called function ROOMMATE_Attr()";
+
+    if ( $attribute eq "disable" ) {
+        if ( $value and $value == 1 ) {
+            $hash->{STATE} = "disabled";
+            ROOMMATE_StopInternalTimers($hash);
+        }
+        elsif ( $cmd eq "del" or !$value ) {
+            evalStateFormat($hash);
+            ROOMMATE_StartInternalTimers( $hash, 1 );
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "autoGoneAfter" ) {
+        if ($value) {
+            ROOMMATE_AutoGone($hash);
+        }
+        elsif ( !$value ) {
+            delete $hash->{AUTOGONE} if ( $hash->{AUTOGONE} );
+            RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "noDuration" ) {
+        if ($value) {
+            delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+            RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+        }
+        elsif ( !$value ) {
+            ROOMMATE_DurationTimer($hash);
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "lang" ) {
+        my $lang =
+          $cmd eq "set" ? uc($value) : AttrVal( "global", "language", "EN" );
+
+        # for initial define, ensure fallback to EN
+        $lang = "EN"
+          if ( $cmd eq "init" && $lang !~ /^EN|DE$/i );
+
+        if ( $lang eq "DE" ) {
+            $attr{$name}{devStateIcon} =
+'.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+            $attr{$name}{eventMap} =
+"home:anwesend absent:abwesend gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+            $attr{$name}{widgetOverride} =
+              "state:anwesend,bettfertig,abwesend,verreist";
+        }
+        elsif ( $lang eq "EN" ) {
+            $attr{$name}{devStateIcon} =
+'.*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home';
+            delete $attr{$name}{eventMap}
+              if ( defined( $attr{$name}{eventMap} ) );
+            delete $attr{$name}{widgetOverride}
+              if ( defined( $attr{$name}{widgetOverride} ) );
+        }
+        else {
+            return "Unsupported language $lang";
+        }
+
+        evalStateFormat($hash);
+    }
+
+    return if ( IsDisabled($name) );
+    return;
+}
+
+###################################
 sub ROOMMATE_Undefine($$) {
     my ( $hash, $name ) = @_;
 
-    RESIDENTStk_RemoveInternalTimer( "AutoGone",      $hash );
-    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+    ROOMMATE_StopInternalTimers($hash);
 
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
         my $old = $hash->{RESIDENTGROUPS};
@@ -155,6 +231,7 @@ sub ROOMMATE_Notify($$) {
     my ( $hash, $dev ) = @_;
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
+    return if ( IsDisabled($hashName) or IsDisabled($devName) );
 
     # process global:INITIALIZED
     if ( $dev->{NAME} eq "global"
@@ -288,6 +365,8 @@ sub ROOMMATE_Set($@) {
     my $mood     = ReadingsVal( $name, "mood", "-" );
     my $location = ReadingsVal( $name, "location", "undefined" );
     my $silent   = 0;
+
+    return if ( IsDisabled($name) );
 
     Log3 $name, 5, "ROOMMATE $name: called function ROOMMATE_Set()";
 
@@ -634,6 +713,7 @@ sub ROOMMATE_Set($@) {
                 ROOMMATE_AutoGone($hash);
             }
             elsif ( $state eq "absent" ) {
+                delete $hash->{AUTOGONE} if ( $hash->{AUTOGONE} );
                 RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
             }
         }
@@ -868,20 +948,19 @@ sub ROOMMATE_Set($@) {
 ###################################
 sub ROOMMATE_AutoGone($;$) {
     my ( $mHash, @a ) = @_;
-    my $hash = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
-    my $name = $hash->{NAME};
+    my $hash          = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name          = $hash->{NAME};
+    my $autoGoneAfter = AttrVal( $hash->{NAME}, "rr_autoGoneAfter", 36 );
+    delete $hash->{AUTOGONE} if ( $hash->{AUTOGONE} );
 
     RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
+
+    return if ( IsDisabled($name) || !$autoGoneAfter );
 
     if ( ReadingsVal( $name, "state", "home" ) eq "absent" ) {
         my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp,
             $timeDiff );
         my $timestampNow = gettimeofday();
-        my $timeout      = (
-            defined( $attr{$name}{rr_autoGoneAfter} )
-            ? $attr{$name}{rr_autoGoneAfter}
-            : "36"
-        );
 
         ( $date, $time ) = split( ' ', $hash->{READINGS}{state}{TIME} );
         ( $y,    $m,   $d )   = split( '-', $date );
@@ -890,13 +969,14 @@ sub ROOMMATE_AutoGone($;$) {
         $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
         $timeDiff = $timestampNow - $timestamp;
 
-        if ( $timeDiff >= $timeout * 3600 ) {
+        if ( $timeDiff >= $autoGoneAfter * 3600 ) {
             Log3 $name, 3,
               "ROOMMATE $name: AutoGone timer changed state to 'gone'";
             ROOMMATE_Set( $hash, $name, "silentSet", "state", "gone" );
         }
         else {
-            my $runtime = $timestamp + $timeout * 3600;
+            my $runtime = $timestamp + $autoGoneAfter * 3600;
+            $hash->{AUTOGONE} = $runtime;
             Log3 $name, 4, "ROOMMATE $name: AutoGone timer scheduled: $runtime";
             RESIDENTStk_InternalTimer( "AutoGone", $runtime,
                 "ROOMMATE_AutoGone", $hash, 1 );
@@ -917,74 +997,71 @@ sub ROOMMATE_DurationTimer($;$) {
     my $durPresence = "0";
     my $durAbsence  = "0";
     my $durSleep    = "0";
+    my $noDuration  = AttrVal( $hash->{NAME}, "rr_noDuration", 0 );
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
 
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 
-    if ( !defined( $attr{$name}{rr_noDuration} )
-        || $attr{$name}{rr_noDuration} == 0 )
+    return if ( IsDisabled($name) || $noDuration );
+
+    # presence timer
+    if (   ReadingsVal( $name, "presence", "absent" ) eq "present"
+        && ReadingsVal( $name, "lastArrival", "-" ) ne "-" )
     {
-
-        # presence timer
-        if (   ReadingsVal( $name, "presence", "absent" ) eq "present"
-            && ReadingsVal( $name, "lastArrival", "-" ) ne "-" )
-        {
-            $durPresence =
-              $timestampNow -
-              time_str2num( ReadingsVal( $name, "lastArrival", "" ) );
-        }
-
-        # absence timer
-        if (   ReadingsVal( $name, "presence", "present" ) eq "absent"
-            && ReadingsVal( $name, "lastDeparture", "-" ) ne "-" )
-        {
-            $durAbsence =
-              $timestampNow -
-              time_str2num( ReadingsVal( $name, "lastDeparture", "" ) );
-        }
-
-        # sleep timer
-        if (   ReadingsVal( $name, "state", "home" ) eq "asleep"
-            && ReadingsVal( $name, "lastSleep", "-" ) ne "-" )
-        {
-            $durSleep =
-              $timestampNow -
-              time_str2num( ReadingsVal( $name, "lastSleep", "" ) );
-        }
-
-        my $durPresence_hr =
-          ( $durPresence > 0 )
-          ? RESIDENTStk_sec2time($durPresence)
-          : "00:00:00";
-        my $durPresence_cr =
-          ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
-        my $durAbsence_hr =
-          ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
-        my $durAbsence_cr =
-          ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
-        my $durSleep_hr =
-          ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
-        my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
-
-        readingsBeginUpdate($hash) if ( !$silent );
-        readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
-          if ( ReadingsVal( $name, "durTimerPresence_cr", "" ) ne
-            $durPresence_cr );
-        readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
-          if (
-            ReadingsVal( $name, "durTimerPresence", "" ) ne $durPresence_hr );
-        readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
-          if (
-            ReadingsVal( $name, "durTimerAbsence_cr", "" ) ne $durAbsence_cr );
-        readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
-          if ( ReadingsVal( $name, "durTimerAbsence", "" ) ne $durAbsence_hr );
-        readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
-          if ( ReadingsVal( $name, "durTimerSleep_cr", "" ) ne $durSleep_cr );
-        readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
-          if ( ReadingsVal( $name, "durTimerSleep", "" ) ne $durSleep_hr );
-        readingsEndUpdate( $hash, 1 ) if ( !$silent );
+        $durPresence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastArrival", "" ) );
     }
 
-    RESIDENTStk_InternalTimer( "DurationTimer", $timestampNow + 60,
+    # absence timer
+    if (   ReadingsVal( $name, "presence", "present" ) eq "absent"
+        && ReadingsVal( $name, "lastDeparture", "-" ) ne "-" )
+    {
+        $durAbsence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastDeparture", "" ) );
+    }
+
+    # sleep timer
+    if (   ReadingsVal( $name, "state", "home" ) eq "asleep"
+        && ReadingsVal( $name, "lastSleep", "-" ) ne "-" )
+    {
+        $durSleep =
+          $timestampNow - time_str2num( ReadingsVal( $name, "lastSleep", "" ) );
+    }
+
+    my $durPresence_hr =
+      ( $durPresence > 0 )
+      ? RESIDENTStk_sec2time($durPresence)
+      : "00:00:00";
+    my $durPresence_cr =
+      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+    my $durAbsence_hr =
+      ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
+    my $durAbsence_cr =
+      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+    my $durSleep_hr =
+      ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
+    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+
+    readingsBeginUpdate($hash) if ( !$silent );
+    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
+      if ( ReadingsVal( $name, "durTimerPresence_cr", "" ) ne $durPresence_cr );
+    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
+      if ( ReadingsVal( $name, "durTimerPresence", "" ) ne $durPresence_hr );
+    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
+      if ( ReadingsVal( $name, "durTimerAbsence_cr", "" ) ne $durAbsence_cr );
+    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
+      if ( ReadingsVal( $name, "durTimerAbsence", "" ) ne $durAbsence_hr );
+    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
+      if ( ReadingsVal( $name, "durTimerSleep_cr", "" ) ne $durSleep_cr );
+    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
+      if ( ReadingsVal( $name, "durTimerSleep", "" ) ne $durSleep_hr );
+    readingsEndUpdate( $hash, 1 ) if ( !$silent );
+
+    $hash->{DURATIONTIMER} = $timestampNow + 60;
+
+    RESIDENTStk_InternalTimer( "DurationTimer", $hash->{DURATIONTIMER},
         "ROOMMATE_DurationTimer", $hash, 1 );
 
     return undef;
@@ -1187,6 +1264,17 @@ sub ROOMMATE_StartInternalTimers($$) {
     ROOMMATE_DurationTimer($hash);
 }
 
+###################################
+sub ROOMMATE_StopInternalTimers($) {
+    my ($hash) = @_;
+
+    delete $hash->{AUTOGONE}      if ( $hash->{AUTOGONE} );
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+
+    RESIDENTStk_RemoveInternalTimer( "AutoGone",      $hash );
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+}
+
 1;
 
 =pod
@@ -1350,6 +1438,9 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_geofenceUUIDs</b> - comma separated list of device UUIDs updating their location via <a href="#GEOFANCY">GEOFANCY</a>. Avoids necessity for additional notify/DOIF/watchdog devices and can make GEOFANCY attribute <i>devAlias</i> obsolete. (using more than one UUID/device might not be a good idea as location my leap)
           </li>
           <li>
+            <b>rr_lang</b> - overwrite global language setting; helps to set device attributes to translate FHEMWEB display text
+          </li>
+          <li>
             <b>rr_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to 'home'
           </li>
           <li>
@@ -1371,7 +1462,7 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_moods</b> - list of moods to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces
           </li>
           <li>
-            <b>rr_noDuration</b> - may be used to disable duration timer calculation (see readings durTimer*)
+            <b>rr_noDuration</b> - may be used to disable continuous, non-event driven duration timer calculation (see readings durTimer*)
           </li>
           <li>
             <b>rr_passPresenceTo</b> - synchronize presence state with other ROOMMATE or GUEST devices; separte devices by space
@@ -1647,6 +1738,9 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_geofenceUUIDs</b> - Mit Komma getrennte Liste von Ger&auml;te UUIDs, die ihren Standort &uuml;ber <a href="#GEOFANCY">GEOFANCY</a> aktualisieren. Vermeidet zus&auml;tzliche notify/DOIF/watchdog Ger&auml;te und kann als Ersatz f&uuml;r das GEOFANCY attribute <i>devAlias</i> dienen. (hier ehr als eine UUID/Device zu hinterlegen ist eher keine gute Idee da die Lokation dann wom&ouml;glich anf&auml;ngt zu springen)
           </li>
           <li>
+            <b>rr_lang</b> - &uuml;berschreibt globale Spracheinstellung; hilft beim setzen von Device Attributen, um FHEMWEB Anzeigetext zu &uuml;bersetzen
+          </li>
+          <li>
             <b>rr_locationHome</b> - hiermit &uuml;bereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird f&uuml;r das Zusammenspiel bei Status&auml;nderungen benutzt; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist 'home'
           </li>
           <li>
@@ -1668,7 +1762,7 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_moods</b> - Liste von Stimmungen, wie sie in FHEMWEB angezeigt werden sollen; mehrere Eintr&auml;ge nur durch Komma trennen und KEINE Leerzeichen verwenden
           </li>
           <li>
-            <b>rr_noDuration</b> - deaktiviert die Berechnung der Zeitspannen (siehe Readings durTimer*)
+            <b>rr_noDuration</b> - deaktiviert die kontinuierliche, nicht Event-basierte Berechnung der Zeitspannen (siehe Readings durTimer*)
           </li>
           <li>
             <b>rr_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen ROOMMATE oder GUEST Devices; mehrere Devices durch Leerzeichen trennen
