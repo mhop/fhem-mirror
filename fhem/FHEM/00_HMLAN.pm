@@ -694,7 +694,7 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{helper}{ids}{$src}{flg} = 0 if ($type eq "00");
 
     if ($stat){# message with status information
-      HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{q}{HMcndN} != $HMcnd);
+      HMLAN_condUpdate($hash,$HMcnd) if ($hash->{helper}{q}{HMcndN} != $HMcnd);
       my $myId = $attr{$name}{hmId};
       if    ($stat & 0x03 && $dst eq $myId){HMLAN_qResp($hash,$src,0);}
       elsif ($stat & 0x08 && $src eq $myId){HMLAN_qResp($hash,$dst,0);}
@@ -1028,7 +1028,7 @@ sub HMLAN_KeepAliveCheck($) {##################################################
   my $hash = $defs{$name};
   if ($hash->{helper}{q}{keepAliveRec} != 1){# no answer
     if ($hash->{helper}{q}{keepAliveRpt} >2){# give up here
-      HMLAN_condUpdate($hash,252);# trigger timeout event
+      HMLAN_condUpdate($hash,253);# trigger timeout event
       DevIo_Disconnected($hash);
     }
     else{
@@ -1037,9 +1037,9 @@ sub HMLAN_KeepAliveCheck($) {##################################################
     }
   }
   else{
-    $hash->{helper}{q}{keepAliveRpt}=0;
+    $hash->{helper}{q}{keepAliveRpt} = 0;
+    HMLAN_condUpdate($hash,0) if ($hash->{helper}{q}{HMcndN} == 255);
   }
-
 }
 sub HMLAN_secSince2000() {#####################################################
   # Calculate the local time in seconds from 2000.
@@ -1090,6 +1090,11 @@ sub HMLAN_clearQ($) {#clear pending acks due to timeout########################
 sub HMLAN_condUpdate($$) {#####################################################
   my($hash,$HMcnd) = @_;
   my $name = $hash->{NAME};
+  if (AttrVal($name,"dummy",undef)){
+    readingsUpdateSingle($hash,"state","disconnected");
+    $hash->{XmitOpen} = 0;
+    return;
+  }
   my $hashCnd = $hash->{helper}{cnd};#short to helper
   my $hashQ   = $hash->{helper}{q};#short to helper
   $hash->{helper}{cnd}{$HMcnd} = 0 if (!$hash->{helper}{cnd} || 
@@ -1107,7 +1112,7 @@ sub HMLAN_condUpdate($$) {#####################################################
           if (InternalVal($name,"STATE","") eq "overload");
   }
 
-  my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
+  my $HMcndTxt = $HMcond{$HMcnd} ? $HMcond{$HMcnd} : "Unknown:$HMcnd";
   Log3 $hash, 1, "HMLAN_Parse: $name new condition $HMcndTxt";
   my $txt;
   $txt .= $HMcond{$_}.":".$hash->{helper}{cnd}{$_}." "
