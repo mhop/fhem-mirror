@@ -259,7 +259,7 @@ my %sleepers;                   # list of sleepers
 $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-$featurelevel = 5.8;
+$featurelevel = 5.8; # see also GlobalAttr
 
 
 $modules{Global}{ORDER} = -1;
@@ -2468,8 +2468,9 @@ GlobalAttr($$$$)
   my ($type, $me, $name, $val) = @_;
 
   if($type eq "del") {
-    my %noDel = ( verbose=>1, modpath=>1, logfile=>1, featurelevel=>1 );
+    my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
+    $featurelevel = 5.8 if($name eq "featurelevel");
     return undef;
   }
 
