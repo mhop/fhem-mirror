@@ -27,6 +27,7 @@ my $mainPgm = "/fhem.pl\$";
 my %upd_connecthash;
 my $upd_needJoin;
 my $upd_nChanged;
+my $upd_running;
 
 
 ########################################
@@ -69,14 +70,18 @@ CommandUpdate($$)
   $updateInBackground = AttrVal("global","updateInBackground",1);
   $updateInBackground = 0 if($arg ne "all");                                   
   $updArg = $arg;
+  return "An update is already running" if($upd_running);
+  $upd_running = 1;
   if($updateInBackground) {
     CallFn($cl->{NAME}, "ActivateInformFn", $cl, "log");
-    BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg});
+    sub updDone(@) { $upd_running=0 }
+    BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg}, "updDone");
     return "Executing the update the background.";
 
   } else {
     doUpdateLoop($src, $arg);
     my $ret = $updRet; $updRet = "";
+    $upd_running = 0;
     return $ret;
 
   }
