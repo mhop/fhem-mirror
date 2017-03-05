@@ -3791,7 +3791,7 @@ sub SYSMON_readPassword($)
    }
    else
    {
-      SYSMON_Log($hash, 2, "No password in file");
+      SYSMON_Log($hash, 5, "No password in file");
       return undef;
    }
 }
