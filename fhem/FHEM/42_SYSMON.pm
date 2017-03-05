@@ -42,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.3";
+my $VERSION = "2.3.1";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -4163,18 +4163,28 @@ SYSMON_Exec_Ssh($$)
      return $msg unless defined $host;
    }
    my $pwd = SYSMON_readPassword($hash);#AttrVal( $name, "remote_password", undef );
-   if(!defined($pwd)) {
-     $msg="Error: no passwort provided";
-     SYSMON_Log($hash, 3, $msg);
-     return $msg unless defined $pwd;
+   my $t_sshpass = '';
+   if(defined($pwd)) {
+     #$msg="Error: no passwort provided";
+     #SYSMON_Log($hash, 3, $msg);
+     #return $msg unless defined $pwd;
+     $t_sshpass = 'echo '.$pwd.' | sshpass ';
+     #$t_sshpass = 'sshpass -p '.$pwd.' ';
    }
    my $user = $hash->{USER};#AttrVal( $name, "remote_user", "" );
+   my $port = $hash->{PORT};#AttrVal( $name, "remote_port", "22" );
    
    SYSMON_Log($hash, 5, "Execute '".$cmd."' by SSH");
-   #{qx(""sshpass -p <pwd> ssh <user>\@<host> <cmd>"")}
-   my $call = "echo $pwd \| sshpass ssh ".$user."\@".$host." ".$cmd;
-   my $call_zens = "sshpass -p 'pwd' ssh ".$user."\@".$host." ".$cmd;
-   SYSMON_Log ($hash, 5, "Call: '".$call_zens."'");
+   my $p_tmp = '';
+   if(!defined($port)) {
+     $p_tmp = ' -p '.$port.' ';
+   }
+   
+   my $call = "ssh ".$p_tmp.$user."\@".$host." ".$cmd;
+   SYSMON_Log ($hash, 5, "Call: '".$call."'");
+   $call = $t_sshpass.$call;
+   
+   
    my @result = qx($call);
    # Arrays als solche zurueckgeben
    if(scalar(@result)>1) {
@@ -4291,6 +4301,10 @@ sub SYSMON_Log($$$) {
       </li>
    </ul>
    To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password &lt;password&gt;'. For MODE parameter are 'telnet', 'ssh' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
+   <br>
+    For SSH login with password, 'sshpass' must be installed (note: not recommended! Use public key authentication instead).
+    For SSH login to work, a manual SSH connection to the remote machine from the FHEM-Acount may need to be done once
+    (under whose rights FHEM runs) the fingerprint must be confirmed.
    <br>
    <br>
    <b>Readings:</b>
@@ -4847,6 +4861,10 @@ sub SYSMON_Log($$$) {
    F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen.
    Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
    Als MODE sind derzeit 'telnet', 'ssh' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
+   <br>
+   Bei SSH-Anmeldung mit Passwort muss 'sshpass' installiert sein (Achtung! Sicherheitstechnisch nicht empfehlenswert! Besser Public-Key-Verfahren benutzen).
+   Damit SSH-Anmeldung funktioniert, muss ggf. einmalig eine manuelle SSH-Verbindung an die Remote-Machine von dem FHEM-Acount 
+   (unter dessen Rechten FHEM läuft) durchgef&uuml;hrt und fingerprint best&auml;tigt werden.
    <br>
    <br>
    <b>Readings:</b>
