@@ -315,9 +315,7 @@ sub msgConfig_Set($@) {
         my $device = AttrVal( $name, "msgResidentsDev", "rgr_Residents" );
         my $return = "";
 
-        my $lang = "en";
-        $lang = $a[0]
-          if ( defined( $a[0] ) && $a[0] eq "de" );
+        my $lang = defined( $a[0] ) ? uc( $a[0] ) : "EN";
 
         return
 "Device $device is already existing but not a RESIDENTS or ROOMMATE device"
@@ -339,33 +337,12 @@ sub msgConfig_Set($@) {
               . " device $device was updated.";
         }
 
-        if ( $lang eq "de" ) {
-            $attr{$device}{alias} = "Bewohner";
-            $attr{$device}{eventMap} =
-"home:zu_Hause absent:außer_Haus gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
-            $attr{$device}{group} = "Haus Status"
-              if ( !defined( $attr{$device}{group} ) );
-            $attr{$device}{room} = "Haus"
-              if ( !defined( $attr{$device}{room} ) );
-            $attr{$device}{widgetOverride} =
-              "state:zu_Hause,bettfertig,außer_Haus,verreist";
-        }
-        else {
-            $attr{$device}{alias} = "Residents";
-            $attr{$device}{group} = "Home State"
-              if ( !defined( $attr{$device}{group} ) );
-            $attr{$device}{room} = "House"
-              if ( !defined( $attr{$device}{room} ) );
-            delete $attr{$device}{eventMap}
-              if ( defined( $attr{$device}{eventMap} ) );
-            delete $attr{$device}{widgetOverride}
-              if ( defined( $attr{$device}{widgetOverride} ) );
-        }
+        my $txt = fhem("attr $device rgr_lang $lang") unless ( $lang eq "EN" );
+        $return .= $txt if ($txt);
+
         $attr{$device}{comment} = "Auto-created by $name"
           if ( !defined( $attr{$device}{comment} )
             || $attr{$device}{comment} ne "Auto-created by $name" );
-        $attr{$device}{devStateIcon} =
-'.*home:status_available@green .*absent:status_away_1@orange .*gone:status_standby .*none:control_building_empty .*gotosleep:status_night@green:asleep .*asleep:status_night@green .*awoken:status_available@green:home .*zu_Hause:user_available:absent .*außer_Haus:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown';
 
         $return .=
 "\nIf you would like this device to act as an overall presence device for ALL msg commands, please adjust attribute msgResidentsDev at device $name to $device."
