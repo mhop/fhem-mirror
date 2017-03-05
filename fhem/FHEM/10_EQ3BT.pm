@@ -6,9 +6,14 @@
 #
 # FHEM module to communicate with EQ-3 Bluetooth thermostats
 #
-# Version: 2.0.0
+# Version: 2.0.1
 #
 #############################################################
+#
+# v2.0.1 - 20170204
+# - BUGFIX:  fix lastChangeBy
+# - BUGFIX:  fix retry of updateStatus, updateSystemInformation
+#            if it BlockingCall timeouts
 #
 # v2.0.0 - 20170129
 # - FEATURE: use all available bluetooth interfaces to communicate
@@ -155,7 +160,7 @@ sub EQ3BT_Define($$) {
     my $mac;
     
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.0.0";
+    $hash->{VERSION} = "2.0.1";
     Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 3) {
@@ -294,7 +299,7 @@ sub EQ3BT_setResetConsumption {
 sub EQ3BT_updateSystemInformation {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|updateSystemInformation|0x0411|00|listen", "EQ3BT_processGatttoolResult", 300, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|updateSystemInformation|0x0411|00|listen", "EQ3BT_processGatttoolResult", 300, "EQ3BT_updateSystemInformationFailed", $hash);
 }
 
 sub EQ3BT_updateSystemInformationSuccessful {
@@ -319,7 +324,7 @@ sub EQ3BT_updateSystemInformationFailed {
 sub EQ3BT_updateStatus {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|updateStatus|0x0411|03|listen", "EQ3BT_processGatttoolResult", 300, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|updateStatus|0x0411|03|listen", "EQ3BT_processGatttoolResult", 300, "EQ3BT_updateStatusFailed", $hash);
 }
 
 sub EQ3BT_updateStatusSuccessful {
@@ -663,12 +668,12 @@ sub EQ3BT_processNotification {
 
         readingsSingleUpdate($hash, "valvePosition", $pct, 1);
         #changes below this line will set lastchangeby
-        readingsSingleUpdate($hash, "windowOpen", $wndOpen, 1);
-        readingsSingleUpdate($hash, "ecoMode", $eco, 1);
-        readingsSingleUpdate($hash, "battery", $batteryStr, 1);
-        readingsSingleUpdate($hash, "boost", $isBoost, 1);
-        readingsSingleUpdate($hash, "mode", $modeStr, 1);
-        readingsSingleUpdate($hash, "desiredTemperature", sprintf("%.1f", $temp), 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "windowOpen", $wndOpen, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "ecoMode", $eco, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "battery", $batteryStr, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "boost", $isBoost, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "mode", $modeStr, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "desiredTemperature", sprintf("%.1f", $temp), 1);
     }
     
     return undef;
