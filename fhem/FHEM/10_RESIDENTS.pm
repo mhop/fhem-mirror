@@ -447,9 +447,13 @@ sub RESIDENTS_Set($@) {
                 return "Can't create, device $rr_name already existing."
                   unless ( $defs{$rr_name}{TYPE} eq "ROOMMATE" );
 
-                fhem( "attr " . $rr_name . "rr_lang" . uc( $a[3] ) )
-                  if ( defined( $a[3] )
-                    && AttrVal( $rr_name, "rr_lang", "EN" ) ne uc( $a[3] ) );
+                my $lang =
+                  $a[3]
+                  ? uc( $a[3] )
+                  : AttrVal( $rr_name, "rr_lang",
+                    AttrVal( $name, "rgr_lang", undef ) );
+                fhem( "attr " . $rr_name . " rr_lang " . $lang )
+                  if ($lang);
 
                 $attr{$rr_name}{comment} = "Auto-created by $name"
                   unless ( defined( $attr{$rr_name}{comment} )
@@ -503,9 +507,13 @@ sub RESIDENTS_Set($@) {
                 return "Can't create, device $rg_name already existing."
                   unless ( $defs{$rg_name}{TYPE} eq "GUEST" );
 
-                fhem( "attr " . $rg_name . "rg_lang" . uc( $a[3] ) )
-                  if ( defined( $a[3] )
-                    && AttrVal( $rg_name, "rg_lang", "EN" ) ne uc( $a[3] ) );
+                my $lang =
+                  $a[3]
+                  ? uc( $a[3] )
+                  : AttrVal( $rg_name, "rg_lang",
+                    AttrVal( $name, "rgr_lang", undef ) );
+                fhem( "attr " . $rg_name . " rg_lang " . $lang )
+                  if ($lang);
 
                 $attr{$rg_name}{comment} = "Auto-created by $name"
                   unless ( defined( $attr{$rg_name}{comment} )
