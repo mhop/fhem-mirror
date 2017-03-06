@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: at+notify: extend the FHEMWEB Wizard with a simple command modifier
   - feature: 42_SYSMON: support ssh login with public key
   - bugfix:  10_EQ3BT: fix lastChangeBy reading
   - bugfix:  74_AMAD: 2.6.12 fix empty androidVersion Reading when use Nougat
