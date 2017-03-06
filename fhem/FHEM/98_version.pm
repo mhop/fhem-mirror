@@ -29,6 +29,7 @@ CommandVersion($$)
   push @ret, cfgDB_svnId() if(configDBUsed());
   @files = () if($param && $param eq "revision");
   foreach my $fn (@files) {
+    next unless($fn);
     next unless($fn =~ /^(?:$modpath.?)?FHEM/ or $fn =~ /fhem.pl$/); # configDB 
     my $mod_name = ($fn=~ /[\/\\]([^\/\\]+)$/ ? $1 : $fn);
     next if($param ne "" && $mod_name !~ /$param/);
@@ -132,6 +133,8 @@ sub version_getRevFromControls(;$)
   only the latest revision number since the last update.<br><br>
   The optional flag <code>noheader</code> disables the output of the header lines (Latest Revision, File, Rev, Last Change).
   <br><br>
+  When issued via FHEMWEB command line, all executed JavaScript files with their corresponding version will be listed additionally.
+  <br><br>
   Example output of <code>version</code>:
   <ul>
     <code><br>
@@ -176,6 +179,8 @@ sub version_getRevFromControls(;$)
   zeigt nur die aktuellste Revisions-Nummer seit dem letzten Update an.
   <br><br>
   Der optionale Parameter <code>noheader</code> unterdr&uuml;ckt die Ausgabe des Listenkopfs (Latest Revision, File, Rev, Last Change).
+  <br><br>
+  Wenn dieser Befehl &uuml;ber die FHEMWEB-Kommandozeile eingegeben wird, werden zus&auml;tzlich alle aktuell geladenen JavaScript-Dateien mit ihren zugeh&ouml;rigen Versionsinformationen angezeigt.
   <br><br>
   Beispiel der Ausgabe von <code>version</code>:
   <ul>
