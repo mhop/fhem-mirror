@@ -1,4 +1,4 @@
-// $Id$
+FW_version["fhemweb_sortable.js"] = "$Id$";
 
 // Wrapper for the widget.
 FW_widgets['sortable'] = { createFn:FW_sortableCreate, };
