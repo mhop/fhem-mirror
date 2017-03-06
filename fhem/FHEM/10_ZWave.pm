@@ -5081,13 +5081,13 @@ s2Hex($)
     If only a weekday is specified without any time and tempDiff, then the
     complete schedule for the specified day is removed and marked as unused.
     </li>
-  <li>cssSetOverride (no|temporary|permanent) (frost|energy|$tempOffset) <br>
+  <li>ccsOverride (no|temporary|permanent) (frost|energy|$tempOffset) <br>
     set the override state<br>
     no: switch the override off<br>
     temporary: override the current schedule only<br>
     permanent: override all schedules<br>
     frost/energy: set override mode to frost protection or engergy saving<br>
-    $tempOffset: the temperature setback (offset to setpoint) in 1/10 degrees<br>
+    $tempOffset: the temperature setback (offset to setpoint) in 1/10 degrees
     range from -12.8 to 12.0, values will be limited to this range.
     </li>
 
