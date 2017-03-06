@@ -341,23 +341,22 @@ at_fhemwebFn($$$$)
   my $isPerl = ($ts =~ m/^{(.*)}/);
   $ts = $1 if($isPerl);
 
-return "<br>Timespec wizard:".
-"<table id='atWizard' nm='$hash->{NAME}' ts='$ts' rl='$hash->{RELATIVE}' ".
+  my $h1 = "<br>Change Wizard:".
+"<table class='block wide' id='atWizard' nm='$hash->{NAME}' ts='$ts' ".
+       "rl='$hash->{RELATIVE}' ".
        "pr='$hash->{PERIODIC}' ip='$isPerl' class='block wide'>".<<'EOF';
-  <tr class="even">
-    <td>Relative &nbsp; <input type="checkbox" id="aw_rl" value="yes"></td>
-    <td>Periodic &nbsp; <input type="checkbox" id="aw_pr" value="yes"></td>
-  </tr><tr class="odd"><td>Use perl function for timespec</td>
-    <td><input type="checkbox" id="aw_ip"></td>
-  </tr><tr class="even"><td>Timespec</td>
-    <td><input type="text" name="aw_pts"></td>
-  </tr><tr class="even"><td>Timespec</td>
-    <td><input type="text" name="aw_ts" size="5"></td>
+  <tr class="even"><td>Change the timespec:</td></tr>
+  <tr class="odd">
+    <td>Relative <input type="checkbox" id="aw_rl" value="yes">&nbsp;
+        Periodic <input type="checkbox" id="aw_pr" value="yes">&nbsp;
+        Use perl function for timespec <input type="checkbox" id="aw_ip"></td>
+  </tr><tr class="even"><td><input type="text" name="aw_pts"></td>
+  </tr><tr class="even"><td><input type="text" name="aw_ts"></td>
+  </tr><tr class="odd"><td><input type="button" id="aw_md" value="Modify"></td>
   </tr>
-  </tr><tr class="even">
-    <td colspan="2"><input type="button" id="aw_md" value="Modify"></td>
-  </tr>
-</table>
+EOF
+
+  my $j1 = << 'EOF';
 <script type="text/javascript">
   {
     var t=$("#atWizard"), ip=$(t).attr("ip"), ts=$(t).attr("ts");
@@ -390,6 +389,11 @@ return "<br>Timespec wizard:".
   }
 </script>
 EOF
+ 
+  my @d = split(" ",$hash->{DEF},2);
+  LoadModule("notify");
+  my ($h2, $j2) = notfy_addFWCmd($d, $d[0], 2);
+  return "$h1$h2</table><br>$j1$j2";
 }
 
 1;

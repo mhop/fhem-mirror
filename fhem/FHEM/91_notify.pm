@@ -220,13 +220,14 @@ notify_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
 
-  my $ret .= "<br>Regexp wizard";
-  my $row=0;
-  $ret .= "<br><table class=\"block wide\">";
+  my $ret .= "Change wizard<br><table class='block wide'>";
+  my $row = 0;
   my @ra = split(/\|/, $hash->{REGEXP});
+  $ret .= "<tr class='".(($row++&1)?"odd":"even").
+        "'><td colspan='2'>Change the condition:</td></tr>";
   if(@ra > 1) {
     foreach my $r (@ra) {
-      $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+      $ret .= "<tr class='".(($row++&1)?"odd":"even")."'>";
       my $cmd = "cmd.X= set $d removeRegexpPart&val.X=$r"; # =.set: avoid JS
       $ret .= "<td>$r</td>";
       $ret .= FW_pH("$cmd&detail=$d", "removeRegexpPart", 1,undef,1);
@@ -236,9 +237,10 @@ notify_fhemwebFn($$$$)
 
   my @et = devspec2array("TYPE=eventTypes");
   if(!@et) {
+    $ret .= "<tr class='".(($row++&1)?"odd":"even")."'>";
     $ret .= FW_pH("$FW_ME/docs/commandref.html#eventTypes",
                   "To add a regexp an eventTypes definition is needed",
-                  1, undef, 1);
+                  1, undef, 1)."</tr>";
   } else {
     my %dh;
     my $etList = AnalyzeCommand(undef, "get $et[0] list");
@@ -263,9 +265,88 @@ notify_fhemwebFn($$$$)
     $ret .= FW_detailSelect($d, "set", $list, "addRegexpPart");
     $ret .= "</td></tr>";
   }
-  $ret .= "</table>";
+  my ($tr, $js) = notfy_addFWCmd($d, $hash->{REGEXP}, $row);
+  return "$ret$tr</table><br>$js";
+}
 
-  return $ret;
+sub
+notfy_addFWCmd($$$)
+{
+  my ($d, $param, $row) = @_;
+
+  my $ret="";
+  $ret .= "<tr class='".(($row++&1)?"odd":"even")."'><td colspan='2'>".
+                "&nbsp;</td></tr>";
+  $ret .= "<tr class='".(($row++&1)?"odd":"even")."'><td colspan='2'>".
+                "Change the executed command:</td></tr>";
+  $ret .= "<tr class='".(($row++&1)?"odd":"even")."'><td colspan='2'>";
+
+  my @list = grep { !$defs{$_}{TEMPORARY} && $_ ne $d && 
+                    $modules{$defs{$_}{TYPE}}{SetFn} } sort keys %defs;
+  $ret .= "<input class='set' id='modCmd' type='submit' value='modify' ".
+             "data-d='$d' data-p='$param'>";
+  $ret .= "<div class='set downText'>&nbsp;$d $param set </div>";
+  $ret .= FW_select("modDev", "mod", \@list, undef, "set");
+  $ret .= "<select class='set' id='modArg'></select>";
+  $ret .= "<input type='text' name='modVal' size='10'/>";
+  $ret .= "</td></tr>";
+
+  my $js = << 'END';
+<script>
+  var ntArr, ntDev;
+
+  function
+  ntfyCmd()
+  {
+    ntDev=$("#modDev").val();
+    FW_cmd(FW_root+
+      "?cmd="+addcsrf(encodeURIComponent("set "+ntDev+" ?"))+"&XHR=1",
+      function(ret) {
+        ret = ret.replace(/[\r\n]/g,'');
+        ntArr=ret.substr(ret.indexOf("choose one of")+14,ret.length).split(" ");
+        var str="";
+        for(var i1=0; i1<ntArr.length; i1++) {
+          var off = ntArr[i1].indexOf(":");
+          str += "<option value="+i1+">"+
+                    (off==-1 ? ntArr[i1] : ntArr[i1].substr(0,off))+
+                 "</option>";
+        }
+        $("#modArg").html(str);
+        ntfyArg();
+      });
+  }
+
+  function
+  ntfyArg()
+  {
+    var v=ntArr[$("#modArg").val()];
+    var vArr = [];
+    if(v.indexOf(":") > 0)
+      vArr = v.substr(v.indexOf(":")+1).split(",");
+    FW_replaceWidget($("#modArg").next(), ntDev, vArr);
+  }
+
+  function
+  ntfyGo()
+  {
+    var d=$("#modCmd").attr("data-d");
+    var p=$("#modCmd").attr("data-p");
+    var cmd = "modify "+d+" "+p+" set "+$("#modDev").val()+" "+
+              $("#modArg :selected").text()+" "+$("[name=modVal]").val();
+    location=FW_root+"?cmd="+addcsrf(encodeURIComponent(cmd))+"&detail="+d;
+  }
+  
+  $(document).ready(function(){
+    $("#modDev").change(ntfyCmd);
+    $("#modArg").change(ntfyArg);
+    $("#modCmd").click(ntfyGo);
+    $("#").change(ntfyArg);
+    ntfyCmd();
+  });
+</script>
+END
+
+  return ($ret, $js);
 }
 
 1;
