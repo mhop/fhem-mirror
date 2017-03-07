@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 01/2017
-my $thzversion = "0.156";
+# by immi 03/2017
+my $thzversion = "0.157";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -314,11 +314,11 @@ my %sets439 = (
   "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0.1", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
   "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p18RoomInfluenceHC2"			=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
-  "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "14", argMax =>   "50",	type =>"5temp",  unit =>" °C"},
-  "p05DHWsetNightTemp"			=> {cmd2=>"0A05BF", argMin =>  "14", argMax =>   "50",	type =>"5temp",  unit =>" °C"},
-  "p83DHWsetSolarTemp"			=> {cmd2=>"0A05BE", argMin =>  "14", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
-  "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
-  "p11DHWsetManualTemp"			=> {cmd2=>"0A0580", argMin =>  "14", argMax =>   "54",	type =>"5temp",  unit =>" °C"},
+  "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "10", argMax =>   "55",	type =>"5temp",  unit =>" °C"},
+  "p05DHWsetNightTemp"			=> {cmd2=>"0A05BF", argMin =>  "10", argMax =>   "55",	type =>"5temp",  unit =>" °C"},
+  "p83DHWsetSolarTemp"			=> {cmd2=>"0A05BE", argMin =>  "10", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
+  "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin =>  "10", argMax =>   "55",	type =>"5temp",  unit =>" °C"},
+  "p11DHWsetManualTemp"			=> {cmd2=>"0A0580", argMin =>  "10", argMax =>   "55",	type =>"5temp",  unit =>" °C"},
   "p36DHWMaxTime"			=> {cmd2=>"0A0180", argMin =>  "6", argMax =>   "12",	type =>"1clean",  unit =>""},
   "p07FanStageDay"			=> {cmd2=>"0A056C", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
   "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
