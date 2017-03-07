@@ -747,10 +747,15 @@ ParseCommandsDoIf($$$)
       }
     }
     if ($eval) {
-      if ($ret = AnalyzeCommandChain(undef,$currentBlock)) {
-        Log3 $pn,2 , "$pn: $currentBlock: $ret";
-        $last_error.="$currentBlock: $ret ";
-      }
+	   if ($currentBlock =~ /^{.*}$/) {
+	     $ret = AnalyzePerlCommand(undef,$currentBlock);
+	   } else {
+         $ret = AnalyzeCommandChain(undef,$currentBlock);
+       }
+	   if ($ret) {
+         Log3 $pn,2 , "$pn: $currentBlock: $ret";
+         $last_error.="$currentBlock: $ret ";
+       }
     }
     $tailBlock=substr($tailBlock,pos($tailBlock)) if ($tailBlock =~ /^\s*,/g);
   }
@@ -1870,9 +1875,15 @@ CmdDoIf($$)
     #DOIF
     $if_cmd_ori="";
     $j=0;
-    while ($tail =~ /^\s*\(/) {
-      ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-      return ($if_cmd_ori,$err) if ($err);
+    while ($tail =~ /^\s*(\(|\{)/) {
+	  if ($tail =~ /^\s*\(/) {
+        ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+        return ($if_cmd_ori,$err) if ($err);
+	  } elsif ($tail =~ /^\s*\{/) {
+	    ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+        return ($if_cmd_ori,$err) if ($err);
+		$if_cmd_ori="{".$if_cmd_ori."}";
+	  }
       ($if_cmd,$err)=ParseCommandsDoIf($hash,$if_cmd_ori,0);
       return ($if_cmd,$err) if ($err);
       #return ($tail,"no commands") if ($if_cmd eq "");
@@ -2137,7 +2148,7 @@ Mit diesem Modul ist es möglich, sowohl Ereignis- als auch Zeitsteuerung mit Hi
 Damit können komplexere Problemstellungen innerhalb eines DOIF-Moduls gelöst werden, ohne Perlcode in Kombination mit anderen Modulen programmieren zu müssen.
 <br><br>
 Das DOIF-Modul bedient sich selbst des Perlinterpreters, damit sind beliebige logische Abfragen möglich. Logische Abfragen werden in DOIF/DOELSEIF-Bedingungen vornehmlich mit Hilfe von and/or-Operatoren erstellt.
-Diese werden mit Angaben von Stati, Readings, Internals, Events oder Zeiten kombiniert.
+Diese werden mit Angaben von Status, Readings, Internals, Events oder Zeiten kombiniert.
 Sie werden grundsätzlich in eckigen Klammern angegeben und führen zur Triggerung des Moduls und damit zur Auswertung der dazugehörigen Bedingung.
 Zusätzlich können in einer Bedingung Perl-Funktionen angegeben werden, die in FHEM definiert sind.
 Wenn eine Bedingung wahr wird, so werden die dazugehörigen Befehle ausgeführt.<br>
@@ -2182,10 +2193,10 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
   <a href="#DOIF_Indirekten_Zeitangaben">Indirekten Zeitangaben</a><br>
   <a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">Zeitsteuerung mit Zeitberechnung</a><br>
   <a href="#DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen">Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</a><br>
-  <a href="#DOIF_Zeitintervalle_Readings_und_Stati_ohne_Trigger">Zeitintervalle, Readings und Stati ohne Trigger</a><br>
-  <a href="#DOIF_Nutzung_von_Readings_Stati_oder_Internals_im_Ausfuehrungsteil">Nutzung von Readings, Stati oder Internals im Ausführungsteil</a><br>
+  <a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Zeitintervalle, Readings und Status ohne Trigger</a><br>
+  <a href="#DOIF_Nutzung_von_Readings_Status_oder_Internals_im_Ausfuehrungsteil">Nutzung von Readings, Status oder Internals im Ausführungsteil</a><br>
   <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
-  <a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Stati</a><br>
+  <a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a><br>
   <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
   <a href="#DOIF_wait">Verzögerungen</a><br>
   <a href="#DOIF_timerWithWait">Verzögerungen von Timern</a><br>
@@ -2286,7 +2297,7 @@ Vergleichende Abfragen werden, wie in Perl gewohnt, mit Operatoren <code>==, !=,
 Logische Verknüpfungen sollten zwecks Übersichtlichkeit mit <code>and</code> bzw. <code>or</code> vorgenommen werden.
 Selbstverständlich lassen sich auch alle anderen Perl-Operatoren verwenden, da die Auswertung der Bedingung vom Perl-Interpreter vorgenommen wird.
 Die Reihenfolge der Auswertung wird, wie in höheren Sprachen üblich, durch runde Klammern beeinflusst.
-Stati werden mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code>,
+Status werden mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code>,
 Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Einfache Ereignissteuerung wie beim notify mit einmaliger Ausführung beim Zustandswechsel, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
@@ -2294,7 +2305,7 @@ Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben.<br>
 <code>define di_garage DOIF ([remotecontrol] eq "on") (set garage on) DOELSEIF ([remotecontrol] eq "off") (set garage off)</code><br>
 <br>
 Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein Event erzeugt. Das geschieht, wenn irgendein Reading oder der Status von "remotecontrol" aktualisiert wird.
-Ausgewertet wird hier der Zustand des Statuses von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
+Ausgewertet wird hier der Zustand des Status von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
 Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Die nächste mögliche Ausführung ist "set garage off", wenn Fernbedienung "off" liefert.
 <a name="DOIF_do_always"></a>
 Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat, 
@@ -2311,10 +2322,8 @@ ist die Nutzung des Attributes <code>do always</code> nicht sinnvoll, da das ent
 wenn der Temperatursensor in regelmäßigen Abständen eine Temperatur unter 20 Grad sendet.
 Ohne <code>do always</code> wird hier dagegen erst wieder "set heating on" ausgeführt, wenn der Zustand des Moduls auf "cmd_2" gewechselt hat, also die Temperatur zwischendurch größer oder gleich 20 Grad war.<br>
 <br>
-Zu beachten ist, dass bei <code>do always</code> der Zustand "cmd_2" bei Nichterfüllung der Bedingung nicht gesetzt wird.
-Möchte man dennoch bei Nichterfüllung der Bedingung einen Zustandswechsel auf "cmd_2" erreichen, so muss man am Ende seiner Definition DOELSE ohne weitere Angaben setzen.
-Wenn das Attribut <code>do always</code> nicht gesetzt ist, wird dagegen bei Definitionen mit einer einzigen Bedingung, wie im obigen Beispiel, der Zustand "cmd_2" bei Nichterfüllung der Bedingung automatisch gesetzt.
-Ohne diesen automatischen Zustandswechsel, wäre ansonsten die Definition nicht sinnvoll, da der Zustand "cmd_1" ohne <code>do always</code> nur ein einziges Mal ausgeführt werden könnte.<br> 
+Soll bei nicht Erfüllung aller Bedingungen ein Zustandswechsel erfolgen, so muss man ein DOELSE am Ende der Definition anhängen. Ausnahme ist eine einzige Bedingung ohne do always, wie im obigen Beispiel,
+ hierbei wird intern ein virtuelles DOELSE angenommen, um bei nicht Erfüllung der Bedingung einen Zustandswechsel zu provozieren, da sonst nur ein einziges Mal geschaltet werden könnte, da das Modul aus dem cmd_1-Zustand nicht mehr herauskäme.<br>
 <br>
 <a name="DOIF_Teilausdruecke_abfragen"></a>
 <b>Teilausdrücke abfragen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -2331,7 +2340,7 @@ Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insb
 <a name="DOIF_Ereignissteuerung_ueber_Auswertung_von_Events"></a>
 <b>Ereignissteuerung über Auswertung von Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Der Suchstring wird als regulärer Ausdruck in Anführungszeichen angegeben.
+Eine Alternative zur Auswertung von Status oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Der Suchstring wird als regulärer Ausdruck in Anführungszeichen angegeben.
 Die Syntax lautet: <code>[&lt;devicename&gt;:"&lt;regex&gt;"]</code><br>
 <br>
 <u>Anwendungsbeispiel</u>: wie oben, jedoch wird hier nur das Ereignis (welches im Eventmonitor erscheint) ausgewertet und nicht der Status von "remotecontrol" wie im vorherigen Beispiel<br>
@@ -2419,7 +2428,7 @@ DOELSEIF ([":battery: ok"] and [?$SELF:B_$DEVICE] ne "ok")<br>
 <br>  
 attr di_battery do always</code><br>
 <br>
-Eine aktuelle Übersicht aller Batterie-Stati entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
+Eine aktuelle Übersicht aller Batterie-Status entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
 <br>
 <br>
 Allgemeine Ereignistrigger können ebenfalls so definiert werden, dass sie nicht nur wahr zum Triggerzeitpunkt und sonst nicht wahr sind,
@@ -2453,15 +2462,15 @@ Durch eigene Regex-Filter-Angaben kann man beliebige Teile des Events herausfilt
 <a name="DOIF_Angaben_im_Ausfuehrungsteil"></a>
 <b>Angaben im Ausführungsteil</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Der Ausführungsteil wird immer, wie die Bedingung, in runden Klammern angegeben. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
+Der Ausführungsteil wird durch runde Klammern eingeleitet. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
 <br>
 Sollen mehrere FHEM-Befehle ausgeführt werden, so werden sie mit Komma statt mit Semikolon angegeben <code>... (set lamp1 on, set lamp2 off)</code><br>
 <br>
 Falls ein Komma nicht als Trennzeichen zwischen FHEM-Befehlen gelten soll, so muss der FHEM-Ausdruck zusätzlich in runde Klammern gesetzt werden: <code>...((set lamp1,lamp2 on),set switch on)</code><br>
 <br>
-Perlbefehle müssen zusätzlich in geschweifte Klammern gesetzt werden: <code>... ({system ("wmail Peter is at home")})</code> <br>
+Perlbefehle werden in geschweifte Klammern gesetzt: <code>... {system ("wmail Peter is at home")}</code>. In diesem Fall können die runden Klammern des Ausführungsteils weggelassen werden.<br>
 <br>
-Mehrere Perlbefehle hintereinander werden im DEF-Editor mit zwei Semikolons angegeben: <code>...({system ("wmail Peter is at home");;system ("wmail Marry is at home")})</code><br>
+Perlcode kann im DEF-Editor wie gewohnt programmiert werden: <code>...{my $name="Peter"; system ("wmail $name is at home");}</code><br>
 <br>
 FHEM-Befehle lassen sich mit Perl-Befehlen kombinieren: <code>... ({system ("wmail Peter is at home")}, set lamp on)</code><br>
 <br>
@@ -2607,7 +2616,7 @@ Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <b>Indirekten Zeitangaben</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Oft möchte man keine festen Zeiten im Modul angeben, sondern Zeiten, die man z. B. über Dummys über die Weboberfläche verändern kann.
-Statt fester Zeitangaben können Stati, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS oder eine Zahl beinhalten.<br>
+Statt fester Zeitangaben können Status, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS oder eine Zahl beinhalten.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll zu einer bestimmten Zeit eingeschaltet werden. Die Zeit soll über den Dummy <code>time</code> einstellbar sein:<br>
 <br>
@@ -2664,7 +2673,7 @@ Indirekte Zeitangaben lassen sich mit Wochentagangaben kombinieren, z. B.:<br>
 Zeitberechnungen werden innerhalb der eckigen Klammern zusätzlich in runde Klammern gesetzt. Die berechneten Triggerzeiten können absolut oder relativ mit einem Pluszeichen vor den runden Klammern angegeben werden.
 Es können beliebige Ausdrücke der Form HH:MM und Angaben in Sekunden als ganze Zahl in Perl-Rechenoperationen kombiniert werden.
 Perlfunktionen, wie z. B. sunset(), die eine Zeitangabe in HH:MM liefern, werden in geschweifte Klammern gesetzt.
-Zeiten im Format HH:MM bzw. Stati oder Readings, die Zeitangaben in dieser Form beinhalten werden in eckige Klammern gesetzt.<br>
+Zeiten im Format HH:MM bzw. Status oder Readings, die Zeitangaben in dieser Form beinhalten werden in eckige Klammern gesetzt.<br>
 <br>
 <u>Anwendungsbeispiele</u>:<br>
 <br>
@@ -2711,8 +2720,8 @@ Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Be
 <br>
 <code>define di_shutters DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7]) (set shutters up) DOELSEIF ([sensor:brightness]&lt;50) (set shutters down)</code><br>
 <br>
-<a name="DOIF_Zeitintervalle_Readings_und_Stati_ohne_Trigger"></a>
-<b>Zeitintervalle, Readings und Stati ohne Trigger</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<a name="DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger"></a>
+<b>Zeitintervalle, Readings und Status ohne Trigger</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu keiner Triggerung des Moduls, sie dienen lediglich der Abfrage.<br>
 <br>
@@ -2721,8 +2730,8 @@ Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu kei
 <code>define di_motion DOIF ([?06:00-10:00] and [button] and [?Home] eq "present")(set lamp on-for-timer 600)<br>
 attr di_motion do always</code><br>
 <br>
-<a name="DOIF_Nutzung_von_Readings_Stati_oder_Internals_im_Ausfuehrungsteil"></a>
-<b>Nutzung von Readings, Stati oder Internals im Ausführungsteil</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<a name="DOIF_Nutzung_von_Readings_Status_oder_Internals_im_Ausfuehrungsteil"></a>
+<b>Nutzung von Readings, Status oder Internals im Ausführungsteil</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <u>Anwendungsbeispiel</u>: Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden:<br>
 <br>
@@ -2737,7 +2746,7 @@ attr di_button do always</code><br>
 <b>Berechnungen im Ausführungsteil</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Berechnungen können in geschweiften Klammern erfolgen. Aus Kompatibilitätsgründen, muss die Berechnung unmittelbar mit einer runden Klammer beginnen.
-Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
+Innerhalb der Perlberechnung können Readings, Status oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Es soll ein Vorgabewert aus zwei verschiedenen Readings ermittelt werden und an das set Kommando übergeben werden:<br>
 <br>
@@ -2745,10 +2754,10 @@ Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt 
 attr di_average do always</code><br>
 <br>
 <a name="DOIF_notexist"></a>
-<b>Ersatzwert für nicht existierende Readings oder Stati</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Ersatzwert für nicht existierende Readings oder Status</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Es kommt immer wieder vor, dass in der Definition des DOIF-Moduls angegebene Readings oder Stati zur Laufzeit nicht existieren. Der Wert ist dann leer.
-Bei der Definition von Stati oder Readings kann für diesen Fall ein Vorgabewert oder sogar eine Perlberechnung am Ende des Ausdrucks kommagetrennt angegeben werden.<br>
+Es kommt immer wieder vor, dass in der Definition des DOIF-Moduls angegebene Readings oder Status zur Laufzeit nicht existieren. Der Wert ist dann leer.
+Bei der Definition von Status oder Readings kann für diesen Fall ein Vorgabewert oder sogar eine Perlberechnung am Ende des Ausdrucks kommagetrennt angegeben werden.<br>
 <br>
 Syntax:<br>
 <br>
@@ -2846,7 +2855,7 @@ Denn bei einer Befehlssequenz werden Zwischenzustände cmd1_1, cmd1_2 usw. gener
 <br>
 Für Kommandos, die nicht verzögert werden sollen, werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein Kommando eines anderen DO-Falls, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
-Statt Sekundenangaben können ebenfalls Stati, Readings in eckigen Klammen, Perl-Funktionen sowie Perl-Berechnung angegeben werden. Dabei werden die Trennzeichen Komma und Doppelpunkt in Klammern geschützt und gelten dort nicht als Trennzeichen.
+Statt Sekundenangaben können ebenfalls Status, Readings in eckigen Klammen, Perl-Funktionen sowie Perl-Berechnung angegeben werden. Dabei werden die Trennzeichen Komma und Doppelpunkt in Klammern geschützt und gelten dort nicht als Trennzeichen.
 Diese Angaben können ebenfalls bei folgenden Attributen gemacht werden: cmdpause, repeatcmd, repeatsame, waitsame, waitdel<br>
 <br>
 Beispiel:<br>
@@ -2919,7 +2928,7 @@ Wiederholungen der Ausführung von Kommandos werden pro Befehlsfolge über das A
 <br>
 <code>attr &lt;DOIF-modul&gt; repeatcmd &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
 <br>
-Statt Sekundenangaben können ebenfalls Stati in eckigen Klammen oder Perlbefehle angegeben werden.<br>
+Statt Sekundenangaben können ebenfalls Status in eckigen Klammen oder Perlbefehle angegeben werden.<br>
 <br>
 Die Wiederholung findet so lange statt, bis der Zustand des Moduls in einen anderen DO-Fall wechselt.<br>
 <br>
@@ -3118,6 +3127,13 @@ attr time_switch setList mybutton:on,off mybegin:time myend:time<br>
 attr time_switch webCmd mybutton:mybegin:myend
 </code><br>
 <br>
+<u>Anwendungsbeispiel</u>: Ausführung von Befehlen abhängig einer Auswahl ohne Zusatzreading<br>
+<br>
+<code>define di_web DOIF ([$SELF:"myInput first"]) (do something) DOELSEIF ([$SELF:"myInput second"]) (do something else)<br>
+<br>
+attr di_web setList myInput:first,second</code><br>
+<br>
+<br>
 <a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -3129,7 +3145,7 @@ Beispiele:<br>
 <br>
 <code>attr di_lamp cmdState on|off</code><br>
 <br>
-Pro Status können ebenfalls Stati oder Readings in eckigen Klammern oder Perlfunktionen sowie Berechnungen in Klammern der Form {(...)} angegeben werden.<br>
+Pro Status können ebenfalls Status oder Readings in eckigen Klammern oder Perlfunktionen sowie Berechnungen in Klammern der Form {(...)} angegeben werden.<br>
 Die Trennzeichen Komma und | sind in Klammern und Anführungszeichen geschützt und gelten dort nicht als Trennzeichen.<br>
 <br>
 Zustände cmd1_1, cmd1 und cmd2 sollen wie folgt umdefiniert werden:<br>
@@ -3149,7 +3165,7 @@ attr di_hum cmdState wet|normal|dry</code><br>
 <a name="DOIF_state"></a>
 <b>Anpassung des Status mit Hilfe des Attributes <code>state</code></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
+Es können beliebige Reading und Status oder Internals angegeben werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Aktuelle Außenfeuchtigkeit inkl. Klimazustand (Status des Moduls wurde mit cmdState definiert s. o.)<br>
 <br>
@@ -3229,12 +3245,17 @@ Zusätzlich führt die Definition von <code>setList</code> zur Ausführung von <
 <br>
 Zweipunktregler a la THRESHOLD<br>
 <br>
-<code>setreading sensor default 20<br>
-setreading sensor hysteresis 1<br>
+<code>define di_threshold DOIF ([sensor:temperature]<([$SELF:desired]-1))<br>
+  (set heating on)<br>
+DOELSEIF ([sensor:temperature]>[$SELF:desired])<br>
+  (set heating off)<br>
 <br>
-define di_threshold DOIF ([sensor:temperature]&lt;([sensor:default]-[sensor:hysteresis])) (set heating on) DOELSEIF ([sensor:temperature]&gt;[sensor:default]) (set heating off)</code><br>
-<br>
-Eleganter lässt sich ein Zweipunktregler (Thermostat) mit Hilfe des, für solche Zwecke, spezialisierten THRESHOLD-Moduls realisieren, siehe: <a href="http://fhem.de/commandref_DE.html#THRESHOLD">THRESHOLD</a><br>
+attr di_threshold cmdState on|off<br>
+attr di_threshold readingList desired<br>
+attr di_threshold setList desired:17,18,19,20,21,22<br>
+attr di_threshold webCmd desired<br>
+</code><br>
+Die Hysterese ist hier mit einem Grad vorgegeben. Die Vorwahltemperatur wird per Dropdown-Auswahl eingestellt.<br>
 <br>
 on-for-timer<br>
 <br>
@@ -3372,7 +3393,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <u>Operanden in der Bedingung und den Befehlen</u>
 <ul>
 <dl>
-        <dt><a href="#DOIF_Ereignissteuerung">Stati</a> <code><b>[</b>&lt;Device&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
+        <dt><a href="#DOIF_Ereignissteuerung">Status</a> <code><b>[</b>&lt;Device&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
                 <dd></dd>
 </br>
         <dt><a href="#DOIF_Ereignissteuerung">Readings</a> <code><b>[</b>&lt;Device&gt;<b>:</b>&lt;Reading&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
@@ -3419,7 +3440,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden nach Mitternacht</dd>
 </br>
         <dt><a href="#DOIF_Indirekten_Zeitangaben">indirekte Zeitangaben</a> <code><b>[[</b>&lt;indirekte Zeit&gt;<b>]]</b></code></dt>
-                <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden nach Mitternacht, <code>&lt;indirekte Zeit&gt;</code> ist ein Stati, Reading oder Internal</dd>
+                <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden nach Mitternacht, <code>&lt;indirekte Zeit&gt;</code> ist ein Status, Reading oder Internal</dd>
 </br>
         <dt><a href="#DOIF_Relative_Zeitangaben">relative Zeitangaben</a> <code><b>[+</b>&lt;time&gt;<b>]</b></code></dt>
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden</dd>
@@ -3439,8 +3460,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">berechnete Zeitangaben</a> <code><b>[(</b>&lt;Berechnung, gibt Zeit in Sekunden zur&uuml;ck, im Sinne von <a target=blank href="http://perldoc.perl.org/functions/time.html">time</a>&gt;<b>)]</b></code></dt>
                 <dd>Berechnungen sind mit runden Klammern einzuschliessen. Perlfunktionen, die HH:MM zur&uuml;ckgeben sind mit geschweiften Klammern einzuschliessen.</dd>
 </br>
-        <dt><a href="#DOIF_Zeitintervalle_Readings_und_Stati_ohne_Trigger">Trigger verhindern</a> <code><b>[?</b>&lt;devicename&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:</b>&lt;readingname&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:&amp;</b>&lt;internalname&gt;<b>]</b></code>, <code><b>[?</b>&lt;time specification&gt;<b>]</b></code></dt>
-                <dd>Werden Stati, Readings, Internals und Zeitangaben in der Bedingung mit einem Fragezeichen eingeleitet, triggern sie nicht.</dd>
+        <dt><a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Trigger verhindern</a> <code><b>[?</b>&lt;devicename&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:</b>&lt;readingname&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:&amp;</b>&lt;internalname&gt;<b>]</b></code>, <code><b>[?</b>&lt;time specification&gt;<b>]</b></code></dt>
+                <dd>Werden Status, Readings, Internals und Zeitangaben in der Bedingung mit einem Fragezeichen eingeleitet, triggern sie nicht.</dd>
 </br>
         <dt>$device, $event, $events</dt>
                 <dd>Perl-Variablen mit der Bedeutung der Schl&uuml;sselworte $DEVICE, $EVENT, $EVENTS</dd>
@@ -3512,12 +3533,12 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>erzeugt beim Setzen eines Timers ein Event. ungleich Null aktiviert, 0 deaktiviert</dd>
 </br>
         <dt><a href="#DOIF_cmdState">Ger&auml;testatus ersetzen</a> <code><b>attr</b> &lt;name&gt; <b>cmdState </b>&lt;Ersatz cmd_1_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_1&gt;<b>|</b>&lt;Ersatz cmd_2_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_2&gt;<b>|...</b></code></dt>
-                <dd>ersetzt die Standartwerte des Ger&auml;testatus als direkte Angabe oder Berechnung, die Ersatzstati von Befehlssequenzen werden durch Kommata, die von Befehlszweigen durch Pipe Zeichen getrennt.</dd>
+                <dd>ersetzt die Standartwerte des Ger&auml;testatus als direkte Angabe oder Berechnung, die Ersatzstatus von Befehlssequenzen werden durch Kommata, die von Befehlszweigen durch Pipe Zeichen getrennt.</dd>
 </br>
         <dt><a href="#DOIF_state">dynamischer Status </a> <code><b>attr</b> &lt;name&gt; <b>state </b>&lt;dynamischer Inhalt&gt;</code></dt>
                 <dd>Zum Erstellen von <code>&lt;dynamischer Inhalt&gt;</code> k&ouml;nnen die f&uuml;r Befehle verf&uuml;gbaren Operanden verwendet werden.</dd>
 </br>
-        <dt><a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Stati</a> <code><b>attr</b> &lt;name&gt; <b>notexist </b>"&lt;Ersatzwert&gt;"</code></dt>
+        <dt><a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a> <code><b>attr</b> &lt;name&gt; <b>notexist </b>"&lt;Ersatzwert&gt;"</code></dt>
                 <dd></dd>
 </br>
         <dt><a href="#DOIF_initialize">Status Initialisierung nach Neustart</a> <code><b>attr</b> &lt;name&gt; <b>intialize </b>&lt;Status nach Neustart&gt;</code></dt>
