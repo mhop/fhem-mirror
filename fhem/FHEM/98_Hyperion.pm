@@ -183,7 +183,7 @@ sub Hyperion_list2array($$)
 sub Hyperion_isLocal($)
 {
   my ($hash) = @_;
-  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.(0{1,2})?1)$/)?1:undef;
+  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1)$/)?1:undef;
 }
 
 sub Hyperion_Get($@)
@@ -465,7 +465,7 @@ sub Hyperion_GetUpdate(@)
   {
     InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash);
   }
-  return undef if (IsDisabled($hash));
+  return if ($attr{$name}{disable});
   Hyperion_Call($hash);
   return undef;
 }
@@ -475,6 +475,7 @@ sub Hyperion_Set($@)
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
   my $value = (defined($args[0])) ? $args[0] : undef;
+  return if ($attr{$name}{disable} && $cmd ne "?");
   return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
