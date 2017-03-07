@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Text2Speech: new server mode to serve audiofile for requestors
   - feature: at+notify: extend the FHEMWEB Wizard with a simple command modifier
   - feature: 42_SYSMON: support ssh login with public key
   - bugfix:  10_EQ3BT: fix lastChangeBy reading
