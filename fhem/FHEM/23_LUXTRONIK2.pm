@@ -370,12 +370,16 @@ LUXTRONIK2_DoUpdate($)
   my $hash = $defs{$name};
   my $host = $hash->{HOST};
   my $port = $hash->{PORT};
+  my @heatpump_temp;
   my @heatpump_values;
   my @heatpump_parameters;
   my @heatpump_visibility;
   my $count=0;
+  my $retryCounter=0;
   my $result="";
+  my $buf="";
   my $readingStartTime = time();
+  my $missingBytes = 0;
   
   LUXTRONIK2_Log $name, 5, "Opening connection to $host:$port";
   my $socket = new IO::Socket::INET (  
@@ -394,9 +398,10 @@ LUXTRONIK2_DoUpdate($)
 #Fetch operational values (FOV)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for operational values";
-  $socket->send(pack("N", 3004));
-  $socket->send(pack("N", 0));
-  
+  $buf=pack("N", 3004);
+  $buf.=pack("N",0);
+  $socket->send($buf);
+
   LUXTRONIK2_Log $name, 5, "Start to receive operational values";
  #(FOV) read first 4 bytes of response -> should be request_echo = 3004
   $socket->recv($result,4);
@@ -426,15 +431,17 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FOV) read remaining response -> should be previous number of parameters
-  my $i=1;
-  $result="";
-  my $buf="";
-  while($i<=$count_calc_values) {
-     $socket->recv($buf,4);
-      $result.=$buf;
-     $i++;
+ # SocketAPI allows to read less than requested. This may occur and is no fault. To handle it correctly we have to repeat until we get enough data
+  $buf=""; $result=""; $retryCounter=0;
+  $missingBytes = $count_calc_values*4;
+  while ( $missingBytes>0 && $retryCounter<15 ) {
+      $socket->recv( $buf, $missingBytes); 
+      $missingBytes -= length($buf);
+      $result .= $buf;
+      $retryCounter++;
   }
-  if(length($result) != $count_calc_values*4) {
+
+  if($missingBytes > 0) {
       LUXTRONIK2_Log $name, 1, "Operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
       $socket->close();
       return "$name|0|Number of values read mismatch ( $!)\n";
@@ -455,8 +462,9 @@ LUXTRONIK2_DoUpdate($)
 #Fetch set parameters (FSP)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for set parameters";
-  $socket->send(pack("N", 3003));
-  $socket->send(pack("N", 0));
+  $buf=pack("N", 3003);
+  $buf.=pack("N",0);
+  $socket->send($buf);
 
   LUXTRONIK2_Log $name, 5, "Start to receive set parameters";
  #(FSP) read first 4 bytes of response -> should be request_echo=3003
@@ -478,16 +486,17 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FSP) read remaining response -> should be previous number of parameters
-  $i=1;
-  $result="";
-  $buf="";
-  while($i<=$count_set_parameter) {
-     $socket->recv($buf,4);
-      $result.=$buf;
-     $i++;
+  $buf=""; $result=""; $retryCounter=0;
+  $missingBytes = $count_set_parameter*4;
+  while ( $missingBytes>0 && $retryCounter<15 ) {
+      $socket->recv( $buf, $missingBytes); 
+      $missingBytes -= length($buf);
+      $result .= $buf;
+      $retryCounter++;
   }
-  if(length($result) != $count_set_parameter*4) {
-      LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
+
+  if($missingBytes > 0) {
+     LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
      $socket->close();
       return "$name|0|Number of parameters read mismatch ( $!)\n";
   }
@@ -505,8 +514,9 @@ LUXTRONIK2_DoUpdate($)
 #Fetch Visibility Attributes (FVA)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for visibility attributes";
-  $socket->send(pack("N", 3005));
-  $socket->send(pack("N", 0));
+  $buf=pack("N", 3005);
+  $buf.=pack("N",0);
+  $socket->send($buf);
 
   LUXTRONIK2_Log $name, 5, "Start to receive visibility attributes";
  #(FVA) read first 4 bytes of response -> should be request_echo=3005
@@ -528,15 +538,16 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FVA) read remaining response bytewise -> should be previous number of parameters
-  $i=1;
-  $result="";
-  $buf="";
-  while($i<=$countVisibAttr) {
-     $socket->recv($buf,1);
-      $result.=$buf;
-     $i++;
+  $buf=""; $result=""; $retryCounter=0;
+  $missingBytes = $countVisibAttr;
+  while ( $missingBytes>0 && $retryCounter<15 ) {
+      $socket->recv( $buf, $missingBytes); 
+      $missingBytes -= length($buf);
+      $result .= $buf;
+      $retryCounter++;
   }
-  if(length($result) != $countVisibAttr) {
+
+  if($missingBytes > 0) {
       LUXTRONIK2_Log $name, 1, "Visibility attributes length check: ".length($result)." should have been ". $countVisibAttr;
      $socket->close();
       return "$name|0|Number of Visibility attributes read mismatch ( $!)\n";
@@ -710,6 +721,8 @@ LUXTRONIK2_DoUpdate($)
    $return_str .= "|". ($heatpump_visibility[97]==1 ? $heatpump_parameters[44] : "no");
   # 72 - heatSourcedefrostAirEnd
    $return_str .= "|". ($heatpump_visibility[105]==1 ? $heatpump_parameters[98] : "no");
+  # 73 - analogOut4 - Voltage heating system circulation pump
+   $return_str .= "|". ($heatpump_visibility[267]==1 ? $heatpump_values[163] : "no");
 
    return $return_str;
 }
@@ -857,6 +870,12 @@ LUXTRONIK2_UpdateDone($)
    my $hotWaterBoilerValve = $a[9]; #BUP
    my $heatingSystemCircPump = $a[27]; #HUP
    my $opStateHeatPump3 = $a[3];
+   my $analogOut4 = $a[73]; #Voltage heating system circulation pump
+   my $flowRate = $a[19]; # flow rate
+   # skips inconsistent flow rates (known problem of the used flow measurement devices)
+   if ($flowRate !~ /no/ && $heatingSystemCircPump) {
+      $flowRate = "inconsistent" if $flowRate == 0;
+   } 
    
    my $heatPumpPower = 0;
    my $heatRodPower = AttrVal($name, "heatRodElectricalPowerWatt", 0);
@@ -865,13 +884,13 @@ LUXTRONIK2_UpdateDone($)
    my $thermalPower = 0;
    # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
    if ($opStateHeatPump3 =~ /^(0|5|16)$/) { 
-      if ($a[19] !~ /no/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; } #Nur bei Wärmezählern
+      if ($flowRate !~ /no|inconsistent/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $flowRate / 866.65; } #Nur bei Wärmezählern
       $heatPumpPower = AttrVal($name, "heatPumpElectricalPowerWatt", -1);
       $heatPumpPower *= (1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0));
    }
-   if ($a[19] !~ /no/) { readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower); } #Nur bei Wärmezählern
+   if ($flowRate !~ /no|inconsistent/) { readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower); } #Nur bei Wärmezählern
    if ($heatPumpPower >-1 ) {    readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
-   if ($heatPumpPower > 0 && $a[19] !~ /no/) { #Nur bei Wärmezählern
+   if ($heatPumpPower > 0 && $flowRate !~ /no|inconsistent/) { #Nur bei Wärmezählern
      $cop = $thermalPower * 1000 / $heatPumpPower;
      readingsBulkUpdate( $hash, "COP", sprintf "%.2f", $cop);
    }
@@ -1021,7 +1040,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
      my $delayDeviceTimeCalc=sprintf("%.0f",$a[29]-$a[22]);
      readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-     my $durationFetchReadings = sprintf("%.2f",$a[30]-$a[29]);
+     my $durationFetchReadings = sprintf("%.3f",$a[30]-$a[29]);
      readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
      #Remember min and max reading durations, will be reset when initializing the device
      if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
@@ -1047,7 +1066,8 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "returnTemperatureHyst", $returnTempHyst);
      readingsBulkUpdate( $hash, "returnTemperatureSetBack",LUXTRONIK2_CalcTemp($a[54]));
      if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));}
-     if ($a[19] !~ /no/) {readingsBulkUpdate( $hash, "flowRate",$a[19]);}
+     if ($analogOut4 !~ /no/) {readingsBulkUpdate( $hash, "heatingSystemCircPumpVoltage", $analogOut4/100);}
+     if ($flowRate !~ /no|inconsistent/ ) { readingsBulkUpdate( $hash, "flowRate",$flowRate); }
      readingsBulkUpdate( $hash, "heatSourceIN", $heatSourceIN );
      readingsBulkUpdate( $hash, "heatSourceOUT", $heatSourceOUT );
      readingsBulkUpdate( $hash, "heatSourceMotor", $heatSourceMotor?"on":"off");
@@ -1073,18 +1093,18 @@ LUXTRONIK2_UpdateDone($)
      LUXTRONIK2_storeReadings $hash, "counterHoursHotWater", $a[35], 3600, $doStatistic, $heatPumpPower;
      my $heatQTotal = 0 ; 
      if ($a[36] !~ /no/) {
-         LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($flowRate !~ /no/ ? $doStatistic : 0), -1; 
          $heatQTotal += $a[36];
       }
      if ($a[37] !~ /no/) { 
-         LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($flowRate !~ /no/ ? $doStatistic : 0), -1; 
          $heatQTotal += $a[37];
      }
      if ($a[62] !~ /no/) { 
-         LUXTRONIK2_storeReadings $hash, "counterHeatQPool", $a[62], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         LUXTRONIK2_storeReadings $hash, "counterHeatQPool", $a[62], 10, ($flowRate !~ /no/ ? $doStatistic : 0), -1; 
          $heatQTotal += $a[62];
      }
-     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $heatQTotal, 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
+     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $heatQTotal, 10, ($flowRate !~ /no/ ? $doStatistic : 0), -1;
       
      
    # Input / Output status
