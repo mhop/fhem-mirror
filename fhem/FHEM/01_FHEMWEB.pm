@@ -557,7 +557,7 @@ FW_Read($$)
   my $expires = ($cacheable?
                 ("Expires: ".FmtDateTimeRFC1123($now+900)."\r\n") : "");
   Log3 $FW_wname, 4,
-        "name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
+        "$FW_wname: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! FW_addToWritebuffer($hash,
            "HTTP/1.1 $FW_httpRetCode\r\n" .
            "Content-Length: $length\r\n" .
