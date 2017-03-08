@@ -492,7 +492,9 @@ Log 1, $intent_name;
           push @{$schema->{intents}}, {intent => $intent_name };
         }
 
-        $samples .= "\n$intent_name $utterance";
+        foreach my $u ( split( '\|', $utterance ) ) {
+          $samples .= "\n$intent_name $u";
+        }
       }
       $samples .= "\n";
     }
