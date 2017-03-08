@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 71_YAMAHA_NP: Code rewritten for improved usabiliy. See docs.
   - new:     98_MediaList: adds support to navigate through local attached
              media library, pls see https://wiki.fhem.de/wiki/MediaList
   - feature: 98_Text2Speech: new server mode to serve audiofile for requestors
