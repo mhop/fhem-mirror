@@ -64,7 +64,7 @@ function dashboard_showsvgIcon(svgIcon, svgColor, destObj) {
 		type: "GET",
 		contentType: "application/json",
 		data: "{}",
-		url: svgIcon + "&XHR=1",
+		url: svgIcon + "&XHR=1&fwcsrf=" + $('body').attr('fwcsrf'),
 		dataType: "text",
 		success: function(data) {
 			if (data) {
@@ -97,7 +97,7 @@ function dashboard_getData(jsonurl, get, dType, cb) {//get Dashboard config
 		type: "POST",
 		contentType: "application/json",
 		data: "{}",
-		url: jsonurl+" "+get+"&XHR=1",
+		url: jsonurl+" "+get+"&XHR=1&fwcsrf=" + $('body').attr('fwcsrf'),
 		dataType: dType,
 		success: function(data) {
 			if (get == "config") {for (var key in data.CONFIG) {if (data.CONFIG.hasOwnProperty(key)) {DashboardConfigHash[key] = data.CONFIG[key];} } }

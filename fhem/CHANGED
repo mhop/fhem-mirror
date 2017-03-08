@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: fixed issue with csrf token that prevents
+                           ajax request to succeed
   - feature: 71_YAMAHA_NP: Code rewritten for improved usabiliy. See docs.
   - new:     98_MediaList: adds support to navigate through local attached
              media library, pls see https://wiki.fhem.de/wiki/MediaList
