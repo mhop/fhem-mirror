@@ -171,6 +171,8 @@ at_Exec($)
 
   my $skip = AttrVal($name, "skip_next", undef);
   delete $attr{$name}{skip_next} if($skip);
+  $hash->{TEMPORARY} = 1 if($hash->{VOLATILE}); # 68680
+  delete $hash->{VOLATILE};
 
   if(!$skip && !IsDisabled($name)) {
     Log3 $name, 5, "exec at command $name";
