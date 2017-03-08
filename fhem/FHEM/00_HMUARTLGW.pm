@@ -376,8 +376,13 @@ sub HMUARTLGW_LGW_Init($)
 			if ($hash->{DevType} eq "LGW") {
 				readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash, "D-type", $2);
-				readingsBulkUpdate($hash, "D-LANfirmware", $3);
 				readingsBulkUpdate($hash, "D-serialNr", $4);
+				my $fw = $3;
+				if ($fw =~ m/^(\d+)\.(\d+)\.(\d+)$/) {
+					my $fwver = (int($1) << 16) | (int($2) << 8) | int($3);
+					$fw .= " (outdated)" if ($fwver < 0x010105);
+				}
+				readingsBulkUpdate($hash, "D-LANfirmware", $fw);
 				readingsEndUpdate($hash, 1);
 			}
 		} elsif ($line =~ m/^V(..),(................................)$/) {
@@ -916,6 +921,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 			         hex(substr($msg, 12, 2)).".".
 			         hex(substr($msg, 14, 2));
 			$hash->{Helper}{FW} = hex((substr($msg, 10, 6)));
+			$fw .= " (outdated)" if ($hash->{Helper}{FW} < 0x010401);
 			readingsSingleUpdate($hash, "D-firmware", $fw, 1);
 		}
 		$hash->{DevState} = HMUARTLGW_STATE_SET_NORMAL_MODE;
@@ -2440,8 +2446,8 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         supplied file. Source for firmware-images (version 1.4.1, official
         eQ-3 repository):<br>
         <ul>
-            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a></li>
-            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a><br>
+            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a> (version 1.4.1)</li>
+            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a> (version 1.4.1)<br>
             Please also make sure that D-LANfirmware is at least at version
             1.1.5. To update to this version, use the eQ-3 CLI tools (see wiki)
             or use the eQ-3 netfinder with this firmware image: <a href="https://github.com/eq-3/occu/raw/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/hm-lgw-o-tw-w-eu_update.eq3">hm-lgw-o-tw-w-eu_update.eq3</a><br>
@@ -2575,8 +2581,8 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         angegebenen Datei. Quelle f&uuml;r Firmware-Images (Version 1.4.1,
         offizielles eQ-3 Repository):<br>
         <ul>
-            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a></li>
-            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a><br>
+            <li>HM-MOD-UART: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/HM-MOD-UART/coprocessor_update.eq3">coprocessor_update.eq3</a> (Version 1.4.1)</li>
+            <li>HM-LGW-O-TW-W-EU: <a href="https://raw.githubusercontent.com/eq-3/occu/28045df83480122f90ab92f7c6e625f9bf3b61aa/firmware/coprocessor_update_hm_only.eq3">coprocessor_update_hm_only.eq3</a> (Version 1.4.1)<br>
             Bitte zus&auml;tzlich sicherstellen, dass die Version der
             D-LANfirmware mindestens 1.1.5 betr&auml;gt. Um auf diese Version
             zu aktualisieren k&ouml;nnen die eQ-3 CLI Tools (siehe Wiki) oder
