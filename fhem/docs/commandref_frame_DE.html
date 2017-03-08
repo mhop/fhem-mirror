@@ -80,7 +80,7 @@
   </ul>
 
   <br>
-  <b>Ger&auml;te</b>
+  <b>Ger&auml;temodule</b>
   <ul>
       <a href="#global">global</a><br>
       <!-- header:device -->
@@ -580,7 +580,9 @@ Ger&auml;t dokumentiert.
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
     "readings:minInterval" Paare. readings kann ein regexp sein. Ein Event wird
     nur dann generiert, falls seit dem letzten Auftreten des gleichen Events
-    mindestens minInterval Sekunden vergangen sind.
+    mindestens minInterval Sekunden vergangen sind. Falls
+    event-on-change-reading auch spezifiziert ist, dann werden sie mit ODER
+    kombiniert, d.h. wenn einer der beiden Bedingungen wahr ist.
     </li>
 
     <a name="userReadings"></a>
