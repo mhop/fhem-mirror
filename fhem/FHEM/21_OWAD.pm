@@ -86,7 +86,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="6.0";
+my $owx_version="6.1";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -944,7 +944,7 @@ sub OWAD_Set($@) {
  
  #-- re-intialize
  if($key eq "initialize") {
-    OWADInitializeDevice($hash);
+    OWAD_Initialize($hash);
     return undef;
   }
   
@@ -1737,6 +1737,8 @@ sub OWXAD_PT_SetPage($$) {
 1;
 
 =pod
+=item device
+=item summary to control 1-Wire  A/D converters DS2450
 =begin html
 
 <a name="OWAD"></a>

@@ -75,7 +75,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="6.0";
+my $owx_version="6.1";
 my $owg_channel = "";
 
 my %gets = (
@@ -781,6 +781,7 @@ sub OWXVAR_BinValues($$$$$$$) {
       if( $main::owx_debug>2 );
     return undef;
     
+  #--- obsolete code - we have put all operations into the SetValues part. Leave in for now
   }elsif( $context eq "setstate" )  {
     my $val  = ord($res);
     #$hash->{owg_val}=sprintf("%5.2f",(1-$val/255.0)*100);  
@@ -796,8 +797,7 @@ sub OWXVAR_BinValues($$$$$$$) {
       if( $main::owx_debug>2 );
     ####        master   slave  context     proc  owx_dev   data      crcpart numread startread callback delay
     #                                       2 suppresses the initial bus reset, 16 inserts at top of queue      
-    OWX_Qomplex($master, $hash, "confirm",  18,   $owx_dev, "\x96",   0,      0,      11,       undef,   0); 
-    
+    #OWX_Qomplex($master, $hash, "confirm",  18,   $owx_dev, "\x96",   0,      2,      11,       undef,   0.01); 
     return undef;
   }
 }
@@ -839,7 +839,7 @@ sub OWXVAR_GetValues($) {
   #-- NEW OWX interface
   }else{
     ####        master   slave  context     proc owx_dev   data     crcpart numread startread callback            delay
-    OWX_Qomplex($master, $hash, "getstate", 0,   $owx_dev, "\xF0",  0,      2,      10,       \&OWXVAR_BinValues, 0); 
+    OWX_Qomplex($master, $hash, "getstate", 0,   $owx_dev, "\xF0",  0,      2,      10,       \&OWXVAR_BinValues, 0.01); 
     return undef;
   }
 }
@@ -890,7 +890,8 @@ sub OWXVAR_SetValues($$$) {
   #-- NEW OWX interface
   }else{
     ####        master   slave  context     proc  owx_dev   data      crcpart numread startread callback              delay
-    OWX_Qomplex($master, $hash, "setstate", 0,    $owx_dev, $select,  $pos,   1,      11,       \&OWXVAR_BinValues,   0);   
+    OWX_Qomplex($master, $hash, "setstate", 0,    $owx_dev, $select,  0,      1,      0,        undef,   0);   
+    OWX_Qomplex($master, $hash, "confirm",  3,    $owx_dev, "\x96",   0,      1,      0,        undef,   0); 
     $hash->{owg_val}=sprintf("%5.2f",(1-$pos/255.0)*100);  
   }
   return undef;
@@ -900,7 +901,9 @@ sub OWXVAR_SetValues($$$) {
 
 1;
 
-=pod
+=pod 
+=item device
+=item summary to control 1-Wire variable resistor DS2890
 =begin html
 
 <a name="OWVAR"></a>

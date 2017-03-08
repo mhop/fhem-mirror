@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="6.0";
+my $owx_version="6.1";
 
 my %gets = (
   "id"          => "",
@@ -1070,7 +1070,7 @@ sub OWXTHERM_GetValues($) {
     #-- NEW OWX interface
     }else{
       ####        master   slave  context proc  owx_dev   data     crcpart numread startread callback delay
-      OWX_Qomplex($master, $hash, undef,  0,     $owx_dev, "\x44",  0,      0,      undef,    undef,   $convtimes{AttrVal($name,"resolution",12)}*0.001); 
+      OWX_Qomplex($master, $hash, undef,  0,    $owx_dev, "\x44",  0,      0,      undef,    undef, $convtimes{AttrVal($name,"resolution",12)}*0.001); 
     }
   }
   #-- NOW ask the specific device
@@ -1090,8 +1090,8 @@ sub OWXTHERM_GetValues($) {
     return $@ ? $@ : undef;
   #-- NEW OWX interface
   }else{
-    ####        master   slave  context proc owx_dev   data    crcpart numread startread callback              delay
-    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, "\xBE", 0,      9,      10,       \&OWXTHERM_BinValues, 0); 
+    ####        master   slave  context            proc owx_dev   data    crcpart numread startread callback              delay
+    OWX_Qomplex($master, $hash, undef,             1,   $owx_dev, "\xBE", 0,      9,      10,       \&OWXTHERM_BinValues, 0.01); 
     return undef;
   }
 }
@@ -1150,7 +1150,7 @@ sub OWXTHERM_SetValues($$) {
   #-- NEW OWX interface
   }else{
     ####        master   slave  context proc owx_dev   data     crcpart numread startread callback delay
-    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, $select, 0,      3,      10,       undef,   0); 
+    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, $select, 0,      3,      10,       undef,   0.05); 
   }
   return undef;
 }
@@ -1279,6 +1279,8 @@ sub OWXTHERM_PT_SetValues($$) {
 1;
 
 =pod
+=item device
+=item summary to control 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 =begin html
 
 <a name="OWTHERM"></a>

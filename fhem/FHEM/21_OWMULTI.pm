@@ -87,7 +87,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.01";
+my $owx_version="6.1";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel);
 
@@ -888,9 +888,10 @@ sub OWXMULTI_BinValues($$$$$$$) {
   
   #-- process results
   @data=split(//,$res);
-  if (@data != 9) {
-    $msg="$name returns invalid data length, ".int(@data)." instead of 9 bytes";
-  }elsif ((ord($data[0]) & 112)!=0) {
+  #-- not useful here, because data may be filled up with ff
+  #if (@data != 9) {
+  #  $msg="$name returns invalid data length, ".int(@data)." instead of 9 bytes";
+  if ((ord($data[0]) & 112)!=0) {
     $msg="$name: conversion not complete or data invalid";
   }elsif (OWX_CRC8(substr($res,0,8),$data[8])==0) {
     $msg="$name returns invalid CRC";
@@ -898,12 +899,13 @@ sub OWXMULTI_BinValues($$$$$$$) {
     $msg="No error";
   }
   OWX_WDBG($name,"OWXMULTI_BinValues: ".$msg,"")
-      if( $main::owx_debug>2 );
+    if( $main::owx_debug>2 );
 
   #-- this must be different for the different device types
   #   family = 26 => DS2438
   #-- transform binary rep of VDD
   if( $context eq "ds2438.getvdd") { 
+    #-- possible addtional check: $data[0] must be 08
     #-- temperature
     $lsb  = ord($data[1]);
     $msb  = ord($data[2]) & 127;
@@ -933,6 +935,7 @@ sub OWXMULTI_BinValues($$$$$$$) {
     
   #-- transform binary rep of VAD
   }elsif( $context eq "ds2438.getvad") {      
+    #-- possible addtional check: $data[0] must be 08
     #-- voltage
     $lsb  = ord($data[3]);
     $msb  = ord($data[4]) & 3;
@@ -1088,38 +1091,38 @@ sub OWXMULTI_GetValues($) {
     #OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x08", 0,       0,       0,        undef,   0); 
     #-- switch the device to current measurement on, VDD only
     #-- issue the match ROM command \x55 and the write scratchpad command
-    ####        master   slave  context  proc  owx_dev   data            crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x09", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x09", 0,       2,       0,        undef,   0.01); 
   
     #-- copy scratchpad to register
     #-- issue the match ROM command \x55 and the copy scratchpad command
-    ####        master   slave  context  proc  owx_dev   data        crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context      proc  owx_dev   data        crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       1,       0,        undef,   0.01); 
   
     #-- initiate temperature conversion
     #-- conversion needs some 12 ms !
     #-- issue the match ROM command \x55 and the start conversion command
-    ####        master   slave  context  proc  owx_dev   data    crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "T conversion",   0,    $owx_dev, "\x44", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context           proc  owx_dev   data    crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "T conversion",   0,    $owx_dev, "\x44", 0,       0,       0,        undef,   0.02); 
   
     #-- initiate voltage conversion
     #-- conversion needs some 6 ms  !
     #-- issue the match ROM command \x55 and the start conversion command
-    ####        master   slave  context  proc  owx_dev   data    crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "V conversion",   0,    $owx_dev, "\xB4", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context           proc  owx_dev   data    crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "V conversion",   0,    $owx_dev, "\xB4", 0,       0,       0,        undef,   0.01); 
   
     #-- from memory to scratchpad
     #-- copy needs some 12 ms !
     #-- issue the match ROM command \x55 and the recall memory command
-    ####        master   slave  context  proc  owx_dev   data        crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "recall",   0,    $owx_dev, "\xB8\x00", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context     proc  owx_dev   data        crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "recall",   0,    $owx_dev, "\xB8\x00", 0,       2,       0,        undef,   0.02); 
     
     #-- NOW ask the specific device 
     #-- issue the match ROM command \x55 and the read scratchpad command \xBE
     #-- reading 9 + 2 + 9 data bytes = 20 bytes
     ####        master   slave  context            proc  owx_dev   data            crcpart  numread  startread callback delay
-    #                                              1 provides additional reset after last operattion
-    OWX_Qomplex($master, $hash, "ds2438.getvdd",   1,    $owx_dev, "\xBE\x00\x08", 0,       9,       11,        \&OWXMULTI_BinValues,   0); 
+    #                                              1 provides additional reset after last operation
+    OWX_Qomplex($master, $hash, "ds2438.getvdd",   1,    $owx_dev, "\xBE\x00\x08", 0,       9,       11,        \&OWXMULTI_BinValues,   0.01); 
    
     #-- switch the device to current measurement off, V external only
     #-- issue the match ROM command \x55 and the write scratchpad command
@@ -1127,33 +1130,33 @@ sub OWXMULTI_GetValues($) {
     #OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x00", 0,       0,       0,        undef,   0); 
     #-- switch the device to current measurement on, V external only
     #-- issue the match ROM command \x55 and the write scratchpad command
-    ####        master   slave  context  proc  owx_dev   data            crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x01", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x01", 0,       1,       0,        undef,   0.01); 
 
 
     #-- copy scratchpad to register
     #-- issue the match ROM command \x55 and the copy scratchpad command
-    ####        master   slave  context  proc  owx_dev   data        crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context      proc  owx_dev   data        crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       1,       0,        undef,   0.01); 
   
     #-- initiate voltage conversion
     #-- conversion needs some 6 ms  !
     #-- issue the match ROM command \x55 and the start conversion command
-    ####        master   slave  context  proc  owx_dev   data    crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "V conversion",   0,    $owx_dev, "\xB4", 0,       0,       0,        undef,   0); 
+    ####        master   slave  context           proc  owx_dev   data    crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "V conversion",   0,    $owx_dev, "\xB4", 0,       0,       0,        undef,   0.01); 
    
     #-- from memory to scratchpad
     #-- copy needs some 12 ms !
     #-- issue the match ROM command \x55 and the recall memory command
     ####        master   slave  context   proc  owx_dev   data        crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "recall", 0,    $owx_dev, "\xB8\x00", 0,       0,       0,        undef,   0); 
+    OWX_Qomplex($master, $hash, "recall", 0,    $owx_dev, "\xB8\x00", 0,       1,       0,        undef,   0.02); 
     
     #-- NOW ask the specific device 
     #-- issue the match ROM command \x55 and the read scratchpad command \xBE
     #-- reading 9 + 2 + 9 data bytes = 20 bytes
     ####        master   slave  context            proc  owx_dev   data        crcpart  numread  startread callback delay
-    #                                              1 provides additional reset after last operattion
-    OWX_Qomplex($master, $hash, "ds2438.getvad",   1,    $owx_dev, "\xBE\x00", 0,       20,       11,        \&OWXMULTI_BinValues,   0);
+    #                                              1 provides additional reset after last operation
+    OWX_Qomplex($master, $hash, "ds2438.getvad",   1,    $owx_dev, "\xBE\x00", 0,       9,       11,        \&OWXMULTI_BinValues,   0.01);
 
     return undef;
   }   
@@ -1396,6 +1399,8 @@ sub OWXMULTI_PT_SetValues($@) {
 1;
 
 =pod
+=item device
+=item summary to control 1-Wire chip DS2438Z - Smart Battery Monitor
 =begin html
 
  <a name="OWMULTI"></a>

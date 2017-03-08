@@ -68,7 +68,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="6.01";
+my $owx_version="6.1";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -477,6 +477,8 @@ sub OWID_Undef ($) {
 1;
 
 =pod
+=item device
+=item summary to control 1-Wire devices having only a serial number
 =begin html
 
  <a name="OWID"></a>
