@@ -56,16 +56,18 @@
 #   disabled attribute and change in connections  - msg554933
 #   
 # 0.8 2016-03-01 revert changes
+#   fix for page 10 not recognized : #msg592948 
+#   _connect/Disconnect/isConnected subs
+#   init device after notify on initialized
+#   fix connection  - to work also if nextion is unavailable
 #   
 ##############################################
 ##############################################
 ### TODO
 #
 #
-#   disable attribute
 #   timeout with checkalive check?
-#   init device after notify on initialized
-#
+#   
 #   react on events with commands allowing values from FHEM
 #   remove wait for answer by attribute
 #   commands 
@@ -155,7 +157,8 @@ Nextion_Initialize($)
   $hash->{UndefFn}      = "Nextion_Undef";
   $hash->{ShutdownFn}   = "Nextion_Undef";
   $hash->{ReadAnswerFn} = "Nextion_ReadAnswer";
-  
+  $hash->{NotifyFn}     = "Nextion_Notify"; 
+   
   $hash->{AttrFn}     = "Nextion_Attr";
   $hash->{AttrList}   = "initPage0:textField-long initPage1:textField-long initPage2:textField-long initPage3:textField-long initPage4:textField-long ".
                         "initPage5:textField-long initPage6:textField-long initPage7:textField-long initPage8:textField-long initPage9:textField-long ".
@@ -187,12 +190,18 @@ Nextion_Define($$)
   my %matchList = ( "1:NEXTION" => ".*" );
   $hash->{MatchList} = \%matchList;
 
-  DevIo_CloseDev($hash);
+  Nextion_Disconnect($hash);
   $hash->{DeviceName} = $dev;
 
   return undef if($dev eq "none"); # DEBUGGING
   
-  my $ret = Nextion_Connect( $hash );
+  my $ret;
+  if( $init_done ) {
+    Nextion_Disconnect($hash);
+    $ret = Nextion_Connect($hash);
+  } elsif( $hash->{STATE} ne "???" ) {
+    $hash->{STATE} = "Initialized";
+  }    
   return $ret;
 }
 
@@ -249,11 +258,12 @@ Nextion_Set($@)
       }
     }  
   } elsif($type eq "reopen") {
-    DevIo_CloseDev($hash);
-    delete $hash->{DevIoJustClosed} if($hash->{DevIoJustClosed});
-    return Nextion_Connect( $hash );
+    Nextion_Disconnect($hash);
+    delete $hash->{DevIoJustClosed} if($hash->{DevIoJustClosed});   
+    delete($hash->{NEXT_OPEN}); # needed ? - can this ever occur
+    return Nextion_Connect( $hash, 1 );
   } elsif($type eq "disconnect") {
-    DevIo_CloseDev($hash);
+    Nextion_Disconnect($hash);
     DevIo_setStates($hash, "disconnected"); 
       #    DevIo_Disconnected($hash);
 #    delete $hash->{DevIoJustClosed} if($hash->{DevIoJustClosed});
@@ -297,7 +307,7 @@ sub Nextion_Attr(@) {
 
     } elsif ($aName eq 'disable') {
       if($aVal eq "1") {
-        DevIo_CloseDev($hash);
+        Nextion_Disconnect($hash);
         DevIo_setStates($hash, "disabled"); 
       } else {
         if($hash->{READINGS}{state}{VAL} eq "disabled") {
@@ -315,26 +325,78 @@ sub Nextion_Attr(@) {
 }
 
   
-#####################################
-sub
-Nextion_Connect($;$) 
+######################################
+sub Nextion_IsConnected($)
 {
+  my $hash = shift;
+#  stacktrace();
+#  Debug "Name : ".$hash->{NAME};
+#  Debug "FD: ".((exists($hash->{FD}))?"def":"undef");
+#  Debug "TCPDev: ".((defined($hash->{TCPDev}))?"def":"undef");
+
+  return 0 if(!exists($hash->{FD}));
+  if(!defined($hash->{TCPDev})) {
+    Nextion_Disconnect($_[0]);
+    return 0;
+  }
+  return 1;
+}
+  
+######################################
+sub Nextion_Disconnect($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 5, "Nextion_Disconnect: $name";
+  DevIo_CloseDev($hash);
+} 
+
+######################################
+sub Nextion_Connect($;$) {
   my ($hash, $mode) = @_;
   my $name = $hash->{NAME};
-  
+ 
+  my $ret;
+
   $mode = 0 if!($mode);
-  my $enabled = AttrVal($name, "disable", "0") != "1";
-  if($enabled) {
-    my $ret = DevIo_OpenDev($hash, $mode, "Nextion_DoInit");
-    return $ret;
-  }
+
+  return undef if(Nextion_IsConnected($hash));
   
-  return undef;
+#  Debug "NEXT_OPEN: $name".((defined($hash->{NEXT_OPEN}))?time()-$hash->{NEXT_OPEN}:"undef");
+
+  if(!IsDisabled($name)) {
+    # undefined means timeout / 0 means failed / 1 means ok
+    if ( DevIo_OpenDev($hash, $mode, "Nextion_DoInit") ) {
+      if(!Nextion_IsConnected($hash)) {
+        $ret = "Nextion_Connect: Could not connect :".$name;
+        Log3 $hash, 2, $ret;
+      }
+    }
+  }
+ return $ret;
 }
    
-  
-  
-  
+#####################################
+sub
+Nextion_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+
+  if( IsDisabled($name) > 0 ) {
+    readingsSingleUpdate($hash, 'state', 'disabled', 1 ) if( ReadingsVal($name,'state','' ) ne 'disabled' );
+    return undef;
+  }
+
+  Nextion_Connect($hash);
+
+  return undef;
+}    
 #####################################
 sub
 Nextion_DoInit($)
@@ -366,7 +428,7 @@ Nextion_Undef($@)
 {
   my ($hash, $arg) = @_;
   ### ??? send finish commands
-  DevIo_CloseDev($hash);
+  Nextion_Disconnect($hash);
   return undef;
 }
 
@@ -624,6 +686,9 @@ Nextion_Ready($)
 {
   my ($hash) = @_;
 
+#  Debug "Name : ".$hash->{NAME};
+#  stacktrace();
+  
   return Nextion_Connect( $hash, 1 ) if($hash->{STATE} eq "disconnected");
   return 0;
 }
@@ -706,7 +771,8 @@ Nextion_convertMsg($)
       $text .= $rest;
       $val = $rest;
     }
-  } elsif ( $raw =~ /^\x66(.)$/ ) {
+  } elsif ( $raw =~ /^\x66(.)$/s ) {
+    # need to parse multiline due to issue with page 10 --> x0A 
     # page started
     $text = "page ";
     my $rest = $1;
