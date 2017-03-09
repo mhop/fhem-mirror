@@ -72,7 +72,7 @@ sub YAMAHA_NP_Initialize
   my $volumeStraightMax = ReadingsVal($name,".volumeStraightMax",60);
   my $timerVolume = "timerVolume:";
   my $i;
-
+  
   for($i = $volumeStraightMin; $i < $volumeStraightMax; $i++)
   {
     $timerVolume .= "$i,";  
@@ -449,13 +449,13 @@ sub YAMAHA_NP_Get
   }
   elsif($what eq "deviceInfo")
   {
-    return "DeviceInfo:\n  ".
-           join("\n  ", map {"$_: $hash->{helper}{dInfo}{$_}"} sort keys %{$hash->{helper}{dInfo}});
+    my $deviceInfo = join("\n", map {sprintf("%-15s: %-15s", $_, $hash->{helper}{dInfo}{$_})} sort keys %{$hash->{helper}{dInfo}});
+	return "Device info:\n\n$deviceInfo";
   }
   elsif($what eq "favoriteList"  )
   {
     return "No favorites defined" if(!$hash->{helper}{fav});
-    my $favoriteList = "Favorite list:\n"
+    my $favoriteList = "Favorite list:\n\n"
                  ."name           :input      -> stream\n";
     foreach my $fav (sort keys%{$hash->{helper}{fav}})
     {
@@ -1158,7 +1158,7 @@ desiredListNloop:
       }
       elsif($what eq "volumeUp")
       {
-          $target_volume = $hash->{READINGS}{volumeStraight}{VAL} + 1;
+          $target_volume = $hash->{READINGS}{volumeStraight}{VAL} + 1;		  
       }
       else
       {
@@ -1637,7 +1637,9 @@ sub YAMAHA_NP_ParseResponse
           {
             
             $hash->{MODEL}                      = $1;
-            $hash->{FIRMWARE}                   = $3;
+            $hash->{helper}{dInfo}{MODEL}       = $1;
+			$hash->{FIRMWARE}                   = $3;
+			$hash->{helper}{dInfo}{FIRMWARE}    = $3;
             $hash->{helper}{dInfo}{SYSTEM_ID}   = $2;
             readingsBulkUpdate($hash, ".volumeStraightMin" , int($4));
             readingsBulkUpdate($hash, ".volumeStraightMax" , int($5));
@@ -1670,15 +1672,20 @@ sub YAMAHA_NP_ParseResponse
           if($data =~ /<Volume><Lvl>(.+?)<\/Lvl><Mute>(.+?)<\/Mute><\/Volume>/)
           {
             readingsBulkUpdate($hash, "mute", lc($2));
-            readingsBulkUpdate($hash, "volumeStraight", ($1));
             if($1 eq "0")
             {
               readingsBulkUpdate($hash, "mute", "on");
               # Bug in the NP firmware. Even if volume = 0. Mute remains off.
             }
-            readingsBulkUpdate($hash, "volumeStraight", ($1));
-            readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $1));
-            
+			
+			# Surpress Readings update during smooth volume change
+            $hash->{helper}{volumeChangeProcessing} = "0" if(not defined($hash->{helper}{volumeChangeProcessing}));
+			if ($hash->{helper}{volumeChangeProcessing} eq "0")
+			{
+			  readingsBulkUpdate($hash, "volumeStraight", ($1));
+              readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $1));
+			}
+			
             if($hash->{helper}{power} eq "on" && (ReadingsVal($name, "volumeStraight", "") eq "0" || ReadingsVal($name, "mute", "") eq "on"))
             {
               if(ReadingsVal($name, "input", "") =~ m/(server|netradio|cd|usb)/)
@@ -2067,7 +2074,7 @@ sub YAMAHA_NP_ParseResponse
           if($data =~ /<UDN>(.+)<\/UDN>/)
           {
             my @uuid = split(/:/, $1);
-            $hash->{helper}{dInfo}{UNIQUE_DEVICE_NAME} = uc($uuid[1]);            
+            $hash->{helper}{dInfo}{UUID} = uc($uuid[1]);            
           }
           
           $data =~ s/[\n\t\r]//g;# replace \n\t\r by ""
@@ -2232,31 +2239,37 @@ sub YAMAHA_NP_ParseResponse
 
             if($hash->{helper}{targetVolume} eq $volumeStraight)
             {
-              $hash->{helper}{volumeChangeDir} = "EQUAL";
+              $hash->{helper}{volumeChangeDir} = "EQUAL";			   
             }
             
             if($hash->{helper}{volumeChangeDir} eq "EQUAL")
             {
-              readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+              $hash->{helper}{volumeChangeProcessing} = "0";
+			  readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
               readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
-            }
+            }			
             elsif($hash->{helper}{volumeChangeDir} =~ m/(UP|DOWN)/)
             {
-              # Reset timer in order to avoid status request collisions
-		          # due to recursive volume change call
-		          YAMAHA_NP_ResetTimer($hash);
-              if   ($hash->{helper}{volumeChangeDir} eq "UP")  {$volumeStraight += 1;}
-			        elsif($hash->{helper}{volumeChangeDir} eq "DOWN"){$volumeStraight -= 1;}
-			        readingsBulkUpdate($hash, "volumeStraight", $volumeStraight);
+              $hash->{helper}{volumeChangeProcessing} = "1";
+			  if($hash->{helper}{volumeChangeDir} eq "UP")
+			  {
+				$volumeStraight += 1;				
+			  }
+			  elsif($hash->{helper}{volumeChangeDir} eq "DOWN")
+			  {
+			    $volumeStraight -= 1;			
+              }
+			  readingsBulkUpdate($hash, "volumeStraight", $volumeStraight);
               readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $volumeStraight));
-              YAMAHA_NP_SendCmd($hash, "PUT:System,Volume,Lvl:$volumeStraight", "volume", $volumeStraight, 0);  
-            }
+			  YAMAHA_NP_SendCmd($hash, "PUT:System,Volume,Lvl:$volumeStraight", "volume", $volumeStraight, 0);
+			}
           }
           else
           {
             readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
             readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
-            $hash->{helper}{volumeChangeDir} = "EQUAL";  
+            $hash->{helper}{volumeChangeDir} = "EQUAL";
+            $hash->{helper}{volumeChangeProcessing} = "0";
           }
         }
       }
