@@ -1296,7 +1296,6 @@ FW_detailSelect(@)
   $ret .= "<form method=\"$FW_formmethod\" ".
                   "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   $ret .= FW_hidden("detail", $d);
-  $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   $ret .= FW_hidden("dev.$cmd$d", $d.($param ? " $param":""));
   $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd.($psc?" psc":""));
   $ret .= "<div class=\"$cmd downText\">&nbsp;$d&nbsp;".
@@ -2032,6 +2031,7 @@ FW_submit($$@)
   my ($n, $v, $class) = @_;
   $class = ($class ? "class=\"$class\"" : "");
   my $s ="<input type=\"submit\" name=\"$n\" value=\"$v\" $class/>";
+  $s = FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}).$s if($FW_CSRF);
   return $s;
 }
 
@@ -2186,7 +2186,6 @@ FW_style($$)
       FW_pO "<br><br>";
     }
     FW_pO FW_hidden("cmd", "style save $fileName $cfgDB");
-    FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
     FW_pO "<textarea $readOnly name=\"data\" cols=\"$ncols\" rows=\"30\">" .
             "$data</textarea>";
     FW_pO "</form>";
@@ -2686,7 +2685,6 @@ FW_makeEdit($$$)
   FW_pO   "<div id=\"edit\" style=\"display:none\">";
   FW_pO   "<form method=\"$FW_formmethod\">";
   FW_pO       FW_hidden("detail", $name);
-  FW_pO       FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   my $cmd = "modify";
   my $ncols = $FW_ss ? 30 : 60;
   FW_pO      "<textarea name=\"val.${cmd}$name\" ".
