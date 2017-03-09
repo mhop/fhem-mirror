@@ -530,7 +530,7 @@ sub HMUARTLGW_SendPendingCmd($)
 	if (defined($hash->{XmitOpen}) &&
 	    $hash->{XmitOpen} == 2) {
 		if ($hash->{Helper}{PendingCMD}) {
-			my $qLen = AttrVal($name, "qLen", 20);
+			my $qLen = AttrVal($name, "qLen", 60);
 			if (scalar(@{$hash->{Helper}{PendingCMD}}) < $qLen) {
 				$hash->{XmitOpen} = 1;
 			}
@@ -1570,7 +1570,7 @@ sub HMUARTLGW_Write($$$)
 			#return;
 		}
 
-		my $qLen = AttrVal($name, "qLen", 20);
+		my $qLen = AttrVal($name, "qLen", 60);
 
 		#Queue full?
 		if ($hash->{Helper}{PendingCMD} &&
@@ -1886,8 +1886,8 @@ sub HMUARTLGW_Attr(@)
 		}
 	} elsif ($aName eq "qLen") {
 		if ($cmd eq "set") {
-			return "wrong syntax: qLen must be between 1 and 100"
-			    if ($aVal !~ m/^\d+$/ || $aVal < 1 || $aVal > 100);
+			return "wrong syntax: qLen must be between 1 and 200"
+			    if ($aVal !~ m/^\d+$/ || $aVal < 1 || $aVal > 200);
 			$attr{$name}{$aName} = $aVal;
 		} else {
 			delete $attr{$name}{$aName};
@@ -2510,8 +2510,10 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         </li>
     <li>qLen<br>
         Maximum number of commands in the internal queue of the HMUARTLGW module.
-        New commands when the queue is full are dropped.<br>
-        Default: 20
+        New commands when the queue is full are dropped. Each command has a maximum
+        lifetime of 3s when active, so the worst-case delay of a command is qLen * 3s
+        (3 minutes with default settings).<br>
+        Default: 60
         </li>
   </ul>
   <br>
@@ -2654,8 +2656,10 @@ sub HMUARTLGW_getVerbLvl($$$$) {
     <li>qLen<br>
         Maximale Anzahl an Kommandos in der internen Warteschlange des
         HMUARTLGW-Moduls. Neue Kommandos werden verworfen, wenn die Warteschlange
-        gef&uuml;llt ist.<br>
-        Default: 20
+        gef&uuml;llt ist. Jedes Kommando hat eine Lebensdauer von 3s, sobald es
+        aktiv verarbeitet wird. Die Verz&ouml;gerung eines Kommandos betr&auml;gt
+        im schlechtesten Fall also qLen * 3s (3 Minuten mit den Defaulteinstellungen).<br>
+        Default: 60
         </li>
   </ul>
   <br>
