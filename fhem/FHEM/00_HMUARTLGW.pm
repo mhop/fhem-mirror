@@ -1139,7 +1139,11 @@ sub HMUARTLGW_Parse($$$$)
 			return;
 		}
 
-		Log3($hash, 1 ,"HMUARTLGW ${name} Ack with invalid counter received, dropping. We: $hash->{CNT}, device: $hash->{DEVCNT}, " .
+		#Firmware sometimes send additional ACK when receiving the
+		#next frame from a device after a command, even if it has
+		#already ACKed the command.
+		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
+		               "HMUARTLGW ${name} Ack with invalid/old counter received, dropping. We: $hash->{CNT}, device: $hash->{DEVCNT}, " .
 		               "state: $hash->{DevState}, msg: ${dst} ${msg}");
 
 		return;
