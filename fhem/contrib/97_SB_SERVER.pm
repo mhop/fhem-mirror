@@ -508,6 +508,7 @@ sub SB_SERVER_Attr( @ ) {
                      $args[ 1 ] );
         }
     }
+    return; # 0032 betateilchen/mahowi
 }
 
 
