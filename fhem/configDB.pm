@@ -238,8 +238,9 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-$configDB{attr}{nostate} = 1 if($ENV{'cfgDB_nostate'});
-$configDB{attr}{rescue}  = 1 if($ENV{'cfgDB_rescue'});
+$configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
+$configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
+$configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
 
 ##################################################
 # Basic functions needed for DB configuration
@@ -716,8 +717,18 @@ sub _cfgDB_ReadCfg(@) {
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sth, @line, $row);
 
+    my $version = $configDB{attr}{loadversion};
+    delete $configDB{attr}{loadversion};
+    if ($version > 0) {
+       my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemversions');
+       $count--;
+       $version = $version > $count ? $count : $version;
+       Log 0, "configDB loading version $version on user request. ".
+              "Don't forget to unset variable cfgDB_version in environment!";
+    }    
+
 # maybe this will be done with join later
-	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	my $uuid = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE version = '$version'");
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb' order by version" );  
 
 	$sth->execute();
