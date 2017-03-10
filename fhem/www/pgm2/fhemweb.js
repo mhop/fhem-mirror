@@ -632,7 +632,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
     var isDef = true;
 
-    if( newDef == undefined ) {
+    if(newDef == undefined ||
+       $(this).attr("value").indexOf("modify") != 0) {
       isDef = false;
       var div = $(this).closest("div.makeSelect");
       var devName = $(div).attr("dev"),
