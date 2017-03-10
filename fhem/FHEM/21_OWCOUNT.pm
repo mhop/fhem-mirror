@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="6.01";
+my $owx_version="6.1";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -113,6 +113,7 @@ my %gets = (
   "id"          => "",
   "present"     => "",
   "interval"    => "",
+  "mcache"    => "",
   "memory"      => "",
   "midnight"    => "",
   "raw"         => "",
@@ -278,9 +279,6 @@ sub OWCOUNT_Define ($$) {
 
   $modules{OWCOUNT}{defptr}{$id} = $hash;
   
- 
-  
-  
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log3 $name, 3, "OWCOUNT:  Device $name defined."; 
@@ -360,6 +358,7 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{owg_midnight}->[$i] = "";
     $hash->{owg_str}->[$i]      = "";
   }
+  $hash->{memory} = "";
   
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
@@ -689,6 +688,8 @@ sub OWCOUNT_FormatValues($) {
       $total3 = 0;
     };
   }
+  #--- memory most recently read
+  readingsBulkUpdate($hash,"memory",$hash->{memory});
       
   #-- STATE
   readingsBulkUpdate($hash,"state",$svalue);
@@ -827,28 +828,33 @@ sub OWCOUNT_Get($@) {
   
   #-- check syntax for getting memory page 0..13 or midnight A/B
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  if( $reading eq "memory" ){
+  if( ($reading eq "memory") || ($reading eq "mcache") ){
     return "OWCOUNT: Memory usage disabled"
       if( $nomemory==1 );
-    return "OWCOUNT: Get needs parameter when reading memory: <page>"
+    return "OWCOUNT: Get needs parameter when reading memory/mcache: <page>"
       if( int(@a)<2 );
     $page=int($a[2]);
     if( ($page<0) || ($page>13) ){
-      return "OWCOUNT: Wrong memory page requested";
+      return "OWCOUNT: Wrong memory/mcache page requested";
     }
-    $ret = OWCOUNT_GetPage($hash,$page,1,1);  
-    #-- process result
-    if( $master->{ASYNCHRONOUS} ){
-      return "OWCOUNT: $name getting memory $page, please wait for completion";
-    }else{
-      #-- when we have a return code, we have an error
-      if( $ret ){
-        return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
+    if( $reading eq "memory" ){
+      $ret = OWCOUNT_GetPage($hash,$page,1,1);  
+      #-- process result
+      if( $master->{ASYNCHRONOUS} ){
+        return "OWCOUNT: $name getting memory $page, please wait for completion";
       }else{
-        return "OWCOUNT: $name.$reading [$page] =>".$hash->{owg_str}->[$page];
+        #-- when we have a return code, we have an error
+        if( $ret ){
+          return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
+        }else{
+          return "OWCOUNT: $name.$reading [$page] =>".$hash->{owg_str}->[$page];
+        }
       }
+    }else{
+      return "OWCOUNT: $name.$reading [$page] =>".$hash->{owg_str}->[$page];
     }
   } 
+  #-- get midnight value 
   if( $reading eq "midnight" ){
     return "OWCOUNT: get needs parameter when reading midnight: <channel>"
       if( int(@a)<3 );
@@ -1645,8 +1651,8 @@ sub OWXCOUNT_BinValues($$$$$$$) {
     if( $main::owx_debug>2 );
   
   return undef unless (defined $context and $context =~ /^(get|set|check)page\.([\d]+)(\.final|)$/);
-  my $cmd = $1;
-  my $page = $2;
+  my $cmd   = $1;
+  my $page  = $2;
   my $final = $3;
   #=============== get memory + counter ===============================
   if ($cmd eq "get") {
@@ -1691,16 +1697,19 @@ sub OWXCOUNT_BinValues($$$$$$$) {
       $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
       #Log3 $name,5,"OWCOUNT: retrieved from disk   for page $page ==> $strval";
     }      
-    $hash->{owg_str}->[$page]= defined $strval ? $strval : "";
+    $hash->{owg_str}->[$page] = defined $strval ? $strval : "";
+    $hash->{memory}           = defined $strval ? $strval : "";
     #-- counter part
     if( ($page == 14) || ($page == 15) ){
       @data=split(//,substr($res,32));
       if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
-        OWX_WDBG($name, "device $name returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7])," ");
+        my $msg = "device $name returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
+        OWX_WDBG($name,"OWXCOUNT_BinValues: ".$msg,"")
       }
       #-- counter value
       $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
       $hash->{owg_val}->[$page-14] = $value;
+     
       #-- midnight value
       #Log3 $name,1, "OWCOUNT_BinValues ParseMidnight: ".(defined $strval ? $strval : "undef");
       OWCOUNT_ParseMidnight($hash,$strval,$page);
@@ -1801,14 +1810,14 @@ sub OWXCOUNT_GetPage($$$) {
     return "$owx_dev has returned invalid data"
       if( length($res)!=54);
     eval {
-        OWXCOUNT_BinValues($hash,$context,0,$owx_dev,$select,45,substr($res,12));
+        OWXCOUNT_BinValues($hash,$context,0,$owx_dev,$select,44,substr($res,12));
       };
       return $@ ? $@ : undef;
   #-- NEW OWX interface
   }else{
     ####        master   slave  context   proc  owx_dev   data     crcpart  numread  startread callback               delay
     #                                     1 additional reset after last action
-    OWX_Qomplex($master, $hash, $context, 1,     $owx_dev, $select, $select, 45,      12,       \&OWXCOUNT_BinValues, 0); 
+    OWX_Qomplex($master, $hash, $context, 1,     $owx_dev, $select, $select, 44,      12,       \&OWXCOUNT_BinValues, 0.01); 
     return undef;
   }   
 }
@@ -1846,7 +1855,7 @@ sub OWXCOUNT_SetPage($$$) {
   #   \x0F TA1 TA2 followed by the data
   my $ta2 = ($page*32) >> 8;
   my $ta1 = ($page*32) & 255;
-  #Log 1, "OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
+  Log 1, "==========================> OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
   $select=sprintf("\x0F%c%c",$ta1,$ta2).$data;   
   #-- OLD OWX interface
   if( !$master->{ASYNCHRONOUS} ){
@@ -1896,10 +1905,10 @@ sub OWXCOUNT_SetPage($$$) {
   }else{
     ####        master   slave  context            proc  owx_dev   data     crcpart  numread  startread callback delay
     #                                              8 prevents from filling up with 0xFF 
-    OWX_Qomplex($master, $hash, undef,             8,    $owx_dev, $select, $select, 35,      10,       undef,   0);
+    OWX_Qomplex($master, $hash, "setscratch",      8,    $owx_dev, $select, $select, 35,      10,       undef,   0);
     #-- The third step of copying the scratchpad into memory can be scheduled only when the authorization code has been received
     #   will be done in the callback of the following line
-    OWX_Qomplex($master, $hash, "setpage.".$page,  0,    $owx_dev, "\xAA",  0,       37,      10,       \&OWXCOUNT_BinValues, 0); 
+    OWX_Qomplex($master, $hash, "setpage.".$page,  0,    $owx_dev, "\xAA",  0,       35,      10,       \&OWXCOUNT_BinValues, 0.01); 
   }   
   return undef;
 }
@@ -2080,6 +2089,8 @@ sub OWXCOUNT_PT_InitializeDevicePage($$$) {
 1;
 
 =pod
+=item device
+=item summary to commmunicate with 1-Wire Counter/RAM DS2423
 =begin html
 
 <a name="OWCOUNT"></a>
@@ -2165,7 +2176,10 @@ sub OWXCOUNT_PT_InitializeDevicePage($$$) {
                 seconds. </li>
             <li><a name="owcount_memory2">
                     <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Obtain 32 bytes from
-                memory page 0..13 </li>
+                memory page 0..13 and store in cache <i>$hash->{owg_str}->[page]</i> as well as in reading "memory"</li>
+            <li><a name="owcount_mcache">
+                    <code>get &lt;name&gt; mcache &lt;page&gt;</code></a><br />Obtain 32 bytes from
+                cache  <i>$hash->{owg_str}->[page]</i> and display.</li>
             <li><a name="owcount_midnight2">
                     <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain the
                 day's starting value for counter &lt;channel&gt; (A, B or named channel, see
