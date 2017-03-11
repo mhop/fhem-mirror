@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="6.1";
+my $owx_version="6.11";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1855,7 +1855,6 @@ sub OWXCOUNT_SetPage($$$) {
   #   \x0F TA1 TA2 followed by the data
   my $ta2 = ($page*32) >> 8;
   my $ta1 = ($page*32) & 255;
-  Log 1, "==========================> OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
   $select=sprintf("\x0F%c%c",$ta1,$ta2).$data;   
   #-- OLD OWX interface
   if( !$master->{ASYNCHRONOUS} ){
