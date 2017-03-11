@@ -32,11 +32,13 @@ use constant {      getDevices => '13',       #  19
                      setSoftOn => 'DB',       # -37
                     setSoftOff => 'DC',       # -36
 
-                       switch => 1,
-                     ctdimmer => 2,
-                       dimmer => 4,
-                  colordimmer => 8,
-               extcolordimmer => 10,
+                       switch => 0x1,
+                     ctdimmer => 0x2,
+                       dimmer => 0x4,
+                  colordimmer => 0x8,
+               extcolordimmer => 0x10,
+               motiondetector => 0x20,
+                    pushbuton => 0x41,
              };
 
 sub
@@ -630,6 +632,8 @@ LIGHTIFY_toJson($$$$$$$$$$)
 
     if( !$chash->{helper}{type} ) {
       Log3 $hash->{NAME}, 2, "$chash->{NAME}: unknown light type";
+    } elsif( $chash->{helper}{type} == motiondetector ) {
+      $json->{type} = 'MotionDetector';
     } elsif( $chash->{helper}{type} == extcolordimmer ) {
       $json->{type} = 'Extended color light';
     } elsif( $chash->{helper}{type} == colordimmer ) {
@@ -644,9 +648,22 @@ LIGHTIFY_toJson($$$$$$$$$$)
 
     my $has_ct = ($chash->{helper}{type} & 0x02) ? 1: 0;
     my $has_rgb = ($chash->{helper}{type} & 0x08) ? 1 : 0;
-    if( $has_rgb ) {
+    my $is_sensor = ($chash->{helper}{type} >= 0x20) ? 1 : 0;
+    if( $is_sensor ) {
+      $json->{state}->{lastupdated} = TimeNow();
+      if( $chash->{helper}{type} == motiondetector ) {
+        if( $r eq '01' ) {
+          $json->{config}->{on} = 1;
+          $json->{state}->{presence} = $g eq '01'?1:0;
+        } else {
+          $json->{config}->{on} = 0;
+        }
+      }
+
+    } elsif( $has_rgb ) {
       if( $has_ct && "$r$g$b" eq '111' ) {
         $json->{state}->{colormode} = 'ct';
+
       } elsif( defined($r) ) {
         my( $r, $g, $b ) = (hex($r)/255.0, hex($g)/255.0, hex($b)/255.0);
         my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
@@ -726,11 +743,13 @@ LIGHTIFY_Parse($$)
 
       my $has_ct = (hex($type) & 0x02) ? 1: 0;
       my $has_rgb = (hex($type) & 0x08) ? 1 : 0;
+      my $is_sensor = (hex($type) >= 0x20) ? 1 : 0;
       #$has_ct = 1 if( $type eq '00' );
-      Log3 $name, 4, "$alias: $id:$short, type: $type (ct:$has_ct, rgb:$has_rgb), firmware: $firmware, reachable: $reachable, groups: $groups, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b, w: $w";
+      Log3 $name, 4, "$alias: $id:$short, type: $type (ct:$has_ct, rgb:$has_rgb, sensor:$is_sensor), firmware: $firmware, reachable: $reachable, groups: $groups, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b, w: $w";
 
       #my $code = $id;
       my $code = $name ."-". $id;
+      $code = $name ."-S". $id if( $is_sensor );
       if( defined($modules{HUEDevice}{defptr}{$code}) ) {
         Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
 
@@ -738,6 +757,7 @@ LIGHTIFY_Parse($$)
         my $devname = "LIGHTIFY" . $id;
         #my $define= "$devname HUEDevice $id";
         my $define= "$devname HUEDevice $id IODev=$name";
+        $define= "$devname HUEDevice sensor $id IODev=$name" if( $is_sensor );
         Log3 $name, 4, "$name: create new device '$devname' for address '$id'";
         my $cmdret= CommandDefine(undef,$define);
         if($cmdret) {
@@ -870,6 +890,10 @@ LIGHTIFY_Parse($$)
 
       my $code = $name ."-". $id;
       my $chash = $modules{HUEDevice}{defptr}{$code};
+      if( !$chash ) {
+        $code = $name ."-S". $id;
+        $chash = $modules{HUEDevice}{defptr}{$code};
+      }
 
       if( $length < 30 ) {
         $json = { state => { } };
