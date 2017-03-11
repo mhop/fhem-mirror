@@ -1,4 +1,4 @@
-REV 13659
+REV 13664
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -22,7 +22,7 @@ MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
 UPD 2017-03-10_07:45:02 187566 ./CHANGED
-UPD 2017-02-11_07:45:02 35614 ./configDB.pm
+UPD 2017-03-11_07:45:02 36142 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-03-06_07:45:04 130240 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
@@ -121,7 +121,7 @@ UPD 2017-03-06_07:45:02 77814 FHEM/20_ROOMMATE.pm
 UPD 2016-01-08_07:45:10 19616 FHEM/20_X10.pm
 UPD 2016-10-29_07:45:14 31382 FHEM/21_N4HMODULE.pm
 UPD 2017-03-09_07:45:02 62033 FHEM/21_OWAD.pm
-UPD 2016-04-07_07:45:15 77195 FHEM/21_OWCOUNT.pm
+UPD 2017-03-11_07:45:02 77974 FHEM/21_OWCOUNT.pm
 UPD 2017-03-09_07:45:02 15925 FHEM/21_OWID.pm
 UPD 2016-04-07_07:45:14 72055 FHEM/21_OWLCD.pm
 UPD 2017-03-09_07:45:02 56422 FHEM/21_OWMULTI.pm
@@ -564,7 +564,7 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-03-10_07:45:03 2726119 docs/commandref.html
+UPD 2017-03-11_07:45:04 2726415 docs/commandref.html
 UPD 2017-03-10_07:45:04 1577457 docs/commandref_DE.html
 UPD 2017-03-09_07:45:02 69056 docs/commandref_frame.html
 UPD 2017-03-09_07:45:02 77574 docs/commandref_frame_DE.html
@@ -1838,7 +1838,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-03-07_07:45:02 5344 www/pgm2/defaultCommon.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-03-04_07:45:02 44150 www/pgm2/fhemweb.js
+UPD 2017-03-11_07:45:02 44203 www/pgm2/fhemweb.js
 UPD 2017-03-03_07:45:02 12493 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
 UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
