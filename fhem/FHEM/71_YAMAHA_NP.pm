@@ -1854,9 +1854,9 @@ sub YAMAHA_NP_ParseResponse
             
             if   ($hash->{helper}{tuner}{band} eq "FM")
             {
-              my $id         = "";
-              my $frequency  = "";
-              my $tunerInfo1 = "";
+              my $id         = "-";
+              my $frequency  = "-";
+              my $tunerInfo1 = "-";
               
               if($data =~ /<FM><Preset><Preset_Sel>(.+)<\/Preset_Sel><\/Preset><Tuning><Freq>(.+)<\/Freq>(.*)<\/FM/)
               {
@@ -1865,21 +1865,29 @@ sub YAMAHA_NP_ParseResponse
 
               if($data =~ /<Program_Service>(.*)<\/Program_Service>/)
               {
-                readingsBulkUpdate($hash, "tunerInfo1"   , ($1 ? YAMAHA_NP_html2txt($1) : ""));
+                readingsBulkUpdate($hash, "tunerInfo1"   , ($1 ? YAMAHA_NP_html2txt($1) : "-"));
                 $tunerInfo1 = $1;
               }              
               if($data =~ /<Radio_Text_A>(.*)<\/Radio_Text_A>/)
               {
-                readingsBulkUpdate($hash, "tunerInfo2_A" , ($1 ? YAMAHA_NP_html2txt($1) : ""));
+                readingsBulkUpdate($hash, "tunerInfo2_A" , ($1 ? YAMAHA_NP_html2txt($1) : "-"));
               }
               if($data =~ /<Radio_Text_B>(.*)<\/Radio_Text_B>/)
               {
-                readingsBulkUpdate($hash, "tunerInfo2_B" , ($1 ? YAMAHA_NP_html2txt($1) : ""));
+                readingsBulkUpdate($hash, "tunerInfo2_B" , ($1 ? YAMAHA_NP_html2txt($1) : "-"));
               } 
               if($data =~ /<Tuning><Freq>(.*)<\/Freq><\/Tuning>/)
               {
-                $frequency = $1 ? $1 : "";
-                $frequency =~ s/(\d{2})$/.$1/; # Insert '.' to frequency
+                if(ReadingsVal($name, "power","") eq "off")
+				{
+					# Bug in the firmware. Last tuned frequency is send also in Standby mode.
+					$frequency = "-";
+				}
+				else
+				{
+			      $frequency = $1 ? $1 : "";
+                  $frequency =~ s/(\d{2})$/.$1/; # Insert '.' to frequency
+				}
                 readingsBulkUpdate($hash, "tunerFrequency", $frequency." MHz");
               }
               # No presets stored
@@ -1913,18 +1921,28 @@ sub YAMAHA_NP_ParseResponse
             elsif($hash->{helper}{tuner}{band} eq "DAB")
             {
               my ($fq,$br,$qu,$am,$ch,$es,$dp,$sId) = ("-","-","-","-","-","-","DAB+","");
-              if($data =~ /<Signal_Info><Freq>(.+)<\/Freq>/)
+              
+			  if($data =~ /<Signal_Info><Freq>(.+)<\/Freq>/)
               {
                 $fq = $1;
                 $fq =~ s/(\d{3})$/.$1/; # Insert '.' to frequency
               }
-              
+			                
               $br = $1                     if($data =~ /<Bit_Rate>(.+)<\/Bit_Rate>/);
               $qu = $1                     if($data =~ /<Quality>(.+)<\/Quality>/);
               $am = $1                     if($data =~ /<Audio_Mode>(.+)<\/Audio_Mode>/);
               $ch = $1                     if($data =~ /<Ch_Label>(.*)<\/Ch_Label>/);
+			  $ch = "-"                    if($ch eq "");
               $es = YAMAHA_NP_html2txt($1) if($data =~ /<Ensemble_Label>(.*)<\/Ensemble_Label>/);
+			  $es = "-"                    if($es eq "");
               $dp = "DAB"                  if($data =~ /<DAB_PLUS>Negate<\/DAB_PLUS>/);
+			  
+			  if($fq eq "-")
+			  {
+				$am = "-";
+				$dp = "-";
+				$qu = "-";
+			  }
               
               # remember station name
               my $stName = "-";
@@ -1933,11 +1951,11 @@ sub YAMAHA_NP_ParseResponse
 
               if($data =~ /<DLS>(.*)<\/DLS>/)
               {
-                readingsBulkUpdate($hash, "tunerInfo1"  , ($1 ? YAMAHA_NP_html2txt($1) : ""));
+                readingsBulkUpdate($hash, "tunerInfo1"  , ($1 ? YAMAHA_NP_html2txt($1) : "-"));
               }
               if($data =~ /<Service_Label>(.*)<\/Service_Label>/)
               {
-                $stName = $1 ? YAMAHA_NP_html2txt($1) : "";
+                $stName = $1 ? YAMAHA_NP_html2txt($1) : "-";
                 readingsBulkUpdate($hash, "tunerStation", $stName);
               }
               if($data =~ /<ID>(.+)<\/ID>/)
