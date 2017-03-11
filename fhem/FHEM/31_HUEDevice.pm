@@ -1201,10 +1201,12 @@ HUEDevice_Parse($$)
 
     my $lastupdated;
     if( my $state = $result->{state} ) {
-      return undef if( $state->{lastupdated} eq 'none' );
-
       $lastupdated = $state->{lastupdated};
-      substr( $lastupdated, 10, 1, ' ' );
+
+      return undef if( !$lastupdated );
+      return undef if( $lastupdated eq 'none' );
+
+      substr( $lastupdated, 10, 1, ' ' ) if($lastupdated);
 
       my $offset = 0;
       if( my $iohash = $hash->{IODev} ) {
