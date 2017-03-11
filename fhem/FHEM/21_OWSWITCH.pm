@@ -87,7 +87,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.1";
+my $owx_version="6.11";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1118,7 +1118,6 @@ sub OWXSWITCH_BinValues($$$$$$$) {
       }else{
         $gpio |= (1<<$outfnd); 
       } 
-      Log 1,"DEBUGGING OWXNG : After reading old gpio with outval=$outval and outfnd=$outfnd we are setting a new gpio as $gpio";
       #-- re-set the state 
       OWXSWITCH_SetState($hash,$gpio);
     }
