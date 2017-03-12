@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  00_SONOS: New version, see Wiki- or File-Changelog 
   - update:  88_HMCCU: Code optimized. Fixed Windows process ID bug.
   - bugfix:  71_YAMAHA_NP: Fixed tuner readings in standby.
   - bugfix:  42_Nextion:  mult. fixes - page10 / disconnect / init

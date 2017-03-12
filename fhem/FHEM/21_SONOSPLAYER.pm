@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, March 2016
+# SONOSPLAYER.pm (c) by Reiner Leins, March 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -126,7 +126,7 @@ my %sets = (
 	'SnoozeAlarm' => 'timestring|seconds',
 	'DailyIndexRefreshTime' => 'timestring',
 	'SleepTimer' => 'timestring|seconds',
-	'AddMember' => 'member_devicename',
+	'AddMember' => 'member_devicename[,member_devicename]',
 	'RemoveMember' => 'member_devicename',
 	'MakeStandaloneGroup' => '',
 	'GroupVolume' => 'volumelevel(0..100)',
@@ -174,7 +174,6 @@ sub SONOSPLAYER_Initialize ($) {
 	$hash->{GetFn} = "SONOSPLAYER_Get";
 	$hash->{SetFn} = "SONOSPLAYER_Set";
 	$hash->{StateFn} = "SONOSPLAYER_State";
-	$hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	$hash->{AttrFn}  = 'SONOSPLAYER_Attribute';
 	
 	$hash->{AttrList} = "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,TrackProvider,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackProvider,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
@@ -191,6 +190,8 @@ sub SONOSPLAYER_Initialize ($) {
 ########################################################################################
 sub SONOSPLAYER_Define ($$) {
 	my ($hash, $def) = @_;
+	
+	# $hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	  
 	# define <name> SONOSPLAYER <udn>
 	# e.g.: define Sonos_Wohnzimmer SONOSPLAYER RINCON_000EFEFEFEF401400
@@ -1103,6 +1104,8 @@ sub SONOSPLAYER_Log($$$) {
 1;
 
 =pod
+=item summary    Module to work with Sonos-Zoneplayers
+=item summary_DE Modul für die Steuerung von Sonos Zoneplayern
 =begin html
 
 <a name="SONOSPLAYER"></a>
@@ -1190,7 +1193,7 @@ sub SONOSPLAYER_Log($$$) {
 <li><b>Playing Control-Commands</b><ul>
 <li><a name="SONOSPLAYER_setter_CurrentTrackPosition">
 <b><code>CurrentTrackPosition &lt;TimePosition&gt;</code></b></a>
-<br /> Sets the current timeposition inside the title to the given value.</li>
+<br /> Sets the current timeposition inside the title to the given timevalue (e.g. 0:01:15) or seconds (e.g. 81). You can make relative jumps like '+0:00:10' or just '+10'. Additionally you can make a call with a percentage value like '+10%'. This relative value can be negative.</li>
 <li><a name="SONOSPLAYER_setter_Pause">
 <b><code>Pause</code></b></a>
 <br /> Pause the playing</li>
@@ -1550,7 +1553,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><b>Abspiel-Steuerbefehle</b><ul>
 <li><a name="SONOSPLAYER_setter_CurrentTrackPosition">
 <b><code>CurrentTrackPosition &lt;TimePosition&gt;</code></b></a>
-<br /> Setzt die Abspielposition innerhalb des Liedes auf den angegebenen Zeitwert (z.B. 0:01:15).</li>
+<br /> Setzt die Abspielposition innerhalb des Liedes auf den angegebenen Zeitwert (z.B. 0:01:15) oder eine Sekundenangabe (z.B. 81). Man kann hier auch relative Angaben machen wie '+0:00:10' oder nur '+10'. Zusätzlich kann man auch Prozentwerte angeben wie z.B. '+10%'. Natürlich können diese Angaben auch negativ sein.</li>
 <li><a name="SONOSPLAYER_setter_Pause">
 <b><code>Pause</code></b></a>
 <br /> Pausiert die Wiedergabe</li>
