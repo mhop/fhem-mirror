@@ -198,7 +198,8 @@ consAddRegexpPart()
     "FileLog":{ modify:    "set modDev addRegexpPart evtDev event",
                 createArg: "./log/modDev.log evtDev:event" },
     "watchdog":{createArg: "evtDev:event 00:15 SAME {}" },
-    "sequence":{createArg: "evtDev:event 00:15 evtDev:event" }
+    "sequence":{createArg: "evtDev:event 00:15 evtDev:event" },
+    "DOIF":{createArg: "([evtDev:\"^event$\"]) ()" }
   };
 
   var modDev, devList, devHash = {};
