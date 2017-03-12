@@ -16,8 +16,7 @@ sub EvaluateTemplate($$) {
 
   # load template from file
   my ($err, @result)= FileRead($filename);
-  return ($err, undef, undef, undef) if(defined($err));
-  
+  return ($err, undef, undef, undef) if(defined($err) && $err ne "");
   # remove trailing newlines and empty/whitespace lines
   @result= grep /\S/, map { s/\r?\n$//; $_ } @result;
   
