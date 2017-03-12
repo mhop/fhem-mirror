@@ -5,7 +5,7 @@
 #
 # $Id$
 #
-# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in February 2016
+# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in March 2017
 # Original Copyright by Andreas Kwasnik (gemx)
 #
 # Fhem is free software: you can redistribute it and/or modify
@@ -23,6 +23,9 @@
 #
 ########################################################################################
 # Changelog
+# 12.03.2017
+#	Es gibt einen neuen Getter "plugins", der das Reading "Plugins" mit den aktuell verfügbaren Plugins und deren WindowIds belegt
+#	Es gibt einen neuen Setter "window" der als Parameter eine WindowId oder einen Pluginnamen (URL-Encoded mit %20 für Leerzeichen!) erhält
 # 14.03.2016
 #	Es gibt nun ein Attribut "HeartbeatInterval", mit dem das Intervall für die Verbindungsprüfung festgelegt werden kann. Ein Wert von "0" deaktiviert die Prüfung.
 #	Es gibt nun das Attribut "disable", mit dem das Modul deaktiviert werden kann.
@@ -54,6 +57,7 @@ use Time::HiRes qw(gettimeofday);
 use DevIo;
 use JSON;
 use HttpUtils;
+use Scalar::Util qw(looks_like_number);
 
 use Data::Dumper;
 
@@ -106,7 +110,7 @@ sub MEDIAPORTAL_Define($$) {
 	$dev .= ":8017" if ($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 	
 	$hash->{DeviceName} = $dev;
-	$hash->{STATE} = 'Disconnected';
+	$hash->{STATE} = 'disconnected';
 	
 	my $ret = undef;
 	$ret = DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit') if AttrVal($hash->{NAME}, 'disable', 0);
@@ -185,7 +189,7 @@ sub MEDIAPORTAL_Attribute($@) {
 sub MEDIAPORTAL_DoInit($) {
 	my ($hash) = @_;
 	
-	$hash->{STATE} = 'Connecting...';
+	readingsSingleUpdate($hash, 'state', 'Connecting...', 1);
 	$hash->{helper}{buffer} = '';
 	$hash->{helper}{LastStatusTimestamp} = time();
 	
@@ -234,8 +238,10 @@ sub MEDIAPORTAL_Get($@) {
 		$cmd = "{\"Type\":\"requestnowplaying\"}\r\n";
 	} elsif ($cname eq "notify") {
 		$cmd = '{"Type":"properties","Properties":["#Play.Current.Title","#TV.View.title"]}'."\r\n";
+	} elsif ($cname eq "plugins") {
+		$cmd = "{\"Type\":\"plugins\",\"SendIcons\":false}\r\n";
 	} else {
-		return "Unknown command '$cname', choose one of status:noArg nowplaying:noArg";
+		return "Unknown command '$cname', choose one of status:noArg nowplaying:noArg plugins:noArg";
 	}
 	
 	DevIo_SimpleWrite($hash, $cmd, 0);
@@ -288,6 +294,17 @@ sub MEDIAPORTAL_GetNowPlaying($) {
 	my ($hash) = @_;
 	
 	MEDIAPORTAL_Get($hash, ($hash->{NAME}, 'nowplaying'));
+}
+
+########################################################################################
+#
+#  MEDIAPORTAL_GetPlugins
+#
+########################################################################################
+sub MEDIAPORTAL_GetPlugins($) {
+	my ($hash) = @_;
+	
+	MEDIAPORTAL_Get($hash, ($hash->{NAME}, 'plugins'));
 }
 
 ########################################################################################
@@ -384,8 +401,17 @@ sub MEDIAPORTAL_Set($@) {
 		DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit');
 		
 		return undef;
+	} elsif ($cname eq "window") {
+		my $param = $a[2];
+		if (!looks_like_number($param)) {
+			my %plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+			$param =~ s/\%20/ /g;
+			$param = $plugins{$param};
+		}
+		$cmd = "{\"Type\":\"window\",\"Window\":$param}\r\n";
 	} else {
-		return "Unknown command '$cname', choose one of wakeup:noArg sleep:noArg connect:noArg reconnect:noArg command:".join(',', split(/ /, $mpcommands))." key Volume:slider,0,1,100 powermode:".join(',', split(/ /, $powermodes))." playfile playchannel playradiochannel playlist";
+		my %plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+		return "Unknown command '$cname', choose one of wakeup:noArg sleep:noArg connect:noArg reconnect:noArg command:".join(',', split(/ /, $mpcommands))." key Volume:slider,0,1,100 powermode:".join(',', split(/ /, $powermodes))." playfile playchannel playradiochannel playlist window".((scalar(keys(%plugins)) != 0) ? ':'.join(',', map { s/ /%20/g; $_; } sort(keys(%plugins))) : '');
 	}
 	
 	DevIo_SimpleWrite($hash, $cmd, 0);
@@ -461,7 +487,9 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 		} elsif ($json->{Type} eq "authenticationresponse") {
 			MEDIAPORTAL_Log $hash->{NAME}, 4, "AUTHRESPONSE received. SUCCESS=$json->{Success}";
 			
-			$hash->{STATE} = "Authenticated. Processing messages.";
+			#readingsSingleUpdate($hash, 'state', 'Authenticated. Processing messages.', 1);
+			readingsSingleUpdate($hash, 'state', 'opened', 1);
+			InternalTimer(gettimeofday() + 1, 'MEDIAPORTAL_GetPlugins', $hash, 0);
 		} elsif ($json->{Type} eq "status") {
 			MEDIAPORTAL_Log $hash->{NAME}, 4, 'STATUS received.';
 			
@@ -559,9 +587,16 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			
 			MEDIAPORTAL_Log undef, 4, 'JSON: '.Dumper($json);
 		} elsif ($json->{Type} eq "facadeinfo") {
-			MEDIAPORTAL_Log $hash->{NAME}, 4, 'FACADEINFO5 received.';
+			MEDIAPORTAL_Log $hash->{NAME}, 4, 'FACADEINFO received.';
 		} elsif ($json->{Type} eq "dialog") {
 			MEDIAPORTAL_Log $hash->{NAME}, 4, 'DIALOG received.';
+		} elsif ($json->{Type} eq "plugins") {
+			MEDIAPORTAL_Log $hash->{NAME}, 1, 'Plugins received.';
+			my %plugins = ();
+			foreach (@{$json->{Plugins}}) {
+				$plugins{$_->{Name}} = $_->{WindowId};
+			}
+			readingsSingleUpdate($hash, 'Plugins', MEDIAPORTAL_Dumper(\%plugins), 1);
 		} else {
 			MEDIAPORTAL_Log $hash->{NAME}, 1, "Unhandled message received: MessageType '$json->{Type}'";
 		}
@@ -724,6 +759,21 @@ sub MEDIAPORTAL_posInList($@) {
 
 ########################################################################################
 #
+#  MEDIAPORTAL_Dumper - Returns the 'Dumpered' Output of the given Datastructure-Reference
+#
+########################################################################################
+sub MEDIAPORTAL_Dumper($) {
+	my ($varRef) = @_;
+	
+	$Data::Dumper::Indent = 0;
+	my $text = Dumper($varRef);
+	$Data::Dumper::Indent = 2;
+	
+	return $text;
+}
+
+########################################################################################
+#
 #  MEDIAPORTAL_Log - Log to the normal Log-command with the prefix 'SONOSPLAYER'
 #
 ########################################################################################
@@ -736,6 +786,8 @@ sub MEDIAPORTAL_Log($$$) {
 1;
 
 =pod
+=item summary    Connects to a running MediaPortal instance via the WifiRemote plugin.
+=item summary_DE Verbindet sich über das Wifiremote-Plugin mit einer Mediaportal-Instanz.
 =begin html
 
 <a name="MEDIAPORTAL"></a>
