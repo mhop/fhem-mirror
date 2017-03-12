@@ -5,7 +5,7 @@
 <script type="text/javascript"> 
    if (top == self) top.location = "../index.html";
 </script>
-<meta http-equiv="pragma" content="no-cache" />
+<meta http-equiv="cache-control" content="max-age=86400">
 </head>
 
 <body>
@@ -16,7 +16,7 @@
       <li>Install prerequisits:<br/><br/>
         <ul><code>apt-get -y install perl-base libdevice-serialport-perl libwww-perl libio-socket-ssl-perl libcgi-pm-perl libjson-perl sqlite3 libdbd-sqlite3-perl libtext-diff-perl libtimedate-perl libmail-imapclient-perl libgd-graph-perl libtext-csv-perl libxml-simple-perl liblist-moreutils-perl ttf-liberation libimage-librsvg-perl libgd-text-perl libsocket6-perl libio-socket-inet6-perl libmime-base64-perl libimage-info-perl libusb-1.0-0-dev libnet-server-perl</code></ul></li><br/>
       <li>Download latest stable package:<br/><br/>
-        <ul><code>wget http://debian.fhem.de/fhem-==MAJOR==.deb</code></ul></li><br/>
+        <ul><code>wget http://fhem.de/fhem-==MAJOR==.deb</code></ul></li><br/>
       <li>Install package:<br/><br/>
         <ul><code>dpkg -i fhem-==MAJOR==.deb</code></ul></li><br/>
       <li>If you want to add the fhem user manually, just run the following command::<br/><br/>

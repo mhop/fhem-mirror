@@ -1,10 +1,10 @@
 <html>
 <head>
-<!-- ==DATE== ==TIME== -->
+<!-- content created: ==DATE== ==TIME== -->
 <title>FHEM for Debian</title>
-<link rel="stylesheet" type="text/css"     href="../style/style.css"   />
+<link rel="stylesheet" type="text/css"     href="../style/style.css?v=1.0"   />
 <link rel="icon"       type="image/x-icon" href="./grafik/favicon.ico" />
-<meta http-equiv="pragma" content="no-cache" />
+<meta http-equiv="cache-control" content="no-cache" />
 </head>
 
 <body>
@@ -18,22 +18,22 @@
         <tr><td></td></tr>
         <tr><td><b>Content:</b></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/default.html'">Start</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/default.html?v===MINOR=='">Start</p></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/manual.html'">Manual installation</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/manual.html?v===MAJOR=='">Manual installation</p></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/stable.html'">Stable build using apt</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/nightly.html?v===MINOR=='">The easy way: use apt-get</p></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/nightly.html'">Nightly build using apt</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/configurator.html?v===MINOR=='">The comfortable way: FHEM configurator</p></td></tr>
         <tr><td></td></tr>
-<!--        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/https_trouble.html'">https Trouble?</p></td></tr>
-        <tr><td></td></tr> -->
-        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/gpg_trouble.html'">gpg key Trouble</p></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/https_trouble.html?v===MAJOR=='">https Trouble?</p></td></tr>
+        <tr><td></td></tr>
+        <tr><td><p class="a" onclick="parent.rightcontent.location.href='./html/gpg_trouble.html??v===MAJOR=='">gpg key Trouble?</p></td></tr>
         <tr><td></td></tr>
         <tr><td><hr/></td></tr>
         <tr><td><b>Nightly build:</b></td></tr>
         <tr><td></td></tr>
-        <tr><td><p class="asmall">Rev ==MAJOR==.==MINOR==<br/>==DATE== ==TIME==</p></td></tr>
+        <tr><td><p class="a_s">==DATE== ==TIME==</p><p class="a">Rev ==MAJOR==.==MINOR==</p></td></tr>
         <tr><td></td></tr>
         <tr><td><hr/></td></tr>
         <tr><td><b>Links:</b></td></tr>
@@ -49,10 +49,10 @@
       </table>
       </table>
     </div>
-    <div id="aws"></div>
+    <div id="nocookies" title="(C)SEK-2000"></div>
   </div>
 
-  <div id="right"><iframe id="rightcontent" name="rightcontent" style="border:0px;" width="100%" height="100%" src="./html/default.html"></iframe></div>
+  <div id="right"><iframe id="rightcontent" name="rightcontent" style="border:0px;" width="100%" height="100%" src="./html/default.html?v===MINOR=="></iframe></div>
   
 </body>
 </html>
