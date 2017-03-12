@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.006
+#  Version 3.9.007
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -50,10 +50,7 @@
 #  attr <name> ccudefaults <filename>
 #  attr <name> ccuflags { intrpc,extrpc,dptnocheck,noagg }
 #  attr <name> ccuget { State | Value }
-#  attr <name> ccureadingfilter <filter_rule>
-#  attr <name> ccureadingformat { name[lc] | address[lc] | datapoint[lc] }
 #  attr <name> ccureadings { 0 | 1 }
-#  attr <name> ccutrace {<ccudevname_exp>|<ccudevaddr_exp>}
 #  attr <name> parfile <parfile>
 #  attr <name> rpcevtimeout <seconds>
 #  attr <name> rpcinterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear }
@@ -65,7 +62,7 @@
 #  attr <name> rpcserverport <base_port>
 #  attr <name> rpctimeout <read>[,<write>]
 #  attr <name> stripchar <character>
-#  attr <name> stripnumber { 0 | 1 | 2 }
+#  attr <name> stripnumber { -<digits> | 0 | 1 | 2 }
 #  attr <name> substitute <subst_rule>
 #
 #  filter_rule := [channel-regexp!]datapoint-regexp[,...]
@@ -104,7 +101,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.006';
+my $HMCCU_VERSION = '3.9.007';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -132,7 +129,7 @@ my $HMCCU_INIT_INTERVAL2 = 5;
 # Number of arguments in RPC events
 my %rpceventargs = (
 	"EV", 3,
-	"ND", 2,
+	"ND", 6,
 	"DD", 1,
 	"RD", 2,
 	"RA", 1,
@@ -201,6 +198,7 @@ sub HMCCU_Substitute ($$$$$);
 sub HMCCU_SubstRule ($$$);
 sub HMCCU_SubstVariables ($$);
 sub HMCCU_UpdateClients ($$$$);
+sub HMCCU_UpdateDeviceTable ($$);
 sub HMCCU_UpdateDevices ($$$);
 sub HMCCU_UpdateSingleDatapoint ($$$$);
 sub HMCCU_UpdateSingleDevice ($$$);
@@ -225,6 +223,7 @@ sub HMCCU_IsDevAddr ($$);
 sub HMCCU_IsChnAddr ($$);
 sub HMCCU_SplitChnAddr ($);
 sub HMCCU_GetCCUObjectAttribute ($$$);
+sub HMCCU_FindClientDevices ($$$$);
 sub HMCCU_FindIODevice ($);
 sub HMCCU_GetHash ($@);
 sub HMCCU_GetAttribute ($$$$);
@@ -307,7 +306,7 @@ sub HMCCU_Initialize ($)
 	$hash->{ShutdownFn} = "HMCCU_Shutdown";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults rpcinterfaces:multiple-strict,".join(',',sort keys %HMCCU_RPC_PORT)." ccudef-hmstatevals:textField-long ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc  ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT)." rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccutrace ccuget:Value,State ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults rpcinterfaces:multiple-strict,".join(',',sort keys %HMCCU_RPC_PORT)." ccudef-hmstatevals:textField-long ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc  ccuflags:multiple-strict,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT)." rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccuget:Value,State ". $readingFnAttributes;
 }
 
 ##################################################
@@ -831,13 +830,11 @@ sub HMCCU_AggregateReadings ($$)
 	my $resval;
 	$resval = $ftrue if ($fcond =~ /^(max|min|sum|avg)$/);
 	
-	foreach my $d (keys %defs) {
-		# Get device parameters and check device type
+	my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, undef);
+	foreach my $d (@devlist) {
 		my $ch = $defs{$d};
-		next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
 		my $cn = $ch->{NAME};
 		my $ct = $ch->{TYPE};
-		next if ($ct ne 'HMCCUCHN' && $ct ne 'HMCCUDEV');
 		
 		my $fmatch = '';
 		$fmatch = $cn if ($ftype eq 'name');
@@ -930,7 +927,7 @@ sub HMCCU_Undef ($$)
 	HMCCU_Shutdown ($hash);
 
 	# Delete reference to IO module in client devices
-	my @keylist = sort keys %defs;
+	my @keylist = keys %defs;
 	foreach my $d (@keylist) {
 		if (exists ($defs{$d}) && exists($defs{$d}{IODev}) &&
 		    $defs{$d}{IODev} == $hash) {
@@ -1151,7 +1148,6 @@ sub HMCCU_Get ($@)
 		return "HMCCU: CCU busy, choose one of rpcstate:noArg";
 	}
 
-	my $ccureadingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
 	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 	my $parfile = AttrVal ($name, "parfile", '');
 	my $rpcport = $hash->{hmccu}{rpcports};
@@ -1924,21 +1920,20 @@ sub HMCCU_UpdateClients ($$$$)
 		foreach my $name (sort keys %{$hash->{hmccu}{adr}}) {
 			next if ($name !~ /$devexp/ || !($hash->{hmccu}{adr}{$name}{valid}));
 
-			foreach my $d (keys %defs) {
+			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, "ccudevstate=active");
+			
+			foreach my $d (@devlist) {
 				my $ch = $defs{$d};
-				next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
-				next if ($ch->{TYPE} ne 'HMCCUDEV' && $ch->{TYPE} ne 'HMCCUCHN');
-				next if ($ch->{ccudevstate} ne 'Active');
 				next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
 				next if ($ch->{ccuaddr} ne $hash->{hmccu}{adr}{$name}{address});
 
 				my $rc = HMCCU_GetUpdate ($ch, $hash->{hmccu}{adr}{$name}{address}, $ccuget);
 				if ($rc <= 0) {
 					if ($rc == -10) {
-						Log3 $fhname, 1, "HMCCU: Device $name has no readable datapoints";
+						Log3 $fhname, 3, "HMCCU: Device $name has no readable datapoints";
 					}
 					else {
-						Log3 $fhname, 1, "HMCCU: Update of device $name failed" if ($rc != -10);
+						Log3 $fhname, 2, "HMCCU: Update of device $name failed" if ($rc != -10);
 					}
 					$c_err++;
 				}
@@ -1949,13 +1944,11 @@ sub HMCCU_UpdateClients ($$$$)
 		}
 	}
 	else {
-		foreach my $d (keys %defs) {
-			# Get hash of client device
+		my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", $devexp, "ccudevstate=active");
+		Log3 $fhname, 2, "HMCCU: No client devices matching $devexp" if (scalar (@devlist) == 0);
+		
+		foreach my $d (@devlist) {
 			my $ch = $defs{$d};
-			next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
-			next if ($ch->{TYPE} ne 'HMCCUDEV' && $ch->{TYPE} ne 'HMCCUCHN');
-			next if ($ch->{ccudevstate} ne 'Active');
-			next if ($ch->{NAME} !~ /$devexp/);
 			next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
 
 			my $rc = HMCCU_GetUpdate ($ch, $ch->{ccuaddr}, $ccuget);
@@ -1976,6 +1969,127 @@ sub HMCCU_UpdateClients ($$$$)
 	}
 
 	return ($c_ok, $c_err);
+}
+
+##########################################################################
+# Update parameters in internal device tables and client devices.
+# Parameter devices is a hash reference with keys:
+#  {address}
+#  {address}{flag} := [N, D, R]
+#  {address}{addtype} := [chn, dev]
+#  {address}{channels}  := Number of channels
+#  {address}{name}      := Device or channel name
+#  {address}{type}      := Homematic device type
+#  {address}{usetype}   := Usage type
+#  {address}{interface} := Device interface ID
+#  {address}{firmware}  := Firmware version of device
+#  {address}{version}   := Version of RPC device description
+#  {address}{rxmode}    := Transmit mode
+# If flag is 'D' the hash must contain an entry for the device address
+# and for each channel address.
+##########################################################################
+
+sub HMCCU_UpdateDeviceTable ($$)
+{
+	my ($hash, $devices) = @_;
+	my $devcount = 0;
+	my $chncount = 0;
+
+	# Update internal device table
+	foreach my $da (keys %{$devices}) {
+		my $nm = $hash->{hmccu}{dev}{$da}{name} if (defined ($hash->{hmccu}{dev}{$da}{name}));
+		$nm = $devices->{$da}{name} if (defined ($devices->{$da}{name}));
+
+		if ($devices->{$da}{flag} eq 'N' && defined ($nm)) {
+			# Updated or new device/channel
+			$hash->{hmccu}{dev}{$da}{addtype}   = HMCCU_IsChnAddr ($da, 0) ? 'chn' : 'dev';
+			$hash->{hmccu}{dev}{$da}{name}      = $nm if (defined ($nm));
+			$hash->{hmccu}{dev}{$da}{valid}     = 1;
+			$hash->{hmccu}{dev}{$da}{channels}  = $devices->{$da}{channels}
+				if (defined ($devices->{$da}{channels}));
+			$hash->{hmccu}{dev}{$da}{type}      = $devices->{$da}{type}
+				if (defined ($devices->{$da}{type}));
+			$hash->{hmccu}{dev}{$da}{usetype}   = $devices->{$da}{usetype}
+				if (defined ($devices->{$da}{usetype}));
+			$hash->{hmccu}{dev}{$da}{interface} = $devices->{$da}{interface}
+				if (defined ($devices->{$da}{interface}));
+			$hash->{hmccu}{dev}{$da}{version}   = $devices->{$da}{version}
+				if (defined ($devices->{$da}{version}));
+			$hash->{hmccu}{dev}{$da}{firmware}  = $devices->{$da}{firmware}
+				if (defined ($devices->{$da}{firmware}));
+			$hash->{hmccu}{dev}{$da}{rxmode}    = $devices->{$da}{rxmode}
+				if (defined ($devices->{$da}{rxmode}));
+			$hash->{hmccu}{adr}{$nm}{address}   = $da;
+			$hash->{hmccu}{adr}{$nm}{addtype}   = $hash->{hmccu}{dev}{$da}{addtype};
+			$hash->{hmccu}{adr}{$nm}{valid}     = 1 if (defined ($nm));
+		}
+		elsif ($devices->{$da}{flag} eq 'D' && exists ($hash->{hmccu}{dev}{$da})) {
+			# Device deleted, mark as invalid
+			$hash->{hmccu}{dev}{$da}{valid} = 0;
+			$hash->{hmccu}{adr}{$nm}{valid} = 0 if (defined ($nm));
+		}
+		elsif ($devices->{$da}{flag} eq 'R' && exists ($hash->{hmccu}{dev}{$da})) {
+			# Device replaced, change address
+			my $na = $devices->{hmccu}{newaddr};
+			# Copy device entries and delete old device entries
+			foreach my $k (keys %{$hash->{hmccu}{dev}{$da}}) {
+				$hash->{hmccu}{dev}{$na}{$k} = $hash->{hmccu}{dev}{$da}{$k};
+			}
+			$hash->{hmccu}{adr}{$nm}{address} = $na;
+			delete $hash->{hmccu}{dev}{$da};
+		}
+	}
+	
+	# Update client devices
+	my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, undef);
+
+	foreach my $d (@devlist) {
+		my $ch = $defs{$d};
+		my $ct = $ch->{TYPE};
+		my $ca = $ch->{ccuaddr};
+		next if (!exists ($devices->{$ca}));
+		if ($devices->{$ca}{flag} eq 'N') {
+			# New device or new device information
+			$ch->{ccudevstate} = 'active';
+			if ($ct eq 'HMCCUDEV') {
+				$ch->{ccutype} = $hash->{hmccu}{dev}{$ca}{type} 
+					if (defined ($hash->{hmccu}{dev}{$ca}{type}));
+				$ch->{firmware} = $devices->{$ca}{firmware}
+					if (defined ($devices->{$ca}{firmware}));
+			}
+			else {
+				$ch->{chntype} = $devices->{$ca}{usetype}
+					if (defined ($devices->{$ca}{usetype}));
+				my ($add, $chn) = HMCCU_SplitChnAddr ($ca);
+				$ch->{ccutype} = $devices->{$add}{type}
+					if (defined ($devices->{$add}{type}));
+				$ch->{firmware} = $devices->{$add}{firmware}
+					if (defined ($devices->{$add}{firmware}));
+			}
+			$ch->{ccuname} = $hash->{hmccu}{dev}{$ca}{name}
+				if (defined ($hash->{hmccu}{dev}{$ca}{name}));
+			$ch->{ccuif} = $hash->{hmccu}{dev}{$ca}{interface}
+				if (defined ($devices->{$ca}{interface}));
+			$ch->{channels} = $hash->{hmccu}{dev}{$ca}{channels}
+				if (defined ($hash->{hmccu}{dev}{$ca}{channels}));
+		}
+		elsif ($devices->{$ca}{flag} eq 'D') {
+			# Deleted device
+			$ch->{ccudevstate} = 'deleted';
+		}
+		elsif ($devices->{$ca}{flag} eq 'R') {
+			# Replaced device
+			$ch->{ccuaddr} = $devices->{$ca}{newaddr};
+		}
+	}
+	
+	# Update internals of I/O device
+	foreach my $adr (keys %{$hash->{hmccu}{dev}}) {
+		$devcount++ if ($hash->{hmccu}{dev}{$adr}{addtype} eq 'dev');
+		$chncount++ if ($hash->{hmccu}{dev}{$adr}{addtype} eq 'chn');
+	}
+	$hash->{ccudevices} = $devcount;
+	$hash->{ccuchannels} = $chncount;
 }
 
 ####################################################
@@ -2007,7 +2121,7 @@ sub HMCCU_UpdateDevices ($$$)
 			my $ch = $defs{$d};
 			next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
 			if ($ch->{TYPE} eq 'HMCCUDEV' && $ch->{ccuaddr} eq $a) {
-				$ch->{ccudevstate} = $mode ? 'Active' : 'Deleted';
+				$ch->{ccudevstate} = $mode ? 'active' : 'deleted';
 				readingsSingleUpdate ($ch, 'state', $mode ? 'Activated' : 'Deleted', 1);
 			}
 			elsif ($ch->{TYPE} eq 'HMCCUCHN' && $ch->{ccuaddr} =~ /^$a:[0-9]+/) {
@@ -2015,7 +2129,7 @@ sub HMCCU_UpdateDevices ($$$)
 					$ch->{chntype} = defined ($hash->{hmccu}{dev}{$a}{chntype}) ?
 						$hash->{hmccu}{dev}{$a}{chntype} : "unknown";
 				}
-				$ch->{ccudevstate} = $mode ? 'Active' : 'Deleted';
+				$ch->{ccudevstate} = $mode ? 'active' : 'deleted';
 				readingsSingleUpdate ($ch, 'state', $mode ? 'Activated' : 'Deleted', 1);
 			}
 		}
@@ -2072,11 +2186,10 @@ sub HMCCU_UpdateSingleDevice ($$$)
 
 	# Check for updated data
 	my ($devaddr, $cnum) = HMCCU_SplitChnAddr ($clthash->{ccuaddr});
+	return 0 if (!exists ($objects->{$devaddr}));
 	return 0 if ($clttype eq 'HMCUCCHN' && !exists ($objects->{$devaddr}{$cnum}) &&
 		!exists ($objects->{$devaddr}{0}));
-	return 0 if ($clttype eq 'HMCCUDEV' && $clthash->{ccuif} eq 'VirtualDevices' && 
-		!exists ($objects->{$devaddr}));
-		
+
 	# Get attributes of IO device
 	my $ccuflags = AttrVal ($ccuname, 'ccuflags', 'null');
 	
@@ -2099,6 +2212,11 @@ sub HMCCU_UpdateSingleDevice ($$$)
 		}
 	}
 
+	if ($cltflags =~ /trace/) {
+		Log3 $ccuname, 2, "HMCCU: $cltname Devlist = ".join(',', @devlist);
+		Log3 $ccuname, 2, "HMCCU: $cltname Objects = ".join(',', keys %{$objects});
+	}
+	
 	# Store the resulting readings
 	my %results;
 	
@@ -2138,7 +2256,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 						", orgvalue=$value value=$cvalue" if ($cltflags =~ /trace/);
 
 					foreach my $rn (@readings) {
-						HMCCU_BulkUpdate ($clthash, $rn, $value, $cvalue) if ($rn ne '');
+						HMCCU_BulkUpdate ($clthash, $rn, $fvalue, $cvalue) if ($rn ne '');
 					}
 					foreach my $clcr (keys %calcs) {
 						HMCCU_BulkUpdate ($clthash, $clcr, $calcs{$clcr}, $calcs{$clcr});
@@ -2168,8 +2286,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 # Parameter objects is a hash reference:
 #   {devaddr}
 #   {devaddr}{channelno}
-#   {devaddr}{channelno}{datapoint}
-#   {devaddr}{channelno}{datapoint}{value}
+#   {devaddr}{channelno}{datapoint} = value
 # Return number of updated devices.
 ######################################################################
 
@@ -2184,16 +2301,9 @@ sub HMCCU_UpdateMultipleDevices ($$)
 	return 0 if (!defined ($hash) || !defined ($objects));
 
 	# Update reading in matching client devices
-	foreach my $d (keys %defs) {
-		# Get hash and name of client device
+	my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, "ccudevstate=active");
+	foreach my $d (@devlist) {
 		my $ch = $defs{$d};
-		next if (!exists ($ch->{NAME}) || !exists ($ch->{TYPE}));
-		my $ct = $ch->{TYPE};
-		my $cn = $ch->{NAME};
-
-		# Filter devices
-		next if ($ct ne 'HMCCUDEV' && $ct ne 'HMCCUCHN');
-
 		my $rc = HMCCU_UpdateSingleDevice ($hash, $ch, $objects);
 		$c++ if (ref ($rc));
 	}
@@ -2561,7 +2671,7 @@ sub HMCCU_StopRPCServer ($)
 	# Send signal SIGINT to RPC server processes
 	foreach my $clkey (keys %{$hash->{hmccu}{rpc}}) {
 		my $rpchash = \%{$hash->{hmccu}{rpc}{$clkey}};
-		if (exists ($rpchash->{pid}) && $rpchash->{pid} > 0) {
+		if (exists ($rpchash->{pid}) && $rpchash->{pid} != 0) {
 			Log3 $name, 0, "HMCCU: Stopping RPC server $clkey with PID ".$rpchash->{pid};
 			kill ('INT', $rpchash->{pid});
 			$rpchash->{state} = "stopping";
@@ -2682,7 +2792,7 @@ sub HMCCU_IsRPCServerRunning ($$$)
 		foreach my $clkey (keys %{$hash->{hmccu}{rpc}}) {
 			if (exists ($hash->{hmccu}{rpc}{$clkey}{pid}) &&
 			   defined ($hash->{hmccu}{rpc}{$clkey}{pid}) &&
-			   $hash->{hmccu}{rpc}{$clkey}{pid} > 0) {
+			   $hash->{hmccu}{rpc}{$clkey}{pid} != 0) {
 			   my $pid = $hash->{hmccu}{rpc}{$clkey}{pid};
 				push (@$hm_pids, $pid) if (kill (0, $pid));
 			}
@@ -2733,7 +2843,6 @@ sub HMCCU_GetDeviceInfo ($$$)
 	return '' if (!defined ($hmccu_hash));
 
 	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
-	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $device, 0);
@@ -2770,7 +2879,7 @@ if (odev) {
 	);
 
 	my $response = HMCCU_HMScript ($hmccu_hash, $script);
-	if (($ccutrace ne '' && ($device =~ /$ccutrace/ || $devname =~ /$ccutrace/)) || $ccuflags =~ /trace/) {
+	if ($ccuflags =~ /trace/) {
 		Log3 $name, 2, "HMCCU: Device=$device Devname=$devname";
 		Log3 $name, 2, "HMCCU: Script response = \n".$response;
 		Log3 $name, 2, "HMCCU: Script = ".$script;
@@ -3491,6 +3600,35 @@ sub HMCCU_GetCCUObjectAttribute ($$$)
 	return undef;
 }
 
+######################################################################
+# Get list of client devices matching the specified criteria.
+# If no criteria is specified all device names will be returned.
+# Parameters modexp and namexp are regular expressions for module
+# name and device name. Parameter internal contains an expression
+# like internal=valueexp. All parameters can be undefined.
+######################################################################
+ 
+sub HMCCU_FindClientDevices ($$$$)
+{
+	my ($hash, $modexp, $namexp, $internal) = @_;
+	my @devlist = ();
+
+	foreach my $d (keys %defs) {
+		my $ch = $defs{$d};
+		next if (!defined ($ch->{TYPE}) || !defined ($ch->{NAME}));
+		next if (defined ($modexp) && $ch->{TYPE} !~ /$modexp/);
+		next if (defined ($namexp) && $ch->{NAME} !~ /$namexp/);
+		next if (defined ($hash) && exists ($ch->{IODev}) && $ch->{IODev} != $hash);
+		if (defined ($internal)) {
+			my ($i, $v) = split ('=', $internal);
+			next if (defined ($v) && exists ($ch->{$i}) && $ch->{$i} !~ /$v/);
+		}
+		push @devlist, $ch->{NAME};
+	}
+
+	return @devlist;
+}
+
 ####################################################
 # Get hash of HMCCU IO device which is responsible
 # for device or channel specified by parameter
@@ -3784,11 +3922,11 @@ sub HMCCU_ProcessEvent ($$)
 			return undef;
 		}
 		Log3 $name, 0, "HMCCU: Received IN event. RPC server $clkey initialized.";
-		$rh->{$clkey}{state} = $rh->{$clkey}{pid} > 0 ? "running" : "initialized";
+		$rh->{$clkey}{state} = $rh->{$clkey}{pid} != 0 ? "running" : "initialized";
 		
 		# Check if all RPC servers were initialized. Set overall status
 		foreach my $ser (keys %{$rh}) {
-			$norun++ if ($rh->{$ser}{state} ne "running" && $rh->{$ser}{pid} > 0);
+			$norun++ if ($rh->{$ser}{state} ne "running" && $rh->{$ser}{pid} != 0);
 			$norun++ if ($rh->{$ser}{state} ne "initialized" && $rh->{$ser}{pid} == 0);
 			$run++ if ($rh->{$ser}{state} eq "running");
 		}
@@ -3836,13 +3974,22 @@ sub HMCCU_ProcessEvent ($$)
 		$hash->{hmccu}{rpcinit} = $run;
 		return ($t[0], $clkey, $t[2], $f, $run);
 	}
-	elsif ($t[0] eq 'ND' || $t[0] eq 'DD' || $t[0] eq 'RA') {
+	elsif ($t[0] eq 'ND') {
+		#
+		# CCU device added
+		# Input:  ND|C/D|Address|Type|Version|Firmware|RxMode
+		# Output: ND, DevAdd, C/D, Type, Version, Firmware, RxMode
+		#
+#		Log3 $name, 2, "HMCCU: ND ".join (',', @t);
+		return ($t[0], $t[2], $t[1], $t[3], $t[4], $t[5], $t[6]);
+	}
+	elsif ($t[0] eq 'DD' || $t[0] eq 'RA') {
 		#
 		# CCU device added, deleted or readded
-		# Input:  {ND,DD,RA}|Address
-		# Output: {ND,DD,RA}, DevAdd, [ChnType]
+		# Input:  {DD,RA}|Address
+		# Output: {DD,RA}, DevAdd
 		#
-		return ($t[0], $t[1], $t[2]);
+		return ($t[0], $t[1]);
 	}
 	elsif ($t[0] eq 'UD') {
 		#
@@ -3892,17 +4039,18 @@ sub HMCCU_ReadRPCQueue ($)
 	my $name = $hash->{NAME};
 	my $eventno = 0;
 	my $f = 0;
-	my @newdevices;
-	my @deldevices;
+ 	my @newdevices;
+ 	my @deldevices;
 	my @termpids;
 	my $newcount = 0;
-	my $delcount = 0;
+#	my $delcount = 0;
+	my $devcount = 0;
 	my %events = ();
-
+	my %devices = ();
+	
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', 5);
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
 	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpctimeout = AttrVal ($name, 'rpcevtimeout', 300);
 	my $maxevents = $rpcinterval*10;
@@ -3930,18 +4078,37 @@ sub HMCCU_ReadRPCQueue ($)
 					last if ($eventno == $maxevents);
 				}
 				elsif ($et eq 'ND') {
-					push (@newdevices, $par[0]);
+#					push (@newdevices, $par[1]);
 					$newcount++ if (!exists ($hash->{hmccu}{dev}{$par[0]}));
-					$hash->{hmccu}{dev}{$par[0]}{chntype} = $par[1];
+#					$hash->{hmccu}{dev}{$par[1]}{chntype} = $par[3];
+					$devices{$par[0]}{flag} = 'N';
+					$devices{$par[0]}{version} = $par[3];
+					if ($par[1] eq 'D') {
+						$devices{$par[0]}{type} = $par[2];
+						$devices{$par[0]}{firmware} = $par[4];
+						$devices{$par[0]}{rxmode} = $par[5];
+					}
+					else {
+						$devices{$par[0]}{usetype} = $par[2];
+					}
+					$devcount++;
 				}
 				elsif ($et eq 'DD') {
-					push (@deldevices, $par[0]);
-					$delcount++;
+#					push (@deldevices, $par[0]);
+					$devices{$par[0]}{flag} = 'D';
+					$devcount++;
+#					$delcount++;
+				}
+				elsif ($et eq 'RD') {
+					$devices{$par[0]}{flag} = 'R';
+					$devices{$par[0]}{newaddr} = $par[1];			
+					$devcount++;
 				}
 				elsif ($et eq 'SL') {
 					InternalTimer (gettimeofday()+$HMCCU_INIT_INTERVAL1,
 					   'HMCCU_RPCRegisterCallback', $hash, 0);
-					return;
+					$f = -1;
+					last;
 				}
 				elsif ($et eq 'EX') {
 					push (@termpids, $par[1]);
@@ -3950,6 +4117,8 @@ sub HMCCU_ReadRPCQueue ($)
 				}
 			}
 
+			last if ($f == -1);
+			
 			# Read next element from queue
 			$element = HMCCU_QueueDeq ($hash);
 		}
@@ -3957,7 +4126,13 @@ sub HMCCU_ReadRPCQueue ($)
 		HMCCU_QueueClose ($hash);
 	}
 
+	# Update readings
 	HMCCU_UpdateMultipleDevices ($hash, \%events) if ($eventno > 0);
+
+	# Update device table and client device parameter
+	HMCCU_UpdateDeviceTable ($hash, \%devices) if ($devcount > 0);
+	
+	return if ($f == -1);
 	
 	# Check if events from CCU timed out
 	if ($hash->{hmccu}{evtime} > 0 && time()-$hash->{hmccu}{evtime} > $rpctimeout &&
@@ -3968,19 +4143,19 @@ sub HMCCU_ReadRPCQueue ($)
 	}
 
 	# CCU devices deleted
-	$delcount = scalar @deldevices;
-	if ($delcount > 0) {
-		HMCCU_UpdateDevices ($hash, \@deldevices, 0);
-		$hash->{DelDevices} = $delcount;
-		DoTrigger ($name, "$delcount devices deleted in CCU");
-	}
+# 	$delcount = scalar @deldevices;
+# 	if ($delcount > 0) {
+# 		HMCCU_UpdateDevices ($hash, \@deldevices, 0);
+# 		$hash->{DelDevices} = $delcount;
+# 		DoTrigger ($name, "$delcount devices deleted in CCU");
+# 	}
 
 	# CCU devices added
-	HMCCU_UpdateDevices ($hash, \@newdevices, 1) if (scalar @newdevices > 0);
-	if ($newcount > 0) {
-		$hash->{NewDevices} += $newcount;
-		DoTrigger ($name, "$newcount devices added in CCU");
-	}
+# 	HMCCU_UpdateDevices ($hash, \@newdevices, 1) if (scalar @newdevices > 0);
+# 	if ($newcount > 0) {
+# 		$hash->{NewDevices} += $newcount;
+# 		DoTrigger ($name, "$newcount devices added in CCU");
+# 	}
 
 	my @hm_pids;
 	my @ex_pids;
@@ -4097,7 +4272,7 @@ sub HMCCU_GetDatapoint ($@)
 
 	$hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $value) if (!defined ($hmccu_hash));
-	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
+	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
@@ -4156,7 +4331,7 @@ sub HMCCU_SetDatapoint ($$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return -3 if (!defined ($hmccu_hash));
-	return -4 if ($hash->{ccudevstate} eq 'Deleted');
+	return -4 if ($hash->{ccudevstate} eq 'deleted');
 	my $name = $hmccu_hash->{NAME};
 	my $cdname = $hash->{NAME};
 	
@@ -4351,13 +4526,12 @@ sub HMCCU_GetUpdate ($$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($cl_hash);
 	return -3 if (!defined ($hmccu_hash));
-	return -4 if ($type ne 'HMCCU' && $cl_hash->{ccudevstate} eq 'Deleted');
+	return -4 if ($type ne 'HMCCU' && $cl_hash->{ccudevstate} eq 'deleted');
 
 	my $nam = '';
 	my $script;
 
 	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $cl_hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
-	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	if (HMCCU_IsChnAddr ($addr, 0)) {
@@ -4436,7 +4610,7 @@ WriteLine (c);
 	}
 
 	my $response = HMCCU_HMScript ($hmccu_hash, $script);
-	if (($ccutrace ne '' && ($addr =~ /$ccutrace/ || $nam =~ /$ccutrace/)) || $ccuflags =~ /trace/) {
+	if ($ccuflags =~ /trace/) {
 		Log3 $name, 2, "HMCCU: Addr=$addr Name=$nam";
 		Log3 $name, 2, "HMCCU: Script response = \n".$response;
 		Log3 $name, 2, "HMCCU: Script = \n".$script;
@@ -4566,7 +4740,7 @@ sub HMCCU_RPCGetConfig ($$$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $result) if (!defined ($hmccu_hash));
-	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
+	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
@@ -4658,7 +4832,7 @@ sub HMCCU_RPCSetConfig ($$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return -3 if (!defined ($hmccu_hash));
-	return -4 if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
+	return -4 if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 	
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_FULLADDR);
@@ -5349,7 +5523,16 @@ sub HMCCU_CCURPC_NewDevicesCB ($$$)
 	
 	Log3 $name, 2, "CCURPC: $cb NewDevice received $devcount device specifications";	
 	for my $dev (@$a) {
-		HMCCU_CCURPC_Write ("ND", $dev->{ADDRESS}."|".$dev->{TYPE});
+		my $msg = '';
+		if ($dev->{ADDRESS} =~ /:[0-9]{1,2}$/) {
+			$msg = "C|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|null|null";
+		}
+		else {
+			$msg = "D|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|".
+				$dev->{FIRMWARE}."|".$dev->{RX_MODE};
+		}
+		HMCCU_CCURPC_Write ("ND", $msg);
+#		HMCCU_CCURPC_Write ("ND", $dev->{ADDRESS}."|".$dev->{TYPE});
 	}
 
 	return;
@@ -5721,19 +5904,9 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
          'Value' because each request is sent to the device. With method 'Value' only CCU
          is queried. Default is 'Value'.
       </li><br/>
-      <li><b>ccureadingformat {<u>name</u> | address | datapoint | namelc | addresslc |
-       datapointlc}</b><br/>
-        Format of reading names (channel name, channel address or channel number combined with
-        datapoint). With suffix 'lc' reading names are lowercase. Default is 'name'.
-      </li><br/>
       <li><b>ccureadings {0 | <u>1</u>}</b><br/>
          If set to 1 values read from CCU will be stored as readings. Otherwise output
          is displayed in browser window.
-      </li><br/>
-      <li><b>ccutrace {&lt;ccu-devname-exp&gt; | &lt;ccu-address-exp&gt;}</b><br/>
-         Turn on trace mode for devices matching specified expression. Will write extended
-         information into FHEM log (level 1). Deprecated. Use attribute 'ccuflags' in 
-         client devices instead.
       </li><br/>
       <li><b>parfile &lt;filename&gt;</b><br/>
          Define parameter file for command 'get parfile'.

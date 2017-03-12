@@ -145,7 +145,7 @@ sub HMCCUCHN_Define ($@)
 	AssignIoPort ($hash, $hmccu_hash->{NAME});
 
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
-	$hash->{ccudevstate} = 'Active';
+	$hash->{ccudevstate} = 'active';
 
 	return undef;
 }

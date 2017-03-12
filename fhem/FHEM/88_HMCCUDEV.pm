@@ -207,7 +207,7 @@ sub HMCCUDEV_Define ($@)
 	AssignIoPort ($hash, $hmccu_hash->{NAME});
 
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
-	$hash->{ccudevstate} = 'Active';
+	$hash->{ccudevstate} = 'active';
 
 	return undef;
 }
@@ -280,6 +280,7 @@ sub HMCCUDEV_Set ($@)
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $statevals = AttrVal ($name, "statevals", '');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 
@@ -380,6 +381,8 @@ sub HMCCUDEV_Set ($@)
 		
 		# Read current value of datapoint
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
+		Log3 $name, 2, "HMCCU: set toggle: GetDatapoint returned $rc, $result"
+			if ($ccuflags =~ /trace/);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		my $objvalue = '';

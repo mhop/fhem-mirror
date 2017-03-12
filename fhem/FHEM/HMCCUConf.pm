@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.001
+#  Version 3.9.002
 #
 #  Configuration parameters for Homematic devices.
 #
@@ -126,7 +126,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
-	"HM-PB-2-FM" => {
+	"HM-PB-2-FM|HM-PB-2-WM55|HM-PB-2-WM55-2" => {
 	_description     => "Funk-Wandtaster 2-fach",
 	_channels        => "1,2",
 	ccureadingfilter => "PRESS",
@@ -414,7 +414,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
-	"HM-PB-2-FM" => {
+	"HM-PB-2-FM|HM-PB-2-WM55|HM-PB-2-WM55-2" => {
 	_description     => "Funk-Wandtaster 2-fach",
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
