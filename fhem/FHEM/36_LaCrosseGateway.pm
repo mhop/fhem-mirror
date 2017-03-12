@@ -132,7 +132,13 @@ sub LaCrosseGateway_StartUpload($) {
   my @deviceName = split('@', $hash->{DeviceName});
   my $port = $deviceName[0];
   my $logFile = AttrVal("global", "logdir", "./log") . "/LaCrosseGatewayFlash.log";
-  my $hexFile = "./FHEM/firmware/JeeLink_LaCrosseGateway.bin";
+  my $hexFile;
+  if($hash->{model} =~ m/^\[LaCrosseGateway32 V/) {
+    $hexFile = "./FHEM/firmware/LaCrosseGateway32.bin";
+  }
+  else {
+    $hexFile = "./FHEM/firmware/JeeLink_LaCrosseGateway.bin";
+  }
   
   if(!-e $hexFile) {
     LaCrosseGateway_LogOTA("The file '$hexFile' does not exist");
@@ -576,8 +582,8 @@ sub LaCrosseGateway_Parse($$$$) {
 
     return;
   }
-
-  if($msg =~ m/^\[LaCrosseITPlusReader.Gateway/ ) {
+  
+  if($msg =~ m/^\[LaCrosseITPlusReader.Gateway|\[LaCrosseGateway32 V/) {
     $hash->{model} = $msg;
 
     my $attrVal = AttrVal($name, "timeout", undef);
