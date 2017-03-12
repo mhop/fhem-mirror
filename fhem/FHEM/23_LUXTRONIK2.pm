@@ -105,7 +105,7 @@ LUXTRONIK2_Define($$)
 
   my $interval = 5*60;
   $interval = $a[3] if(int(@a) == 4);
-  $interval = 30 if( $interval < 30 );
+  $interval = 10 if( $interval < 10 );
 
   $hash->{NAME} = $name;
 
@@ -216,7 +216,7 @@ LUXTRONIK2_Set($$@)
    
    elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
       Log3 $name, 3, "set $name $cmd $val";
-      $val = 30 if( $val < 30 );
+      $val = 10 if( $val < 10 );
       $hash->{INTERVAL}=$val;
       return "Polling interval set to $val seconds.";
    }
@@ -363,23 +363,19 @@ LUXTRONIK2_GetUpdate($)
   $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
-sub ########################################
-LUXTRONIK2_DoUpdate($)
+########################################
+sub LUXTRONIK2_DoUpdate($)
 {
   my ($name) = @_;
   my $hash = $defs{$name};
   my $host = $hash->{HOST};
   my $port = $hash->{PORT};
-  my @heatpump_temp;
   my @heatpump_values;
   my @heatpump_parameters;
   my @heatpump_visibility;
   my $count=0;
-  my $retryCounter=0;
   my $result="";
-  my $buf="";
   my $readingStartTime = time();
-  my $missingBytes = 0;
   
   LUXTRONIK2_Log $name, 5, "Opening connection to $host:$port";
   my $socket = new IO::Socket::INET (  
@@ -398,13 +394,11 @@ LUXTRONIK2_DoUpdate($)
 #Fetch operational values (FOV)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for operational values";
-  $buf=pack("N", 3004);
-  $buf.=pack("N",0);
-  $socket->send($buf);
+  $socket->send( pack( "N2", (3004,0) ) );
 
   LUXTRONIK2_Log $name, 5, "Start to receive operational values";
  #(FOV) read first 4 bytes of response -> should be request_echo = 3004
-  $socket->recv($result,4);
+  $socket->recv( $result,4, MSG_WAITALL );
   $count = unpack("N", $result);
   if($count != 3004) {
       LUXTRONIK2_Log $name, 2, "Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
@@ -413,7 +407,7 @@ LUXTRONIK2_DoUpdate($)
   }
  
  #(FOV) read next 4 bytes of response -> should be status = 0
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   $count = unpack("N", $result);
   if($count > 0) {
       LUXTRONIK2_Log $name, 4, "Parameter on target changed, restart parameter reading after 5 seconds";
@@ -422,7 +416,7 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FOV) read next 4 bytes of response -> should be count_calc_values > 0
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   my $count_calc_values = unpack("N", $result);
   if($count_calc_values == 0) {
       LUXTRONIK2_Log $name, 2, "Fetching operational values - 0 values announced: ".length($result)." -> ".$count_calc_values;
@@ -431,17 +425,8 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FOV) read remaining response -> should be previous number of parameters
- # SocketAPI allows to read less than requested. This may occur and is no fault. To handle it correctly we have to repeat until we get enough data
-  $buf=""; $result=""; $retryCounter=0;
-  $missingBytes = $count_calc_values*4;
-  while ( $missingBytes>0 && $retryCounter<15 ) {
-      $socket->recv( $buf, $missingBytes); 
-      $missingBytes -= length($buf);
-      $result .= $buf;
-      $retryCounter++;
-  }
-
-  if($missingBytes > 0) {
+  $socket->recv( $result, $count_calc_values*4, MSG_WAITALL ); 
+  if( length($result) != $count_calc_values*4 ) {
       LUXTRONIK2_Log $name, 1, "Operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
       $socket->close();
       return "$name|0|Number of values read mismatch ( $!)\n";
@@ -462,13 +447,11 @@ LUXTRONIK2_DoUpdate($)
 #Fetch set parameters (FSP)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for set parameters";
-  $buf=pack("N", 3003);
-  $buf.=pack("N",0);
-  $socket->send($buf);
+  $socket->send( pack( "N2", (3003,0) ) );
 
   LUXTRONIK2_Log $name, 5, "Start to receive set parameters";
  #(FSP) read first 4 bytes of response -> should be request_echo=3003
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   $count = unpack("N", $result);
   if($count != 3003) {
       LUXTRONIK2_Log $name, 2, "Wrong echo of request 3003: ".length($result)." -> ".$count;
@@ -477,7 +460,7 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FSP) read next 4 bytes of response -> should be number_of_parameters > 0
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   my $count_set_parameter = unpack("N", $result);
   if($count_set_parameter == 0) {
       LUXTRONIK2_Log $name, 2, "0 parameter read: ".length($result)." -> ".$count_set_parameter;
@@ -486,17 +469,10 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FSP) read remaining response -> should be previous number of parameters
-  $buf=""; $result=""; $retryCounter=0;
-  $missingBytes = $count_set_parameter*4;
-  while ( $missingBytes>0 && $retryCounter<15 ) {
-      $socket->recv( $buf, $missingBytes); 
-      $missingBytes -= length($buf);
-      $result .= $buf;
-      $retryCounter++;
-  }
+   $socket->recv( $result, $count_set_parameter*4, MSG_WAITALL ); 
 
-  if($missingBytes > 0) {
-     LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
+  if( length($result) != $count_set_parameter*4 ) {
+     LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". ($count_set_parameter * 4);
      $socket->close();
       return "$name|0|Number of parameters read mismatch ( $!)\n";
   }
@@ -514,13 +490,11 @@ LUXTRONIK2_DoUpdate($)
 #Fetch Visibility Attributes (FVA)
 ############################ 
   LUXTRONIK2_Log $name, 5, "Ask host for visibility attributes";
-  $buf=pack("N", 3005);
-  $buf.=pack("N",0);
-  $socket->send($buf);
+  $socket->send( pack( "N2", (3005,0) ) );
 
   LUXTRONIK2_Log $name, 5, "Start to receive visibility attributes";
  #(FVA) read first 4 bytes of response -> should be request_echo=3005
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   $count = unpack("N", $result);
   if($count != 3005) {
       LUXTRONIK2_Log $name, 2, "Wrong echo of request 3005: ".length($result)." -> ".$count;
@@ -529,34 +503,26 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FVA) read next 4 bytes of response -> should be number_of_Visibility_Attributes > 0
-  $socket->recv($result,4);
+  $socket->recv($result,4, MSG_WAITALL );
   my $countVisibAttr = unpack("N", $result);
   if($countVisibAttr == 0) {
       LUXTRONIK2_Log $name, 2, "0 visibility attributes announced: ".length($result)." -> ".$countVisibAttr;
-     $socket->close();
+      $socket->close();
       return "$name|0|0 visibility attributes announced";
   }
   
  #(FVA) read remaining response bytewise -> should be previous number of parameters
-  $buf=""; $result=""; $retryCounter=0;
-  $missingBytes = $countVisibAttr;
-  while ( $missingBytes>0 && $retryCounter<15 ) {
-      $socket->recv( $buf, $missingBytes); 
-      $missingBytes -= length($buf);
-      $result .= $buf;
-      $retryCounter++;
-  }
-
-  if($missingBytes > 0) {
+  $socket->recv( $result, $countVisibAttr, MSG_WAITALL ); 
+   if( length( $result ) != $countVisibAttr ) {
       LUXTRONIK2_Log $name, 1, "Visibility attributes length check: ".length($result)." should have been ". $countVisibAttr;
-     $socket->close();
+      $socket->close();
       return "$name|0|Number of Visibility attributes read mismatch ( $!)\n";
-  }
+   }
 
   @heatpump_visibility = unpack("C$countVisibAttr", $result);
   if(scalar(@heatpump_visibility) != $countVisibAttr) {
       LUXTRONIK2_Log $name, 2, "Unpacking problem by visibility attributes: ".scalar(@heatpump_visibility)." instead of ".$countVisibAttr;
-     $socket->close();
+      $socket->close();
       return "$name|0|Unpacking problem of visibility attributes";
   }
 
@@ -1389,13 +1355,11 @@ sub LUXTRONIK2_SetParameter ($$$)
       $socket->autoflush(1);
      
      LUXTRONIK2_Log $name, 5, "Set parameter $parameterName ($setParameter) = $realValue ($setValue)";
-     $socket->send(pack("N", 3002));
-     $socket->send(pack("N", $setParameter));
-     $socket->send(pack("N", $setValue));
+     $socket->send( pack( "N3", (3002, $setParameter, $setValue) ) );
      
      LUXTRONIK2_Log $name, 5, "Receive confirmation";
     #read first 4 bytes of response -> should be request_echo = 3002
-     $socket->recv($buffer,4);
+     $socket->recv($buffer,4, MSG_WAITALL );
      $result = unpack("N", $buffer);
      if($result != 3002) {
         LUXTRONIK2_Log $name, 2, "Set parameter $parameterName - wrong echo of request: $result instead of 3002";
@@ -1404,7 +1368,7 @@ sub LUXTRONIK2_SetParameter ($$$)
      }
     
     #Read next 4 bytes of response -> should be setParameter
-     $socket->recv($buffer,4);
+     $socket->recv($buffer,4, MSG_WAITALL );
      $result = unpack("N", $buffer);
      if($result !=$setParameter) {
         LUXTRONIK2_Log $name, 2, "Set parameter $parameterName - missing confirmation: $result instead of $setParameter";
@@ -2112,7 +2076,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address[:Port]&gt; [poll-interval]</code><br>
-    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 30.
+    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 10.
     <br>
     Usually, the port needs not to be defined.
     <br>
@@ -2242,7 +2206,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse[:Port]&gt; [Abfrageinterval]</code>
     <br>
-    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
+    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 10.
     <br>
     Die Angabe des Portes kann gew&ouml;hnlich entfallen.
     <br>
