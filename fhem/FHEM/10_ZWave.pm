@@ -5001,8 +5001,14 @@ s2Hex($)
   <b>Set</b>
   <ul>
   <br>
-  <b>Note</b>: devices with on/off functionality support the <a
-      href="#setExtensions"> set extensions</a>.
+  <b>Notes</b>:
+  <ul>
+    <li>devices with on/off functionality support the <a
+      href="#setExtensions"> set extensions</a>.</li>
+    <li>A set command does not automatically updates the correspondig reading,
+      you have to execute a get for this purpose. This can be automatically
+      done via a notify, although this is not recommended in all cases.</li>
+  </ul>
 
   <br><br><b>All</b>
   <li>neighborUpdate<br>
