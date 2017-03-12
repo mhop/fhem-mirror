@@ -8,34 +8,39 @@
 # may be called with optional parameter "quiet"
 #
 
-QUIET=$1
 
 clear
 echo "#"
-echo "# Starting FHEM package build"
+echo "# Starting FHEM package build (nightly)"
 echo "#"
 
-# remove old version infos
-#
-#rm ~/scripts/templates/nversion.shtml
-#rm ~/scripts/templates/major.shtml
+QUIET=$1
+DATE=`date +%d.%m.%y`
+TIME=`date +%X`
 
 
+######################################################################
 # update svn repo
 #
+
 cd ~/fhem.svn
 if [ "$QUIET" = "quiet" ]
   then svn update > /dev/null
   else svn update
 fi
 
+MAJOR=`cat Makefile |grep '^VERS=' |sed 's/VERS=//' |sed 's/\r//'`
+MINOR=`svn info | grep 'Revision' | awk '{ print $2; }'`
+
+#
+######################################################################
+
+
+######################################################################
 # replace version infos in various html files
 # because Amazon S3 does not support shtml
 #
-MAJOR=`cat Makefile |grep '^VERS=' |sed 's/VERS=//' |sed 's/\r//'`
-MINOR=`svn info | grep 'Revision' | awk '{ print $2; }'`
-DATE=`date +%d.%m.%y`
-TIME=`date +%X`
+
 echo "# $MAJOR.$MINOR"
 echo "#"
 echo "# $DATE $TIME"
@@ -55,10 +60,16 @@ mv nightly.html ../debianfhemde/html/
 cp templates/manual.template manual.html
 sed -i s/==MAJOR==/$MAJOR/g manual.html
 mv manual.html ../debianfhemde/html/
+#exit # for debugging
+
+#
+######################################################################
 
 
+######################################################################
 # build nightly deb package
 #
+
 echo "#"
 echo "# processing Makefile - be patient..."
 echo "#"
@@ -67,23 +78,39 @@ if [ "$QUIET" = "quiet" ]
    then make --silent deb
    else make deb
 fi
+mkdir -p ~/debianfhemde/nightly > /dev/null
 mv fhem-$MAJOR.deb ~/debianfhemde/nightly/
 
+#
+######################################################################
 
+
+######################################################################
 # create package informations for aptitude
 # and sign all the stuff
 #
+
 echo "#"
 echo "# creating package index for aptitude"
 echo "#"
 cd ~/debianfhemde/
 apt-ftparchive packages nightly > nightly/Packages
 sed -i s/nightly.//g nightly/Packages
+cd nightly
+gzip -c Packages > Packages.gz
+cd ..
 apt-ftparchive release  nightly > nightly/Release
+gpg --batch --yes --passphrase-file ~/.gnupg/passphrase.txt --clearsign -o nightly/InRelease nightly/Release
 gpg --batch --yes --passphrase-file ~/.gnupg/passphrase.txt --output nightly/Release.gpg -bas nightly/Release
 
+#
+######################################################################
+
+
+######################################################################
 # sync to Amazon S3 Instance
 #
+
 echo "# starting sync"
 echo "#"
 cd ~/debianfhemde
@@ -93,5 +120,6 @@ if [ "$QUIET" = "quiet" ]
 fi
 echo "# done."
 echo "#"
-###
 
+#
+######################################################################

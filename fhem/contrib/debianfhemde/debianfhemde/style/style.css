@@ -3,8 +3,13 @@ body     { background-color: #FFFFE7;
 input    { font-family:Arial, sans-serif; font-size:16px; }
 select   { font-family:Arial, sans-serif; font-size:16px; }
 
+#werbefrei { margin-top:10px; margin-left:30px; width:120px; 
+           content:url(../grafik/werbefrei.png); }
+
 #aws     { margin-top:10px; margin-left:30px; width:120px; height:45px; 
            content:url(../grafik/aws.png); }
+#nocookies { margin-top:10px; margin-left:30px; width:120px; 
+           content:url(../grafik/cookies_free.png); }
 #logo    { margin-top:10px; margin-left:30px; width:120px; height:132px;
            background-image:url(../grafik/fhemicon.png); }
 #menu    { margin-top:10px; margin-left:20px; width:140px; }
@@ -18,9 +23,10 @@ select   { font-family:Arial, sans-serif; font-size:16px; }
                position:absolute; top:0px; left:40px; z-index: 10; }
 .devType { padding-top:20px; }
 
-a   { color: #278727; }
-p.a { color: #278727; text-align: center; }
-p.asmall { color: #278727; text-align: center; font-size: 75%; }
+a     { color: #278727; }
+a_s   { color: #278727; font-size: 75%; }
+p.a   { color: #278727; text-align: center; }
+p.a_s { color: #278727; text-align: center; font-size: 75%; }
 
 img {  border-style: none; }
 
@@ -45,37 +51,5 @@ button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 a img { border-style:none; }
 .col2 { text-align:center; }
 
-/* detail-selector & slider */
-.makeTable { display:inline; float:left; clear:left;
-             margin-top:10px; margin-bottom:20px;}
-.makeSelect { display:inline; float:left; clear:left; }
-
-select {  margin-left:5px; margin-right:5px; }
-.get,.set,.attr { margin-bottom:5px; float:left; }
-.slider { float:left; width:250px; height:26px; }
-
-/* detail only */
-.makeSelect .slider {background:#F0F0D8; border-radius:8px;}
-
-/* timepicker */
-.set .set { margin-bottom:2px; margin-top:3px; }
-
-.handle { position:relative; cursor:pointer; width:50px;
-          height:20px; line-height:20px; 
-          -webkit-user-select:none; -moz-user-select:none; -user-select:none;
-          border:3px solid; color:#278727; text-align:center; } 
-.downText { margin-top:2px; }
-
 pre { white-space: pre-wrap; }
 
-svg      { height:32px; width:32px; fill:#278727; }
-svg.on,svg.FS20_on { fill:orange; }
-
-/* next lines are for remotecontrol */
-.rc_body              { border-style: solid; border-color: gray; border-width: 2px; padding: 5px;
-                        background: #C8C8B0; font-size:6px;}
-.rc_button            { padding: 5px 7px;}
-.rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
-.rc_button img:active { border-color: gray; }
-
-.changed { color:red; }
