@@ -2162,7 +2162,8 @@ ZWave_mcCapability($$)
   my $id = $hash->{nodeIdHex};
 
   my @classes;
-  my $genericClass  = shift(@l);
+  my $type6  = shift(@l);
+  $type6 = $zw_type6{$type6} if($type6 && $zw_type6{lc($type6)});
   my $specificClass = shift(@l);
   for my $classId (@l) {
     push @classes, $zwave_id2class{lc($classId)} ?
@@ -2175,7 +2176,7 @@ ZWave_mcCapability($$)
     my $lcaps = substr($caps, 6);
     $id = hex($id);
     DoTrigger("global",
-      "UNDEFINED ZWave_${genericClass}_$id.$chid ZWave $homeId $lid $lcaps", 1);
+      "UNDEFINED ZWave_${type6}_$id.$chid ZWave $homeId $lid $lcaps", 1);
   }
 
   return "mcCapability_$chid:".join(" ", @classes);
