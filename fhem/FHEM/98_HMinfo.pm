@@ -201,7 +201,7 @@ sub HMinfo_Notify(@){##########################################################
   HMinfo_listOfTempTemplates() if (grep /(FILEWRITE.*$cfgFn|INITIALIZED)/,@{$events});
 
   if (grep /(SAVE|SHUTDOWN)/,@{$events}){# also save configuration
-    HMinfo_archConfig($hash,$name,"","");
+    HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
   if (grep /INITIALIZED/,@{$events}){
     HMinfo_SetFn($hash,$name,"loadConfig") 
@@ -444,10 +444,10 @@ sub HMinfo_regCheck(@) { ######################################################
         my $pre =  (CUL_HM_getAttrInt($eName,"expert") & 0x02)?"":".";#raw register on
 
         delete $ehash->{helper}{shadowReg}{$rl} 
-              if (   (   $ehash->{READINGS}{$pre.$rl} 
-                      && $ehash->{READINGS}{$pre.$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl}
-                      )                                  # content is already displayed
-                   ||(!$ehash->{helper}{shadowReg}{$rl}) # content is missing
+              if (   ( !$ehash->{helper}{shadowReg}{$rl}) # content is missing
+                  ||(   $ehash->{READINGS}{$pre.$rl} 
+                     && $ehash->{READINGS}{$pre.$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl}
+                     )                                  # content is already displayed
                    );
       }
       push @regChPend,$eName if (keys %{$ehash->{helper}{shadowReg}});
