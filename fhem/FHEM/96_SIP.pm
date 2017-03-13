@@ -46,14 +46,15 @@ use strict;
 use warnings;
 
 use Net::SIP qw//;
+use Net::SIP::Packet;
 use IO::Socket;
 use Socket;
 use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.31 / 28.02.17";
-my $ua;			# SIP user agent
+my $sip_version ="V1.41 / 13.03.17";
+my $ua;	# SIP user agent
 
 my %sets = (
    "call"         => "",
@@ -73,7 +74,9 @@ sub SIP_Initialize($$)
   $hash->{ShutdownFn}   = "SIP_Undef";
   $hash->{SetFn}        = "SIP_Set";
   $hash->{GetFn}        = "SIP_Get";
-  $hash->{AttrList}     = "sip_waits ".
+  $hash->{NotifyFn}     = "SIP_Notify";
+  $hash->{AttrFn}       = "SIP_Attr";
+  $hash->{AttrList}     = "sip_watch_listen ".
                           "sip_ringtime ".
                           "sip_waittime ". 
                           "sip_ip ".
@@ -81,9 +84,17 @@ sub SIP_Initialize($$)
                           "sip_user ".
                           "sip_registrar ".
                           "sip_from ".
-                          "sip_audiofile ".
+                          "sip_audiofile_call ".
+                          "sip_audiofile_dtmf ".
+                          "sip_audiofile_ok ".
+                          "sip_audiofile_wfp ".
                           "sip_dtmf_size:1,2,3,4 ".
-                          "sip_listen:none,dtmf,wfp ". 
+                          "sip_dtmf_send:audio,rfc2833 ".
+                          "sip_dtmf_loop:once,loop ".
+                          "sip_listen:none,dtmf,wfp ".
+                          "T2S_Device ".
+                          "T2S_Timeout ".
+                          "audio_converter:sox,ffmpeg ".
                           "disabled:0,1 ".$readingFnAttributes;
 }						
 
@@ -97,18 +108,87 @@ sub SIP_Define($$)
 
   $hash->{STATE}              = "defined"; 	
   $hash->{VERSION}            = $sip_version;
-  $attr{$name}{sip_ringtime}  = '10'        unless (exists($attr{$name}{sip_ringtime}));
+  $hash->{".reset"}           = 0;
+   
+  $attr{$name}{sip_ringtime}  = '3'         unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
   $attr{$name}{sip_ip}        = $addr       unless (exists($attr{$name}{sip_ip}));
   $attr{$name}{sip_port}      = '5060'      unless (exists($attr{$name}{sip_port}));
   $attr{$name}{sip_registrar} = 'fritz.box' unless (exists($attr{$name}{sip_registrar}));
   $attr{$name}{sip_listen}    = 'none'      unless (exists($attr{$name}{sip_listen}));
   $attr{$name}{sip_dtmf_size} = '2'         unless (exists($attr{$name}{sip_dtmf_size}));
+  $attr{$name}{sip_dtmf_loop} = 'once'      unless (exists($attr{$name}{sip_dtmf_loop}));
+  $attr{$name}{sip_dtmf_send} = 'audio'     unless (exists($attr{$name}{sip_dtmf_send}));
   $attr{$name}{sip_from}      = 'sip:'.$attr{$name}{sip_user}.'@'.$attr{$name}{sip_registrar} unless (exists($attr{$name}{sip_from}));
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "SIP_updateConfig", $hash, 0);
   return undef;
+}
+
+sub SIP_Notify($$) 
+{
+  # $hash is my entry, $dev_hash is the entry of the changed device
+  my ($hash, $dev_hash) = @_;
+  return undef if ($dev_hash->{NAME} ne AttrVal($hash->{NAME},"T2S_Device",""));
+  SIP_wait_for_tts($hash) if (defined($hash->{callnr}) && defined($hash->{ringtime}));
+  return undef;
+}
+
+sub SIP_Attr (@) 
+{
+
+ my ($cmd, $name, $attrName, $attrVal) = @_;
+ my $hash  = $defs{$name};
+
+ if ($cmd eq "set")
+ {
+   if (substr($attrName ,0.4) eq "sip_") 
+   {
+     $_[3] = $attrVal;
+     $hash->{".reset"} = 1 if ($hash->{LPID} && ($attrName ne "sip_audiofile_call") && ($attrName ne "sip_dtmf_send"));
+   }
+   elsif (($attrName eq "disable") && ($attrVal == 1))
+   {
+     readingsSingleUpdate($hash,"state","disabled",1);
+     $_[3] = $attrVal;
+     $hash->{".reset"} = 1 if $hash->{LPID};
+   }
+   elsif ($attrName eq "audio_converter")
+   {
+      my $res = qx(which $attrVal);
+      $res =~ s/\n//;
+      $hash->{AC} = ($res) ? $res : undef;
+   }
+   elsif ($attrName eq "T2S_Device")
+   {
+    $_[3] = $attrVal;
+    $hash->{NOTIFYDEV} = $attrVal;
+   }
+
+ }
+ elsif ($cmd eq "del")
+ {
+   if (substr($attrName,0.4) eq "sip_")
+   {
+     $_[3] = $attrVal;
+     $hash->{".reset"} = 1 if ($hash->{LPID} && ($attrName ne "sip_audiofile_call") && ($attrName ne "sip_dtmf_send"));
+   } 
+   elsif ($attrName eq "audio_converter")
+   {
+    $_[3] = $attrVal;
+    delete $hash->{AC};
+   }
+   elsif ($attrName eq "T2S_Device")
+   {
+    $_[3] = $attrVal;
+    delete $hash->{NOTIFYDEV};
+   }
+
+ }
+
+ SIP_updateConfig($hash) if ($hash->{".reset"});
+ return undef;
 }
 
 sub SIP_updateConfig($)
@@ -133,7 +213,7 @@ sub SIP_updateConfig($)
 	RemoveInternalTimer($hash);
 	if(defined($hash->{LPID}))
 	{
-                    Log3 $name,4, "$name, Listen Kill PID : ".$hash->{LPID};
+            Log3 $name,4, "$name, Listen Kill PID : ".$hash->{LPID};
 	    BlockingKill($hash->{helper}{LISTEN_PID});
 	    delete $hash->{helper}{LISTEN_PID};
 	    delete $hash->{LPID};
@@ -155,6 +235,18 @@ sub SIP_updateConfig($)
 	return undef;
     }
 
+    my $t2s = AttrVal($name,"T2S_Device",undef);
+    $hash->{NOTIFYDEV}    = $t2s if defined($t2s);
+
+    if (AttrVal($name,"audio_converter","") && defined($t2s))
+    {
+       my $converter = AttrVal($name,"audio_converter","");
+       my $res = qx(which $converter);
+       $res =~ s/\n//;
+       $hash->{AC} = ($res) ? $res : undef;
+    }
+
+
         if (AttrVal($name,"sip_listen", "none") ne "none")
         {
       
@@ -174,9 +266,9 @@ sub SIP_updateConfig($)
 }
     
 
-sub SIP_Register($$)
+sub SIP_Register($$$)
 {
-  my ($hash,$port) = @_;
+  my ($hash,$port,$type) = @_;
   my $name = $hash->{NAME};
   my $ip   = AttrVal($name,"sip_ip","");
   return "missing attr sip_ip" if (!$ip);
@@ -218,6 +310,7 @@ sub SIP_Register($$)
   $sub_register = sub {
 	my $expire = $ua->register(registrar => $registrar ) || return "registration failed: ".$ua->error;
 	Log3 $name,4,"$name, register new expire : ".localtime(time()+$expire);
+        SIP_telnet($hash,"set $name state $type\nexit\n");
 	# need to refresh registration periodically
 	$ua->add_timer( $expire/2, $sub_register );
         };
@@ -250,41 +343,51 @@ sub SIP_CALLStart($)
   my $dtmf  = 'ABCD*#123--4567890';
   my $port = AttrVal($name,"sip_port","5060");
   my $call; 
+  my $codec;
   
   $ua = undef;
- 
-  sleep 1;
 
-  my $error = SIP_Register($hash,$port);
+  $hash->{telnetPort} = SIP_telnetPort();
+  return $name."|no telnet port without password found" if (!$hash->{telnetPort}); 
+ 
+
+  my $error = SIP_Register($hash,$port,"calling");
   return $name."|0|CallRegister: $error" if ($error);
  
   if ((substr($msg,0,1) ne "-") && $msg)
   {
-    Log3 $name,4,"$name, CallStart msg : $msg";
-    $call = $ua->invite( $nr,
-    init_media => $ua->rtp('send_recv', $msg),
+    $codec = "PCMA/8000" if ($msg =~ /\.al(.+)$/);
+    $codec = "PCMU/8000" if ($msg =~ /\.ul(.+)$/);
+    return $name."|0|CallStart: please use filetype .alaw (for a-law) or .ulaw (for u-law)" if !defined($codec);
+
+    Log3 $name,4,"$name, CallStart msg : $msg - $codec";
+     $call = $ua->invite( $nr,
+     init_media => $ua->rtp('send_recv', $msg),
     cb_rtp_done => \$rtp_done,
-    cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
-    recv_bye => \$peer_hangup,
+       cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
+       recv_bye => \$peer_hangup,
     cb_noanswer => \$no_answer,
-    asymetric_rtp => 0,
-    rtp_param => [8, 160, 160/8000, 'PCMA/8000']) || return $name."|0|invite failed: ".$ua->error;
+      rtp_param => [8, 160, 160/8000, $codec]) || return $name."|0|invite failed: ".$ua->error;
   }
    else
   {
     $dtmf = (substr($msg,0,1) eq "-") ? substr($msg,1) : $dtmf; 
     Log3 $name,4,"$name, CallStart DTMF : $dtmf";
     $call = $ua->invite($nr, 
-    init_media => $ua->rtp( 'recv_echo',undef,0 ),
-    cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
+     init_media => $ua->rtp( 'recv_echo',undef,0 ),
+      rtp_param => [0, 160, 160/8000, 'PCMU/8000'],
+       cb_final => sub { my ($status,$self,%info) = @_; $final = $info{code};},
     cb_noanswer => \$no_answer,
-    recv_bye => \$peer_hangup) || return $name."|0|invite failed ".$ua->error;
-    $call->dtmf( $dtmf, cb_final => \$rtp_done);
+       recv_bye => \$peer_hangup) || return $name."|0|invite failed ".$ua->error;
+
+    if (AttrVal($name,"sip_dtmf_send","audio") eq "audio")
+    { $call->dtmf( $dtmf, methods => 'audio', duration => 500, cb_final => \$rtp_done); }
+    else  { $call->dtmf( $dtmf,  cb_final => \$rtp_done); }
   }
 
   return "$name|0|invite call failed ".$call->error if ($call->error);
-  $hash->{telnetPort} = SIP_telnetPort();
-  SIP_telnet($hash,"set $name call_state calling $nr\nexit\n") if $hash->{telnetPort} ; 
+
+  SIP_telnet($hash,"set $name call_state calling $nr\nexit\n"); 
   Log3 $name,4,"$name, calling : $nr";
 
   return "$name|0|no answer" if ($no_answer);
@@ -300,7 +403,6 @@ sub SIP_CALLStart($)
     $ua->loop( \$stopvar );
   }
  
-  # $state = $rtp_done if (!$state);
   Log3 $name,5,"$name, RTP done : $rtp_done"   if defined($rtp_done);
   Log3 $name,5,"$name, Hangup : $peer_hangup"  if defined($peer_hangup);
   Log3 $name,5,"$name, Stopvar : $stopvar"     if defined($stopvar);
@@ -308,7 +410,6 @@ sub SIP_CALLStart($)
 
   if (defined($rtp_done))
   {
-   #print Dumper($stopvar);
    if ($rtp_done eq "OK") {return $name."|1|ok";} # kein Audio
    else 
    {
@@ -353,6 +454,7 @@ sub SIP_CALLDone($)
     readingsBulkUpdate($hash, "call","done");
     readingsBulkUpdate($hash, "last_error",$final);
     readingsBulkUpdate($hash, "call_state","fail");
+    readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
    else
@@ -360,6 +462,7 @@ sub SIP_CALLDone($)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "call","done");
     readingsBulkUpdate($hash, "call_state",lc($final));
+    readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
 
@@ -393,26 +496,72 @@ sub SIP_Set($@)
   if  ($cmd eq "call") 
   {
     my $nr       = (defined($a[2])) ? $a[2] : "";
-    my $ringtime = (defined($a[3])) ? $a[3] : AttrVal($name, "sip_ringtime", "10");
-    my $msg      = (defined($a[4])) ? $a[4] : AttrVal($name, "sip_audiofile", "");
+    my $ringtime = (defined($a[3])) ? $a[3] : 30;
+    my $msg      = (defined($a[4])) ? $a[4] : AttrVal($name, "sip_audiofile_call", "");
     return "there is already a call activ with pid ".$hash->{CPID} if exists($hash->{CPID});
-    return "missung call number" if (!$nr);
+    return "missing call number" if (!$nr);
 
-    my $arg;
     if ($msg)
     {
-      Log3 $name, 4, $name.", sending file $msg to $nr, ringtime: $ringtime"; 
+      #Log3 $name, 4, $name.", sending $msg to $nr, ringtime: $ringtime"; 
 
-      if((-e $msg) || (substr($msg,0,1) eq "-")) { Log3 $name, 4, $name.", $msg found"; } 
-      else 
+      if (substr($msg,0,1) eq "-") 
+      { 
+        Log3 $name, 4, $name.", message DTMF = $msg"; 
+      } 
+      elsif (substr($msg,0,1) eq "!") # Text2Speech Text ?
+      {
+       $msg =~ s/^\!//; # das ! muss weg
+       my $t2s_name = AttrVal($name,"T2S_Device",undef);
+       return "attr T2S_Device not set !" if !defined($t2s_name);
+       my $t2s_hash = $defs{$t2s_name};
+       return "T2S_Device $t2s_name not found" if !defined($t2s_hash);
+
+       return "attr audio_converter not set" if !AttrVal($name,"audio_converter","");
+       return "external sox or ffmpeg programm not found, please install sox or ffmpeg first and set attr audio_converter" if !defined($hash->{AC});
+
+       my $t2s_file = ReadingsVal($t2s_name,"lastFilename",undef);
+       Log3 $name,3,"$name, Reading lastFilename not found at device $t2s_name, are you using a old version ?" if !defined($t2s_file);
+
+       readingsSingleUpdate($t2s_hash,"lastFilename","---",0);
+
+       shift @a;
+       shift @a;
+       $a[0] = $t2s_name; # ist aber egal wird eh verworfen
+       $a[1] = "tts"; # Kommando des Set Befehls
+       $a[2] = $msg;
+
+       my $ret = Text2Speech_Set($t2s_hash, @a); # na dann lege schon mal los
+       if (defined($ret))
+       {
+        Log3 $name,3,"$name, T2S error : $ret"; 
+        readingsSingleUpdate($hash,"last_error",$ret,0);
+        return $ret; # Das ging leider schief
+       }
+       readingsSingleUpdate($hash,"call_state","waiting T2S",0);
+
+       $hash->{callnr}   = $nr;
+       $hash->{ringtime} = $ringtime;
+
+       RemoveInternalTimer($hash);
+       # geben wir TTS mal ein paar Sekunden
+       InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_wait_for_tts", $hash, 0);
+       return undef;
+      }
+      elsif (-e $msg) 
+      { 
+        Log3 $name, 4, $name.", message $msg found"; 
+        return "unknown message type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
+      } 
+      else
       { 
         Log3 $name, 3, $name.", message $msg NOT found !";
         $msg = ""; 
       }
     }
-    else { Log3 $name, 4, $name.", calling $nr, ringtime: $ringtime"; }
+    else { Log3 $name, 4, $name.", calling $nr, ringtime: $ringtime , no message"; }
 
-    $arg = "$name|$nr|$ringtime|$msg"; 
+    my $arg = "$name|$nr|$ringtime|$msg"; 
     #BlockingCall($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg);
     $hash->{helper}{CALL_PID} = BlockingCall("SIP_CALLStart",$arg, "SIP_CALLDone") unless(exists($hash->{helper}{CALL_PID}));
 
@@ -424,6 +573,7 @@ sub SIP_Set($@)
      readingsBulkUpdate($hash, "call_state","invite");
      readingsBulkUpdate($hash, "call",$nr);
      readingsEndUpdate($hash, 1);
+     $hash->{'.oldstate'} = ReadingsVal($name,"state",undef);
      return undef;
     }
      else  
@@ -469,7 +619,7 @@ sub SIP_Set($@)
   }
   elsif ($cmd eq "reset")
   {
-   $hash->{".reset"} =1;
+   $hash->{".reset"} = 1;
    SIP_updateConfig($hash);
    return undef;
   }
@@ -480,7 +630,12 @@ sub SIP_Set($@)
   # den Rest als ein String
   $subcmd = join(" ",@a);
 
-  if ($cmd eq "caller")
+  if ($cmd eq "state")
+  {
+   readingsSingleUpdate($hash, "state",$subcmd,1);
+   return undef;
+  }
+  elsif ($cmd eq "caller")
   {
    readingsSingleUpdate($hash, "caller",$subcmd,1);
    return undef;
@@ -533,10 +688,18 @@ sub SIP_ListenStart($)
  my $hash             = $defs{$name}; # $hash / $name gueltig in diesem Block 
  $hash->{telnetPort}  = undef;
 
+ my $dtmfloop;		# Ende-Flag für die DTMF-Schleife
+ my $okloop;		# Ende-Flag für die OK-Ansage
+ my $okloopbye = 0;	# Ende-Flag für recv_bye währne der OK-Ansage
+ my $byebye    = 0;	# Anrufer hat aufgelegt
+ my $packets   = 50;
+
+ my $sub_create;
  my $sub_invite;
  my $sub_filter;
  my $sub_bye;
  my $sub_dtmf;
+ my $send_something;
 
  $hash->{telnetPort} = SIP_telnetPort();
 
@@ -545,24 +708,44 @@ sub SIP_ListenStart($)
  my $port = AttrVal($name,"sip_port","5060");
  $port += 10;
  $ua = undef;
- my $error = SIP_Register($hash,$port);
+ my $error = SIP_Register($hash,$port,"listen_".AttrVal($name,"sip_listen",""));
  return $name."|ListenRegister: $error" if ($error);
+ 
+ my $msg1 = AttrVal($name, "sip_audiofile_dtmf", "");
+ my $msg2 = AttrVal($name, "sip_audiofile_ok", "");
+ my $msg3 = AttrVal($name, "sip_audiofile_wfp", "");
 
- my $msg = AttrVal($name, "sip_audiofile", "");
+ $msg1 = SIP_check_file($hash,$msg1) if ($msg1);
+ $msg2 = SIP_check_file($hash,$msg2) if ($msg2);
+ $msg3 = SIP_check_file($hash,$msg3) if ($msg3);
+
 
  $hash->{dtmf}       = 0;
  $hash->{dtmf_event} = "";
  $hash->{old}        ="-";
 
- $sub_dtmf = sub {
+ $send_something = sub {
+                        return unless $packets-- > 0;
+                        my $buf = sprintf "%010d",$packets;
+                        $buf .= "1234567890" x 15;
+                        return $buf; # 160 bytes for PCMU/8000
+                        };
+
+
+ $sub_dtmf = sub 
+ {
   my ($event,$dur) = @_;
-  Log3 $name,5,"$name : DTMF Event : $event";
-  if ($event eq "#")
+  Log3 $name,5,"$name : DTMF Event : $event - $dur ms";
+  return if (int($dur) < 100);
+
+  if (($event eq "#") && !$hash->{dtmf})
   {
-    $hash->{dtmf} = 1;
-    $hash->{old}  = $event;
-    return;
+      $hash->{dtmf}       = 1;
+      $hash->{dtmf_event} = "";
+      $hash->{old}        = $event;
+      return;
   }
+
   if (($event ne $hash->{old}) && $hash->{dtmf})
   {
    
@@ -577,14 +760,25 @@ sub SIP_ListenStart($)
       $hash->{dtmf}       = 0;
       $hash->{dtmf_event} = "";
       $hash->{old}        ="-";
+      $dtmfloop = 1;
    }
   }
- return;
+  return;
  };
 
- $sub_invite = sub {
+ $sub_create = sub
+ {
+  my ($call,$request,$leg,$from) = @_;
+  my $method = $request->method;
+  my $response = $request->create_response( '180','Ringing' );
+  $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
+  1;
+ };
+ 
+ $sub_invite = sub 
+ {
   my ($a,$b,$c,$d) = @_;
-  my $waittime     = AttrVal($name, "sip_waittime", "10");
+  my $waittime     = int(AttrVal($name, "sip_waittime", 10));
   my $action;
   my $i;
 
@@ -600,12 +794,12 @@ sub SIP_ListenStart($)
     SIP_telnet($hash,"set $name caller_state fetching\nexit\n");
     last; 
    }
-   #$call->bye();
   }
   return 0;
  };
 
- $sub_filter = sub {
+ $sub_filter = sub 
+ {
   my ($a,$b) = @_;
   my ($caller,undef)  = split("\;", $a);
   $caller =~ s/\"//g;
@@ -618,11 +812,13 @@ sub SIP_ListenStart($)
   return 1;
  };
 
- $sub_bye = sub {
+ $sub_bye = sub 
+ {
   my ($event) = @_;
   Log3 $name, 5,  "$name, SIP_bye : $event";
   #print Dumper($event);
   SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") ;
+  $byebye = 1;
   return 1;
  };
 
@@ -631,28 +827,97 @@ sub SIP_ListenStart($)
  if (AttrVal($name,"sip_listen", "none") eq "dtmf")
  {
      $hash->{dtmf} = 0;
-     $ua->listen(init_media => ($msg) ? $ua->rtp('send_recv',$msg) : $ua->rtp('recv_echo'), # echo everything back
-                   cb_dtmf  => \&$sub_dtmf ,
+     $dtmfloop     = 0;	# Ende-Flag für die DTMF-Schleife
+     $okloop       = 0;	# Ende-Flag für die OK-Ansage
+     $okloopbye    = 0;	# Ende-Flag für recv_bye währne der OK-Ansage
+     $byebye       = 0;	# Anrufer hat aufgelegt
+
+     while(1)
+     {
+     my $call;
+     $ua->listen (cb_create => \&$sub_create,
+                  cb_invite =>  sub {
+                                      SIP_telnet($hash,"set $name caller_state ringing\nexit\n");
+                                      sleep int(AttrVal($name, "sip_ringtime", 3)); #Anrufer hört das typische Klingeln wenn die Gegenseite nicht abnimmt
+                                    }, 
                    filter   => \&$sub_filter, 
-                  recv_bye  => \&$sub_bye,
-              asymetric_rtp => 0,
-              rtp_param     => [8, 160, 160/8000, 'PCMA/8000']) 
- } 
+             cb_established => sub { 
+                                     (my $status,$call) = @_; 
+                                     SIP_telnet($hash,"set $name caller_state established\nexit\n");
+                                     return 1; 
+                                   } # sobald invite verlassen wird, wird in cb_established verzweigt
+              ); 
+     
+     $ua->loop(\$call);
+     # Der SIP-Client ist jetzt im echo-Modus und zwar so lange, bis der Anrufer auflegt, 
+     # das bekommen wir durch recv_bye mit
+
+     my $dtmf_loop = 1; # für jeden Anruf neu setzen
+
+      while ($dtmf_loop) # Schleife für Code-Ansage, DTMF-Erkennung, okay-Ansage
+      {
+       $dtmfloop  = 0;
+       $okloop    = 0;
+       $okloopbye = 0;
+
+       $call->reinvite( 
+        init_media => $ua->rtp('send_recv',($msg1) ? $msg1 : $send_something),
+         rtp_param => [8, 160, 160/8000, 'PCMA/8000'],
+       cb_rtp_done => sub { $packets = 25; },
+           cb_dtmf => \&$sub_dtmf,
+          recv_bye => \&$sub_bye,
+         );
+
+       $ua->loop(\$dtmfloop, \$byebye);
+
+       if (!$byebye) 
+       { # Anrufer hat nicht aufgelegt
+        $call->reinvite(
+        init_media => $ua->rtp('send_recv',($msg2) ? $msg2 : $send_something),
+         rtp_param => [8, 160, 160/8000, 'PCMA/8000'],
+       cb_rtp_done => sub { select(undef, undef, undef, 0.1); $okloop = 1; $packets = 50;},
+          recv_bye => sub { $okloopbye = 1; },
+        cb_cleanup => sub {0},
+        );
+
+        $ua->loop(\$okloop,\$okloopbye);   # ohne diese loop endet der Anruf sofort
+       } 
+       else { $dtmf_loop = 0; }  # Schleife beenden, Anrufer hat aufgelegt
+
+       if ( ( defined $okloopbye && $okloopbye ) || $byebye ) 
+       { # wenn jemand mitten im "okay" auflegt 
+         $dtmf_loop = 0; # beende die inner loop 
+         $byebye    = 1;
+       } 
+        else { $dtmf_loop = (AttrVal($name,"sip_dtmf_loop","once")) ? 0 : 1;
+               SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") if(!$dtmf_loop);
+             } # führt ggf. zum Schleifenende
+     } # end inner loop
+
+     if (!$byebye) 
+     {		     # Anrufer hat nicht aufgelegt und nur ein DTMF angefordert
+      my $hanguploop;
+      $call->bye( cb_final => \$hanguploop );
+      $ua->loop( \$hanguploop );
+     }
+   } # while(1)
+ }
  elsif (AttrVal($name,"sip_listen", "none") eq "wfp")
  {
    $ua->listen(
-	cb_invite     => \&$sub_invite, 
-	filter        => \&$sub_filter, 
-	recv_bye      => \&$sub_bye,
-        init_media    => ($msg) ? $ua->rtp('send_recv',$msg) : $ua->rtp('recv_echo'),
-        asymetric_rtp => 0,
-        rtp_param     => [8, 160, 160/8000, 'PCMA/8000']
+          cb_create => \&$sub_create,
+	  cb_invite => \&$sub_invite, 
+	     filter => \&$sub_filter, 
+	   recv_bye => \&$sub_bye,
+         init_media => $ua->rtp('send_recv',($msg3) ? $msg3 : $send_something),
+        cb_rtp_done => sub { $packets = 50;},
+          rtp_param => [8, 160, 160/8000, 'PCMA/8000']
 	); # options are invite and hangup
- }
- else { return $name."|end"; }  
- $ua->loop;
- $ua->cleanup;
- return $name."|end";
+  }
+  else { return $name."|end"; }  
+  $ua->loop;
+
+  return $name."|end"; # hier sollten wir eigentlich nie himkommen !
 } 
 
 
@@ -680,7 +945,7 @@ sub SIP_ListenDone($)
    readingsEndUpdate($hash, 1 );
    Log3 $name, 3 , "$name, listen error -> $ret";
    return if(IsDisabled($name));
-   InternalTimer(gettimeofday()+AttrVal($name, "sip_waits", 60), "SIP_try_listen", $hash, 0);
+   InternalTimer(gettimeofday()+AttrVal($name, "sip_watch_listen", 60), "SIP_try_listen", $hash, 0);
   }
   else 
   { 
@@ -696,7 +961,7 @@ sub SIP_try_listen($)
 {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $waits  = AttrVal($name, "sip_waits", 60);
+  my $waits  = AttrVal($name, "sip_watch_listen", 60);
 
   $hash->{helper}{LISTEN_PID} = BlockingCall("SIP_ListenStart",$name, "SIP_ListenDone") unless(exists($hash->{helper}{LISTEN_PID}));
 
@@ -706,8 +971,8 @@ sub SIP_try_listen($)
     Log3 $name, 4 , $name.", Listen new PID : ".$hash->{LPID};
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$waits, "SIP_watch_listen", $hash, 0); # starte die Überwachung
-    my $state = "listen_for_".AttrVal($name,"sip_listen",undef);
-    readingsSingleUpdate($hash, "state", $state, 1);
+    #my $state = "listen_for_".AttrVal($name,"sip_listen",undef);
+    #readingsSingleUpdate($hash, "state", $state, 1);
     return 0;
   }
   else 
@@ -729,7 +994,6 @@ sub SIP_watch_listen($)
   return if (IsDisabled($name));
   return if (!defined($hash->{LPID}));
 
-  my $waits  = AttrVal($name, "sip_waits", 60);
   my $cmd    = "ps -e | grep '".$hash->{LPID}." '";
   my $result = qx($cmd); 
 
@@ -743,8 +1007,74 @@ sub SIP_watch_listen($)
   }
   else { Log3 $name, 5 , $name.", listen prozess ".$hash->{LPID}." found"; }
 
-  InternalTimer(gettimeofday()+$waits, "SIP_watch_listen", $hash, 0);
+  InternalTimer(gettimeofday()+60, "SIP_watch_listen", $hash, 0);
   return;
+}
+
+sub SIP_wait_for_tts($)
+{
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  RemoveInternalTimer($hash);
+
+  my $t2s_name = AttrVal($name,"T2S_Device",undef);
+  my $file     = ReadingsVal($t2s_name,"lastFilename","---");
+  my $msg      = "";
+
+  if ($file ne "---")
+  {
+   Log3 $name,4,"$name, new TTS file $file";
+ 
+   my $out = $file;
+   $out  =~ s/mp3/alaw/;
+   if (-e $out)
+   { 
+     Log3 $name,5,"$name, not converted using $out from cache";
+     $msg = $out; 
+   } 
+    else
+   {    
+    my $ret;
+    my $cmd;
+    my $converter = AttrVal($name,"audio_converter","sox");
+    if (($converter eq "sox") && defined($hash->{AC}))
+    {
+     $cmd = $hash->{AC}." ".$file." -t raw -r 8000 -c 1 -e a-law ".$out;
+     Log3 $name,5,"$name, $cmd";
+     $_ = qx($cmd);
+    }
+    elsif (($converter eq "ffmpeg") && defined($hash->{AC}))
+    {
+     $cmd = $hash->{AC}." -v quiet -y -i ".$file." -f alaw -ar 8000 ".$out;
+     Log3 $name,5,"$name, $cmd";
+     $_ = qx($cmd);
+    }
+
+
+    if ($_)
+     {
+      Log3 $name,4,"$name, $converter : $_ , $?";
+      readingsSingleUpdate($hash,"last_error","$converter error $_",1);
+     }
+     else { $msg = $out; }
+   }
+  }        
+  else
+  {
+   Log3 $name,3,"$name, timeout waiting for T2S";
+   readingsSingleUpdate($hash,"call_state","TTS timeout",1);
+  }
+ 
+  # nun aber calling
+ 
+  my @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg) ;
+  delete($hash->{callnr});
+  delete($hash->{ringtime});
+  my $ret = SIP_Set($hash , @a);
+  Log3 $name,3,"$name, TTS Call : $ret" if defined($ret);
+  # haben wir vllt. den Timer missbraucht ?
+  SIP_watch_listen($hash) if (defined($hash->{LPID}));
+  return undef;
 }
 
 sub SIP_telnetPort()
@@ -863,6 +1193,30 @@ sub SIP_readPassword($)
    
 ##################################### 
 
+ sub SIP_check_file($$)
+ {
+   my ($hash,$file) = @_;
+   my $name        = $hash->{NAME};
+
+   if (substr($file,0,1) eq "!")
+   {
+    Log3 $name,3,"$name, Text2Speech is not supported for listen, ignoring it";
+    return "";
+   }
+   if (!-e $file)
+   {
+    Log3 $name,3,"$name, audio file $file not found, ignoring it";
+    return "";
+   }
+   if (($file !~ /\.al(.+)$/) && ($file !~ /\.ul(.+)$/))
+   {
+    Log3 $name,3,"$name, audio file $file not type .alaw or .ulaw, ignoring it";
+    return "";
+   }
+   return $file;
+ }
+
+
 1;
 
 =pod
@@ -906,7 +1260,7 @@ sub SIP_readPassword($)
    <li>
     <code>set &lt;name&gt; call &lt;number&gt [&lt;ringtime&gt] [&lt;message&gt]</code><br>
     Start a call to the given number.<br>
-    Optionally you can supply a ringtime. If not given the value from attribute sip_ringtime is taken. Default is 10.
+    Optionally you can supply a max time. Default is 10.
     Optionally you can supply a message which is either a full path to an audio file or a relativ path starting from the home directory of the fhem.pl.
    </li>
    <li>
@@ -923,11 +1277,14 @@ sub SIP_readPassword($)
   <a name="SIPattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#sip_audiofile">sip_audiofile</a><br>
+    <li><a href="#sip_audiofile_wfp">sip_audiofile_wfp</a><br>
       Audio file that will be played after <b>fetch</b> command. The audio file has to be generated via <br>
-      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.alaw<br>
+      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
       since only raw audio format is supported. 
       </li>
+     <li><a href="#sip_audiofile_call">sip_audiofile_call</a></li>
+     <li><a href="#sip_audiofile_dtmf">sip_audiofile_dtmf</a></li>
+     <li><a href="#sip_audiofile_ok">sip_audiofile_ok</a></li>
     <li><a href="#sip_listen">sip_listen</a>(none , dtmf , wfp)</li>
     <li><a name="#sip_from">sip_from</a><br>
       My sip client info, defaults to sip:620@fritz.box
@@ -942,16 +1299,19 @@ sub SIP_readPassword($)
       Hostname or IP address of the SIP server you are connecting to, defaults to fritz.box.
       </li>
     <li><a name="#sip_ringtime">sip_ringtime</a><br>
-      Calltime for outgoing calls. Please dont use it now, it will be changed in a later version !
+      Ringtime for incomming calls (dtmf &wfp)
       </li>
     <li><a name="#sip_user">sip_user</a><br>
       User name of the SIP client, defaults to 620.
       </li>
     <li><a name="#sip_waittime">sip_waittime</a><br>
-       Maximum waiting time in state listen_for_nwfp it will wait to pick up the call.  
+       Maximum waiting time in state listen_for_wfp it will wait to pick up the call.  
       </li>
     <li><a name="#sip_dtmf_size">sip_dtmf_size</a><br>
     1 to 4 , default is 2      ...
+    </li>
+    <li><a name="#sip_dtmf_loop">sip_dtmf_loop</a><br>
+    once or loop , default once      ...
     </li>
 
   </ul>
@@ -997,7 +1357,7 @@ sub SIP_readPassword($)
    <li>
     <code>set &lt;name&gt; call &lt;nummer&gt [&lt;ringtime&gt] [&lt;nachricht&gt]</code><br>
     Startet einen Anruf an die angegebene Nummer.<br>
-    Optional kann die ringtime angegeben werden. Wird keine angegeben zieht das Attribut sip_ringtime. Default ist 10.<br>
+    Optional kann die maximale Zeit angegeben werden. Default ist 10.<br>
     Optional kann eine Nachricht in Form eines Audiofiles angegeben werden . Das File ist mit dem vollen Pfad oder dem relativen ab dem Verzeichnis mit fhem.pl anzugeben..
    </li>
    <li>
@@ -1013,11 +1373,15 @@ sub SIP_readPassword($)
   <a name="SIPattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#sip_audiofile">sip_audiofile</a><br>
+    <li><a href="#sip_audiofile_wfp">sip_audiofile_wfp</a><br>
       Audiofile das nach dem Command <b>fetch</b> abgespielt wird. Das Audiofile kann mit dem externen Programm sox erzeugt werden :<br>
-      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.alaw<br>
+      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
       da nur das raw audio format unterstützt wird. 
-</li>
+    </li>
+    <li><a href="#sip_audiofile_call">sip_audiofile_call</a></li>
+    <li><a href="#sip_audiofile_dtmf">sip_audiofile_dtmf</a></li>
+    <li><a href="#sip_audiofile_ok">sip_audiofile_ok</a></li>
+
     <li><a href="#sip_listen">sip_listen</a> (none , dtmf, wfp)</li>
     <li><a name="#sip_from">sip_from</a><br>
       Meine SIP-Client-Info. Default ist sip:620@fritz.box
@@ -1032,7 +1396,7 @@ sub SIP_readPassword($)
       Hostname oder IP-Addresse des SIP-Servers mit dem sich der Client verbindet. Default ist fritz.box.
       </li>
     <li><a name="#sip_ringtime">sip_ringtime</a><br>
-      Klingelzeit für ausgehende Anrufe.
+      Klingelzeit für eingehende Anrufe.(dtmf & wfp)
       </li>
     <li><a name="#sip_user">sip_user</a><br>
       User Name des SIP-Clients. Default ist 620.
@@ -1040,6 +1404,10 @@ sub SIP_readPassword($)
     <li><a name="#sip_dtmf_size">sip_dtmf_size</a><br>
     1 bis 4 , default 2 Legt die L&auml;ge des erwartenden DTMF Events fest.
       </li>
+    <li><a name="#sip_dtmf_loop">sip_dtmf_loop</a><br>
+    once oder loop , default once      ...
+    </li>
+
     <li><a name="#sip_waittime">sip_waittime</a><br>
        Maximale Wartezeit im Status listen_for_wfp bis das Gespräch automatisch angenommen wird.
       </li>
