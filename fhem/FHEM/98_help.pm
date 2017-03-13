@@ -3,19 +3,21 @@
 package main;
 use strict;
 use warnings;
-use Data::Dumper;
+#use Data::Dumper;
 
 my $ret;
 
 sub CommandHelp;
 sub cref_search;
 sub cref_search_cmd;
+sub cref_fill_list;
 
 sub help_Initialize($$) {
   my %hash = (  Fn => "CommandHelp",
 		   Hlp => "[<moduleName>],get help (this screen or module dependent docu)",
 		   InternalCmds => "attributes,command,commands,devspec,global,perl" );
   $cmds{help} = \%hash;
+  cref_fill_list();
 }
 
 sub CommandHelp {
@@ -126,7 +128,7 @@ sub CommandHelp {
 
   } else {   # mod
 
-    cref_search_cmd(undef);
+#    cref_search_cmd(undef);
 
     my $str = "Possible commands:\n\n" .
 		"Command        Parameter\n" .
@@ -197,6 +199,39 @@ sub cref_search_cmd {
       $cmds{$i} = \%hash if $i;
    }  
    return;
+}
+
+sub cref_fill_list(){
+
+  my %mods;
+  my %modIdx;
+  my @modDir = ("FHEM");
+
+  foreach my $modDir (@modDir) {
+    opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
+    while(my $l = readdir DH) {
+      next if($l !~ m/^\d\d_.*\.pm$/);
+      my $of = $l;
+      $l =~ s/.pm$//;
+      $l =~ s/^[0-9][0-9]_//;
+      $mods{$l} = "$modDir/$of";
+      $modIdx{$l} = "device";
+      open(MOD, "$modDir/$of") || die("Cant open $modDir/$l");
+      while(my $cl = <MOD>) {
+        if($cl =~ m/^=item\s+(helper|command|device)/) {
+          $modIdx{$l} = $1;
+          last;
+        }
+      }
+      close(MOD);
+    }
+  }
+
+  foreach my $mod (sort keys %mods) {
+    my %h = (  Fn => undef,
+		      Hlp => "Command $mod not loaded. Use \"help $mod\" for more help" );
+    $cmds{$mod} = \%h if ( ($modIdx{$mod} eq "command") && !(defined($cmds{$mod})) );
+  }
 }
 
 
