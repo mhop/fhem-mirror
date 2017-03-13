@@ -140,19 +140,20 @@ sub SIP_Attr (@)
 
  my ($cmd, $name, $attrName, $attrVal) = @_;
  my $hash  = $defs{$name};
+ #Log3 $name,5,"$name , SIP_Attr : $cmd, $attrName, $attrVal";
 
  if ($cmd eq "set")
  {
-   if (substr($attrName ,0.4) eq "sip_") 
+   if (substr($attrName ,0,4) eq "sip_") 
    {
      $_[3] = $attrVal;
-     $hash->{".reset"} = 1 if ($hash->{LPID} && ($attrName ne "sip_audiofile_call") && ($attrName ne "sip_dtmf_send"));
+     $hash->{".reset"} = 1 if defined($hash->{LPID});
    }
    elsif (($attrName eq "disable") && ($attrVal == 1))
    {
      readingsSingleUpdate($hash,"state","disabled",1);
      $_[3] = $attrVal;
-     $hash->{".reset"} = 1 if $hash->{LPID};
+     $hash->{".reset"} = 1 if defined($hash->{LPID});
    }
    elsif ($attrName eq "audio_converter")
    {
@@ -169,10 +170,10 @@ sub SIP_Attr (@)
  }
  elsif ($cmd eq "del")
  {
-   if (substr($attrName,0.4) eq "sip_")
+   if (substr($attrName,0,4) eq "sip_")
    {
      $_[3] = $attrVal;
-     $hash->{".reset"} = 1 if ($hash->{LPID} && ($attrName ne "sip_audiofile_call") && ($attrName ne "sip_dtmf_send"));
+     $hash->{".reset"} = 1 if defined($hash->{LPID});
    } 
    elsif ($attrName eq "audio_converter")
    {
@@ -187,7 +188,11 @@ sub SIP_Attr (@)
 
  }
 
- SIP_updateConfig($hash) if ($hash->{".reset"});
+ if ($hash->{".reset"})
+ {
+  Log3 $name,5,"$name , SIP_Attr : reset";
+  SIP_updateConfig($hash);
+ }
  return undef;
 }
 
