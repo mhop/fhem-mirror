@@ -51,6 +51,8 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 13.03.2017
+#	Saubere Fehlerbehandlung bei der Verarbeitung von currentFavouriteName, currentPlaylistName und currentRadioName.
 # 12.03.2017
 #	NotifyFn und NotifyDev werden nun im Define des Moduls festgelegt (anstatt wie vorher im Initialize). Dadurch sollten deutlich weniger Notify-Anfragen beim Modul ankommen.
 #	Es gibt nun einen Set-Befehl "RefreshShareIndex" zum Aktualisieren der Bibliothek und ein Reading "ShareIndexInProgress", welches angibt, ob eine Aktualisierung gerade in Ausführung ist.
@@ -1248,36 +1250,51 @@ sub SONOS_Read($) {
 				readingsBeginUpdate($hash);
 				
 				# Wurden für das Device bereits Favoriten geladen? Dann raussuchen, ob gerade ein solcher abgespielt wird...
-				my %favourites = %{eval(ReadingsVal($hash->{NAME}, 'Favourites', '{}'))};
 				$current{FavouriteName} = '';
-				while (my ($key, $value) = each (%favourites)) {
-					if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-						if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-							$current{FavouriteName} = $value->{Title};
+				eval {
+					my %favourites = %{eval(ReadingsVal($hash->{NAME}, 'Favourites', '{}'))};
+					while (my ($key, $value) = each (%favourites)) {
+						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+								$current{FavouriteName} = $value->{Title};
+							}
 						}
 					}
+				};
+				if ($@) {
+					SONOS_Log $hash->{UDN}, 1, "Error during retreiving of FavouriteName: $@";
 				}
 				
 				# Wurden für das Device bereits Playlisten geladen? Dann raussuchen, ob gerade eine solche abgespielt wird...
-				my %playlists = %{eval(ReadingsVal($hash->{NAME}, 'Playlists', '{}'))};
 				$current{PlaylistName} = '';
-				while (my ($key, $value) = each (%playlists)) {
-					if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-						if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-							$current{PlaylistName} = $value->{Title};
+				eval {
+					my %playlists = %{eval(ReadingsVal($hash->{NAME}, 'Playlists', '{}'))};
+					while (my ($key, $value) = each (%playlists)) {
+						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+								$current{PlaylistName} = $value->{Title};
+							}
 						}
 					}
+				};
+				if ($@) {
+					SONOS_Log $hash->{UDN}, 1, "Error during retreiving of PlaylistName: $@";
 				}
 				
 				# Wurden für das Device bereits Radios geladen? Dann raussuchen, ob gerade ein solches abgespielt wird...
-				my %radios = %{eval(ReadingsVal($hash->{NAME}, 'Radios', '{}'))};
 				$current{RadioName} = '';
-				while (my ($key, $value) = each (%radios)) {
-					if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-						if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-							$current{RadioName} = $value->{Title};
+				eval {
+					my %radios = %{eval(ReadingsVal($hash->{NAME}, 'Radios', '{}'))};
+					while (my ($key, $value) = each (%radios)) {
+						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+								$current{RadioName} = $value->{Title};
+							}
 						}
 					}
+				};
+				if ($@) {
+					SONOS_Log $hash->{UDN}, 1, "Error during retreiving of RadioName: $@";
 				}
 				
 				# Dekodierung durchführen
