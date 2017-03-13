@@ -4962,7 +4962,7 @@ s2Hex($)
 <h3>ZWave</h3>
 <ul>
   This module is used to control ZWave devices via FHEM, see <a
-  href="http://www.z-wave.com">www.z-wave.com</a> on details for this device
+  href="http://www.z-wave.com">www.z-wave.com</a> for details for this device
   family.  This module is a client of the <a href="#ZWDongle">ZWDongle</a>
   module, which is directly attached to the controller via USB or TCP/IP.  To
   use the SECURITY features, the Crypt-Rijndael perl module is needed.
@@ -4992,8 +4992,8 @@ s2Hex($)
   Note: the sets/gets/generated events of a given node depend on the classes
   supported by this node. If a node supports 3 classes, then the union of
   these sets/gets/events will be available for this node.<br>
-  Commands for battery operated nodes will be queues internally, and sent when
-  the node sends a message. Answer to get commands appear then as events, the
+  Commands for battery operated nodes will be queued internally, and sent when
+  the node sends a message. Answers to get commands appear then as events, the
   corresponding readings will be updated.
   <br><br>
 
@@ -5005,14 +5005,14 @@ s2Hex($)
   <ul>
     <li>devices with on/off functionality support the <a
       href="#setExtensions"> set extensions</a>.</li>
-    <li>A set command does not automatically updates the correspondig reading,
+    <li>A set command does not automatically update the corresponding reading,
       you have to execute a get for this purpose. This can be automatically
       done via a notify, although this is not recommended in all cases.</li>
   </ul>
 
   <br><br><b>All</b>
   <li>neighborUpdate<br>
-    Requests controller to update his routing table which is based on
+    Requests controller to update its routing table which is based on
     slave's neighbor list. The update may take significant time to complete.
     With the event "done" or "failed" ZWDongle will notify the end of the
     update process.  To read node's neighbor list see neighborList get
@@ -5037,8 +5037,8 @@ s2Hex($)
     Enable (on) or disable (off) the sending of unsolicited reports for
     the alarm type &lt;alarmType&gt;. A list of supported alarm types of the
     device can be obtained with the alarmTypeSupported command. The
-    name of the alarm type is case insensitive. Sending of an unsolicted
-    notification only works to associated nodes, broadcasting is not
+    name of the alarm type is case insensitive. Sending of an unsolicited
+    notification only works for associated nodes, broadcasting is not
     allowed, so associations have to be set up. This command is
     specified in version 2.</li>
   <li> Note:<br>
@@ -5050,9 +5050,9 @@ s2Hex($)
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
   Add the specified list of nodeIds to the association group groupId.<br> Note:
-  upon creating a fhem-device for the first time fhem will automatically add
+  upon creating a FHEM-device for the first time FHEM will automatically add
   the controller to the first association group of the node corresponding to
-  the fhem device, i.e it issues a "set name associationAdd 1
+  the FHEM device, i.e it issues a "set name associationAdd 1
   controllerNodeId"</li>
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the association group groupId.</li>
@@ -5093,7 +5093,7 @@ s2Hex($)
     no: switch the override off<br>
     temporary: override the current schedule only<br>
     permanent: override all schedules<br>
-    frost/energy: set override mode to frost protection or engergy saving<br>
+    frost/energy: set override mode to frost protection or energy saving<br>
     $tempOffset: the temperature setback (offset to setpoint) in 1/10 degrees
     range from -12.8 to 12.0, values will be limited to this range.
     </li>
@@ -5120,7 +5120,7 @@ s2Hex($)
       configWord cfgAddress 16bitValue<br>
       configLong cfgAddress 32bitValue<br>
     Send a configuration value for the parameter cfgAddress. cfgAddress and
-    value is node specific.<br>
+    value are node specific.<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config commands are available.</li>
   <li>configDefault cfgAddress<br>
@@ -5160,7 +5160,7 @@ s2Hex($)
     switch the indicator off</li>
   <li>indicatorDim value<br>
     takes values from 1 to 99.
-    If the indicator does not support dimming. It is interpreted as on.</li>
+    If the indicator does not support dimming, it is interpreted as on.</li>
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
    <br>Fibaro FGR(M)-222 only:
@@ -5207,7 +5207,7 @@ s2Hex($)
   <li>mcaDel groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     delete node or node:endpoint associations.
     Special cases: just specifying the groupId will delete everything for this
-    groupId. Specifying 0 for groupid will delete all associations.
+    groupId. Specifying 0 for groupId will delete all associations.
     </li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
@@ -5230,7 +5230,7 @@ s2Hex($)
         NUM_REPORTS: number of reports to follow, must be 0.<br>
         CMD: command(s) (as hexcode sequence) that the schedule executes,
           see report of scheduleSupported command for supported command
-          class and mask. A list of space separated command can be
+          class and mask. A list of space separated commands can be
           specified.<br>
       </ul>
       </li>
@@ -5412,12 +5412,12 @@ s2Hex($)
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointHeating value<br>
     set the thermostat to heat to the given value.
-    The value is a whole number and read as celsius.<br>
+    The value is an integer and read as celsius.<br>
     See thermostatSetpointSet for a more enhanced method.
   </li>
   <li>setpointCooling value<br>
-    set the thermostat to heat to the given value.
-    The value is a whole number and read as celsius.<br>
+    set the thermostat to cool down to the given value.
+    The value is an integer and read as celsius.<br>
     See thermostatSetpointSet for a more enhanced method.
   </li>
   <li>thermostatSetpointSet TEMP [SCALE [TYPE [PREC [SIZE]]]]<br>
@@ -5444,7 +5444,7 @@ s2Hex($)
       PREC: (optional) number of decimals to be used, [1-7], defaults
             to 1<br>
       SIZE: (optional) number of bytes used, [1, 2, 4], defaults to 2<br>
-      Note: optinal parameters can be ommitted and are used with there
+      Note: optional parameters can be ommitted and are used with there
             default values. If you need or want to specify an optional
             parameter, ALL parameters in front of this parameter need
             to be also specified!<br>
@@ -5462,7 +5462,6 @@ s2Hex($)
     </li>
   <li>desired-temp value<br>
     same as thermostatSetpoint, used to make life easier for helper-modules
-    like 
     </li>
 
   <br><br><b>Class TIME, V2</b>
@@ -5564,7 +5563,7 @@ s2Hex($)
   <br><br><b>Class BASIC</b>
   <li>basicStatus<br>
     return the status of the node as basicReport:XY. The value (XY) depends on
-    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+    the node, e.g. a SWITCH_BINARY device reports 00 for off and FF (255) for on.
     Devices with version 2 (or greater) can return two additional values, the
     'target value' and 'duration'. The 'duration' is reported in seconds, 
     as "unknown duration" (value 0xFE = 253) or as "255 (reserved value)" 
@@ -5621,7 +5620,7 @@ s2Hex($)
 
   <br><br><b>Class HRV_STATUS</b>
   <li>hrvStatus<br>
-    report the current status (temperature, etc)
+    report the current status (temperature, etc.)
     </li>
   <li>hrvStatusSupported<br>
     report the supported status fields as a bitfield.
@@ -5676,7 +5675,7 @@ s2Hex($)
     </li>
   <li>mcCapability chid<br>
     return the classes supported by the endpoint/channel chid. If the channel
-    does not exists, create a FHEM node for it. Example:<br>
+    does not exist, create a FHEM node for it. Example:<br>
     mcCapability_02:SWITCH_BINARY<br>
     <b>Note:</b> This is the best way to create the secondary nodes of a
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
@@ -5906,7 +5905,7 @@ s2Hex($)
   <ul>
     <li><a href="#IODev">IODev</a></li>
     <li><a name="WNMI_delay">WNMI_delay</a><br>
-      This attribute set the time delay between the last message sent to an
+      This attribute sets the time delay between the last message sent to an
       WakeUp device and the sending of the WNMI Message
       (WakeUpNoMoreInformation) that will set the device to sleep mode.  Value
       is in seconds, subseconds my be specified. Values outside of 0.2-5.0 are
@@ -5921,7 +5920,7 @@ s2Hex($)
     <li><a href="#dummy">dummy</a></li>
     <li><a name="eventForRaw">eventForRaw</a><br>
       Generate an an additional event for the RAW message.  Can be used if
-      someone fears that critical notifies wont work, if FHEM changes the event
+      someone fears that critical notifies won't work, if FHEM changes the event
       text after an update.  </li>
     <li><a name="extendedAlarmReadings">extendedAlarmReadings</a><br>
       Some devices support more than one alarm type, this attribute
