@@ -369,6 +369,7 @@ sub FRITZBOX_Set($$@)
    elsif ( lc $cmd eq 'checkapis') {
       Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       $hash->{APICHECKED} = 0;
+      $hash->{fhem}{sidTime} = 0;
       $hash->{fhem}{LOCAL} = 1;
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
       $hash->{fhem}{LOCAL} = 0;
@@ -4233,7 +4234,7 @@ sub FRITZBOX_TR064_Cmd($$$)
       my $soap = SOAP::Lite
          -> on_fault ( sub {} )
          -> uri( "urn:dslforum-org:service:".$service )
-         -> proxy('https://'.$host.":".$port."/upnp/control/".$control, ssl_opts => [ SSL_verify_mode => 0 ] )
+         -> proxy('https://'.$host.":".$port."/upnp/control/".$control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
          -> readable(1);
       my $res = $soap -> call( $action => @soapParams );
       
@@ -4396,7 +4397,7 @@ sub FRITZBOX_TR064_Init ($$)
       FRITZBOX_Log $hash, 4, "Open TR-064 connection and ask for security port";
    my $s = SOAP::Lite
       -> uri('urn:dslforum-org:service:DeviceInfo:1')
-      -> proxy('http://'.$host.':49000/upnp/control/deviceinfo')
+      -> proxy('http://'.$host.':49000/upnp/control/deviceinfo', timeout => 10 )
       -> getSecurityPort();
 
    my $port = $s->result;
