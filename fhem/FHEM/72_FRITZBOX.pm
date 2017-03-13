@@ -749,7 +749,7 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
          FRITZBOX_Log $hash, 4, "API luaQuery found (".$response->code.").";
       }
-      elsif ($response->code eq "500") {
+      elsif ($response->code eq "500" || $response->code eq "403") {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
          FRITZBOX_Log $hash, 4, "API luaQuery found but responded with: ".$response->status_line;
       }
