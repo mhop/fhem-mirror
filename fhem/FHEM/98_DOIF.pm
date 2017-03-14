@@ -59,7 +59,7 @@ DOIF_delAll($)
   #delete ($hash->{state});
   #delete ($defs{$hash->{NAME}}{READINGS});
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
-    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
+    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
   }
 
 }   
@@ -1067,11 +1067,23 @@ DOIF_CheckCond($$)
     #   $idx++;
     #}
   }
+  $cmdFromAnalyze="$hash->{NAME}: ".sprintf("warning in condition c%02d",($condition+1));
+  $lastWarningMsg="";
   my $ret = eval $command;
   if($@){
-    $err = "perl error in condition: $hash->{condition}{$condition}: $@";
+    $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
+    $err = sprintf("condition c%02d",($condition+1)).": $@";
     $ret = 0;
   }
+  if ($lastWarningMsg) {
+    $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+    readingsSingleUpdate ($hash, "warning", sprintf("condition c%02d",($condition+1)).": $lastWarningMsg",0);
+  } else {
+    delete ($defs{$hash->{NAME}}{READINGS}{warning});
+  }
+  $lastWarningMsg="";
+  $cmdFromAnalyze = undef;
+  
   return ($ret,$err);
 }
 
@@ -3384,6 +3396,10 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt>wait_timer</dt>
                 <dd>Angabe des aktuellen Wait-Timers</dd>
 </br>
+        <dt>warning</dt>
+                <dd>Perl-Warnung bei der Auswertung einer Bedingung</dd>
+</br>
+
   <a name="DOIF_Benutzerreadings"></a>
         <dt>&lt;A-Z&gt;_&lt;readingname&gt;</dt>
                 <dd>Readings, die mit einem Großbuchstaben und nachfolgendem Unterstrich beginnen, sind für User reserviert und werden auch zuk&uuml;nftig nicht vom Modul selbst benutzt.</dd>
