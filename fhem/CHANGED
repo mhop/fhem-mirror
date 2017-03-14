@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_Text2Speech: some small improvements
+                special Audiodevice "none" is now "default due
+                collision with new Server mode
   - update:  98_DOIFtools: Improved DOIF-Operand derivation from an event line
                 if the event monitor is opend in DOIFs detail view.
                 Improved dialog to insert the  selected operand in a definition

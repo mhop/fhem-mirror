@@ -337,9 +337,9 @@ sub Text2Speech_OpenDev($) {
   if($hash->{SSL}) {
     eval "use IO::Socket::SSL";
     Log3 $name, 1, $@ if($@);
-    $conn = IO::Socket::SSL->new(PeerAddr => "$dev") if(!$@);
+    $conn = IO::Socket::SSL->new(PeerAddr => "$dev", MultiHomed => 1) if(!$@);
   } else {
-    $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    $conn = IO::Socket::INET->new(PeerAddr => $dev, MultiHomed => 1);
   } 
 
   if(!$conn) {
@@ -636,9 +636,17 @@ sub Text2Speech_BuildMplayerCmdString($$) {
   }
 
   my $AlsaDevice = $hash->{ALSADEVICE};
-  if($AlsaDevice eq "none") {
+  if($AlsaDevice eq "default") {
     $AlsaDevice = "";
     $mplayerAudioOpts = "";
+  }
+
+  # anstatt  mplayer wird ein anderer Player verwendet
+  if ($TTS_MplayerCall !~ m/mplayer/) {
+    $AlsaDevice = "";
+    $mplayerAudioOpts = "";
+    $mplayerNoDebug = "";
+    $mplayerOpts = "";
   }
 
   my $NoDebug = $mplayerNoDebug;
@@ -652,6 +660,10 @@ sub Text2Speech_BuildMplayerCmdString($$) {
   return $cmd;
 }
 
+#####################################
+# Benutzt um Infos aus dem Blockingprozess
+# in die Readings zu schreiben
+#####################################
 sub Text2Speech_readingsSingleUpdateByName($$$) {
   my ($devName, $readingName, $readingVal) = @_;
   my $hash = $defs{$devName};
@@ -1019,14 +1031,14 @@ sub Text2Speech_WriteStats($$$$){
         <code>apt-get install mplayer</code><br>
         The given alsadevice has to be configured in <code>/etc/asound.conf</code>
         <p>
-          <b>Special AlsaDevice: </b><i>none</i><br>
-          The internal mplayer command will be without any audio directive if the given alsadevice is <i>none</i>.
+          <b>Special AlsaDevice: </b><i>default</i><br>
+          The internal mplayer command will be without any audio directive if the given alsadevice is <i>default</i>.
           In this case mplayer is using the standard audiodevice.
         </p>
         <p>
           <b>Example:</b><br>
           <code>define MyTTS Text2Speech hw=0.0</code><br>
-          <code>define MyTTS Text2Speech none</code>
+          <code>define MyTTS Text2Speech default</code>
         </p>
       </ul>
     </li>
@@ -1236,14 +1248,14 @@ sub Text2Speech_WriteStats($$$$){
         <code>apt-get install mplayer</code><br>
         Das angegebene Alsadevice ist in der <code>/etc/asound.conf</code> zu konfigurieren.
         <p>
-          <b>Special AlsaDevice: </b><i>none</i><br>
-          Ist als Alsa-Device <i>none</i> angegeben, so wird mplayer ohne eine Audiodevice Angabe aufgerufen. 
+          <b>Special AlsaDevice: </b><i>default</i><br>
+          Ist als Alsa-Device <i>default</i> angegeben, so wird mplayer ohne eine Audiodevice Angabe aufgerufen. 
           Dementsprechend verwendet mplayer das Standard Audio Ausgabedevice.
         </p>
         <p>
           <b>Beispiel:</b><br>
           <code>define MyTTS Text2Speech hw=0.0</code><br>
-          <code>define MyTTS Text2Speech none</code>
+          <code>define MyTTS Text2Speech default</code>
         </p>
       </ul>
     </li>
