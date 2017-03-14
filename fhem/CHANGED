@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: Improved DOIF-Operand derivation from an event line
+                if the event monitor is opend in DOIFs detail view.
+                Improved dialog to insert the  selected operand in a definition
   - new:     31_PLAYBULB: Integrates different smart lights from MIPOW and
                           displays several settings
   - bugfix:  00_SONOS: Errorhandling for RadioName etc.

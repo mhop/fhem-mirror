@@ -48,42 +48,106 @@ my @DOIFtools_we =();
 my $DOIFtoolsJSfuncEM = <<'EOF';
   <script type="text/javascript">
     //functions
-    function doiftoolsCopyToClipboard() {
-        var txtarea = document.getElementById('console');
+function doiftoolsCopyToClipboard() {
+    var r = $("head").attr("root");
+    var myFW_root = FW_root;
+    if(r)
+      myFW_root = r;
+    FW_cmd(myFW_root+"?cmd={AttrVal(\"global\",\"language\",\"EN\")}&XHR=1", function(data){
+        var lang = data.match(/(DE|EN)/);
+        var lang =lang[1];
+        var txtarea = document.getElementById("console");
         var start = txtarea.selectionStart;
         var finish = txtarea.selectionEnd;
         var txt = txtarea.value.substring(start, finish);
-        var hlp = "Please highlight exactly one complete event line";
+        var hlp = (lang == "DE") ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
         if(!txt)
           return FW_okDialog(hlp);
-        var re = /^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
-        var ret = txt.match(re);
-        if(!ret)
+        var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
+        var retdi = txt.match(redi);
+        if(!retdi)
           return FW_okDialog(hlp);
-        var dev = ret[3];
-        var ret1;
-        var red ="";
-        var val ="";
-        if (ret[4]) {
-          ret1 = ret[4].match(/(.*):\s$/);
-          red = ret1[1];
+        var evtDev = retdi[3];
+        var retdi1;
+        var evtRead ="";
+        var evtVal ="";
+        if (retdi[4]) {
+          retdi1 = retdi[4].match(/(.*):\s$/);
+          evtRead = retdi1[1];
         }
-        val = ret[5];
-        val = val.replace(/\s/g, ".");
-        re1 = "["+dev+(red ? ":"+red : "")+"]";
-        re2 = "["+dev+(red ? ":"+red : "")+"] eq \""+val+"\"";
-        re3 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:")+"\"]";
-        re4 = "[\"^"+dev+(red ? "$:^"+red+": " : "$:^")+val+"$\"]";
+        evtVal = retdi[5];
+        var treffer = evtVal.match(/(-?\d+(\.\d+)?)/);
+        var evtNum;
+        try {
+          evtNum = treffer[1];
+        } catch (e) {
+          evtNum = "";
+        }
 
-        var txt = "Copy &amp; paste it to your DOIF definition<br><br>";
-        txt += "<div><ul>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation:<br><code>"+re1+"</code></li><br>";
-        txt += "<li>event as [&lt;device&gt;:&lt;reading&gt;] representation with comparison:<br><code>"+re2+"</code></li><br>";
-        txt += "<li>event as <i>regular expression</i>:<br><code>"+re3+"</code></li><br>";
-        txt += "<li>event as <i>regular expression</i> with value:<br><code>"+re4+"</code></li><br>";
-        txt += "</ul></div>";
-        return FW_okDialog(txt);
-    }
+        var treffer = evtVal.match(/(\d\d:\d\d)/);
+        var evtHM;
+        try {
+          evtHM = treffer[1];
+        } catch (e) {
+          evtHM = "";
+        }
+
+        var evtEvt = evtVal.replace(/\s/g, ".")
+                       .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
+
+        var diop = [];
+        var icnt = 0;
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"]"; icnt++;
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"] eq \""+evtVal+"\""; icnt++;
+        if (evtNum != "") {diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+":d] == "+evtNum; icnt++}
+        if (evtHM != "") {diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+":\"(\\d\\d:\\d\\d)\":$1,\"00:00\"] ge $hm"; icnt++}
+        diop[icnt] = "["+evtDev+(evtRead ? ":\"^"+evtRead+": " : ":\"")+"\"]"; icnt++;
+        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:")+"\"]"; icnt++;
+        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+evtEvt+"$\"]"; icnt++;
+        if (evtHM != "") {diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+":\"(\\d\\d:\\d\\d)\":$1,\"00:00\"] ge $hm"; icnt++}
+        var maxlength = 33;
+        for (var i = 0; i < diop.length; i++)
+            maxlength = diop[i].length > maxlength ? diop[i].length : maxlength;
+
+        // build the dialog
+        var txt = '<style type="text/css">\n'+
+                  'div.opdi label { display:block; margin-left:2em; font-family:Courier}\n'+
+                  'div.opdi input { float:left; }\n'+
+                  '</style>\n';
+        var inputPrf = "<input type='radio' name=";
+
+        txt += ((lang == "DE") ? "Der gewählte Operand wird in die Zwischenablage kopiert." : "Selected operand will be copied to Clipboard") + "<br><br>";
+        for (var i = 0; i < diop.length; i++) {
+            txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"'/>"+
+               "<label>"+diop[i]+"</label></div><br>";
+        }
+        txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
+        ((lang == "DE") ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
+        "' ></input>";
+
+        $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
+        $('#evtCoM').dialog(
+          { modal:true, closeOnEscape:true, width:"auto",
+            close:function(){ $('#evtCoM').remove(); },
+            buttons:[
+            { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+            { text:"Open DEF-Editor", title:((lang == "DE") ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
+              $("input#opditmp").val($("input#opditmp").val()).select();
+              document.execCommand("copy");
+              if ($("#edit").css("display") == "none")
+                $("#DEFa").click();
+              $(this).dialog('close');
+            }}],
+            open:function(){
+              $("#evtCoM input,#evtCoM select").change(optChanged);
+            }
+          });
+    });
+}
+
+function optChanged() {
+    $("input#opditmp").val($("#evtCoM input:checked").next("label").text());
+}
 
     function delbutton() {
         var r = $("head").attr("root");
@@ -211,8 +275,9 @@ sub DOIFtools_eM($$$$) {
   my $ret = "";
   $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
   # Event Monitor
-  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
+  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on";
+  my $lang = AttrVal("global","language","EN");
+  $ret .= "<div class=\"dval\"><br><span title=\"".($lang eq "DE" ? "toggle schaltet den Event-Monitor ein/aus" : "toggle switches event monitor on/off")."\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
   $ret .= "</div>";
 
   my $a = "";
@@ -226,7 +291,7 @@ sub DOIFtools_eM($$$$) {
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\" ></textarea>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\" ></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
   }
@@ -399,6 +464,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   $ret .= "</div><br>";
   my $a = "";
   if (ReadingsVal($d,".eM","off") eq "on") {
+    my $lang = AttrVal("global","language","EN");
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
     # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/doiftools.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
@@ -409,7 +475,7 @@ sub DOIFtools_fhemwebFn($$$$) {
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
     $ret .= "<div>";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"selecting an event line displays example operands for DOIFs definition\"></textarea>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\"></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
   }
@@ -1336,7 +1402,8 @@ DOIFtools contains tools to support DOIF.<br>
     <li>lists every DOIF definition in <i>probably associated with</i>.</li>
     <li>access to DOIFtools from any DOIF device via <i>probably associated with</i></li>
     <li>access from DOIFtools to existing DOIFtoolsLog logfiles</li>
-    <li>show event monitor in device overview and optionally DOIF</li>
+    <li>show event monitor in device detail view and optionally in DOIFs detail view</li>
+    <li>convert events to DOIF operands, a selected operand is copied to clipboard and the DEF editor will open</li>
     <li>check definitions and offer recommendations</li>
     <li>create shortcuts</li>
     <li>optionally create a menu entry</li>
@@ -1370,6 +1437,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>Zugriff aus DOIFtools auf vorhandene DOIFtoolsLog-Logdateien.</li>
     <li>zeigt den Event Monitor in der Detailansicht von DOIFtools.</li>
     <li>ermöglicht den Zugriff auf den Event Monitor in der Detailansicht von DOIF.</li>
+    <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors, ein gewählter Operand wird in die Zwischenablage kopiert und kann im DEF-Editor in die Definition eingefügt werden.</li>
     <li>prüfen der DOIF Definitionen mit Empfehlungen.</li>
     <li>erstellen von Shortcuts</li>
     <li>optionalen Menüeintrag erstellen</li>
