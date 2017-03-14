@@ -640,7 +640,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
           cmd = $(div).attr("cmd");
       var sel = $(this).closest("form").find("select");
       var arg = $(sel).val();
-      var ifid = (devName+"-"+arg).replace(/\./g, '\\.');
+      var ifid = (devName+"-"+arg).replace(/([^_a-z0-9])/gi,
+                                   function(m){ return "\\"+m });
       if($(".dval[informid="+ifid+"]").length == 0) {
         console.log(this);
         $(this).unbind('click').click();// No element found to replace, reload
@@ -1062,7 +1063,7 @@ function
 FW_queryValue(cmd, el)
 {
   log("FW_queryValue:"+cmd);
-  var query = location.pathname+"?cmd="+cmd+"&XHR=1";
+  var query = location.pathname+"?cmd="+encodeURIComponent(cmd)+"&XHR=1";
   query = addcsrf(query);
   var qConn = new XMLHttpRequest();
   qConn.onreadystatechange = function() {
