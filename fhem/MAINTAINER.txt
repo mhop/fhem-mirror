@@ -25,7 +25,7 @@ FHEM/00_HMUARTLGW.pm         mgernoth             http://forum.fhem.de HomeMatic
 FHEM/00_HXB.pm               neubert              http://forum.fhem.de Sonstige Systeme
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
-FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
+FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  http://forum.fhem.de MAX
 FHEM/00_MQTT.pm              eisler               http://forum.fhem.de Sonstige Systeme
 FHEM/00_MYSENSORS.pm         ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               http://forum.fhem.de Sonstige Systeme
@@ -61,7 +61,7 @@ FHEM/00_HXBDevice.pm         neubert              http://forum.fhem.de Sonstige 
 FHEM/10_IT.pm                dancer0705/bjoernh   http://forum.fhem.de InterTechno
 FHEM/10_Itach_IR             ulimaass             http://forum.fhem.de Sonstige Systeme
 FHEM/10_KOPP_FC.pm           raspii               http://forum.fhem.de/index.php/topic,32048.30.html#lastPost
-FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
+FHEM/10_MAX.pm               rudolfkoenig/orphan  http://forum.fhem.de MAX
 FHEM/10_MQTT_BRIDGE          eisler               http://forum.fhem.de Sonstige Systeme
 FHEM/10_MQTT_DEVICE          eisler               http://forum.fhem.de Sonstige Systeme
 FHEM/10_MYSENSORS_DEVICE     ntruchsess           http://forum.fhem.de Sonstige Systeme
@@ -77,7 +77,7 @@ FHEM/11_OWDevice.pm          neubert/mfr69bs      http://forum.fhem.de 1Wire
 FHEM/14_Hideki.pm            Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/12_HMS.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/13_KS300.pm             rudolfkoenig         http://forum.fhem.de SlowRF
-FHEM/14_CUL_MAX.pm           mgehre               http://forum.fhem.de MAX
+FHEM/14_CUL_MAX.pm           rudolfkoenig/orphan  http://forum.fhem.de MAX
 FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   http://forum.fhem.de Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   http://forum.fhem.de Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         http://forum.fhem.de SlowRF
@@ -438,7 +438,7 @@ FHEM/FritzBoxUtils.pm        rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/HMCCUConf.pm            zap                  http://forum.fhem.de HomeMatic
 FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
+FHEM/MaxCommon.pm            rudolfkoenig/orphan  http://forum.fhem.de MAX
 FHEM/msgSchema.pm            loredo               http://forum.fhem.de Automatisierung
 FHEM/ONKYOdb.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/OWX_DS2480.pm           ntruchsess           http://forum.fhem.de 1Wire
