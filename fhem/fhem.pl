@@ -203,6 +203,7 @@ sub cfgDB_WriteFile($@);
 
 use vars qw($auth_refresh);
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
+use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($cvsid);            # used in 98_version.pm
 use vars qw($devcount);         # Maximum device number, used for storing
 use vars qw($featurelevel); 
@@ -2988,6 +2989,7 @@ SignalHandling()
     my ($msg) = @_;
 
     return if($inWarnSub);
+    $lastWarningMsg = $msg;
     if(!$attr{global}{stacktrace} && $data{WARNING}{$msg}) {
       $data{WARNING}{$msg}++;
       return;
@@ -3497,7 +3499,7 @@ Dispatch($$$)
 
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
-    next if($dmsg !~ m/$modules{$m}{Match}/i);
+    next if(!$modules{$m} || $dmsg !~ m/$modules{$m}{Match}/i);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
       ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
