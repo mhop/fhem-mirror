@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     31_PLAYBULB: Integrates different smart lights from MIPOW and
+                          displays several settings
   - bugfix:  00_SONOS: Errorhandling for RadioName etc.
   - feature: 98_template: new FHEM command template
   - feature: 70_MEDIAPORTAL: Plugins can be retreived and changed to
