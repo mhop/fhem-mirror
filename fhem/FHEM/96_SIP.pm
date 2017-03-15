@@ -53,7 +53,7 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.41 / 13.03.17";
+my $sip_version ="V1.42 / 15.03.17";
 my $ua;	# SIP user agent
 
 my %sets = (
@@ -109,7 +109,6 @@ sub SIP_Define($$)
   $hash->{STATE}              = "defined"; 	
   $hash->{VERSION}            = $sip_version;
   $hash->{".reset"}           = 0;
-   
   $attr{$name}{sip_ringtime}  = '3'         unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
   $attr{$name}{sip_ip}        = $addr       unless (exists($attr{$name}{sip_ip}));
@@ -122,16 +121,24 @@ sub SIP_Define($$)
   $attr{$name}{sip_from}      = 'sip:'.$attr{$name}{sip_user}.'@'.$attr{$name}{sip_registrar} unless (exists($attr{$name}{sip_from}));
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5, "SIP_updateConfig", $hash, 0);
+  InternalTimer(gettimeofday()+5, "SIP_updateConfig", $hash);
   return undef;
 }
 
 sub SIP_Notify($$) 
 {
-  # $hash is my entry, $dev_hash is the entry of the changed device
+  # $hash is my hash, $dev_hash is the hash of the changed device
   my ($hash, $dev_hash) = @_;
   return undef if ($dev_hash->{NAME} ne AttrVal($hash->{NAME},"T2S_Device",""));
-  SIP_wait_for_tts($hash) if (defined($hash->{callnr}) && defined($hash->{ringtime}));
+  my $val = ReadingsVal($dev_hash->{NAME},"lastFilename","");
+  return undef if (!$val);
+
+   if (defined($hash->{audio1}) || 
+       defined($hash->{audio2}) || 
+       defined($hash->{audio3}) ||
+      (defined($hash->{callnr}) && defined($hash->{ringtime})))
+      { SIP_wait_for_t2s($hash);}
+  
   return undef;
 }
 
@@ -191,10 +198,11 @@ sub SIP_Attr (@)
  if ($hash->{".reset"})
  {
   Log3 $name,5,"$name , SIP_Attr : reset";
-  SIP_updateConfig($hash);
+  InternalTimer(gettimeofday()+1,"SIP_updateConfig",$hash);
  }
  return undef;
 }
+
 
 sub SIP_updateConfig($)
 {
@@ -208,7 +216,7 @@ sub SIP_updateConfig($)
     if (!$init_done)
     {
 	RemoveInternalTimer($hash);
-	InternalTimer(gettimeofday()+5,"SIP_updateConfig", $hash, 0);
+	InternalTimer(gettimeofday()+5,"SIP_updateConfig", $hash);
 	return;
     }
     ## kommen wir via reset Kommando ?
@@ -226,10 +234,10 @@ sub SIP_updateConfig($)
 	}
 	if(defined($hash->{CPID}))
 	{
-                    Log3 $name,4, "$name, CALL Kill PID : ".$hash->{CPID};
+            Log3 $name,4, "$name, CALL Kill PID : ".$hash->{CPID};
 	    BlockingKill($hash->{helper}{CALL_PID});
 	    delete $hash->{helper}{CALL_PID};
-                    delete $hash->{CPID};
+            delete $hash->{CPID};
 	    Log3 $name,4,"$name, Reset Call done";
 	}
     } 
@@ -516,41 +524,23 @@ sub SIP_Set($@)
       } 
       elsif (substr($msg,0,1) eq "!") # Text2Speech Text ?
       {
-       $msg =~ s/^\!//; # das ! muss weg
-       my $t2s_name = AttrVal($name,"T2S_Device",undef);
-       return "attr T2S_Device not set !" if !defined($t2s_name);
-       my $t2s_hash = $defs{$t2s_name};
-       return "T2S_Device $t2s_name not found" if !defined($t2s_hash);
-
-       return "attr audio_converter not set" if !AttrVal($name,"audio_converter","");
-       return "external sox or ffmpeg programm not found, please install sox or ffmpeg first and set attr audio_converter" if !defined($hash->{AC});
-
-       my $t2s_file = ReadingsVal($t2s_name,"lastFilename",undef);
-       Log3 $name,3,"$name, Reading lastFilename not found at device $t2s_name, are you using a old version ?" if !defined($t2s_file);
-
-       readingsSingleUpdate($t2s_hash,"lastFilename","---",0);
-
        shift @a;
        shift @a;
-       $a[0] = $t2s_name; # ist aber egal wird eh verworfen
+       $a[0] = "t2s_name"; # ist egal wird eh verworfen
        $a[1] = "tts"; # Kommando des Set Befehls
-       $a[2] = $msg;
+       $a[2] =~ s/^\!//; # das ! muss weg
 
-       my $ret = Text2Speech_Set($t2s_hash, @a); # na dann lege schon mal los
-       if (defined($ret))
-       {
-        Log3 $name,3,"$name, T2S error : $ret"; 
-        readingsSingleUpdate($hash,"last_error",$ret,0);
-        return $ret; # Das ging leider schief
-       }
+       my $ret = SIP_create_T2S_File($hash,@a); # na dann lege schon mal los
+       return $ret if defined($ret); # Das ging leider schief
+
        readingsSingleUpdate($hash,"call_state","waiting T2S",0);
 
        $hash->{callnr}   = $nr;
        $hash->{ringtime} = $ringtime;
 
        RemoveInternalTimer($hash);
-       # geben wir TTS mal ein paar Sekunden
-       InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_wait_for_tts", $hash, 0);
+       # geben wir T2S mal ein paar Sekunden
+       InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_wait_for_t2s", $hash);
        return undef;
       }
       elsif (-e $msg) 
@@ -680,7 +670,8 @@ sub SIP_Undef($$)
   $ua->cleanup if (defined($ua));
 
   BlockingKill($hash->{helper}{LISTEN_PID}) if (defined($hash->{helper}{LISTEN_PID}));
-  RemoveInternalTimer($hash);
+  #RemoveInternalTimer($hash);
+  #RemoveInternalTimer($name);
   return undef;
 }
 
@@ -717,25 +708,33 @@ sub SIP_ListenStart($)
  return $name."|ListenRegister: $error" if ($error);
  
  my $msg1 = AttrVal($name, "sip_audiofile_dtmf", "");
- my $msg2 = AttrVal($name, "sip_audiofile_ok", "");
- my $msg3 = AttrVal($name, "sip_audiofile_wfp", "");
+ my $msg2 = AttrVal($name, "sip_audiofile_ok",   "");
+ my $msg3 = AttrVal($name, "sip_audiofile_wfp",  "");
 
- $msg1 = SIP_check_file($hash,$msg1) if ($msg1);
- $msg2 = SIP_check_file($hash,$msg2) if ($msg2);
- $msg3 = SIP_check_file($hash,$msg3) if ($msg3);
+ $msg1 = $hash->{audio1} if (defined($hash->{audio1}) && $msg1); 
+ $msg1 = SIP_check_file($hash,$msg1) if (!defined($hash->{audio1}) && $msg1);;
 
+ $msg2 = $hash->{audio2} if (defined($hash->{audio2}) && $msg2); 
+ $msg2 = SIP_check_file($hash,$msg2) if (!defined($hash->{audio2}) && $msg2);;
+
+ $msg3 = $hash->{audio3} if (defined($hash->{audio3}) && $msg3); 
+ $msg3 = SIP_check_file($hash,$msg3) if (!defined($hash->{audio3}) && $msg3);;
+
+ Log3 $name,4,"$name, using $msg1 for audio_dtmf" if ($msg1);
+ Log3 $name,4,"$name, using $msg2 for audio_ok"   if ($msg2);
+ Log3 $name,4,"$name, using $msg3 for audio_wfp"  if ($msg3);
 
  $hash->{dtmf}       = 0;
  $hash->{dtmf_event} = "";
  $hash->{old}        ="-";
 
- $send_something = sub {
-                        return unless $packets-- > 0;
-                        my $buf = sprintf "%010d",$packets;
-                        $buf .= "1234567890" x 15;
-                        return $buf; # 160 bytes for PCMU/8000
-                        };
-
+ $send_something = sub 
+ {
+   return unless $packets-- > 0;
+   my $buf = sprintf "%010d",$packets;
+   $buf .= "1234567890" x 15;
+   return $buf; # 160 bytes for PCMU/8000
+ };
 
  $sub_dtmf = sub 
  {
@@ -940,7 +939,7 @@ sub SIP_ListenDone($)
   
   delete($hash->{helper}{LISTEN_PID});
   delete $hash->{LPID};
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($name);
 
   if ($ret ne "end")
   { 
@@ -950,7 +949,7 @@ sub SIP_ListenDone($)
    readingsEndUpdate($hash, 1 );
    Log3 $name, 3 , "$name, listen error -> $ret";
    return if(IsDisabled($name));
-   InternalTimer(gettimeofday()+AttrVal($name, "sip_watch_listen", 60), "SIP_try_listen", $hash, 0);
+   InternalTimer(gettimeofday()+AttrVal($name, "sip_watch_listen", 60), "SIP_try_listen", $hash);
   }
   else 
   { 
@@ -967,6 +966,52 @@ sub SIP_try_listen($)
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my $waits  = AttrVal($name, "sip_watch_listen", 60);
+  my $audio1 = AttrVal($name, "sip_audiofile_dtmf","-");
+  my $audio2 = AttrVal($name, "sip_audiofile_ok",  "-");
+  my $audio3 = AttrVal($name, "sip_audiofile_wfp", "-");
+  my @a = ("tts","tts", "-");;
+  
+  if (AttrVal($name,"sip_listen","none") eq "dtmf")
+  {
+   if ((substr($audio1,0,1) eq "!") && !defined($hash->{audio1})) # muss erst T2S gefragt werden ?
+    { 
+     $audio1 =~ s/^\!//;
+     $hash->{audio1} = $audio1;
+     $a[2] = $audio1;
+     Log3 $name ,4,"$name, hole $audio1";
+    }
+    elsif ((substr($audio2,0,1) eq "!") && !defined($hash->{audio2})) # muss erst T2S gefragt werden ?
+    {
+     $audio2 =~ s/^\!//;
+     $hash->{audio2} = $audio2;
+     $a[2] = $audio2;
+     Log3 $name ,4,"$name, hole $audio2";
+    }
+  }
+  elsif ((substr($audio3,0,1) eq "!") && !defined($hash->{audio3}) && (AttrVal($name,"sip_listen","none") eq "wfp")) # muss erst T2S gefragt werden ?
+  {
+   $audio3 =~ s/^\!//;
+   $hash->{audio3} = $audio3;
+   $a[2] = $audio3;
+   Log3 $name ,4,"$name, hole $audio3";
+  }
+
+  if ($a[2] ne "-")
+  {
+    my $ret = SIP_create_T2S_File($hash,@a);
+    if ($ret)
+    {
+      delete $hash->{audio1} if defined($hash->{audio1});
+      delete $hash->{audio2} if defined($hash->{audio2});
+      delete $hash->{audio3} if defined($hash->{audio3});
+      return $ret;
+    }
+    #starte die Überwachung von T2S
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_watchdog_t2s", $hash);
+    return undef;
+  }
+
 
   $hash->{helper}{LISTEN_PID} = BlockingCall("SIP_ListenStart",$name, "SIP_ListenDone") unless(exists($hash->{helper}{LISTEN_PID}));
 
@@ -974,17 +1019,18 @@ sub SIP_try_listen($)
   {
     $hash->{LPID} = $hash->{helper}{LISTEN_PID}{pid};
     Log3 $name, 4 , $name.", Listen new PID : ".$hash->{LPID};
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$waits, "SIP_watch_listen", $hash, 0); # starte die Überwachung
-    #my $state = "listen_for_".AttrVal($name,"sip_listen",undef);
-    #readingsSingleUpdate($hash, "state", $state, 1);
+    RemoveInternalTimer($name);
+    InternalTimer(gettimeofday()+$waits, "SIP_watch_listen", $name); # starte die Überwachung
+    delete $hash->{audio1};
+    delete $hash->{audio2};
+    delete $hash->{audio3};
     return 0;
   }
   else 
   {
     Log3 $name, 2 , $name.", Listen Start failed, waiting $waits seconds for next try";
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$waits, "SIP_try_listen", $hash, 0);
+    InternalTimer(gettimeofday()+$waits, "SIP_try_listen", $hash);
     return "Listen Start failed";
   }
 }
@@ -992,10 +1038,10 @@ sub SIP_try_listen($)
 sub SIP_watch_listen($)
 {
   # Lebt denn der Listen Prozess überhaupt noch ? 
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
+  my ($name) = @_;
+  my $hash   = $defs{$name};
 
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($name);
   return if (IsDisabled($name));
   return if (!defined($hash->{LPID}));
 
@@ -1012,23 +1058,24 @@ sub SIP_watch_listen($)
   }
   else { Log3 $name, 5 , $name.", listen prozess ".$hash->{LPID}." found"; }
 
-  InternalTimer(gettimeofday()+60, "SIP_watch_listen", $hash, 0);
+  InternalTimer(gettimeofday()+60, "SIP_watch_listen", $name, 0);
   return;
 }
 
-sub SIP_wait_for_tts($)
+sub SIP_wait_for_t2s($)
 {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   RemoveInternalTimer($hash);
 
   my $t2s_name = AttrVal($name,"T2S_Device",undef);
-  my $file     = ReadingsVal($t2s_name,"lastFilename","---");
+  my $file     = ReadingsVal($t2s_name,"lastFilename","");
   my $msg      = "";
+  Log3 $name,4,"$name, wait_for_t2s file : $file";
 
-  if ($file ne "---")
+  if ($file)
   {
-   Log3 $name,4,"$name, new TTS file $file";
+   Log3 $name,4,"$name, new T2S file $file";
  
    my $out = $file;
    $out  =~ s/mp3/alaw/;
@@ -1067,24 +1114,43 @@ sub SIP_wait_for_tts($)
   else
   {
    Log3 $name,3,"$name, timeout waiting for T2S";
-   readingsSingleUpdate($hash,"call_state","TTS timeout",1);
+   readingsSingleUpdate($hash,"call_state","T2S timeout",1);
   }
- 
+   
+  if ($msg && defined($hash->{audio3}))
+  {
+     $hash->{audio3} = $msg;
+     SIP_try_listen($hash);
+     return undef;
+  }
+
+  if ($msg && defined($hash->{audio2}))
+  {
+     $hash->{audio2} = $msg;
+     SIP_try_listen($hash);
+     return undef;
+  }
+
+  if ($msg && defined($hash->{audio1}))
+  {
+     $hash->{audio1} = $msg;
+     SIP_try_listen($hash);
+     return undef;
+  }
+
   # nun aber calling
  
   my @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg) ;
   delete($hash->{callnr});
   delete($hash->{ringtime});
   my $ret = SIP_Set($hash , @a);
-  Log3 $name,3,"$name, TTS Call : $ret" if defined($ret);
-  # haben wir vllt. den Timer missbraucht ?
-  SIP_watch_listen($hash) if (defined($hash->{LPID}));
+  Log3 $name,3,"$name, T2S Call : $ret" if defined($ret);
   return undef;
 }
 
 sub SIP_telnetPort()
 {
-foreach my $d (sort keys %defs) 
+ foreach my $d (sort keys %defs) 
  {  
     my $h = $defs{$d};
     next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
@@ -1205,7 +1271,7 @@ sub SIP_readPassword($)
 
    if (substr($file,0,1) eq "!")
    {
-    Log3 $name,3,"$name, Text2Speech is not supported for listen, ignoring it";
+    Log3 $name,3,"$name, Text : $file found, ignoring it";
     return "";
    }
    if (!-e $file)
@@ -1221,6 +1287,62 @@ sub SIP_readPassword($)
    return $file;
  }
 
+ sub SIP_create_T2S_File($@)
+ {
+   my ($hash,@a) = @_;
+   my $name        = $hash->{NAME};
+ 
+   my $t2s_name = AttrVal($name,"T2S_Device",undef);
+   return "attr T2S_Device not set !" if !defined($t2s_name);
+   my $t2s_hash = $defs{$t2s_name};
+   return "T2S_Device $t2s_name not found" if !defined($t2s_hash);
+
+   return "attr audio_converter not set" if !AttrVal($name,"audio_converter","");
+   return "external sox or ffmpeg programm not found, please install sox or ffmpeg first and set attr audio_converter" if !defined($hash->{AC});
+
+   my $t2s_file = ReadingsVal($t2s_name,"lastFilename",undef);
+   Log3 $name,3,"$name, Reading lastFilename not found at device $t2s_name, are you using a old version ?" if !defined($t2s_file);
+
+   readingsSingleUpdate($t2s_hash,"lastFilename","",0);
+
+   my $ret = Text2Speech_Set($t2s_hash, @a); # na dann lege schon mal los
+   if (defined($ret))
+   {
+    Log3 $name,3,"$name, T2S error : $ret"; 
+    readingsSingleUpdate($hash,"last_error",$ret,0);
+    return $ret; # Das ging leider schief
+   }
+
+  return undef; # alles klar
+ }
+
+ sub SIP_watchdog_T2S($)
+ {
+   my ($hash) = @_;
+   my $name   = $hash->{NAME};
+   Log3 $name,3,"$name, Timeout waiting for T2S";
+
+   if (defined($hash->{audio1}))
+   {
+    $hash->{audio1}="!T2S Timeout";
+    SIP_try_listen($hash);
+    return undef;
+   }
+
+   if (defined($hash->{audio2}))
+   {
+    $hash->{audio2}="!T2S Timeout";
+    SIP_try_listen($hash);
+    return undef;
+   }
+
+   if (defined($hash->{audio3}))
+   {
+    $hash->{audio3}="!T2S Timeout";
+    SIP_try_listen($hash);
+    return undef;
+   }
+ }
 
 1;
 
@@ -1263,9 +1385,9 @@ sub SIP_readPassword($)
     Stop any listen process and initialize device.<br>
    </li>
    <li>
-    <code>set &lt;name&gt; call &lt;number&gt [&lt;ringtime&gt] [&lt;message&gt]</code><br>
+    <code>set &lt;name&gt; call &lt;number&gt [&lt;maxtime&gt;] [&lt;message&gt;]</code><br>
     Start a call to the given number.<br>
-    Optionally you can supply a max time. Default is 10.
+    Optionally you can supply a max time. Default is 30.
     Optionally you can supply a message which is either a full path to an audio file or a relativ path starting from the home directory of the fhem.pl.
    </li>
    <li>
@@ -1360,9 +1482,9 @@ sub SIP_readPassword($)
     Stoppt laufende listen-Prozess und initalisiert das Device.<br>
    </li>
    <li>
-    <code>set &lt;name&gt; call &lt;nummer&gt [&lt;ringtime&gt] [&lt;nachricht&gt]</code><br>
+    <code>set &lt;name&gt; call &lt;nummer&gt; [&lt;maxtime&gt;] [&lt;nachricht&gt;]</code><br>
     Startet einen Anruf an die angegebene Nummer.<br>
-    Optional kann die maximale Zeit angegeben werden. Default ist 10.<br>
+    Optional kann die maximale Zeit angegeben werden. Default ist 30.<br>
     Optional kann eine Nachricht in Form eines Audiofiles angegeben werden . Das File ist mit dem vollen Pfad oder dem relativen ab dem Verzeichnis mit fhem.pl anzugeben..
    </li>
    <li>
@@ -1381,12 +1503,16 @@ sub SIP_readPassword($)
     <li><a href="#sip_audiofile_wfp">sip_audiofile_wfp</a><br>
       Audiofile das nach dem Command <b>fetch</b> abgespielt wird. Das Audiofile kann mit dem externen Programm sox erzeugt werden :<br>
       sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
-      da nur das raw audio format unterstützt wird. 
+      da nur das raw audio format unterstützt wird<br>
+      Statt eines echten Audiofiles kann auch eine Text2Speech Nachricht eingetragen werden.<br>
+      Bsp : attr mySIP sip_audiofile_call !Hier ist dein FHEM Server
     </li>
     <li><a href="#sip_audiofile_call">sip_audiofile_call</a></li>
+    Audiofile das dem Angerufenen bei set call vorgespielt wird.
     <li><a href="#sip_audiofile_dtmf">sip_audiofile_dtmf</a></li>
+    Audiofile das dem Anrufer bei listen_for_dtmf abgespielt wird.
     <li><a href="#sip_audiofile_ok">sip_audiofile_ok</a></li>
-
+    Audiofile das bei erkannter DTMF Sequenz abgespielt wird.
     <li><a href="#sip_listen">sip_listen</a> (none , dtmf, wfp)</li>
     <li><a name="#sip_from">sip_from</a><br>
       Meine SIP-Client-Info. Default ist sip:620@fritz.box
@@ -1401,7 +1527,7 @@ sub SIP_readPassword($)
       Hostname oder IP-Addresse des SIP-Servers mit dem sich der Client verbindet. Default ist fritz.box.
       </li>
     <li><a name="#sip_ringtime">sip_ringtime</a><br>
-      Klingelzeit für eingehende Anrufe.(dtmf & wfp)
+      Klingelzeit für eingehende Anrufe bei listen_for_dtmf 
       </li>
     <li><a name="#sip_user">sip_user</a><br>
       User Name des SIP-Clients. Default ist 620.
@@ -1412,10 +1538,19 @@ sub SIP_readPassword($)
     <li><a name="#sip_dtmf_loop">sip_dtmf_loop</a><br>
     once oder loop , default once      ...
     </li>
-
     <li><a name="#sip_waittime">sip_waittime</a><br>
        Maximale Wartezeit im Status listen_for_wfp bis das Gespräch automatisch angenommen wird.
       </li>
+    <li>T2S_Device<br>
+    Name des Text2Speech Devices
+    </li>
+     <li>T2S_Timeout<br>
+     Wartezeit wie lange max auf Text2Speech gewartet wird.
+     </li>
+    <li>audo_converter<br>sox oder ffmpeg, default sox<br>
+     f&uml;r Text2Speech unbedingt erforderlich !<br>
+     Installation z.B. mit sudo apt-get install sox und noch die mp3 Unterst&uuml;tzung mit sudo apt-get install libsox-fmt-mp3
+    </li>
   </ul>
   <br>
 
