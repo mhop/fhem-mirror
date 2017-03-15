@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_expandJSON: initial check in
   - update:  98_DOIFtools: added hints to the derived operands
   - update:  98_Text2Speech: some small improvements
                 special Audiodevice "none" is now "default due

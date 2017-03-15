@@ -404,6 +404,7 @@ FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstue
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        http://forum.fhem.de Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_expandJSON.pm        dev0                 http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_fheminfo.pm          mfr69bs/rudolfkoenig http://forum.fhem.de Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_GoogleAuth.pm        betateilchen         http://forum.fhem.de Unterstuetzende Dienste
