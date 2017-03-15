@@ -484,6 +484,7 @@ contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Wettermod
 contrib/Infratec/*           wzut                 http://forum.fhem.de Bastelecke
 contrib/PRESENCE             markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 contrib/PRESENCE/lepresenced PatrickR             http://forum.fhem.de Unterstuetzende Dienste
+contrib/SIP/*        	     wzut                 http://forum.fhem.de Sonstiges
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          http://forum.fhem.de Frontends
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
