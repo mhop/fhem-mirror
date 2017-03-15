@@ -55,12 +55,13 @@ function doiftoolsCopyToClipboard() {
       myFW_root = r;
     FW_cmd(myFW_root+"?cmd={AttrVal(\"global\",\"language\",\"EN\")}&XHR=1", function(data){
         var lang = data.match(/(DE|EN)/);
-        var lang =lang[1];
+        var lang = lang[1] == "DE" ? 1 : 0;
+
         var txtarea = document.getElementById("console");
         var start = txtarea.selectionStart;
         var finish = txtarea.selectionEnd;
         var txt = txtarea.value.substring(start, finish);
-        var hlp = (lang == "DE") ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
+        var hlp = lang ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
         if(!txt)
           return FW_okDialog(hlp);
         var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
@@ -96,15 +97,27 @@ function doiftoolsCopyToClipboard() {
                        .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
 
         var diop = [];
+        var diophlp = [];
         var icnt = 0;
+        diophlp[icnt] = lang ? "a) einfacher auslösender Zugriff auf ein Reading-Wert eines Gerätes oder auf den Wert des Internal STATE, wenn kein Reading im Ereignis vorkommt" : "a) simple triggering access to device reading or internal STATE";
         diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"]"; icnt++;
+        diophlp[icnt] = lang ? "b) wie a), zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (eq &#8793; equal) und Vergleichswert" : "b) like a) additionally with string operator (eq &#8793; equal) and reference value";
         diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"] eq \""+evtVal+"\""; icnt++;
-        if (evtNum != "") {diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+":d] == "+evtNum; icnt++}
-        if (evtHM != "") {diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+":\"(\\d\\d:\\d\\d)\":$1,\"00:00\"] ge $hm"; icnt++}
+        if (evtNum != "") {
+            diophlp[icnt] = lang ? "c) wie a) aber mit Zugriff nur auf die erste Zahl der Wertes und eines Vergleichsoperators für Zahlen (==) und numerischem Vergleichswert" : "c) like a) but with access to the first number and a relational operator for numbers (==) and a numeric reference value";
+            diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":d] == "+evtNum; icnt++}
+        if (evtHM != "") {
+            diophlp[icnt] = lang ? "d) wie a) aber mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe für nicht existierende Readings/Internals, zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (ge &#8793; greater equal) und Vergleichswert" : "d) like a) with filter for time (hh:mm), default value for nonexisting readings or Internals and a relational string operator (ge &#8793; greater equal) and a reference value";
+            diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
+        diophlp[icnt] = lang ? "e) auslösender Zugriff auf ein Gerät mit Angabe eines \"regulären Ausdrucks\" für ein Reading mit beliebigen Reading-Wert" : "e) triggering access to a device with \"regular expression\" for a reading with arbitrary value";
         diop[icnt] = "["+evtDev+(evtRead ? ":\"^"+evtRead+": " : ":\"")+"\"]"; icnt++;
-        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:")+"\"]"; icnt++;
+        diophlp[icnt] = lang ? "f) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit beliebigen Reading-Wert" : "f) access by a \"regular expression\" for a device and a reading with arbitrary value";
+        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$: ")+"\"]"; icnt++;
+      diophlp[icnt] = lang ? "g) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit exaktem Reding-Wert" : "g) access by a \"regular expression\" for a device and a reading with distinct value";
         diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+evtEvt+"$\"]"; icnt++;
-        if (evtHM != "") {diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+":\"(\\d\\d:\\d\\d)\":$1,\"00:00\"] ge $hm"; icnt++}
+        if (evtHM != "") {
+            diophlp[icnt] = lang ? "h) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe falls ein anderer Operand auslöst" : "h) access by a \"regular expression\" for a device and a reading and a filter for a time value (hh:mm), a default value in case a different operator triggers and a relational string operator (ge &#8793; greater equal) and a reference value";
+            diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+"\"" : "$:\"")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
         var maxlength = 33;
         for (var i = 0; i < diop.length; i++)
             maxlength = diop[i].length > maxlength ? diop[i].length : maxlength;
@@ -116,13 +129,13 @@ function doiftoolsCopyToClipboard() {
                   '</style>\n';
         var inputPrf = "<input type='radio' name=";
 
-        txt += ((lang == "DE") ? "Der gewählte Operand wird in die Zwischenablage kopiert." : "Selected operand will be copied to Clipboard") + "<br><br>";
+        txt += (lang ? "Der gewählte Operand wird in die Zwischenablage kopiert." : "Selected operand will be copied to Clipboard") + "<br><br>";
         for (var i = 0; i < diop.length; i++) {
-            txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"'/>"+
-               "<label>"+diop[i]+"</label></div><br>";
+            txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"' />"+
+               "<label title='"+diophlp[i]+"' >"+diop[i]+"</label></div><br>";
         }
         txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
-        ((lang == "DE") ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
+        (lang ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
         "' ></input>";
 
         $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
@@ -131,7 +144,7 @@ function doiftoolsCopyToClipboard() {
             close:function(){ $('#evtCoM').remove(); },
             buttons:[
             { text:"Cancel", click:function(){ $(this).dialog('close'); }},
-            { text:"Open DEF-Editor", title:((lang == "DE") ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
+            { text:"Open DEF-Editor", title:(lang ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
               $("input#opditmp").val($("input#opditmp").val()).select();
               document.execCommand("copy");
               if ($("#edit").css("display") == "none")
