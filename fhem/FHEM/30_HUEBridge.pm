@@ -968,10 +968,11 @@ sub HUEBridge_ProcessResponse($$)
             } elsif( $l[1] eq 'groups' && $l[3] eq 'action' ) {
               my $code = $name ."-G". $l[2];
               my $d = $modules{HUEDevice}{defptr}{$code};
-              my $lights = $d->{lights};
-              foreach my $light ( split(',', $lights) ) {
-                $json{$light}->{state}->{$l[4]} = $success->{$key};
-                $successes++;
+              if( my $lights = $d->{lights} ) {
+                foreach my $light ( split(',', $lights) ) {
+                  $json{$light}->{state}->{$l[4]} = $success->{$key};
+                  $successes++;
+                }
               }
 
             }
