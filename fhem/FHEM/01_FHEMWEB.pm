@@ -3321,10 +3321,9 @@ FW_widgetOverride($$)
        If set, FHEMWEB requires the value of this attribute as fwcsrf Parameter
        for each command. It is used as countermeasure for Cross Site Resource
        Forgery attacks. If the value is random, then a random number will be
-       generated on each FHEMWEB start. If it is set to none, no token is
-       expected. Default is random for featurelevel 5.8 and greater, and none
-       for featurelevel below 5.8
-       </li><br>
+       generated on each FHEMWEB start. If it is set to the literal string
+       none, no token is expected. Default is random for featurelevel 5.8 and
+       greater, and none for featurelevel below 5.8 </li><br>
 
     <a name="CssFiles"></a>
     <li>CssFiles<br>
