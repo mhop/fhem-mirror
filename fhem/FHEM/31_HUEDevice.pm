@@ -652,6 +652,8 @@ HUEDevice_Set($@)
     my $id = $hash->{ID};
     $id = $1 if( $id =~ m/^S(\d.*)/ );
 
+    $hash->{".triggerUsed"} = 1;
+
     if( $cmd eq "statusRequest" ) {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate($hash);
