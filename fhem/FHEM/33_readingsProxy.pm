@@ -116,9 +116,11 @@ readingsProxy_update($$)
   my $name = $hash->{NAME};
 
   my $DEVICE = $hash->{DEVICE};
+  return if( !$DEVICE );
   my $READING = $hash->{READING};
 
   $value = ReadingsVal($DEVICE,$READING,undef) if( $DEVICE && !defined($value) );
+  #return if( !defined($value) );
 
   my $value_fn = AttrVal( $name, "valueFn", "" );
   if( $value_fn =~ m/^{.*}$/s ) {
@@ -171,21 +173,25 @@ readingsProxy_Notify($$)
       if( defined($hash->{CONTENT}{$old}) ) {
 
         $hash->{DEF} =~ s/(^|\s+)$old((:\S+)?\s*)/$1$new$2/g;
+
+        readingsProxy_updateDevices($hash);
       }
-      readingsProxy_updateDevices($hash);
+
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DELETED ([^ ]*)$/) {
       my ($name) = ($1);
 
       if( defined($hash->{CONTENT}{$name}) ) {
 
-        $hash->{DEF} =~ s/(^|\s+)$name((:\S+)?\s*)/ /g;
-        $hash->{DEF} =~ s/^ //;
-        $hash->{DEF} =~ s/ $//;
+        #$hash->{DEF} =~ s/(^|\s+)$name((:\S+)?\s*)/ /g;
+        #$hash->{DEF} =~ s/^ //;
+        #$hash->{DEF} =~ s/ $//;
+
+        readingsProxy_updateDevices($hash);
       }
-      readingsProxy_updateDevices($hash);
 
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
-      readingsProxy_updateDevices($hash);
+      my ($name) = ($1);
+      readingsProxy_updateDevices($hash) if( !$hash->{DEVICE} );
 
     } else {
       next if( !$hash->{DEVICE} );
