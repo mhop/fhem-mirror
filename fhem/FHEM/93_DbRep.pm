@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.11.2       16.03.2017       bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME)
 # 4.11.1       28.02.2017       commandref completed
 # 4.11.0       18.02.2017       added [current|previous]_[month|week|day|hour]_begin and 
 #                               [current|previous]_[month|week|day|hour]_end as options of timestamp
@@ -175,7 +176,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.11.1";
+my $DbRepVersion = "4.11.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3447,7 +3448,7 @@ sub dbmeta_DoParse($) {
              my $key = "SQLITE_DB_FILENAME";
              push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
          }
-         my @a = split(' ',qx(du -m /opt/fhem/fhem.db)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+         my @a = split(' ',qx(du -m $hash->{DATABASE})) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
          my $key = "SQLITE_FILE_SIZE_MB";
          push(@row_array, $key." ".$a[0]) if($key =~ m/($param)/i);
      }
