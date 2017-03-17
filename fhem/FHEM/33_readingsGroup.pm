@@ -1186,6 +1186,7 @@ readingsGroup_Notify($$)
     readingsGroup_inithtml($hash);
     return undef;
   }
+  return if( !$init_done );
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
