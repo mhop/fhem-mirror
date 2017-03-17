@@ -601,6 +601,14 @@ FW_replaceLink(el)
 }
 
 function
+FW_htmlQuote(text)
+{
+  return text.replace(/&/g, '&amp;')    // Same as in 01_FHEMWEB
+             .replace(/</g, '&lt;')
+             .replace(/>/g, '&gt;');
+}
+
+function
 FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 {
   var cm;
@@ -655,16 +663,16 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
       if(resp) {
+        resp = FW_htmlQuote(resp);
         if(resp.indexOf("\n") >= 0)
           resp = '<pre>'+resp+'</pre>';
         return FW_okDialog(resp);
       }
-      newDef = newDef.replace(/&/g, '&amp;')    // Same as in 01_FHEMWEB
-                     .replace(/</g, '&lt;')
-                     .replace(/>/g, '&gt;');
       if(isDef) {
         if(newDef.indexOf("\n") >= 0)
           newDef = '<pre>'+newDef+'</pre>';
+        else
+          newDef = FW_htmlQuote(newDef);
         $("div#disp").html(newDef).css("display", "");
         $("div#edit").css("display", "none");
       }
