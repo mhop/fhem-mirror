@@ -53,7 +53,7 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.42 / 15.03.17";
+my $sip_version ="V1.43 / 17.03.17";
 my $ua;	# SIP user agent
 
 my %sets = (
@@ -92,6 +92,7 @@ sub SIP_Initialize($$)
                           "sip_dtmf_send:audio,rfc2833 ".
                           "sip_dtmf_loop:once,loop ".
                           "sip_listen:none,dtmf,wfp ".
+                          "sip_filter ".
                           "T2S_Device ".
                           "T2S_Timeout ".
                           "audio_converter:sox,ffmpeg ".
@@ -282,8 +283,9 @@ sub SIP_updateConfig($)
 sub SIP_Register($$$)
 {
   my ($hash,$port,$type) = @_;
-  my $name = $hash->{NAME};
-  my $ip   = AttrVal($name,"sip_ip","");
+  my $name    = $hash->{NAME};
+  my $logname = $name."[".$$."]";
+  my $ip      = AttrVal($name,"sip_ip","");
   return "missing attr sip_ip" if (!$ip);
 
   my $leg = IO::Socket::INET->new(
@@ -294,13 +296,13 @@ sub SIP_Register($$$)
 #  if  port is already used try another one
    if (!$leg) 
    {
-   Log3 $name,2,"$name, cannot open port $port at $ip: $!";
+   Log3 $name,2,"$logname, cannot open port $port at $ip: $!";
    $port += 10;
    $leg = IO::Socket::INET->new(
     Proto => 'udp',
     LocalHost => $ip,
     LocalPort => $port) || return "cannot open port ".($port-10)." or $port at $ip: $!";
-    Log3 $name,2,"$name, using port $port";
+    Log3 $name,2,"$logname, using port $port";
    }
 
   close($leg);
@@ -320,18 +322,28 @@ sub SIP_Register($$$)
 
   # optional registration
   my $sub_register;
-  $sub_register = sub {
+  $sub_register = sub 
+  {
 	my $expire = $ua->register(registrar => $registrar ) || return "registration failed: ".$ua->error;
-	Log3 $name,4,"$name, register new expire : ".localtime(time()+$expire);
+        my $parent = getppid();
+        Log3 $name,5,"$logname, my parent is $parent";
+        my $cmd    = "ps -e | grep '".$parent." '";
+        my $result = qx($cmd); 
+        if  (index($result,"perl") == -1)
+        {
+          Log3 $name, 2 , $logname.", cant find my parent ".$parent." in process list !";
+          die;
+        }
+	Log3 $name,4,"$logname, register new expire : ".localtime(time()+$expire);
         SIP_telnet($hash,"set $name state $type\nexit\n");
 	# need to refresh registration periodically
 	$ua->add_timer( $expire/2, $sub_register );
-        };
+  };
+
   $sub_register->();
 
   if($ua->register) # returned  expires time or undef if failed
   {
-   #Log3 $name,4,"$name, ua register : ".$ua->register;
    return 0;
   }
 
@@ -345,9 +357,10 @@ sub SIP_CALLStart($)
   my ($arg) = @_;
   return unless(defined($arg));
   my ($name,$nr,$ringtime,$msg) = split("\\|",$arg);
-  my $hash = $defs{$name};
+  my $hash             = $defs{$name};
+  my $logname          = $name."[".$$."]";
   $hash->{telnetPort}  = undef;
-  my $rtp_done = 0;
+  my $rtp_done         = 0;
   my $final;
   my $peer_hangup;
   my $stopvar;
@@ -373,7 +386,7 @@ sub SIP_CALLStart($)
     $codec = "PCMU/8000" if ($msg =~ /\.ul(.+)$/);
     return $name."|0|CallStart: please use filetype .alaw (for a-law) or .ulaw (for u-law)" if !defined($codec);
 
-    Log3 $name,4,"$name, CallStart msg : $msg - $codec";
+    Log3 $name,4,"$logname, CallStart msg : $msg - $codec";
      $call = $ua->invite( $nr,
      init_media => $ua->rtp('send_recv', $msg),
     cb_rtp_done => \$rtp_done,
@@ -401,7 +414,7 @@ sub SIP_CALLStart($)
   return "$name|0|invite call failed ".$call->error if ($call->error);
 
   SIP_telnet($hash,"set $name call_state calling $nr\nexit\n"); 
-  Log3 $name,4,"$name, calling : $nr";
+  Log3 $name,4,"$logname, calling : $nr";
 
   return "$name|0|no answer" if ($no_answer);
 
@@ -416,10 +429,10 @@ sub SIP_CALLStart($)
     $ua->loop( \$stopvar );
   }
  
-  Log3 $name,5,"$name, RTP done : $rtp_done"   if defined($rtp_done);
-  Log3 $name,5,"$name, Hangup : $peer_hangup"  if defined($peer_hangup);
-  Log3 $name,5,"$name, Stopvar : $stopvar"     if defined($stopvar);
-  Log3 $name,5,"$name, Final : $final"         if defined($final);
+  Log3 $name,5,"$logname, RTP done : $rtp_done"   if defined($rtp_done);
+  Log3 $name,5,"$logname, Hangup : $peer_hangup"  if defined($peer_hangup);
+  Log3 $name,5,"$logname, Stopvar : $stopvar"     if defined($stopvar);
+  Log3 $name,5,"$logname, Final : $final"         if defined($final);
 
   if (defined($rtp_done))
   {
@@ -513,6 +526,7 @@ sub SIP_Set($@)
     my $msg      = (defined($a[4])) ? $a[4] : AttrVal($name, "sip_audiofile_call", "");
     return "there is already a call activ with pid ".$hash->{CPID} if exists($hash->{CPID});
     return "missing call number" if (!$nr);
+    return "invalid max time : $ringtime" unless $ringtime =~ m/^\d+$/;
 
     if ($msg)
     {
@@ -680,7 +694,7 @@ sub SIP_ListenStart($)
 {
  my ($name) = @_;
  return unless(defined($name));
-
+ my $logname          = $name."[".$$."]"; 
  my $hash             = $defs{$name}; # $hash / $name gueltig in diesem Block 
  $hash->{telnetPort}  = undef;
 
@@ -720,9 +734,9 @@ sub SIP_ListenStart($)
  $msg3 = $hash->{audio3} if (defined($hash->{audio3}) && $msg3); 
  $msg3 = SIP_check_file($hash,$msg3) if (!defined($hash->{audio3}) && $msg3);;
 
- Log3 $name,4,"$name, using $msg1 for audio_dtmf" if ($msg1);
- Log3 $name,4,"$name, using $msg2 for audio_ok"   if ($msg2);
- Log3 $name,4,"$name, using $msg3 for audio_wfp"  if ($msg3);
+ Log3 $name,4,"$logname, using $msg1 for audio_dtmf" if ($msg1);
+ Log3 $name,4,"$logname, using $msg2 for audio_ok"   if ($msg2);
+ Log3 $name,4,"$logname, using $msg3 for audio_wfp"  if ($msg3);
 
  $hash->{dtmf}       = 0;
  $hash->{dtmf_event} = "";
@@ -739,7 +753,7 @@ sub SIP_ListenStart($)
  $sub_dtmf = sub 
  {
   my ($event,$dur) = @_;
-  Log3 $name,5,"$name : DTMF Event : $event - $dur ms";
+  Log3 $name,5,"$logname, DTMF Event: $event - $dur ms";
   return if (int($dur) < 100);
 
   if (($event eq "#") && !$hash->{dtmf})
@@ -756,15 +770,15 @@ sub SIP_ListenStart($)
    $hash->{dtmf} ++;
    $hash->{old} = $event;
    $hash->{dtmf_event} .= $event;
-   Log3 $name,5,"$name : DTMF Total: ".$hash->{dtmf_event}." , Anz: ".$hash->{dtmf};
+   Log3 $name,5,"$logname, DTMF: ".$hash->{dtmf_event}." , Anz: ".$hash->{dtmf};
    
    if ($hash->{dtmf} > int(AttrVal($name,"sip_dtmf_size",2)))
    {
       SIP_telnet($hash,"set $name dtmf_event ".$hash->{dtmf_event}."\n");
       $hash->{dtmf}       = 0;
       $hash->{dtmf_event} = "";
-      $hash->{old}        ="-";
-      $dtmfloop = 1;
+      $hash->{old}        = "-";
+      $dtmfloop           = 1;
    }
   }
   return;
@@ -792,7 +806,7 @@ sub SIP_ListenStart($)
    sleep 1;
    ######## $$$ read state of my device
    $action = SIP_telnet($hash,"get $name caller\n");
-   Log3 $name, 4,  "$name, SIP_invite ->ringing $i : $action";
+   Log3 $name, 4,  "$logname, SIP_invite ->ringing $i : $action";
    if ( $action eq "fetch" ) 
    { 
     SIP_telnet($hash,"set $name caller_state fetching\nexit\n");
@@ -805,21 +819,38 @@ sub SIP_ListenStart($)
  $sub_filter = sub 
  {
   my ($a,$b) = @_;
+  Log3 $name, 5, "$logname, SIP_filter : a:$a | b:$b";
+
   my ($caller,undef)  = split("\;", $a);
+  my @callers;
   $caller =~ s/\"//g;
   $caller =~ s/\>//g;
   $caller =~ s/\<//g; # fhem mag keine <> in ReadingsVal :(
   $caller = "???" if (!$caller);
- 
   SIP_telnet($hash, "set $name caller $caller\nexit\n");
-  Log3 $name, 5, "$name, SIP_filter : a:$a | b:$b";
+
+  my ($callnr,undef)  = split("\@", $caller);
+  # $callnr =~ s/sip://;
+
+  my $filter = AttrVal($name,"sip_filter",undef);
+  if (defined($filter))
+  {
+    @callers = split (/,/,$filter); 
+    foreach (@callers)
+    {
+     #Log3 $name, 5, "$logname, $_ -> $callnr";
+     return 1 if (index($callnr, $_) > -1);
+    }
+    Log3 $name, 5, "$logname, blocking $callnr not found in $filter"; 
+    return 0;
+  }
   return 1;
  };
 
  $sub_bye = sub 
  {
   my ($event) = @_;
-  Log3 $name, 5,  "$name, SIP_bye : $event";
+  Log3 $name, 5,  "$logname, SIP_bye : $event";
   #print Dumper($event);
   SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") ;
   $byebye = 1;
@@ -839,6 +870,7 @@ sub SIP_ListenStart($)
      while(1)
      {
      my $call;
+
      $ua->listen (cb_create => \&$sub_create,
                   cb_invite =>  sub {
                                       SIP_telnet($hash,"set $name caller_state ringing\nexit\n");
@@ -1170,7 +1202,8 @@ sub SIP_telnet($$)
 {
   my ($hash,$cmd) = @_;
   my $name        = $hash->{NAME};
-  Log3 $name, 5,  "$name, telnet : $cmd";
+  my $logname     = $name."[".$$."]";
+  Log3 $name, 5,  "$logname, telnet : $cmd";
 
   my $sock  = IO::Socket::INET->new(
               PeerHost => "127.0.0.1",
@@ -1268,20 +1301,21 @@ sub SIP_readPassword($)
  {
    my ($hash,$file) = @_;
    my $name        = $hash->{NAME};
+   my $logname     = $name."[".$$."]";
 
    if (substr($file,0,1) eq "!")
    {
-    Log3 $name,3,"$name, Text : $file found, ignoring it";
+    Log3 $name,3,"$logname, Text : $file found, ignoring it";
     return "";
    }
    if (!-e $file)
    {
-    Log3 $name,3,"$name, audio file $file not found, ignoring it";
+    Log3 $name,3,"$logname, audio file $file not found, ignoring it";
     return "";
    }
    if (($file !~ /\.al(.+)$/) && ($file !~ /\.ul(.+)$/))
    {
-    Log3 $name,3,"$name, audio file $file not type .alaw or .ulaw, ignoring it";
+    Log3 $name,3,"$logname, audio file $file not type .alaw or .ulaw, ignoring it";
     return "";
    }
    return $file;
