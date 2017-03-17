@@ -97,7 +97,9 @@ sub readingsProxy_Define($$)
 
   $hash->{STATE} = 'Initialized';
 
-  readingsProxy_updateDevices($hash);
+  if( $init_done ) {
+    readingsProxy_updateDevices($hash);
+  }
 
   return undef;
 }
@@ -153,11 +155,11 @@ readingsProxy_Notify($$)
   if( grep(m/^INITIALIZED$/, @{$events}) ) {
     readingsProxy_updateDevices($hash);
     return undef;
-  }
-  elsif( grep(m/^REREADCFG$/, @{$events}) ) {
+  } elsif( grep(m/^REREADCFG$/, @{$events}) ) {
     readingsProxy_updateDevices($hash);
     return undef;
   }
+  return if( !$init_done );
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
