@@ -1,4 +1,4 @@
-REV 13718
+REV 13724
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -166,9 +166,9 @@ UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
 UPD 2017-03-02_07:45:02 117772 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-01-22_07:45:02 4463 FHEM/33_readingsChange.pm
-UPD 2017-02-20_07:45:02 68032 FHEM/33_readingsGroup.pm
+UPD 2017-03-18_07:45:02 68060 FHEM/33_readingsGroup.pm
 UPD 2016-10-09_07:45:11 23083 FHEM/33_readingsHistory.pm
-UPD 2017-03-17_07:45:02 11889 FHEM/33_readingsProxy.pm
+UPD 2017-03-18_07:45:02 11942 FHEM/33_readingsProxy.pm
 UPD 2017-02-25_07:45:02 103636 FHEM/34_ESPEasy.pm
 UPD 2015-08-06_07:45:08 13198 FHEM/34_NUT.pm
 UPD 2016-08-23_07:45:12 47048 FHEM/34_SWAP.pm
@@ -367,7 +367,7 @@ UPD 2015-07-28_14:05:31 11755 FHEM/95_PachLog.pm
 UPD 2017-01-28_07:45:02 63444 FHEM/95_PostMe.pm
 UPD 2016-12-31_07:45:02 16005 FHEM/95_holiday.pm
 UPD 2016-02-05_07:45:11 21301 FHEM/95_remotecontrol.pm
-UPD 2017-03-16_07:45:02 47238 FHEM/96_SIP.pm
+UPD 2017-03-18_07:45:02 48337 FHEM/96_SIP.pm
 UPD 2017-01-24_07:45:02 31432 FHEM/96_Snapcast.pm
 UPD 2017-02-24_07:45:02 18217 FHEM/96_allowed.pm
 UPD 2016-12-21_07:45:02 12157 FHEM/97_TrashCal.pm
@@ -1375,6 +1375,7 @@ UPD 2015-07-28_14:05:32 2613 www/images/fhemSVG/unknown.svg
 UPD 2015-07-28_14:05:32 2405 www/images/fhemSVG/usb.svg
 UPD 2015-07-28_14:05:32 6689 www/images/fhemSVG/usb_stick.svg
 UPD 2015-07-28_14:05:32 4105 www/images/fhemSVG/user_unknown.svg
+UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2015-07-28_14:05:33 1269 www/images/openautomation/audio_audio.svg
 UPD 2015-07-28_14:05:33 1192 www/images/openautomation/audio_eject.svg
 UPD 2015-07-28_14:05:33 1578 www/images/openautomation/audio_eq.svg
@@ -1841,7 +1842,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-03-07_07:45:02 5344 www/pgm2/defaultCommon.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-03-15_07:45:02 44292 www/pgm2/fhemweb.js
+UPD 2017-03-18_07:45:02 44390 www/pgm2/fhemweb.js
 UPD 2017-03-03_07:45:02 12493 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
 UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
