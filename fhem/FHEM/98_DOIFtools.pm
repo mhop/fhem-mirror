@@ -129,37 +129,78 @@ function doiftoolsCopyToClipboard() {
                   '</style>\n';
         var inputPrf = "<input type='radio' name=";
 
-        txt += (lang ? "Der gewählte Operand wird in die Zwischenablage kopiert." : "Selected operand will be copied to Clipboard") + "<br><br>";
+        txt += (lang ? "Bitte einen Opranden wählen." : "Select an Operand please.") + "<br><br>";
         for (var i = 0; i < diop.length; i++) {
             txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"' />"+
                "<label title='"+diophlp[i]+"' >"+diop[i]+"</label></div><br>";
         }
-        txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
-        (lang ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
-        "' ></input>";
+ 
+        if ($('#doiftoolstype').attr('devtype') == 'doif') {
+            txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
+            (lang ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
+            "' ></input>";
+        } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
+            txt += "<input newdev='' class='opdi' id='opditmp' type='text' size='"+(maxlength+36)+"' style='font-family:Courier' title='"+
+            (lang ? "Die Definition kann vor der Weiterverarbeitung angepasst werden." : "The definition may be changed before processing.")+
+            "' ></input>";
+        }
 
         $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
-        $('#evtCoM').dialog(
-          { modal:true, closeOnEscape:true, width:"auto",
-            close:function(){ $('#evtCoM').remove(); },
-            buttons:[
-            { text:"Cancel", click:function(){ $(this).dialog('close'); }},
-            { text:"Open DEF-Editor", title:(lang ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
-              $("input#opditmp").val($("input#opditmp").val()).select();
-              document.execCommand("copy");
-              if ($("#edit").css("display") == "none")
-                $("#DEFa").click();
-              $(this).dialog('close');
-            }}],
-            open:function(){
-              $("#evtCoM input,#evtCoM select").change(optChanged);
-            }
-          });
+        if ($('#doiftoolstype').attr('devtype') == 'doif') {
+          $('#evtCoM').dialog(
+            { modal:true, closeOnEscape:true, width:"auto",
+              close:function(){ $('#evtCoM').remove(); },
+              buttons:[
+              { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+              { text:"Open DEF-Editor", title:(lang ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
+                $("input#opditmp").select();
+                document.execCommand("copy");
+                if ($("#edit").css("display") == "none")
+                  $("#DEFa").click();
+                  $(this).dialog('close');
+                }}],
+              open:function(){
+                $("#evtCoM input[name='opType'],#evtCoM select").change(optChanged);
+              }
+            });
+        } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
+          $('#evtCoM').dialog(
+            { modal:true, closeOnEscape:true, width:"auto",
+              close:function(){ $('#evtCoM').remove(); },
+              buttons:[
+              { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+              { text:"Execute Definition", title:(lang ? "Führt den define-Befehl aus und öffnet die Detailansicht des erzeugten Gerätes." : "Executes the define command and opens the detail view of the created device."), click:function(){
+                FW_cmd(myFW_root+"?cmd="+$("input#opditmp").val()+"&XHR=1");
+                $("input[class='maininput'][name='cmd']").val($("input#opditmp").val());
+                var newDev = $("input#opditmp").val();
+                $(this).dialog('close');
+                var rex = newDev.match(/define\s+(.*)\s+DOIF/);
+                try {
+                location = myFW_root+'?detail='+rex[1];
+                } catch (e) {
+                
+                }
+                }}],
+              open:function(){
+                $("#evtCoM input[name='opType'],#evtCoM select").change(optChanged);
+              }
+            });
+        }
+
     });
 }
 
 function optChanged() {
-    $("input#opditmp").val($("#evtCoM input:checked").next("label").text());
+    if ($('#doiftoolstype').attr('devtype') == 'doif') {
+      $("input#opditmp").val($("#evtCoM input:checked").next("label").text());
+    } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
+      var N = 8;
+      var newDev = Array(N+1).join((Math.random().toString(36)+'00000000000000000').slice(2, 18)).slice(0, N);
+      $("input#opditmp").val('define newDevice_'+newDev+' DOIF ('+$("#evtCoM input:checked").next("label").text()+') ()');
+      var inpt = document.getElementById("opditmp");
+      inpt.focus();
+      inpt.setSelectionRange(7,17+N);
+    }
 }
 
     function delbutton() {
@@ -298,12 +339,12 @@ sub DOIFtools_eM($$$$) {
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
     $ret .= "<div id='doiftoolscons'>";
-    $ret .= "<div><br>";
+    $ret .= "<div id='doiftoolstype' devtype='doif'><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
-          "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
+          "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, Definition ergänzen" : "&emsp;<b>Hint:</b> select event line, choose operand, modify definition")."</div>\n";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\" ></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
@@ -486,9 +527,9 @@ sub DOIFtools_fhemwebFn($$$$) {
           "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
-          "&nbsp;&nbsp;<button id='eventReset'>Reset</button></div>\n";
-    $ret .= "<div>";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\"></textarea>";
+          "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, neue Definition erzeugen" : "&emsp;<b>Hint:</b> select event line, choose operand, create definition")."</div>\n";
+    $ret .= "<div id='doiftoolstype' devtype='doiftools'>";
+    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, mit ihnen kann eine neue DOIF-Definition erzeugt werden." : "Selecting an event line displays operands for DOIFs definition, they are used to create a new DOIF definition.")."\"></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
   }
@@ -1423,7 +1464,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>show a list of running wait timer</li>
   </ul>
 <br>
-Just one definition per FHEM-installation is allowed. <a href="#DOIFtools"More in the german section.</a>
+Just one definition per FHEM-installation is allowed. <a href="https://fhem.de/commandref_DE.html#DOIFtools">More in the german section.</a>
 <br>
 </ul>
 =end html
@@ -1450,13 +1491,27 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>Zugriff aus DOIFtools auf vorhandene DOIFtoolsLog-Logdateien.</li>
     <li>zeigt den Event Monitor in der Detailansicht von DOIFtools.</li>
     <li>ermöglicht den Zugriff auf den Event Monitor in der Detailansicht von DOIF.</li>
-    <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors, ein gewählter Operand wird in die Zwischenablage kopiert und kann im DEF-Editor in die Definition eingefügt werden.</li>
+    <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors:</li>
+    <ul>
+      <li>Ist der <b>Event-Monitor in DOIF</b> geöffnet, dann kann die Definition des <b>DOIF geändert</b> werden.</li>
+      <li>Ist der <b>Event-Monitor in DOIFtools</b> geöffnet, dann kann die Definition eines <b>DOIF erzeugt</b> werden.</li>
+    </ul>
     <li>prüfen der DOIF Definitionen mit Empfehlungen.</li>
     <li>erstellen von Shortcuts</li>
     <li>optionalen Menüeintrag erstellen</li>
     <li>Liste der laufenden Wait-Timer anzeigen</li>
   </ul>
 <br>
+<b>Inhalt</b><br>
+<ul>
+  <a href="#DOIFtoolsBedienungsanleitung">Bedienungsanleitung</a><br>
+  <a href="#DOIFtoolsDefinition">Definition</a><br>
+  <a href="#DOIFtoolsSet">Set-Befehl</a><br>
+  <a href="#DOIFtoolsGet">Get-Befehl</a><br>
+  <a href="#DOIFtoolsAttribute">Attribute</a><br>
+  <a href="#DOIFtoolsReadings">Readings</a><br>
+  <a href="#DOIFtoolsLinks">Links</a><br>
+</ul><br>
 
 <a name="DOIFtoolsBedienungsanleitung"></a>
 <b>Bedienungsanleitung</b>
@@ -1477,7 +1532,6 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>
         defmod DOIFtools DOIFtools<br>
         attr DOIFtools DOIFtoolsEventMonitorInDOIF 1<br>
-        attr DOIFtools DOIFtoolsEMbeforeReadings 1<br>
         attr DOIFtools DOIFtoolsExecuteDefinition 1<br>
         attr DOIFtools DOIFtoolsExecuteSave 1<br>
         attr DOIFtools DOIFtoolsMenuEntry 1<br>
@@ -1638,7 +1692,14 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
 <br>
 <ul>
 <a href="https://forum.fhem.de/index.php/topic,63938.0.html">DOIFtools im FHEM-Forum</a><br>
-<a href="https://wiki.fhem.de/wiki/DOIFtools">DOIFtools im FHEM-Wiki</a>
+<a href="https://wiki.fhem.de/wiki/DOIFtools">DOIFtools im FHEM-Wiki</a><br>
+<br>
+<a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
+<a href="https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Erste_Schritte_mit_DOIF:_Zeit-_und_Ereignissteuerung">Erste Schritte mit DOIF</a><br>
+<a href="https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen">DOIF: Einsteigerleitfaden, Grundfunktionen und Erläuterungen</a><br>
+<a href="https://wiki.fhem.de/wiki/DOIF/Labor_-_ausf%C3%BChrbare,_praxisnahe_Beispiele_als_Probleml%C3%B6sung_zum_Experimentieren">DOIF-Labor - ausführbare, praxisnahe Beispiele als Problemlösung zum Experimentieren</a><br>
+<a href="https://wiki.fhem.de/wiki/DOIF/Tipps_zur_leichteren_Bedienung">DOIF: Tipps zur leichteren Bedienung</a><br>
+<a href="https://wiki.fhem.de/wiki/DOIF/Tools_und_Fehlersuche">DOIF: Tools und Fehlersuche</a><br>
 </ul>
 </ul>
 =end html_DE
