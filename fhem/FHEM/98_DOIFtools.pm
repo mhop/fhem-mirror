@@ -46,151 +46,147 @@ sub DOIFtoolsDeleteStatReadings;
 
 my @DOIFtools_we =();
 my $DOIFtoolsJSfuncEM = <<'EOF';
-  <script type="text/javascript">
-    //functions
+<script type="text/javascript">
+//functions
 function doiftoolsCopyToClipboard() {
     var r = $("head").attr("root");
     var myFW_root = FW_root;
     if(r)
       myFW_root = r;
-    FW_cmd(myFW_root+"?cmd={AttrVal(\"global\",\"language\",\"EN\")}&XHR=1", function(data){
-        var lang = data.match(/(DE|EN)/);
-        var lang = lang[1] == "DE" ? 1 : 0;
+    var lang = $('#doiftoolstype').attr('lang');
+    var txtarea = document.getElementById("console");
+    var start = txtarea.selectionStart;
+    var finish = txtarea.selectionEnd;
+    var txt = txtarea.value.substring(start, finish);
+    var hlp = lang ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
+    if(!txt)
+      return FW_okDialog(hlp);
+    var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
+    var retdi = txt.match(redi);
+    if(!retdi)
+      return FW_okDialog(hlp);
+    var evtDev = retdi[3];
+    var retdi1;
+    var evtRead ="";
+    var evtVal ="";
+    if (retdi[4]) {
+      retdi1 = retdi[4].match(/(.*):\s$/);
+      evtRead = retdi1[1];
+    }
+    evtVal = retdi[5];
+    var treffer = evtVal.match(/(-?\d+(\.\d+)?)/);
+    var evtNum;
+    try {
+      evtNum = treffer[1];
+    } catch (e) {
+      evtNum = "";
+    }
 
-        var txtarea = document.getElementById("console");
-        var start = txtarea.selectionStart;
-        var finish = txtarea.selectionEnd;
-        var txt = txtarea.value.substring(start, finish);
-        var hlp = lang ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
-        if(!txt)
-          return FW_okDialog(hlp);
-        var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
-        var retdi = txt.match(redi);
-        if(!retdi)
-          return FW_okDialog(hlp);
-        var evtDev = retdi[3];
-        var retdi1;
-        var evtRead ="";
-        var evtVal ="";
-        if (retdi[4]) {
-          retdi1 = retdi[4].match(/(.*):\s$/);
-          evtRead = retdi1[1];
-        }
-        evtVal = retdi[5];
-        var treffer = evtVal.match(/(-?\d+(\.\d+)?)/);
-        var evtNum;
-        try {
-          evtNum = treffer[1];
-        } catch (e) {
-          evtNum = "";
-        }
+    var treffer = evtVal.match(/(\d\d:\d\d)/);
+    var evtHM;
+    try {
+      evtHM = treffer[1];
+    } catch (e) {
+      evtHM = "";
+    }
 
-        var treffer = evtVal.match(/(\d\d:\d\d)/);
-        var evtHM;
-        try {
-          evtHM = treffer[1];
-        } catch (e) {
-          evtHM = "";
-        }
+    var evtEvt = evtVal.replace(/\s/g, ".")
+                   .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
 
-        var evtEvt = evtVal.replace(/\s/g, ".")
-                       .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
+    var diop = [];
+    var diophlp = [];
+    var icnt = 0;
+    diophlp[icnt] = lang ? "a) einfacher auslösender Zugriff auf ein Reading-Wert eines Gerätes oder auf den Wert des Internal STATE, wenn kein Reading im Ereignis vorkommt" : "a) simple triggering access to device reading or internal STATE";
+    diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"]"; icnt++;
+    diophlp[icnt] = lang ? "b) wie a), zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (eq &#8793; equal) und Vergleichswert" : "b) like a) additionally with string operator (eq &#8793; equal) and reference value";
+    diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"] eq \""+evtVal+"\""; icnt++;
+    if (evtNum != "") {
+        diophlp[icnt] = lang ? "c) wie a) aber mit Zugriff nur auf die erste Zahl der Wertes und eines Vergleichsoperators für Zahlen (==) und numerischem Vergleichswert" : "c) like a) but with access to the first number and a relational operator for numbers (==) and a numeric reference value";
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":d] == "+evtNum; icnt++}
+    if (evtHM != "") {
+        diophlp[icnt] = lang ? "d) wie a) aber mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe für nicht existierende Readings/Internals, zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (ge &#8793; greater equal) und Vergleichswert" : "d) like a) with filter for time (hh:mm), default value for nonexisting readings or Internals and a relational string operator (ge &#8793; greater equal) and a reference value";
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
+    diophlp[icnt] = lang ? "e) auslösender Zugriff auf ein Gerät mit Angabe eines \"regulären Ausdrucks\" für ein Reading mit beliebigen Reading-Wert" : "e) triggering access to a device with \"regular expression\" for a reading with arbitrary value";
+    diop[icnt] = "["+evtDev+(evtRead ? ":\"^"+evtRead+": " : ":\"")+"\"]"; icnt++;
+    diophlp[icnt] = lang ? "f) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit beliebigen Reading-Wert" : "f) access by a \"regular expression\" for a device and a reading with arbitrary value";
+    diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$: ")+"\"]"; icnt++;
+    diophlp[icnt] = lang ? "g) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit exaktem Reding-Wert" : "g) access by a \"regular expression\" for a device and a reading with distinct value";
+    diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+evtEvt+"$\"]"; icnt++;
+    if (evtHM != "") {
+        diophlp[icnt] = lang ? "h) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe falls ein anderer Operand auslöst" : "h) access by a \"regular expression\" for a device and a reading and a filter for a time value (hh:mm), a default value in case a different operator triggers and a relational string operator (ge &#8793; greater equal) and a reference value";
+        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+"\"" : "$:\"")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
+    var maxlength = 33;
+    for (var i = 0; i < diop.length; i++)
+        maxlength = diop[i].length > maxlength ? diop[i].length : maxlength;
 
-        var diop = [];
-        var diophlp = [];
-        var icnt = 0;
-        diophlp[icnt] = lang ? "a) einfacher auslösender Zugriff auf ein Reading-Wert eines Gerätes oder auf den Wert des Internal STATE, wenn kein Reading im Ereignis vorkommt" : "a) simple triggering access to device reading or internal STATE";
-        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"]"; icnt++;
-        diophlp[icnt] = lang ? "b) wie a), zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (eq &#8793; equal) und Vergleichswert" : "b) like a) additionally with string operator (eq &#8793; equal) and reference value";
-        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"] eq \""+evtVal+"\""; icnt++;
-        if (evtNum != "") {
-            diophlp[icnt] = lang ? "c) wie a) aber mit Zugriff nur auf die erste Zahl der Wertes und eines Vergleichsoperators für Zahlen (==) und numerischem Vergleichswert" : "c) like a) but with access to the first number and a relational operator for numbers (==) and a numeric reference value";
-            diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":d] == "+evtNum; icnt++}
-        if (evtHM != "") {
-            diophlp[icnt] = lang ? "d) wie a) aber mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe für nicht existierende Readings/Internals, zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (ge &#8793; greater equal) und Vergleichswert" : "d) like a) with filter for time (hh:mm), default value for nonexisting readings or Internals and a relational string operator (ge &#8793; greater equal) and a reference value";
-            diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
-        diophlp[icnt] = lang ? "e) auslösender Zugriff auf ein Gerät mit Angabe eines \"regulären Ausdrucks\" für ein Reading mit beliebigen Reading-Wert" : "e) triggering access to a device with \"regular expression\" for a reading with arbitrary value";
-        diop[icnt] = "["+evtDev+(evtRead ? ":\"^"+evtRead+": " : ":\"")+"\"]"; icnt++;
-        diophlp[icnt] = lang ? "f) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit beliebigen Reading-Wert" : "f) access by a \"regular expression\" for a device and a reading with arbitrary value";
-        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$: ")+"\"]"; icnt++;
-      diophlp[icnt] = lang ? "g) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit exaktem Reding-Wert" : "g) access by a \"regular expression\" for a device and a reading with distinct value";
-        diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+evtEvt+"$\"]"; icnt++;
-        if (evtHM != "") {
-            diophlp[icnt] = lang ? "h) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe falls ein anderer Operand auslöst" : "h) access by a \"regular expression\" for a device and a reading and a filter for a time value (hh:mm), a default value in case a different operator triggers and a relational string operator (ge &#8793; greater equal) and a reference value";
-            diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+"\"" : "$:\"")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
-        var maxlength = 33;
-        for (var i = 0; i < diop.length; i++)
-            maxlength = diop[i].length > maxlength ? diop[i].length : maxlength;
+    // build the dialog
+    var txt = '<style type="text/css">\n'+
+              'div.opdi label { display:block; margin-left:2em; font-family:Courier}\n'+
+              'div.opdi input { float:left; }\n'+
+              '</style>\n';
+    var inputPrf = "<input type='radio' name=";
 
-        // build the dialog
-        var txt = '<style type="text/css">\n'+
-                  'div.opdi label { display:block; margin-left:2em; font-family:Courier}\n'+
-                  'div.opdi input { float:left; }\n'+
-                  '</style>\n';
-        var inputPrf = "<input type='radio' name=";
+    txt += (lang ? "Bitte einen Opranden wählen." : "Select an Operand please.") + "<br><br>";
+    for (var i = 0; i < diop.length; i++) {
+        txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"' />"+
+           "<label title='"+diophlp[i]+"' >"+diop[i]+"</label></div><br>";
+    }
 
-        txt += (lang ? "Bitte einen Opranden wählen." : "Select an Operand please.") + "<br><br>";
-        for (var i = 0; i < diop.length; i++) {
-            txt += "<div class='opdi'>"+inputPrf+"'opType' id='di"+i+"' />"+
-               "<label title='"+diophlp[i]+"' >"+diop[i]+"</label></div><br>";
-        }
- 
-        if ($('#doiftoolstype').attr('devtype') == 'doif') {
-            txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
-            (lang ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
-            "' ></input>";
-        } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
-            txt += "<input newdev='' class='opdi' id='opditmp' type='text' size='"+(maxlength+36)+"' style='font-family:Courier' title='"+
-            (lang ? "Die Definition kann vor der Weiterverarbeitung angepasst werden." : "The definition may be changed before processing.")+
-            "' ></input>";
-        }
+    if ($('#doiftoolstype').attr('devtype') == 'doif') {
+        txt += "<input class='opdi' id='opditmp' type='text' size='"+(maxlength+10)+"' style='font-family:Courier' title='"+
+        (lang ? "Der gewählte Operand könnte vor dem Kopieren geändert werden." : "The selected operand may be changed before copying.")+
+        "' ></input>";
+    } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
+        txt += "<input newdev='' class='opdi' id='opditmp' type='text' size='"+(maxlength+36)+"' style='font-family:Courier' title='"+
+        (lang ? "Die Definition kann vor der Weiterverarbeitung angepasst werden." : "The definition may be changed before processing.")+
+        "' ></input>";
+    }
 
-        $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
-        if ($('#doiftoolstype').attr('devtype') == 'doif') {
-          $('#evtCoM').dialog(
-            { modal:true, closeOnEscape:true, width:"auto",
-              close:function(){ $('#evtCoM').remove(); },
-              buttons:[
-              { text:"Cancel", click:function(){ $(this).dialog('close'); }},
-              { text:"Open DEF-Editor", title:(lang ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
-                $("input#opditmp").select();
-                document.execCommand("copy");
-                if ($("#edit").css("display") == "none")
-                  $("#DEFa").click();
-                  $(this).dialog('close');
-                }}],
-              open:function(){
-                $("#evtCoM input[name='opType'],#evtCoM select").change(optChanged);
-              }
-            });
-        } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
-          $('#evtCoM').dialog(
-            { modal:true, closeOnEscape:true, width:"auto",
-              close:function(){ $('#evtCoM').remove(); },
-              buttons:[
-              { text:"Cancel", click:function(){ $(this).dialog('close'); }},
-              { text:"Execute Definition", title:(lang ? "Führt den define-Befehl aus und öffnet die Detailansicht des erzeugten Gerätes." : "Executes the define command and opens the detail view of the created device."), click:function(){
-                FW_cmd(myFW_root+"?cmd="+$("input#opditmp").val()+"&XHR=1");
-                $("input[class='maininput'][name='cmd']").val($("input#opditmp").val());
-                var newDev = $("input#opditmp").val();
-                $(this).dialog('close');
-                var rex = newDev.match(/define\s+(.*)\s+DOIF/);
-                try {
-                location = myFW_root+'?detail='+rex[1];
-                } catch (e) {
-                
-                }
-                }}],
-              open:function(){
-                $("#evtCoM input[name='opType'],#evtCoM select").change(optChanged);
-              }
-            });
-        }
+    $('body').append('<div id="evtCoM" style="display:none">'+txt+'</div>');
+    if ($('#doiftoolstype').attr('devtype') == 'doif') {
+      $('#evtCoM').dialog(
+        { modal:true, closeOnEscape:true, width:"auto",
+          close:function(){ $('#evtCoM').remove(); },
+          buttons:[
+          { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+          { text:"Open DEF-Editor", title:(lang ? "Kopiert die Eingabezeile in die Zwischenablage und öffnet den DEF-Editor der aktuellen Detailansicht. Mit Strg-v kann der Inhalt der Zwischenablage in die Definition eingefügt werden." : "Copies the input line to clipboard and opens the DEF editor of the current detail view. Paste the content of the clipboard to the editor by using ctrl-v"), click:function(){
+            $("input#opditmp").select();
+            document.execCommand("copy");
+            if ($("#edit").css("display") == "none")
+              $("#DEFa").click();
+              $(this).dialog('close');
+            }}],
+          open:function(){
+            $("#evtCoM input[name='opType'],#evtCoM select").change(doiftoolsOptChanged);
+          }
+        });
+    } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
+      $('#evtCoM').dialog(
+        { modal:true, closeOnEscape:true, width:"auto",
+          close:function(){ $('#evtCoM').remove(); },
+          buttons:[
+          { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+          { text:"Execute Definition", title:(lang ? "Führt den define-Befehl aus und öffnet die Detailansicht des erzeugten Gerätes." : "Executes the define command and opens the detail view of the created device."), click:function(){
+            FW_cmd(myFW_root+"?cmd="+$("input#opditmp").val()+"&XHR=1");
+            $("input[class='maininput'][name='cmd']").val($("input#opditmp").val());
+            var newDev = $("input#opditmp").val();
+            $(this).dialog('close');
+            var rex = newDev.match(/define\s+(.*)\s+DOIF/);
+            try {
+            location = myFW_root+'?detail='+rex[1];
+            } catch (e) {
+            
+            }
+            }}],
+          open:function(){
+            $("#evtCoM input[name='opType'],#evtCoM select").change(doiftoolsOptChanged);
+          }
+        });
+    }
 
-    });
 }
 
-function optChanged() {
+function doiftoolsOptChanged() {
     if ($('#doiftoolstype').attr('devtype') == 'doif') {
       $("input#opditmp").val($("#evtCoM input:checked").next("label").text());
     } else if ($('#doiftoolstype').attr('devtype') == 'doiftools') {
@@ -203,38 +199,24 @@ function optChanged() {
     }
 }
 
-    function delbutton() {
-        var r = $("head").attr("root");
-        var myFW_root = FW_root;
-        if(r)
-          myFW_root = r;
-
-        FW_cmd(myFW_root+"?cmd={my @d = devspec2array('TYPE=DOIFtools');;return $d[0] ? $d[0] : ''}&XHR=1", function(data){
-          if (data) {
-            var dn = data;
-            FW_cmd(myFW_root+"?cmd={AttrVal(\""+dn+"\",\"DOIFtoolsEMbeforeReadings\",\"0\")}&XHR=1", function(data){
-              if (data == 1) {
-                var ins = document.getElementsByClassName('makeTable wide readings');
-                var del = document.getElementById('doiftoolscons');
-                if (del) {
-                  ins[0].parentNode.insertBefore(del,ins[0]);
-                }
-              }
-            });
-          }
-        });
-      var del = document.getElementById('addRegexpPart');
+function delbutton() {
+    if ($('#doiftoolstype').attr('embefore') == 1) {
+      var ins = document.getElementsByClassName('makeTable wide readings');
+      var del = document.getElementById('doiftoolscons');
       if (del) {
-        removeEventListener ('DOMNodeInserted', delbutton);
-        del.parentNode.removeChild(del);
+        ins[0].parentNode.insertBefore(del,ins[0]);
       }
     }
-    //execute
-    var ins = document.getElementById('doiftoolsdel');
-    addEventListener ('DOMNodeInserted', delbutton, false);
-    var ins = document.getElementById('console');
-    ins.addEventListener ('select', doiftoolsCopyToClipboard, false);
-  </script>
+    var del = document.getElementById('addRegexpPart');
+    if (del) {
+      $( window ).off( "load", delbutton );
+      del.parentNode.removeChild(del);
+    }
+}
+  //execute
+  $( window ).on( "load", delbutton );
+  $('#console').on('select', doiftoolsCopyToClipboard);
+</script>
 EOF
 my $DOIFtoolsJSfuncStart = <<'EOF';
 <script type="text/javascript">
@@ -339,7 +321,8 @@ sub DOIFtools_eM($$$$) {
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
     $ret .= "<div id='doiftoolscons'>";
-    $ret .= "<div id='doiftoolstype' devtype='doif'><br>";
+    my $embefore = AttrVal($dtn[0],"DOIFtoolsEMbeforeReadings","0") ? "1" : "";
+    $ret .= "<div id='doiftoolstype' devtype='doif' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'><br>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
@@ -528,7 +511,8 @@ sub DOIFtools_fhemwebFn($$$$) {
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, neue Definition erzeugen" : "&emsp;<b>Hint:</b> select event line, choose operand, create definition")."</div>\n";
-    $ret .= "<div id='doiftoolstype' devtype='doiftools'>";
+    my $embefore = AttrVal($d,"DOIFtoolsEMbeforeReadings","0") ? "1" : "";
+    $ret .= "<div id='doiftoolstype' devtype='doiftools' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'><br>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, mit ihnen kann eine neue DOIF-Definition erzeugt werden." : "Selecting an event line displays operands for DOIFs definition, they are used to create a new DOIF definition.")."\"></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
