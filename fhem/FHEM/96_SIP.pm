@@ -53,7 +53,7 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.43 / 17.03.17";
+my $sip_version ="V1.44 / 18.03.17";
 my $ua;	# SIP user agent
 
 my %sets = (
@@ -1040,7 +1040,7 @@ sub SIP_try_listen($)
     }
     #starte die Überwachung von T2S
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_watchdog_t2s", $hash);
+    InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_watchdog_T2S", $hash);
     return undef;
   }
 
