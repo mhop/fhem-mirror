@@ -277,7 +277,9 @@ $(document).ready(function(){
     $('#addLookUp').dialog( "close" );
     $(".assoc").find("a:even").each(function() {
         $(this).on("mouseover",doiftoolsAddLookUp);
-        // $(this).on("mouseleave",doiftoolsRemoveLookUp);
+    });
+    $("table[class*='block wide']").each(function() {
+        $(this).on("mouseenter",doiftoolsRemoveLookUp);
     });
 });
 </script>
