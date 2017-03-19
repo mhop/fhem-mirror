@@ -53,12 +53,13 @@
 # 0041: fixed eventmap, excess "delete"-messages during rereadconfig (Sept 24, 2015)
 # 0042: fixed log-errors, for commandref changed link to german installation guide in fhemwiki (Nov 21, 2015)
 # 0043: fixed erroneous replacement of own devicename by actual devicename upon drag&drop (May 15,2016)
+# 0044: added csrf-token (March 2017)
 #
 ################################################################
 #
 #  Copyright notice
 #
-#  (c) 2012-2016 Copyright: Ulrich Maass
+#  (c) 2012-2017 Copyright: Ulrich Maass
 #
 #  This file is part of fhem.
 # 
@@ -144,6 +145,7 @@ my %FP_webArgs = ();             # sections of analyzed URL
 my $FP_fwdetail;                 # set when floorplan is called from fhemweb-detailscreen
 my $FP_viewport;                 # Define width for touchpad device
 #  $FW_ME                        # from FHEMWEB: fhem URL
+#  $FW_CSRF                      # from FHEMWEB: CSRF Token or empty
 #  $FW_tp                        # from FHEMWEB: is touchpad
 #  $FW_ss                        # from FHEMWEB: is smallscreen
 #  $FW_longpoll;                 # from FHEMWEB: longpoll 
@@ -763,7 +765,7 @@ FP_menu() {
     # List FPs
     FW_pO "<table class=\"start\" id=\"floorplans\">";
     FW_pO "<tr>";
-    FW_pH "$FW_ME", "fhem", 1;
+    FW_pH "$FW_ME", "FHEM", 1;
     FW_pO "</tr>";
     foreach my $f (sort keys %defs) {
         next if (!$defs{$f}{TYPE} || $defs{$f}{TYPE} ne "FLOORPLAN");
@@ -920,8 +922,8 @@ FP_detailFn($$$$) {
   ## Arrange-mode on/off
   FW_pO "Arrange-mode<br>";
   FW_pO '<table class="block wide">';
-  my $armon = "<div class=\"dval\"><a href=\"$FW_ME?cmd.$d=attr $d fp_arrange 1&detail=$d\"><div class=\"col2\">on</div></a></div>";
-  my $armoff= "<div class=\"dval\"><a href=\"$FW_ME?cmd.$d=attr $d fp_arrange 0&detail=$d\"><div class=\"col2\">off</div></a></div>";
+  my $armon = "<div class=\"dval\"><a href=\"$FW_ME?cmd.$d=attr $d fp_arrange 1&detail=$d$FW_CSRF\"><div class=\"col2\">on</div></a></div>";  #mod20170319
+  my $armoff= "<div class=\"dval\"><a href=\"$FW_ME?cmd.$d=attr $d fp_arrange 0&detail=$d$FW_CSRF\"><div class=\"col2\">off</div></a></div>"; #mod20170319
   FW_pO "<tr><td><div class=\"dname\">fp_arrange</div></td><td>$armon</td><td>$armoff</td></tr>";
   FW_pO '</table><br>';
   return;
@@ -984,6 +986,9 @@ FP_pOfill($@) {
 1;
 
 =pod
++=item helper
+=item summary    Alternative FHEM Frontend with background pictures
+=item summary_DE Alternatives FHEM Frontend mit Hintergrundbildern
 =begin html
 
 <a name="FLOORPLAN"></a>
