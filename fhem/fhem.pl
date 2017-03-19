@@ -2998,7 +2998,7 @@ SignalHandling()
     $data{WARNING}{$msg}++;
     chomp($msg);
     Log 1, "PERL WARNING: $msg"; 
-    Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $msg =~ m/\(eval /);
+    Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze);
     stacktrace() if($attr{global}{stacktrace} &&
                     $msg !~ m/ redefined at /);
     $inWarnSub = 0;
@@ -4856,8 +4856,8 @@ parseParams($;$)
       $value = $key;
       $key = undef;
 
-    # the key can not start with a { -> it must be a perl expression
-    } elsif( $key =~ m/^\s*{/ ) {
+    # the key can not start with a { -> it must be a perl expression # vim:}
+    } elsif( $key =~ m/^\s*{/ ) { # for vim: }
       $value = $param;
       $key = undef;
     }

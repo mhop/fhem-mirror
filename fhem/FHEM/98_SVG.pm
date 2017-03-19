@@ -68,6 +68,7 @@ SVG_Initialize($)
     plotWeekStartDay:0,1,2,3,4,5,6
     plotfunction
     plotsize
+    plotReplace
     startDate
     title
   );
@@ -755,8 +756,21 @@ SVG_readgplotfile($$$)
   $srcDesc{all} = "";
   $srcDesc{order} = \@empty;
 
+  my $specval = AttrVal($wl, "plotfunction", undef);
+  my $plotReplace = AttrVal($wl, "plotReplace", undef);
+  my ($list, $pr) = parseParams($plotReplace) if($plotReplace);
+  if($plotReplace) {
+    for my $k (keys %$pr) {
+      if($pr->{$k} =~ m/^{.*}$/) {
+        $cmdFromAnalyze = $pr->{$k};
+        $pr->{$k} = eval $cmdFromAnalyze;
+      }
+    }
+  }
+
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
+    map { $l =~ s/<$_>/$pr->{$_}/ } keys %$pr if($plotReplace);
     my ($src, $plotfn) = (undef, undef);
     if($l =~ m/^#([^ ]*) (.*)$/) {
       if($1 eq $ldType) {
@@ -773,7 +787,6 @@ SVG_readgplotfile($$$)
     if($plotfn) {
       Log 3, "$wl: space is not allowed in $ldType definition: $plotfn"
         if($plotfn =~ m/\s/);
-      my $specval = AttrVal($wl, "plotfunction", undef);
       if ($specval) {
         my @spec = split(" ",$specval);
         my $spec_count=1;
@@ -2460,14 +2473,15 @@ plotAsPng(@)
       </ul>
       The value minAll and maxAll (representing the minimum/maximum over all
       values) is also available from the data hash.
-
-      </li>
+      <br>Deprecated, see plotReplace.
+      </li><br>
 
     <a name="title"></a>
     <li>title<br>
       A special form of label (see above), which replaces the string &lt;TL&gt;
       in the .gplot file. It defaults to the filename of the logfile.
-    </li>
+      <br>Deprecated, see plotReplace.
+      </li><br>
 
     <a name="captionLeft"></a>
     <li>captionLeft<br>
@@ -2493,7 +2507,16 @@ plotAsPng(@)
             #DbLog Garage_Raumtemp:temperature::
         </li>
       </ul>
-    </li>
+      Deprecated, see plotReplace.
+      </li><br>
+
+    <a name="plotReplace"></a>
+    <li>plotReplace<br>
+      space separated list of key=value pairs. value may contain spaces if
+      enclosed in "" or {}. value will be evaluated, if it is enclosed in {}.
+      In the .gplot file &lt;key&gt; is replaced with the corresponding value.
+      Replaces the title, label and plotfunction attributes.
+    </li><br>
   </ul>
   <br>
 
@@ -2664,6 +2687,7 @@ plotAsPng(@)
       </ul>
       Die Werte minAll und maxAll (die das Minimum/Maximum aller Werte
       repr&auml;sentieren) sind ebenfals im data hash vorhanden.
+      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li>
 
     <a name="title"></a>
@@ -2672,6 +2696,7 @@ plotAsPng(@)
       Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
       Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
       eingesetzt.
+      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li><br>
 
     <a name="captionLeft"></a>
@@ -2704,7 +2729,17 @@ plotAsPng(@)
             <code>#DbLog Garage_Raumtemp:temperature::</code>
           </li>
       </ul>
-      </li>
+      &Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
+    </li><br>
+
+    <a name="plotReplace"></a>
+    <li>plotReplace<br>
+      Leerzeichen getrennte Liste von Name=Wert Paaren. Wert kann Leerzeichen
+      enthalten, falls es in "" oder {} eingeschlossen ist. Wert wird als
+      perl-Ausdruck ausgewertet, falls es in {} eingeschlossen ist. In der
+      .gplot Datei werden alle &lt;Name&gt; Zeichenketten durch den
+      zugehoerigen Wert ersetzt.
+    </li><br>
   </ul>
   <br>
 
