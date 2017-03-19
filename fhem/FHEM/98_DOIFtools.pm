@@ -90,30 +90,52 @@ function doiftoolsCopyToClipboard() {
       evtHM = "";
     }
 
+    var treffer = evtVal.match(/^(\d\d:\d\d(:\d\d)?)$/);
+    var evtHMex;
+    try {
+      evtHMex = treffer[1];
+    } catch (e) {
+      evtHMex = "";
+    }
+
     var evtEvt = evtVal.replace(/\s/g, ".")
-                   .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
+                       .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
 
     var diop = [];
     var diophlp = [];
     var icnt = 0;
     diophlp[icnt] = lang ? "a) einfacher auslösender Zugriff auf ein Reading-Wert eines Gerätes oder auf den Wert des Internal STATE, wenn kein Reading im Ereignis vorkommt" : "a) simple triggering access to device reading or internal STATE";
     diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"]"; icnt++;
+    
     diophlp[icnt] = lang ? "b) wie a), zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (eq &#8793; equal) und Vergleichswert" : "b) like a) additionally with string operator (eq &#8793; equal) and reference value";
     diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : "")+"] eq \""+evtVal+"\""; icnt++;
+    
     if (evtNum != "") {
         diophlp[icnt] = lang ? "c) wie a) aber mit Zugriff nur auf die erste Zahl der Wertes und eines Vergleichsoperators für Zahlen (==) und numerischem Vergleichswert" : "c) like a) but with access to the first number and a relational operator for numbers (==) and a numeric reference value";
-        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":d] == "+evtNum; icnt++}
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":d] == "+evtNum; icnt++;}
+        
     if (evtHM != "") {
         diophlp[icnt] = lang ? "d) wie a) aber mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe für nicht existierende Readings/Internals, zusätzlich mit Angabe eines Vergleichsoperators für Zeichenketten (ge &#8793; greater equal) und Vergleichswert" : "d) like a) with filter for time (hh:mm), default value for nonexisting readings or Internals and a relational string operator (ge &#8793; greater equal) and a reference value";
-        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
-    diophlp[icnt] = lang ? "e) auslösender Zugriff auf ein Gerät mit Angabe eines \"regulären Ausdrucks\" für ein Reading mit beliebigen Reading-Wert" : "e) triggering access to a device with \"regular expression\" for a reading with arbitrary value";
+        diop[icnt] = "["+evtDev+(evtRead ? ":"+evtRead : ":state")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++;
+        
+        diophlp[icnt] = lang ? "e1) Zeitpunkt (hh:mm) als Auslöser" : "e1) time specification (hh:mm) as trigger";
+        diop[icnt] = "["+evtHM+"]"; icnt++;}
+        
+    if (evtHMex != "") {
+        diophlp[icnt] = lang ? "e2) indirekte Angabe eines Zeitpunktes als Auslöser" : "e2) indirect time specification as trigger";
+        diop[icnt] = "[["+evtDev+(evtRead ? ":"+evtRead : "")+"]]"; icnt++;}
+        
+    diophlp[icnt] = lang ? "f) auslösender Zugriff auf ein Gerät mit Angabe eines \"regulären Ausdrucks\" für ein Reading mit beliebigen Reading-Wert" : "f) triggering access to a device with \"regular expression\" for a reading with arbitrary value";
     diop[icnt] = "["+evtDev+(evtRead ? ":\"^"+evtRead+": " : ":\"")+"\"]"; icnt++;
-    diophlp[icnt] = lang ? "f) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit beliebigen Reading-Wert" : "f) access by a \"regular expression\" for a device and a reading with arbitrary value";
+    
+    diophlp[icnt] = lang ? "g) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit beliebigen Reading-Wert" : "g) access by a \"regular expression\" for a device and a reading with arbitrary value";
     diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$: ")+"\"]"; icnt++;
-    diophlp[icnt] = lang ? "g) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit exaktem Reding-Wert" : "g) access by a \"regular expression\" for a device and a reading with distinct value";
+    
+    diophlp[icnt] = lang ? "h) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit exaktem Reding-Wert" : "h) access by a \"regular expression\" for a device and a reading with distinct value";
     diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+": " : "$:^")+evtEvt+"$\"]"; icnt++;
+    
     if (evtHM != "") {
-        diophlp[icnt] = lang ? "h) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe falls ein anderer Operand auslöst" : "h) access by a \"regular expression\" for a device and a reading and a filter for a time value (hh:mm), a default value in case a different operator triggers and a relational string operator (ge &#8793; greater equal) and a reference value";
+        diophlp[icnt] = lang ? "i) Zugriff mit Angabe eines \"regulären Ausdrucks\" für ein Gerät und ein Reading mit Filter für eine Zeitangabe (hh:mm), einer Zeitvorgabe falls ein anderer Operand auslöst" : "i) access by a \"regular expression\" for a device and a reading and a filter for a time value (hh:mm), a default value in case a different operator triggers and a relational string operator (ge &#8793; greater equal) and a reference value";
         diop[icnt] = "[\"^"+evtDev+(evtRead ? "$:^"+evtRead+"\"" : "$:\"")+":\"(\\d\\d:\\d\\d)\",\"00:00\"] ge $hm"; icnt++}
     var maxlength = 33;
     for (var i = 0; i < diop.length; i++)

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: few more derived operands
+                           in DOIFtools event monitor assistant
   - new:     98_monitoring: introducing new  module to monitor devices towards
                 events and stores them in two lists
   - update:  88_HMCCU: Prepared code for version 4.
