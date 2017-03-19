@@ -53,6 +53,7 @@ sub monitoring_Initialize($) {
 
   $hash->{AttrList} =
       "addStateEvent:1,0 "
+    . "blacklist "
     . "disable:1,0 "
     . "disabledForIntervals "
     . "errorFuncAdd:textField-long "
@@ -78,8 +79,6 @@ sub monitoring_Define($$) {
     if(int(@re) < 1 || int(@re) > 2);
 
   readingsBeginUpdate($hash);
-  # readingsBulkUpdate($hash, "warning", "") unless($hash->{READINGS}{warning});
-  # readingsBulkUpdate($hash, "error", "") unless($hash->{READINGS}{error});
   readingsEndUpdate($hash, 0);
   monitoring_setActive($hash) if($init_done);
 
@@ -235,6 +234,7 @@ sub monitoring_Notify($$) {
     || $removeRegex && $removeRegex =~ m/^$name:/
     || $events
   );
+  return if(AttrVal($SELF, "blacklist", "") =~ m/(^|,)$name(,|$)/);
 
   foreach my $event (@{$events}){
     my $addMatch = "$name:$event" =~ $addRegex;
@@ -463,7 +463,7 @@ sub monitoring_setActive($) {
     formatted by two attributes.<br>
     <br>
     The following applications are possible and are described
-    <a href="monitoringexamples"><u>below</u></a>:<br>
+    <a href="#monitoringexamples"><u>below</u></a>:<br>
     <ul>
       <li>opened windows</li>
       <li>battery warnings</li>
@@ -597,9 +597,13 @@ sub monitoring_setActive($) {
     <b>Attribute</b>
     <ul>
       <li>
-        <a href="addStateEvent">
+        <a href="#addStateEvent">
           <u><code>addStateEvent</code></u>
         </a>
+      </li>
+      <li>
+        <code>blacklist</code><br>
+        Comma-separated list of devices which will be ignored.
       </li>
       <li>
         <code>disable (1|0)</code><br>
@@ -607,7 +611,7 @@ sub monitoring_setActive($) {
         0: see "set active"
       </li>
       <li>
-        <a href="disabledForIntervals">
+        <a href="#disabledForIntervals">
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
@@ -707,7 +711,7 @@ sub monitoring_setActive($) {
         Like errorReturn, just for the warning list.
       </li>
       <li>
-        <a href="readingFnAttributes">
+        <a href="#readingFnAttributes">
           <u><code>readingFnAttributes</code></u>
         </a>
       </li>
@@ -811,7 +815,7 @@ attr Wasserfilter_monitoring warningReturn {return unless(@warnings);;\
  return "Der Wasserfilter muss demn&auml;chst gewechselt werden.";;\
 }
 attr Wasserfilter_monitoring warningWait 60*60*24*25</pre>
-        A <a href="dash_dhcp"><u>DashButton</u></a> is used to tell FHEM that
+        A <a href="#dash_dhcp"><u>DashButton</u></a> is used to tell FHEM that
         the water filter has been changed.<br>
         After 30 days, the DashButton is set to the error list.
       </li>
@@ -841,7 +845,7 @@ attr putzen_monitoring errorReturn {return unless(@errors);;\
  return(join("\n - ", "Die folgenden Räume müssen wieder geputzt werden:", @errors))\
 }
 attr putzen_monitoring errorWait 60*60*24*7</pre>
-        Several <a href="dash_dhcp"><u>DashButton</u></a> are used to inform
+        Several <a href="#dash_dhcp"><u>DashButton</u></a> are used to inform
         FHEM that the rooms have been cleaned.<br>
         After 7 days, the room is set to the error list.<br>
         However, the room name is not the device name but the readings name and
@@ -877,9 +881,9 @@ attr BeamerFilter_monitoring errorReturn {return unless(@errors);;\
 }
 attr BeamerFilter_monitoring warningFuncAdd {return}
 attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
-        An <a href="HourCounter"><u>HourCounter</u></a> is used to record the
+        An <a href="#HourCounter"><u>HourCounter</u></a> is used to record the
         operating hours of a beamer and a
-        <a href="dash_dhcp"><u>DashButton</u></a>  to tell FHEM that the filter
+        <a href="#dash_dhcp"><u>DashButton</u></a>  to tell FHEM that the filter
         has been cleaned.<br>
         If the filter has not been cleaned for more than 200 hours, the device
         is set to the error list.<br>
@@ -912,7 +916,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
     zwei Attribute formatiert ausgeben.<br>
     <br>
     Folgende Anwendungen sind m&ouml;glich und werden
-    <a href="monitoringexamples"><u>unten</u></a> beschrieben:<br>
+    <a href="#monitoringexamples"><u>unten</u></a> beschrieben:<br>
     <ul>
       <li>ge&ouml;ffnete Fenster</li>
       <li>Batterie Warnungen</li>
@@ -1056,9 +1060,13 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
     <b>Attribute</b>
     <ul>
       <li>
-        <a href="addStateEvent">
+        <a href="#addStateEvent">
           <u><code>addStateEvent</code></u>
         </a>
+      </li>
+      <li>
+        <code>blacklist</code><br>
+        Durch Komma getrennte Liste von Ger&auml;ten die ignoriert werden.
       </li>
       <li>
         <code>disable (1|0)</code><br>
@@ -1066,7 +1074,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         0: siehe "set active"
       </li>
       <li>
-        <a href="disabledForIntervals">
+        <a href="#disabledForIntervals">
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
@@ -1168,7 +1176,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         Wie errorReturn, nur f&uuml;r die warning-Liste.
       </li>
       <li>
-        <a href="readingFnAttributes">
+        <a href="#readingFnAttributes">
           <u><code>readingFnAttributes</code></u>
         </a>
       </li>
@@ -1282,7 +1290,7 @@ attr Wasserfilter_monitoring warningReturn {return unless(@warnings);;\
  return "Der Wasserfilter muss demn&auml;chst gewechselt werden.";;\
 }
 attr Wasserfilter_monitoring warningWait 60*60*24*25</pre>
-        Hierbei wird ein <a href="dash_dhcp"><u>DashButton</u></a> genutzt um
+        Hierbei wird ein <a href="#dash_dhcp"><u>DashButton</u></a> genutzt um
         FHEM mitzuteilen, dass der Wasserfilter gewechselt wurde.<br>
         Nach 30 Tagen wird der DashButton auf die error-Liste gesetzt.
       </li>
@@ -1315,7 +1323,7 @@ attr putzen_monitoring errorReturn {return unless(@errors);;\
  return(join("\n - ", "Die folgenden Räume müssen wieder geputzt werden:", @errors))\
 }
 attr putzen_monitoring errorWait 60*60*24*7</pre>
-        Hierbei werden mehrere <a href="dash_dhcp"><u>DashButton</u></a>
+        Hierbei werden mehrere <a href="#dash_dhcp"><u>DashButton</u></a>
         genutzt um FHEM mitzuteilen, dass die Räume geputzt wurden.<br>
         Nach 7 Tagen wird der Raum auf die error-Liste gesetzt.<br>
         Der Raum Name ist hierbei jedoch nicht der Geräte-Name, sondern der
@@ -1352,9 +1360,9 @@ attr BeamerFilter_monitoring errorReturn {return unless(@errors);;\
 }
 attr BeamerFilter_monitoring warningFuncAdd {return}
 attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
-        Hierbei wird ein <a href="HourCounter"><u>HourCounter</u></a> genutzt
+        Hierbei wird ein <a href="#HourCounter"><u>HourCounter</u></a> genutzt
         um die Betriebsstunden eine Beamer zu erfassen und ein
-        <a href="dash_dhcp"><u>DashButton</u></a> um FHEM mitzuteilen, dass der
+        <a href="#dash_dhcp"><u>DashButton</u></a> um FHEM mitzuteilen, dass der
         Filter gereinigt wurde.<br>
         Wurde der Filter l&auml;nger als 200 Betriebsstunden nicht gereinigt
         wird das Ger&auml;t auf die error-Liste gesetzt.<br>
