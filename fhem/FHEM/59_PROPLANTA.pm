@@ -123,7 +123,23 @@ my $curReadingType = 0;
       ,["BD_18", "cloud18", 2]
       ,["BD_21", "cloud21", 2]
       ,["MA", "moonRise", 5]
-      ,["MU", "moonSet", 5]
+      ,["MU", "moonSet", 5]      
+      ,["WGRAD_0", "windDir00", 2]
+      ,["WGRAD_3", "windDir03", 2]
+      ,["WGRAD_6", "windDir06", 2]
+      ,["WGRAD_9", "windDir09", 2]
+      ,["WGRAD_12", "windDir12", 2]
+      ,["WGRAD_15", "windDir15", 2]
+      ,["WGRAD_18", "windDir18", 2]
+      ,["WGRAD_21", "windDir21", 2]
+      ,["WGESCHW_0", "wind00", 2]
+      ,["WGESCHW_3", "wind03", 2]
+      ,["WGESCHW_6", "wind06", 2]
+      ,["WGESCHW_9", "wind09", 2]
+      ,["WGESCHW_12", "wind12", 2]
+      ,["WGESCHW_15", "wind15", 2]
+      ,["WGESCHW_18", "wind18", 2]
+      ,["WGESCHW_21", "wind21", 2]
   );
 
    my %intensity = ( "keine" => 0
@@ -787,6 +803,10 @@ PROPLANTA_Html($)
 1;
 
 =pod
+=item device
+=item summary extracts weather data from www.proplanta.de
+=item summary_DE Extrahiert Wetterdaten von www.proplanta.de
+
 =begin html
 
 <a name="PROPLANTA"></a>
