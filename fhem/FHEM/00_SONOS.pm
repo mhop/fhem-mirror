@@ -51,6 +51,9 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 19.03.2017
+#	Es gibt ein neues Attribut "getListsDirectlyToReadings", mit welchem die UserReadings bzgl. Favourites, Playlists und Radios (sowie currentTrackPosition) obsolet werden, da sie dann direkt in die passenden Readings geschrieben werden. Wenn man selber beeinflussen möchte, auf welche Weise und mit welchem Namen diese Readings gefüllt werden, dann darf dieses Attribut nicht gesetzt werden (es bleibt dann das bisherige Verhalten)
+#	Es gibt zwei neue Getter "Queue" und "QueueWithCovers", welche die aktuelle Abspielliste liefern. Diese können wieder mit UserReadings oder dem neuen Attribut "getListsDirectlyToReadings" in entsprechende Readings übertragen werden. Hierbei werden auch zwei neue Readings "QueueDuration" und "QueueDurationSec" gefüllt, die die gesamte Abspieldauer der Abspielliste enthalten.
 # 13.03.2017
 #	Saubere Fehlerbehandlung bei der Verarbeitung von currentFavouriteName, currentPlaylistName und currentRadioName.
 # 12.03.2017
@@ -231,7 +234,7 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 						'^x-sonosapi-hls-static:' => 'Amazon Music');
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
-my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout);
+my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout getListsDirectlyToReadings);
 my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble TruePlay SurroundEnable SurroundLevel SubEnable SubGain SubPolarity AudioDelay AudioDelayLeftRear AudioDelayRightRear NightMode DialogLevel AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupState ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon transportState TransportState LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash GroupMasterPlayer ShareIndexInProgress DirectControlClientID DirectControlIsSuspended DirectControlAccountID);
 
 # Obsolete Einstellungen...
@@ -364,7 +367,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 getListsDirectlyToReadings:1,0 '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -1211,6 +1214,7 @@ sub SONOS_Read($) {
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentEnqueuedTransportURI", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackDuration", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPosition", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPositionSec", 0);
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentTitle", 'Disappeared');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentArtist", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbum", '');
@@ -1332,6 +1336,7 @@ sub SONOS_Read($) {
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentRadioName", $current{RadioName});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackDuration", $current{TrackDuration});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPosition", $current{TrackPosition});
+				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPositionSec", $current{TrackPositionSec});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackProvider", $current{TrackProvider});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTitle", $current{Title});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentArtist", $current{Artist});
@@ -2289,7 +2294,18 @@ sub SONOS_Discover() {
 					}
 				} elsif ($workType eq 'getCurrentTrackPosition') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime'));
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							my $position = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+							
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $position);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPositionSec', SONOS_GetTimeSeconds($position));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime'));
+						}
 					}
 				} elsif ($workType eq 'setCurrentTrackPosition') {
 					my $value1 = $params[0];
@@ -2686,7 +2702,16 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'PlaylistsListAlias', join('|', sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'PlaylistsList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						}
 					}
 				} elsif ($workType eq 'getPlaylistsWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2700,7 +2725,13 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Ressource} = decode_entities($3);
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'Playlists', SONOS_Dumper(\%resultHash));
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						}
 					}
 				} elsif ($workType eq 'getFavourites') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2712,7 +2743,16 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'FavouritesListAlias', join('|', sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'FavouritesList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						}
 					}
 				} elsif ($workType eq 'getFavouritesWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2726,7 +2766,13 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Ressource} = decode_entities($3);
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'Favourites', SONOS_Dumper(\%resultHash));
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						}
 					}
 				} elsif ($workType eq 'getSearchlistCategories') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -3075,7 +3121,16 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'RadioListAlias', join('|', sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'RadioList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
+						}
 					}
 				} elsif ($workType eq 'getRadiosWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -3089,7 +3144,109 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Ressource} = decode_entities($3);
 						}
 						
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'Radios', SONOS_Dumper(\%resultHash));
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						}
+					}
+				} elsif ($workType eq 'getQueue') {
+					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+						my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', 0, 0, '');
+						my $tmp = $result->getValue('Result');
+						
+						my $numberReturned = $result->getValue('NumberReturned');
+						my $totalMatches = $result->getValue('TotalMatches');
+						while ($numberReturned < $totalMatches) {
+							$result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', $numberReturned, 0, '');
+							$tmp .= $result->getValue('Result');
+						
+							$numberReturned += $result->getValue('NumberReturned');
+							$totalMatches = $result->getValue('TotalMatches');
+						}
+						
+						my @inputArray;
+						while ($tmp =~ m/(<item id="Q:0\/\d+".*?>.*?<\/item>)/ig) {
+							push(@inputArray, $1);
+						}
+						
+						my @resultArray;
+						my $position = 0;
+						foreach my $line (@inputArray) {
+							my $id = $1 if ($line =~ m/<item id="(Q:0\/\d+)".*?>.*?<\/item>/i);
+							my $duration = $1 if ($line =~ m/<item id="Q:0\/\d+".*?>.*?<res.*?duration="(.+?)".*?>.*?<\/item>/i);
+							my $res = $1 if ($line =~ m/<item id="Q:0\/\d+".*?>.*?<res.*?>(.*?)<\/res>.*?<\/item>/i);
+							my $title = $1 if ($line =~ m/<item id="Q:0\/\d+".*?>.*?<dc:title>(.*?)<\/dc:title>.*?<\/item>/i);
+							my $artist = $1 if ($line =~ m/<item id="Q:0\/\d+".*?>.*?<dc:creator>(.*?)<\/dc:creator>.*?<\/item>/i);
+							my $album = $1 if ($line =~ m/<item id="Q:0\/\d+".*?>.*?<upnp:album>(.*?)<\/upnp:album>.*?<\/item>/i);
+							
+							if ($duration) {
+								push(@resultArray, ++$position.'. ('.$artist.') '.$title.' ['.$duration.']');
+							} else {
+								push(@resultArray, ++$position.'. ('.$artist.') '.$title.' [k.A.]');
+							}
+						}
+						
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'QueueListAlias', join('|', @resultArray));
+							
+							# Elemente um 1 verschieben...
+							unshift(@resultArray, ''); @resultArray = keys @resultArray; shift(@resultArray);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'QueueList', join('|', @resultArray));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', @resultArray).'"');
+						}
+					}
+				} elsif ($workType eq 'getQueueWithCovers') {
+					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+						my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', 0, 0, '');
+						my $tmp = $result->getValue('Result');
+						
+						my $numberReturned = $result->getValue('NumberReturned');
+						my $totalMatches = $result->getValue('TotalMatches');
+						while ($numberReturned < $totalMatches) {
+							$result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', $numberReturned, 0, '');
+							$tmp .= $result->getValue('Result');
+						
+							$numberReturned += $result->getValue('NumberReturned');
+							$totalMatches = $result->getValue('TotalMatches');
+						}
+						
+						my %resultHash;
+						$resultHash{DurationSec} = 0;
+						$resultHash{Duration} = '0:00:00';
+						my $position = 0;
+						while ($tmp =~ m/<item id="(Q:0\/\d+)".*?>.*?<res.*?duration="(.+?)".*?>(.*?)<\/res>.*?<dc:title>(.*?)<\/dc:title>.*?<dc:creator>(.*?)<\/dc:creator>.*?<upnp:album>(.*?)<\/upnp:album>.*?<\/item>/ig) {
+							$resultHash{$1}->{Position} = ++$position;
+							$resultHash{$1}->{ShowTitle} = $position.'. ('.$5.') '.$4.' ['.$2.']';
+							$resultHash{$1}->{Title} = $4;
+							$resultHash{$1}->{Artist} = $5;
+							$resultHash{$1}->{Album} = $6;
+							$resultHash{$1}->{Duration} = $2;
+							$resultHash{$1}->{DurationSec} = SONOS_GetTimeSeconds($2);
+							$resultHash{DurationSec} += $resultHash{$1}->{DurationSec};
+							$resultHash{$1}->{Cover} = SONOS_MakeCoverURL($udn, $3);
+							$resultHash{$1}->{Ressource} = decode_entities($3);
+						}
+						$resultHash{Duration} = SONOS_ConvertSecondsToTime($resultHash{DurationSec});
+						
+						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'QueueDuration', $resultHash{Duration});
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'QueueDurationSec', $resultHash{DurationSec});
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'Queue', SONOS_Dumper(\%resultHash));
+							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
+						} else {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
+						}
 					}
 				} elsif ($workType eq 'loadRadio') {
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
@@ -5550,6 +5707,7 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackProvider', SONOS_GetTrackProvider($result->getValue('TrackURI')));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPositionSec', SONOS_GetTimeSeconds($result->getValue('RelTime')));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
 					
 					$result = $SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
@@ -5706,7 +5864,9 @@ sub SONOS_GetDefineStringlist($$$$$$$$$$) {
 		push(@defs, 'CommandAttr:'.$name.' sortby 1');
 		
 		if (!$isZoneBridge) {
-			push(@defs, 'CommandAttr:'.$name.' userReadings Favourites:LastActionResult.*?GetFavouritesWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Radios:LastActionResult.*?GetRadiosWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Playlists:LastActionResult.*?GetPlaylistsWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, currentTrackPosition:LastActionResult.*?GetCurrentTrackPosition.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }');
+			if (!SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
+				push(@defs, 'CommandAttr:'.$name.' userReadings Favourites:LastActionResult.*?GetFavouritesWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Radios:LastActionResult.*?GetRadiosWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Playlists:LastActionResult.*?GetPlaylistsWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Queue:LastActionResult.*?GetQueueWithCovers.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, currentTrackPosition:LastActionResult.*?GetCurrentTrackPosition.* { if (ReadingsVal($name, "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }');
+			}
 			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize1 <NormalAudio><Artist prefix="(" suffix=")"/><Title prefix=" \'" suffix="\'" ifempty="[Keine Musikdatei]"/><Album prefix=" vom Album \'" suffix="\'"/></NormalAudio> <StreamAudio><Sender suffix=":"/><SenderCurrent prefix=" \'" suffix="\' -"/><SenderInfo prefix=" "/></StreamAudio>');
 			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize2 <TransportState/><InfoSummarize1 prefix=" => "/>');
 			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize3 <Volume prefix="Lautstärke: "/><Mute instead=" ~ Kein Ton" ifempty=" ~ Ton An" emptyval="0"/> ~ Balance: <Balance ifempty="Mitte" emptyval="0"/><HeadphoneConnected instead=" ~ Kopfhörer aktiv" ifempty=" ~ Kein Kopfhörer" emptyval="0"/>');
@@ -6013,6 +6173,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{TrackURI} = ReadingsVal($name, 'currentEnqueuedTransportURI', '');
 		$current{TrackDuration} = ReadingsVal($name, 'currentTrackDuration', '');
 		$current{TrackPosition} = ReadingsVal($name, 'currentTrackPosition', '');
+		$current{TrackPosition} = ReadingsVal($name, 'currentTrackPositionSec', '');
 		$current{TrackProvider} = ReadingsVal($name, 'currentTrackProvider', '');
 		#$current{TrackMetaData} = '';
 		$current{AlbumArtURI} = ReadingsVal($name, 'currentAlbumArtURI', '');
@@ -6441,6 +6602,7 @@ sub SONOS_ServiceCallback($$) {
 	# Current Trackposition ermitteln (durch Abfrage beim Player, bzw. bei Streams statisch)
 	if ($isStream) {
 		SONOS_Client_Notifier('SetCurrent:TrackPosition:0:00:00');
+		SONOS_Client_Notifier('SetCurrent:TrackPositionSec:0');
 	} else {
 		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 			my $trackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
@@ -6448,6 +6610,7 @@ sub SONOS_ServiceCallback($$) {
 				$trackPosition = '0:00:00';
 			}
 			SONOS_Client_Notifier('SetCurrent:TrackPosition:'.$trackPosition);
+			SONOS_Client_Notifier('SetCurrent:TrackPositionSec:'.SONOS_GetTimeSeconds($trackPosition));
 			$SONOS_BookmarkSpeicher{OldTrackPositions}{$udn} = SONOS_GetTimeSeconds($trackPosition);
 			$SONOS_BookmarkSpeicher{OldTimestamp}{$udn} = scalar(gettimeofday()) - SONOS_GetTimeSeconds($trackPosition);
 		}
@@ -9376,6 +9539,8 @@ The order in the sublists are important, because the first entry defines the so-
 </a><br />One of (0..10,15,20,25,30). Defines the timeout for waiting of the Sonosplayer for Cover-Downloads. Defaults to 5.</li>
 <li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again started.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
+<li><a name="SONOS_attribut_getListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
+</a><br />One of (0,1). With this attribute you can define that the module fills the readings for the lists of Favourites, Playlists, Radios and the Queue directly without the need of userReadings.</li>
 <li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Address&gt;[,IP-Address]</code></b>
 </a><br />With this attribute you can define IP-addresses, which has to be ignored by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
@@ -9554,6 +9719,8 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 </a><br />Eines von (0..10,15,20,25,30). Definiert den Timeout der für die Abfrage des Covers beim Sonosplayer verwendet wird. Wenn nicht angegeben, dann wird 5 verwendet.</li>
 <li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Hiermit kann das Modul abgeschaltet werden. Wirkt sofort. Bei 1 wird der SubProzess beendet, und somit keine weitere Verarbeitung durchgeführt. Bei 0 wird der Prozess wieder gestartet.<br />Damit kann das Modul temporär abgeschaltet werden, um bei der Neueinrichtung von Sonos-Komponenten keine halben Zustände mitzubekommen.</li>
+<li><a name="SONOS_attribut_getListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
+</a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Listen für Favoriten, Playlists, Radios und Queue direkt in die entsprechenden Readings zu schreiben. Dafür sind dann keine Userreadings mehr notwendig.</li>
 <li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die vom UPnP-System ignoriert werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>

@@ -71,6 +71,8 @@ my %gets = (
 	'FavouritesWithCovers' => '',
 	'Radios' => '',
 	'RadiosWithCovers' => '',
+	'Queue' => '',
+	'QueueWithCovers' => '',
 	'Alarm' => 'ID',
 	'EthernetPortStatus' => 'PortNum(0..3)',
 	'SupportLinks' => '',
@@ -347,6 +349,10 @@ sub SONOSPLAYER_Get($@) {
 		SONOS_DoWork($udn, 'getRadios');
 	} elsif (lc($reading) eq 'radioswithcovers') {
 		SONOS_DoWork($udn, 'getRadiosWithCovers');
+	} elsif (lc($reading) eq 'queue') {
+		SONOS_DoWork($udn, 'getQueue');
+	} elsif (lc($reading) eq 'queuewithcovers') {
+		SONOS_DoWork($udn, 'getQueueWithCovers');
 	} elsif (lc($reading) eq 'searchlistcategories') {
 		SONOS_DoWork($udn, 'getSearchlistCategories');
 	} elsif (lc($reading) eq 'ethernetportstatus') {
@@ -1391,6 +1397,12 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_getter_PlaylistsWithCovers">
 <b><code>PlaylistsWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the playlists stored in Sonos e.g. {'SQ:14' => {'Cover' => 'urlzumcover', 'Title' => '1. Playlist'}}</li>
+<li><a name="SONOSPLAYER_getter_Queue">
+<b><code>Queue</code></b></a>
+<br /> Retrieves a list with the names of all titles in the current queue. This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of the titles. e.g. "1. Liste 1 [0:02:14]","2. Eintrag 2 [k.A.]","3. Test [0:14:00]"</li>
+<li><a name="SONOSPLAYER_getter_QueueWithCovers">
+<b><code>QueueWithCovers</code></b></a>
+<br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the titles in the current queue. e.g.: {'Q:0/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Titel'}}.</li>
 <li><a name="SONOSPLAYER_getter_Radios">
 <b><code>Radios</code></b></a>
 <br /> Retrieves a list with the names of all saved radiostations (favorites). This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of radiostations. e.g. "Sender 1","Sender 2","Test"</li>
@@ -1751,6 +1763,12 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_getter_PlaylistsWithCovers">
 <b><code>PlaylistsWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller gespeicherten Sonos-Playlisten. Z.B.: {'SQ:14' => {'Cover' => 'urlzumcover', 'Title' => '1. Playlist'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
+<li><a name="SONOSPLAYER_getter_Queue">
+<b><code>Queue</code></b></a>
+<br /> Liefert eine Liste mit den Namen aller Titel in der aktuellen Abspielliste. Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "1. Liste 1 [0:02:14]","2. Eintrag 2 [k.A.]","3. Test [0:14:00]"</li>
+<li><a name="SONOSPLAYER_getter_QueueWithCovers">
+<b><code>QueueWithCovers</code></b></a>
+<br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller Titel der aktuellen Abspielliste. Z.B.: {'Q:0/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Titel'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
 <li><a name="SONOSPLAYER_getter_Radios">
 <b><code>Radios</code></b></a>
 <br /> Liefert eine Liste mit den Namen aller gespeicherten Radiostationen (Favoriten). Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "Sender 1","Sender 2","Test"</li>
