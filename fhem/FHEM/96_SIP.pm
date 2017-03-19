@@ -53,8 +53,9 @@ use Net::Domain qw( hostfqdn );
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.44 / 18.03.17";
+my $sip_version ="V1.45 / 19.03.17";
 my $ua;	# SIP user agent
+my @fifo;
 
 my %sets = (
    "call"         => "",
@@ -492,6 +493,13 @@ sub SIP_CALLDone($)
     readingsEndUpdate($hash, 1);
    }
 
+   my $call = shift @fifo;
+   if ($call)
+   { 
+     my @a = split(" ",$call);
+     SIP_Set($hash,@a); 
+   }
+   
    return undef;
 }
 
@@ -503,7 +511,7 @@ sub SIP_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME}; 
-  my $cmd  = $a[1];
+  my $cmd  = (defined($a[1])) ? $a[1] : "??";
   my $subcmd;
 
   return join(" ", sort keys %sets) if ($cmd eq "?");
@@ -524,9 +532,17 @@ sub SIP_Set($@)
     my $nr       = (defined($a[2])) ? $a[2] : "";
     my $ringtime = (defined($a[3])) ? $a[3] : 30;
     my $msg      = (defined($a[4])) ? $a[4] : AttrVal($name, "sip_audiofile_call", "");
-    return "there is already a call activ with pid ".$hash->{CPID} if exists($hash->{CPID});
     return "missing call number" if (!$nr);
     return "invalid max time : $ringtime" unless $ringtime =~ m/^\d+$/;
+
+    if (exists($hash->{CPID}))
+     {
+        my $call = join(" ",@a); 
+        push (@fifo,$call);
+        Log3 $name ,4,"$name, add $call to fifo";
+        return undef;
+        #return "there is already a call activ with pid ".$hash->{CPID};
+     }
 
     if ($msg)
     {
@@ -696,6 +712,8 @@ sub SIP_ListenStart($)
  return unless(defined($name));
  my $logname          = $name."[".$$."]"; 
  my $hash             = $defs{$name}; # $hash / $name gueltig in diesem Block 
+ my $parent = getppid();
+ Log3 $name,3,"$logname, my parent is $parent";
  $hash->{telnetPort}  = undef;
 
  my $dtmfloop;		# Ende-Flag für die DTMF-Schleife
@@ -851,7 +869,6 @@ sub SIP_ListenStart($)
  {
   my ($event) = @_;
   Log3 $name, 5,  "$logname, SIP_bye : $event";
-  #print Dumper($event);
   SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") ;
   $byebye = 1;
   return 1;
