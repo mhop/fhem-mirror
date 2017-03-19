@@ -905,6 +905,8 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
+      <li><b>fc</b><i>0</i><b>_wind</b><i>15</i> - wind speed <i>today</i> at <i>15</i>:00 Uhr in km/h</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - wind direction <i>today</i> at <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -1013,6 +1015,8 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
+      <li><b>fc</b><i>0</i><b>_wind</b><i>15</i> - Windgeschwindigkeit <i>heute</i> um <i>15</i>:00 Uhr in km/h</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
