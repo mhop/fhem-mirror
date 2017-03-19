@@ -770,7 +770,7 @@ SVG_readgplotfile($$$)
 
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
-    map { $l =~ s/<$_>/$pr->{$_}/ } keys %$pr if($plotReplace);
+    map { $l =~ s/<$_>/$pr->{$_}/g } keys %$pr if($plotReplace);
     my ($src, $plotfn) = (undef, undef);
     if($l =~ m/^#([^ ]*) (.*)$/) {
       if($1 eq $ldType) {
