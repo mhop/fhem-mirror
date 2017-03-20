@@ -1239,13 +1239,21 @@ sub HP1000_PushSrv($$) {
 
     HttpUtils_NonblockingGet(
         {
-            url        => $srv_url . $cmd,
-            timeout    => $timeout,
-            noshutdown => $http_noshutdown,
-            data       => undef,
-            hash       => $hash,
+            url         => $srv_url . $cmd,
+            timeout     => $timeout,
+            noshutdown  => $http_noshutdown,
+            data        => undef,
+            hash        => $hash,
+            callback    => \&HP1000_ReturnSrv,
             httpversion => "1.1",
-            callback   => \&HP1000_ReturnSrv,
+            loglevel    => AttrVal( $name, "httpLoglevel", 5 ),
+            header      => {
+                Agent        => 'FHEM-HP1000/1.0.0',
+                'User-Agent' => 'FHEM-HP1000/1.0.0',
+            },
+            sslargs => {
+                SSL_verify_mode => 0,
+            },
         }
     );
 
@@ -1327,12 +1335,18 @@ sub HP1000_PushWU($$) {
 
     HttpUtils_NonblockingGet(
         {
-            url        => $wu_url . $cmd,
-            timeout    => $timeout,
-            noshutdown => $http_noshutdown,
-            data       => undef,
-            hash       => $hash,
-            callback   => \&HP1000_ReturnWU,
+            url         => $wu_url . $cmd,
+            timeout     => $timeout,
+            noshutdown  => $http_noshutdown,
+            data        => undef,
+            hash        => $hash,
+            callback    => \&HP1000_ReturnWU,
+            httpversion => "1.1",
+            loglevel    => AttrVal( $name, "httpLoglevel", 5 ),
+            header      => {
+                Agent        => 'FHEM-HP1000/1.0.0',
+                'User-Agent' => 'FHEM-HP1000/1.0.0',
+            },
         }
     );
 
