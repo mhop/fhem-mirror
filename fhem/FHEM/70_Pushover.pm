@@ -573,17 +573,17 @@ sub Pushover_ReceiveCommand($$$) {
                         readingsBulkUpdate( $hash,
                             "cbCancelId_" . $values->{cbNr},
                             $values->{cancel_id} )
-                          if ( defined( $values->{cancel_id} ) );
+                          if ( defined( $values->{cancel_id} )
+                            && $values->{cancel_id} ne "" );
                     }
                     else {
                         readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
                             $values->{cbNr} );
                     }
 
-                    if ( $values->{action} ne "" ) {
-                        readingsBulkUpdate( $hash, "cbAct_" . $values->{cbNr},
-                            $values->{action} );
-                    }
+                    readingsBulkUpdate( $hash, "cbAct_" . $values->{cbNr},
+                        $values->{action} )
+                      if ( $values->{action} ne "" );
                 }
             }
 
