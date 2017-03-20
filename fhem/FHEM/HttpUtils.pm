@@ -334,7 +334,10 @@ HttpUtils_Connect2($)
   if($hash->{protocol} eq "https" && $hash->{conn} && !$hash->{hu_sslAdded}) {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log3 $hash, $hash->{loglevel}, $@;
+      my $errstr = "$hash->{addr}: $@";
+      Log3 $hash, $hash->{loglevel}, $errstr;
+      HttpUtils_Close($hash);
+      return $errstr;
     } else {
       $hash->{conn}->blocking(1);
       my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
