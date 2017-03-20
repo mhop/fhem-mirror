@@ -775,7 +775,7 @@ FW_answerCall($)
     $dir =~ s/\.\.//g;
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
-    my $file = $ofile;
+    my $file = urlDecode($ofile);        # 69164
     $file =~ s/\?.*//; # Remove timestamp of CSS reloader
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
@@ -2398,6 +2398,7 @@ FW_makeImage(@)
     }
   } else {
     $class = "class='$class'" if($class);
+    $p = urlEncodePath($p);
     return "<img $class src=\"$FW_ME/images/$p\" alt=\"$txt\" title=\"$txt\">";
   }
 }
