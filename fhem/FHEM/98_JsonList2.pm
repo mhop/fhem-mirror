@@ -130,7 +130,7 @@ CommandJsonList2($$)
 <a name="JsonList2"></a>
 <h3>JsonList2</h3>
 <ul>
-  <code>jsonlist [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
+  <code>jsonlist2 [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
   <br><br>
   This is a command, to be issued on the command line (FHEMWEB or telnet
   interface). Can also be called via HTTP by
@@ -153,7 +153,7 @@ CommandJsonList2($$)
 <a name="JsonList2"></a>
 <h3>JsonList2</h3>
 <ul>
-  <code>jsonlist [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
+  <code>jsonlist2 [&lt;devspec&gt;] [&lt;value1&gt; &lt;value2&gt; ...]</code>
   <br><br>
   Dieses Befehl sollte in der FHEMWEB oder telnet Eingabezeile ausgef&uuml;hrt
   werden, kann aber auch direkt &uuml;ber HTTP abgerufen werden &uuml;ber 
