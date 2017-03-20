@@ -1607,7 +1607,10 @@ sub PHTV_SendCommand($$;$$$) {
             callback    => \&PHTV_ReceiveCommand,
             loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
             header      => {
-                'Content-Type' => 'application/json',
+                Agent            => 'FHEM-PHTV/1.0.0',
+                'User-Agent'     => 'FHEM-PHTV/1.0.0',
+                Accept           => 'application/json;charset=UTF-8',
+                'Accept-Charset' => 'UTF-8',
             },
             sslargs => {
                 SSL_verify_mode => 0,
