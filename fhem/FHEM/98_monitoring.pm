@@ -78,8 +78,6 @@ sub monitoring_Define($$) {
   return("Usage: define <name> $TYPE <add-event> [<remove-event>]")
     if(int(@re) < 1 || int(@re) > 2);
 
-  readingsBeginUpdate($hash);
-  readingsEndUpdate($hash, 0);
   monitoring_setActive($hash) if($init_done);
 
   return;
@@ -140,7 +138,7 @@ sub monitoring_Set($@) {
       unless(IsDisabled($SELF));
     readingsEndUpdate($hash, 0);
 
-    Log3($SELF, 2, "$SELF ($TYPE) set $SELF $argument $value");
+    Log3($SELF, 2, "$TYPE ($SELF) set $SELF $argument $value");
   }
   elsif($argument =~ /^(error|warning)(Add|Remove)$/){
     monitoring_modify("$SELF|$1|".lc($2)."|$value");
@@ -158,7 +156,7 @@ sub monitoring_Get($@) {
   return("\"get $TYPE\" needs at least one argument") if(@a < 1);
 
   my $argument = shift @a;
-  my $value    = join(" ", @a) if (@a);
+  my $value = join(" ", @a) if (@a);
   my $default = AttrVal($SELF, "getDefault", "all");
   my %monitoring_gets = (
       "all"     => "all:noArg"
@@ -201,7 +199,7 @@ sub monitoring_Attr(@) {
     }
     else{
       readingsSingleUpdate($hash, "state", "disabled", 0);
-      Log3($SELF, 3, "$SELF ($hash->{TYPE}) attr $SELF disabled");
+      Log3($SELF, 3, "$hash->{TYPE} ($SELF) attr $SELF disabled");
     }
   }
 }
@@ -242,7 +240,7 @@ sub monitoring_Notify($$) {
 
     next unless(defined($event) && ($addMatch || $removeMatch));
 
-    Log3($SELF, 4 , "$SELF ($TYPE) triggered by \"$name $event\"");
+    Log3($SELF, 4 , "$TYPE ($SELF) triggered by \"$name $event\"");
 
     foreach my $list ("warning", "error"){
       my $listFuncAdd = AttrVal($SELF, $list."FuncAdd", "preset");
@@ -252,21 +250,21 @@ sub monitoring_Notify($$) {
 
       if($listFuncAdd eq "preset" && $listFuncRemove eq "preset"){
         Log3($SELF, 5
-          , "$SELF ($TYPE) "
+          , "$TYPE ($SELF) "
           . $list."FuncAdd and "
           . $list."FuncRemove are preset"
         );
         if(!$removeRegex){
           if($listWait == 0){
             Log3($SELF, 2
-              , "$SELF ($TYPE) set \"$list"."Wait\" while \"$list"
+              , "$TYPE ($SELF) set \"$list"."Wait\" while \"$list"
               . "FuncAdd\" and \"$list"."FuncRemove\" are same"
             ) if($list eq "error");
 
             next;
           }
 
-          Log3($SELF, 5, "$SELF ($TYPE) only addRegex is defined");
+          Log3($SELF, 5, "$TYPE ($SELF) only addRegex is defined");
 
           monitoring_modify("$SELF|$list|remove|$name");
           monitoring_modify(
@@ -279,7 +277,7 @@ sub monitoring_Notify($$) {
           next unless($list eq "error" || AttrVal($SELF, "errorWait", undef));
 
           Log3($SELF, 5
-            , "$SELF ($TYPE) addRegex ($addRegex) "
+            , "$TYPE ($SELF) addRegex ($addRegex) "
             . "and removeRegex ($removeRegex) are defined"
           );
 
@@ -293,12 +291,12 @@ sub monitoring_Notify($$) {
       $listFuncAdd = 1 if($listFuncAdd eq "preset" && $addMatch);
 
       if(!$removeRegex){
-        Log3($SELF, 5, "$SELF ($TYPE) only addRegex is defined");
+        Log3($SELF, 5, "$TYPE ($SELF) only addRegex is defined");
 
         if($listFuncRemove eq "preset"){
           if($listWait == 0){
             Log3($SELF, 2
-              , "$SELF ($TYPE) set \"$list"."Wait\" while \"$list"
+              , "$TYPE ($SELF) set \"$list"."Wait\" while \"$list"
               . "FuncAdd\" and \"$list"."FuncRemove\" are same"
             ) if($list eq "error");
 
@@ -310,7 +308,7 @@ sub monitoring_Notify($$) {
       }
       else{
         Log3($SELF, 5
-          , "$SELF ($TYPE) addRegex ($addRegex) "
+          , "$TYPE ($SELF) addRegex ($addRegex) "
           . "and removeRegex ($removeRegex) are defined"
         );
 
@@ -348,7 +346,7 @@ sub monitoring_modify($) {
   my $reading = $list."Add_".$value;
 
   Log3(
-    $SELF, 5 , "$SELF ($TYPE)"
+    $SELF, 5 , "$TYPE ($SELF)"
     . "\n    entering monitoring_modify"
     . "\n        reading:   $list"
     . "\n        operation: $operation"
@@ -410,7 +408,7 @@ sub monitoring_setActive($) {
   my $TYPE = $hash->{TYPE};
 
   readingsSingleUpdate($hash, "state", "active", 0);
-  Log3($SELF, 3, "$SELF ($TYPE) set $SELF active");
+  Log3($SELF, 3, "$TYPE ($SELF) set $SELF active");
 
   foreach my $reading (sort(keys %{$hash->{READINGS}})){
     if($reading =~ m/(error|warning)Add_(.+)/){
@@ -422,7 +420,7 @@ sub monitoring_setActive($) {
 
       if($wait > 0){
         Log3($SELF, 4
-          , "$SELF ($TYPE) restore Timer \"$SELF|$1|add|$2\""
+          , "$TYPE ($SELF) restore Timer \"$SELF|$1|add|$2\""
         );
       }
       else{
