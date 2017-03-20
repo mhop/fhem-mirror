@@ -428,7 +428,9 @@ FW_Read($$)
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
-  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
+  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3)
+        if($FW_httpheader[0]);
+  $method = "" if(!$method);
   if($method !~ m/^(GET|POST)$/i){
     my $retCode = ($method eq "OPTIONS") ? "200 OK" : "405 Method Not Allowed";
     TcpServer_WriteBlocking($FW_chash,
@@ -439,6 +441,7 @@ FW_Read($$)
     FW_Read($hash, 1) if($hash->{BUF});
     Log 3, "$FW_cname: unsupported HTTP method $method, rejecting it."
         if($retCode ne "200 OK");
+    FW_closeConn($hash);
     return;
   }
 
