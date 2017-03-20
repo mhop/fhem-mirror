@@ -637,7 +637,11 @@ FW_addToWritebuffer($$@)
     if( $len < 126 ) {
       $txt = chr(0x81) . chr($len) . $txt;
     } else {
-      $txt = chr(0x81) . chr(0x7E) . pack('n', $len) . $txt;
+      if ( $len < 65536 ) {
+        $txt = chr(0x81) . chr(0x7E) . pack('n', $len) . $txt;
+      } else {
+        $txt = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) . chr(0x00) . chr(0x00) . pack('N', $len) . $txt;
+      }
     }
   }
   return addToWritebuffer($hash, $txt, $callback, $nolimit);
