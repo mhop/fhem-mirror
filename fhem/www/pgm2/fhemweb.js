@@ -696,7 +696,7 @@ FW_rawDef()
       }
 
       $("#content").append('<div id="rawDef">'+
-          '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
+          '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%"/>'+
           '<button>Execute commands</button>'+
           ' Dump "Probably associated with" too <input type="checkbox">'+
         '</div></br>');
@@ -1155,7 +1155,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
       });
   };
 
-  if( is_long )
+  if(is_long)
     $(newEl).click(myFunc);
 
   return newEl;
