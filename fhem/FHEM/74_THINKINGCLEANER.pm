@@ -1094,16 +1094,23 @@ sub THINKINGCLEANER_SendCommand($$;$$) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => undef,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => undef,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
+                callback    => \&THINKINGCLEANER_ReceiveCommand,
                 httpversion => "1.1",
-                callback   => \&THINKINGCLEANER_ReceiveCommand,
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
+                header      => {
+                    Agent            => 'FHEM-THINKINGCLEANER/1.0.0',
+                    'User-Agent'     => 'FHEM-THINKINGCLEANER/1.0.0',
+                    Accept           => 'application/json;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
             }
         );
 
@@ -1121,15 +1128,24 @@ sub THINKINGCLEANER_SendCommand($$;$$) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => $cmd,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
-                callback   => \&THINKINGCLEANER_ReceiveCommand,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => $cmd,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
+                callback    => \&THINKINGCLEANER_ReceiveCommand,
+                httpversion => "1.1",
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
+                header      => {
+                    Agent            => 'FHEM-THINKINGCLEANER/1.0.0',
+                    'User-Agent'     => 'FHEM-THINKINGCLEANER/1.0.0',
+                    'Content-Type'   => 'application/json',
+                    Accept           => 'application/json;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
             }
         );
     }
