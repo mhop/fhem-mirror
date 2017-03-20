@@ -247,7 +247,14 @@ sub Pushover_SendCommand($$;$\%) {
                 cmd         => $cmd,
                 type        => $type,
                 httpversion => "1.1",
-                callback    => \&Pushover_ReceiveCommand,
+                header      => {
+                    Agent            => 'FHEM-Pushover/1.0.0',
+                    'User-Agent'     => 'FHEM-Pushover/1.0.0',
+                    'Content-Type'   => 'application/x-www-form-urlencoded',
+                    Accept           => 'application/json;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
+                callback => \&Pushover_ReceiveCommand,
             }
         );
 
@@ -265,15 +272,23 @@ sub Pushover_SendCommand($$;$\%) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => $cmd,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
-                callback   => \&Pushover_ReceiveCommand,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => $cmd,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
+                httpversion => "1.1",
+                header      => {
+                    Agent            => 'FHEM-Pushover/1.0.0',
+                    'User-Agent'     => 'FHEM-Pushover/1.0.0',
+                    'Content-Type'   => 'application/x-www-form-urlencoded',
+                    Accept           => 'application/json;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
+                callback => \&Pushover_ReceiveCommand,
             }
         );
     }
@@ -1352,7 +1367,7 @@ sub Pushover_CGI() {
 
         my $webArgs;
         my $receipt = "";
-        my $revReadings;
+        my %revReadings;
 
         # extract values from URI
         foreach my $pv ( split( "&", $URI ) ) {
@@ -1376,21 +1391,18 @@ sub Pushover_CGI() {
         }
 
         # search for existing receipt
-        while ( ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            if ( $key =~ /^cb_\d+$/ ) {
-                my $val = $value->{VAL};
-                $revReadings{$val} = $key;
-            }
+        keys %{ $hash->{READINGS} };
+        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            $revReadings{ $value->{VAL} } = $1
+              if ( defined( $value->{VAL} ) && $key =~ /^cb_(\d+)$/ );
         }
 
         if ( defined( $revReadings{$receipt} ) ) {
-            my $r      = $revReadings{$receipt};
-            my @rBase  = split( "_", $r );
-            my $rAct   = "cbAct_" . $rBase[1];
-            my $rAck   = "cbAck_" . $rBase[1];
-            my $rAckAt = "cbAckAt_" . $rBase[1];
-            my $rAckBy = "cbAckBy_" . $rBase[1];
-            my $rDev   = "cbDev_" . $rBase[1];
+            my $rAct   = "cbAct_" . $revReadings{$receipt};
+            my $rAck   = "cbAck_" . $revReadings{$receipt};
+            my $rAckAt = "cbAckAt_" . $revReadings{$receipt};
+            my $rAckBy = "cbAckBy_" . $revReadings{$receipt};
+            my $rDev   = "cbDev_" . $revReadings{$receipt};
 
             return ( "text/plain; charset=utf-8",
                 "NOK " . $receipt . ": invalid argument 'acknowledged'" )
@@ -1402,12 +1414,8 @@ sub Pushover_CGI() {
               if ( !defined( $webArgs->{acknowledged_by} )
                 || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
 
-            return ( "text/plain; charset=utf-8",
-                "NOK " . $receipt . ": receipt does not exist" )
-              if ( ReadingsVal( $name, $rAck, "N/A" ) eq "N/A" );
-
-            if ( ReadingsVal( $name, $rAck, 1 ) == 0
-                && $rBase[1] > int( time() ) )
+            if ( ReadingsVal( $name, $rAck, "1" ) eq "0"
+                && $revReadings{$receipt} > int( time() ) )
             {
                 readingsBeginUpdate($hash);
 
