@@ -258,15 +258,15 @@ sub Pushover_SendCommand($$;$\%) {
                 service     => $service,
                 cmd         => $cmd,
                 type        => $type,
+                callback    => \&Pushover_ReceiveCommand,
                 httpversion => "1.1",
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
                 header      => {
                     Agent            => 'FHEM-Pushover/1.0.0',
                     'User-Agent'     => 'FHEM-Pushover/1.0.0',
-                    'Content-Type'   => 'application/x-www-form-urlencoded',
                     Accept           => 'application/json;charset=UTF-8',
                     'Accept-Charset' => 'UTF-8',
                 },
-                callback => \&Pushover_ReceiveCommand,
             }
         );
 
@@ -292,15 +292,15 @@ sub Pushover_SendCommand($$;$\%) {
                 service     => $service,
                 cmd         => $cmd,
                 type        => $type,
+                callback    => \&Pushover_ReceiveCommand,
                 httpversion => "1.1",
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
                 header      => {
                     Agent            => 'FHEM-Pushover/1.0.0',
                     'User-Agent'     => 'FHEM-Pushover/1.0.0',
-                    'Content-Type'   => 'application/x-www-form-urlencoded',
                     Accept           => 'application/json;charset=UTF-8',
                     'Accept-Charset' => 'UTF-8',
                 },
-                callback => \&Pushover_ReceiveCommand,
             }
         );
     }
