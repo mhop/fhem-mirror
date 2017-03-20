@@ -968,16 +968,26 @@ sub ENIGMA2_SendCommand($$;$$) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => undef,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
-                callback   => \&ENIGMA2_ReceiveCommand,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => undef,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
+                callback    => \&ENIGMA2_ReceiveCommand,
                 httpversion => "1.1",
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
+                header      => {
+                    Agent            => 'FHEM-ENIGMA2/1.0.0',
+                    'User-Agent'     => 'FHEM-ENIGMA2/1.0.0',
+                    Accept           => 'text/xml;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
+                sslargs => {
+                    SSL_verify_mode => 0,
+                },
             }
         );
 
@@ -995,15 +1005,26 @@ sub ENIGMA2_SendCommand($$;$$) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => $cmd,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
-                callback   => \&ENIGMA2_ReceiveCommand,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => $cmd,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
+                callback    => \&ENIGMA2_ReceiveCommand,
+                httpversion => "1.1",
+                loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
+                header      => {
+                    Agent            => 'FHEM-ENIGMA2/1.0.0',
+                    'User-Agent'     => 'FHEM-ENIGMA2/1.0.0',
+                    Accept           => 'text/xml;charset=UTF-8',
+                    'Accept-Charset' => 'UTF-8',
+                },
+                sslargs => {
+                    SSL_verify_mode => 0,
+                },
             }
         );
     }
