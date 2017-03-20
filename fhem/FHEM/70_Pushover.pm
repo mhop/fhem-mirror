@@ -13,8 +13,6 @@ use HttpUtils;
 use SetExtensions;
 use Encode;
 
-my %sets = ( "msg" => 1, "glance" => 1 );
-
 #------------------------------------------------------------------------------
 sub Pushover_Initialize($$) {
     my ($hash) = @_;
@@ -128,12 +126,23 @@ sub Pushover_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
     my ( $a, $h ) = parseParams( join " ", @args );
 
-    if ( !defined( $sets{$cmd} ) ) {
-        return
-            "Unknown argument "
-          . $cmd
-          . ", choose one of "
-          . join( " ", sort keys %sets );
+    unless ( $cmd =~ /^(msg|msgCancel|glance)$/i ) {
+        my $usage = "Unknown argument $cmd, choose one of msg glance";
+
+        sort keys %{ $hash->{READINGS} };
+        my $cancelIds;
+        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            if (   defined( $value->{VAL} )
+                && $value->{VAL} ne ""
+                && $key =~ /^cbCancelId_(\d+)$/ )
+            {
+                $cancelIds .= "," if ($cancelIds);
+                $cancelIds .= $value->{VAL};
+            }
+        }
+
+        $usage .= " msgCancel:" . $cancelIds if ($cancelIds);
+        return $usage;
     }
 
     return "Unable to send message: Device is disabled"
@@ -157,6 +166,9 @@ sub Pushover_Set($@) {
 
     return Pushover_SetMessage( $hash, @args )
       if ( $cmd eq 'msg' );
+
+    return Pushover_CancelMessage( $hash, @args )
+      if ( lc($cmd) eq 'msgcancel' );
 }
 
 #------------------------------------------------------------------------------
@@ -558,6 +570,10 @@ sub Pushover_ReceiveCommand($$$) {
                     if ( defined $return->{receipt} ) {
                         readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
                             $return->{receipt} );
+                        readingsBulkUpdate( $hash,
+                            "cbCancelId_" . $values->{cbNr},
+                            $values->{cancel_id} )
+                          if ( defined( $values->{cancel_id} ) );
                     }
                     else {
                         readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
@@ -574,6 +590,32 @@ sub Pushover_ReceiveCommand($$$) {
             elsif ( $values{expire} ne "" ) {
                 $values{result} =
                   "SoftFail: Callback not supported. Please install Perl::JSON";
+            }
+        }
+
+        # receipts/$receipt/cancel.json
+        elsif ( $service =~ /^receipts\/(.*)\/cancel.json$/ ) {
+            my $receipt = $1;
+
+            while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+                if (   $key =~ /^cb_(\d+)$/
+                    && defined( $value->{VAL} )
+                    && $value->{VAL} eq $receipt )
+                {
+                    my $rAct      = "cbAct_" . $1;
+                    my $rAck      = "cbAck_" . $1;
+                    my $rAckAt    = "cbAckAt_" . $1;
+                    my $rAckBy    = "cbAckBy_" . $1;
+                    my $rCancelId = "cbCancelId_" . $1;
+
+                    if ( $param->{code} == 200 ) {
+                        readingsBulkUpdate( $hash, $rAck,   "1" );
+                        readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
+                        readingsBulkUpdate( $hash, $rAckBy, "aborted" );
+                        delete $hash->{READINGS}{$rCancelId}
+                          if ( defined( $hash->{READINGS}{$rCancelId} ) );
+                    }
+                }
             }
         }
 
@@ -683,14 +725,13 @@ sub Pushover_ValidateUser ($;$) {
     }
 
     elsif ( $device ne "" ) {
-        Pushover_SendCommand( $hash, "users/validate.json", "device=$device" );
+        return Pushover_SendCommand( $hash, "users/validate.json",
+            "device=$device" );
     }
 
     else {
-        Pushover_SendCommand( $hash, "users/validate.json" );
+        return Pushover_SendCommand( $hash, "users/validate.json" );
     }
-
-    return;
 }
 
 #------------------------------------------------------------------------------
@@ -949,30 +990,30 @@ sub Pushover_SetMessage {
         }
 
         # cleanup callback readings
-        my $revReadings;
-        while ( ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            if ( $key =~ /^cb_\d+$/ ) {
-                my @rBase  = split( "_", $key );
-                my $rTit   = "cbTitle_" . $rBase[1];
-                my $rMsg   = "cbMsg_" . $rBase[1];
-                my $rPrio  = "cbPrio_" . $rBase[1];
-                my $rAct   = "cbAct_" . $rBase[1];
-                my $rAck   = "cbAck_" . $rBase[1];
-                my $rAckAt = "cbAckAt_" . $rBase[1];
-                my $rAckBy = "cbAckBy_" . $rBase[1];
-                my $rDev   = "cbDev_" . $rBase[1];
+        keys %{ $hash->{READINGS} };
+        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            if ( $key =~ /^cb_(\d+)$/ ) {
+                my $rTit      = "cbTitle_" . $1;
+                my $rMsg      = "cbMsg_" . $1;
+                my $rPrio     = "cbPrio_" . $1;
+                my $rAct      = "cbAct_" . $1;
+                my $rAck      = "cbAck_" . $1;
+                my $rAckAt    = "cbAckAt_" . $1;
+                my $rAckBy    = "cbAckBy_" . $1;
+                my $rCancelId = "cbCancelId_" . $1;
+                my $rDev      = "cbDev_" . $1;
 
                 Log3 $name, 5,
                     "Pushover $name: checking to clean up "
                   . $hash->{NAME}
                   . " $key: time="
-                  . $rBase[1] . " ack="
+                  . $1 . " ack="
                   . ReadingsVal( $name, $rAck, "-" )
                   . " curTime="
                   . int( time() );
 
-                if ( ReadingsVal( $name, $rAck, 0 ) == 1
-                    || $rBase[1] <= int( time() ) )
+                if ( ReadingsVal( $name, $rAck, "0" ) eq "1"
+                    || $1 <= int( time() ) )
                 {
                     delete $hash->{READINGS}{$key};
                     delete $hash->{READINGS}{$rTit};
@@ -981,25 +1022,22 @@ sub Pushover_SetMessage {
                     delete $hash->{READINGS}{$rAck};
                     delete $hash->{READINGS}{$rDev};
 
-                    if ( defined( $hash->{READINGS}{$rAct} ) ) {
-                        delete $hash->{READINGS}{$rAct};
-                    }
-                    if ( defined( $hash->{READINGS}{$rAckAt} ) ) {
-                        delete $hash->{READINGS}{$rAckAt};
-                    }
-                    if ( defined( $hash->{READINGS}{$rAckBy} ) ) {
-                        delete $hash->{READINGS}{$rAckBy};
-                    }
+                    delete $hash->{READINGS}{$rAct}
+                      if ( defined( $hash->{READINGS}{$rAct} ) );
+                    delete $hash->{READINGS}{$rAckAt}
+                      if ( defined( $hash->{READINGS}{$rAckAt} ) );
+                    delete $hash->{READINGS}{$rAckBy}
+                      if ( defined( $hash->{READINGS}{$rAckBy} ) );
+                    delete $hash->{READINGS}{$rCancelId}
+                      if ( defined( $hash->{READINGS}{$rCancelId} ) );
 
                     Log3 $name, 4,
-                      "Pushover $name: cleaned up expired receipt " . $rBase[1];
+                      "Pushover $name: cleaned up expired receipt " . $1;
                 }
             }
         }
 
-        Pushover_SendCommand( $hash, "messages.json", $body, %values );
-
-        return;
+        return Pushover_SendCommand( $hash, "messages.json", $body, %values );
     }
     else {
 
@@ -1053,6 +1091,8 @@ sub Pushover_SetMessage2 ($$$$) {
     $values{url_title} = $h->{url_title} ? $h->{url_title} : "";
     $values{action} =
       $h->{action} ? $h->{action} : ( $h->{url} ? $h->{url} : "" );
+    $values{cancel_id} = $h->{cancel_id}
+      if ( defined( $h->{cancel_id} ) && $values{priority} ge "2" );
 
     # glances only
     if ( $cmd eq "glance" ) {
@@ -1276,30 +1316,30 @@ sub Pushover_SetMessage2 ($$$$) {
         }
 
         # cleanup callback readings
-        my $revReadings;
-        while ( ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            if ( $key =~ /^cb_\d+$/ ) {
-                my @rBase  = split( "_", $key );
-                my $rTit   = "cbTitle_" . $rBase[1];
-                my $rMsg   = "cbMsg_" . $rBase[1];
-                my $rPrio  = "cbPrio_" . $rBase[1];
-                my $rAct   = "cbAct_" . $rBase[1];
-                my $rAck   = "cbAck_" . $rBase[1];
-                my $rAckAt = "cbAckAt_" . $rBase[1];
-                my $rAckBy = "cbAckBy_" . $rBase[1];
-                my $rDev   = "cbDev_" . $rBase[1];
+        keys %{ $hash->{READINGS} };
+        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            if ( $key =~ /^cb_(\d+)$/ ) {
+                my $rTit      = "cbTitle_" . $1;
+                my $rMsg      = "cbMsg_" . $1;
+                my $rPrio     = "cbPrio_" . $1;
+                my $rAct      = "cbAct_" . $1;
+                my $rAck      = "cbAck_" . $1;
+                my $rAckAt    = "cbAckAt_" . $1;
+                my $rAckBy    = "cbAckBy_" . $1;
+                my $rCancelId = "cbCancelId_" . $1;
+                my $rDev      = "cbDev_" . $1;
 
                 Log3 $name, 5,
                     "Pushover $name: checking to clean up "
                   . $hash->{NAME}
                   . " $key: time="
-                  . $rBase[1] . " ack="
+                  . $1 . " ack="
                   . ReadingsVal( $name, $rAck, "-" )
                   . " curTime="
                   . int( time() );
 
-                if ( ReadingsVal( $name, $rAck, 0 ) == 1
-                    || $rBase[1] <= int( time() ) )
+                if ( ReadingsVal( $name, $rAck, "0" ) eq "1"
+                    || $1 <= int( time() ) )
                 {
                     delete $hash->{READINGS}{$key};
                     delete $hash->{READINGS}{$rTit};
@@ -1308,28 +1348,25 @@ sub Pushover_SetMessage2 ($$$$) {
                     delete $hash->{READINGS}{$rAck};
                     delete $hash->{READINGS}{$rDev};
 
-                    if ( defined( $hash->{READINGS}{$rAct} ) ) {
-                        delete $hash->{READINGS}{$rAct};
-                    }
-                    if ( defined( $hash->{READINGS}{$rAckAt} ) ) {
-                        delete $hash->{READINGS}{$rAckAt};
-                    }
-                    if ( defined( $hash->{READINGS}{$rAckBy} ) ) {
-                        delete $hash->{READINGS}{$rAckBy};
-                    }
+                    delete $hash->{READINGS}{$rAct}
+                      if ( defined( $hash->{READINGS}{$rAct} ) );
+                    delete $hash->{READINGS}{$rAckAt}
+                      if ( defined( $hash->{READINGS}{$rAckAt} ) );
+                    delete $hash->{READINGS}{$rAckBy}
+                      if ( defined( $hash->{READINGS}{$rAckBy} ) );
+                    delete $hash->{READINGS}{$rCancelId}
+                      if ( defined( $hash->{READINGS}{$rCancelId} ) );
 
                     Log3 $name, 4,
-                      "Pushover $name: cleaned up expired receipt " . $rBase[1];
+                      "Pushover $name: cleaned up expired receipt " . $1;
                 }
             }
         }
 
-        Pushover_SendCommand( $hash, "messages.json", $body, %values )
+        return Pushover_SendCommand( $hash, "messages.json", $body, %values )
           if ( $cmd eq "msg" );
-        Pushover_SendCommand( $hash, "glances.json", $body, %values )
+        return Pushover_SendCommand( $hash, "glances.json", $body, %values )
           if ( $cmd eq "glance" );
-
-        return;
     }
     else {
 
@@ -1338,6 +1375,34 @@ sub Pushover_SetMessage2 ($$$$) {
         return
 "Syntax: $name msg <text> [ option1=<value> option2='<value with space>' ... ]";
     }
+}
+
+sub Pushover_CancelMessage {
+    my $hash     = shift;
+    my $cancelId = shift;
+    my $name     = $hash->{NAME};
+    my $success  = 0;
+    my $return;
+
+    Log3 $name, 5, "Pushover $name: called function Pushover_CancelMessage()";
+
+    keys %{ $hash->{READINGS} };
+    while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+        if (   $key =~ /^cbCancelId_(\d+)$/
+            && defined( $value->{VAL} )
+            && $value->{VAL} eq $cancelId )
+        {
+            $success = 1;
+            my $receipt = ReadingsVal( $name, "cb_" . $1, $1 );
+
+            $return .= " " if ($return);
+            $return .=
+              Pushover_SendCommand( $hash, "receipts/$receipt/cancel.json" );
+        }
+    }
+
+    return "Invalid cancel_id '$cancelId'" unless ($success);
+    return $return;
 }
 
 #------------------------------------------------------------------------------
@@ -1398,11 +1463,12 @@ sub Pushover_CGI() {
         }
 
         if ( defined( $revReadings{$receipt} ) ) {
-            my $rAct   = "cbAct_" . $revReadings{$receipt};
-            my $rAck   = "cbAck_" . $revReadings{$receipt};
-            my $rAckAt = "cbAckAt_" . $revReadings{$receipt};
-            my $rAckBy = "cbAckBy_" . $revReadings{$receipt};
-            my $rDev   = "cbDev_" . $revReadings{$receipt};
+            my $rAct      = "cbAct_" . $revReadings{$receipt};
+            my $rAck      = "cbAck_" . $revReadings{$receipt};
+            my $rAckAt    = "cbAckAt_" . $revReadings{$receipt};
+            my $rAckBy    = "cbAckBy_" . $revReadings{$receipt};
+            my $rCancelId = "cbCancelId_" . $revReadings{$receipt};
+            my $rDev      = "cbDev_" . $revReadings{$receipt};
 
             return ( "text/plain; charset=utf-8",
                 "NOK " . $receipt . ": invalid argument 'acknowledged'" )
@@ -1417,6 +1483,9 @@ sub Pushover_CGI() {
             if ( ReadingsVal( $name, $rAck, "1" ) eq "0"
                 && $revReadings{$receipt} > int( time() ) )
             {
+                delete $hash->{READINGS}{$rCancelId}
+                  if ( defined( $hash->{READINGS}{$rCancelId} ) );
+
                 readingsBeginUpdate($hash);
 
                 readingsBulkUpdate( $hash, $rAck, "1" );
@@ -1554,8 +1623,9 @@ sub Pushover_CGI() {
     <code><b>action</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text - Either a FHEM command to run when user taps link or a <a href="https://pushover.net/api#urls">supplementary URL</a> to show with your message.<br>
     <code><b>url_title</b>&nbsp;</code> - type: text - A title for your FHEM command or supplementary URL, otherwise just the URL is shown.<br>
     <code><b>priority</b>&nbsp;&nbsp;</code> - type: integer - Send as -2 to generate no notification/alert, -1 to always send as a quiet notification, 1 to display as <a href="https://pushover.net/api#priority">high-priority</a> and bypass the user's quiet hours, or 2 to also require confirmation from the user.<br>
-    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority >= 2.<br>
-    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority >= 2.<br>
+    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority &gt;= 2.<br>
+    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: integer - Mandatory in combination with message priority &gt;= 2.<br>
+    <code><b>cancel_id</b>&nbsp;</code> - type: text - Custom ID to immediate expire messages with priority &gt;=2 and disable reoccuring notification.<br>
     <code><b>timestamp</b>&nbsp;</code> - type: integer - A Unix timestamp of your message's date and time to display to the user, rather than the time your message is received by the Pushover servers. Takes precendence over attribute timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  The name of one of the <a href="https://pushover.net/api#sounds">sounds</a> supported by device clients to override the user's default sound choice.<br>
     <br>
@@ -1574,6 +1644,20 @@ sub Pushover_CGI() {
       <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security issue in living room. sound=siren url_title="Click here for action" action="set device something"</code><br>
     </ul>
     <br>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>msgCancel</b><ul>
+    <code>set &lt;Pushover_device&gt; msgCancel &lt;ID&gt;</code>
+    <br>
+    <br>
+    Prematurely stopps reoccuring confirmation request for messages with priority &gt;= 2.<br>
+    <br>
+    Example:
+    <ul>
+      <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security Alarm in Living room. sound=siren cancel_id=SecurityAlarm</code><br>
+      <code>set Pushover1 cancel SecurityAlarm</code>
+    </ul>   
   </ul></ul>
   <br>
   <br>
@@ -1716,8 +1800,9 @@ sub Pushover_CGI() {
     <code><b>action</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Entweder ein auszuf&uuml;hrendes FHEM Kommando, wenn der Empf&auml;nger den Link anklickt oder eine <a href="https://pushover.net/api#urls">supplementary URL</a>, die mit der Nachricht zusammen angezeigt werden soll.<br>
     <code><b>url_title</b>&nbsp;</code> - Typ: Text - Ein Titel f&uuml;r das FHEM Kommando oder die supplementary URL, andernfalls wird die URL direkt angezeigt.<br>
     <code><b>priority</b>&nbsp;&nbsp;</code> - Type: Integer - Sende mit -2, um keine/n Benachrichtigung/Alarm zu generieren. Sende mit -1, um immer eine lautlose Benachrichtigung zu senden. Sende mit 1, um die Nachricht mit <a href="https://pushover.net/api#priority">hoher Priorit&auml;t</a> anzuzeigen und die Ruhezeiten des Empf&auml;ngers zu umgehen. Oder sende mit 2, um zus&auml;tzlich eine Best&auml;tigung des Empf&auml;ngers anzufordern.<br>
-    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t >= 2.<br>
-    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t >= 2.<br>
+    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
+    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
+    <code><b>cancel_id</b>&nbsp;</code> - type: text - Benutzerdefinierte ID, um Nachrichten mit einer Priorit&auml;t &gt;= 2 sofort ablaufen zu lassen und die wiederholte Benachrichtigung auszuschalten.<br>
     <code><b>timestamp</b>&nbsp;</code> - Type: Integer - Ein Unix Zeitstempfel mit Datum und Uhrzeit deiner Nachricht, die dem Empf&auml;nger statt der Uhrzeit des Einganges auf den Pushover Servern angezeigt wird. Hat Vorrang bei gesetztem Attribut timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Der Name eines vom Empf&auml;ngerger&auml;t unterst&uuml;tzten <a href="https://pushover.net/api#sounds">Klangs</a>, um den vom Empf&auml;nger ausgew&auml;hlten Klang zu &uuml;berschreiben.<br>
     <br>
@@ -1736,6 +1821,20 @@ sub Pushover_CGI() {
       <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer. sound=siren url_title="Hier klicken, um den Befehl auszuf&uuml;hren" action="set device something"</code><br>
     </ul>
     <br>
+  </ul></ul>
+  <br>
+  <br>
+  <ul><b>msgCancel</b><ul>
+    <code>set &lt;Pushover_device&gt; msgCancel &lt;ID&gt;</code>
+    <br>
+    <br>
+    Stoppt vorzeitig die wiederkehrende Aufforderung zur Best&auml;tigung bei Nachrichten mit Priorit&auml;t &gt;= 2.<br>
+    <br>
+    Beispiel:
+    <ul>
+      <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer. sound=siren cancel_id=SicherheitsAlarm</code><br>
+      <code>set Pushover1 cancel SicherheitsAlarm</code>
+    </ul>   
   </ul></ul>
   <br>
   <br>
