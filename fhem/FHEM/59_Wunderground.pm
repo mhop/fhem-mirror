@@ -401,17 +401,19 @@ sub Wunderground_SendCommand($$) {
 
     HttpUtils_NonblockingGet(
         {
-            url     => $URL,
-            timeout => AttrVal( $name, "timeout", "3" ),
-            hash    => $hash,
-            method  => "GET",
-            header  => {
-                agent        => 'FHEM-Wunderground/1.0.0',
-                'User-Agent' => 'FHEM-Wunderground/1.0.0',
-                Accept       => 'application/json',
-            },
-            httpversion => "1.1",
+            url         => $URL,
+            timeout     => AttrVal( $name, "timeout", "3" ),
+            hash        => $hash,
+            method      => "GET",
             callback    => \&Wunderground_ReceiveCommand,
+            httpversion => "1.1",
+            loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
+            header      => {
+                Agent            => 'FHEM-Wunderground/1.0.0',
+                'User-Agent'     => 'FHEM-Wunderground/1.0.0',
+                Accept           => 'application/json;charset=UTF-8',
+                'Accept-Charset' => 'UTF-8',
+            },
         }
     );
 
