@@ -1,22 +1,6 @@
 # $Id$
 ###############################################################################
 #
-# A module to send notifications to Pushover.
-#
-# written        2013 by Johannes B <johannes_b at icloud.com>
-# modified 24.02.2014 by Benjamin Battran <fhem.contrib at benni.achalmblick.de>
-#	-> Added title, device, priority and sound attributes (see documentation below)
-# modified 09.08.2015 by Julian Pawlowski <julian.pawlowski@gmail.com>
-# -> Rewrite for Non-Blocking HttpUtils
-# -> much more readings
-# -> Support for emergency callback via push (see documentation below)
-# -> Support for supplementary URLs incl. push callback (e.g. for priority < 2)
-# -> Added readingFnAttributes to AttrList
-# -> Added support for HTML formatted text
-# -> Added user/group token validation
-#
-###############################################################################
-#
 # Also see API documentation:
 # https://pushover.net/api
 
@@ -28,8 +12,6 @@ use Data::Dumper;
 use HttpUtils;
 use SetExtensions;
 use Encode;
-
-no if $] >= 5.017011, warnings => 'experimental';
 
 my %sets = ( "msg" => 1, "glance" => 1 );
 
@@ -256,16 +238,16 @@ sub Pushover_SendCommand($$;$\%) {
 
         HttpUtils_NonblockingGet(
             {
-                url        => $URL,
-                timeout    => $timeout,
-                noshutdown => $http_noshutdown,
-                data       => undef,
-                hash       => $hash,
-                service    => $service,
-                cmd        => $cmd,
-                type       => $type,
+                url         => $URL,
+                timeout     => $timeout,
+                noshutdown  => $http_noshutdown,
+                data        => undef,
+                hash        => $hash,
+                service     => $service,
+                cmd         => $cmd,
+                type        => $type,
                 httpversion => "1.1",
-                callback   => \&Pushover_ReceiveCommand,
+                callback    => \&Pushover_ReceiveCommand,
             }
         );
 
@@ -1069,9 +1051,12 @@ sub Pushover_SetMessage2 ($$$$) {
             $values{text} = join ' ', @$a;
         }
     }
-    $values{subtext} = $h->{subtext} ? $h->{subtext} : undef;
-    $values{count}   = $h->{count}   ? $h->{count}   : undef;
-    $values{percent} = $h->{percent} ? $h->{percent} : undef;
+    $values{subtext} =
+      defined( $h->{subtext} ) && $h->{subtext} ne "" ? $h->{subtext} : undef;
+    $values{count} =
+      defined( $h->{count} ) && $h->{count} ne "" ? $h->{count} : undef;
+    $values{percent} =
+      defined( $h->{percent} ) && $h->{percent} ne "" ? $h->{percent} : undef;
 
     my $callback = (
         defined( $attr{$name}{callbackUrl} )
@@ -1416,6 +1401,10 @@ sub Pushover_CGI() {
                 "NOK " . $receipt . ": invalid argument 'acknowledged_by'" )
               if ( !defined( $webArgs->{acknowledged_by} )
                 || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
+
+            return ( "text/plain; charset=utf-8",
+                "NOK " . $receipt . ": receipt does not exist" )
+              if ( ReadingsVal( $name, $rAck, "N/A" ) eq "N/A" );
 
             if ( ReadingsVal( $name, $rAck, 1 ) == 0
                 && $rBase[1] > int( time() ) )
