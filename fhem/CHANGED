@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: better shortcut positioning
   - feature: 70_Pushover: new command 'msgCancel' to prematurely cancel
                           confirmation requests for priority 2 messages
   - feature: 00_SONOS: New feature 'get Queue' added

@@ -439,17 +439,19 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><br><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
-  $ret .= "Shortcuts: " if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0) or AttrVal($d,"DOIFtoolsMyShortcuts",""));
+  $ret .= "<div class=\"dval\"><table>";
+  $ret .= "<tr><td><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
+    $ret .= "Shortcuts: ";
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm$FW_CSRF\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update check$FW_CSRF\">update check</a>&nbsp;&nbsp;";
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update$FW_CSRF\">update</a>&nbsp;&nbsp;" if(!ReadingsVal($d,".debug",""));
-    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=set%20update_du:FILTER=state=0%201&fwcsrf=$FW_CSRF\">update</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
+    $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=update$FW_CSRF\">update</a>&nbsp;&nbsp;";
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=shutdown restart$FW_CSRF\">shutdown restart</a>&nbsp;&nbsp;";
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=fheminfo send$FW_CSRF\">fheminfo send</a>&nbsp;&nbsp;";
   }
+  $ret .= "</td></tr>";
   if (AttrVal($d,"DOIFtoolsMyShortcuts","")) {
+  $ret .= "<tr><td>";
     my @sc = split(",",AttrVal($d,"DOIFtoolsMyShortcuts",""));
     for (my $i = 0; $i < @sc; $i+=2) {
       if ($sc[$i] =~ m/^\#\#(.*)/) {
@@ -458,13 +460,16 @@ sub DOIFtools_fhemwebFn($$$$) {
         $ret .= "<a href=\"/$sc[$i+1]$FW_CSRF\">$sc[$i]</a>&nbsp;&nbsp;" if($sc[$i] and $sc[$i+1]);
       }
     }
+    $ret .= "</td></tr>";
   }
+  $ret .= "</table>";
+
   if (!AttrVal($d, "DOIFtoolsHideGetSet", 0)) {
-      $ret .= "<br><br>";
       my $a1 = ReadingsVal($d,"doStatistics", "disabled") =~ "disabled|deleted" ? "enabled" : "disabled"; 
       my $a2 = ReadingsVal($d,"specialLog", 0) ? 0 : 1; 
+      $ret .= "<table ><tr>";
       # set doStatistics enabled/disabled
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">";
       $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
       $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
@@ -472,9 +477,9 @@ sub DOIFtools_fhemwebFn($$$$) {
       <div class=\"set downText\">&nbsp;doStatistics $a1&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
       <input name=\"val.set$d\" value=\"doStatistics $a1\" type=\"hidden\">
-      </div></form>";
+      </div></form></td>";
       # set doStatistics deleted
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">";
       $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
       $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
@@ -482,9 +487,9 @@ sub DOIFtools_fhemwebFn($$$$) {
       <div class=\"set downText\">&nbsp;doStatistics deleted&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
       <input name=\"val.set$d\" value=\"doStatistics deleted\" type=\"hidden\">
-      </div></form>";
+      </div></form></td>";
       # set specialLog 0/1
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">";
       $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
       $ret .= "<input name=\"dev.set$d\" value=\"$d\" type=\"hidden\">
@@ -492,51 +497,52 @@ sub DOIFtools_fhemwebFn($$$$) {
       <div class=\"set downText\">&nbsp;specialLog $a2&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-doStatistics\">
       <input name=\"val.set$d\" value=\"specialLog $a2\" type=\"hidden\">
-      </div></form>";
-      $ret .= "<br><br>";
+      </div></form></td>";
+      $ret .= "</tr><tr>";
       # get statisticsReport
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
       <div class=\"get downText\">&nbsp;statisticsReport&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-statisticsReport\">
       <input name=\"val.get$d\" value=\"statisticsReport\" type=\"hidden\">
-      </div></form>";
+      </div></form></td>";
       # get checkDOIF
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
       <div class=\"get downText\">&nbsp;checkDOIF&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-checkDOIF\">
       <input name=\"val.get$d\" value=\"checkDOIF\" type=\"hidden\">
-      </div></form>";
+      </div></form></td>";
       # get runningTimerInDOIF
-      $ret .= "<form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
+      $ret .= "<td><form method=\"post\" action=\"$FW_ME\" autocomplete=\"off\">
       <input name=\"detail\" value=\"$d\" type=\"hidden\">
       <input name=\"dev.get$d\" value=\"$d\" type=\"hidden\">
       <input name=\"cmd.get$d\" value=\"get\" class=\"get\" type=\"submit\">
       <div class=\"get downText\">&nbsp;runningTimerInDOIF&emsp;</div>
       <div style=\"display:none\" class=\"noArg_widget\" informid=\"$d-runningTimerInDOIF\">
       <input name=\"val.get$d\" value=\"runningTimerInDOIF\" type=\"hidden\">
-      </div></form>";
+      </div></form></td>";
+      $ret .= "</tr></table>";
   }
-  $ret .= "</div><br>";
+  $ret .= "</div>";
   my $a = "";
   if (ReadingsVal($d,".eM","off") eq "on") {
     my $lang = AttrVal("global","language","EN");
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
     # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/doiftools.js\"></script>";
     my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
-    $ret .= "<div><br>";
+    $ret .= "<div><table><tr><td>";
     $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
                 ($a && $a eq "log" ? " checked":"")."></span>".
-          "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, neue Definition erzeugen" : "&emsp;<b>Hint:</b> select event line, choose operand, create definition")."</div>\n";
+          "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, neue Definition erzeugen" : "&emsp;<b>Hint:</b> select event line, choose operand, create definition")."</td></tr></table></div>\n";
     my $embefore = AttrVal($d,"DOIFtoolsEMbeforeReadings","0") ? "1" : "";
-    $ret .= "<div id='doiftoolstype' devtype='doiftools' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'><br>";
+    $ret .= "<div id='doiftoolstype' devtype='doiftools' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'>";
     $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, mit ihnen kann eine neue DOIF-Definition erzeugt werden." : "Selecting an event line displays operands for DOIFs definition, they are used to create a new DOIF definition.")."\"></textarea>";
     $ret .= "</div>";
     $ret .= $DOIFtoolsJSfuncEM;
@@ -1404,9 +1410,9 @@ sub DOIFtools_Get($@)
       }
       $ret .= join(" ",@coll);
       if ($DE) {
-        $ret .= "\n<ul><li><b>DOELSIF</b> ohne <b>DOELSE</b> ist o.k., wenn der Status wechselt, bevor die selbe Bedingung wiederholt wahr wird,<br> andernfalls sollte <b>do always</b> genutzt werden (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">Steuerung durch Events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">Verhalten ohne Attribute</a>)</li></ul> \n" if (@coll);
+        $ret .= "\n<ul><li><b>DOELSEIF</b> ohne <b>DOELSE</b> ist o.k., wenn der Status wechselt, bevor die selbe Bedingung wiederholt wahr wird,<br> andernfalls sollte <b>do always</b> genutzt werden (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">Steuerung durch Events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">Verhalten ohne Attribute</a>)</li></ul> \n" if (@coll);
       } else {
-        $ret .= "\n<ul><li><b>DOELSIF</b> without <b>DOELSE</b> is o.k., if state changes between, the same condition becomes true again,<br>otherwise use attribute <b>do always</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">controlling by events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">behaviour without attributes</a>)</li></ul> \n" if (@coll);
+        $ret .= "\n<ul><li><b>DOELSEIF</b> without <b>DOELSE</b> is o.k., if state changes between, the same condition becomes true again,<br>otherwise use attribute <b>do always</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">controlling by events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">behaviour without attributes</a>)</li></ul> \n" if (@coll);
       }
       foreach my $di (@doifList) {
         $ret .= DOIFtoolsCheckDOIF($hash,$di);
@@ -1543,7 +1549,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         attr DOIFtools DOIFtoolsExecuteDefinition 1<br>
         attr DOIFtools DOIFtoolsExecuteSave 1<br>
         attr DOIFtools DOIFtoolsMenuEntry 1<br>
-        attr DOIFtools DOIFtoolsMyShortcuts ##&lt;br&gt;My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools<br>
+        attr DOIFtools DOIFtoolsMyShortcuts ##My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools<br>
         </code>
     </ul>
 <br>
