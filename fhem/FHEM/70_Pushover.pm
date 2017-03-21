@@ -1656,7 +1656,7 @@ sub Pushover_CGI() {
     Example:
     <ul>
       <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security Alarm in Living room. sound=siren cancel_id=SecurityAlarm</code><br>
-      <code>set Pushover1 cancel SecurityAlarm</code>
+      <code>set Pushover1 msgCancel SecurityAlarm</code>
     </ul>   
   </ul></ul>
   <br>
@@ -1833,7 +1833,7 @@ sub Pushover_CGI() {
     Beispiel:
     <ul>
       <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer. sound=siren cancel_id=SicherheitsAlarm</code><br>
-      <code>set Pushover1 cancel SicherheitsAlarm</code>
+      <code>set Pushover1 msgCancel SicherheitsAlarm</code>
     </ul>   
   </ul></ul>
   <br>
