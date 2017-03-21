@@ -202,6 +202,8 @@ sub monitoring_Attr(@) {
       Log3($SELF, 3, "$hash->{TYPE} ($SELF) attr $SELF disabled");
     }
   }
+
+  return;
 }
 
 sub monitoring_Notify($$) {
