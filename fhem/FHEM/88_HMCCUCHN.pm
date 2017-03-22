@@ -791,7 +791,11 @@ sub HMCCUCHN_SetError ($$)
       	Calculate special values like dewpoint based on datapoints specified in
       	<i>dp-list</i>. The result is stored in <i>reading</i>. The following <i>values</i>
       	are supported:<br/>
-      	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;
+      	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
+      	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,
+      	&lt;humidity&gt;<br/>
+      	Example:<br/>
+      	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
       <li><b>ccuflags {nochn0, trace}</b><br/>
       	Control behaviour of device:<br/>
