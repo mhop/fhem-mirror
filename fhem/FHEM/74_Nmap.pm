@@ -509,7 +509,7 @@ sub Nmap_updateUptime($$;$) {
   my ($hash, $metaReading, $uptime) = @_;
   my $SELF = $hash->{NAME};
 
-  my $uptime =(
+  $uptime =(
       ReadingsVal($SELF, $metaReading."_uptime", 0)
     + ReadingsAge($SELF, $metaReading."_uptime", 0)
   ) unless($uptime);
