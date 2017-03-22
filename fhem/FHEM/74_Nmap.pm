@@ -509,7 +509,7 @@ sub Nmap_updateUptime($$;$) {
   my ($hash, $metaReading, $uptime) = @_;
   my $SELF = $hash->{NAME};
 
-  $uptime =(
+  $uptime = (
       ReadingsVal($SELF, $metaReading."_uptime", 0)
     + ReadingsAge($SELF, $metaReading."_uptime", 0)
   ) unless($uptime);
@@ -774,6 +774,11 @@ sub Nmap_updateUptime($$;$) {
         <code>path</code><br>
         Path under which the Nmap program is to be reached.<br>
         The default is "/urs/bin/nmap".
+      </li><br>
+      <li>
+        <a href="#readingFnAttributes">
+          <u><code>readingFnAttributes</code></u>
+        </a>
       </li><br>
       <li>
         <code>sudo 1</code><br>
@@ -1041,6 +1046,11 @@ sub Nmap_updateUptime($$;$) {
         <code>path</code><br>
         Pfad unter dem das Nmap Programm zu erreichen ist.<br>
         Die Vorgabe ist "/urs/bin/nmap".
+      </li><br>
+      <li>
+        <a href="#readingFnAttributes">
+          <u><code>readingFnAttributes</code></u>
+        </a>
       </li><br>
       <li>
         <code>sudo 1</code><br>
