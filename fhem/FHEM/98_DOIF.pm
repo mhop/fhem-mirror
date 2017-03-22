@@ -74,7 +74,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all setList:textField-long readingList ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList ".$readingFnAttributes;
 }
 
 
@@ -762,6 +762,18 @@ ParseCommandsDoIf($$$)
   return("",$last_error);
 }
 
+sub DOIF_weekdays($$)
+{
+  my ($hash,$weekdays)=@_;
+  my @days=SplitDoIf(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT"));
+  for (my $i=0;$i<@days;$i++)
+  {
+    $weekdays =~ s/$days[$i]/$i/;
+  } 
+  return($weekdays);
+}
+
+
 sub
 DOIF_CheckTimers($$$$)
 {
@@ -842,8 +854,9 @@ DOIF_CheckTimers($$$$)
     $hash->{timeCond}{$nr}=$condition;
     $hash->{days}{$nr}=$days if ($days ne "");
     if ($init_done) {
-      $err=(DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr));
-      return($hash->{time}{$nr},$err) if ($err);
+      DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr); 
+      #$err=(DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr));
+      #return($hash->{time}{$nr},$err) if ($err);
     }
     $hash->{timers}{$condition}.=" $nr " if ($trigger);
   }
@@ -871,6 +884,8 @@ DOIF_time
   my $ret=0;
   my ($hash,$b,$e,$wday,$hms,$days)=@_;
   $days="" if (!defined ($days));
+  return 0 if (!defined $hash->{realtime}{$b});
+  return 0 if (!defined $hash->{realtime}{$e});
   my $begin=$hash->{realtime}{$b};
   my $end=$hash->{realtime}{$e};
   my $err;
@@ -882,6 +897,7 @@ DOIF_time
     readingsSingleUpdate ($hash, "error", $errmsg,0);
     return 0;
   }
+  $days=DOIF_weekdays($hash,$days);
   my $we=DOIF_we($wday);
   if ($end gt $begin) {
     if ($hms ge $begin and $hms lt $end) {
@@ -916,6 +932,7 @@ DOIF_time_once
     readingsSingleUpdate ($hash, "error", $errmsg,0);
     return 0;
   }
+  $days=DOIF_weekdays($hash,$days);
   my $we=DOIF_we($wday);
   if ($flag) {
     return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
@@ -1414,20 +1431,21 @@ DOIF_Notify($$)
     }
   }
  
+  
+  return "" if (!$hash->{helper}{globalinit});
+  return "" if (defined $hash->{helper}{cur_cmd_nr});
+  return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !$hash->{state}{device} and !$hash->{regexp}{all});
+  
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
-    for (my $j=0; $j<$hash->{helper}{last_timer};$j++) { 
+  for (my $j=0; $j<$hash->{helper}{last_timer};$j++) { 
 	  if (CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)) {
-  #  { if (AttrVal($pn, "checkReadingEvent", 0) and CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)
-  #    or !AttrVal($pn, "checkReadingEvent", 0) and $hash->{time}{$j} =~ /\[$dev->{NAME}(\]|:.+\]|,.+\])/) {
         DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
   }
+  
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
-  return "" if (!$hash->{helper}{globalinit});
-  return "" if (defined $hash->{helper}{cur_cmd_nr});
-  return "" if (!$hash->{devices}{all} and !$hash->{state}{device} and !$hash->{regexp}{all});
-    
+  
   if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,-1)){
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
@@ -1480,16 +1498,17 @@ DOIF_TimerTrigger ($)
   my $pn = $hash->{NAME};
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
+  
   my $ret;
   my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
   $hash->{helper}{cur_cmd_nr}="timer $localtime" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
   #$hash->{helper}{cur_cmd_nr}="timer $localtime";
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
-    if ($hash->{localtime}{$j} == $localtime) {
+    if (defined $hash->{localtime}{$j} and $hash->{localtime}{$j} == $localtime) {
       if (defined ($hash->{interval}{$j})) {
         if ($hash->{interval}{$j} != -1) {
-          if ($hash->{realtime}{$j} eq $hash->{realtime}{$hash->{interval}{$j}}) {
+          if (defined $hash->{realtime}{$j} eq $hash->{realtime}{$hash->{interval}{$j}}) {
             $hash->{timer}{$hash->{interval}{$j}}=0;
             next;
           }
@@ -1504,7 +1523,7 @@ DOIF_TimerTrigger ($)
   $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled"); 
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
     $hash->{timer}{$j}=0;
-    if ($hash->{localtime}{$j} == $localtime) {
+    if (defined $hash->{localtime}{$j} and $hash->{localtime}{$j} == $localtime) {
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
           if ($hash->{interval}{$j} != -1) {
@@ -1665,7 +1684,22 @@ DOIF_SetTimer($$$)
   my $timeStr=$hash->{time}{$nr};
   my $cond=$hash->{timeCond}{$nr};
   my $next_time;
-  
+  if (defined ($hash->{localtime}{$nr})) {
+    my $old_lt=$hash->{localtime}{$nr};
+    my $found=0;
+    delete ($hash->{localtime}{$nr});
+    delete ($hash->{realtime}{$nr});
+    foreach my $lt (keys %{$hash->{localtime}}) {
+      if ($hash->{localtime}{$lt} == $old_lt) {
+        $found=1;
+        last;
+      }
+    }
+    if (!$found) {
+      RemoveInternalTimer(\$hash->{triggertime}{$old_lt});
+      delete ($hash->{triggertime}{$old_lt});
+    }    
+  }
   my ($second,$err, $rel)=DOIF_CalcTime($hash,$timeStr);
   my $timernr=sprintf("timer_%02d_c%02d",($nr+1),($cond+1));
   if ($err)
@@ -1673,7 +1707,7 @@ DOIF_SetTimer($$$)
       readingsSingleUpdate ($hash,$timernr,"error: ".$err,AttrVal($hash->{NAME},"timerevent","")?1:0);
       Log3 $hash->{NAME},4 , "$hash->{NAME} ".$timernr." error: ".$err;
       #RemoveInternalTimer($timer);
-      $hash->{realtime}{$nr}="00:00:00";
+      #$hash->{realtime}{$nr} = "00:00:00" if (!defined $hash->{realtime}{$nr});
       return $err;
   }
   
@@ -1705,35 +1739,16 @@ DOIF_SetTimer($$$)
       }
     }
   }
-  #if ($next_time < $now and $isdst_now == $isdst) {
-  #  readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"back to the past is not allowed",AttrVal($hash->{NAME},"timerevent","")?1:0);
-  #  return("timer_".($nr+1)."_c".($cond+1),"back to the past is not allowed");
-  #} else {
   
   my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
   $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
   readingsSingleUpdate ($hash,$timernr,$next_time_str,AttrVal($hash->{NAME},"timerevent","")?1:0);
   $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
-  if (defined ($hash->{localtime}{$nr})) {
-    my $old_lt=$hash->{localtime}{$nr};
-    my $found=0;
-    delete ($hash->{localtime}{$nr});
-    foreach my $lt (keys %{$hash->{localtime}}) {
-      if ($hash->{localtime}{$lt} == $old_lt) {
-        $found=1;
-        last;
-      }
-    }
-    if (!$found) {
-      RemoveInternalTimer(\$hash->{triggertime}{$old_lt});
-      delete ($hash->{triggertime}{$old_lt});
-    }    
-  }
   $hash->{localtime}{$nr}=$next_time;
   if (!defined ($hash->{triggertime}{$next_time})) {
     $hash->{triggertime}{$next_time}{hash}=$hash;
     $hash->{triggertime}{$next_time}{localtime}=$next_time;
-    InternalTimer($next_time, $func, \$hash->{triggertime}{$next_time}, 0);
+	InternalTimer($next_time, $func, \$hash->{triggertime}{$next_time}, 0);
   }  
   return undef;
 }
@@ -2026,6 +2041,8 @@ DOIF_Set($@)
   } elsif ($arg eq "initialize" ) {
       delete ($defs{$hash->{NAME}}{READINGS}{mode});
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
+	  delete ($defs{$hash->{NAME}}{READINGS}{cmd});
+	  delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
       readingsSingleUpdate($hash, "state","initialize",1);
   } elsif ($arg eq "enable" ) {
@@ -2180,12 +2197,21 @@ Dieses Verhalten ist sinnvoll, um zu verhindern, dass zyklisch sendende Sensoren
 <br>
 <u>Einfache Anwendungsbeispiele:</u><ol>
 <br>
-Fernbedienung (Ereignissteuerung): <code>define di_rc_tv DOIF ([remotecontol:"on"]) (set tv on) DOELSE (set tv off)</code><br>
+Fernbedienung (Ereignissteuerung)<br>
 <br>
-Zeitschaltuhr (Zeitsteuerung): <code>define di_clock_radio DOIF ([06:30|8] or [08:30|7]) (set radio on) DOELSEIF ([08:00|8] or [09:30|7]) (set radio off)</code><br>
+<code>define di_rc_tv DOIF ([remotecontol:"on"]) (set tv on) DOELSE (set tv off)</code><br>
 <br>
-Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
+Zeitschaltuhr (Zeitsteuerung)<br>
+<br>
+<code>define di_clock_radio DOIF ([06:30|Mo Di Mi] or [08:30|Do Fr Sa So]) (set radio on) DOELSEIF ([08:00|Mo Di Mi] or [09:30|Do Fr Sa So]) (set radio off)</code><br>
+<br>
+Kombinierte Ereignis- und Zeitsteuerung<br>
+<br>
+<code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 </ol><br>
+Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgelesen werden: 
+<a href="https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Erste_Schritte_mit_DOIF:_Zeit-_und_Ereignissteuerung">Erste Schritte mit DOIF</a><br><br>
+<br>
 <a name="DOIF_Inhaltsuebersicht"></a>
 <b>Inhaltsübersicht</b><br>
 <ul><br>
@@ -2245,6 +2271,9 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
   <a name="DOIF_Attribute"></a>
   <a href="#DOIF_Attribute_kurz"><b>Attribute</b></a><br>
   <ul>
+  <a href="#DOIF_addStateEvent">addStateEvent</a> &nbsp;
+  <a href="#DOIF_checkall">checkall</a> &nbsp;
+  <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
   <a href="#DOIF_cmdpause">cmdpause</a> &nbsp;
   <a href="#DOIF_cmdState">cmdState</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
@@ -2254,19 +2283,16 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
   <a href="#DOIF_notexist">notexist</a> &nbsp;
   <a href="#DOIF_repeatcmd">repeatcmd</a> &nbsp;
   <a href="#DOIF_repeatsame">repeatsame</a> &nbsp;
+  <a href="#DOIF_selftrigger">selftrigger</a> &nbsp;
+  <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
+  <a href="#DOIF_setList__readingList">setList</a> &nbsp;
   <a href="#DOIF_state">state</a> &nbsp;
+  <a href="#DOIF_timerevent">timerevent</a> &nbsp;
   <a href="#DOIF_timerWithWait">timerWithWait</a> &nbsp;
   <a href="#DOIF_wait">wait</a> &nbsp;
   <a href="#DOIF_waitdel">waitdel</a> &nbsp;
   <a href="#DOIF_waitsame">waitsame</a> &nbsp;
-  <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
-  <a href="#DOIF_addStateEvent">addStateEvent</a> &nbsp;
-  <a href="#DOIF_selftrigger">selftrigger</a> &nbsp;
-  <a href="#DOIF_timerevent">timerevent</a> &nbsp;
-  <a href="#DOIF_checkall">checkall</a> &nbsp;
-  <a href="#DOIF_setList__readingList">setList</a> &nbsp;
-  <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
-  
+  <a href="#DOIF_weekdays">weekdays</a> &nbsp;
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
   </ul>
 <br>
@@ -2558,22 +2584,39 @@ attr di_gong do always</code><br>
 <a name="DOIF_Wochentagsteuerung"></a>
 <b>Wochentagsteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Hinter der Zeitangabe kann ein oder mehrere Wochentage als Ziffer getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
+Hinter der Zeitangabe kann ein oder mehrere Wochentage getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
 <br>
 <code>[&lt;time&gt;|012345678]</code> 0-8 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochenende und Feiertage (entspricht $we) und 8 für Arbeitstage (entspricht !$we)<br>
 <br>
-<u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. An Arbeitstagen soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden.<br>
+alternativ mit Buchstaben-Kürzeln:<br>
 <br>
-<code>define di_radio DOIF ([06:30|8] or [08:30|7]) (set radio on) DOELSEIF ([07:30|8] or [09:30|7]) (set radio off)</code><br>
+<code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT]</code> WE entspricht der Ziffer 7 und AT der Ziffer 8<br>
 <br>
-Anstatt einer Zifferkombination kann ein Status oder Reading in eckigen Klammern angegeben werden. Dieser muss zum Triggerzeitpunkt mit der gewünschten Ziffernkombination für Wochentage, wie oben definiert, belegt sein.<br>
+<a name="DOIF_weekdays"></a>
+Mit Hilfe des Attributes <code>weekdays</code> können beliebige Wochentagbezeichnungen definiert werden. Die Syntax lautet:<br>
+<br>
+<code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende&gt;,&lt;Bezeichnung für Arbeitstage&gt;</code><br>
+<br>
+Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag</code><br>
+<br>
+<u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. Am Montag und Mittwoch soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden. Hier mit englischen Bezeichnern:<br>
+<br>
+<code>define di_radio DOIF ([06:30|Mo We] or [08:30|WE]) (set radio on) DOELSEIF ([07:30|Mo We] or [09:30|WE]) (set radio off)</code><br>
+<br>
+<code>attr di_radio weekdays Su,Mo,Tu,We,Th,Fr,Sa,WE,WD</code><br>
+<br>
+Bemerkung: Es ist unerheblich wie die definierten Wochenttagbezeichner beim Timer angegeben werden. Sie können mit beliebigen Trennzeichen oder ohne Trennzeichen direkt aneinander angegeben werden.<br>
+<br>
+Anstatt einer direkten Wochentagangabe, kann ein Status oder Reading in eckigen Klammern angegeben werden. Dieser muss zum Triggerzeitpunkt mit der gewünschten Angabe für Wochentage, wie oben definiert, belegt sein.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Der Wochentag soll über einen Dummy bestimmt werden.<br>
 <br>
-<code>define dummy Wochentag<br>
-set Wochentag 135<br>
+<code>define dummy myweekday<br>
+set myweekday monday wednesday thursday weekend<br>
 <br>
-define di_radio DOIF ([06:30|[Wochentag]]) (set radio on) DOELSEIF ([07:30|[Wochentag]]) (set radio off)</code><br>
+define di_radio DOIF ([06:30|[myweekday]]) (set radio on) DOELSEIF ([07:30|[myweekday]]) (set radio off)<br>
+<br>
+attr di_radio weekdays sunday,monday,thuesday,wednesday,thursday,friday,saturday,weekend,workdays</code><br>
 <br>
 <a name="DOIF_Zeitsteuerung_mit_Zeitintervallen"></a>
 <b>Zeitsteuerung mit Zeitintervallen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -3111,7 +3154,7 @@ Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich festste
 Bei der Abarbeitung der Bedingungen, werden nur die Bedingungen überprüft,
 die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten. Mit dem Attribut <b>checkall</b> lässt sich das Verhalten so verändern,
 dass bei einem Event-Trigger auch Bedingungen geprüft werden, die das triggernde Device nicht beinhalten.
-Folgende Parameter können angebeben werden:<br>
+Folgende Parameter können angegeben werden:<br>
 <br>
 <code>checkall event</code> Es werden alle Bedingungen geprüft, wenn ein Event-Trigger auslöst.<br>
 <code>checkall timer</code> Es werden alle Bedingungen geprüft, wenn ein Timer-Trigger auslöst.<br>
