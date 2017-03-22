@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_Nmap: introducing new module to perform a network scan with
+                Nmap and display information about the available network
+                devices
   - update:  98_DOIFtools: better shortcut positioning
   - feature: 70_Pushover: new command 'msgCancel' to prematurely cancel
                           confirmation requests for priority 2 messages
