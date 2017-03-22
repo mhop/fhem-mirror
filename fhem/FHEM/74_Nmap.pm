@@ -29,7 +29,14 @@ package main;
 
   use Blocking;
 
-  use Nmap::Parser;
+  my $rc = eval{
+    require Nmap::Parser;
+    Nmap::Parser->import();
+    1;
+  };
+
+  return("Error loading Nmap::Parser. Maybe this module is not installed?")
+    unless($rc);
 
 # forward declarations ########################################################
 sub Nmap_Initialize($);
