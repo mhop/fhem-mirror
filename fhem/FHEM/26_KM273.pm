@@ -73,6 +73,7 @@
 #       0011    01.06.2016  mike3436            KM273_ReadElementList           negative min values corrected: value interpretation has to be as signed int64, XDHW_TIME+XDHW_STOP_TEMP added to KM273_gets
 #       0012    02.06.2016  mike3436            KM273_ReadElementList           byte nibbles in extid turned
 #       0013    07.01.2017  mike3436            KM273_gets                      HOLIDAY params added for get/set, cyclic read for some alarms and requests activated in KM273_elements_default
+#       0014    22.03.2017  mike3436            KM273_getsAdd                   add variables for 2nd heating circuit if Attribut HeatCircit2Active is set to 1
 
 package main;
 use strict;
@@ -2171,6 +2172,7 @@ sub KM273_UpdateElements($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME} . ": KM273_UpdateElements";
+    my $name1 = $hash->{NAME};
     Log 3, "$name";
 
     foreach my $element (keys %KM273_elements_default)
@@ -2178,7 +2180,7 @@ sub KM273_UpdateElements($)
         my $text = $KM273_elements_default{$element}{text};
         my $read = $KM273_elements_default{$element}{read};
         my $elem1 = $KM273_ReadElementListElements{$text};
-        if ((!defined $elem1) && ($read != 0))
+        if ((!defined $elem1) && (($read == 1) || (($read == 2) && defined($attr{$name1}{HeatCircuit2Active}) && ($attr{$name1}{HeatCircuit2Active} == 1))))
         {
           my @days = ("1MON","2TUE","3WED","4THU","5FRI","6SAT","7SUN");
           foreach my $day (@days)
@@ -2214,12 +2216,14 @@ sub KM273_CreatePollingList($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME} . ": KM273_CreatePollingList";
+    my $name1 = $hash->{NAME};
     Log 3, "$name";
 
     @KM273_readingsRTR = ();
     foreach my $element (keys %KM273_elements)
     {
         push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if $KM273_elements{$element}{read} == 1;
+        push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if ($KM273_elements{$element}{read} == 2) && defined($attr{$name1}{HeatCircuit2Active}) && ($attr{$name1}{HeatCircuit2Active} == 1);
     }
     foreach my $val (@KM273_readingsRTR)
     {
@@ -2264,6 +2268,7 @@ sub KM273_Initialize($)
                           "ConsoleMessage " .
                           "DoNotPoll " .
                           "ReadBackDelay " .
+                          "HeatCircuit2Active " .
                           $readingFnAttributes;
 }
 
@@ -2273,7 +2278,7 @@ sub KM273_Define($$)
     my $name = $hash->{NAME} . ": KM273_Define";
     Log 5, "$name";
 
-    $hash->{VERSION} = "0013";
+    $hash->{VERSION} = "0014";
     
     my @param = split('[ \t]+', $def);
 
@@ -2321,6 +2326,7 @@ sub KM273_Get($@)
     my $opt = shift @param;
     if(!defined($KM273_gets{$opt})) {
         my @cList = keys %KM273_gets;
+        push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
         return "Unknown argument $opt, choose one of " . join(" ", @cList);
     }
 
@@ -2352,6 +2358,7 @@ sub KM273_Set($@)
 
     if(!defined($KM273_gets{$opt}) && !defined($KM273_writingsTXD{$opt})) {
         my @cList = keys %KM273_gets;
+        push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
         return "Unknown argument $opt, choose one of " . join(" ", @cList);
     }
 
@@ -2839,6 +2846,9 @@ sub CAN_DoInit($)
         <ul>
             <li><i>DoNotPoll</i> 0|1<br>
                 When you set DoNotPoll to "1", the module is only listening to the telegrams on CAN bus. Default is "0".
+            </li>
+            <li><i>HeatCircuit2Active</i> 0|1<br>
+                When you set HeatCircuit2Active to "1", the module read and set also the values for the second heating circuit E12. Default is "0".
             </li>
         </ul>
     </ul>

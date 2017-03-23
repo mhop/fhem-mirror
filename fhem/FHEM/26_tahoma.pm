@@ -42,6 +42,7 @@
 # 2017-01-24 V 0212 start scene with launchActionGroup so cancel is working on scenes now
 # 2017-01-24 V 0212 Attribut interval used to disable or enable refreshAllstates
 # 2017-01-24 V 0212 Setup changes recognized for reading places
+# 2017-03-23 V 0213 username and password stored encrypted
 
 package main;
 
@@ -94,7 +95,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0212";
+  my $ModuleVersion = "0213";
   
   my $subtype;
   my $name = $a[0];
@@ -149,13 +150,15 @@ sub tahoma_Define($$)
   } elsif( $a[2] eq "ACCOUNT" && @a == 5 ) {
     $subtype = "ACCOUNT";
 
-    my $username = $a[@a-2];
-    my $password = $a[@a-1];
+    my $username = tahoma_encrypt($a[@a-2]);
+    my $password = tahoma_encrypt($a[@a-1]);
 
     $hash->{Clients} = ":tahoma:";
 
-    $hash->{username} = $username;
-    $hash->{password} = $password;
+    $hash->{DEF} = "$subtype $username $password";
+
+    $hash->{helper}{username} = $username;
+    $hash->{helper}{password} = $password;
     $hash->{BLOCKING} = 0;
     $hash->{INTERVAL} = 0;
     $hash->{VERSION} = $ModuleVersion;
@@ -229,7 +232,7 @@ sub tahoma_login($)
     noshutdown => 1,
     hash => $hash,
     page => 'login',
-    data => {'userId' => $hash->{username} , 'userPassword'  => $hash->{password}},
+    data => {'userId' => tahoma_decrypt($hash->{helper}{username}) , 'userPassword'  => tahoma_decrypt($hash->{helper}{password})},
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -1428,6 +1431,39 @@ sub tahoma_GetCookies($$)
     
 }
 
+sub tahoma_encrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /^crypt:(.*)/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'. $encoded;
+}
+
+sub tahoma_decrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+  
+  return $decoded;
+}
 
 1;
 
