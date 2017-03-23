@@ -266,10 +266,10 @@ SVG_FwFn($$$$)
   }
 
   my $arg="$FW_ME/SVG_showLog?dev=$d".
-                "&amp;logdev=$hash->{LOGDEVICE}".
-                "&amp;gplotfile=$hash->{GPLOTFILE}".
-                "&amp;logfile=$hash->{LOGFILE}".
-                "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+                "&logdev=$hash->{LOGDEVICE}".
+                "&gplotfile=$hash->{GPLOTFILE}".
+                "&logfile=$hash->{LOGFILE}".
+                "&pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
   if($pm eq "SVG") {
     $ret .= "<div class=\"SVGplot SVG_$d\">";
