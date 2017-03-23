@@ -148,11 +148,10 @@ When starting the server you have to specify a configuration file:<br>
 </ul>
 <br>
 
-A minimal configuration file looks like: <pre>
+A reasonable minimal configuration file looks like: <pre>
     attr global <a href="#logfile">logfile</a> log/fhem.log
     attr global <a href="#modpath">modpath</a> .
     attr global <a href="#statefile">statefile</a> log/fhem.save
-    attr global <a href="#verbose">verbose</a> 3
     define telnetPort <a href="#telnet">telnet</a> 7072 global
     define WEB <a href="#FHEMWEB">FHEMWEB</a> 8083 global</pre>
 
@@ -178,6 +177,9 @@ telnet) or single client command (via fhem.pl). Example:
 <ul>
     <code>fhem.pl &lt;fhemhost&gt;:7072 "&lt;fhem-command&gt" "..."</code>
 </ul>
+<br>
+If a OS-user called fhem exists, and FHEM is started as root, FHEM will
+automatically change to to this user via setuid. <br>
 </ul>
 <!-- intro end - diese Zeile nicht entfernen! -->
 
