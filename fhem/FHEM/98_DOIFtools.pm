@@ -701,11 +701,15 @@ sub DOIFtoolsRg
 }
 # calculate real date in userReadings
 sub DOIFtoolsNextTimer {
-  my ($timer_str) = @_;
-  $timer_str =~ /(\d\d).(\d\d).(\d\d\d\d) (\d\d):(\d\d):(\d\d)\|([0-8]+)/;
-  my $tdays = $7;
-  return "$1.$2.$3 $4:$5:$6" if (length($7)==0); 
+  my ($timer_str,$tn) = @_;
+  $timer_str =~ /(\d\d).(\d\d).(\d\d\d\d) (\d\d):(\d\d):(\d\d)\|?(.*)/;
+  my $tstr = "$1.$2.$3 $4:$5:$6";
+  return $tstr if (length($7) == 0); 
   my $timer = timelocal($6,$5,$4,$1,$2-1,$3);
+  my $tdays = "";
+  $tdays = $tn ? DOIF_weekdays($defs{$tn},$7) : $7;
+  $tdays =~/([0-8])/;
+  return $tstr if (length($1) == 0); 
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($timer);
   my $ilook = 0;
   my $we;
@@ -739,8 +743,8 @@ sub DOIFtoolsNxTimer {
   my $ret = "";
   my @ret;
   foreach my $key (keys %{$thash->{READINGS}}) {
-    if ($key =~ m/^timer_\d\d_c\d\d/ && $thash->{READINGS}{$key}{VAL} =~ m/.*\|[0-8]+/) {
-      $ret = AttrVal($pn,"DOIFtoolsReadingsPrefix","N_")."$key:$key.* \{DOIFtoolsNextTimer(ReadingsVal(\"$tn\",\"$key\",\"none\"))\}";
+    if ($key =~ m/^timer_\d\d_c\d\d/ && $thash->{READINGS}{$key}{VAL} =~ m/\d\d.\d\d.\d\d\d\d \d\d:\d\d:\d\d\|.*/) {
+      $ret = AttrVal($pn,"DOIFtoolsReadingsPrefix","N_")."$key:$key.* \{DOIFtoolsNextTimer(ReadingsVal(\"$tn\",\"$key\",\"none\"),\"$tn\")\}";
       push @ret, $ret if ($ret);
     }
   }
@@ -1221,7 +1225,7 @@ sub DOIFtools_Get($@)
 
   foreach my $i (@doifList) {
     foreach my $key (keys %{$defs{$i}{READINGS}}) {
-      if ($key =~ m/^timer_\d\d_c\d\d/ && $defs{$i}{READINGS}{$key}{VAL} =~ m/.*\|[0-8]+/) {
+      if ($key =~ m/^timer_\d\d_c\d\d/ && $defs{$i}{READINGS}{$key}{VAL} =~ m/\d\d.\d\d.\d\d\d\d \d\d:\d\d:\d\d\|.*/) {
         push @ntL, $i;
         last;
       }
