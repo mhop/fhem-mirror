@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_XiaomiFlowerSens: 1.0.0, add Attribut ssh Support for remote
+                                  call, Atrribut min and max Value for Reading-
+                                  Warnings
   - update:  98_DOIFtools: real next timer handles DOIF's attribute weekdays
   - update:  88_HMCCU: Introducing new client module HMCCURPC.
   - new:     98_Nmap: introducing new module to perform a network scan with
