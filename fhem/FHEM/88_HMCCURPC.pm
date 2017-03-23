@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.7 beta
+#  Version 0.8 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -37,7 +37,11 @@ use SetExtensions;
 
 
 # HMCCU version
-my $HMCCURPC_VERSION = '0.7 beta';
+my $HMCCURPC_VERSION = '0.8 beta';
+
+# Maximum number of errors during TriggerIO()
+my $HMCCURPC_MAX_IOERRORS  = 100;
+my $HMCCURPC_MAX_QUEUESIZE = 500;
 
 # RPC Ports and URL extensions
 my %HMCCURPC_RPC_NUMPORT = (
@@ -137,7 +141,8 @@ sub HMCCURPC_Initialize ($)
 
 	$hash->{AttrList} = "rpcInterfaces:multiple-strict,".join(',',sort keys %HMCCURPC_RPC_PORT).
 		" ccuflags:multiple-strict,expert rpcMaxEvents rpcQueueSize rpcTriggerTime". 
-		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcConnTimeout rpcWaitTime ".
+		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
+		" rpcConnTimeout rpcWaitTime ".
 		$readingFnAttributes;
 }
 
@@ -1070,9 +1075,10 @@ sub HMCCURPC_StartRPCServer ($)
 	my $rpcserverport    = HMCCURPC_GetAttribute ($hash, 'rpcServerPort', 'rpcserverport', 5400);
 	my $ccuflags         = AttrVal ($name, 'ccuflags', 'null');
 	$thrpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout', 0.001);
-	$thrpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout', 1);
+	$thrpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout', 10);
+	$thrpar{acctimeout}  = AttrVal ($name, 'rpcAcceptTimeout', 1);
 	$thrpar{waittime}    = AttrVal ($name, 'rpcWaitTime', 100000);
-	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize', 500);
+	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize', $HMCCURPC_MAX_QUEUESIZE);
 	$thrpar{triggertime} = AttrVal ($name, 'rpcTriggerTime', 10);
 	$thrpar{name}        = $name;
 	
@@ -1463,7 +1469,7 @@ sub HMCCURPC_HandleConnection ($$$$)
 	HMCCURPC_Write ($rpcsrv, "SL", $clkey, $tid);
 	Log3 $name, 2, "CCURPC: $clkey accepting connections. TID=$tid";
 
-	$rpcsrv->{__daemon}->timeout ($thrpar->{conntimeout});
+	$rpcsrv->{__daemon}->timeout ($thrpar->{acctimeout});
 
 	while ($run) {
 		# Next statement blocks for timeout seconds
@@ -1514,7 +1520,7 @@ sub HMCCURPC_TriggerIO ($$$)
 		$err = $!;
 	}
 	elsif ($nf == 0) {
-		$err = "select found no reader";
+		$err = "Select found no reader";
 	}
 	else {
 		my $bytes= syswrite ($fh, "IT|$num_items;");
@@ -1526,13 +1532,7 @@ sub HMCCURPC_TriggerIO ($$$)
 		}
 	}
 	
-	if ($err ne '') {
-		Log3 $thrpar->{name}, 2, "CCURPC: I/O error during data processing ($err)";
-		return 0;
-	}
-	else {
-		return time ();
-	}
+	return (($err eq '') ? time () : 0, $err);
 }
 
 ######################################################################
@@ -1556,6 +1556,7 @@ sub HMCCURPC_ProcessData ($$$$)
 	my $threadname = "DATA";
 	my $run = 1;
 	my $warn = 0;
+	my $ec = 0;
 	my $tid = threads->tid ();
 	
 	$SIG{INT} = sub { $run = 0; };
@@ -1579,9 +1580,18 @@ sub HMCCURPC_ProcessData ($$$$)
 				else {
 					$warn = 0 if ($warn == 1);
 				}
+				
 				# Inform reader about new items in queue
 				Log3 $name, 4, "CCURPC: Trigger I/O for $num_items items";
-				my $ttime = HMCCURPC_TriggerIO ($socket, $num_items, $thrpar);
+				my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, $num_items, $thrpar);
+				if ($ttime == 0) {
+					$ec++;
+					Log3 $name, 2, "CCURPC: I/O error during data processing ($err)" if ($ec == 1);
+					$ec = 0 if ($ec == $HMCCURPC_MAX_IOERRORS);
+				}
+				else {
+					$ec = 0;
+				}
 			}
 		}
 		
@@ -1594,7 +1604,7 @@ sub HMCCURPC_ProcessData ($$$$)
 	
 	# Inform FHEM about the EX event in queue
 	for (my $i=0; $i<10; $i++) {
-		my $ttime = HMCCURPC_TriggerIO ($socket, 1, $thrpar);
+		my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, 1, $thrpar);
 		last if ($ttime > 0);
 		usleep ($thrpar->{waittime});
 	}
@@ -1615,7 +1625,7 @@ sub HMCCURPC_Write ($$$$)
 		my $queue = $server->{hmccu}{eventqueue};
 
 		if (defined ($server->{hmccu}{queuesize}) &&
-			$queue->pending () == $server->{hmccu}{queuesize}) {
+			$queue->pending () >= $server->{hmccu}{queuesize}) {
 			Log3 $name, 1, "CCURPC: $cb maximum queue size reached";
 			return;
 		}
@@ -1804,9 +1814,12 @@ sub HMCCURPC_ListDevicesCB ($$)
 			Set flags for controlling device behaviour. Meaning of flags is:<br/>
 				expert - Activate expert mode<br/>
 		</li><br/>
+		<li><b>rpcAcceptTimeout &lt;seconds&gt;</b><br/>
+			Specify timeout for accepting incoming connections. Default is 1 second. Increase this 
+			value by 1 or 2 seconds on slow systems.
+		</li><br/>
 	   <li><b>rpcConnTimeout &lt;seconds&gt;</b><br/>
-	   	Specify timeout of CCU connection handling. Default is 1 second. Increase this value
-	   	by 1 or 2 seconds on slow systems.
+	   	Specify timeout of CCU connection handling. Default is 10 second.
 	   </li><br/>
 	   <li><b>rpcInterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear }</b><br/>
 	   	Select RPC interfaces. If attribute is missing the corresponding attribute of I/O device

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  88_HMCCURPC: Adjusted network parameters.
   - feature: 74_XiaomiFlowerSens: 1.0.0, add Attribut ssh Support for remote
                                   call, Atrribut min and max Value for Reading-
                                   Warnings
