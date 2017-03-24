@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.009
+#  Version 3.9.010
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -101,7 +101,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.009';
+my $HMCCU_VERSION = '3.9.010';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -359,7 +359,7 @@ sub HMCCU_Define ($$)
 }
 
 ######################################################################
-# Set attribute
+# Set or delete attribute
 ######################################################################
 
 sub HMCCU_Attr ($@)
@@ -528,9 +528,9 @@ sub HMCCU_AggregationRules ($$)
 	return 1;
 }
 
-#####################################
+######################################################################
 # Export default attributes.
-#####################################
+######################################################################
 
 sub HMCCU_ExportDefaults ($)
 {
@@ -617,10 +617,10 @@ sub HMCCU_ImportDefaults ($)
 	return 1;
 }
 
-#####################################
+######################################################################
 # Find default attributes
 # Return template reference.
-#####################################
+######################################################################
 
 sub HMCCU_FindDefaults ($$)
 {
@@ -768,9 +768,9 @@ sub HMCCU_GetDefaults ($$)
 	return $result;	
 }
 
-############################################################
+######################################################################
 # Handle FHEM events
-############################################################
+######################################################################
 
 sub HMCCU_Notify ($$)
 {
@@ -829,9 +829,10 @@ sub HMCCU_Notify ($$)
 	return;
 }
 
-#####################################
-# Calculate reading aggregation
-#####################################
+######################################################################
+# Calculate reading aggregation.
+# Called by Notify or via command get aggregation.
+######################################################################
 
 sub HMCCU_AggregateReadings ($$)
 {
@@ -941,9 +942,9 @@ sub HMCCU_AggregateReadings ($$)
 	return $result;
 }
 
-#####################################
+######################################################################
 # Delete device
-#####################################
+######################################################################
 
 sub HMCCU_Undef ($$)
 {
@@ -964,16 +965,26 @@ sub HMCCU_Undef ($$)
 	return undef;
 }
 
-#####################################
+######################################################################
 # Shutdown FHEM
-#####################################
+######################################################################
 
 sub HMCCU_Shutdown ($)
 {
 	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	
 	# Shutdown RPC server
-	HMCCU_StopRPCServer ($hash);
+	if ($ccuflags =~ /extrpc/) {
+		HMCCU_StopExtRPCServer ($hash);
+	}
+	else {
+		HMCCU_StopRPCServer ($hash);
+	}
+	
+	# Remove existing timer functions
 	RemoveInternalTimer ($hash);
 
 	return undef;
@@ -988,7 +999,8 @@ sub HMCCU_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "var execute hmscript cleardefaults:noArg defaults:noArg importdefaults rpcserver:on,off";
+	my $options = "var execute hmscript cleardefaults:noArg defaults:noArg ".
+		"importdefaults rpcserver:on,off";
 	my $host = $hash->{host};
 
 	if ($opt ne 'rpcserver' && HMCCU_IsRPCStateBlocking ($hash)) {
@@ -1169,9 +1181,9 @@ sub HMCCU_Set ($@)
 	}
 }
 
-#####################################
+######################################################################
 # Get commands
-#####################################
+######################################################################
 
 sub HMCCU_Get ($@)
 {
@@ -1466,7 +1478,7 @@ sub HMCCU_Get ($@)
 	}
 }
 
-##################################################################
+######################################################################
 # Parse CCU object specification.
 # Supports classic Homematic and Homematic-IP addresses.
 # Supports team addresses with leading * for BidCos-RF.
@@ -1482,15 +1494,15 @@ sub HMCCU_Get ($@)
 #   Address:Channel
 #   Channelname
 #
-# If object name doesn't match the rules above object is treated
-# as name.
-# With parameter flags one can specify if result is filled up
-# with default values for interface or datapoint.
+# If object name doesn't match the rules above it's treated as name.
+# With parameter flags one can specify if result is filled up with
+# default values for interface or datapoint.
 #
-# Return list of detected attributes:
+# Return list of detected attributes (empty string if attribute is
+# not detected):
 #   (Interface, Address, Channel, Datapoint, Name, Flags)
 #   Flags is a bitmask of detected attributes.
-##################################################################
+######################################################################
 
 sub HMCCU_ParseObject ($$$)
 {
@@ -1587,11 +1599,11 @@ sub HMCCU_ParseObject ($$$)
 	return ($i, $a, $c, $d, $n, $f);
 }
 
-##################################################################
+######################################################################
 # Filter reading by datapoint and optionally by channel name or
 # channel address.
 # Parameters: hash, channel, datapoint
-##################################################################
+######################################################################
 
 sub HMCCU_FilterReading ($$$)
 {
@@ -1651,7 +1663,7 @@ sub HMCCU_FilterReading ($$$)
 #
 # Valid combinations:
 #
-#   ChannelNam,Datapoint
+#   ChannelName,Datapoint
 #   Address,Datapoint
 #   Address,ChannelNo,Datapoint
 #

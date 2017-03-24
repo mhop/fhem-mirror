@@ -4,16 +4,15 @@
 #
 #  $Id$
 #
-#  Version 0.8 beta
+#  Version 0.9 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
-#  (c) 2017 zap (zap01 <at> t-online <dot> de)
+#  (c) 2017 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #  Requires modules:
 #
-#    88_HMCCU.pm
 #    threads
 #    Thread::Queue
 #    Time::HiRes
@@ -36,12 +35,36 @@ use RPC::XML::Server;
 use SetExtensions;
 
 
-# HMCCU version
-my $HMCCURPC_VERSION = '0.8 beta';
+######################################################################
+# Constants
+######################################################################
 
-# Maximum number of errors during TriggerIO()
+# HMCCURPC version
+my $HMCCURPC_VERSION = '0.9 beta';
+
+# Maximum number of events processed per call of Read()
+my $HMCCURPC_MAX_EVENTS = 50;
+
+# Maximum number of errors during TriggerIO() before log message is written
 my $HMCCURPC_MAX_IOERRORS  = 100;
+
+# Maximum number of elements in queue
 my $HMCCURPC_MAX_QUEUESIZE = 500;
+
+# Time to wait after data processing loop
+my $HMCCURPC_TIME_WAIT = 100000;
+
+# Time to wait before calling TriggerIO() again after I/O error
+my $HMCCURPC_TIME_TRIGGER = 10;
+
+# Timeout for established CCU connection
+my $HMCCURPC_TIMEOUT_CONNECTION = 10;
+
+# Timeout for TriggerIO()
+my $HMCCURPC_TIMEOUT_WRITE = 0.001;
+
+# Timeout for accepting incoming connections
+my $HMCCURPC_TIMEOUT_ACCEPT = 1;
 
 # RPC Ports and URL extensions
 my %HMCCURPC_RPC_NUMPORT = (
@@ -58,7 +81,7 @@ my %HMCCURPC_RPC_URL = (
 
 # Initial intervals for registration of RPC callbacks and reading RPC queue
 #
-# X                      = Start RPC server
+# X                         = Start RPC server
 # X+HMCCURPC_INIT_INTERVAL1 = Register RPC callback
 # X+HMCCURPC_INIT_INTERVAL2 = Read RPC Queue
 #
@@ -67,11 +90,15 @@ my $HMCCURPC_INIT_INTERVAL1 = 7;
 my $HMCCURPC_INIT_INTERVAL2 = 5;
 my $HMCCURPC_INIT_INTERVAL3 = 25;
 
+# Thread type flags
 my $HMCCURPC_THREAD_DATA = 1;
 my $HMCCURPC_THREAD_SERVER = 2;
 my $HMCCURPC_THREAD_ALL = 3;
 
-my $HMCCURPC_MAX_EVENTS = 50;
+
+######################################################################
+# Functions
+######################################################################
 
 # Standard functions
 sub HMCCURPC_Initialize ($);
@@ -120,6 +147,7 @@ sub HMCCURPC_ReplaceDeviceCB ($$$$);
 sub HMCCURPC_ReaddDevicesCB ($$$);
 sub HMCCURPC_EventCB ($$$$$);
 sub HMCCURPC_ListDevicesCB ($$);
+
 
 ######################################################################
 # Initialize module
@@ -361,7 +389,7 @@ sub HMCCURPC_Notify ($$)
 	my $devtype = $devhash->{TYPE};
 
 	my $disable = AttrVal ($name, 'disable', 0);
-	my $rpcserver = AttrVal ($name, 'rpcserver', 'off');
+	my $rpcserver = AttrVal ($name, 'rpcServer', 'off');
 	return if ($disable);
 		
 	my $events = deviceEvents ($devhash, 1);
@@ -1074,12 +1102,12 @@ sub HMCCURPC_StartRPCServer ($)
 	my $localaddr        = HMCCURPC_GetAttribute ($hash, 'rpcServerAddr', 'rpcserveraddr', '');
 	my $rpcserverport    = HMCCURPC_GetAttribute ($hash, 'rpcServerPort', 'rpcserverport', 5400);
 	my $ccuflags         = AttrVal ($name, 'ccuflags', 'null');
-	$thrpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout', 0.001);
-	$thrpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout', 10);
-	$thrpar{acctimeout}  = AttrVal ($name, 'rpcAcceptTimeout', 1);
-	$thrpar{waittime}    = AttrVal ($name, 'rpcWaitTime', 100000);
-	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize', $HMCCURPC_MAX_QUEUESIZE);
-	$thrpar{triggertime} = AttrVal ($name, 'rpcTriggerTime', 10);
+	$thrpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPC_TIMEOUT_WRITE);
+	$thrpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout',   $HMCCURPC_TIMEOUT_CONNECTION);
+	$thrpar{acctimeout}  = AttrVal ($name, 'rpcAcceptTimeout', $HMCCURPC_TIMEOUT_ACCEPT);
+	$thrpar{waittime}    = AttrVal ($name, 'rpcWaitTime',      $HMCCURPC_TIME_WAIT);
+	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize',     $HMCCURPC_MAX_QUEUESIZE);
+	$thrpar{triggertime} = AttrVal ($name, 'rpcTriggerTime',   $HMCCURPC_TIME_TRIGGER);
 	$thrpar{name}        = $name;
 	
 	my $ccunum = $hash->{CCUNum};
@@ -1588,6 +1616,7 @@ sub HMCCURPC_ProcessData ($$$$)
 					$ec++;
 					Log3 $name, 2, "CCURPC: I/O error during data processing ($err)" if ($ec == 1);
 					$ec = 0 if ($ec == $HMCCURPC_MAX_IOERRORS);
+					sleep ($thrpar->{triggertime});
 				}
 				else {
 					$ec = 0;
@@ -1830,6 +1859,11 @@ sub HMCCURPC_ListDevicesCB ($$)
 	   	slows down decrease this value. On a fast system this value can be increased to 100.
 	   	Default value is 50.
 	   </li><br/>
+	   <li><b>rpcQueueSize &lt;count&gt;</b><br/>
+	   	Specify maximum size of event queue. When this limit is reached no more CCU events
+	   	are forwarded to FHEM. In this case increase this attribute or increase attribute
+	   	<b>rpcMaxEvents</b>. Default value is 500.
+	   </li><br/>
 	   <li><b>rpcServer { on | off }</b><br/>
 	   	If set to 'on' start RPC server(s) after FHEM start. Default is 'off'.
 	   </li><br/>
@@ -1844,10 +1878,10 @@ sub HMCCURPC_ListDevicesCB ($$)
 	   	If attribute is missing the corresponding attribute of I/O device (HMCCU device)
 	   	is used. Default value is 5400.
 	   </li><br/>
-	   <li><b>rpcQueueSize &lt;count&gt;</b><br/>
-	   	Specify maximum size of event queue. When this limit is reached no more CCU events
-	   	are forwarded to FHEM. In this case increase this attribute or increase attribute
-	   	<b>rpcMaxEvents</b>. Default value is 500.
+	   <li><b>rpcTriggerTime &lt;seconds&gt;</b><br/>
+	   	Set time to wait before trigger I/O again after I/O error. Default value is 10 seconds.
+	   	On fast systems this value can be set to 5 seconds. Reduces number of log messages
+	   	written if FHEM is busy and not able to read data from CCU.
 	   </li><br/>
 		<li><b>rpcWaitTime &lt;microseconds&gt;</b><br/>
 			Specify time to wait for data processing thread after each loop. Default value is
