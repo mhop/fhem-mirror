@@ -49,17 +49,18 @@ use Net::SIP qw//;
 use Net::SIP::Packet;
 use IO::Socket;
 use Socket;
-use Net::Domain qw( hostfqdn );
+use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.46 / 21.03.17";
+my $sip_version ="V1.47 / 24.03.17";
 my $ua;	# SIP user agent
 my @fifo;
 
 my %sets = (
    "call"         => "",
    "listen:noArg" => "",
+   "reject:noArg"  => "",
    "reset:noArg"  => "",
    "fetch:noArg"  => "",
    "password"     => ""
@@ -95,6 +96,7 @@ sub SIP_Initialize($$)
                           "sip_dtmf_loop:once,loop ".
                           "sip_listen:none,dtmf,wfp ".
                           "sip_filter ".
+                          "sip_blocking ".
                           "T2S_Device ".
                           "T2S_Timeout ".
                           "audio_converter:sox,ffmpeg ".
@@ -106,15 +108,13 @@ sub SIP_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = shift @a;
-  my $host = hostfqdn();
-  my $addr = inet_ntoa(scalar(gethostbyname($host)));
+  my $addr = "0.0.0.0";
 
   $hash->{STATE}              = "defined"; 	
   $hash->{VERSION}            = $sip_version;
   $hash->{".reset"}           = 0;
   $attr{$name}{sip_ringtime}  = '3'         unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
-  $attr{$name}{sip_ip}        = $addr       unless (exists($attr{$name}{sip_ip}));
   $attr{$name}{sip_port}      = '5060'      unless (exists($attr{$name}{sip_port}));
   $attr{$name}{sip_registrar} = 'fritz.box' unless (exists($attr{$name}{sip_registrar}));
   $attr{$name}{sip_listen}    = 'none'      unless (exists($attr{$name}{sip_listen}));
@@ -122,6 +122,18 @@ sub SIP_Define($$)
   $attr{$name}{sip_dtmf_loop} = 'once'      unless (exists($attr{$name}{sip_dtmf_loop}));
   $attr{$name}{sip_dtmf_send} = 'audio'     unless (exists($attr{$name}{sip_dtmf_send}));
   $attr{$name}{sip_from}      = 'sip:'.$attr{$name}{sip_user}.'@'.$attr{$name}{sip_registrar} unless (exists($attr{$name}{sip_from}));
+ 
+  unless (exists($attr{$name}{sip_ip})) 
+  {
+   eval { $addr = inet_ntoa(scalar(gethostbyname(hostfqdn()))); };
+   if ($@)
+   {
+    Log3 $name,2,"$name, please check your FQDN hostname -> $@";
+    eval { $addr = inet_ntoa(scalar(gethostbyname(hostname()))); };
+    Log3 $name,2,"$name, please check your hostname -> ".$@ if ($@);
+   }
+   $attr{$name}{sip_ip} = $addr; 
+  }
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "SIP_updateConfig", $hash);
@@ -513,8 +525,7 @@ sub SIP_CALLDone($)
     my $nr2 = $nr;
     $nr2 =~ tr/0-9//cd;
     CommandDefine(undef, "at_forcecall_".$nr2." at +00:01:00 set $name call $nr $ringtime $msg $force");
-    my $room = AttrVal($name,"room","unsorted");
-    $attr{"at_forcecall_".$nr2}{room} = $room;
+    $attr{"at_forcecall_".$nr2}{room} =  AttrVal($name,"room","unsorted");
     delete $hash->{CALL};
    }
  
@@ -677,6 +688,12 @@ sub SIP_Set($@)
    readingsSingleUpdate($hash, "caller","fetch",1);
    return undef;
   }
+  elsif ($cmd eq "reject")
+  {
+   readingsSingleUpdate($hash, "caller","reject",1);
+   return undef;
+  }
+
   elsif ($cmd eq "reset")
   {
    $hash->{".reset"} = 1;
@@ -756,9 +773,10 @@ sub SIP_ListenStart($)
  my $okloopbye = 0;	# Ende-Flag für recv_bye währne der OK-Ansage
  my $byebye    = 0;	# Anrufer hat aufgelegt
  my $packets   = 50;
+ my $block_it;
 
  my $sub_create;
- my $sub_invite;
+ my $sub_invite_wfp;
  my $sub_filter;
  my $sub_bye;
  my $sub_dtmf;
@@ -840,34 +858,56 @@ sub SIP_ListenStart($)
  $sub_create = sub
  {
   my ($call,$request,$leg,$from) = @_;
-  my $method = $request->method;
-  my $response = $request->create_response( '180','Ringing' );
+  $hash->{call} = $call;
+  $hash->{request} = $request;
+  $hash->{leg} = $leg;
+  $hash->{from} = $from;
+  #my $method = $request->method;
+  my $response = ($block_it) ? $request->create_response('487','Request Terminated') : $request->create_response('180','Ringing');
   $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
   1;
  };
  
- $sub_invite = sub 
+ $sub_invite_wfp = sub 
  {
   my ($a,$b,$c,$d) = @_;
   my $waittime     = int(AttrVal($name, "sip_waittime", 10));
-  my $action;
   my $i;
  
   $packets = 50;
-  for($i=0; $i<$waittime; $i++) 
+  for($i=1; $i<=$waittime; $i++) 
   {
-   SIP_telnet($hash,"set $name caller_state ringing\nexit\n") if (!$i);
+   last if ($block_it); #und gleich wieder weg
+   Log3 $name, 4,"$logname, SIP_invite -> ringing $i";
+   SIP_telnet($hash,"set $name caller_state ringing_$i\nexit\n");
    sleep 1;
    ######## $$$ read state of my device
-   $action = SIP_telnet($hash,"get $name caller\n");
-   Log3 $name, 4,  "$logname, SIP_invite ->ringing $i : $action";
+   my $action = SIP_telnet($hash,"get $name caller\n");
    if ( $action eq "fetch" ) 
    { 
+    Log3 $name, 4,"$logname, SIP_invite fetch !";
     SIP_telnet($hash,"set $name caller_state fetching\nexit\n");
     last; 
    }
+   elsif ( $action eq "reject" ) 
+   { 
+    Log3 $name, 4,"$logname, SIP_invite block !";
+    SIP_telnet($hash,"set $name caller_state rejected\nexit\n");
+    
+    my $call    = $hash->{call};
+    my $request = $hash->{request};
+    my $leg     = $hash->{leg};
+    my $from    = $hash->{from};
+
+    my $response = $request->create_response('603','Declined');
+    $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
+ 
+    last; 
+   }
+
+
   }
-  SIP_telnet($hash, "set $name caller none\nset $name caller_state waiting\nexit\n") if ($i>=$waittime);
+  SIP_telnet($hash, "set $name caller none\nset $name caller_state waiting\nexit\n") if ($i>$waittime);
 
   return 0;
  };
@@ -876,7 +916,8 @@ sub SIP_ListenStart($)
  {
   my ($a,$b) = @_;
   Log3 $name, 5, "$logname, SIP_filter : a:$a | b:$b";
-
+  $block_it  = 0; # 
+ 
   my ($caller,undef)  = split("\;", $a);
   my @callers;
   $caller =~ s/\"//g;
@@ -886,18 +927,30 @@ sub SIP_ListenStart($)
   SIP_telnet($hash, "set $name caller $caller\nexit\n");
 
   my ($callnr,undef)  = split("\@", $caller);
-  # $callnr =~ s/sip://;
+ 
+  my $block = AttrVal($name,"sip_blocking",undef);
+  if (defined($block))
+  {
+    my @blockers = split (/,/,$block); 
+    foreach (@blockers)
+    {
+     if ((index($callnr, $_) > -1) || ($_ eq ".*"))
+     {
+       SIP_telnet($hash,"set $name caller_state blocking\nexit\n");
+       Log3 $name, 4, "$logname, blocking $callnr found on $block";
+       $block_it = 1;
+       #$byebye = 1;
+     }
+    }
+  }
 
   my $filter = AttrVal($name,"sip_filter",undef);
   if (defined($filter))
   {
     @callers = split (/,/,$filter); 
-    foreach (@callers)
-    {
-     #Log3 $name, 5, "$logname, $_ -> $callnr";
-     return 1 if (index($callnr, $_) > -1);
-    }
-    Log3 $name, 5, "$logname, blocking $callnr not found in $filter"; 
+    foreach (@callers) { return 1 if (index($callnr, $_) > -1); }
+    SIP_telnet($hash,"set $name caller_state ignoring\nexit\n");
+    Log3 $name, 4, "$logname, ignoring $callnr number not found in $filter"; 
     return 0;
   }
   return 1;
@@ -928,17 +981,26 @@ sub SIP_ListenStart($)
      $hash->{dtmf}       = 0;
      $hash->{dtmf_event} = "";
      $hash->{old}        ="-";
+  
+     SIP_telnet($hash, "set $name caller none\nset $name caller_state waitting\nexit\n") ;
 
      $ua->listen (cb_create => \&$sub_create,
                   cb_invite =>  sub {
+                                     if (!$block_it)
+                                     {  
                                       SIP_telnet($hash,"set $name caller_state ringing\nexit\n");
                                       sleep int(AttrVal($name, "sip_ringtime", 3)); #Anrufer hört das typische Klingeln wenn die Gegenseite nicht abnimmt
+                                     }
                                     }, 
                    filter   => \&$sub_filter, 
              cb_established => sub { 
                                      (my $status,$call) = @_; 
-                                     SIP_telnet($hash,"set $name caller_state established\nexit\n");
-                                     return 1; 
+                                     if (!$block_it)
+                                          { SIP_telnet($hash,"set $name caller_state established\nexit\n"); return 1; } 
+                                     else { 
+                                            sleep 1;
+                                            #SIP_telnet($hash, "set $name caller none\nset $name caller_state waitting\nexit\n") ;
+                                            return 0; } 
                                    } # sobald invite verlassen wird, wird in cb_established verzweigt
               ); 
      
@@ -983,8 +1045,8 @@ sub SIP_ListenStart($)
          $dtmf_loop = 0; # beende die inner loop 
          $byebye    = 1;
        } 
-        else { $dtmf_loop = (AttrVal($name,"sip_dtmf_loop","once")) ? 0 : 1;
-               SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") if(!$dtmf_loop);
+        else { $dtmf_loop = ((AttrVal($name,"sip_dtmf_loop","once") eq 'once')) ? 0 : 1;
+               SIP_telnet($hash, "set $name caller_state hangup\nexit\n") if(!$dtmf_loop);
              } # führt ggf. zum Schleifenende
      } # end inner loop
 
@@ -1000,7 +1062,7 @@ sub SIP_ListenStart($)
  {
    $ua->listen(
           cb_create => \&$sub_create,
-	  cb_invite => \&$sub_invite, 
+	  cb_invite => \&$sub_invite_wfp, 
 	     filter => \&$sub_filter, 
 	   recv_bye => \&$sub_bye,
          init_media => $ua->rtp('send_recv',($msg3) ? $msg3 : $send_something),
