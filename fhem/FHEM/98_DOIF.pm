@@ -1,6 +1,6 @@
 #############################################
-# $Id$
-# 
+# $Id$# 
+#
 # This file is part of fhem.
 # 
 # Fhem is free software: you can redistribute it and/or modify
@@ -1433,7 +1433,6 @@ DOIF_Notify($$)
  
   
   return "" if (!$hash->{helper}{globalinit});
-  return "" if (defined $hash->{helper}{cur_cmd_nr});
   return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !$hash->{state}{device} and !$hash->{regexp}{all});
   
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
@@ -1444,6 +1443,7 @@ DOIF_Notify($$)
     }
   }
   
+  return "" if (defined $hash->{helper}{cur_cmd_nr});
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
   
   if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,-1)){
