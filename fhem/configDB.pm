@@ -120,6 +120,8 @@
 # 2016-07-04 - fixed     improve config file read
 # 2016-07-07 - bugfix    select configuration
 #
+# 2017-03-24 - added     use index on fhemconfig (only sqlite)
+#
 ##############################################################################
 =cut
 
@@ -261,6 +263,11 @@ sub cfgDB_Init() {
 
 #	create TABLE fhemconfig if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(50), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
+	
+#	create INDEX on fhemconfig if nonexistent (only if SQLITE)
+	$fhem_dbh->do("CREATE INDEX IF NOT EXISTS config_idx on 'fhemconfig' (versionuuid,version)") 
+	           if($cfgDB_dbtype eq "SQLITE");
+		
 #	check TABLE fhemconfig already populated
 	my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	if($count < 1) {
