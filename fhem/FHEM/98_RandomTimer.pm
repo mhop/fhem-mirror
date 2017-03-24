@@ -111,7 +111,7 @@ sub RandomTimer_Define($$)
   readingsSingleUpdate ($hash,  "TimeToSwitch", $hash->{helper}{TIMETOSWITCH}, 1);
   
   myRemoveInternalTimer("SetTimer", $hash);
-  myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);
+  myInternalTimer      ("SetTimer", time(), "RandomTimer_SetTimer", $hash, 0);
 
   return undef;
 }
