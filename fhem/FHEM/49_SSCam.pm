@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 1.42   15.03.2017    camop_nonbl changed to get all cam id's and names
+# 1.41   15.03.2017    minor bugfix of blank character in state "disabled" (row 3383)
 # 1.40   21.01.2017    downgrade of API apicammaxver in SVS 8.0.0
 # 1.39   20.01.2017    compatibility to SVS 8.0.0, Version in Internals, execute getsvsinfo after set credentials
 # 1.37   10.10.2016    bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23)
@@ -156,7 +158,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "1.40";
+my $SSCamVersion = "1.42";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -2205,7 +2207,7 @@ sub login_nonbl ($) {
                         
                         # Downgrades für nicht kompatible API-Versionen
                         Log3($name, 4, "$name - ------- Begin of adaption section -------");
-                        $apiptzmaxver    = 4;
+                        $apiptzmaxver = 4;
                         Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
                         $apicammaxver = 8;
                         Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
@@ -2554,13 +2556,11 @@ sub camop_nonbl ($) {
                 
         if ($success)                                # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
         {             
-             $camcount = $data->{'data'}->{'total'};
              $i = 0;
          
              # Namen aller installierten Kameras mit Id's in Assoziatives Array einlesen
              %allcams = ();
-             while ($i < $camcount) 
-                 {
+             while ($data->{'data'}->{'cameras'}->[$i]) {
                  if ($apicammaxver <= 8) {
 				     $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
 				 } else {
@@ -2569,7 +2569,7 @@ sub camop_nonbl ($) {
                  $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
                  $allcams{"$n"} = "$id";
                  $i += 1;
-                 }
+             }
              
              # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
              if (exists($allcams{$camname})) 
@@ -3379,7 +3379,7 @@ sub camret_nonbl ($) {
                     }
                     elsif ($camStatus eq "7") {
                     $camStatus = "disabled";
-                    readingsSingleUpdate($hash,"state", "disabled ", 0); 
+                    readingsSingleUpdate($hash,"state", "disabled", 0); 
                     }
                     else {
                     $camStatus = "other";
