@@ -854,14 +854,10 @@ if (\$EVTPART0 eq \"stop\") {\
             $nextWakeupDev = "none";
             $nextWakeup    = "OFF";
         }
-        readingsBulkUpdate( $defs{$wakeupUserdevice},
-            "nextWakeupDev", $nextWakeupDev )
-          if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeupDev", 0 ) ne
-            $nextWakeupDev );
-        readingsBulkUpdate( $defs{$wakeupUserdevice},
-            "nextWakeup", $nextWakeup )
-          if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeup", 0 ) ne
-            $nextWakeup );
+        readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
+            "nextWakeupDev", $nextWakeupDev );
+        readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
+            "nextWakeup", $nextWakeup );
         readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     }
@@ -1202,21 +1198,16 @@ sub RESIDENTStk_wakeupRun($;$) {
         $nextWakeupDev = "none";
         $nextWakeup    = "OFF";
     }
-    readingsBulkUpdate( $defs{$wakeupUserdevice},
-        "nextWakeupDev", $nextWakeupDev )
-      if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeupDev", 0 ) ne
-        $nextWakeupDev );
-    readingsBulkUpdate( $defs{$wakeupUserdevice}, "nextWakeup", $nextWakeup )
-      if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeup", 0 ) ne
-        $nextWakeup );
+    readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
+        "nextWakeupDev", $nextWakeupDev );
+    readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
+        "nextWakeup", $nextWakeup );
     readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     if ( $running && $wakeupOffset > 0 ) {
         readingsBeginUpdate( $defs{$NAME} );
-        readingsBulkUpdate( $defs{$NAME}, "running", "1" )
-          if ( ReadingsVal( $NAME, "running", 0 ) ne "1" );
-        readingsBulkUpdate( $defs{$NAME}, "state", "running" )
-          if ( ReadingsVal( $NAME, "state", 0 ) ne "running" );
+        readingsBulkUpdateIfChanged( $defs{$NAME}, "running", "1" );
+        readingsBulkUpdateIfChanged( $defs{$NAME}, "state",   "running" );
         readingsEndUpdate( $defs{$NAME}, 1 );
     }
 

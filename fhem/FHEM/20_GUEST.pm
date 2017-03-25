@@ -624,9 +624,7 @@ sub GUEST_Set($@) {
                 }
 
                 # reset wayhome
-                if ( ReadingsVal( $name, "wayhome", 1 ) > 0 ) {
-                    readingsBulkUpdate( $hash, "wayhome", "0" );
-                }
+                readingsBulkUpdateIfChanged( $hash, "wayhome", "0" );
 
                 # update statistics
                 if ( $newpresence eq "present" ) {
@@ -804,8 +802,7 @@ sub GUEST_Set($@) {
                 {
                     Log3 $name, 3,
                       "GUEST $name: on way back home from $location";
-                    readingsBulkUpdate( $hash, "wayhome", "1" )
-                      if ( ReadingsVal( $name, "wayhome", "0" ) ne "1" );
+                    readingsBulkUpdateIfChanged( $hash, "wayhome", "1" );
                 }
 
                 readingsEndUpdate( $hash, 1 ) if ( !$silent );
@@ -1016,7 +1013,7 @@ sub GUEST_DurationTimer($;$) {
     my $durPresence = "0";
     my $durAbsence  = "0";
     my $durSleep    = "0";
-    my $noDuration  = AttrVal( $hash->{NAME}, "rg_noDuration", 0 );
+    my $noDuration  = AttrVal( $name, "rg_noDuration", 0 );
     delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
 
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
@@ -1064,18 +1061,13 @@ sub GUEST_DurationTimer($;$) {
     my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
 
     readingsBeginUpdate($hash) if ( !$silent );
-    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
-      if ( ReadingsVal( $name, "durTimerPresence_cr", "" ) ne $durPresence_cr );
-    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
-      if ( ReadingsVal( $name, "durTimerPresence", "" ) ne $durPresence_hr );
-    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
-      if ( ReadingsVal( $name, "durTimerAbsence_cr", "" ) ne $durAbsence_cr );
-    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
-      if ( ReadingsVal( $name, "durTimerAbsence", "" ) ne $durAbsence_hr );
-    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
-      if ( ReadingsVal( $name, "durTimerSleep_cr", "" ) ne $durSleep_cr );
-    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
-      if ( ReadingsVal( $name, "durTimerSleep", "" ) ne $durSleep_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence_cr",
+        $durPresence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence",   $durPresence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence_cr", $durAbsence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence",    $durAbsence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep_cr",   $durSleep_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep",      $durSleep_hr );
     readingsEndUpdate( $hash, 1 ) if ( !$silent );
 
     $hash->{DURATIONTIMER} = $timestampNow + 60;
