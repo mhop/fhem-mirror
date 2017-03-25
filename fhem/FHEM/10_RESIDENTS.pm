@@ -1513,7 +1513,7 @@ sub RESIDENTS_UpdateReadings (@) {
     }
 
     # calculate duration timers
-    RESIDENTS_DurationTimer($hash);
+    RESIDENTS_DurationTimer( $hash, 1 );
 }
 
 sub RESIDENTS_DurationTimer($;$) {
