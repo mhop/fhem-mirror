@@ -53,7 +53,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.47 / 24.03.17";
+my $sip_version ="V1.48 / 25.03.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -112,6 +112,7 @@ sub SIP_Define($$)
 
   $hash->{STATE}              = "defined"; 	
   $hash->{VERSION}            = $sip_version;
+  $hash->{NOTIFYDEV}          = "global";
   $hash->{".reset"}           = 0;
   $attr{$name}{sip_ringtime}  = '3'         unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
@@ -144,9 +145,11 @@ sub SIP_Notify($$)
 {
   # $hash is my hash, $dev_hash is the hash of the changed device
   my ($hash, $dev_hash) = @_;
+  my $events = deviceEvents($dev_hash,0);
+
   return undef if ($dev_hash->{NAME} ne AttrVal($hash->{NAME},"T2S_Device",""));
   my $val = ReadingsVal($dev_hash->{NAME},"lastFilename","");
-  return undef if (!$val);
+  return undef if ((!$val) || (index(@{$events}[0],"lastFilename") == -1));
 
    if (defined($hash->{audio1}) || 
        defined($hash->{audio2}) || 
@@ -525,7 +528,7 @@ sub SIP_CALLDone($)
     my $nr2 = $nr;
     $nr2 =~ tr/0-9//cd;
     CommandDefine(undef, "at_forcecall_".$nr2." at +00:01:00 set $name call $nr $ringtime $msg $force");
-    $attr{"at_forcecall_".$nr2}{room} =  AttrVal($name,"room","unsorted");
+    $attr{"at_forcecall_".$nr2}{room} =  AttrVal($name,"room","Unsorted");
     delete $hash->{CALL};
    }
  
@@ -858,11 +861,11 @@ sub SIP_ListenStart($)
  $sub_create = sub
  {
   my ($call,$request,$leg,$from) = @_;
-  $hash->{call} = $call;
+  $hash->{call}    = $call;
   $hash->{request} = $request;
-  $hash->{leg} = $leg;
-  $hash->{from} = $from;
-  #my $method = $request->method;
+  $hash->{leg}     = $leg;
+  $hash->{from}    = $from;
+  Log3 $name,4,"$logname, cb_create : ".$request->method;
   my $response = ($block_it) ? $request->create_response('487','Request Terminated') : $request->create_response('180','Ringing');
   $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
   1;
@@ -877,7 +880,12 @@ sub SIP_ListenStart($)
   $packets = 50;
   for($i=1; $i<=$waittime; $i++) 
   {
-   last if ($block_it); #und gleich wieder weg
+   if ($block_it) #und gleich wieder weg
+   {
+    sleep int(AttrVal($name, "sip_waittime", 2)); # kleine Pause
+    last;
+   }
+
    Log3 $name, 4,"$logname, SIP_invite -> ringing $i";
    SIP_telnet($hash,"set $name caller_state ringing_$i\nexit\n");
    sleep 1;
@@ -907,7 +915,7 @@ sub SIP_ListenStart($)
 
 
   }
-  SIP_telnet($hash, "set $name caller none\nset $name caller_state waiting\nexit\n") if ($i>$waittime);
+  SIP_telnet($hash, "set $name caller none\nset $name caller_state waiting\nexit\n") if (($i>$waittime) || $block_it);
 
   return 0;
  };
