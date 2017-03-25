@@ -50,7 +50,7 @@ sub RESIDENTS_Initialize($) {
     $hash->{AttrFn}   = "RESIDENTS_Attr";
     $hash->{UndefFn}  = "RESIDENTS_Undefine";
     $hash->{AttrList} =
-"disable:1,0 rgr_showAllStates:0,1 rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_lang:EN,DE rgr_wakeupDevice "
+"disable:1,0 rgr_showAllStates:0,1 rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_lang:EN,DE rgr_noDuration:0,1 rgr_wakeupDevice "
       . $readingFnAttributes;
 }
 
@@ -71,6 +71,13 @@ sub RESIDENTS_Define($$) {
         $attr{$name}{room}   = "Residents";
         $attr{$name}{webCmd} = "state";
     }
+
+    # run timers
+    InternalTimer(
+        gettimeofday() + 15,
+        "RESIDENTS_StartInternalTimers",
+        $hash, 0
+    );
 
     # Injecting AttrFn for use with RESIDENTS Toolkit
     if ( !defined( $modules{dummy}{AttrFn} ) ) {
@@ -94,10 +101,24 @@ sub RESIDENTS_Attr(@) {
     Log3 $name, 5, "RESIDENTS $name: called function RESIDENTS_Attr()";
 
     if ( $attribute eq "disable" ) {
-        $hash->{STATE} = "disabled"
-          if ( $value and $value == 1 );
-        evalStateFormat($hash)
-          if ( $cmd eq "del" or !$value );
+        if ( $value and $value == 1 ) {
+            $hash->{STATE} = "disabled";
+            RESIDENTS_StopInternalTimers($hash);
+        }
+        elsif ( $cmd eq "del" or !$value ) {
+            evalStateFormat($hash);
+            RESIDENTS_StartInternalTimers( $hash, 1 );
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "noDuration" ) {
+        if ($value) {
+            delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+            RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+        }
+        elsif ( !$value ) {
+            RESIDENTS_DurationTimer($hash);
+        }
     }
 
     elsif ( $attribute eq $prefix . "lang" ) {
@@ -151,6 +172,7 @@ sub RESIDENTS_Attr(@) {
 sub RESIDENTS_Undefine($$) {
     my ( $hash, $name ) = @_;
 
+    RESIDENTS_StopInternalTimers($hash);
     RESIDENTStk_findResidentSlaves($hash);
 
     # delete child roommates
@@ -1142,226 +1164,154 @@ sub RESIDENTS_UpdateReadings (@) {
     }
 
     # update counter
-    readingsBulkUpdate( $hash, "residentsTotal", $state_total )
-      if ( ReadingsVal( $name, "residentsTotal", "" ) ne $state_total );
+    readingsBulkUpdateIfChanged( $hash, "residentsTotal", $state_total );
 
-    readingsBulkUpdate( $hash, "residentsTotalGuests", $state_totalGuests )
-      if ( ReadingsVal( $name, "residentsTotalGuests", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalGuests",
         $state_totalGuests );
 
-    readingsBulkUpdate( $hash, "residentsTotalGuestsPresent",
-        $state_totalGuestsPresent )
-      if ( ReadingsVal( $name, "residentsTotalGuestsPresent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalGuestsPresent",
         $state_totalGuestsPresent );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalGuestsPresentDevs",
         $residentsDevs_totalPresentGuest
-      )
-      if ( ReadingsVal( $name, "residentsTotalGuestsPresentDevs", "" ) ne
-        $residentsDevs_totalPresentGuest );
+    );
 
-    readingsBulkUpdate( $hash, "residentsTotalGuestsPresentNames",
-        $residents_totalPresentGuest )
-      if ( ReadingsVal( $name, "residentsTotalGuestsPresentNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalGuestsPresentNames",
         $residents_totalPresentGuest );
 
-    readingsBulkUpdate( $hash, "residentsTotalGuestsAbsent",
-        $state_totalGuestsAbsent )
-      if ( ReadingsVal( $name, "residentsTotalGuestsAbsent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalGuestsAbsent",
         $state_totalGuestsAbsent );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalGuestsAbsentDevs",
         $residentsDevs_totalAbsentGuest
-      )
-      if ( ReadingsVal( $name, "residentsTotalGuestsAbsentDevs", "" ) ne
-        $residentsDevs_totalAbsentGuest );
+    );
 
-    readingsBulkUpdate( $hash, "residentsTotalGuestsAbsentNames",
-        $residents_totalAbsentGuest )
-      if ( ReadingsVal( $name, "residentsTotalGuestsAbsentNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalGuestsAbsentNames",
         $residents_totalAbsentGuest );
 
-    readingsBulkUpdate( $hash, "residentsTotalRoommates",
-        $state_totalRoommates )
-      if ( ReadingsVal( $name, "residentsTotalRoommates", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalRoommates",
         $state_totalRoommates );
 
-    readingsBulkUpdate( $hash, "residentsTotalRoommatesPresent",
-        $state_totalRoommatesPresent )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesPresent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalRoommatesPresent",
         $state_totalRoommatesPresent );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalRoommatesPresentDevs",
         $residentsDevs_totalPresentRoommates
-      )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesPresentDevs", "" ) ne
-        $residentsDevs_totalPresentRoommates );
+    );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalRoommatesPresentNames",
         $residents_totalPresentRoommates
-      )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesPresentNames", "" ) ne
-        $residents_totalPresentRoommates );
+    );
 
-    readingsBulkUpdate( $hash, "residentsTotalRoommatesAbsent",
-        $state_totalRoommatesAbsent )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesAbsent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalRoommatesAbsent",
         $state_totalRoommatesAbsent );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalRoommatesAbsentDevs",
         $residentsDevs_totalAbsentRoommates
-      )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesAbsentDevs", "" ) ne
-        $residentsDevs_totalAbsentRoommates );
+    );
 
-    readingsBulkUpdate(
+    readingsBulkUpdateIfChanged(
         $hash,
         "residentsTotalRoommatesAbsentNames",
         $residents_totalAbsentRoommates
-      )
-      if ( ReadingsVal( $name, "residentsTotalRoommatesAbsentNames", "" ) ne
-        $residents_totalAbsentRoommates );
+    );
 
-    readingsBulkUpdate( $hash, "residentsTotalPresent", $state_totalPresent )
-      if ( ReadingsVal( $name, "residentsTotalPresent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPresent",
         $state_totalPresent );
 
-    readingsBulkUpdate( $hash, "residentsTotalPresentDevs",
-        $residentsDevs_totalPresent )
-      if ( ReadingsVal( $name, "residentsTotalPresentDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPresentDevs",
         $residentsDevs_totalPresent );
 
-    readingsBulkUpdate( $hash, "residentsTotalPresentNames",
-        $residents_totalPresent )
-      if ( ReadingsVal( $name, "residentsTotalPresentNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalPresentNames",
         $residents_totalPresent );
 
-    readingsBulkUpdate( $hash, "residentsTotalAbsent", $state_totalAbsent )
-      if ( ReadingsVal( $name, "residentsTotalAbsent", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalAbsent",
         $state_totalAbsent );
 
-    readingsBulkUpdate( $hash, "residentsTotalAbsentDevs",
-        $residentsDevs_totalAbsent )
-      if ( ReadingsVal( $name, "residentsTotalAbsentDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalAbsentDevs",
         $residentsDevs_totalAbsent );
 
-    readingsBulkUpdate( $hash, "residentsTotalAbsentNames",
-        $residents_totalAbsent )
-      if ( ReadingsVal( $name, "residentsTotalAbsentNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalAbsentNames",
         $residents_totalAbsent );
 
-    readingsBulkUpdate( $hash, "residentsHome", $state_home )
-      if ( ReadingsVal( $name, "residentsHome", "" ) ne $state_home );
+    readingsBulkUpdateIfChanged( $hash, "residentsHome", $state_home );
 
-    readingsBulkUpdate( $hash, "residentsHomeDevs", $residentsDevs_home )
-      if (
-        ReadingsVal( $name, "residentsHomeDevs", "" ) ne $residentsDevs_home );
+    readingsBulkUpdateIfChanged( $hash, "residentsHomeDevs",
+        $residentsDevs_home );
 
-    readingsBulkUpdate( $hash, "residentsHomeNames", $residents_home )
-      if ( ReadingsVal( $name, "residentsHomeNames", "" ) ne $residents_home );
+    readingsBulkUpdateIfChanged( $hash, "residentsHomeNames", $residents_home );
 
-    readingsBulkUpdate( $hash, "residentsGotosleep", $state_gotosleep )
-      if ( ReadingsVal( $name, "residentsGotosleep", "" ) ne $state_gotosleep );
+    readingsBulkUpdateIfChanged( $hash, "residentsGotosleep",
+        $state_gotosleep );
 
-    readingsBulkUpdate( $hash, "residentsGotosleepDevs",
-        $residentsDevs_gotosleep )
-      if ( ReadingsVal( $name, "residentsGotosleepDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsGotosleepDevs",
         $residentsDevs_gotosleep );
 
-    readingsBulkUpdate( $hash, "residentsGotosleepNames", $residents_gotosleep )
-      if ( ReadingsVal( $name, "residentsGotosleepNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsGotosleepNames",
         $residents_gotosleep );
 
-    readingsBulkUpdate( $hash, "residentsAsleep", $state_asleep )
-      if ( ReadingsVal( $name, "residentsAsleep", "" ) ne $state_asleep );
+    readingsBulkUpdateIfChanged( $hash, "residentsAsleep", $state_asleep );
 
-    readingsBulkUpdate( $hash, "residentsAsleepDevs", $residentsDevs_asleep )
-      if ( ReadingsVal( $name, "residentsAsleepDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsAsleepDevs",
         $residentsDevs_asleep );
 
-    readingsBulkUpdate( $hash, "residentsAsleepNames", $residents_asleep )
-      if (
-        ReadingsVal( $name, "residentsAsleepNames", "" ) ne $residents_asleep );
+    readingsBulkUpdateIfChanged( $hash, "residentsAsleepNames",
+        $residents_asleep );
 
-    readingsBulkUpdate( $hash, "residentsAwoken", $state_awoken )
-      if ( ReadingsVal( $name, "residentsAwoken", "" ) ne $state_awoken );
-
-    readingsBulkUpdate( $hash, "residentsAwokenDevs", $residentsDevs_awoken )
-      if ( ReadingsVal( $name, "residentsAwokenDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsAwoken", $state_awoken );
+    readingsBulkUpdateIfChanged( $hash, "residentsAwokenDevs",
         $residentsDevs_awoken );
 
-    readingsBulkUpdate( $hash, "residentsAwokenNames", $residents_awoken )
-      if (
-        ReadingsVal( $name, "residentsAwokenNames", "" ) ne $residents_awoken );
+    readingsBulkUpdateIfChanged( $hash, "residentsAwokenNames",
+        $residents_awoken );
 
-    readingsBulkUpdate( $hash, "residentsAbsent", $state_absent )
-      if ( ReadingsVal( $name, "residentsAbsent", "" ) ne $state_absent );
-
-    readingsBulkUpdate( $hash, "residentsAbsentDevs", $residentsDevs_absent )
-      if ( ReadingsVal( $name, "residentsAbsentDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsAbsent", $state_absent );
+    readingsBulkUpdateIfChanged( $hash, "residentsAbsentDevs",
         $residentsDevs_absent );
 
-    readingsBulkUpdate( $hash, "residentsAbsentNames", $residents_absent )
-      if (
-        ReadingsVal( $name, "residentsAbsentNames", "" ) ne $residents_absent );
+    readingsBulkUpdateIfChanged( $hash, "residentsAbsentNames",
+        $residents_absent );
 
-    readingsBulkUpdate( $hash, "residentsGone", $state_gone )
-      if ( ReadingsVal( $name, "residentsGone", "" ) ne $state_gone );
+    readingsBulkUpdateIfChanged( $hash, "residentsGone", $state_gone );
 
-    readingsBulkUpdate( $hash, "residentsGoneDevs", $residentsDevs_gone )
-      if (
-        ReadingsVal( $name, "residentsGoneDevs", "" ) ne $residentsDevs_gone );
+    readingsBulkUpdateIfChanged( $hash, "residentsGoneDevs",
+        $residentsDevs_gone );
 
-    readingsBulkUpdate( $hash, "residentsGoneNames", $residents_gone )
-      if ( ReadingsVal( $name, "residentsGoneNames", "" ) ne $residents_gone );
+    readingsBulkUpdateIfChanged( $hash, "residentsGoneNames", $residents_gone );
 
-    readingsBulkUpdate( $hash, "residentsTotalWakeup", $wakeup )
-      if ( ReadingsVal( $name, "residentsTotalWakeup", "" ) ne $wakeup );
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWakeup", $wakeup );
 
-    readingsBulkUpdate( $hash, "residentsTotalWakeupDevs",
-        $residentsDevs_wakeup )
-      if ( ReadingsVal( $name, "residentsTotalWakeupDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWakeupDevs",
         $residentsDevs_wakeup );
 
-    readingsBulkUpdate( $hash, "residentsTotalWakeupNames", $residents_wakeup )
-      if ( ReadingsVal( $name, "residentsTotalWakeupNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWakeupNames",
         $residents_wakeup );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhome", $wayhome )
-      if ( ReadingsVal( $name, "residentsTotalWayhome", "" ) ne $wayhome );
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhome", $wayhome );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhomeDevs",
-        $residentsDevs_wayhome )
-      if ( ReadingsVal( $name, "residentsTotalWayhomeDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhomeDevs",
         $residentsDevs_wayhome );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhomeNames",
-        $residents_wayhome )
-      if ( ReadingsVal( $name, "residentsTotalWayhomeNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhomeNames",
         $residents_wayhome );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayed", $wayhomeDelayed )
-      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayed", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhomeDelayed",
         $wayhomeDelayed );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayedDevs",
-        $residentsDevs_wayhomeDelayed )
-      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayedDevs", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhomeDelayedDevs",
         $residentsDevs_wayhomeDelayed );
 
-    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayedNames",
-        $residents_wayhomeDelayed )
-      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayedNames", "" ) ne
+    readingsBulkUpdateIfChanged( $hash, "residentsTotalWayhomeDelayedNames",
         $residents_wayhomeDelayed );
 
     #
@@ -1561,6 +1511,98 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
     }
+
+    # calculate duration timers
+    RESIDENTS_DurationTimer($hash);
+}
+
+sub RESIDENTS_DurationTimer($;$) {
+    my ( $mHash, @a ) = @_;
+    my $hash         = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name         = $hash->{NAME};
+    my $silent       = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
+    my $timestampNow = gettimeofday();
+    my $diff;
+    my $durPresence = "0";
+    my $durAbsence  = "0";
+    my $durSleep    = "0";
+    my $noDuration  = AttrVal( $name, "rgr_noDuration", 0 );
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+
+    return if ( IsDisabled($name) || $noDuration );
+
+    # presence timer
+    if (   ReadingsVal( $name, "presence", "absent" ) eq "present"
+        && ReadingsVal( $name, "lastArrival", "-" ) ne "-" )
+    {
+        $durPresence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastArrival", "" ) );
+    }
+
+    # absence timer
+    if (   ReadingsVal( $name, "presence", "present" ) eq "absent"
+        && ReadingsVal( $name, "lastDeparture", "-" ) ne "-" )
+    {
+        $durAbsence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastDeparture", "" ) );
+    }
+
+    # sleep timer
+    if (   ReadingsVal( $name, "state", "home" ) eq "asleep"
+        && ReadingsVal( $name, "lastSleep", "-" ) ne "-" )
+    {
+        $durSleep =
+          $timestampNow - time_str2num( ReadingsVal( $name, "lastSleep", "" ) );
+    }
+
+    my $durPresence_hr =
+      ( $durPresence > 0 )
+      ? RESIDENTStk_sec2time($durPresence)
+      : "00:00:00";
+    my $durPresence_cr =
+      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+    my $durAbsence_hr =
+      ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
+    my $durAbsence_cr =
+      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+    my $durSleep_hr =
+      ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
+    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+
+    readingsBeginUpdate($hash) if ( !$silent );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence_cr",
+        $durPresence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence",   $durPresence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence_cr", $durAbsence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence",    $durAbsence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep_cr",   $durSleep_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep",      $durSleep_hr );
+    readingsEndUpdate( $hash, 1 ) if ( !$silent );
+
+    $hash->{DURATIONTIMER} = $timestampNow + 60;
+
+    RESIDENTStk_InternalTimer( "DurationTimer", $hash->{DURATIONTIMER},
+        "RESIDENTS_DurationTimer", $hash, 1 );
+
+    return undef;
+}
+
+sub RESIDENTS_StartInternalTimers($$) {
+    my ($hash) = @_;
+
+    RESIDENTS_DurationTimer($hash);
+}
+
+sub RESIDENTS_StopInternalTimers($) {
+    my ($hash) = @_;
+
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 }
 
 1;
@@ -1663,6 +1705,9 @@ sub RESIDENTS_UpdateReadings (@) {
         <ul>
           <li>
             <b>rgr_lang</b> - overwrite global language setting; helps to set device attributes to translate FHEMWEB display text
+          </li>
+          <li>
+            <b>rgr_noDuration</b> - may be used to disable continuous, non-event driven duration timer calculation (see readings durTimer*)
           </li>
           <li>
             <b>rgr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0
@@ -2035,6 +2080,9 @@ sub RESIDENTS_UpdateReadings (@) {
         <ul>
           <li>
             <b>rgr_lang</b> - &uuml;berschreibt globale Spracheinstellung; hilft beim setzen von Device Attributen, um FHEMWEB Anzeigetext zu &uuml;bersetzen
+          </li>
+          <li>
+            <b>rgr_noDuration</b> - deaktiviert die kontinuierliche, nicht Event-basierte Berechnung der Zeitspannen (siehe Readings durTimer*)
           </li>
           <li>
             <b>rgr_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0
