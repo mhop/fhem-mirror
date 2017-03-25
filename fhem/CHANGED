@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  32_withings: account data encryption
   - update:  38_netatmo: dynamic interval, various fixes, logging changes
   - feature: 75_MSG: add support for parseParams
   - feature: 10_RESIDENTS: add new durTimer* readings, similar to

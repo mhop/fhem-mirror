@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 02 / 2017-02-27
+# Release 03 / 2017-03-26
 
 package main;
 
@@ -76,7 +76,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       14 => { name => "unknown 14", reading => "unknown14", }, #device? event home - peak sound level?
                       15 => { name => "Noise (dB)", reading => "noise", },
                       18 => { name => "Weight Objective Speed", reading => "weightObjectiveSpeed", },
-                      19 => { name => "Breastfeeding (sec)", reading => "breast", }, #baby
+                      19 => { name => "Breastfeeding (s)", reading => "breastfeeding", }, #baby
                       20 => { name => "Bottle (ml)", reading => "bottle", }, #baby
                       22 => { name => "BMI", reading => "bmi", }, #user? goals
                       35 => { name => "CO2 (ppm)", reading => "co2", },
@@ -123,7 +123,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       87 => { name => "Active Calories (kcal)", reading => "caloriesActive", dailyreading => "dailyCaloriesActive", }, # measures list sleepreading!
                       88 => { name => "Bone Mass (kg)", reading => "boneMassWeight", },
                       89 => { name => "unknown 89", reading => "unknown89", },
-                      90 => { name => "unknown 90", reading => "unknown90", },
+                      90 => { name => "unknown 90", reading => "unknown90", }, #pulse
                       91 => { name => "Pulse Wave Velocity (m/s)", reading => "pulseWave", }, # new weight
                       93 => { name => "Muscle Mass (%)", reading => "muscleRatio", }, # cardio scale
                       94 => { name => "Bone Mass (%)", reading => "boneRatio", }, # cardio scale
@@ -233,15 +233,19 @@ my %timeline_classes = (  'noise_detected' => { name => "Noise", reading => "ale
                           'snapshot' => { name => "Snapshot", reading => "alertSnapshot", unit => 0, },
                           );
 
-my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading => "sleepDurationLight", unit => 0, },
-                        'deepsleepduration' => { name => "Deep Sleep", reading => "sleepDurationDeep", unit => 0, },
-                        'remsleepduration' => { name => "REM Sleep", reading => "sleepDurationREM", unit => 0, },
-                        'wakeupduration' => { name => "Awake In Bed", reading => "sleepDurationAwake", unit => 0, },
+my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading => "sleepDurationLight", unit => "s", },
+                        'deepsleepduration' => { name => "Deep Sleep", reading => "sleepDurationDeep", unit => "s", },
+                        'remsleepduration' => { name => "REM Sleep", reading => "sleepDurationREM", unit => "s", },
+                        'wakeupduration' => { name => "Awake In Bed", reading => "sleepDurationAwake", unit => "s", },
                         'wakeupcount' => { name => "Wakeup Count", reading => "wakeupCount", unit => 0, },
-                        'durationtosleep' => { name => "Duration To Sleep", reading => "durationToSleep", unit => 0, },
-                        'durationtowakeup' => { name => "Duration To Wake Up", reading => "durationToWakeUp", unit => 0, },
+                        'durationtosleep' => { name => "Duration To Sleep", reading => "durationToSleep", unit => "s", },
+                        'durationtowakeup' => { name => "Duration To Wake Up", reading => "durationToWakeUp", unit => "s", },
                         'sleepscore' => { name => "Sleep Score", reading => "sleepScore", unit => 0, },
                         'wsdid' => { name => "wsdid", reading => "wsdid", unit => 0, },
+                        'hr_resting' => { name => "Resting HR", reading => "heartrateResting", unit => "bpm", },
+                        'hr_min' => { name => "Minimum HR", reading => "heartrateMinimum", unit => "bpm", },
+                        'hr_average' => { name => "Average HR", reading => "heartrateAverage", unit => "bpm", },
+                        'hr_max' => { name => "Maximum HR", reading => "heartrateMaximum", unit => "bpm", },
                         );
 
 my %alarm_sound = (  0 => "Unknown",
@@ -353,19 +357,25 @@ sub withings_Define($$) {
   } elsif( @a == 4  || ($a[2] eq "ACCOUNT" && @a == 5 ) ) {
     $subtype = "ACCOUNT";
 
-    my $login = $a[@a-2];
-    my $password = $a[@a-1];
+    my $user = $a[@a-2];
+    my $pass = $a[@a-1];
+
+    my $username = withings_encrypt($user);
+    my $password = withings_encrypt($pass);
+    Log3 $name, 3, "$name: encrypt $user/$pass to $username/$password";
+
+    #$hash->{DEF} =~ s/$user/$username/g;
+    #$hash->{DEF} =~ s/$pass/$password/g;
+    $hash->{DEF} = "$username $password";
 
     $hash->{Clients} = ":withings:";
 
-    $hash->{Login} = $login;
-    $hash->{Password} = $password;
-    $hash->{appliver} = undef;
-    $hash->{csrf_token} = undef;
+    $hash->{helper}{username} = $username;
+    $hash->{helper}{password} = $password;
+    $hash->{helper}{appliver} = undef;
+    $hash->{helper}{csrf_token} = undef;
   } else {
-    return "Usage: define <name> withings device\
-       define <name> withings userid publickey\
-       define <name> withings [ACCOUNT] login password"  if(@a < 3 || @a > 5);
+    return "Usage: define <name> withings ACCOUNT <login> <password>"  if(@a < 3 || @a > 5);
   }
 
   $hash->{NAME} = $name;
@@ -494,7 +504,7 @@ sub withings_getToken($) {
   $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
   my $once = $json->{body}{once};
   $hash->{Once} = $once;
-  my $hashstring = $hash->{Login}.':'.md5_hex($hash->{Password}).':'.$once;
+  my $hashstring = withings_decrypt($hash->{helper}{username}).':'.md5_hex(withings_decrypt($hash->{helper}{password})).':'.$once;
   $hash->{Hash} = md5_hex($hashstring);
 }
 
@@ -517,7 +527,7 @@ sub withings_getSessionKey($) {
   $hash->{'.https'} = "https" if(!defined($hash->{'.https'}));
 
   my $data1;
-  if( !defined($hash->{appliver}) || !defined($hash->{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{appliver}) || !defined($hash->{csrf_token}))
+  if( !defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}))
   {
     my($err0,$data0) = HttpUtils_BlockingGet({
       url => $hash->{'.https'}."://healthmate.withings.com/",
@@ -531,32 +541,32 @@ sub withings_getSessionKey($) {
     }
     $data1 = $data0;
     $data0 =~ /appliver=([^.*]+)\&/;
-    $hash->{appliver} = $1;
-    if(!defined($hash->{appliver})) {
+    $hash->{helper}{appliver} = $1;
+    if(!defined($hash->{helper}{appliver})) {
       Log3 "withings", 1, "$name: APPLIVER ERROR ";
       $hash->{STATE} = "APPLIVER error";
       return undef;
     }
-    Log3 "withings", 4, "$name: appliver ".$hash->{appliver};
+    Log3 "withings", 4, "$name: appliver ".$hash->{helper}{appliver};
   #}
 
 
-  #if( !defined($hash->{csrf_token}) )
+  #if( !defined($hash->{helper}{csrf_token}) )
   #{
     $data1 =~ /csrf_token" value="(.*)"/;
-    $hash->{csrf_token} = $1;
+    $hash->{helper}{csrf_token} = $1;
     
-    if(!defined($hash->{csrf_token})) {
+    if(!defined($hash->{helper}{csrf_token})) {
       Log3 "withings", 1, "$name: CSRF ERROR ";
       $hash->{STATE} = "CSRF error";
       return undef;
     }
-    Log3 "withings", 4, "$name: csrf_token ".$hash->{csrf_token};
+    Log3 "withings", 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
   }
 
     #my $ua = LWP::UserAgent->new;
-    #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://account.withings.com/connectionuser/account_login?appname=my2&appliver='.$hash->{appliver}.'&r=https%3A%2F%2Fhealthmate.withings.com%2F',[email => $hash->{Login}, password => $hash->{Password}, is_admin => '',]);
-    #my $get_data = 'use_authy=&is_admin=&email='.uri_escape($hash->{Login}).'&password='.uri_escape($hash->{Password});
+    #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://account.withings.com/connectionuser/account_login?appname=my2&appliver='.$hash->{helper}{appliver}.'&r=https%3A%2F%2Fhealthmate.withings.com%2F',[email => withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => '',]);
+    #my $get_data = 'use_authy=&is_admin=&email='.uri_escape(withings_decrypt($hash->{helper}{username})).'&password='.uri_escape(withings_decrypt($hash->{helper}{password}));
     #$request->content($get_data);
     #my $response = $ua->request($request);
 
@@ -568,11 +578,11 @@ sub withings_getSessionKey($) {
     }
 
   my $datahash = {
-    url => $hash->{'.https'}."://account.withings.com/connectionuser/account_login?appname=my2&appliver=".$hash->{appliver}."&r=https%3A%2F%2Fhealthmate.withings.com%2F",
+    url => $hash->{'.https'}."://account.withings.com/connectionuser/account_login?appname=my2&appliver=".$hash->{helper}{appliver}."&r=https%3A%2F%2Fhealthmate.withings.com%2F",
     timeout => 10,
     noshutdown => 1,
     ignoreredirects => 1,
-    data => { email=> $hash->{Login}, password => $hash->{Password}, is_admin => '', csrf_token => $hash->{csrf_token} },
+    data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => '', csrf_token => $hash->{helper}{csrf_token} },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
@@ -597,8 +607,8 @@ sub withings_getSessionKey($) {
     {
       $hash->{STATE} = "Cookie error";
       Log3 "withings", 1, "$name: COOKIE ERROR ";
-      $hash->{appliver} = undef;
-      $hash->{csrf_token} = undef;
+      $hash->{helper}{appliver} = undef;
+      $hash->{helper}{csrf_token} = undef;
       return undef;
     }
   }
@@ -609,7 +619,7 @@ sub withings_getSessionKey($) {
       url => $hash->{'.https'}."://healthmate.withings.com/index/service/account",
       timeout => 10,
       noshutdown => 1,
-      data => {sessionid => $hash->{SessionKey}, appname => 'my2', appliver=> $hash->{appliver}, apppfm => 'web', action => 'get'},
+      data => {sessionid => $hash->{SessionKey}, appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'get'},
     });
     return undef if(!defined($data));
 
@@ -620,7 +630,7 @@ sub withings_getSessionKey($) {
 
       foreach my $account (@{$json->{body}{account}}) {
           next if( !defined($account->{id}) );
-          if($account->{email} eq $hash->{Login})
+          if($account->{email} eq withings_decrypt($hash->{helper}{username}))
           {
             $hash->{AccountID} = $account->{id};
           }
@@ -729,6 +739,81 @@ sub withings_connect($) {
 }
 
 
+sub withings_autocreate($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 "withings", 5, "$name: autocreate";
+
+  $hash->{'.https'} = "https";
+  $hash->{'.https'} = "http" if( AttrVal($name, "nossl", 0) );
+
+
+  withings_getSessionKey( $hash );
+
+  my $autocreated = 0;
+
+  my $users = withings_getUsers($hash);
+  foreach my $user (@{$users}) {
+    if( defined($modules{$hash->{TYPE}}{defptr}{"U$user->{id}"}) ) {
+      Log3 $name, 2, "$name: user '$user->{id}' already defined";
+      next;
+    }
+    next if($user->{firstname} eq "Repository-User");
+
+    my $id = $user->{id};
+    my $devname = "withings_U". $id;
+    my $define= "$devname withings $id $user->{publickey}";
+
+    Log3 $name, 2, "$name: create new device '$devname' for user '$id'";
+
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$user->{shortname});
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
+      $cmdret= CommandAttr(undef,"$devname room Withings");
+
+      $autocreated++;
+    }
+  }
+
+
+  my $devices = withings_getDevices($hash);
+  foreach my $device (@{$devices}) {
+    if( defined($modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"}) ) {
+      my $d = $modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"};
+      $d->{association} = $device->{association} if($device->{association});
+
+      Log3 $name, 2, "$name: device '$device->{deviceid}' already defined";
+      next;
+    }
+
+
+    my $detail = $device->{deviceproperties};
+    next if( !defined($detail->{id}) );
+
+    my $id = $detail->{id};
+    my $devname = "withings_D". $id;
+    my $define= "$devname withings $id";
+
+    Log3 $name, 2, "$name: create new device '$devname' for device '$id'";
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$device_types{$detail->{type}}) if( defined($device_types{$detail->{type}}) );
+      $cmdret= CommandAttr(undef,"$devname alias ".$device_models{$detail->{type}}->{$detail->{model}}) if( defined($device_models{$detail->{type}}) && defined($device_models{$detail->{type}}->{$detail->{model}}) );
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
+      $cmdret= CommandAttr(undef,"$devname room Withings");
+
+      $autocreated++;
+    }
+  }
+
+  CommandSave(undef,undef) if( $autocreated && AttrVal( "autocreate", "autosave", 1 ) );
+}
+
 
 
 sub withings_initDevice($) {
@@ -833,12 +918,12 @@ sub withings_getUsers($) {
     url => $hash->{'.https'}."://healthmate.withings.com/index/service/account",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , recurse_use => '1', recurse_devtype => '1', listmask => '5', allusers => 't' , appname => 'my2', appliver=> $hash->{appliver}, apppfm => 'web', action => 'getuserslist'},
+    data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , recurse_use => '1', recurse_devtype => '1', listmask => '5', allusers => 't' , appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'getuserslist'},
   });
 
   #my $ua = LWP::UserAgent->new;
   #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://healthmate.withings.com/index/service/account');
-  #my $get_data = 'sessionid='.$hash->{SessionKey}.'&accountid='.$hash->{AccountID}.'&recurse_use=1&recurse_devtype=1&listmask=5&allusers=t&appname=my2&appliver='.$hash->{appliver}.'&apppfm=web&action=getuserslist';
+  #my $get_data = 'sessionid='.$hash->{SessionKey}.'&accountid='.$hash->{AccountID}.'&recurse_use=1&recurse_devtype=1&listmask=5&allusers=t&appname=my2&appliver='.$hash->{helper}{appliver}.'&apppfm=web&action=getuserslist';
   #$request->content($get_data);
   #my $response = $ua->request($request);
   return undef if(!defined($data));
@@ -869,12 +954,12 @@ sub withings_getDevices($) {
     url => $hash->{'.https'}."://healthmate.withings.com/index/service/association",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , type => '-1', enrich => 't' , appname => 'my2', appliver=> $hash->{appliver}, apppfm => 'web', action => 'getbyaccountid'},
+    data => {sessionid => $hash->{SessionKey}, accountid => $hash->{AccountID} , type => '-1', enrich => 't' , appname => 'my2', appliver=> $hash->{helper}{appliver}, apppfm => 'web', action => 'getbyaccountid'},
   });
 
   #my $ua = LWP::UserAgent->new;
   #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://healthmate.withings.com/index/service/association');
-  #my $get_data = 'sessionid='.$hash->{SessionKey}.'&accountid='.$hash->{AccountID}.'&type=-1&enrich=t&appname=my2&appliver='.$hash->{appliver}.'&apppfm=web&action=getbyaccountid';
+  #my $get_data = 'sessionid='.$hash->{SessionKey}.'&accountid='.$hash->{AccountID}.'&type=-1&enrich=t&appname=my2&appliver='.$hash->{helper}{appliver}.'&apppfm=web&action=getbyaccountid';
   #$request->content($get_data);
   #my $response = $ua->request($request);
   return undef if(!defined($data));
@@ -2063,7 +2148,7 @@ sub withings_parseVasistas($$;$) {
           }
           if($updatetype eq "duration")
           {
-            Log3 $name, 1, "$name: Duration skipped ".$updatetime.'  '.$updatetype.': '.$updatevalue if($updatevalue > 90);
+            Log3 $name, 4, "$name: Duration skipped ".$updatetime.'  '.$updatetype.': '.$updatevalue if($updatevalue > 90);
             $newlastupdate = $readingsdate if($readingsdate > $newlastupdate);
             next;
           }
@@ -2372,7 +2457,7 @@ sub withings_Get($$@) {
       return undef;
     }
   } elsif( $hash->{SUBTYPE} eq "ACCOUNT" ) {
-    $list = "users:noArg devices:noArg";
+    $list = "users:noArg devices:noArg showAccount:noArg";
 
     if( $cmd eq "users" ) {
       my $users = withings_getUsers($hash);
@@ -2384,7 +2469,8 @@ sub withings_Get($$@) {
       $ret = "id\tshort\tpublickey\t\tname\n" . $ret if( $ret );;
       $ret = "no users found" if( !$ret );
       return $ret;
-    } elsif( $cmd eq "devices" ) {
+    }
+    if( $cmd eq "devices" ) {
       my $devices = withings_getDevices($hash);
       my $ret;
       foreach my $device (@{$devices}) {
@@ -2396,6 +2482,20 @@ sub withings_Get($$@) {
       $ret = "no devices found" if( !$ret );
       return $ret;
     }
+    if( $cmd eq 'showAccount' )
+    {
+      my $username = $hash->{helper}{username};
+      my $password = $hash->{helper}{password};
+
+      return 'no username set' if( !$username );
+      return 'no password set' if( !$password );
+
+      $username = withings_decrypt( $username );
+      $password = withings_decrypt( $password );
+
+      return "username: $username\npassword: $password";
+    }
+
   }
 
   return "Unknown argument $cmd, choose one of $list";
@@ -2454,9 +2554,11 @@ sub withings_Set($$@) {
       return withings_setAuraAlarm($hash,$cmd,join( ":", @arg ));
     }
     return "Unknown argument $cmd, choose one of $list";
-  }
-  else
-  {
+  } elsif($hash->{SUBTYPE} eq "ACCOUNT") {
+    $list = "autocreate:noArg";
+    return withings_autocreate($hash) if($cmd eq "autocreate");
+    return "Unknown argument $cmd, choose one of $list";
+  } else {
     return "Unknown argument $cmd, choose one of $list";
   }
 }
@@ -3007,6 +3109,43 @@ sub withings_Dispatch($$$) {
   }
 }
 
+
+
+sub withings_encrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /crypt:/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'.$encoded;
+}
+
+sub withings_decrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  return $encoded if( $encoded !~ /crypt:/ );
+  
+  $encoded = $1 if( $encoded =~ /crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+
+  return $decoded;
+}
 
 
 
