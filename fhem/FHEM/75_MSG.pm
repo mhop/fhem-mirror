@@ -23,14 +23,19 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+#
+#TODO
+# - advanced options as attribute in JSON or parseParams format
+# - allow ? to recipients to soft-fail if they are not configured or not
+#   reachable via msg
+# - implement default messages in RESIDENTS using msg command
+#
 
 package main;
 use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Data::Dumper;
-
-no if $] >= 5.017011, warnings => 'experimental';
 
 sub CommandMsg($$;$$);
 
@@ -77,37 +82,37 @@ sub CommandMsg($$;$$) {
     # default settings
     my $cmdSchema = msgSchema::get();
     my $settings  = {
-        'audio' => {
-            'typeEscalation' => {
-                'gwUnavailable'  => 'text',
-                'emergency'      => 'text',
-                'residentGone'   => 'text',
-                'residentAbsent' => 'text',
+        audio => {
+            typeEscalation => {
+                gwUnavailable  => 'text',
+                emergency      => 'text',
+                residentGone   => 'text',
+                residentAbsent => 'text',
             },
         },
 
-        'light' => {
-            'typeEscalation' => {
-                'gwUnavailable'  => 'audio',
-                'emergency'      => 'audio',
-                'residentGone'   => 'audio',
-                'residentAbsent' => 'audio',
+        light => {
+            typeEscalation => {
+                gwUnavailable  => 'audio',
+                emergency      => 'audio',
+                residentGone   => 'audio',
+                residentAbsent => 'audio',
             },
         },
 
-        'push' => {
-            'typeEscalation' => {
-                'gwUnavailable' => 'mail',
-                'emergency'     => 'mail',
+        push => {
+            typeEscalation => {
+                gwUnavailable => 'mail',
+                emergency     => 'mail',
             },
         },
 
-        'screen' => {
-            'typeEscalation' => {
-                'gwUnavailable'  => 'light',
-                'emergency'      => 'light',
-                'residentGone'   => 'light',
-                'residentAbsent' => 'light',
+        screen => {
+            typeEscalation => {
+                gwUnavailable  => 'light',
+                emergency      => 'light',
+                residentGone   => 'light',
+                residentAbsent => 'light',
             },
         },
     };
@@ -116,16 +121,47 @@ sub CommandMsg($$;$$) {
     ### extract message details
     ###
 
-    my $types      = "";
-    my $recipients = "";
-    my $priority   = "";
-    my $title      = "-";
-    my $advanced   = "";
+    my ( $msgA, $params ) = parseParams($msg);
 
+    # only use output from parseParams when
+    # parameters where found
+    if ( ref($params) eq "HASH" && keys %$params ) {
+        if ( scalar @$msgA > 0 ) {
+            $msg = join( " ", @$msgA );
+        }
+        else {
+            $msg = "";
+        }
+    }
+
+    if ( defined( $params->{msgText} ) ) {
+        Log3 $globalDevName, 5,
+          "msg: Adding message text from given user parameters";
+        $msg .= " " unless ( $msg eq "" );
+        $msg .= $params->{msgText};
+        delete $params->{msgText};
+    }
+
+    return $return
+      . "Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>"
+      if ( $msg =~ m/^[\s\t\n ]*$/ );
+
+    Log3 $globalDevName, 5, "msg: Extracted user parameters\n" . Dumper($params)
+      if ( ref($params) eq "HASH" && keys %$params );
+
+    my $types       = "";
+    my $recipients  = "";
+    my $priority    = "";
+    my $title       = "-";
     my $priorityCat = "";
 
     # check for message types
-    if ( $msg =~
+    if ( $params->{msgType} ) {
+        Log3 $globalDevName, 5, "msg: given types=$params->{msgType}";
+        $types = $params->{msgType};
+        delete $params->{msgType};
+    }
+    elsif ( $msg =~
 s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
       )
     {
@@ -135,7 +171,13 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
 
     # programatic exception:
     # e.g. recipients were given automatically from empty readings
-    if ( $msg =~ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+// ) {
+    if (
+        $msg =~ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+//
+        || (   $params->{msgRcpt}
+            && $params->{msgRcpt} =~
+            m/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+/ )
+      )
+    {
         Log3 $globalDevName, 4,
             "msg: message won't be sent - recipient '$1' contains special"
           . " characters like ',-:|' or behind the @ character is simply"
@@ -147,7 +189,12 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
     }
 
     # check for given recipients
-    if ( $msg =~
+    if ( $params->{msgRcpt} ) {
+        Log3 $globalDevName, 5, "msg: given recipient=$params->{msgRcpt}";
+        $recipients = $params->{msgRcpt};
+        delete $params->{msgRcpt};
+    }
+    elsif ( $msg =~
 s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
       )
     {
@@ -156,18 +203,28 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     }
 
     # check for given priority
-    if ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[.\d]*)[\s\t]*// ) {
+    if ( defined( $params->{msgPrio} ) ) {
+        Log3 $globalDevName, 5, "msg: given priority=$params->{msgPrio}";
+        $priority = $params->{msgPrio};
+        delete $params->{msgPrio};
+    }
+    elsif ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[.\d]*)[\s\t]*// ) {
         Log3 $globalDevName, 5, "msg: found priority=$1";
         $priority = $1;
     }
 
     # check for given message title
-    if ( $msg =~ s/^[\s\t]*\|(.*?)\|[\s\t]*// ) {
+    if ( defined( $params->{msgTitle} ) ) {
+        Log3 $globalDevName, 5, "msg: given title=$params->{msgTitle}";
+        $title = $params->{msgTitle};
+        delete $params->{msgTitle};
+    }
+    elsif ( $msg =~ s/^[\s\t]*\|(.*?)\|[\s\t]*// ) {
         Log3 $globalDevName, 5, "msg: found title=$1";
         $title = $1;
     }
 
-    # check for advanced options
+    # check for user parameters (DEPRECATED / legacy compatibility only)
     if ( $msg =~ s/[\s\t]*O(\[\{.*\}\])[\s\t]*$// ) {
 
         Log3 $globalDevName, 5, "msg: found options=$1";
@@ -177,21 +234,33 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
             require JSON;
             import JSON qw( decode_json );
         };
-        if ( !$@ ) {
-            eval '$advanced = decode_json( Encode::encode_utf8($1) ); 1';
-            if ( !$@ ) {
-                Log3 $globalDevName, 5,
-                  "msg: Decoded advanced options\n" . Dumper($advanced);
-            }
-            else {
-                Log3 $globalDevName, 5,
-                  "msg: Error decoding JSON for advanced options";
-                $advanced = "";
-            }
+        if ($@) {
+            Log3 $globalDevName, 3,
+"msg: To use user parameters in message text, please install Perl JSON.";
         }
         else {
-            Log3 $globalDevName, 3,
-              "msg: To use advanced options, please install Perl JSON.";
+            my $o;
+            eval '$o = decode_json( Encode::encode_utf8($1) ); 1';
+            if ($@) {
+                Log3 $globalDevName, 5,
+                  "msg: Error decoding JSON for user parameters: $@";
+            }
+            elsif ( ref($o) eq "ARRAY" ) {
+
+                for my $item (@$o) {
+                    next unless ( ref($item) eq "HASH" );
+                    for my $key ( keys(%$item) ) {
+                        next if ( ref( $item->{$key} ) );
+                        my $val = $item->{$key};
+                        $params->{$key} = $item->{$key}
+                          unless ( $params->{$key} );
+                    }
+                }
+
+                Log3 $globalDevName, 5,
+                  "msg: Decoded user parameters\n" . Dumper($params)
+                  if ($params);
+            }
         }
     }
 
@@ -243,7 +312,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
             # check for correct type
             my @msgCmds =
               ( "screen", "light", "audio", "text", "push", "mail" );
-            if ( !( $type[$i] ~~ @msgCmds ) ) {
+            if ( !grep { $type[$i] eq $_ } @msgCmds ) {
                 $return .= "Unknown message type $type[$i]\n";
                 next;
             }
@@ -988,8 +1057,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push+mail";
-                            push @type, "push" if !( "push" ~~ @type );
-                            push @type, "mail" if !( "mail" ~~ @type );
+                            push @type, "push" if !grep { "push" eq $_ } @type;
+                            push @type, "mail" if !grep { "mail" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 1
@@ -1000,7 +1069,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !( "push" ~~ @type );
+                            push @type, "push" if !grep { "push" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 0
@@ -1011,7 +1080,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !( "mail" ~~ @type );
+                            push @type, "mail" if !grep { "mail" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextNormal
                             && $routes{push} == 1 )
@@ -1021,7 +1090,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !( "push" ~~ @type );
+                            push @type, "push" if !grep { "push" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextNormal
                             && $routes{mail} == 1 )
@@ -1031,7 +1100,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !( "mail" ~~ @type );
+                            push @type, "mail" if !grep { "mail" eq $_ } @type;
                         }
                         elsif ( $routes{mail} == 1 ) {
                             Log3 $logDevice, 4,
@@ -1039,7 +1108,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !( "mail" ~~ @type );
+                            push @type, "mail" if !grep { "mail" eq $_ } @type;
                         }
                         elsif ( $routes{push} == 1 ) {
                             Log3 $logDevice, 4,
@@ -1047,7 +1116,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !( "push" ~~ @type );
+                            push @type, "push" if !grep { "push" eq $_ } @type;
                         }
 
                         # FATAL ERROR: routing decision failed
@@ -1961,17 +2030,19 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $cmd =~ s/%TERMINAL%/$termRecipient/gi
                               if ( $termRecipient ne "" );
 
-                            # advanced options from message
-                            if ( ref($advanced) eq "ARRAY" ) {
-                                for my $item (@$advanced) {
-                                    for my $key ( keys(%$item) ) {
-                                        my $val = $item->{$key};
-                                        $cmd =~ s/%$key%/$val/gi;
-                                    }
+                            # user parameters from message
+                            if ( ref($params) eq "HASH" ) {
+                                for my $key ( keys %$params ) {
+                                    next if ( ref( $params->{$key} ) );
+                                    my $val = $params->{$key};
+                                    $cmd =~ s/%$key%/$val/gi;
+                                    $cmd =~ s/\$$key/$val/g;
+                                    Log3 $logDevice, 5,
+"msg $device: User parameters: replacing %$key% and \$$key by '$val'";
                                 }
                             }
 
-                            # advanced options from command schema hash
+                            # user parameters from command schema hash
                             if (
                                 $priorityCat ne ""
                                 && defined(
@@ -1988,6 +2059,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     for my $key ( keys(%$item) ) {
                                         my $val = $item->{$key};
                                         $cmd =~ s/%$key%/$val/gi;
+                                        $cmd =~ s/\$$key/$val/g;
+                                        Log3 $logDevice, 5,
+"msg $device: msgSchema: replacing %$key% and \$$key by '$val'";
                                     }
                                 }
 
@@ -2008,6 +2082,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     for my $key ( keys(%$item) ) {
                                         my $val = $item->{$key};
                                         $cmd =~ s/%$key%/$val/gi;
+                                        $cmd =~ s/\$$key/$val/g;
+                                        Log3 $logDevice, 5,
+"msg $device: msgSchema: replacing %$key% and \$$key by '$val'";
                                     }
                                 }
 
@@ -2030,6 +2107,35 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                       if ($err);
                                     $cmd = join( " ", @a )
                                       unless ($err);
+                                }
+
+                                # add user parameters
+                                # if gateway supports parseParams
+                                my $gatewayDevType =
+                                  defined( $defs{$gatewayDev}{TYPE} )
+                                  ? $defs{$gatewayDev}{TYPE}
+                                  : undef;
+                                if (
+                                    ref($params) eq "HASH"
+                                    && (
+                                        $modules{$gatewayDevType}->{parseParams}
+                                        || $modules{$gatewayDevType}
+                                        ->{'.msgParams'}{parseParams} )
+                                  )
+                                {
+                                    Log3 $logDevice, 5,
+"msg $device: parseParams support: Handing over user parameters to other device";
+
+                                    my ( $a, $h ) = parseParams($cmd);
+
+                                    while ( ( my $key, my $value ) =
+                                        each %$params )
+                                    {
+                                        $key =~ s/^$gatewayDevType\_//;
+                                        $cmd .= " $key='$value'"
+                                          if ( !defined( $h->{$key} )
+                                            || $h->{$key} =~ m/^[\s\t\n ]*$/ );
+                                    }
                                 }
 
                                 # run command
@@ -2343,7 +2449,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     # if no gateway device for this type was available
                     if (   $msgSentDev == 0
                         && $fw_gwUnavailable ne ""
-                        && !( $fw_gwUnavailable ~~ @type )
+                        && !grep { $fw_gwUnavailable eq $_ } @type
                         && $routes{$fw_gwUnavailable} == 1 )
                     {
                         Log3 $logDevice, 4,
@@ -2361,7 +2467,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     # if emergency priority
                     if (   $loopPriority >= $msgFwPrioEmergency
                         && $fw_emergency ne ""
-                        && !( $fw_emergency ~~ @type )
+                        && !grep { $fw_emergency eq $_ } @type
                         && $routes{$fw_emergency} == 1 )
                     {
                         Log3 $logDevice, 4,
@@ -2380,7 +2486,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     if (   $residentDevPresence eq "absent"
                         && $loopPriority >= $msgFwPrioGone
                         && $fw_residentGone ne ""
-                        && !( $fw_residentGone ~~ @type )
+                        && !grep { $fw_residentGone eq $_ } @type
                         && $routes{$fw_residentGone} == 1 )
                     {
                         Log3 $logDevice, 4,
@@ -2400,7 +2506,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     if (   $residentDevState eq "absent"
                         && $loopPriority >= $msgFwPrioAbsent
                         && $fw_residentAbsent ne ""
-                        && !( $fw_residentAbsent ~~ @type )
+                        && !grep { $fw_residentAbsent eq $_ } @type
                         && $routes{$fw_residentAbsent} == 1 )
                     {
                         Log3 $logDevice, 4,
