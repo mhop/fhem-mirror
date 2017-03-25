@@ -24,8 +24,6 @@
 #
 ##############################################################################
 
-no if $] >= 5.017011, warnings => 'experimental';
-
 sub RESIDENTStk_Initialize() {
 }
 
@@ -1050,7 +1048,8 @@ sub RESIDENTStk_wakeupRun($;$) {
         fhem "set $NAME nextRun OFF";
         return;
     }
-    elsif ( !$wakeupHolidays && !( $wday ~~ @days ) && !$forceRun ) {
+
+    elsif ( !$wakeupHolidays && !grep { $wday eq $_ } @days && !$forceRun ) {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: weekday restriction in use - not triggering wake-up program this time";
     }
@@ -1060,7 +1059,7 @@ sub RESIDENTStk_wakeupRun($;$) {
         && (   $wakeupHolidays eq "orHoliday"
             || $wakeupHolidays eq "orNoHoliday" )
         && (
-            !( $wday ~~ @days )
+            !grep { $wday eq $_ } @days
             && (   ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
                 || ( $wakeupHolidays eq "orNoHoliday" && $holidayToday ) )
         )
@@ -1075,7 +1074,7 @@ sub RESIDENTStk_wakeupRun($;$) {
         && (   $wakeupHolidays eq "andHoliday"
             || $wakeupHolidays eq "andNoHoliday" )
         && (
-            !( $wday ~~ @days )
+            !grep { $wday eq $_ } @days
             || (   ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
                 || ( $wakeupHolidays eq "andNoHoliday" && $holidayToday ) )
         )
@@ -1220,7 +1219,7 @@ sub RESIDENTStk_wakeupRun($;$) {
         $doReset = 0;
     }
 
-    if ( $wakeupDefaultTime && $wday ~~ @rdays && $doReset ) {
+    if ( $wakeupDefaultTime && grep { $wday eq $_ } @rdays && $doReset ) {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
         fhem
@@ -1419,7 +1418,7 @@ sub RESIDENTStk_wakeupGetNext($) {
 "RESIDENTStk $wakeupDevice: 04 - this is a candidate for today";
 
                 # if today is in scope
-                if ( $wday ~~ @days ) {
+                if ( grep { $wday eq $_ } @days ) {
 
                     # if we need to consider holidays in addition
                     if (
@@ -1484,7 +1483,7 @@ sub RESIDENTStk_wakeupGetNext($) {
 "RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow";
 
                 # if tomorrow is in scope
-                if ( $wdayTomorrow ~~ @daysTomorrow ) {
+                if ( grep { $wdayTomorrow eq $_ } @daysTomorrow ) {
 
                     # if we need to consider holidays in addition
                     if (
@@ -1715,7 +1714,7 @@ sub RESIDENTStk_findResidentSlaves($) {
         next
           unless (
             defined( $defs{$_}{RESIDENTGROUPS} )
-            && grep { /^$hash->{NAME}$/ }
+            && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
         $hash->{ROOMMATES} .= "," if ( $hash->{ROOMMATES} );
@@ -1727,7 +1726,7 @@ sub RESIDENTStk_findResidentSlaves($) {
         next
           unless (
             defined( $defs{$_}{RESIDENTGROUPS} )
-            && grep { /^$hash->{NAME}$/ }
+            && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
         $hash->{GUESTS} .= "," if ( $hash->{GUESTS} );
