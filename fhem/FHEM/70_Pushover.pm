@@ -23,6 +23,9 @@ sub Pushover_Initialize($$) {
 "disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,-1,-2 callbackUrl "
       . $readingFnAttributes;
 
+    #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
+    $hash->{'.msgParams'} = { parseParams => 1, };
+
     # a priority value of 2 is not predifined as for this also a value for
     # retry and expire must be set which will most likely not be used with
     # default values.
@@ -64,13 +67,15 @@ sub Pushover_removeExtension($) {
 sub Pushover_Define($$) {
     my ( $hash, $def ) = @_;
 
-    my @args = split( "[ \t]+", $def );
+    my @a    = split( "[ \t]+", $def );
+    my $name = shift @a;
+    my $type = shift @a;
 
     return
 "Invalid number of arguments: define <name> Pushover <token> <user> [<infix>]"
-      if ( int(@args) < 2 );
+      if ( int(@a) < 2 );
 
-    my ( $name, $type, $token, $user, $infix ) = @args;
+    my ( $token, $user, $infix ) = @a;
 
     return "$user does not seem to be a valid user or group token"
       if ( $user !~ /^([a-zA-Z0-9]{30})$/ );
@@ -164,11 +169,11 @@ sub Pushover_Set($@) {
         )
       );
 
+    return Pushover_CancelMessage( $hash, $cmd, $a, $h )
+      if ( lc($cmd) eq 'msgcancel' );
+
     return Pushover_SetMessage( $hash, @args )
       if ( $cmd eq 'msg' );
-
-    return Pushover_CancelMessage( $hash, @args )
-      if ( lc($cmd) eq 'msgcancel' );
 }
 
 #------------------------------------------------------------------------------
@@ -597,6 +602,7 @@ sub Pushover_ReceiveCommand($$$) {
         elsif ( $service =~ /^receipts\/(.*)\/cancel.json$/ ) {
             my $receipt = $1;
 
+            keys %{ $hash->{READINGS} };
             while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
                 if (   $key =~ /^cb_(\d+)$/
                     && defined( $value->{VAL} )
@@ -1074,12 +1080,18 @@ sub Pushover_SetMessage2 ($$$$) {
         if ( defined( $h->{message} ) ) {
             $values{message} = $h->{message};
         }
+        elsif ( defined( $h->{msg} ) ) {
+            $values{message} = $h->{msg};
+        }
         elsif ( defined( $h->{text} ) ) {
             $values{message} = $h->{text};
         }
         else {
             $values{message} = join ' ', @$a;
         }
+
+        return "Message cannot be empty"
+          unless ( defined( $values{message} ) && $values{message} ne "" );
     }
     $values{priority} =
       $h->{priority} ? $h->{priority} : AttrVal( $hash->{NAME}, "priority", 0 );
@@ -1102,9 +1114,15 @@ sub Pushover_SetMessage2 ($$$$) {
         elsif ( defined( $h->{message} ) ) {
             $values{text} = $h->{message};
         }
+        elsif ( defined( $h->{msg} ) ) {
+            $values{text} = $h->{msg};
+        }
         else {
             $values{text} = join ' ', @$a;
         }
+
+        return "Text cannot be empty"
+          unless ( defined( $values{text} ) && $values{text} ne "" );
     }
     $values{subtext} =
       defined( $h->{subtext} ) && $h->{subtext} ne "" ? $h->{subtext} : undef;
@@ -1377,31 +1395,38 @@ sub Pushover_SetMessage2 ($$$$) {
     }
 }
 
-sub Pushover_CancelMessage {
-    my $hash     = shift;
-    my $cancelId = shift;
-    my $name     = $hash->{NAME};
-    my $success  = 0;
+sub Pushover_CancelMessage ($$$$) {
+    my ( $hash, $cmd, $cancelIds, $h ) = @_;
+    my $name    = $hash->{NAME};
+    my $success = 0;
     my $return;
+
+    return "Unknown argument, choose one of cancel_id"
+      if ( int(@$cancelIds) < 1 || $cancelIds[0] =~ /^(\?|help)$/i );
 
     Log3 $name, 5, "Pushover $name: called function Pushover_CancelMessage()";
 
     keys %{ $hash->{READINGS} };
     while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-        if (   $key =~ /^cbCancelId_(\d+)$/
-            && defined( $value->{VAL} )
-            && $value->{VAL} eq $cancelId )
-        {
-            $success = 1;
-            my $receipt = ReadingsVal( $name, "cb_" . $1, $1 );
+        foreach my $string (@$cancelIds) {
+            foreach my $cancelId ( split( ',', $string ) ) {
+                if (   $key =~ /^cbCancelId_(\d+)$/
+                    && defined( $value->{VAL} )
+                    && $value->{VAL} eq $cancelId )
+                {
+                    $success = 1;
+                    my $receipt = ReadingsVal( $name, "cb_" . $1, $1 );
 
-            $return .= " " if ($return);
-            $return .=
-              Pushover_SendCommand( $hash, "receipts/$receipt/cancel.json" );
+                    $return .= " " if ($return);
+                    $return .=
+                      Pushover_SendCommand( $hash,
+                        "receipts/$receipt/cancel.json" );
+                }
+            }
         }
     }
 
-    return "Invalid cancel_id '$cancelId'" unless ($success);
+    return "Invalid cancel_id" unless ($success);
     return $return;
 }
 
