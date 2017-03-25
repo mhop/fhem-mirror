@@ -567,7 +567,12 @@ $lastDefChange = 1;
 
 foreach my $d (keys %defs) {
   if($defs{$d}{IODevMissing}) {
-    Log 3, "No I/O device found for $defs{$d}{NAME}";
+    if($defs{$d}{IODevName} && $defs{$defs{$d}{IODevName}}) {
+      $defs{$d}{IODev} = $defs{$defs{$d}{IODevName}};
+      delete $defs{$d}{IODevName};
+    } else {
+      Log 3, "No I/O device found for $defs{$d}{NAME}";
+    }
     delete $defs{$d}{IODevMissing};
   }
 }
@@ -2638,11 +2643,6 @@ CommandAttr($$)
       $hash->{'.userReadings'}= \@userReadings;
     } 
 
-    if($attrName eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
-      push @rets,"$sdev: unknown IODev $a[2] specified";
-      next;
-    }
-
     if($attrName eq "eventMap") {
       delete $hash->{".eventMapHash"};
       delete $hash->{".eventMapCmd"};
@@ -2673,6 +2673,16 @@ CommandAttr($$)
     $attr{$sdev}{$attrName} = $val;
 
     if($attrName eq "IODev") {
+      if(!$a[2] || !defined($defs{$a[2]})) {
+        if($init_done) {
+          push @rets,"$sdev: unknown IODev $a[2] specified";
+        } else {
+          $hash->{IODevMissing} = 1;
+          $hash->{IODevName} = $a[2];
+        }
+        next;
+      }
+
       my $ioname = $a[2];
       $hash->{IODev} = $defs{$ioname};
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
