@@ -212,11 +212,11 @@ my $db = {
 
         'Pushover' => {
             'Normal' =>
-'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% %MSG%',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% %MSG%',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% msg title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% %MSG%',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'         => '',
@@ -225,6 +225,7 @@ my $db = {
                     'EXPIRE'            => '',
                     'URLTITLE'          => '',
                     'ACTION'            => '',
+                    'Pushover_PTYPE'    => 'msg',
                     'Pushover_SOUND'    => '',
                     'Pushover_CANCELID' => '',
                 },
@@ -235,6 +236,7 @@ my $db = {
                     'EXPIRE'            => '600',
                     'URLTITLE'          => '',
                     'ACTION'            => '',
+                    'Pushover_PTYPE'    => 'msg',
                     'Pushover_SOUND'    => '',
                     'Pushover_CANCELID' => '',
                 },
@@ -245,6 +247,7 @@ my $db = {
                     'EXPIRE'            => '',
                     'URLTITLE'          => '',
                     'ACTION'            => '',
+                    'Pushover_PTYPE'    => 'msg',
                     'Pushover_SOUND'    => '',
                     'Pushover_CANCELID' => '',
                 },
