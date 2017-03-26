@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 03 / 2017-03-26
+# Release 02 / 2017-02-27
 
 package main;
 
@@ -991,7 +991,7 @@ sub withings_getDeviceDetail($) {
     url => $hash->{'.https'}."://healthmate.withings.com/index/service/device",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getproperties'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getproperties'},
   });
 
   #Log3 "withings", 5, "$name: getdevicedetaildata ".Dumper($data);
@@ -1034,12 +1034,12 @@ sub withings_getDeviceLink($) {
     url => $hash->{'.https'}."://healthmate.withings.com/index/service/v2/link",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{appliver}, apppfm => 'web', action => 'get'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid => $hash->{Device} , appname => 'my2', appliver=> $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'get'},
   });
 
   #my $ua = LWP::UserAgent->new;
   #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://healthmate.withings.com/index/service/v2/link');
-  #my $get_data = 'sessionid='.$hash->{IODev}->{SessionKey}.'&deviceid='.$hash->{Device}.'&appname=my2&appliver='.$hash->{IODev}->{appliver}.'&apppfm=web&action=get';
+  #my $get_data = 'sessionid='.$hash->{IODev}->{SessionKey}.'&deviceid='.$hash->{Device}.'&appname=my2&appliver='.$hash->{IODev}->{helper}{appliver}.'&apppfm=web&action=get';
   #$request->content($get_data);
   #my $response = $ua->request($request);
   return undef if(!defined($data));
@@ -1068,7 +1068,7 @@ sub withings_getDeviceProperties($) {
     url => "https://healthmate.withings.com/index/service/device",
     timeout => 30,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getproperties'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getproperties'},
       hash => $hash,
       type => 'deviceProperties',
       callback => \&withings_Dispatch,
@@ -1104,7 +1104,7 @@ sub withings_getDeviceReadingsScale($) {
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,35', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getmeashf'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,35', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
       hash => $hash,
       type => 'deviceReadingsScale',
       enddate => int($enddate),
@@ -1139,7 +1139,7 @@ sub withings_getDeviceReadingsBedside($) {
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,56', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getmeashf'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,56', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
       hash => $hash,
       type => 'deviceReadingsBedside',
       enddate => int($enddate),
@@ -1174,7 +1174,7 @@ sub withings_getDeviceReadingsHome($) {
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 30,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,58', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getmeashf'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, deviceid=> $hash->{Device}, meastype => '12,13,14,15,58', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeashf'},
       hash => $hash,
       type => 'deviceReadingsHome',
       enddate => int($enddate),
@@ -1392,7 +1392,7 @@ sub withings_getUserDetail($) {
     url => $hash->{'.https'}."://healthmate.withings.com/index/service/user",
     timeout => 10,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid => $hash->{User} , appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getbyuserid'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid => $hash->{User} , appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
   });
 
   return undef if(!defined($data));
@@ -1513,7 +1513,7 @@ sub withings_getUserReadingsDaily($) {
     url => "https://healthmate.withings.com/index/service/v2/aggregate",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, range => '1', meastype => '36,37,38,40,41,49,50,51,52,53,87', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getbyuserid'},
+    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, range => '1', meastype => '36,37,38,40,41,49,50,51,52,53,87', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
       hash => $hash,
       type => 'userDailyAggregate',
       enddate => int($enddate),
@@ -1531,7 +1531,7 @@ sub withings_getUserReadingsDaily($) {
     url => "https://healthmate.withings.com/index/service/v2/activity",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, subcategory => '37', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getbyuserid'},
+    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, subcategory => '37', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
       hash => $hash,
       type => 'userDailyActivity',
       enddate => int($enddate),
@@ -1566,7 +1566,7 @@ sub withings_getUserReadingsCommon($) {
     url => "https://healthmate.withings.com/index/service/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, category => '1',  userid=> $hash->{User}, offset => '0', limit => '400', startdate => int($lastupdate), enddate => int($enddate), appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getmeas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, category => '1',  userid=> $hash->{User}, offset => '0', limit => '400', startdate => int($lastupdate), enddate => int($enddate), appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getmeas'},
       hash => $hash,
       type => 'userReadingsCommon',
       enddate => int($enddate),
@@ -1598,13 +1598,13 @@ sub withings_getUserReadingsSleep($) {
   $lastupdate = $hash->{lastsessiondate} if(defined($hash->{lastsessiondate}) and $hash->{lastsessiondate} < $lastupdate);
   my $enddate = ($lastupdate+(8*60*60));
   $enddate = $now if ($enddate > $now);
-  #    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '43,44,11,57,59,60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getvasistas'},
+  #    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '43,44,11,57,59,60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
 
   HttpUtils_NonblockingGet({
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsSleep',
       enddate => int($enddate),
@@ -1638,7 +1638,7 @@ sub withings_getUserReadingsSleepDebug($) {
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '60,61,62,63,64,65,66,67,68,69,70', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsSleepDebug',
       enddate => int($enddate),
@@ -1676,7 +1676,7 @@ sub withings_getUserReadingsActivity($) {
     url => "https://healthmate.withings.com/index/service/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'my2', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsActivity',
       enddate => int($enddate),
