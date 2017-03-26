@@ -29,14 +29,16 @@ package main;
 
   use Blocking;
 
-  my $rc = eval{
-    require Nmap::Parser;
-    Nmap::Parser->import();
-    1;
-  };
+  use Nmap::Parser;
 
-  return("Error loading Nmap::Parser. Maybe this module is not installed?")
-    unless($rc);
+  # my $rc = eval{
+  #   require Nmap::Parser;
+  #   Nmap::Parser->import();
+  #   1;
+  # };
+  #
+  # return("Error loading Nmap::Parser. Maybe this module is not installed?")
+  #   unless($rc);
 
 # forward declarations ########################################################
 sub Nmap_Initialize($);
@@ -153,6 +155,9 @@ sub Nmap_Set($@) {
     if($argument eq "interrupt"){
       BlockingKill($hash->{helper}{RUNNING_PID})
         if(defined($hash->{helper}{RUNNING_PID}));
+
+      Nmap_aborted($hash);
+
       RemoveInternalTimer($hash);
       InternalTimer(
         gettimeofday() + $hash->{INTERVAL}, "Nmap_statusRequest", $hash
@@ -247,6 +252,9 @@ sub Nmap_statusRequest($) {
   my ($hash) = @_;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
+  my $interval = $hash->{INTERVAL};
+  my $timeout = $interval - 1;
+  my $path = $hash->{PATH};
 
   BlockingKill($hash->{helper}{RUNNING_PID})
     if(defined($hash->{helper}{RUNNING_PID}));
@@ -255,12 +263,22 @@ sub Nmap_statusRequest($) {
   return if(IsDisabled($SELF));
 
   InternalTimer(
-    gettimeofday() + $hash->{INTERVAL}, "Nmap_statusRequest", $hash
+    gettimeofday() + $interval, "Nmap_statusRequest", $hash
   );
+
+  unless(-X $path){
+    readingsSingleUpdate($hash, "state", "aborted", 1);
+    Log3(
+        $SELF, 1, "$TYPE ($SELF) - "
+      . "please check if Nmap ist installed and available at path $path"
+    );
+
+    return;
+  }
 
   if(
        AttrVal($SELF, "sudo", 0) == 1
-    && qx(sudo -n $hash->{PATH} -V 2>&1 > /dev/null)
+    && qx(sudo -n $path -V 2>&1 > /dev/null)
   ){
     readingsSingleUpdate($hash, "state", "aborted", 1);
     Log3($SELF, 1, "$TYPE ($SELF) - sudo password required");
@@ -272,9 +290,8 @@ sub Nmap_statusRequest($) {
   Log3($SELF, 3, "$TYPE ($SELF) - starting network scan");
 
   $hash->{helper}{RUNNING_PID} = BlockingCall(
-      "Nmap_blocking_statusRequest", $SELF
-    , "Nmap_done", $hash->{INTERVAL}-1
-    , "Nmap_aborted", $hash
+      "Nmap_blocking_statusRequest", $SELF, "Nmap_done"
+    , $timeout, "Nmap_aborted", $hash
   ) unless(exists($hash->{helper}{RUNNING_PID}));
 
   return;
@@ -462,7 +479,8 @@ sub Nmap_done($) {
   readingsEndUpdate($hash, 1);
 
   my $deleteOldReadings = AttrVal($SELF, "deleteOldReadings", 0);
-  Nmap_deleteOldReadings($hash, $deleteOldReadings) if($deleteOldReadings != 0);
+  Nmap_deleteOldReadings($hash, $deleteOldReadings)
+    if($deleteOldReadings ne "0");
 
   Log3($SELF, 3, "$TYPE ($SELF) - network scan done");
 
