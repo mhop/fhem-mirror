@@ -29,6 +29,7 @@
 # - allow ? to recipients to soft-fail if they are not configured or not
 #   reachable via msg
 # - implement default messages in RESIDENTS using msg command
+# - queue message until recipient is available again (e.g. when absent)
 #
 
 package main;
@@ -49,6 +50,89 @@ sub MSG_Initialize($$) {
     $cmds{msg} = \%hash;
 
     require "$attr{global}{modpath}/FHEM/msgSchema.pm";
+}
+
+########################################
+sub MSG_FindAttrVal($$$$) {
+    my ( $d, $n, $msgType, $default ) = @_;
+    $msgType = ucfirst($msgType);
+    $n .= $msgType if ( $n =~ /^msg(Contact|Priority)$/ );
+
+    my $g = (
+        (
+            defined( $modules{msgConfig}{defptr} )
+              && $n !~ /^(verbose|msgContact.*)$/
+        )
+        ? $modules{msgConfig}{defptr}{NAME}
+        : ""
+    );
+
+    return
+
+      # look for direct
+      AttrVal(
+        $d, $n,
+
+        # look for indirect
+        AttrVal(
+            AttrVal( $d, "msgRecipient$msgType", "" ),
+            $n,
+
+            # look for indirect general
+            AttrVal(
+                AttrVal( $d, "msgRecipient", "" ),
+                $n,
+
+                # look for global direct
+                AttrVal(
+                    $g, $n,
+
+                    #look for global indirect
+                    AttrVal(
+                        AttrVal( $g, "msgRecipient$msgType", "" ),
+                        $n,
+
+                        # look for global indirect general
+                        AttrVal(
+                            AttrVal( $g, "msgRecipient", "" ),
+                            $n,
+
+                            # default
+                            $default
+                        )
+                    )
+                )
+            )
+        )
+      );
+}
+
+########################################
+sub MSG_FindReadingsVal($$$$) {
+    my ( $d, $n, $msgType, $default ) = @_;
+    $msgType = ucfirst($msgType);
+
+    return
+
+      # look for direct
+      ReadingsVal(
+        $d, $n,
+
+        #look for indirect
+        ReadingsVal(
+            AttrVal( $d, "msgRecipient$msgType", "" ),
+            $n,
+
+            # look for indirect general
+            ReadingsVal(
+                AttrVal( $d, "msgRecipient", "" ),
+                $n,
+
+                # default
+                $default
+            )
+        )
+      );
 }
 
 ########################################
@@ -159,10 +243,11 @@ sub CommandMsg($$;$$) {
     if ( $params->{msgType} ) {
         Log3 $globalDevName, 5, "msg: given types=$params->{msgType}";
         $types = $params->{msgType};
+        $types =~ s/[\s\t]*//g;
         delete $params->{msgType};
     }
     elsif ( $msg =~
-s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
+s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//i
       )
     {
         Log3 $globalDevName, 5, "msg: found types=$1";
@@ -192,6 +277,7 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
     if ( $params->{msgRcpt} ) {
         Log3 $globalDevName, 5, "msg: given recipient=$params->{msgRcpt}";
         $recipients = $params->{msgRcpt};
+        $recipients =~ s/[\s\t]*//g;
         delete $params->{msgRcpt};
     }
     elsif ( $msg =~
@@ -206,17 +292,22 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     if ( defined( $params->{msgPrio} ) ) {
         Log3 $globalDevName, 5, "msg: given priority=$params->{msgPrio}";
         $priority = $params->{msgPrio};
+        $priority =~ s/[\s\t]*//g;
         delete $params->{msgPrio};
     }
-    elsif ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[.\d]*)[\s\t]*// ) {
+    elsif ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[\.\d]*)[\s\t]*// ) {
         Log3 $globalDevName, 5, "msg: found priority=$1";
         $priority = $1;
     }
+    $priority = int($priority) if ( $priority =~ /^[-+]{0,1}\d+\.\d*$/ );
+    return "Invalid priority $priority: Needs to be an integer value"
+      unless ( $priority eq "" || $priority =~ /^[-+]{0,1}\d+$/ );
 
     # check for given message title
     if ( defined( $params->{msgTitle} ) ) {
         Log3 $globalDevName, 5, "msg: given title=$params->{msgTitle}";
         $title = $params->{msgTitle};
+        $title =~ s/^[\s\t]*\|(.*?)\|[\s\t]*/$1/;
         delete $params->{msgTitle};
     }
     elsif ( $msg =~ s/^[\s\t]*\|(.*?)\|[\s\t]*// ) {
@@ -297,11 +388,11 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
           "msg: start typeOr loop for type(s) $typesOr[$iTypesOr]"
           if ( $testMode ne "1" );
 
-        my @type = split( /,/, $typesOr[$iTypesOr] );
+        my @type = split( /,/, lc( $typesOr[$iTypesOr] ) );
         for ( my $i = 0 ; $i < scalar( grep { defined $_ } @type ) ; $i++ ) {
             Log3 $globalDevName, 5, "msg: running loop for type $type[$i]"
               if ( $testMode ne "1" );
-            last if ( !defined( $type[$i] ) );
+            last unless ( defined( $type[$i] ) );
 
             my $forceType = 0;
             if ( $type[$i] =~ s/(.*)![\s\t]*$// ) {
@@ -312,7 +403,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
             # check for correct type
             my @msgCmds =
               ( "screen", "light", "audio", "text", "push", "mail" );
-            if ( !grep { $type[$i] eq $_ } @msgCmds ) {
+            unless ( grep { $type[$i] eq $_ } @msgCmds ) {
                 $return .= "Unknown message type $type[$i]\n";
                 next;
             }
@@ -423,27 +514,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     my $logDevice;
                     $logDevice = $globalDevName;
                     $logDevice = $device
-                      if (
-                        # look for direct
-                        AttrVal(
-                            $device, "verbose",
-
-                            #look for indirect
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "verbose",
-
-                                #look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "verbose",
-
-                                    # no verbose found
-                                    ""
-                                )
-                            )
-                        ) ne ""
-                      );
+                      if ( MSG_FindAttrVal( $device, "verbose", $typeUc, "" ) ne
+                        "" );
 
                     ################################################################
                     ### get target information from device location
@@ -453,50 +525,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     my @locationDevs;
                     @locationDevs = split(
                         /,/,
-
-                        # look for direct
-                        AttrVal(
-                            $device, "msgLocationDevs",
-
-                            #look for indirect
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgLocationDevs",
-
-                                # look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgLocationDevs",
-
-                                    # look for global direct
-                                    AttrVal(
-                                        $globalDevName, "msgLocationDevs",
-
-                                        #look for global indirect
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient$typeUc",
-                                                ""
-                                            ),
-                                            "msgLocationDevs",
-
-                                            # look for global indirect general
-                                            AttrVal(
-                                                AttrVal(
-                                                    $globalDevName,
-                                                    "msgRecipient",
-                                                    ""
-                                                ),
-                                                "msgLocationDevs",
-
-                                                # no locations defined
-                                                ""
-                                            )
-                                        )
-                                    )
-                                )
-                            )
+                        MSG_FindAttrVal(
+                            $device, "msgLocationDevs", $typeUc, ""
                         )
                     );
 
@@ -504,26 +534,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
 
                         # get device location
                         my $deviceLocation =
-
-                          # look for direct
-                          ReadingsVal(
-                            $device, "location",
-
-                            # look for indirect
-                            ReadingsVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "location",
-
-                                # look for indirect general
-                                ReadingsVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "location",
-
-                                    # no location found
-                                    ""
-                                )
-                            )
-                          );
+                          MSG_FindReadingsVal( $device, "location", $typeUc,
+                            "" );
 
                         my $locationDev = "";
                         if ( $deviceLocation ne "" && $deviceType eq "device" )
@@ -559,32 +571,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
 
                             # look for gateway device
                             $gatewayDevs =
-
-                              # look for direct
-                              AttrVal(
-                                $locationDev, "msgContact$typeUc",
-
-                                # look for indirect
-                                AttrVal(
-                                    AttrVal(
-                                        $locationDev, "msgRecipient$typeUc",
-                                        ""
-                                    ),
-                                    "msgContact$typeUc",
-
-                                    # look for indirect general
-                                    AttrVal(
-                                        AttrVal(
-                                            $locationDev, "msgRecipient",
-                                            ""
-                                        ),
-                                        "msgContact$typeUc",
-
-                                        # no contact found
-                                        ""
-                                    )
-                                )
-                              );
+                              MSG_FindAttrVal( $locationDev, "msgContact",
+                                $typeUc, "" );
 
                             # at least one of the location gateways needs to
                             # be available. Otherwise we fall back to
@@ -722,28 +710,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                           if ( $testMode ne "1" );
 
                         $gatewayDevs =
-
-                          # look for direct
-                          AttrVal(
-                            $device,
-                            "msgContact$typeUc",
-
-                            # look for indirect
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgContact$typeUc",
-
-                                # look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgContact$typeUc",
-
-                                    # self
-                                    $device
-                                )
-                            )
-                          );
-
+                          MSG_FindAttrVal( $device, "msgContact", $typeUc,
+                            $device );
                     }
 
                     ################################################################
@@ -754,26 +722,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                         # look for gateway device
                         $gatewayDevs =
-
-                          # look for direct
-                          AttrVal(
-                            $device, "msgContact$typeUc",
-
-                            #look for indirect
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgContact$typeUc",
-
-                                #look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgContact$typeUc",
-
-                                    # no contact found
-                                    ""
-                                )
-                            )
-                          );
+                          MSG_FindAttrVal( $device, "msgContact", $typeUc, "" );
 
                         # fallback/catchall
                         if ( $gatewayDevs eq "" ) {
@@ -785,83 +734,16 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                               if ( $catchall == 1 );
 
                             $gatewayDevs =
-
-                              # look for direct
-                              AttrVal(
-                                $globalDevName, "msgContact$typeUc",
-
-                                #look for indirect
-                                AttrVal(
-                                    AttrVal(
-                                        $globalDevName, "msgRecipient$typeUc",
-                                        ""
-                                    ),
-                                    "msgContact$typeUc",
-
-                                    #look for indirect general
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName, "msgRecipient",
-                                            ""
-                                        ),
-                                        "msgContact$typeUc",
-
-                                        # no contact found
-                                        ""
-                                    )
-                                )
-                              );
+                              MSG_FindAttrVal( $globalDevName, "msgContact",
+                                $typeUc, "" );
                         }
                     }
 
                     # Find priority if none was explicitly specified
                     my $loopPriority = $priority;
                     $loopPriority =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgPriority$typeUc",
-
-                        #look for indirect
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgPriority$typeUc",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgPriority$typeUc",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgPriority$typeUc",
-
-                                    #look for global indirect
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgPriority$typeUc",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgPriority$typeUc",
-
-                                            # default
-                                            0
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      ) if ( !$priority );
+                      MSG_FindAttrVal( $device, "msgPriority", $typeUc, 0 )
+                      unless ( defined($priority) );
 
                     # check for available routes
                     #
@@ -952,102 +834,16 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                         # user selected emergency priority text threshold
                         my $prioThresTextEmg =
-
-                          # look for direct
-                          AttrVal(
-                            $device, "msgThPrioTextEmergency",
-
-                            #look for indirect audio
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgThPrioTextEmergency",
-
-                                #look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgThPrioTextEmergency",
-
-                                    # look for global direct
-                                    AttrVal(
-                                        $globalDevName,
-                                        "msgThPrioTextEmergency",
-
-                                        #look for global indirect type
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient$typeUc",
-                                                ""
-                                            ),
-                                            "msgThPrioTextEmergency",
-
-                                            #look for global indirect general
-                                            AttrVal(
-                                                AttrVal(
-                                                    $globalDevName,
-                                                    "msgRecipient",
-                                                    ""
-                                                ),
-                                                "msgThPrioTextEmergency",
-
-                                                # default
-                                                "2"
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                          );
+                          MSG_FindAttrVal( $device, "msgThPrioTextEmergency",
+                            $typeUc, 2 );
 
                         # user selected low priority text threshold
                         my $prioThresTextNormal =
+                          MSG_FindAttrVal( $device, "msgThPrioTextNormal",
+                            $typeUc, -2 );
 
-                          # look for direct
-                          AttrVal(
-                            $device, "msgThPrioTextNormal",
-
-                            #look for indirect audio
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgThPrioTextNormal",
-
-                                #look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgThPrioTextNormal",
-
-                                    # look for global direct
-                                    AttrVal(
-                                        $globalDevName, "msgThPrioTextNormal",
-
-                                        #look for global indirect type
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient$typeUc",
-                                                ""
-                                            ),
-                                            "msgThPrioTextNormal",
-
-                                            #look for global indirect general
-                                            AttrVal(
-                                                AttrVal(
-                                                    $globalDevName,
-                                                    "msgRecipient",
-                                                    ""
-                                                ),
-                                                "msgThPrioTextNormal",
-
-                                                # default
-                                                "-2"
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                          );
-
-                     # Decide push and/or e-mail destination based on priorities
+                        # Decide push and/or e-mail destination based
+                        # on priorities
                         if (   $loopPriority >= $prioThresTextEmg
                             && $routes{push} == 1
                             && $routes{mail} == 1 )
@@ -1057,8 +853,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push+mail";
-                            push @type, "push" if !grep { "push" eq $_ } @type;
-                            push @type, "mail" if !grep { "mail" eq $_ } @type;
+                            push @type, "push"
+                              unless grep { "push" eq $_ } @type;
+                            push @type, "mail"
+                              unless grep { "mail" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 1
@@ -1069,7 +867,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !grep { "push" eq $_ } @type;
+                            push @type, "push"
+                              unless grep { "push" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 0
@@ -1080,7 +879,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !grep { "mail" eq $_ } @type;
+                            push @type, "mail"
+                              unless grep { "mail" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextNormal
                             && $routes{push} == 1 )
@@ -1090,7 +890,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !grep { "push" eq $_ } @type;
+                            push @type, "push"
+                              unless grep { "push" eq $_ } @type;
                         }
                         elsif ($loopPriority >= $prioThresTextNormal
                             && $routes{mail} == 1 )
@@ -1100,7 +901,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !grep { "mail" eq $_ } @type;
+                            push @type, "mail"
+                              unless grep { "mail" eq $_ } @type;
                         }
                         elsif ( $routes{mail} == 1 ) {
                             Log3 $logDevice, 4,
@@ -1108,7 +910,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
-                            push @type, "mail" if !grep { "mail" eq $_ } @type;
+                            push @type, "mail"
+                              unless grep { "mail" eq $_ } @type;
                         }
                         elsif ( $routes{push} == 1 ) {
                             Log3 $logDevice, 4,
@@ -1116,7 +919,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
-                            push @type, "push" if !grep { "push" eq $_ } @type;
+                            push @type, "push"
+                              unless grep { "push" eq $_ } @type;
                         }
 
                         # FATAL ERROR: routing decision failed
@@ -1165,246 +969,29 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                     # user selected audio-visual announcement state
                     my $annState = ReadingsVal(
-
-                        # look for direct
-                        AttrVal(
-                            $device, "msgSwitcherDev",
-
-                            #look for indirect audio
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient$typeUc", "" ),
-                                "msgSwitcherDev",
-
-                                #look for indirect general
-                                AttrVal(
-                                    AttrVal( $device, "msgRecipient", "" ),
-                                    "msgSwitcherDev",
-
-                                    # look for global direct
-                                    AttrVal(
-                                        $globalDevName, "msgSwitcherDev",
-
-                                        #look for global indirect type
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient$typeUc",
-                                                ""
-                                            ),
-                                            "msgSwitcherDev",
-
-                                            #look for global indirect general
-                                            AttrVal(
-                                                AttrVal(
-                                                    $globalDevName,
-                                                    "msgRecipient",
-                                                    ""
-                                                ),
-                                                "msgSwitcherDev",
-
-                                                # default
-                                                ""
-                                            )
-                                        )
-                                    )
-                                )
-                            )
+                        MSG_FindAttrVal(
+                            $device, "msgSwitcherDev", $typeUc, ""
                         ),
-                        "state",
-                        "long"
+                        "state", "long"
                     );
 
                     # user selected emergency priority audio threshold
                     my $prioThresAudioEmg =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgThPrioAudioEmergency",
-
-                        #look for indirect audio
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgThPrioAudioEmergency",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgThPrioAudioEmergency",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgThPrioAudioEmergency",
-
-                                    #look for global indirect type
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgThPrioAudioEmergency",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgThPrioAudioEmergency",
-
-                                            # default
-                                            "2"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgThPrioAudioEmergency",
+                        $typeUc, 2 );
 
                     # user selected high priority audio threshold
                     my $prioThresAudioHigh =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgThPrioAudioHigh",
-
-                        #look for indirect audio
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgThPrioAudioHigh",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgThPrioAudioHigh",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgThPrioAudioHigh",
-
-                                    #look for global indirect type
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgThPrioAudioHigh",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgThPrioAudioHigh",
-
-                                            # default
-                                            "1"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgThPrioAudioHigh", $typeUc,
+                        1 );
 
                     # user selected high priority threshold
                     my $prioThresHigh =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgThPrioHigh",
-
-                        #look for indirect audio
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgThPrioHigh",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgThPrioHigh",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgThPrioHigh",
-
-                                    #look for global indirect type
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgThPrioHigh",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgThPrioHigh",
-
-                                            # default
-                                            "2"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgThPrioHigh", $typeUc, 2 );
 
                     # user selected normal priority threshold
                     my $prioThresNormal =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgThPrioNormal",
-
-                        #look for indirect audio
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgThPrioNormal",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgThPrioNormal",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgThPrioNormal",
-
-                                    #look for global indirect type
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgThPrioNormal",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgThPrioNormal",
-
-                                            # default
-                                            "0"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgThPrioNormal", $typeUc, 0 );
 
                     if ( $type[$i] eq "audio" ) {
                         if (   $annState eq "long"
@@ -1593,51 +1180,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                     # user selected emergency priority text threshold
                     my $prioThresGwEmg =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgThPrioGwEmergency",
-
-                        #look for indirect type
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgThPrioGwEmergency",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgThPrioGwEmergency",
-
-                                # look for global direct
-                                AttrVal(
-                                    $globalDevName, "msgThPrioGwEmergency",
-
-                                    #look for global indirect type
-                                    AttrVal(
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgThPrioGwEmergency",
-
-                                        #look for global indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgThPrioGwEmergency",
-
-                                            # default
-                                            "2"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgThPrioGwEmergency",
+                        $typeUc, 2 );
 
                     if ( $featurelevel >= 5.7 ) {
                         my %dummy;
@@ -1807,54 +1351,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             # use title from device, global or internal default
                             my $loopTitle = $title;
                             $loopTitle =
-
-                              # look for direct high
-                              AttrVal(
-                                $device, "msgTitle$typeUc$priorityCat",
-
-                                # look for indirect high
-                                AttrVal(
-                                    AttrVal(
-                                        $device, "msgRecipient$typeUc", ""
-                                    ),
-                                    "msgTitle$typeUc$priorityCat",
-
-                                    #look for indirect general high
-                                    AttrVal(
-                                        AttrVal( $device, "msgRecipient", "" ),
-                                        "msgTitle$typeUc$priorityCat",
-
-                                        # look for global direct high
-                                        AttrVal(
-                                            $globalDevName,
-                                            "msgTitle$typeUc$priorityCat",
-
-                                            # look for global indirect high
-                                            AttrVal(
-                                                AttrVal(
-                                                    $globalDevName,
-                                                    "msgRecipient$typeUc",
-                                                    ""
-                                                ),
-                                                "msgTitle$typeUc$priorityCat",
-
-                                          #look for global indirect general high
-                                                AttrVal(
-                                                    AttrVal(
-                                                        $globalDevName,
-                                                        "msgRecipient",
-                                                        ""
-                                                    ),
-"msgTitle$typeUc$priorityCat",
-
-                                                    # default
-                                                    $defTitle
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                              ) if ( $title eq "-" );
+                              MSG_FindAttrVal( $device,
+                                "msgTitle$typeUc$priorityCat", $typeUc,
+                                $defTitle )
+                              if ( $title eq "-" );
 
                             $loopTitle = ""
                               if ( $loopTitle eq "none"
@@ -1863,10 +1363,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             my $loopMsg = $msg;
                             if ( $catchall == 1 ) {
                                 $loopTitle = "Fw: $loopTitle"
-                                  if ( $loopTitle
+                                  if ( $loopTitle ne ""
                                     && $type[$i] !~ /^(audio|screen)$/ );
                                 $loopMsg = "Forwarded Message: $loopMsg"
-                                  if ( !$loopTitle );
+                                  if ( $loopTitle eq "" );
                                 if ( $type[$i] eq "mail" ) {
                                     $loopMsg .=
 "\n\n-- \nMail catched from device $device";
@@ -1916,55 +1416,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                               AttrVal(
                                 $gatewayDev, "msgCmd$typeUc$priorityCat",
 
-                                # look for direct
-                                AttrVal(
+                                MSG_FindAttrVal(
                                     $device, "msgCmd$typeUc$priorityCat",
-
-                                    # look for indirect
-                                    AttrVal(
-                                        AttrVal(
-                                            $device, "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgCmd$typeUc$priorityCat",
-
-                                        #look for indirect general
-                                        AttrVal(
-                                            AttrVal(
-                                                $device, "msgRecipient", ""
-                                            ),
-                                            "msgCmd$typeUc$priorityCat",
-
-                                            # look for global direct
-                                            AttrVal(
-                                                $globalDevName,
-                                                "msgCmd$typeUc$priorityCat",
-
-                                                # look for global indirect
-                                                AttrVal(
-                                                    AttrVal(
-                                                        $globalDevName,
-                                                        "msgRecipient$typeUc",
-                                                        ""
-                                                    ),
-                                                    "msgCmd$typeUc$priorityCat",
-
-                                               #look for global indirect general
-                                                    AttrVal(
-                                                        AttrVal(
-                                                            $globalDevName,
-                                                            "msgRecipient",
-                                                            ""
-                                                        ),
-"msgCmd$typeUc$priorityCat",
-
-                                                        # internal
-                                                        $defCmd
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
+                                    $typeUc, $defCmd
                                 )
                               );
 
@@ -2098,7 +1552,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                                 # ReplaceSetMagic
                                 #
-                                if ( $featurelevel >= 5.7 && !$replaceError ) {
+                                if ( $featurelevel >= 5.7
+                                    && !$replaceError )
+                                {
                                     my %dummy;
                                     my ( $err, @a ) =
                                       ReplaceSetMagic( \%dummy, 0, ($cmd) );
@@ -2350,72 +1806,18 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                     ### emergency
                     my $msgFwPrioEmergency =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgFwPrioEmergency$typeUc",
-
-                        #look for indirect
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgFwPrioEmergency$typeUc",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgFwPrioEmergency$typeUc",
-
-                                # default
-                                2
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgFwPrioEmergency$typeUc",
+                        $typeUc, 2 );
 
                     ### absent
                     my $msgFwPrioAbsent =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgFwPrioAbsent$typeUc",
-
-                        #look for indirect
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgFwPrioAbsent$typeUc",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgFwPrioAbsent$typeUc",
-
-                                # default
-                                0
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgFwPrioAbsent$typeUc",
+                        $typeUc, 0 );
 
                     ### gone
                     my $msgFwPrioGone =
-
-                      # look for direct
-                      AttrVal(
-                        $device, "msgFwPrioGone$typeUc",
-
-                        #look for indirect
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgFwPrioGone$typeUc",
-
-                            #look for indirect general
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgFwPrioGone$typeUc",
-
-                                # default
-                                1
-                            )
-                        )
-                      );
+                      MSG_FindAttrVal( $device, "msgFwPrioGone$typeUc",
+                        $typeUc, 1 );
 
                     Log3 $logDevice, 5,
 "msg $device: Implicit forwards: recipient presence=$residentDevPresence state=$residentDevState"
