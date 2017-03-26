@@ -220,6 +220,9 @@ sub Nmap_Attr(@) {
 
     readingsSingleUpdate($hash, ".knownHosts", $knownHosts, 0);
   }
+  elsif($attribute eq "path"){
+    $hash->{PATH} = $cmd eq "set" ? $value : "/usr/bin/nmap";
+  }
 
   return if(IsDisabled($SELF));
 
@@ -280,6 +283,7 @@ sub Nmap_statusRequest($) {
 sub Nmap_blocking_statusRequest($) {
   my ($SELF) = @_;
   my ($hash) = $defs{$SELF};
+  my $TYPE = $hash->{TYPE};
   my @ret = $SELF;
   my $NP = new Nmap::Parser;
   my $path =
@@ -289,10 +293,18 @@ sub Nmap_blocking_statusRequest($) {
   my $excludeHosts = AttrVal($SELF, "excludeHosts", undef);
   my $args = $hash->{ARGS};
   $args .= " --exclude $excludeHosts" if($excludeHosts);
+  my $STDERR = "";
 
-  open(STDERR, ">", "/dev/null");
+  close STDERR;
+  open(STDERR, ">", \$STDERR);
 
   $NP->parsescan($path, $args, $hash->{DEF});
+
+  close (STDERR);
+
+  Log3($SELF, 4, "$TYPE ($SELF) - $_")
+    foreach(split( "\n", $STDERR));
+
   my $NPS = $NP->get_session();
 
   push(@ret, $NPS->nmap_version());
@@ -512,7 +524,7 @@ sub Nmap_updateUptime($$;$) {
   $uptime = (
       ReadingsVal($SELF, $metaReading."_uptime", 0)
     + ReadingsAge($SELF, $metaReading."_uptime", 0)
-  ) unless($uptime);
+  ) unless(defined($uptime));
 
   my $s = $uptime;
   my $d = int($s / 86400);
