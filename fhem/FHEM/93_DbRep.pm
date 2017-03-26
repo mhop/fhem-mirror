@@ -40,6 +40,8 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.11.3       26.03.2017       usage of daylight saving time changed to avoid wrong selection when wintertime
+#                               switch to summertime, minor bug fixes
 # 4.11.2       16.03.2017       bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME)
 # 4.11.1       28.02.2017       commandref completed
 # 4.11.0       18.02.2017       added [current|previous]_[month|week|day|hour]_begin and 
@@ -176,7 +178,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.11.2";
+my $DbRepVersion = "4.11.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -780,7 +782,6 @@ sub sqlexec($$) {
  # $mon   als 0..11
  # $time = timelocal( $sec, $min, $hour, $mday, $mon, $year ); 
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();     # Istzeit Ableitung
- 
  ###############################################################################################
  # Auswertungszeit Beginn (String)
  # dynamische Berechnung von Startdatum/zeit aus current_xxx_begin / previous_xxx_begin 
@@ -794,7 +795,7 @@ sub sqlexec($$) {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year));
  } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin") {
      my $ryear = ($mon-1<0)?$year-1:$year;
-	 my $rmon  = ($mon-1<0)?12:$mon;
+	 my $rmon  = ($mon-1<0)?12:$mon-1;
      $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear));
  } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin") {
 	 my $tsub = 0 if($wday == 1);         # wenn Start am "Mo" keine Korrektur
@@ -865,12 +866,12 @@ sub sqlexec($$) {
  } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
      $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1));
  } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end") {
-     my $dim = $mon-2?30+($mon*3%7<4):28+!($year%4||$year%400*!($year%100));
+     my $dim = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
      $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year));
  } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end") {
      my $ryear = ($mon-1<0)?$year-1:$year;
-	 my $rmon  = ($mon-1<0)?12:$mon;
-	 my $dim   = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+	 my $rmon  = ($mon-1<0)?12:$mon-1;
+	 my $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
      $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear));
  } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end") {
 	 my $tadd = 518400 if($wday == 1);         # wenn Start am "Mo" dann Korrektur +6 Tage
@@ -3611,7 +3612,7 @@ sub collaggstr($$$$) {
          # Monatsaggregation
          if ($aggregation eq "month") {
              $runtime_orig = $runtime;
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              
              # Hilfsrechnungen
              my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
@@ -3651,7 +3652,7 @@ sub collaggstr($$$$) {
          
          # Wochenaggregation
          if ($aggregation eq "week") {          
-             $runtime = $runtime+3600 if($i!=1 && dsttest($hash,$runtime,$aggsec));      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime = $runtime+3600 if($i!=1 && dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              $runtime_orig = $runtime; 
 
              my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
@@ -3666,7 +3667,7 @@ sub collaggstr($$$$) {
                  # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
                  my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
                  $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
-                 $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                 $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                  $runtime = $runtime+$wdadd;
                  $runtime_orig = $runtime-$aggsec;                             
                  
@@ -3698,7 +3699,7 @@ sub collaggstr($$$$) {
              $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                                                
              if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
                  $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
@@ -3718,7 +3719,7 @@ sub collaggstr($$$$) {
          if ($aggregation eq "hour") {
              $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec));                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
              
              my @a = split (":",$tsstr);
