@@ -58,7 +58,7 @@ sub Pushover_removeExtension($) {
     my $url  = "/$link";
     my $name = $data{FWEXT}{$url}{deviceName};
     Log3 $name, 2,
-      "Pushover $name: Unregistering Pushover for webhook URL $url...";
+      "Pushover $name: Unregistering Pushover for webhook URI $url...";
     delete $data{FWEXT}{$url};
     delete $name->{HASH}{FHEMWEB_URI};
 }
@@ -620,6 +620,7 @@ sub Pushover_ReceiveCommand($$$) {
                         readingsBulkUpdate( $hash, $rAckBy, "aborted" );
                         delete $hash->{READINGS}{$rCancelId}
                           if ( defined( $hash->{READINGS}{$rCancelId} ) );
+                        keys %{ $hash->{READINGS} };
                     }
                 }
             }
