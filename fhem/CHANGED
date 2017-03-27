@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     00_DFPlayerMini: module to control an embedded MP3 player
   - feature: 75_MSG: add support for PostMe module
   - feature: 74_XiaomiFlowerSens: 1.0.1 new Attributs minLux and maxLux
   - feature: 98_monitoring: blacklist attribute is now a space seperated list 

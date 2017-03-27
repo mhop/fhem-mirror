@@ -17,6 +17,7 @@ configDB.pm                  betateilchen         http://forum.fhem.de Sonstiges
 
 FHEM/00_CM11.pm              neubert              http://forum.fhem.de SlowRF
 FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/00_DFPlayerMini.pm      kaihs                http://forum.fhem.de Multimedia
 FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FBAHAHTTP.pm         rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
