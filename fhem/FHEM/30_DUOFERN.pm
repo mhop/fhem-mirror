@@ -905,7 +905,7 @@ DUOFERN_Parse($$)
     DoTrigger("global","UNDEFINED DUOFERN_$code DUOFERN $code");
     $def = $modules{DUOFERN}{defptr}{$code};
     if(!$def) {
-      Log3 $hash, 1, "DUOFERN UNDEFINED, code $code";
+      Log3 $hash, 4, "DUOFERN UNDEFINED, code $code";
       return "UNDEFINED DUOFERN_$code DUOFERN $code $msg";
     }
   }
@@ -1284,7 +1284,7 @@ DUOFERN_Parse($$)
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch  
             
     } else {
-      Log3 $hash, 2, "DUOFERN unknown msg: $msg";
+      Log3 $hash, 3, "DUOFERN unknown msg: $msg";
     }
   
   #Wandtaster, Funksender UP, Handsender, Sensoren      
@@ -1292,7 +1292,7 @@ DUOFERN_Parse($$)
     my $id = substr($msg, 4, 4);
     
     if (!(exists $sensorMsg{$id})) {
-      Log3 $hash, 2, "DUOFERN unknown msg: $msg";
+      Log3 $hash, 3, "DUOFERN unknown msg: $msg";
     }
     
     my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
@@ -1442,7 +1442,7 @@ DUOFERN_Parse($$)
     Log3 $hash, 3, "DUOFERN error: $name MISSING ACK";
                    
   } else {
-    Log3 $hash, 2, "DUOFERN unknown msg: $msg";
+    Log3 $hash, 3, "DUOFERN unknown msg: $msg";
   }
   
   DoTrigger($def01->{NAME}, undef) if ($def01);
