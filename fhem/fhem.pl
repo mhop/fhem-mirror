@@ -4845,10 +4845,11 @@ perlSyntaxCheck($%)
 
 #####################################
 sub
-parseParams($;$)
+parseParams($;$$)
 {
-  my($cmd, $separator) = @_;
-  $separator = ' ' if( !$separator );
+  my($cmd, $separator, $joiner) = @_;
+  $separator = ' ' if(!$separator);
+  $joiner = $separator if(!$joiner); # needed if separator is a regexp
   my(@a, %h);
 
   my @params;
@@ -4876,7 +4877,7 @@ parseParams($;$)
     while( $param && $value =~ m/^('|")/ && $value !~ m/$1$/ ) {
       my $next = shift(@params);
       last if( !defined($next) );
-      $value .= $separator . $next;
+      $value .= $joiner . $next;
     }
     #remove matching ' or " from the start and end
     if( $value =~ m/^('|")/ && $value =~ m/$1$/ ) {
@@ -4895,7 +4896,7 @@ parseParams($;$)
       while( $param && $count != 0 ) {
         my $next = shift(@params);
         last if( !defined($next) );
-        $value .= $separator . $next;
+        $value .= $joiner . $next;
 
         for my $i (0..length($next)-1) {
           my $c = substr($next, $i, 1);
@@ -4912,7 +4913,6 @@ parseParams($;$)
     }
 
   }
-
   return(\@a, \%h);
 }
 

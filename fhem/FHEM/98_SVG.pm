@@ -68,7 +68,7 @@ SVG_Initialize($)
     plotWeekStartDay:0,1,2,3,4,5,6
     plotfunction
     plotsize
-    plotReplace
+    plotReplace:textField-long
     startDate
     title
   );
@@ -758,7 +758,7 @@ SVG_readgplotfile($$$)
 
   my $specval = AttrVal($wl, "plotfunction", undef);
   my $plotReplace = AttrVal($wl, "plotReplace", undef);
-  my ($list, $pr) = parseParams($plotReplace) if($plotReplace);
+  my ($list, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
   if($plotReplace) {
     for my $k (keys %$pr) {
       if($k =~ m/^_/) {
@@ -864,7 +864,7 @@ SVG_substcfg($$$$$$)
 
   my $plotReplace = AttrVal($wl, "plotReplace", undef);
   if($plotReplace) {
-    my ($list, $pr) = parseParams($plotReplace);
+    my ($list, $pr) = parseParams($plotReplace, "\\s"," ");
     for my $k (keys %$pr) {
       if($k !~ m/^_/) {
         if($pr->{$k} =~ m/^{.*}$/) {
