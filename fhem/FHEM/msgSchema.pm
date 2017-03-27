@@ -380,9 +380,9 @@ my $db = {
             'Normal' =>
 'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'High' =>
-'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
+'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'Low' =>
-'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
+'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'defaultValues' => {
                 'Normal' => {
                     'TITLE'       => 'Info',

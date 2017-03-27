@@ -1643,21 +1643,13 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             }
 
                             # user parameters from attributes
-                            my $paramsAttr1 = AttrVal(
-                                $device,
-                                "msgParams"
-                                  . ucfirst($gatewayDev)
-                                  . $typeUc
-                                  . $priorityCat,
-                                undef
-                            );
+                            my $paramsAttr1 =
+                              AttrVal( $gatewayDev,
+                                "msgParams$typeUc$priorityCat", undef );
                             my $paramsAttr2 =
-                              AttrVal( $device,
-                                "msgParams" . ucfirst($gatewayDev) . $typeUc,
-                                undef );
+                              AttrVal( $gatewayDev, "msgParams$typeUc", undef );
                             my $paramsAttr3 =
-                              AttrVal( $device,
-                                "msgParams" . ucfirst($gatewayDev), undef );
+                              AttrVal( $gatewayDev, "msgParams", undef );
                             my $paramsAttr4 =
                               MSG_FindAttrVal( $device,
                                 "msgParams$typeUc$priorityCat",
