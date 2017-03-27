@@ -30,6 +30,7 @@
 #   reachable via msg
 # - implement default messages in RESIDENTS using msg command
 # - queue message until recipient is available again (e.g. when absent)
+#   also see https://forum.fhem.de/index.php/topic,69683.0.html
 #
 
 package main;
@@ -55,7 +56,7 @@ sub MSG_Initialize($$) {
 ########################################
 sub MSG_FindAttrVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
-    $msgType = ucfirst($msgType);
+    $msgType = ucfirst($msgType) if ($msgType);
     $n .= $msgType if ( $n =~ /^msg(Contact|Priority)$/ );
 
     my $g = (
@@ -78,7 +79,7 @@ sub MSG_FindAttrVal($$$$) {
             AttrVal( $d, "msgRecipient$msgType", "" ),
             $n,
 
-            # look for indirect general
+            # look for indirect, type-independent
             AttrVal(
                 AttrVal( $d, "msgRecipient", "" ),
                 $n,
@@ -87,12 +88,12 @@ sub MSG_FindAttrVal($$$$) {
                 AttrVal(
                     $g, $n,
 
-                    #look for global indirect
+                    # look for global indirect
                     AttrVal(
                         AttrVal( $g, "msgRecipient$msgType", "" ),
                         $n,
 
-                        # look for global indirect general
+                        # look for global indirect, type-independent
                         AttrVal(
                             AttrVal( $g, "msgRecipient", "" ),
                             $n,
@@ -110,7 +111,7 @@ sub MSG_FindAttrVal($$$$) {
 ########################################
 sub MSG_FindReadingsVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
-    $msgType = ucfirst($msgType);
+    $msgType = ucfirst($msgType) if ($msgType);
 
     return
 
@@ -118,12 +119,12 @@ sub MSG_FindReadingsVal($$$$) {
       ReadingsVal(
         $d, $n,
 
-        #look for indirect
+        # look for indirect
         ReadingsVal(
             AttrVal( $d, "msgRecipient$msgType", "" ),
             $n,
 
-            # look for indirect general
+            # look for indirect, type-independent
             ReadingsVal(
                 AttrVal( $d, "msgRecipient", "" ),
                 $n,
@@ -366,6 +367,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     my %sentTypesPerDevice;
     my $sentCounter    = 0;
     my $msgID          = time();
+    my $msgDateTime    = TimeNow();
     my $isTypeOr       = 1;
     my $isRecipientOr  = 1;
     my $hasTypeOr      = 0;
@@ -743,7 +745,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     my $loopPriority = $priority;
                     $loopPriority =
                       MSG_FindAttrVal( $device, "msgPriority", $typeUc, 0 )
-                      unless ( defined($priority) );
+                      if ( $priority eq "" );
 
                     # check for available routes
                     #
@@ -1473,14 +1475,90 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 }
                             }
 
-                            $cmd =~ s/%DEVICE%/$gatewayDev/gi;
                             $cmd =~ s/%PRIORITY%/$loopPriority/gi;
-                            $cmd =~ s/%TITLE%/$loopTitle/gi;
+                            $cmd =~ s/%PRIOCAT%/$priorityCat/gi;
                             $cmd =~ s/%MSG%/$loopMsg/gi;
+                            $cmd =~ s/%MSGID%/$msgID.$sentCounter/gi;
+                            $cmd =~ s/%TITLE%/$loopTitle/gi;
+
+                            my $loopTitle2 = $loopTitle;
+                            $loopTitle2 = substr( $loopTitle2, 0, 27 ) . "..."
+                              if ( length($loopTitle2) > 30 );
+                            $cmd =~ s/%TITLESHRT%/$loopTitle2/gi;
+                            $loopTitle2 =~ s/^([\s\t ]*\w+).*/$1/g;
+                            $loopTitle2 = substr( $loopTitle2, 0, 17 ) . "..."
+                              if ( length($loopTitle2) > 20 );
+                            $cmd =~ s/%TITLESHRT2%/$loopTitle2/gi;
+
+                            my $deviceName = AttrVal(
+                                $device,
+                                AttrVal(
+                                    $device,
+                                    "rg_realname",
+                                    AttrVal( $device, "rr_realname", "group" )
+                                ),
+                                AttrVal( $device, "alias", $device )
+                            );
+                            my $deviceName2 = $deviceName;
+                            $deviceName2 =~ s/ /_/;
+
+                            $cmd =~ s/%SOURCE%/$device/gi;
+                            $cmd =~ s/%SRCALIAS%/$deviceName/gi;
+                            $cmd =~ s/%SRCALIAS2%/$deviceName2/gi;
+
+                            my $gatewayDevName = AttrVal(
+                                $gatewayDev,
+                                AttrVal(
+                                    $gatewayDev,
+                                    "rg_realname",
+                                    AttrVal(
+                                        $gatewayDev, "rr_realname", "group"
+                                    )
+                                ),
+                                AttrVal( $gatewayDev, "alias", $gatewayDev )
+                            );
+                            my $gatewayDevName2 = $gatewayDevName;
+                            $gatewayDevName2 =~ s/ /_/;
+
+                            $cmd =~ s/%DEVICE%/$gatewayDev/gi;
+                            $cmd =~ s/%DEVALIAS%/$gatewayDevName/gi;
+                            $cmd =~ s/%DEVALIAS2%/$gatewayDevName2/gi;
+
+                            my $loopMsgDateTime = $msgDateTime;
+                            $loopMsgDateTime .= ".$sentCounter"
+                              if ($sentCounter);
+                            my $loopMsgDateTime2 = $loopMsgDateTime;
+                            $loopMsgDateTime2 =~ s/ /_/;
+
+                            $cmd =~ s/%MSGDATETIME%/$loopMsgDateTime/gi;
+                            $cmd =~ s/%MSGDATETIME2%/$loopMsgDateTime2/gi;
+
+                            my $subRecipientName =
+                              $subRecipient eq ""
+                              ? ""
+                              : AttrVal(
+                                $subRecipient,
+                                AttrVal(
+                                    $subRecipient,
+                                    "rg_realname",
+                                    AttrVal(
+                                        $subRecipient, "rr_realname",
+                                        "group"
+                                    )
+                                ),
+                                AttrVal(
+                                    $subRecipient, "alias", $subRecipient
+                                )
+                              );
+                            my $subRecipientName2 = $subRecipientName;
+                            $subRecipientName2 =~ s/ /_/;
 
                             $cmd =~ s/%RECIPIENT%/$subRecipient/gi
                               if ( $subRecipient ne "" );
-
+                            $cmd =~ s/%RCPTNAME%/$subRecipientName/gi
+                              if ( $subRecipientName ne "" );
+                            $cmd =~ s/%RCPTNAME2%/$subRecipientName2/gi
+                              if ( $subRecipientName2 ne "" );
                             $cmd =~ s/%TERMINAL%/$termRecipient/gi
                               if ( $termRecipient ne "" );
 
@@ -1584,6 +1662,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                                     my ( $a, $h ) = parseParams($cmd);
 
+                                    keys %$params;
                                     while ( ( my $key, my $value ) =
                                         each %$params )
                                     {
@@ -1730,6 +1809,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                     my $gwStates = "-";
 
+                    keys %gatewaysStatus;
                     while ( ( my $gwName, my $gwState ) = each %gatewaysStatus )
                     {
                         $gwStates = "" if $gwStates eq "-";
@@ -1938,6 +2018,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
     }
 
     # finalize device readings
+    keys %sentTypesPerDevice;
     while ( ( my $device, my $types ) = each %sentTypesPerDevice ) {
         $device = $globalDevName
           if ( $device =~ /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ );

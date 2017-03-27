@@ -374,6 +374,41 @@ my $db = {
             },
         },
 
+        'PostMe' => {
+            'Normal' =>
+'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_MSG% %MSG%',
+            'High' =>
+'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_PRIO% %PRIOCAT%/%PRIORITY%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_MSG% %MSG%',
+            'Low' =>
+'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_PRIO% %PRIOCAT%/%PRIORITY%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_MSG% %MSG%',
+            'defaultValues' => {
+                'Normal' => {
+                    'RCPTNAME2'   => 'Notifications',
+                    'TITLE'       => 'Info',
+                    'PostMe_TO'   => 'To',
+                    'PostMe_PRIO' => 'Priority',
+                    'PostMe_SUB'  => 'Subject',
+                    'PostMe_MSG'  => 'Message',
+                },
+                'High' => {
+                    'RCPTNAME2'   => 'Notifications',
+                    'TITLE'       => 'Warning',
+                    'PostMe_TO'   => 'To',
+                    'PostMe_PRIO' => 'Priority',
+                    'PostMe_SUB'  => 'Subject',
+                    'PostMe_MSG'  => 'Message',
+                },
+                'Low' => {
+                    'RCPTNAME2'   => 'Notifications',
+                    'TITLE'       => 'Notice',
+                    'PostMe_TO'   => 'To',
+                    'PostMe_PRIO' => 'Priority',
+                    'PostMe_SUB'  => 'Subject',
+                    'PostMe_MSG'  => 'Message',
+                },
+            },
+        },
+
         'XBMC' => {
             'Normal' =>
 '{ my $d=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $d msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',

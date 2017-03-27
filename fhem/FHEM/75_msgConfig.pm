@@ -22,13 +22,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.0.0
-#
-# Major Version History:
-# - 1.0.0 - 2015-10-18
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -115,7 +108,7 @@ sub msgConfig_Initialize($) {
       msgTitleText
       msgTitleTextHigh
       msgTitleTextLow
-      msgType
+      msgType:text,push,mail,screen,light,audio
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
@@ -161,6 +154,7 @@ sub msgConfig_Define($$) {
         $attr{$name}{room}    = $room if ( $room ne "" );
         $attr{$name}{comment} = "FHEM Global Configuration for command 'msg'";
         $attr{$name}{stateFormat} = "fhemMsgState";
+        $attr{$name}{msgType}     = "text";
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, "fhemMsgState", "initialized" );
