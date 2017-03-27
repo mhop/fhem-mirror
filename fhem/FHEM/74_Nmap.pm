@@ -134,6 +134,8 @@ sub Nmap_Set($@) {
     "statusRequest"     => "statusRequest:noArg"
   );
 
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_Set");
+
   return(
       "Unknown argument $argument, choose one of "
     . join(" ", values %Nmap_sets)
@@ -174,6 +176,8 @@ sub Nmap_Set($@) {
 sub Nmap_Attr(@) {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my $hash = $defs{$SELF};
+
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_Attr");
 
   if($attribute eq "args"){
     $hash->{ARGS} = $cmd eq "set" ? $value : "-sn";
@@ -256,6 +260,8 @@ sub Nmap_statusRequest($) {
   my $timeout = $interval - 1;
   my $path = $hash->{PATH};
 
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_statusRequest");
+
   BlockingKill($hash->{helper}{RUNNING_PID})
     if(defined($hash->{helper}{RUNNING_PID}));
   RemoveInternalTimer($hash);
@@ -288,6 +294,7 @@ sub Nmap_statusRequest($) {
 
   readingsSingleUpdate($hash, "state", "running", 1);
   Log3($SELF, 3, "$TYPE ($SELF) - starting network scan");
+  Log3($SELF, 5, "$TYPE ($SELF) - BlockingCall Nmap_blocking_statusRequest");
 
   $hash->{helper}{RUNNING_PID} = BlockingCall(
       "Nmap_blocking_statusRequest", $SELF, "Nmap_done"
@@ -311,6 +318,8 @@ sub Nmap_blocking_statusRequest($) {
   my $args = $hash->{ARGS};
   $args .= " --exclude $excludeHosts" if($excludeHosts);
   my $STDERR = "";
+
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_blocking_statusRequest");
 
   close STDERR;
   open(STDERR, ">", \$STDERR);
@@ -353,6 +362,8 @@ sub Nmap_done($) {
   my $devAliases = AttrVal($SELF, "devAlias", undef);
   my %knownHosts = map{$_, 0} split(",", ReadingsVal($SELF, ".knownHosts", ""));
   my $metaReadingAttrVal = AttrVal($SELF, "metaReading", "ip");
+
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_done");
 
   delete($hash->{helper}{RUNNING_PID});
 
@@ -507,6 +518,8 @@ sub Nmap_deleteOldReadings($$) {
   my $TYPE = $hash->{TYPE};
   $value = eval($value);
 
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_deleteOldReadings");
+
   unless(looks_like_number($value)){
     my $ret = "no numeric value given for deleteOldReadings";
 
@@ -538,6 +551,8 @@ sub Nmap_deleteOldReadings($$) {
 sub Nmap_updateUptime($$;$) {
   my ($hash, $metaReading, $uptime) = @_;
   my $SELF = $hash->{NAME};
+
+  Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_updateUptime");
 
   $uptime = (
       ReadingsVal($SELF, $metaReading."_uptime", 0)
