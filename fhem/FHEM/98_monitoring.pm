@@ -193,7 +193,19 @@ sub monitoring_Attr(@) {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my ($hash) = $defs{$SELF};
 
-  if($attribute eq "disable"){
+  if($attribute eq "blacklist" && $value){
+    my @blacklist;
+
+    push(@blacklist, devspec2array($_)) foreach (split(" ", $value));
+
+    my %blacklist = map{$_, 1} @blacklist;
+
+    foreach my $name (sort(keys %blacklist)){
+      monitoring_modify("$SELF|warning|remove|$name");
+      monitoring_modify("$SELF|error|remove|$name");
+    }
+  }
+  elsif($attribute eq "disable"){
     if($cmd eq "set" and $value == 1){
       monitoring_setActive($hash);
     }
@@ -234,7 +246,13 @@ sub monitoring_Notify($$) {
     || $removeRegex && $removeRegex =~ m/^$name:/
     || $events
   );
-  return if(AttrVal($SELF, "blacklist", "") =~ m/(^|,)$name(,|$)/);
+
+  my @blacklist;
+
+  push(@blacklist, devspec2array($_))
+    foreach (split(" ", AttrVal($SELF, "blacklist", "")));
+
+  return if(@blacklist && grep(/$name/, @blacklist));
 
   foreach my $event (@{$events}){
     my $addMatch = "$name:$event" =~ $addRegex;
@@ -603,7 +621,9 @@ sub monitoring_setActive($) {
       </li>
       <li>
         <code>blacklist</code><br>
-        Comma-separated list of devices which will be ignored.
+        Space-separated list of devspecs which will be ignored.<br>
+        If the attribute is set all devices which are specified by the devspecs
+        are removed from both lists.
       </li>
       <li>
         <code>disable (1|0)</code><br>
@@ -1066,7 +1086,9 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
       </li>
       <li>
         <code>blacklist</code><br>
-        Durch Komma getrennte Liste von Ger&auml;ten die ignoriert werden.
+        Durch Leerzeichen getrennte Liste von devspecs die ignoriert werden.<br>
+        Wenn das Attribut gesetzt wird werden alle Geräte die durch die
+        devspecs definiert sind von beiden Listen gelöscht.
       </li>
       <li>
         <code>disable (1|0)</code><br>
