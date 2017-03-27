@@ -1583,7 +1583,12 @@ FW_getSVG(emb)
 {
   if(emb.contentDocument)
     return emb.contentDocument;
-  if(typeof emb.getSVGDocument == "function")
-    return emb.getSVGDocument();
+  if(typeof emb.getSVGDocument == "function") {
+    try {
+      return emb.getSVGDocument();
+    } catch(err) {
+      // dom not loaded -> fall through -> retry;
+    }
+  }
   return undefined;
 }
