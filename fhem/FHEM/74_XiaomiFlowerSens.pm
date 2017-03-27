@@ -36,7 +36,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 
 
@@ -78,6 +78,8 @@ sub XiaomiFlowerSens_Initialize($) {
                             "maxTemp ".
                             "minMoisture ".
                             "maxMoisture ".
+                            "minLux ".
+                            "maxLux ".
                             "sshHost ".
                             $readingFnAttributes;
 
@@ -559,6 +561,9 @@ sub XiaomiFlowerSens_BlockingDone($) {
     
     DoTrigger($name, 'minMoisture ' . ($response_json->{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
     DoTrigger($name, 'maxMoisture ' . ($response_json->{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
+    
+    DoTrigger($name, 'minLux ' . ($response_json->{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
+    DoTrigger($name, 'maxLux ' . ($response_json->{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
 
 
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingDone ($name) - Abschluss!";
@@ -653,7 +658,9 @@ sub XiaomiFlowerSens_BlockingAborted($) {
     <li>minMoisture - min moisture value befor low warn event</li>
     <li>maxMoisture - max moisture value befor High warn event</li>
     <li>minTemp - min temperature value befor low warn event</li>
-    <li>maxTemp - max temperature value befor high warn event
+    <li>maxTemp - max temperature value befor high warn event</li>
+    <li>minlux - min lux value befor low warn event</li>
+    <li>maxlux - max lux value befor high warn event
     <br>
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>

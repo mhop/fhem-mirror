@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_XiaomiFlowerSens: 1.0.1 new Attributs minLux and maxLux
   - feature: 98_monitoring: blacklist attribute is now a space seperated list 
                 of devspecs instead a comma seperated list of devices
   - bugfix:  32_withings: web token fix
