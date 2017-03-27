@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-
 package main;
 
 use strict;
@@ -3069,8 +3068,8 @@ sub EnOcean_Set($@)
             return "Usage: $cmd [learn]" if ($a[1] ne "learn");
             if ($a[1] eq "learn") {
               $cmd = 'off';
-              $setCmd = $setCmd | 0x24;
-              readingsSingleUpdate($hash, "block", "lock", 1);
+              $setCmd = $setCmd | 0x28;
+              readingsSingleUpdate($hash, "block", "unlock", 1);
             }
             shift(@a);
           }
@@ -7032,11 +7031,11 @@ sub EnOcean_Parse($$)
 
     if ($st eq "FRW" || $st eq "smokeDetector.02") {
       # smoke detector
-      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || AttrVal($name, 'alarm', '') eq 'dead_sensor') {
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || ReadingsVal($name, 'alarm', '') eq 'dead_sensor') {
         if ($db[0] == 0x30) {
           push @event, "3:alarm:off";
           push @event, "3:battery:low";
-          $msg = AttrVal($name, 'state', 'off');
+          $msg = ReadingsVal($name, 'state', 'off');
         } elsif ($db[0] == 0x10) {
           push @event, "3:battery:ok";
           push @event, "3:alarm:smoke-alarm";
@@ -7055,11 +7054,11 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "windSpeed.00") {
       # wind speed threshold detector
-      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || AttrVal($name, 'alarm', '') eq 'dead_sensor') {
+      if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} != $db[0] || ReadingsVal($name, 'alarm', '') eq 'dead_sensor') {
         push @event, "3:alarm:off";
         if ($db[0] == 0x30) {
           push @event, "3:battery:low";
-          $msg = AttrVal($name, 'state', 'off');
+          $msg = ReadingsVal($name, 'state', 'off');
         } elsif ($db[0] == 0x10) {
           push @event, "3:windSpeed:on";
           push @event, "3:battery:ok";
