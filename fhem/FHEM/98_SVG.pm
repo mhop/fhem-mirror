@@ -761,9 +761,11 @@ SVG_readgplotfile($$$)
   my ($list, $pr) = parseParams($plotReplace) if($plotReplace);
   if($plotReplace) {
     for my $k (keys %$pr) {
-      if($pr->{$k} =~ m/^{.*}$/) {
+      if($k =~ m/^_/) {
         $cmdFromAnalyze = $pr->{$k};
         $pr->{$k} = eval $cmdFromAnalyze;
+      } elsif($pr->{$k} =~ m/^{.*}$/) {
+        delete $pr->{$k};
       }
     }
   }
@@ -831,7 +833,6 @@ SVG_substcfg($$$$$$)
   my $fileesc = $file;
   $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
   my $title = AttrVal($wl, "title", "\"$fileesc\"");
-
   $title = AnalyzeCommand(undef, "{ $title }");
   my $label = AttrVal($wl, "label", undef);
   my @g_label;
@@ -860,6 +861,21 @@ SVG_substcfg($$$$$$)
       $g_count++;
     }
   }
+
+  my $plotReplace = AttrVal($wl, "plotReplace", undef);
+  if($plotReplace) {
+    my ($list, $pr) = parseParams($plotReplace);
+    for my $k (keys %$pr) {
+      if($k !~ m/^_/) {
+        if($pr->{$k} =~ m/^{.*}$/) {
+          $cmdFromAnalyze = $pr->{$k};
+          $pr->{$k} = eval $cmdFromAnalyze;
+        }
+        $gplot_script =~ s/<$k>/$pr->{$k}/gs;
+      }
+    }
+  }
+
 
   $plot =~ s/\r//g;             # For our windows friends...
   $gplot_script =~ s/\r//g;
@@ -2515,7 +2531,13 @@ plotAsPng(@)
       space separated list of key=value pairs. value may contain spaces if
       enclosed in "" or {}. value will be evaluated, if it is enclosed in {}.
       In the .gplot file &lt;key&gt; is replaced with the corresponding value.
-      Replaces the title, label and plotfunction attributes.
+      <br>
+      If the key starts with the _ character, &lt;key&gt; is replaced
+      <i>before</i> the input is processed, so it can be used to modify the
+      input processing parameters.<br> Else &lt;key&gt; is replaced
+      <i>after</i> the input is processed, so $data{min1} etc can be used.
+      plotReplace is the successor of the title, label and plotfunction
+      attributes.
     </li><br>
   </ul>
   <br>
@@ -2739,8 +2761,14 @@ plotAsPng(@)
       perl-Ausdruck ausgewertet, falls es in {} eingeschlossen ist. In der
       .gplot Datei werden alle &lt;Name&gt; Zeichenketten durch den
       zugehoerigen Wert ersetzt.
+      <br>
+      Falls das erste Zeichen von Name _ ist, dann erfolgt die Ersetzung von
+      &lt;Name&gt; <i>vor</i> der Erzeugung der Inputdaten (damit man die
+      Parameter f&uuml;r die Erzeugung der Inputdaten bestimmen zu kann).
+      Sonst erfolgt sie <i>danach</i>, z.Bsp. um die $data{min1},usw Werte
+      verwenden zu k&ouml;nnen.
     </li><br>
-  </ul>
+  </ul> 
   <br>
 
   <a name="plotEditor"></a>
