@@ -176,6 +176,7 @@ sub Nmap_Set($@) {
 sub Nmap_Attr(@) {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my $hash = $defs{$SELF};
+  my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_Attr");
 
@@ -551,6 +552,7 @@ sub Nmap_deleteOldReadings($$) {
 sub Nmap_updateUptime($$;$) {
   my ($hash, $metaReading, $uptime) = @_;
   my $SELF = $hash->{NAME};
+  my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering Nmap_updateUptime");
 
