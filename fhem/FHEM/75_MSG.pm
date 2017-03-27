@@ -25,12 +25,19 @@
 ##############################################################################
 #
 #TODO
-# - advanced options as attribute in JSON or parseParams format
 # - allow ? to recipients to soft-fail if they are not configured or not
 #   reachable via msg
 # - implement default messages in RESIDENTS using msg command
 # - queue message until recipient is available again (e.g. when absent)
 #   also see https://forum.fhem.de/index.php/topic,69683.0.html
+#   - new msgType "queue"
+#   - escalation to type "queue" when n/a
+#   - automatically trigger to release queue messages by arriving at home
+#     (ROOMMATE)
+# - allow some other ? to only reach people when they are at home
+# - if ROOMMATE is asleep, queue message for next day
+#   (usefull escalate for screen with PostMe?)
+# - delivery options as attributes (like ! or ? to gateways, devices or types)
 #
 
 package main;
@@ -57,7 +64,7 @@ sub MSG_Initialize($$) {
 sub MSG_FindAttrVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
     $msgType = ucfirst($msgType) if ($msgType);
-    $n .= $msgType if ( $n =~ /^msg(Contact|Priority)$/ );
+    $n .= $msgType if ( $n =~ /^msg(Contact)$/ );
 
     my $g = (
         (
@@ -185,6 +192,12 @@ sub CommandMsg($$;$$) {
             },
         },
 
+        # mail => {
+        #     typeEscalation => {
+        #         gwUnavailable => 'queue',
+        #     },
+        # },
+
         push => {
             typeEscalation => {
                 gwUnavailable => 'mail',
@@ -200,6 +213,13 @@ sub CommandMsg($$;$$) {
                 residentAbsent => 'light',
             },
         },
+
+        # queue => {
+        #     typeEscalation => {
+        #         gwUnavailable => 'mail',
+        #         emergency     => 'mail',
+        #     },
+        # },
     };
 
     ################################################################
@@ -248,7 +268,7 @@ sub CommandMsg($$;$$) {
         delete $params->{msgType};
     }
     elsif ( $msg =~
-s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//i
+s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail|queue)[a-z,!|]*)[\s\t]+//i
       )
     {
         Log3 $globalDevName, 5, "msg: found types=$1";
@@ -404,7 +424,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 
             # check for correct type
             my @msgCmds =
-              ( "screen", "light", "audio", "text", "push", "mail" );
+              ( "screen", "light", "audio", "text", "push", "mail", "queue" );
             unless ( grep { $type[$i] eq $_ } @msgCmds ) {
                 $return .= "Unknown message type $type[$i]\n";
                 next;
@@ -702,6 +722,12 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     $cmdSchema->{ $type[$i] }{$deviceType2}
                                 )
                             )
+                            || (
+                                $type[$i] eq "queue"
+                                && defined(
+                                    $cmdSchema->{ $type[$i] }{$deviceType2}
+                                )
+                            )
                         )
                       )
                     {
@@ -744,7 +770,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     # Find priority if none was explicitly specified
                     my $loopPriority = $priority;
                     $loopPriority =
-                      MSG_FindAttrVal( $device, "msgPriority", $typeUc, 0 )
+                      MSG_FindAttrVal( $device, "msgPriority$typeUc", $typeUc,
+                        MSG_FindAttrVal( $device, "msgPriority", $typeUc, 0 ) )
                       if ( $priority eq "" );
 
                     # check for available routes
@@ -756,6 +783,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     $routes{text}   = 0;
                     $routes{push}   = 0;
                     $routes{mail}   = 0;
+                    $routes{queue}  = 1;
 
                     if (
                         !defined($testMode)
@@ -1352,11 +1380,20 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                             # use title from device, global or internal default
                             my $loopTitle = $title;
-                            $loopTitle =
-                              MSG_FindAttrVal( $device,
-                                "msgTitle$typeUc$priorityCat", $typeUc,
-                                $defTitle )
-                              if ( $title eq "-" );
+                            $loopTitle = MSG_FindAttrVal(
+                                $device,
+                                "msgTitle$typeUc$priorityCat",
+                                $typeUc,
+                                MSG_FindAttrVal(
+                                    $device,
+                                    "msgTitle$typeUc",
+                                    $typeUc,
+                                    MSG_FindAttrVal(
+                                        $device, "msgTitle",
+                                        $typeUc, $defTitle
+                                    )
+                                )
+                            ) if ( $title eq "-" );
 
                             $loopTitle = ""
                               if ( $loopTitle eq "none"
@@ -1379,16 +1416,25 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 }
                             }
 
+                            my $loopMsgShrt =
+                              defined( $params->{msgTextShrt} )
+                              ? $params->{msgTextShrt}
+                              : $msg;
+
                             # correct message format
                             #
 
                             # Remove Sonos Speak commands
                             $loopMsg =~ s/(\s*\|\w+\|\s*)/\\n\\n/gi
                               if ( $type[$i] ne "audio" );
+                            $loopMsgShrt =~ s/(\s*\|\w+\|\s*)/\\n\\n/gi
+                              if ( $type[$i] ne "audio" );
 
                             # Replace new line with HTML break
                             # for e-mails
                             $loopMsg =~ s/\n/<br \/>\n/gi
+                              if ( $type[$i] eq "mail" );
+                            $loopMsgShrt =~ s/\n/<br \/>\n/gi
                               if ( $type[$i] eq "mail" );
 
                            # use command from device, global or internal default
@@ -1478,17 +1524,39 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $cmd =~ s/%PRIORITY%/$loopPriority/gi;
                             $cmd =~ s/%PRIOCAT%/$priorityCat/gi;
                             $cmd =~ s/%MSG%/$loopMsg/gi;
+                            $cmd =~ s/%MSGSHRT%/$loopMsgShrt/gi;
                             $cmd =~ s/%MSGID%/$msgID.$sentCounter/gi;
                             $cmd =~ s/%TITLE%/$loopTitle/gi;
 
-                            my $loopTitle2 = $loopTitle;
-                            $loopTitle2 = substr( $loopTitle2, 0, 27 ) . "..."
-                              if ( length($loopTitle2) > 30 );
-                            $cmd =~ s/%TITLESHRT%/$loopTitle2/gi;
-                            $loopTitle2 =~ s/^([\s\t ]*\w+).*/$1/g;
-                            $loopTitle2 = substr( $loopTitle2, 0, 17 ) . "..."
-                              if ( length($loopTitle2) > 20 );
-                            $cmd =~ s/%TITLESHRT2%/$loopTitle2/gi;
+                            my $loopTitleShrt =
+                              defined( $params->{msgTitleShrt} )
+                              ? $params->{msgTitleShrt}
+                              : MSG_FindAttrVal(
+                                $device,
+                                "msgTitleShrt$typeUc$priorityCat",
+                                $typeUc,
+                                MSG_FindAttrVal(
+                                    $device,
+                                    "msgTitleShrt$typeUc",
+                                    $typeUc,
+                                    MSG_FindAttrVal(
+                                        $device, "msgTitleShrt",
+                                        $typeUc, $loopTitle
+                                    )
+                                )
+                              );
+
+                            $loopTitleShrt =
+                              substr( $loopTitleShrt, 0, 37 ) . "..."
+                              if ( length($loopTitleShrt) > 40 );
+                            $cmd =~ s/%TITLESHRT%/$loopTitleShrt/gi;
+                            $loopTitleShrt =~ s/ /_/;
+                            $cmd =~ s/%TITLESHRT2%/$loopTitleShrt/gi;
+                            $loopTitleShrt =~ s/^([\s\t ]*\w+).*/$1/g;
+                            $loopTitleShrt =
+                              substr( $loopTitleShrt, 0, 17 ) . "..."
+                              if ( length($loopTitleShrt) > 20 );
+                            $cmd =~ s/%TITLESHRT3%/$loopTitleShrt/gi;
 
                             my $deviceName = AttrVal(
                                 $device,
@@ -1571,6 +1639,72 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     $cmd =~ s/\$$key/$val/g;
                                     Log3 $logDevice, 5,
 "msg $device: User parameters: replacing %$key% and \$$key by '$val'";
+                                }
+                            }
+
+                            # user parameters from attributes
+                            my $paramsAttr1 = AttrVal(
+                                $device,
+                                "msgParams"
+                                  . ucfirst($gatewayDev)
+                                  . $typeUc
+                                  . $priorityCat,
+                                undef
+                            );
+                            my $paramsAttr2 =
+                              AttrVal( $device,
+                                "msgParams" . ucfirst($gatewayDev) . $typeUc,
+                                undef );
+                            my $paramsAttr3 =
+                              AttrVal( $device,
+                                "msgParams" . ucfirst($gatewayDev), undef );
+                            my $paramsAttr4 =
+                              MSG_FindAttrVal( $device,
+                                "msgParams$typeUc$priorityCat",
+                                $typeUc, undef );
+                            my $paramsAttr5 =
+                              MSG_FindAttrVal( $device, "msgParams$typeUc",
+                                $typeUc, undef );
+                            my $paramsAttr6 =
+                              MSG_FindAttrVal( $device, "msgParams", $typeUc,
+                                undef );
+
+                            foreach (
+                                $paramsAttr1, $paramsAttr2, $paramsAttr3,
+                                $paramsAttr4, $paramsAttr5, $paramsAttr6
+                              )
+                            {
+                                next unless ($_);
+                                my $params;
+                                if (   $_ =~ m/^{.*}$/s
+                                    && $_ =~ m/=>/
+                                    && $_ !~ m/\$/ )
+                                {
+                                    my $av = eval $_;
+                                    if ($@) {
+                                        Log3 $logDevice, 3,
+"msg $device: ERROR while reading attribute msgParams";
+                                    }
+                                    else {
+                                        $params = $av
+                                          if ( ref($av) eq "HASH" );
+                                    }
+                                }
+                                else {
+                                    my ( $a, $h ) = parseParams($_);
+                                    $params = $h
+                                      if ( ref($h) eq "HASH" );
+                                }
+
+                                if ( ref($params) eq "HASH" ) {
+                                    for my $key ( keys %$params ) {
+                                        next if ( ref( $params->{$key} ) );
+                                        my $val = $params->{$key};
+                                        $cmd =~ s/%$key%/$val/gi;
+                                        $cmd =~ s/\$$key/$val/g;
+                                        Log3 $logDevice, 5,
+"msg $device: msgParams: replacing %$key% and \$$key by '$val'";
+                                    }
                                 }
                             }
 

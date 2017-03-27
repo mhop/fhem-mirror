@@ -75,6 +75,24 @@ sub msgConfig_Initialize($) {
       msgFwPrioGoneLight:-2,-1,0,1,2
       msgFwPrioGoneScreen:-2,-1,0,1,2
       msgLocationDevs
+      msgParamsAudio
+      msgParamsAudioShort
+      msgParamsAudioShortPrio
+      msgParamsLight
+      msgParamsLightHigh
+      msgParamsLightLow
+      msgParamsMail
+      msgParamsMailHigh
+      msgParamsMailLow
+      msgParamsPush
+      msgParamsPushHigh
+      msgParamsPushLow
+      msgParamsScreen
+      msgParamsScreenHigh
+      msgParamsScreenLow
+      msgParamsText
+      msgParamsTextHigh
+      msgParamsTextLow
       msgPriorityAudio:-2,-1,0,1,2
       msgPriorityLight:-2,-1,0,1,2
       msgPriorityMail:-2,-1,0,1,2
@@ -108,17 +126,37 @@ sub msgConfig_Initialize($) {
       msgTitleText
       msgTitleTextHigh
       msgTitleTextLow
-      msgType:text,push,mail,screen,light,audio
+      msgTitleShrtAudio
+      msgTitleShrtAudioShort
+      msgTitleShrtAudioShortPrio
+      msgTitleShrtLight
+      msgTitleShrtLightHigh
+      msgTitleShrtLightLow
+      msgTitleShrtMail
+      msgTitleShrtMailHigh
+      msgTitleShrtMailLow
+      msgTitleShrtPush
+      msgTitleShrtPushHigh
+      msgTitleShrtPushLow
+      msgTitleShrtScreen
+      msgTitleShrtScreenHigh
+      msgTitleShrtScreenLow
+      msgTitleShrtText
+      msgTitleShrtTextHigh
+      msgTitleShrtTextLow
+      msgType:text,push,mail,screen,light,audio,queue
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
 
     # add global attributes
     foreach (
-        "msgContactAudio",    "msgContactMail",   "msgContactPush",
-        "msgContactScreen",   "msgContactLight",  "msgRecipient",
-        "msgRecipientAudio",  "msgRecipientMail", "msgRecipientPush",
-        "msgRecipientScreen", "msgRecipientText", "msgRecipientLight",
+        "msgContactAudio",  "msgContactMail",    "msgContactPush",
+        "msgContactScreen", "msgContactLight",   "msgParams",
+        "msgPriority",      "msgRecipient",      "msgRecipientAudio",
+        "msgRecipientMail", "msgRecipientPush",  "msgRecipientScreen",
+        "msgRecipientText", "msgRecipientLight", "msgTitle",
+        "msgTitleShrt",
       )
     {
         addToAttrList($_);
@@ -184,7 +222,7 @@ sub msgConfig_Set($@) {
 
     Log3 $name, 5, "msgConfig $name: called function msgConfig_Set()";
 
-    my @msgTypes = ( "audio", "light", "mail", "push", "screen" );
+    my @msgTypes = ( "audio", "light", "mail", "push", "screen", "queue" );
 
     # cleanReadings
     if ( lc($what) eq "cleanreadings" ) {
@@ -364,7 +402,7 @@ sub msgConfig_Get($@) {
 
     Log3 $name, 5, "msgConfig $name: called function msgConfig_Get()";
 
-    my @msgTypes = ( "audio", "light", "mail", "push", "screen" );
+    my @msgTypes = ( "audio", "light", "mail", "push", "screen", "queue" );
 
     # routeCmd
     if ( lc($what) eq "routecmd" ) {
@@ -575,7 +613,7 @@ sub msgConfig_Get($@) {
 
     else {
         return
-"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen";
+"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen,queue";
     }
 }
 

@@ -42,8 +42,8 @@ my $db = {
 
         'AMAD' => {
             'Normal'        => 'set %DEVICE% ttsMsg %MSG%',
-            'ShortPrio'     => 'set %DEVICE% ttsMsg %MSGSH%',
-            'Short'         => 'set %DEVICE% ttsMsg %MSGSH%',
+            'ShortPrio'     => 'set %DEVICE% ttsMsg %MSGSHRT%',
+            'Short'         => 'set %DEVICE% ttsMsg %MSGSHRT%',
             'defaultValues' => {
                 'ShortPrio' => {
                     'MSGSH' => 'Achtung!',
@@ -56,8 +56,8 @@ my $db = {
 
         'SB_PLAYER' => {
             'Normal'        => 'set %DEVICE% talk |%TITLE%| %MSG%',
-            'ShortPrio'     => 'set %DEVICE% talk |%TITLE%| %MSGSH%',
-            'Short'         => 'set %DEVICE% talk |%TITLE%| %MSGSH%',
+            'ShortPrio'     => 'set %DEVICE% talk |%TITLE%| %MSGSHRT%',
+            'Short'         => 'set %DEVICE% talk |%TITLE%| %MSGSHRT%',
             'defaultValues' => {
                 'Normal' => {
                     'TITLE' => 'Announcement',
@@ -74,10 +74,12 @@ my $db = {
         },
 
         'SONOSPLAYER' => {
-            'Normal' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSG%',
+            'Normal' =>
+              'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSHRT%',
             'ShortPrio' =>
-              'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
-            'Short' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
+              'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %SHOUTOUT%',
+            'Short' =>
+              'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %SHOUTOUT%',
             'defaultValues' => {
                 'Normal' => {
                     'VOLUME' => 38,
@@ -85,24 +87,24 @@ my $db = {
                     'TITLE'  => 'Announcement',
                 },
                 'ShortPrio' => {
-                    'VOLUME' => 33,
-                    'LANG'   => 'de',
-                    'MSGSH'  => 'Achtung!',
-                    'TITLE'  => 'Announcement',
+                    'VOLUME'   => 33,
+                    'LANG'     => 'de',
+                    'TITLE'    => 'Announcement',
+                    'SHOUTOUT' => 'Achtung!',
                 },
                 'Short' => {
-                    'VOLUME' => 28,
-                    'LANG'   => 'de',
-                    'MSGSH'  => '',
-                    'TITLE'  => 'Announcement',
+                    'VOLUME'   => 28,
+                    'LANG'     => 'de',
+                    'TITLE'    => 'Announcement',
+                    'SHOUTOUT' => '',
                 },
             },
         },
 
         'Text2Speech' => {
             'Normal'        => 'set %DEVICE% tts %MSG%',
-            'ShortPrio'     => 'set %DEVICE% tts %MSGSH%',
-            'Short'         => 'set %DEVICE% tts %MSGSH%',
+            'ShortPrio'     => 'set %DEVICE% tts %MSGSHRT%',
+            'Short'         => 'set %DEVICE% tts %MSGSHRT%',
             'defaultValues' => {
                 'ShortPrio' => {
                     'MSGSH' => 'Achtung!',
@@ -376,35 +378,29 @@ my $db = {
 
         'PostMe' => {
             'Normal' =>
-'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%TITLESHRT2% %PostMe_MSG% %MSG%',
+'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'High' =>
-'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_PRIO% %PRIOCAT%/%PRIORITY%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_MSG% %MSG%',
+'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'Low' =>
-'set %DEVICE% create %RCPTNAME2%; set %DEVICE% add %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_PRIO% %PRIOCAT%/%PRIORITY%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_TO% %SRCALIAS2%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_SUB% %TITLE%; set %DEVICE% modify %RCPTNAME2% %MSGDATETIME2%_%PRIOCAT%__%TITLESHRT2% %PostMe_MSG% %MSG%',
+'set %DEVICE% create %TITLESHRT2%_%MSGID%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSGDATETIME%; set %DEVICE% add %TITLESHRT2%_%MSGID% %TITLE%; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_TO%: %SRCALIAS% (%SOURCE%); set %DEVICE% add %TITLESHRT2%_%MSGID% _________________________; set %DEVICE% add %TITLESHRT2%_%MSGID% %PostMe_PRIO%: %PRIOCAT%/%PRIORITY%; set %DEVICE% add %TITLESHRT2%_%MSGID% %MSG%',
             'defaultValues' => {
                 'Normal' => {
-                    'RCPTNAME2'   => 'Notifications',
                     'TITLE'       => 'Info',
                     'PostMe_TO'   => 'To',
-                    'PostMe_PRIO' => 'Priority',
                     'PostMe_SUB'  => 'Subject',
-                    'PostMe_MSG'  => 'Message',
+                    'PostMe_PRIO' => 'Priority',
                 },
                 'High' => {
-                    'RCPTNAME2'   => 'Notifications',
                     'TITLE'       => 'Warning',
                     'PostMe_TO'   => 'To',
-                    'PostMe_PRIO' => 'Priority',
                     'PostMe_SUB'  => 'Subject',
-                    'PostMe_MSG'  => 'Message',
+                    'PostMe_PRIO' => 'Priority',
                 },
                 'Low' => {
-                    'RCPTNAME2'   => 'Notifications',
                     'TITLE'       => 'Notice',
                     'PostMe_TO'   => 'To',
-                    'PostMe_PRIO' => 'Priority',
                     'PostMe_SUB'  => 'Subject',
-                    'PostMe_MSG'  => 'Message',
+                    'PostMe_PRIO' => 'Priority',
                 },
             },
         },
