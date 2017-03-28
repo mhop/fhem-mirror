@@ -120,7 +120,7 @@ sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
-sub parseParams($;$);
+sub parseParams($;$$);
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
