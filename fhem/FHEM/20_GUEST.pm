@@ -316,7 +316,10 @@ sub GUEST_Notify($$) {
         }
 
         # process PRESENCE
-        if ( @presenceDevices && grep { /^$devName$/ } @presenceDevices ) {
+        if ( @presenceDevices
+            && grep { /^[\s\t ]*$devName(:[A-Za-z\d_\.\-\/]*)?[\s\t ]*$/ }
+            @presenceDevices )
+        {
 
             my $counter = {
                 absent  => 0,
@@ -324,15 +327,25 @@ sub GUEST_Notify($$) {
             };
 
             foreach (@presenceDevices) {
+                my $r = "presence";
+                my $d = $_;
+                if ( $d =~
+m/^[\s\t ]*([A-Za-z\d_\.\-\/]+):([A-Za-z\d_\.\-\/]+)?[\s\t ]*$/
+                  )
+                {
+                    $d       = $1;
+                    $reading = $2;
+                }
+
                 my $presenceState =
-                  ReadingsVal( $_, "presence", ReadingsVal( $_, "state", "" ) );
+                  ReadingsVal( $d, $r, ReadingsVal( $d, "state", "" ) );
                 next
                   unless ( $presenceState =~
-/^((absent|disappeared|unavailable)|(present|appeared|available|))$/i
+m/^(absent|disappeared|unavailable|disconnected)|(present|appeared|available|connected|)$/i
                   );
 
-                $counter->{absent}++  if ($2);
-                $counter->{present}++ if ($3);
+                $counter->{absent}++  if ($1);
+                $counter->{present}++ if ($2);
             }
 
             if ( $counter->{absent} && !$counter->{present} ) {
@@ -1471,7 +1484,7 @@ sub GUEST_StopInternalTimers($) {
             <b>rg_passPresenceTo</b> - synchronize presence state with other GUEST or GUEST devices; separte devices by space
           </li>
           <li>
-            <b>rg_presenceDevices</b> - take over presence state from any other FHEM device. Separate more than one device with comma meaning ALL of them need to be either present or absent to trigger update of this ROOMMATE device.
+            <b>rg_presenceDevices</b> - take over presence state from any other FHEM device. Separate more than one device with comma meaning ALL of them need to be either present or absent to trigger update of this ROOMMATE device. You may optionally add a reading name separated by :, otherwise reading name presence and state will be considered.
           </li>
           <li>
             <b>rg_realname</b> - whenever GUEST wants to use the realname it uses the value of attribute alias or group; defaults to group
@@ -1771,7 +1784,7 @@ sub GUEST_StopInternalTimers($) {
             <b>rg_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen GUEST oder ROOMMATE Devices; mehrere Devices durch Leerzeichen trennen
           </li>
           <li>
-            <b>rg_presenceDevices</b> - &uuml;bernehmen des presence Status von einem anderen FHEM Device. Bei mehreren Devices diese mit Komma trennen, um ein Update des GUEST Devices auszul&ouml;sen, sobald ALLE Devices entweder absent oder present sind.
+            <b>rg_presenceDevices</b> - &uuml;bernehmen des presence Status von einem anderen FHEM Device. Bei mehreren Devices diese mit Komma trennen, um ein Update des GUEST Devices auszul&ouml;sen, sobald ALLE Devices entweder absent oder present sind. Optional kann auch durch : abgetrennt ein Reading Name angegeben werden, ansonsten werden die Readings presence und state ber&uuml;cksichtigt.
           </li>
           <li>
             <b>rg_realname</b> - wo immer GUEST den richtigen Namen verwenden m&ouml;chte nutzt es den Wert des Attributs alias oder group; Standard ist group
