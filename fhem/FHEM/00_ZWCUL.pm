@@ -20,7 +20,6 @@ sub ZWCUL_Parse($$$$$);
 sub ZWCUL_Read($@);
 sub ZWCUL_ReadAnswer($$$);
 sub ZWCUL_Ready($);
-sub ZWCUL_SimpleWrite($$);
 sub ZWCUL_Write($$$);
 sub ZWCUL_ProcessSendStack($);
 
@@ -89,9 +88,9 @@ ZWCUL_Define($$)
   setReadingsVal($hash, "homeId",       # ZWDongle compatibility
           "HomeId:$hash->{homeId} CtrlNodeIdHex:$hash->{nodeIdHex}", TimeNow());
 
-  $hash->{Clients} = ":ZWave:STACKABLE_CC:";
+  $hash->{Clients} = ":ZWave:STACKABLE:";
   my %matchList = ( "1:ZWave" => ".*",
-                    "2:STACKABLE_CC"=>"^\\*");
+                    "2:STACKABLE"=>"^\\*" );
   $hash->{MatchList} = \%matchList;
 
   if($dev eq "none") {
@@ -127,7 +126,7 @@ ZWCUL_DoInit($)
 
   my ($err, $ver, $try) = ("", "", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
-    ZWCUL_SimpleWrite($hash, "V");
+    DevIo_SimpleWrite($hash, "V\n", 2);
     ($err, $ver) = ZWCUL_ReadAnswer($hash, "Version", "^V");
     return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
     $ver = "" if(!$ver);
@@ -141,8 +140,8 @@ ZWCUL_DoInit($)
   $ver =~ s/[\r\n]//g;
   $hash->{VERSION} = $ver;
 
-  ZWCUL_SimpleWrite($hash, "zi".$hash->{homeIdSet}.$hash->{nodeIdHex});
-  ZWCUL_SimpleWrite($hash, $hash->{initString});
+  DevIo_SimpleWrite($hash, "zi".$hash->{homeIdSet}.$hash->{nodeIdHex}."\n", 2);
+  DevIo_SimpleWrite($hash, $hash->{initString}."\n", 2);
 
   readingsSingleUpdate($hash, "state", "Initialized", 1);
   return undef;
@@ -154,7 +153,7 @@ sub
 ZWCUL_Undef($$) 
 {
   my ($hash,$arg) = @_;
-  ZWCUL_SimpleWrite($hash, "zx");
+  DevIo_SimpleWrite($hash, "zx\n", 2);
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -164,7 +163,7 @@ ZWCUL_tmp9600($$)
 {
   my ($hash, $on) = @_;
   $hash->{baudRate} = ($on ? "9600" : AttrVal($hash->{NAME},"dataRate","40k"));
-  ZWCUL_SimpleWrite($hash, $on ? $on : $hash->{initString});
+  DevIo_SimpleWrite($hash, ($on ? $on : $hash->{initString})."\n", 2);
 }
 
 #####################################
@@ -243,7 +242,7 @@ ZWCUL_cmd($$@)
   }
 
   $cmd = sprintf($cmd, @a);
-  ZWCUL_SimpleWrite($hash,  $cmd);
+  DevIo_SimpleWrite($hash,  $cmd."\n", 2);
   
   return undef if($type eq "set");
 
@@ -255,23 +254,6 @@ ZWCUL_cmd($$@)
 
 sub ZWCUL_Set() { return ZWCUL_cmd("set", \%sets, @_); };
 sub ZWCUL_Get() { return ZWCUL_cmd("get", \%gets, @_); };
-
-#####################################
-sub
-ZWCUL_SimpleWrite($$)
-{
-  my ($hash, $msg) = @_;
-  return if(!$hash);
-
-  my $name = $hash->{NAME};
-  Log3 $name, 5, "SW: $msg";
-  $msg .= "\n";
-
-  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
-  syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
-  select(undef, undef, undef, 0.001);
-}
 
 #####################################
 sub
@@ -302,7 +284,11 @@ ZWCUL_Write($$$)
                     length($p)/2+($s100 ? 11 : 10), $targetId, $p);
     $msg .= ($s100 ? zwlib_checkSum_16($msg) : zwlib_checkSum_8($msg));
 
-    ZWCUL_SimpleWrite($hash, "zs".$msg);
+    DevIo_SimpleWrite($hash, "zs".$msg, 2);
+
+  } elsif($hash->{STACKED}) {      
+    DevIo_SimpleWrite($hash, $msg, 2);
+
   }
 }
 
@@ -380,7 +366,7 @@ ZWCUL_Parse($$$$$)
 {
   my ($hash, $iohash, $name, $rmsg, $nodispatch) = @_;
 
-  if($rmsg =~ m/^\*/) {                           # STACKABLE_CC
+  if($rmsg =~ m/^\*/) {                           # STACKABLE
     Dispatch($hash, $rmsg, undef);
     return;
   }
@@ -626,7 +612,7 @@ ZWCUL_Attr($$$$)
               ($value eq "9600" ? "9" : "4"));
     $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm$sfx":"zr$sfx");
     $hash->{baudRate} = $value;
-    ZWCUL_SimpleWrite($hash, $hash->{initString});
+    DevIo_SimpleWrite($hash, $hash->{initString}, 2);
 
   }
 

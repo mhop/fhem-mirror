@@ -45,7 +45,7 @@ my %sets = (
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
-my $sccMods = "STACKABLE_CC:TSSTACKED"; # for noansi
+my $sccMods = "STACKABLE_CC:TSSTACKED:STACKABLE";
 my $culNameRe = "^(CUL|TSCUL)\$";
 
 my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
@@ -80,6 +80,7 @@ my %matchListSlowRF = (
     "K:CUL_TCM97001"  => "^s[A-F0-9]+",
     "L:CUL_REDIRECT"  => "^o+",
     "M:TSSTACKED"=>"^\\*",
+    "N:STACKABLE"=>"^\\*",
 );
 
 my %matchListHomeMatic = (
@@ -88,6 +89,7 @@ my %matchListHomeMatic = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
     "M:TSSTACKED"=>"^\\*",
+    "N:STACKABLE"=>"^\\*",
 );
 
 my %matchListMAX = (
@@ -96,6 +98,7 @@ my %matchListMAX = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
     "M:TSSTACKED"=>"^\\*",
+    "N:STACKABLE"=>"^\\*",
 );
 
 my %matchListWMBus = (
@@ -104,6 +107,7 @@ my %matchListWMBus = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
     "M:TSSTACKED"=>"^\\*",
+    "N:STACKABLE"=>"^\\*",
 );
 
 my %matchListKOPP_FC = (
@@ -112,6 +116,7 @@ my %matchListKOPP_FC = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
     "M:TSSTACKED"=>"^\\*",
+    "N:STACKABLE"=>"^\\*",
 );
 
 
@@ -505,7 +510,7 @@ CUL_DoInit($)
     $fhtid =~ s/[\r\n]//g;
     Log3 $name, 5, "GOT CUL fhtid: $fhtid";
     if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
-      Log3 $name, 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
+      Log3 $name, 2, "Setting $name fhtid from $fhtid to " . $hash->{FHTID};
       CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
     }
   }
@@ -833,10 +838,6 @@ CUL_Parse($$$$@)
 {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
 
-  if($rmsg =~ m/^\*/) {                           # STACKABLE_CC
-    Dispatch($hash, $rmsg, undef);
-    return;
-  }
   if($rmsg =~ m/^V/) {                            # CUN* keepalive
     Log3 $name, 4, "CUL_Parse: $name $rmsg";
     return;
@@ -885,10 +886,6 @@ CUL_Parse($$$$@)
       $dmsg = sprintf("81%02x04xx0909a001%s00%s",
                        $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
-
-    } else {
-      ;                                            # => 09_CUL_FHTTK.pm
-
     }
 
   } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
@@ -920,16 +917,6 @@ CUL_Parse($$$$@)
     $dmsg = lc($dmsg);
   } elsif($fn eq "i" && $len >= 7) {              # IT
     $dmsg = lc($dmsg);
-  } elsif($fn eq "Y" && $len >= 3) {               # SOMFY RTS
-    ;
-  } elsif($fn eq "S" && $len >= 33) {              # CUL_ESA / ESA2000 / Native
-    ;
-  } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
-    ;
-  } elsif($fn eq "R" && $len >= 11) {              # CUL_HOERMANN / Native
-    ;
-  } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
-    ;
   } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
     my $src = substr($dmsg,9,6);
     if($modules{CUL_HM}{defptr}{$src}){
@@ -944,16 +931,6 @@ CUL_Parse($$$$@)
     $dmsg .= "::$rssi" if (defined($rssi));
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
-  } elsif($fn eq "s" && $len >= 5)  {              # CUL_TCM97001
-    ;
-  } elsif($fn eq "o" && $len >= 5)  {              # CUL_REDIRECT
-    ;
-  } elsif($fn eq "k" && $len >= 20) {              # KOPP_FC
-    ;
-  } else {
-    DoTrigger($name, "UNKNOWNCODE $dmsg");
-    Log3 $name, 2, "$name: unknown message $dmsg";
-    return;
   }
 
   $hash->{"${name}_MSGCNT"}++;
@@ -1005,23 +982,7 @@ CUL_SimpleWrite(@)
   my ($hash, $msg, $nonl) = @_;
   return if(!$hash);
   ($hash, $msg) = CUL_prefix(1, $hash, $msg);
-
-  my $name = $hash->{NAME};
-  if (AttrVal($name,"rfmode","") eq "HomeMatic"){
-    Log3 $name, 4, "CUL_send:  $name".join(" ",unpack('A2A2A2A4A6A6A*',$msg));
-  }
-  else{
-    Log3 $name, 5, "SW: $msg";
-  }
-
-  $msg .= "\n" unless($nonl);
-
-  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
-  syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
-
-  # Some linux installations are broken with 0.001, T01 returns no answer
-  select(undef, undef, undef, 0.01);
+  DevIo_SimpleWrite($hash, $msg, 2, !$nonl);
 }
 
 sub
