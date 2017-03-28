@@ -1,4 +1,4 @@
-REV 13826
+REV 13828
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -24,7 +24,7 @@ MOV FHEM/firmware/LaCrosseGateway.bin unused
 UPD 2017-03-28_07:45:02 190911 ./CHANGED
 UPD 2017-03-25_07:45:02 36411 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2017-03-28_07:45:05 130697 ./fhem.pl
+UPD 2017-03-28_09:31:26 130698 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-01-07_07:45:02 58179 FHEM/00_CUL.pm
 UPD 2017-03-28_07:45:02 76525 FHEM/00_DFPlayerMini.pm
