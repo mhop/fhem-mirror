@@ -760,8 +760,7 @@ SVG_readgplotfile($$$)
 
   my $plotReplace = AttrVal($wl, "plotReplace", undef);
   my ($list, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
-  sub
-  prSubst($)
+  my $prSubst = sub($)
   {
     my $v = $pr->{$_[0]};
     return "%$_[0]%" if(!$v);
@@ -771,12 +770,12 @@ SVG_readgplotfile($$$)
     } else {
       return $v;
     }
-  }
+  };
 
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
 
-    map { $l =~ s/%($_)%/prSubst($1)/ge } keys %$pr if($plotReplace);
+    map { $l =~ s/%($_)%/&$prSubst($1)/ge } keys %$pr if($plotReplace);
     my ($src, $plotfn) = (undef, undef);
     if($l =~ m/^#([^ ]*) (.*)$/) {
       if($1 eq $ldType) {
