@@ -757,22 +757,26 @@ SVG_readgplotfile($$$)
   $srcDesc{order} = \@empty;
 
   my $specval = AttrVal($wl, "plotfunction", undef);
+
   my $plotReplace = AttrVal($wl, "plotReplace", undef);
   my ($list, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
-  if($plotReplace) {
-    for my $k (keys %$pr) {
-      if($k =~ m/^_/) {
-        $cmdFromAnalyze = $pr->{$k};
-        $pr->{$k} = eval $cmdFromAnalyze;
-      } elsif($pr->{$k} =~ m/^{.*}$/) {
-        delete $pr->{$k};
-      }
+  sub
+  prSubst($)
+  {
+    my $v = $pr->{$_[0]};
+    return $_[0] if(!$v);
+    if($v =~ m/^{.*}$/) {
+      $cmdFromAnalyze = $v;
+      return eval $v;
+    } else {
+      return $v;
     }
   }
 
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
-    map { $l =~ s/<$_>/$pr->{$_}/g } keys %$pr if($plotReplace);
+
+    map { $l =~ s/%($_)%/prSubst($1)/ge } keys %$pr if($plotReplace);
     my ($src, $plotfn) = (undef, undef);
     if($l =~ m/^#([^ ]*) (.*)$/) {
       if($1 eq $ldType) {
@@ -866,13 +870,11 @@ SVG_substcfg($$$$$$)
   if($plotReplace) {
     my ($list, $pr) = parseParams($plotReplace, "\\s"," ");
     for my $k (keys %$pr) {
-      if($k !~ m/^_/) {
-        if($pr->{$k} =~ m/^{.*}$/) {
-          $cmdFromAnalyze = $pr->{$k};
-          $pr->{$k} = eval $cmdFromAnalyze;
-        }
-        $gplot_script =~ s/<$k>/$pr->{$k}/gs;
+      if($pr->{$k} =~ m/^{.*}$/) {
+        $cmdFromAnalyze = $pr->{$k};
+        $pr->{$k} = eval $cmdFromAnalyze;
       }
+      $gplot_script =~ s/<$k>/$pr->{$k}/g;
     }
   }
 
@@ -2529,15 +2531,15 @@ plotAsPng(@)
     <a name="plotReplace"></a>
     <li>plotReplace<br>
       space separated list of key=value pairs. value may contain spaces if
-      enclosed in "" or {}. value will be evaluated, if it is enclosed in {}.
-      In the .gplot file &lt;key&gt; is replaced with the corresponding value.
+      enclosed in "" or {}. value will be evaluated as a perl expression, if it
+      is enclosed in {}.
       <br>
-      If the key starts with the _ character, &lt;key&gt; is replaced
-      <i>before</i> the input is processed, so it can be used to modify the
-      input processing parameters.<br> Else &lt;key&gt; is replaced
-      <i>after</i> the input is processed, so $data{min1} etc can be used.
-      plotReplace is the successor of the title, label and plotfunction
-      attributes.
+      In the .gplot file &lt;key&gt; is replaced with the corresponding value,
+      the evaluation of {} takes place <i>after</i> the input file is
+      processed, so $data{min1} etc can be used.
+      <br>
+      %key% will be repaced <i>before</i> the input file is processed, this
+      expression can be used to replace parameters for the input processing.
     </li><br>
   </ul>
   <br>
@@ -2758,15 +2760,15 @@ plotAsPng(@)
     <li>plotReplace<br>
       Leerzeichen getrennte Liste von Name=Wert Paaren. Wert kann Leerzeichen
       enthalten, falls es in "" oder {} eingeschlossen ist. Wert wird als
-      perl-Ausdruck ausgewertet, falls es in {} eingeschlossen ist. In der
-      .gplot Datei werden alle &lt;Name&gt; Zeichenketten durch den
-      zugehoerigen Wert ersetzt.
+      perl-Ausdruck ausgewertet, falls es in {} eingeschlossen ist.
       <br>
-      Falls das erste Zeichen von Name _ ist, dann erfolgt die Ersetzung von
-      &lt;Name&gt; <i>vor</i> der Erzeugung der Inputdaten (damit man die
-      Parameter f&uuml;r die Erzeugung der Inputdaten bestimmen zu kann).
-      Sonst erfolgt sie <i>danach</i>, z.Bsp. um die $data{min1},usw Werte
-      verwenden zu k&ouml;nnen.
+      In der .gplot Datei werden &lt;Name&gt; Zeichenketten durch den
+      zugehoerigen Wert ersetzt, die Auswertung von {} Ausdr&uuml;cken erfolgt
+      <i>nach</i> dem die Daten ausgewertet wurden, d.h. man kann hier
+      $data{min1},etc verwenden.
+      <br>
+      Bei %Name% erfolgt die Ersetzung <i>vor</i> der Datenauswertung, das kann
+      man verwenden, um Parameter f&uuml;r die Auswertung zu ersetzen.
     </li><br>
   </ul> 
   <br>
