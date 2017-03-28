@@ -333,15 +333,15 @@ sub GUEST_Notify($$) {
 m/^[\s\t ]*([A-Za-z\d_\.\-\/]+):([A-Za-z\d_\.\-\/]+)?[\s\t ]*$/
                   )
                 {
-                    $d       = $1;
-                    $reading = $2;
+                    $d = $1;
+                    $r = $2;
                 }
 
                 my $presenceState =
                   ReadingsVal( $d, $r, ReadingsVal( $d, "state", "" ) );
                 next
                   unless ( $presenceState =~
-m/^(absent|disappeared|unavailable|disconnected)|(present|appeared|available|connected|)$/i
+m/^(0|false|absent|disappeared|unavailable|unreachable|disconnected)|(1|true|present|appeared|available|reachable|connected|)$/i
                   );
 
                 $counter->{absent}++  if ($1);
