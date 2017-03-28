@@ -764,7 +764,7 @@ SVG_readgplotfile($$$)
   prSubst($)
   {
     my $v = $pr->{$_[0]};
-    return $_[0] if(!$v);
+    return "%$_[0]%" if(!$v);
     if($v =~ m/^{.*}$/) {
       $cmdFromAnalyze = $v;
       return eval $v;
@@ -877,7 +877,6 @@ SVG_substcfg($$$$$$)
       $gplot_script =~ s/<$k>/$pr->{$k}/g;
     }
   }
-
 
   $plot =~ s/\r//g;             # For our windows friends...
   $gplot_script =~ s/\r//g;
