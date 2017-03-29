@@ -848,7 +848,7 @@ if (\$EVTPART0 eq \"stop\") {\
         my ( $nextWakeupDev, $nextWakeup ) =
           RESIDENTStk_wakeupGetNext($wakeupUserdevice);
         if ( !$nextWakeupDev || !$nextWakeup ) {
-            $nextWakeupDev = "none";
+            $nextWakeupDev = "";
             $nextWakeup    = "OFF";
         }
         readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
@@ -1192,7 +1192,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     my ( $nextWakeupDev, $nextWakeup ) =
       RESIDENTStk_wakeupGetNext($wakeupUserdevice);
     if ( !$nextWakeupDev || !$nextWakeup ) {
-        $nextWakeupDev = "none";
+        $nextWakeupDev = "";
         $nextWakeup    = "OFF";
     }
     readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
@@ -1393,7 +1393,7 @@ sub RESIDENTStk_wakeupGetNext($) {
         if ( lc($nextRun) ne "off" && $nextRun =~ /^([0-9]{2}:[0-9]{2})$/ ) {
 
             Log3 $name, 4,
-              "RESIDENTStk $wakeupDevice: 02 - possible candidate found";
+"RESIDENTStk $wakeupDevice: 02 - possible candidate found - weekdayToday=$today weekdayTomorrow=$tomorrow";
 
             my $nextRunSec;
 
@@ -1445,6 +1445,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                 else {
                     Log3 $name, 4,
 "RESIDENTStk $wakeupDevice: 05 - won't be running today anymore based on weekday decision";
+                    next;
                 }
 
                 # if we need to consider holidays in parallel to weekdays
@@ -1475,10 +1476,10 @@ sub RESIDENTStk_wakeupGetNext($) {
 
             }
 
-            # running tomorrow
+            # running later
             else {
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow";
+"RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow or later - weekdayTomorrow=$tomorrow";
 
                 # if tomorrow is in scope
                 if ( $daysTomorrow{$tomorrow} ) {
@@ -1510,7 +1511,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                 else {
                     Log3 $name, 4,
 "RESIDENTStk $wakeupDevice: 05 - won't be running tomorrow based on weekday decision";
-
+                    next;
                 }
 
                 # if we need to consider holidays in parallel to weekdays
