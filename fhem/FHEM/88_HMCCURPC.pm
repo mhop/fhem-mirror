@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.9 beta
+#  Version 0.92 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.9 beta';
+my $HMCCURPC_VERSION = '0.92 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -66,17 +66,29 @@ my $HMCCURPC_TIMEOUT_WRITE = 0.001;
 # Timeout for accepting incoming connections
 my $HMCCURPC_TIMEOUT_ACCEPT = 1;
 
-# RPC Ports and URL extensions
+# Send statistic information after specified amount of events
+my $HMCCURPC_STATISTICS = 500;
+
+# RPC protocol name by port number
 my %HMCCURPC_RPC_NUMPORT = (
 	2000 => 'BidCos-Wired', 2001 => 'BidCos-RF', 2010 => 'HmIP-RF', 9292 => 'VirtualDevices',
 	2003 => 'Homegear'
 );
+
+# RPC ports by protocol name
 my %HMCCURPC_RPC_PORT = (
    'BidCos-Wired', 2000, 'BidCos-RF', 2001, 'HmIP-RF', 2010, 'VirtualDevices', 9292,
    'Homegear', 2003
 );
+
+# URL extensions
 my %HMCCURPC_RPC_URL = (
 	9292, 'groups'
+);
+
+# Type of RPC interface. A=ASCII B=BINARY
+my %HMCCURPC_RPC_PROT = (
+   2000 => 'A', 2001 => 'A', 2010 => 'A', 9292 => 'A', 2003 => 'A', 8701 => 'B'
 );
 
 # Initial intervals for registration of RPC callbacks and reading RPC queue
@@ -94,6 +106,21 @@ my $HMCCURPC_INIT_INTERVAL3 = 25;
 my $HMCCURPC_THREAD_DATA = 1;
 my $HMCCURPC_THREAD_SERVER = 2;
 my $HMCCURPC_THREAD_ALL = 3;
+
+# Data types
+my $BINRPC_INTEGER = 1;
+my $BINRPC_BOOL    = 2;
+my $BINRPC_STRING  = 3;
+my $BINRPC_DOUBLE  = 4;
+my $BINRPC_BASE64  = 17;
+my $BINRPC_ARRAY   = 256;
+my $BINRPC_STRUCT  = 257;
+
+# Message types
+my $BINRPC_REQUEST        = 0x42696E00;
+my $BINRPC_RESPONSE       = 0x42696E01;
+my $BINRPC_REQUEST_HEADER = 0x42696E40;
+my $BINRPC_ERROR          = 0x42696EFF;
 
 
 ######################################################################
@@ -140,6 +167,7 @@ sub HMCCURPC_HandleConnection ($$$$);
 sub HMCCURPC_TriggerIO ($$$);
 sub HMCCURPC_ProcessData ($$$$);
 sub HMCCURPC_Write ($$$$);
+sub HMCCURPC_WriteStats ($$);
 sub HMCCURPC_NewDevicesCB ($$$);
 sub HMCCURPC_DeleteDevicesCB ($$$);
 sub HMCCURPC_UpdateDeviceCB ($$$$);
@@ -147,6 +175,31 @@ sub HMCCURPC_ReplaceDeviceCB ($$$$);
 sub HMCCURPC_ReaddDevicesCB ($$$);
 sub HMCCURPC_EventCB ($$$$$);
 sub HMCCURPC_ListDevicesCB ($$);
+
+# Binary RPC encoding functions
+sub HMCCURPC_EncInteger ($);
+sub HMCCURPC_EncBool ($);
+sub HMCCURPC_EncString ($);
+sub HMCCURPC_EncName ($);
+sub HMCCURPC_EncDouble ($);
+sub HMCCURPC_EncBase64 ($);
+sub HMCCURPC_EncArray ($);
+sub HMCCURPC_EncStruct ($);
+sub HMCCURPC_EncType ($$);
+sub HMCCURPC_EncodeRequest ($$);
+sub HMCCURPC_EncodeResponse ($$);
+
+# Binary RPC decoding functions
+sub HMCCURPC_DecInteger ($$$);
+sub HMCCURPC_DecBool ($$);
+sub HMCCURPC_DecString ($$);
+sub HMCCURPC_DecDouble ($$);
+sub HMCCURPC_DecBase64 ($$);
+sub HMCCURPC_DecArray ($$);
+sub HMCCURPC_DecStruct ($$);
+sub HMCCURPC_DecType ($$);
+sub HMCCURPC_DecodeRequest ($);
+sub HMCCURPC_DecodeResponse ($);
 
 
 ######################################################################
@@ -170,7 +223,7 @@ sub HMCCURPC_Initialize ($)
 	$hash->{AttrList} = "rpcInterfaces:multiple-strict,".join(',',sort keys %HMCCURPC_RPC_PORT).
 		" ccuflags:multiple-strict,expert rpcMaxEvents rpcQueueSize rpcTriggerTime". 
 		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
-		" rpcConnTimeout rpcWaitTime ".
+		" rpcConnTimeout rpcWaitTime rpcStatistics ".
 		$readingFnAttributes;
 }
 
@@ -356,6 +409,7 @@ sub HMCCURPC_Get ($@)
 		foreach my $clkey (keys %{$hash->{hmccu}{rpc}}) {
 			next if ($clkey eq 'DATA');
 			$result .= "Event statistics for server $clkey\n";
+			$result .= "Average event delay = ".$hash->{hmccu}{rpc}{$clkey}{avgdelay}."\n";
 			$result .= "========================================\n";
 			$result .= "ET Sent by RPC server   Received by FHEM\n";
 			$result .= "----------------------------------------\n";
@@ -648,9 +702,9 @@ sub HMCCURPC_ProcessEvent ($$)
 	my $rh = \%{$hash->{hmccu}{rpc}};	# Just for code simplification
 	my $hmccu_hash = $hash->{IODev};
 
-	# Number of arguments in RPC events
+	# Number of arguments in RPC events (without event type and clkey)
 	my %rpceventargs = (
-		"EV", 3,
+		"EV", 4,
 		"ND", 6,
 		"DD", 1,
 		"RD", 2,
@@ -659,7 +713,7 @@ sub HMCCURPC_ProcessEvent ($$)
 		"IN", 2,
 		"EX", 2,
 		"SL", 1,
-		"ST", 9
+		"ST", 10
 	);
 	
 	# Parse event
@@ -702,11 +756,14 @@ sub HMCCURPC_ProcessEvent ($$)
 	if ($et eq 'EV') {
 		#
 		# Update of datapoint
-		# Input:  EV|clkey|Address|Datapoint|Value
+		# Input:  EV|clkey|Time|Address|Datapoint|Value
 		# Output: EV, clkey, DevAdd, ChnNo, Datapoint, Value
 		#
-		my ($add, $chn) = split (/:/, $t[0]);
-		return ($et, $clkey, $add, $chn, $t[1], $t[2]);
+		my $delay = $rh->{$clkey}{evtime}-$t[0];
+		$rh->{$clkey}{sumdelay} += $delay;
+		$rh->{$clkey}{avgdelay} = $rh->{$clkey}{sumdelay}/$rh->{$clkey}{rec}{$et};
+		my ($add, $chn) = split (/:/, $t[1]);
+		return ($et, $clkey, $add, $chn, $t[2], $t[3]);
 	}
 	elsif ($et eq 'SL') {
 		#
@@ -747,6 +804,7 @@ sub HMCCURPC_ProcessEvent ($$)
 			$hash->{hmccu}{rpcstarttime} = 0;
 			HMCCURPC_SetRPCState ($hash, "running", "All RPC servers running");
 			HMCCURPC_SetState ($hash, "OK");
+			HMCCU_SetState ($hmccu_hash, "OK");
 			($c_ok, $c_err) = HMCCU_UpdateClients ($hmccu_hash, '.*', 'Attr', 0);
 			Log3 $name, 2, "HMCCURPC: Updated devices. Success=$c_ok Failed=$c_err";
 			RemoveInternalTimer ($hash);
@@ -827,14 +885,15 @@ sub HMCCURPC_ProcessEvent ($$)
 	}
 	elsif ($et eq 'ST') {
 		#
-		# Statistic data. Store snapshots of sent and received events.
-		# Input:  ST|clkey|nTotal|nEV|nND|nDD|nRD|nRA|nUD|nIN|nSL|nEX
+		# Statistic data. Store snapshots of sent events.
+		# Input:  ST|clkey|nTotal|nEV|nND|nDD|nRD|nRA|nUD|nIN|nEX|nSL
 		# Output: ST, clkey, ...
 		#
 		my @res = ($et, $clkey);
 		push (@res, @t);
+		my $total = shift @t;
 		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
-		for (my $i=0; $i<$rpceventargs{$et}; $i++) {
+		for (my $i=0; $i<9; $i++) {
 			$hash->{hmccu}{rpc}{$clkey}{snd}{$eventtypes[$i]} += $t[$i];
 		}
 		return @res;
@@ -1108,6 +1167,7 @@ sub HMCCURPC_StartRPCServer ($)
 	$thrpar{waittime}    = AttrVal ($name, 'rpcWaitTime',      $HMCCURPC_TIME_WAIT);
 	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize',     $HMCCURPC_MAX_QUEUESIZE);
 	$thrpar{triggertime} = AttrVal ($name, 'rpcTriggerTime',   $HMCCURPC_TIME_TRIGGER);
+	$thrpar{statistics}  = AttrVal ($name, 'rpcStatistics',    $HMCCURPC_STATISTICS);
 	$thrpar{name}        = $name;
 	
 	my $ccunum = $hash->{CCUNum};
@@ -1197,6 +1257,7 @@ sub HMCCURPC_StartRPCServer ($)
 			$hash->{hmccu}{rpc}{$clkey}{rec}{$et} = 0;
 			$hash->{hmccu}{rpc}{$clkey}{snd}{$et} = 0;
 		}
+		$hash->{hmccu}{rpc}{$clkey}{sumdelay} = 0;
 	}
 
 	sleep (1);
@@ -1470,6 +1531,7 @@ sub HMCCURPC_HandleConnection ($$$$)
 
 	# Initialize RPC server
 	my $iface = $HMCCURPC_RPC_NUMPORT{$port};
+	my $prot = $HMCCURPC_RPC_PROT{$port};
 	Log3 $name, 2, "CCURPC: Initializing RPC server $clkey for interface $iface";
 	my $rpcsrv = HMCCURPC_InitRPCServer ($name, $port, $callbackport);
 	if (!defined ($rpcsrv)) {
@@ -1486,8 +1548,10 @@ sub HMCCURPC_HandleConnection ($$$$)
 	$rpcsrv->{hmccu}{clkey} = $clkey;
 	$rpcsrv->{hmccu}{eventqueue} = $queue;
 	$rpcsrv->{hmccu}{queuesize} = $thrpar->{queuesize};
+	$rpcsrv->{hmccu}{statistics} = $thrpar->{statistics};
 	
 	# Initialize statistic counters
+	$rpcsrv->{hmccu}{snd}{total} = 0;
 	foreach my $et (@eventtypes) {
 		$rpcsrv->{hmccu}{snd}{$et} = 0;
 	}
@@ -1506,19 +1570,20 @@ sub HMCCURPC_HandleConnection ($$$$)
 		last if (! $run);
 		$connection->timeout ($thrpar->{conntimeout});
 		Log3 $name, 4, "CCURPC: $clkey processing CCU request";
-		$rpcsrv->process_request ($connection);
+		if ($prot eq 'A') {
+			$rpcsrv->process_request ($connection);
+		}
+		else {
+#			HMCCURPC_ProcessRequest ($connection);
+		}
 		shutdown ($connection, 2);
 		undef $connection;
 	}
 
 	# Send statistic info
-	my $et = shift @eventtypes;
-	my $st = $rpcsrv->{hmccu}{snd}{$et};
-	foreach $et (@eventtypes) {
-		$st .= '|'.$rpcsrv->{hmccu}{snd}{$et};
-	}
-	HMCCURPC_Write ($rpcsrv, "ST", $clkey, $st);
-	
+	HMCCURPC_WriteStats ($rpcsrv, $clkey);
+
+	# Send exit information	
 	HMCCURPC_Write ($rpcsrv, "EX", $clkey, "SHUTDOWN|$tid");
 	Log3 $name, 2, "CCURPC: RPC server $clkey stopped handling connections. TID=$tid";
 
@@ -1586,6 +1651,7 @@ sub HMCCURPC_ProcessData ($$$$)
 	my $warn = 0;
 	my $ec = 0;
 	my $tid = threads->tid ();
+	my $triggertime = $thrpar->{triggertime};
 	
 	$SIG{INT} = sub { $run = 0; };
 
@@ -1612,14 +1678,16 @@ sub HMCCURPC_ProcessData ($$$$)
 				# Inform reader about new items in queue
 				Log3 $name, 4, "CCURPC: Trigger I/O for $num_items items";
 				my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, $num_items, $thrpar);
-				if ($ttime == 0) {
-					$ec++;
-					Log3 $name, 2, "CCURPC: I/O error during data processing ($err)" if ($ec == 1);
-					$ec = 0 if ($ec == $HMCCURPC_MAX_IOERRORS);
-					sleep ($thrpar->{triggertime});
-				}
-				else {
-					$ec = 0;
+				if ($triggertime > 0) {
+					if ($ttime == 0) {
+						$ec++;
+						Log3 $name, 2, "CCURPC: I/O error during data processing ($err)" if ($ec == 1);
+						$ec = 0 if ($ec == $HMCCURPC_MAX_IOERRORS);
+						sleep ($triggertime);
+					}
+					else {
+						$ec = 0;
+					}
 				}
 			}
 		}
@@ -1641,9 +1709,9 @@ sub HMCCURPC_ProcessData ($$$$)
 	return;
 }
 
-##################################################
+######################################################################
 # Write event into queue
-##################################################
+######################################################################
 
 sub HMCCURPC_Write ($$$$)
 {
@@ -1662,7 +1730,32 @@ sub HMCCURPC_Write ($$$$)
 		Log3 $name, 4, "CCURPC: $cb enqueue event $et. parameter = $msg";
 		$queue->enqueue ($et."|".$cb."|".$msg);
 		$server->{hmccu}{snd}{$et}++;
+		$server->{hmccu}{snd}{total}++;
+		HMCCURPC_WriteStats ($server, $cb)
+			if ($server->{hmccu}{snd}{total} % $server->{hmccu}{statistics} == 0);
 	}
+}
+
+######################################################################
+# Write statistics
+######################################################################
+
+sub HMCCURPC_WriteStats ($$)
+{
+	my ($server, $clkey) = @_;
+	my $name = $server->{hmccu}{name};
+	
+	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
+
+	# Send statistic info
+	my $st = $server->{hmccu}{snd}{total};
+	foreach my $et (@eventtypes) {
+		$st .= '|'.$server->{hmccu}{snd}{$et};
+	}
+	
+	Log3 $name, 4, "CCURPC: Event statistics = $st";
+	my $queue = $server->{hmccu}{eventqueue};
+	$queue->enqueue ("ST|$clkey|$st");
 }
 
 ######################################################################
@@ -1769,8 +1862,9 @@ sub HMCCURPC_EventCB ($$$$$)
 {
 	my ($server, $cb, $devid, $attr, $val) = @_;
 	my $name = $server->{hmccu}{name};
+	my $etime = time ();
 	
-	HMCCURPC_Write ($server, "EV", $cb, $devid."|".$attr."|".$val);
+	HMCCURPC_Write ($server, "EV", $cb, $etime."|".$devid."|".$attr."|".$val);
 
 	# Never remove this statement!
 	return;
@@ -1791,6 +1885,463 @@ sub HMCCURPC_ListDevicesCB ($$)
 
 	return RPC::XML::array->new ();
 }
+
+
+######################################################################
+# Binary RPC encoding functions
+######################################################################
+
+######################################################################
+# Encode integer (type = 1)
+######################################################################
+
+sub HMCCURPC_EncInteger ($)
+{
+	my ($v) = @_;
+	
+	return pack ('Nl', $BINRPC_INTEGER, $v);
+}
+
+######################################################################
+# Encode bool (type = 2)
+######################################################################
+
+sub HMCCURPC_EncBool ($)
+{
+	my ($v) = @_;
+	
+	return pack ('NC', $BINRPC_BOOL, $v);
+}
+
+######################################################################
+# Encode string (type = 3)
+# Input is string. Empty string = void
+######################################################################
+
+sub HMCCURPC_EncString ($)
+{
+	my ($v) = @_;
+	
+	return pack ('NN', $BINRPC_STRING, length ($v)).$v;
+}
+
+######################################################################
+# Encode name
+######################################################################
+
+sub HMCCURPC_EncName ($)
+{
+	my ($v) = @_;
+
+	return pack ('N', length ($v)).$v;
+}
+
+######################################################################
+# Encode double (type = 4)
+######################################################################
+
+sub HMCCURPC_EncDouble ($)
+{
+	my ($v) = @_;
+ 
+	my $s = $v < 0 ? -1.0 : 1.0;
+	my $l = log (abs($v))/log (2);
+	my $f = $l;
+       
+	if ($l-int ($l) > 0) {
+		$f = ($l < 0) ? -int (abs ($l)+1.0) : int ($l);
+	}
+	my $e = $f+1;
+	my $m = int ($s*$v*2**-$e*0x40000000);
+       
+	return pack ('NNN', $BINRPC_DOUBLE, $m, $e);
+}
+
+######################################################################
+# Encode base64 (type = 17)
+# Input is base64 encoded string
+######################################################################
+
+sub HMCCURPC_EncBase64 ($)
+{
+	my ($v) = @_;
+	
+	return pack ('NN', $BINRPC_DOUBLE, length ($v)).$v;
+}
+
+######################################################################
+# Encode array (type = 256)
+# Input is array reference. Array must contain (type, value) pairs
+######################################################################
+
+sub HMCCURPC_EncArray ($)
+{
+	my ($a) = @_;
+	
+	my $r = '';
+	my $s = 0;
+
+	while (my $t = shift @$a) {
+		my $e = shift @$a;
+		if ($e) {
+			$r .= HMCCURPC_EncType ($t, $e);
+			$s++;
+		}
+	}
+	
+	return pack ('NN', $BINRPC_ARRAY, $s).$r;
+}
+
+######################################################################
+# Encode struct (type = 257)
+# Input is hash reference. Hash elements:
+#   hash->{$element}{T} = Type
+#   hash->{$element}{V} = Value
+######################################################################
+
+sub HMCCURPC_EncStruct ($)
+{
+	my ($h) = @_;
+	
+	my $r = '';
+	my $s = 0;
+	
+	foreach my $k (keys %{$h}) {
+		$r .= HMCCURPC_EncName ($k);
+		$r .= HMCCURPC_EncType ($h->{$k}{T}, $h->{$k}{V});
+		$s++;
+	}
+
+	return pack ('NN', $BINRPC_STRUCT, $s).$r;
+}
+
+######################################################################
+# Encode any type
+# Input is type and value
+# Return encoded data or empty string on error
+######################################################################
+
+sub HMCCURPC_EncType ($$)
+{
+	my ($t, $v) = @_;
+	
+	if ($t == $BINRPC_INTEGER) {
+		return HMCCURPC_EncInteger ($v);
+	}
+	elsif ($t == $BINRPC_BOOL) {
+		return HMCCURPC_EncBool ($v);
+	}
+	elsif ($t == $BINRPC_STRING) {
+		return HMCCURPC_EncString ($v);
+	}
+	elsif ($t == $BINRPC_DOUBLE) {
+		return HMCCURPC_EncDouble ($v);
+	}
+	elsif ($t == $BINRPC_BASE64) {
+		return HMCCURPC_EncBase64 ($v);
+	}
+	elsif ($t == $BINRPC_ARRAY) {
+		return HMCCURPC_EncArray ($v);
+	}
+	elsif ($t == $BINRPC_STRUCT) {
+		return HMCCURPC_EncStruct ($v);
+	}
+	else {
+		return '';
+	}
+}
+
+######################################################################
+# Encode RPC request with method and optional parameters.
+# Headers are not supported.
+# Input is method name reference to parameter array.
+# Array must contain (type, value) pairs
+# Return encoded data or empty string on error
+######################################################################
+
+sub HMCCURPC_EncodeRequest ($$)
+{
+	my ($method, $args) = @_;
+
+	# Encode method
+	my $m = HMCCURPC_EncName ($method);
+	
+	# Encode parameters
+	my $r = '';
+	my $s = 0;
+
+	if (defined ($args)) {
+		while (my $t = shift @$args) {
+			my $e = shift @$args;
+			last if (!defined ($e));
+			$r .= HMCCURPC_EncType ($t, $e);
+			$s++;
+		}
+	}
+	
+	# Method, ParameterCount, Parameters
+	$r = $m.pack ('N', $s).$r;
+
+	# Identifier, ContentLength, Content
+	# Ggf. +8
+	$r = pack ('NN', $BINRPC_REQUEST, length ($r)+8).$r;
+	
+	return $r;
+}
+
+######################################################################
+# Encode RPC response
+# Input is type and value
+######################################################################
+
+sub HMCCURPC_EncodeResponse ($$)
+{
+	my ($t, $v) = @_;
+
+	if (defined ($t) && defined ($v)) {
+		my $r = HMCCURPC_EncType ($t, $v);
+		# Ggf. +8
+		return pack ('NN', $BINRPC_RESPONSE, length ($r)).$r;
+	}
+	else {
+		return pack ('NN', $BINRPC_RESPONSE);
+	}
+}
+
+######################################################################
+# Decoding functions
+######################################################################
+
+######################################################################
+# Decode integer (type = 1)
+# Return (value, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecInteger ($$$)
+{
+	my ($d, $i, $u) = @_;
+
+	return ($i+4 <= length ($d)) ? (unpack ($u, substr ($d, $i, 4)), 4) : (undef, undef);
+}
+
+######################################################################
+# Decode bool (type = 2)
+# Return (value, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecBool ($$)
+{
+	my ($d, $i) = @_;
+
+	return ($i+1 <= length ($d)) ? (unpack ('C', substr ($d, $i, 1)), 1) : (undef, undef);
+}
+
+######################################################################
+# Decode string or void (type = 3)
+# Return (string, packet size) or (undef, undef)
+# Return ('', 4) for special type 'void'
+######################################################################
+
+sub HMCCURPC_DecString ($$)
+{
+	my ($d, $i) = @_;
+
+	my ($s, $o) = HMCCURPC_DecInteger ($d, $i, 'N');
+	if (defined ($s) && $i+$s+4 <= length ($d)) {
+		return $s > 0 ? (substr ($d, $i+4, $s), $s+4) : ('', 4);
+	}
+	
+	return (undef, undef);
+}
+
+######################################################################
+# Decode double (type = 4)
+# Return (value, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecDouble ($$)
+{
+	my ($d, $i) = @_;
+
+	return (undef, undef) if ($i+8 > length ($d));
+	
+	my $m = unpack ('N', substr ($d, $i, 4));
+	my $e = unpack ('N', substr ($d, $i+4, 4));
+	
+	return (sprintf ("%.6f",$m/0x40000000*(2**$e)), 8);
+}
+
+######################################################################
+# Decode base64 encoded string (type = 17)
+# Return (string, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecBase64 ($$)
+{
+	my ($d, $i) = @_;
+	
+	return HMCCURPC_DecString ($d, $i);
+}
+
+######################################################################
+# Decode array (type = 256)
+# Return (arrayref, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecArray ($$)
+{
+	my ($d, $i) = @_;
+	my @r = ();
+
+	my ($s, $x) = HMCCURPC_DecInteger ($d, $i, 'N');
+	if (defined ($s)) {
+		my $j = $x;
+		for (my $n=0; $n<$s; $n++) {
+			my ($v, $o) = HMCCURPC_DecType ($d, $i+$j);
+			return (undef, undef) if (!defined ($o));
+			push (@r, $v);
+			$j += $o;
+		}
+		return (\@r, $j);
+	}
+	
+	return (undef, undef);
+}
+
+######################################################################
+# Decode struct (type = 257)
+# Return (hashref, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecStruct ($$)
+{
+	my ($d, $i) = @_;
+	my %r;
+	
+	my ($s, $x) = HMCCURPC_DecInteger ($d, $i, 'N');
+	if (defined ($s)) {
+		my $j = $x;
+		for (my $n=0; $n<$s; $n++) {
+			my ($k, $o1) = HMCCURPC_DecString ($d, $i+$j);
+			return (undef, undef) if (!defined ($o1));
+			my ($v, $o2) = HMCCURPC_DecType ($d, $i+$j+$o1);
+			return (undef, undef) if (!defined ($o2));
+			$r{$k} = $v;
+			$j += $o1+$o2;
+		}
+		return (\%r, $j);
+	}
+	
+	return (undef, undef);
+}
+
+######################################################################
+# Decode any type
+# Return (element, packetsize) or (undef, undef)
+######################################################################
+
+sub HMCCURPC_DecType ($$)
+{
+	my ($d, $i) = @_;
+	
+	return (undef, undef) if ($i+4 > length ($d));
+
+	my @r = ();
+	
+	my $t = unpack ('N', substr ($d, $i, 4));
+	$i += 4;
+	
+	if ($t == $BINRPC_INTEGER) {
+		# Integer
+		@r = HMCCURPC_DecInteger ($d, $i, 'l');
+	}
+	elsif ($t == $BINRPC_BOOL) {
+		# Bool
+		@r = HMCCURPC_DecBool ($d, $i);
+	}
+	elsif ($t == $BINRPC_STRING || $t == $BINRPC_BASE64) {
+		# String / Base64
+		@r = HMCCURPC_DecString ($d, $i);
+	}
+	elsif ($t == $BINRPC_DOUBLE) {
+		# Double
+		@r = HMCCURPC_DecDouble ($d, $i);
+	}
+	elsif ($t == $BINRPC_ARRAY) {
+		# Array
+		@r = HMCCURPC_DecArray ($d, $i);
+	}
+	elsif ($t == $BINRPC_STRUCT) {
+		# Struct
+		@r = HMCCURPC_DecStruct ($d, $i);
+	}
+	
+	$r[1] += 4;
+
+	return @r;
+}
+
+######################################################################
+# Decode request.
+# Return method, arguments. Arguments are returned as array.
+######################################################################
+
+sub HMCCURPC_DecodeRequest ($)
+{
+	my ($data) = @_;
+
+	my @r = ();
+	my $i = 8;
+	
+	return (undef, undef) if (length ($data) < 8);
+	
+	# Decode method
+	my ($method, $o) = HMCCURPC_DecString ($data, $i);
+	return (undef, undef) if (!defined ($method));
+
+	$i += $o;
+	
+	my $c = unpack ('N', substr ($data, $i, 4));
+	for (my $n=0; $n<$c; $n++) {
+		my ($d, $s) = HMCCURPC_DecType ($data, $i);
+		return (undef, undef) if (!defined ($d) || !defined ($s));
+		push (@r, $d);
+		$i += $s;
+	}
+	
+	return ($method, \@r);
+}
+
+######################################################################
+# Decode response.
+# Return (ref, type) or (undef, undef)
+# type: 1=ok, 0=error
+######################################################################
+
+sub HMCCURPC_DecodeResponse ($)
+{
+	my ($data) = @_;
+	
+	return (undef, undef) if (length ($data) < 8);
+	
+	my $id = unpack ('N', substr ($data, 0, 4));
+	if ($id == $BINRPC_RESPONSE) {
+		# Data
+		my ($result, $offset) = HMCCURPC_DecType ($data, 8);
+		return ($result, 1);
+	}
+	elsif ($id == $BINRPC_ERROR) {
+		# Error
+		my ($result, $offset) = HMCCURPC_DecType ($data, 8);
+		return ($result, 0);
+	}
+#	Response with header not supported
+#	elsif ($id == 0x42696E41) {
+#	}
+	
+	return (undef, undef);
+}
+
 
 1;
 
@@ -1879,9 +2430,10 @@ sub HMCCURPC_ListDevicesCB ($$)
 	   	is used. Default value is 5400.
 	   </li><br/>
 	   <li><b>rpcTriggerTime &lt;seconds&gt;</b><br/>
-	   	Set time to wait before trigger I/O again after I/O error. Default value is 10 seconds.
-	   	On fast systems this value can be set to 5 seconds. Reduces number of log messages
-	   	written if FHEM is busy and not able to read data from CCU.
+	   	Set time to wait before triggering I/O again after an I/O error "no reader" occurred.
+	   	Default value is 10 seconds, 0 will deactivate error handling for this kind of error.
+	   	On fast systems this value can be set to 5 seconds. Higher values Reduce number of
+	   	log messages written if FHEM is busy and not able to read data from CCU.
 	   </li><br/>
 		<li><b>rpcWaitTime &lt;microseconds&gt;</b><br/>
 			Specify time to wait for data processing thread after each loop. Default value is
