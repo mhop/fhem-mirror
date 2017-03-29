@@ -905,15 +905,16 @@ FW_longpoll()
     filter = "";
   var retry;
   if(filter == "") {
-    $("embed").each(function() {
-      if(FW_getSVG(this) == undefined && !retry &&
-         filter != ".*" && --embedLoadRetry > 0) {
+    $("embed").each(function() {        // wait for all embeds to be there
+      if(retry)
+        return;
+      var ed = FW_getSVG(this);
+      if(!retry && ed == undefined && filter != ".*" && --embedLoadRetry > 0) {
         retry = 1;
         setTimeout(FW_longpoll, 100);
         return;
       }
-      
-      if($(FW_getSVG(this)).find("svg[flog]").attr("flog"))
+      if(ed && $(ed).find("svg[flog]").attr("flog"))
         filter=".*";
     });
     if(retry)
