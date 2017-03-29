@@ -215,12 +215,12 @@ if (\$EVTPART0 eq \"stop\") {\
 	# An additional notify for user state 'awoken' may take further actions\
 	# and change to state 'home' afterwards.\
 	if (\$EVTPART3) {\
-		fhem \"define atTmp_9_\$NAME at +00:05:00 set \$EVTPART4:FILTERstate=asleep awoken\";;\
+		fhem \"define atTmp_9_\$NAME at +00:05:00 set \$EVTPART4:FILTER=state=asleep awoken\";;\
 \
 	# Without enforced wake-up, be jentle and just set user state to 'home' after some\
 	# additional long nap time\
 	} else {\
-		fhem \"define atTmp_9_\$NAME at +01:30:00 set \$EVTPART4:FILTERstate=asleep home\";;\
+		fhem \"define atTmp_9_\$NAME at +01:30:00 set \$EVTPART4:FILTER=state=asleep home\";;\
     }\
 }\
 \
@@ -851,9 +851,9 @@ if (\$EVTPART0 eq \"stop\") {\
             $nextWakeupDev = "none";
             $nextWakeup    = "OFF";
         }
-        readingsBulkUpdate( $defs{$wakeupUserdevice},
+        readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
             "nextWakeupDev", $nextWakeupDev );
-        readingsBulkUpdate( $defs{$wakeupUserdevice},
+        readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
             "nextWakeup", $nextWakeup );
         readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
@@ -1195,9 +1195,10 @@ sub RESIDENTStk_wakeupRun($;$) {
         $nextWakeupDev = "none";
         $nextWakeup    = "OFF";
     }
-    readingsBulkUpdate( $defs{$wakeupUserdevice},
+    readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
         "nextWakeupDev", $nextWakeupDev );
-    readingsBulkUpdate( $defs{$wakeupUserdevice}, "nextWakeup", $nextWakeup );
+    readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
+        "nextWakeup", $nextWakeup );
     readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     if ( $running && $wakeupOffset > 0 ) {
