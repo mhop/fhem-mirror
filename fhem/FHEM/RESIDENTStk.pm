@@ -1550,6 +1550,7 @@ sub RESIDENTStk_wakeupGetNext($) {
     }
 
     if ( $definitiveNextTodayDev && $definitiveNextToday ) {
+        $definitiveNextToday = $definitiveNextToday + $wakeupOffset * 60;
         Log3 $name, 4,
             "RESIDENTStk $name: 07 - next wake-up result: today at "
           . RESIDENTStk_sec2time($definitiveNextToday)
@@ -1560,6 +1561,7 @@ sub RESIDENTStk_wakeupGetNext($) {
             substr( RESIDENTStk_sec2time($definitiveNextToday), 0, -3 ) );
     }
     elsif ( $definitiveNextTomorrowDev && $definitiveNextTomorrow ) {
+        $definitiveNextTomorrow = $definitiveNextTomorrow + $wakeupOffset * 60;
         Log3 $name, 4,
             "RESIDENTStk $name: 07 - next wake-up result: tomorrow at "
           . RESIDENTStk_sec2time($definitiveNextTomorrow)
