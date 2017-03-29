@@ -785,6 +785,7 @@ IsDisabled($)
 
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
+    $dfi =~ s/{([^\x7d]*)}/$cmdFromAnalyze=$1; eval $1/ge; # Forum #69787
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
     my $dhms = sprintf("%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec);
     foreach my $ft (split(" ", $dfi)) {

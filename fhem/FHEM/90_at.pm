@@ -567,6 +567,10 @@ EOF
         <ul>
           23:00-24:00 00:00-01:00
         </ul>
+        If parts of the attribute value are enclosed in {}, they are evaluated:
+        <ul>
+          {sunset_abs()}-24 {sunrise_abs()}-08
+        </ul>
         </li><br>
 
     <a name="skip_next"></a>
@@ -753,6 +757,11 @@ EOF
         zwei einzelne angeben, z.Bsp.:
         <ul>
           23:00-24:00 00:00-01:00
+        </ul>
+        Falls Teile des Wertes in {} eingeschlossen sind, dann werden sie als
+        ein Perl Ausdruck ausgewertet:
+        <ul>
+          {sunset_abs()}-24 {sunrise_abs()}-08
         </ul>
         </li><br>
 
