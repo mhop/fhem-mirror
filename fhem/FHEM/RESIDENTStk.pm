@@ -1671,7 +1671,7 @@ sub RESIDENTStk_sec2time($) {
 
 sub RESIDENTStk_time2sec($) {
     my ($s) = @_;
-    my @time = split /:/, $s;
+    my @t = split /:/, $s;
     $t[2] = 0 unless ( $t[2] );
 
     return $t[0] * 3600 + $t[1] * 60 + $t[2];
