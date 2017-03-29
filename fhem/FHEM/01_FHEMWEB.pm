@@ -1879,7 +1879,7 @@ FW_fileList($;$)
     push(@ret, $f);
   }
   closedir(DH);
-  return sort { (CORE::stat("$dir/$a"))[9] cmp (CORE::stat("$dir/$b"))[9] }
+  return sort { (CORE::stat("$dir/$a"))[9] <=> (CORE::stat("$dir/$b"))[9] }
          @ret if($mtime);
   @ret = cfgDB_FW_fileList($dir,$re,@ret) if (configDBUsed());
   return sort @ret;
