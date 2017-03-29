@@ -759,9 +759,11 @@ SVG_readgplotfile($$$)
   my $specval = AttrVal($wl, "plotfunction", undef);
 
   my $plotReplace = AttrVal($wl, "plotReplace", undef);
-  my ($list, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
+  my $pr;
+  (undef, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
   my $prSubst = sub($)
   {
+    return "%$_[0]%" if(!$pr);
     my $v = $pr->{$_[0]};
     return "%$_[0]%" if(!$v);
     if($v =~ m/^{.*}$/) {
