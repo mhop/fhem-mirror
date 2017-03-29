@@ -93,7 +93,7 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
                 AttrVal( $NAME, "wakeupUserdevice", "" ),
                 AttrVal(
                     AttrVal( $NAME, "wakeupUserdevice", "" ), "rr_realname",
-                    "group"
+                    "alias"
                 ),
                 $wakeupUserdeviceRealname
             );
@@ -774,13 +774,14 @@ if (\$EVTPART0 eq \"stop\") {\
                 fhem "set $wakeupUserdevice:FILTER=state=asleep awoken";
             }
 
-            fhem "setreading $wakeupUserdevice:FILTER=wakeup=1 wakeup 0";
-
             my $wakeupStopAtdevice = $wakeupAtdevice . "_stop";
             if ( defined( $defs{$wakeupStopAtdevice} ) ) {
                 fhem "delete $wakeupStopAtdevice";
             }
         }
+
+        fhem "setreading $wakeupUserdevice:FILTER=wakeup=1 wakeup 0";
+
         return;
     }
 
