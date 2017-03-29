@@ -29,17 +29,6 @@ package main;
 
   use Blocking;
 
-  use Nmap::Parser;
-
-  # my $rc = eval{
-  #   require Nmap::Parser;
-  #   Nmap::Parser->import();
-  #   1;
-  # };
-  #
-  # return("Error loading Nmap::Parser. Maybe this module is not installed?")
-  #   unless($rc);
-
 # forward declarations ########################################################
 sub Nmap_Initialize($);
 
@@ -87,8 +76,18 @@ sub Nmap_Initialize($) {
 sub Nmap_Define($$) {
   my ($hash, $def) = @_;
   my ($SELF, $TYPE, $targets) = split(/[\s]+/, $def, 3);
+  my $rc = eval{
+    require Nmap::Parser;
+    Nmap::Parser->import();
+    1;
+  };
 
-  return "Usage: define <name> $TYPE <target specification>" if(!$targets);
+  return(
+      "Error loading Nmap::Parser. Maybe this module is not installed? "
+    . "\nUnder debian (based) system it can be installed using "
+    . "\n\"apt-get install libnmap-parser-perl\""
+  ) unless($rc);
+  return("Usage: define <name> $TYPE <target specification>") if(!$targets);
 
   my $interval = AttrVal($SELF, "interval", 900);
   $interval = 900 if(!looks_like_number($interval));
@@ -435,14 +434,7 @@ sub Nmap_done($) {
       && AttrVal($SELF, "keepReadings", 0) == 0
     ){
       delete $knownHosts{$oldMetaReading};
-      delete $hash->{READINGS}{$oldMetaReading."_alias"};
-      delete $hash->{READINGS}{$oldMetaReading."_hostname"};
-      delete $hash->{READINGS}{$oldMetaReading."_ip"};
-      delete $hash->{READINGS}{$oldMetaReading."_lastSeen"};
-      delete $hash->{READINGS}{$oldMetaReading."_macAddress"};
-      delete $hash->{READINGS}{$oldMetaReading."_macVendor"};
-      delete $hash->{READINGS}{$oldMetaReading."_state"};
-      delete $hash->{READINGS}{$oldMetaReading."_uptime"};
+      CommandDeleteReading(undef, "$SELF $oldMetaReading.*");
 
       Log3($SELF, 4, "$TYPE ($SELF) - delete old host: $oldMetaReading");
     }
@@ -606,8 +598,9 @@ sub Nmap_updateUptime($$;$) {
     Prerequisites:
     <ul>
       The "Nmap" program and the Perl module "Nmap::Parser" are required.<br>
-      Under Debian (based) system, these can be installed using "apt-get
-      install nmap libnmap-parser-perl".
+      Under Debian (based) system, these can be installed using
+      <code>"apt-get install nmap libnmap-parser-perl"</code>
+      .
     </ul>
     <br>
     <a name="Nmapdefine"></a>
@@ -635,15 +628,15 @@ sub Nmap_updateUptime($$;$) {
       <li>
         <code>clear readings</code><br>
         Deletes all readings except "state".
-      </li><br>
+      </li>
       <li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Deletes all readings older than &lt;s&gt; seconds.
-      </li><br>
+      </li>
       <li>
         <code>interrupt</code><br>
         Cancels a running scan.
-      </li><br>
+      </li>
       <li>
         <code>statusRequest</code><br>
         Starts a network scan.
@@ -651,98 +644,100 @@ sub Nmap_updateUptime($$;$) {
     </ul><br>
     <a name="Nmapreadings"></a>
     <b>Readings</b><br>
-    <br>
-    General Readings:
     <ul>
-      <li>
-        <code>NmapVersion</code><br>
-        The version number of the installed Nmap program.
-      </li><br>
-      <li>
-        <code>hostsScanned</code><br>
-        The number of scanned addresses.
-      </li><br>
-      <li>
-        <code>hostsUp</code><br>
-        The number of available network devices.
-      </li><br>
-      <li>
-        <code>knownHosts</code><br>
-        The number of known network devices.
-      </li><br>
-      <li>
-        <code>scanDuration</code><br>
-        The scan time in seconds.
-      </li><br>
-      <li>
-        <code>state</code><br>
-        <ul>
-          <li>
-            <code>Initialized</code><br>
-            Nmap has been defined or enabled.
-          </li><br>
-          <li>
-            <code>running</code><br>
-            A network scan is running.
-          </li><br>
-          <li>
-            <code>done</code><br>
-            Network scan completed successfully.
-          </li><br>
-          <li>
-            <code>aborted</code><br>
-            The network scan was aborted due to a timeout or by the user.
-          </li><br>
-          <li>
-            <code>disabled</code><br>
-            Nmap has been disabled.
-          </li>
-        </ul>
-      </li><br>
-    </ul>
-    Host-specific readings:
-    <ul>
-      <li>
-        <code>&lt;metaReading&gt;_alias</code><br>
-        Alias ​​which is specified under the attribute "devAlias" for the
-        network device. If no alias is specified, the hostname is displayed.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_hostname</code><br>
-        Hostname of the network device. If this can not be determined, the IPv4
-        address is displayed.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_ip</code><br>
-        IPv4 address of the network device.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_lastSeen</code><br>
-        The time at which the network device was last seen as.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_macAddress</code><br>
-        MAC address of the network device. This can only be determined if the
-        scan is executed with root privileges.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_macVendor</code><br>
-        Probable manufacturer of the network device. This can only be
-        determined if the scan is executed with root privileges.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_state</code><br>
-        State of the network device. Can be either "absent" or "present".
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_uptime</code><br>
-        Time in seconds since the network device is reachable.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_uptimeText</code><br>
-        Time in "d days, hh hours, mm minutes, ss seconds" since the network
-        device is reachable.
-      </li>
+      General Readings:
+      <ul>
+        <li>
+          <code>NmapVersion</code><br>
+          The version number of the installed Nmap program.
+        </li>
+        <li>
+          <code>hostsScanned</code><br>
+          The number of scanned addresses.
+        </li>
+        <li>
+          <code>hostsUp</code><br>
+          The number of available network devices.
+        </li>
+        <li>
+          <code>knownHosts</code><br>
+          The number of known network devices.
+        </li>
+        <li>
+          <code>scanDuration</code><br>
+          The scan time in seconds.
+        </li>
+        <li>
+          <code>state</code><br>
+          <ul>
+            <li>
+              <code>Initialized</code><br>
+              Nmap has been defined or enabled.
+            </li>
+            <li>
+              <code>running</code><br>
+              A network scan is running.
+            </li>
+            <li>
+              <code>done</code><br>
+              Network scan completed successfully.
+            </li>
+            <li>
+              <code>aborted</code><br>
+              The network scan was aborted due to a timeout or by the user.
+            </li>
+            <li>
+              <code>disabled</code><br>
+              Nmap has been disabled.
+            </li>
+          </ul>
+        </li>
+      </ul>
+      <br>
+      Host-specific readings:
+      <ul>
+        <li>
+          <code>&lt;metaReading&gt;_alias</code><br>
+          Alias ​​which is specified under the attribute "devAlias" for the
+          network device. If no alias is specified, the hostname is displayed.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_hostname</code><br>
+          Hostname of the network device. If this can not be determined, the IPv4
+          address is displayed.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_ip</code><br>
+          IPv4 address of the network device.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_lastSeen</code><br>
+          The time at which the network device was last seen as.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_macAddress</code><br>
+          MAC address of the network device. This can only be determined if the
+          scan is executed with root privileges.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_macVendor</code><br>
+          Probable manufacturer of the network device. This can only be
+          determined if the scan is executed with root privileges.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_state</code><br>
+          State of the network device. Can be either "absent" or "present".
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_uptime</code><br>
+          Time in seconds since the network device is reachable.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_uptimeText</code><br>
+          Time in "d days, hh hours, mm minutes, ss seconds" since the network
+          device is reachable.
+        </li>
+      </ul>
     </ul><br>
     <a name="Nmapattr"></a>
     <b>Attribute</b>
@@ -755,17 +750,17 @@ sub Nmap_updateUptime($$;$) {
         "absent". If this attribute is set to a value &gt;1, the reading
         "&lt;metaReading&gt;_state" remains on "present" until the final status
         changes to "absent".
-      </li><br>
+      </li>
       <li>
         <code>args &lt;args&gt;</code><br>
         Arguments for the Nmap scan.<br>
         The default is "-sn".
-      </li><br>
+      </li>
       <li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         After a network scan, all host-specific readings older than &lt;s&gt;
         seconds are deleted
-      </li><br>
+      </li>
       <li>
         <code>
           devAlias &lt;ID&gt;:&lt;ALIAS&gt; &lt;ID2&gt;:&lt;ALIAS2&gt; ...
@@ -788,45 +783,45 @@ sub Nmap_updateUptime($$;$) {
             attr &lt;name&gt; devAlias 192.168.1.130:Michaels_Handy_byIP
           </code><br>
         </ul>
-      </li><br>
+      </li>
       <li>
         <code>disable 1</code><br>
         A running scan is canceled and no new scans are started.
-      </li><br>
+      </li>
       <li>
         <code>excludeHosts &lt;target specification&gt;</code><br>
         All target hosts in the &lt;target specification&gt; are skipped during the scan.
-      </li><br>
+      </li>
       <li>
         <code>interval &lt;seconds&gt;</code><br>
         Interval in seconds in which the scan is performed.<br>
         The default value is 900 seconds and the minimum value is 30 seconds.
-      </li><br>
+      </li>
       <li>
         <code>keepReadings 1</code><br>
         If a new IP address is recognized for a device with a known MAC
         address, the invalid readings are deleted unless this attribute is set.
-      </li><br>
+      </li>
       <li>
         <code>leadingZeros 1</code><br>
         For the readings, the IPv4 addresses are displayed with leading zeros.
-      </li><br>
+      </li>
       <li>
         <code>metaReading &lt;metaReading&gt;</code><br>
         You can specify "alias", "hostname", "ip" or "macAddress" as
         &lt;metaReading&gt; and is the identifier for the readings.<br>
         The default is "ip".
-      </li><br>
+      </li>
       <li>
         <code>path</code><br>
         Path under which the Nmap program is to be reached.<br>
         The default is "/urs/bin/nmap".
-      </li><br>
+      </li>
       <li>
         <a href="#readingFnAttributes">
           <u><code>readingFnAttributes</code></u>
         </a>
-      </li><br>
+      </li>
       <li>
         <code>sudo 1</code><br>
         The scan runs with root privileges.<br>
@@ -896,15 +891,15 @@ sub Nmap_updateUptime($$;$) {
       <li>
         <code>clear readings</code><br>
         L&ouml;scht alle Readings außer "state".
-      </li><br>
+      </li>
       <li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Löscht alle Readings die älter sind als &lt;s&gt; Sekunden.
-      </li><br>
+      </li>
       <li>
         <code>interrupt</code><br>
         Bricht einen laufenden Scan ab.
-      </li><br>
+      </li>
       <li>
         <code>statusRequest</code><br>
         Startet einen Netzwerkscan.
@@ -912,101 +907,103 @@ sub Nmap_updateUptime($$;$) {
     </ul><br>
     <a name="Nmapreadings"></a>
     <b>Readings</b><br>
-    <br>
-    Allgemeine Readings:
     <ul>
-      <li>
-        <code>NmapVersion</code><br>
-        Die Versionsnummer des installierten Nmap Programms.
-      </li><br>
-      <li>
-        <code>hostsScanned</code><br>
-        Die Anzahl der gescannten Adressen.
-      </li><br>
-      <li>
-        <code>hostsUp</code><br>
-        Die Anzahl der erreichbaren Netzwerkger&auml;te.
-      </li><br>
-      <li>
-        <code>knownHosts</code><br>
-        Die Anzahl der bekannten Netzwerkger&auml;te.
-      </li><br>
-      <li>
-        <code>scanDuration</code><br>
-        Die Scan-Dauer in Sekunden.
-      </li><br>
-      <li>
-        <code>state</code><br>
-        <ul>
-          <li>
-            <code>Initialized</code><br>
-            Nmap wurde definiert oder enabled.
-          </li><br>
-          <li>
-            <code>running</code><br>
-            Ein Netzwerkscan wird ausgef&uuml;hrt.
-          </li><br>
-          <li>
-            <code>done</code><br>
-            Der Netzwerkscan wurde erfolgreich abgeschlossen.
-          </li><br>
-          <li>
-            <code>aborted</code><br>
-            Der Netzwerkscan wurde aufgrund einer Zeit&uuml;berschreitung oder
-            durch den Benutzer abgebrochen.
-          </li><br>
-          <li>
-            <code>disabled</code><br>
-            Nmap wurde deaktiviert.
-          </li>
-        </ul>
-      </li><br>
-    </ul>
-    Hostspezifische Readings:
-    <ul>
-      <li>
-        <code>&lt;metaReading&gt;_alias</code><br>
-        Alias welcher unter dem Attribut "devAlias" für das Netzwerkger&auml;t
-        angegeben ist. Ist kein Alias angegeben wird der Hostname angezeigt.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_hostname</code><br>
-        Hostname des Netzwerkger&auml;ts. Kann dieser nicht ermittel werden
-        wird die IPv4-Adresse angezeigt.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_ip</code><br>
-        IPv4-Adresse des Netzwerkger&auml;ts.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_lastSeen</code><br>
-        Der Zeitpunkt zu dem das Netzwerkger&auml;t das letzte mal als gesehen
-        wurde.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_macAddress</code><br>
-        MAC-Adresse des Netzwerkger&auml;ts. Diese kann nur ermittelt werden,
-        wenn der Scan mit Root-Rechten ausgef&uuml;hrt wird.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_macVendor</code><br>
-        Vermutlicher Hersteller des Netzwerkger&auml;ts. Dieser kann nur
-        ermittelt werden, wenn der Scan mit Root-Rechten ausgef&uuml;hrt wird.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_state</code><br>
-        Status des Netzwerkger&auml;ts. Kann entweder "absent" oder "present"
-        sein.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_uptime</code><br>
-        Zeit in Sekunden seit der das Netzwerkger&auml;t erreichbar ist.
-      </li><br>
-      <li>
-        <code>&lt;metaReading&gt;_uptimeText</code><br>
-        Zeit in "d days, hh hours, mm minutes, ss seconds" seit der das
-        Netzwerkger&auml;t erreichbar ist.
-      </li>
+      Allgemeine Readings:
+      <ul>
+        <li>
+          <code>NmapVersion</code><br>
+          Die Versionsnummer des installierten Nmap Programms.
+        </li>
+        <li>
+          <code>hostsScanned</code><br>
+          Die Anzahl der gescannten Adressen.
+        </li>
+        <li>
+          <code>hostsUp</code><br>
+          Die Anzahl der erreichbaren Netzwerkger&auml;te.
+        </li>
+        <li>
+          <code>knownHosts</code><br>
+          Die Anzahl der bekannten Netzwerkger&auml;te.
+        </li>
+        <li>
+          <code>scanDuration</code><br>
+          Die Scan-Dauer in Sekunden.
+        </li>
+        <li>
+          <code>state</code><br>
+          <ul>
+            <li>
+              <code>Initialized</code><br>
+              Nmap wurde definiert oder enabled.
+            </li>
+            <li>
+              <code>running</code><br>
+              Ein Netzwerkscan wird ausgef&uuml;hrt.
+            </li>
+            <li>
+              <code>done</code><br>
+              Der Netzwerkscan wurde erfolgreich abgeschlossen.
+            </li>
+            <li>
+              <code>aborted</code><br>
+              Der Netzwerkscan wurde aufgrund einer Zeit&uuml;berschreitung oder
+              durch den Benutzer abgebrochen.
+            </li>
+            <li>
+              <code>disabled</code><br>
+              Nmap wurde deaktiviert.
+            </li>
+          </ul>
+        </li>
+      </ul>
+      <br>
+      Hostspezifische Readings:
+      <ul>
+        <li>
+          <code>&lt;metaReading&gt;_alias</code><br>
+          Alias welcher unter dem Attribut "devAlias" für das Netzwerkger&auml;t
+          angegeben ist. Ist kein Alias angegeben wird der Hostname angezeigt.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_hostname</code><br>
+          Hostname des Netzwerkger&auml;ts. Kann dieser nicht ermittel werden
+          wird die IPv4-Adresse angezeigt.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_ip</code><br>
+          IPv4-Adresse des Netzwerkger&auml;ts.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_lastSeen</code><br>
+          Der Zeitpunkt zu dem das Netzwerkger&auml;t das letzte mal als gesehen
+          wurde.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_macAddress</code><br>
+          MAC-Adresse des Netzwerkger&auml;ts. Diese kann nur ermittelt werden,
+          wenn der Scan mit Root-Rechten ausgef&uuml;hrt wird.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_macVendor</code><br>
+          Vermutlicher Hersteller des Netzwerkger&auml;ts. Dieser kann nur
+          ermittelt werden, wenn der Scan mit Root-Rechten ausgef&uuml;hrt wird.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_state</code><br>
+          Status des Netzwerkger&auml;ts. Kann entweder "absent" oder "present"
+          sein.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_uptime</code><br>
+          Zeit in Sekunden seit der das Netzwerkger&auml;t erreichbar ist.
+        </li>
+        <li>
+          <code>&lt;metaReading&gt;_uptimeText</code><br>
+          Zeit in "d days, hh hours, mm minutes, ss seconds" seit der das
+          Netzwerkger&auml;t erreichbar ist.
+        </li>
+      </ul>
     </ul><br>
     <a name="Nmapattr"></a>
     <b>Attribute</b>
@@ -1020,17 +1017,17 @@ sub Nmap_updateUptime($$;$) {
         ge&auml;ndert wird. Wenn dieses Attribut auf einen Wert &gt;1 gesetzt
         ist, verbleibt das Reading "&lt;metaReading&gt;_state" auf "present",
         bis der Status final auf "absent" wechselt.
-      </li><br>
+      </li>
       <li>
         <code>args &lt;args&gt;</code><br>
         Argumente für den Nmap-Scan.<br>
         Die Vorgabe ist "-sn".
-      </li><br>
+      </li>
       <li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Nach einem Netzwerkscan werden alle hostspezifischen Readings, die
         älter sind als &lt;s&gt; Sekunden, gelöscht
-      </li><br>
+      </li>
       <li>
         <code>
           devAlias &lt;ID&gt;:&lt;ALIAS&gt; &lt;ID2&gt;:&lt;ALIAS2&gt; ...
@@ -1055,50 +1052,50 @@ sub Nmap_updateUptime($$;$) {
             attr &lt;name&gt; devAlias 192.168.1.130:Michaels_Handy_byIP
           </code><br>
         </ul>
-      </li><br>
+      </li>
       <li>
         <code>disable 1</code><br>
         Ein laufender Scan wird abgebrochen und es werden keine neuen Scans
         gestartet.
-      </li><br>
+      </li>
       <li>
         <code>excludeHosts &lt;target specification&gt;</code><br>
         In der &lt;target specification&gt; stehen alle Zielhosts, die beim
         Scan &uuml;bersprungen werden sollen.
-      </li><br>
+      </li>
       <li>
         <code>interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden in dem der Scan durchgef&uuml;hrt wird.<br>
         Der Vorgabewert ist 900 Sekunden und der Mindestwert 30 Sekunden.
-      </li><br>
+      </li>
       <li>
         <code>keepReadings 1</code><br>
         Wird für ein Gertät mit bekannter MAC-Adresse eine neue IP-Adresse
         erkannt, werden die ungültig gewordenen Readings gelöscht es sei denn
         dieses Attribut ist gesetzt.
-      </li><br>
+      </li>
       <li>
         <code>leadingZeros 1</code><br>
         Bei den Readings-Namen werden die IPv4-Adressen mit f&uuml;hrenden
         Nullen dargestellt.
-      </li><br>
+      </li>
       <li>
         <code>metaReading &lt;metaReading&gt;</code><br>
         Als &lt;metaReading&gt; kann "alias", "hostname", "ip" oder
         "macAddress" angegeben werden und ist der Bezeichner für die
         Readings.<br>
         Die Vorgabe is "ip".
-      </li><br>
+      </li>
       <li>
         <code>path</code><br>
         Pfad unter dem das Nmap Programm zu erreichen ist.<br>
         Die Vorgabe ist "/urs/bin/nmap".
-      </li><br>
+      </li>
       <li>
         <a href="#readingFnAttributes">
           <u><code>readingFnAttributes</code></u>
         </a>
-      </li><br>
+      </li>
       <li>
         <code>sudo 1</code><br>
         Der Scan wird mit Root-Rechten ausgef&uuml;hrt.<br>
