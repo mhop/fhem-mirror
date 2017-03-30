@@ -40,6 +40,8 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.11.4       29.03.2017       bugfix timestamp in minValue, maxValue if VALUE contains more than one
+#                               numeric value (like in sysmon)
 # 4.11.3       26.03.2017       usage of daylight saving time changed to avoid wrong selection when wintertime
 #                               switch to summertime, minor bug fixes
 # 4.11.2       16.03.2017       bugfix in func dbmeta_DoParse (SQLITE_DB_FILENAME)
@@ -178,7 +180,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.11.3";
+my $DbRepVersion = "4.11.4";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1540,16 +1542,14 @@ sub maxval_DoParse($) {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       my $value          = $a[1];
-      
-      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
-      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      $a[-1]             =~ s/:/-/g if($a[-1]);          # substituieren unsupported characters -> siehe fhem.pl
+      my $timestamp      = ($a[-1]&&$a[-2])?$a[-2]."_".$a[-1]:$a[-1];
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
       
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
-          $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
@@ -1775,16 +1775,15 @@ sub minval_DoParse($) {
       $lastruntimestring = $runtime_string if ($i == 1);
       $value             = $a[1];
       $min_value         = $a[1] if ($i == 1);
-      
-      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
-      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      $a[-1]             =~ s/:/-/g if($a[-1]);          # substituieren unsupported characters -> siehe fhem.pl
+      my $timestamp      = ($a[-1]&&$a[-2])?$a[-2]."_".$a[-1]:$a[-1];
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
       
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
-          $a[3] =~ s/\s+$//g;
+          # $a[-1] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in minValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
