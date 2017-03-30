@@ -2921,12 +2921,17 @@ netatmo_parseReadings($$;$)
         delete $hash->{readings};
       }
     
-    if(int($time) > 0 && defined($step_time)) {
-      my $nextdata = $time + $step_time + 30;
-      RemoveInternalTimer($hash, "netatmo_poll");
-      InternalTimer($nextdata, "netatmo_poll", $hash);
-      Log3 $name, 2, "$name: next dynamic update at ".FmtDateTime($nextdata);
-    }
+      if(int($time) > 0 && defined($step_time)) {
+        my $nextdata = $time + $step_time + 30;
+        if($nextdata > (gettimeofday()+300))
+        {
+          RemoveInternalTimer($hash, "netatmo_poll");
+          InternalTimer($nextdata, "netatmo_poll", $hash);
+          Log3 $name, 3, "$name: next dynamic update at ".FmtDateTime($nextdata);
+        } else {
+          Log3 $name, 2, "$name: invalid time for dynamic update: ".FmtDateTime($nextdata);
+        }
+      }
   
     }
   }

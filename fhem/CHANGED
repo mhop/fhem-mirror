@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: sanity check for dynamic interval
   - bugfix:  88_HMCCU: fixed bug in update of virtual devices
   - feature: 70_BRAVIA: command remoteControl supports 'Netflix'
   - feature: 50_TelegramBot:  favorite handling / hidden favorites /
