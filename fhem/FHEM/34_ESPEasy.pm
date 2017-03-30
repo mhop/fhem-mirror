@@ -1,4 +1,4 @@
-# $Id$ 
+# $Id$
 ################################################################################
 #
 #  34_ESPEasy.pm is a FHEM Perl module to control ESP8266 /w ESPEasy
@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.00;       # Version of this module
+my $module_version    = 1.01;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -164,6 +164,17 @@ my %ESPEasy_pinMap = (
   "TX"   => 1,
   "SD2"  => 9,
   "SD3"  => 10
+);
+
+# ------------------------------------------------------------------------------
+# build id
+# ------------------------------------------------------------------------------
+my %ESPEasy_build_id = (
+  "1"  =>  { "type" => "ESP Easy",      "ver" => "STD" },
+  "17" =>  { "type" => "ESP Easy Mega", "ver" => "STD" },
+  "33" =>  { "type" => "ESP Easy 32",   "ver" => "STD" },
+  "65" =>  { "type" => "ARDUINO Easy",  "ver" => "STD" },
+  "81" =>  { "type" => "NANO Easy",     "ver" => "STD" }
 );
 
 # ------------------------------------------------------------------------------
@@ -915,22 +926,23 @@ sub ESPEasy_Attr(@)
 
   elsif ($aName eq "maxHttpSessions") {
     ($cmd eq "set" && ($aVal !~ m/^[0-9]+$/))
-    ? $ret = ">= 0 (default: $d_maxHttpSessions, 0: disable queuing)"
-    : $hash->{MAX_HTTP_SESSIONS} = $aVal;
+    ? ($ret = ">= 0 (default: $d_maxHttpSessions, 0: disable queuing)")
+    : ($hash->{MAX_HTTP_SESSIONS} = $aVal);
     if ($cmd eq "del") {$hash->{MAX_HTTP_SESSIONS} = $d_maxHttpSessions}
   }
       
   elsif ($aName eq "maxQueueSize") {
     ($cmd eq "set" && ($aVal !~ m/^[1-9][0-9]+$/))
-    ? $ret = ">10 (default: $d_maxQueueSize)"
-    : $hash->{MAX_QUEUE_SIZE} = $aVal;
+    ? ($ret = ">=10 (default: $d_maxQueueSize)")
+    : ($hash->{MAX_QUEUE_SIZE} = $aVal);
     if ($cmd eq "del") {$hash->{MAX_QUEUE_SIZE} = $d_maxQueueSize}
   }
       
   elsif ($aName eq "Interval") {
     ($cmd eq "set" && ($aVal !~ m/^(\d)+$/ || $aVal <10 && $aVal !=0))
-      ? $ret = "0 or >=10" 
-      : $hash->{INTERVAL} = $aVal}
+      ? ($ret = "0 or >=10")
+      : ($hash->{INTERVAL} = $aVal)
+  }
 
   if (!$init_done) {
     if ($aName =~ /^disable$/ && $aVal == 1) {
@@ -2181,7 +2193,7 @@ sub ESPEasy_ip2bin($)
 
 # ------------------------------------------------------------------------------
 # expand IPv6 address to 8 full blocks
-# Advantage of IO::Socket: already installed and it is the fastest way
+# Advantage of IO::Socket : already installed and it seems to be the fastest way
 # http://stackoverflow.com/questions/4800691/perl-ipv6-address-expansion-parsing
 # ------------------------------------------------------------------------------
 sub ESPEasy_expandIPv6($)
