@@ -144,19 +144,29 @@ sub msgConfig_Initialize($) {
       msgTitleShrtText
       msgTitleShrtTextHigh
       msgTitleShrtTextLow
-      msgType:text,push,mail,screen,light,audio,queue
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
 
     # add global attributes
     foreach (
-        "msgContactAudio",  "msgContactMail",    "msgContactPush",
-        "msgContactScreen", "msgContactLight",   "msgParams",
-        "msgPriority",      "msgRecipient",      "msgRecipientAudio",
-        "msgRecipientMail", "msgRecipientPush",  "msgRecipientScreen",
-        "msgRecipientText", "msgRecipientLight", "msgTitle",
+        "msgContactAudio",
+        "msgContactMail",
+        "msgContactPush",
+        "msgContactScreen",
+        "msgContactLight",
+        "msgParams",
+        "msgPriority",
+        "msgRecipient",
+        "msgRecipientAudio",
+        "msgRecipientMail",
+        "msgRecipientPush",
+        "msgRecipientScreen",
+        "msgRecipientText",
+        "msgRecipientLight",
+        "msgTitle",
         "msgTitleShrt",
+        "msgType:text,push,mail,screen,light,audio,queue",
       )
     {
         addToAttrList($_);

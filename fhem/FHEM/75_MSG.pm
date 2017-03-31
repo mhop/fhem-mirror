@@ -25,8 +25,7 @@
 ##############################################################################
 #
 #TODO
-# - allow ? to recipients to soft-fail if they are not configured or not
-#   reachable via msg
+# - forceType/forceDevice in user parameters
 # - implement default messages in RESIDENTS using msg command
 # - queue message until recipient is available again (e.g. when absent)
 #   also see https://forum.fhem.de/index.php/topic,69683.0.html
@@ -63,7 +62,8 @@ sub MSG_Initialize($$) {
 ########################################
 sub MSG_FindAttrVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
-    $msgType = ucfirst($msgType) if ($msgType);
+    $msgType = "" unless ($msgType);
+    $msgType = ucfirst($msgType);
     $n .= $msgType if ( $n =~ /^msg(Contact)$/ );
 
     my $g = (
@@ -166,7 +166,7 @@ sub CommandMsg($$;$$) {
           "Global configuration device $globalDevName was created.\n\n";
     }
 
-    if ( $msg eq "" || $msg =~ /^\?[\s\t]*$/ || $msg eq "help" ) {
+    if ( $msg eq "" || $msg =~ /^\?[\s\t ]*$/ || $msg eq "help" ) {
         return $return
           . "Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
     }
@@ -192,11 +192,11 @@ sub CommandMsg($$;$$) {
             },
         },
 
-        # mail => {
-        #     typeEscalation => {
-        #         gwUnavailable => 'queue',
-        #     },
-        # },
+        mail => {
+            typeEscalation => {
+                gwUnavailable => 'queue',
+            },
+        },
 
         push => {
             typeEscalation => {
@@ -214,12 +214,12 @@ sub CommandMsg($$;$$) {
             },
         },
 
-        # queue => {
-        #     typeEscalation => {
-        #         gwUnavailable => 'mail',
-        #         emergency     => 'mail',
-        #     },
-        # },
+        queue => {
+            typeEscalation => {
+                gwUnavailable => 'mail',
+                emergency     => 'mail',
+            },
+        },
     };
 
     ################################################################
@@ -264,24 +264,25 @@ sub CommandMsg($$;$$) {
     if ( $params->{msgType} ) {
         Log3 $globalDevName, 5, "msg: given types=$params->{msgType}";
         $types = $params->{msgType};
-        $types =~ s/[\s\t]*//g;
+        $types =~ s/[\s\t ]+//g;
         delete $params->{msgType};
     }
     elsif ( $msg =~
-s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail|queue)[a-z,!|]*)[\s\t]+//i
+s/^[\s\t ]*([a-z,]*!?(screen|light|audio|text|push|mail|queue)[\w,!?&|]*)[\s\t ]+//i
       )
     {
-        Log3 $globalDevName, 5, "msg: found types=$1";
+        Log3 $globalDevName, 5, "msg: found types=$1"
+          unless ( defined($testMode) && $testMode eq "1" );
         $types = $1;
     }
 
     # programatic exception:
     # e.g. recipients were given automatically from empty readings
     if (
-        $msg =~ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+//
+        $msg =~ m/^[\s\t ]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t ]+/
         || (   $params->{msgRcpt}
             && $params->{msgRcpt} =~
-            m/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+/ )
+            m/^[\s\t ]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t ]+/ )
       )
     {
         Log3 $globalDevName, 4,
@@ -298,14 +299,15 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail|queue)[a-z,!|]*)[\s\t]+//
     if ( $params->{msgRcpt} ) {
         Log3 $globalDevName, 5, "msg: given recipient=$params->{msgRcpt}";
         $recipients = $params->{msgRcpt};
-        $recipients =~ s/[\s\t]*//g;
+        $recipients =~ s/[\s\t ]+//g;
         delete $params->{msgRcpt};
     }
     elsif ( $msg =~
-s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
+s/^[\s\t ]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!?|:]*)[\s\t ]+//
       )
     {
-        Log3 $globalDevName, 5, "msg: found recipient=$1";
+        Log3 $globalDevName, 5, "msg: found recipient=$1"
+          unless ( defined($testMode) && $testMode eq "1" );
         $recipients = $1;
     }
 
@@ -313,11 +315,13 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     if ( defined( $params->{msgPrio} ) ) {
         Log3 $globalDevName, 5, "msg: given priority=$params->{msgPrio}";
         $priority = $params->{msgPrio};
-        $priority =~ s/[\s\t]*//g;
+        $priority =~ s/[\s\t ]+//g;
         delete $params->{msgPrio};
     }
-    elsif ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[\.\d]*)[\s\t]*// ) {
-        Log3 $globalDevName, 5, "msg: found priority=$1";
+    elsif ( $msg =~ s/^[\s\t ]*([-+]{0,1}\d+[\.\d]*)[\s\t ]*// ) {
+        Log3 $globalDevName, 5, "msg: found priority=$1"
+          unless ( defined($testMode) && $testMode eq "1" );
+
         $priority = $1;
     }
     $priority = int($priority) if ( $priority =~ /^[-+]{0,1}\d+\.\d*$/ );
@@ -328,18 +332,21 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     if ( defined( $params->{msgTitle} ) ) {
         Log3 $globalDevName, 5, "msg: given title=$params->{msgTitle}";
         $title = $params->{msgTitle};
-        $title =~ s/^[\s\t]*\|(.*?)\|[\s\t]*/$1/;
+        $title =~ s/^[\s\t ]*\|(.*?)\|[\s\t ]*/$1/;
         delete $params->{msgTitle};
     }
-    elsif ( $msg =~ s/^[\s\t]*\|(.*?)\|[\s\t]*// ) {
-        Log3 $globalDevName, 5, "msg: found title=$1";
+    elsif ( $msg =~ s/^[\s\t ]*\|(.*?)\|[\s\t ]*// ) {
+        Log3 $globalDevName, 5, "msg: found title=$1"
+          unless ( defined($testMode) && $testMode eq "1" );
+
         $title = $1;
     }
 
     # check for user parameters (DEPRECATED / legacy compatibility only)
-    if ( $msg =~ s/[\s\t]*O(\[\{.*\}\])[\s\t]*$// ) {
+    if ( $msg =~ s/[\s\t ]*O(\[\{.*\}\])[\s\t ]*$// ) {
 
-        Log3 $globalDevName, 5, "msg: found options=$1";
+        Log3 $globalDevName, 5, "msg: found options=$1"
+          unless ( defined($testMode) && $testMode eq "1" );
 
         # Use JSON module if possible
         eval {
@@ -348,9 +355,12 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
         };
         if ($@) {
             Log3 $globalDevName, 3,
-"msg: To use user parameters in message text, please install Perl JSON.";
+              "msg: Error loading Perl::JSON. "
+              . "Please switch to new syntax to use user parameters";
         }
         else {
+            Log3 $globalDevName, 4,
+              "msg: Please switch to new syntax to use user parameters";
             my $o;
             eval '$o = decode_json( Encode::encode_utf8($1) ); 1';
             if ($@) {
@@ -376,11 +386,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
         }
     }
 
-    ################################################################
-    ### command queue
-    ###
-
-    $types = AttrVal( "msgType", $globalDevName, "text" )
+    $types = "default"
       if ( $types eq "" );
     my $msgSent   = 0;
     my $forwarded = "";
@@ -392,90 +398,130 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     my $isRecipientOr  = 1;
     my $hasTypeOr      = 0;
     my $hasRecipientOr = 0;
+    my $softFail       = 0;
     $recipients = "\@" . $globalDevName if ( $recipients eq "" );
 
-    my @typesOr = split( /\|/, $types );
-    $hasTypeOr = 1 if ( scalar( grep { defined $_ } @typesOr ) > 1 );
-    Log3 $globalDevName, 5,
-      "msg: typeOr total is " . scalar( grep { defined $_ } @typesOr )
-      if ( $testMode ne "1" );
+    ################################################################
+    ### recipient loop
+    ###
+
+    my @recipientsOr = split( /\|/, $recipients );
+    Log3 $globalDevName, 6,
+      "msg: recipientOr total is " . scalar( grep { defined $_ } @recipientsOr )
+      unless ( defined($testMode) && $testMode eq "1" );
 
     for (
-        my $iTypesOr = 0 ;
-        $iTypesOr < scalar( grep { defined $_ } @typesOr ) ;
-        $iTypesOr++
+        my $iRecipOr = 0 ;
+        $iRecipOr < scalar( grep { defined $_ } @recipientsOr ) ;
+        $iRecipOr++
       )
     {
-        Log3 $globalDevName, 5,
-          "msg: start typeOr loop for type(s) $typesOr[$iTypesOr]"
-          if ( $testMode ne "1" );
+        Log3 $globalDevName, 6,
+          "msg: "
+          . "running loop recipientsOr for recipient(s) $recipientsOr[$iRecipOr]"
+          unless ( defined($testMode) && $testMode eq "1" );
+        my $loopReturn1 = "";
 
-        my @type = split( /,/, lc( $typesOr[$iTypesOr] ) );
-        for ( my $i = 0 ; $i < scalar( grep { defined $_ } @type ) ; $i++ ) {
-            Log3 $globalDevName, 5, "msg: running loop for type $type[$i]"
-              if ( $testMode ne "1" );
-            last unless ( defined( $type[$i] ) );
+        $hasRecipientOr = 1
+          if ( scalar( grep { defined $_ } @recipientsOr ) > 1 );
 
-            my $forceType = 0;
-            if ( $type[$i] =~ s/(.*)![\s\t]*$// ) {
-                $type[$i] = $1;
-                $forceType = 1;
-            }
-
-            # check for correct type
-            my @msgCmds =
-              ( "screen", "light", "audio", "text", "push", "mail", "queue" );
-            unless ( grep { $type[$i] eq $_ } @msgCmds ) {
-                $return .= "Unknown message type $type[$i]\n";
-                next;
-            }
+        my @recipient = split( /,/, $recipientsOr[$iRecipOr] );
+        foreach my $device (@recipient) {
+            Log3 $globalDevName, 6, "msg: running loop for device $device"
+              unless ( defined($testMode) && $testMode eq "1" );
+            my $loopReturn2 = "";
 
             ################################################################
-            ### recipient loop
+            ### type loop
             ###
 
-            my @recipientsOr = split( /\|/, $recipients );
-            $hasRecipientOr = 1
-              if ( scalar( grep { defined $_ } @recipientsOr ) > 1 );
-            Log3 $globalDevName, 5,
-              "msg: recipientOr total is "
-              . scalar( grep { defined $_ } @recipientsOr )
-              if ( $testMode ne "1" );
+            my @typesOr = split( /\|/, $types );
+            Log3 $globalDevName, 6,
+              "msg: typeOr total is " . scalar( grep { defined $_ } @typesOr )
+              unless ( defined($testMode) && $testMode eq "1" );
 
             for (
-                my $iRecipOr = 0 ;
-                $iRecipOr < scalar( grep { defined $_ } @recipientsOr ) ;
-                $iRecipOr++
+                my $iTypesOr = 0 ;
+                $iTypesOr < scalar( grep { defined $_ } @typesOr ) ;
+                $iTypesOr++
               )
             {
-                Log3 $globalDevName, 5,
-"msg: start recipientsOr loop for recipient(s) $recipientsOr[$iRecipOr]"
-                  if ( $testMode ne "1" );
+                Log3 $globalDevName, 6,
+                  "msg: running loop typeOr for type(s) $typesOr[$iTypesOr]"
+                  unless ( defined($testMode) && $testMode eq "1" );
+                my $loopReturn3 = "";
 
-                my @recipient = split( /,/, $recipientsOr[$iRecipOr] );
-                foreach my $device (@recipient) {
+                $hasTypeOr = 1
+                  if ( scalar( grep { defined $_ } @typesOr ) > 1 );
 
-                    Log3 $globalDevName, 5,
-                      "msg: running loop for device $device"
-                      if ( $testMode ne "1" );
+                my @type = split( /,/, lc( $typesOr[$iTypesOr] ) );
+                for (
+                    my $i = 0 ;
+                    $i < scalar( grep { defined $_ } @type ) ;
+                    $i++
+                  )
+                {
+                    Log3 $globalDevName, 6,
+                      "msg: running loop for type $type[$i]"
+                      unless ( defined($testMode) && $testMode eq "1" );
+                    last unless ( defined( $type[$i] ) );
+
+                    # check for correct type
+                    my @msgCmds = (
+                        "screen", "light", "audio", "text",
+                        "push",   "mail",  "queue", "default"
+                    );
+                    unless ( grep { $type[$i] =~ /^$_/i } @msgCmds ) {
+                        $loopReturn3 .= "Unknown message type $type[$i]\n";
+                        next;
+                    }
+
+                    ###
+                    ### /type loop
+                    ################################################################
+
+                    my $logDevice;
+                    $logDevice = $globalDevName;
+                    $logDevice = $device
+                      if (
+                        MSG_FindAttrVal( $device, "verbose", undef, undef ) );
 
                     my $msgSentDev  = 0;
                     my $gatewayDevs = "";
                     my $forceDevice = 0;
+                    my $forceQueue  = 0;
 
                     # for device type
                     my $deviceType = "device";
                     if ( $device =~
-                        /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ )
+                        m/^(([A-Za-z0-9%+._-])+@+([%+a-z0-9A-Z.-]*))$/ )
                     {
                         $gatewayDevs = $1;
                         $deviceType  = "email";
                     }
-                    elsif ( $device =~ s/^@?(.*)![\s\t]*$// ) {
-                        $device      = $1;
-                        $forceDevice = 1;
+                    elsif ( $device =~
+                        m/^@?([A-Za-z\d_\.\-\/]+)([^A-Za-z\d_\.\-\/]+)[\s\t ]*$/
+                      )
+                    {
+                        $device = $1;
+
+                        foreach ( split( /(\S)/, $2 ) ) {
+                            $forceDevice = 1 if ( $_ eq "!" );
+                            $softFail    = 1 if ( $_ eq "?" );
+                            $forceQueue  = 1 if ( $_ eq "&" );
+                        }
+
+                        Log3 $logDevice, 5,
+"msg $device: forceDevice=$forceDevice (from device contact)"
+                          if ($forceDevice);
+                        Log3 $logDevice, 5,
+"msg $device: softFail=$softFail (from device contact)"
+                          if ($softFail);
+                        Log3 $logDevice, 5,
+"msg $device: forceQueue=$forceQueue (from device contact)"
+                          if ($forceQueue);
                     }
-                    elsif ( $device =~ s/^@(.*)// ) {
+                    elsif ( $device =~ /^@(.*)/ ) {
                         $device = $1;
                     }
 
@@ -495,10 +541,16 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     if ( !defined( $defs{$device} )
                         && $deviceType eq "device" )
                     {
-                        $return .= "Device $device does not exist\n";
-                        Log3 $globalDevName, 5,
-                          "msg $device: Device does not exist"
-                          if ( $testMode ne "1" );
+                        $loopReturn3 .= "Device $device does not exist\n"
+                          unless ($softFail);
+                        unless ( defined($testMode) && $testMode eq "1" ) {
+                            Log3 $logDevice, 2,
+                              "msg $device: Device does not exist"
+                              unless ($softFail);
+                            Log3 $logDevice, 5,
+                              "msg $device: Device does not exist"
+                              if ($softFail);
+                        }
 
                         my $regex1 =
                           "\\s*!?@?" . $device . "[,|]";    # at the beginning
@@ -518,13 +570,69 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                         next;
                     }
 
-# next type loop if device is an email address and this is not the mail type loop run
+                    # Find custom types for devices
+                    if ( $type[$i] eq "default" ) {
+                        delete $typesOr[$iTypesOr]
+                          if ( $typesOr[$iTypesOr] eq "default" );
+                        delete $type[$i];
+                        Log3 $logDevice, 5,
+                          "msg $device: msgType lookup for $device:";
+
+                        my @t = split(
+                            m/\|/,
+                            MSG_FindAttrVal(
+                                $device, "msgType", undef, "text"
+                            )
+                        );
+                        $hasTypeOr = 1
+                          if ( scalar( grep { defined $_ } @t ) > 1 );
+
+                        foreach (@t) {
+                            Log3 $logDevice, 5,
+                              "msg $device:    Adding to \@typesOr: $_";
+
+                            push @typesOr, $_;
+
+                            foreach ( split( /,/, lc($_) ) ) {
+                                Log3 $logDevice, 5,
+                                  "msg $device:       Adding to \@type: $_";
+                                push @type, $_;
+                            }
+                        }
+                    }
+
+                    my $forceType = 0;
+                    if ( $type[$i] =~
+                        m/^([A-Za-z\d_\.\-\/]+)([^A-Za-z\d_\.\-\/]+)[\s\t ]*$/ )
+                    {
+                        $type[$i] = $1;
+
+                        foreach ( split( /(\S)/, $2 ) ) {
+                            $forceType  = 1 if ( $_ eq "!" );
+                            $softFail   = 1 if ( $_ eq "?" );
+                            $forceQueue = 1 if ( $_ eq "&" );
+                        }
+
+                        Log3 $logDevice, 5,
+                          "msg $device: forceType=$forceType (from type)"
+                          if ($forceType);
+                        Log3 $logDevice, 5,
+                          "msg $device: softFail=$softFail (from type)"
+                          if ($softFail);
+                        Log3 $logDevice, 5,
+                          "msg $device: forceQueue=$forceQueue (from type)"
+                          if ($forceQueue);
+                    }
+
+                    # next type loop if device is an email address
+                    # and this is not the mail type loop run
                     if (   $deviceType eq "email"
                         && $type[$i] ne "mail"
                         && $type[$i] ne "text" )
                     {
-                        Log3 $globalDevName, 5,
-"msg $device: Skipping loop for device type 'email' with unmatched message type '"
+                        Log3 $logDevice, 5,
+                            "msg $device: "
+                          . "Skipping loop for device type 'email' with unmatched message type '"
                           . $type[$i] . "'";
                         next;
                     }
@@ -532,12 +640,6 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     my $typeUc      = ucfirst( $type[$i] );
                     my $catchall    = 0;
                     my $useLocation = 0;
-
-                    my $logDevice;
-                    $logDevice = $globalDevName;
-                    $logDevice = $device
-                      if ( MSG_FindAttrVal( $device, "verbose", $typeUc, "" ) ne
-                        "" );
 
                     ################################################################
                     ### get target information from device location
@@ -610,6 +712,13 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                       unless ($err);
                                 }
 
+                                my @availabilityIndicators = (
+                                    "0",            "false",
+                                    "absent",       "disappeared",
+                                    "unauthorized", "unavailable",
+                                    "unreachable",  "disconnected"
+                                );
+
                                 foreach
                                   my $gatewayDevOr ( split /\|/, $gatewayDevs )
                                 {
@@ -618,7 +727,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         $gatewayDevOr )
                                     {
                                         my $tmpSubRecipient;
-                                        if ( $gatewayDev =~ s/:(.*)// ) {
+                                        if ( $gatewayDev =~ /:(.*)/ ) {
                                             $tmpSubRecipient = $1;
                                         }
 
@@ -638,24 +747,36 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         elsif (
                                             $type[$i] ne "mail"
                                             && (
-                                                ReadingsVal(
-                                                    $gatewayDev, "presence",
-                                                    "present"
-                                                ) =~
-m/^(0|false|absent|disappeared|unauthorized|disconnected|unreachable)$/i
-                                                || ReadingsVal(
-                                                    $gatewayDev, "state",
-                                                    "present"
-                                                ) =~
-m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
-                                                || (   $defs{$gatewayDev}{STATE}
-                                                    && $defs{$gatewayDev}{STATE}
-                                                    =~ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
+                                                grep {
+                                                    ReadingsVal(
+                                                        $gatewayDev,
+                                                        "presence",
+                                                        "present"
+                                                      ) eq $_
+                                                } @availabilityIndicators
+
+                                                || grep {
+                                                    ReadingsVal( $gatewayDev,
+                                                        "state", "present" ) eq
+                                                      $_
+                                                } @availabilityIndicators
+
+                                                || (
+                                                    defined(
+                                                        $defs{$gatewayDev}
+                                                          {STATE}
+                                                    )
+                                                    && grep {
+                                                        $defs{$gatewayDev}
+                                                          {STATE} eq $_
+                                                    } @availabilityIndicators
                                                 )
+
                                                 || ReadingsVal(
                                                     $gatewayDev, "available",
                                                     "yes"
                                                 ) =~ m/^(0|no|false)$/i
+
                                                 || ReadingsVal(
                                                     $gatewayDev, "reachable",
                                                     "yes"
@@ -677,8 +798,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 # use gatewayDevs from location only
                                 # if it has been confirmed to be available
                                 if ( $useLocation == 1 ) {
-                                    Log3 $logDevice, 4,
-"msg $device: Matching location definition found.";
+                                    Log3 $logDevice, 4, "msg $device: "
+                                      . "Matching location definition found";
                                 }
                                 else {
                                     $gatewayDevs = "";
@@ -732,10 +853,11 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                       )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Recipient type $deviceType2 is a gateway device itself for message type "
+                            "msg $device: Recipient type $deviceType2 "
+                          . "is a gateway device itself for message type "
                           . $type[$i]
                           . ". Still checking for any delegates ..."
-                          if ( $testMode ne "1" );
+                          unless ( defined($testMode) && $testMode eq "1" );
 
                         $gatewayDevs =
                           MSG_FindAttrVal( $device, "msgContact", $typeUc,
@@ -757,8 +879,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $catchall = 1
                               if ( $device ne $globalDevName );
 
-                            Log3 $logDevice, 5,
-"msg $device:			(No $typeUc contact defined, trying global instead)"
+                            Log3 $logDevice, 6,
+                              "msg $device:			(No $typeUc contact defined, "
+                              . "trying global instead)"
                               if ( $catchall == 1 );
 
                             $gatewayDevs =
@@ -792,7 +915,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                       )
                     {
                         Log3 $logDevice, 5,
-"msg $device: Checking for available routes (triggered by type $type[$i])";
+                          "msg $device: Checking for available routes "
+                          . "(triggered by type $type[$i])";
 
                         $routes{screen} = 1
                           if (
@@ -879,7 +1003,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             && $routes{mail} == 1 )
                         {
                             Log3 $logDevice, 4,
-"msg $device: Text routing decision: push+mail(1)";
+                              "msg $device: "
+                              . "Text routing decision: push+mail(1)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push+mail";
@@ -956,13 +1081,17 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                         # FATAL ERROR: routing decision failed
                         else {
                             Log3 $logDevice, 4,
-"msg $device: Text routing FAILED - priority=$loopPriority push="
+                                "msg $device: "
+                              . "Text routing FAILED - priority=$loopPriority push="
                               . $routes{push}
                               . " mail="
                               . $routes{mail};
 
-                            $return .=
-"ERROR: Could not find any Push or Mail contact for device $device - set attributes: msgContactPush | msgContactMail | msgContactText | msgRecipientPush | msgRecipientMail | msgRecipientText | msgRecipient\n";
+                            $loopReturn3 .=
+                              "ERROR: Could not find any Push or Mail contact "
+                              . "for device $device - set attributes: msgContactPush "
+                              . "| msgContactMail | msgContactText | msgRecipientPush "
+                              . "| msgRecipientMail | msgRecipientText | msgRecipient\n";
                         }
 
                         next;
@@ -973,28 +1102,18 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     if (   $gatewayDevs eq ""
                         && $device ne $globalDevName )
                     {
-                        $return .=
-"ERROR: Could not find any $typeUc contact for device $device - set attributes: msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n";
+                        $loopReturn3 .=
+                            "ERROR: Could not find any $typeUc contact "
+                          . "for device $device - set attributes: msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n"
+                          unless ( $type[$i] eq "queue" );
                     }
 
                     # FATAL ERROR: we could not find any targets at all
                     elsif ( $gatewayDevs eq "" ) {
-                        $return .=
-"ERROR: Could not find any general $typeUc contact. Please specify a destination device or set attributes in general msg configuration device $globalDevName : msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n";
-                    }
-
-                    #####################
-                    # return if we are in routing target test mode
-                    #
-                    if ( defined($testMode) && $testMode eq "1" ) {
-                        Log3 $logDevice, 5,
-"msg $device:		$type[$i] route check result: ROUTE_AVAILABLE"
-                          if ( $return eq "" );
-                        Log3 $logDevice, 5,
-"msg $device:		$type[$i] route check result: ROUTE_UNAVAILABLE"
-                          if ( $return ne "" );
-                        return "ROUTE_AVAILABLE"   if ( $return eq "" );
-                        return "ROUTE_UNAVAILABLE" if ( $return ne "" );
+                        $loopReturn3 .=
+                          "ERROR: Could not find any general $typeUc contact. "
+                          . "Please specify a destination device or set attributes in general msg configuration device $globalDevName : msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n"
+                          unless ( $type[$i] eq "queue" );
                     }
 
                     # user selected audio-visual announcement state
@@ -1208,6 +1327,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     ### Send message
                     ###
 
+                    my $queued = 0;
+
                     # user selected emergency priority text threshold
                     my $prioThresGwEmg =
                       MSG_FindAttrVal( $device, "msgThPrioGwEmergency",
@@ -1222,6 +1343,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     }
 
                     my %gatewaysStatus;
+                    $gatewayDevs = $globalDevName if ( $type[$i] eq "queue" );
 
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
@@ -1236,19 +1358,24 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                             }
 
                             my $logMsg =
-"msg $device: Trying to send message via gateway $gatewayDev";
+                                "msg $device: "
+                              . "Trying to send message via gateway $gatewayDev";
                             $logMsg .= " to recipient $subRecipient"
                               if ( $subRecipient ne "" );
                             $logMsg .= ", terminal device $termRecipient"
                               if ( $termRecipient ne "" );
-                            Log3 $logDevice, 5, $logMsg;
+                            Log3 $logDevice, 5, $logMsg
+                              unless ( defined($testMode) && $testMode eq "1" );
 
                             ##############
                            # check for gateway availability and set route status
                            #
 
                             my $routeStatus = "OK";
-                            if (   $type[$i] ne "mail"
+                            if ( $type[$i] eq "queue" ) {
+                                $routeStatus = "OK_QUEUE";
+                            }
+                            elsif ($type[$i] ne "mail"
                                 && !defined( $defs{$gatewayDev} )
                                 && $deviceType eq "device" )
                             {
@@ -1344,6 +1471,20 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 $routeStatus .= "+LOCATION";
                             }
 
+                            # add to queue
+                            if (
+                                (
+                                       $routeStatus eq "USER_DISABLED"
+                                    || $routeStatus eq "USER_ABSENT"
+                                    || $routeStatus eq "USER_ASLEEP"
+                                )
+                                && $routeStatus !~ /^OK/
+                                && !$softFail
+                              )
+                            {
+                                $routeStatus .= "+QUEUE";
+                            }
+
                             my $gatewayType = (
                                 $type[$i] eq "mail" ? "fhemMsgMail"
                                 : (
@@ -1376,7 +1517,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                               );
 
                             Log3 $logDevice, 5,
-"msg $device: Determined default title: $defTitle";
+                              "msg $device: "
+                              . "Determined default title: $defTitle"
+                              unless ( defined($testMode) && $testMode eq "1" );
 
                             # use title from device, global or internal default
                             my $loopTitle = $title;
@@ -1400,7 +1543,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 || $loopTitle eq "-" );
 
                             my $loopMsg = $msg;
-                            if ( $catchall == 1 ) {
+                            if ( $catchall == 1 && $type[$i] ne "queue" ) {
                                 $loopTitle = "Fw: $loopTitle"
                                   if ( $loopTitle ne ""
                                     && $type[$i] !~ /^(audio|screen)$/ );
@@ -1408,7 +1551,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                   if ( $loopTitle eq "" );
                                 if ( $type[$i] eq "mail" ) {
                                     $loopMsg .=
-"\n\n-- \nMail catched from device $device";
+                                        "\n\n-- \nMail catched "
+                                      . "from device $device";
                                 }
                                 elsif ( $type[$i] !~ /^(audio|screen)$/ ) {
                                     $loopMsg .=
@@ -1470,11 +1614,15 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 )
                               );
 
-                            if ( $cmd eq "" ) {
+                            if ( $cmd eq "" && $type[$i] ne "queue" ) {
                                 Log3 $logDevice, 4,
-"$gatewayDev: Unknown command schema for gateway device type $gatewayType. Use manual definition by userattr msgCmd*";
-                                $return .=
-"$gatewayDev: Unknown command schema for gateway device type $gatewayType. Use manual definition by userattr msgCmd*\n";
+                                  "$gatewayDev: Unknown command schema "
+                                  . "for gateway device type $gatewayType. Use manual definition by userattr msgCmd*"
+                                  unless ( defined($testMode)
+                                    && $testMode eq "1" );
+                                $loopReturn3 .=
+                                    "$gatewayDev: Unknown command schema "
+                                  . "for gateway device type $gatewayType. Use manual definition by userattr msgCmd*\n";
                                 next;
                             }
 
@@ -1630,64 +1778,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $cmd =~ s/%TERMINAL%/$termRecipient/gi
                               if ( $termRecipient ne "" );
 
-                            # user parameters from message
-                            if ( ref($params) eq "HASH" ) {
-                                for my $key ( keys %$params ) {
-                                    next if ( ref( $params->{$key} ) );
-                                    my $val = $params->{$key};
-                                    $cmd =~ s/%$key%/$val/gi;
-                                    $cmd =~ s/\$$key/$val/g;
-                                    Log3 $logDevice, 5,
-"msg $device: User parameters: replacing %$key% and \$$key by '$val'";
-                                }
-                            }
+                            unless ( defined($testMode) && $testMode eq "1" ) {
 
-                            # user parameters from attributes
-                            my $paramsAttr1 =
-                              AttrVal( $gatewayDev,
-                                "msgParams$typeUc$priorityCat", undef );
-                            my $paramsAttr2 =
-                              AttrVal( $gatewayDev, "msgParams$typeUc", undef );
-                            my $paramsAttr3 =
-                              AttrVal( $gatewayDev, "msgParams", undef );
-                            my $paramsAttr4 =
-                              MSG_FindAttrVal( $device,
-                                "msgParams$typeUc$priorityCat",
-                                $typeUc, undef );
-                            my $paramsAttr5 =
-                              MSG_FindAttrVal( $device, "msgParams$typeUc",
-                                $typeUc, undef );
-                            my $paramsAttr6 =
-                              MSG_FindAttrVal( $device, "msgParams", $typeUc,
-                                undef );
-
-                            foreach (
-                                $paramsAttr1, $paramsAttr2, $paramsAttr3,
-                                $paramsAttr4, $paramsAttr5, $paramsAttr6
-                              )
-                            {
-                                next unless ($_);
-                                my $params;
-                                if (   $_ =~ m/^{.*}$/s
-                                    && $_ =~ m/=>/
-                                    && $_ !~ m/\$/ )
-                                {
-                                    my $av = eval $_;
-                                    if ($@) {
-                                        Log3 $logDevice, 3,
-"msg $device: ERROR while reading attribute msgParams";
-                                    }
-                                    else {
-                                        $params = $av
-                                          if ( ref($av) eq "HASH" );
-                                    }
-                                }
-                                else {
-                                    my ( $a, $h ) = parseParams($_);
-                                    $params = $h
-                                      if ( ref($h) eq "HASH" );
-                                }
-
+                                # user parameters from message
                                 if ( ref($params) eq "HASH" ) {
                                     for my $key ( keys %$params ) {
                                         next if ( ref( $params->{$key} ) );
@@ -1695,55 +1788,120 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         $cmd =~ s/%$key%/$val/gi;
                                         $cmd =~ s/\$$key/$val/g;
                                         Log3 $logDevice, 5,
-"msg $device: msgParams: replacing %$key% and \$$key by '$val'";
-                                    }
-                                }
-                            }
-
-                            # user parameters from command schema hash
-                            if (
-                                $priorityCat ne ""
-                                && defined(
-                                    $cmdSchema->{ $type[$i] }{$gatewayType}
-                                      {defaultValues}{$priorityCat}
-                                )
-                              )
-                            {
-
-                                for my $item (
-                                    $cmdSchema->{ $type[$i] }{$gatewayType}
-                                    {defaultValues}{$priorityCat} )
-                                {
-                                    for my $key ( keys(%$item) ) {
-                                        my $val = $item->{$key};
-                                        $cmd =~ s/%$key%/$val/gi;
-                                        $cmd =~ s/\$$key/$val/g;
-                                        Log3 $logDevice, 5,
-"msg $device: msgSchema: replacing %$key% and \$$key by '$val'";
+                                          "msg $device: User parameters: "
+                                          . "replacing %$key% and \$$key by '$val'";
                                     }
                                 }
 
-                            }
-                            elsif (
-                                $priorityCat eq ""
-                                && defined(
-                                    $cmdSchema->{ $type[$i] }{$gatewayType}
-                                      {defaultValues}{Normal}
-                                )
-                              )
-                            {
+                                # user parameters from attributes
+                                my $paramsAttr1 =
+                                  AttrVal( $gatewayDev,
+                                    "msgParams$typeUc$priorityCat", undef );
+                                my $paramsAttr2 =
+                                  AttrVal( $gatewayDev, "msgParams$typeUc",
+                                    undef );
+                                my $paramsAttr3 =
+                                  AttrVal( $gatewayDev, "msgParams", undef );
+                                my $paramsAttr4 =
+                                  MSG_FindAttrVal( $device,
+                                    "msgParams$typeUc$priorityCat",
+                                    $typeUc, undef );
+                                my $paramsAttr5 =
+                                  MSG_FindAttrVal( $device, "msgParams$typeUc",
+                                    $typeUc, undef );
+                                my $paramsAttr6 =
+                                  MSG_FindAttrVal( $device, "msgParams",
+                                    $typeUc, undef );
 
-                                for my $item (
-                                    $cmdSchema->{ $type[$i] }{$gatewayType}
-                                    {defaultValues}{Normal} )
+                                foreach (
+                                    $paramsAttr1, $paramsAttr2, $paramsAttr3,
+                                    $paramsAttr4, $paramsAttr5, $paramsAttr6
+                                  )
                                 {
-                                    for my $key ( keys(%$item) ) {
-                                        my $val = $item->{$key};
-                                        $cmd =~ s/%$key%/$val/gi;
-                                        $cmd =~ s/\$$key/$val/g;
-                                        Log3 $logDevice, 5,
-"msg $device: msgSchema: replacing %$key% and \$$key by '$val'";
+                                    next unless ($_);
+                                    my $params;
+                                    if (   $_ =~ m/^{.*}$/s
+                                        && $_ =~ m/=>/
+                                        && $_ !~ m/\$/ )
+                                    {
+                                        my $av = eval $_;
+                                        if ($@) {
+                                            Log3 $logDevice, 3,
+                                              "msg $device: "
+                                              . "ERROR while reading attribute msgParams";
+                                        }
+                                        else {
+                                            $params = $av
+                                              if ( ref($av) eq "HASH" );
+                                        }
                                     }
+                                    else {
+                                        my ( $a, $h ) = parseParams($_);
+                                        $params = $h
+                                          if ( ref($h) eq "HASH" );
+                                    }
+
+                                    if ( ref($params) eq "HASH" ) {
+                                        for my $key ( keys %$params ) {
+                                            next if ( ref( $params->{$key} ) );
+                                            my $val = $params->{$key};
+                                            $cmd =~ s/%$key%/$val/gi;
+                                            $cmd =~ s/\$$key/$val/g;
+                                            Log3 $logDevice, 5,
+                                              "msg $device: "
+                                              . "msgParams: replacing %$key% and \$$key by '$val'";
+                                        }
+                                    }
+                                }
+
+                                # user parameters from command schema hash
+                                if (
+                                    $priorityCat ne ""
+                                    && defined(
+                                        $cmdSchema->{ $type[$i] }{$gatewayType}
+                                          {defaultValues}{$priorityCat}
+                                    )
+                                  )
+                                {
+
+                                    for my $item (
+                                        $cmdSchema->{ $type[$i] }{$gatewayType}
+                                        {defaultValues}{$priorityCat} )
+                                    {
+                                        for my $key ( keys(%$item) ) {
+                                            my $val = $item->{$key};
+                                            $cmd =~ s/%$key%/$val/gi;
+                                            $cmd =~ s/\$$key/$val/g;
+                                            Log3 $logDevice, 5,
+                                              "msg $device: "
+                                              . "msgSchema: replacing %$key% and \$$key by '$val'";
+                                        }
+                                    }
+
+                                }
+                                elsif (
+                                    $priorityCat eq ""
+                                    && defined(
+                                        $cmdSchema->{ $type[$i] }{$gatewayType}
+                                          {defaultValues}{Normal}
+                                    )
+                                  )
+                                {
+
+                                    for my $item (
+                                        $cmdSchema->{ $type[$i] }{$gatewayType}
+                                        {defaultValues}{Normal} )
+                                    {
+                                        for my $key ( keys(%$item) ) {
+                                            my $val = $item->{$key};
+                                            $cmd =~ s/%$key%/$val/gi;
+                                            $cmd =~ s/\$$key/$val/g;
+                                            Log3 $logDevice, 5,
+                                              "msg $device: "
+                                              . "msgSchema: replacing %$key% and \$$key by '$val'";
+                                        }
+                                    }
+
                                 }
 
                             }
@@ -1754,99 +1912,146 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                                 my $error = 0;
 
-                                # ReplaceSetMagic
-                                #
-                                if ( $featurelevel >= 5.7
-                                    && !$replaceError )
+                                unless ( defined($testMode)
+                                    && $testMode eq "1" )
                                 {
-                                    my %dummy;
-                                    my ( $err, @a ) =
-                                      ReplaceSetMagic( \%dummy, 0, ($cmd) );
-                                    $replaceError .=
-                                      "ReplaceSetMagic failed for CMD: $err\n"
-                                      if ($err);
-                                    $cmd = join( " ", @a )
-                                      unless ($err);
-                                }
 
-                                # add user parameters
-                                # if gateway supports parseParams
-                                my $gatewayDevType =
-                                  defined( $defs{$gatewayDev}{TYPE} )
-                                  ? $defs{$gatewayDev}{TYPE}
-                                  : undef;
-                                if (
-                                    ref($params) eq "HASH"
-                                    && (
-                                        $modules{$gatewayDevType}->{parseParams}
-                                        || $modules{$gatewayDevType}
-                                        ->{'.msgParams'}{parseParams} )
-                                  )
-                                {
-                                    Log3 $logDevice, 5,
-"msg $device: parseParams support: Handing over user parameters to other device";
-
-                                    my ( $a, $h ) = parseParams($cmd);
-
-                                    keys %$params;
-                                    while ( ( my $key, my $value ) =
-                                        each %$params )
+                                    # ReplaceSetMagic
+                                    #
+                                    if ( $featurelevel >= 5.7
+                                        && !$replaceError )
                                     {
-                                        $key =~ s/^$gatewayDevType\_//;
-                                        $cmd .= " $key='$value'"
-                                          if ( !defined( $h->{$key} )
-                                            || $h->{$key} =~ m/^[\s\t\n ]*$/ );
+                                        my %dummy;
+                                        my ( $err, @a ) =
+                                          ReplaceSetMagic( \%dummy, 0, ($cmd) );
+                                        $replaceError .=
+                                            "ReplaceSetMagic failed for CMD: "
+                                          . "$err\n"
+                                          if ($err);
+                                        $cmd = join( " ", @a )
+                                          unless ($err);
                                     }
-                                }
 
-                                # run command
-                                if ($replaceError) {
-                                    $error = 2;
-                                    $return .= $replaceError;
-                                }
-                                elsif ( $cmd =~ /^\s*\{.*\}\s*$/ ) {
-                                    Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (Perl): $cmd";
-                                    eval $cmd;
-                                    if ($@) {
-                                        $error = 1;
-                                        $return .= "$gatewayDev: $@\n";
+                                    # add user parameters
+                                    # if gateway supports parseParams
+                                    my $gatewayDevType =
+                                      defined( $defs{$gatewayDev}{TYPE} )
+                                      ? $defs{$gatewayDev}{TYPE}
+                                      : undef;
+                                    if (
+                                        ref($params) eq "HASH"
+                                        && ( $modules{$gatewayDevType}
+                                            ->{parseParams}
+                                            || $modules{$gatewayDevType}
+                                            ->{'.msgParams'}{parseParams} )
+                                      )
+                                    {
+                                        Log3 $logDevice, 5,
+                                          "msg $device: "
+                                          . "parseParams support: Handing over user parameters to other device";
+
+                                        my ( $a, $h ) = parseParams($cmd);
+
+                                        keys %$params;
+                                        while ( ( my $key, my $value ) =
+                                            each %$params )
+                                        {
+                                            $key =~ s/^$gatewayDevType\_//;
+                                            $cmd .= " $key='$value'"
+                                              if ( !defined( $h->{$key} )
+                                                || $h->{$key} =~
+                                                m/^[\s\t\n ]*$/ );
+                                        }
                                     }
-                                }
-                                else {
-                                    Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (fhem): $cmd";
-                                    fhem $cmd, 1;
-                                    if ($@) {
-                                        $error = 1;
-                                        $return .= "$gatewayDev: $@\n";
+
+                                    # queue message
+                                    if ( $routeStatus eq "OK_QUEUE" ) {
+                                        $queued = 1;
                                     }
+
+                                    # run command
+                                    elsif ($replaceError) {
+                                        $error = 2;
+                                        $loopReturn3 .= $replaceError;
+                                    }
+                                    elsif ( $cmd =~ /^\s*\{.*\}\s*$/ ) {
+                                        Log3 $logDevice, 5,
+                                          "msg $device: "
+                                          . "$type[$i] route command (Perl): $cmd";
+                                        eval $cmd;
+                                        if ($@) {
+                                            $error = 1;
+                                            $loopReturn3 .= "$gatewayDev: $@\n";
+                                        }
+                                    }
+                                    else {
+                                        Log3 $logDevice, 5,
+                                          "msg $device: "
+                                          . "$type[$i] route command (fhem): $cmd";
+                                        fhem $cmd, 1;
+                                        if ($@) {
+                                            $error = 1;
+                                            $loopReturn3 .= "$gatewayDev: $@\n";
+                                        }
+                                    }
+
+                                    $routeStatus = "ERROR"
+                                      if ( $error == 1 );
+                                    $routeStatus = "ERROR_EVAL"
+                                      if ( $error == 2 );
+
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "RECIPIENT=$subRecipient "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority($priorityCat) "
+                                      . "TITLE='$loopTitle' "
+                                      . "MSG='$loopMsg'"
+                                      if ( $priorityCat ne ""
+                                        && $subRecipient ne "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "RECIPIENT=$subRecipient "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' "
+                                      . "MSG='$loopMsg'"
+                                      if ( $priorityCat eq ""
+                                        && $subRecipient ne "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority($priorityCat) "
+                                      . "TITLE='$loopTitle' "
+                                      . "MSG='$loopMsg'"
+                                      if ( $priorityCat ne ""
+                                        && $subRecipient eq "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' "
+                                      . "MSG='$loopMsg'"
+                                      if ( $priorityCat eq ""
+                                        && $subRecipient eq "" );
+
                                 }
-
-                                $routeStatus = "ERROR"
-                                  if ( $error == 1 );
-                                $routeStatus = "ERROR_EVAL"
-                                  if ( $error == 2 );
-
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$loopMsg'"
-                                  if ( $priorityCat ne ""
-                                    && $subRecipient ne "" );
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$loopMsg'"
-                                  if ( $priorityCat eq ""
-                                    && $subRecipient ne "" );
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$loopMsg'"
-                                  if ( $priorityCat ne ""
-                                    && $subRecipient eq "" );
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$loopMsg'"
-                                  if ( $priorityCat eq ""
-                                    && $subRecipient eq "" );
 
                                 $msgSent    = 1 if ( $error == 0 );
                                 $msgSentDev = 1 if ( $error == 0 );
+
                                 if ( $subRecipient ne "" ) {
                                     $gatewaysStatus{"$gatewayDev:$subRecipient"}
                                       = $routeStatus
@@ -1862,29 +2067,106 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                       if ( $globalDevName eq $gatewayDev );
                                 }
                             }
-                            elsif ($routeStatus eq "UNAVAILABLE"
-                                || $routeStatus eq "UNDEFINED" )
-                            {
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
-                                  if ( $subRecipient ne "" );
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
-                                  if ( $subRecipient eq "" );
+
+                            elsif ( $routeStatus =~ /\+QUEUE/ || $forceQueue ) {
+                                unless ( defined($testMode)
+                                    && $testMode eq "1" )
+                                {
+                                    if ( !( grep { "queue" eq $_ } @type ) ) {
+                                        push @type, "queue";
+                                    }
+
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "RECIPIENT=$subRecipient "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient ne "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient eq "" );
+                                }
+
+                                $msgSent    = 3 if ( $msgSent != 1 );
+                                $msgSentDev = 3 if ( $msgSentDev != 1 );
+
                                 $gatewaysStatus{$gatewayDev} = $routeStatus
                                   if ( $globalDevName ne $gatewayDev );
                                 $gatewaysStatus{$device} = $routeStatus
                                   if ( $globalDevName eq $gatewayDev );
                             }
+
+                            elsif ($routeStatus eq "UNAVAILABLE"
+                                || $routeStatus eq "UNDEFINED" )
+                            {
+                                unless ( defined($testMode)
+                                    && $testMode eq "1" )
+                                {
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "RECIPIENT=$subRecipient "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient ne "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient eq "" );
+                                }
+
+                                $gatewaysStatus{$gatewayDev} = $routeStatus
+                                  if ( $globalDevName ne $gatewayDev );
+                                $gatewaysStatus{$device} = $routeStatus
+                                  if ( $globalDevName eq $gatewayDev );
+                            }
+
                             else {
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
-                                  if ( $subRecipient ne "" );
-                                Log3 $logDevice, 3,
-"msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$loopMsg'"
-                                  if ( $subRecipient eq "" );
+                                unless ( defined($testMode)
+                                    && $testMode eq "1" )
+                                {
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "RECIPIENT=$subRecipient "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient ne "" );
+                                    Log3 $logDevice, 3,
+                                        "msg $device: "
+                                      . "ID=$msgID.$sentCounter "
+                                      . "TYPE=$type[$i] "
+                                      . "ROUTE=$gatewayDev "
+                                      . "STATUS=$routeStatus "
+                                      . "PRIORITY=$loopPriority "
+                                      . "TITLE='$loopTitle' '$loopMsg'"
+                                      if ( $subRecipient eq "" );
+                                }
+
                                 $msgSent    = 2 if ( $msgSent != 1 );
                                 $msgSentDev = 2 if ( $msgSentDev != 1 );
+
                                 $gatewaysStatus{$gatewayDev} = $routeStatus
                                   if ( $globalDevName ne $gatewayDev );
                                 $gatewaysStatus{$device} = $routeStatus
@@ -1893,7 +2175,23 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                         }
 
-                        last if ( $msgSentDev == 1 );
+                        last if ( $msgSentDev == 1 || $msgSentDev == 3 );
+                    }
+
+                    #####################
+                    # return if we are in routing target test mode
+                    #
+                    if ( defined($testMode) && $testMode eq "1" ) {
+                        Log3 $logDevice, 5,
+                          "msg $device:		"
+                          . "$type[$i] route check result: ROUTE_AVAILABLE"
+                          if ( $loopReturn3 eq "" );
+                        Log3 $logDevice, 5,
+                          "msg $device:		"
+                          . "$type[$i] route check result: ROUTE_UNAVAILABLE"
+                          if ( $loopReturn3 ne "" );
+                        return "ROUTE_AVAILABLE"   if ( $loopReturn3 eq "" );
+                        return "ROUTE_UNAVAILABLE" if ( $loopReturn3 ne "" );
                     }
 
                     if ( $catchall == 0 ) {
@@ -1947,22 +2245,27 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     readingsBulkUpdate( $readingsDev,
                         "fhemMsg" . $typeUc . "State", $msgSentDev );
 
+                    # suppress errors when there are still alternatives
+                    if (   $hasTypeOr == 1
+                        && $isTypeOr < scalar( grep { defined $_ } @typesOr ) )
+                    {
+                        $loopReturn3 = "";
+                    }
+
                     ################################################################
                     ### Implicit forwards based on priority or presence
                     ###
 
-                    # no implicit escalations for type mail
-                    next if ( $type[$i] eq "mail" );
-
                     # Skip if typeOr is defined
                     # and this is not the last type entry
-                    # TODO: bei mehreren gleichzeitigen Typen (and-Definition)?
-                    if (   $msgSentDev != 1
+                    if (   $msgSentDev != 3
+                        && $msgSentDev != 1
                         && $hasTypeOr == 1
                         && $isTypeOr < scalar( grep { defined $_ } @typesOr ) )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Skipping implicit forward due to typesOr definition";
+                          "msg $device: "
+                          . "Skipping implicit forward due to typesOr definition";
 
                         # remove recipient from list to avoid
                         # other interaction when using recipientOr in parallel
@@ -1989,22 +2292,27 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $recipients =~ s/$regex4/|/gi;
                         }
 
-                        next;
                     }
 
                     # Skip if recipientOr is defined
                     # and this is not the last device entry
-                    # TODO: bei mehreren gleichzeitigen Empfängern
-                    #       (and-Definition)?
-                    if (   $msgSentDev != 1
+                    if (   $msgSentDev != 3
+                        && $msgSentDev != 1
                         && $hasRecipientOr == 1
                         && $isRecipientOr <
                         scalar( grep { defined $_ } @recipientsOr ) )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Skipping implicit forward due to recipientOr definition";
+                          "msg $device: "
+                          . "Skipping implicit forward due to recipientOr definition";
+                    }
 
-                        next;
+                    # Skip if softFail
+                    elsif ( $msgSentDev != 3 && $msgSentDev != 1 && $softFail )
+                    {
+                        Log3 $logDevice, 4,
+                          "msg $device: Skipping implicit forward";
+                        $loopReturn3 = "";
                     }
 
                     # priority forward thresholds
@@ -2024,11 +2332,6 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     my $msgFwPrioGone =
                       MSG_FindAttrVal( $device, "msgFwPrioGone$typeUc",
                         $typeUc, 1 );
-
-                    Log3 $logDevice, 5,
-"msg $device: Implicit forwards: recipient presence=$residentDevPresence state=$residentDevState"
-                      if ( $residentDevPresence ne ""
-                        || $residentDevState ne "" );
 
                     my $fw_gwUnavailable =
                       defined(
@@ -2057,97 +2360,98 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                     # if no gateway device for this type was available
                     if (   $msgSentDev == 0
                         && $fw_gwUnavailable ne ""
-                        && !grep { $fw_gwUnavailable eq $_ } @type
+                        && !( grep { $fw_gwUnavailable eq $_ } @type )
                         && $routes{$fw_gwUnavailable} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: No $type[$i] gateway device available for recipient $device ($gatewayDevs). Trying alternative message type "
+                            "msg $device: "
+                          . "Implicit forwards: No $type[$i] gateway device available for recipient $device ($gatewayDevs). Trying alternative message type "
                           . $fw_gwUnavailable;
 
                         push @type, $fw_gwUnavailable;
-                        $forwarded .= "," . $type[$i] . ">" . $fw_gwUnavailable
-                          if ( $forwarded ne "" );
-                        $forwarded .= $type[$i] . ">" . $fw_gwUnavailable
-                          if ( $forwarded eq "" );
+                        $forwarded .= "," if ( $forwarded ne "" );
+                        $forwarded .= $type[$i] . ">" . $fw_gwUnavailable;
                     }
 
                     # Forward message
                     # if emergency priority
                     if (   $loopPriority >= $msgFwPrioEmergency
                         && $fw_emergency ne ""
-                        && !grep { $fw_emergency eq $_ } @type
+                        && !( grep { $fw_emergency eq $_ } @type )
                         && $routes{$fw_emergency} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating high priority $type[$i] message via "
+                            "msg $device: "
+                          . "Implicit forwards: Escalating high priority $type[$i] message via "
                           . $fw_emergency;
 
                         push @type, $fw_emergency;
-                        $forwarded .= "," . $type[$i] . ">" . $fw_emergency
-                          if ( $forwarded ne "" );
-                        $forwarded .= $type[$i] . ">" . $fw_emergency
-                          if ( $forwarded eq "" );
+                        $forwarded .= "," if ( $forwarded ne "" );
+                        $forwarded .= $type[$i] . ">" . $fw_emergency;
                     }
 
                     # Forward message
-                    # if high priority and residents are constantly not at home
+                    # if high priority and residents are
+                    # constantly not at home
                     if (   $residentDevPresence eq "absent"
                         && $loopPriority >= $msgFwPrioGone
                         && $fw_residentGone ne ""
-                        && !grep { $fw_residentGone eq $_ } @type
+                        && !( grep { $fw_residentGone eq $_ } @type )
                         && $routes{$fw_residentGone} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating high priority $type[$i] message via "
+                            "msg $device: "
+                          . "Implicit forwards: Escalating high priority $type[$i] message via "
                           . $fw_residentGone;
 
                         push @type, $fw_residentGone;
-                        $forwarded .= "," . $type[$i] . ">" . $fw_residentGone
-                          if ( $forwarded ne "" );
-                        $forwarded .= $type[$i] . ">" . $fw_residentGone
-                          if ( $forwarded eq "" );
+                        $forwarded .= "," if ( $forwarded ne "" );
+                        $forwarded .= $type[$i] . ">" . $fw_residentGone;
                     }
 
                     # Forward message
                     # if priority is normal or higher and residents
                     # are not at home but nearby
-                    if (   $residentDevState eq "absent"
+                    if (  !$forceQueue
+                        && $residentDevState eq "absent"
                         && $loopPriority >= $msgFwPrioAbsent
                         && $fw_residentAbsent ne ""
-                        && !grep { $fw_residentAbsent eq $_ } @type
+                        && !( grep { $fw_residentAbsent eq $_ } @type )
                         && $routes{$fw_residentAbsent} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating $type[$i] message via "
+                            "msg $device: "
+                          . "Implicit forwards: Escalating $type[$i] message via "
                           . $fw_residentAbsent
                           . " due to absence";
 
                         push @type, $fw_residentAbsent;
-                        $forwarded .=
-                          "," . $type[$i] . ">" . $fw_residentAbsent
-                          if ( $forwarded ne "" );
-                        $forwarded .= $type[$i] . ">" . $fw_residentAbsent
-                          if ( $forwarded eq "" );
+                        $forwarded .= "," if ( $forwarded ne "" );
+                        $forwarded .= $type[$i] . ">" . $fw_residentAbsent;
                     }
 
                 }
 
+                $loopReturn2 .= $loopReturn3 unless ($softFail);
                 last if ( $msgSent == 1 );
 
-                $isRecipientOr++;
+                $isTypeOr++;
             }
+
+            $loopReturn1 .= $loopReturn2;
         }
 
+        $return .= $loopReturn1;
         last if ( $msgSent == 1 );
 
-        $isTypeOr++;
+        $isRecipientOr++;
     }
 
     # finalize device readings
     keys %sentTypesPerDevice;
     while ( ( my $device, my $types ) = each %sentTypesPerDevice ) {
         $device = $globalDevName
-          if ( $device =~ /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ );
+          if ( $device =~ /^(([A-Za-z0-9%+._-])+@+([%+a-z0-9A-Z.-]*))$/ );
 
         readingsBulkUpdate( $defs{$device}, "fhemMsgStateTypes", $types )
           if ( $forwarded eq "" );
@@ -2158,14 +2462,12 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
         readingsEndUpdate( $defs{$device}, 1 );
     }
 
-    if ( $msgSent == 1 && $return ne "" ) {
-        $return .= "However, message was still sent to some recipients!";
-    }
+    $return .= "However, message was still sent to some recipients!"
+      if ( $msgSent == 1 && $return ne "" );
 
-    if ( $msgSent == 2 ) {
-        $return .=
-          "FATAL ERROR: Message NOT sent. No gateway device was available.";
-    }
+    $return .=
+      "FATAL ERROR: Message NOT sent. No gateway device was available."
+      if ( !$softFail && $msgSent == 2 );
 
     return $return;
 }
