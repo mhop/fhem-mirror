@@ -13,6 +13,14 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.14.4     28.03.2017       pre-connection check in DbLog_execmemcache deleted (avoid possible blocking), attr excludeDevs
+#                             can be specified as devspec
+# 2.14.3     24.03.2017       DbLog_Get, DbLog_Push changed for better plotfork-support
+# 2.14.2     23.03.2017       new reading "lastCachefile"
+# 2.14.1     22.03.2017       cacheFile will be renamed after successful import by set importCachefile                 
+# 2.14.0     19.03.2017       new set-commands exportCache, importCachefile, new attr expimpdir, all cache relevant set-commands
+#                             only in drop-down list when asynch mode is used, minor fixes
+# 2.13.6     13.03.2017       plausibility check in set reduceLog(Nbl) enhanced, minor fixes
 # 2.13.5     20.02.2017       check presence of table current in DbLog_sampleDataFn
 # 2.13.4     18.02.2017       DbLog_Push & DbLog_PushAsync: separate eval-routines for history & current table execution
 #                             to decouple commit or rollback transactions, DbLog_sampleDataFn changed to avoid fhem from crash if table
@@ -100,7 +108,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.13.5";
+my $DbLogVersion = "2.14.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -134,6 +142,7 @@ sub DbLog_Initialize($)
                               "suppressUndef:0,1 ".
 		                      "verbose4Devs ".
 							  "excludeDevs ".
+							  "expimpdir ".
 							  "syncInterval ".
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
@@ -188,7 +197,7 @@ sub DbLog_Define($@)
   $hash->{VERSION}    = $DbLogVersion;
   $hash->{MODE}       = "synchronous";   # Standardmode
   
-  # nur Events dieser Devices an NotifyFn weiterleiten
+  # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
   notifyRegexpChanged($hash, $regexp);
   
   #remember PID for plotfork
@@ -326,14 +335,42 @@ sub DbLog_Set($@) {
     my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
 	my $usage = "Unknown argument, choose one of reduceLog reduceLogNbl reopen rereadcfg:noArg count:noArg countNbl:noArg 
-	             deleteOldDays deleteOldDaysNbl userCommand listCache:noArg purgeCache:noArg commitCache:noArg clearReadings:noArg 
-				 eraseReadings:noArg";
+	             deleteOldDays deleteOldDaysNbl userCommand clearReadings:noArg 
+				 eraseReadings:noArg ";
+	$usage .= "listCache:noArg purgeCache:noArg commitCache:noArg exportCache:nopurge,purgecache " if (AttrVal($name, "asyncMode", undef));
+    my (@logs,$dir);
+	
+	if (!AttrVal($name,"expimpdir",undef)) {
+	    $dir = $attr{global}{modpath}."/log/";
+	} else {
+	    $dir = AttrVal($name,"expimpdir",undef);
+	}
+	
+	opendir(DIR,$dir);
+	my $sd = "cache_".$name."_";
+    while (my $file = readdir(DIR)) {
+        next unless (-f "$dir/$file");
+        next unless ($file =~ /^$sd/);
+        push @logs,$file;
+    }
+    closedir(DIR);
+	my $cj = join(",",reverse(sort @logs)) if (@logs);
+	
+	if (@logs) {
+	    $usage .= "importCachefile:".$cj." ";
+	} else {
+	    $usage .= "importCachefile ";
+	}
+	
 	return $usage if(int(@a) < 2);
-	my $dbh = $hash->{DBHP};
-	my $db  = (split(/;|=/, $hash->{dbconn}))[1];
+	my $dbh  = $hash->{DBHP};
+	my $db   = (split(/;|=/, $hash->{dbconn}))[1];
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
+	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
+            return "ReduceLog syntax error in set command. Please see commandref for help.";
+        }
         if (defined $a[2] && $a[2] =~ /^\d+$/) {
             $ret = DbLog_reduceLog($hash,@a);
 			InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
@@ -343,6 +380,9 @@ sub DbLog_Set($@) {
         }
     }
 	elsif ($a[1] eq 'reduceLogNbl') {
+	    if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
+            return "ReduceLogNbl syntax error in set command. Please see commandref for help.";
+        }
         if (defined $a[2] && $a[2] =~ /^\d+$/) {
             if ($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} !~ m/DEAD/) {  
                 $ret = "reduceLogNbl already in progress. Please wait for the current process to finish.";
@@ -428,6 +468,89 @@ sub DbLog_Set($@) {
 		}
 	    return $cache;
 	}
+	elsif ($a[1] eq 'exportCache') {
+	    my $cln;
+		my $crows = 0;
+		my $outfile;
+		my $now = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+		
+		# return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled, nicht im asynch-Mode
+	    return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
+		return if (!AttrVal($name, "asyncMode", undef));
+		
+        $outfile = $dir."cache_".$name."_".$now;
+		
+        if (open(FH, ">$outfile")) {
+            binmode (FH);
+        } else {
+		    readingsSingleUpdate($hash, "lastCachefile", $outfile." - Error - ".$!, 1);
+            return "could not open ".$outfile.": ".$!;
+        }
+	    foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
+            $cln = $hash->{cache}{memcache}{$key}."\n";
+            print FH $cln ;
+            $crows++; 			
+		}
+		close(FH);
+		readingsSingleUpdate($hash, "lastCachefile", $outfile." export successful", 1);
+		readingsSingleUpdate($hash, "state", $crows." cache rows exported to ".$outfile, 1);
+		Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
+		
+		if ($a[-1] =~ m/^purgecache/i) {
+	        delete $hash->{cache};
+            readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
+			Log3($name, 3, "DbLog $name: Cache purged after exporting rows to $outfile.");
+		}
+	    return;
+	}
+	elsif ($a[1] eq 'importCachefile') {
+	    my $cln;
+		my $crows = 0;
+		my $infile;
+		my @row_array;
+		readingsSingleUpdate($hash, "lastCachefile", "", 0);
+	    
+		# return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
+	    return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
+		
+		if (!$a[2]) {
+		    return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
+		} else {
+		    $infile = $dir.$a[2];
+		}
+		
+        if (open(FH, "$infile")) {
+            binmode (FH);
+        } else {
+            return "could not open ".$infile.": ".$!;
+        }
+        while (<FH>) {
+			push(@row_array, $_);
+			$crows++;
+	    }
+		close(FH);
+		
+        if(@row_array) {
+            my $error = DbLog_Push($hash, 1, @row_array);
+		    if($error) {
+			    readingsSingleUpdate($hash, "lastCachefile", $infile." - Error - ".$!, 1);
+                readingsSingleUpdate($hash, "state", $error, 1);
+				Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
+		    } else {
+			    unless(rename($dir.$a[2], $dir."impdone_".$a[2])) {
+				    Log3($name, 2, "DbLog $name: cachefile $infile couldn't be renamed after import !");
+				}
+				readingsSingleUpdate($hash, "lastCachefile", $infile." import successful", 1);
+		        readingsSingleUpdate($hash, "state", $crows." cache rows imported from ".$infile, 1);
+			    Log3($name, 3, "DbLog $name: $crows cache rows imported from $infile.");
+		    }
+        } else {
+		    readingsSingleUpdate($hash, "state", "no rows in ".$infile, 1);
+	        Log3($name, 3, "DbLog $name: $infile doesn't contain any rows - no imports done.");
+		}
+		
+	    return;
+	}
     elsif ($a[1] eq 'count') {
         $dbh = DbLog_ConnectNewDBH($hash);
         if(!$dbh) {
@@ -492,8 +615,8 @@ sub DbLog_Set($@) {
                 return;
             }
         } else {
-            Log3($name, 1, "DbLog $name: reduceLogNbl error, no <days> given.");
-            $ret = "reduceLogNbl error, no <days> given.";
+            Log3($name, 1, "DbLog $name: deleteOldDaysNbl error, no <days> given.");
+            $ret = "deleteOldDaysNbl error, no <days> given.";
         }
     }
     elsif ($a[1] eq 'userCommand') {
@@ -852,7 +975,8 @@ sub DbLog_Log($$) {
   my $events = deviceEvents($dev_hash,0);  
   return if(!$events);
   
-  my $lcdev    = lc($dev_name);
+  my $max   = int(@{$events});
+  my $lcdev = lc($dev_name);
   
   # verbose4 Logs nur für Devices in Attr "verbose4Devs"
   my $vb4show  = 0;
@@ -869,12 +993,21 @@ sub DbLog_Log($$) {
 	  Log3 $name, 4, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
   }
   
+  if($vb4show) {
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+      Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+      Log3 $name, 4, "DbLog $name -> amount of events received: $max for device: $dev_name";
+  }
+  
   # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV} oder $hash->{NOTIFYDEV} = .*)
   if(!$hash->{NOTIFYDEV} || $hash->{NOTIFYDEV} eq ".*") {
-      my @exdevs  = split(",", AttrVal($name, "excludeDevs", ""));
-	  if(@exdevs) {
-	      foreach (@exdevs) {
-		      if($dev_name =~ m/$_/i) {
+      my @exdvs = devspec2array(AttrVal($name, "excludeDevs", ""));
+	  for(@exdvs){s/\n/,/g}
+	  if(@exdvs) {
+	      # Log3 $name, 4, "DbLog $name -> excludeDevs: @exdvs";
+	      foreach (@exdvs) {
+		      if(lc($dev_name) eq lc($_)) {
 	              Log3 $name, 4, "DbLog $name -> Device: $dev_name excluded from database logging due to attribute \"excludeDevs\" restrictions" if($vb4show);
 	              return;
 		      }
@@ -883,7 +1016,6 @@ sub DbLog_Log($$) {
   }
   
   my $re                 = $hash->{REGEXP};
-  my $max                = int(@{$events});
   my @row_array;
   my ($event,$reading,$value,$unit);
   my $ts_0               = TimeNow();                                    # timestamp in SQL format YYYY-MM-DD hh:mm:ss
@@ -891,14 +1023,7 @@ sub DbLog_Log($$) {
   my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
   my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
   my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");  
-  
-  if($vb4show) {
-      Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
-      Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> amount of events received: $max for device: $dev_name";
-  }
-  
+    
   #one Transaction
   eval {  
       for (my $i = 0; $i < $max; $i++) {
@@ -1060,18 +1185,26 @@ sub DbLog_Push(@) {
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
   my $dbh;
   
-  $dbh = $hash->{DBHP};
-  eval {
-      if ( !$dbh || not $dbh->ping ) {
-          #### DB Session dead, try to reopen now !
-          DbLog_ConnectPush($hash);
-      }  
-  };
-  if ($@) {
-      Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-	  return $@;
+  my $nh = ($hash->{DBMODEL} ne 'SQLITE')?1:0;
+  # Unterscheidung $dbh um Abbrüche in Plots (SQLite) zu vermeiden und 
+  # andererseite kein "MySQL-Server has gone away" Fehler
+  if ($nh) {
+      $dbh = DbLog_ConnectNewDBH($hash);
+	  return "Can't connect to database." if(!$dbh);
   } else {
       $dbh = $hash->{DBHP};
+      eval {
+          if ( !$dbh || not $dbh->ping ) {
+              # DB Session dead, try to reopen now !
+              DbLog_ConnectPush($hash,1);
+          }  
+      };
+      if ($@) {
+          Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	      return $@;
+      } else {
+          $dbh = $hash->{DBHP};
+      }
   } 
   
   $dbh->{RaiseError} = 1; 
@@ -1203,7 +1336,7 @@ sub DbLog_Push(@) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 3, "DbLog $name -> Failed to insert into history - TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]" if($vb4show);
+				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history failed".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]" if($vb4show);
 			  }
 		  }
       }
@@ -1300,6 +1433,7 @@ sub DbLog_Push(@) {
   }
   $dbh->{RaiseError} = 0; 
   $dbh->{PrintError} = 1;
+  $dbh->disconnect if ($nh);
 
 return $error;
 }
@@ -1340,53 +1474,39 @@ sub DbLog_execmemcache ($) {
   if($hash->{HELPER}{RUNNING_PID} && $hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {
       delete $hash->{HELPER}{RUNNING_PID};
   }
-  
-  # nur Verbindungstest, DbLog_PushAsync hat eigene Verbindungsroutine
-  eval {
-    $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });
-  }; 
-  
-  if ($@) {
-      Log3($name, 2, "DbLog $name: Error DBLog_execmemcache - $@");
-	  $error = $@;
-  } else {
-      # Testverbindung abbauen
-      $dbh->disconnect(); 
 	  
-	  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
-      if($ce == 2) {
-          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
-      } else {
-	      readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
-      }
+  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+  if($ce == 2) {
+      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
+  } else {
+      readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
+  }
 	
-	  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
-	      Log3 $name, 5, "DbLog $name -> ################################################################";
-          Log3 $name, 5, "DbLog $name -> ###              New database processing cycle               ###";
-          Log3 $name, 5, "DbLog $name -> ################################################################";
-	      Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains $memcount entries to process";
-		
+  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
+      Log3 $name, 5, "DbLog $name -> ################################################################";
+      Log3 $name, 5, "DbLog $name -> ###              New database processing cycle               ###";
+      Log3 $name, 5, "DbLog $name -> ################################################################";
+	  Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains $memcount entries to process";
 		  
-		  foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
-		      Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: $hash->{cache}{memcache}{$key}";
-			  push(@row_array, delete($hash->{cache}{memcache}{$key})); 
-		  }
+	  foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
+          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: $hash->{cache}{memcache}{$key}";
+		  push(@row_array, delete($hash->{cache}{memcache}{$key})); 
+	  }
 
-		  my $rowlist = join('§', @row_array);
-		  $rowlist = encode_base64($rowlist,"");
-		  $hash->{HELPER}{RUNNING_PID} = BlockingCall (
-		                                     "DbLog_PushAsync", 
-		                                     "$name|$rowlist", 
-					                         "DbLog_PushAsyncDone", 
-									         $timeout, 
-									         "DbLog_PushAsyncAborted", 
-									         $hash );
+	  my $rowlist = join('§', @row_array);
+	  $rowlist = encode_base64($rowlist,"");
+	  $hash->{HELPER}{RUNNING_PID} = BlockingCall (
+	                                 "DbLog_PushAsync", 
+	                                 "$name|$rowlist", 
+			                         "DbLog_PushAsyncDone", 
+							         $timeout, 
+							         "DbLog_PushAsyncAborted", 
+							         $hash );
 
-          Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
-      } else {
-	      if($hash->{HELPER}{RUNNING_PID}) {
-		      $error = "Commit already running - resync at NextSync";
-		  }
+      Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
+  } else {
+      if($hash->{HELPER}{RUNNING_PID}) {
+	      $error = "Commit already running - resync at NextSync";
 	  }
   }
   
@@ -1587,7 +1707,7 @@ sub DbLog_PushAsync(@) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 3, "DbLog $name -> Failed to insert into history - TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]";
+				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history failed".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]";
 			  }
 		  }
       }
@@ -1812,11 +1932,9 @@ sub DbLog_implode_datetime($$$$$$) {
   return $retv;
 }
 
-################################################################
-#
-#                  Verbindungen zur DB aufbauen
-#
-################################################################
+###################################################################################
+#                            Verbindungen zur DB aufbauen
+###################################################################################
 sub _DbLog_readCfg($){
   my ($hash)= @_;
   my $name = $hash->{NAME};
@@ -1853,15 +1971,15 @@ sub _DbLog_readCfg($){
 	return;
 }
 
-sub DbLog_ConnectPush($) {
-  # own $dbhp only for synchronous logging
-  my ($hash)= @_;
+sub DbLog_ConnectPush($;$$) {
+  # own $dbhp for synchronous logging and dblog_get 
+  my ($hash,$get)= @_;
   my $name = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   
-  Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser";
+  Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
   my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
   
   if(!$dbhp) {
@@ -1873,8 +1991,8 @@ sub DbLog_ConnectPush($) {
     return 0;
   }
 
-  Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created";
-  readingsSingleUpdate($hash, 'state', 'connected', 1);
+  Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created" if(!$get);
+  readingsSingleUpdate($hash, 'state', 'connected', 1) if(!$get);
 
   $hash->{DBHP}= $dbhp;
   
@@ -1889,7 +2007,7 @@ sub DbLog_ConnectPush($) {
 }
 
 sub DbLog_ConnectNewDBH($) {
-  # new dbh for every use (except DbLog_Push)
+  # new dbh for common use (except DbLog_Push and get-function)
   my ($hash)= @_;
   my $name = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
@@ -1966,9 +2084,6 @@ DbLog_Get($@)
   my $name = $hash->{NAME};
   my $dbh;
   
-  $dbh = DbLog_ConnectNewDBH($hash);
-  return if(!$dbh); 
-  
   return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
@@ -2034,13 +2149,19 @@ DbLog_Get($@)
     $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
   }
 
-  #create new connection for plotfork
+  $dbh = $hash->{DBHP};
+  if ( !$dbh || not $dbh->ping ) {
+      # DB Session dead, try to reopen now !
+      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
+	  $dbh = $hash->{DBHP};
+  } 
+  
   if( $hash->{PID} != $$ ) {
-    $dbh->disconnect(); 
-    return "Can't connect to database." if(!DbLog_ConnectNewDBH($hash));
+      #create new connection for plotfork
+      $dbh->disconnect(); 
+      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
+	  $dbh = $hash->{DBHP};
   }
-  $dbh = DbLog_ConnectNewDBH($hash);
-  return if(!$dbh);
 
   #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{DBMODEL} eq "POSTGRESQL") {
@@ -2456,8 +2577,7 @@ DbLog_Get($@)
   }
 
   #cleanup (plotfork) connection
-  # $dbh->disconnect() if( $hash->{PID} != $$ );
-  $dbh->disconnect();
+  $dbh->disconnect() if( $hash->{PID} != $$ );
 
   if($internal) {
     $internal_data = \$retval;
@@ -3702,40 +3822,53 @@ sub checkUsePK ($$){
   <ul>
     <code>set &lt;name&gt; clearReadings </code><br><br>
       <ul> This function clears readings which were created by different DbLog-functions. </ul><br>
-	  
-    <code>set &lt;name&gt; eraseReadings </code><br><br>
-      <ul> This function deletes all readings except reading "state". </ul><br>
-	  
+
     <code>set &lt;name&gt; commitCache </code><br><br>
       <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the cached data in memory will be written into the database 
 	  and subsequently the cache will be cleared. Thereby the internal timer for the asynchronous mode Modus will be set new.
       The command can be usefull in case of you want to write the cached data manually or e.g. by an AT-device on a defined 
 	  point of time into the database. </ul><br>
-	  
-    <code>set &lt;name&gt; reopen [n] </code><br/><br/>
-      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file if no time [n] was set. <br>
-	  If optionally a delay time of [n] seconds was set, the database connection will be disconnect immediately but it was only reopened 
-	  after [n] seconds. In synchronous mode the events won't saved during that time. In asynchronous mode the events will be
-	  stored in the memory cache and saved into database after the reconnect was done. </ul><br/>
-
-    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
-      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
-      Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.</ul><br/>
-	  
-    <code>set &lt;name&gt; listCache </code><br><br>
-      <ul>If DbLog is set to asynchronous mode (attribute asyncMode=1), you can use that command to list the events are cached in memory.</ul><br>
 
     <code>set &lt;name&gt; count </code><br/><br/>
       <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
 
     <code>set &lt;name&gt; countNbl </code><br/><br/>
       <ul>The non-blocking execution of "set &lt;name&gt; count".</ul><br/>
-
+	    
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
       <ul>Delete records from history older than &lt;n&gt; days. Number of deleted records will be written into reading lastRowsDeleted.</ul><br/>
 	  
     <code>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt;</code><br/><br/>
       <ul>Is identical to function "deleteOldDays" 	whereupon deleteOldDaysNbl will be executed non-blocking. </ul><br/>	
+
+    <code>set &lt;name&gt; eraseReadings </code><br><br>
+      <ul> This function deletes all readings except reading "state". </ul><br>
+
+	<a name="DbLogsetexportCache"></a>
+    <code>set &lt;name&gt; exportCache [nopurge | purgeCache] </code><br><br>
+      <ul>If DbLog is operating in asynchronous mode, it's possible to exoprt the cache content into a textfile.
+	  The file will be written to the directory (global->modpath)/log/ by default setting. The detination directory can be
+	  changed by the <a href="#DbLogattr">attribute</a> expimpdir. <br>
+	  The filename will be generated automatically and is built by a prefix "cache_", followed by DbLog-devicename and the
+	  present timestmp, e.g. "cache_LogDB_2017-03-23_22-13-55". <br>
+      There are two options possible, "nopurge" respectively "purgeCache". The option determines whether the cache content 
+	  will be deleted after export or not.
+	  Using option "nopurge" (default) the cache content will be preserved.  </ul><br>
+		  
+    <code>set &lt;name&gt; importCachefile &lt;file&gt; </code><br><br>
+      <ul>Imports an textfile into the database which has been written by the "exportCache" function. 
+	  The allocatable files will be searched in directory (global->modpath)/log/ by default and a drop-down list will be 
+      generated from the files which are found in the directory.
+	  The source directory can be changed by the <a href="#DbLogattr">attribute</a> expimpdir. <br>
+	  Only that files will be shown which are correlate on pattern starting with "cache_", followed by the DbLog-devicename. <br> 
+	  For example a file with the name "cache_LogDB_2017-03-23_22-13-55", will match if Dblog-device has name "LogDB". <br>
+      After the import has been successfully done, a prefix "impdone_" will be added at begin of the filename and this file 
+      ddoesn't appear on the drop-down list anymore. <br>
+	  If you want to import a cachefile from another source database, you may adapt the filename so it fits the search criteria 
+      "DbLog-Device" in its name. After renaming the file appeares again on the drop-down list. </ul><br>
+
+	  <code>set &lt;name&gt; listCache </code><br><br>
+      <ul>If DbLog is set to asynchronous mode (attribute asyncMode=1), you can use that command to list the events are cached in memory.</ul><br>
 
     <code>set &lt;name&gt; purgeCache </code><br><br>
       <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the in memory cached data will be deleted. 
@@ -3761,6 +3894,16 @@ sub checkUsePK ($$){
       <ul>Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented non-blocking ! <br>
       </ul><br>
 
+    <code>set &lt;name&gt; reopen [n] </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file if no time [n] was set. <br>
+	  If optionally a delay time of [n] seconds was set, the database connection will be disconnect immediately but it was only reopened 
+	  after [n] seconds. In synchronous mode the events won't saved during that time. In asynchronous mode the events will be
+	  stored in the memory cache and saved into database after the reconnect was done. </ul><br/>
+
+    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
+      Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.</ul><br/>
+	  
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
           Perform any (!!!) sql statement on connected database. Useercommand and result will be written into corresponding readings.<br/>
@@ -3966,7 +4109,7 @@ sub checkUsePK ($$){
 	  If the database isn't available, the events will be cached in memeory furthermore, and tried to save into database again after 
 	  the next synchronisation time cycle if the database is available. <br>
 	  In asynchronous mode the data insert into database will be executed non-blocking by a background process. 
-	  You can adjust the timeout value for this background process by attribute "timeout" (default 120s). <br>
+	  You can adjust the timeout value for this background process by attribute "timeout" (default 1800s). <br>
 	  In synchronous mode (normal mode) the events won't be cached im memory and get saved into database immediately. If the database isn't
 	  available the events are get lost. <br>
     </ul>
@@ -4118,19 +4261,41 @@ sub checkUsePK ($$){
   <ul><b>excludeDevs</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; excludeDevs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
 	   </code><br>
       
-	   The devices "device1", "device2" up to "device.." will be excluded from logging into database. This attribute will only be evaluated
-	   if in DbLog-define ".*:.*" (that means all devices should be logged) is set. Thereby devices can be excluded explicitly instead of
-	   include all relevant devices (devices want to log into database) in the DbLog-define (e.g. by string (device1|device2|device..):.* and so on).  
-	   The devices to exclude are evaluated as Regex. <br>
+	   The devices "devspec1", "devspec2" up to "devspec.." will be excluded from logging into database. This attribute 
+	   will only be evaluated if internal "NOTIFYDEV" is not defined or if DbLog-define ".*:.*" (that means all devices 
+	   should be logged) is set. 
+	   Thereby devices can be explicit excluded from logging. The devices to exclude can be specified as 
+	   <a href="#devspec">device-specification</a>. 
+	   For further informations about devspec please see <a href="#devspec">device-specification</a>.  <br>
 	   
 	   <b>Example</b> <br>
        <code>
-	   attr &lt;device&gt; excludeDevs global,Log.*,Cam.*
+	   attr &lt;device&gt; excludeDevs global,Log.*,Cam.*,TYPE=DbLog
 	   </code><br>
-	   # The devices global respectively devices starting with "Log" or "Cam" are excluded from database logging. <br>
+	   # The devices global respectively devices starting with "Log" or "Cam" and devices with Type=DbLog 
+	   are excluded from database logging. <br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>expimpdir</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; expimpdir &lt;directory&gt; 
+	   </code><br>
+      
+	   If the cache content will be exported by <a href="#DbLogsetexportCache">"exportCache"</a> or the "importCachefile"
+	   command, the file will be written into or read from that directory. The default directory is 
+	   "(global->modpath)/log/". 
+	   Make sure the specified directory is existing and writable. <br>
+	   
+	  <b>Example</b> <br>
+      <code>
+	  attr &lt;device&gt; expimpdir /opt/fhem/cache/
+	  </code><br>
      </ul>
   </ul>
   <br>
@@ -4338,38 +4503,45 @@ sub checkUsePK ($$){
       Der Befehl kann nützlich sein um manuell oder z.B. über ein AT den Cacheinhalt zu einem definierten Zeitpunkt in die 
 	  Datenbank zu schreiben. </ul><br>
 	  
-    <code>set &lt;name&gt; reopen [n]</code><br/><br/>
-      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder wenn keine Zeit [n] in Sekunden angegeben wurde. 
-	  Dabei wird die Journaldatei geleert und neu angelegt.<br/>
-      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme. <br>
-	  Wurde eine optionale Verzögerungszeit [n] in Sekunden angegeben, wird die Verbindung zur Datenbank geschlossen und erst 
-	  nach Ablauf von [n] Sekunden wieder neu verbunden. 
-	  Im synchronen Modus werden die Events in dieser Zeit nicht gespeichert. 
-	  Im asynchronen Modus werden die Events im Cache gespeichert und nach dem Reconnect in die Datenbank geschrieben. </ul><br>
+    <code>set &lt;name&gt; count </code><br><br>
+      <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings 
+	  countCurrent und countHistory.</ul><br>
+	  
+    <code>set &lt;name&gt; countNbl </code><br/><br>
+      <ul>Die non-blocking Ausführung von "set &lt;name&gt; count".</ul><br>
 
-    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
-      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
-      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.<br/>
-      Zwischen dem Schließen der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
+    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br>
+      <ul>Löscht Datensätze in Tabelle history, die älter sind als &lt;n&gt; Tage sind. 
+	  Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br>
+
+    <code>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt;</code><br><br>
+      <ul>Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird. </ul><br>	  
+
+	<a name="DbLogsetexportCache"></a>
+    <code>set &lt;name&gt; exportCache [nopurge | purgeCache] </code><br><br>
+      <ul>Wenn DbLog im asynchronen Modus betrieben wird, kann der Cache mit diesem Befehl in ein Textfile geschrieben
+	  werden. Das File wird per Default in dem Verzeichnis (global->modpath)/log/ erstellt. Das Zielverzeichnis kann mit
+	  dem <a href="#DbLogattr">Attribut</a> expimpdir geändert werden. <br>
+	  Der Name des Files wird automatisch generiert und enthält den Präfix "cache_", gefolgt von dem DbLog-Devicenamen und
+	  dem aktuellen Zeitstempel, z.B. "cache_LogDB_2017-03-23_22-13-55". <br>
+      Mit den Optionen "nopurge" bzw. "purgeCache" wird festgelegt, ob der Cacheinhalt nach dem Export gelöscht werden
+      soll oder nicht. Mit "nopurge" (default) bleibt der Cacheinhalt erhalten.  </ul><br>
+	  
+    <code>set &lt;name&gt; importCachefile &lt;file&gt; </code><br><br>
+      <ul>Importiert ein mit "exportCache" geschriebenes File in die Datenbank. 
+	  Die verfügbaren Dateien werden per Default im Verzeichnis (global->modpath)/log/ gesucht und eine Drop-Down Liste
+	  erzeugt sofern Dateien gefunden werden. Das Quellverzeichnis kann mit dem <a href="#DbLogattr">Attribut</a> expimpdir geändert werden. <br>
+	  Es werden nur die Dateien angezeigt, die dem Muster "cache_", gefolgt von dem DbLog-Devicenamen entsprechen. <br> 
+	  Zum Beispiel "cache_LogDB_2017-03-23_22-13-55", falls das Log-Device "LogDB" heißt. <br>
+      Nach einem erfolgreichen Import wird das File mit dem Präfix "impdone_" versehen und erscheint dann nicht mehr
+	  in der Drop-Down Liste. Soll ein Cachefile in eine andere als der Quelldatenbank importiert werden, kann das 
+      DbLog-Device im Filenamen angepasst werden damit dieses File den Suchktiterien entspricht und in der Drop-Down Liste
+      erscheint. </ul><br>
 	  
     <code>set &lt;name&gt; listCache </code><br><br>
       <ul>Wenn DbLog im asynchronen Modus betrieben wird (Attribut asyncMode=1), können mit diesem Befehl die im Speicher gecachten Events 
 	  angezeigt werden.</ul><br>
 
-    <code>set &lt;name&gt; count </code><br/><br/>
-      <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings 
-	  countCurrent und countHistory.</ul><br/>
-	  
-    <code>set &lt;name&gt; countNbl </code><br/><br/>
-      <ul>Die non-blocking Ausführung von "set &lt;name&gt; count".</ul><br/>
-
-    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
-      <ul>Löscht Datensätze in Tabelle history, die älter sind als &lt;n&gt; Tage sind. 
-	  Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
-
-    <code>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt;</code><br/><br/>
-      <ul>Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird. </ul><br/>	  
-	  
     <code>set &lt;name&gt; purgeCache </code><br><br>
       <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten gelöscht. 
       Es werden keine Daten aus dem Cache in die Datenbank geschrieben. </ul><br>
@@ -4396,6 +4568,20 @@ sub checkUsePK ($$){
       <ul>Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
 	      mehr blockiert da diese Funktion non-blocking implementiert ist ! <br>
           </ul><br>
+		  
+    <code>set &lt;name&gt; reopen [n]</code><br/><br/>
+      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder wenn keine Zeit [n] in Sekunden angegeben wurde. 
+	  Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme. <br>
+	  Wurde eine optionale Verzögerungszeit [n] in Sekunden angegeben, wird die Verbindung zur Datenbank geschlossen und erst 
+	  nach Ablauf von [n] Sekunden wieder neu verbunden. 
+	  Im synchronen Modus werden die Events in dieser Zeit nicht gespeichert. 
+	  Im asynchronen Modus werden die Events im Cache gespeichert und nach dem Reconnect in die Datenbank geschrieben. </ul><br>
+
+    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
+      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.<br/>
+      Zwischen dem Schließen der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>BENUTZE DIESE FUNKTION NUR, WENN DU WIRKLICH (WIRKLICH!) WEISST, WAS DU TUST!!!</b><br/><br/>
@@ -4620,7 +4806,7 @@ sub checkUsePK ($$){
 	  Ist die Datenbank nicht verfügbar, werden die Events weiterhin im Speicher gehalten und nach Ablauf des Syncintervalls in die Datenbank
 	  geschrieben falls sie dann verfügbar ist. <br>
 	  Im asynchronen Mode werden die Daten nicht blockierend mit einem separaten Hintergrundprozess in die Datenbank geschrieben.
-	  Det Timeout-Wert für diesen Hintergrundprozess kann mit dem Attribut "timeout" (Default 120s) eingestellt werden.
+	  Det Timeout-Wert für diesen Hintergrundprozess kann mit dem Attribut "timeout" (Default 1800s) eingestellt werden.
 	  Im synchronen Modus (Normalmodus) werden die Events nicht gecacht und sofort in die Datenbank geschrieben. Ist die Datenbank nicht 
 	  verfügbar gehen sie verloren.<br>
     </ul>
@@ -4778,23 +4964,42 @@ sub checkUsePK ($$){
   <ul><b>excludeDevs</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; excludeDevs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; 
+	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
 	   </code><br>
       
-	   Die Devices "device1", "device2" bis "device.." werden vom Logging in der Datenbank ausgeschlossen. Diese Attribut wirkt nur wenn
-       im Define des DbLog-Devices ".*:.*" (d.h. alle Devices werden geloggt) angegeben wurde. Dadurch können Devices explizit ausgeschlossen
-	   werden anstatt alle zu loggenden Devices im Define einzuschließen (z.B. durch den String (device1|device2|device..):.* usw.). 
-	   Die auszuschließenden Devices werden als Regex ausgewertet. <br>
+	   Die Devices "devspec1", "devspec2" bis "devspec.." werden vom Logging in der Datenbank ausgeschlossen. 
+	   Diese Attribut wirkt nur wenn kein Internal "NOTIFYDEV" vorhanden ist bzw. im Define des DbLog-Devices ".*:.*" 
+	   (d.h. alle Devices werden geloggt) angegeben wurde. Dadurch können Devices explizit vom Logging ausgeschlossen werden. 
+	   Die auszuschließenden Devices können als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. 
+	   Für weitere Details bezüglich devspec siehe <a href="#devspec">Geräte-Spezifikation</a>.  <br>
 	   
 	  <b>Beispiel</b> <br>
       <code>
-	  attr &lt;device&gt; excludeDevs global,Log.*,Cam.*
+	  attr &lt;device&gt; excludeDevs global,Log.*,Cam.*,TYPE=DbLog
 	  </code><br>
-	  # Es werden die Devices global bzw. Devices beginnend mit "Log" oder "Cam" vom Datenbanklogging ausgeschlossen. <br>
+	  # Es werden die Devices global bzw. Devices beginnend mit "Log" oder "Cam" bzw. Devices vom Typ "DbLog" vom Datenbanklogging ausgeschlossen. <br>
      </ul>
   </ul>
   <br>
 
+  <ul><b>expimpdir</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; expimpdir &lt;directory&gt; 
+	   </code><br>
+      
+	   In diesem Verzeichnis wird das Cachefile beim Export angelegt bzw. beim Import gesucht. Siehe set-Kommandos 
+	   <a href="#DbLogsetexportCache">"exportCache"</a> bzw. "importCachefile". Das Default-Verzeichnis ist "(global->modpath)/log/". 
+	   Das im Attribut angegebene Verzeichnis muss vorhanden und beschreibbar sein. <br>
+	   
+	  <b>Beispiel</b> <br>
+      <code>
+	  attr &lt;device&gt; expimpdir /opt/fhem/cache/
+	  </code><br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>shutdownWait</b>
      <ul>
 	   <code>
