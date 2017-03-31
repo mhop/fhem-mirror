@@ -132,7 +132,7 @@ readingsProxy_update($$)
     my $value_fn = eval $value_fn;
     Log3 $name, 3, $name .": valueFn: ". $@ if($@);
     return undef if( !defined($value_fn) );
-    $value = $value_fn if( $value_fn );
+    $value = $value_fn if( $value_fn ne '' );
   }
 
   if( AttrVal($name, 'event-on-change-reading', undef ) || AttrVal($name, 'event-on-update-reading', undef ) ) {
@@ -256,7 +256,7 @@ readingsProxy_Set($@)
     readingsSingleUpdate($hash, "lastCmd", $a[0], 0);
 
     return undef if( !defined($set_fn) );
-    $v = $set_fn if( $set_fn );
+    $v = $set_fn if( $set_fn ne '' );
   } else {
     readingsSingleUpdate($hash, "lastCmd", $a[0], 0);
   }
@@ -304,7 +304,7 @@ readingsProxy_Get($@)
     Log3 $name, 3, $name .": getFn: ". $@ if($@);
     return $get_fn if($direct_return);
     return undef if( !defined($get_fn) );
-    $v = $get_fn if( $get_fn );
+    $v = $get_fn if( $get_fn ne '' );
   }
 
   if( $hash->{INGET} ) {
@@ -402,14 +402,14 @@ readingsProxy_Attr($$$;$)
         perl expresion that will return the get command forwarded to the parent device.
         has access to $DEVICE, $READING, $CMD and $ARGS.<br>
         undef -> do nothing<br>
-        ""    -> pass-through<br>
+        ""    -> pass through<br>
         (<value>,1) -> directly return <value>, don't call parent getFn<br>
         everything else -> use this instead</li>
       <li>setFn<br>
         perl expresion that will return the set command forwarded to the parent device.
         has access to $CMD, $DEVICE, $READING and $ARGS.<br>
         undef -> do nothing<br>
-        ""    -> pass-through<br>
+        ""    -> pass through<br>
         everything else -> use this instead<br>
         Examples:<br>
           <code>attr myProxy setFn {($CMD eq "on")?"off":"on"}</code>
@@ -418,7 +418,7 @@ readingsProxy_Attr($$$;$)
         perl expresion that will return the value that sould be used as state.
         has access to $LASTCMD, $DEVICE, $READING and $VALUE.<br>
         undef -> do nothing<br>
-        ""    -> pass-through<br>
+        ""    -> pass through<br>
         everything else -> use this instead<br>
         Examples:<br>
           <code>attr myProxy valueFn {($VALUE == 0)?"off":"on"}</code>
