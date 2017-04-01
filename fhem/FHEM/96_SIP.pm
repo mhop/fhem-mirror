@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.5 / 31.03.17";
+my $sip_version ="V1.51 / 01.04.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -98,7 +98,7 @@ sub SIP_Initialize($$)
                           "sip_listen:none,dtmf,wfp,echo ". #
                           "sip_filter ".                  #
                           "sip_blocking ".                #
-                          "sip_elbc:no,yes ".             #
+                          "sip_elbc:yes,no ".             #
                           "sip_force_interval ".          #
                           "T2S_Device ".                  #
                           "T2S_Timeout ".                 #
@@ -119,13 +119,12 @@ sub SIP_Define($$)
   $hash->{".reset"}           = 0;
   $attr{$name}{sip_ringtime}  = '3'         unless (exists($attr{$name}{sip_ringtime}));
   $attr{$name}{sip_user}      = '620'       unless (exists($attr{$name}{sip_user}));
-  $attr{$name}{sip_port}      = '5060'      unless (exists($attr{$name}{sip_port}));
   $attr{$name}{sip_registrar} = 'fritz.box' unless (exists($attr{$name}{sip_registrar}));
   $attr{$name}{sip_listen}    = 'none'      unless (exists($attr{$name}{sip_listen}));
   $attr{$name}{sip_dtmf_size} = '2'         unless (exists($attr{$name}{sip_dtmf_size}));
   $attr{$name}{sip_dtmf_loop} = 'once'      unless (exists($attr{$name}{sip_dtmf_loop}));
   $attr{$name}{sip_dtmf_send} = 'audio'     unless (exists($attr{$name}{sip_dtmf_send}));
-  $attr{$name}{sip_elbc}      = 'no'        unless (exists($attr{$name}{sip_elbc}));
+  $attr{$name}{sip_elbc}      = 'yes'       unless (exists($attr{$name}{sip_elbc}));
   $attr{$name}{sip_from}      = 'sip:'.$attr{$name}{sip_user}.'@'.$attr{$name}{sip_registrar} unless (exists($attr{$name}{sip_from}));
  
   unless (exists($attr{$name}{sip_ip})) 
@@ -307,24 +306,23 @@ sub SIP_Register($$$)
   my $name    = $hash->{NAME};
   my $logname = $name."[".$$."]";
   my $ip      = AttrVal($name,"sip_ip","");
-  return "missing attr sip_ip" if (!$ip);
+  return "missing attribute sip_ip" if (!$ip);
+  return "this is the IP address of your registrar , not your FHEM !" if ($ip eq AttrVal($name,"sip_registrar","")); 
+  return "invalid IP address $ip" if (($ip eq "0.0.0.0") || ($ip eq "127.0.0.1")); 
 
-  my $leg = IO::Socket::INET->new(
-    Proto => 'udp',
-    LocalHost => $ip,
-    LocalPort => $port);
+  my $leg = IO::Socket::INET->new(Proto => 'udp', LocalHost => $ip, LocalPort => $port);
 
-#  if  port is already used try another one
-   if (!$leg) 
-   {
+  # if  port is already used try another one
+  if (!$leg) 
+  {
    Log3 $name,2,"$logname, cannot open port $port at $ip: $!";
    $port += 10;
    $leg = IO::Socket::INET->new(
-    Proto => 'udp',
+        Proto => 'udp',
     LocalHost => $ip,
-    LocalPort => $port) || return "cannot open port ".($port-10)." or $port at $ip: $!";
-    Log3 $name,2,"$logname, using port $port";
-   }
+    LocalPort => $port) || return "can't open port ".($port-10)." or $port at $ip: $!";
+    Log3 $name,2,"$logname, using secundary port $port with IP $ip";
+  }
 
   close($leg);
   $leg = $ip.":".$port;
@@ -351,7 +349,7 @@ sub SIP_Register($$$)
         my $result = qx($cmd); 
         if  (index($result,"perl") == -1)
         {
-          Log3 $name, 2 , $logname.", can´t find my parent ".$hash->{parent}." in process list !";
+          Log3 $name,1,"$logname, can´t find my parent ".$hash->{parent}." in process list !";
           die;
         }
 	Log3 $name,4,"$logname, register new expire : ".localtime(time()+$expire);
@@ -383,7 +381,7 @@ sub SIP_CALLStart($)
      $ua                = undef;
   my $rtp_done          = 0;
   my $dtmf              = 'ABCD*#123--4567890';
-  my $port              = AttrVal($name,"sip_port","5060");
+  my $port              = AttrVal($name,"sip_port",0);
   my $delay             = AttrVal($name,"sip_call_audio_delay",0); # Verzoegerung in 1/4 Sekunden Schritten 
   my $fi                = 0;
      #$repeat            = 0 if (!$repeat); 
@@ -411,6 +409,13 @@ sub SIP_CALLStart($)
 
   $hash->{telnetPort} = SIP_telnetPort();
   return $name."|no telnet port without password found" if (!$hash->{telnetPort}); 
+
+  if (!$port)
+  { 
+   srand $$;
+   $port = int(rand(500)+44000); 
+   Log3 $name,4,"$logname, using random port $port";
+  }
 
   my $error = SIP_Register($hash,$port,"calling");
   return $name."|0|CallRegister: $error" if ($error);
@@ -584,8 +589,8 @@ sub SIP_CALLDone($)
    Log3 $name, 4,"$name, CALLDone -> $string";
    
    delete($hash->{helper}{CALL_PID}) if (defined($hash->{helper}{CALL_PID}));
-   delete($hash->{CPID}) if (defined($hash->{CPID}));
-   
+   delete($hash->{CPID})             if (defined($hash->{CPID}));
+   delete $hash->{lastnr}            if (defined($hash->{lastnr}));
  
    if ($error ne "1")
    {
@@ -651,6 +656,7 @@ sub SIP_Set($@)
   my $name = $hash->{NAME}; 
   my $cmd  = (defined($a[1])) ? $a[1] : "?";
   my $subcmd;
+  my $ret;
 
   return join(" ", sort keys %sets) if ($cmd eq "?");
 
@@ -675,21 +681,19 @@ sub SIP_Set($@)
 
     if (exists($hash->{CPID}))
      {
-        #return "there is already a call activ for target $nr" if (defined($hash->{lastnr}) && ($hash->{lastnr} eq $nr));
+        return "there is already a call activ for target $nr" if (defined($hash->{lastnr}) && ($hash->{lastnr} eq $nr));
         my $call = join(" ",@a); 
         push (@fifo,$call);
-        Log3 $name ,4,"$name, add call -> $call to fifo we will do it later";
+        Log3 $name ,4,"$name, add call $call to fifo so we can do it later !";
         return undef;
      }
 
     my $anz = @a;
     $anz--; # letztes Element
     my $force  = ($a[$anz] eq "&") ? 1 : 0;
-    $anz-- if ($force); # checken wir dann noch auf repeat 
-    my $repeat;
-    if (substr($a[$anz],0,1) ne "*")
-    { $repeat = 0; }
-    else 
+    $anz-- if ($force == 1); # checken wir dann noch auf repeat 
+    my $repeat = 0;
+    if (substr($a[$anz],0,1) eq "*")
     { 
       $repeat = $a[$anz];
       $repeat =~ s/^\*//;
@@ -701,7 +705,7 @@ sub SIP_Set($@)
 
      if (exists($hash->{LPID}) && (AttrVal($name,"sip_elbc","no") ne "no"))
      {
-      Log3 $name,4,"$name, listen process $hash->{LPID} must be killed befor starting call !";
+      Log3 $name,4,"$name, listen process $hash->{LPID} must be killed befor we start a new call !";
       BlockingKill($hash->{helper}{LISTEN_PID});
       delete $hash->{helper}{LISTEN_PID};
       delete $hash->{LPID};
@@ -735,7 +739,6 @@ sub SIP_Set($@)
 
        readingsSingleUpdate($hash,"call_state","waiting T2S",0);
 
-       Log3 $name,1,"$name :set repeat $repeat";
        RemoveInternalTimer($hash);
        # geben wir T2S mal ein paar Sekunden
        InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_wait_for_t2s", $hash);
@@ -743,12 +746,14 @@ sub SIP_Set($@)
       }
       elsif (-e $msg) 
       { 
-        Log3 $name, 4, $name.", message $msg found"; 
-        return "unknown message type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
+        Log3 $name, 4, $name.", audio file $msg found"; 
+        return "unknown audio type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
       } 
       else
       { 
-        Log3 $name, 3, $name.", message $msg NOT found !";
+        $ret = "audio file $msg not found";
+        readingsBulkUpdate($hash, "last_error",$ret);
+        Log3 $name, 3, "$name, $ret !";
         $hash->{repeat}    = 0;
         $hash->{forcecall} = 0;
         $msg = ""; 
@@ -756,7 +761,9 @@ sub SIP_Set($@)
     }
     else { Log3 $name, 4, $name.", calling $nr, ringtime: $ringtime , no message"; }
 
+    $hash->{lastnr} = $nr;
     my $arg = "$name|$nr|$ringtime|$msg|$repeat"; # da muss force nicht mit 
+    Log3 $name, 4, "$name, $arg";
     #BlockingCall($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg);
     $hash->{helper}{CALL_PID} = BlockingCall("SIP_CALLStart",$arg, "SIP_CALLDone") unless(exists($hash->{helper}{CALL_PID}));
 
@@ -764,8 +771,10 @@ sub SIP_Set($@)
     { 
      $hash->{CPID} = $hash->{helper}{CALL_PID}{pid};
      $hash->{CALL} = $arg."|$force"; # hier retten wir aber force
+     
      Log3 $name, 4,  "$name, call -> ".$hash->{CALL};
      Log3 $name, 5,  "$name, call has pid ".$hash->{CPID};
+    
      readingsBeginUpdate($hash);
      readingsBulkUpdate($hash, "call_state","invite");
      readingsBulkUpdate($hash, "call",$nr);
@@ -776,33 +785,30 @@ sub SIP_Set($@)
      else  
     { # das war wohl nix :(
       Log3 $name, 3,  "$name, CALL process start failed, arg : $arg"; 
-      my $txt = "can't execute call number $nr as NonBlockingCall";
+      $ret = "can't execute call number $nr as NonBlockingCall";
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "last_error",$txt);
+      readingsBulkUpdate($hash, "last_error",$ret);
       readingsBulkUpdate($hash, "call_state","fail");
       readingsEndUpdate($hash, 1);
       delete $hash->{lastnr} if (defined($hash->{lastnr}));
-      return $txt;
+      return $ret;
     }
   }
-
   elsif ($cmd eq "listen")
   {
    my $type = AttrVal($name,"sip_listen","none");
    return "there is already a listen process running with pid ".$hash->{LPID} if exists($hash->{LPID});
    return "please set attr sip_listen to dtmf or wfp or echo first" if (AttrVal($name,"sip_listen","none") eq "none");
-   my $error = SIP_try_listen($hash);
-   if ($error)
+   $ret = SIP_try_listen($hash);
+   if ($ret)
    { 
-    Log3 $name, 1, $name.", listen -> $error";
+    Log3 $name, 1, $name.", listen -> $ret";
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"state","error");
-    readingsBulkUpdate($hash,"last_error",$error);
+    readingsBulkUpdate($hash,"last_error",$ret);
     readingsEndUpdate($hash, 1 );
-    return $error;
+    return $ret;
    }
-   
-   #else {readingsSingleUpdate($hash, "state","listen_for_$type",1);}
    return undef;
   }
   elsif (($cmd eq "dtmf_event") && defined($a[2]))
@@ -913,8 +919,14 @@ sub SIP_ListenStart($)
 
  return $name."|no telnet port without password found" if (!$hash->{telnetPort}); 
 
- my $port = AttrVal($name,"sip_port","5060");
- $port += 10;
+ my $port = AttrVal($name,"sip_port",0);
+ if (!$port)
+ {  
+   srand $$;
+   $port = int(rand(500)+44500);
+   Log3 $name,4,"$logname, using random port $port"; 
+ }
+ else { $port += 10; }
  $ua = undef;
  my $error = SIP_Register($hash,$port,"listen_".AttrVal($name,"sip_listen",""));
  return $name."|ListenRegister: $error" if ($error);
@@ -1440,18 +1452,21 @@ sub SIP_wait_for_t2s($)
   }
 
   # nun aber calling
-  $hash->{repeat} =  "*".$hash->{repeat};
-  $hash->{forcecall} = ($hash->{forcecall}) ? "&" : "";
-  my @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$hash->{repeat},$hash->{forcecall}) ;
-  my $test = join(" ",@a);
-  Log3 $name ,1,"$name, Test : $test";  
+  my $repeat =  "*".$hash->{repeat};
+
+  my $force  = ($hash->{forcecall}) ? "&" : "";
+  my @a;
+  if ($force)  
+  { @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$repeat,$force) ; }
+  else
+  { @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$repeat) ; }
 
   delete($hash->{callnr});
   delete($hash->{ringtime});
   delete($hash->{forcecall});
   delete($hash->{repeat});
   my $ret = SIP_Set($hash , @a);
-  Log3 $name,3,"$name, T2S Call : $ret" if defined($ret);
+  Log3 $name,3,"$name, error T2S Call : $ret" if defined($ret);
   return undef;
 }
 
@@ -1731,7 +1746,8 @@ sub SIP_readPassword($)
       external IP address of the FHEM server.
       </li>
     <li><a name="#sip_port">sip_port</a><br>
-      Port used for sip client, defaults to 5060 and will be automatically increased by 10 if not available.
+      Optionally portnumber used for sip client<br>
+      If attribute is not set a random port number between 44000 and 45000 will be used
       </li>
     <li><a name="#sip_registrar">sip_registrar</a><br>
       Hostname or IP address of the SIP server you are connecting to, defaults to fritz.box.
@@ -1824,7 +1840,8 @@ sub SIP_readPassword($)
       Die IP-Addresse von FHEM im Heimnetz. Solange das Attribut nicht gesetzt ist versucht das Modul diese beim Start zu ermitteln.
       </li>
     <li><a name="#sip_port">sip_port</a><br>
-      Port der vom Modul genutzt wird. Default ist 5060 und wird automatisch um 10 erh&oml;ht wenn der Port nicht frei sein sollte.
+      Optinale Portnummer die vom Modul benutzt wird.<br>
+      Wenn dem Attribut kein Wert zugewiesen wurde verwendet das Modul eine zuf&auml;llige Portnummer zwichen 44000 und 45000
       </li>
   
      <li><b>Audiofiles</b>
