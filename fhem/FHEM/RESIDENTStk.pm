@@ -315,6 +315,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ## Start music from playlist\
 #fhem \"sleep 3.0;; set Sonos_Bedroom StartFavourite Evening%%20Chill\";;\
 \
+return;;\
 }";
 
             Log3 $NAME, 3,
@@ -389,6 +390,7 @@ if (\$EVTPART0 eq \"stop\") {\
 #	fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; msg audio \\\@Sonos_Bedroom \$text\";;\
 #}
 \
+return;;\
 }";
 
             Log3 $NAME, 3,
@@ -456,6 +458,10 @@ if (\$EVTPART0 eq \"stop\") {\
 ## Kitchen 5 seonds after it started\
 #fhem \"set Sonos_Bathroom,Sonos_Kitchen Volume 15;; sleep 15;; set Sonos_Bedroom AddMember Sonos_Bathroom;; set Sonos_Bedroom AddMember Sonos_Kitchen\";;\
 \
+## change user state to home after 60 seconds\
+fhem \"sleep 60;; set $wakeupUserdevice:FILTER=state!=home home\";;\
+\
+return;;\
 }";
 
             Log3 $NAME, 3,
@@ -540,6 +546,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ## Turn off all media devices in the Living Room\
 #fhem \"set g_HSE_Media [FILTER=state!=off] off\";;\
 \
+return;;\
 }";
 
                 Log3 $NAME, 3,
@@ -598,6 +605,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ## Stop playback at SONOS devices in shared rooms, e.g. Bathroom\
 #fhem \"set Sonos_Bathroom:FILTER=transportState=PLAYING Stop\";;\
 \
+return;;\
 }";
 
                 Log3 $NAME, 3,
@@ -659,6 +667,7 @@ if (\$EVTPART0 eq \"stop\") {\
 #	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \\\@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
 #}\
 \
+return;;\
 }";
 
                 Log3 $NAME, 3,
