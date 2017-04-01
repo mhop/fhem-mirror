@@ -490,7 +490,7 @@ return;;\
         #
 
         my $RESIDENTGROUPS = "";
-        if ( RESIDENTStk_GetType($wakeupUserdevice) eq "RESIDENTS" ) {
+        if ( RESIDENTStk_IsDevice( $wakeupUserdevice, "RESIDENTS" ) ) {
             $RESIDENTGROUPS = $wakeupUserdevice;
         }
         elsif ( RESIDENTStk_IsDevice($wakeupUserdevice)
@@ -1804,10 +1804,11 @@ sub RESIDENTStk_IsDevice($;$) {
     return 0;
 }
 
-sub RESIDENTStk_GetType($) {
+sub RESIDENTStk_GetType($;$) {
     my $devname = shift;
+    my $default = shift;
 
-    return "" unless ( RESIDENTStk_IsDevice($devname) );
+    return $default unless ( RESIDENTStk_IsDevice($devname) );
     return $defs{$devname}{TYPE};
 }
 
