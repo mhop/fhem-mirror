@@ -60,90 +60,6 @@ sub MSG_Initialize($$) {
 }
 
 ########################################
-sub MSG_FindAttrVal($$$$) {
-    my ( $d, $n, $msgType, $default ) = @_;
-    $msgType = "" unless ($msgType);
-    $msgType = ucfirst($msgType);
-    $n .= $msgType if ( $n =~ /^msg(Contact)$/ );
-
-    my $g = (
-        (
-            defined( $modules{msgConfig}{defptr} )
-              && $n !~ /^(verbose|msgContact.*)$/
-        )
-        ? $modules{msgConfig}{defptr}{NAME}
-        : ""
-    );
-
-    return
-
-      # look for direct
-      AttrVal(
-        $d, $n,
-
-        # look for indirect
-        AttrVal(
-            AttrVal( $d, "msgRecipient$msgType", "" ),
-            $n,
-
-            # look for indirect, type-independent
-            AttrVal(
-                AttrVal( $d, "msgRecipient", "" ),
-                $n,
-
-                # look for global direct
-                AttrVal(
-                    $g, $n,
-
-                    # look for global indirect
-                    AttrVal(
-                        AttrVal( $g, "msgRecipient$msgType", "" ),
-                        $n,
-
-                        # look for global indirect, type-independent
-                        AttrVal(
-                            AttrVal( $g, "msgRecipient", "" ),
-                            $n,
-
-                            # default
-                            $default
-                        )
-                    )
-                )
-            )
-        )
-      );
-}
-
-########################################
-sub MSG_FindReadingsVal($$$$) {
-    my ( $d, $n, $msgType, $default ) = @_;
-    $msgType = ucfirst($msgType) if ($msgType);
-
-    return
-
-      # look for direct
-      ReadingsVal(
-        $d, $n,
-
-        # look for indirect
-        ReadingsVal(
-            AttrVal( $d, "msgRecipient$msgType", "" ),
-            $n,
-
-            # look for indirect, type-independent
-            ReadingsVal(
-                AttrVal( $d, "msgRecipient", "" ),
-                $n,
-
-                # default
-                $default
-            )
-        )
-      );
-}
-
-########################################
 sub CommandMsg($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
@@ -480,6 +396,13 @@ s/^[\s\t ]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!?|:]*)[\s\t ]+//
                     ### /type loop
                     ################################################################
 
+                    my @unavailabilityIndicators = (
+                        "0",            "false",
+                        "absent",       "disappeared",
+                        "unauthorized", "unavailable",
+                        "unreachable",  "disconnected"
+                    );
+
                     my $logDevice;
                     $logDevice = $globalDevName;
                     $logDevice = $device
@@ -538,7 +461,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     }
 
                     # FATAL ERROR: device does not exist
-                    if ( !defined( $defs{$device} )
+                    if ( !msgConfig_IsDevice($device)
                         && $deviceType eq "device" )
                     {
                         $loopReturn3 .= "Device $device does not exist\n"
@@ -658,7 +581,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
 
                         # get device location
                         my $deviceLocation =
-                          MSG_FindReadingsVal( $device, "location", $typeUc,
+                          msgConfig_FindReadingsVal( $device, "location", $typeUc,
                             "" );
 
                         my $locationDev = "";
@@ -712,13 +635,6 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                       unless ($err);
                                 }
 
-                                my @availabilityIndicators = (
-                                    "0",            "false",
-                                    "absent",       "disappeared",
-                                    "unauthorized", "unavailable",
-                                    "unreachable",  "disconnected"
-                                );
-
                                 foreach
                                   my $gatewayDevOr ( split /\|/, $gatewayDevs )
                                 {
@@ -732,7 +648,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         }
 
                                         if (   $type[$i] ne "mail"
-                                            && !defined( $defs{$gatewayDev} )
+                                            && !msgConfig_IsDevice($gatewayDev)
                                             && $deviceType eq "device" )
                                         {
                                             $useLocation = 2
@@ -747,29 +663,40 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         elsif (
                                             $type[$i] ne "mail"
                                             && (
-                                                grep {
-                                                    ReadingsVal(
-                                                        $gatewayDev,
-                                                        "presence",
-                                                        "present"
-                                                      ) eq $_
-                                                } @availabilityIndicators
+                                                (
+                                                    grep {
+                                                        ReadingsVal(
+                                                            $gatewayDev,
+                                                            "presence",
+                                                            "present"
+                                                          ) eq $_
+                                                    } @unavailabilityIndicators
+                                                )
 
-                                                || grep {
-                                                    ReadingsVal( $gatewayDev,
-                                                        "state", "present" ) eq
-                                                      $_
-                                                } @availabilityIndicators
+                                                || (
+                                                    grep {
+                                                        ReadingsVal(
+                                                            $gatewayDev,
+                                                            "state",
+                                                            "present"
+                                                          ) eq $_
+                                                    } @unavailabilityIndicators
+                                                )
 
                                                 || (
                                                     defined(
                                                         $defs{$gatewayDev}
+                                                    )
+                                                    && defined(
+                                                        $defs{$gatewayDev}
                                                           {STATE}
                                                     )
-                                                    && grep {
-                                                        $defs{$gatewayDev}
-                                                          {STATE} eq $_
-                                                    } @availabilityIndicators
+                                                    && (
+                                                        grep {
+                                                            $defs{$gatewayDev}
+                                                              {STATE} eq $_
+                                                        } @unavailabilityIndicators
+                                                    )
                                                 )
 
                                                 || ReadingsVal(
@@ -812,8 +739,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     ### given device name is already a gateway device itself
                     ###
 
-                    my $deviceType2 =
-                      defined( $defs{$device} ) ? $defs{$device}{TYPE} : "";
+                    my $deviceType2 = msgConfig_GetType($device);
 
                     if (
                            $gatewayDevs eq ""
@@ -1375,17 +1301,58 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                             if ( $type[$i] eq "queue" ) {
                                 $routeStatus = "OK_QUEUE";
                             }
+
                             elsif ($type[$i] ne "mail"
-                                && !defined( $defs{$gatewayDev} )
+                                && !msgConfig_IsDevice($gatewayDev)
                                 && $deviceType eq "device" )
                             {
                                 $routeStatus = "UNDEFINED";
                             }
+
                             elsif ( $type[$i] ne "mail"
                                 && IsDisabled($gatewayDev) )
                             {
                                 $routeStatus = "DISABLED";
                             }
+
+                            elsif (
+                                $type[$i] ne "mail"
+                                && (
+                                    (
+                                        grep {
+                                            ReadingsVal( $gatewayDev,
+                                                "presence", "present" ) eq $_
+                                        } @unavailabilityIndicators
+                                    )
+
+                                    || (
+                                        grep {
+                                            ReadingsVal( $gatewayDev, "state",
+                                                "present" ) eq $_
+                                        } @unavailabilityIndicators
+                                    )
+
+                                    || (
+                                           msgConfig_IsDevice($gatewayDev)
+                                        && defined( $defs{$gatewayDev}{STATE} )
+                                        && (
+                                            grep {
+                                                $defs{$gatewayDev}{STATE} eq $_
+                                            } @unavailabilityIndicators
+                                        )
+                                    )
+
+                                    || ReadingsVal( $gatewayDev, "available",
+                                        "yes" ) =~ m/^(0|no|false)$/i
+
+                                    || ReadingsVal( $gatewayDev, "reachable",
+                                        "yes" ) =~ m/^(0|no|false)$/i
+                                )
+                              )
+                            {
+                                $routeStatus = "UNAVAILABLE";
+                            }
+
                             elsif (
                                 $type[$i] ne "mail"
                                 && (
@@ -1395,7 +1362,8 @@ m/^(0|false|absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     || ReadingsVal( $gatewayDev, "state",
                                         "present" ) =~
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
-                                    || (   $defs{$gatewayDev}{STATE}
+                                    || (   msgConfig_IsDevice($gatewayDev)
+                                        && defined( $defs{$gatewayDev}{STATE} )
                                         && $defs{$gatewayDev}{STATE} =~
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     )
@@ -1408,28 +1376,33 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             {
                                 $routeStatus = "UNAVAILABLE";
                             }
+
                             elsif ( $type[$i] eq "screen"
                                 && ReadingsVal( $gatewayDev, "power", "on" ) =~
                                 m/^(0|off)$/i )
                             {
                                 $routeStatus = "OFF";
                             }
+
                             elsif ($type[$i] eq "audio"
                                 && $annState ne "long"
                                 && $annState ne "short" )
                             {
                                 $routeStatus = "USER_DISABLED";
                             }
+
                             elsif ( $type[$i] eq "light" && $annState eq "off" )
                             {
                                 $routeStatus = "USER_DISABLED";
                             }
+
                             elsif ($type[$i] ne "push"
                                 && $type[$i] ne "mail"
                                 && $residentDevPresence eq "absent" )
                             {
                                 $routeStatus = "USER_ABSENT";
                             }
+
                             elsif ($type[$i] ne "push"
                                 && $type[$i] ne "mail"
                                 && $residentDevState eq "asleep" )
@@ -1485,14 +1458,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 $routeStatus .= "+QUEUE";
                             }
 
-                            my $gatewayType = (
-                                $type[$i] eq "mail" ? "fhemMsgMail"
-                                : (
-                                      $defs{$gatewayDev}{TYPE}
-                                    ? $defs{$gatewayDev}{TYPE}
-                                    : "UNDEFINED"
-                                )
-                            );
+                            my $gatewayType =
+                              $type[$i] eq "mail"
+                              ? "fhemMsgMail"
+                              : msgConfig_GetType( $gatewayDev, "UNDEFINED" );
 
                             my $defTitle = "";
                             $defTitle =
@@ -1935,13 +1904,14 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     # add user parameters
                                     # if gateway supports parseParams
                                     my $gatewayDevType =
-                                      defined( $defs{$gatewayDev}{TYPE} )
-                                      ? $defs{$gatewayDev}{TYPE}
-                                      : undef;
+                                      msgConfig_GetType($gatewayDev);
                                     if (
-                                        ref($params) eq "HASH"
+                                           $gatewayDevType
+                                        && ref($params) eq "HASH"
                                         && ( $modules{$gatewayDevType}
                                             ->{parseParams}
+                                            || $modules{$gatewayDevType}
+                                            ->{msgParams}{parseParams}
                                             || $modules{$gatewayDevType}
                                             ->{'.msgParams'}{parseParams} )
                                       )

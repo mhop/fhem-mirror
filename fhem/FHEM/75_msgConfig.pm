@@ -255,9 +255,9 @@ sub msgConfig_Set($@) {
         $device =~ s/[\s\t-]+/_/g;
 
         return "Device $device is already existing but not a dummy device"
-          if ( defined( $defs{$device} ) && $defs{$device}{TYPE} ne "dummy" );
+          if ( msgConfig_IsDevice($device) && msgConfig_GetType($device) ne "dummy" );
 
-        if ( !defined( $defs{$device} ) ) {
+        if ( !msgConfig_IsDevice($device) ) {
             $return = fhem( "define $device dummy", 1 );
             $return .= "Device $device was created"
               if ( $return eq "" );
@@ -302,9 +302,9 @@ sub msgConfig_Set($@) {
           if ( defined( $a[0] ) && $a[0] eq "de" );
 
         return "Device $device is already existing but not a dummy device"
-          if ( defined( $defs{$device} ) && $defs{$device}{TYPE} ne "dummy" );
+          if ( msgConfig_IsDevice($device) && msgConfig_GetType($device) ne "dummy" );
 
-        if ( !defined( $defs{$device} ) ) {
+        if ( !msgConfig_IsDevice($device) ) {
             $return = fhem( "define $device dummy", 1 );
             $return .= "Device $device was created"
               if ( $return eq "" );
@@ -361,13 +361,10 @@ sub msgConfig_Set($@) {
 
         return
 "Device $device is already existing but not a RESIDENTS or ROOMMATE device"
-          if (
-            defined( $defs{$device} )
-            && (   $defs{$device}{TYPE} ne "RESIDENTS"
-                && $defs{$device}{TYPE} ne "ROOMMATE" )
-          );
+          if ( msgConfig_IsDevice($device)
+            && !msgConfig_IsDevice( $device, "RESIDENTS|ROOMMATE" ) );
 
-        if ( !defined( $defs{$device} ) ) {
+        if ( !msgConfig_IsDevice($device) ) {
             $return = fhem( "define $device RESIDENTS", 1 );
             $return .= "RESIDENTS device $device was created."
               if ( $return eq "" );
@@ -375,11 +372,12 @@ sub msgConfig_Set($@) {
         else {
             $return =
                 "Existing "
-              . $defs{$device}{TYPE}
+              . msgConfig_GetType($device)
               . " device $device was updated.";
         }
 
-        my $txt = fhem("attr $device rgr_lang $lang") unless ( $lang eq "EN" );
+        my $txt = fhem("attr $device rgr_lang $lang")
+          unless ( $lang eq "EN" );
         $return .= $txt if ($txt);
 
         $attr{$device}{comment} = "Auto-created by $name"
@@ -412,7 +410,7 @@ sub msgConfig_Get($@) {
 
     Log3 $name, 5, "msgConfig $name: called function msgConfig_Get()";
 
-    my @msgTypes = ( "audio", "light", "mail", "push", "screen", "queue" );
+    my @msgTypes = ( "audio", "light", "mail", "push", "screen" );
 
     # routeCmd
     if ( lc($what) eq "routecmd" ) {
@@ -428,12 +426,12 @@ sub msgConfig_Get($@) {
             # Check device
             if ( $devicesReq ne "" ) {
                 foreach my $device ( split( /,/, $devicesReq ) ) {
-                    if ( defined( $defs{$device} ) ) {
-                        $UserDeviceTypes .= "," . $defs{$device}{TYPE}
+                    if ( msgConfig_IsDevice($device) ) {
+                        $UserDeviceTypes .= "," . msgConfig_GetType($device)
                           if ( $UserDeviceTypes ne ""
                             && $msgType ne "mail"
                             && $device ne $name );
-                        $UserDeviceTypes = $defs{$device}{TYPE}
+                        $UserDeviceTypes = msgConfig_GetType($device)
                           if ( $UserDeviceTypes eq ""
                             && $msgType ne "mail"
                             && $device ne $name );
@@ -459,53 +457,8 @@ sub msgConfig_Get($@) {
                             my $priorityCat = "";
                             $priorityCat = $prio if ( $prio ne "Normal" );
 
-                            my $cmd =
-
-                              # look for direct
-                              AttrVal(
-                                $device, "msgCmd$typeUc$priorityCat",
-
-                                # look for indirect
-                                AttrVal(
-                                    AttrVal(
-                                        $device, "msgRecipient$typeUc", ""
-                                    ),
-                                    "msgCmd$typeUc$priorityCat",
-
-                                    #look for indirect general
-                                    AttrVal(
-                                        AttrVal( $device, "msgRecipient", "" ),
-                                        "msgCmd$typeUc$priorityCat",
-
-                                        # look for global direct
-                                        AttrVal(
-                                            $name,
-                                            "msgCmd$typeUc$priorityCat",
-
-                                            # look for global indirect
-                                            AttrVal(
-                                                AttrVal(
-                                                    $name,
-                                                    "msgRecipient$typeUc", ""
-                                                ),
-                                                "msgCmd$typeUc$priorityCat",
-
-                                               #look for global indirect general
-                                                AttrVal(
-                                                    AttrVal(
-                                                        $name, "msgRecipient",
-                                                        ""
-                                                    ),
-                                                    "msgCmd$typeUc$priorityCat",
-
-                                                    # none
-                                                    ""
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                              );
+                            my $cmd = MSG_FindAttrVal( $device,
+                                "msgCmd$typeUc$priorityCat", $typeUc, "" );
 
                             next
                               if ( $cmd eq ""
@@ -517,7 +470,7 @@ sub msgConfig_Get($@) {
                               if ( $output == 0 );
                             $return .=
                               "  $device (DEVICE TYPE: "
-                              . $defs{$device}{TYPE} . ")\n"
+                              . msgConfig_GetType($device) . ")\n"
                               if ( $output == 0 );
                             $output = 1 if ( $output == 0 );
 
@@ -625,6 +578,125 @@ sub msgConfig_Get($@) {
         return
 "Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen,queue";
     }
+}
+
+########################################
+sub MSG_FindAttrVal($$$$) {
+    my ( $d, $n, $msgType, $default ) = @_;
+    $msgType = "" unless ($msgType);
+    $msgType = ucfirst($msgType);
+    $n .= $msgType if ( $n =~ /^msg(Contact)$/ );
+
+    my $g = (
+        (
+            defined( $modules{msgConfig}{defptr} )
+              && $n !~ /^(verbose|msgContact.*)$/
+        )
+        ? $modules{msgConfig}{defptr}{NAME}
+        : ""
+    );
+
+    return
+
+      # look for direct
+      AttrVal(
+        $d, $n,
+
+        # look for indirect
+        AttrVal(
+            AttrVal( $d, "msgRecipient$msgType", "" ),
+            $n,
+
+            # look for indirect, type-independent
+            AttrVal(
+                AttrVal( $d, "msgRecipient", "" ),
+                $n,
+
+                # look for global direct
+                AttrVal(
+                    $g, $n,
+
+                    # look for global indirect
+                    AttrVal(
+                        AttrVal( $g, "msgRecipient$msgType", "" ),
+                        $n,
+
+                        # look for global indirect, type-independent
+                        AttrVal(
+                            AttrVal( $g, "msgRecipient", "" ),
+                            $n,
+
+                            # default
+                            $default
+                        )
+                    )
+                )
+            )
+        )
+      );
+}
+
+########################################
+sub msgConfig_FindReadingsVal($$$$) {
+    my ( $d, $n, $msgType, $default ) = @_;
+    $msgType = ucfirst($msgType) if ($msgType);
+
+    return
+
+      # look for direct
+      ReadingsVal(
+        $d, $n,
+
+        # look for indirect
+        ReadingsVal(
+            AttrVal( $d, "msgRecipient$msgType", "" ),
+            $n,
+
+            # look for indirect, type-independent
+            ReadingsVal(
+                AttrVal( $d, "msgRecipient", "" ),
+                $n,
+
+                # default
+                $default
+            )
+        )
+      );
+}
+
+########################################
+sub msgConfig_IsDevice($;$) {
+    my $devname = shift;
+    my $devtype = shift;
+    $devtype = ".*" unless ( $devtype && $devtype ne "" );
+
+    return 1
+      if ( defined($devname)
+        && defined( $defs{$devname} )
+        && ref( $defs{$devname} ) eq "HASH"
+        && defined( $defs{$devname}{NAME} )
+        && $defs{$devname}{NAME} eq $devname
+        && defined( $defs{$devname}{TYPE} )
+        && $defs{$devname}{TYPE} =~ m/^$devtype$/
+        && defined( $modules{ $defs{$devname}{TYPE} } )
+        && defined( $modules{ $defs{$devname}{TYPE} }{LOADED} )
+        && $modules{ $defs{$devname}{TYPE} }{LOADED} );
+
+    delete $defs{$devname}
+      if ( defined($devname)
+        && defined( $defs{$devname} )
+        && $devtype eq ".*" );
+
+    return 0;
+}
+
+########################################
+sub msgConfig_GetType($;$) {
+    my $devname = shift;
+    my $default = shift;
+
+    return $default unless ( msgConfig_IsDevice($devname) );
+    return $defs{$devname}{TYPE};
 }
 
 1;
