@@ -137,9 +137,9 @@ sub RESIDENTS_Attr(@) {
               if ( !defined( $attr{$name}{group} )
                 || $attr{$name}{group} eq "Home State" );
             $attr{$name}{devStateIcon} =
-'.*anwesend:status_available:absent .*abwesend:status_away_1:home .*verreist:status_standby:home .*keine:control_building_empty .*bettfertig:status_night:asleep .*schläft:status_night:awoken .*aufgestanden:status_available:home .*:user_unknown:home';
+'.*anwesend:status_available:absent .*abwesend:status_away_1:home .*verreist:status_standby:home .*keine:control_building_empty .*bettfertig:status_night:asleep .*schlaeft:status_night:awoken .*aufgestanden:status_available:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:anwesend absent:abwesend gone:verreist none:keine gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+"home:anwesend absent:abwesend gone:verreist none:keine gotosleep:bettfertig asleep:schlaeft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
               "state:anwesend,bettfertig,abwesend,verreist";
         }
@@ -212,9 +212,7 @@ sub RESIDENTS_Notify($$) {
     return unless ( $devName ne $hashName );    # only foreign events
     return if ( IsDisabled($hashName) or IsDisabled($devName) );
     return
-      unless ( defined( $defs{$devName} )
-        && defined( $defs{$devName}{TYPE} )
-        && $defs{$devName}{TYPE} =~ /^(ROOMMATE|GUEST|dummy)$/i );
+      unless ( RESIDENTStk_GetType( $devName, "ROOMMATE|GUEST|dummy" ) );
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -463,11 +461,11 @@ sub RESIDENTS_Set($@) {
 
             # define roommate
             fhem( "define " . $rr_name . " ROOMMATE " . $name )
-              unless ( defined( $defs{$rr_name} ) );
+              unless ( RESIDENTStk_IsDevice($rr_name) );
 
-            if ( defined( $defs{$rr_name} ) ) {
+            if ( RESIDENTStk_IsDevice($rr_name) ) {
                 return "Can't create, device $rr_name already existing."
-                  unless ( $defs{$rr_name}{TYPE} eq "ROOMMATE" );
+                  unless ( RESIDENTStk_IsDevice( $rr_name, "ROOMMATE" ) );
 
                 my $lang =
                   $a[3]
@@ -499,7 +497,7 @@ sub RESIDENTS_Set($@) {
             my $rr_name = $a[2];
 
             # delete roommate
-            if ( defined( $defs{$rr_name} ) ) {
+            if ( RESIDENTStk_IsDevice($rr_name) ) {
                 Log3 $name, 3, "RESIDENTS $name: deleted device $rr_name"
                   if fhem( "delete " . $rr_name );
             }
@@ -523,11 +521,11 @@ sub RESIDENTS_Set($@) {
 
             # define guest
             fhem( "define " . $rg_name . " GUEST " . $name )
-              unless ( defined( $defs{$rg_name} ) );
+              unless ( RESIDENTStk_IsDevice($rg_name) );
 
-            if ( defined( $defs{$rg_name} ) ) {
+            if ( RESIDENTStk_IsDevice($rg_name) ) {
                 return "Can't create, device $rg_name already existing."
-                  unless ( $defs{$rg_name}{TYPE} eq "GUEST" );
+                  unless ( RESIDENTStk_IsDevice( $rg_name, "GUEST" ) );
 
                 my $lang =
                   $a[3]
@@ -559,7 +557,7 @@ sub RESIDENTS_Set($@) {
             my $rg_name = $a[2];
 
             # delete guest
-            if ( defined( $defs{$rg_name} ) ) {
+            if ( RESIDENTStk_IsDevice($rg_name) ) {
                 Log3 $name, 3, "RESIDENTS $name: deleted device $rg_name"
                   if fhem( "delete " . $rg_name );
             }
@@ -577,7 +575,7 @@ sub RESIDENTS_Set($@) {
             my $created         = 0;
 
             until ($created) {
-                if ( defined( $defs{$wakeuptimerName} ) ) {
+                if ( RESIDENTStk_IsDevice($wakeuptimerName) ) {
                     $i++;
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
@@ -1416,9 +1414,8 @@ sub RESIDENTS_UpdateReadings (@) {
             for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
                 next if !$wakeupDevice;
 
-                if ( defined( $defs{$wakeupDevice} )
-                    && $defs{$wakeupDevice}{TYPE} eq "dummy" )
-                {
+                if ( RESIDENTStk_GetType($wakeupDevice) eq "dummy" ) {
+
                     # forced-stop only if resident is not present anymore
                     if ( $newpresence eq "present" ) {
                         fhem "set $wakeupDevice:FILTER=running!=0 end";

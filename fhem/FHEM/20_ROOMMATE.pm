@@ -74,7 +74,7 @@ sub ROOMMATE_Define($$) {
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
         foreach ( split( /,/, $hash->{RESIDENTGROUPS} ) ) {
             RESIDENTStk_findResidentSlaves( $defs{$_} )
-              if ( defined( $defs{$_} ) );
+              if ( RESIDENTStk_IsDevice( $_, "RESIDENTS" ) );
         }
     }
 
@@ -180,9 +180,9 @@ sub ROOMMATE_Attr(@) {
 
         if ( $lang eq "DE" ) {
             $attr{$name}{devStateIcon} =
-'.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+'.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:anwesend absent:abwesend gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+"home:anwesend absent:abwesend gone:verreist gotosleep:bettfertig asleep:schlaeft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
               "state:anwesend,bettfertig,abwesend,verreist";
         }
@@ -216,7 +216,7 @@ sub ROOMMATE_Undefine($$) {
         delete $hash->{RESIDENTGROUPS};
         foreach ( split( /,/, $old ) ) {
             RESIDENTStk_findResidentSlaves( $defs{$_} )
-              if ( defined( $defs{$_} ) );
+              if ( RESIDENTStk_IsDevice( $_, "RESIDENTS" ) );
         }
     }
 
@@ -250,8 +250,7 @@ sub ROOMMATE_Notify($$) {
 
                 # make sure computeAfterInit is set at at-device
                 # and re-calculate on our own this time
-                if (   defined( $defs{$wakeupAtdevice} )
-                    && $defs{$wakeupAtdevice}{TYPE} eq "at"
+                if (   RESIDENTStk_IsDevice( $wakeupAtdevice, "at" )
                     && AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne
                     "1" )
                 {
@@ -581,9 +580,8 @@ sub ROOMMATE_Set($@) {
                 for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
                     next if !$wakeupDevice;
 
-                    if ( defined( $defs{$wakeupDevice} )
-                        && $defs{$wakeupDevice}{TYPE} eq "dummy" )
-                    {
+                    if ( RESIDENTStk_IsDevice( $wakeupDevice, "dummy" ) ) {
+
                         # forced-stop only if resident is not present anymore
                         if ( $newpresence eq "present" ) {
                             Log3 $name, 4,
@@ -698,15 +696,10 @@ sub ROOMMATE_Set($@) {
                       split( ' ', $attr{$name}{"rr_passPresenceTo"} );
 
                     foreach my $object (@linkedObjects) {
-                        if (
-                               defined( $defs{$object} )
+                        if (   RESIDENTStk_IsDevice( $object, "ROOMMATE|GUEST" )
                             && $defs{$object} ne $name
-                            && defined( $defs{$object}{TYPE} )
-                            && (   $defs{$object}{TYPE} eq "ROOMMATE"
-                                || $defs{$object}{TYPE} eq "GUEST" )
                             && ReadingsVal( $object, "state", "" ) ne "gone"
-                            && ReadingsVal( $object, "state", "" ) ne "none"
-                          )
+                            && ReadingsVal( $object, "state", "" ) ne "none" )
                         {
                             fhem("set $object $newstate");
                         }
@@ -856,7 +849,7 @@ sub ROOMMATE_Set($@) {
             my $created         = 0;
 
             until ($created) {
-                if ( defined( $defs{$wakeuptimerName} ) ) {
+                if ( RESIDENTStk_IsDevice($wakeuptimerName) ) {
                     $i++;
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
@@ -909,7 +902,7 @@ sub ROOMMATE_Set($@) {
         elsif ( lc( $a[2] ) eq "locationmap" ) {
             my $locationmapName = $name . "_map";
 
-            if ( defined( $defs{$locationmapName} ) ) {
+            if ( RESIDENTStk_IsDevice($locationmapName) ) {
                 return
 "Device $locationmapName existing already, delete it first to have it re-created.";
             }
