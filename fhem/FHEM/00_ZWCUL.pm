@@ -126,7 +126,7 @@ ZWCUL_DoInit($)
 
   my ($err, $ver, $try) = ("", "", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
-    DevIo_SimpleWrite($hash, "V\n", 2);
+    DevIo_SimpleWrite($hash, "V", 2, 1);
     ($err, $ver) = ZWCUL_ReadAnswer($hash, "Version", "^V");
     return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
     $ver = "" if(!$ver);
@@ -140,8 +140,8 @@ ZWCUL_DoInit($)
   $ver =~ s/[\r\n]//g;
   $hash->{VERSION} = $ver;
 
-  DevIo_SimpleWrite($hash, "zi".$hash->{homeIdSet}.$hash->{nodeIdHex}."\n", 2);
-  DevIo_SimpleWrite($hash, $hash->{initString}."\n", 2);
+  DevIo_SimpleWrite($hash, "zi".$hash->{homeIdSet}.$hash->{nodeIdHex}, 2, 1);
+  DevIo_SimpleWrite($hash, $hash->{initString}, 2, 1);
 
   readingsSingleUpdate($hash, "state", "Initialized", 1);
   return undef;
@@ -153,7 +153,7 @@ sub
 ZWCUL_Undef($$) 
 {
   my ($hash,$arg) = @_;
-  DevIo_SimpleWrite($hash, "zx\n", 2);
+  DevIo_SimpleWrite($hash, "zx", 2, 1);
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -163,7 +163,7 @@ ZWCUL_tmp9600($$)
 {
   my ($hash, $on) = @_;
   $hash->{baudRate} = ($on ? "9600" : AttrVal($hash->{NAME},"dataRate","40k"));
-  DevIo_SimpleWrite($hash, ($on ? $on : $hash->{initString})."\n", 2);
+  DevIo_SimpleWrite($hash, $on ? $on : $hash->{initString}, 2, 1);
 }
 
 #####################################
@@ -242,7 +242,7 @@ ZWCUL_cmd($$@)
   }
 
   $cmd = sprintf($cmd, @a);
-  DevIo_SimpleWrite($hash,  $cmd."\n", 2);
+  DevIo_SimpleWrite($hash,  $cmd, 2, 1);
   
   return undef if($type eq "set");
 
@@ -284,10 +284,10 @@ ZWCUL_Write($$$)
                     length($p)/2+($s100 ? 11 : 10), $targetId, $p);
     $msg .= ($s100 ? zwlib_checkSum_16($msg) : zwlib_checkSum_8($msg));
 
-    DevIo_SimpleWrite($hash, "zs".$msg, 2);
+    DevIo_SimpleWrite($hash, "zs".$msg, 2, 1);
 
   } elsif($hash->{STACKED}) {      
-    DevIo_SimpleWrite($hash, $msg, 2);
+    DevIo_SimpleWrite($hash, $msg, 2, 1);
 
   }
 }
@@ -425,8 +425,8 @@ ZWCUL_Parse($$$$$)
   }
 
   if(AttrVal($me, "verbose", 1) > 4) {
-    Log3 $hash, 5, "$H S:$S F:$F f:$f SN:$sn L:$L T:$T ${ri}${u1}P:$P C:$C";
-    Log3 $hash, 5, "   F:".
+    Log3 $hash,5,"$name $H S:$S F:$F f:$f SN:$sn L:$L T:$T ${ri}${u1}P:$P C:$C";
+    Log3 $hash,5,"   F:".
       (($hF & 3)==1 ? " singleCast" :
        ($hF & 3)==2 ? " multiCast" :
        ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
