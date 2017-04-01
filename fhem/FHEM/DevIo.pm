@@ -64,7 +64,7 @@ DevIo_SimpleRead($)
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
   if(defined($buf) && length($buf) == 0) {
-    $buf = DevIo_SimpleReadWithTimeout($hash, 1);
+    $buf = DevIo_SimpleReadWithTimeout($hash, 0.01); # Forum #57806
   }
 
   if(!defined($buf) || length($buf) == 0) {
