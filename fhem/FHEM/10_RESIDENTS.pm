@@ -212,7 +212,7 @@ sub RESIDENTS_Notify($$) {
     return unless ( $devName ne $hashName );    # only foreign events
     return if ( IsDisabled($hashName) or IsDisabled($devName) );
     return
-      unless ( RESIDENTStk_GetType( $devName, "ROOMMATE|GUEST|dummy" ) );
+      unless ( RESIDENTStk_IsDevice( $devName, "ROOMMATE|GUEST|dummy" ) );
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -1414,7 +1414,7 @@ sub RESIDENTS_UpdateReadings (@) {
             for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
                 next if !$wakeupDevice;
 
-                if ( RESIDENTStk_GetType($wakeupDevice) eq "dummy" ) {
+                if ( RESIDENTStk_IsDevice( $wakeupDevice, "dummy" ) ) {
 
                     # forced-stop only if resident is not present anymore
                     if ( $newpresence eq "present" ) {
