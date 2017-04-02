@@ -1123,16 +1123,16 @@ sub Pushover_SetMessage2 ($$$$) {
           $h->{action} ? $h->{action} : ( $h->{url} ? $h->{url} : undef );
         $values{url_title} = ( $h->{url_title} ? $h->{url_title} : undef );
 
-        return "url_title requires parameter url"
+        return "url_title requires parameter action"
           if ( defined( $values{url_title} )
-            && !defined( $values{url} ) );
+            && !defined( $values{action} ) );
 
-        return "url requires parameter url_title"
-          if ( defined( $values{url} )
+        return "action requires parameter url_title"
+          if ( defined( $values{action} )
             && !defined( $values{url_title} ) );
 
-        return "messages containing a URL require parameter expire"
-          if ( $values{action}
+        return "messages containing a URL requires parameter expire"
+          if ( defined( $values{action} )
             && defined( $values{url_title} )
             && !defined( $values{expire} ) );
 
