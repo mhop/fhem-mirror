@@ -132,8 +132,23 @@
 #   2016-09-20  fixed bugs where extractAllJSON filled requestReadings hash with wrong key and 
 #               requestReadings structure was filled with wrong data in updateRequestHash
 #               optimized deletion of readings with their metadata, check $buffer before jsonflatter
+#   2016-10-02  changed logging in _Read: shorter log on level 3 if $err and details only on level 4
+#   2016-10-06  little modification to help debugging a strange syntax error
+#   2017-02-08  fix bug in xpath handling reported in https://forum.fhem.de/index.php/topic,45176.315.html
+#               catch warnings in evals - to be finished (drop subroutine and add inline)
+#   2017-03-16  Log line removed in JsonFlatter (creates warning if $value is not defined and it is not needed anyways)
+#   2017-03-23  new attribute removeBuf
+#
+
 #
 #   Todo:       
+#               get after set um readings zu aktualisieren
+#               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
+#
+#               named groups im regexes [?<name>.  )
+#                   you can refer to them by absolute number (using "$1" instead of "\g1" , etc)
+#                   or by name via the %+ hash, using "$+{name}".
+#                   -> if named groups exist - 
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
@@ -189,7 +204,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.3.5 - 29.9.2016';
+my $HTTPMOD_Version = '3.3.9 - 23.3.2017';
 
 #
 # FHEM module intitialisation
@@ -252,6 +267,7 @@ sub HTTPMOD_Initialize($)
 
       "showMatched:0,1 " .
       "showError:0,1 " .
+      "removeBuf:0,1 " .
       
       "parseFunction1 " .
       "parseFunction2 " .
@@ -454,7 +470,9 @@ sub HTTPMOD_Attr(@)
     
     if ($cmd eq "set") {        
         if ($aName =~ /Regex/) {    # catch all Regex like attributes
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: set attr $aName $aVal created warning: @_"; };
             eval {qr/$aVal/};
+            $SIG{__WARN__} = 'DEFAULT';
             if ($@) {
                 Log3 $name, 3, "$name: Attr with invalid regex in attr $name $aName $aVal: $@";
                 return "Invalid Regex $aVal";
@@ -482,7 +500,9 @@ sub HTTPMOD_Attr(@)
             my $timeDiff = 0;
             my @matchlist = ();
             no warnings qw(uninitialized);
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: set attr $aName $aVal created warning: @_"; };
             eval $aVal;
+            $SIG{__WARN__} = 'DEFAULT';
             if ($@) {
                 Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
                 return "Invalid Expression $aVal";
@@ -516,7 +536,9 @@ sub HTTPMOD_Attr(@)
             Log3 $name, 5, "$name: validating attr $name $aName $aVal";
             if (AttrVal($name, "replacement${2}Mode", "text") eq "expression") {
                 no warnings qw(uninitialized);
+                $SIG{__WARN__} = sub { Log3 $name, 3, "$name: set attr $aName $aVal created warning: @_"; };
                 eval $aVal;
+                $SIG{__WARN__} = 'DEFAULT';
                 if ($@) {
                     Log3 $name, 3, "$name: Attr with invalid Expression (mode is expression) in attr $name $aName $aVal: $@";
                     return "Attr with invalid Expression (mode is expression) in attr $name $aName $aVal: $@";
@@ -994,7 +1016,9 @@ sub HTTPMOD_Replace($$$)
                 $match = 1;
             }
         } elsif ($mode eq 'expression') {
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: Replacement $rNum with expression $value created warning: @_"; };
             $match = eval {$string =~ s/$regex/$value/gee};
+            $SIG{__WARN__} = 'DEFAULT';     
             if ($@) {
                 Log3 $name, 3, "$name: Replace: invalid regex / expression: /$regex/$value/gee - $@";
             }
@@ -1019,8 +1043,10 @@ sub HTTPMOD_ModifyWithExpr($$$$$)
     my ($name, $context, $num, $attr, $text) = @_;
     my $exp = AttrVal($name, "${context}${num}${attr}", undef);
     if ($exp) {
-        my $old = $text;
+        my $old = $text;        
+        $SIG{__WARN__} = sub { Log3 $name, 3, "$name: ModifyWithExpr ${context}${num}${attr} created warning: @_"; };
         $text = eval($exp);
+        $SIG{__WARN__} = 'DEFAULT';     
         if ($@) {
             Log3 $name, 3, "$name: error in $attr for $context $num: $@";
         }
@@ -1331,7 +1357,7 @@ sub HTTPMOD_Set($@)
     # suche den übergebenen setName in den Attributen und setze setNum
     
     foreach my $aName (keys %{$attr{$name}}) {
-        if ($aName =~ /^set([0-9]+)Name$/) {              # ist das Attribut ein "setXName" ?
+        if ($aName =~ /^set([0-9]+)Name$/) {            # ist das Attribut ein "setXName" ?
             if ($setName eq $attr{$name}{$aName}) {     # ist es der im konkreten Set verwendete setName?
                 $setNum = $1;                           # gefunden -> merke Nummer X im Attribut
             }            
@@ -1406,7 +1432,9 @@ sub HTTPMOD_Set($@)
         $exp    = AttrVal($name, "set${setNum}IExpr", "");      # new syntax overrides old one
         if ($exp) {
             my $val = $rawVal;
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: Set IExpr $exp created warning: @_"; };
             $rawVal = eval($exp);
+            $SIG{__WARN__} = 'DEFAULT';     
             if ($@) {
                 Log3 $name, 3, "$name: Set error in setExpr $exp: $@";
             } else {
@@ -1575,7 +1603,7 @@ sub HTTPMOD_JsonFlatter($$;$)
     if (ref($ref) eq "ARRAY" ) { 
         my $key = 0;
         foreach my $value (@{$ref}) {
-            Log3 $name, 5, "$name: JSON Flatter in array while, key = $key, value = $value"; 
+            #Log3 $name, 5, "$name: JSON Flatter in array while, key = $key, value = $value"; 
             if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
                 Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
                 HTTPMOD_JsonFlatter($hash, $value, $prefix.sprintf("%02i",$key+1)."_"); 
@@ -1589,7 +1617,7 @@ sub HTTPMOD_JsonFlatter($$;$)
         }                                                                            
     } elsif (ref($ref) eq "HASH" ) {
         while( my ($key,$value) = each %{$ref}) {                                       
-            Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = $value";
+            #Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = $value";
             if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
                 Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
                 HTTPMOD_JsonFlatter($hash, $value, $prefix.$key."_");
@@ -1654,7 +1682,9 @@ sub HTTPMOD_FormatReading($$$$$)
         my $timeStr = ReadingsTimestamp($name, $reading, 0);
         $timeDiff = ($now - time_str2num($timeStr)) if ($timeStr);
         
+        $SIG{__WARN__} = sub { Log3 $name, 3, "$name: FormatReadig OExpr $expr created warning: @_"; };
         $val = eval $expr;
+        $SIG{__WARN__} = 'DEFAULT';     
         if ($@) {
             Log3 $name, 3, "$name: FormatReading error, context $context, expression $expr: $@";
         }
@@ -1769,9 +1799,20 @@ sub HTTPMOD_ExtractReading($$$$$)
         if ($@) {
             Log3 $name, 3, "$name: error in find for XPathStrictNodeset: $@";
         } else {
-            foreach my $node ($nodeset->get_nodelist) {
-                push @matchlist, XML::XPath::XMLParser::as_string($node);
+        
+            # bug in xpath handling reported in https://forum.fhem.de/index.php/topic,45176.315.html
+            #foreach my $node ($nodeset->get_nodelist) {
+            #    push @matchlist, XML::XPath::XMLParser::as_string($node);
+            #}
+            
+            if ($nodeset->isa('XML::XPath::NodeSet')) {
+                foreach my $node ($nodeset->get_nodelist) {
+                    push @matchlist, XML::XPath::XMLParser::as_string($node);
+                }
+            } else {
+                push @matchlist, $nodeset;
             }
+            
         }
     } else {
         $try   = 0; # neither regex, xpath nor json attribute found ...
@@ -1786,7 +1827,9 @@ sub HTTPMOD_ExtractReading($$$$$)
         
         if ($recomb) {
             Log3 $name, 5, "$name: ExtractReading is recombining $match matches with expression $recomb";
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: RecombineExpr $recomb created warning: @_"; };
             my $val = (eval $recomb);
+            $SIG{__WARN__} = 'DEFAULT';     
             if ($@) {
                 Log3 $name, 3, "$name: ExtractReading error in RecombineExpr: $@";
             }
@@ -1856,7 +1899,9 @@ sub HTTPMOD_PullToFile($$$$)
     while ($buffer =~ /$regex/g) {
         $matches++;                 
         no warnings qw(uninitialized);
+        $SIG{__WARN__} = sub { Log3 $name, 3, "$name: RecombineExpr $recombine created warning: @_"; };
         my $val = eval($recombine);
+        $SIG{__WARN__} = 'DEFAULT';     
         if ($@) {
             Log3 $name, 3, "$name: PullToFile error in RecombineExpr $recombine: $@";
         } else {
@@ -1951,7 +1996,9 @@ sub HTTPMOD_DoMaxAge($)
                 if ($mode eq "expression") {
                     Log3 $name, 4, "$name: MaxAge: reading $reading too old - using Perl expression as MaxAge replacement: $rep";
                     my $val = ReadingsVal($name, $reading, "");
+                    $SIG{__WARN__} = sub { Log3 $name, 3, "$name: MaxAge replacement expr $rep created warning: @_"; };
                     $rep = eval($rep);
+                    $SIG{__WARN__} = 'DEFAULT';     
                     if($@) {         
                         Log3 $name, 3, "$name: MaxAge: error in replacement expression $1: $@";
                         $rep = "error in replacement expression";
@@ -2337,21 +2384,23 @@ sub HTTPMOD_Read($$$)
     }
     
     if (!$name || $hash->{TYPE} ne "HTTPMOD") {
-        Log3 "HTTPMOD", 3, "HTTPMOD _Read callback was called with illegal hash - this should never happen - problem in HttpUtils?";
+        $name = "HTTPMOD";
+        Log3 $name, 3, "HTTPMOD _Read callback was called with illegal hash - this should never happen - problem in HttpUtils?";
         return undef;
     }
     
     $hash->{BUSY} = 0;
-    my $ll = ($err ? 3 : 4);        # Log Level - 3 if error
-    Log3 $name, $ll, "$name: Read callback: request type was $type" . 
+    Log3 $name, 3, "$name: Read callback: Error: $err" if ($err);
+    Log3 $name, 4, "$name: Read callback: request type was $type" . 
         " retry $request->{retryCount}" .
          ($header ? ",\r\nHeader: $header" : ", no headers") . 
-         ($body ? ",\r\nBody: $body" : ", body empty") . 
-         ($err ? ", \r\nError: $err" : "no error");
+         ($body ? ",\r\nBody: $body" : ", body empty");
     
     $body = "" if (!$body);
     $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # for matching sid / reauth
     $buffer = $buffer . "\r\n\r\n" . $err if ($err);                 # for matching reauth
+    
+    delete $hash->{buf} if (AttrVal($name, "removeBuf", 0));
     
     HTTPMOD_InitParsers($hash, $body);   
     HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
@@ -3453,6 +3502,10 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>showError</b></li>
             if set to 1 then HTTPMOD will create a reading and event with the Name LAST_ERROR 
             that contains the error message of the last error returned from HttpUtils. 
+        <li><b>removeBuf</b></li>
+            if set to 1 then HTTPMOD removes the internal named buf when a HTTP-response has been
+            received. $hash->{buf} is used internally be Fhem httpUtils and in some use cases it is desireable to remove this internal after reception because it contains a vers long response which looks ugly in Fhemweb.
+            
         <li><b>timeout</b></li>
             time in seconds to wait for an answer. Default value is 2
         <li><b>queueDelay</b></li>
