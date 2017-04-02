@@ -137,11 +137,11 @@ sub RESIDENTS_Attr(@) {
               if ( !defined( $attr{$name}{group} )
                 || $attr{$name}{group} eq "Home State" );
             $attr{$name}{devStateIcon} =
-'.*anwesend:status_available:absent .*abwesend:status_away_1:home .*verreist:status_standby:home .*keine:control_building_empty .*bettfertig:status_night:asleep .*schläft:status_night:awoken .*aufgestanden:status_available:home .*:user_unknown:home';
+'.*zuhause:status_available:absent .*anwesend:status_available:absent .*abwesend:status_away_1:home .*verreist:status_standby:home .*keine:control_building_empty .*bettfertig:status_night:asleep .*schlaeft:status_night:awoken .*schläft:status_night:awoken .*aufgestanden:status_available:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:anwesend absent:abwesend gone:verreist none:keine gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+"home:zuhause absent:abwesend gone:verreist none:keine gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
-              "state:anwesend,bettfertig,schläft,abwesend,verreist";
+"state:zuhause,bettfertig,schläft,aufgestanden,abwesend,verreist";
         }
         elsif ( $lang eq "EN" ) {
             $attr{$name}{alias} = "Residents"
