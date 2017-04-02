@@ -1801,7 +1801,8 @@ sub RESIDENTStk_GetType($;$) {
     my $devname = shift;
     my $default = shift;
 
-    return $default unless ( IsDevice($devname) && $defs{$devname}{TYPE} );
+    return $default
+      unless ( RESIDENTStk_IsDevice($devname) && $defs{$devname}{TYPE} );
     return $defs{$devname}{TYPE};
 }
 
