@@ -4,6 +4,8 @@
 # Basiert auf der Idee Fhem Daten auf einem Kindle anzuzeigen
 # wie im Forum beschrieben
 #
+# regex tester e.g.: http://retester.herokuapp.com/
+#
 ##############################################################################
 #   Changelog:
 #
@@ -17,7 +19,35 @@
 #   2014-12-25  little bug fixes, kleineres Datum ergänzt
 #   2015-03-22  flexibleres Datumsformat für das Reading LastUpdate per strftime ergänzt 
 #   2015-04-25  allow {expr} as replacement for MaxAge, MinValue and MaxValue
+#   2016-10-31  added SVG
+#   2016-11-02  RepXXText und RepXXTidy, delay first update for 1 secs after INITIALIZED
+#               Attribute disable, fixed uninitialized wearning at start with SVG
+#	2016-11-17	fixed missing REREADCFG in Notify check
+#	2016-12-21	set NOTIFYDEV in Define
 #
+
+# to include an SVG Plot
+# add a group to the template like this:
+#
+#  <g id="Plot1Group"
+#     transform="matrix(1,0,0,1,8,177)">
+#    <rect
+#       id="Plot1"
+#       width="500"
+#       height="100"
+#       x="16"
+#       y="16" />
+#  </g>
+#
+# Replacement Attributes:
+# attr fr Rep31Regex <rect[^>]+id="Plot1"[^>]+/> 
+# attr fr Rep31SVG SVG_FileLog_PM_1 
+# 
+# define a suitable size for the plot 
+# attr SVG_FileLog_PM_1 plotsize 490,100  
+#
+
+
 
 package main;
 
@@ -34,18 +64,23 @@ sub FReplacer_Undef($$);
 sub FReplacer_Update($);
 sub FReplacer_Attr(@);
 
-require "$attr{global}{modpath}/FHEM/99_Utils.pm";
+my $FReplacer_Version = '2.4 - 21.12.2016';
 
 #####################################
 sub FReplacer_Initialize($)
 {
     my ($hash) = @_;
 
-    $hash->{DefFn}   =  "FReplacer_Define";
-    $hash->{UndefFn} =  "FReplacer_Undef";
-    $hash->{AttrFn}  =  "FReplacer_Attr";
-    $hash->{SetFn}   =  "FReplacer_Set";
-    $hash->{AttrList}=  "Rep[0-9]+Regex " .         # Match für Ersetzungen
+    $hash->{DefFn}    = "FReplacer_Define";
+    $hash->{UndefFn}  = "FReplacer_Undef";
+    $hash->{AttrFn}   = "FReplacer_Attr";
+    $hash->{SetFn}    = "FReplacer_Set";
+    $hash->{NotifyFn} = "FReplacer_Notify";
+
+    $hash->{AttrList} = "Rep[0-9]+Regex " .         # Match für Ersetzungen
+                        "Rep[0-9]+Text " .          # Replace with static text
+                        "Rep[0-9]+Tidy " .          # XML Encode special characters
+                        "Rep[0-9]+SVG " .           # Replace with Plot
                         "Rep[0-9]+Reading " .       # Reading for Replacement
                         "Rep[0-9]+MaxAge " .        # optional Max age of Reading
                         "Rep[0-9]+MinValue " .      # optional Min Value of Reading
@@ -56,7 +91,11 @@ sub FReplacer_Initialize($)
                         "ReplacementEncode " .      # Ergebnis einer Ersetzung z.B. in UTF-8 Encoden
                         "PostCommand " .            # Systembefehl, der nach der Ersetzung ausgeführt wird
                         "LUTimeFormat " .           # time format for strftime for LastUpdate
+                        "disable:0,1 " .
+
                         $readingFnAttributes;  
+    LoadModule "SVG";
+    
 }
 
 
@@ -68,15 +107,15 @@ sub FReplacer_Define($$)
     my ($name, $FReplacer, $template, $output, $interval) = @a;
     return "wrong syntax: define <name> FReplacer [Template] [Output] [interval]"
         if(@a < 4);
-    $hash->{TEMPLATE} = $template;
-    $hash->{OUTPUT}   = $output;    
+    $hash->{TEMPLATE}  = $template;
+    $hash->{OUTPUT}    = $output;    
+    $hash->{NOTIFYDEV} = "global";                  # NotifyFn nur aufrufen wenn global events (INITIALIZED)
     if (!defined($interval)) {
         $hash->{INTERVAL} = 60; 
     } else {
         $hash->{INTERVAL} = $interval;
     }
-    RemoveInternalTimer ($hash);
-    InternalTimer(gettimeofday()+1, "FReplacer_Update", $hash, 0);
+    $hash->{ModuleVersion} = $FReplacer_Version;
     return undef;
 }
 
@@ -92,6 +131,30 @@ FReplacer_Undef($$)
 }
 
 
+########################################################
+# Notify for INITIALIZED 
+sub FReplacer_Notify($$)
+{
+    my ($hash, $source) = @_;
+    return if($source->{NAME} ne "global");
+
+    my $events = deviceEvents($source, 1);
+    return if(!$events);
+
+    my $name = $hash->{NAME};
+    # Log3 $name, 5, "$name: Notify called for source $source->{NAME} with events: @{$events}";
+  
+    return if (!grep(m/^INITIALIZED|REREADCFG$/, @{$source->{CHANGED}}));
+
+    return if (AttrVal($name, "disable", undef));
+
+    RemoveInternalTimer ($hash);
+    InternalTimer(gettimeofday()+1, "FReplacer_Update", $hash, 0);
+
+    return;
+}
+
+
 #
 # Attr command 
 ##############################################################
@@ -99,6 +162,7 @@ sub
 FReplacer_Attr(@)
 {
     my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash = $defs{$name};
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
@@ -144,6 +208,18 @@ FReplacer_Attr(@)
         } 
         addToDevAttrList($name, $aName)
     }
+    
+    if ($aName eq 'disable') {
+        if ($cmd eq "set" && $aVal) {
+            Log3 $name, 5, "$name: disable attribute set, stop timer";
+            RemoveInternalTimer ($hash);
+        } elsif ($cmd eq "del" || ($cmd eq "set" && !$aVal)) {
+            Log3 $name, 5, "$name: disable attribute removed, starting timer";
+            RemoveInternalTimer ($hash);
+            InternalTimer(gettimeofday()+1, "FReplacer_Update", $hash, 0);
+        }
+    }   
+
     return undef;
 }
 
@@ -196,12 +272,13 @@ FReplacer_Update($) {
     my $time2 = strftime("%d.%m %R", localtime);
     readingsSingleUpdate($hash, "LastUpdateSmall", $time2, 1 );
     
-    foreach my $key (keys %{$attr{$name}}) {
+    foreach my $key (sort keys %{$attr{$name}}) {
         if ($key =~ /Rep([0-9]+)Regex/) {
+            my $replacement = "";
             my $index = $1;
             my $regex = $attr{$name}{"Rep${index}Regex"};
-            my $replacement = "";
-            my $skip = 0;
+            my $skip  = 0;
+            my $isSVG = 0;
             
             if ($attr{$name}{"Rep${index}Reading"}) {
                 if ($attr{$name}{"Rep${index}Reading"} !~ '([^\:]+):([^\:]+):?(.*)') {
@@ -272,28 +349,66 @@ FReplacer_Update($) {
                         $skip = 1;
                     }
                 }
+            } elsif ($attr{$name}{"Rep${index}Text"}) {
+                $replacement = $attr{$name}{"Rep${index}Text"};                
+                $skip = 1;
+            } elsif ($attr{$name}{"Rep${index}SVG"}) {
+                my $svgDev = $attr{$name}{"Rep${index}SVG"};                
+                $isSVG = 1;
+                if ($defs{$svgDev}) {
+                    my $svgHash = $defs{$svgDev};
+                    my $logDev  = $svgHash->{LOGDEVICE};
+                    my $gplotF  = $svgHash->{GPLOTFILE};
+                    my $logF    = $svgHash->{LOGFILE};                  
+                    my $type;
+                    Log3 $name, 5, "$name: creating SVG with $svgDev, $logDev, $gplotF, $logF";
+                    $FW_RET="";
+                    $FW_plotmode = "SVG" if (!$FW_plotmode);
+                    ($type, $replacement) = SVG_doShowLog($svgDev, $logDev, $gplotF, $logF);
+                    $replacement =~ s/<\?xml version="1\.0" encoding="UTF-8"\?>[^<]+<!DOCTYPE svg>//g;
+                    Log3 $name, 5, "$name: SVG data created";
+                } else {
+                    Log3 $name, 3, "$name: invalid SVG device name $svgDev";
+                }
+                $skip = 1;
             }
-            if ($attr{$name}{"Rep${index}Expr"} && !$skip) {
-                Log3 $name, 5, "$name: Evaluating Expr" . $attr{$name}{"Rep${index}Expr"} .
-                    "\$replacement = $replacement";
-                $replacement = eval($attr{$name}{"Rep${index}Expr"});
-                Log3 $name, 5, "$name: result is $replacement";
-                if ($@) {
-                    Log3 $name, 3, "$name: error evaluating attribute Rep${index}Expr: $@";
-                    next;
+            if (!$isSVG && !$skip) {
+                if ($attr{$name}{"Rep${index}Expr"}) {
+                    Log3 $name, 5, "$name: Evaluating Expr" . $attr{$name}{"Rep${index}Expr"} .
+                        "\$replacement = $replacement";
+                    $replacement = eval($attr{$name}{"Rep${index}Expr"});
+                    Log3 $name, 5, "$name: result is $replacement";
+                    if ($@) {
+                        Log3 $name, 3, "$name: error evaluating attribute Rep${index}Expr: $@";
+                        next;
+                    }
+                }
+                if ($attr{$name}{"Rep${index}Format"}) {
+                    Log3 $name, 5, "$name: doing sprintf with format " . $attr{$name}{"Rep${index}Format"} .
+                        " value is $replacement";
+                    $replacement = sprintf($attr{$name}{"Rep${index}Format"}, $replacement);
+                    Log3 $name, 5, "$name: result is $replacement";
                 }
             }
-            if ($attr{$name}{"Rep${index}Format"} && !$skip) {
-                Log3 $name, 5, "$name: doing sprintf with format " . $attr{$name}{"Rep${index}Format"} .
-                    " value is $replacement";
-                $replacement = sprintf($attr{$name}{"Rep${index}Format"}, $replacement);
-                Log3 $name, 5, "$name: result is $replacement";
+
+            if ($attr{$name}{"Rep${index}Tidy"}) {
+                $replacement =~ s/</&lt;/g;
+                $replacement =~ s/>/&gt;/g;
+                $replacement =~ s/\"/&quot;/g;
+                $replacement =~ s/\'/&apos;/g;
+                $replacement =~ s/&amp;/&/g;
+                $replacement =~ s/&/&amp;/g;
+            }
+
+            if ($isSVG) {
+                Log3 $name, 5, "$name: Replacing $regex with SVG Plot";
+            } else {
+                Log3 $name, 5, "$name: Replacing $regex with $replacement";
+                $replacement = encode(AttrVal($name, "ReplacementEncode", undef), $replacement) 
+                    if (AttrVal($name, "ReplacementEncode", undef));
+                Log3 $name, 5, "$name: Replacement encoded as $replacement";
             }
             
-            Log3 $name, 5, "$name: Replacing $regex with $replacement";
-            $replacement = encode(AttrVal($name, "ReplacementEncode", undef), $replacement) 
-                if (AttrVal($name, "ReplacementEncode", undef));
-            Log3 $name, 5, "$name: Replacement encoded as $replacement";
             $content =~ s/$regex/$replacement/g;
         }
     }
@@ -310,6 +425,9 @@ FReplacer_Update($) {
 1;
 
 =pod
+=item device
+=item summary replace place holders with readings or SVG plot in a file
+=item summary_DE ersetzt Platzhalter mit Readings oder SVG Plots in einer Datei
 =begin html
 
 <a name="FReplacer"></a>
@@ -397,6 +515,10 @@ FReplacer_Update($) {
         <li><b>Rep[0-9]+Reading</b></li>
             defines a device and reading to be used as replacement value. It is specified as devicename:readingname:default_value.<br>
             The default_value is optional and defaults to 0. If the reading doesn't exist, default_value is used.
+        <li><b>Rep[0-9]+Text</b></li>
+            Use static text as replacement value. 
+        <li><b>Rep[0-9]+Tidy</b></li>
+            XML encode special characters in this replacement.
         <li><b>Rep[0-9]+MaxAge</b></li>
             this can optionally be used together with RepReading to define a maximum age of the reading. It is specified as seconds:replacement. If the corresponding reading has not been updated for the specified number of seconds, then the replacement is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
             If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
@@ -413,6 +535,9 @@ FReplacer_Update($) {
         <li><b>Rep[0-9]+Format</b></li>
             defines an optional format string to be used in a sprintf statement to format the replacement before it is applied.<br>
             Can be used with RepReading or RepExpr or both.
+        <li><b>Rep[0-9]+SVG</b></li>
+            defines a SVG Plot be used as replacement. It is specified as the name of a defined fhem SVG.<br>
+            In order to include this in a SVG template, include e.g. a group in the template with a rect in it and then replace the rect with the SVG Plot data.
         <li><b>LUTimeFormat</b></li>
             defines a time format string (see Posix strftime format) to be used when creating the reading LastUpdate.
         <li><b>PostCommand</b></li>
@@ -428,6 +553,8 @@ FReplacer_Update($) {
             Inkscape might be needed because ImageMagick seems to have problems convertig SVG files with embedded icons. However a PNG file created by Inkscape is not in 8 bit greyscale so Imagemagick can be run after Inkscape to convert to 8 bit greyscale
         <li><b>ReplacementEncode</b></li>
             defines an encoding to apply to the replacement string, e.g. UTF-8
+        <li><b>disable</b></li>
+            disables the update timer
     </ul>
 </ul>
 
