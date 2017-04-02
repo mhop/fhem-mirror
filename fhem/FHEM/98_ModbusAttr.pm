@@ -35,6 +35,8 @@
 #   2016-12-18  documentation added
 #   2016-12-24  documentation added
 #   2017-01-02  allowShortResponses documented
+#	2017-01-25	documentation for ignoreExpr
+#	2017-03-12	fixed documentation for logical attrs that were wrongly defined as physical ones
 #
 
 package main;
@@ -144,13 +146,19 @@ ModbusAttr_Initialize($)
         
         Attributes to define data objects start with obj- followed by a code that identifies the type and address
         of the data object. <br>
-        Modbus devices offer the following types of data objects: holding registers (16 bit objects that can be read and written), 
-        input registers (16 bit objects that can only be read), coils (single bit objects that can be read and written) 
-        or discrete inputs (single bit objects that can only be read). 
+		
+        Modbus devices offer the following types of data objects: 
+		<ul>
+		<li> holding registers (16 bit objects that can be read and written)</li>
+        <li> input registers (16 bit objects that can only be read)</li>
+		<li> coils (single bit objects that can be read and written)</li>
+        <li> discrete inputs (single bit objects that can only be read)</li>
+		</ul>		
         <br>
+		
         The module uses the first character of these data object types to define attributes. 
         Thus h770 refers to a holding register with the decimal address 770 and c120 refers to a coil with address 120. 
-        The address has to be specified as pure decimal number without any leading zeros or spaces.<br><br>
+        The address has to be specified as pure decimal number. The address counting starts at address 0<br><br>
         
         <code>attr PWP obj-h258-reading Temp_Wasser_Aus</code> defines a reading with the name Temp_Wasser_Aus that is read from the Modbus holding register at address 258.<br>
         With the attribute ending on <code>-expr</code> you can define a perl expression to do some conversion or calculation on the raw value read from the device. 
@@ -183,7 +191,7 @@ ModbusAttr_Initialize($)
             <li><code>stop</code></li>
                 stops the interval timer that is used to automatically poll objects through modbus.
             <li><code>start</code></li>
-                starts the interval timer that is used to automatically poll objects through modbus. If an interval is specified during the define command then the interval timer is started automatically. However if you stop it with the commend <code>set &lt;mydevice&gt; stop</code> thd you can start it again with <code>set &lt;mydevice&gt; start</code>.
+                starts the interval timer that is used to automatically poll objects through modbus. If an interval is specified during the define command then the interval timer is started automatically. However if you stop it with the command <code>set &lt;mydevice&gt; stop</code> then you can start it again with <code>set &lt;mydevice&gt; start</code>.
             <li><code>reread</code></li>
                 causes a read of all objects that are set to be polled in the defined interval. The interval timer is not modified.
             <br>
@@ -192,8 +200,8 @@ ModbusAttr_Initialize($)
                 holding registers with addresses between 100 and 120. <br>
                 <code>set MyModbusAttrDevice scanModbusObjects h100-120</code><br>
                 For each reply it gets, the module creates a reading like<br>
-                <code>scan-h100 hex=0021, len=2, string=.!, s=8448, s>=33, S=8448, S>=33</code><br>
-                len=2 means that the result did contain 2 bytes (one register), its representation as hex is 0021 and
+                <code>scan-h100 hex=0021, string=.!, s=8448, s>=33, S=8448, S>=33</code><br>
+                the representation of the result as hex is 0021 and
                 the ASCII representation is .!. s, s>, S and S> are different representations with their Perl pack-code.
             <li><code>scanModbusIds &lt;startId&gt; - &lt;endId&gt; &lt;knownObj&gt;</code></li>
                 scans for Modbus Ids on an RS485 Bus. The following set command for example starts a scan:<br>
@@ -201,7 +209,7 @@ ModbusAttr_Initialize($)
                 since many modbus devices don't reply at all if an object is requested that does not exist, scanModbusId 
                 needs the adress of an object that is known to exist.
                 If a device with Id 5 replies to a read request for holding register 770, a reading like the following will be created:<br>
-                <code>scanId-5-Response-h770 hex=0064, len=2, string=.d, s=25600, s>=100, S=25600, S>=100</code>
+                <code>scanId-5-Response-h770 hex=0064, string=.d, s=25600, s>=100, S=25600, S>=100</code>
             <li><code>scanStop</code></li>
                 stops any running scans.
         </ul>
@@ -224,9 +232,9 @@ ModbusAttr_Initialize($)
         <li><b>alignTime</b></li>
             Aligns each periodic read request for the defined interval to this base time. This is typcally something like 00:00 (see the Fhem at command)
         <li><b>enableControlSet</b></li>
-            enables the built in set commands interval, stop, start and reread
-        
+            enables the built in set commands like interval, stop, start and reread (see above)        
         <br>
+		
         please also notice the attributes for the physical modbus interface as documented in 98_Modbus.pm
         <br>
         
@@ -253,6 +261,9 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>obj-[cdih][1-9][0-9]*-expr</b></li> 
             defines a perl expression that converts the raw value read from the device.
+		<br>
+        <li><b>obj-[cdih][1-9][0-9]*-ignoreExpr</b></li> 
+            defines a perl expression that returns 1 if a value should be ignored and the existing reading should not be modified
         <br>
         <li><b>obj-[cdih][1-9][0-9]*-map</b></li> 
             defines a map to convert values read from the device to more convenient values when the raw value is read from the device 
@@ -328,9 +339,6 @@ ModbusAttr_Initialize($)
         <li><b>dev-([cdih]-)*combine</b></li> 
             defines how many adjacent objects can be read in one request. If not specified, the default is 1
         <br>
-        <li><b>dev-([cdih]-)*allowShortResponses</b></li> 
-            if set to 1 the module will accept a response with valid checksum but data lengh < lengh in header
-        <br>
         <li><b>dev-([cdih]-)*defLen</b></li> 
             defines the default length for this object type. If not specified, the default is 1
         <br>
@@ -339,6 +347,9 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>dev-([cdih]-)*defExpr</b></li> 
             defines a default Perl expression to use for this object type to convert raw values read.
+		<br>
+        <li><b>dev-([cdih]-)*defIgnoreExpr</b></li> 
+            defines a default Perl expression to decide when values should be ignored.
         <br>
         <li><b>dev-([cdih]-)*defUnpack</b></li> 
             defines the default unpack code for this object type. 
@@ -363,6 +374,9 @@ ModbusAttr_Initialize($)
         <li><b>dev-([cdih]-)*defShowGet</b></li> 
             if set to 1 then all objects of this type will have a visible get by default. 
         <br>
+        <li><b>dev-([cdih]-)*allowShortResponses</b></li> 
+            if set to 1 the module will accept a response with valid checksum but data lengh < lengh in header
+        <br>
         <li><b>dev-timing-timeout</b></li> 
             timeout for the device (defaults to 2 seconds)
         <br>
@@ -372,6 +386,9 @@ ModbusAttr_Initialize($)
         <li><b>dev-timing-commDelay</b></li> 
             delay between the last read and a next request. Default ist 0.1 seconds.
         <br>
+        <li><b>queueMax</b></li> 
+            max length of the send queue, defaults to 100
+		<br>
         <li><b>nextOpenDelay</b></li> 
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
         <li><b>openTimeout</b></li>     
