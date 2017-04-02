@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.011
+#  Version 3.9.012
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -101,7 +101,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.011';
+my $HMCCU_VERSION = '3.9.012';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -1622,6 +1622,8 @@ sub HMCCU_FilterReading ($$$)
 
 	my $chnnam = HMCCU_IsChnAddr ($chn, 0) ? HMCCU_GetChannelName ($hmccu_hash, $chn, '') : $chn;
 
+	Log3 $name, 2, "HMCCU: $fnc: chn=$chn, dpt=$dpt, rules = $rf" if ($cf =~ /trace/);
+	
 	my $rm = 1;
 	my @rules = split (';', $rf);
 	foreach my $r (@rules) {
@@ -1631,24 +1633,24 @@ sub HMCCU_FilterReading ($$$)
 			$r =~ s/^N://;
 		}
 		my ($c, $f) = split ("!", $r);
-		Log3 $name, 2, "HMCCU: $fnc rm=$rm, r=$r, dpt=$dpt chnflt=$c chnnam=$chnnam"
+		Log3 $name, 2, "HMCCU:    rm=$rm, r=$r, dpt=$dpt chnflt=$c chnnam=$chnnam"
 			if ($cf =~ /trace/);
 		if (defined ($f) && $chnnam ne '') {
 			if ($chnnam =~ /$c/) {
-				Log3 $name, 2, "HMCCU: $fnc $chnnam = $c" if ($cf =~/trace/);
+				Log3 $name, 2, "HMCCU:    $chnnam = $c" if ($cf =~/trace/);
 				return $rm if (($rm && $dpt =~ /$f/) || (!$rm && $dpt =~ /$f/));
 				return $rm ? 0 : 1;
 			}
 		}
 		else {
-			Log3 $name, 2, "HMCCU: $fnc Check $rm = 1 AND $dpt = $r OR $rm = 0 AND $dpt = $r"
+			Log3 $name, 2, "HMCCU:    check $rm = 1 AND $dpt = $r OR $rm = 0 AND $dpt = $r"
 				if ($cf =~ /trace/);
 			return $rm if (($rm && $dpt =~ /$r/) || (!$rm && $dpt =~ /$r/));
-			Log3 $name, 2, "HMCCU: Check negative" if ($cf =~ /trace/);
+			Log3 $name, 2, "HMCCU:    check negative" if ($cf =~ /trace/);
 		}
 	}
 
-	Log3 $name, 2, "HMCCU: $fnc return rm = $rm ? 0 : 1" if ($cf =~ /trace/);
+	Log3 $name, 2, "HMCCU: $fnc: return rm = $rm ? 0 : 1" if ($cf =~ /trace/);
 	return $rm ? 0 : 1;
 }
 
@@ -2165,11 +2167,12 @@ sub HMCCU_UpdateSingleDatapoint ($$$$)
 	
 	my %objects;
 	
-	my ($devaddr, $chnnum) = HMCCU_SplitChnAddr ($hash->{ccuaddr});
+	my $ccuaddr = $hash->{ccuaddr};
+	my ($devaddr, $chnnum) = HMCCU_SplitChnAddr ($ccuaddr);
 	$objects{$devaddr}{$chn}{$dpt} = $value;
 	
 	my $rc = HMCCU_UpdateSingleDevice ($hmccu_hash, $hash, \%objects);
-	return (ref ($rc)) ? $rc->{$devaddr}{$dpt} : $value;
+	return (ref ($rc)) ? $rc->{$devaddr}{$chn}{$dpt} : $value;
 }
 
 ######################################################################
@@ -2193,7 +2196,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 	my $ccuname = $ccuhash->{NAME};
 	my $cltname = $clthash->{NAME};
 	my $clttype = $clthash->{TYPE};
-	my $fnc = "HMCCU_UpdateSingleDevice";
+	my $fnc = "UpdateSingleDevice";
 
 	return 0 if (!defined ($clthash->{IODev}) || !defined ($clthash->{ccuaddr}));
 	return 0 if ($clthash->{IODev} != $ccuhash);
@@ -2232,8 +2235,9 @@ sub HMCCU_UpdateSingleDevice ($$$)
 	}
 	
 	if ($cltflags =~ /trace/) {
-		Log3 $ccuname, 2, "HMCCU: $cltname Devlist = ".join(',', @virlist);
-		Log3 $ccuname, 2, "HMCCU: $cltname Objects = ".join(',', keys %{$objects});
+		Log3 $ccuname, 2, "HMCCU: $fnc: $cltname Virlist = ".join(',', @virlist);
+		Log3 $ccuname, 2, "HMCCU: $fnc: $cltname Grplist = ".join(',', @grplist);
+		Log3 $ccuname, 2, "HMCCU: $fnc: $cltname Objects = ".join(',', keys %{$objects});
 	}
 	
 	# Store the resulting readings
@@ -2248,6 +2252,8 @@ sub HMCCU_UpdateSingleDevice ($$$)
 		my $update = AttrVal ($cn, 'ccureadings', 1);
 		next if ($update == 0 || $disable == 1);
 
+		Log3 $ccuname, 2, "HMCCU: $fnc: Processing device $cn" if ($cf =~ /trace/);
+		
 		my $crf = HMCCU_GetAttrReadingFormat ($ch, $ccuhash);
 		my $substitute = HMCCU_GetAttrSubstitute ($ch, $ccuhash);
 		my ($sc, $st, $cc, $cd) = HMCCU_GetSpecialDatapoints ($ch, '', 'STATE', '', '');
@@ -2268,7 +2274,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 			foreach my $chnnum (keys (%{$objects->{$da}})) {
 				next if ($ct eq 'HMCCUCHN' && "$chnnum" ne "$cnum" && "$chnnum" ne "0");
 				next if ("$chnnum" eq "0" && $cf =~ /nochn0/);
-				my $chnadd = "$dev:$chnnum";
+				my $chnadd = "$da:$chnnum";
 			
 				# Update datapoints of channel
 				foreach my $dpt (keys (%{$objects->{$da}{$chnnum}})) {
@@ -2276,7 +2282,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 					next if (!defined ($value));
 					$clthash->{hmccu}{dp}{"$chnnum.$dpt"}{VAL} = $value;
 
-					Log3 $ccuname, 2, "HMCCU: $fnc dev=$cn, chnadd=$dev:$chnnum, dpt=$dpt, value=$value"
+					Log3 $ccuname, 2, "HMCCU: $fnc dev=$cn, chnadd=$chnadd, dpt=$dpt, value=$value"
 						if ($cf =~ /trace/);
 
 					if (HMCCU_FilterReading ($ch, $chnadd, $dpt)) {
@@ -2287,7 +2293,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 						my %calcs = HMCCU_CalculateReading ($ch, $chnnum, $dpt);
 					
 						# Store the resulting value after scaling, formatting and substitution
-						$results{$dev}{$dpt} = $cvalue;
+						$results{$da}{$chnnum}{$dpt} = $cvalue;
 					
 						Log3 $ccuname, 2, "HMCCU: $fnc device=$cltname, readings=".join(',', @readings).
 							", orgvalue=$value value=$cvalue" if ($cf =~ /trace/);
@@ -2332,7 +2338,7 @@ sub HMCCU_UpdateMultipleDevices ($$)
 {
 	my ($hash, $objects) = @_;
 	my $name = $hash->{NAME};
-	my $fnc = "HMCCU_UpdateMultipleDevices";
+	my $fnc = "UpdateMultipleDevices";
 	my $c = 0;
 	
 	# Check syntax
@@ -3778,6 +3784,7 @@ sub HMCCU_GetAttrReadingFormat ($$)
 sub HMCCU_GetAttrSubstitute ($$)
 {
 	my ($clhash, $iohash) = @_;
+	my $fnc = "GetAttrSubstitute";
 	
 	my $clname = $clhash->{NAME};
 	my $ioname = $iohash->{NAME};
@@ -3786,13 +3793,13 @@ sub HMCCU_GetAttrSubstitute ($$)
 	my $substdef = AttrVal ($ioname, 'ccudef-substitute', '');
 	my $subst = AttrVal ($clname, 'substitute', $substdef);
 	$subst .= ";$substdef" if ($subst ne $substdef && $substdef ne '');
-	Log3 $clname, 2, "HMCCU: GetAttrSubstitute: subst = $subst" if ($ccuflags =~ /trace/);
+	Log3 $clname, 2, "HMCCU: $fnc: subst = $subst" if ($ccuflags =~ /trace/);
 	
 	return $subst if ($subst !~ /\$\{.+\}/);
 
 	$subst = HMCCU_SubstVariables ($clhash, $subst);
 
-	Log3 $clname, 2, "HMCCU: GetAttrSubstitute: subst = $subst" if ($ccuflags =~ /trace/);
+	Log3 $clname, 2, "HMCCU: fnc: subst_vars = $subst" if ($ccuflags =~ /trace/);
 	
 	return $subst;
 }
@@ -4216,6 +4223,7 @@ sub HMCCU_GetDatapoint ($@)
 	my ($hash, $param) = @_;
 	my $name = $hash->{NAME};
 	my $type = $hash->{TYPE};
+	my $fnc = "GetDatapoint";
 	my $hmccu_hash;
 	my $value = '';
 
@@ -4246,7 +4254,7 @@ sub HMCCU_GetDatapoint ($@)
 	}
 
 	if ($tf) {
-		Log3 $name, 2, "$type: GetDatapoint()";
+		Log3 $name, 2, "$type: $fnc";
 		Log3 $name, 2, "$type:   URL=$url";
 		Log3 $name, 2, "$type:   param=$param";
 		Log3 $name, 2, "$type:   ccuget=$ccuget";
@@ -4257,10 +4265,11 @@ sub HMCCU_GetDatapoint ($@)
 	$response =~ m/<r1>(.*)<\/r1>/;
 	$value = $1;
 
-	Log3 ($name, 2, "$type: Response = ".$rawresponse) if ($tf);
+	Log3 ($name, 2, "$type: $fnc: Response = ".$rawresponse) if ($tf);
 
 	if (defined ($value) && $value ne '' && $value ne 'null') {
 		$value = HMCCU_UpdateSingleDatapoint ($hash, $chn, $dpt, $value);
+		Log3 $name, 2, "$type: $fnc: Value of $chn.$dpt = $value" if ($tf); 
 		return (1, $value);
 	}
 	else {
