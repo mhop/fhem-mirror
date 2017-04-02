@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.51 / 01.04.17";
+my $sip_version ="V1.52 / 02.04.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -610,39 +610,43 @@ sub SIP_CALLDone($)
     readingsEndUpdate($hash, 1);
    }
 
-    my (undef,$nr,$ringtime,$msg,$repeat,$force) = split("\\|",$hash->{CALL}); # zerlegen wir den Original Call
+   my (undef,$nr,$ringtime,$msg,$repeat,$force) = split("\\|",$hash->{CALL}); # zerlegen wir den Original Call
 
-    if ($force && (lc($final) ne "ok"))
+   if ($force && (lc($final) ne "ok"))
     {
      $repeat = "0" if (!$repeat);
+     $force =~ s/^\&//;
+     $force ++; $force --;
+
      my $nr2 = $nr;
      $nr2 =~ tr/0-9//cd;
 
-     my $t      = int(AttrVal($name,"sip_force_interval",60));
+     my $t = ($force) ? $force : int(AttrVal($name,"sip_force_interval",60));
+
      my $time_s = strftime("\%H:\%M:\%S", gmtime($t));
-     $error = CommandDefine(undef, "at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *$repeat &");
+     $error = CommandDefine(undef, "at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." &".$t);
      if (!$error) { $attr{"at_forcecall_".$nr2}{room} = AttrVal($name,"room","Unsorted"); } 
      else { Log3 $name,2,"$name, $error"; }
+     Log3 $name,4,"$name, at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." &".$force;
     }
  
    my $nextcall = shift @fifo; # sind da noch Calls in der Queue ?
    if ($nextcall)
-   { 
+    { 
      @a = split(" ",$nextcall);
      $error = SIP_Set($hash,@a); 
      Log3 $name,3,"$name, error setting nextcall $nextcall -> $error" if ($error);
      return undef;
-   } else { Log3 $name,5,"$name, fifo is empty"; }
+    } else { Log3 $name,5,"$name, fifo is empty"; }
     
-
    if (exists($hash->{'.elbc'}))
-   {
+    {
      @a = (undef,"listen"); 
      Log3 $name,4,"$name, try restarting listen process after call ends";
      $error = SIP_Set($hash,@a);
      Log3 $name,3,"$name, error restarting listen -> $error" if ($error);
      delete $hash->{'.elbc'};
-   } else { Log3 $name,5,"$name, no elbc"; }
+    } else { Log3 $name,5,"$name, no elbc"; }
 
    delete $hash->{CALL};
    return undef;
@@ -690,8 +694,8 @@ sub SIP_Set($@)
 
     my $anz = @a;
     $anz--; # letztes Element
-    my $force  = ($a[$anz] eq "&") ? 1 : 0;
-    $anz-- if ($force == 1); # checken wir dann noch auf repeat 
+    my $force  = (substr($a[$anz],0,1) eq "&") ? $a[$anz] : 0;
+    $anz-- if ($force); # checken wir dann noch auf repeat 
     my $repeat = 0;
     if (substr($a[$anz],0,1) eq "*")
     { 
@@ -1454,10 +1458,9 @@ sub SIP_wait_for_t2s($)
   # nun aber calling
   my $repeat =  "*".$hash->{repeat};
 
-  my $force  = ($hash->{forcecall}) ? "&" : "";
   my @a;
-  if ($force)  
-  { @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$repeat,$force) ; }
+  if ($hash->{forcecall})  
+  { @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$repeat,$hash->{forcecall}) ; }
   else
   { @a = ($name,"call",$hash->{callnr}, $hash->{ringtime},$msg,$repeat) ; }
 
