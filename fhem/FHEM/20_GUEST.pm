@@ -177,11 +177,11 @@ sub GUEST_Attr(@) {
 
         if ( $lang eq "DE" ) {
             $attr{$name}{devStateIcon} =
-'.*anwesend:user_available:absent .*abwesend:user_away:home .*keiner:control_building_empty:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+'.*anwesend:user_available:absent .*abwesend:user_away:home .*keiner:control_building_empty:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:anwesend absent:abwesend none:keiner gotosleep:bettfertig asleep:schlaeft awoken:aufgestanden";
+"home:anwesend absent:abwesend none:keiner gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
-              "state:anwesend,bettfertig,abwesend,keiner";
+              "state:anwesend,bettfertig,schläft,abwesend,keiner";
         }
         elsif ( $lang eq "EN" ) {
             $attr{$name}{devStateIcon} =

@@ -87,7 +87,7 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
 
     my $wakeupUserdeviceRealname = "Bewohner";
 
-    if ( RESIDENTStk_GetType($wakeupUserdevice) eq "ROOMMATE" ) {
+    if ( RESIDENTStk_IsDevice( $wakeupUserdevice, "ROOMMATE" ) ) {
         $wakeupUserdeviceRealname = AttrVal(
             AttrVal( $NAME, "wakeupUserdevice", "" ),
             AttrVal(
@@ -97,7 +97,7 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
             $wakeupUserdeviceRealname
         );
     }
-    elsif ( RESIDENTStk_GetType($wakeupUserdevice) eq "GUEST" ) {
+    elsif ( RESIDENTStk_IsDevice( $wakeupUserdevice, "GUEST" ) ) {
         $wakeupUserdeviceRealname = AttrVal(
             AttrVal( $NAME, "wakeupUserdevice", "" ),
             AttrVal(
@@ -330,7 +330,7 @@ return;;\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameGotosleep created";
             fhem
-"define $wdNameGotosleep watchdog $wakeupUserdevice:gotosleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|asleep|awoken) trigger $macroNameGotosleep";
+"define $wdNameGotosleep watchdog $wakeupUserdevice:(gotosleep|bettfertig) 00:00:04 $wakeupUserdevice:(home|anwesend|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroNameGotosleep";
             fhem "attr $wdNameGotosleep autoRestart 1";
             fhem
 "attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
@@ -405,7 +405,7 @@ return;;\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
             fhem
-"define $wdNameAsleep watchdog $wakeupUserdevice:asleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|awoken) trigger $macroNameAsleep";
+"define $wdNameAsleep watchdog $wakeupUserdevice:(asleep|schlaeft|schläft) 00:00:04 $wakeupUserdevice:(home|anwesend|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroNameAsleep";
             fhem "attr $wdNameAsleep autoRestart 1";
             fhem
 "attr $wdNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
@@ -476,7 +476,7 @@ return;;\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
             fhem
-"define $wdNameAwoken watchdog $wakeupUserdevice:awoken 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|asleep) trigger $macroNameAwoken";
+"define $wdNameAwoken watchdog $wakeupUserdevice:(awoken|aufgestanden) 00:00:04 $wakeupUserdevice:(home|anwesend|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroNameAwoken";
             fhem "attr $wdNameAwoken autoRestart 1";
             fhem
 "attr $wdNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
@@ -558,7 +558,7 @@ return;;\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdRNameGotosleep created";
                 fhem
-"define $wdRNameGotosleep watchdog $deviceName:gotosleep 00:00:03 $deviceName:(home|absent|gone|none|asleep|awoken) trigger $macroRNameGotosleep";
+"define $wdRNameGotosleep watchdog $deviceName:(gotosleep|bettfertig) 00:00:03 $deviceName:(home|anwesend|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroRNameGotosleep";
                 fhem "attr $wdRNameGotosleep autoRestart 1";
                 fhem
 "attr $wdRNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
@@ -617,7 +617,7 @@ return;;\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
                 fhem
-"define $wdRNameAsleep watchdog $deviceName:asleep 00:00:03 $deviceName:(home|absent|gone|none|gotosleep|awoken) trigger $macroRNameAsleep";
+"define $wdRNameAsleep watchdog $deviceName:(asleep|schlaeft|schläft) 00:00:03 $deviceName:(home|anwesend|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroRNameAsleep";
                 fhem "attr $wdRNameAsleep autoRestart 1";
                 fhem
 "attr $wdRNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
@@ -679,7 +679,7 @@ return;;\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
                 fhem
-"define $wdRNameAwoken watchdog $deviceName:awoken 00:00:04 $deviceName:(home|absent|gone|none|gotosleep|asleep) trigger $macroRNameAwoken";
+"define $wdRNameAwoken watchdog $deviceName:(awoken|aufgestanden) 00:00:04 $deviceName:(home|anwesend|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroRNameAwoken";
                 fhem "attr $wdRNameAwoken autoRestart 1";
                 fhem
 "attr $wdRNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
@@ -1782,24 +1782,17 @@ sub RESIDENTStk_findResidentSlaves($) {
 sub RESIDENTStk_IsDevice($;$) {
     my $devname = shift;
     my $devtype = shift;
-    $devtype = ".*" unless ( $devtype && $devtype ne "" );
 
     return 1
       if ( defined($devname)
         && defined( $defs{$devname} )
-        && ref( $defs{$devname} ) eq "HASH"
-        && defined( $defs{$devname}{NAME} )
-        && $defs{$devname}{NAME} eq $devname
-        && defined( $defs{$devname}{TYPE} )
-        && $defs{$devname}{TYPE} =~ m/^$devtype$/
-        && defined( $modules{ $defs{$devname}{TYPE} } )
-        && defined( $modules{ $defs{$devname}{TYPE} }{LOADED} )
-        && $modules{ $defs{$devname}{TYPE} }{LOADED} );
+        && ( !$devtype || $devtype eq "" ) );
 
-    delete $defs{$devname}
+    return 1
       if ( defined($devname)
         && defined( $defs{$devname} )
-        && $devtype eq ".*" );
+        && defined( $defs{$devname}{TYPE} )
+        && $defs{$devname}{TYPE} =~ m/^$devtype$/ );
 
     return 0;
 }
@@ -1808,7 +1801,7 @@ sub RESIDENTStk_GetType($;$) {
     my $devname = shift;
     my $default = shift;
 
-    return $default unless ( RESIDENTStk_IsDevice($devname) );
+    return $default unless ( IsDevice($devname) && $defs{$devname}{TYPE} );
     return $defs{$devname}{TYPE};
 }
 

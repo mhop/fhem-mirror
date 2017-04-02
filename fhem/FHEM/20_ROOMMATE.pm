@@ -180,11 +180,11 @@ sub ROOMMATE_Attr(@) {
 
         if ( $lang eq "DE" ) {
             $attr{$name}{devStateIcon} =
-'.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+'.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:anwesend absent:abwesend gone:verreist gotosleep:bettfertig asleep:schlaeft awoken:aufgestanden";
+"home:anwesend absent:abwesend gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
-              "state:anwesend,bettfertig,abwesend,verreist";
+              "state:anwesend,bettfertig,schläft,abwesend,verreist";
         }
         elsif ( $lang eq "EN" ) {
             $attr{$name}{devStateIcon} =
