@@ -161,6 +161,7 @@ FHEMWEB_Initialize($)
     fwcompress:0,1
     hiddengroup
     hiddenroom
+    hiddenroomRegexp
     iconPath
     longpoll:0,1,websocket
     longpollSVG:1,0
@@ -1161,10 +1162,12 @@ FW_updateHashes()
   %FW_groups = (); # Make a group  hash
   %FW_types = ();  # Needed for type sorting
 
+  my $hre = AttrVal($FW_wname, "hiddenroomRegexp", "");
   foreach my $d (keys %defs ) {
     next if(IsIgnored($d));
 
     foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
+      next if($hre && $r =~ m/$hre/);
       $FW_rooms{$r}{$d} = 1;
     }
     foreach my $r (split(",", AttrVal($d, "group", ""))) {
@@ -3473,6 +3476,18 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="hiddenroomRegexp"></a>
+    <li>hiddenroomRegexp<br>
+        One regexp for the same purpose as hiddenroom. Example:
+        <ul>
+          attr WEB hiddenroomRegexp .*config
+        </ul>
+        Note: the special values input, detail and save cannot be specified
+        with hiddenroomRegexp.
+        </li>
+        <br>
+
+
     <a name="hiddengroup"></a>
     <li>hiddengroup<br>
         Comma separated list of groups to "hide", i.e. not to show in any room
@@ -4203,7 +4218,7 @@ FW_widgetOverride($$)
 
     <a name="hiddengroup"></a>
     <li>hiddengroup<br>
-        Wie hiddenroom (siehe oben), jedoch auf Ger&auml;tegruppen bezogen.
+        Wie hiddenroom (siehe unten), jedoch auf Ger&auml;tegruppen bezogen.
         <br>
         Beispiel:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
         </li><br>
@@ -4216,6 +4231,17 @@ FW_widgetOverride($$)
        der URL sind diese R&auml;ume weiterhin erreichbar!<br>
        Ebenso k&ouml;nnen Eintr&auml;ge in den Logfile/Commandref/etc Block
        versteckt werden.  </li><br>
+
+    <a name="hiddenroomRegexp"></a>
+    <li>hiddenroomRegexp<br>
+        Ein regul&auml;rer Ausdruck, um R&auml;ume zu verstecken. Beispiel:
+        <ul>
+          attr WEB hiddenroomRegexp .*config
+        </ul>
+        Achtung: die besonderen Werte input, detail und save m&uuml;ssen mit
+        hiddenroom spezifiziert werden.
+        </li>
+        <br>
 
     <a name="HTTPS"></a>
     <li>HTTPS<br>
