@@ -10,7 +10,6 @@
 package main;
 use strict;
 use warnings;
-use Unit;
 use Time::HiRes qw(gettimeofday usleep);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
@@ -66,18 +65,6 @@ my %SML_specialities = ("TIME"			=> [qr{0.0.96.2.1
 											  |129.129.199.130.3}x, ""],
 );
     
-      my %devs= (
-#   Name,      Init-String,                 interval,  2ndInit
-    "none"		=>	["",                        -1,    ""],
-    "Unknown"	=>	["",                        -1,    ""],
-    "SML"		=>	["/?!".chr(13).chr(10),    600,    ""],
-    "Ext"		=>	["",                        -1,    ""],
-    "Standard"	=>	["",                        -1,    ""],
-    "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."050".chr(13).chr(10)],
-    "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."050".chr(13).chr(10)],
-    "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."050".chr(13).chr(10)],
-    );
-    
 #####################################
 sub OBIS_Initialize($)
 {
@@ -89,14 +76,11 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-  $hash->{DbLog_splitFn} = "Unit_DbLog_split";
-  
 #  $hash->{SetFn} = "OBIS_Set";
-  $hash->{GetFn} = "OBIS_Get";
-  
+    $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both desiredSpeed ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both ".
   					  $readingFnAttributes;
 }
 
@@ -150,12 +134,24 @@ sub OBIS_Define($$)
   }
   else {$baudrate=9600; $hash->{helper}{SPEED}="5";}
   
+  my %devs= (
+#   Name,      Init-String,                 interval,  2ndInit
+    "none"		=>	["",                        -1,    ""],
+    "Unknown"	=>	["",                        -1,    ""],
+    "SML"		=>	["",                        -1,    ""],
+    "Ext"		=>	["",                        -1,    ""],
+    "Standard"	=>	["",                        -1,    ""],
+    "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    );
     if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
-    if ($devs{$type}[2] != "") {$devs{$type}[2]=chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10);}
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
-
+#    if( !$init_done ) {
+#	    $attr{$name}{"event-on-change-reading"} = ".*";
+ #   }
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
@@ -163,6 +159,20 @@ sub OBIS_Define($$)
   
   	Log3 $hash,5,"OBIS ($name) - Opening device...";
   	  return DevIo_OpenDev($hash, 0, "OBIS_Init");
+}
+
+sub OBIS_Get($@)
+{
+  my ($hash, @a) = @_;
+  my $name = shift @a;
+  my $opt = shift @a;
+	
+  if ($opt eq "update") {
+  	GetUpdate($hash);
+  } else 
+  
+  {return "Unknown argument $opt, choose one of update";}
+  
 }
 
 sub OBIS_Set($@)
@@ -189,22 +199,7 @@ sub OBIS_Set($@)
 		}		
 		
 	}
-	
 	return;
-}
-
-sub OBIS_Get($@)
-{
-  my ($hash, @a) = @_;
-  my $name = shift @a;
-  my $opt = shift @a;
-	
-  if ($opt eq "update") {
-  	GetUpdate($hash);
-  } else 
-  
-  {return "Unknown argument $opt, choose one of update";}
-  
 }
 
 # Update-Routine
@@ -492,7 +487,6 @@ sub OBIS_Parse($$)
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 							  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
-							  					$hash->{readingsDesc}{$L}{rtype}=$4;
     										}
 										}
 										 
@@ -502,7 +496,6 @@ sub OBIS_Parse($$)
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 							  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
-							  					$hash->{readingsDesc}{$L}{rtype}=$4;
     										}
 										}
 										
@@ -512,11 +505,9 @@ sub OBIS_Parse($$)
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 												if($1==1) {
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6"));
-													$hash->{readingsDesc}{$L.$chan}{rtype}=$6;
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
 												} elsif ($1==2) {
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6"));
-													$hash->{readingsDesc}{$L.$chan}{rtype}=$6; 				
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
 												}
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
     										}											
@@ -684,16 +675,6 @@ sub OBIS_Attr(@)
 			} 
 		}
 		
-		if ($aName eq "desiredSpeed")
-		{
-			if ($aVal ge 0 and $aVal le 9)
-			{
-				
-			} else
-			{
-				return "OBIS ($name): desiredSpeed - Value must be between 0 and 9";
-			}
-		}
 	}
 	return undef;
 }
@@ -840,7 +821,7 @@ sub OBIS_decodeTL($){
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
       Example: <br>
-    <code>define myPowerMeter OBIS /dev/ttyPlugwise@9600,7,E,1 VSM102</code>
+    <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
       <br>
     <br>
  
@@ -905,7 +886,7 @@ sub OBIS_decodeTL($){
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
       Beispiel: <br>
-    <code>define myPowerMeter OBIS /dev/ttyPlugwise@9600,7,E,1 VSM102</code>
+    <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
       <br>
     <br>
  
