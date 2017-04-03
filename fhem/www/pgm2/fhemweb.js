@@ -1059,6 +1059,8 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
   if( $(newEl).find("[informId]").length == 0 && !$(newEl).attr("informId") ) {
     if(reading)
       $(newEl).attr("informId", devName+"-"+reading);
+    if(reading != "state")
+      $(newEl).attr("title", reading);
   }
 
   $(oldEl).replaceWith(newEl);
