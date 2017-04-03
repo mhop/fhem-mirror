@@ -1250,7 +1250,6 @@ sub FRITZBOX_Readout_Run_Web($)
    my $startTime = time();
    my $runNo;
    my $sid;
-   my $Error;
    
 #Start update 
    FRITZBOX_Log $hash, 4, "Prepare query string for luaQuery.";
@@ -1324,12 +1323,9 @@ sub FRITZBOX_Readout_Run_Web($)
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
    
    # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
-   $Error = undef;
-   $Error = $result->{Error} if defined $result->{Error};
-   $Error = $result->{error} if defined $result->{error};
-   if (defined $Error) {
-      FRITZBOX_Log $hash, 2, "Error: ".$Error;
-      my $returnStr = "Error|" . $Error;
+   if ( defined $result->{Error} ) {
+      FRITZBOX_Log $hash, 2, "Error: ".$result->{Error};
+      my $returnStr = "Error|" . $result->{Error};
       $returnStr .= "|fhem->sidTime|0"    if defined $result->{ResetSID};
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
@@ -4615,6 +4611,7 @@ sub FRITZBOX_Web_Query($$@)
       $jsonResult = JSON->new->latin1->decode( $jsonText );
    }
    $jsonResult->{sid} = $sid;
+   $jsonResult->{Error} = $jsonResult->{error}  if defined $jsonResult->{error};
    return $jsonResult;
 }
 
