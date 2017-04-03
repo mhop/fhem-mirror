@@ -76,7 +76,7 @@ sub Hyperion_Initialize($)
 sub Hyperion_Define($$)
 {
   my ($hash,$def) = @_;
-  my @args = split("[ \t]+",$def);
+  my @args = split " ",$def;
   return "Usage: define <name> Hyperion <IP> <PORT> [<INTERVAL>]"
     if (@args < 4);
   my ($name,$type,$host,$port,$interval) = @args;
@@ -172,7 +172,7 @@ sub Hyperion_list2array($$)
 {
   my ($list,$round) = @_;
   my @arr;
-  foreach my $part (split(",",$list))
+  foreach my $part (split /,/,$list)
   {
     $part = sprintf($round,$part) * 1;
     push @arr,$part;
@@ -241,7 +241,7 @@ sub Hyperion_Read($)
         if (!$data->{hyperion_build}->[0]->{version});
       if (!$error)
       {
-        my $ver       = (split("V",(split(" ",$data->{hyperion_build}->[0]->{version}))[0]))[1];
+        my $ver       = (split /V/,(split " ",$data->{hyperion_build}->[0]->{version})[0])[1];
         $ver          =~ s/\.//g;
         my $rver      = $Hyperion_requiredVersion;
         $rver         =~ s/\.//g;
@@ -306,7 +306,7 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"blacklevel",$blkL);
     readingsBulkUpdate($hash,"colorTemperature",$temP);
     readingsBulkUpdate($hash,"correction",$corS);
-    readingsBulkUpdate($hash,"effect",(split(",",$effectList))[0]) if (!defined ReadingsVal($name,"effect",undef));
+    readingsBulkUpdate($hash,"effect",(split /,/,$effectList)[0]) if (!defined ReadingsVal($name,"effect",undef));
     readingsBulkUpdate($hash,".effects",$effectList);
     readingsBulkUpdate($hash,"effectArgs",$effargs);
     readingsBulkUpdate($hash,"duration",$duration);
@@ -350,7 +350,7 @@ sub Hyperion_Read($)
     }
     elsif ($col)
     {
-      my $rgb = lc((split("x",$col))[1]);
+      my $rgb = lc((split /x/,$col)[1]);
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
       my $dim = int($v * 100);
@@ -445,9 +445,9 @@ sub Hyperion_listFilesInDir($$)
     for (my $i = 0; $i < @files; $i++)
     {
       my $file = $files[$i];
-      $file =~ s/\s+//gm;
+      chomp $file;
       next if ($file !~ /\w+\.config\.json$/);
-      $file =~ s/.config.json$//gm;
+      $file =~ s/\.config\.json$//gm;
       push @filelist,$file;
       Log3 $name,4,"$name: Hyperion_listFilesInDir matching file: \"$file\"";
     }
@@ -510,7 +510,7 @@ sub Hyperion_Set($@)
     $value = $value.".config.json";
     my $confdir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
     my $binpath  = AttrVal($name,"hyperionBin","/usr/bin/hyperiond");
-    my $bin = (split("/",$binpath))[scalar(split("/",$binpath)) - 1];
+    my $bin = (split "/",$binpath)[scalar(split "/",$binpath) - 1];
     $bin =~ s/\.sh$// if ($bin =~ /\.sh$/);
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
@@ -540,7 +540,7 @@ sub Hyperion_Set($@)
     if (!$status)
     {
       Log3 $name,4,"$name: restarted Hyperion with $binpath $confdir$value";
-      $value =~ s/.config.json$//;
+      $value =~ s/\.config\.json$//;
       readingsSingleUpdate($hash,"configFile",$value,1);
       return undef;
     }
@@ -678,7 +678,7 @@ sub Hyperion_Set($@)
     return "$cmd need no additional value of $value" if (defined $value);
     my $mode = ReadingsVal($name,"mode","off");
     my $nmode;
-    my @modeorder = split(",",AttrVal($name,"hyperionToggleModes","clearall,rgb,effect,off"));
+    my @modeorder = split /,/,AttrVal($name,"hyperionToggleModes","clearall,rgb,effect,off");
     for (my $i = 0; $i < @modeorder; $i++)
     {
       $nmode = $i < @modeorder - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
@@ -770,7 +770,7 @@ sub Hyperion_Set($@)
   {
     return "$name must be in effect mode!" if (ReadingsVal($name,"mode","off") ne "effect");
     return "Value of $cmd has to be a name like My_custom_EffeKt1 or my-effect!" if (!defined $value || $value !~ /^[a-zA-Z0-9_-]+$/);
-    return "Effect with name $value already defined! Please choose a different name!" if (grep(/^$value$/,split(",",ReadingsVal($name,".effects",""))));
+    return "Effect with name $value already defined! Please choose a different name!" if (grep(/^$value$/,split /,/,ReadingsVal($name,".effects","")));
     my $eff  = ReadingsVal($name,"effect","");
     foreach my $e (@{$hash->{helper}{customeffects}})
     {
@@ -819,9 +819,7 @@ sub Hyperion_Attr(@)
       }
       else
       {
-        $attr_value =~ s/\r\n/ /;
-        $attr_value =~ s/\s{2,}/ /;
-        my @custeffs = split(" ",$attr_value);
+        my @custeffs = split " ",$attr_value;
         my @effs;
         if (@custeffs > 1)
         {
