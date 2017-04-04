@@ -4381,7 +4381,7 @@ sub Unit_DbLog_split($$) {
     # general event handling
     if ( !defined($value)
         && $event =~
-/^(.+): +[\D]*(\d+\.?\d*)[\s\u202F\u00A0]*[\[\{\(]?[\s\u202F\u00A0]*([\w\°\%\^\/\\]*).*/
+m/^(.+): +[\D]*(\d+\.?\d*)[\s\u202F\u00A0]*[\[\{\(]?[\s\u202F\u00A0]*([\w\°\%\^\/\\]*).*/
         && defined($1)
         && defined($2) )
     {
@@ -4390,10 +4390,10 @@ sub Unit_DbLog_split($$) {
         $unit    = defined($3) ? $3 : "";
     }
 
-    unless ( defined($value) && looks_like_number($value) ) {
+    if ( !defined($value) || !looks_like_number($value) ) {
         Unit_Log3( $name, $reading, undef, 10,
 "Unit_DbLog_split $name: Ignoring event $event: value $value does not look like a number"
-        );
+        ) if ( defined($value) );
         return undef;
     }
 
@@ -4458,7 +4458,7 @@ sub CommandSetReadingDesc($@) {
     my @rets;
     my $last;
     foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        if ( !defined( $defs{$name} ) ) {
+        unless ( Unit_IsDevice($name) ) {
             push @rets, "Please define $name first";
             next;
         }
@@ -4524,7 +4524,7 @@ sub CommandDeleteReadingDesc($@) {
     my @rets;
     my $last;
     foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        if ( !defined( $defs{$name} ) ) {
+        unless ( Unit_IsDevice($name) ) {
             push @rets, "Please define $name first";
             next;
         }
@@ -4547,6 +4547,24 @@ sub CommandDeleteReadingDesc($@) {
         }
     }
     return join( "\n", @rets );
+}
+
+sub Unit_IsDevice($;$) {
+    my $devname = shift;
+    my $devtype = shift;
+
+    return 1
+      if ( defined($devname)
+        && defined( $defs{$devname} )
+        && ( !$devtype || $devtype eq "" ) );
+
+    return 1
+      if ( defined($devname)
+        && defined( $defs{$devname} )
+        && defined( $defs{$devname}{TYPE} )
+        && $defs{$devname}{TYPE} =~ m/^$devtype$/ );
+
+    return 0;
 }
 
 1;
