@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.9.012
+#  Version 3.9.013
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
@@ -101,7 +101,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.012';
+my $HMCCU_VERSION = '3.9.013';
 
 # RPC Ports and URL extensions
 my %HMCCU_RPC_NUMPORT = (
@@ -2203,9 +2203,9 @@ sub HMCCU_UpdateSingleDevice ($$$)
 
 	# Check for updated data
  	my ($devaddr, $cnum) = HMCCU_SplitChnAddr ($clthash->{ccuaddr});
-# 	return 0 if (!exists ($objects->{$devaddr}));
-# 	return 0 if ($clttype eq 'HMCUCCHN' && !exists ($objects->{$devaddr}{$cnum}) &&
-# 		!exists ($objects->{$devaddr}{0}));
+ 	return 0 if (!exists ($objects->{$devaddr}));
+ 	return 0 if ($clttype eq 'HMCUCCHN' && !exists ($objects->{$devaddr}{$cnum}) &&
+ 		!exists ($objects->{$devaddr}{0}));
 
 	# Get attributes of IO device
 	my $ccuflags = AttrVal ($ccuname, 'ccuflags', 'null');
