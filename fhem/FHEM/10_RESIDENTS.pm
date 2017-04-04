@@ -212,7 +212,7 @@ sub RESIDENTS_Notify($$) {
     return unless ( $devName ne $hashName );    # only foreign events
     return if ( IsDisabled($hashName) or IsDisabled($devName) );
     return
-      unless ( RESIDENTStk_IsDevice( $devName, "ROOMMATE|GUEST|dummy" ) );
+      unless ( IsDevice( $devName, "ROOMMATE|GUEST|dummy" ) );
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -461,11 +461,11 @@ sub RESIDENTS_Set($@) {
 
             # define roommate
             fhem( "define " . $rr_name . " ROOMMATE " . $name )
-              unless ( RESIDENTStk_IsDevice($rr_name) );
+              unless ( IsDevice($rr_name) );
 
-            if ( RESIDENTStk_IsDevice($rr_name) ) {
+            if ( IsDevice($rr_name) ) {
                 return "Can't create, device $rr_name already existing."
-                  unless ( RESIDENTStk_IsDevice( $rr_name, "ROOMMATE" ) );
+                  unless ( IsDevice( $rr_name, "ROOMMATE" ) );
 
                 my $lang =
                   $a[3]
@@ -497,7 +497,7 @@ sub RESIDENTS_Set($@) {
             my $rr_name = $a[2];
 
             # delete roommate
-            if ( RESIDENTStk_IsDevice($rr_name) ) {
+            if ( IsDevice($rr_name) ) {
                 Log3 $name, 3, "RESIDENTS $name: deleted device $rr_name"
                   if fhem( "delete " . $rr_name );
             }
@@ -521,11 +521,11 @@ sub RESIDENTS_Set($@) {
 
             # define guest
             fhem( "define " . $rg_name . " GUEST " . $name )
-              unless ( RESIDENTStk_IsDevice($rg_name) );
+              unless ( IsDevice($rg_name) );
 
-            if ( RESIDENTStk_IsDevice($rg_name) ) {
+            if ( IsDevice($rg_name) ) {
                 return "Can't create, device $rg_name already existing."
-                  unless ( RESIDENTStk_IsDevice( $rg_name, "GUEST" ) );
+                  unless ( IsDevice( $rg_name, "GUEST" ) );
 
                 my $lang =
                   $a[3]
@@ -557,7 +557,7 @@ sub RESIDENTS_Set($@) {
             my $rg_name = $a[2];
 
             # delete guest
-            if ( RESIDENTStk_IsDevice($rg_name) ) {
+            if ( IsDevice($rg_name) ) {
                 Log3 $name, 3, "RESIDENTS $name: deleted device $rg_name"
                   if fhem( "delete " . $rg_name );
             }
@@ -575,7 +575,7 @@ sub RESIDENTS_Set($@) {
             my $created         = 0;
 
             until ($created) {
-                if ( RESIDENTStk_IsDevice($wakeuptimerName) ) {
+                if ( IsDevice($wakeuptimerName) ) {
                     $i++;
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
@@ -1414,7 +1414,7 @@ sub RESIDENTS_UpdateReadings (@) {
             for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
                 next if !$wakeupDevice;
 
-                if ( RESIDENTStk_IsDevice( $wakeupDevice, "dummy" ) ) {
+                if ( IsDevice( $wakeupDevice, "dummy" ) ) {
 
                     # forced-stop only if resident is not present anymore
                     if ( $newpresence eq "present" ) {

@@ -4458,7 +4458,7 @@ sub CommandSetReadingDesc($@) {
     my @rets;
     my $last;
     foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        unless ( Unit_IsDevice($name) ) {
+        unless ( IsDevice($name) ) {
             push @rets, "Please define $name first";
             next;
         }
@@ -4524,7 +4524,7 @@ sub CommandDeleteReadingDesc($@) {
     my @rets;
     my $last;
     foreach my $name ( devspec2array( $a->[0], $cl ) ) {
-        unless ( Unit_IsDevice($name) ) {
+        unless ( IsDevice($name) ) {
             push @rets, "Please define $name first";
             next;
         }
@@ -4547,24 +4547,6 @@ sub CommandDeleteReadingDesc($@) {
         }
     }
     return join( "\n", @rets );
-}
-
-sub Unit_IsDevice($;$) {
-    my $devname = shift;
-    my $devtype = shift;
-
-    return 1
-      if ( defined($devname)
-        && defined( $defs{$devname} )
-        && ( !$devtype || $devtype eq "" ) );
-
-    return 1
-      if ( defined($devname)
-        && defined( $defs{$devname} )
-        && defined( $defs{$devname}{TYPE} )
-        && $defs{$devname}{TYPE} =~ m/^$devtype$/ );
-
-    return 0;
 }
 
 1;

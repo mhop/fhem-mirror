@@ -74,7 +74,7 @@ sub ROOMMATE_Define($$) {
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
         foreach ( split( /,/, $hash->{RESIDENTGROUPS} ) ) {
             RESIDENTStk_findResidentSlaves( $defs{$_} )
-              if ( RESIDENTStk_IsDevice( $_, "RESIDENTS" ) );
+              if ( IsDevice( $_, "RESIDENTS" ) );
         }
     }
 
@@ -216,7 +216,7 @@ sub ROOMMATE_Undefine($$) {
         delete $hash->{RESIDENTGROUPS};
         foreach ( split( /,/, $old ) ) {
             RESIDENTStk_findResidentSlaves( $defs{$_} )
-              if ( RESIDENTStk_IsDevice( $_, "RESIDENTS" ) );
+              if ( IsDevice( $_, "RESIDENTS" ) );
         }
     }
 
@@ -250,7 +250,7 @@ sub ROOMMATE_Notify($$) {
 
                 # make sure computeAfterInit is set at at-device
                 # and re-calculate on our own this time
-                if (   RESIDENTStk_IsDevice( $wakeupAtdevice, "at" )
+                if (   IsDevice( $wakeupAtdevice, "at" )
                     && AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne
                     "1" )
                 {
@@ -580,7 +580,7 @@ sub ROOMMATE_Set($@) {
                 for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
                     next if !$wakeupDevice;
 
-                    if ( RESIDENTStk_IsDevice( $wakeupDevice, "dummy" ) ) {
+                    if ( IsDevice( $wakeupDevice, "dummy" ) ) {
 
                         # forced-stop only if resident is not present anymore
                         if ( $newpresence eq "present" ) {
@@ -696,7 +696,7 @@ sub ROOMMATE_Set($@) {
                       split( ' ', $attr{$name}{"rr_passPresenceTo"} );
 
                     foreach my $object (@linkedObjects) {
-                        if (   RESIDENTStk_IsDevice( $object, "ROOMMATE|GUEST" )
+                        if (   IsDevice( $object, "ROOMMATE|GUEST" )
                             && $defs{$object} ne $name
                             && ReadingsVal( $object, "state", "" ) ne "gone"
                             && ReadingsVal( $object, "state", "" ) ne "none" )
@@ -849,7 +849,7 @@ sub ROOMMATE_Set($@) {
             my $created         = 0;
 
             until ($created) {
-                if ( RESIDENTStk_IsDevice($wakeuptimerName) ) {
+                if ( IsDevice($wakeuptimerName) ) {
                     $i++;
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
@@ -902,7 +902,7 @@ sub ROOMMATE_Set($@) {
         elsif ( lc( $a[2] ) eq "locationmap" ) {
             my $locationmapName = $name . "_map";
 
-            if ( RESIDENTStk_IsDevice($locationmapName) ) {
+            if ( IsDevice($locationmapName) ) {
                 return
 "Device $locationmapName existing already, delete it first to have it re-created.";
             }

@@ -1030,7 +1030,7 @@ sub THINKINGCLEANER_removeExtension($) {
     my $url  = "?/$link";
     my $name = $data{FWEXT}{$url}{deviceName};
     Log3 $name, 2,
-"THINKINGCLEANER $name: Unregistering THINKINGCLEANER for webhook URL $url...";
+"THINKINGCLEANER $name: Unregistering THINKINGCLEANER for webhook URI $url...";
     delete $data{FWEXT}{$url};
 }
 

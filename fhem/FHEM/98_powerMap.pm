@@ -845,45 +845,45 @@ sub powerMap_AttrVal($$$$) {
     # $defs{device}{TYPE}{attribute}
     return $defs{$d}{$TYPE}{$n}
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{$TYPE} )
         && defined( $defs{$d}{$TYPE}{$n} ) );
 
     # $defs{device}{.TYPE}{attribute}
     return $defs{$d}{".$TYPE"}{$n}
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{".$TYPE"} )
         && defined( $defs{$d}{".$TYPE"}{$n} ) );
 
     # $defs{device}{TYPE_attribute}
     return $defs{$d}{ $TYPE . "_" . $n }
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{ $TYPE . "_" . $n } ) );
 
     # $defs{device}{attribute}
     return $defs{$d}{$n}
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{$n} ) );
 
     # $defs{device}{.TYPE_attribute}
     return $defs{$d}{ "." . $TYPE . "_" . $n }
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{ "." . $TYPE . "_" . $n } ) );
 
     # $defs{device}{.attribute}
     return $defs{$d}{".$n"}
       if ( $d
-        && defined( $defs{$d} )
+        && IsDevice($d)
         && defined( $defs{$d}{".$n"} ) );
 
     # module HASH
     #
 
-    my $t = $defs{$d}{TYPE};
+    my $t = GetType($d);
 
     # $modules{module}{TYPE}{attribute}
     return $modules{$t}{$TYPE}{$n}
@@ -1024,8 +1024,7 @@ sub powerMap_findPowerMaps($;$) {
     # directly return any existing device specific definition
     if ( $dev && $dev !~ /^:/ ) {
         return {}
-          unless ( defined( $defs{$dev} )
-            && defined( $defs{$dev}{TYPE} ) );
+          unless ( IsDevice($dev) );
 
         return $defs{$dev}{powerMap}{map}
           if (

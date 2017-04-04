@@ -136,7 +136,7 @@ sub ONKYO_AVR_removeExtension($) {
     my $url  = "?/$link";
     my $name = $data{FWEXT}{$url}{deviceName};
     Log3 $name, 2,
-      "ONKYO_AVR $name: Unregistering ONKYO_AVR for webhook URL $url...";
+      "ONKYO_AVR $name: Unregistering ONKYO_AVR for webhook URI $url...";
     delete $data{FWEXT}{$url};
 }
 

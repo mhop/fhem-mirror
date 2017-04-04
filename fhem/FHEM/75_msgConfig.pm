@@ -255,9 +255,10 @@ sub msgConfig_Set($@) {
         $device =~ s/[\s\t-]+/_/g;
 
         return "Device $device is already existing but not a dummy device"
-          if ( msgConfig_IsDevice($device) && msgConfig_GetType($device) ne "dummy" );
+          if ( IsDevice($device)
+            && GetType($device) ne "dummy" );
 
-        if ( !msgConfig_IsDevice($device) ) {
+        if ( !IsDevice($device) ) {
             $return = fhem( "define $device dummy", 1 );
             $return .= "Device $device was created"
               if ( $return eq "" );
@@ -302,9 +303,10 @@ sub msgConfig_Set($@) {
           if ( defined( $a[0] ) && $a[0] eq "de" );
 
         return "Device $device is already existing but not a dummy device"
-          if ( msgConfig_IsDevice($device) && msgConfig_GetType($device) ne "dummy" );
+          if ( IsDevice($device)
+            && GetType($device) ne "dummy" );
 
-        if ( !msgConfig_IsDevice($device) ) {
+        if ( !IsDevice($device) ) {
             $return = fhem( "define $device dummy", 1 );
             $return .= "Device $device was created"
               if ( $return eq "" );
@@ -361,19 +363,17 @@ sub msgConfig_Set($@) {
 
         return
 "Device $device is already existing but not a RESIDENTS or ROOMMATE device"
-          if ( msgConfig_IsDevice($device)
-            && !msgConfig_IsDevice( $device, "RESIDENTS|ROOMMATE" ) );
+          if ( IsDevice($device)
+            && !IsDevice( $device, "RESIDENTS|ROOMMATE" ) );
 
-        if ( !msgConfig_IsDevice($device) ) {
+        if ( !IsDevice($device) ) {
             $return = fhem( "define $device RESIDENTS", 1 );
             $return .= "RESIDENTS device $device was created."
               if ( $return eq "" );
         }
         else {
             $return =
-                "Existing "
-              . msgConfig_GetType($device)
-              . " device $device was updated.";
+              "Existing " . GetType($device) . " device $device was updated.";
         }
 
         my $txt = fhem("attr $device rgr_lang $lang")
@@ -426,12 +426,12 @@ sub msgConfig_Get($@) {
             # Check device
             if ( $devicesReq ne "" ) {
                 foreach my $device ( split( /,/, $devicesReq ) ) {
-                    if ( msgConfig_IsDevice($device) ) {
-                        $UserDeviceTypes .= "," . msgConfig_GetType($device)
+                    if ( IsDevice($device) ) {
+                        $UserDeviceTypes .= "," . GetType($device)
                           if ( $UserDeviceTypes ne ""
                             && $msgType ne "mail"
                             && $device ne $name );
-                        $UserDeviceTypes = msgConfig_GetType($device)
+                        $UserDeviceTypes = GetType($device)
                           if ( $UserDeviceTypes eq ""
                             && $msgType ne "mail"
                             && $device ne $name );
@@ -470,7 +470,7 @@ sub msgConfig_Get($@) {
                               if ( $output == 0 );
                             $return .=
                               "  $device (DEVICE TYPE: "
-                              . msgConfig_GetType($device) . ")\n"
+                              . GetType($device) . ")\n"
                               if ( $output == 0 );
                             $output = 1 if ( $output == 0 );
 
@@ -665,38 +665,62 @@ sub msgConfig_FindReadingsVal($$$$) {
 }
 
 ########################################
-sub msgConfig_IsDevice($;$) {
-    my $devname = shift;
-    my $devtype = shift;
-    $devtype = ".*" unless ( $devtype && $devtype ne "" );
+sub msgConfig_QueueAdd(@) {
+    my (
+        $msgA,          $params,   $datetime,  $msgID,
+        $minorID,       $type,     $recipient, $subRecipient,
+        $termRecipient, $priority, $title,     $msg
+    ) = @_;
 
-    return 1
-      if ( defined($devname)
-        && defined( $defs{$devname} )
-        && ref( $defs{$devname} ) eq "HASH"
-        && defined( $defs{$devname}{NAME} )
-        && $defs{$devname}{NAME} eq $devname
-        && defined( $defs{$devname}{TYPE} )
-        && $defs{$devname}{TYPE} =~ m/^$devtype$/
-        && defined( $modules{ $defs{$devname}{TYPE} } )
-        && defined( $modules{ $defs{$devname}{TYPE} }{LOADED} )
-        && $modules{ $defs{$devname}{TYPE} }{LOADED} );
+    my $name = $modules{msgConfig}{defptr}{NAME};
 
-    delete $defs{$devname}
-      if ( defined($devname)
-        && defined( $defs{$devname} )
-        && $devtype eq ".*" );
+    return 0 if ( $defs{$name}{queue}{$recipient}{"$msgID.$minorID"} );
 
-    return 0;
+    $defs{$name}{queue}{$recipient}{"$msgID.$minorID"} = {
+        msgOrig           => $msgA,
+        msgOrigParams     => $params,
+        datetime          => $datetime,
+        majorId           => $msgID,
+        minorId           => $minorID,
+        type              => $type,
+        recipient         => $recipient,
+        subRecipient      => $subRecipient,
+        terminalRecipient => $termRecipient,
+        priority          => $priority,
+        title             => $title,
+        message           => $msg,
+    };
+
+    delete $defs{$name}{queue}{$recipient}{"$msgID.$minorID"}{msgOrigParams}
+      {msgQID};
+
+    readingsSingleUpdate(
+        $defs{$name},
+        "Q_" . $recipient,
+        scalar keys %{ $defs{$name}{queue}{$recipient} }, 1
+    );
+
+    return 1;
 }
 
 ########################################
-sub msgConfig_GetType($;$) {
-    my $devname = shift;
-    my $default = shift;
+sub msgConfig_QueueReleaseMsgId($$) {
+    my ( $recipient, $msgID ) = @_;
 
-    return $default unless ( msgConfig_IsDevice($devname) );
-    return $defs{$devname}{TYPE};
+    my $name = $modules{msgConfig}{defptr}{NAME};
+
+    return 0
+      unless ( $defs{$name}{queue}
+        && $defs{$name}{queue}{$recipient}
+        && $defs{$name}{queue}{$recipient}{$msgID} );
+
+    delete $defs{$name}{queue}{$recipient}{$msgID};
+    my $c = scalar keys %{ $defs{$name}{queue}{$recipient} };
+    delete $defs{$name}{queue}{$recipient} unless ($c);
+
+    readingsSingleUpdate( $defs{$name}, "Q_" . $recipient, $c, 1 );
+
+    return 1;
 }
 
 1;

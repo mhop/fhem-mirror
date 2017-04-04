@@ -2652,9 +2652,7 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
                                 Log3 $name, 5, $logtext;
 
                                 # next for if HUE device is not ready
-                                if (   !defined( $defs{$dev} )
-                                    || !defined( $defs{$dev}{TYPE} )
-                                    || $defs{$dev}{TYPE} ne "HUEDevice"
+                                if (  !IsDevice( $dev, "HUEDevice" )
                                     || ReadingsVal( $dev, "reachable", 0 ) ne
                                     "1" )
                                 {
