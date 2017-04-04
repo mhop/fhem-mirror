@@ -613,7 +613,7 @@ sub
 ZWave_Initialize($)
 {
   my ($hash) = @_;
-  $hash->{Match}     = ".*";
+  $hash->{Match}     = "^[0-9A-Fa-f]+\$";
   $hash->{SetFn}     = "ZWave_Set";
   $hash->{GetFn}     = "ZWave_Get";
   $hash->{DefFn}     = "ZWave_Define";

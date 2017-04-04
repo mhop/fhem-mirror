@@ -89,7 +89,7 @@ ZWCUL_Define($$)
           "HomeId:$hash->{homeId} CtrlNodeIdHex:$hash->{nodeIdHex}", TimeNow());
 
   $hash->{Clients} = ":ZWave:STACKABLE:";
-  my %matchList = ( "1:ZWave" => ".*",
+  my %matchList = ( "1:ZWave" => "^[0-9A-Fa-f]+\$",
                     "2:STACKABLE"=>"^\\*" );
   $hash->{MatchList} = \%matchList;
 
