@@ -40,6 +40,7 @@ for(;;) {
     } else {
       $msg = "**T123400A62D04";
     }
+    
     foreach my $fd (keys %selectlist) {
       if($fd != $serverSock->fileno()) {
         my $h = $selectlist{$fd};
@@ -80,21 +81,31 @@ for(;;) {
 
     $buf = $h->{partial} . $buf;
     while($buf =~ m/\n/) {
+      $cnt++;
       my ($cmd, $rest) = split("\n", $buf, 2);
-      print "$h->{addr}:$h->{port}: rcv >$cmd<\n";
+      print "$h->{addr}:$h->{port}: $cnt rcv >$cmd<\n";
       my $stars;
       $cmd =~ m/^(\**)(.*)$/;
       $stars = $1; $cmd = $2;
 
-      my $msg = "";
-           if($cmd eq "V")   { $msg = "V 1.6".length($stars)." CUL868";
-      } elsif($cmd eq "T01") { $msg = "0000";
-      } elsif($cmd eq "?")   { $msg = "? (? is unknown) Use one of t u x";
-      } elsif($cmd eq "t")   { $msg = sprintf("%08X", (time()%86400)*125);
+      my @msg;
+      if($cmd eq "V")  {
+        push @msg, "E01015BE2940100B80B" if($cnt > 5); # Forum #57806
+        push @msg, $stars."V 1.6".length($stars)." CUL868";
+
+      } elsif($cmd eq "T01"){
+        push @msg, $stars."0000";
+
+      } elsif($cmd eq "?") {
+        push @msg, $stars."? (? is unknown) Use one of t u x";
+
+      } elsif($cmd eq "t") {
+        push @msg, $stars.sprintf("%08X", (time()%86400)*125);
+
       }
-      if($msg) {
-        print "$h->{addr}:$h->{port}:    =>$stars$msg<\n";
-        syswrite($h->{sock}, $stars . $msg."\n")
+      if(@msg) {
+        print "$h->{addr}:$h->{port}:    =>".join(",",@msg)."<\n";
+        syswrite($h->{sock}, join("\n",@msg)."\n");
       }
 
       $buf = $rest;
