@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.12.0       31.03.2017       support of primary key (set in table history/current) for insert functions
 # 4.11.4       29.03.2017       bugfix timestamp in minValue, maxValue if VALUE contains more than one
 #                               numeric value (like in sysmon)
 # 4.11.3       26.03.2017       usage of daylight saving time changed to avoid wrong selection when wintertime
@@ -180,7 +181,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.11.4";
+my $DbRepVersion = "4.12.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -2570,7 +2571,7 @@ sub insert_Push($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $err;
+ my ($err,$sth);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -2599,21 +2600,37 @@ sub insert_Push($) {
  my $i_unit      = $hash->{HELPER}{I_UNIT} ? $hash->{HELPER}{I_UNIT} : " "; 
  
  # SQL zusammenstellen für DB-Operation
-    
  Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
  
  # SQL-Startzeit
  my $st = [gettimeofday];
 
- $dbh->begin_work();
- my $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+ # insert history mit/ohne primary key
+ if ($usepkh && $dbloghash->{DBMODEL} eq 'MYSQL') {
+     eval { $sth = $dbh->prepare("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'SQLITE') {
+     eval { $sth = $dbh->prepare("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'POSTGRESQL') {
+     eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+ } else {
+     eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ }
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
+	 $dbh->disconnect();
+     return "$name|''|''|$err";
+ }
  
+ $dbh->begin_work();
+  
  eval {$sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);};
  
  my $irow;
  if ($@) {
      $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
+     Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh?" (possible PK violation) ":": ")."$@");
      $dbh->rollback();
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
@@ -3142,6 +3159,7 @@ sub impfile_Push($) {
  my $dbmodel    = $hash->{dbloghash}{DBMODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $err=0;
+ my $sth;
 
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -3157,6 +3175,9 @@ sub impfile_Push($) {
      Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
      return "$name|''|''|$err";
  }
+ 
+ # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
  
  my $infile = AttrVal($name, "expimpfile", undef);
  if (open(FH, "$infile")) {
@@ -3178,8 +3199,26 @@ sub impfile_Push($) {
  # Beispiel Inline:  
  # "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""
  
+ # insert history mit/ohne primary key
+ if ($usepkh && $dbloghash->{DBMODEL} eq 'MYSQL') {
+     eval { $sth = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'SQLITE') {
+     eval { $sth = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'POSTGRESQL') {
+     eval { $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+ } else {
+     eval { $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+ }
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
+	 $dbh->disconnect();
+     return "$name|''|''|$err";
+ }
+ 
  $dbh->begin_work();
- my $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+ 
  my $irowdone = 0;
  my $irowcount = 0;
  my $warn = 0;
@@ -3995,7 +4034,7 @@ return;
                                  # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br><br>
                                  
                                  <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # field length is maximum 32 (MYSQL) / 64 (POSTGRESQL) characters long, Spaces are NOT allowed in fieldvalues ! <br>
+                                 # Spaces are NOT allowed in fieldvalues ! <br>
                                  <br>
 								 
 								 <b>Note: </b><br>
@@ -4495,7 +4534,7 @@ return;
                                  # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
                                  <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # die Feldlänge ist maximal 64 Zeichen lang , es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
+                                 # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
                                  <br>
 								 
 								 <b>Hinweis: </b><br>
