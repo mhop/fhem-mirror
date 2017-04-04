@@ -63,12 +63,14 @@ sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
 sub GetTimeSpec($);
+sub GetType($;$);
 sub GlobalAttr($$$$);
 sub HandleArchiving($;$);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$;$);
 sub InternalVal($$$);
+sub IsDevice($;$);
 sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
@@ -752,6 +754,26 @@ while (1) {
 
 ################################################
 sub
+IsDevice($;$)
+{
+  my $devname = shift;
+  my $devtype = shift;
+
+  return 1
+    if ( defined($devname)
+      && defined( $defs{$devname} )
+      && (!$devtype || $devtype eq "" ) );
+
+  return 1
+    if ( defined($devname)
+      && defined( $defs{$devname} )
+      && defined( $defs{$devname}{TYPE} )
+      && $defs{$devname}{TYPE} =~ m/^$devtype$/ );
+
+  return 0;
+}
+
+sub
 IsDummy($)
 {
   my $devname = shift;
@@ -840,6 +862,16 @@ GetVerbose($)
     return $attr{global}{verbose};
 
   }
+}
+
+sub
+GetType($;$)
+{
+  my $devname = shift;
+  my $default = shift;
+
+  return $default unless ( IsDevice($devname) && $defs{$devname}{TYPE} );
+  return $defs{$devname}{TYPE};
 }
 
 
