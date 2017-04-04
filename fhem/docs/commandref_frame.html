@@ -1083,10 +1083,11 @@ The following local attributes are used by a wider range of devices:
   <br><br>
   From featurelevel 5.7 on the set and setreading command replaces:
   <ul>
-  <li>[device:reading] with the corresponding reading of device, if both device
-    and reading exists.</li>
-  <li>[device:reading:d] same as above, but only the number is retrieved, see
-     ReadingsNum </li>
+  <li>[device:name] with the reading, internal or attribute of the device, if
+    both device and the reading, internal or attribute exists. You can use the
+    r:, i: or a: prefix to restrict the search to one type, analogue to the
+    devspec filtering.</li>
+  <li>[device:name:d] same as above, but only the number is retrieved</li>
   <li>{(perlExpression)} with the result of perlExpression.
     The $DEV variable is additionally available, designating the set device
     name.
@@ -1649,6 +1650,14 @@ The following local attributes are used by a wider range of devices:
       <li>
         ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Return the reading as a number, i.e. delete non-numerical values.
+        </li><br>
+      <li>ReadingsTimestamp(&lt;devicename&gt;,&lt;reading&gt;,&lt;
+        defaultvalue&gt;)<br>
+        returns the timestamp of the reading.
+        </li><br>
+      <li>ReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)
+        <br>
+        returns the age of the reading in seconds.
         </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>

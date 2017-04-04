@@ -1151,10 +1151,12 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   <br><br>
   Ab featurelevel 5.7 ersetzt das set und setreading Befehl
   <ul>
-  <li>[device:reading] mit dem Wert des Readings f&uuml;r device, falls sowohl
-    device, als auch Reading existiert, und nicht leer ist.</li>
-  <li>[device:reading:d] wie ohne :d, aber alles nicht-numerische wird
-    entfernt, siehe ReadingsNum</li>
+  <li>[device:name] mit dem Wert des Readings, Internals oder Attributes
+    f&uuml;r device, falls sowohl device, als auch Reading, Internal oder
+    Attribut existiert, und nicht leer ist. Man kann einen der Prefixe r:, i:
+    oder a: verwenden, um die Suche einzuschraenken, genau wie im devspec.</li>
+  <li>[device:name:d] wie ohne :d, aber alles nicht-numerische wird
+    entfernt.</li>
   <li>{(perlExpression)} mit dem Ergebnis der perlExpression.
     $DEV wird dabei mit dem Namen des vom set betroffenen Ger&auml;tes ersetzt.
     </li>
@@ -1785,6 +1787,13 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Wie ReadingsVal, l&ouml;scht aber alles, was kein Zahl ist, um den Wert
         bei Berechnungen verwenden zu k&ouml;nnen.
+        </li><br>
+      <li>ReadingsTimestamp(&lt;devicename&gt;)<br>
+        gibt den Zeitstempel des Readings zur&uuml;ck.
+        </li><br>
+      <li>ReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)
+        <br>
+        gibt das Alter des Readings in Sekunden zur&uuml;ck.
         </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>

@@ -1620,10 +1620,24 @@ ReplaceSetMagic($$@)       # Forum #38276
   my $a = join(" ", @_);
   my $oa = $a;
 
-  $a =~ s/\[([a-z0-9._]+):([a-z0-9._-]+)(:d)?\]/{
-    my $x = $3 ? ReadingsNum($1,$2,"") : ReadingsVal($1,$2,"");
-    $x eq "" ? "[$1:$2".($3?$3:"")."]" : $x
-  }/egi;
+  sub
+  rsmVal($$$$$)
+  {
+    my ($all, $t, $d, $n, $s, $val) = @_;
+    my $hash = $defs{$d};
+    return $all if(!$hash);
+    if(!$t || $t eq "r:") {
+      my $r = $hash->{READINGS};
+      $val = $r->{$n}{VAL} if($r && $r->{$n});
+    }
+    $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq "i:"));
+    $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
+    return $all if(!defined($val));
+    $val =~ s/[^-\.\d]//g if($s);
+    return $val;
+  }
+
+  $a=~s/(\[(.:)?([a-z0-9._]+):([a-z0-9._-]+)(:d)?\])/rsmVal($1,$2,$3,$4,$5)/egi;
 
   $evalSpecials->{'%DEV'} = $hash->{NAME};
   $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
