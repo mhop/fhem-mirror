@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 00_SONOS: New lists for groupinformations
   - bugfix:  88_HMCCU: Fixed toggle function for HMCCUCHN devices
   - change:  93_DbLog: new version 2.14.4, new set-commands exportCache, 
                        importCachefile, some fixes (e.g. many SVGs from SQLite 
