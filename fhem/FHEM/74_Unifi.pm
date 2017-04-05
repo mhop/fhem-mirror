@@ -810,7 +810,8 @@ sub Unifi_SetClientReadings($) {
         
         for my $apID (keys %{$hash->{accespoints}}) {
             $apRef = $hash->{accespoints}->{$apID};
-            if ($apRef->{mac} eq $clientRef->{ap_mac}) {
+            if (defined $apRef->{mac} && defined $clientRef->{ap_mac}
+                && $apRef->{mac} eq $clientRef->{ap_mac}) {
                 $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
                 last;
             }
