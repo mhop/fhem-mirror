@@ -1153,10 +1153,23 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   <ul>
   <li>[device:name] mit dem Wert des Readings, Internals oder Attributes
     f&uuml;r device, falls sowohl device, als auch Reading, Internal oder
-    Attribut existiert, und nicht leer ist. Man kann einen der Prefixe r:, i:
-    oder a: verwenden, um die Suche einzuschraenken, genau wie im devspec.</li>
-  <li>[device:name:d] wie ohne :d, aber alles nicht-numerische wird
-    entfernt.</li>
+    Attribut existiert, und nicht leer ist.
+    <ul>
+      <li>Man kann einen der Pr&auml;fixe r:, i: oder a: verwenden, um die
+         Suche einzuschr&auml;nken, genau wie im devspec.</li>
+      <li>Das Suffix :d extrahiert die erste Zahl als Ganzzahl.</li>
+      <li>Das Suffix :r&lt;n&gt; extrahiert die erste Zahl, und rundet sie auf
+         &lt;n&gt; Dezimalstellen. Falls &lt;n&gt; fehlt, dann wird auf eine
+         Dezimalstelle gerundet.</li>
+      <li>Das Suffix :t liefert den Zeitstempel des Readings</li>
+      <li>Das Suffix :sec liefert Anzahl der Sekunden seit &Auml;nderung
+          des Readings.</li>
+    </ul>
+    Beispiel:
+    <ul>
+      set Lamp blink [blinkDummy:number] [r:blinkDummy:duration:d]
+    </ul>
+    </lu>
   <li>{(perlExpression)} mit dem Ergebnis der perlExpression.
     $DEV wird dabei mit dem Namen des vom set betroffenen Ger&auml;tes ersetzt.
     </li>
@@ -1784,9 +1797,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         dem &quot;Readings&quot;-Abschnitt von "list device" angezeigt wird)
         </li><br>
       <li>
-        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
-        Wie ReadingsVal, l&ouml;scht aber alles, was kein Zahl ist, um den Wert
-        bei Berechnungen verwenden zu k&ouml;nnen.
+        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
+                   &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Gibt die erste Zahl aus dem Readingswert zur&uuml;ck.
+        Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
+        Dezimalstellen gerundet.
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,
                             &lt;reading&gt;,&lt;defaultvalue&gt;)<br>
@@ -1798,7 +1813,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
-        Gibt die gesetzteb Attribute des Ger&auml;tes zur&uuml;ck
+        Gibt das entsprechende Attribut des Ger&auml;tes zur&uuml;ck
         <br><br>
         { Value("wz") }<br>
         { OldValue("wz") }<br>
@@ -1808,9 +1823,24 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         { AttrVal("wz", "room", "none") }<br>
         </li><br>
       <li>
-        InternalVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        AttrNum(&lt;devicename&gt;,&lt;attribute&gt;,
+                   &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Gibt die erste Zahl aus dem Attributwert zur&uuml;ck.
+        Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
+        Dezimalstellen gerundet.
+        </li><br>
+      <li>
+        InternalVal(&lt;devicename&gt;,&lt;internal&gt;,
+                    &lt;defaultvalue&gt;)<br>
         Gibt den Inhalt der &quot;internal&quot; zur&uuml;ck (den Inhalt der in
         dem &quot;Internals&quot;-Abschnitt von "list device" angezeigt wird)
+        </li><br>
+      <li>
+        InternalNum(&lt;devicename&gt;,&lt;internal&gt;,
+                   &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Gibt die erste Zahl aus dem &quot;internal&quot; zur&uuml;ck.
+        Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
+        Dezimalstellen gerundet.
         </li><br>
       </ul>
 

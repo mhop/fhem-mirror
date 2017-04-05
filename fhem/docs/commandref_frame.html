@@ -1084,10 +1084,26 @@ The following local attributes are used by a wider range of devices:
   From featurelevel 5.7 on the set and setreading command replaces:
   <ul>
   <li>[device:name] with the reading, internal or attribute of the device, if
-    both device and the reading, internal or attribute exists. You can use the
-    r:, i: or a: prefix to restrict the search to one type, analogue to the
-    devspec filtering.</li>
+    both device and the reading, internal or attribute exists.
+    <ul>
+      <li>You can use the r:, i: or a: prefix to restrict the search to one
+          type, analogue to the devspec filtering.</li>
+      <li>The suffix :d retrieves the first number and converts it to an
+          integer.</li>
+      <li>The suffix :r&lt;n&gt; retrieves the first number and rounds it to
+          &lt;n&gt; decimal places. If &lt;n&gt; is missing, then rounds it to
+          one decimal place.</li>
+      <li>The suffix :t returns the timestamp (works only for readings)</li>
+      <li>The suffix :sec returns the number of seconds since the reading was
+          set.</li>
+    </ul>
+    Example:
+    <ul>
+      set Lamp blink [blinkDummy:number] [r:blinkDummy:duration:d]
+    </ul>
+  </li>
   <li>[device:name:d] same as above, but only the number is retrieved</li>
+  <li>[device:name:sec] same as above, but only the number is retrieved</li>
   <li>{(perlExpression)} with the result of perlExpression.
     The $DEV variable is additionally available, designating the set device
     name.
@@ -1648,8 +1664,10 @@ The following local attributes are used by a wider range of devices:
         Return the reading (the value in the Readings section of "list device")
         </li><br>
       <li>
-        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
-        Return the reading as a number, i.e. delete non-numerical values.
+        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
+                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Return the first number from a reading value.
+        Round id to &lt;round&gt; devimal places (optional parameter).
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,&lt;reading&gt;,&lt;
         defaultvalue&gt;)<br>
@@ -1671,10 +1689,22 @@ The following local attributes are used by a wider range of devices:
         { AttrVal("wz", "room", "none") }<br>
         </li><br>
       <li>
+        AttrNum(&lt;devicename&gt;,&lt;attribute&gt;,
+                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Return the first number from an attribute value.
+        Round id to &lt;round&gt; devimal places (optional parameter).
+        </li><br>
+      <li>
         InternalVal(&lt;devicename&gt;,&lt;property&gt;,&lt;defaultvalue&gt;)
         <br>
         Return the internal value (the value in the Internals section of "list
         device").
+        </li><br>
+      <li>
+        InternalNum(&lt;devicename&gt;,&lt;property&gt;,
+                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        Return the first number from an internal value.
+        Round id to &lt;round&gt; devimal places (optional parameter).
         </li><br>
       </ul>
 

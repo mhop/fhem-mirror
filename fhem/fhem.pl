@@ -48,6 +48,7 @@ sub AnalyzeInput($);
 sub AnalyzePerlCommand($$;$);
 sub AssignIoPort($;$);
 sub AttrVal($$$);
+sub AttrNum($$$;$);
 sub CallFn(@);
 sub CallInstanceFn(@);
 sub CheckDuplicate($$@);
@@ -70,6 +71,7 @@ sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$;$);
 sub InternalVal($$$);
+sub InternalNum($$$;$);
 sub IsDevice($;$);
 sub IsDisabled($);
 sub IsDummy($);
@@ -82,7 +84,7 @@ sub OldTimestamp($);
 sub OldValue($);
 sub OpenLogfile($);
 sub PrintHash($$);
-sub ReadingsNum($$$);
+sub ReadingsNum($$$;$);
 sub ReadingsTimestamp($$$);
 sub ReadingsVal($$$);
 sub RefreshAuthList();
@@ -1660,16 +1662,28 @@ ReplaceSetMagic($$@)       # Forum #38276
     return $all if(!$hash);
     if(!$t || $t eq "r:") {
       my $r = $hash->{READINGS};
+      if($s && ($s eq ":t" || $s eq ":sec")) {
+        return $all if (!$r || !$r->{$n});
+        $val = $r->{$n}{TIME};
+        $val = time() - time_str2num($val) if($s eq ":sec");
+        return $val;
+      }
       $val = $r->{$n}{VAL} if($r && $r->{$n});
     }
     $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq "i:"));
     $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
     return $all if(!defined($val));
-    $val =~ s/[^-\.\d]//g if($s);
+
+    if($s && $val =~ /(-?\d+(\.\d+)?)/) {
+      $val = $1;
+      $s = ":r0" if($s eq ":d");
+      $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
+    }
     return $val;
   }
 
-  $a=~s/(\[(.:)?([a-z0-9._]+):([a-z0-9._-]+)(:d)?\])/rsmVal($1,$2,$3,$4,$5)/egi;
+  $a =~ s/(\[([ari]:)?([a-z0-9._]+):([a-z0-9._-]+)(:(t|sec|d|r|r\d))?\])/
+         rsmVal($1,$2,$3,$4,$5)/egi;
 
   $evalSpecials->{'%DEV'} = $hash->{NAME};
   $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
@@ -3939,6 +3953,16 @@ InternalVal($$$)
 }
 
 sub
+InternalNum($$$;$)
+{
+  my ($d,$n,$default,$round) = @_;
+  my $val = InternalVal($d,$n,$default);
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  $val = round($val,$round) if($round);
+  return $val;
+}
+
+sub
 ReadingsVal($$$)
 {
   my ($d,$n,$default) = @_;
@@ -3952,11 +3976,12 @@ ReadingsVal($$$)
 }
 
 sub
-ReadingsNum($$$)
+ReadingsNum($$$;$)
 {
-  my ($d,$n,$default) = @_;
+  my ($d,$n,$default,$round) = @_;
   my $val = ReadingsVal($d,$n,$default);
-  $val =~ s/[^-\.\d]//g;
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  $val = round($val,$round) if($round);
   return $val;
 }
 
@@ -4015,6 +4040,16 @@ AttrVal($$$)
   my ($d,$n,$default) = @_;
   return $attr{$d}{$n} if($d && defined($attr{$d}) && defined($attr{$d}{$n}));
   return $default;
+}
+
+sub
+AttrNum($$$;$)
+{
+  my ($d,$n,$default,$round) = @_;
+  my $val = AttrVal($d,$n,$default);
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  $val = round($val,$round) if($round);
+  return $val;
 }
 
 ################################################################
