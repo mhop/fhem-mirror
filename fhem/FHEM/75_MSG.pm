@@ -25,6 +25,7 @@
 ##############################################################################
 #
 #TODO
+# - be able to use type "default" to let read from attr
 # - forceType/forceDevice in user parameters
 # - implement default messages in RESIDENTS using msg command
 # - queue message until recipient is available again (e.g. when absent)
@@ -108,12 +109,6 @@ sub CommandMsg($$;$$) {
             },
         },
 
-        mail => {
-            typeEscalation => {
-                gwUnavailable => 'queue',
-            },
-        },
-
         push => {
             typeEscalation => {
                 gwUnavailable => 'mail',
@@ -130,12 +125,6 @@ sub CommandMsg($$;$$) {
             },
         },
 
-        queue => {
-            typeEscalation => {
-                gwUnavailable => 'mail',
-                emergency     => 'mail',
-            },
-        },
     };
 
     ################################################################
@@ -461,7 +450,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     }
 
                     # FATAL ERROR: device does not exist
-                    if ( !msgConfig_IsDevice($device)
+                    if ( !IsDevice($device)
                         && $deviceType eq "device" )
                     {
                         $loopReturn3 .= "Device $device does not exist\n"
@@ -581,8 +570,8 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
 
                         # get device location
                         my $deviceLocation =
-                          msgConfig_FindReadingsVal( $device, "location", $typeUc,
-                            "" );
+                          msgConfig_FindReadingsVal( $device, "location",
+                            $typeUc, "" );
 
                         my $locationDev = "";
                         if ( $deviceLocation ne "" && $deviceType eq "device" )
@@ -648,7 +637,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                         }
 
                                         if (   $type[$i] ne "mail"
-                                            && !msgConfig_IsDevice($gatewayDev)
+                                            && !IsDevice($gatewayDev)
                                             && $deviceType eq "device" )
                                         {
                                             $useLocation = 2
@@ -739,7 +728,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                     ### given device name is already a gateway device itself
                     ###
 
-                    my $deviceType2 = msgConfig_GetType($device);
+                    my $deviceType2 = GetType($device);
 
                     if (
                            $gatewayDevs eq ""
@@ -1303,7 +1292,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                             }
 
                             elsif ($type[$i] ne "mail"
-                                && !msgConfig_IsDevice($gatewayDev)
+                                && !IsDevice($gatewayDev)
                                 && $deviceType eq "device" )
                             {
                                 $routeStatus = "UNDEFINED";
@@ -1333,7 +1322,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                     )
 
                                     || (
-                                           msgConfig_IsDevice($gatewayDev)
+                                           IsDevice($gatewayDev)
                                         && defined( $defs{$gatewayDev}{STATE} )
                                         && (
                                             grep {
@@ -1362,7 +1351,7 @@ m/^(0|false|absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     || ReadingsVal( $gatewayDev, "state",
                                         "present" ) =~
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
-                                    || (   msgConfig_IsDevice($gatewayDev)
+                                    || (   IsDevice($gatewayDev)
                                         && defined( $defs{$gatewayDev}{STATE} )
                                         && $defs{$gatewayDev}{STATE} =~
 m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
@@ -1444,24 +1433,24 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                 $routeStatus .= "+LOCATION";
                             }
 
-                            # add to queue
-                            if (
-                                (
-                                       $routeStatus eq "USER_DISABLED"
-                                    || $routeStatus eq "USER_ABSENT"
-                                    || $routeStatus eq "USER_ASLEEP"
-                                )
-                                && $routeStatus !~ /^OK/
-                                && !$softFail
-                              )
-                            {
-                                $routeStatus .= "+QUEUE";
-                            }
+                            # # add to queue
+                            # if (
+                            #     (
+                            #            $routeStatus eq "USER_DISABLED"
+                            #         || $routeStatus eq "USER_ABSENT"
+                            #         || $routeStatus eq "USER_ASLEEP"
+                            #     )
+                            #     && $routeStatus !~ /^OK/
+                            #     && !$softFail
+                            #   )
+                            # {
+                            #     $routeStatus .= "+QUEUE";
+                            # }
 
                             my $gatewayType =
                               $type[$i] eq "mail"
                               ? "fhemMsgMail"
-                              : msgConfig_GetType( $gatewayDev, "UNDEFINED" );
+                              : GetType( $gatewayDev, "UNDEFINED" );
 
                             my $defTitle = "";
                             $defTitle =
@@ -1903,8 +1892,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
                                     # add user parameters
                                     # if gateway supports parseParams
-                                    my $gatewayDevType =
-                                      msgConfig_GetType($gatewayDev);
+                                    my $gatewayDevType = GetType($gatewayDev);
                                     if (
                                            $gatewayDevType
                                         && ref($params) eq "HASH"
@@ -1934,9 +1922,16 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         }
                                     }
 
-                                    # queue message
+                                    # excplicitly queue message
                                     if ( $routeStatus eq "OK_QUEUE" ) {
-                                        $queued = 1;
+                                        $queued = msgConfig_QueueAdd(
+                                            $msgA,          $params,
+                                            $msgDateTime,   $msgID,
+                                            $sentCounter,   $type[$i],
+                                            $device,        $subRecipient,
+                                            $termRecipient, $priority,
+                                            $loopTitle,     $loopMsg
+                                        ) ? 1 : 0;
                                     }
 
                                     # run command
@@ -2043,7 +2038,14 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                     && $testMode eq "1" )
                                 {
                                     if ( !( grep { "queue" eq $_ } @type ) ) {
-                                        push @type, "queue";
+                                        $queued = msgConfig_QueueAdd(
+                                            $msgA,          $params,
+                                            $msgDateTime,   $msgID,
+                                            $sentCounter,   $type[$i],
+                                            $device,        $subRecipient,
+                                            $termRecipient, $priority,
+                                            $loopTitle,     $loopMsg
+                                        ) ? 1 : 0;
                                     }
 
                                     Log3 $logDevice, 3,
