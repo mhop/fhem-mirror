@@ -1674,15 +1674,15 @@ ReplaceSetMagic($$@)       # Forum #38276
     $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
     return $all if(!defined($val));
 
-    if($s && $val =~ /(-?\d+(\.\d+)?)/) {
+    if($s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
       $val = $1;
-      $s = ":r0" if($s eq ":d");
+      $val = int($val) if ( $s eq ":i" );
       $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
     }
     return $val;
   }
 
-  $a =~ s/(\[([ari]:)?([a-z0-9._]+):([a-z0-9._-]+)(:(t|sec|d|r|r\d))?\])/
+  $a =~ s/(\[([ari]:)?([a-z0-9._]+):([a-z0-9._-]+)(:(t|sec|i|d|r|r\d))?\])/
          rsmVal($1,$2,$3,$4,$5)/egi;
 
   $evalSpecials->{'%DEV'} = $hash->{NAME};
