@@ -2096,7 +2096,7 @@ DOIF_Set($@)
 				readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
 				$hash->{helper}{sleeptimer}=-1;
 			  }
-			  DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($1+1));
+			  DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($i+1));
 			  last;
 			}
 		  }
