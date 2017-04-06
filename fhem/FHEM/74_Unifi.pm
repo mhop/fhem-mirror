@@ -843,8 +843,8 @@ sub Unifi_SetHealthReadings($) {
     readingsBulkUpdate($hash,'-UC_wlan_users',$hash->{wlan_health}->{num_user});
     readingsBulkUpdate($hash,'-UC_wlan_accesspoints',$hash->{wlan_health}->{num_ap});
     readingsBulkUpdate($hash,'-UC_wlan_guests',$hash->{wlan_health}->{num_guest});
-    readingsBulkUpdate($hash,'-UC_unarchived_alerts',scalar @{$hash->{alerts_unarchived}});
-    readingsBulkUpdate($hash,'-UC_events',scalar(@{$hash->{events}}).' (last '.$hash->{unifi}->{eventPeriod}.'h)');
+    readingsBulkUpdate($hash,'-UC_unarchived_alerts',scalar @{$hash->{alerts_unarchived}}) if(ref($hash->{alerts_unarchived}) eq 'ARRAY'); 
+    readingsBulkUpdate($hash,'-UC_events',scalar(@{$hash->{events}}).' (last '.$hash->{unifi}->{eventPeriod}.'h)') if(ref($hash->{events}) eq 'ARRAY');
     
     return undef;
 }
