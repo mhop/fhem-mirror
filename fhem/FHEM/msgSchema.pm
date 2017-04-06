@@ -214,11 +214,11 @@ my $db = {
 
         'Pushover' => {
             'Normal' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=%URLTITLE% action=%ACTION% cancel_id=%Pushover_CANCELID% message=\'%MSG%\'',
+'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'         => '',
