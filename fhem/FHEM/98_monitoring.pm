@@ -51,8 +51,8 @@ sub monitoring_Initialize($) {
   $hash->{AttrFn}   = $TYPE."_Attr";
   $hash->{NotifyFn} = $TYPE."_Notify";
 
-  $hash->{AttrList} =
-      "addStateEvent:1,0 "
+  $hash->{AttrList} = ""
+    . "addStateEvent:1,0 "
     . "blacklist "
     . "disable:1,0 "
     . "disabledForIntervals "
@@ -66,6 +66,7 @@ sub monitoring_Initialize($) {
     . "warningFuncRemove:textField-long "
     . "warningWait "
     . "warningReturn:textField-long "
+    . "whitelist "
     . $readingFnAttributes
   ;
 }
@@ -193,7 +194,7 @@ sub monitoring_Attr(@) {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my ($hash) = $defs{$SELF};
 
-  if($attribute eq "blacklist" && $value){
+  if($attribute =~  "blacklist" && $value){
     my @blacklist;
 
     push(@blacklist, devspec2array($_)) foreach (split(" ", $value));
@@ -203,6 +204,18 @@ sub monitoring_Attr(@) {
     foreach my $name (sort(keys %blacklist)){
       monitoring_modify("$SELF|warning|remove|$name");
       monitoring_modify("$SELF|error|remove|$name");
+    }
+  }
+  elsif($attribute eq "whitelist" && $value){
+    my @whitelist;
+
+    push(@whitelist, devspec2array($_)) foreach (split(" ", $value));
+
+    foreach my $list ("warning", "error"){
+      foreach my $name (split(",", ReadingsVal($SELF, $list, ""))){
+        monitoring_modify("$SELF|$list|remove|$name")
+          unless(grep(/$name/, @whitelist));
+      }
     }
   }
   elsif($attribute eq "disable"){
@@ -253,6 +266,13 @@ sub monitoring_Notify($$) {
     foreach (split(" ", AttrVal($SELF, "blacklist", "")));
 
   return if(@blacklist && grep(/$name/, @blacklist));
+
+  my @whitelist;
+
+  push(@whitelist, devspec2array($_))
+    foreach (split(" ", AttrVal($SELF, "whitelist", "")));
+
+  return if(@whitelist && !(grep(/$name/, @whitelist)));
 
   foreach my $event (@{$events}){
     my $addMatch = "$name:$event" =~ $addRegex;
@@ -731,6 +751,12 @@ sub monitoring_setActive($) {
         Like errorReturn, just for the warning list.
       </li>
       <li>
+        <code>whitelist {&lt;perl code&gt;}</code><br>
+        Space-separated list of devspecs which are allowed.<br>
+        If the attribute is set all devices which are not specified by the
+        devspecs are removed from both lists.
+      </li>
+      <li>
         <a href="#readingFnAttributes">
           <u><code>readingFnAttributes</code></u>
         </a>
@@ -1196,6 +1222,13 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
       <li>
         <code>warningReturn {&lt;perl code&gt;}</code><br>
         Wie errorReturn, nur f&uuml;r die warning-Liste.
+      </li>
+      <li>
+        <code>whitelist {&lt;perl code&gt;}</code><br>
+        Durch Leerzeichen getrennte Liste von devspecs die erlaubt sind
+        werden.<br>
+        Wenn das Attribut gesetzt wird werden alle Geräte die nicht durch die
+        devspecs definiert sind von beiden Listen gelöscht.
       </li>
       <li>
         <a href="#readingFnAttributes">
