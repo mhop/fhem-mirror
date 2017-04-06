@@ -576,7 +576,7 @@ sub Nmap_updateUptime($$;$) {
 
 # commandref ##################################################################
 =pod
-=item helper
+=item device
 =item summary    Interpret of an Nmap network scans
 =item summary_DE Auswertung eines Nmap Netzwerkscans
 
