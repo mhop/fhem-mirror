@@ -2704,6 +2704,9 @@ CommandAttr($$)
       $hash->{'.userReadings'}= \@userReadings;
     } 
 
+    $a[0] = $sdev;
+    my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
+
     if($attrName eq "eventMap") {
       delete $hash->{".eventMapHash"};
       delete $hash->{".eventMapCmd"};
@@ -2721,8 +2724,6 @@ CommandAttr($$)
       return "Bad regexp: $@" if($@);
     }
 
-    $a[0] = $sdev;
-    my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
       push @rets, $ret;
