@@ -2804,8 +2804,6 @@ CommandSetstate($$)
     if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/s) {
       my ($tim, $nameval) =  ($1, $2);
       my ($sname, $sval) = split(" ", $nameval, 2);
-      (undef, $sval) = ReplaceEventMap($sdev, [$sdev, $sval], 0)
-                                if($attr{$sdev}{eventMap});
       $sval = "" if(!defined($sval));
       my $ret = CallFn($sdev, "StateFn", $d, $tim, $sname, $sval);
       if($ret) {
