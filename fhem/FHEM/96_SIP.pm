@@ -54,14 +54,14 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.52 / 02.04.17";
+my $sip_version ="V1.54 / 07.04.17";
 my $ua;	# SIP user agent
 my @fifo;
 
 my %sets = (
    "call"         => "",
    "listen:noArg" => "",
-   "reject:noArg"  => "",
+   "reject:noArg" => "",
    "reset:noArg"  => "",
    "fetch:noArg"  => "",
    "password"     => ""
@@ -383,6 +383,7 @@ sub SIP_CALLStart($)
   my $dtmf              = 'ABCD*#123--4567890';
   my $port              = AttrVal($name,"sip_port",0);
   my $delay             = AttrVal($name,"sip_call_audio_delay",0); # Verzoegerung in 1/4 Sekunden Schritten 
+  my $w                 = ($delay) ? -1 : 0;
   my $fi                = 0;
      #$repeat            = 0 if (!$repeat); 
   my $packets           = int($delay)*50;
@@ -398,6 +399,8 @@ sub SIP_CALLStart($)
   my $call_established;
   my @files;
   my $anz;
+  my $stat;
+  my $ph_ok = 0;
   my $sound_of_silence = sub 
      {
        return unless $packets-- > 0;
@@ -426,7 +429,11 @@ sub SIP_CALLStart($)
     $codec = "PCMU/8000" if ($msg =~ /\.ul(.+)$/);
     return $name."|0|CallStart: please use filetype .alaw (for a-law) or .ulaw (for u-law)" if !defined($codec);
 
+
     push @files,$sound_of_silence if ($delay);
+
+    if ($repeat < 0) { $repeat = $repeat * -1; $ph_ok= 1; }
+
     for(my $i=0; $i<=$repeat; $i++)  { push @files,$msg; }
     $anz = @files; 
     Log3 $name,4,"$logname, CallStart with $anz files - first file : $files[0] - $codec , repeat $repeat";
@@ -436,6 +443,7 @@ sub SIP_CALLStart($)
     cb_rtp_done => \$rtp_done,
        cb_final => sub { my ($status,$self,%info) = @_; 
                          $final = $info{code};
+                         $stat  = $status;
                          Log3 $name,4,"$logname, cb_final - status : $status" if (!defined($final));
                          Log3 $name,4,"$logname, cb_final - status : $status - final : $final" if (defined($final));
                          if (($status eq "FAIL") && defined($final))
@@ -529,7 +537,9 @@ sub SIP_CALLStart($)
                    ) || return $name."|0|reinvite failed: ".$ua->error;
 
     $ua->loop( \$rtp_done,\$peer_hangup2,\$peer_hangup,\$stopvar );
-  }
+    Log3 $name,4,"$logname, loop rtp_done : $rtp_done"       if defined($rtp_done);
+    $w++;
+ }
  
   $timeout = 1 if defined($stopvar); # nach eventuellen reinvte nochmal testen
   # timeout or dtmf done, hang up
@@ -546,6 +556,8 @@ sub SIP_CALLStart($)
   Log3 $name,5,"$logname, Hangup2  : $peer_hangup2" if defined($peer_hangup2);
   Log3 $name,5,"$logname, Timeout  : $timeout";
   Log3 $name,5,"$logname, Final    : $final"        if defined($final);
+  Log3 $name,5,"$logname, while    : $w"            if defined($w);
+  Log3 $name,5,"$logname, Status   : $stat"         if defined($stat);
 
   if (defined($rtp_done))
   {
@@ -571,6 +583,8 @@ sub SIP_CALLStart($)
   $final  = "peer hangup" if defined($peer_hangup);
   $final  = "peer_hangup" if defined($peer_hangup2); # ts,ts hat der doch glatt im reinvite noch abgebochen 
 
+  # geben wir doch ok zurueck wenn er sich die Nachricht min 1x angehört hat
+  return $name."|1|ok peer hangup" if ($ph_ok && defined($peer_hangup2) && ($stat eq "OK") && ($w>0)); # bei delay 1x mehr !
   return $name."|1|".$final;
 }
 
@@ -580,24 +594,29 @@ sub SIP_CALLDone($)
    return unless(defined($string));
 
    my @r = split("\\|",$string);
-   my $hash   = $defs{$r[0]};
-   my $error  = (defined($r[1])) ? $r[1] : "0";
-   my $final  = (defined($r[2])) ? $r[2] : "???";
-   my $name   = $hash->{NAME};
+   my $hash    = $defs{$r[0]};
+   my $error   = (defined($r[1])) ? $r[1] : "0";
+   my $final   = (defined($r[2])) ? $r[2] : "???";
+   my $name    = $hash->{NAME};
+   my $success = (substr($final,0,2) eq "ok") ? 1 : 0;
    my @a;
 
    Log3 $name, 4,"$name, CALLDone -> $string";
    
+   my $calltime = time() - $hash->{helper}{CALL_START};
    delete($hash->{helper}{CALL_PID}) if (defined($hash->{helper}{CALL_PID}));
    delete($hash->{CPID})             if (defined($hash->{CPID}));
    delete $hash->{lastnr}            if (defined($hash->{lastnr}));
- 
+   delete($hash->{helper}{CALL_START}) if (defined($hash->{helper}{CALL_START}));
+   
    if ($error ne "1")
    {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "call","done");
+    readingsBulkUpdate($hash, "call_time",$calltime) if defined($calltime);
     readingsBulkUpdate($hash, "last_error",$final);
     readingsBulkUpdate($hash, "call_state","fail");
+    readingsBulkUpdate($hash, "call_success","0");
     readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
@@ -606,17 +625,20 @@ sub SIP_CALLDone($)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "call","done");
     readingsBulkUpdate($hash, "call_state",lc($final));
+    readingsBulkUpdate($hash, "call_success",$success);
+    readingsBulkUpdate($hash, "call_time",$calltime) if defined($calltime);
     readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
 
    my (undef,$nr,$ringtime,$msg,$repeat,$force) = split("\\|",$hash->{CALL}); # zerlegen wir den Original Call
 
-   if ($force && (lc($final) ne "ok"))
+   if ($force && !$success)
     {
-     $repeat = "0" if (!$repeat);
+     #$repeat = "0" if (!defined($repeat) || ($repeat eq "")) ;
+     $repeat++; $repeat--; 
      $force =~ s/^\&//;
-     $force ++; $force --;
+     $force++; $force--;
 
      my $nr2 = $nr;
      $nr2 =~ tr/0-9//cd;
@@ -778,7 +800,7 @@ sub SIP_Set($@)
      
      Log3 $name, 4,  "$name, call -> ".$hash->{CALL};
      Log3 $name, 5,  "$name, call has pid ".$hash->{CPID};
-    
+     $hash->{helper}{CALL_START} = time();
      readingsBeginUpdate($hash);
      readingsBulkUpdate($hash, "call_state","invite");
      readingsBulkUpdate($hash, "call",$nr);
@@ -862,6 +884,11 @@ sub SIP_Set($@)
   elsif ($cmd eq "call_state")
   {
    readingsSingleUpdate($hash, "call_state",$subcmd,1);
+   return undef;
+  }
+  elsif ($cmd eq "caller_time")
+  {
+   readingsSingleUpdate($hash, "caller_time",$subcmd,1);
    return undef;
   }
   elsif ($cmd eq "password")
@@ -1108,7 +1135,8 @@ sub SIP_ListenStart($)
  {
   my ($event) = @_;
   Log3 $name, 5,  "$logname, SIP_bye : $event";
-  SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nexit\n") ;
+  my $calltime = time()-$hash->{CALL_START};
+  SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nset $name caller_time $calltime\nexit\n") ;
   $byebye = 1;
   return 1;
  };
@@ -1129,7 +1157,7 @@ sub SIP_ListenStart($)
      $hash->{dtmf}       = 0;
      $hash->{dtmf_event} = "";
      $hash->{old}        ="-";
-  
+
      SIP_telnet($hash, "set $name caller none\nset $name caller_state waitting\nexit\n") ;
 
      $ua->listen (cb_create => \&$sub_create,
@@ -1144,7 +1172,10 @@ sub SIP_ListenStart($)
              cb_established => sub { 
                                      (my $status,$call) = @_; 
                                      if (!$block_it)
-                                          { SIP_telnet($hash,"set $name caller_state established\nexit\n"); return 1; } 
+                                          { 
+                                             $hash->{CALL_START} = time();
+                                             SIP_telnet($hash,"set $name caller_state established\nexit\n"); return 1; 
+                                          } 
                                      else { 
                                             sleep 1;
                                             #SIP_telnet($hash, "set $name caller none\nset $name caller_state waitting\nexit\n") ;
@@ -1194,7 +1225,8 @@ sub SIP_ListenStart($)
          $byebye    = 1;
        } 
         else { $dtmf_loop = ((AttrVal($name,"sip_dtmf_loop","once") eq 'once')) ? 0 : 1;
-               SIP_telnet($hash, "set $name caller_state hangup\nexit\n") if(!$dtmf_loop);
+               my $calltime = time()-$hash->{CALL_START};
+               SIP_telnet($hash, "set $name caller_state hangup\nset $name caller_time $calltime\nexit\n") if(!$dtmf_loop);
              } # führt ggf. zum Schleifenende
      } # end inner loop
 
@@ -1210,7 +1242,8 @@ sub SIP_ListenStart($)
  {
    $ua->listen(
           cb_create => \&$sub_create,
-	  cb_invite => \&$sub_invite_wfp, 
+	  cb_invite => \&$sub_invite_wfp,
+     cb_established => sub { $hash->{CALL_START} = time(); },  
 	     filter => \&$sub_filter, 
 	   recv_bye => \&$sub_bye,
          init_media => $ua->rtp('send_recv',($msg3) ? $msg3 : $send_something),
@@ -1230,6 +1263,7 @@ sub SIP_ListenStart($)
                                    sleep int(AttrVal($name, "sip_ringtime", 3)); #Anrufer hört das typische Klingeln wenn die Gegenseite nicht abnimmt
                                   }
                                  }, 
+          cb_established => sub { $hash->{CALL_START} = time(); },
               init_media => $ua->rtp( 'recv_echo',undef,0 ),
                rtp_param => [8, 160, 160/8000, 'PCMA/8000'],
                 recv_bye => \&$sub_bye,
