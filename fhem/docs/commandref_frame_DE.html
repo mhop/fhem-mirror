@@ -467,7 +467,8 @@ Ger&auml;t dokumentiert.
     alle W&ouml;rter im Wert des Attributes durch das entsprechende Reading des
     Ger&auml;tes ersetzt (soweit vorhanden). Falls der Wert in {}
     eingeschlossen ist, dann wird es als Perl Ausdruck ausgewertet. Die
-    Auswertung passiert bei jeder &Auml;nderung eines Readings.
+    Auswertung passiert bei jeder &Auml;nderung eines Readings.<br>
+    Die <a href="#set">hier</a> beschriebene "set magic" wird auch angewendet.
     </li>
 
     <a name="event-on-update-reading"></a>
@@ -1175,6 +1176,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     $DEV wird dabei mit dem Namen des vom set betroffenen Ger&auml;tes ersetzt.
     </li>
   </ul>
+  Diese Ersetzungen sind unter dem Namen "set magic" bekannt.
   <br><br>
 
   <a name="setExtensions"></a>
