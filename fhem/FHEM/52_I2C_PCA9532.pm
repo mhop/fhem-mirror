@@ -80,8 +80,6 @@ sub I2C_PCA9532_Init($$) {
 		return "Define: Wrong syntax. Usage:\n" .
 					 "define <name> I2C_PCA9532 <i2caddress>";
 	}
-	#return "$name I2C Address not valid" unless ($a[0] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
- 
 	if (defined (my $address = shift @$args)) {
 		$hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address; 
 	} else {
@@ -96,6 +94,7 @@ sub I2C_PCA9532_Init($$) {
 	I2C_PCA9532_Set($hash, $name,"PWM1", ReadingsVal($name,"PWM1",0) );
 	#Portzustände wiederherstellen
 	my @outports = sort(split(/,/,AttrVal($name, "OutputPorts", "")));
+	I2C_PCA9532_ResetInputs($hash, @outports);
 	foreach (0..15) {
 		I2C_PCA9532_Set($hash, $name,"Port".$_, ReadingsVal($name,"Port".$_,0) ) if ( $_ ~~ @outports);
 	}
@@ -179,8 +178,8 @@ sub I2C_PCA9532_Attr(@) {
 		substr($attr,0,1,"");
 		my $regaddr = ($attr == 0 ? 2 : 4);
 		$msg = I2C_PCA9532_I2CSet($hash,$val,$regaddr);
-###################################################################irgendwann raus damit
- } elsif ($attr && $attr eq "InputPorts") {
+################################################################### irgendwann raus damit
+ 	} elsif ($attr && $attr eq "InputPorts") {
 		my @inp = split(" ", $val) if defined($val);
 		my $oval = 65535;
 		foreach (@inp) {
@@ -199,24 +198,26 @@ sub I2C_PCA9532_Attr(@) {
 			$val = "" unless defined($val);
 			Log3 $hash ,1 , "\"attr $name $attr $val\" will removed in further versions, generated: \"attr $name OutputPorts $outports\" please store it in your config and remove InputPorts";
 ###############################################################################################
-		} elsif ($attr && $attr eq "OutputPorts") {
+	} elsif ($attr && $attr eq "OutputPorts") {
 		my @inp = split(/,/, $val) if defined($val);
 		foreach (@inp) {
 			return "wrong value: $_ for \"attr $name $attr\" use comma separated numbers 0-15" unless ($_ >= 0 && $_ < 16);
 		}
-		$msg = I2C_PCA9532_ResetInputs($hash, @inp) unless $msg;
- } elsif ($attr && $attr eq "OnStartup") {
-	if (defined $val) {
-		foreach (split (/,/,$val)) {
-			my @pair = split (/=/,$_);
-			$msg = "wrong value: $_ for \"attr $hash->{NAME} $attr\" use comma separated <port>=on|off|PWM0|PWM1|last or PWM0|PWM1=0..255|last where <port> = 0 - 15 " 
-				unless ( scalar(@pair) == 2 &&
+		if ($main::init_done) {
+			$msg = I2C_PCA9532_ResetInputs($hash, @inp) unless $msg;		
+		}
+ 	} elsif ($attr && $attr eq "OnStartup") {
+		if (defined $val) {
+			foreach (split (/,/,$val)) {
+				my @pair = split (/=/,$_);
+				$msg = "wrong value: $_ for \"attr $hash->{NAME} $attr\" use comma separated <port>=on|off|PWM0|PWM1|last or PWM0|PWM1=0..255|last where <port> = 0 - 15 " 
+					unless ( scalar(@pair) == 2 &&
 								(($pair[0] =~ m/^[0-9]|1[0-5]$/i && ( $pair[1] eq "last" || exists($setsP{$pair[1]}) ) ) ||
 								( $pair[0] =~ m/^PWM(0|1)$/i     && looks_like_number($pair[1]) &&  $pair[1] >=0 && $pair[1] < 256))
-								);		
+							);		
+			}
 		}
-	}
- }
+ 	}
 	return ($msg) ? $msg : undef; 
 }
 
@@ -260,12 +261,10 @@ sub I2C_PCA9532_Set($@) {
 	my $cmd = $a[1];
 	my $val = $a[2];
 	my @outports = sort(split(/,/,AttrVal($name, "OutputPorts", "")));
-	#my @inports = sort(split( " ",AttrVal($name, "InputPorts", "")));
 	unless (@a == 3) {
 	
 	}
 	my $msg;
-	#my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" );
 	if ( $cmd && $cmd =~ m/^Port((0|)[0-9]|1[0-5])$/i) {
 		return "wrong value: $val for \"set $name $cmd\" use one of: " . 
 			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) )
@@ -288,38 +287,23 @@ sub I2C_PCA9532_Set($@) {
 			}
 		}
 		$msg = I2C_PCA9532_I2CSet($hash,$sbyte,$regaddr);
-	
-		#$sendpackage{data} = sprintf("%.2X",$sbyte);	
-		#$sendpackage{data} = $sbyte;	
-		#$sendpackage{reg} = sprintf("%.2X", $regaddr);
-		#$sendpackage{reg} = $regaddr;
-		
+			
 	} elsif ($cmd && $cmd =~ m/^PWM[0-1]$/i) {
 		return "wrong value: $val for \"set $name $cmd\" use 0-255"
 			unless(looks_like_number($val) && $val >= 0 && $val < 256);
 		substr($cmd,0,3,"");
 		my $regaddr = ($cmd == 0 ? 3 : 5);
 		$msg = I2C_PCA9532_I2CSet($hash,$val,$regaddr);
-		#return $msg if $msg;
-		
-		#$sendpackage{data} = sprintf("%.2X", $val);
-		#$sendpackage{data} = $val;
-		#$sendpackage{reg} = sprintf("%.2X", $regaddr);
 		
 	} else {
 		my $list = undef;
 		foreach (0..15) {
 			next unless ( $_ ~~ @outports );		#Inputs ueberspringen
-			#$list .= "Port" . $_ . ":" . join(',', sort keys %setsP) . " ";
 			$list .= "Port" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 		}
 		$list .= join($setdim, ("PWM0", "PWM1")) . $setdim;
 		$msg = "Unknown argument $a[1], choose one of " . $list;
 	}
-	#return "$name: no IO device defined" unless ($hash->{IODev});
-	#my $phash = $hash->{IODev};
-	#my $pname = $phash->{NAME};
-	#CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
 	return defined $msg ? $msg : undef 
 }
 ###############################################################################
@@ -334,6 +318,7 @@ sub I2C_PCA9532_I2CSet {
 				}) if (defined $hash->{I2C_Address});
 	} else {
 		return "no IODev assigned to '$hash->{NAME}'";
+		Log3 $hash, 5, "$hash->{NAME} I2CSet: Register: $reg Wert: $regval";
 	}
 }
 ###############################################################################
