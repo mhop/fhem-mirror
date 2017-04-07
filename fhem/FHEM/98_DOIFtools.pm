@@ -57,11 +57,13 @@ function doiftoolsCopyToClipboard() {
     var txtarea = document.getElementById("console");
     var start = txtarea.selectionStart;
     var finish = txtarea.selectionEnd;
-    var txt = txtarea.value.substring(start, finish);
+    var txt = $("textarea#console").text().substring(start, finish);
     var hlp = lang ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
+    $('#console').attr('disabled', 'disabled');
+    $('#console').removeAttr('disabled');
     if(!txt)
       return FW_okDialog(hlp);
-    var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\r\n]*)?$/;
+    var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\n]*)?$/;
     var retdi = txt.match(redi);
     if(!retdi)
       return FW_okDialog(hlp);
@@ -220,6 +222,9 @@ function doiftoolsOptChanged() {
       inpt.setSelectionRange(7,17+N);
     }
 }
+function doiftoolsReplaceBR() {
+        $("textarea#console").html($("textarea#console").html().replace(/<br>/g,""));
+}
 
 function delbutton() {
     if ($('#doiftoolstype').attr('embefore') == 1) {
@@ -238,6 +243,8 @@ function delbutton() {
   //execute
   $( window ).on( "load", delbutton );
   $('#console').on('select', doiftoolsCopyToClipboard);
+  $('#console').on('mouseover',doiftoolsReplaceBR);
+  $('#console').on('mousedown',doiftoolsReplaceBR);
 </script>
 EOF
 my $DOIFtoolsJSfuncStart = <<'EOF';
@@ -254,20 +261,20 @@ function doiftoolsAddLookUp () {
       var devList = JSON.parse(data);
       var dev = devList.Results[0];
       var row = 0;
-      for (item in dev.Internals) {
+      for (var item in dev.Internals) {
         if (item == "DEF") {dev.Internals[item] = "<pre>"+dev.Internals[item]+"</pre>"}
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Internals[item].replace(/\n/g,"<br>")+"</td></tr>\n";
       }
       txt += "</table>Readings<table class='block wide readings' style='font-size:12px'><br>";
       row = 0;
-      for (item in dev.Readings) {
+      for (var item in dev.Readings) {
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Readings[item].Value+"</td><td>"+dev.Readings[item].Time+"</td></tr>\n";
       }
       txt += "</table>Attributes<table class='block wide attributes' style='font-size:12px'><br>";
       row = 0;
-      for (item in dev.Attributes) {
+      for (var item in dev.Attributes) {
         if (item.match(/(userReadings|wait|setList)/) ) {dev.Attributes[item] = "<pre>"+dev.Attributes[item]+"</pre>"}
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Attributes[item]+"</td></tr>\n";
