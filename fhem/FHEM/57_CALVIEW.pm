@@ -161,9 +161,9 @@ sub CALVIEW_GetUpdate($){
 					#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
 					if($isbday == 1 ){
 						@termyear = split(/\./,$termin->{bdate});
-						if($yobfield eq "_location" && defined($termin->{location}) && length($termin->{location}) > 0 && $termin->{location}=~ /^\d+$/ ) { $age = $termyear[2] - ($termin->{location});}
-						elsif($yobfield eq "_description" && defined($termin->{description})&& length($termin->{description}) > 0 && $termin->{description}=~ /^\d+$/) { $age = $termyear[2] - ($termin->{description});}
-						elsif($yobfield eq "_summary" && defined($termin->{summary}) && length($termin->{summary}) > 0 ) {my ($byear) = $termin->{summary} =~ /(\d\d\d\d)/ ; $age = $termyear[2] -  $byear;}
+						if($yobfield eq "_location" && defined($termin->{location}) && length($termin->{location}) > 0 && $termin->{location} =~ /(\d{4})/) { my ($byear) = $termin->{location} =~ /(\d{4})/ ; $age = $termyear[2] - $byear;}
+						elsif($yobfield eq "_description" && defined($termin->{description})&& length($termin->{description}) > 0 && $termin->{description} =~ /(\d{4})/) { my ($byear) = $termin->{description} =~ /(\d{4})/ ; $age = $termyear[2] - $byear;}
+						elsif($yobfield eq "_summary" && defined($termin->{summary}) && length($termin->{summary}) > 0 && $termin->{summary} =~ /(\d{4})/ ) { my ($byear) = $termin->{summary} =~ /(\d{4})/ ; $age = $termyear[2] -  $byear;}
 						else {$age = " "}
 					}
 
@@ -219,6 +219,8 @@ sub CALVIEW_GetUpdate($){
 				
 			}
 			$validterm = 0;
+			$age = " ";
+			
 		};
 
 		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)); 
