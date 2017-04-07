@@ -267,7 +267,6 @@ western_easter($)
 1;
 
 =pod
-=item helper
 =item summary    define holidays in a local file
 =item summary_DE Urlaubs-/Feiertagskalender aus einer lokalen Datei
 =begin html
