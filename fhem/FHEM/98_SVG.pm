@@ -2425,6 +2425,14 @@ plotAsPng(@)
   <a name="SVGattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#endPlotNow">endPlotNow</a></li><br>
+    <li><a href="#endPlotToday">endPlotToday</a></li><br>
+
+    <a name="captionLeft"></a>
+    <li>captionLeft<br>
+      Show the legend on the left side.
+      </li><br>
+
     <a name="fixedrange"></a>
     <li>fixedrange [offset]<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
@@ -2447,18 +2455,6 @@ plotAsPng(@)
     <li>fixedoffset &lt;nDays&gt;<br>
         Set an fixed offset (in days) for the plot.
         </li><br>
-
-    <a name="startDate"></a>
-    <li>startDate<br>
-        Set the start date for the plot. Used for demo installations.
-        </li><br>
-
-    <li><a href="#plotsize">plotsize</a></li><br>
-    <li><a href="#plotmode">plotmode</a></li><br>
-    <li><a href="#endPlotNow">endPlotNow</a></li><br>
-    <li><a href="#endPlotToday">endPlotToday</a></li><br>
-    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
-
 
     <a name="label"></a>
     <li>label<br>
@@ -2494,17 +2490,7 @@ plotAsPng(@)
       <br>Deprecated, see plotReplace.
       </li><br>
 
-    <a name="title"></a>
-    <li>title<br>
-      A special form of label (see above), which replaces the string &lt;TL&gt;
-      in the .gplot file. It defaults to the filename of the logfile.
-      <br>Deprecated, see plotReplace.
-      </li><br>
-
-    <a name="captionLeft"></a>
-    <li>captionLeft<br>
-      Show the legend on the left side.
-      </li><br>
+    <li><a href="#nrAxis">nrAxis</a></li><br>
 
     <a name="plotfunction"></a>
     <li>plotfunction<br>
@@ -2528,6 +2514,8 @@ plotAsPng(@)
       Deprecated, see plotReplace.
       </li><br>
 
+    <li><a href="#plotmode">plotmode</a></li><br>
+
     <a name="plotReplace"></a>
     <li>plotReplace<br>
       space separated list of key=value pairs. value may contain spaces if
@@ -2541,6 +2529,22 @@ plotAsPng(@)
       %key% will be repaced <i>before</i> the input file is processed, this
       expression can be used to replace parameters for the input processing.
     </li><br>
+
+    <li><a href="#plotsize">plotsize</a></li><br>
+    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
+
+    <a name="startDate"></a>
+    <li>startDate<br>
+        Set the start date for the plot. Used for demo installations.
+        </li><br>
+
+    <a name="title"></a>
+    <li>title<br>
+      A special form of label (see above), which replaces the string &lt;TL&gt;
+      in the .gplot file. It defaults to the filename of the logfile.
+      <br>Deprecated, see plotReplace.
+      </li><br>
+
   </ul>
   <br>
 
@@ -2635,6 +2639,19 @@ plotAsPng(@)
   <a name="SVGattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="captionLeft"></a>
+    <li>captionLeft<br>
+      Anzeigen der Legende auf der linken Seite
+      </li><br>
+
+    <li><a href="#endPlotNow">endPlotNow</a></li><br>
+    <li><a href="#endPlotToday">endPlotToday</a></li><br>
+
+    <a name="fixedoffset"></a>
+    <li>fixedoffset &lt;nTage&gt;<br>
+      Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
+      </li><br>
+
     <a name="fixedrange"></a>
     <li>fixedrange [offset]<br>
       Version 1<br>
@@ -2655,23 +2672,6 @@ plotAsPng(@)
       Zeitintervall (z.B. letztes Jahr: <code> fixedrange year -1</code>,
       vorgestern: <code> fixedrange day -2</code>).
       </li><br>
-
-    <a name="fixedoffset"></a>
-    <li>fixedoffset &lt;nTage&gt;<br>
-      Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
-      </li><br>
-
-    <a name="startDate"></a>
-    <li>startDate<br>
-      Setzt das Startdatum f&uuml;r den Plot. Wird f&uuml;r Demo-Installationen
-      verwendet.
-      </li><br>
-
-    <li><a href="#plotsize">plotsize</a></li><br>
-    <li><a href="#plotmode">plotmode</a></li><br>
-    <li><a href="#endPlotNow">endPlotNow</a></li><br>
-    <li><a href="#endPlotToday">endPlotToday</a></li><br>
-    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
 
     <a name="label"></a>
     <li>label<br>
@@ -2712,21 +2712,9 @@ plotAsPng(@)
       Die Werte minAll und maxAll (die das Minimum/Maximum aller Werte
       repr&auml;sentieren) sind ebenfals im data hash vorhanden.
       <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
-      </li>
-
-    <a name="title"></a>
-    <li>title<br>
-      Eine besondere Form der &Uuml;berschrift (siehe oben), bei der die
-      Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
-      Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
-      eingesetzt.
-      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li><br>
 
-    <a name="captionLeft"></a>
-    <li>captionLeft<br>
-      Anzeigen der Legende auf der linken Seite
-      </li><br>
+    <li><a href="#nrAxis">nrAxis</a></li><br>
 
     <a name="plotfunction"></a>
     <li>plotfunction<br>
@@ -2756,6 +2744,8 @@ plotAsPng(@)
       &Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
     </li><br>
 
+    <li><a href="#plotmode">plotmode</a></li><br>
+
     <a name="plotReplace"></a>
     <li>plotReplace<br>
       Leerzeichen getrennte Liste von Name=Wert Paaren. Wert kann Leerzeichen
@@ -2770,6 +2760,25 @@ plotAsPng(@)
       Bei %Name% erfolgt die Ersetzung <i>vor</i> der Datenauswertung, das kann
       man verwenden, um Parameter f&uuml;r die Auswertung zu ersetzen.
     </li><br>
+
+    <li><a href="#plotsize">plotsize</a></li><br>
+    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
+
+    <a name="startDate"></a>
+    <li>startDate<br>
+      Setzt das Startdatum f&uuml;r den Plot. Wird f&uuml;r Demo-Installationen
+      verwendet.
+      </li><br>
+
+    <a name="title"></a>
+    <li>title<br>
+      Eine besondere Form der &Uuml;berschrift (siehe oben), bei der die
+      Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
+      Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
+      eingesetzt.
+      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
+      </li><br>
+
   </ul> 
   <br>
 
