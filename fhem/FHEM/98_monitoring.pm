@@ -53,7 +53,7 @@ sub monitoring_Initialize($) {
 
   $hash->{AttrList} = ""
     . "addStateEvent:1,0 "
-    . "blacklist "
+    . "blacklist:textField-long "
     . "disable:1,0 "
     . "disabledForIntervals "
     . "errorFuncAdd:textField-long "
@@ -66,7 +66,7 @@ sub monitoring_Initialize($) {
     . "warningFuncRemove:textField-long "
     . "warningWait "
     . "warningReturn:textField-long "
-    . "whitelist "
+    . "whitelist:textField-long "
     . $readingFnAttributes
   ;
 }
@@ -197,7 +197,7 @@ sub monitoring_Attr(@) {
   if($attribute =~  "blacklist" && $value){
     my @blacklist;
 
-    push(@blacklist, devspec2array($_)) foreach (split(" ", $value));
+    push(@blacklist, devspec2array($_)) foreach (split(/[\s]+/, $value));
 
     my %blacklist = map{$_, 1} @blacklist;
 
@@ -209,7 +209,7 @@ sub monitoring_Attr(@) {
   elsif($attribute eq "whitelist" && $value){
     my @whitelist;
 
-    push(@whitelist, devspec2array($_)) foreach (split(" ", $value));
+    push(@whitelist, devspec2array($_)) foreach (split(/[\s]+/, $value));
 
     foreach my $list ("warning", "error"){
       foreach my $name (split(",", ReadingsVal($SELF, $list, ""))){
@@ -263,14 +263,14 @@ sub monitoring_Notify($$) {
   my @blacklist;
 
   push(@blacklist, devspec2array($_))
-    foreach (split(" ", AttrVal($SELF, "blacklist", "")));
+    foreach (split(/[\s]+/, AttrVal($SELF, "blacklist", "")));
 
   return if(@blacklist && grep(/$name/, @blacklist));
 
   my @whitelist;
 
   push(@whitelist, devspec2array($_))
-    foreach (split(" ", AttrVal($SELF, "whitelist", "")));
+    foreach (split(/[\s]+/, AttrVal($SELF, "whitelist", "")));
 
   return if(@whitelist && !(grep(/$name/, @whitelist)));
 
