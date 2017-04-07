@@ -244,7 +244,6 @@ function delbutton() {
   $( window ).on( "load", delbutton );
   $('#console').on('select', doiftoolsCopyToClipboard);
   $('#console').on('mouseover',doiftoolsReplaceBR);
-  $('#console').on('mousedown',doiftoolsReplaceBR);
 </script>
 EOF
 my $DOIFtoolsJSfuncStart = <<'EOF';
