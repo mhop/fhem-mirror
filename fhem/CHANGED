@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: new version 4.12.1, get tableinfo changed for MySQL
   - bugfix:  98_DOIFtools: fixed browser issues for Chrome and IE
   - feature: 98_monitoring: whitelist attribute added
   - feature: 93_DbRep: support of primary key (set in table history/current)

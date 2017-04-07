@@ -40,7 +40,8 @@
 ###########################################################################################################
 #  Versions History:
 #
-# 4.12.0       31.03.2017       support of primary key (set in table history/current) for insert functions
+# 4.12.1       07.04.2017       get tableinfo changed for MySQL
+# 4.12.0       31.03.2017       support of primary key for insert functions
 # 4.11.4       29.03.2017       bugfix timestamp in minValue, maxValue if VALUE contains more than one
 #                               numeric value (like in sysmon)
 # 4.11.3       26.03.2017       usage of daylight saving time changed to avoid wrong selection when wintertime
@@ -181,7 +182,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.12.0";
+my $DbRepVersion = "4.12.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3361,6 +3362,7 @@ sub dbmeta_DoParse($) {
  my $opt         = $a[1];
  my $dbloghash   = $hash->{dbloghash};
  my $dbconn      = $dbloghash->{dbconn};
+ my $db          = (split(/;|=/, $dbloghash->{dbconn}))[1];
  my $dbuser      = $dbloghash->{dbuser};
  my $dblogname   = $dbloghash->{NAME};
  my $dbpassword  = $attr{"sec$dblogname"}{secret};
@@ -3418,56 +3420,63 @@ sub dbmeta_DoParse($) {
          } elsif ($opt eq "dbstatus") {
              $sql = "show global status like '$ple';";
          } elsif ($opt eq "tableinfo") {
-             $sql = "select 
-                     table_name,
-                     table_schema,
-                     round(sum(data_length+index_length)/1024/1024,2),
-                     round(data_free/1024/1024,2),
-                     row_format,
-                     table_collation,
-                     engine,
-                     table_type,
-                     create_time
-                     from information_schema.tables group by 1;";
+             $sql = "show Table Status from $db;";
          }
-     
+
          Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
  
          $sth = $dbh->prepare($sql); 
          eval {$sth->execute();};
  
          if ($@) {
+		     # error bei sql-execute
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
              Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
-         } else {
-             while (my @line = $sth->fetchrow_array()) {
-                 Log3 ($name, 5, "DbRep $name - SQL result: @line");
-                 my $row = join("§", @line);
-                 $row =~ s/ /_/g;
-                 @line = split("§", $row);
-                 if ($opt eq "tableinfo") {
-                     $param = AttrVal($name, "showTableInfo", "[A-Z_]");
-                     $param =~ s/,/\|/g;
-                     $param =~ tr/%//d;
-                     if($line[0] =~ m/($param)/i) {
-                         push(@row_array, $line[0].".table_schema ".$line[1]);
-                         push(@row_array, $line[0].".data_index_length_MB ".$line[2]);
-                         push(@row_array, $line[0].".table_name ".$line[1]);
-                         push(@row_array, $line[0].".data_free_MB ".$line[3]);
-                         push(@row_array, $line[0].".row_format ".$line[4]);
-                         push(@row_array, $line[0].".table_collation ".$line[5]);
-                         push(@row_array, $line[0].".engine ".$line[6]);
-                         push(@row_array, $line[0].".table_type ".$line[7]);
-                         push(@row_array, $line[0].".create_time ".$line[8]);
+         
+		 } else {
+             # kein error bei sql-execute
+             if ($opt eq "tableinfo") {
+			     $param = AttrVal($name, "showTableInfo", "[A-Z_]");
+                 $param =~ s/,/\|/g;
+                 $param =~ tr/%//d;
+			     while ( my $line = $sth->fetchrow_hashref()) {
+				 
+				     Log3 ($name, 5, "DbRep $name - SQL result: $line->{Name}, $line->{Version}, $line->{Row_format}, $line->{Rows}, $line->{Avg_row_length}, $line->{Data_length}, $line->{Max_data_length}, $line->{Index_length}, $line->{Data_free}, $line->{Auto_increment}, $line->{Create_time}, $line->{Check_time}, $line->{Collation}, $line->{Checksum}, $line->{Create_options}, $line->{Comment}");
+					 
+                     if($line->{Name} =~ m/($param)/i) {
+				         push(@row_array, $line->{Name}.".engine ".$line->{Engine}) if($line->{Engine});
+					     push(@row_array, $line->{Name}.".version ".$line->{Version}) if($line->{Version});
+					     push(@row_array, $line->{Name}.".row_format ".$line->{Row_format}) if($line->{Row_format});
+					     push(@row_array, $line->{Name}.".number_of_rows ".$line->{Rows}) if($line->{Rows});
+					     push(@row_array, $line->{Name}.".avg_row_length ".$line->{Avg_row_length}) if($line->{Avg_row_length});
+					     push(@row_array, $line->{Name}.".data_length_MB ".sprintf("%.2f",$line->{Data_length}/1024/1024)) if($line->{Data_length});
+					     push(@row_array, $line->{Name}.".max_data_length_MB ".sprintf("%.2f",$line->{Max_data_length}/1024/1024)) if($line->{Max_data_length});
+					     push(@row_array, $line->{Name}.".index_length_MB ".sprintf("%.2f",$line->{Index_length}/1024/1024)) if($line->{Index_length});
+						 push(@row_array, $line->{Name}.".data_index_length_MB ".sprintf("%.2f",($line->{Data_length}+$line->{Index_length})/1024/1024));
+					     push(@row_array, $line->{Name}.".data_free_MB ".sprintf("%.2f",$line->{Data_free}/1024/1024)) if($line->{Data_free});
+					     push(@row_array, $line->{Name}.".auto_increment ".$line->{Auto_increment}) if($line->{Auto_increment});
+					     push(@row_array, $line->{Name}.".create_time ".$line->{Create_time}) if($line->{Create_time});
+					     push(@row_array, $line->{Name}.".update_time ".$line->{Update_time}) if($line->{Update_time});
+					     push(@row_array, $line->{Name}.".check_time ".$line->{Check_time}) if($line->{Check_time});
+					     push(@row_array, $line->{Name}.".collation ".$line->{Collation}) if($line->{Collation});
+					     push(@row_array, $line->{Name}.".checksum ".$line->{Checksum}) if($line->{Checksum});
+					     push(@row_array, $line->{Name}.".create_options ".$line->{Create_options}) if($line->{Create_options});
+					     push(@row_array, $line->{Name}.".comment ".$line->{Comment}) if($line->{Comment});
                      }
-                 } else {
-                     push(@row_array, $line[0]." ".$line[1]);
-                 }
-             }  
-         } 
+				 }
+             } else {
+			     while (my @line = $sth->fetchrow_array()) {
+                     Log3 ($name, 4, "DbRep $name - SQL result: @line");
+                     my $row = join("§", @line);
+                     $row =~ s/ /_/g;
+                     @line = split("§", $row);                     
+					 push(@row_array, $line[0]." ".$line[1]);
+			     }
+			 }
+		 } 
      $sth->finish;
      }
  } else {
@@ -3478,12 +3487,14 @@ sub dbmeta_DoParse($) {
      if($dbmodel eq 'SQLITE') {
          my $sf = $dbh->sqlite_db_filename();
          if ($@) {
+		     # error bei sql-execute
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
              Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
          } else {
+		     # kein error bei sql-execute
              my $key = "SQLITE_DB_FILENAME";
              push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
          }
@@ -4181,10 +4192,10 @@ return;
                                  <br><br>
                                  </ul>                                                      
                                  
-    <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database schema. The analyzed schematics are depend on the rights of the 
-                              used  database user (default: the database schema of tables current,history). 
-                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited. Further detailed informations  
-                              of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
+    <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
+	                          All available tables in the connected database will be selected by default. 
+                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited to tables you want to show. 
+							  Further detailed informations of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
                                  
                                  <br><ul>
                                  Example:  <br>
@@ -4270,7 +4281,7 @@ return;
                               # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
                               </ul><br>  
                               
-  <li><b>showTableInfo </b>   - limits the sample space of command "get ... tableinfo". SQL-Wildcards (% _) can be used.   </li> <br>
+  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get ... tableinfo". SQL-Wildcards (% _) can be used.   </li> <br>
 
                               <ul>
                               Example:    attr ... showTableInfo current,history  <br>
@@ -4683,8 +4694,8 @@ return;
                                  <br><br>
                                  </ul>                                                      
                                  
-    <li><b> tableinfo </b> -  ruft Detailinformationen der in einem MySQL-Schema angelegten Tabellen ab. Die ausgewerteten Schemata sind abhängig von den Rechten 
-                              des verwendeten Datenbankusers (default: das DB-Schema der current/history-Tabelle). 
+    <li><b> tableinfo </b> -  ruft Tabelleninformationen aus der mit dem DbRep-Device verbundenen Datenbank ab (MySQL). 
+	                          Es werden per default alle in der verbundenen Datenbank angelegten Tabellen ausgewertet. 
                               Mit dem <a href="#DbRepattr">Attribut</a> "showTableInfo" können die Ergebnisse eingeschränkt werden. Erläuterungen zu den erzeugten 
                               Readings sind  <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>hier</a> zu finden.  <br>
                                  
