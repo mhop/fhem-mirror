@@ -2841,7 +2841,7 @@ sub SYSMON_getNetworkInfo ($$$) {
         }
       }
       elsif (1 eq SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && echo 1 || echo 0")) {
-        $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed");
+        $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed 2>/dev/null");
       }
       else {
         $speed = "not available";
@@ -3977,8 +3977,6 @@ sub SYSMON_Exec($$;$)
    my $openedTelnet = 0;
    my $telnet = $hash->{".telnet"};
    
-   #TODO: SSH
-   
    my $name = $hash->{NAME};
    my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'telnet') {
@@ -4184,6 +4182,7 @@ SYSMON_Exec_Ssh($$)
    SYSMON_Log ($hash, 5, "Call: '".$call."'");
    $call = $t_sshpass.$call;
    
+   # $call = $call.' 2>/dev/null';
    
    my @result = qx($call);
    # Arrays als solche zurueckgeben
