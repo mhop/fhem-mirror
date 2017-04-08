@@ -46,6 +46,7 @@
 # V 1.19 2016-09-20 - FIX: PERL WARNING: Subroutine from Blocking.pm redefined
 # V 1.20 2016-10-27 - FIX: ContactAsSwitch protocol independend
 # V 1.21 2016-11-13 - NEW: support contact sensors 
+# V 1.22 2017-04-08 - NEW: support contact sensor GS-iwds07
 ############################################## 
 package main;
 
@@ -841,6 +842,7 @@ sub pilight_ctrl_Parse($$)
     case m/contact/     {$protoID = 3;}
     case m/ev1527/      {$protoID = 3;}
     case m/sc2262/      {$protoID = 3;}
+    case m/GW-iwds07/   {$protoID = 3;}
     
     #Weather Stations temperature, humidity
     case m/alecto/      {$protoID = 4;}
