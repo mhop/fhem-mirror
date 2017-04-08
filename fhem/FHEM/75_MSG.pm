@@ -1914,6 +1914,13 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         while ( ( my $key, my $value ) =
                                             each %$params )
                                         {
+                                            # Compatibility to legacy schema:
+                                            # lowercase after _
+                                            $key =~
+s/^($gatewayDevType)(_[A-Z0-9]+)$/\1\L\2\e/;
+
+                                            # remove gateway TYPE when
+                                            # used as prefix
                                             $key =~ s/^$gatewayDevType\_//;
                                             $cmd .= " $key='$value'"
                                               if ( !defined( $h->{$key} )
@@ -1953,10 +1960,10 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         Log3 $logDevice, 5,
                                           "msg $device: "
                                           . "$type[$i] route command (fhem): $cmd";
-                                        fhem $cmd, 1;
-                                        if ($@) {
+                                        my $ret = fhem $cmd, 1;
+                                        if ($ret) {
                                             $error = 1;
-                                            $loopReturn3 .= "$gatewayDev: $@\n";
+                                            $loopReturn3 .= "$gatewayDev: $ret\n";
                                         }
                                     }
 
