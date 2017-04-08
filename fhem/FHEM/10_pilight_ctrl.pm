@@ -47,6 +47,7 @@
 # V 1.20 2016-10-27 - FIX: ContactAsSwitch protocol independend
 # V 1.21 2016-11-13 - NEW: support contact sensors 
 # V 1.22 2017-04-08 - NEW: support contact sensor GW-iwds07
+# V 1.23 2017-04-08 - NEW: support new temperature protocols bmp085 and bmp180
 ############################################## 
 package main;
 
@@ -860,6 +861,8 @@ sub pilight_ctrl_Parse($$)
     case m/cpu_temp/    {$protoID = 4;}
     case m/lm75/        {$protoID = 4;}
     case m/lm76/        {$protoID = 4;}
+    case m/bmp085/      {$protoID = 4;}
+    case m/bmp180/      {$protoID = 4;}
     
     case m/screen/      {$protoID = 5;}
     
