@@ -245,6 +245,7 @@ FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          neubert              http://forum.fhem.de Unterstuetzende Dienste/Kalendermodule
 FHEM/57_CALVIEW.pm           chris1284            http://forum.fhem.de Unterstuetzende Dienste/Kalendermodule
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
+FHEM/59_LuftdatenInfo        igami                http://forum.fhem.de Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
 FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
