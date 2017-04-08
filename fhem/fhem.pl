@@ -1682,8 +1682,8 @@ ReplaceSetMagic($$@)       # Forum #38276
     return $val;
   }
 
-  $a =~ s/(\[([ari]:)?([a-z0-9._]+):([a-z0-9._-]+)(:(t|sec|i|d|r|r\d))?\])/
-         rsmVal($1,$2,$3,$4,$5)/egi;
+  $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/
+         rsmVal($1,$2,$3,$4,$5)/eg;
 
   $evalSpecials->{'%DEV'} = $hash->{NAME};
   $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
