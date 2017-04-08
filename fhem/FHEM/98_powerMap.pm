@@ -816,6 +816,8 @@ sub powerMap_Notify($$) {
                 # recalculate CHANGEDWITHSTATE
                 # for target device in deviceEvents()
                 $dev_hash->{CHANGEDWITHSTATE} = [];
+
+                last;
             }
         }
     }
@@ -1346,8 +1348,7 @@ sub powerMap_power($$$;$) {
 
     if ( $event =~ /^([A-Za-z\d_\.\-\/]+):\s+(.*)$/ ) {
         my ( $reading, $val ) = ( $1, $2 );
-        my $num = $val;
-        $num =~ s/[^-\.\d]//g;
+        my $num = ( $val =~ /(-?\d+(\.\d+)?)/ ? $1 : $val );
 
         my $valueAliases = {
             initialized  => '0',
