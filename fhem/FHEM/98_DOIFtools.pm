@@ -58,7 +58,7 @@ function doiftoolsCopyToClipboard() {
     var start = txtarea.selectionStart;
     var finish = txtarea.selectionEnd;
     var txt = $("textarea#console").text().substring(start, finish);
-    var hlp = lang ? "Bitte, genau eine komplette Event-Zeile markieren." : "Please highlight exactly one complete event line";
+    var hlp = lang ? "Bitte, genau eine komplette Eventzeile markieren." : "Please highlight exactly one complete event line.";
     $('#console').attr('disabled', 'disabled');
     $('#console').removeAttr('disabled');
     if(!txt)
@@ -66,7 +66,7 @@ function doiftoolsCopyToClipboard() {
     var redi=/^....-..-..\s..:..:..(\....)?\s([^\s]+)\s([^\s]+)\s([^\s]+:\s)?(.*)([\n]*)?$/;
     var retdi = txt.match(redi);
     if(!retdi)
-      return FW_okDialog(hlp);
+      return FW_okDialog("\""+txt+"\" "+(lang ? "ist keine gültige Auswahl." : "is not a valid selection.")+"<br>"+hlp);
     var evtDev = retdi[3];
     var retdi1;
     var evtRead ="";
@@ -223,7 +223,7 @@ function doiftoolsOptChanged() {
     }
 }
 function doiftoolsReplaceBR() {
-        $("textarea#console").html($("textarea#console").html().replace(/<br>/g,""));
+        $("textarea#console").html($("textarea#console").html().replace(/<br(.*)?>/g,""));
 }
 
 function delbutton() {
