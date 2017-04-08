@@ -602,11 +602,10 @@ sub Pushover_ReceiveCommand($$$) {
         elsif ( $service =~ /^receipts\/(.*)\/cancel.json$/ ) {
             my $receipt = $1;
 
-            keys %{ $hash->{READINGS} };
-            while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            my @delete;
+            foreach my $key ( %{ $hash->{READINGS} } ) {
                 if (   $key =~ /^cb_(\d+)$/
-                    && defined( $value->{VAL} )
-                    && $value->{VAL} eq $receipt )
+                    && $hash->{READINGS}{$key}{VAL} eq $receipt )
                 {
                     my $rAct      = "cbAct_" . $1;
                     my $rAck      = "cbAck_" . $1;
@@ -618,11 +617,15 @@ sub Pushover_ReceiveCommand($$$) {
                         readingsBulkUpdate( $hash, $rAck,   "1" );
                         readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
                         readingsBulkUpdate( $hash, $rAckBy, "aborted" );
-                        delete $hash->{READINGS}{$rCancelId}
-                          if ( defined( $hash->{READINGS}{$rCancelId} ) );
-                        keys %{ $hash->{READINGS} };
+                        push @delete, $rCancelId;
                     }
                 }
+            }
+
+            # cleanup
+            foreach (@delete) {
+                delete $hash->{READINGS}{$_}
+                  if ( defined( $hash->{READINGS}{$_} ) );
             }
         }
 
@@ -1424,21 +1427,20 @@ sub Pushover_CancelMessage ($$$$) {
 
     Log3 $name, 5, "Pushover $name: called function Pushover_CancelMessage()";
 
-    keys %{ $hash->{READINGS} };
-    while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-        foreach my $string (@$cancelIds) {
-            foreach my $cancelId ( split( ',', $string ) ) {
+    foreach my $string (@$cancelIds) {
+        foreach my $cancelId ( split( ',', $string ) ) {
+            foreach my $key ( keys %{ $hash->{READINGS} } ) {
                 if (   $key =~ /^cbCancelId_(\d+)$/
-                    && defined( $value->{VAL} )
-                    && $value->{VAL} eq $cancelId )
+                    && $hash->{READINGS}{$key}{VAL} eq $cancelId )
                 {
                     $success = 1;
-                    my $receipt = ReadingsVal( $name, "cb_" . $1, $1 );
+                    my $receipt = $hash->{READINGS}{ "cb_" . $1 }{VAL};
 
                     $return .= " " if ($return);
                     $return .=
                       Pushover_SendCommand( $hash,
-                        "receipts/$receipt/cancel.json" );
+                        "receipts/$receipt/cancel.json" )
+                      if ($receipt);
                 }
             }
         }
