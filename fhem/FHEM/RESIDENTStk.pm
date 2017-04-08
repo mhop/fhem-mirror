@@ -1036,6 +1036,10 @@ sub RESIDENTStk_wakeupRun($;$) {
     if ( !IsDevice($NAME) ) {
         return "$NAME: Non existing device";
     }
+    elsif ( IsDisabled($wakeupDevice) ) {
+        Log3 $name, 4,
+          "RESIDENTStk $NAME: device disabled - not triggering wake-up program";
+    }
     elsif ( lc($nextRun) eq "off" && !$forceRun ) {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: alarm set to OFF - not triggering wake-up program";
@@ -1203,11 +1207,18 @@ sub RESIDENTStk_wakeupRun($;$) {
         }
     }
 
+    if ( $running && $wakeupOffset > 0 ) {
+        readingsBeginUpdate( $defs{$NAME} );
+        readingsBulkUpdate( $defs{$NAME}, "running", "1" );
+        readingsBulkUpdate( $defs{$NAME}, "state",   "running" );
+        readingsEndUpdate( $defs{$NAME}, 1 );
+    }
+
     # Update user device with next wakeup details
     #
     readingsBeginUpdate( $defs{$wakeupUserdevice} );
     my ( $nextWakeupDev, $nextWakeup ) =
-      RESIDENTStk_wakeupGetNext($wakeupUserdevice);
+      RESIDENTStk_wakeupGetNext( $wakeupUserdevice, $NAME );
     if ( !$nextWakeupDev || !$nextWakeup ) {
         $nextWakeupDev = "";
         $nextWakeup    = "OFF";
@@ -1217,13 +1228,6 @@ sub RESIDENTStk_wakeupRun($;$) {
     readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
         "nextWakeup", $nextWakeup );
     readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
-
-    if ( $running && $wakeupOffset > 0 ) {
-        readingsBeginUpdate( $defs{$NAME} );
-        readingsBulkUpdate( $defs{$NAME}, "running", "1" );
-        readingsBulkUpdate( $defs{$NAME}, "state",   "running" );
-        readingsEndUpdate( $defs{$NAME}, 1 );
-    }
 
     my $doReset = 1;
     if (   $wakeupResetSwitcher
@@ -1307,8 +1311,8 @@ sub RESIDENTStk_AttrFnDummy(@) {
 #------------------------------------
 #
 
-sub RESIDENTStk_wakeupGetNext($) {
-    my ($name) = @_;
+sub RESIDENTStk_wakeupGetNext($;$) {
+    my ( $name, $wakeupDeviceRunning ) = @_;
     my $wakeupDeviceAttrName = "";
 
     $wakeupDeviceAttrName = "rgr_wakeupDevice"
@@ -1342,6 +1346,9 @@ sub RESIDENTStk_wakeupGetNext($) {
     for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
         next if !$wakeupDevice;
 
+        my $ltoday    = $today;
+        my $ltomorrow = $tomorrow;
+
         if ( !IsDevice($wakeupDevice) ) {
             Log3 $name, 4,
 "RESIDENTStk $name: 00 - ignoring reference to non-existing wakeupDevice $wakeupDevice";
@@ -1357,6 +1364,11 @@ sub RESIDENTStk_wakeupGetNext($) {
                 fhem "attr $name $wakeupDeviceAttrName $wakeupDeviceListNew";
             }
 
+            next;
+        }
+        elsif ( IsDisabled($wakeupDevice) ) {
+            Log3 $name, 4,
+"RESIDENTStk $name: 00 - ignoring disabled wakeupDevice $wakeupDevice";
             next;
         }
 
@@ -1376,6 +1388,7 @@ sub RESIDENTStk_wakeupGetNext($) {
         my $wakeupHolidays = AttrVal( $wakeupDevice, "wakeupHolidays", 0 );
         my $holidayToday   = 0;
         my $holidayTomorrow = 0;
+        my $nextRunSrc;
 
         # get holiday status for today and tomorrow
         if (   $wakeupHolidays
@@ -1398,13 +1411,13 @@ sub RESIDENTStk_wakeupGetNext($) {
         }
 
         # set day scope for today
-        my @days = ($today);
+        my @days = ($ltoday);
         @days = split /,/, $wakeupDays
           if ( $wakeupDays ne "" );
         my %days = map { $_ => 1 } @days;
 
         # set day scope for tomorrow
-        my @daysTomorrow = ($tomorrow);
+        my @daysTomorrow = ($ltomorrow);
         @daysTomorrow = split /,/, $wakeupDays
           if ( $wakeupDays ne "" );
         my %daysTomorrow = map { $_ => 1 } @daysTomorrow;
@@ -1419,7 +1432,7 @@ sub RESIDENTStk_wakeupGetNext($) {
         else {
 
             Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 02 - possible candidate found - weekdayToday=$today weekdayTomorrow=$tomorrow";
+"RESIDENTStk $wakeupDevice: 02 - possible candidate found - weekdayToday=$ltoday weekdayTomorrow=$ltomorrow";
 
             my $nextRunSec;
             my $nextRunSecTarget;
@@ -1428,25 +1441,53 @@ sub RESIDENTStk_wakeupGetNext($) {
             if (   $wakeupAtNTM
                 && $wakeupAtNTM =~ /^([0-9]{2}:[0-9]{2})$/ )
             {
+                $nextRunSrc       = "at";
                 $nextRunSec       = RESIDENTStk_time2sec($wakeupAtNTM);
                 $nextRunSecTarget = $nextRunSec + $wakeupOffset * 60;
+
+                if ( $wakeupOffset && $nextRunSecTarget >= 86400 ) {
+                    $nextRunSecTarget -= 86400;
+
+                    $ltoday++;
+                    $ltoday = $ltoday - 7
+                      if ( $ltoday > 6 );
+
+                    $ltomorrow++;
+                    $ltomorrow = $ltomorrow - 7
+                      if ( $ltomorrow > 6 );
+                }
+
                 Log3 $name, 4,
 "RESIDENTStk $wakeupDevice: 03 - considering at-device value wakeupAtNTM=$wakeupAtNTM wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget";
             }
             else {
+                $nextRunSrc       = "dummy";
                 $nextRunSecTarget = RESIDENTStk_time2sec($nextRun);
                 $nextRunSec       = $nextRunSecTarget - $wakeupOffset * 60;
+
+                if ( $wakeupOffset && $nextRunSec < 0 ) {
+                    $nextRunSec += 86400;
+
+                    $ltoday--;
+                    $ltoday = $ltoday + 7
+                      if ( $ltoday < 0 );
+
+                    $ltomorrow--;
+                    $ltomorrow = $ltomorrow + 7
+                      if ( $ltomorrow < 0 );
+                }
+
                 Log3 $name, 4,
 "RESIDENTStk $wakeupDevice: 03 - considering dummy-device value nextRun=$nextRun wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget (wakeupAtNTM=$wakeupAtNTM)";
             }
 
             # still running today
-            if ( $nextRunSecTarget > $secNow ) {
+            if ( $nextRunSec > $secNow ) {
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 04 - this is a candidate for today - weekdayToday=$today";
+"RESIDENTStk $wakeupDevice: 04 - this is a candidate for today - weekdayToday=$ltoday";
 
                 # if today is in scope
-                if ( $days{$today} ) {
+                if ( $days{$ltoday} ) {
 
                     # if we need to consider holidays in addition
                     if (
@@ -1509,10 +1550,10 @@ sub RESIDENTStk_wakeupGetNext($) {
             # running later
             else {
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow or later - weekdayTomorrow=$tomorrow";
+"RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow or later - weekdayTomorrow=$ltomorrow";
 
                 # if tomorrow is in scope
-                if ( $daysTomorrow{$tomorrow} ) {
+                if ( $daysTomorrow{$ltomorrow} ) {
 
                     # if we need to consider holidays in addition
                     if (
@@ -1572,16 +1613,28 @@ sub RESIDENTStk_wakeupGetNext($) {
 
         }
 
-        # add Offset
-        $definitiveNextToday += $wakeupOffset * 60
-          if ($definitiveNextToday);
-        $definitiveNextTomorrow += $wakeupOffset * 60
-          if ($definitiveNextTomorrow);
+        if ($wakeupOffset) {
 
-        $definitiveNextToday = 0
-          if ( $definitiveNextToday == 86400 );
-        $definitiveNextTomorrow = 0
-          if ( $definitiveNextTomorrow == 86400 );
+            # add Offset
+            $definitiveNextToday += $wakeupOffset * 60
+              if ( defined($definitiveNextToday) );
+            $definitiveNextTomorrow += $wakeupOffset * 60
+              if ( defined($definitiveNextTomorrow) );
+
+            if ( $definitiveNextToday >= 86400 ) {
+                $definitiveNextToday -= 86400;
+            }
+            elsif ( $definitiveNextToday < 0 ) {
+                $definitiveNextToday += 86400;
+            }
+
+            if ( $definitiveNextTomorrow >= 86400 ) {
+                $definitiveNextTomorrow -= 86400;
+            }
+            elsif ( $definitiveNextTomorrow < 0 ) {
+                $definitiveNextTomorrow += 86400;
+            }
+        }
     }
 
     if (   defined($definitiveNextTodayDev)
