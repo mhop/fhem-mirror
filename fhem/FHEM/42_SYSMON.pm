@@ -3625,10 +3625,10 @@ sub SYSMON_PowerAcInfo($$) {
   my $base = "cat /sys/class/power_supply/".$type."/";
     
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
+  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
   if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
   if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   #$map->{"power_".$type."_online"}=$d_online;
@@ -3650,10 +3650,10 @@ sub SYSMON_PowerUsbInfo($$) {
   my $base = "cat /sys/class/power_supply/".$type."/";
     
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
+  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
   if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
   if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   #$map->{"power_".$type."_online"}=$d_online;
@@ -3676,13 +3676,13 @@ sub SYSMON_PowerBatInfo($$) {
   my $base = "cat /sys/class/power_supply/".$type."/";
     
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
+  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
   if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
   if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
-  my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
+  my $d_capacity = trim(SYSMON_execute($hash, $base."capacity 2>/dev/null"));
   if($d_present ne "1") {
     $d_capacity = "0";
   }
@@ -3695,10 +3695,10 @@ sub SYSMON_PowerBatInfo($$) {
   
   if($d_present eq "1") {
     # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
-    my $d_technology = trim(SYSMON_execute($hash, $base."technology"));
-    my $d_status = trim(SYSMON_execute($hash, $base."status"));
-    my $d_health = trim(SYSMON_execute($hash, $base."health"));
-    my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design"));
+    my $d_technology = trim(SYSMON_execute($hash, $base."technology 2>/dev/null"));
+    my $d_status = trim(SYSMON_execute($hash, $base."status 2>/dev/null"));
+    my $d_health = trim(SYSMON_execute($hash, $base."health 2>/dev/null"));
+    my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design 2>/dev/null"));
     
     $map->{"power_".$type."_info"}=$type." info: ".$d_technology." , capacity: ".$d_capacity." %, status: ".$d_status." , health: ".$d_health." , total capacity: ".$d_energy_full_design." mAh";
     
