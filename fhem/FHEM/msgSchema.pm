@@ -173,18 +173,18 @@ my $db = {
         },
 
         'Jabber' => {
-            'Normal' => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
-            'High'   => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
-            'Low'    => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
+            'Normal' => 'set %DEVICE% msg%Jabber_MTYPE% %RECIPIENT% %MSG%',
+            'High'   => 'set %DEVICE% msg%Jabber_MTYPE% %RECIPIENT% %MSG%',
+            'Low'    => 'set %DEVICE% msg%Jabber_MTYPE% %RECIPIENT% %MSG%',
             'defaultValues' => {
                 'Normal' => {
-                    'JabberMsgType' => '',
+                    'Jabber_MTYPE' => '',
                 },
                 'High' => {
-                    'JabberMsgType' => '',
+                    'Jabber_MTYPE' => '',
                 },
                 'Low' => {
-                    'JabberMsgType' => '',
+                    'Jabber_MTYPE' => '',
                 },
             },
         },
@@ -214,55 +214,42 @@ my $db = {
 
         'Pushover' => {
             'Normal' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
+'set %DEVICE% %Pushover_MTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% url_title="%URLTITLE%" message=\'%MSG%\'',
             'High' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
+'set %DEVICE% %Pushover_MTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% url_title="%URLTITLE%" retry=%RETRY% expire=%EXPIRE% message=\'%MSG%\'',
             'Low' =>
-'set %DEVICE% %Pushover_PTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% sound=\'%Pushover_SOUND%\' retry=%RETRY% expire=%EXPIRE% url_title=\'%URLTITLE%\' action=\'%ACTION%\' cancel_id=\'%Pushover_CANCELID%\' message=\'%MSG%\'',
+'set %DEVICE% %Pushover_MTYPE% title=\'%TITLE%\' device=\'%RECIPIENT%:%TERMINAL%\' priority=%PRIORITY% url_title="%URLTITLE%" message=\'%MSG%\'',
             'defaultValues' => {
                 'Normal' => {
-                    'RECIPIENT'         => '',
-                    'TERMINAL'          => '',
-                    'RETRY'             => '',
-                    'EXPIRE'            => '',
-                    'URLTITLE'          => '',
-                    'ACTION'            => '',
-                    'Pushover_PTYPE'    => 'msg',
-                    'Pushover_SOUND'    => '',
-                    'Pushover_CANCELID' => '',
+                    'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
+                    'URLTITLE'       => '',
+                    'Pushover_MTYPE' => 'msg',
                 },
                 'High' => {
-                    'RECIPIENT'         => '',
-                    'TERMINAL'          => '',
-                    'RETRY'             => '120',
-                    'EXPIRE'            => '600',
-                    'URLTITLE'          => '',
-                    'ACTION'            => '',
-                    'Pushover_PTYPE'    => 'msg',
-                    'Pushover_SOUND'    => '',
-                    'Pushover_CANCELID' => '',
+                    'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
+                    'RETRY'          => '120',
+                    'EXPIRE'         => '600',
+                    'URLTITLE'       => '',
+                    'Pushover_MTYPE' => 'msg',
                 },
                 'Low' => {
-                    'RECIPIENT'         => '',
-                    'TERMINAL'          => '',
-                    'RETRY'             => '',
-                    'EXPIRE'            => '',
-                    'URLTITLE'          => '',
-                    'ACTION'            => '',
-                    'Pushover_PTYPE'    => 'msg',
-                    'Pushover_SOUND'    => '',
-                    'Pushover_CANCELID' => '',
+                    'RECIPIENT'      => '',
+                    'TERMINAL'       => '',
+                    'URLTITLE'       => '',
+                    'Pushover_MTYPE' => 'msg',
                 },
             },
         },
 
         'Pushsafer' => {
             'Normal' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'High' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'Low' =>
-'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" sound="%Pushsafer_SOUND%" icon="%Pushsafer_ICON%" vibration="%Pushsafer_VIBRATION%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
+'set %DEVICE% message "%MSG%" title="%TITLE%" key="%RECIPIENT%" device="%TERMINAL%" url="%ACTION%" urlText="%URLTITLE%" ttl="%EXPIRE%"',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'           => '',
@@ -270,8 +257,6 @@ my $db = {
                     'EXPIRE'              => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
-                    'Pushsafer_ICON'      => '',
-                    'Pushsafer_SOUND'     => '',
                     'Pushsafer_VIBRATION' => '1',
                 },
                 'High' => {
@@ -280,19 +265,14 @@ my $db = {
                     'EXPIRE'              => '',
                     'URLTITLE'            => '',
                     'ACTION'              => '',
-                    'Pushsafer_ICON'      => '',
-                    'Pushsafer_SOUND'     => '',
                     'Pushsafer_VIBRATION' => '2',
                 },
                 'Low' => {
-                    'RECIPIENT'           => '',
-                    'TERMINAL'            => '',
-                    'EXPIRE'              => '',
-                    'URLTITLE'            => '',
-                    'ACTION'              => '',
-                    'Pushsafer_ICON'      => '',
-                    'Pushsafer_SOUND'     => '',
-                    'Pushsafer_VIBRATION' => '',
+                    'RECIPIENT' => '',
+                    'TERMINAL'  => '',
+                    'EXPIRE'    => '',
+                    'URLTITLE'  => '',
+                    'ACTION'    => '',
                 },
             },
         },
@@ -331,21 +311,21 @@ my $db = {
         },
 
         'ENIGMA2' => {
-            'Normal' => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
-            'High'   => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
-            'Low'    => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
+            'Normal' => 'set %DEVICE% msg %ENIGMA2_MTYPE% %TIMEOUT% %MSG%',
+            'High'   => 'set %DEVICE% msg %ENIGMA2_MTYPE% %TIMEOUT% %MSG%',
+            'Low'    => 'set %DEVICE% msg %ENIGMA2_MTYPE% %TIMEOUT% %MSG%',
             'defaultValues' => {
                 'Normal' => {
-                    'ENIGMA2_TYPE' => 'info',
-                    'TIMEOUT'      => 8,
+                    'ENIGMA2_MTYPE' => 'info',
+                    'TIMEOUT'       => 8,
                 },
                 'High' => {
-                    'ENIGMA2_TYPE' => 'attention',
-                    'TIMEOUT'      => 12,
+                    'ENIGMA2_MTYPE' => 'attention',
+                    'TIMEOUT'       => 12,
                 },
                 'Low' => {
-                    'ENIGMA2_TYPE' => 'message',
-                    'TIMEOUT'      => 8,
+                    'ENIGMA2_MTYPE' => 'message',
+                    'TIMEOUT'       => 8,
                 },
             },
         },
