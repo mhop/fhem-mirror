@@ -1859,12 +1859,7 @@ CommandDefine($$)
                 if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
   return "Invalid characters in name (not A-Za-z0-9._): $name"
-                        if($name !~ m/^[a-z0-9.:_]*$/i);
-  if($name =~ m/:/) { # Forum #45788
-    my $msg = "unsupported character (:) in devicename $name";
-    return $msg if($init_done);
-    Log 3, "WARNING: $msg";
-  }
+                        if($name !~ m/^[a-z0-9._]*$/i);
 
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
