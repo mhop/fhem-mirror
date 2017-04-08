@@ -20,15 +20,11 @@ sub Pushover_Initialize($$) {
     $hash->{UndefFn} = "Pushover_Undefine";
     $hash->{SetFn}   = "Pushover_Set";
     $hash->{AttrList} =
-"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,-1,-2 callbackUrl "
+"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire "
       . $readingFnAttributes;
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
     $hash->{'.msgParams'} = { parseParams => 1, };
-
-    # a priority value of 2 is not predifined as for this also a value for
-    # retry and expire must be set which will most likely not be used with
-    # default values.
 }
 
 #------------------------------------------------------------------------------
@@ -134,15 +130,14 @@ sub Pushover_Set($@) {
     unless ( $cmd =~ /^(msg|msgCancel|glance)$/i ) {
         my $usage = "Unknown argument $cmd, choose one of msg glance";
 
-        sort keys %{ $hash->{READINGS} };
         my $cancelIds;
-        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            if (   defined( $value->{VAL} )
-                && $value->{VAL} ne ""
+        foreach my $key ( sort keys %{ $hash->{READINGS} } ) {
+            if (   defined( $hash->{READINGS}{$key}{VAL} )
+                && $hash->{READINGS}{$key}{VAL} ne ""
                 && $key =~ /^cbCancelId_(\d+)$/ )
             {
                 $cancelIds .= "," if ($cancelIds);
-                $cancelIds .= $value->{VAL};
+                $cancelIds .= $hash->{READINGS}{$key}{VAL};
             }
         }
 
@@ -752,25 +747,18 @@ sub Pushover_SetMessage {
 
     Log3 $name, 5, "Pushover $name: called function Pushover_SetMessage()";
 
-    #Set defaults
+    # Set defaults
     $values{title}     = AttrVal( $hash->{NAME}, "title", "" );
     $values{message}   = "";
     $values{device}    = AttrVal( $hash->{NAME}, "device", "" );
     $values{priority}  = AttrVal( $hash->{NAME}, "priority", 0 );
     $values{sound}     = AttrVal( $hash->{NAME}, "sound", "" );
-    $values{retry}     = "";
-    $values{expire}    = "";
+    $values{retry}     = AttrVal( $hash->{NAME}, "retry", "" );
+    $values{expire}    = AttrVal( $hash->{NAME}, "expire", "" );
     $values{url_title} = "";
     $values{action}    = "";
 
-    my $callback = (
-        defined( $attr{$name}{callbackUrl} )
-          && defined( $hash->{fhem}{infix} )
-        ? $attr{$name}{callbackUrl}
-        : ""
-    );
-
-    #Split parameters
+    # Split parameters
     my $param = join( " ", @_ );
     my $argc = 0;
     if ( $param =~
@@ -832,237 +820,27 @@ sub Pushover_SetMessage {
         Log3 $name, 4, "Pushover $name:		message=$values{message}";
     }
 
-    #Remove quotation marks
-    if ( $values{title} =~ /^['"](.*)['"]$/s ) {
-        $values{title} = $1;
-    }
-    if ( $values{message} =~ /^['"](.*)['"]$/s ) {
-        $values{message} = $1;
-    }
-    if ( $values{device} =~ /^['"](.*)['"]$/s ) {
-        $values{device} = $1;
-    }
-    if ( $values{priority} =~ /^['"](.*)['"]$/s ) {
-        $values{priority} = $1;
-    }
-    if ( $values{sound} =~ /^['"](.*)['"]$/s ) {
-        $values{sound} = $1;
-    }
-    if ( $values{retry} =~ /^['"](.*)['"]$/s ) {
-        $values{retry} = $1;
-    }
-    if ( $values{expire} =~ /^['"](.*)['"]$/s ) {
-        $values{expire} = $1;
-    }
-    if ( $values{url_title} =~ /^['"](.*)['"]$/s ) {
-        $values{url_title} = $1;
-    }
-    if ( $values{action} =~ /^['"](.*)['"]$/s ) {
-        $values{action} = $1;
-    }
+    # Remove quotation marks
+    $values{title} = $1
+      if ( $values{title} =~ /^['"](.*)['"]$/s );
+    $values{message} = $1
+      if ( $values{message} =~ /^['"](.*)['"]$/s );
+    $values{device} = $1
+      if ( $values{device} =~ /^['"](.*)['"]$/s );
+    $values{priority} = $1
+      if ( $values{priority} =~ /^['"](.*)['"]$/s );
+    $values{sound} = $1
+      if ( $values{sound} =~ /^['"](.*)['"]$/s );
+    $values{retry} = $1
+      if ( $values{retry} =~ /^['"](.*)['"]$/s );
+    $values{expire} = $1
+      if ( $values{expire} =~ /^['"](.*)['"]$/s );
+    $values{url_title} = $1
+      if ( $values{url_title} =~ /^['"](.*)['"]$/s );
+    $values{action} = $1
+      if ( $values{action} =~ /^['"](.*)['"]$/s );
 
-    # check if we got a user or group key as device and use it as
-    # user-key instead of hash->USER_KEY
-    if ( $values{device} =~ /^(([A-Za-z0-9]{30}):)?([A-Za-z0-9,_-]*)(.*)$/ ) {
-        $values{USER_KEY} = $2 if ( $2 ne "" );
-        $values{device} = $3;
-
-        return $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} }
-          if ( $values{USER_KEY}
-            && defined( $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} } )
-          );
-    }
-
-    # Check if all mandatory arguments are filled:
-    # "message" can not be empty and if "priority" is set to "2" "retry" and
-    # "expire" must also be set.
-    # "url_title" and "action" need to be set together and require "expire"
-    # to be set as well.
-    if (
-        $values{message} ne ""
-        && ( ( $values{retry} ne "" && $values{expire} ne "" )
-            || $values{priority} < 2 )
-        && (
-            (
-                   $values{url_title} ne ""
-                && $values{action} ne ""
-                && $values{expire} ne ""
-            )
-            || ( $values{url_title} eq "" && $values{action} eq "" )
-        )
-      )
-    {
-        my $body;
-        $body = "title=" . urlEncode( $values{title} )
-          if ( $values{title} ne "" );
-
-        if ( $values{message} =~
-            /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/
-            && $values{message} !~ /^nohtml:.*/ )
-        {
-            Log3 $name, 4, "Pushover $name: handling message with HTML content";
-            $body .= "&html=1";
-
-            # replace \n by <br /> but ignore \\n
-            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
-        }
-
-        elsif ( $values{message} =~ /^nohtml:.*/ ) {
-            Log3 $name, 4,
-              "Pushover $name: explicitly ignoring HTML tags in message";
-            $values{message} =~ s/^(nohtml:).*//;
-        }
-
-        # HttpUtil's urlEncode() does not handle \n but would escape %
-        # so we encode first
-        $values{message} = urlEncode( $values{message} );
-
-        # replace any URL-encoded \n with their hex equivalent but ignore \\n
-        $values{message} =~ s/(?<!%5c)(%5cn)/%0a/g;
-
-        # replace any URL-encoded \\n by \n
-        $values{message} =~ s/%5c%5cn/%5cn/g;
-
-        $body .= "&message=" . $values{message};
-
-        if ( $values{device} ne "" ) {
-            $body .= "&device=" . $values{device};
-        }
-
-        if ( $values{priority} ne "" ) {
-            $values{priority} = 2  if ( $values{priority} > 2 );
-            $values{priority} = -2 if ( $values{priority} < -2 );
-            $body .= "&priority=" . $values{priority};
-        }
-
-        if ( $values{sound} ne "" ) {
-            $body .= "&sound=" . $values{sound};
-        }
-
-        if ( $values{retry} ne "" ) {
-            $body .= "&retry=" . $values{retry};
-        }
-
-        if ( $values{expire} ne "" ) {
-            $body .= "&expire=" . $values{expire};
-
-            $values{cbNr} = int( time() ) + $values{expire};
-            my $cbReading = "cb_" . $values{cbNr};
-            until ( ReadingsVal( $name, $cbReading, "" ) eq "" ) {
-                $values{cbNr}++;
-                $cbReading = "cb_" . $values{cbNr};
-            }
-        }
-
-        if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
-            $body .= "&timestamp=" . int( time() );
-        }
-
-        if ( $callback ne "" && $values{priority} > 1 ) {
-            Log3 $name, 5,
-              "Pushover $name: Adding emergency callback URL $callback";
-            $body .= "&callback=" . $callback;
-        }
-
-        if (   $values{url_title} ne ""
-            && $values{action} ne ""
-            && $values{expire} ne "" )
-        {
-            my $url;
-
-            if (
-                $callback eq ""
-                || (   $values{action} !~ /^http[s]?:\/\/.*$/
-                    && $values{action} =~ /^[\w-]+:\/\/.*$/ )
-              )
-            {
-                $url = $values{action};
-                $values{expire} = "";
-            }
-            else {
-                $url =
-                    $callback
-                  . "?acknowledged=1&acknowledged_by="
-                  . $hash->{USER_KEY}
-                  . "&FhemCallbackId="
-                  . $values{cbNr};
-            }
-
-            Log3 $name, 5,
-"Pushover $name: Adding supplementary URL '$values{url_title}' ($url) with "
-              . "action '$values{action}' (expires after $values{expire} => "
-              . "$values{cbNr})";
-            $body =
-                $body
-              . "&url_title="
-              . urlEncode( $values{url_title} ) . "&url="
-              . urlEncode($url);
-        }
-
-        # cleanup callback readings
-        keys %{ $hash->{READINGS} };
-        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            if ( $key =~ /^cb_(\d+)$/ ) {
-                my $rTit      = "cbTitle_" . $1;
-                my $rMsg      = "cbMsg_" . $1;
-                my $rPrio     = "cbPrio_" . $1;
-                my $rAct      = "cbAct_" . $1;
-                my $rAck      = "cbAck_" . $1;
-                my $rAckAt    = "cbAckAt_" . $1;
-                my $rAckBy    = "cbAckBy_" . $1;
-                my $rCancelId = "cbCancelId_" . $1;
-                my $rDev      = "cbDev_" . $1;
-
-                Log3 $name, 5,
-                    "Pushover $name: checking to clean up "
-                  . $hash->{NAME}
-                  . " $key: time="
-                  . $1 . " ack="
-                  . ReadingsVal( $name, $rAck, "-" )
-                  . " curTime="
-                  . int( time() );
-
-                if ( ReadingsVal( $name, $rAck, "0" ) eq "1"
-                    || $1 <= int( time() ) )
-                {
-                    delete $hash->{READINGS}{$key};
-                    delete $hash->{READINGS}{$rTit};
-                    delete $hash->{READINGS}{$rMsg};
-                    delete $hash->{READINGS}{$rPrio};
-                    delete $hash->{READINGS}{$rAck};
-                    delete $hash->{READINGS}{$rDev};
-
-                    delete $hash->{READINGS}{$rAct}
-                      if ( defined( $hash->{READINGS}{$rAct} ) );
-                    delete $hash->{READINGS}{$rAckAt}
-                      if ( defined( $hash->{READINGS}{$rAckAt} ) );
-                    delete $hash->{READINGS}{$rAckBy}
-                      if ( defined( $hash->{READINGS}{$rAckBy} ) );
-                    delete $hash->{READINGS}{$rCancelId}
-                      if ( defined( $hash->{READINGS}{$rCancelId} ) );
-
-                    Log3 $name, 4,
-                      "Pushover $name: cleaned up expired receipt " . $1;
-                }
-            }
-        }
-
-        return Pushover_SendCommand( $hash, "messages.json", $body, %values );
-    }
-    else {
-
-        # There was a problem with the arguments, so tell the user the
-        # correct usage of the 'set msg' command
-        if ( 1 == $argc && $values{title} eq "" ) {
-            return
-"Please define the default title in the pushover device arguments.";
-        }
-        else {
-            return
-"Syntax: $name msg ['<title>'] '<text>' ['<device>' <priority> '<sound>' "
-              . "[<retry> <expire> ['<url_title>' '<action>']]]";
-        }
-    }
+    return Pushover_SetMessage2( $hash, "msg", undef, \%values );
 }
 
 #------------------------------------------------------------------------------
@@ -1101,19 +879,21 @@ sub Pushover_SetMessage2 ($$$$) {
             $h->{priority}
           ? $h->{priority}
           : AttrVal( $hash->{NAME}, "priority", undef );
-        return "priority is out of scope"
+        return "parameter priority is out of scope"
           unless ( !$values{priority} || $values{priority} =~ m/^-?\d+$/ );
 
-        return "timestamp is out of scope"
+        return "parameter timestamp is out of scope"
           unless ( !$values{timestamp} || $values{timestamp} =~ m/\d+$/ );
 
-        $values{retry} = ( $h->{retry} ? $h->{retry} : undef );
-        return "retry is out of scope"
+        $values{retry} =
+          ( $h->{retry} ? $h->{retry} : AttrVal( $name, "retry", undef ) );
+        return "parameter retry is out of scope"
           unless ( !$values{retry}
             || ( $values{retry} =~ m/\d+$/ && $values{retry} >= 30 ) );
 
-        $values{expire} = ( $h->{expire} ? $h->{expire} : undef );
-        return "retry is out of scope"
+        $values{expire} =
+          ( $h->{expire} ? $h->{expire} : AttrVal( $name, "expire", undef ) );
+        return "parameter retry is out of scope"
           unless ( !$values{expire} || $values{expire} =~ m/\d+$/ );
 
         return "priority 2 messages require parameters retry and expire"
@@ -1122,19 +902,29 @@ sub Pushover_SetMessage2 ($$$$) {
             && !defined( $values{retry} )
             && !defined( $values{expire} ) );
 
+        return "priority 2 messages require parameter retry"
+          if ( $values{priority}
+            && $values{priority} == 2
+            && !defined( $values{retry} ) );
+
+        return "priority 2 messages require parameter expire"
+          if ( $values{priority}
+            && $values{priority} == 2
+            && !defined( $values{expire} ) );
+
         $values{action} =
           $h->{action} ? $h->{action} : ( $h->{url} ? $h->{url} : undef );
         $values{url_title} = ( $h->{url_title} ? $h->{url_title} : undef );
 
-        return "url_title requires parameter action"
+        return "parameter url_title requires parameter action"
           if ( defined( $values{url_title} )
             && !defined( $values{action} ) );
 
-        return "action requires parameter url_title"
+        return "parameter action requires parameter url_title"
           if ( defined( $values{action} )
             && !defined( $values{url_title} ) );
 
-        return "messages containing a URL requires parameter expire"
+        return "messages containing a URL require parameter expire"
           if ( defined( $values{action} )
             && defined( $values{url_title} )
             && !defined( $values{expire} ) );
@@ -1167,11 +957,11 @@ sub Pushover_SetMessage2 ($$$$) {
         $values{subtext} = ( defined( $h->{subtext} ) ? $h->{subtext} : undef );
 
         $values{count} = ( defined( $h->{count} ) ? $h->{count} : undef );
-        return "count is out of scope"
+        return "parameter count is out of scope"
           unless ( !$values{count} || $values{count} =~ m/-?\d+$/ );
 
         $values{percent} = ( defined( $h->{percent} ) ? $h->{percent} : undef );
-        return "percent is out of scope"
+        return "parameter percent is out of scope"
           unless (
             !$values{percent}
             || (   $values{percent} =~ m/\d+$/
@@ -1213,25 +1003,21 @@ sub Pushover_SetMessage2 ($$$$) {
     $body = "title=" . urlEncode( $values{title} )
       if ( defined( $values{title} ) );
 
-    if (   $values{message}
-        && $values{message} =~
-        /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/
-        && $values{message} !~ /^nohtml:.*/ )
-    {
-        Log3 $name, 4, "Pushover $name: handling message with HTML content";
-        $body .= "&html=1";
-
-        # replace \n by <br /> but ignore \\n
-        $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
-    }
-
-    elsif ( $values{message} && $values{message} =~ /^nohtml:.*/ ) {
-        Log3 $name, 4,
-          "Pushover $name: explicitly ignoring HTML tags in message";
-        $values{message} =~ s/^(nohtml:).*//;
-    }
-
     if ( $values{message} ) {
+        if ( $values{message} =~ /^\s*nohtml:\s*(.*)$/i ) {
+            Log3 $name, 4,
+              "Pushover $name: explicitly ignoring HTML tags in message";
+            $values{message} = $1;
+        }
+        elsif ( $values{message} =~
+            m/\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/i )
+        {
+            Log3 $name, 4, "Pushover $name: handling message with HTML content";
+            $body .= "&html=1";
+
+            # replace \n by <br /> but ignore \\n
+            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
+        }
 
         # HttpUtil's urlEncode() does not handle \n but would escape %
         # so we encode first
@@ -1781,6 +1567,12 @@ sub Pushover_CGI() {
     <li><a name="PushoverAttrpriority"></a><code>priority</code><br>
         Will be used as priority value if priority is not specified as an argument. Valid values are -1 = silent / 0 = normal priority / 1 = high priority
     </li>
+    <li><a name="PushoverAttrexpire"></a><code>expire</code><br>
+        When message priority is 2, this default value will be used for expire when not provided in the message. Needs to be 30 or higher.
+    </li>
+    <li><a name="PushoverAttrretry"></a><code>retry</code><br>
+        When message priority is 2, this default value will be used for retry when not provided in the message.
+    </li>
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Will be used as the default sound if sound argument is missing. If left blank the adjusted sound of the app will be used. 
     </li>
@@ -1956,6 +1748,12 @@ sub Pushover_CGI() {
     </li>
     <li><a name="PushoverAttrpriority"></a><code>priority</code><br>
         Wird beim Senden als Priorit&auml;t verwendet, sofern diese nicht als Aufrufargument angegeben wurde. Zul&auml;ssige Werte sind -1 = leise / 0 = normale Priorit&auml;t / 1 = hohe Priorit&auml;t
+    </li>
+    <li><a name="PushoverAttrexpire"></a><code>expire</code><br>
+        Wenn die Nachrichten Priorit&auml;t 2 ist, wird dieser Wert als Standard f&uuml;r expire verwendet, falls dieser nicht in der Nachricht angegeben wurde. Muss 30 oder h&ouml;her sein.
+    </li>
+    <li><a name="PushoverAttrretry"></a><code>retry</code><br>
+        Wenn die Nachrichten Priorit&auml;t 2 ist, wird dieser Wert als Standard f&uuml;r retry verwendet, falls dieser nicht in der Nachricht angegeben wurde.
     </li>
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
