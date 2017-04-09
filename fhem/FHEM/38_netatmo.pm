@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 09 / 2017-03-25
+# Release 10 / 2017-04-09
 
 package main;
 
@@ -682,7 +682,7 @@ netatmo_refreshToken($;$)
   my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
 
-  if( $hash->{access_token} && $nonblocking && defined($hash->{expires_at}) ) {
+  if( $hash->{access_token} && defined($hash->{expires_at}) ) {
     my ($seconds) = gettimeofday();
     return undef if( $seconds < $hash->{expires_at} - 300 );
   }
@@ -740,16 +740,16 @@ netatmo_refreshAppToken($;$)
 
   if($hash->{network} eq "dns")
   {
+    Log3 $name, 2, "$name: app token dns error, update postponed!";
     InternalTimer( gettimeofday() + 600, "netatmo_refreshAppTokenTimer", $hash);
     return undef;
   }
 
-  if( !$hash->{access_token_app} ) {
-    Log3 $name, 2, "$name: missing app token!";
-
+  if( !$hash->{refresh_token_app} ) {
+    Log3 $name, 2, "$name: missing app refresh token!";
     netatmo_getAppToken($hash);
     return undef;
-  } elsif( $nonblocking && defined($hash->{expires_at_app}) ) {
+  } elsif( defined($hash->{access_token_app}) && defined($hash->{expires_at_app}) ) {
     my ($seconds) = gettimeofday();
     return undef if( $seconds < $hash->{expires_at_app} - 300 );
   }
@@ -1757,13 +1757,6 @@ netatmo_setCamera($$$)
   my ($hash,$status,$pin) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
-  netatmo_refreshAppToken($iohash, defined($iohash->{access_token_app}));
-  return undef if(!defined($iohash->{access_token_app}));
-
-
   my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
 
@@ -1790,11 +1783,7 @@ netatmo_setCameraSetting($$$)
   my ($hash,$setting,$newvalue) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
   #netatmo_pingCamera( $hash );
-
 
   my $commandurl = ReadingsVal( $name, "vpn_url", undef );
   return undef if(!defined($commandurl));
@@ -1822,11 +1811,7 @@ netatmo_setFloodlight($$)
   my ($hash,$setting) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
   #netatmo_pingCamera( $hash );
-
 
   my $commandurl = ReadingsVal( $name, "local_url", ReadingsVal( $name, "vpn_url", undef ) );
   return undef if(!defined($commandurl));
@@ -1854,9 +1839,6 @@ netatmo_setIntensity($$)
   my ($hash,$setting) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
   #netatmo_pingCamera( $hash );
 
 
@@ -1887,9 +1869,6 @@ netatmo_setPresenceConfig($$)
   my ($hash,$setting) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
   #netatmo_pingCamera( $hash );
 
 
@@ -1919,9 +1898,6 @@ netatmo_getPresenceConfig($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
-
-  my $iohash = $hash->{IODev};
   #netatmo_pingCamera( $hash );
 
 
@@ -1952,12 +1928,9 @@ netatmo_setTagCalibration($$)
   my ($hash,$setting) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( !defined($hash->{IODev}) );
   return undef if( !defined($hash->{Camera}) );
 
-  my $iohash = $hash->{IODev};
   my $camerahash = $modules{$hash->{TYPE}}{defptr}{"C$hash->{Camera}"};
-
   return undef if( !defined($camerahash));
 
   #netatmo_pingCamera( $hash );
@@ -2185,8 +2158,12 @@ netatmo_dispatch($$$)
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
-  if(!defined($name)){
-    Log3 "netatmo", 2, "netatmo: dispatch fail (name missing)";
+  if(!defined($param->{hash})){
+    Log3 "netatmo", 2, "netatmo: ".$param->{type}."dispatch fail (hash missing)";
+    return undef;
+  }
+  if(!defined($hash->{NAME})){
+    Log3 "netatmo", 2, "netatmo: ".$param->{type}."dispatch fail (name missing)";
     return undef;
   }
 
@@ -2367,6 +2344,7 @@ netatmo_autocreate($;$)
 
   if( !$force ) {
     foreach my $d (keys %defs) {
+      next if(!defined($defs{$d}));
       next if($defs{$d}{TYPE} ne "autocreate");
       return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
     }
@@ -2430,6 +2408,7 @@ netatmo_autocreatehome($;$)
 
   if( !$force ) {
     foreach my $d (keys %defs) {
+      next if(!defined($defs{$d}));
       next if($defs{$d}{TYPE} ne "autocreate");
       return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
     }
@@ -2536,6 +2515,7 @@ netatmo_autocreatethermostat($;$)
 
   if( !$force ) {
     foreach my $d (keys %defs) {
+      next if(!defined($defs{$d}));
       next if($defs{$d}{TYPE} ne "autocreate");
       return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
     }
@@ -2601,6 +2581,7 @@ netatmo_autocreatehomecoach($;$)
 
   if( !$force ) {
     foreach my $d (keys %defs) {
+      next if(!defined($defs{$d}));
       next if($defs{$d}{TYPE} ne "autocreate");
       return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
     }
@@ -2866,7 +2847,8 @@ netatmo_parseReadings($$;$)
 
     my ($time,$step_time) = 0;
 
-    if( $hash->{status} eq "ok" ) {
+    if( $hash->{status} eq "ok" ) 
+    {
 
       if(scalar(@{$json->{body}}) == 0)
       {
@@ -5519,6 +5501,7 @@ sub netatmo_Attr($$$)
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "interval" || $attrName eq "setpoint_duration");
   $attrVal = 15 if($attrName eq "setpoint_duration" && $attrVal < 15 && $attrVal != 0);
+  return undef if(!defined($defs{$name}));
 
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
