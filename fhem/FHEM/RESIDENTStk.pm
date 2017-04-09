@@ -45,8 +45,9 @@ sub RESIDENTStk_wakeupSet($$) {
 m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9]{2}:[0-9]{2})$/i
       )
     {
-        Log3 $NAME, 5,
-            "RESIDENTStk $NAME: received unspecified notify '"
+        Log3 $NAME, 6,
+            "RESIDENTStk $NAME: "
+          . "received unspecified notify '"
           . $notify[0]
           . "' - nothing to do";
         return;
@@ -110,31 +111,36 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
 
     # check for required userattr attribute
     my $userattributes =
-"wakeupOffset:slider,0,1,120 wakeupDefaultTime:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 wakeupMacro wakeupUserdevice wakeupAtdevice wakeupResetSwitcher wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupHolidays:andHoliday,orHoliday,andNoHoliday,orNoHoliday wakeupEnforced:0,1,2 wakeupWaitPeriod:slider,0,1,360";
+"wakeupOffset:slider,0,1,120 wakeupDefaultTime:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 wakeupMacro wakeupUserdevice wakeupAtdevice wakeupResetSwitcher wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupHolidays:andHoliday,orHoliday,andNoHoliday,orNoHoliday wakeupEnforced:0,1,2,3 wakeupWaitPeriod:slider,0,1,360";
     if ( !$userattr || $userattr ne $userattributes ) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: adjusting dummy device for required attribute userattr";
+          "RESIDENTStk $NAME: "
+          . "adjusting dummy device for required attribute userattr";
         fhem "attr $NAME userattr $userattributes";
     }
 
     # check for required userdevice attribute
     if ( !$wakeupUserdevice ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - set attribute wakeupUserdevice before running wakeup function!";
+          "RESIDENTStk $NAME: "
+          . "WARNING - set attribute wakeupUserdevice before running wakeup function!";
     }
     elsif ( !IsDevice($wakeupUserdevice) ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - user device $wakeupUserdevice does not exist!";
+          "RESIDENTStk $NAME: "
+          . "WARNING - user device $wakeupUserdevice does not exist!";
     }
     elsif ( !IsDevice( $wakeupUserdevice, "RESIDENTS|ROOMMATE|GUEST" ) ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - defined user device '$wakeupUserdevice' is not a RESIDENTS, ROOMMATE or GUEST device!";
+          "RESIDENTStk $NAME: "
+          . "WARNING - defined user device '$wakeupUserdevice' is not a RESIDENTS, ROOMMATE or GUEST device!";
     }
 
     # check for required wakeupMacro attribute
     if ( !$wakeupMacro ) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: adjusting dummy device for required attribute wakeupMacro";
+          "RESIDENTStk $NAME: "
+          . "adjusting dummy device for required attribute wakeupMacro";
         fhem "attr $NAME wakeupMacro $macroName";
         $wakeupMacro = $macroName;
     }
@@ -164,11 +170,7 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
 ## Executed for start to cleanup in case this wake-up automation is re-started.\
 ## Executed for stop to cleanup in case the user ends this automation earlier.\
 ##\
-for (my \$i=1;; \$i <= 10;; \$i++) {\
-	if (defined(\$defs{\"atTmp_\".\$i.\"_\".\$NAME})) {\
-    	fhem \"delete atTmp_\".\$i.\"_\".\$NAME;;\
-	}\
-}\
+fhem \"delete atTmp_.*_\".\$NAME;;\
 \
 ##-----------------------------------------------------------------------------\
 ## BEGIN WAKE-UP PROGRAM\
@@ -185,7 +187,7 @@ if (\$EVTPART0 eq \"start\") {\
 \
 	# if wake-up should be enforced\
 	if (\$EVTPART3) {\
-		Log (4, \"\$NAME: planning enforced wake-up\");;\
+		Log3 \$NAME, 3, \"\$NAME: planning enforced wake-up\";;\
 #		fhem \"define atTmp_3_\$NAME at +00:25:00 set Sonos_Bedroom:FILTER=Volume>4 Volume 4;;;; sleep 0.5;;;; set Sonos_Bedroom:FILTER=Shuffle=0 Shuffle 1;;;; sleep 0.5;;;; set Sonos_Bedroom StartFavourite Morning%20Sounds\";;\
 #		fhem \"define atTmp_4_\$NAME at +00:26:00 set Sonos_Bedroom:FILTER=Volume<5 Volume 5\";;\
 #		fhem \"define atTmp_5_\$NAME at +00:27:00 set Sonos_Bedroom:FILTER=Volume<6 Volume 6\";;\
@@ -223,32 +225,35 @@ if (\$EVTPART0 eq \"stop\") {\
 ";
 
         Log3 $NAME, 3,
-          "RESIDENTStk $NAME: new notify macro device $wakeupMacro created";
+          "RESIDENTStk $NAME: "
+          . "new notify macro device $wakeupMacro created";
         fhem "define $wakeupMacro notify $wakeupMacro $wakeUpMacroTemplate";
         fhem
           "attr $wakeupMacro comment Macro auto-created by RESIDENTS Toolkit";
         fhem "attr $wakeupMacro room $room"
           if ($room);
     }
-    elsif ( GetType($wakeupMacro) ne "notify" ) {
+    elsif ( !IsDevice( $wakeupMacro, "notify" ) ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - defined macro device '$wakeupMacro' is not a notify device!";
+          "RESIDENTStk $NAME: "
+          . "WARNING - defined macro device '$wakeupMacro' is not a notify device!";
     }
 
     # check for required wakeupAtdevice attribute
     if ( !$wakeupAtdevice ) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: adjusting dummy device for required attribute wakeupAtdevice";
+          "RESIDENTStk $NAME: "
+          . "adjusting dummy device for required attribute wakeupAtdevice";
         fhem "attr $NAME wakeupAtdevice $atName";
         $wakeupAtdevice = $atName;
     }
     if ( !IsDevice($wakeupAtdevice) ) {
         Log3 $NAME, 3,
-          "RESIDENTStk $NAME: new at-device $wakeupAtdevice created";
-        fhem
-"define $wakeupAtdevice at *{RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")} set $NAME trigger";
-        fhem
-"attr $wakeupAtdevice comment Auto-created by RESIDENTS Toolkit: trigger wake-up timer at specific time";
+          "RESIDENTStk $NAME: " . "new at-device $wakeupAtdevice created";
+        fhem "define $wakeupAtdevice "
+          . "at *{RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")} set $NAME trigger";
+        fhem "attr $wakeupAtdevice "
+          . "comment Auto-created by RESIDENTS Toolkit: trigger wake-up timer at specific time";
         fhem "attr $wakeupAtdevice computeAfterInit 1";
         fhem "attr $wakeupAtdevice room $room"
           if ($room);
@@ -258,7 +263,7 @@ if (\$EVTPART0 eq \"stop\") {\
         # for ROOMMATE or GUEST devices
 
         # macro: gotosleep
-        if ( GetType($wakeupUserdevice) ne "RESIDENTS"
+        if (   !IsDevice( $wakeupUserdevice, "RESIDENTS" )
             && !IsDevice($macroNameGotosleep) )
         {
             my $templateGotosleep = "{\
@@ -314,11 +319,12 @@ return;;\
 }";
 
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroNameGotosleep created";
-            fhem
-"define $macroNameGotosleep notify $macroNameGotosleep $templateGotosleep";
-            fhem
-"attr $macroNameGotosleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when gettin' ready for bed";
+              "RESIDENTStk $NAME: "
+              . "new notify macro device $macroNameGotosleep created";
+            fhem "define $macroNameGotosleep "
+              . "notify $macroNameGotosleep $templateGotosleep";
+            fhem "attr $macroNameGotosleep "
+              . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when gettin' ready for bed";
             fhem "attr $macroNameGotosleep room $room"
               if ($room);
         }
@@ -326,18 +332,19 @@ return;;\
         # wd: gotosleep
         if ( !IsDevice($wdNameGotosleep) ) {
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new watchdog device $wdNameGotosleep created";
-            fhem
-"define $wdNameGotosleep watchdog $wakeupUserdevice:(gotosleep|bettfertig) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroNameGotosleep";
+              "RESIDENTStk $NAME: "
+              . "new watchdog device $wdNameGotosleep created";
+            fhem "define $wdNameGotosleep "
+              . "watchdog $wakeupUserdevice:(gotosleep|bettfertig) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroNameGotosleep";
             fhem "attr $wdNameGotosleep autoRestart 1";
-            fhem
-"attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
+            fhem "attr $wdNameGotosleep "
+              . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
             fhem "attr $wdNameGotosleep room $room"
               if ($room);
         }
 
         # macro: asleep
-        if ( GetType($wakeupUserdevice) ne "RESIDENTS"
+        if (   !IsDevice( $wakeupUserdevice, "RESIDENTS" )
             && !IsDevice($macroNameAsleep) )
         {
             my $templateAsleep = "{\
@@ -389,11 +396,12 @@ return;;\
 }";
 
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroNameAsleep created";
+              "RESIDENTStk $NAME: "
+              . "new notify macro device $macroNameAsleep created";
             fhem
               "define $macroNameAsleep notify $macroNameAsleep $templateAsleep";
-            fhem
-"attr $macroNameAsleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when jumpin' into bed and start to sleep";
+            fhem "attr $macroNameAsleep "
+              . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when jumpin' into bed and start to sleep";
             fhem "attr $macroNameAsleep room $room"
               if ($room);
         }
@@ -401,18 +409,19 @@ return;;\
         # wd: asleep
         if ( !IsDevice($wdNameAsleep) ) {
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
-            fhem
-"define $wdNameAsleep watchdog $wakeupUserdevice:(asleep|schlaeft|schläft) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroNameAsleep";
+              "RESIDENTStk $NAME: "
+              . "new watchdog device $wdNameAsleep created";
+            fhem "define $wdNameAsleep "
+              . "watchdog $wakeupUserdevice:(asleep|schlaeft|schläft) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroNameAsleep";
             fhem "attr $wdNameAsleep autoRestart 1";
-            fhem
-"attr $wdNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
+            fhem "attr $wdNameAsleep "
+              . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
             fhem "attr $wdNameAsleep room $room"
               if ($room);
         }
 
         # macro: awoken
-        if ( GetType($wakeupUserdevice) ne "RESIDENTS"
+        if (   !IsDevice( $wakeupUserdevice, "RESIDENTS" )
             && !IsDevice($macroNameAwoken) )
         {
             my $templateAwoken = "{\
@@ -460,11 +469,12 @@ return;;\
 }";
 
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroNameAwoken created";
+              "RESIDENTStk $NAME: "
+              . "new notify macro device $macroNameAwoken created";
             fhem
               "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
-            fhem
-"attr $macroNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after confirming to be awake";
+            fhem "attr $macroNameAwoken "
+              . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after confirming to be awake";
             fhem "attr $macroNameAwoken room $room"
               if ($room);
         }
@@ -472,12 +482,13 @@ return;;\
         # wd: awoken
         if ( !IsDevice($wdNameAwoken) ) {
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
-            fhem
-"define $wdNameAwoken watchdog $wakeupUserdevice:(awoken|aufgestanden) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroNameAwoken";
+              "RESIDENTStk $NAME: "
+              . "new watchdog device $wdNameAwoken created";
+            fhem "define $wdNameAwoken "
+              . "watchdog $wakeupUserdevice:(awoken|aufgestanden) 00:00:04 $wakeupUserdevice:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroNameAwoken";
             fhem "attr $wdNameAwoken autoRestart 1";
-            fhem
-"attr $wdNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
+            fhem "attr $wdNameAwoken "
+              . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
             fhem "attr $wdNameAwoken room $room"
               if ($room);
         }
@@ -542,7 +553,8 @@ return;;\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroRNameGotosleep created";
+                  "RESIDENTStk $NAME: "
+                  . "new notify macro device $macroRNameGotosleep created";
                 fhem
 "define $macroRNameGotosleep notify $macroRNameGotosleep $templateGotosleep";
                 fhem
@@ -554,12 +566,13 @@ return;;\
             # wd: gotosleep
             if ( !IsDevice($wdRNameGotosleep) ) {
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new watchdog device $wdRNameGotosleep created";
-                fhem
-"define $wdRNameGotosleep watchdog $deviceName:(gotosleep|bettfertig) 00:00:03 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroRNameGotosleep";
+                  "RESIDENTStk $NAME: "
+                  . "new watchdog device $wdRNameGotosleep created";
+                fhem "define $wdRNameGotosleep "
+                  . "watchdog $deviceName:(gotosleep|bettfertig) 00:00:03 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|asleep|schlaeft|schläft|awoken|aufgestanden) trigger $macroRNameGotosleep";
                 fhem "attr $wdRNameGotosleep autoRestart 1";
-                fhem
-"attr $wdRNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
+                fhem "attr $wdRNameGotosleep "
+                  . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
                 fhem "attr $wdRNameGotosleep room $room"
                   if ($room);
             }
@@ -601,11 +614,12 @@ return;;\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroRNameAsleep created";
-                fhem
-"define $macroRNameAsleep notify $macroRNameAsleep $templateAsleep";
-                fhem
-"attr $macroRNameAsleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are in their beds";
+                  "RESIDENTStk $NAME: "
+                  . "new notify macro device $macroRNameAsleep created";
+                fhem "define $macroRNameAsleep "
+                  . "notify $macroRNameAsleep $templateAsleep";
+                fhem "attr $macroRNameAsleep "
+                  . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are in their beds";
                 fhem "attr $macroRNameAsleep room $room"
                   if ($room);
             }
@@ -613,12 +627,13 @@ return;;\
             # wd: asleep
             if ( !IsDevice($wdRNameAsleep) ) {
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
-                fhem
-"define $wdRNameAsleep watchdog $deviceName:(asleep|schlaeft|schläft) 00:00:03 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroRNameAsleep";
+                  "RESIDENTStk $NAME: "
+                  . "new watchdog device $wdNameAsleep created";
+                fhem "define $wdRNameAsleep "
+                  . "watchdog $deviceName:(asleep|schlaeft|schläft) 00:00:03 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|awoken|aufgestanden) trigger $macroRNameAsleep";
                 fhem "attr $wdRNameAsleep autoRestart 1";
-                fhem
-"attr $wdRNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
+                fhem "attr $wdRNameAsleep "
+                  . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
                 fhem "attr $wdRNameAsleep room $room"
                   if ($room);
             }
@@ -663,11 +678,12 @@ return;;\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new notify macro device $macroRNameAwoken created";
-                fhem
-"define $macroRNameAwoken notify $macroRNameAwoken $templateAwoken";
-                fhem
-"attr $macroRNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after first resident confirmed to be awake";
+                  "RESIDENTStk $NAME: "
+                  . "new notify macro device $macroRNameAwoken created";
+                fhem "define $macroRNameAwoken "
+                  . "notify $macroRNameAwoken $templateAwoken";
+                fhem "attr $macroRNameAwoken "
+                  . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after first resident confirmed to be awake";
                 fhem "attr $macroRNameAwoken room $room"
                   if ($room);
             }
@@ -675,12 +691,13 @@ return;;\
             # wd: awoken
             if ( !IsDevice($wdRNameAwoken) ) {
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
-                fhem
-"define $wdRNameAwoken watchdog $deviceName:(awoken|aufgestanden) 00:00:04 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroRNameAwoken";
+                  "RESIDENTStk $NAME: "
+                  . "new watchdog device $wdNameAwoken created";
+                fhem "define $wdRNameAwoken "
+                  . "watchdog $deviceName:(awoken|aufgestanden) 00:00:04 $deviceName:(home|anwesend|zuhause|absent|abwesend|gone|verreist|gotosleep|bettfertig|asleep|schlaeft|schläft) trigger $macroRNameAwoken";
                 fhem "attr $wdRNameAwoken autoRestart 1";
-                fhem
-"attr $wdRNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
+                fhem "attr $wdRNameAwoken "
+                  . "comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
                 fhem "attr $wdRNameAwoken room $room"
                   if ($room);
             }
@@ -688,13 +705,15 @@ return;;\
         }
 
     }
-    elsif ( GetType($wakeupAtdevice) ne "at" ) {
+    elsif ( !IsDevice( $wakeupAtdevice, "at" ) ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - defined at-device '$wakeupAtdevice' is not an at-device!";
+          "RESIDENTStk $NAME: "
+          . "WARNING - defined at-device '$wakeupAtdevice' is not an at-device!";
     }
     elsif ( AttrVal( $wakeupAtdevice, "computeAfterInit", 0 ) ne "1" ) {
         Log3 $NAME, 3,
-"RESIDENTStk $NAME: Correcting '$wakeupAtdevice' attribute computeAfterInit required for correct recalculation after reboot";
+          "RESIDENTStk $NAME: "
+          . "Correcting '$wakeupAtdevice' attribute computeAfterInit required for correct recalculation after reboot";
         fhem "attr $wakeupAtdevice computeAfterInit 1";
     }
 
@@ -702,21 +721,24 @@ return;;\
     if ($wakeupHolidays) {
         if ( !$holidayDevice ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: ERROR - wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
-            return
-"ERROR: wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
+              "RESIDENTStk $NAME: "
+              . "ERROR - wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
+            return "ERROR: "
+              . "wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
         }
         elsif ( !IsDevice($holidayDevice) ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: ERROR - global attribute holiday2we has reference to non-existing device $holidayDevice";
-            return
-"ERROR: global attribute holiday2we has reference to non-existing device $holidayDevice";
+              "RESIDENTStk $NAME: "
+              . "ERROR - global attribute holiday2we has reference to non-existing device $holidayDevice";
+            return "ERROR: "
+              . "global attribute holiday2we has reference to non-existing device $holidayDevice";
         }
-        elsif ( GetType($holidayDevice) ne "holiday" ) {
+        elsif ( !IsDevice( $holidayDevice, "holiday" ) ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: ERROR - global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
-            return
-"ERROR: global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
+              "RESIDENTStk $NAME: "
+              . "ERROR - global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
+            return "ERROR: "
+              . "global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
         }
     }
 
@@ -735,22 +757,25 @@ return;;\
     # stop | end
     #
     elsif ( ( $VALUE eq "stop" || $VALUE eq "end" ) && $running ) {
-        Log3 $NAME, 4, "RESIDENTStk $NAME: stopping wake-up program";
+        Log3 $NAME, 4, "RESIDENTStk $NAME: " . "stopping wake-up program";
         fhem "setreading $NAME running 0";
         fhem "set $NAME nextRun $nextRun";
 
         # trigger macro again so it may clean up it's stuff.
         # use $EVTPART1 to check
         if ( !$wakeupMacro ) {
-            Log3 $NAME, 2, "RESIDENTStk $NAME: missing attribute wakeupMacro";
+            Log3 $NAME, 2,
+              "RESIDENTStk $NAME: " . "missing attribute wakeupMacro";
         }
         elsif ( !IsDevice($wakeupMacro) ) {
             Log3 $NAME, 2,
-"RESIDENTStk $NAME: notify macro $wakeupMacro not found - no wakeup actions defined!";
+              "RESIDENTStk $NAME: "
+              . "notify macro $wakeupMacro not found - no wakeup actions defined!";
         }
-        elsif ( GetType($wakeupMacro) ne "notify" ) {
+        elsif ( !IsDevice( $wakeupMacro, "notify" ) ) {
             Log3 $NAME, 2,
-              "RESIDENTStk $NAME: device $wakeupMacro is not of type notify";
+              "RESIDENTStk $NAME: "
+              . "device $wakeupMacro is not of type notify";
         }
         else {
 
@@ -768,15 +793,17 @@ return;;\
 
             if ( defined( $notify[1] ) || $VALUE eq "end" ) {
                 Log3 $NAME, 4,
-"RESIDENTStk $NAME: trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
-                fhem
-"trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
+                  "RESIDENTStk $NAME: "
+                  . "trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
+                fhem "trigger $wakeupMacro "
+                  . "stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
             }
             else {
                 Log3 $NAME, 4,
-"RESIDENTStk $NAME: trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
-                fhem
-"trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
+                  "RESIDENTStk $NAME: "
+                  . "trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
+                fhem "trigger $wakeupMacro "
+                  . "forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
 
                 fhem "set $wakeupUserdevice:FILTER=state=asleep awoken";
             }
@@ -810,7 +837,8 @@ return;;\
         }
         elsif ( $VALUE eq "reset" ) {
             Log3 $NAME, 4,
-"RESIDENTStk $NAME: no default value specified in attribute wakeupDefaultTime, just keeping setting OFF";
+              "RESIDENTStk $NAME: "
+              . "no default value specified in attribute wakeupDefaultTime, just keeping setting OFF";
             fhem "set $NAME:FILTER=state!=OFF nextRun OFF";
         }
 
@@ -824,7 +852,7 @@ return;;\
             || $VALUE =~ /^[\+\-][1-9]*[0-9]*$/
             || $VALUE =~ /^[\+\-]?([0-9]{2}):([0-9]{2})$/
         )
-        && GetType($wakeupAtdevice) eq "at"
+        && IsDevice( $wakeupAtdevice, "at" )
       )
     {
 
@@ -837,12 +865,12 @@ return;;\
         #
         readingsBeginUpdate( $defs{$NAME} );
         if ( ReadingsVal( $NAME, "nextRun", 0 ) ne $VALUE ) {
-            Log3 $NAME, 4, "RESIDENTStk $NAME: New wake-up time: $VALUE";
+            Log3 $NAME, 4, "RESIDENTStk $NAME: " . "New wake-up time: $VALUE";
             readingsBulkUpdate( $defs{$NAME}, "nextRun", $VALUE );
 
             # Update at-device
-            fhem
-"set $wakeupAtdevice modifyTimeSpec {RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")}";
+            fhem "set $wakeupAtdevice "
+              . "modifyTimeSpec {RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")}";
         }
         if ( ReadingsVal( $NAME, "state", 0 ) ne $VALUE
             && !$running )
@@ -893,7 +921,8 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
 
     if ($wakeupAtdevice) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: Wakeuptime recalculation triggered by at-device $wakeupAtdevice";
+          "RESIDENTStk $NAME: "
+          . "Wakeuptime recalculation triggered by at-device $wakeupAtdevice";
     }
 
     # just give any valuable return to at-device
@@ -901,21 +930,25 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     # and run self-destruction to clean up
     if ( !IsDevice($NAME) ) {
         Log3 $NAME, 3,
-          "RESIDENTStk $NAME: this wake-up timer device does not exist anymore";
+          "RESIDENTStk $NAME: "
+          . "this wake-up timer device does not exist anymore";
         my $atName = "at_" . $NAME;
 
-        if ( GetType($wakeupAtdevice) eq "at" ) {
+        if ( IsDevice( $wakeupAtdevice, "at" ) ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: Cleaning up at-device $wakeupAtdevice (self-destruction)";
+              "RESIDENTStk $NAME: "
+              . "Cleaning up at-device $wakeupAtdevice (self-destruction)";
             fhem "sleep 1; delete $wakeupAtdevice";
         }
-        elsif ( GetType($atName) eq "at" ) {
-            Log3 $NAME, 3, "RESIDENTStk $NAME: Cleaning up at-device $atName";
+        elsif ( IsDevice( $atName, "at" ) ) {
+            Log3 $NAME, 3,
+              "RESIDENTStk $NAME: " . "Cleaning up at-device $atName";
             fhem "sleep 1; delete $atName";
         }
         else {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: Could not automatically clean up at-device, please perform manual cleanup.";
+              "RESIDENTStk $NAME: "
+              . "Could not automatically clean up at-device, please perform manual cleanup.";
         }
 
         return $wakeupInitTime;
@@ -924,7 +957,7 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     # use nextRun value if not OFF
     if ( $nextRun && lc($nextRun) ne "off" ) {
         $wakeupTime = $nextRun;
-        Log3 $NAME, 4, "RESIDENTStk $NAME: wakeupGetBegin source: nextRun";
+        Log3 $NAME, 4, "RESIDENTStk $NAME: " . "wakeupGetBegin source: nextRun";
     }
 
     # use wakeupDefaultTime if present and not OFF
@@ -933,13 +966,14 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     {
         $wakeupTime = $wakeupDefaultTime;
         Log3 $NAME, 4,
-          "RESIDENTStk $NAME: wakeupGetBegin source: wakeupDefaultTime";
+          "RESIDENTStk $NAME: " . "wakeupGetBegin source: wakeupDefaultTime";
     }
 
     # Use a default value to ensure auto-reset at least once a day
     else {
         $wakeupTime = $wakeupInitTime;
-        Log3 $NAME, 4, "RESIDENTStk $NAME: wakeupGetBegin source: defaultValue";
+        Log3 $NAME, 4,
+          "RESIDENTStk $NAME: " . "wakeupGetBegin source: defaultValue";
     }
 
     # Recalculate new wake-up value
@@ -947,7 +981,8 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     if ( $seconds < 0 ) { $seconds = 86400 + $seconds }
 
     Log3 $NAME, 4,
-"RESIDENTStk $NAME: wakeupGetBegin result: $wakeupTime = $seconds s - $wakeupOffset m = "
+        "RESIDENTStk $NAME: "
+      . "wakeupGetBegin result: $wakeupTime = $seconds s - $wakeupOffset m = "
       . RESIDENTStk_sec2time($seconds);
 
     return RESIDENTStk_sec2time($seconds);
@@ -981,7 +1016,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $holidayToday = "";
 
     if ( $wakeupHolidays
-        && GetType($holidayDevice) eq "holiday" )
+        && IsDevice( $holidayDevice, "holiday" ) )
     {
         my $hdayTod = ReadingsVal( $holidayDevice, "state", "" );
 
@@ -1016,11 +1051,11 @@ sub RESIDENTStk_wakeupRun($;$) {
 
     if ( $nextRun ne $nowRun ) {
         $lastRun = $nowRun;
-        Log3 $NAME, 4, "RESIDENTStk $NAME: lastRun != nextRun = $lastRun";
+        Log3 $NAME, 4, "RESIDENTStk $NAME: " . "lastRun != nextRun = $lastRun";
     }
     else {
         $lastRun = $nextRun;
-        Log3 $NAME, 4, "RESIDENTStk $NAME: lastRun = nextRun = $lastRun";
+        Log3 $NAME, 4, "RESIDENTStk $NAME: " . "lastRun = nextRun = $lastRun";
     }
 
     my @days = ($today);
@@ -1038,11 +1073,13 @@ sub RESIDENTStk_wakeupRun($;$) {
     }
     elsif ( IsDisabled($wakeupDevice) ) {
         Log3 $name, 4,
-          "RESIDENTStk $NAME: device disabled - not triggering wake-up program";
+          "RESIDENTStk $NAME: "
+          . "device disabled - not triggering wake-up program";
     }
     elsif ( lc($nextRun) eq "off" && !$forceRun ) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: alarm set to OFF - not triggering wake-up program";
+          "RESIDENTStk $NAME: "
+          . "alarm set to OFF - not triggering wake-up program";
     }
     elsif ( !$wakeupUserdevice ) {
         return "$NAME: missing attribute wakeupUserdevice";
@@ -1051,20 +1088,22 @@ sub RESIDENTStk_wakeupRun($;$) {
         return "$NAME: Non existing wakeupUserdevice $wakeupUserdevice";
     }
     elsif ( !IsDevice( $wakeupUserdevice, "RESIDENTS|ROOMMATE|GUEST" ) ) {
-        return
-"$NAME: device $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
+        return "$NAME: "
+          . "device $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
     }
-    elsif ( GetType($wakeupUserdevice) eq "GUEST"
+    elsif ( IsDevice( $wakeupUserdevice, "GUEST" )
         && $wakeupUserdeviceState eq "none" )
     {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: GUEST device $wakeupUserdevice has status value 'none' so let's disable this alarm timer";
+          "RESIDENTStk $NAME: "
+          . "GUEST device $wakeupUserdevice has status value 'none' so let's disable this alarm timer";
         fhem "set $NAME nextRun OFF";
         return;
     }
     elsif ( !$wakeupHolidays && !$days{$today} && !$forceRun ) {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: weekday restriction in use - not triggering wake-up program this time";
+          "RESIDENTStk $NAME: "
+          . "weekday restriction in use - not triggering wake-up program this time";
     }
     elsif (
            $wakeupHolidays
@@ -1082,7 +1121,8 @@ sub RESIDENTStk_wakeupRun($;$) {
       )
     {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: neither weekday nor holiday restriction matched - not triggering wake-up program this time";
+          "RESIDENTStk $NAME: "
+          . "neither weekday nor holiday restriction matched - not triggering wake-up program this time";
     }
     elsif (
            $wakeupHolidays
@@ -1100,7 +1140,8 @@ sub RESIDENTStk_wakeupRun($;$) {
       )
     {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: weekday restriction in conjunction with $wakeupHolidays in use - not triggering wake-up program this time";
+          "RESIDENTStk $NAME: "
+          . "weekday restriction in conjunction with $wakeupHolidays in use - not triggering wake-up program this time";
     }
     elsif ($wakeupUserdeviceState eq "absent"
         || $wakeupUserdeviceState eq "gone"
@@ -1108,7 +1149,8 @@ sub RESIDENTStk_wakeupRun($;$) {
         || $wakeupUserdeviceState eq "awoken" )
     {
         Log3 $NAME, 4,
-"RESIDENTStk $NAME: we should not start any wake-up program for resident device $wakeupUserdevice being in state '"
+            "RESIDENTStk $NAME: "
+          . "we should not start any wake-up program for resident device $wakeupUserdevice being in state '"
           . $wakeupUserdeviceState
           . "' - not triggering wake-up program this time";
     }
@@ -1135,31 +1177,51 @@ sub RESIDENTStk_wakeupRun($;$) {
             return "$NAME: missing attribute wakeupMacro";
         }
         elsif ( !IsDevice($wakeupMacro) ) {
-            return
-"$NAME: notify macro $wakeupMacro not found - no wakeup actions defined!";
+            return "$NAME: "
+              . "notify macro $wakeupMacro not found - no wakeup actions defined!";
         }
-        elsif ( GetType($wakeupMacro) ne "notify" ) {
+        elsif ( !IsDevice( $wakeupMacro, "notify" ) ) {
             return "$NAME: device $wakeupMacro is not of type notify";
         }
         elsif ($wakeupUserdeviceWakeup) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: Another wake-up program is already being executed for device $wakeupUserdevice, won't trigger $wakeupMacro";
+              "RESIDENTStk $NAME: "
+              . "Another wake-up program is already being executed for device $wakeupUserdevice, won't trigger $wakeupMacro";
         }
         elsif ( $expLastWakeup > $nowRunSec && !$forceRun ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastWakeup (expLastWakeup=$expLastWakeup > nowRunSec=$nowRunSec)";
+              "RESIDENTStk $NAME: "
+              . "won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastWakeup (expLastWakeup=$expLastWakeup > nowRunSec=$nowRunSec)";
         }
         elsif ( $expLastAwake > $nowRunSec && !$forceRun ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastAwake (expLastAwake=$expLastAwake > nowRunSec=$nowRunSec)";
+              "RESIDENTStk $NAME: "
+              . "won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastAwake (expLastAwake=$expLastAwake > nowRunSec=$nowRunSec)";
         }
         else {
             # conditional enforced wake-up:
+            # only if actual wake-up time is
+            # earlier than wakeupDefaultTime
+            if (   $wakeupEnforced == 3
+                && $wakeupDefaultTime
+                && RESIDENTStk_time2sec($wakeupDefaultTime) >
+                RESIDENTStk_time2sec($lastRun) )
+            {
+                Log3 $NAME, 4,
+                  "RESIDENTStk $NAME: "
+                  . "Enforcing wake-up because wake-up time is earlier than normal (wakeupDefaultTime=$wakeupDefaultTime > lastRun=$lastRun)";
+                $wakeupEnforced = 1;
+            }
+
+            # conditional enforced wake-up:
             # only if actual wake-up time is not wakeupDefaultTime
-            if (   $wakeupEnforced == 2
+            elsif ($wakeupEnforced == 2
                 && $wakeupDefaultTime
                 && $wakeupDefaultTime ne $lastRun )
             {
+                Log3 $NAME, 4,
+                  "RESIDENTStk $NAME: "
+                  . "Enforcing wake-up because wake-up is different from normal (wakeupDefaultTime=$wakeupDefaultTime =! lastRun=$lastRun)";
                 $wakeupEnforced = 1;
             }
             elsif ( $wakeupEnforced == 2 ) {
@@ -1167,9 +1229,9 @@ sub RESIDENTStk_wakeupRun($;$) {
             }
 
             Log3 $NAME, 4,
-              "RESIDENTStk $NAME: trigger $wakeupMacro (running=1)";
-            fhem
-"trigger $wakeupMacro start $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
+              "RESIDENTStk $NAME: " . "trigger $wakeupMacro (running=1)";
+            fhem "trigger $wakeupMacro "
+              . "start $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
 
             # Update user device with last wakeup details
             #
@@ -1194,12 +1256,13 @@ sub RESIDENTStk_wakeupRun($;$) {
                 }
 
                 Log3 $NAME, 4,
-"RESIDENTStk $NAME: created at-device $wakeupStopAtdevice to stop wake-up program in $wakeupOffset minutes";
+                  "RESIDENTStk $NAME: "
+                  . "created at-device $wakeupStopAtdevice to stop wake-up program in $wakeupOffset minutes";
                 fhem "define $wakeupStopAtdevice at +"
                   . RESIDENTStk_sec2time( $wakeupOffset * 60 + 1 )
                   . " set $NAME:FILTER=running=1 stop triggerpost";
-                fhem
-"attr $wakeupStopAtdevice comment Auto-created by RESIDENTS Toolkit: temp. at-device to stop wake-up program of timer $NAME when wake-up time is reached";
+                fhem "attr $wakeupStopAtdevice "
+                  . "comment Auto-created by RESIDENTS Toolkit: temp. at-device to stop wake-up program of timer $NAME when wake-up time is reached";
 
                 $running = 1;
             }
@@ -1230,8 +1293,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     my $doReset = 1;
-    if (   $wakeupResetSwitcher
-        && GetType($wakeupResetSwitcher) eq "dummy"
+    if (   IsDevice( $wakeupResetSwitcher, "dummy" )
         && ReadingsVal( $wakeupResetSwitcher, "state", 0 ) eq "off" )
     {
         $doReset = 0;
@@ -1239,9 +1301,9 @@ sub RESIDENTStk_wakeupRun($;$) {
 
     if ( $wakeupDefaultTime && $rdays{$today} && $doReset ) {
         Log3 $NAME, 4,
-          "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
-        fhem
-"set $NAME:FILTER=state!=$wakeupDefaultTime nextRun $wakeupDefaultTime";
+          "RESIDENTStk $NAME: " . "Resetting based on wakeupDefaultTime";
+        fhem "set $NAME:FILTER=state!=$wakeupDefaultTime "
+          . "nextRun $wakeupDefaultTime";
     }
     elsif ( !$running ) {
         fhem "setreading $NAME:FILTER=state!=$nextRun state $nextRun";
@@ -1272,16 +1334,16 @@ sub RESIDENTStk_AttrFnDummy(@) {
                 my $room  = AttrVal( $name, "room",  0 );
 
                 fhem "define $aVal dummy";
-                fhem
-"attr $aVal comment Auto-created by RESIDENTS Toolkit: easy between on/off for auto time reset of wake-up timer $NAME";
+                fhem "attr $aVal "
+                  . "comment Auto-created by RESIDENTS Toolkit: easy between on/off for auto time reset of wake-up timer $NAME";
                 if ($alias) {
                     fhem "attr $aVal alias $alias Reset";
                 }
                 else {
                     fhem "attr $aVal alias Wake-up Timer Reset";
                 }
-                fhem
-"attr $aVal devStateIcon auto:time_automatic:off off:time_manual_mode:auto";
+                fhem "attr $aVal "
+                  . "devStateIcon auto:time_automatic:off off:time_manual_mode:auto";
                 fhem "attr $aVal group $group"
                   if ($group);
                 fhem "attr $aVal icon refresh";
@@ -1294,9 +1356,10 @@ sub RESIDENTStk_AttrFnDummy(@) {
                 Log3 $name, 3,
                   "RESIDENTStk $name: new slave dummy device $aVal created";
             }
-            elsif ( GetType($aVal) ne "dummy" ) {
+            elsif ( !IsDevice( $aVal, "dummy" ) ) {
                 Log3 $name, 3,
-"RESIDENTStk $name: Defined device name in attr $aName is not a dummy device";
+                  "RESIDENTStk $name: "
+                  . "Defined device name in attr $aName is not a dummy device";
                 return "Existing device $aVal is not a dummy!";
             }
         }
@@ -1351,7 +1414,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
 
         if ( !IsDevice($wakeupDevice) ) {
             Log3 $name, 4,
-"RESIDENTStk $name: 00 - ignoring reference to non-existing wakeupDevice $wakeupDevice";
+              "RESIDENTStk $name: "
+              . "00 - ignoring reference to non-existing wakeupDevice $wakeupDevice";
 
             my $wakeupDeviceListNew = $wakeupDeviceList;
             $wakeupDeviceListNew =~ s/,$wakeupDevice,/,/g;
@@ -1360,7 +1424,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
 
             if ( $wakeupDeviceListNew ne $wakeupDeviceList ) {
                 Log3 $name, 3,
-"RESIDENTStk $name: reference to non-existing wakeupDevice '$wakeupDevice' was removed";
+                  "RESIDENTStk $name: "
+                  . "reference to non-existing wakeupDevice '$wakeupDevice' was removed";
                 fhem "attr $name $wakeupDeviceAttrName $wakeupDeviceListNew";
             }
 
@@ -1368,12 +1433,14 @@ sub RESIDENTStk_wakeupGetNext($;$) {
         }
         elsif ( IsDisabled($wakeupDevice) ) {
             Log3 $name, 4,
-"RESIDENTStk $name: 00 - ignoring disabled wakeupDevice $wakeupDevice";
+              "RESIDENTStk $name: "
+              . "00 - ignoring disabled wakeupDevice $wakeupDevice";
             next;
         }
 
         Log3 $name, 4,
-"RESIDENTStk $name: 00 - checking for next wake-up candidate $wakeupDevice";
+          "RESIDENTStk $name: "
+          . "00 - checking for next wake-up candidate $wakeupDevice";
 
         my $nextRun = ReadingsVal( $wakeupDevice, "nextRun", 0 );
         my $wakeupAtdevice = AttrVal( $wakeupDevice, "wakeupAtdevice", 0 );
@@ -1391,9 +1458,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
         my $nextRunSrc;
 
         # get holiday status for today and tomorrow
-        if (   $wakeupHolidays
-            && $holidayDevice
-            && GetType($holidayDevice) eq "holiday" )
+        if ( $wakeupHolidays
+            && IsDevice( $holidayDevice, "holiday" ) )
         {
             if ( $hdayTod ne "none" && $hdayTod ne "" ) {
                 $holidayToday = 1;
@@ -1403,7 +1469,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             }
 
             Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 01 - Holidays to be considered - today=$holidayToday tomorrow=$holidayTomorrow";
+              "RESIDENTStk $wakeupDevice: "
+              . "01 - Holidays to be considered - today=$holidayToday tomorrow=$holidayTomorrow";
         }
         else {
             Log3 $name, 4,
@@ -1426,13 +1493,14 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             || $nextRun !~ /^([0-9]{2}:[0-9]{2})$/ )
         {
             Log3 $name, 4,
-              "RESIDENTStk $wakeupDevice: 02 - set to OFF so no candidate";
+              "RESIDENTStk $wakeupDevice: " . "02 - set to OFF so no candidate";
             next;
         }
         else {
 
             Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 02 - possible candidate found - weekdayToday=$ltoday weekdayTomorrow=$ltomorrow";
+              "RESIDENTStk $wakeupDevice: "
+              . "02 - possible candidate found - weekdayToday=$ltoday weekdayTomorrow=$ltomorrow";
 
             my $nextRunSec;
             my $nextRunSecTarget;
@@ -1458,7 +1526,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 }
 
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 03 - considering at-device value wakeupAtNTM=$wakeupAtNTM wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget";
+                  "RESIDENTStk $wakeupDevice: "
+                  . "03 - considering at-device value wakeupAtNTM=$wakeupAtNTM wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget";
             }
             else {
                 $nextRunSrc       = "dummy";
@@ -1478,13 +1547,15 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 }
 
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 03 - considering dummy-device value nextRun=$nextRun wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget (wakeupAtNTM=$wakeupAtNTM)";
+                  "RESIDENTStk $wakeupDevice: "
+                  . "03 - considering dummy-device value nextRun=$nextRun wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget (wakeupAtNTM=$wakeupAtNTM)";
             }
 
             # still running today
             if ( $nextRunSec > $secNow ) {
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 04 - this is a candidate for today - weekdayToday=$ltoday";
+                  "RESIDENTStk $wakeupDevice: "
+                  . "04 - this is a candidate for today - weekdayToday=$ltoday";
 
                 # if today is in scope
                 if ( $days{$ltoday} ) {
@@ -1498,7 +1569,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                       )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - no run today due to holiday based on combined weekday and holiday decision";
+                          "RESIDENTStk $wakeupDevice: "
+                          . "05 - no run today due to holiday based on combined weekday and holiday decision";
                         next;
                     }
 
@@ -1507,7 +1579,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                         || $nextRunSec < $definitiveNextToday )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - until now, will be NEXT WAKE-UP RUN today based on weekday decision";
+                          "RESIDENTStk $wakeupDevice: "
+                          . "05 - until now, will be NEXT WAKE-UP RUN today based on weekday decision";
                         $definitiveNextToday    = $nextRunSec;
                         $definitiveNextTodayDev = $wakeupDevice;
                     }
@@ -1515,7 +1588,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 }
                 else {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - won't be running today anymore based on weekday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "05 - won't be running today anymore based on weekday decision";
                     next;
                 }
 
@@ -1531,7 +1605,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 {
 
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 06 - won't be running today based on holiday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "06 - won't be running today based on holiday decision";
                     next;
                 }
 
@@ -1540,7 +1615,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                     || $nextRunSec < $definitiveNextToday )
                 {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 06 - until now, will be NEXT WAKE-UP RUN today based on holiday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "06 - until now, will be NEXT WAKE-UP RUN today based on holiday decision";
                     $definitiveNextToday    = $nextRunSec;
                     $definitiveNextTodayDev = $wakeupDevice;
                 }
@@ -1550,7 +1626,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             # running later
             else {
                 Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 04 - this is a candidate for tomorrow or later - weekdayTomorrow=$ltomorrow";
+                  "RESIDENTStk $wakeupDevice: "
+                  . "04 - this is a candidate for tomorrow or later - weekdayTomorrow=$ltomorrow";
 
                 # if tomorrow is in scope
                 if ( $daysTomorrow{$ltomorrow} ) {
@@ -1564,7 +1641,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                       )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - no run tomorrow due to holiday based on combined weekday and holiday decision";
+                          "RESIDENTStk $wakeupDevice: "
+                          . "05 - no run tomorrow due to holiday based on combined weekday and holiday decision";
                         next;
                     }
 
@@ -1573,7 +1651,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                         || $nextRunSec < $definitiveNextTomorrow )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - until now, will be NEXT WAKE-UP RUN tomorrow based on weekday decision";
+                          "RESIDENTStk $wakeupDevice: "
+                          . "05 - until now, will be NEXT WAKE-UP RUN tomorrow based on weekday decision";
                         $definitiveNextTomorrow    = $nextRunSec;
                         $definitiveNextTomorrowDev = $wakeupDevice;
                     }
@@ -1581,7 +1660,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 }
                 else {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - won't be running tomorrow based on weekday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "05 - won't be running tomorrow based on weekday decision";
                     next;
                 }
 
@@ -1596,7 +1676,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                   )
                 {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 06 - won't be running tomorrow based on holiday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "06 - won't be running tomorrow based on holiday decision";
                     next;
                 }
 
@@ -1604,7 +1685,8 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                     || $nextRunSec < $definitiveNextTomorrow )
                 {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 06 - until now, will be NEXT WAKE-UP RUN tomorrow based on holiday decision";
+                      "RESIDENTStk $wakeupDevice: "
+                      . "06 - until now, will be NEXT WAKE-UP RUN tomorrow based on holiday decision";
                     $definitiveNextTomorrow    = $nextRunSec;
                     $definitiveNextTomorrowDev = $wakeupDevice;
                 }
@@ -1712,7 +1794,8 @@ sub RESIDENTStk_TimeDiff ($$;$) {
 
     if ( $datetimeNow eq "" || $datetimeOld eq "" ) {
         Log3 $name, 5,
-"RESIDENTStk $name: empty data: datetimeNow='$datetimeNow' datetimeOld='$datetimeOld'";
+          "RESIDENTStk $name: "
+          . "empty data: datetimeNow='$datetimeNow' datetimeOld='$datetimeOld'";
         $datetimeNow = "1970-01-01 00:00:00";
         $datetimeOld = "1970-01-01 00:00:00";
     }

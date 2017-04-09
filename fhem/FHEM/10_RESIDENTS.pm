@@ -1953,7 +1953,7 @@ sub RESIDENTS_StopInternalTimers($) {
 								<i>wakeupDefaultTime</i> - after triggering macro reset the wake-up time to this default value (optional)
 							</li>
 							<li>
-								<i>wakeupEnforced</i> - Enforce wake-up (optional; 0=no, 1=yes, 2=if wake-up time is not wakeupDefaultTime)
+								<i>wakeupEnforced</i> - Enforce wake-up (optional; 0=no, 1=yes, 2=if wake-up time is not wakeupDefaultTime, 3=if wake-up time is earlier than wakeupDefaultTime)
 							</li>
 							<li>
 								<i>wakeupHolidays</i> - May trigger macro on holidays or non-holidays (optional; andHoliday=on holidays also considering wakeupDays, orHoliday=on holidays independently of wakeupDays, andNoHoliday=on non-holidays also considering wakeupDays, orNoHoliday=on non-holidays independently of wakeupDays)
@@ -2328,7 +2328,7 @@ sub RESIDENTS_StopInternalTimers($) {
 								<i>wakeupDefaultTime</i> - Stellt die Weckzeit nach dem ausl&ouml;sen zur&uuml;ck auf diesen Standardwert (optional)
 							</li>
 							<li>
-								<i>wakeupEnforced</i> - Forciertes wecken (optional; 0=nein, 1=ja, 2=wenn Weckzeit ungleich wakeupDefaultTime)
+								<i>wakeupEnforced</i> - Forciertes wecken (optional; 0=nein, 1=ja, 2=wenn Weckzeit ungleich wakeupDefaultTime, 3=wenn Weckzeit fr&uuml;her ist als wakeupDefaultTime)
 							</li>
 							<li>
 								<i>wakeupHolidays</i> - Makro u.U. an Feiertagen oder Nicht-Feiertagen ausf&uuml;hren (optional; andHoliday=an Feiertagen ggf. zusammen mit wakeupDays, orHoliday=an Feiertagen unabh&auml;ngig von wakeupDays, andNoHoliday=an Nicht-Feiertagen ggf. zusammen mit wakeupDays, orNoHoliday=an Nicht-Feiertagen unabh&auml;ngig von wakeupDays)
