@@ -4069,10 +4069,12 @@ Log 1, "!!!!!!!!!!";
           my $obj = eval { decode_json($data) };
 
           if( $obj ) {
+            Log3 $pname, 5, "$pname: websocket data: ". Dumper $obj;
+
             my $phash = $hash->{phash};
             my $handled = 0;
 
-            if( $obj->{_elementType} eq 'NotificationContainer' ) {
+            if( $obj->{_elementType} && $obj->{_elementType} eq 'NotificationContainer' ) {
               if( $obj->{type} eq 'playing' ) {
                 $handled = 1;
 
@@ -4142,7 +4144,11 @@ Log 1, "!!!!!!!!!!";
               }
             }
 
-            Log3 $pname, 4, "$pname: unhandled websocket text type: $obj->{type}: $data" if( !$handled );
+            if( $obj->{type} ) {
+              Log3 $pname, 4, "$pname: unhandled websocket text type: $obj->{type}: $data" if( !$handled );
+            } else {
+              Log3 $pname, 4, "$pname: unhandled websocket data: $data" if( !$handled );
+            }
 
           } else {
             Log3 $pname, 2, "$pname: unhandled websocket text $data";
