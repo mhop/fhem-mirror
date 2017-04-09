@@ -4,13 +4,13 @@
 #
 #  $Id$
 #
-#  Version 3.9.002
+#  Version 4.0
 #
 #  Configuration parameters for Homematic devices.
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
-#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR*, SABOTAGE and FAULT* must
+#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR.*, SABOTAGE and FAULT.* must
 #  not be specified in ccureadingfilter. They are always stored as readings.
 #  Datapoints LOWBAT, LOW_BAT and UNREACH must not be specified in
 #  substitute because they are substituted by default.
@@ -25,11 +25,12 @@ use warnings;
 
 use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
+use vars qw(%HMCCU_SCRIPTS);
 
-# 
-#
+######################################################################
 # Default attributes for Homematic devices of type HMCCUCHN
-#
+######################################################################
+
 %HMCCU_CHN_DEFAULTS = (
 	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
@@ -126,7 +127,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
-	"HM-PB-2-FM|HM-PB-2-WM55|HM-PB-2-WM55-2" => {
+	"HM-PB-2-FM" => {
 	_description     => "Funk-Wandtaster 2-fach",
 	_channels        => "1,2",
 	ccureadingfilter => "PRESS",
@@ -275,9 +276,10 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	}
 );
 
-#
+######################################################################
 # Default attributes for Homematic devices of type HMCCUDEV
-#
+######################################################################
+
 %HMCCU_DEV_DEFAULTS = (
    "CCU2" => {
    _description     => "HomeMatic CCU2",
@@ -414,7 +416,7 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
-	"HM-PB-2-FM|HM-PB-2-WM55|HM-PB-2-WM55-2" => {
+	"HM-PB-2-FM" => {
 	_description     => "Funk-Wandtaster 2-fach",
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
@@ -629,7 +631,69 @@ use vars qw(%HMCCU_DEV_DEFAULTS);
 	eventMap         => "/datapoint 3.SUBMIT:display/",
 	substitute       => "PRESS_LONG,PRESS_SHORT,PRESS_CONT!(1|true):pressed,(0|false):notPressed;PRESS_LONG_RELEASE!(1|true):release",
 	widgetOverride   => "display:textField"
+	},
+	"CUX-HM-TC-IT-WM-W-EU" => {
+	_description     => "CUxD Wandthermostat",
+	ccureadingfilter => "(TEMP|HUM|DEW)",
+	stripnumber      => 1
+	}
+);
 
+######################################################################
+# Homematic scripts
+######################################################################
+
+%HMCCU_SCRIPTS = (
+   "CreateVariable" => {
+   	_description => "Create CCU system variable of type STRING, NUMBER, BOOL or LIST",
+   	_pardesc     => "Type, Name, Unit, Init, Desc [, { Min, Max | Val1, Val2 | ValList } ]",
+   	parameters   => 6,
+   	code         => qq(
+object oSV = dom.GetObject("p2");
+if (!oSV){   
+  object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
+  oSV = dom.CreateObject(OT_VARDP);
+  oSysVars.Add(svObj.ID());
+  oSV.Name("p2");
+  if ("p1" = "STRING") {
+    oSV.ValueType(ivtString);
+    oSV.ValueSubType(istChar8859);
+  }
+  if ("p1" = "NUMBER") {
+    oSV.ValueType(ivtFloat);
+    oSV.ValueSubType(istGeneric);
+    oSV.ValueMin(p6);
+    oSV.ValueMax(p7);
+  }
+  if ("p1" = "BOOL") {
+    oSV.ValueType(ivtBinary);
+    oSV.ValueSubType(istBool);
+    oSV.ValueName0("p6");
+    oSV.ValueName1("p7");    
+  }
+  if ("p1" = "LIST") {
+    oSV.ValueType(ivtInteger);
+    oSV.ValueSubType(istEnum);
+    oSV.ValueList("p6");
+  }
+  oSV.DPInfo("p5");
+  oSV.ValueUnit("p3");
+  oSV.State("p4");
+  oSV.Internal(false);
+  oSV.Visible(true);
+  dom.RTUpdate(false);
+}
+   	)
+   },
+	"DeleteVariable" => {
+		_description => "Delete CCU system variable",
+		parameters   => 1,
+		code         => qq(
+object oSV = dom.GetObject("p1");
+if (oSV) {
+  dom.DeleteObject(oSV.ID());
+}
+		)
 	}
 );
 

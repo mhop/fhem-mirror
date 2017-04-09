@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Version 3.9
+#  Version 4.0
 #
-#  (c) 2016 zap (zap01 <at> t-online <dot> de)
+#  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
 #####################################################################
 #

@@ -4,13 +4,14 @@
 #
 #  $Id$
 #
-#  Version 3.9.013
+#  Version 4.0
 #
 #  Module for communication between FHEM and Homematic CCU2.
-#  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
-#  CCU group devices, HomeGear.
 #
-#  (c) 2016 zap (zap01 <at> t-online <dot> de)
+#  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
+#  CCU group devices, HomeGear, CUxD, Osram Lightify.
+#
+#  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -95,25 +96,31 @@ use HMCCUConf;
 # Import configuration data
 my $HMCCU_CHN_DEFAULTS = \%HMCCUConf::HMCCU_CHN_DEFAULTS;
 my $HMCCU_DEV_DEFAULTS = \%HMCCUConf::HMCCU_DEV_DEFAULTS;
+my $HMCCU_SCRIPTS = \%HMCCUConf::HMCCU_SCRIPTS;
 
 # Custom configuration data
 my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '3.9.013';
+my $HMCCU_VERSION = '4.0';
 
 # RPC Ports and URL extensions
+my $HMCCU_RPC_PORT_DEFAULT = 2001;
+
 my %HMCCU_RPC_NUMPORT = (
 	2000 => 'BidCos-Wired', 2001 => 'BidCos-RF', 2010 => 'HmIP-RF', 9292 => 'VirtualDevices',
-	2003 => 'Homegear'
+	2003 => 'Homegear', 8701 => 'CUxD'
 );
 my %HMCCU_RPC_PORT = (
    'BidCos-Wired', 2000, 'BidCos-RF', 2001, 'HmIP-RF', 2010, 'VirtualDevices', 9292,
-   'Homegear', 2003
+   'Homegear', 2003, 'CUxD', 8701
 );
 my %HMCCU_RPC_URL = (
 	9292, 'groups'
+);
+my %HMCCU_RPC_PROT = (
+   2000 => 'A', 2001 => 'A', 2010 => 'A', 9292 => 'A', 2003 => 'A', 8701 => 'B'
 );
 
 # Initial intervals for registration of RPC callbacks and reading RPC queue
@@ -283,7 +290,6 @@ sub HMCCU_CCURPC_ReplaceDeviceCB ($$$$);
 sub HMCCU_CCURPC_ReaddDevicesCB ($$$);
 sub HMCCU_CCURPC_EventCB ($$$$$);
 sub HMCCU_CCURPC_ListDevicesCB ($$);
-sub HMCCU_CCURPC_GetEventsCB ($$);
 
 
 ##################################################
@@ -304,12 +310,22 @@ sub HMCCU_Initialize ($)
 	$hash->{ShutdownFn} = "HMCCU_Shutdown";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long ccudefaults rpcinterfaces:multiple-strict,".join(',',sort keys %HMCCU_RPC_PORT)." ccudef-hmstatevals:textField-long ccudef-substitute:textField-long ccudef-readingname:textField-long ccudef-readingfilter:textField-long ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc  ccuflags:multiple-strict,extrpc,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1 rpcdevice rpcinterval:2,3,5,7,10 rpcqueue rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT)." rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute ccuget:Value,State ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar stripnumber ccuackstate:0,1 ccuaggregate:textField-long".
+		" ccudefaults rpcinterfaces:multiple-strict,".join(',',sort keys %HMCCU_RPC_PORT).
+		" ccudef-hmstatevals:textField-long ccudef-substitute:textField-long".
+		" ccudef-readingname:textField-long ccudef-readingfilter:textField-long".
+		" ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc".
+		" ccuflags:multiple-strict,extrpc,intrpc,dptnocheck,noagg,nohmstate ccureadings:0,1".
+		" rpcdevice rpcinterval:2,3,5,7,10 rpcqueue".
+		" rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT).
+		" rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute".
+		" ccuget:Value,State ".
+		$readingFnAttributes;
 }
 
-##################################################
+######################################################################
 # Define device
-##################################################
+######################################################################
 
 sub HMCCU_Define ($$)
 {
@@ -332,21 +348,24 @@ sub HMCCU_Define ($$)
 			my $ch = $defs{$d};
 			next if (!exists ($ch->{TYPE}));
 			$ccucount++ if ($ch->{TYPE} eq 'HMCCU' && $ch != $hash);
+			$ccucount++ if ($ch->{TYPE} eq 'HMCCURPC' && $ch->{noiodev} == 1);
 		}
 		$hash->{CCUNum} = $ccucount+1;
 	}
 
-	Log3 $name, 1, "HMCCU: Initialized version $HMCCU_VERSION. Updating devices from ".$hash->{host};
 	$hash->{version} = $HMCCU_VERSION;
 	$hash->{ccutype} = 'CCU2';
-	HMCCU_GetDeviceList ($hash);
 	$hash->{RPCState} = "stopped";
+
+	Log3 $name, 1, "HMCCU: Device $name. Initialized version $HMCCU_VERSION";
+	my ($devcnt, $chncnt) = HMCCU_GetDeviceList ($hash);
+	Log3 $name, 1, "HMCCU: Read $devcnt devices with $chncnt channels read from CCU".$hash->{host};
 	
 	$hash->{hmccu}{evtime} = 0;
 	$hash->{hmccu}{evtimeout} = 0;
 	$hash->{hmccu}{updatetime} = 0;
 	$hash->{hmccu}{rpccount} = 0;
-	$hash->{hmccu}{rpcports} = '2001';
+	$hash->{hmccu}{rpcports} = $HMCCU_RPC_PORT_DEFAULT;
 
 	readingsBeginUpdate ($hash);
 	readingsBulkUpdate ($hash, "state", "Initialized");
@@ -441,7 +460,7 @@ sub HMCCU_Attr ($@)
 			delete $hash->{RPCDEV} if (exists ($hash->{RPCDEV}));
 		}
 		elsif ($attrname eq 'rpcport' || $attrname eq 'rpcinterfaces') {
-			$hash->{hmccu}{rpcports} = '2001';
+			$hash->{hmccu}{rpcports} = $HMCCU_RPC_PORT_DEFAULT;
 		}
 	}
 	
@@ -1190,7 +1209,8 @@ sub HMCCU_Get ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "defaults:noArg exportdefaults devicelist dump vars update updateccu parfile configdesc rpcevents:noArg rpcstate:noArg deviceinfo";
+	my $options = "defaults:noArg exportdefaults devicelist dump vars update updateccu parfile".
+		" configdesc rpcevents:noArg rpcstate:noArg deviceinfo";
 	my $host = $hash->{host};
 
 	if ($opt ne 'rpcstate' && HMCCU_IsRPCStateBlocking ($hash)) {
@@ -1201,7 +1221,6 @@ sub HMCCU_Get ($@)
 	my $ccuflags = AttrVal ($name, "ccuflags", "null");
 	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 	my $parfile = AttrVal ($name, "parfile", '');
-	my $rpcport = $hash->{hmccu}{rpcports};
 
 	my $readname;
 	my $readaddr;
@@ -1333,8 +1352,10 @@ sub HMCCU_Get ($@)
 		my @hm_pids = ();
 		my @ex_pids = ();
 		if (HMCCU_IsRPCServerRunning ($hash, \@hm_pids, \@ex_pids)) {
-			return "RPC process(es) running with pid(s) ".join (',', @hm_pids) if (scalar (@hm_pids) > 0);
-			return "RPC thread(s) running with tid(s) ".join (',', @ex_pids) if (scalar (@ex_pids) > 0);
+			return "RPC process(es) running with pid(s) ".
+				join (',', @hm_pids) if (scalar (@hm_pids) > 0);
+			return "RPC thread(s) running with tid(s) ".
+				join (',', @ex_pids) if (scalar (@ex_pids) > 0);
 		}
 		return "No RPC processes or threads are running";
 	}
@@ -1356,7 +1377,8 @@ sub HMCCU_Get ($@)
 						$n = 0;
 					}
 					else {
-						$result .= "  Channel $n ".'"'.$hash->{hmccu}{dev}{$add}{name}.'"'." [".$add."]\n";
+						$result .= "  Channel $n ".'"'.$hash->{hmccu}{dev}{$add}{name}.'"'.
+							" [".$add."]\n";
 						$n++;
 					}
 				}
@@ -1976,7 +1998,8 @@ sub HMCCU_UpdateClients ($$$$)
 		foreach my $name (sort keys %{$hash->{hmccu}{adr}}) {
 			next if ($name !~ /$devexp/ || !($hash->{hmccu}{adr}{$name}{valid}));
 
-			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, "ccudevstate=active");
+			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef,
+				"ccudevstate=active");
 			
 			foreach my $d (@devlist) {
 				my $ch = $defs{$d};
@@ -2000,7 +2023,8 @@ sub HMCCU_UpdateClients ($$$$)
 		}
 	}
 	else {
-		my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", $devexp, "ccudevstate=active");
+		my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", $devexp, 
+			"ccudevstate=active");
 		Log3 $fhname, 2, "HMCCU: No client devices matching $devexp" if (scalar (@devlist) == 0);
 		
 		foreach my $d (@devlist) {
@@ -2029,10 +2053,10 @@ sub HMCCU_UpdateClients ($$$$)
 
 ##########################################################################
 # Update parameters in internal device tables and client devices.
-# Parameter devices is a hash reference with keys:
+# Parameter devices is a hash reference with following keys:
 #  {address}
-#  {address}{flag} := [N, D, R]
-#  {address}{addtype} := [chn, dev]
+#  {address}{flag}      := [N, D, R]
+#  {address}{addtype}   := [chn, dev]
 #  {address}{channels}  := Number of channels
 #  {address}{name}      := Device or channel name
 #  {address}{type}      := Homematic device type
@@ -2212,13 +2236,6 @@ sub HMCCU_UpdateSingleDevice ($$$)
 	
 	# Get attributes of client device
  	my $cltflags = AttrVal ($cltname, 'ccuflags', 'null');
-# 	my $disable = AttrVal ($cltname, 'disable', 0);
-# 	my $update = AttrVal ($cltname, 'ccureadings', 1);
-# 	return 0 if ($update == 0 || $disable == 1);
-	
-# 	my $crf = HMCCU_GetAttrReadingFormat ($clthash, $ccuhash);
-# 	my $substitute = HMCCU_GetAttrSubstitute ($clthash, $ccuhash);
-# 	my ($sc, $st, $cc, $cd) = HMCCU_GetSpecialDatapoints ($clthash, '', 'STATE', '', '');
 
 	# Build device list including virtual devices
 	my @grplist = ($cltname);
@@ -2356,26 +2373,36 @@ sub HMCCU_UpdateMultipleDevices ($$)
 	return $c;
 }
 
-####################################################
-# Get list of RPC ports. Default is 2001.
-####################################################
+######################################################################
+# Get list of valid RPC ports.
+# Considers binary RPC ports and interfaces used by CCU devices.
+# Default is 2001.
+######################################################################
 
 sub HMCCU_GetRPCPortList ($)
 {
 	my ($hash) = @_;
-	my @ports = (2001);
+	my $name = $hash->{NAME};
+	my @ports = ($HMCCU_RPC_PORT_DEFAULT);
+	
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	
 	if (defined ($hash->{hmccu}{rpcports})) {
-		@ports = split (',', $hash->{hmccu}{rpcports});
-	}
+		foreach my $p (split (',', $hash->{hmccu}{rpcports})) {
+			my $ifname = $HMCCU_RPC_NUMPORT{$p};
+			next if ($p == $HMCCU_RPC_PORT_DEFAULT ||
+				($HMCCU_RPC_PROT{$p} eq 'B' && $ccuflags !~ /extrpc/) ||
+				!exists ($hash->{hmccu}{iface}{$ifname}));
+			push (@ports, $p);
+		}
+	}	
 	
 	return @ports;
 }
 
-####################################################
-# Register RPC callbacks at CCU if RPC-Server
-# already in server loop
-####################################################
+######################################################################
+# Register RPC callbacks at CCU if RPC-Server already in server loop
+######################################################################
 
 sub HMCCU_RPCRegisterCallback ($)
 {
@@ -2384,13 +2411,12 @@ sub HMCCU_RPCRegisterCallback ($)
 	my $serveraddr = $hash->{host};
 	my $localaddr = $hash->{hmccu}{localaddr};
 
-#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
-	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL2);
 	my $rpcserveraddr = AttrVal ($name, 'rpcserveraddr', $localaddr);
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	my @rpcports = HMCCU_GetRPCPortList ($hash);
 	
-	foreach my $port (split (',', $rpcport)) {
+	foreach my $port (@rpcports) {
 		my $clkey = 'CB'.$port;
 		my $cburl = "http://".$localaddr.":".$hash->{hmccu}{rpc}{$clkey}{cbport}."/fh".$port;
 		my $url = "http://$serveraddr:$port/";
@@ -2414,11 +2440,12 @@ sub HMCCU_RPCRegisterCallback ($)
 	InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
 }
 
-####################################################
+######################################################################
 # Deregister RPC callbacks at CCU
-####################################################
+######################################################################
 
-sub HMCCU_RPCDeRegisterCallback ($) {
+sub HMCCU_RPCDeRegisterCallback ($)
+{
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	
@@ -2437,9 +2464,9 @@ sub HMCCU_RPCDeRegisterCallback ($) {
 	}
 }
 
-####################################################
+######################################################################
 # Initialize statistic counters
-####################################################
+######################################################################
 
 sub HMCCU_ResetCounters ($)
 {
@@ -2466,15 +2493,10 @@ sub HMCCU_StartExtRPCServer ($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	
-# 	if (!exists ($modules{'HMCCURPC'})) {
-# 		Log3 $name, 0, "HMCCU: Module HMCCURPC not loaded";
-# 		return 0;
-# 	}
-	
 	# Search RPC device. Create one if none exists
 	my $rpcdev = HMCCU_GetRPCDevice ($hash, 1);
 	if ($rpcdev eq '') {
-		Log3 $name, 0, "HMCCU: Can't find or create RPC device";
+		Log3 $name, 0, "HMCCU: Can't find or create HMCCURPC device";
 		return 0;
 	}
 	
@@ -2525,11 +2547,9 @@ sub HMCCU_StartIntRPCServer ($)
 	
 	# Address and ports
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
-	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpcserverport = AttrVal ($name, 'rpcserverport', 5400);
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL1);
-	my @rpcportlist = split (",", $rpcport);
+	my @rpcportlist = HMCCU_GetRPCPortList ($hash);
 	my $serveraddr = $hash->{host};
 	my $fork_cnt = 0;
 
@@ -2618,10 +2638,9 @@ sub HMCCU_StartIntRPCServer ($)
 	return $fork_cnt;
 }
 
-####################################################
-# Stop RPC server(s)
-# Send SIGINT to process(es)
-####################################################
+######################################################################
+# Stop RPC server(s) by sending SIGINT to process(es)
+######################################################################
 
 sub HMCCU_StopRPCServer ($)
 {
@@ -2630,8 +2649,6 @@ sub HMCCU_StopRPCServer ($)
 	my $pid = 0;
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-#	my $rpcport = AttrVal ($name, 'rpcport', 2001);
-	my $rpcport = $hash->{hmccu}{rpcports};
 	my $serveraddr = $hash->{host};
 
 	# Deregister callback URLs in CCU
@@ -2757,9 +2774,9 @@ sub HMCCU_IsRPCServerRunning ($$$)
 	return (@$hm_pids > 0 || @$ex_pids > 0) ? 1 : 0;
 }
 
-####################################################
+######################################################################
 # Get channels and datapoints of CCU device
-####################################################
+######################################################################
 
 sub HMCCU_GetDeviceInfo ($$$)
 {
@@ -2841,7 +2858,7 @@ sub HMCCU_FormatDeviceInfo ($)
 }
 
 ######################################################################
-# Read list of CCU devices via Homematic Script.
+# Read list of CCU devices and channels via Homematic Script.
 # Update data of client devices if not current.
 # Return (device count, channel count) or (-1, -1) on error.
 ######################################################################
@@ -2879,8 +2896,8 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 
 #  Hash elements:
 #
-#  {address}{flag} := [N, D, R]
-#  {address}{addtype} := [chn, dev]
+#  {address}{flag}      := [N, D, R]
+#  {address}{addtype}   := [chn, dev]
 #  {address}{channels}  := Number of channels
 #  {address}{name}      := Device or channel name
 #  {address}{type}      := Homematic device type
@@ -2901,7 +2918,15 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 			$objects{$hmdata[2]}{flag}      = 'N';
 			$objects{$hmdata[2]}{interface} = $hmdata[1];
 			$objects{$hmdata[2]}{name}      = $hmdata[3];
-			$objects{$hmdata[2]}{type}      = ($hmdata[2] =~ /^CUX/) ? "CUX-".$hmdata[4] : $hmdata[4];			
+			$objects{$hmdata[2]}{type}      = ($hmdata[2] =~ /^CUX/) ? "CUX-".$hmdata[4] : $hmdata[4];
+			# Count used interfaces
+			$hash->{hmccu}{iface}{$hmdata[1]}++;
+			# CCU information
+			if ($hmdata[2] eq 'BidCoS-RF') {
+				$hash->{ccuname} = $hmdata[3];
+				$hash->{ccuaddr} = $hmdata[2];
+				$hash->{ccuif}   = $hmdata[1];
+			}
 		}
 		elsif ($hmdata[0] eq 'C') {
 			# 1=Channel-Address 2=Channel-Name
@@ -2913,6 +2938,9 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 		}
 	}
 
+	# Update some CCU I/O device information
+	$hash->{ccuinterfaces} = join (',', keys %{$hash->{hmccu}{iface}});
+	
 	($devcount, $chncount) = HMCCU_UpdateDeviceTable ($hash, \%objects) if (scalar (@scrlines) > 0);
 	HMCCU_GetDatapointList ($hash);
 
@@ -3001,10 +3029,10 @@ foreach (sDevice, sDevList.Split(",")) {
 	return $c;
 }
 
-####################################################
-# Check if device/channel name or address is valid
-# and refers to an existing device or channel.
-####################################################
+######################################################################
+# Check if device/channel name or address is valid and refers to an
+# existing device or channel.
+######################################################################
 
 sub HMCCU_IsValidDeviceOrChannel ($$)
 {
@@ -3026,10 +3054,10 @@ sub HMCCU_IsValidDeviceOrChannel ($$)
 	}
 }
 
-####################################################
-# Check if device name or address is valid
-# and refers to an existing device.
-####################################################
+######################################################################
+# Check if device name or address is valid and refers to an existing
+# device.
+######################################################################
 
 sub HMCCU_IsValidDevice ($$)
 {
@@ -3051,10 +3079,10 @@ sub HMCCU_IsValidDevice ($$)
 	}
 }
 
-####################################################
-# Check if channel name or address is valid
-# and refers to an existing channel.
-####################################################
+######################################################################
+# Check if channel name or address is valid and refers to an existing
+# channel.
+######################################################################
 
 sub HMCCU_IsValidChannel ($$)
 {
@@ -3076,11 +3104,11 @@ sub HMCCU_IsValidChannel ($$)
 	}
 }
 
-####################################################
-# Get CCU parameters of device or channel. Returns
-# list containing interface, deviceaddress, name
-# type, channels.
-####################################################
+######################################################################
+# Get CCU parameters of device or channel.
+# Returns list containing interface, deviceaddress, name, type and
+# channels.
+######################################################################
 
 sub HMCCU_GetCCUDeviceParam ($$)
 {
@@ -3164,14 +3192,14 @@ sub HMCCU_GetValidDatapoints ($$$$$)
 	return scalar (@$dplistref);
 }
 
-####################################################
+######################################################################
 # Find a datapoint for device type.
 # hash = hash of client or IO device
 # devtype = Homematic device type
 # chn = Channel number, -1=all channels
 # oper = Valid operation: 1=Read, 2=Write, 4=Event
 # Return channel of first match or -1.
-####################################################
+######################################################################
 
 sub HMCCU_FindDatapoint ($$$$$)
 {
@@ -3184,9 +3212,8 @@ sub HMCCU_FindDatapoint ($$$$$)
 	if ($chn >= 0) {
 		if (exists ($hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$chn})) {
 			foreach my $dp (sort keys %{$hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$chn}}) {
-				if ($dp eq $dpt && $hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$chn}{$dp}{oper} & $oper) {
-					return $chn;
-				}
+				return $chn if ($dp eq $dpt &&
+					$hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$chn}{$dp}{oper} & $oper);
 			}
 		}
 	}
@@ -3194,9 +3221,8 @@ sub HMCCU_FindDatapoint ($$$$$)
 		if (exists ($hmccu_hash->{hmccu}{dp}{$devtype})) {
 			foreach my $ch (sort keys %{$hmccu_hash->{hmccu}{dp}{$devtype}{ch}}) {
 				foreach my $dp (sort keys %{$hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$ch}}) {
-					if ($dp eq $dpt && $hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$ch}{$dp}{oper} & $oper) {
-						return $ch;
-					}
+					return $ch if ($dp eq $dpt &&
+						$hmccu_hash->{hmccu}{dp}{$devtype}{ch}{$ch}{$dp}{oper} & $oper);
 				}
 			}
 		}
@@ -3205,11 +3231,10 @@ sub HMCCU_FindDatapoint ($$$$$)
 	return -1;
 }
 
-####################################################
-# Get channel number and datapoint name for special
-# datapoint. Valid modes are ontime, ramptime,
-# submit, level
-####################################################
+######################################################################
+# Get channel number and datapoint name for special datapoint.
+# Valid modes are ontime, ramptime, submit, level
+######################################################################
 
 sub HMCCU_GetSwitchDatapoint ($$$)
 {
@@ -3290,10 +3315,10 @@ sub HMCCU_GetMatchingDevices ($$$$)
 	return $c;
 }
 
-####################################################
+######################################################################
 # Get name of a CCU device by address.
 # Channel number will be removed if specified.
-####################################################
+######################################################################
 
 sub HMCCU_GetDeviceName ($$$)
 {
@@ -3309,9 +3334,9 @@ sub HMCCU_GetDeviceName ($$$)
 	return $default;
 }
 
-####################################################
+######################################################################
 # Get name of a CCU device channel by address.
-####################################################
+######################################################################
 
 sub HMCCU_GetChannelName ($$$)
 {
@@ -3326,10 +3351,10 @@ sub HMCCU_GetChannelName ($$$)
 	return $default;
 }
 
-####################################################
+######################################################################
 # Get type of a CCU device by address.
 # Channel number will be removed if specified.
-####################################################
+######################################################################
 
 sub HMCCU_GetDeviceType ($$$)
 {
@@ -3346,10 +3371,10 @@ sub HMCCU_GetDeviceType ($$$)
 }
 
 
-####################################################
+######################################################################
 # Get number of channels of a CCU device.
 # Channel number will be removed if specified.
-####################################################
+######################################################################
 
 sub HMCCU_GetDeviceChannels ($$$)
 {
@@ -3365,10 +3390,10 @@ sub HMCCU_GetDeviceChannels ($$$)
 	return 0;
 }
 
-####################################################
+######################################################################
 # Get interface of a CCU device by address.
 # Channel number will be removed if specified.
-####################################################
+######################################################################
 
 sub HMCCU_GetDeviceInterface ($$$)
 {
@@ -3384,10 +3409,10 @@ sub HMCCU_GetDeviceInterface ($$$)
 	return $default;
 }
 
-####################################################
+######################################################################
 # Get address of a CCU device or channel by name.
 # Return array with device address and channel no.
-####################################################
+######################################################################
 
 sub HMCCU_GetAddress ($$$$)
 {
@@ -3425,10 +3450,10 @@ sub HMCCU_GetAddress ($$$$)
 	return ($add, $chn);
 }
 
-####################################################
+######################################################################
 # Check if parameter is a channel address (syntax)
 # f=1: Interface required.
-####################################################
+######################################################################
 
 sub HMCCU_IsChnAddr ($$)
 {
@@ -3448,10 +3473,10 @@ sub HMCCU_IsChnAddr ($$)
 	}
 }
 
-####################################################
+######################################################################
 # Check if parameter is a device address (syntax)
 # f=1: Interface required.
-####################################################
+######################################################################
 
 sub HMCCU_IsDevAddr ($$)
 {
@@ -3471,11 +3496,10 @@ sub HMCCU_IsDevAddr ($$)
 	}
 }
 
-####################################################
-# Split channel address into device address and
-# channel number. Returns device address only if
-# parameter is already a device address.
-####################################################
+######################################################################
+# Split channel address into device address and channel number.
+# Returns device address only if parameter is already a device address.
+######################################################################
 
 sub HMCCU_SplitChnAddr ($)
 {
@@ -3491,11 +3515,10 @@ sub HMCCU_SplitChnAddr ($)
 	return ('', '');
 }
 
-####################################################
-# Query object attribute from CCU. Attribute must
-# be a valid method for specified object, 
-# i.e. Address()
-####################################################
+######################################################################
+# Query object attribute from CCU. Attribute must be a valid method
+# for specified object, i.e. Address()
+######################################################################
 
 sub HMCCU_GetCCUObjectAttribute ($$$)
 {
@@ -3607,10 +3630,10 @@ sub HMCCU_GetRPCDevice ($$)
 	return $rpcdevname;
 }
 
-####################################################
-# Get hash of HMCCU IO device which is responsible
-# for device or channel specified by parameter
-####################################################
+######################################################################
+# Get hash of HMCCU IO device which is responsible for device or
+# channel specified by parameter
+######################################################################
 
 sub HMCCU_FindIODevice ($)
 {
@@ -3627,11 +3650,10 @@ sub HMCCU_FindIODevice ($)
 	return undef;
 }
 
-####################################################
-# Get hash of HMCCU IO device. Useful for client
-# devices. Accepts hash of HMCCU, HMCCUDEV or 
-# HMCCUCHN device as parameter.
-####################################################
+######################################################################
+# Get hash of HMCCU IO device. Useful for client devices. Accepts hash
+# of HMCCU, HMCCUDEV or HMCCUCHN device as parameter.
+######################################################################
 
 sub HMCCU_GetHash ($@)
 {
@@ -3657,10 +3679,9 @@ sub HMCCU_GetHash ($@)
 	return undef;
 }
 
-####################################################
-# Get attribute of client device with fallback to
-# attribute of IO device.
-####################################################
+######################################################################
+# Get attribute of client device. Fallback to attribute of IO device.
+######################################################################
 
 sub HMCCU_GetAttribute ($$$$)
 {
@@ -3672,10 +3693,10 @@ sub HMCCU_GetAttribute ($$$$)
 	return $value;
 }
 
-####################################################
+######################################################################
 # Get number of occurrences of datapoint.
 # Return 0 if datapoint does not exist.
-####################################################
+######################################################################
 
 sub HMCCU_GetDatapointCount ($$$)
 {
@@ -3804,9 +3825,9 @@ sub HMCCU_GetAttrSubstitute ($$)
 	return $subst;
 }
 
-####################################################
+######################################################################
 # Clear RPC queue
-####################################################
+######################################################################
 
 sub HMCCU_ResetRPCQueue ($$)
 {
@@ -3824,9 +3845,9 @@ sub HMCCU_ResetRPCQueue ($$)
 	$hash->{hmccu}{rpc}{$clkey}{queue} = '' if (exists ($hash->{hmccu}{rpc}{$clkey}{queue}));
 }
 
-####################################################
+######################################################################
 # Process RPC server event
-####################################################
+######################################################################
 
 sub HMCCU_ProcessEvent ($$)
 {
@@ -4006,9 +4027,9 @@ sub HMCCU_ProcessEvent ($$)
 	return undef;
 }
 
-####################################################
+######################################################################
 # Timer function for reading RPC queue
-####################################################
+######################################################################
 
 sub HMCCU_ReadRPCQueue ($)
 {
@@ -4020,7 +4041,6 @@ sub HMCCU_ReadRPCQueue ($)
  	my @deldevices;
 	my @termpids;
 	my $newcount = 0;
-#	my $delcount = 0;
 	my $devcount = 0;
 	my %events = ();
 	my %devices = ();
@@ -4028,13 +4048,12 @@ sub HMCCU_ReadRPCQueue ($)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', 5);
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = $hash->{hmccu}{rpcports};
 	my $rpctimeout = AttrVal ($name, 'rpcevtimeout', 300);
 	my $maxevents = $rpcinterval*10;
 	$maxevents = 50 if ($maxevents > 50);
 	$maxevents = 10 if ($maxevents < 10);
 
-	my @portlist = split (',', $rpcport);
+	my @portlist = HMCCU_GetRPCPortList ($hash);
 	foreach my $port (@portlist) {
 		my $clkey = 'CB'.$port;
 		next if (!exists ($hash->{hmccu}{rpc}{$clkey}{queue}));
@@ -4173,10 +4192,10 @@ sub HMCCU_ReadRPCQueue ($)
 	}
 }
 
-####################################################
+######################################################################
 # Execute Homematic script on CCU.
 # Parameters: hostname, script-code
-####################################################
+######################################################################
 
 sub HMCCU_HMScript ($$)
 {
@@ -4200,10 +4219,9 @@ sub HMCCU_HMScript ($$)
 	}
 }
 
-####################################################
-# Bulk update of reading considering attribute
-# substexcl.
-####################################################
+######################################################################
+# Bulk update of reading considering attribute substexcl.
+######################################################################
 
 sub HMCCU_BulkUpdate ($$$$)
 {
@@ -4214,9 +4232,9 @@ sub HMCCU_BulkUpdate ($$$$)
 	readingsBulkUpdate ($hash, $reading, ($excl ne '' && $reading =~ /$excl/ ? $orgval : $subval));
 }
 
-####################################################
-# Get datapoint and update reading.
-####################################################
+######################################################################
+# Get datapoint value from CCU and update reading.
+######################################################################
 
 sub HMCCU_GetDatapoint ($@)
 {
@@ -4278,9 +4296,9 @@ sub HMCCU_GetDatapoint ($@)
 	}
 }
 
-####################################################
-# Set datapoint
-####################################################
+######################################################################
+# Set datapoint on CCU
+######################################################################
 
 sub HMCCU_SetDatapoint ($$$)
 {
@@ -4405,9 +4423,10 @@ sub HMCCU_ScaleValue ($$$$)
 	return $value;
 }
 
-####################################################
-# Get CCU system variables and update readings
-####################################################
+######################################################################
+# Get CCU system variables and update readings.
+# System variable readings are stored in I/O device.
+######################################################################
 
 sub HMCCU_GetVariables ($$)
 {
@@ -4447,15 +4466,16 @@ foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs())
 	return ($count, $result);
 }
 
-####################################################
-# Set CCU system variable
-####################################################
+######################################################################
+# Set CCU system variable. Variable must exist in CCU.
+######################################################################
 
 sub HMCCU_SetVariable ($$$)
 {
 	my ($hash, $param, $value) = @_;
 	my $name = $hash->{NAME};
-	my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$param.'").State("'.$value.'")';
+	my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$param.
+		'").State("'.$value.'")';
 
 	my $response = GetFileFromURL ($url);
 	if (!defined ($response) || $response =~ /<r1>null</) {
@@ -4466,11 +4486,11 @@ sub HMCCU_SetVariable ($$$)
 	return 0;
 }
 
-########################################################
-# Update all datapoints / readings of device or channel
-# considering attribute ccureadingfilter.
+######################################################################
+# Update all datapoints / readings of device or channel considering
+# attribute ccureadingfilter.
 # Parameter $ccuget can be 'State', 'Value' or 'Attr'.
-########################################################
+######################################################################
 
 sub HMCCU_GetUpdate ($$$)
 {
@@ -4681,9 +4701,9 @@ foreach (sChannel, sChnList.Split(",")) {
 	return ($count, $result);
 }
 
-####################################################
+######################################################################
 # Get RPC paramSet or paramSetDescription
-####################################################
+######################################################################
 
 sub HMCCU_RPCGetConfig ($$$$)
 {
@@ -4774,9 +4794,9 @@ sub HMCCU_RPCGetConfig ($$$$)
 	return (0, $result);
 }
 
-####################################################
+######################################################################
 # Set RPC paramSet
-####################################################
+######################################################################
 
 sub HMCCU_RPCSetConfig ($$$)
 {
@@ -4825,6 +4845,10 @@ sub HMCCU_RPCSetConfig ($$$)
 	return 0;
 }
 
+######################################################################
+# Open file queue
+######################################################################
+
 sub HMCCU_QueueOpen ($$)
 {
 	my ($hash, $queue_file) = @_;
@@ -4860,6 +4884,10 @@ sub HMCCU_QueueOpen ($$)
 	return 1;
 }
 
+######################################################################
+# Close file queue
+######################################################################
+
 sub HMCCU_QueueClose ($)
 {
 	my ($hash) = @_;
@@ -4884,6 +4912,10 @@ sub HMCCU_QueueReset ($)
 	return 1;
 }
 
+######################################################################
+# Put value in file queue
+######################################################################
+
 sub HMCCU_QueueEnq ($$)
 {
 	my ($hash, $element) = @_;
@@ -4896,6 +4928,10 @@ sub HMCCU_QueueEnq ($$)
   
 	return 1;  
 }
+
+######################################################################
+# Return next value in file queue
+######################################################################
 
 sub HMCCU_QueueDeq ($)
 {
@@ -4998,10 +5034,10 @@ sub HMCCU_GetHMState ($$$)
 	return @hmstate;
 }
 
-####################################################
-# Calculate time difference in seconds between
-# current time and specified timestamp
-####################################################
+######################################################################
+# Calculate time difference in seconds between current time and
+# specified timestamp
+######################################################################
 
 sub HMCCU_GetTimeSpec ($)
 {
@@ -5079,7 +5115,7 @@ sub HMCCU_CalculateReading ($$$)
 	return @result;
 }
 
-####################################################
+######################################################################
 # Encode command string for e-paper display
 #
 # Parameters:
@@ -5094,7 +5130,7 @@ sub HMCCU_CalculateReading ($$$)
 #  repeat=0-15
 #
 # Returns undef on error or encoded string on success
-####################################################
+######################################################################
 
 sub HMCCU_EncodeEPDisplay ($)
 {
@@ -5201,9 +5237,9 @@ sub HMCCU_EncodeEPDisplay ($)
 
 
 
-##################################################
-#             *** Subprocess part ***
-##################################################
+######################################################################
+#                     *** Subprocess part ***
+######################################################################
 
 # Child process. Must be global to allow access by RPC callbacks
 my $hmccu_child;
@@ -5229,10 +5265,9 @@ my %child_hash = (
 my $cphash = \%child_hash;
 
 
-##################################################
-# Subprocess
-# Write event to parent process
-##################################################
+######################################################################
+# Subprocess: Write event to parent process
+######################################################################
 
 sub HMCCU_CCURPC_Write ($$)
 {
@@ -5245,10 +5280,9 @@ sub HMCCU_CCURPC_Write ($$)
 	HMCCU_QueueEnq ($cpqueue, $et."|".$msg);
 }
 
-##################################################
-# Subprocess
-# Start RPC server. Return 1 on success.
-##################################################
+######################################################################
+# Subprocess: Initialize RPC server. Return 1 on success.
+######################################################################
 
 sub HMCCU_CCURPC_OnRun ($)
 {
@@ -5261,7 +5295,6 @@ sub HMCCU_CCURPC_OnRun ($)
 	my $clkey = "CB".$serverport;
 	my $ccurpc_server;
 
-# SUBPROCESS
 	# Create, open and reset queue file
  	Log3 $name, 0, "CCURPC: $clkey Creating file queue $queuefile";
  	if (!HMCCU_QueueOpen ($cpqueue, $queuefile)) {
@@ -5269,7 +5302,6 @@ sub HMCCU_CCURPC_OnRun ($)
  		return 0;
  	}
 
-# SUBPROCESS	
 	# Reset event queue
  	HMCCU_QueueReset ($cpqueue);
  	while (defined (HMCCU_QueueDeq ($cpqueue))) { }
@@ -5349,15 +5381,6 @@ sub HMCCU_CCURPC_OnRun ($)
 	   }
 	);
 
-	# Callback for event queue query
-	Log3 $name, 1, "CCURPC: $clkey Adding callback for event query";
-	$ccurpc_server->add_method (
-	   { name=>"getEvents",
-	     signature=>["array string"],
-	     code=>\&HMCCU_CCURPC_GetEventsCB
-	   }
-	);
-
 	# Enter server loop
 	HMCCU_CCURPC_Write ("SL", "$$|$clkey");
 
@@ -5371,10 +5394,9 @@ sub HMCCU_CCURPC_OnRun ($)
 	return 1;
 }
 
-##################################################
-# Subprocess
-# RPC server loop terminated
-##################################################
+######################################################################
+# Subprocess: Called when RPC server loop is terminated
+######################################################################
 
 sub HMCCU_CCURPC_OnExit ()
 {
@@ -5384,10 +5406,9 @@ sub HMCCU_CCURPC_OnExit ()
 	}
 }
 
-##################################################
-# Subprocess
-# Callback for new devices
-##################################################
+######################################################################
+# Subprocess: Callback for new devices
+######################################################################
 
 sub HMCCU_CCURPC_NewDevicesCB ($$$)
 {
@@ -5408,16 +5429,14 @@ sub HMCCU_CCURPC_NewDevicesCB ($$$)
 				$dev->{FIRMWARE}."|".$dev->{RX_MODE};
 		}
 		HMCCU_CCURPC_Write ("ND", $msg);
-#		HMCCU_CCURPC_Write ("ND", $dev->{ADDRESS}."|".$dev->{TYPE});
 	}
 
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for deleted devices
-##################################################
+######################################################################
+# Subprocess: Callback for deleted devices
+######################################################################
 
 sub HMCCU_CCURPC_DeleteDevicesCB ($$$)
 {
@@ -5433,10 +5452,9 @@ sub HMCCU_CCURPC_DeleteDevicesCB ($$$)
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for modified devices
-##################################################
+######################################################################
+# Subprocess: Callback for modified devices
+######################################################################
 
 sub HMCCU_CCURPC_UpdateDeviceCB ($$$$)
 {
@@ -5447,10 +5465,9 @@ sub HMCCU_CCURPC_UpdateDeviceCB ($$$$)
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for replaced devices
-##################################################
+######################################################################
+# Subprocess: Callback for replaced devices
+######################################################################
 
 sub HMCCU_CCURPC_ReplaceDeviceCB ($$$$)
 {
@@ -5461,10 +5478,9 @@ sub HMCCU_CCURPC_ReplaceDeviceCB ($$$$)
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for readded devices
-##################################################
+######################################################################
+# Subprocess: Callback for readded devices
+######################################################################
 
 sub HMCCU_CCURPC_ReaddDevicesCB ($$$)
 {
@@ -5480,10 +5496,9 @@ sub HMCCU_CCURPC_ReaddDevicesCB ($$$)
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for handling CCU events
-##################################################
+######################################################################
+# Subprocess: Callback for handling CCU events
+######################################################################
 
 sub HMCCU_CCURPC_EventCB ($$$$$)
 {
@@ -5506,10 +5521,9 @@ sub HMCCU_CCURPC_EventCB ($$$$$)
 	return;
 }
 
-##################################################
-# Subprocess
-# Callback for list devices
-##################################################
+######################################################################
+# Subprocess: Callback for list devices
+######################################################################
 
 sub HMCCU_CCURPC_ListDevicesCB ($$)
 {
@@ -5521,23 +5535,6 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
 	HMCCU_CCURPC_Write ("IN", "INIT|1|$cb");
 
 	return RPC::XML::array->new();
-}
-
-##################################################
-# Subprocess
-# Callback for event query
-##################################################
-
-sub HMCCU_CCURPC_GetEventsCB ($$)
-{
-	my ($server, $cb) = @_;
-	my @result;
-	my $name = $hmccu_child->{devname};
-	
-	$cb = "unknown" if (!defined ($cb));
-	Log3 $name, 1, "CCURPC: $cb GetEvents";
-
-	return undef;
 }
 
 
@@ -5799,6 +5796,7 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
    		<li>BidCos-RF (Port 2001)</li>
    		<li>Homegear (Port 2003)</li>
    		<li>HmIP (Port 2010)</li>
+   		<li>CUxD (Port 8701)</li>
    		<li>VirtualDevice (Port 9292)</li>
    		</ul>
       </li><br/>
@@ -5813,6 +5811,7 @@ sub HMCCU_CCURPC_GetEventsCB ($$)
          <li>2001 = BidCos-RF (wireless 868 MHz components with BidCos protocol)</li>
          <li>2003 = Homegear (experimental)</li>
          <li>2010 = HM-IP (wireless 868 MHz components with IPv6 protocol)</li>
+         <li>8701 = CUxD (only supported with external RPC server HMCCURPC)</li>
          <li>9292 = CCU group devices (especially heating groups)</li>
          </ul>
       </li><br/>
