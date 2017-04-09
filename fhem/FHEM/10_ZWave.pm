@@ -3378,16 +3378,7 @@ ZWave_secStart($)
   my ($hash) = @_;
   my $dt = gettimeofday();
 
-  if($hash->{ZWaveSubDevice} eq 'yes') { # store secMsg in parent-device
-    my $pHash = $modules{ZWave}{defptr}{$hash->{homeId}." ".
-                                        substr($hash->{nodeIdHex}, 0, 2)};
-    if(!$pHash) {
-      Log 3, "ERROR: secStart aborted for orphan child ($hash->{NAME})";
-      return;
-    }
-    $hash = $pHash;
-  }
-
+  $hash = $defs{$hash->{endpointParent}} if($hash->{endpointParent});
   $hash->{secTime} = $dt;
   $hash->{secTimer} = { hash => $hash };
   InternalTimer($dt+7, "ZWave_secUnlock", $hash->{secTimer}, 0);
@@ -3436,7 +3427,7 @@ ZWave_secIsSecureClass($$)
   if ($cc_cmd =~m/(..)(..)/) {
     my ($cc, $cmd) = ($1, $2);
     my $cc_name = $zwave_id2class{lc($cc)};
-    my $sec_classes = AttrVal($hash->{ZWaveSubDevice} eq 'yes' ?
+    my $sec_classes = AttrVal($hash->{endpointParent} ?
                         $hash->{endpointParent} : $name, "secure_classes", "");
 
     if (($sec_classes =~ m/$cc_name/) && ($cc_name ne 'SECURITY')){
@@ -3571,16 +3562,7 @@ ZWave_secPutMsg ($$$)
   my ($hash, $s, $cmd) = @_;
   my $name = $hash->{NAME};
 
-  if($hash->{ZWaveSubDevice} eq 'yes') { # store secMsg in parent-device
-    my $pHash = $modules{ZWave}{defptr}{$hash->{homeId}." ".
-                                        substr($hash->{nodeIdHex}, 0, 2)};
-    if(!$pHash) {
-      Log 3, "ERROR: secStart aborted for orphan child ($hash->{NAME})";
-      return;
-    }
-    $hash = $pHash;
-  }
-
+  $hash = $defs{$hash->{endpointParent}} if($hash->{endpointParent});
   if (!$hash->{secMsg}) {
     my @arr = ();
     $hash->{secMsg} = \@arr;
