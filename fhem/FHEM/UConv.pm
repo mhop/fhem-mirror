@@ -274,6 +274,13 @@ sub uwpscm2uvi($) {
     return int( ( $data - 100 ) / 450 + 1 );
 }
 
+# Power: convert UV-Index to uW/cm2 (micro watt per square centimeter)
+sub uvi2uwpscm($) {
+    my ($data) = @_;
+
+    return ( $data * ( 450 + 1 ) ) + 100;
+}
+
 # Power: convert lux to W/m2 (watt per square meter)
 sub lux2wpsm($;$) {
     my ( $data, $rnd ) = @_;
@@ -486,7 +493,7 @@ sub decimal_mark ($$) {
 
 sub roundX($;$) {
     my ( $v, $n ) = @_;
-    $n = 1 if ( !$n );
+    $n = 1 unless ($n);
     return sprintf( "%.${n}f", $v );
 }
 

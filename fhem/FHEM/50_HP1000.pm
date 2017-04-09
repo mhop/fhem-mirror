@@ -771,8 +771,9 @@ sub HP1000_CGI() {
         $p = "humidity"       if ( $p eq "_outhumi" );
         $p = "indoorHumidity" if ( $p eq "_inhumi" );
         $p = "luminosity"     if ( $p eq "_light" );
-        $p = "UVR"            if ( $p eq "_UV" );
         $p = "wind_direction" if ( $p eq "_winddir" );
+        $p = "UV" if ( $p eq "_UV" && $hash->{SERVER_TYPE} eq "php" );
+        $p = "UVR" if ( $p eq "_UV" && $hash->{SERVER_TYPE} ne "php" );
 
         # name translation for Metric standard
         $p = "dewpoint"          if ( $p eq "_dewpoint" );
@@ -850,10 +851,23 @@ sub HP1000_CGI() {
             UConv::humidity2condition( $webArgs->{inhumi} ) );
     }
 
-    # UV (convert from uW/cm2)
     if ( defined( $webArgs->{UV} ) ) {
-        $webArgs->{UVI} = UConv::uwpscm2uvi( $webArgs->{UV} );
-        readingsBulkUpdate( $hash, "UV", $webArgs->{UVI} );
+
+        # php reports UV as index
+        # UVR (convert from UVI)
+        if ( $hash->{SERVER_TYPE} eq 'php' ) {
+            $webArgs->{UVI} = $webArgs->{UV};
+            $webArgs->{UVR} = UConv::uvi2uwpscm( $webArgs->{UVI} );
+            readingsBulkUpdate( $hash, "UVR", $webArgs->{UVR} );
+        }
+
+        # jsp reports UV as radiation
+        # UV (convert from uW/cm2)
+        else {
+            $webArgs->{UVR} = $webArgs->{UV};
+            $webArgs->{UVI} = UConv::uwpscm2uvi( $webArgs->{UVR} );
+            readingsBulkUpdate( $hash, "UV", $webArgs->{UVI} );
+        }
     }
 
     # UVcondition
