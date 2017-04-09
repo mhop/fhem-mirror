@@ -51,6 +51,10 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 09.04.2017
+#	Beim Maskieren der Anzeigelisten für Playlisten, Radios oder Favoriten werden Klammern und andere Sonderzeichen für reguläre Ausdrücke nun auch in Punkte umgewandelt, da diese sonst den regulären Such-Ausdruck stören.
+#	Beim Starten/Laden von Playlisten, Radios oder Favoriten werden, vor der eigentlichen Suche im Sonossystem, einfache Anführungszeichen (') in die HTML-Schreibweise (&apos;) übersetzt, da diese so auch von Sonos verwendet werden.
+#	Radiocover werden nun in höherer Auflösung von einer TuneIn-API-Schnittstelle geladen (von dort wo auch der Controller selbst die Cover lädt).
 # 04.04.2017
 #	Es gibt zwei neue Readings "AvailablePlayerList" und "AvailablePlayerListAlias" am Sonosplayer-Device, wenn das Attribut "getListsDirectlyToReadings" am Sonos-Device gesetzt wurde. Diese Reading geben die anderen noch verfügbaren, nicht gebundenen, Player an. Das ist die Grundlage für eine Player-zur-Abspielgruppe-hinzufügen-Funktion als Listendarstellung.
 #	Es gibt zwei neue Readings "AllPlayerNotBonded" und "AllPlayerNotBondedCount" am Sonos-Device, welche alle Masterplayer angibt, die nicht gebunden sind.
@@ -73,20 +77,6 @@
 #	Die Prozedur "SONOS_getGroupsRG()" wurde umgebaut, da FW_makeImage von FhemWeb scheinbar die Variable "$_" verändert.
 # 13.03.2017
 #	Saubere Fehlerbehandlung bei der Verarbeitung von currentFavouriteName, currentPlaylistName und currentRadioName.
-# 12.03.2017
-#	NotifyFn und NotifyDev werden nun im Define des Moduls festgelegt (anstatt wie vorher im Initialize). Dadurch sollten deutlich weniger Notify-Anfragen beim Modul ankommen.
-#	Es gibt nun einen Set-Befehl "RefreshShareIndex" zum Aktualisieren der Bibliothek und ein Reading "ShareIndexInProgress", welches angibt, ob eine Aktualisierung gerade in Ausführung ist.
-#	Die Fehlermeldung beim Verbinden zum Device wurde um die Zieladresse erweitert.
-#	Es gibt drei neue Readings, die sich auf Spotify-Direct-Play beziehen: DirectControlClientID, DirectControlIsSuspended und DirectControlAccountID
-#	Man kann beim Setzen der Titelposition nun auch relative Angaben machen, also z.B. '+0:00:15' oder auch '+10%'. Geht natürlich auch mit '-'.
-#	Man kann beim Setzen der Titelposition nun auch eine ganze Zahl als Sekundenangabe  machen. Dabei gehen auch Relativangaben
-#	Beim Cover-Download wird nun ein Standard_Timeout von 5s verwendet, sodass ein fehlender Player keine Blockade mehr verursachen sollte. Dafür gibt es auch ein neues Attribut 'coverLoadTimeout', womit dieser Wert eingestellt werden kann. Das ganze geht nur für Nicht-Windows-Systeme, da der Timeout über einen Alarm realisiert wird.
-#	Wenn während eines Subscriptions-Renews ein Timeout-Fehler auftreten sollte, wird nun der Discovery-Prozess neu angestartet, um sicherzustellen, daß der Player wieder gefunden und neu initialisiert wird.
-#	In der ControlPoint.pm wurde eine Sicherheitsabfrage eingebaut, wenn total verstümmelte Pakete beim SSDP-Recover ankommen.
-#	Es gibt ein neues Reading "currentEnqueuedTransportURI", welches den TransportURI des hinzugefügten Paketes enthält, aus welchem der Titel gerade abgespielt wird (z.B. der Identifier der Spotify-Playliste)
-#	Es gibt ein neues Reading "currentFavouriteName", welches versucht den "currentEnqueuedTransportURI" in den Favoriten zu finden, und enthält dann den gefundenen Favoritennamen. Dazu müssen die Favoriten einmal mittels "get FavouritesWithCover" ermittelt worden sein, und im Reading "Favourites" bereitstehen.
-#	Es gibt ein neues Reading "currentPlaylistName", welches versucht den "currentEnqueuedTransportURI" in den Playlisten zu finden, und enthält dann den gefundenen Playlistnamen. Dazu müssen die Playlisten einmal mittels "get PlaylistsWithCover" ermittelt worden sein, und im Reading "Playlists" bereitstehen.
-#	Es gibt ein neues Reading "currentRadioName", welches versucht den "currentEnqueuedTransportURI" in den Radios zu finden, und enthält dann den gefundenen Radionamen. Dazu müssen die Radios einmal mittels "get RadiosWithCover" ermittelt worden sein, und im Reading "Radios" bereitstehen.
 #
 ########################################################################################
 #
@@ -269,6 +259,7 @@ my $SONOS_DIDLFooter = '</DIDL-Lite>';
 my $SONOS_GOOGLETRANSLATOR_URL = 'http://translate.google.com/translate_tts?tl=%1$s&client=tw-ob&q=%2$s'; # 1->Sprache, 2->Text
 my $SONOS_GOOGLETRANSLATOR_CHUNKSIZE = 95;
 my $SONOS_DEFAULTCOVERLOADTIMEOUT = 5;
+my $SONOS_LISTELEMMASK = '[ \(\)\/\+\?\|\*\{\}\$\^\[\]\#]';
 
 # Basis UPnP-Object und Search-Referenzen
 my $SONOS_RestartControlPoint = 0;
@@ -711,7 +702,7 @@ sub SONOS_FhemWebCallback($) {
 				last;
 			}
 		}
-		return ("text/html; charset=UTF8", 'Call for Non-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\.cloudfront.net\//i && $albumurl !~ /\.scdn.co\/image\//i && $albumurl !~ /\/music\/image\?/i);
+		return ("text/html; charset=UTF8", 'Call for Non-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\.cloudfront.net\//i && $albumurl !~ /\.scdn.co\/image\//i && $albumurl !~ /cdn-radiotime-logos\.tunein\.com/i && $albumurl !~ /\/music\/image\?/i);
 		
 		# Generierter Dateiname für die Cache-Funktionalitaet
 		my $albumHash;
@@ -1349,15 +1340,15 @@ sub SONOS_Read($) {
 				
 				if (AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'getListsDirectlyToReadings', 0)) {
 					my $val = $current{FavouriteName};
-					$val =~ s/ /\./g;
+					$val =~ s/[ \(\)]/\./g;
 					SONOS_readingsBulkUpdateIfChanged($hash, "currentFavouriteNameMasked", $val);
 					
 					$val = $current{PlaylistName};
-					$val =~ s/ /\./g;
+					$val =~ s/[ \(\)]/\./g;
 					SONOS_readingsBulkUpdateIfChanged($hash, "currentPlaylistNameMasked", $val);
 					
 					$val = $current{RadioName};
-					$val =~ s/ /\./g;
+					$val =~ s/[ \(\)]/\./g;
 					SONOS_readingsBulkUpdateIfChanged($hash, "currentRadioNameMasked", $val);
 				}
 				
@@ -1499,6 +1490,10 @@ sub SONOS_Read($) {
 							$currentValue = $attr{global}{modpath}.'/www/images/default/SONOSPLAYER/'.$name.'_'.$nextName.'AlbumArt.'.SONOS_ImageDownloadTypeExtension($groundURL.$tempURI);
 							SONOS_Log undef, 4, "Transport-Event: Spotify-Bilder-Download failed. Use normal thumbnail: SONOS_DownloadReplaceIfChanged('$srcURI', '".$currentValue."');";
 						}
+					} elsif ($tempURI =~ m/getaa.*?x-sonosapi-stream%3a(.+?)%3f/i) {
+						$srcURI = 'http://cdn-radiotime-logos.tunein.com/'.$1.'g.png';;
+						$currentValue = $attr{global}{modpath}.'/www/images/default/SONOSPLAYER/'.$name.'_'.$nextName.'AlbumArt.png';
+						SONOS_Log undef, 4, "Transport-Event: Radiocover-Download: SONOS_DownloadReplaceIfChanged('$srcURI', '".$currentValue."');";
 					} elsif ($tempURI =~ m/^\/fhem\/sonos\/cover\/(.*)/i) {
 						$srcURI = $attr{global}{modpath}.'/FHEM/lib/UPnP/sonos_'.$1;
 						$currentValue = $attr{global}{modpath}.'/www/images/default/SONOSPLAYER/'.$name.'_'.$nextName.'AlbumArt.jpg';
@@ -2738,7 +2733,7 @@ sub SONOS_Discover() {
 						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
 							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'PlaylistsListAlias', join('|', sort values %resultHash));
-							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'PlaylistsList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'PlaylistsList', join('|', map { $_ =~ s/$SONOS_LISTELEMMASK/\./g; $_ } sort values %resultHash));
 							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 							
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
@@ -2779,7 +2774,7 @@ sub SONOS_Discover() {
 						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
 							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'FavouritesListAlias', join('|', sort values %resultHash));
-							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'FavouritesList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'FavouritesList', join('|', map { $_ =~ s/$SONOS_LISTELEMMASK/\./g; $_ } sort values %resultHash));
 							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 							
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
@@ -3157,7 +3152,7 @@ sub SONOS_Discover() {
 						if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
 							SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'RadiosListAlias', join('|', sort values %resultHash));
-							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'RadiosList', join('|', map { $_ =~ s/ /./g; $_ } sort values %resultHash));
+							SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'RadiosList', join('|', map { $_ =~ s/$SONOS_LISTELEMMASK/\./g; $_ } sort values %resultHash));
 							SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 							
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
@@ -3287,6 +3282,9 @@ sub SONOS_Discover() {
 					my $radioName = $1 if ($regSearch);
 					$radioName = uri_unescape($params[0]) if (!$regSearch);
 					
+					# Alle übergebenen Anführungszeichen in die HTML Entity übersetzen, da es so auch von Sonos geliefert wird.
+					$radioName =~ s/'/&apos;/g;
+					
 					# RegEx prüfen...
 					if ($regSearch) {
 						eval { "" =~ m/$radioName/ };
@@ -3333,6 +3331,9 @@ sub SONOS_Discover() {
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
 					my $favouriteName = $1 if ($regSearch);
 					$favouriteName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# Alle übergebenen Anführungszeichen in die HTML Entity übersetzen, da es so auch von Sonos geliefert wird.
+					$favouriteName =~ s/'/&apos;/g;
 					
 					# RegEx prüfen...
 					if ($regSearch) {
@@ -3406,6 +3407,9 @@ sub SONOS_Discover() {
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
 					my $playlistName = $1 if ($regSearch);
 					$playlistName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# Alle übergebenen Anführungszeichen in die HTML Entity übersetzen, da es so auch von Sonos geliefert wird.
+					$playlistName =~ s/'/&apos;/g;
 					
 					# RegEx prüfen...
 					if ($regSearch) {
@@ -4373,6 +4377,8 @@ sub SONOS_MakeCoverURL($$) {
 		$resURL = SONOS_getSpotifyCoverURL($1, 1);
 	} elsif ($resURL =~ m/^x-sonos-spotify:spotify%3atrack%3a(.*?)(\?|$)/i) {
 		$resURL = SONOS_getSpotifyCoverURL($1);
+	} elsif ($resURL =~ m/^x-sonosapi-stream:(.+?)\?/i) {
+		$resURL = 'http://cdn-radiotime-logos.tunein.com/'.$1.'g.png';
 	} elsif (($resURL =~ m/x-rincon-playlist:.*?#(.*)/i) || ($resURL =~ m/savedqueues.rsq(#\d+)/i)) {
 		my $search = $1;
 		$search = 'SQ:'.$1 if ($search =~ m/#(\d+)/i);
@@ -6501,6 +6507,9 @@ sub SONOS_TransportCallback($$) {
 		if ($tempURI =~ m/^(http:\/\/.*?\/)(.*)/) {
 			$groundURL = $1;
 			$tempURI = $2;
+		} elsif ($tempURI =~ m/^x-sonosapi-stream:(.+?)\?/i) {
+			$groundURL = 'http://cdn-radiotime-logos.tunein.com/';
+			$tempURI = $1.'g.png';
 		}
 		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.$tempURI.':'.$groundURL);
 		
