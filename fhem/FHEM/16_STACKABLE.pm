@@ -128,7 +128,13 @@ STACKABLE_IOReadFn($) # used by synchronuous get
   while($buf !~ m/\n/) {
     $buf .= DevIo_SimpleRead($me->{IODev}); # may block
   }
-  $buf =~ s/^.//;
+
+  my $mName = $me->{NAME};
+  Log3 $mName, 5, "$mName read: $buf";
+  my @l = split("\n", $buf);
+  $buf = join("\n", grep { $_ =~ m/^\*/ } @l)."\n";
+
+  $buf =~ s/^\*//gsm;
   if(AttrVal($me->{NAME},"binary",0)) {
     $buf =~ s/[\r\n]//g;
     return pack("H*",$buf);
