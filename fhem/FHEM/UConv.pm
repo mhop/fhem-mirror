@@ -267,11 +267,14 @@ sub direction2compasspoint($;$) {
 ###
 
 # Power: convert uW/cm2 (micro watt per square centimeter) to UV-Index
-sub uwpscm2uvi($) {
-    my ($data) = @_;
+sub uwpscm2uvi($;$) {
+    my ( $data, $rnd ) = @_;
 
     # Forum topic,44403.msg501704.html#msg501704
-    return int( ( $data - 100 ) / 450 + 1 );
+    return int( ( $data - 100 ) / 450 + 1 ) unless ( defined($rnd) );
+
+    $rnd = 0 unless ( defined($rnd) );
+    return roundX( ( ( $data - 100 ) / 450 + 1 ), $rnd );
 }
 
 # Power: convert UV-Index to uW/cm2 (micro watt per square centimeter)
@@ -493,7 +496,7 @@ sub decimal_mark ($$) {
 
 sub roundX($;$) {
     my ( $v, $n ) = @_;
-    $n = 1 unless ($n);
+    $n = 1 unless ( defined($n) );
     return sprintf( "%.${n}f", $v );
 }
 
