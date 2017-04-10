@@ -25,6 +25,7 @@ alexa_Initialize($)
   $hash->{AttrFn}   = "alexa_Attr";
   $hash->{AttrList} = "alexaMapping:textField-long alexaTypes:textField-long fhemIntents:textField-long ".
                       "articles prepositions ".
+                      "echoRooms:textField-long ".
                       "alexaConfirmationLevel:2,1,0 alexaStatusLevel:2,1 ".
                       $readingFnAttributes;
 }
@@ -64,6 +65,11 @@ alexa_AttrDefaults($)
                                        "light=licht,lampen\n".
                                        "blind=rolladen,rolläden,jalousie,jalousien,rollo,rollos" );
   }
+
+  if( !AttrVal( $name, 'echoRooms', undef ) ) {
+    CommandAttr(undef,"$name echoRooms #<deviceId>=<room>\n" );
+  }
+
 
   if( !AttrVal( $name, 'fhemIntents', undef ) ) {
     CommandAttr(undef,"$name fhemIntents #IntentName=<sample utterance>\n".
