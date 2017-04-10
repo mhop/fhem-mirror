@@ -259,6 +259,7 @@ sub HP1000_Define($$$) {
                   . " with webname 'weatherstation'";
 
                 fhem "define " . $hash->{FW} . " FHEMWEB $port global";
+                fhem "attr " . $hash->{FW} . " closeConn 1";
                 fhem "attr " . $hash->{FW} . " webname weatherstation";
             }
         }
