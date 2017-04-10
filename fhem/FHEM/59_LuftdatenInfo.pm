@@ -369,6 +369,8 @@ sub LuftdatenInfo_ParseHttpResponse($) {
           readingsBulkUpdate($hash, "signal", $1);
         }
       }
+      
+      readingsBulkUpdate($hash, "state", "active");
       readingsEndUpdate($hash, 1);
     }
   }
