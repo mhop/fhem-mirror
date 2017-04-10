@@ -88,7 +88,7 @@ sub HP1000_Initialize($) {
         'UV'                  => { rtype => 'uvi', },
         'UVR'                 => { rtype => 'uwpscm', },
         'UVcondition'         => { rtype => 'condition_uvi', },
-        'UVcondition_rgb'     => { rtype => 'rgb', },
+        'UVcondition_rgb'     => { rtype => 'rgbhex', },
         'condition'           => { rtype => 'condition_weather', },
         'daylight'            => { rtype => 'yesno', },
         'dewpoint'            => { rtype => 'c', formula_symbol => 'Td', },

@@ -1328,13 +1328,23 @@ my $rtypes = {
     },
 
     # color
+    rgbhex => {
+        ref_base          => 900,
+        rtype_description => {
+            de => 'RGB Farbwert in Hex Notation',
+            en => 'RGB color value in Hex notation',
+        },
+        scope => '^#?(([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2}))$',
+    },
+
     rgb => {
         ref_base          => 900,
         rtype_description => {
-            de => 'RGB Farbwert',
-            en => 'RGB color value',
+            de => 'RGB Farbwert in Dezimal Notation',
+            en => 'RGB color value in decimal notation',
         },
-        scope => '^#?(([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2}))$',
+        scope =>
+'^[\s\t\n ]*(?:rgb|RGB)?[\s\t\n ]*\(?[\s\t\n ]*((?:([0-9]{1,2}|1[0-9]{1,2}|2[0-4][0-9]|25[0-5])[\s\t\n ]*,?[\s\t\n ]*)(?:([0-9]{1,2}|1[0-9]{1,2}|2[0-4][0-9]|25[0-5])[\s\t\n ]*,?[\s\t\n ]*)(?:([0-9]{1,2}|1[0-9]{1,2}|2[0-4][0-9]|25[0-5])))[\s\t\n ]*\)?[\s\t\n ]*$',
     },
 
     # logical operators
