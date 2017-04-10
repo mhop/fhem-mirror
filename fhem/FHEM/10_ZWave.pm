@@ -193,7 +193,21 @@ my %zwave_class = (
                "0340011f"  => "thermostatMode:setTmManual",
                } } ,
   PREPAYMENT_ENCAPSULATION => { id => '41' },
-  THERMOSTAT_OPERATING_STATE=>{ id => '42' },
+  THERMOSTAT_OPERATING_STATE=>{ id => '42' ,
+    get   => { thermostatOperatingState   => "02" },
+    parse => { "03420300" => "thermostatOperatingState:idle",
+               "03420301" => "thermostatOperatingState:heating",
+               "03420302" => "thermostatOperatingState:cooling",
+               "03420303" => "thermostatOperatingState:fanOnly",
+               "03420304" => "thermostatOperatingState:pendingHeat",
+               "03420305" => "thermostatOperatingState:pendingCool",
+               "03420306" => "thermostatOperatingState:ventEconomizer",
+               "03420307" => "thermostatOperatingState:auxHeating",
+               "03420308" => "thermostatOperatingState:2ndStageHeating",
+               "03420309" => "thermostatOperatingState:2ndStageCooling",
+               "0342030a" => "thermostatOperatingState:2ndStageAuxHeat",
+               "0342030b" => "thermostatOperatingState:3rdStageAuxHeat",
+               } },
   THERMOSTAT_SETPOINT      => { id => '43',
     set   => { setpointHeating => "010101%02x",
                setpointCooling => "010201%02x",
@@ -5824,6 +5838,11 @@ s2Hex($)
   <li>thermostatMode<br>
     request the mode
     </li>
+    
+  <br><br><b>Class THERMOSTAT_OPERATING_STATE</b>
+  <li>thermostatOperatingState<br>
+    request the operating state
+    </li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpoint [TYPE]<br>
@@ -6321,6 +6340,20 @@ s2Hex($)
   <li>setTmHeating</li>
   <li>setTmCooling</li>
   <li>setTmManual</li>
+  
+  <br><br><b>Class THERMOSTAT_OPERATING_STATE</b>
+  <li>idle</li>
+  <li>heating</li>
+  <li>cooling</li>
+  <li>fanOnly</li>
+  <li>pendingHeat</li>
+  <li>pendingCooling</li>
+  <li>ventEconomizer</li>
+  <li>auxHeating</li>
+  <li>2ndStageHeating</li>
+  <li>2ndStageCooling</li>
+  <li>2ndStageAuxHeat</li>
+  <li>3rdStageAuxHeat</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointTemp:$temp $scale $type<br>
