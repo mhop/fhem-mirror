@@ -1327,6 +1327,16 @@ my $rtypes = {
         },
     },
 
+    # color
+    rgb => {
+        ref_base          => 900,
+        rtype_description => {
+            de => 'RGB Farbwert',
+            en => 'RGB color value',
+        },
+        scope => '^#?(([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2}))$',
+    },
+
     # logical operators
     bool => {
         ref_base => 26,
@@ -1334,7 +1344,7 @@ my $rtypes = {
             de => [ 'falsch', 'wahr' ],
             en => [ 'false',  'true' ],
         },
-        scope             => [ '^(false|no|0)$', '^(true|yes|1)$' ],
+        scope             => [ '^(false|n|no|0)$', '^(true|y|yes|1)$' ],
         rtype_description => {
             de => 'Boolesch wahr/falsch',
             en => 'Boolean true/false',

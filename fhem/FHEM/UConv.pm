@@ -420,21 +420,27 @@ sub humidity2condition($) {
 # Condition: convert UV-Index to UV condition
 sub uvi2condition($) {
     my ($data) = @_;
-    my $v = "low";
+    my $v      = "low";
+    my $rgb    = "4C9329";
 
     if ( $data > 11 ) {
-        $v = "extreme";
+        $v   = "extreme";
+        $rgb = "674BC4";
     }
     elsif ( $data > 8 ) {
-        $v = "veryhigh";
+        $v   = "veryhigh";
+        $rgb = "C72A23";
     }
     elsif ( $data > 6 ) {
-        $v = "high";
+        $v   = "high";
+        $rgb = "E7652B";
     }
     elsif ( $data > 3 ) {
-        $v = "moderate";
+        $v   = "moderate";
+        $rgb = "F4E54C";
     }
 
+    return ( $v, $rgb ) if (wantarray);
     return $v;
 }
 
@@ -442,17 +448,17 @@ sub values2weathercondition($$$$$) {
     my ( $temp, $hum, $light, $isday, $israining ) = @_;
     my $condition = "clear";
 
-    if ( $israining eq "1" ) {
+    if ($israining) {
         $condition = "rain";
     }
     elsif ( $light > 40000 ) {
         $condition = "sunny";
     }
-    elsif ( $isday eq "1" ) {
+    elsif ($isday) {
         $condition = "cloudy";
     }
 
-    $condition = "nt_" . $condition if ( !$isday );
+    $condition = "nt_" . $condition unless ($isday);
 
     return $condition;
 }

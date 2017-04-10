@@ -88,6 +88,7 @@ sub HP1000_Initialize($) {
         'UV'                  => { rtype => 'uvi', },
         'UVR'                 => { rtype => 'uwpscm', },
         'UVcondition'         => { rtype => 'condition_uvi', },
+        'UVcondition_rgb'     => { rtype => 'rgb', },
         'condition'           => { rtype => 'condition_weather', },
         'daylight'            => { rtype => 'yesno', },
         'dewpoint'            => { rtype => 'c', formula_symbol => 'Td', },
@@ -873,8 +874,9 @@ sub HP1000_CGI() {
 
     # UVcondition
     if ( defined( $webArgs->{UVI} ) ) {
-        readingsBulkUpdateIfChanged( $hash, "UVcondition",
-            UConv::uvi2condition( $webArgs->{UVI} ) );
+        my ( $v, $rgb ) = UConv::uvi2condition( $webArgs->{UVI} );
+        readingsBulkUpdateIfChanged( $hash, "UVcondition",     $v );
+        readingsBulkUpdateIfChanged( $hash, "UVcondition_rgb", $rgb );
     }
 
     # solarradiation in W/m2 (convert from lux)
