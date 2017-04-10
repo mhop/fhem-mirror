@@ -358,7 +358,6 @@ ReadingSecDoIf($$)
 sub
 ReadingValDoIf
 {
-
   my ($hash,$name,$reading,$default,$regExp,$output)=@_;
   
   $default=AttrVal($hash->{NAME},'notexist','') if (!defined $default);
@@ -369,7 +368,6 @@ ReadingValDoIf
   } else {
     $default=EvalValueDoIf($hash,"default",$default);
   }
-
   my $r;
   my $element;
     return ($default) if (!defined $defs{$name});
@@ -377,6 +375,7 @@ ReadingValDoIf
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     $r="" if (!defined($r));
     if ($regExp) {
+	  "" =~ /()()()()()()()()()/; #reset $1, $2....
       $element = ($r =~  /$regExp/) ? $1 : "";
       if ($output) {
         $element= eval $output;
