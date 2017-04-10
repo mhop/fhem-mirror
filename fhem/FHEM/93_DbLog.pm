@@ -10,9 +10,21 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
+# redesign 2017 by DS_Starter with credits by
+# JoeAllb, DeeSpe
+#
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.16.3     07.042017        evaluate reading in DbLog_AddLog as regular expression
+# 2.16.2     06.04.2017       sub DbLog_cutCol for cutting fields to maximum length, return to "$lv = "" if(!$lv);" because
+#                             of problems with MinIntervall, DbLogType-Logging in database cycle verbose 5, make $TIMESTAMP
+#                             changable by valueFn
+# 2.16.1     04.04.2017       changed regexp $exc =~ s/(\s|\s*\n)/,/g; , DbLog_AddLog changed, enhanced sort of listCache
+# 2.16.0     03.04.2017       new set-command addLog
+# 2.15.0     03.04.2017       new attr valueFn using for perl expression which may change variables and skip logging
+#                             unwanted datasets, change DbLog_ParseEvent for ZWAVE, 
+#                             change DbLogExclude / DbLogInclude in DbLog_Log to "$lv = "" if(!defined($lv));"
 # 2.14.4     28.03.2017       pre-connection check in DbLog_execmemcache deleted (avoid possible blocking), attr excludeDevs
 #                             can be specified as devspec
 # 2.14.3     24.03.2017       DbLog_Get, DbLog_Push changed for better plotfork-support
@@ -99,7 +111,6 @@
 # 1.8        15.12.2016       bugfix of don't logging all received events
 # 1.7.1      15.12.2016       attr procedure of "disabled" changed
 
-
 package main;
 use strict;
 use warnings;
@@ -108,7 +119,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.14.4";
+my $DbLogVersion = "2.16.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -151,7 +162,8 @@ sub DbLog_Initialize($)
 							  "cacheLimit ".
 							  "syncEvents:1,0 ".
 							  "showNotifyTime:1,0 ".
-							  "timeout " .
+							  "timeout ".
+							  "valueFn:textField-long ".
                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
 							  $readingFnAttributes;
 
@@ -267,8 +279,22 @@ sub DbLog_Attr(@) {
       if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "timeout") {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
       }
+	  if( $aName eq 'valueFn' ) {
+	      my %specials= (
+             "%TIMESTAMP" => $name,
+             "%DEVICE" => $name,
+			 "%DEVICETYPE" => $name,
+			 "%EVENT" => $name,
+             "%READING" => $name,
+             "%VALUE" => $name,
+             "%UNIT" => $name,
+			 "%IGNORE" => $name,
+          );
+          my $err = perlSyntaxCheck($aVal, %specials);
+          return $err if($err);
+      }
   }
-  
+ 
   if($aName eq "colEvent" || $aName eq "colReading" || $aName eq "colValue") {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
@@ -336,7 +362,7 @@ sub DbLog_Set($@) {
 	my $name = $hash->{NAME};
 	my $usage = "Unknown argument, choose one of reduceLog reduceLogNbl reopen rereadcfg:noArg count:noArg countNbl:noArg 
 	             deleteOldDays deleteOldDaysNbl userCommand clearReadings:noArg 
-				 eraseReadings:noArg ";
+				 eraseReadings:noArg addLog ";
 	$usage .= "listCache:noArg purgeCache:noArg commitCache:noArg exportCache:nopurge,purgecache " if (AttrVal($name, "asyncMode", undef));
     my (@logs,$dir);
 	
@@ -413,6 +439,10 @@ sub DbLog_Set($@) {
             delete($defs{$name}{READINGS}{$key}) if($key !~ m/^state$/);
         }
     }	
+	elsif ($a[1] eq 'addLog') {		
+        unless ($a[2]) { return " The argument of $a[1] is not valid. Use a pair of <devicespec>,reading,[value] you want to create a log entry from";}
+        DbLog_AddLog($hash,$a[2]);
+	}
     elsif ($a[1] eq 'reopen') {		
 		if ($dbh) {
             $dbh->commit() if(!$dbh->{AutoCommit});
@@ -463,7 +493,7 @@ sub DbLog_Set($@) {
 	}
 	elsif ($a[1] eq 'listCache') {
 	    my $cache;
-	    foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
+	    foreach my $key (sort{$a <=>$b}keys%{$hash->{cache}{memcache}}) { 
             $cache .= $key." => ".$hash->{cache}{memcache}{$key}."\n"; 			
 		}
 	    return $cache;
@@ -753,10 +783,10 @@ sub DbLog_ParseEvent($$$)
         $unit = $parts[1] if($parts[1]);
       }
   }
-
-  # FBDECT
-  elsif (($type eq "FBDECT")) {
-    if ( $value=~/([\.\d]+)\s([a-z])/i ) {
+  
+  # FBDECT or ZWAVE
+  elsif (($type eq "FBDECT") || ($type eq "ZWAVE")) {
+    if ( $value=~/([\.\d]+)\s([a-z].*)/i ) {
      $value = $1;
      $unit  = $2;
     }
@@ -769,8 +799,7 @@ sub DbLog_ParseEvent($$$)
   }
 
   # FS20
-  elsif(($type eq "FS20") ||
-        ($type eq "X10")) {
+  elsif(($type eq "FS20") || ($type eq "X10")) {
     if($reading =~ m/^dim(\d+).*/o) {
       $value = $1;
       $reading= "dim";
@@ -1002,10 +1031,11 @@ sub DbLog_Log($$) {
   
   # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV} oder $hash->{NOTIFYDEV} = .*)
   if(!$hash->{NOTIFYDEV} || $hash->{NOTIFYDEV} eq ".*") {
-      my @exdvs = devspec2array(AttrVal($name, "excludeDevs", ""));
-	  for(@exdvs){s/\n/,/g}
+      my $exc = AttrVal($name, "excludeDevs", "");
+	  $exc    =~ s/\s/,/g;
+	  my @exdvs = devspec2array($exc);
 	  if(@exdvs) {
-	      # Log3 $name, 4, "DbLog $name -> excludeDevs: @exdvs";
+	      # Log3 $name, 3, "DbLog $name -> excludeDevs: @exdvs";
 	      foreach (@exdvs) {
 		      if(lc($dev_name) eq lc($_)) {
 	              Log3 $name, 4, "DbLog $name -> Device: $dev_name excluded from database logging due to attribute \"excludeDevs\" restrictions" if($vb4show);
@@ -1022,7 +1052,15 @@ sub DbLog_Log($$) {
   my $now                = gettimeofday();                               # get timestamp in seconds since epoch
   my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
   my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
-  my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");  
+  my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");
+  my $value_fn           = AttrVal( $name, "valueFn", "" );  
+  
+  # Funktion aus Attr valueFn validieren
+  if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
+      $value_fn = $1;
+  } else {
+      $value_fn = '';
+  }
     
   #one Transaction
   eval {  
@@ -1072,7 +1110,7 @@ sub DbLog_Log($$) {
                   }
               }
         
-		      #Hier ggf. zusaetlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
+		      #Hier ggf. zusätzlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
               #Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
               if($DoIt == 0) {
                   if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
@@ -1102,19 +1140,37 @@ sub DbLog_Log($$) {
 	    	  if ($DoIt) {
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
-			      
-				  my $colevent   = AttrVal($name, 'colEvent', undef);
-				  my $colreading = AttrVal($name, 'colReading', undef);
-				  my $colvalue   = AttrVal($name, 'colValue', undef);
-	              if ($hash->{DBMODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
-                      # Daten auf maximale Länge beschneiden
-                      $dev_name = substr($dev_name,0, $hash->{HELPER}{DEVICECOL});
-                      $dev_type = substr($dev_type,0, $hash->{HELPER}{TYPECOL});
-                      $event    = substr($event,0, $hash->{HELPER}{EVENTCOL});
-                      $reading  = substr($reading,0, $hash->{HELPER}{READINGCOL});
-                      $value    = substr($value,0, $hash->{HELPER}{VALUECOL});
-                      $unit     = substr($unit,0, $hash->{HELPER}{UNITCOL});
+				  
+			      # Anwender kann Feldwerte mit Funktion aus Attr valueFn verändern oder Datensatz-Log überspringen
+ 		  	      if($value_fn ne '') {
+ 				      my $TIMESTAMP  = $timestamp;
+ 				      my $DEVICE     = $dev_name;
+ 				      my $DEVICETYPE = $dev_type;
+ 				      my $EVENT      = $event;
+ 				      my $READING    = $reading;
+ 		  	          my $VALUE 	 = $value;
+ 				      my $UNIT   	 = $unit;
+					  my $IGNORE     = 0;
+
+ 				      eval $value_fn;
+					  Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
+					  if($IGNORE) {
+					      # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
+						  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
+						                          if($vb4show);
+					      next;  
+					  }
+					  
+					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+ 				      $dev_name  = $DEVICE     if($DEVICE ne '');
+ 				      $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
+ 				      $reading   = $READING    if($READING ne '');
+ 		  	          $value     = $VALUE      if($VALUE ne '');
+ 				      $unit      = $UNIT       if($UNIT ne '');
                   }
+
+				  # Daten auf maximale Länge beschneiden
+                  ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$reading,$value,$unit);
   
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
 				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
@@ -1209,6 +1265,11 @@ sub DbLog_Push(@) {
   
   $dbh->{RaiseError} = 1; 
   $dbh->{PrintError} = 0;
+  
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3 $name, 4, "DbLog $name -> ###         New database processing cycle - synchronous      ###";
+  Log3 $name, 4, "DbLog $name -> ################################################################";
+  Log3 ($name, 4, "DbLog $name -> DbLogType is: $DbLogType");
   
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
@@ -1484,7 +1545,7 @@ sub DbLog_execmemcache ($) {
 	
   if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
       Log3 $name, 5, "DbLog $name -> ################################################################";
-      Log3 $name, 5, "DbLog $name -> ###              New database processing cycle               ###";
+      Log3 $name, 5, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
       Log3 $name, 5, "DbLog $name -> ################################################################";
 	  Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains $memcount entries to process";
 		  
@@ -1553,6 +1614,7 @@ sub DbLog_PushAsync(@) {
   my $rowlback    = 0;  # Eventliste für Rückgabe wenn Fehler
   
   Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsync");
+  Log3 ($name, 5, "DbLog $name -> DbLogType is: $DbLogType");
   
   # Background-Startzeit
   my $bst = [gettimeofday];
@@ -2589,6 +2651,157 @@ DbLog_Get($@)
   } else {
     return $retval;
   }
+}
+
+#########################################################################################
+#
+# Addlog - einfügen des Readingwertes eines gegebenen Devices
+#
+#########################################################################################
+sub DbLog_AddLog($$) {
+  my ($hash,$str)= @_;
+  my $name     = $hash->{NAME};
+  my $async    = AttrVal($name, "asyncMode", undef);
+  my $value_fn = AttrVal( $name, "valueFn", "" );
+  my $ce       = AttrVal($name, "cacheEvents", 0);
+  my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);  
+  my @row_array;  
+  
+  return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
+  
+  # Funktion aus Attr valueFn validieren
+  if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
+      $value_fn = $1;
+  } else {
+      $value_fn = '';
+  }
+  
+  my $ts = TimeNow();
+  my ($devspec,$rdspec,$value) = split(",",$str);
+  
+  my @exdvs = devspec2array($devspec);
+  foreach (@exdvs) {
+      $dev_name = $_;
+      if(!$defs{$dev_name}) {
+          Log3 $name, 2, "DbLog $name -> Device '$dev_name' used by addLog doesn't exist !";
+	      next;
+      }
+	  
+	  my $r = $defs{$dev_name}{READINGS};
+	  my @exrds;
+	  foreach my $rd (sort keys %{$r}) {
+		   push @exrds,$rd if($rd =~ m/^$rdspec$/);
+	  }
+	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
+	  
+	  if(!@exrds) {
+          Log3 $name, 2, "DbLog $name -> no Reading of device '$dev_name' selected from '$rdspec' used by addLog !";
+	      next;
+      }
+	  
+	  foreach (@exrds) {
+	      $dev_reading = $_;
+          $read_val = $value?$value:ReadingsVal($dev_name,$dev_reading,"");
+	      $dev_type = uc($defs{$dev_name}{TYPE});
+  
+          # dummy-Event zusammenstellen
+	      $event = $dev_reading.": ".$read_val;
+	  
+	      # den zusammengestellten Event parsen lassen (evtl. Unit zuweisen)
+          my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
+          $dev_reading = $r[0];
+          $read_val    = $r[1];
+          $ut          = $r[2];
+          if(!defined $dev_reading) {$dev_reading = "";}
+          if(!defined $read_val) {$read_val = "";}
+          if(!defined $ut || $ut eq "") {$ut = AttrVal("$dev_name", "unit", "");}   
+          $event       = "addLog";
+	  
+	      # Anwender spezifische Funktion anwenden 
+          if($value_fn ne '') {
+              my $TIMESTAMP  = $ts;
+ 	          my $DEVICE     = $dev_name;
+ 	          my $DEVICETYPE = $dev_type;
+     	      my $EVENT      = $event;
+ 	          my $READING    = $dev_reading;
+ 	          my $VALUE 	 = $read_val;
+ 	          my $UNIT   	 = $ut;
+	          my $IGNORE     = 0;
+
+ 	          eval $value_fn;
+	          Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
+	          next if($IGNORE);  # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
+		 
+              $ts           = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+ 	          $dev_name     = $DEVICE     if($DEVICE ne '');
+	          $dev_type     = $DEVICETYPE if($DEVICETYPE ne '');
+ 	          $dev_reading  = $READING    if($READING ne '');
+ 	          $read_val     = $VALUE      if($VALUE ne '');
+ 	          $ut           = $UNIT       if($UNIT ne '');
+          }
+	  
+          # Daten auf maximale Länge beschneiden
+          ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
+  
+          my $row = ($ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut);
+          Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut";
+  
+          if($async) {
+              # asynchoner non-blocking Mode
+	          # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+	          $hash->{cache}{index}++;
+	          my $index = $hash->{cache}{index};
+	          $hash->{cache}{memcache}{$index} = $row;
+		      my $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+	          if($ce == 1) {
+                  readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
+	          } else {
+	              readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
+	          }
+          } else {
+              # synchoner Mode	
+	          push(@row_array, $row);
+          }
+	  }
+  }
+  if(!$async) {    
+      if(@row_array) {
+	      # synchoner Mode
+		  # return wenn "reopen" mit Ablaufzeit gestartet ist
+          return if($hash->{HELPER}{REOPEN_RUNS});	  
+          my $error = DbLog_Push($hash, 1, @row_array);
+          Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
+		  if($error) {
+              readingsSingleUpdate($hash, "state", $error, 1);
+		  } else {
+		      readingsSingleUpdate($hash, "state", "connected", 0);
+		  }
+      }
+  }
+return;
+}
+
+#########################################################################################
+#
+# Subroutine cutCol - Daten auf maximale Länge beschneiden
+#
+#########################################################################################
+sub DbLog_cutCol($$$$$$$) {
+  my ($hash,$dn,$dt,$evt,$rd,$val,$unit)= @_;
+  my $name       = $hash->{NAME};  
+  my $colevent   = AttrVal($name, 'colEvent', undef);
+  my $colreading = AttrVal($name, 'colReading', undef);
+  my $colvalue   = AttrVal($name, 'colValue', undef);
+   
+  if ($hash->{DBMODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
+      $dn   = substr($dn,0, $hash->{HELPER}{DEVICECOL});
+      $dt   = substr($dt,0, $hash->{HELPER}{TYPECOL});
+      $evt  = substr($evt,0, $hash->{HELPER}{EVENTCOL});
+      $rd   = substr($rd,0, $hash->{HELPER}{READINGCOL});
+      $val  = substr($val,0, $hash->{HELPER}{VALUECOL});
+      $unit = substr($unit,0, $hash->{HELPER}{UNITCOL});
+  }
+return ($dn,$dt,$evt,$rd,$val,$unit);
 }
 
 #########################################################################################
@@ -3820,6 +4033,23 @@ sub checkUsePK ($$){
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;,&lt;Reading&gt;,[Value] </code><br><br>
+    <ul> Inserts an additional log entry of a device/reading combination into the database.
+      Optionally you can enter a "Value" that is used as reading value for the dataset. If the value isn't specified (default),
+	  the current value of the specified reading will be inserted into the database. The field "$EVENT" will be filled automatically
+	  by "addLog". The device can be declared by a <a href="#devspec">device specification (devspec)</a>. 
+	  "Reading" will be evaluated as regular expression. If $TIMESTAMP 
+	  should be changed, it must meet condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't be changed.
+	  By the addLog-command NO additional events will be created !<br><br>
+      
+	  <b>Examples:</b> <br>
+	  set &lt;name&gt; addLog SMA_Energymeter,Bezug_Wirkleistung <br>
+	  set &lt;name&gt; addLog TYPE=SSCam,state <br>
+	  set &lt;name&gt; addLog MyWetter,(fc10.*|fc8.*) <br>
+	  set &lt;name&gt; addLog MyWetter,(wind|wind_ch.*),20 <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|),(measured-temp|desired-temp|actuator) <br>
+    </ul><br>
+	
     <code>set &lt;name&gt; clearReadings </code><br><br>
       <ul> This function clears readings which were created by different DbLog-functions. </ul><br>
 
@@ -4391,6 +4621,34 @@ sub checkUsePK ($$){
   </ul>
   <br>
   
+  <ul><b>valueFn</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; valueFn {}
+	   </code><br>
+      
+	   Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (value of reading) and 
+	   $UNIT (unit of reading value).
+       It also has readonly-access to $EVENT for evaluation in your expression. <br>
+	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
+	   
+	  <b>Examples</b> <br>
+      <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "living_Clima" && $VALUE eq "off" ){$VALUE=0;} elsif ($DEVICE eq "e-power"){$VALUE= sprintf "%.1f", $VALUE;}}
+	  </code> <br>
+	  # change value "off" to "0" of device "living_Clima" and rounds value of e-power to 1f <br><br>
+	  <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "SMA_Energymeter" && $READING eq "state"){$IGNORE=1;}}
+	  </code><br>
+	  # don't log the dataset of device "SMA_Energymeter" if the reading is "state"  <br><br>
+	  <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "Dum.Energy" && $READING eq "TotalConsumption"){$UNIT="W";}}
+	  </code><br>
+	  # set the unit of device "Dum.Energy" to "W" if reading is "TotalConsumption" <br><br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>verbose4Devs</b>
      <ul>
 	   <code>
@@ -4491,11 +4749,28 @@ sub checkUsePK ($$){
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;,&lt;Reading&gt;,[Value] </code><br><br>
+    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein.
+      Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
+      Wert des Readings in die DB eingefügt. Das Feld "$EVENT" wird automatisch mit "addLog" belegt. Das Device kann 
+	  als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. "Reading" wird als regulärer Ausdruck ausgewertet.
+	  Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
+	  geänderte $timestamp nicht übernommen.
+	  Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
+      
+	  <b>Beispiele:</b> <br>
+	  set &lt;name&gt; addLog SMA_Energymeter,Bezug_Wirkleistung <br>
+	  set &lt;name&gt; addLog TYPE=SSCam,state <br>
+	  set &lt;name&gt; addLog MyWetter,(fc10.*|fc8.*) <br>
+	  set &lt;name&gt; addLog MyWetter,(wind|wind_ch.*),20 <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|),(measured-temp|desired-temp|actuator) <br>
+    </ul><br>
+	  
     <code>set &lt;name&gt; clearReadings </code><br><br>
       <ul> Leert Readings die von verschiedenen DbLog-Funktionen angelegt wurden. </ul><br>
 	  
     <code>set &lt;name&gt; eraseReadings </code><br><br>
-      <ul> Löscht alle Readings auper dem Reading "state". </ul><br>
+      <ul> Löscht alle Readings außer dem Reading "state". </ul><br>
 	  
     <code>set &lt;name&gt; commitCache </code><br><br>
       <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten in die Datenbank geschrieben 
@@ -5093,6 +5368,35 @@ sub checkUsePK ($$){
   </ul>
   <br>
 
+  <ul><b>valueFn</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; valueFn {}
+	   </code><br>
+      
+	   Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (Wert des Readings) und 
+	   $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
+       Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
+	   Diese Variablen können aber nicht verändert werden. <br>
+	   Zusätzlich kann durch Setzen der Variable "$IGNORE=1" ein Datensatz vom Logging ausgeschlossen werden. <br><br>
+	   
+	  <b>Beispiele</b> <br>
+      <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "living_Clima" && $VALUE eq "off" ){$VALUE=0;} elsif ($DEVICE eq "e-power"){$VALUE= sprintf "%.1f", $VALUE;}}
+	  </code> <br>
+	  # ändert den Reading-Wert des Gerätes "living_Clima" von "off" zu "0" und rundet den Wert vom Gerät "e-power" <br><br>
+	  <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "SMA_Energymeter" && $READING eq "state"){$IGNORE=1;}}
+	  </code><br>
+	  # der Datensatz wird nicht geloggt wenn Device = "SMA_Energymeter" und das Reading = "state" ist  <br><br>
+	  <code>
+	  attr &lt;device&gt; valueFn {if ($DEVICE eq "Dum.Energy" && $READING eq "TotalConsumption"){$UNIT="W";}}
+	  </code><br>
+	  # setzt die Einheit des Devices "Dum.Energy" auf "W" wenn das Reading = "TotalConsumption" ist <br><br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>verbose4Devs</b>
      <ul>
 	   <code>
