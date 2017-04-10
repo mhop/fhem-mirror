@@ -1331,9 +1331,6 @@ plex_mediaList($$$)
 #Log 1, Dumper $xml;
   return $xml if( ref($xml) ne 'HASH' );
 
-  my $token = $server->{accessToken};
-  $token = $hash->{token} if( !$token );
-
   $xml->{librarySectionTitle} = encode('UTF-8', $xml->{librarySectionTitle}) if( $xml->{librarySectionTitle} );
   $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
   $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
@@ -1368,9 +1365,6 @@ sub
 plex_mediaDetail2($$$$)
 {
   my ($hash, $server, $xml, $items) = @_;
-
-  my $token = $server->{accessToken};
-  $token = $hash->{token} if( !$token );
 
 #Log 1, Dumper $xml;
 
@@ -1501,13 +1495,10 @@ plex_mediaDetail($$$)
 
   return $xml if( ref($xml) ne 'HASH' );
 
-  my $token = $server->{accessToken};
-  $token = $hash->{token} if( !$token );
-
- $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
- $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
- $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
- $xml->{summary} = encode('UTF-8', $xml->{summary}) if( $xml->{summary} );
+  $xml->{title} = encode('UTF-8', $xml->{title}) if( $xml->{title} );
+  $xml->{title1} = encode('UTF-8', $xml->{title1}) if( $xml->{title1} );
+  $xml->{title2} = encode('UTF-8', $xml->{title2}) if( $xml->{title2} );
+  $xml->{summary} = encode('UTF-8', $xml->{summary}) if( $xml->{summary} );
 
 #Log 1, Dumper $xml;
   my $ret = '';
@@ -2128,6 +2119,7 @@ plex_addToPlaylist($$$$)
                 'X-Plex-Version' => '0.0', },
   };
   $param->{header}{'X-Plex-Token'} = $hash->{token} if( $hash->{token} );
+  $param->{header}{'X-Plex-Token'} = $server->{accessToken} if( $server->{accessToken} );
   if( my $entry = plex_entryOfIP($hash, 'client', $address) ) {
     $param->{header}{'X-Plex-Target-Client-Identifier'} = $entry->{machineIdentifier} if( $entry->{machineIdentifier} );
   }
@@ -2224,6 +2216,7 @@ plex_serverOf($$;$)
 
   if( !$entry && $only ) {
     if( my $mhash = $modules{plex}{defptr}{MASTER} ) {
+Log 1, Dumper $mhash;
       my @keys = keys(%{$modules{plex}{defptr}{MASTER}{servers}});
       if( @keys == 1 ) {
         $entry = $modules{plex}{defptr}{MASTER}{servers}{$keys[0]};
@@ -2483,7 +2476,7 @@ plex_requestNotifications($$)
 
     my $ret = "GET /:/websockets/notifications HTTP/1.1\r\n";
     $ret .= plex_hash2header( {                       'Host' => "$server->{address}:$server->{port}",
-                                              'X-Plex-Token' => $hash->{token},
+                                              'X-Plex-Token' => $server->{accessToken}?$server->{accessToken}:$hash->{token},
                                                    'Upgrade' => 'websocket',
                                                 'Connection' => 'Upgrade',
                                                     'Pragma' => 'no-cache',
@@ -4074,7 +4067,14 @@ Log 1, "!!!!!!!!!!";
             my $phash = $hash->{phash};
             my $handled = 0;
 
-            if( $obj->{_elementType} && $obj->{_elementType} eq 'NotificationContainer' ) {
+            if( $obj->{NotificationContainer} ) {
+              $obj = $obj->{NotificationContainer};
+              if( $obj->{type} eq 'update.statechange' ) {
+                $handled = 1;
+                Log3 $pname, 4, "$pname: update available $obj->{AutoUpdateNotification}[0]{fixed}";
+              }
+
+            } elsif( $obj->{_elementType} && $obj->{_elementType} eq 'NotificationContainer' ) {
               if( $obj->{type} eq 'playing' ) {
                 $handled = 1;
 
