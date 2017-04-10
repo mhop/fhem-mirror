@@ -38,6 +38,8 @@
 # - if ROOMMATE is asleep, queue message for next day
 #   (usefull escalate for screen with PostMe?)
 # - delivery options as attributes (like ! or ? to gateways, devices or types)
+# - all messages should be queued and then delivered so a timer may come back
+#   and check the gateway device for successful delivery
 #
 
 package main;
@@ -1736,6 +1738,8 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $cmd =~ s/%TERMINAL%/$termRecipient/gi
                               if ( $termRecipient ne "" );
 
+                            my $paramsA;
+
                             unless ( defined($testMode) && $testMode eq "1" ) {
 
                                 # user parameters from message
@@ -1777,7 +1781,6 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                   )
                                 {
                                     next unless ($_);
-                                    my $params;
                                     if (   $_ =~ m/^{.*}$/s
                                         && $_ =~ m/=>/
                                         && $_ !~ m/\$/ )
@@ -1789,20 +1792,20 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                               . "ERROR while reading attribute msgParams";
                                         }
                                         else {
-                                            $params = $av
-                                              if ( ref($av) eq "HASH" );
+                                            $paramsA = $av;
                                         }
                                     }
                                     else {
                                         my ( $a, $h ) = parseParams($_);
-                                        $params = $h
-                                          if ( ref($h) eq "HASH" );
+                                        $paramsA = $h;
                                     }
 
-                                    if ( ref($params) eq "HASH" ) {
-                                        for my $key ( keys %$params ) {
+                                    next unless ref($paramsA) eq "HASH";
+
+                                    if ( ref($paramsA) eq "HASH" ) {
+                                        for my $key ( keys %$paramsA ) {
                                             next if ( ref( $params->{$key} ) );
-                                            my $val = $params->{$key};
+                                            my $val = $paramsA->{$key};
                                             $cmd =~ s/%$key%/$val/gi;
                                             $cmd =~ s/\$$key/$val/g;
                                             Log3 $logDevice, 5,
@@ -1916,17 +1919,40 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         {
                                             # Compatibility to legacy schema:
                                             # lowercase after _
-                                            $key =~
-s/^($gatewayDevType)(_[A-Z0-9]+)$/\1\L\2\e/;
+                                            my $s = $gatewayDevType
+                                              . "[\_\/-]([A-Z0-9_-]+)";
+                                            $key =~ s/^$s$/\L$1/;
 
                                             # remove gateway TYPE when
                                             # used as prefix
-                                            $key =~ s/^$gatewayDevType\_//;
+                                            $s = $gatewayDevType . "[_\/-]";
+                                            $key =~ s/^$s//;
                                             $cmd .= " $key='$value'"
                                               if ( !defined( $h->{$key} )
                                                 || $h->{$key} =~
                                                 m/^[\s\t\n ]*$/ );
                                         }
+
+                                        keys %$paramsA;
+                                        while ( ( my $key, my $value ) =
+                                            each %$paramsA )
+                                        {
+                                            # Compatibility to legacy schema:
+                                            # lowercase after _
+                                            my $s = $gatewayDevType
+                                              . "[\_\/-]([A-Z0-9_-]+)";
+                                            $key =~ s/^$s$/\L$1/;
+
+                                            # remove gateway TYPE when
+                                            # used as prefix
+                                            $s = $gatewayDevType . "[_\/-]";
+                                            $key =~ s/^$s//;
+                                            $cmd .= " $key='$value'"
+                                              if ( !defined( $h->{$key} )
+                                                || $h->{$key} =~
+                                                m/^[\s\t\n ]*$/ );
+                                        }
+
                                     }
 
                                     # excplicitly queue message
@@ -1951,7 +1977,8 @@ s/^($gatewayDevType)(_[A-Z0-9]+)$/\1\L\2\e/;
                                           "msg $device: "
                                           . "$type[$i] route command (Perl): $cmd";
                                         eval $cmd;
-                                        if ($@) {
+                                        unless ( !$@ || $@ =~ m/^[\s\t\n ]*$/ )
+                                        {
                                             $error = 1;
                                             $loopReturn3 .= "$gatewayDev: $@\n";
                                         }
@@ -1961,9 +1988,12 @@ s/^($gatewayDevType)(_[A-Z0-9]+)$/\1\L\2\e/;
                                           "msg $device: "
                                           . "$type[$i] route command (fhem): $cmd";
                                         my $ret = fhem $cmd, 1;
-                                        if ($ret) {
+                                        unless ( !$ret
+                                            || $ret =~ m/^[\s\t\n ]*$/ )
+                                        {
                                             $error = 1;
-                                            $loopReturn3 .= "$gatewayDev: $ret\n";
+                                            $loopReturn3 .=
+                                              "$gatewayDev: $ret\n";
                                         }
                                     }
 
