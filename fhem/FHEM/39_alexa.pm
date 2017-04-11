@@ -663,6 +663,8 @@ alexa_Attr($$$)
       maps spoken commands to intents for certain characteristics.</li>
     <li>alexaTypes<br>
       maps spoken device types to ServiceClasses. eg: attr alexa alexaTypes light:licht,lampe,lampen blind:rolladen,jalousie,rollo Outlet:steckdose TemperatureSensor:thermometer LockMechanism:schloss OccupancySensor: anwesenheit</li>
+    <li>echoRooms<br>
+      maps echo devices to default rooms.</li>
     <li>fhemIntents<br>
       maps spoken commands directed to fhem as a whole (i.e. not to specific devices) to events from the alexa device.</li>
     <li>alexaConfirmationLevel<br>
