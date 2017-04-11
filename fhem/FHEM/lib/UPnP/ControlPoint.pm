@@ -434,7 +434,7 @@ sub _receiveSSDPEvent {
 	return if (!defined($peer));
 	
 	my @peerdata = unpack_sockaddr_in($peer);
-	return if (!defined($peerdata));
+	return if (!@peerdata);
 	
 	return if (scalar(%USEDONLYIP) && (!$USEDONLYIP{inet_ntoa($peerdata[1])}));
 	return if ($IGNOREIP{inet_ntoa($peerdata[1])});
