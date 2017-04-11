@@ -306,7 +306,7 @@ sub _createDevice {
 													  {ControlPoint => $self});
 	} else {
 		carp('400-URL-Absolute-Error! Location: "'.$location.'", Content: "'.$response->content.'"') if ($response->code == 400);
-		carp("Loading device description failed with error: " . $response->code . " " . $response->message) if ($response->code != 200);
+		carp("Loading device description failed with error: " . $response->code . " " . $response->message . ' (Location: ' . $location . ')') if ($response->code != 200);
 	}
 	#pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
 	@LWP::Protocol::http::EXTRA_SOCK_OPTS = @SOCK_OPTS_Backup;
@@ -431,7 +431,10 @@ sub _receiveSSDPEvent {
 	my $buf = '';
 
 	my $peer = recv($socket, $buf, 2048, 0);
+	return if (!defined($peer));
+	
 	my @peerdata = unpack_sockaddr_in($peer);
+	return if (!defined($peerdata));
 	
 	return if (scalar(%USEDONLYIP) && (!$USEDONLYIP{inet_ntoa($peerdata[1])}));
 	return if ($IGNOREIP{inet_ntoa($peerdata[1])});
