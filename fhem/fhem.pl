@@ -4032,7 +4032,7 @@ sub
 AttrVal($$$)
 {
   my ($d,$n,$default) = @_;
-  return $attr{$d}{$n} if($d && defined($attr{$d}) && defined($attr{$d}{$n}));
+  return $attr{$d}{$n} if(defined($attr{$d}) && defined($attr{$d}{$n}));
   return $default;
 }
 
