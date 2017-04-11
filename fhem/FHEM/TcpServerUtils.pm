@@ -24,9 +24,11 @@ TcpServer_Open($$$)
     }
   }
 
+  my $lh = ($global ? ($global eq "global"? undef : $global) :
+                      ($hash->{IPV6} ? "::1" : "127.0.0.1"));
   my @opts = (
     Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
-    LocalHost => ($global ? ($global eq "global"? undef:$global) : "127.0.0.1"),
+    LocalHost => $lh,
     LocalPort => $port,
     Listen    => 10,
     Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
