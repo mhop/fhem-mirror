@@ -172,8 +172,8 @@ sub HTTPSRV_CGI() {
     
     # set directory index
     $filename= AttrVal($name,"directoryindex","index.html") unless($filename);
+    $filename =~ s/\?.*//;
     my $MIMEtype= filename2MIMEType($filename);
-
     my $directory= $defs{$name}{fhem}{directory};
     $filename= "$directory/$filename";
     #Debug "read filename= $filename";
@@ -205,7 +205,9 @@ sub HTTPSRV_CGI() {
 
 
 =pod
-=item helper
+=item device
+=item summary rudimentary HTTP server that accepts parameters as readings
+=item summary_DE rudiment&auml;rer HTTP-Server, der auch Parameter als Readings akzeptiert
 =begin html
 
 <a name="HTTPSRV"></a>
