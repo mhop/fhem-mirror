@@ -340,8 +340,9 @@ HttpUtils_Connect2($)
       return $errstr;
     } else {
       $hash->{conn}->blocking(1);
-      my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
-                       AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2"));
+      my $sslVersion = AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2");
+      $sslVersion = AttrVal($hash->{NAME}, "sslVersion", $sslVersion)
+        if($hash->{NAME});
       my %par = %{$hash->{sslargs}};
       $par{Timeout}      = $hash->{timeout};
       $par{SSL_version}  = $sslVersion;
