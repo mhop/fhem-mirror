@@ -422,7 +422,7 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 tempON tempOFF configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "useTopics:0,1 widgetTranslations widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 tempON tempOFF configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -1296,6 +1296,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <a name="weekprofileattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>widgetTranslations<br>
+    Comma seperated list of texts translations <german>:<translation>
+    <code>attr name widgetTranslations Abbrechen:Cancel,Speichern:Save</code> 
+    </li>
     <li>widgetWeekdays<br>
       Comma seperated list of week days starting at Monday
       <code>attr name widgetWeekdays Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday</code>
@@ -1448,6 +1452,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <a name="weekprofileattr"></a>
   <b>Attribute</b>
   <ul>
+    <li>widgetTranslations<br>
+    Liste von Übersetzungen der Form <german>:<Übersetzung> getrennt durch ',' um Texte im Widget zu übersetzen.
+    <code>attr name widgetTranslations Abbrechen:Abbr,Speichern:Save</code> 
+    </li>
     <li>widgetWeekdays<br>
       Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
       Beginnend bei Montag. z.B.
