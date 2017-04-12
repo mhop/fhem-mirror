@@ -137,7 +137,11 @@ function weekprofile_DoEditWeek(devName,newPage)
   var widget = $('div[informid="'+devName+'"]').get(0);
  
   if (newPage == 1) {
-    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURTOPIC+':'+widget.CURPRF+'");;}');
+    var csrfToken = $("body").attr('fwcsrf');
+    var url = FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURTOPIC+':'+widget.CURPRF+'");;}';
+    if (csrfToken)
+      url = url + '&fwcsrf='+ csrfToken;
+    window.location.assign(url);
   } else {
     widget.MODE = 'EDIT';
     $(widget.MENU.BASE).hide();
