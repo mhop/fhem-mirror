@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.93 beta
+#  Version 0.94 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.93 beta';
+my $HMCCURPC_VERSION = '0.94 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -106,9 +106,11 @@ my $HMCCURPC_INIT_INTERVAL2 = 5;
 my $HMCCURPC_INIT_INTERVAL3 = 25;
 
 # Thread type flags
-my $HMCCURPC_THREAD_DATA = 1;
-my $HMCCURPC_THREAD_SERVER = 2;
-my $HMCCURPC_THREAD_ALL = 3;
+my $HMCCURPC_THREAD_DATA   = 1;
+my $HMCCURPC_THREAD_ASCII  = 2;
+my $HMCCURPC_THREAD_BINARY = 4;
+my $HMCCURPC_THREAD_SERVER = 6;
+my $HMCCURPC_THREAD_ALL    = 7;
 
 # Data types
 my $BINRPC_INTEGER = 1;
@@ -885,9 +887,20 @@ sub HMCCURPC_ProcessEvent ($$)
 		#
 		my $c_ok = 0;
 		my $c_err = 0;
+
 		Log3 $name, 1, "HMCCURPC: Received IN event. RPC server $clkey running.";
+		return ($et, $clkey, 0, 0, 0) if ($rh->{$clkey}{state} eq 'running');
 		$rh->{$clkey}{state} = "running";
 		
+		# Set binary RPC interfaces to 'running' if all ascii interfaces are in state 'running'
+		my ($runa, $alla) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ASCII, 'running');
+		if ($runa == $alla) {
+			foreach my $sn (keys %{$rh}) {
+				$rh->{$sn}{state} = "running"
+					if ($rh->{$sn}{type} == $HMCCURPC_THREAD_BINARY && $rh->{$sn}{state} eq 'registered');
+			}
+		}
+				
 		# Check if all RPC servers were initialized. Set overall status
 		my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running');
 		if ($run == $all) {
@@ -1374,7 +1387,8 @@ sub HMCCURPC_StartRPCServer ($)
 			$thr->tid ();
 
 		# Store thread parameters
-		$hash->{hmccu}{rpc}{$clkey}{type}   = $HMCCURPC_THREAD_SERVER;
+		$hash->{hmccu}{rpc}{$clkey}{type}   = HMCCURPC_IsBinRPCPort ($port) ?
+			$HMCCURPC_THREAD_BINARY : $HMCCURPC_THREAD_ASCII;
 		$hash->{hmccu}{rpc}{$clkey}{child}  = $thr;
 		$hash->{hmccu}{rpc}{$clkey}{cbport} = $callbackport;
 		$hash->{hmccu}{rpc}{$clkey}{tid}    = $thr->tid ();
@@ -1694,6 +1708,8 @@ sub HMCCURPC_SendBinRequest ($@)
 
 	return undef if (!HMCCURPC_IsBinRPCPort ($port));	
 	
+	my $verbose = GetVerbose ($name);
+	
 	Log3 $name, 4, "HMCCURPC: Send binary RPC request $request to $serveraddr:$port";
 	my $encreq = HMCCURPC_EncodeRequest ($request, \@param);
 	return undef if ($encreq eq '');
@@ -1713,7 +1729,7 @@ sub HMCCURPC_SendBinRequest ($@)
 		
 		if (defined ($encresp)) {
 			Log3 $name, 4, "HMCCURPC: Response";
-			HMCCURPC_HexDump ($name, $encresp);
+			HMCCURPC_HexDump ($name, $encresp) if ($verbose >= 4);
 			my ($response, $rc) = HMCCURPC_DecodeResponse ($encresp);
 			return $response;
 		}
@@ -1736,6 +1752,7 @@ sub HMCCURPC_ProcessRequest ($$)
 	my $name = $server->{hmccu}{name};
 	my $clkey = $server->{hmccu}{clkey};
 	my @methodlist = ('listDevices', 'listMethods', 'system.multicall');
+	my $verbose = GetVerbose ($name);
 	
 	# Read request
 	my $request = '';
@@ -1745,7 +1762,7 @@ sub HMCCURPC_ProcessRequest ($$)
 	return if (!defined ($request) || $request eq '');
 	
 	Log3 $name, 4, "CCURPC: $clkey raw request:";
-	HMCCURPC_HexDump ($name, $request);
+	HMCCURPC_HexDump ($name, $request) if ($verbose >= 4);
 	
 	# Decode request
 	my ($method, $params) = HMCCURPC_DecodeRequest ($request);
@@ -1760,6 +1777,8 @@ sub HMCCURPC_ProcessRequest ($$)
 		$connection->send (HMCCURPC_EncodeResponse ($BINRPC_ARRAY, undef));
 	}
 	elsif ($method eq 'system.multicall') {
+		# Send INIT to FHEM when we receive the first event from CCU/CUxD because some binary
+		# RPC clients won't send a ListDevices request
 		if ($server->{hmccu}{running} == 0) {
 			$server->{hmccu}{running} = 1;
 			Log3 $name, 1, "CCURPC: Binary RPC $clkey. Sending init to HMCCU";
