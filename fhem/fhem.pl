@@ -1674,7 +1674,7 @@ ReplaceSetMagic($$@)       # Forum #38276
     $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
     return $all if(!defined($val));
 
-    if($s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
+    if($s && $s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
       $val = $1;
       $val = int($val) if ( $s eq ":i" );
       $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
