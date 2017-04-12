@@ -669,7 +669,6 @@ sub weekprofile_Set($$@)
     $prfNew->{TOPIC} = $topic;
     
     push @{$hash->{PROFILES}}, $prfNew;
-    weekprofile_updateReadings($hash);
     weekprofile_writeProfilesToFile($hash);
     return undef;
   }
@@ -739,7 +738,6 @@ sub weekprofile_Set($$@)
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
-    weekprofile_updateReadings($hash);
     return undef;
   }
   
@@ -774,7 +772,6 @@ sub weekprofile_Set($$@)
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
-    weekprofile_updateReadings($hash);
     return undef;
   }
   
@@ -796,7 +793,6 @@ sub weekprofile_Set($$@)
     
     splice(@{$hash->{PROFILES}},$idx, 1);
     weekprofile_writeProfilesToFile($hash);
-    weekprofile_updateReadings($hash);
     return undef;
   }
   
@@ -949,6 +945,7 @@ sub weekprofile_writeProfilesToFile(@)
   }  
   close $fh;
   DoTrigger($me,"PROFILES_SAVED",1);
+  weekprofile_updateReadings($hash);
 }
 ############################################## 
 sub weekprofile_readProfilesFromFile(@)
