@@ -195,7 +195,7 @@ sub LuftdatenInfo_GetHttpResponse($$) {
 
   if($connection eq "remote"){
     my $param = {
-      url      => "http://api.luftdaten.info/v1/sensor/$id",
+      url      => "http://api.luftdaten.info/v1/sensor/$id/",
       timeout  => $timeout,
       hash     => $hash,
       method   => "GET",
@@ -301,7 +301,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
           }
         }
 
-        readingsBulkUpdateIfChanged($hash, "latitude", $latitude);          readingsBulkUpdateIfChanged($hash, "longitude", $longitude);          readingsBulkUpdate($hash, "state", "active");
+        readingsBulkUpdateIfChanged($hash, "latitude", $latitude);
+        readingsBulkUpdateIfChanged($hash, "longitude", $longitude);
+        readingsBulkUpdate($hash, "state", "active");
         readingsEndUpdate($hash, 1);
 
         my $SENSORID2 = InternalVal($SELF, "SENSORID2", undef);
@@ -369,7 +371,7 @@ sub LuftdatenInfo_ParseHttpResponse($) {
           readingsBulkUpdate($hash, "signal", $1);
         }
       }
-      
+
       readingsBulkUpdate($hash, "state", "active");
       readingsEndUpdate($hash, 1);
     }
@@ -420,9 +422,12 @@ sub LuftdatenInfo_statusRequest($) {
 (en | <a href="commandref_DE.html#LuftdatenInfo"><u>de</u></a>)
 <div>
   <ul>
-    LuftdatenInfo is the FHEM module to read 	particulate matter, temperature and humidity values ​​from the self-assembly particulate matter sensors from <a href="http://Luftdaten.info"><u>Luftdaten.info</u></a>.<br>
+    LuftdatenInfo is the FHEM module to read 	particulate matter, temperature
+    and humidity values ​​from the self-assembly particulate matter sensors
+    from <a href="http://Luftdaten.info"><u>Luftdaten.info</u></a>.<br>
     The values ​​can be queried directly from the server or locally.<br>
-    A local query should only be made if the sensor is NOT sendig data to the server, otherwise the sensor may block and need to be restarted.<br>
+    A local query should only be made if the sensor is NOT sendig data to the
+    server, otherwise the sensor may block and need to be restarted.<br>
     <br>
     <b>Prerequisites</b>
     <ul>
@@ -438,7 +443,8 @@ sub LuftdatenInfo_statusRequest($) {
         define &lt;name&gt; LuftdatenInfo
         (&lt;SDS011sensorID&gt; [&lt;DHT22sensorID&gt;]|&lt;ip&gt;)
       </code><br>
-      To query the data from the server, the SDS011 SensorID must be specified.<br>
+      To query the data from the server, the SDS011 SensorID must be
+      specified.<br>
       The SensorID stands right at
       <a href="http://maps.luftdaten.info/">
         <u>http://maps.luftdaten.info/</u>
