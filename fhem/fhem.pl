@@ -3974,6 +3974,7 @@ ReadingsNum($$$;$)
 {
   my ($d,$n,$default,$round) = @_;
   my $val = ReadingsVal($d,$n,$default);
+  return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   $val = round($val,$round) if($round);
   return $val;
