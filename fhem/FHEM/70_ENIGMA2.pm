@@ -757,21 +757,10 @@ sub ENIGMA2_Set($@) {
     elsif ( lc($set) eq "showtext" ) {
         if ( $state ne "absent" || $ignoreState ne "0" ) {
             return "No argument given, choose one of messagetext "
-              if ( !defined( $a->[0] ) );
+              unless (@$a);
 
-            Log3 $name, 3, "ENIGMA2 set $name " . $set;
-
-            my $i    = 2;
-            my $text = $a->[$i];
-            $i++;
-            if ( defined( $a->[$i] ) ) {
-                my $arr_size = @$a;
-                while ( $i < $arr_size ) {
-                    $text = $text . " " . $a->[$i];
-                    $i++;
-                }
-            }
-            $cmd = "type=1&timeout=8&text=" . urlEncode($text);
+            $cmd = "type=1&timeout=8&text=" . urlEncode( join( " ", @$a ) );
+            Log3 $name, 3, "ENIGMA2 set $name $set";
             $result = ENIGMA2_SendCommand( $hash, "message", $cmd );
         }
         else {
