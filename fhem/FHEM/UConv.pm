@@ -423,20 +423,26 @@ sub mph2bft($) {
 sub humidity2condition($) {
     my ($data) = @_;
     my $v = "dry";
+    my $rgb    = "C72A23";
 
     if ( $data >= 80 ) {
         $v = "wet";
+        $rgb = "0066CC";
     }
     elsif ( $data >= 70 ) {
         $v = "high";
+        $rgb = "009999";
     }
     elsif ( $data >= 50 ) {
         $v = "optimal";
+        $rgb = "4C9329";
     }
     elsif ( $data >= 40 ) {
         $v = "low";
+        $rgb = "E7652B";
     }
 
+    return ( $v, $rgb ) if (wantarray);
     return $v;
 }
 
@@ -469,21 +475,20 @@ sub uvi2condition($) {
 
 sub values2weathercondition($$$$$) {
     my ( $temp, $hum, $light, $isday, $israining ) = @_;
-    my $condition = "clear";
+    my $v = "clear";
 
     if ($israining) {
-        $condition = "rain";
+        $v = "rain";
     }
     elsif ( $light > 40000 ) {
-        $condition = "sunny";
+        $v = "sunny";
     }
     elsif ($isday) {
-        $condition = "cloudy";
+        $v = "cloudy";
     }
 
-    $condition = "nt_" . $condition unless ($isday);
-
-    return $condition;
+    $v = "nt_" . $v unless ($isday);
+    return $v;
 }
 
 #TODO rewrite for Unit.pm

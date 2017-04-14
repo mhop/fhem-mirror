@@ -163,29 +163,31 @@ sub HP1000_Initialize($) {
 
     # Unit.pm support
     $hash->{readingsDesc} = {
-        'Activity'            => { rtype => 'oknok', },
-        'UV'                  => { rtype => 'uvi', },
-        'UVR'                 => { rtype => 'uwpscm', },
-        'UVcondition'         => { rtype => 'condition_uvi', },
-        'UVcondition_rgb'     => { rtype => 'rgbhex', },
-        'battery'             => { rtype => 'oknok', },
-        'condition'           => { rtype => 'condition_weather', },
-        'daylight'            => { rtype => 'yesno', },
-        'dewpoint'            => { rtype => 'c', formula_symbol => 'Td', },
-        'dewpoint_f'          => { rtype => 'f', formula_symbol => 'Td', },
-        'extsrv_state'        => { rtype => 'oknok', },
-        'humidity'            => { rtype => 'pct', formula_symbol => 'H', },
-        'humidityAbs'         => { rtype => 'c', formula_symbol => 'Tabs', },
-        'humidityAbs_f'       => { rtype => 'f', formula_symbol => 'Tabs', },
-        'humidityCondition'   => { rtype => 'condition_hum', },
-        'indoorDewpoint'      => { rtype => 'c', formula_symbol => 'Tdi', },
-        'indoorDewpoint_f'    => { rtype => 'f', formula_symbol => 'Tdi', },
-        'indoorHumidity'      => { rtype => 'pct', formula_symbol => 'Hi', },
-        'indoorHumidityAbs'   => { rtype => 'c', formula_symbol => 'Tabsi', },
-        'indoorHumidityAbs_f' => { rtype => 'f', formula_symbol => 'Tabsi', },
-        'indoorHumidityCondition' => { rtype => 'condition_hum', },
-        'indoorTemperature'       => { rtype => 'c', formula_symbol => 'Ti', },
-        'indoorTemperature_f'     => { rtype => 'f', formula_symbol => 'Ti', },
+        'Activity'              => { rtype => 'oknok', },
+        'UV'                    => { rtype => 'uvi', },
+        'UVR'                   => { rtype => 'uwpscm', },
+        'UVcondition'           => { rtype => 'condition_uvi', },
+        'UVcondition_rgb'       => { rtype => 'rgbhex', },
+        'battery'               => { rtype => 'oknok', },
+        'condition'             => { rtype => 'condition_weather', },
+        'daylight'              => { rtype => 'yesno', },
+        'dewpoint'              => { rtype => 'c', formula_symbol => 'Td', },
+        'dewpoint_f'            => { rtype => 'f', formula_symbol => 'Td', },
+        'extsrv_state'          => { rtype => 'oknok', },
+        'humidity'              => { rtype => 'pct', formula_symbol => 'H', },
+        'humidityAbs'           => { rtype => 'c', formula_symbol => 'Tabs', },
+        'humidityAbs_f'         => { rtype => 'f', formula_symbol => 'Tabs', },
+        'humidityCondition'     => { rtype => 'condition_hum', },
+        'humidityCondition_rgb' => { rtype => 'rgbhex', },
+        'indoorDewpoint'        => { rtype => 'c', formula_symbol => 'Tdi', },
+        'indoorDewpoint_f'      => { rtype => 'f', formula_symbol => 'Tdi', },
+        'indoorHumidity'        => { rtype => 'pct', formula_symbol => 'Hi', },
+        'indoorHumidityAbs'     => { rtype => 'c', formula_symbol => 'Tabsi', },
+        'indoorHumidityAbs_f'   => { rtype => 'f', formula_symbol => 'Tabsi', },
+        'indoorHumidityCondition'     => { rtype => 'condition_hum', },
+        'indoorHumidityCondition_rgb' => { rtype => 'rgbhex', },
+        'indoorTemperature' => { rtype => 'c', formula_symbol => 'Ti', },
+        'indoorTemperature_f' => { rtype => 'f', formula_symbol => 'Ti', },
         'israining'               => { rtype => 'yesno', },
         'luminosity'              => { rtype => 'lx', },
         'pressure'                => { rtype => 'hpamb', },
@@ -816,14 +818,17 @@ sub HP1000_CGI() {
 
     # humidityCondition
     if ( defined( $webArgs->{outhumi} ) ) {
-        readingsBulkUpdateIfChanged( $hash, "humidityCondition",
-            UConv::humidity2condition( $webArgs->{outhumi} ) );
+        my ( $v, $rgb ) = UConv::humidity2condition( $webArgs->{outhumi} );
+        readingsBulkUpdateIfChanged( $hash, "humidityCondition",     $v );
+        readingsBulkUpdateIfChanged( $hash, "humidityCondition_rgb", $rgb );
     }
 
     # indoorHumidityCondition
     if ( defined( $webArgs->{inhumi} ) ) {
-        readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition",
-            UConv::humidity2condition( $webArgs->{inhumi} ) );
+        my ( $v, $rgb ) = UConv::humidity2condition( $webArgs->{inhumi} );
+        readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition", $v );
+        readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition_rgb",
+            $rgb );
     }
 
     if ( defined( $webArgs->{UV} ) ) {
