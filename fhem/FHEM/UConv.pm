@@ -154,6 +154,12 @@ sub kph2mph($;$) {
     return roundX( $data * 0.621, $rnd );
 }
 
+# Speed: convert m/s (meter per seconds) to mph (miles per hour)
+sub mps2mph($;$) {
+    my ( $data, $rnd ) = @_;
+    return roundX( kph2mph( mps2kph( $data, 9 ), 9 ), $rnd );
+}
+
 # Length: convert mm (milimeter) to in (inch)
 sub mm2in($;$) {
     my ( $data, $rnd ) = @_;
@@ -222,6 +228,12 @@ sub mph2kph($;$) {
     return roundX( $data * 1.609344, $rnd );
 }
 
+# Speed: convert mph (miles per hour) to m/s (meter per seconds)
+sub mph2mps($;$) {
+    my ( $data, $rnd ) = @_;
+    return roundX( kph2mps( mph2kph( $data, 9 ), 9 ), $rnd );
+}
+
 # Length: convert in (inch) to mm (milimeter)
 sub in2mm($;$) {
     my ( $data, $rnd ) = @_;
@@ -270,6 +282,8 @@ sub direction2compasspoint($;$) {
 sub uwpscm2uvi($;$) {
     my ( $data, $rnd ) = @_;
 
+    return 0 unless ($data);
+
     # Forum topic,44403.msg501704.html#msg501704
     return int( ( $data - 100 ) / 450 + 1 ) unless ( defined($rnd) );
 
@@ -281,6 +295,7 @@ sub uwpscm2uvi($;$) {
 sub uvi2uwpscm($) {
     my ($data) = @_;
 
+    return 0 unless ($data);
     return ( $data * ( 450 + 1 ) ) + 100;
 }
 
@@ -290,6 +305,14 @@ sub lux2wpsm($;$) {
 
     # Forum topic,44403.msg501704.html#msg501704
     return roundX( $data / 126.7, $rnd );
+}
+
+# Power: convert W/m2 to lux
+sub wpsm2lux($;$) {
+    my ( $data, $rnd ) = @_;
+
+    # Forum topic,44403.msg501704.html#msg501704
+    return roundX( $data * 126.7, $rnd );
 }
 
 #################################

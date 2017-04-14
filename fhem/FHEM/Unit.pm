@@ -1374,7 +1374,7 @@ my $rtypes = {
         },
     },
 
-    # numbering
+    # decimal numbering
     short => {
         ref_base          => 25,
         format            => '%i',
@@ -1457,6 +1457,33 @@ my $rtypes = {
             en => 'percent',
         },
         scope => { minValue => 0, maxValue => 100 },
+    },
+
+    # binary numbering
+    bin => {
+        rtype_description => {
+            de => 'Binärnummer',
+            en => 'Binary number',
+        },
+        scope => '^[01]+$',
+    },
+
+    # octal numbering
+    oct => {
+        rtype_description => {
+            de => 'Oktalnummer',
+            en => 'Octal number',
+        },
+        scope => '^[0-7]+$',
+    },
+
+    # hexadecimal numbering
+    hex => {
+        rtype_description => {
+            de => 'Hexadezimalnummer',
+            en => 'Hexadecimal number',
+        },
+        scope => '^[0-9a-fA-F]+$',
     },
 
     # currency
@@ -1661,6 +1688,7 @@ my $rtypes = {
     inhg => {
         ref_base => 12,
         suffix   => 'inHg',
+        format       => '%.2f',
         txt      => {
             de => 'Zoll Quecksilbersäule',
             en => 'Inches of Mercury',
