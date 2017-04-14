@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  38_netatmo: dynamic update intervals for devices
   - update:  98_weekprofile: update reading profile_count after save profiles
   - feature: 98_weekprofile: new attribute widgetTranslations for translations
   - bugfix:  98_weekprofile: handle csrfToken
