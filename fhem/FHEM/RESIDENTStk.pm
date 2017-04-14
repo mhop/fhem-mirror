@@ -170,7 +170,7 @@ m/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9
 ## Executed for start to cleanup in case this wake-up automation is re-started.\
 ## Executed for stop to cleanup in case the user ends this automation earlier.\
 ##\
-fhem \"delete atTmp_.*_\".\$NAME;;\
+fhem \"delete atTmp_.*_\".\$NAME.\":FILTER=TYPE=at\";;\
 \
 ##-----------------------------------------------------------------------------\
 ## BEGIN WAKE-UP PROGRAM\
@@ -758,7 +758,7 @@ return;;\
     #
     elsif ( ( $VALUE eq "stop" || $VALUE eq "end" ) && $running ) {
         Log3 $NAME, 4, "RESIDENTStk $NAME: " . "stopping wake-up program";
-        fhem "setreading $NAME running 0";
+        readingsSingleUpdate( $defs{$NAME}, "running", "0", 1 );
         fhem "set $NAME nextRun $nextRun";
 
         # trigger macro again so it may clean up it's stuff.
@@ -809,13 +809,11 @@ return;;\
             }
 
             my $wakeupStopAtdevice = $wakeupAtdevice . "_stop";
-            if ( IsDevice($wakeupStopAtdevice) ) {
-                fhem "delete $wakeupStopAtdevice";
-            }
+            fhem "delete $wakeupStopAtdevice"
+              if ( IsDevice($wakeupStopAtdevice) );
         }
 
-        fhem "setreading $wakeupUserdevice:FILTER=wakeup=1 wakeup 0";
-
+        readingsSingleUpdate( $defs{$wakeupUserdevice}, "wakeup", "0", 1 );
         return;
     }
 
@@ -1096,7 +1094,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: "
-          . "GUEST device $wakeupUserdevice has status value 'none' so let's disable this alarm timer";
+          . "GUEST device $wakeupUserdevice has status value 'none' so let's disable this wake-up timer";
         fhem "set $NAME nextRun OFF";
         return;
     }
@@ -1243,17 +1241,15 @@ sub RESIDENTStk_wakeupRun($;$) {
             readingsBulkUpdate( $defs{$wakeupUserdevice}, "wakeup", "1" );
             readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
-            fhem "setreading $wakeupUserdevice wakeup 0"
-              if ( !$wakeupOffset );
+            readingsSingleUpdate( $defs{$wakeupUserdevice}, "wakeup", "0", 1 )
+              unless ($wakeupOffset);
 
-            fhem "setreading $NAME lastRun $lastRun";
+            readingsSingleUpdate( $defs{$NAME}, "lastRun", $lastRun, 1 );
 
-            if ( $wakeupOffset > 0 ) {
+            if ($wakeupOffset) {
                 my $wakeupStopAtdevice = $wakeupAtdevice . "_stop";
-
-                if ( IsDevice($wakeupStopAtdevice) ) {
-                    fhem "delete $wakeupStopAtdevice";
-                }
+                fhem "delete $wakeupStopAtdevice"
+                  if ( IsDevice($wakeupStopAtdevice) );
 
                 Log3 $NAME, 4,
                   "RESIDENTStk $NAME: "
@@ -1270,7 +1266,7 @@ sub RESIDENTStk_wakeupRun($;$) {
         }
     }
 
-    if ( $running && $wakeupOffset > 0 ) {
+    if ( $running && $wakeupOffset ) {
         readingsBeginUpdate( $defs{$NAME} );
         readingsBulkUpdate( $defs{$NAME}, "running", "1" );
         readingsBulkUpdate( $defs{$NAME}, "state",   "running" );
@@ -1306,7 +1302,9 @@ sub RESIDENTStk_wakeupRun($;$) {
           . "nextRun $wakeupDefaultTime";
     }
     elsif ( !$running ) {
-        fhem "setreading $NAME:FILTER=state!=$nextRun state $nextRun";
+        readingsBeginUpdate( $defs{$NAME} );
+        readingsBulkUpdateIfChanged( $defs{$NAME}, "state", $nextRun );
+        readingsEndUpdate( $defs{$NAME}, 1 );
     }
 
     return undef;
