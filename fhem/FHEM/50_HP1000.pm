@@ -79,7 +79,7 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"wu_push:1,0 wu_id wu_password wu_realtime:1,0 extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
+"wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
     # Unit.pm support
@@ -343,6 +343,10 @@ sub HP1000_CGI() {
     my $webArgs;
     my $servertype;
 
+    #TODO: should better be blocked in FHEMWEB already
+    return ( "text/plain; charset=utf-8", "booting up" )
+      unless ($init_done);
+
     # incorrect FHEMWEB instance used
     if ( AttrVal( $FW_wname, "webname", "fhem" ) ne "weatherstation" ) {
         return ( "text/plain; charset=utf-8",
@@ -573,6 +577,15 @@ sub HP1000_CGI() {
           UConv::mph2kph( $webArgs->{windgustmph} );
     }
 
+    # windspeed in km/h (convert from windspeedmph)
+    if (   defined( $webArgs->{windspeedmph} )
+        && $webArgs->{windspeedmph} ne ""
+        && !defined( $webArgs->{windspeed} ) )
+    {
+        $webArgs->{windspeed} =
+          UConv::mph2kph( $webArgs->{windspeedmph} );
+    }
+
     # windspeed in km/h (convert from windspdmph)
     if (   defined( $webArgs->{windspdmph} )
         && $webArgs->{windspdmph} ne ""
@@ -737,6 +750,15 @@ sub HP1000_CGI() {
     # windspdmph in mph (convert from windspeed)
     if (   defined( $webArgs->{windspeed} )
         && $webArgs->{windspeed} ne ""
+        && !defined( $webArgs->{windspeedmph} ) )
+    {
+        $webArgs->{windspeedmph} =
+          UConv::kph2mph( $webArgs->{windspeed} );
+    }
+
+    # windspdmph in mph (convert from windspeed)
+    if (   defined( $webArgs->{windspeed} )
+        && $webArgs->{windspeed} ne ""
         && !defined( $webArgs->{windspdmph} ) )
     {
         $webArgs->{windspdmph} =
@@ -773,6 +795,7 @@ sub HP1000_CGI() {
         $p = "humidity"       if ( $p eq "_outhumi" );
         $p = "indoorHumidity" if ( $p eq "_inhumi" );
         $p = "luminosity"     if ( $p eq "_light" );
+        $p = "solarradiation" if ( $p eq "_solarradiation" );
         $p = "wind_direction" if ( $p eq "_winddir" );
         $p = "UV" if ( $p eq "_UV" && $hash->{SERVER_TYPE} eq "php" );
         $p = "UVR" if ( $p eq "_UV" && $hash->{SERVER_TYPE} ne "php" );
@@ -807,6 +830,7 @@ sub HP1000_CGI() {
         $p = "indoorTemperature_f" if ( $p eq "_indoortempf" );
         $p = "wind_chill_f"        if ( $p eq "_windchillf" );
         $p = "wind_gust_mph"       if ( $p eq "_windgustmph" );
+        $p = "wind_speed_mph"      if ( $p eq "_windspeedmph" );
         $p = "wind_speed_mph"      if ( $p eq "_windspdmph" );
 
         readingsBulkUpdate( $hash, $p, $v );
@@ -821,6 +845,25 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{rainrate} ) && $webArgs->{rainrate} > 0 );
     readingsBulkUpdateIfChanged( $hash, "israining", $israining );
 
+    # solarradiation in W/m2 (convert from lux)
+    if ( defined( $webArgs->{light} )
+        && !defined( $webArgs->{solarradiation} ) )
+    {
+        $webArgs->{solarradiation} =
+          UConv::lux2wpsm( $webArgs->{light} );
+        readingsBulkUpdate( $hash, "solarradiation",
+            $webArgs->{solarradiation} );
+    }
+
+    # luminosity in lux (convert from W/m2)
+    if ( defined( $webArgs->{solarradiation} )
+        && !defined( $webArgs->{light} ) )
+    {
+        $webArgs->{light} =
+          UConv::wpsm2lux( $webArgs->{solarradiation} );
+        readingsBulkUpdate( $hash, "luminosity", $webArgs->{light} );
+    }
+
     # daylight
     my $daylight = 0;
     $daylight = 1
@@ -829,8 +872,9 @@ sub HP1000_CGI() {
 
     # condition
     if ( defined( $webArgs->{light} ) ) {
-        my $temp = ( $webArgs->{outtemp} ? $webArgs->{outtemp} : "10" );
-        my $hum  = ( $webArgs->{outhumi} ? $webArgs->{outhumi} : "50" );
+        my $temp =
+          ( defined( $webArgs->{outtemp} ) ? $webArgs->{outtemp} : "10" );
+        my $hum = ( $webArgs->{outhumi} ? $webArgs->{outhumi} : "50" );
 
         readingsBulkUpdateIfChanged(
             $hash,
@@ -877,14 +921,6 @@ sub HP1000_CGI() {
         my ( $v, $rgb ) = UConv::uvi2condition( $webArgs->{UVI} );
         readingsBulkUpdateIfChanged( $hash, "UVcondition",     $v );
         readingsBulkUpdateIfChanged( $hash, "UVcondition_rgb", $rgb );
-    }
-
-    # solarradiation in W/m2 (convert from lux)
-    if ( defined( $webArgs->{light} ) ) {
-        $webArgs->{solarradiation} =
-          UConv::lux2wpsm( $webArgs->{light} );
-        readingsBulkUpdate( $hash, "solarradiation",
-            $webArgs->{solarradiation} );
     }
 
     # pressure_mm in mmHg (convert from hpa)
@@ -1087,13 +1123,14 @@ sub HP1000_CGI() {
     }
 
     # averages/wind_speed_mph_avg2m in mph
-    if ( defined( $webArgs->{windspdmph} ) ) {
+    if ( defined( $webArgs->{windspeedmph} ) ) {
         my $v =
-          HP1000_GetAvg( $hash, "windspdmph", 2 * 60, $webArgs->{windspdmph} );
+          HP1000_GetAvg( $hash, "windspeedmph", 2 * 60,
+            $webArgs->{windspeedmph} );
 
         if ( $hash->{INTERVAL} > 0 ) {
             readingsBulkUpdate( $hash, "wind_speed_mph_avg2m", $v );
-            $webArgs->{windspdmph_avg2m} = $v;
+            $webArgs->{windspeedmph_avg2m} = $v;
         }
     }
 
@@ -1229,8 +1266,11 @@ sub HP1000_PushSrv($$) {
 
     Log3 $name, 5, "HP1000 $name: called function HP1000_PushSrv()";
 
+    $srv_url =~ s/\$SERVER_TYPE/$hash->{SERVER_TYPE}/g
+      if ( $hash->{SERVER_TYPE} );
+
     if ( $srv_url !~
-/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.\:\;\'\,]*)?/
+m/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.\:\;\'\,]*)?/
       )
     {
         return;
@@ -1290,12 +1330,15 @@ sub HP1000_PushWU($$) {
     my $http_noshutdown = AttrVal( $name, "http-noshutdown", "1" );
     my $wu_user         = AttrVal( $name, "wu_id", "" );
     my $wu_pass         = AttrVal( $name, "wu_password", "" );
+    my $wu_indoorValues = AttrVal( $name, "wu_indoorValues", 1 );
+    my $wu_dataValues   = AttrVal( $name, "wu_dataValues", undef );
 
     Log3 $name, 5, "HP1000 $name: called function HP1000_PushWU()";
 
     if ( $wu_user eq "" && $wu_pass eq "" ) {
         Log3 $name, 4,
-"HP1000 $name: missing attributes for Weather Underground transfer: wu_user and wu_password";
+          "HP1000 $name: "
+          . "missing attributes for Weather Underground transfer: wu_user and wu_password";
 
         my $return = "error: missing attributes wu_user and wu_password";
 
@@ -1313,6 +1356,27 @@ sub HP1000_PushWU($$) {
     elsif ( AttrVal( $name, "wu_realtime", "0" ) eq "1" ) {
         Log3 $name, 5, "HP1000 $name: Explicitly turning on realtime";
         $webArgs->{realtime} = 1;
+    }
+
+    if ($wu_dataValues) {
+        my %dummy;
+        my ( $err, @a ) = ReplaceSetMagic( \%dummy, 0, ($wu_dataValues) );
+        if ($err) {
+            Log3 $name, 3, "HP1000 $name: error parsing wu_dataValues: $err";
+        }
+        else {
+            my ( undef, $h ) = parseParams( \@a );
+            foreach ( keys %$h ) {
+                next unless $_ ne "";
+                Log3 $name, 4,
+                  "HP1000 $name: Adding new value for WU: $_=$h->{$_}"
+                  unless ( defined( $webArgs->{$_} ) );
+                Log3 $name, 4,
+                  "HP1000 $name: Replacing existing value for WU: $_=$h->{$_}"
+                  if ( defined( $webArgs->{$_} ) );
+                $webArgs->{$_} = $h->{$_};
+            }
+        }
     }
 
     $webArgs->{rtfreq} = 5
@@ -1342,6 +1406,15 @@ sub HP1000_PushWU($$) {
         }
 
         elsif ( $key eq "UV" ) {
+            next;
+        }
+
+        if (  !$wu_indoorValues
+            && $key =~
+m/^(indoorhumidity|indoortempf|indoordewpointf|inhumi|intemp|indewpoint)/i
+          )
+        {
+            Log3 $name, 4, "HP1000 $name: excluding indoor value $key=$value";
             next;
         }
 
@@ -1427,7 +1500,7 @@ sub HP1000_ReturnWU($$$) {
         my $logprio = 5;
         my $return  = "ok";
 
-        if ( $data !~ m/^success.*/ ) {
+        if ( $data !~ m/^success.*/i ) {
             $logprio = 4;
             $return  = "error";
             $return .= " " . $param->{code} if ( $param->{code} ne "200" );
@@ -1500,6 +1573,13 @@ sub HP1000_ReturnWU($$$) {
       <a name="wu_password"></a><li><b>wu_password</b></li>
         Weather Underground (Wunderground) password
 
+      <a name="wu_dataValues"></a><li><b>wu_dataValues</b></li>
+        Add or replace values before pushing data to Weather Underground.<br>
+        Format is key=value while value may be of <a href="#set">set magic format</a>
+
+      <a name="wu_indoorValues"></a><li><b>wu_indoorValues</b></li>
+        Include indoor values for Weather Underground (defaults to 1=yes)
+
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Enable or disable to push data forward to Weather Underground (defaults to 0=no)
 
@@ -1559,6 +1639,13 @@ sub HP1000_ReturnWU($$$) {
 
       <a name="wu_password"></a><li><b>wu_password</b></li>
         Weather Underground (Wunderground) Passwort
+
+      <a name="wu_dataValues"></a><li><b>wu_dataValues</b></li>
+        Ersetzt Werte oder f&uuml;gt neue Werte hinzu, bevor diese zu Weather Underground &uuml;bertragen werden.<br>
+        Das Format entspricht key=value wobei value im <a href="#set">Format set magic sein</a> kann.
+
+      <a name="wu_indoorValues"></a><li><b>wu_indoorValues</b></li>
+        Gibt an, ob die Innenraumwerte mit zu Weather Underground &uuml;bertragen werden sollen (Standard ist 1=an)
 
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Pushen der Daten zu Weather Underground aktivieren oder deaktivieren (Standard ist 0=aus)
