@@ -1540,7 +1540,7 @@ sub HP1000_ReturnWU($$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Provides webhook receiver for Wifi-based weather station which support PWS protocol from Weather Underground (e.g. HP1000, WH2600, WH2601, WH3000 of Fine Offset Electronics - sometimes also known as Ambient Weather WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/"froggit</a>.<br>
+          Provides webhook receiver for Wifi-based weather station which support <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS protocol</a> from Weather Underground (e.g. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950, WH3000 of <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - sometimes also known as <a href="http://www.ambientweather.com/peorhowest.html>Ambient Weather</a> WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/"froggit</a> or by <a href="">Conrad</a> under it's brand name Renkforce.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
           No other name will work as it's hardcoded in the weather station device itself!<br>
           If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br>
@@ -1557,6 +1557,7 @@ sub HP1000_ReturnWU($$$) {
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
           IMPORTANT: In your hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
+          You might want to check to install a firmware update from <a href="http://www.foshk.com/support/">here</a>.
       </ul>
       </div><br>
     </div>
@@ -1608,7 +1609,7 @@ sub HP1000_ReturnWU($$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das PWS Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH3000 Wetterstation von Fine Offset Electronics - manchmal auch bekannt als Ambient Weather WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/"froggit</a> vertrieben.<br>
+          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS</a> Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950, WH3000 Wetterstation von <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - manchmal auch bekannt als <a href="http://www.ambientweather.com/peorhowest.html>Ambient Weather</a> WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/"froggit</a> vertrieben.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
           Kein anderer Name funktioniert, da dieser fest in der Wetterstation hinterlegt ist!<br>
           Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br>
@@ -1625,6 +1626,7 @@ sub HP1000_ReturnWU($$$) {
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
           WICHTIG: Im Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+          Ggf. sollte man <a href="http://www.foshk.com/support/">hier</a> einmal nach einer neueren Firmware schauen.
       </ul>
       </div><br>
     </div>
