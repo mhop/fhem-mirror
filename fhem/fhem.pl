@@ -4042,6 +4042,7 @@ AttrNum($$$;$)
 {
   my ($d,$n,$default,$round) = @_;
   my $val = AttrVal($d,$n,$default);
+  return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   $val = round($val,$round) if($round);
   return $val;
