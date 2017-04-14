@@ -1130,6 +1130,7 @@ sub HP1000_CGI() {
 
         if ( $hash->{INTERVAL} > 0 ) {
             readingsBulkUpdate( $hash, "wind_speed_mph_avg2m", $v );
+            $webArgs->{windspdmph_avg2m}   = $v;
             $webArgs->{windspeedmph_avg2m} = $v;
         }
     }
@@ -1521,8 +1522,8 @@ sub HP1000_ReturnWU($$$) {
 
 =pod
 =item device
-=item summary support for Wifi-based weather stations HP1000 and WH2600
-=item summary_DE Unterst&uuml;tzung f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstationen
+=item summary support for Wifi-based weather stations using PWS protocol from Wunderground
+=item summary_DE unterst&uuml;tzt WLAN-basierte Wetterstationen mit Wunderground PWS Protokoll
 =begin html
 
     <p>
@@ -1539,12 +1540,12 @@ sub HP1000_ReturnWU($$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI).<br>
+          Provides webhook receiver for Wifi-based weather station which support PWS protocol from Weather Underground (e.g. HP1000, WH2600, WH2601, WH3000 of Fine Offset Electronics - sometimes also known as Ambient Weather WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/"froggit</a>.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
-          No other name will work as it's hardcoded in the HP1000/WH2600 device itself!<br>
+          No other name will work as it's hardcoded in the weather station device itself!<br>
           If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br>
           <br>
-          As the URI has a fixed coding as well there can only be one single HP1000/WH2600 station per FHEM installation.<br>
+          As the URI has a fixed coding as well there can only be one single instance of this module FHEM installation.<br>
         <br>
         Example:<br>
         <div>
@@ -1555,7 +1556,7 @@ sub HP1000_ReturnWU($$$) {
           # to send this ID and PASSWORD for data to be accepted<br>
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
-          IMPORTANT: In your HP1000/WH2600 hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
+          IMPORTANT: In your hardware device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
       </ul>
       </div><br>
     </div>
@@ -1607,12 +1608,12 @@ sub HP1000_ReturnWU($$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI).<br>
+          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das PWS Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH3000 Wetterstation von Fine Offset Electronics - manchmal auch bekannt als Ambient Weather WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/"froggit</a> vertrieben.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
-          Kein anderer Name funktioniert, da dieser hard im HP1000/WH2600 Ger&auml;t hinterlegt ist!<br>
+          Kein anderer Name funktioniert, da dieser fest in der Wetterstation hinterlegt ist!<br>
           Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br>
           <br>
-          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000/WH2600 Station gleichzeitig verwendet werden.<br>
+          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine Instanz dieses Moduls gleichzeitig verwendet werden.<br>
         <br>
         Beispiel:<br>
         <div>
@@ -1623,7 +1624,7 @@ sub HP1000_ReturnWU($$$) {
           # diese ID und PASSWORD sendet, damit Daten akzeptiert werden<br>
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
-          WICHTIG: Im HP1000/WH2600 Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+          WICHTIG: Im Ger&auml;t selbst muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
       </ul>
       </div><br>
     </div>
