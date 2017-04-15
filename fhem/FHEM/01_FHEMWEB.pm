@@ -160,6 +160,7 @@ FHEMWEB_Initialize($)
     endPlotToday:1,0
     fwcompress:0,1
     hiddengroup
+    hiddengroupRegexp
     hiddenroom
     hiddenroomRegexp
     iconPath
@@ -1757,6 +1758,7 @@ FW_showRoom()
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
     $FW_hiddengroup{$r} = 1;
   }
+  my $hge = AttrVal($FW_wname, "hiddengroupRegexp", undef);
 
   FW_pO "<form method=\"$FW_formmethod\" ".  # Why do we need a form here?
                 "action=\"$FW_ME\" autocomplete=\"off\">";
@@ -1780,6 +1782,7 @@ FW_showRoom()
     next if(!$FW_types{$dev});   # FHEMWEB connection, missed due to caching
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
+      next if($hge && $grp =~ m/$hge/);
       $sortIndex{$dev} = FW_sortIndex($dev);
       $group{$grp}{$dev} = 1;
     }
@@ -3465,6 +3468,20 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="hiddengroup"></a>
+    <li>hiddengroup<br>
+        Comma separated list of groups to "hide", i.e. not to show in any room
+        of this FHEMWEB instance.<br>
+        Example:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
+        </li>
+        <br>
+
+    <a name="hiddengroupRegexp"></a>
+    <li>hiddengroupRegexp<br>
+        One regexp for the same purpose as hiddengroup.
+        </li>
+        <br>
+
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
         Comma separated list of rooms to "hide", i.e. not to show. Special
@@ -3487,14 +3504,6 @@ FW_widgetOverride($$)
         </li>
         <br>
 
-
-    <a name="hiddengroup"></a>
-    <li>hiddengroup<br>
-        Comma separated list of groups to "hide", i.e. not to show in any room
-        of this FHEMWEB instance.<br>
-        Example:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
-        </li>
-        <br>
 
     <a name="HTTPS"></a>
     <li>HTTPS<br>
@@ -4222,6 +4231,12 @@ FW_widgetOverride($$)
         <br>
         Beispiel:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
         </li><br>
+
+    <a name="hiddengroupRegexp"></a>
+    <li>hiddengroupRegexp<br>
+        Ein regul&auml;rer Ausdruck, um Gruppen zu verstecken.
+        </li>
+        <br>
 
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
