@@ -2849,6 +2849,7 @@ FW_Notify($$)
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
+        next if($readingName !~ m/^[A-Za-z\d_\.\-\/]+$/); # Forum #70608
         push @data, FW_longpollInfo($h->{fmt},
                                 "$dn-$readingName", $readingVal,$readingVal);
         push @data, FW_longpollInfo($h->{fmt}, "$dn-$readingName-ts", $tn, $tn);

@@ -4942,6 +4942,7 @@ parseParams($;$$)
 
   while (@params) {
     my $param = shift(@params);
+    next if($param eq "");
     my ($key, $value) = split( '=', $param, 2 );
 
     if( !defined( $value ) ) {
