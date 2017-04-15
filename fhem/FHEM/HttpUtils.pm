@@ -348,7 +348,10 @@ HttpUtils_Connect2($)
       $par{SSL_version}  = $sslVersion;
       $par{SSL_hostname} = $hash->{host} 
         if(IO::Socket::SSL->can('can_client_sni') &&
-           IO::Socket::SSL->can_client_sni());
+           IO::Socket::SSL->can_client_sni() &&
+           (!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_hostname})));
+      $par{SSL_verify_mode} = 0
+        if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
       IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
