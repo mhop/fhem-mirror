@@ -1,44 +1,18 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     50_HP1000.pm
-#     An FHEM Perl module to receive data from HP1000 weather stations.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
-
 use strict;
 use warnings;
-use vars qw(%data);
-use HttpUtils;
-use utf8;
-use Encode qw(encode_utf8 decode_utf8);
-use Unit;
-use Time::Local;
-use List::Util qw(sum);
-use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
+use Time::Local;
+use Encode qw(encode_utf8 decode_utf8);
+use List::Util qw(sum);
 
-my %HP1000_wuMapping = (
+use HttpUtils;
+use Unit;
+
+# module hashes ###############################################################
+my %HP1000_pwsMapping = (
 
     # PWS           => 'FHEM',
 
@@ -47,10 +21,11 @@ my %HP1000_wuMapping = (
     solarradiation  => 'solarradiation',
     windcomp        => 'wind_compasspoint',
     windcomp_avg2m  => 'wind_compasspoint_avg2m',
+    windcomp_avg10m => 'wind_compasspoint_avg10m',
     winddir         => 'wind_direction',
     winddir_avg2m   => 'wind_direction_avg2m',
     windgustdir     => 'wind_gust_direction',
-    windgustdir_10m => 'wind_gust_direction_sum10m',
+    windgustdir_10m => 'wind_gust_direction_avg10m',
 
     # name translation for Metric standard
     dewpoint         => 'dewpoint',
@@ -70,9 +45,9 @@ my %HP1000_wuMapping = (
     intemp           => 'indoorTemperature',
     windchill        => 'wind_chill',
     windgust         => 'wind_gust',
-    windgust_10m     => 'wind_gust_sum10m',
+    windgust_10m     => 'wind_gust_max10m',
     windgustmps      => 'wind_gust_mps',
-    windgustmps_10m  => 'wind_gust_mps_sum10m',
+    windgustmps_10m  => 'wind_gust_mps_max10m',
     windspeed        => 'wind_speed',
     windspeed_avg2m  => 'wind_speed_avg2m',
     windspeedmps     => 'wind_speed_mps',
@@ -82,9 +57,9 @@ my %HP1000_wuMapping = (
     barommm          => 'pressure_mm',
     absbarommm       => 'pressureAbs_mm',
     windgustbft      => 'wind_gust_bft',
-    windgustbft_10m  => 'wind_gust_bft_sum10m',
+    windgustbft_10m  => 'wind_gust_bft_max10m',
     windgustkn       => 'wind_gust_kn',
-    windgustkn_10m   => 'wind_gust_kn_sum10m',
+    windgustkn_10m   => 'wind_gust_kn_max10m',
     windspeedbft     => 'wind_speed_bft',
     windspdbft_avg2m => 'wind_speed_bft_avg2m',
     windspeedkn      => 'wind_speed_kn',
@@ -108,37 +83,51 @@ my %HP1000_wuMapping = (
     indoortempf        => 'indoorTemperature_f',
     windchillf         => 'wind_chill_f',
     windgustfts        => 'wind_gust_fts',
-    windgustfts_10m    => 'wind_gust_fts_sum10m',
+    windgustfts_10m    => 'wind_gust_fts_max10m',
     windgustmph        => 'wind_gust_mph',
-    windgustmph_10m    => 'wind_gust_mph_sum10m',
+    windgustmph_10m    => 'wind_gust_mph_max10m',
     windspeedfts       => 'wind_speed_fts',
     windspdfts_avg2m   => 'wind_speed_fts_avg2m',
     windspeedmph       => 'wind_speed_mph',
     windspdmph_avg2m   => 'wind_speed_mph_avg2m',
 );
 
-#########################
-sub HP1000_addExtension($$$) {
-    my ( $name, $func, $link ) = @_;
+my %HP1000_wuParams = (
+    action           => 1,
+    baromin          => 1,
+    clouds           => 1,
+    dailyrainin      => 1,
+    dateutc          => 1,
+    dewptf           => 1,
+    humidity         => 1,
+    ID               => 1,
+    indoorhumidity   => 1,
+    indoortempf      => 1,
+    lowbatt          => 1,
+    monthlyrainin    => 1,
+    PASSWORD         => 1,
+    rainin           => 1,
+    realtime         => 1,
+    rtfreq           => 1,
+    softwaretype     => 1,
+    solarradiation   => 1,
+    tempf            => 1,
+    UV               => 1,
+    weather          => 1,
+    weeklyrainin     => 1,
+    windchillf       => 1,
+    winddir          => 1,
+    winddir_avg2m    => 1,
+    windgustdir      => 1,
+    windgustdir_10m  => 1,
+    windgustmph      => 1,
+    windgustmph_10m  => 1,
+    windspdmph_avg2m => 1,
+    windspeedmph     => 1,
+    yearlyrainin     => 1,
+);
 
-    my $url = "/$link";
-    Log3 $name, 2, "Registering HP1000 $name for URL $url...";
-    $data{FWEXT}{$url}{deviceName} = $name;
-    $data{FWEXT}{$url}{FUNC}       = $func;
-    $data{FWEXT}{$url}{LINK}       = $link;
-}
-
-#########################
-sub HP1000_removeExtension($) {
-    my ($link) = @_;
-
-    my $url  = "/$link";
-    my $name = $data{FWEXT}{$url}{deviceName};
-    Log3 $name, 2, "Unregistering HP1000 $name for URL $url...";
-    delete $data{FWEXT}{$url};
-}
-
-###################################
+# initialize ##################################################################
 sub HP1000_Initialize($) {
     my ($hash) = @_;
 
@@ -158,8 +147,16 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
+"disable:1,0 disabledForIntervals do_not_notify:1,0 wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
+
+    my @wu;
+    foreach ( keys %HP1000_wuParams ) {
+        next unless ( $HP1000_pwsMapping{$_} );
+        push @wu, $HP1000_pwsMapping{$_};
+    }
+
+    $hash->{AttrList} .= " wu_pushValues:multiple," . join( ",", sort @wu );
 
     # Unit.pm support
     $hash->{readingsDesc} = {
@@ -188,43 +185,57 @@ sub HP1000_Initialize($) {
         'indoorHumidityCondition_rgb' => { rtype => 'rgbhex', },
         'indoorTemperature' => { rtype => 'c', formula_symbol => 'Ti', },
         'indoorTemperature_f' => { rtype => 'f', formula_symbol => 'Ti', },
-        'israining'               => { rtype => 'yesno', },
-        'luminosity'              => { rtype => 'lx', },
-        'pressure'                => { rtype => 'hpamb', },
-        'pressureAbs'             => { rtype => 'hpamb', },
-        'pressureAbs_in'          => { rtype => 'inhg', },
-        'pressureAbs_mm'          => { rtype => 'mmhg', },
-        'pressure_in'             => { rtype => 'inhg', },
-        'pressure_mm'             => { rtype => 'mmhg', },
-        'rain'                    => { rtype => 'mm', },
-        'rain_day'                => { rtype => 'mm', },
-        'rain_day_in'             => { rtype => 'in', },
-        'rain_in'                 => { rtype => 'in', },
-        'rain_month'              => { rtype => 'mm', },
-        'rain_month_in'           => { rtype => 'in', },
-        'rain_week'               => { rtype => 'mm', },
-        'rain_week_in'            => { rtype => 'in', },
-        'rain_year'               => { rtype => 'mm', },
-        'rain_year_in'            => { rtype => 'in', },
-        'solarradiation'          => { rtype => 'wpsm', },
-        'temperature'             => { rtype => 'c', },
-        'temperature_f'           => { rtype => 'f', },
-        'wind_compasspoint'       => { rtype => 'compasspoint', },
-        'wind_compasspoint_avg2m' => { rtype => 'compasspoint', },
-        'wind_chill'              => { rtype => 'c', formula_symbol => 'Wc', },
-        'wind_chill_f'            => { rtype => 'f', formula_symbol => 'Wc', },
+
+        #'indoorTemperatureCondition'     => {},
+        'indoorTemperatureCondition_rgb' => { rtype => 'rgbhex', },
+        'israining'                      => { rtype => 'yesno', },
+        'luminosity'                     => { rtype => 'lx', },
+        'pressure'                       => { rtype => 'hpamb', },
+        'pressureAbs'                    => { rtype => 'hpamb', },
+        'pressureAbs_in'                 => { rtype => 'inhg', },
+        'pressureAbs_mm'                 => { rtype => 'mmhg', },
+        'pressure_in'                    => { rtype => 'inhg', },
+        'pressure_mm'                    => { rtype => 'mmhg', },
+        'rain'                           => { rtype => 'mm', },
+        'rain_day'                       => { rtype => 'mm', },
+        'rain_day_in'                    => { rtype => 'in', },
+        'rain_in'                        => { rtype => 'in', },
+        'rain_month'                     => { rtype => 'mm', },
+        'rain_month_in'                  => { rtype => 'in', },
+        'rain_week'                      => { rtype => 'mm', },
+        'rain_week_in'                   => { rtype => 'in', },
+        'rain_year'                      => { rtype => 'mm', },
+        'rain_year_in'                   => { rtype => 'in', },
+        'solarradiation'                 => { rtype => 'wpsm', },
+        'temperature'                    => { rtype => 'c', },
+        'temperature_f'                  => { rtype => 'f', },
+
+        #'temperatureCondition'           => {},
+        'temperatureCondition_rgb' => { rtype => 'rgbhex', },
+
+        #'windCondition'                  => {},
+        'windCondition_rgb' => { rtype => 'rgbhex', },
+
+        #'windWarning'                    => {},
+        'wind_compasspoint'        => { rtype => 'compasspoint', },
+        'wind_compasspoint_avg2m'  => { rtype => 'compasspoint', },
+        'wind_compasspoint_avg10m' => { rtype => 'compasspoint', },
+        'wind_chill'               => { rtype => 'c', formula_symbol => 'Wc', },
+        'wind_chill_f'             => { rtype => 'f', formula_symbol => 'Wc', },
         'wind_direction' =>
           { rtype => 'compasspoint', formula_symbol => 'Wdir', },
         'wind_direction_avg2m' =>
           { rtype => 'compasspoint', formula_symbol => 'Wdir', },
-        'wind_gust'            => { rtype => 'kmph', formula_symbol => 'Wg', },
-        'wind_gust_bft'        => { rtype => 'bft',  formula_symbol => 'Wg', },
+        'wind_gust'     => { rtype => 'kmph', formula_symbol => 'Wg', },
+        'wind_gust_bft' => { rtype => 'bft',  formula_symbol => 'Wg', },
+        'wind_gust_direction_avg10m' =>
+          { rtype => 'compasspoint', formula_symbol => 'Wdir', },
         'wind_gust_fts'        => { rtype => 'fts',  formula_symbol => 'Wg', },
         'wind_gust_kn'         => { rtype => 'kn',   formula_symbol => 'Wg', },
         'wind_gust_mph'        => { rtype => 'mph',  formula_symbol => 'Wg', },
-        'wind_gust_mph_sum10m' => { rtype => 'mph',  formula_symbol => 'Wg', },
+        'wind_gust_mph_max10m' => { rtype => 'mph',  formula_symbol => 'Wg', },
         'wind_gust_mps'        => { rtype => 'mps',  formula_symbol => 'Wg', },
-        'wind_gust_sum10m'     => { rtype => 'kmph', formula_symbol => 'Wg', },
+        'wind_gust_max10m'     => { rtype => 'kmph', formula_symbol => 'Wg', },
         'wind_speed'           => { rtype => 'kmph', formula_symbol => 'W', },
         'wind_speed_avg2m'     => { rtype => 'kmph', formula_symbol => 'W', },
         'wind_speed_bft'       => { rtype => 'bft',  formula_symbol => 'W', },
@@ -254,53 +265,7 @@ sub HP1000_Initialize($) {
     };
 }
 
-###################################
-sub HP1000_Get($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name = $hash->{NAME};
-    my $wu_id = AttrVal( $name, "wu_id", "" );
-
-    Log3 $name, 5, "HP1000 $name: called function HP1000_Get()";
-
-    return "Argument is missing" if ( int(@$a) < 1 );
-
-    my $usage = "Unknown argument " . @$a[1] . ", choose one of";
-    $usage .= " createWUforecast" if ( $wu_id ne "" );
-
-    my $cmd = '';
-    my $result;
-
-    # createWUforecast
-    if ( lc( @$a[1] ) eq "createwuforecast" ) {
-        return
-"Attribute wu_id does not contain a PWS ID to create a Wunderground device"
-          if ( $wu_id eq "" );
-
-        my @wudev = devspec2array("TYPE=Wunderground:FILTER=PWS_ID=$wu_id");
-
-        if ( !@wudev ) {
-            return "Missing WU API key" if ( !defined( @$a[2] ) );
-            Log3 $name, 3, "HP1000 get $name " . @$a[1] . " " . @$a[2];
-
-            $result =
-              fhem "define $name" . "_WU Wunderground " . @$a[2] . " $wu_id";
-            $result = $name . "_WU created"
-              if ( !defined($result) );
-        }
-        else {
-            $result = "Found existing WU device for this PWS ID: $wudev[0]";
-        }
-    }
-
-    # return usage hint
-    else {
-        return $usage;
-    }
-
-    return $result;
-}
-
-###################################
+# regular Fn ##################################################################
 sub HP1000_Define($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name = $hash->{NAME};
@@ -369,7 +334,6 @@ sub HP1000_Define($$$) {
     return undef;
 }
 
-###################################
 sub HP1000_Undefine($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name = $hash->{NAME};
@@ -386,33 +350,52 @@ sub HP1000_Undefine($$$) {
     return undef;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
-
-#####################################
-sub HP1000_SetAliveState($;$) {
-    my ( $hash, $alive ) = @_;
+sub HP1000_Get($$$) {
+    my ( $hash, $a, $h ) = @_;
     my $name = $hash->{NAME};
+    my $wu_id = AttrVal( $name, "wu_id", "" );
 
-    Log3 $name, 5, "HP1000 $name: called function HP1000_SetAliveState()";
-    RemoveInternalTimer($hash);
+    Log3 $name, 5, "HP1000 $name: called function HP1000_Get()";
 
-    my $activity = "dead";
-    $activity = "alive" if ($alive);
+    return "Argument is missing" if ( int(@$a) < 1 );
 
-    readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "Activity", $activity );
-    readingsEndUpdate( $hash, 1 );
+    my $usage = "Unknown argument " . @$a[1] . ", choose one of";
+    $usage .= " createWUforecast" if ( $wu_id ne "" );
 
-    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash, 0 );
+    my $cmd = '';
+    my $result;
 
-    return;
+    # createWUforecast
+    if ( lc( @$a[1] ) eq "createwuforecast" ) {
+        return
+"Attribute wu_id does not contain a PWS ID to create a Wunderground device"
+          if ( $wu_id eq "" );
+
+        my @wudev = devspec2array("TYPE=Wunderground:FILTER=PWS_ID=$wu_id");
+
+        if ( !@wudev ) {
+            return "Missing WU API key" if ( !defined( @$a[2] ) );
+            Log3 $name, 3, "HP1000 get $name " . @$a[1] . " " . @$a[2];
+
+            $result =
+              fhem "define $name" . "_WU Wunderground " . @$a[2] . " $wu_id";
+            $result = $name . "_WU created"
+              if ( !defined($result) );
+        }
+        else {
+            $result = "Found existing WU device for this PWS ID: $wudev[0]";
+        }
+    }
+
+    # return usage hint
+    else {
+        return $usage;
+    }
+
+    return $result;
 }
 
-###################################
+# module Fn ####################################################################
 sub HP1000_CGI() {
 
     my ($request) = @_;
@@ -500,6 +483,7 @@ sub HP1000_CGI() {
     }
 
     $hash = $defs{$name};
+    my $uptime = time() - $fhem_started;
 
     delete $hash->{FORECASTDEV} if ( $hash->{FORECASTDEV} );
     my @wudev = devspec2array(
@@ -533,7 +517,8 @@ sub HP1000_CGI() {
         }
     }
 
-    Log3 $name, 5, "HP1000: received data:\n" . Dumper($webArgs);
+    Log3 $name, 5,
+      "HP1000: received data (uptime=$uptime):\n" . Dumper($webArgs);
 
     # rename wind speed values as those are in m/sec and
     # we want km/h to be our metric default
@@ -563,7 +548,7 @@ sub HP1000_CGI() {
       if ( defined( $webArgs->{outhumi} )
         && !defined( $webArgs->{humidity} ) );
 
-    my %HP1000_wuMappingEquivalent = (
+    my %HP1000_pwsMappingEquivalent = (
 
         # Metric       => 'Angloamerican',
 
@@ -587,15 +572,15 @@ sub HP1000_CGI() {
         windspeedmps   => 'windspeedmph',
     );
 
-    my %HP1000_wuMappingEquivalent_rev =
-      %{ { reverse %HP1000_wuMappingEquivalent } };
+    my %HP1000_pwsMappingEquivalent_rev =
+      %{ { reverse %HP1000_pwsMappingEquivalent } };
 
     # calculate readings for Metric standard from Angloamerican standard
     #
 
     # calculate Celsius based values based on Fahrenheit
     foreach ( 'dewptf', 'tempf', 'indoortempf', 'windchillf' ) {
-        my $k = $HP1000_wuMappingEquivalent_rev{$_};
+        my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -604,7 +589,7 @@ sub HP1000_CGI() {
 
     # calculate hPa based values based on inHg
     foreach ( 'baromin', 'absbaromin' ) {
-        my $k = $HP1000_wuMappingEquivalent_rev{$_};
+        my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -617,7 +602,7 @@ sub HP1000_CGI() {
         'monthlyrainin', 'yearlyrainin'
       )
     {
-        my $k = $HP1000_wuMappingEquivalent_rev{$_};
+        my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -626,7 +611,7 @@ sub HP1000_CGI() {
 
     # calculate kph based values based on mph
     foreach ( 'windgustmph', 'windspeedmph' ) {
-        my $k = $HP1000_wuMappingEquivalent_rev{$_};
+        my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -678,7 +663,7 @@ sub HP1000_CGI() {
 
     # calculate Fahrenheit based values based on Celsius
     foreach ( 'dewpoint', 'outtemp', 'intemp', 'windchill' ) {
-        my $k = $HP1000_wuMappingEquivalent{$_};
+        my $k = $HP1000_pwsMappingEquivalent{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -687,7 +672,7 @@ sub HP1000_CGI() {
 
     # calculate inHg based values based on hPa
     foreach ( 'relbaro', 'absbaro' ) {
-        my $k = $HP1000_wuMappingEquivalent{$_};
+        my $k = $HP1000_pwsMappingEquivalent{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -698,7 +683,7 @@ sub HP1000_CGI() {
     foreach ( 'rainrate', 'dailyrain', 'weeklyrain', 'monthlyrain',
         'yearlyrain' )
     {
-        my $k = $HP1000_wuMappingEquivalent{$_};
+        my $k = $HP1000_pwsMappingEquivalent{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -707,7 +692,7 @@ sub HP1000_CGI() {
 
     # calculate kph based values based on mph
     foreach ( 'windgustmps', 'windspeedmps' ) {
-        my $k = $HP1000_wuMappingEquivalent{$_};
+        my $k = $HP1000_pwsMappingEquivalent{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
         Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
@@ -755,7 +740,7 @@ sub HP1000_CGI() {
             || $p eq "ID"
             || $p eq "PASSWORD" );
 
-        $p = $HP1000_wuMapping{$p} ? $HP1000_wuMapping{$p} : "_" . $p;
+        $p = $HP1000_pwsMapping{$p} ? $HP1000_pwsMapping{$p} : "_" . $p;
 
         readingsBulkUpdate( $hash, $p, $v );
     }
@@ -816,6 +801,21 @@ sub HP1000_CGI() {
         );
     }
 
+    # temperatureCondition
+    if ( defined( $webArgs->{outtemp} ) ) {
+        my ( $v, $rgb ) = UConv::c2condition( $webArgs->{outtemp} );
+        readingsBulkUpdateIfChanged( $hash, "temperatureCondition",     $v );
+        readingsBulkUpdateIfChanged( $hash, "temperatureCondition_rgb", $rgb );
+    }
+
+    # indoorTemperatureCondition
+    if ( defined( $webArgs->{intemp} ) ) {
+        my ( $v, $rgb ) = UConv::c2condition( $webArgs->{intemp}, 1 );
+        readingsBulkUpdateIfChanged( $hash, "indoorTemperatureCondition", $v );
+        readingsBulkUpdateIfChanged( $hash, "indoorTemperatureCondition_rgb",
+            $rgb );
+    }
+
     # humidityCondition
     if ( defined( $webArgs->{outhumi} ) ) {
         my ( $v, $rgb ) = UConv::humidity2condition( $webArgs->{outhumi} );
@@ -825,7 +825,7 @@ sub HP1000_CGI() {
 
     # indoorHumidityCondition
     if ( defined( $webArgs->{inhumi} ) ) {
-        my ( $v, $rgb ) = UConv::humidity2condition( $webArgs->{inhumi} );
+        my ( $v, $rgb ) = UConv::humidity2condition( $webArgs->{inhumi}, 1 );
         readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition", $v );
         readingsBulkUpdateIfChanged( $hash, "indoorHumidityCondition_rgb",
             $rgb );
@@ -1021,46 +1021,63 @@ sub HP1000_CGI() {
         readingsBulkUpdate( $hash, "wind_gust_fts", $webArgs->{windgustfts} );
     }
 
+    # averages/wind_direction_avg10m
     # averages/wind_direction_avg2m
     if ( defined( $webArgs->{winddir} ) ) {
         my $v =
-          round( HP1000_GetAvg( $hash, "winddir", 2 * 60, $webArgs->{winddir} ),
+          round( HP1000_GetAvg( $hash, "winddir", 600, $webArgs->{winddir} ),
             0 );
 
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "wind_direction_avg2m", $v );
-            $webArgs->{winddir_avg2m} = $v;
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 600 ) {
+            $webArgs->{windgustdir_10m} = $v;
+            readingsBulkUpdateIfChanged( $hash,
+                "wind_gust_direction_avg10m", $webArgs->{windgustdir_10m} );
         }
+
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 120 ) {
+            my $v2 = round( HP1000_GetAvg( $hash, "winddir", 120, -1 ), 0 );
+            $webArgs->{winddir_avg2m} = $v2;
+            readingsBulkUpdateIfChanged( $hash, "wind_direction_avg2m",
+                $webArgs->{winddir_avg2m} );
+        }
+    }
+
+    # averages/wind_compasspoint_avg10m
+    if ( defined( $webArgs->{windgustdir_10m} ) ) {
+        $webArgs->{windcomp_avg10m} =
+          UConv::direction2compasspoint( $webArgs->{windgustdir_10m} );
+        readingsBulkUpdateIfChanged( $hash, "wind_compasspoint_avg10m",
+            $webArgs->{windcomp_avg10m} );
     }
 
     # averages/wind_compasspoint_avg2m
     if ( defined( $webArgs->{winddir_avg2m} ) ) {
         $webArgs->{windcomp_avg2m} =
           UConv::direction2compasspoint( $webArgs->{winddir_avg2m} );
-        readingsBulkUpdate( $hash, "wind_compasspoint_avg2m",
+        readingsBulkUpdateIfChanged( $hash, "wind_compasspoint_avg2m",
             $webArgs->{windcomp_avg2m} );
     }
 
     # averages/wind_speed_avg2m in km/h
     if ( defined( $webArgs->{windspeed} ) ) {
-        my $v =
-          HP1000_GetAvg( $hash, "windspeed", 2 * 60, $webArgs->{windspeed} );
+        my $v = HP1000_GetAvg( $hash, "windspeed", 120, $webArgs->{windspeed} );
 
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "wind_speed_avg2m", $v );
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 120 ) {
             $webArgs->{windspeed_avg2m} = $v;
+            readingsBulkUpdateIfChanged( $hash, "wind_speed_avg2m",
+                $webArgs->{windspeed_avg2m} );
         }
     }
 
     # averages/wind_speed_mph_avg2m in mph
     if ( defined( $webArgs->{windspeedmph} ) ) {
         my $v =
-          HP1000_GetAvg( $hash, "windspeedmph", 2 * 60,
-            $webArgs->{windspeedmph} );
+          HP1000_GetAvg( $hash, "windspeedmph", 120, $webArgs->{windspeedmph} );
 
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "wind_speed_mph_avg2m", $v );
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 120 ) {
             $webArgs->{windspdmph_avg2m} = $v;
+            readingsBulkUpdateIfChanged( $hash, "wind_speed_mph_avg2m",
+                $webArgs->{windspdmph_avg2m} );
         }
     }
 
@@ -1068,7 +1085,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{windspeed_avg2m} ) ) {
         $webArgs->{windspdbft_avg2m} =
           UConv::kph2bft( $webArgs->{windspeed_avg2m} );
-        readingsBulkUpdate( $hash, "wind_speed_bft_avg2m",
+        readingsBulkUpdateIfChanged( $hash, "wind_speed_bft_avg2m",
             $webArgs->{windspdbft_avg2m} );
     }
 
@@ -1076,7 +1093,7 @@ sub HP1000_CGI() {
     if ( defined( $webArgs->{windspeed_avg2m} ) ) {
         $webArgs->{windspdkn_avg2m} =
           UConv::kph2kn( $webArgs->{windspeed_avg2m} );
-        readingsBulkUpdate( $hash, "wind_speed_kn_avg2m",
+        readingsBulkUpdateIfChanged( $hash, "wind_speed_kn_avg2m",
             $webArgs->{windspdkn_avg2m} );
     }
 
@@ -1085,30 +1102,36 @@ sub HP1000_CGI() {
         my $v = UConv::kph2mps( $webArgs->{windspeed_avg2m} );
         $webArgs->{windspdmps_avg2m} =
           ( $v > 0.5 ? round( $v, 1 ) : "0.0" );
-        readingsBulkUpdate( $hash, "wind_speed_mps_avg2m",
+        readingsBulkUpdateIfChanged( $hash, "wind_speed_mps_avg2m",
             $webArgs->{windspdmps_avg2m} );
     }
 
-    # averages/wind_gust_sum10m
+    # maximum/wind_gust_max10m
     if ( defined( $webArgs->{windgust} ) ) {
-        my $v =
-          HP1000_GetSum( $hash, "windgust", 10 * 60, $webArgs->{windgust} );
+        my $v = HP1000_GetMax( $hash, "windgust", 600, $webArgs->{windgust} );
 
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "wind_gust_sum10m", $v );
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 600 ) {
             $webArgs->{windgust_10m} = $v;
+            readingsBulkUpdateIfChanged( $hash, "wind_gust_max10m",
+                $webArgs->{windgust_10m} );
+
+            my ( $val, $rgb, $cond, $warn ) =
+              UConv::kph2bft( $webArgs->{windgust_10m} );
+            readingsBulkUpdateIfChanged( $hash, "windCondition",     $cond );
+            readingsBulkUpdateIfChanged( $hash, "windCondition_rgb", $rgb );
+            readingsBulkUpdateIfChanged( $hash, "windWarning",       $warn );
         }
     }
 
-    # averages/wind_gust_mph_sum10m
+    # maximum/wind_gust_mph_max10m
     if ( defined( $webArgs->{windgustmph} ) ) {
         my $v =
-          HP1000_GetSum( $hash, "windgustmph", 10 * 60,
-            $webArgs->{windgustmph} );
+          HP1000_GetMax( $hash, "windgustmph", 600, $webArgs->{windgustmph} );
 
-        if ( $hash->{INTERVAL} > 0 ) {
-            readingsBulkUpdate( $hash, "wind_gust_mph_sum10m", $v );
+        if ( $hash->{INTERVAL} > 0 && $uptime >= 600 ) {
             $webArgs->{windgustmph_10m} = $v;
+            readingsBulkUpdateIfChanged( $hash, "wind_gust_mph_max10m",
+                $webArgs->{windgustmph_10m} );
         }
     }
 
@@ -1147,47 +1170,44 @@ sub HP1000_CGI() {
     return ( "text/plain; charset=utf-8", "success" );
 }
 
-###################################
-sub HP1000_GetAvg($$$$) {
-    my ( $hash, $t, $s, $v, $avg ) = @_;
-    return HP1000_GetSum( $hash, $t, $s, $v, 1 );
+sub HP1000_addExtension($$$) {
+    my ( $name, $func, $link ) = @_;
+
+    my $url = "/$link";
+    Log3 $name, 2, "Registering HP1000 $name for URL $url...";
+    $data{FWEXT}{$url}{deviceName} = $name;
+    $data{FWEXT}{$url}{FUNC}       = $func;
+    $data{FWEXT}{$url}{LINK}       = $link;
 }
 
-sub HP1000_GetSum($$$$;$) {
-    my ( $hash, $t, $s, $v, $avg ) = @_;
+sub HP1000_removeExtension($) {
+    my ($link) = @_;
+
+    my $url  = "/$link";
+    my $name = $data{FWEXT}{$url}{deviceName};
+    Log3 $name, 2, "Unregistering HP1000 $name for URL $url...";
+    delete $data{FWEXT}{$url};
+}
+
+sub HP1000_SetAliveState($;$) {
+    my ( $hash, $alive ) = @_;
     my $name = $hash->{NAME};
 
-    return $v if ( $avg && $hash->{INTERVAL} < 1 );
-    return "0" if ( $hash->{INTERVAL} < 1 );
+    Log3 $name, 5, "HP1000 $name: called function HP1000_SetAliveState()";
+    RemoveInternalTimer($hash);
 
-    my $max = round( $s / $hash->{INTERVAL}, 0 );
-    $max = "1" if ( $max < 1 );
-    my $return;
+    my $activity = "dead";
+    $activity = "alive" if ($alive);
 
-    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v;
-    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max;
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, "Activity", $activity );
+    readingsEndUpdate( $hash, 1 );
 
-    Log3 $name, 5, "HP1000 $name: Updated history for $t:"
-      . Dumper( $hash->{helper}{history}{$t} );
+    InternalTimer( gettimeofday() + 120, "HP1000_SetAliveState", $hash, 0 );
 
-    if ($avg) {
-        $return = round(
-            sum( @{ $hash->{helper}{history}{$t} } ) /
-              @{ $hash->{helper}{history}{$t} },
-            1
-        );
-
-        Log3 $name, 5, "HP1000 $name: Average for $t: $return";
-    }
-    else {
-        $return = round( sum( @{ $hash->{helper}{history}{$t} } ), 1 );
-        Log3 $name, 5, "HP1000 $name: Sum for $t: $return";
-    }
-
-    return $return;
+    return;
 }
 
-###################################
 sub HP1000_PushSrv($$) {
     my ( $hash, $webArgs ) = @_;
     my $name            = $hash->{NAME};
@@ -1241,7 +1261,7 @@ m/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.
                 'User-Agent' => 'FHEM-HP1000/1.0.0',
             },
             sslargs => {
-                SSL_verify_mode => 0,
+                SSL_verify_mode => 'SSL_VERIFY_NONE',
             },
         }
     );
@@ -1249,7 +1269,6 @@ m/(https?):\/\/([\w\.]+):?(\d+)?([a-zA-Z0-9\~\!\@\#\$\%\^\&\*\(\)_\-\=\+\\\/\?\.
     return;
 }
 
-###################################
 sub HP1000_PushWU($$) {
 
     #
@@ -1265,6 +1284,9 @@ sub HP1000_PushWU($$) {
     my $wu_realtime     = AttrVal( $name, "wu_realtime", undef );
     my $wu_indoorValues = AttrVal( $name, "wu_indoorValues", 1 );
     my $wu_dataValues   = AttrVal( $name, "wu_dataValues", undef );
+    my $wu_pushValues   = AttrVal( $name, "wu_pushValues", undef );
+    my @whitelist =
+      ( 'action', 'dateutc', 'ID', 'PASSWORD', 'rtfreq', 'softwaretype' );
 
     Log3 $name, 5, "HP1000 $name: called function HP1000_PushWU()";
 
@@ -1291,34 +1313,51 @@ sub HP1000_PushWU($$) {
         $webArgs->{realtime} = 1;
     }
 
-    if ($wu_dataValues) {
-        my %HP1000_wuMapping_rev = %{ { reverse %HP1000_wuMapping } };
+    if ( $wu_dataValues || $wu_pushValues ) {
+        my %HP1000_pwsMapping_rev = %{ { reverse %HP1000_pwsMapping } };
 
-        my %dummy;
-        $wu_dataValues =~ s/\$name/$name/g;
-        my ( $err, @a ) = ReplaceSetMagic( \%dummy, 0, ($wu_dataValues) );
-        if ($err) {
-            Log3 $name, 3, "HP1000 $name: error parsing wu_dataValues: $err";
-        }
-        else {
-            my ( undef, $h ) = parseParams( \@a );
-            foreach ( keys %$h ) {
-                next unless $_ ne "";
-                my $n = $_;
-                if ( $HP1000_wuMapping_rev{$_} ) {
-                    $n = $HP1000_wuMapping_rev{$_};
+        if ($wu_dataValues) {
+            my %dummy;
+            $wu_dataValues =~ s/\$name/$name/g;
+            my ( $err, @a ) = ReplaceSetMagic( \%dummy, 0, ($wu_dataValues) );
+            if ($err) {
+                Log3 $name, 3,
+                  "HP1000 $name: error parsing wu_dataValues: $err";
+            }
+            else {
+                my ( undef, $h ) = parseParams( \@a );
+                foreach ( keys %$h ) {
+                    next unless $_ ne "";
+                    my $n = $_;
+                    if ( $HP1000_pwsMapping_rev{$_} ) {
+                        $n = $HP1000_pwsMapping_rev{$_};
+                        Log3 $name, 4,
+                          "HP1000 $name: Remapping reading name from $_ to $n";
+                    }
+
                     Log3 $name, 4,
-                      "HP1000 $name: Remapping reading name from $_ to $n";
+                      "HP1000 $name: Adding new value for WU: $n=$h->{$_}"
+                      unless ( defined( $webArgs->{$n} ) );
+                    Log3 $name, 4,
+"HP1000 $name: Replacing existing value for WU: $n=$h->{$_}"
+                      if ( defined( $webArgs->{$n} ) );
+
+                    $webArgs->{$n} = $h->{$_};
                 }
+            }
+        }
 
-                Log3 $name, 4,
-                  "HP1000 $name: Adding new value for WU: $n=$h->{$_}"
-                  unless ( defined( $webArgs->{$n} ) );
-                Log3 $name, 4,
-                  "HP1000 $name: Replacing existing value for WU: $n=$h->{$_}"
-                  if ( defined( $webArgs->{$n} ) );
-
-                $webArgs->{$n} = $h->{$_};
+        if ($wu_pushValues) {
+            foreach ( split( /,/, $wu_pushValues ) ) {
+                if ( $HP1000_pwsMapping_rev{$_} ) {
+                    my $v = $HP1000_pwsMapping_rev{$_};
+                    $v = "humidity"       if ( $v eq "outhumi" );
+                    $v = "indoorhumidity" if ( $v eq "inhumi" );
+                    push @whitelist, $v;
+                }
+                else {
+                    push @whitelist, $_;
+                }
             }
         }
     }
@@ -1343,15 +1382,13 @@ sub HP1000_PushWU($$) {
         $value = urlEncode($value)
           if ( $key =~ /^(softwaretype|dateutc)$/i );
 
-        if ( !$wu_indoorValues && $key =~ m/^in/i ) {
-            Log3 $name, 4, "HP1000 $name: excluding indoor value $key=$value";
-            next;
+        if (   ( $wu_indoorValues || $key =~ m/^in/i )
+            && ( !$wu_pushValues || grep ( $_ eq $key, @whitelist ) ) )
+        {
+            Log3 $name, 4, "HP1000 $name: pushing data to WU: $key=$value";
+            $cmd .= "$key=" . $value . "&";
         }
-
-        $cmd .= "$key=" . $value . "&";
     }
-
-    Log3 $name, 4, "HP1000 $name: pushing data to WU: " . $cmd;
 
     HttpUtils_NonblockingGet(
         {
@@ -1373,7 +1410,6 @@ sub HP1000_PushWU($$) {
     return;
 }
 
-###################################
 sub HP1000_ReturnSrv($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
@@ -1409,7 +1445,6 @@ sub HP1000_ReturnSrv($$$) {
     return;
 }
 
-###################################
 sub HP1000_ReturnWU($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
@@ -1445,6 +1480,60 @@ sub HP1000_ReturnWU($$$) {
     }
 
     return;
+}
+
+sub HP1000_GetSum($$$$) {
+    my ( $hash, $t, $s, $v ) = @_;
+    return HP1000_GetHistory( $hash, $t, $s, $v );
+}
+
+sub HP1000_GetAvg($$$$) {
+    my ( $hash, $t, $s, $v ) = @_;
+    return HP1000_GetHistory( $hash, $t, $s, $v, 1 );
+}
+
+sub HP1000_GetMax($$$$) {
+    my ( $hash, $t, $s, $v ) = @_;
+    return HP1000_GetHistory( $hash, $t, $s, $v, 2 );
+}
+
+sub HP1000_GetHistory($$$$;$) {
+    my ( $hash, $t, $s, $v, $type ) = @_;
+    my $name = $hash->{NAME};
+
+    return $v if ( $type && $type == 1 && $hash->{INTERVAL} < 1 );
+    return "0" if ( $hash->{INTERVAL} < 1 );
+
+    my $max = round( $s / $hash->{INTERVAL}, 0 );
+    $max = "1" if ( $max < 1 );
+    my $return = $v;
+
+    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v
+      unless ( $v < 0 || ( !$type && $v <= 0 ) );
+    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max unless ( $v < 0 );
+
+    Log3 $name, 5, "HP1000 $name: Updated history for $t:"
+      . Dumper( $hash->{helper}{history}{$t} );
+
+    if ( !$type ) {
+        $return = round( sum( @{ $hash->{helper}{history}{$t} } ), 1 );
+        Log3 $name, 5, "HP1000 $name: Sum for $t: $return";
+    }
+    elsif ( $type == 1 ) {
+        $return = round(
+            sum( @{ $hash->{helper}{history}{$t} } ) /
+              @{ $hash->{helper}{history}{$t} },
+            1
+        );
+
+        Log3 $name, 5, "HP1000 $name: Average for $t: $return";
+    }
+    elsif ( $type == 2 ) {
+        $return = maxNum( 0, @{ $hash->{helper}{history}{$t} } );
+        Log3 $name, 5, "HP1000 $name: Max for $t: $return";
+    }
+
+    return $return;
 }
 
 1;
@@ -1514,6 +1603,10 @@ sub HP1000_ReturnWU($$$) {
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Enable or disable to push data forward to Weather Underground (defaults to 0=no)
 
+      <a name="wu_pushValues"></a><li><b>wu_pushValues</b></li>
+        Restrict values to be transferred to Weather Underground,
+        otherwise all values will be transferred.
+
       <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
         Send the data to the WU realtime server instead of using the standard server (defaults to 1=yes)
     </ul>
@@ -1581,6 +1674,10 @@ sub HP1000_ReturnWU($$$) {
 
       <a name="wu_push"></a><li><b>wu_push</b></li>
         Pushen der Daten zu Weather Underground aktivieren oder deaktivieren (Standard ist 0=aus)
+
+      <a name="wu_pushValues"></a><li><b>wu_pushValues</b></li>
+        Schr&auml;nkt die Werte ein, die an Weather Underground &uuml;bertragen werden.
+        Andernfalls werden alle Werte &uuml;bertragen.
 
       <a name="wu_realtime"></a><li><b>wu_realtime</b></li>
         Sendet die Daten an den WU Echtzeitserver statt an den Standard Server (Standard ist 1=an)
