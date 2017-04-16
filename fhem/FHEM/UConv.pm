@@ -1,12 +1,10 @@
+###############################################################################
 # $Id$
-
 package main;
-
 use strict;
 use warnings;
-
-sub UConv_Initialize() {
-}
+use Data::Dumper;
+sub UConv_Initialize() { }
 
 package UConv;
 use Scalar::Util qw(looks_like_number);
@@ -328,196 +326,302 @@ sub kph2kn($;$) {
 # Speed: convert km/h to Beaufort wind force scale
 sub kph2bft($) {
     my ($data) = @_;
-    my $v = "0";
+    my $val    = "0";
+    my $rgb    = "FEFEFE";
+    my $cond   = "calm";
+    my $warn   = " ";
 
     if ( $data >= 118 ) {
-        $v = "12";
+        $val  = "12";
+        $rgb  = "E93323";
+        $cond = "hurricane_force";
+        $warn = "hurricane_force";
     }
     elsif ( $data >= 103 ) {
-        $v = "11";
+        $val  = "11";
+        $rgb  = "EB4826";
+        $cond = "violent_storm";
+        $warn = "storm_force";
     }
     elsif ( $data >= 89 ) {
-        $v = "10";
+        $val  = "10";
+        $rgb  = "E96E2C";
+        $cond = "storm";
+        $warn = "storm_force";
     }
     elsif ( $data >= 75 ) {
-        $v = "9";
+        $val  = "9";
+        $rgb  = "F19E38";
+        $cond = "strong_gale";
+        $warn = "gale_force";
     }
     elsif ( $data >= 62 ) {
-        $v = "8";
+        $val  = "8";
+        $rgb  = "F7CE46";
+        $cond = "gale";
+        $warn = "gale_force";
     }
     elsif ( $data >= 50 ) {
-        $v = "7";
+        $val  = "7";
+        $rgb  = "FFFF54";
+        $cond = "near_gale";
+        $warn = "high_winds";
     }
     elsif ( $data >= 39 ) {
-        $v = "6";
+        $val  = "6";
+        $rgb  = "D6FD51";
+        $cond = "strong_breeze";
+        $warn = "high_winds";
     }
     elsif ( $data >= 29 ) {
-        $v = "5";
+        $val  = "5";
+        $rgb  = "B1FC4F";
+        $cond = "fresh_breeze";
     }
     elsif ( $data >= 20 ) {
-        $v = "4";
+        $val  = "4";
+        $rgb  = "B1FC7B";
+        $cond = "moderate_breeze";
     }
     elsif ( $data >= 12 ) {
-        $v = "3";
+        $val  = "3";
+        $rgb  = "B1FCA3";
+        $cond = "gentle_breeze";
     }
     elsif ( $data >= 6 ) {
-        $v = "2";
+        $val  = "2";
+        $rgb  = "B1FCD0";
+        $cond = "light_breeze";
     }
     elsif ( $data >= 1 ) {
-        $v = "1";
+        $val  = "1";
+        $rgb  = "D6FEFE";
+        $cond = "light_air";
     }
 
-    return $v;
+    return ( $val, $rgb, $cond, $warn ) if (wantarray);
+    return $val;
 }
 
 # Speed: convert mph (miles per hour) to Beaufort wind force scale
 sub mph2bft($) {
     my ($data) = @_;
-    my $v = "0";
+    my $val    = "0";
+    my $rgb    = "FEFEFE";
+    my $cond   = "calm";
+    my $warn   = " ";
 
     if ( $data >= 73 ) {
-        $v = "12";
+        $val  = "12";
+        $rgb  = "E93323";
+        $cond = "hurricane_force";
+        $warn = "hurricane_force";
     }
     elsif ( $data >= 64 ) {
-        $v = "11";
+        $val  = "11";
+        $rgb  = "EB4826";
+        $cond = "violent_storm";
+        $warn = "storm_force";
     }
     elsif ( $data >= 55 ) {
-        $v = "10";
+        $val  = "10";
+        $rgb  = "E96E2C";
+        $cond = "storm";
+        $warn = "storm_force";
     }
     elsif ( $data >= 47 ) {
-        $v = "9";
+        $val  = "9";
+        $rgb  = "F19E38";
+        $cond = "strong_gale";
+        $warn = "gale_force";
     }
     elsif ( $data >= 39 ) {
-        $v = "8";
+        $val  = "8";
+        $rgb  = "F7CE46";
+        $cond = "gale";
+        $warn = "gale_force";
     }
     elsif ( $data >= 32 ) {
-        $v = "7";
+        $val  = "7";
+        $rgb  = "FFFF54";
+        $cond = "near_gale";
+        $warn = "high_winds";
     }
     elsif ( $data >= 25 ) {
-        $v = "6";
+        $val  = "6";
+        $rgb  = "D6FD51";
+        $cond = "strong_breeze";
+        $warn = "high_winds";
     }
     elsif ( $data >= 19 ) {
-        $v = "5";
+        $val  = "5";
+        $rgb  = "B1FC4F";
+        $cond = "fresh_breeze";
     }
     elsif ( $data >= 13 ) {
-        $v = "4";
+        $val  = "4";
+        $rgb  = "B1FC7B";
+        $cond = "moderate_breeze";
     }
     elsif ( $data >= 8 ) {
-        $v = "3";
+        $val  = "3";
+        $rgb  = "B1FCA3";
+        $cond = "gentle_breeze";
     }
     elsif ( $data >= 4 ) {
-        $v = "2";
+        $val  = "2";
+        $rgb  = "B1FCD0";
+        $cond = "light_breeze";
     }
     elsif ( $data >= 1 ) {
-        $v = "1";
+        $val  = "1";
+        $rgb  = "D6FEFE";
+        $cond = "light_air";
     }
 
-    return $v;
+    return ( $val, $rgb, $cond, $warn ) if (wantarray);
+    return $val;
 }
 
 #################################
 ### Textual unit conversions
 ###
 
+# Condition: convert temperature (Celsius) to temperature condition
+sub c2condition($;$) {
+    my ( $data, $indoor ) = @_;
+    my $val = "freeze";
+    my $rgb = "0055BB";
+
+    if ($indoor) {
+        $data -= 5 if ( $data < 22.5 );
+        $data += 5 if ( $data > 25 );
+    }
+
+    if ( $data >= 35 ) {
+        $val = "hot";
+        $rgb = "C72A23";
+    }
+    elsif ( $data >= 30 ) {
+        $val = "high";
+        $rgb = "E7652B";
+    }
+    elsif ( $data >= 14 ) {
+        $val = "ideal";
+        $rgb = "4C9329";
+    }
+    elsif ( $data >= 5 ) {
+        $val = "low";
+        $rgb = "009999";
+    }
+    elsif ( $data >= 2.5 || $indoor ) {
+        $val = "cold";
+        $rgb = "0066CC";
+    }
+
+    return ( $val, $rgb ) if (wantarray);
+    return $val;
+}
+
 # Condition: convert humidity (percent) to humidity condition
-sub humidity2condition($) {
-    my ($data) = @_;
-    my $v = "dry";
-    my $rgb    = "C72A23";
+sub humidity2condition($;$) {
+    my ( $data, $indoor ) = @_;
+    my $val = "dry";
+    my $rgb = "C72A23";
 
     if ( $data >= 80 ) {
-        $v = "wet";
+        $val = "wet";
         $rgb = "0066CC";
     }
     elsif ( $data >= 70 ) {
-        $v = "high";
+        $val = "high";
         $rgb = "009999";
     }
     elsif ( $data >= 50 ) {
-        $v = "optimal";
+        $val = "ideal";
         $rgb = "4C9329";
     }
     elsif ( $data >= 40 ) {
-        $v = "low";
+        $val = "low";
         $rgb = "E7652B";
     }
 
-    return ( $v, $rgb ) if (wantarray);
-    return $v;
+    return ( $val, $rgb ) if (wantarray);
+    return $val;
 }
 
 # Condition: convert UV-Index to UV condition
 sub uvi2condition($) {
     my ($data) = @_;
-    my $v      = "low";
+    my $val    = "low";
     my $rgb    = "4C9329";
 
     if ( $data > 11 ) {
-        $v   = "extreme";
+        $val = "extreme";
         $rgb = "674BC4";
     }
     elsif ( $data > 8 ) {
-        $v   = "veryhigh";
+        $val = "veryhigh";
         $rgb = "C72A23";
     }
     elsif ( $data > 6 ) {
-        $v   = "high";
+        $val = "high";
         $rgb = "E7652B";
     }
     elsif ( $data > 3 ) {
-        $v   = "moderate";
+        $val = "moderate";
         $rgb = "F4E54C";
     }
 
-    return ( $v, $rgb ) if (wantarray);
-    return $v;
+    return ( $val, $rgb ) if (wantarray);
+    return $val;
 }
 
 sub values2weathercondition($$$$$) {
     my ( $temp, $hum, $light, $isday, $israining ) = @_;
-    my $v = "clear";
+    my $val = "clear";
 
     if ($israining) {
-        $v = "rain";
+        $val = "rain";
     }
     elsif ( $light > 40000 ) {
-        $v = "sunny";
+        $val = "sunny";
     }
     elsif ($isday) {
-        $v = "cloudy";
+        $val = "cloudy";
     }
 
-    $v = "nt_" . $v unless ($isday);
-    return $v;
+    $val = "nt_" . $val unless ($isday);
+    return $val;
 }
 
 #TODO rewrite for Unit.pm
 sub fmtTime($) {
-    my ($value) = @_;
+    my ($val) = @_;
     my $suffix = ' s';
 
-    if ( $value >= 60 ) {
-        $value = sprintf( "%.1f", $value / 60 );
+    if ( $val >= 60 ) {
+        $val = sprintf( "%.1f", $val / 60 );
         $suffix = ' min';
 
-        if ( $value >= 60 ) {
-            $value = sprintf( "%.1f", $value / 60 );
+        if ( $val >= 60 ) {
+            $val = sprintf( "%.1f", $val / 60 );
             $suffix = ' h';
         }
     }
 
-    return ( $value, $suffix ) if (wantarray);
-    return $value . $suffix;
+    return ( $val, $suffix ) if (wantarray);
+    return $val . $suffix;
 }
 
 ####################
 # HELPER FUNCTIONS
 
 sub decimal_mark ($$) {
-    my ( $v, $f ) = @_;
-    return $v unless ( looks_like_number($v) && $f );
+    my ( $val, $f ) = @_;
+    return $val unless ( looks_like_number($val) && $f );
 
-    my $text = reverse $v;
+    my $text = reverse $val;
     if ( $f eq "2" ) {
         $text =~ s:\.:,:g;
         $text =~ s/(\d\d\d)(?=\d)(?!\d*,)/$1./g;
@@ -529,9 +633,9 @@ sub decimal_mark ($$) {
 }
 
 sub roundX($;$) {
-    my ( $v, $n ) = @_;
+    my ( $val, $n ) = @_;
     $n = 1 unless ( defined($n) );
-    return sprintf( "%.${n}f", $v );
+    return sprintf( "%.${n}f", $val );
 }
 
 1;
