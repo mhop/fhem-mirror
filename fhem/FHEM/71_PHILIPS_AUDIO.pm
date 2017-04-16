@@ -1269,9 +1269,9 @@ sub PHILIPS_AUDIO_ParseResponse
           }
           else
           {
+            delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
             readingsBulkUpdate($hash, "playerPlaying", "no");
-            readingsBulkUpdate($hash, "input", "-");
-            delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});            
+            readingsBulkUpdate($hash, "input", "-");                        
           }          
         }        
       }
@@ -1279,9 +1279,9 @@ sub PHILIPS_AUDIO_ParseResponse
       {
         if($data =~ /STOP/)
         {
+          delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
           readingsBulkUpdate($hash, "playerPlaying", "no");
           readingsBulkUpdate($hash, "input", "-");
-          delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});          
         }
       }      
       elsif($cmd =~ m/^(volumeStraight|volumeUp|volumeDown)/)
@@ -1300,11 +1300,12 @@ sub PHILIPS_AUDIO_ParseResponse
           if($1 eq "NOWPLAY")
           {
             # New player status information available
+            readingsBulkUpdate($hash, "playerPlaying", "yes");
             PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
           }
           elsif($1 eq "ELAPSE")
           {
-            
+            readingsBulkUpdate($hash, "playerPlaying", "yes");
             if($data =~ /'value':(.+),/)
             {
               # Sometimes the device does not refresh the ELAPSE -> NOWPLAY request
@@ -1396,11 +1397,10 @@ sub PHILIPS_AUDIO_ParseResponse
               }        
               else
               {
+                delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
                 readingsBulkUpdate($hash, "playerPlaying", "no");
                 $hash->{helper}{playerState}   = "home";
                 readingsBulkUpdate($hash, "playerState", "home");
-                delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-                #readingsBulkUpdate($hash, "input", "-");
               }
             }
           }
