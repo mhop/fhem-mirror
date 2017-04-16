@@ -1,9 +1,6 @@
 ###############################################################################
 # $Id$
 package main;
-use strict;
-use warnings;
-use Data::Dumper;
 sub UConv_Initialize() { }
 
 package UConv;
@@ -326,160 +323,98 @@ sub kph2kn($;$) {
 # Speed: convert km/h to Beaufort wind force scale
 sub kph2bft($) {
     my ($data) = @_;
-    my $val    = "0";
-    my $rgb    = "FEFEFE";
-    my $cond   = "calm";
-    my $warn   = " ";
+    my $val = "0";
 
     if ( $data >= 118 ) {
-        $val  = "12";
-        $rgb  = "E93323";
-        $cond = "hurricane_force";
-        $warn = "hurricane_force";
+        $val = "12";
     }
     elsif ( $data >= 103 ) {
-        $val  = "11";
-        $rgb  = "EB4826";
-        $cond = "violent_storm";
-        $warn = "storm_force";
+        $val = "11";
     }
     elsif ( $data >= 89 ) {
-        $val  = "10";
-        $rgb  = "E96E2C";
-        $cond = "storm";
-        $warn = "storm_force";
+        $val = "10";
     }
     elsif ( $data >= 75 ) {
-        $val  = "9";
-        $rgb  = "F19E38";
-        $cond = "strong_gale";
-        $warn = "gale_force";
+        $val = "9";
     }
     elsif ( $data >= 62 ) {
-        $val  = "8";
-        $rgb  = "F7CE46";
-        $cond = "gale";
-        $warn = "gale_force";
+        $val = "8";
     }
     elsif ( $data >= 50 ) {
-        $val  = "7";
-        $rgb  = "FFFF54";
-        $cond = "near_gale";
-        $warn = "high_winds";
+        $val = "7";
     }
     elsif ( $data >= 39 ) {
-        $val  = "6";
-        $rgb  = "D6FD51";
-        $cond = "strong_breeze";
-        $warn = "high_winds";
+        $val = "6";
     }
     elsif ( $data >= 29 ) {
-        $val  = "5";
-        $rgb  = "B1FC4F";
-        $cond = "fresh_breeze";
+        $val = "5";
     }
     elsif ( $data >= 20 ) {
-        $val  = "4";
-        $rgb  = "B1FC7B";
-        $cond = "moderate_breeze";
+        $val = "4";
     }
     elsif ( $data >= 12 ) {
-        $val  = "3";
-        $rgb  = "B1FCA3";
-        $cond = "gentle_breeze";
+        $val = "3";
     }
     elsif ( $data >= 6 ) {
-        $val  = "2";
-        $rgb  = "B1FCD0";
-        $cond = "light_breeze";
+        $val = "2";
     }
     elsif ( $data >= 1 ) {
-        $val  = "1";
-        $rgb  = "D6FEFE";
-        $cond = "light_air";
+        $val = "1";
     }
 
-    return ( $val, $rgb, $cond, $warn ) if (wantarray);
+    if (wantarray) {
+        my ( $cond, $rgb, $warn ) = bft2condition($val);
+        return ( $val, $rgb, $cond, $warn );
+    }
     return $val;
 }
 
 # Speed: convert mph (miles per hour) to Beaufort wind force scale
 sub mph2bft($) {
     my ($data) = @_;
-    my $val    = "0";
-    my $rgb    = "FEFEFE";
-    my $cond   = "calm";
-    my $warn   = " ";
+    my $val = "0";
 
     if ( $data >= 73 ) {
-        $val  = "12";
-        $rgb  = "E93323";
-        $cond = "hurricane_force";
-        $warn = "hurricane_force";
+        $val = "12";
     }
     elsif ( $data >= 64 ) {
-        $val  = "11";
-        $rgb  = "EB4826";
-        $cond = "violent_storm";
-        $warn = "storm_force";
+        $val = "11";
     }
     elsif ( $data >= 55 ) {
-        $val  = "10";
-        $rgb  = "E96E2C";
-        $cond = "storm";
-        $warn = "storm_force";
+        $val = "10";
     }
     elsif ( $data >= 47 ) {
-        $val  = "9";
-        $rgb  = "F19E38";
-        $cond = "strong_gale";
-        $warn = "gale_force";
+        $val = "9";
     }
     elsif ( $data >= 39 ) {
-        $val  = "8";
-        $rgb  = "F7CE46";
-        $cond = "gale";
-        $warn = "gale_force";
+        $val = "8";
     }
     elsif ( $data >= 32 ) {
-        $val  = "7";
-        $rgb  = "FFFF54";
-        $cond = "near_gale";
-        $warn = "high_winds";
+        $val = "7";
     }
     elsif ( $data >= 25 ) {
-        $val  = "6";
-        $rgb  = "D6FD51";
-        $cond = "strong_breeze";
-        $warn = "high_winds";
+        $val = "6";
     }
     elsif ( $data >= 19 ) {
-        $val  = "5";
-        $rgb  = "B1FC4F";
-        $cond = "fresh_breeze";
+        $val = "5";
     }
     elsif ( $data >= 13 ) {
-        $val  = "4";
-        $rgb  = "B1FC7B";
-        $cond = "moderate_breeze";
+        $val = "4";
     }
     elsif ( $data >= 8 ) {
-        $val  = "3";
-        $rgb  = "B1FCA3";
-        $cond = "gentle_breeze";
+        $val = "3";
     }
     elsif ( $data >= 4 ) {
-        $val  = "2";
-        $rgb  = "B1FCD0";
-        $cond = "light_breeze";
+        $val = "2";
     }
     elsif ( $data >= 1 ) {
-        $val  = "1";
-        $rgb  = "D6FEFE";
-        $cond = "light_air";
+        $val = "1";
     }
 
-    return ( $val, $rgb, $cond, $warn ) if (wantarray);
+    if (wantarray) {
+        my ( $cond, $rgb, $warn ) = bft2condition($val);
+        return ( $val, $rgb, $cond, $warn );
+    }
     return $val;
 }
 
@@ -575,6 +510,73 @@ sub uvi2condition($) {
 
     return ( $val, $rgb ) if (wantarray);
     return $val;
+}
+
+# Condition: convert Beaufort to wind condition
+sub bft2condition($) {
+    my ($data) = @_;
+    my $rgb    = "FEFEFE";
+    my $cond   = "calm";
+    my $warn   = " ";
+
+    if ( $data == 12 ) {
+        $rgb  = "E93323";
+        $cond = "hurricane_force";
+        $warn = "hurricane_force";
+    }
+    elsif ( $data == 11 ) {
+        $rgb  = "EB4826";
+        $cond = "violent_storm";
+        $warn = "storm_force";
+    }
+    elsif ( $data == 10 ) {
+        $rgb  = "E96E2C";
+        $cond = "storm";
+        $warn = "storm_force";
+    }
+    elsif ( $data == 9 ) {
+        $rgb  = "F19E38";
+        $cond = "strong_gale";
+        $warn = "gale_force";
+    }
+    elsif ( $data == 8 ) {
+        $rgb  = "F7CE46";
+        $cond = "gale";
+        $warn = "gale_force";
+    }
+    elsif ( $data == 7 ) {
+        $rgb  = "FFFF54";
+        $cond = "near_gale";
+        $warn = "high_winds";
+    }
+    elsif ( $data == 6 ) {
+        $rgb  = "D6FD51";
+        $cond = "strong_breeze";
+        $warn = "high_winds";
+    }
+    elsif ( $data == 5 ) {
+        $rgb  = "B1FC4F";
+        $cond = "fresh_breeze";
+    }
+    elsif ( $data == 4 ) {
+        $rgb  = "B1FC7B";
+        $cond = "moderate_breeze";
+    }
+    elsif ( $data == 3 ) {
+        $rgb  = "B1FCA3";
+        $cond = "gentle_breeze";
+    }
+    elsif ( $data == 2 ) {
+        $rgb  = "B1FCD0";
+        $cond = "light_breeze";
+    }
+    elsif ( $data == 1 ) {
+        $rgb  = "D6FEFE";
+        $cond = "light_air";
+    }
+
+    return ( $cond, $rgb, $warn ) if (wantarray);
+    return $cond;
 }
 
 sub values2weathercondition($$$$$) {
