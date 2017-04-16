@@ -1617,16 +1617,14 @@ sub PHILIPS_AUDIO_ParseResponse
           }        
           else
           {
-            readingsBulkUpdate($hash, "playerPlaying", "no");
             delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-            #readingsBulkUpdate($hash, "input", "-");
+            readingsBulkUpdate($hash, "playerPlaying", "no");            
           }
         }
         else
         {
-          readingsBulkUpdate($hash, "playerPlaying", "no");
           delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-          #readingsBulkUpdate($hash, "input", "-");         
+          readingsBulkUpdate($hash, "playerPlaying", "no");
         }
       }
       elsif($cmd eq "homestatus")
