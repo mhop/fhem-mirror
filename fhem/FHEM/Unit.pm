@@ -1,15 +1,15 @@
+###############################################################################
 # $Id$
-
+package main;
 use strict;
 use warnings;
-use Scalar::Util qw(looks_like_number);
-use UConv;
 use Data::Dumper;
 use utf8;
 use Encode qw(encode_utf8 decode_utf8);
 
-sub Unit_Initialize() {
-}
+use UConv;
+
+sub Unit_Initialize() { }
 
 # scale helper for metric numbers
 my $scales_m = {
@@ -1298,10 +1298,11 @@ my $rtypes = {
         ref_base => 900,
         txt      => {
             de => [ 'trocken', 'niedrig', 'optimal', 'hoch', 'feucht' ],
-            en => [ 'dry',     'low',     'optimal', 'high', 'wet' ],
+            en => [ 'dry',     'low',     'ideal',   'high', 'wet' ],
         },
         scope => [
-            '^(dry|0)$', '^(low|1)$', '^(optimal|2)$', '^(high|3)$',
+            '^(dry|0)$',           '^(low|1)$',
+            '^(ideal|optimal|2)$', '^(high|3)$',
             '^(wet|4)$'
         ],
         rtype_description => {
@@ -1688,7 +1689,7 @@ my $rtypes = {
     inhg => {
         ref_base => 12,
         suffix   => 'inHg',
-        format       => '%.2f',
+        format   => '%.2f',
         txt      => {
             de => 'Zoll Quecksilbersäule',
             en => 'Inches of Mercury',
@@ -2856,9 +2857,9 @@ sub rname2rtype ($$@) {
     # remove some prefix or other values to
     # flatten reading name
     $r =~ s/^fc\d+_//i;
-    $r =~ s/_(min|max|avg|sum|cum|avg\d+m|sum\d+m|cum\d+m)_/_/i;
-    $r =~ s/^(min|max|avg|sum|cum|avg\d+m|sum\d+m|cum\d+m)_//i;
-    $r =~ s/_(min|max|avg|sum|cum|avg\d+m|sum\d+m|cum\d+m)$//i;
+    $r =~ s/_(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)_/_/i;
+    $r =~ s/^(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)_//i;
+    $r =~ s/_(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m)$//i;
     $r =~ s/.*[-_](temp)$/$1/i;
 
     # rename capital letter containing readings
@@ -4398,7 +4399,9 @@ sub Unit_DbLog_split($$) {
     }
 
     # exclude sum/cum and avg events
-    elsif ( $event =~ /^.*(min|max|avg|sum|cum|avg\d+m|sum\d+m|cum\d+m): +.*/ )
+    elsif ( $event =~
+        /^.*(min|max|avg|sum|cum|min\d+m|max\d+m|avg\d+m|sum\d+m|cum\d+m): +.*/
+      )
     {
         Log3 $name, 5, "Unit_DbLog_split $name: Ignoring sum/avg event $event";
         return undef;
