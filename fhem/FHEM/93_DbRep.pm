@@ -40,6 +40,7 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.12.2       17.04.2017       DbRep_checkUsePK changed
 # 4.12.1       07.04.2017       get tableinfo changed for MySQL
 # 4.12.0       31.03.2017       support of primary key for insert functions
 # 4.11.4       29.03.2017       bugfix timestamp in minValue, maxValue if VALUE contains more than one
@@ -182,7 +183,7 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.12.1";
+my $DbRepVersion = "4.12.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3848,20 +3849,23 @@ sub DbRep_checkUsePK ($$){
   my ($hash,$dbh) = @_;
   my $name           = $hash->{NAME};
   my $dbconn         = $hash->{dbloghash}{dbconn};
-  my @usepkh = 0;
-  my @usepkc = 0;
+  my $upkh = 0;
+  my $upkc = 0;
+  my (@pkh,@pkc);
   
   my $db = (split("=",(split(";",$dbconn))[0]))[1];
-  eval {@usepkh = $dbh->primary_key( undef, undef, 'history' );};
-  eval {@usepkc = $dbh->primary_key( undef, undef, 'current' );};
-  my $pkh = @usepkh?join(",",@usepkh):"none";
-  my $pkc = @usepkc?join(",",@usepkc):"none";
+  eval {@pkh = $dbh->primary_key( undef, undef, 'history' );};
+  eval {@pkc = $dbh->primary_key( undef, undef, 'current' );};
+  my $pkh = (!@pkh || @pkh eq "")?"none":join(",",@pkh);
+  my $pkc = (!@pkc || @pkc eq "")?"none":join(",",@pkc);
   $pkh =~ tr/"//d;
   $pkc =~ tr/"//d;
+  $upkh = 1 if(@pkh && @pkh ne "none");
+  $upkc = 1 if(@pkc && @pkc ne "none");
   Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
   Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
 
-  return (scalar(@usepkh),scalar(@usepkc),$pkh,$pkc);
+return ($upkh,$upkc,$pkh,$pkc);
 }
 
 ####################################################################################################
