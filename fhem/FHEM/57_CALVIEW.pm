@@ -98,18 +98,34 @@ sub CALVIEW_GetUpdate($){
 	$year += 1900; $mon += 1; 		
 	my $datenext = sprintf('%02d.%02d.%04d', $mday, $mon, $year);
 	my @termineNew;
+	my @tempstart;
+	my @bts;
+	my @tempend;
+	my $isostarttime;
+	my $isoendtime;
+	my ($D,$M,$Y);
+	my ($eD,$eM,$eY);
 	foreach my $item (@termine ){
-		my @tempstart=split(/\s+/,$item->[0]);
-		my @tempend=split(/\s+/,$item->[2]);	
-		my ($D,$M,$Y)=split(/\./,$tempstart[0]);
-		my ($eD,$eM,$eY)=split(/\./,$tempend[0]);
-		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
+		#start datum und zeit behandeln
+		if( defined($item->[0])&& length($item->[0]) > 0) { 	
+			@tempstart=split(/\s+/,$item->[0]);
+			($D,$M,$Y)=split(/\./,$tempstart[0]);
+			@bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
+			$isostarttime = $Y."-".$M."-".$D."T".$tempstart[1];
+		}
+		else {$item->[0] = "no startdate"}
+		#end datum und zeit behandeln	
+		if( defined($item->[2])&& length($item->[2]) > 0) { 
+			@tempend=split(/\s+/,$item->[2]);	
+			($eD,$eM,$eY)=split(/\./,$tempend[0]);
+			$isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
+		}
+		else {$item->[2] = "no enddate"}
 		#replace the "\," with ","
 		if(length($item->[1]) > 0){ $item->[1] =~ s/\\,/,/g; }
 		if( defined($item->[4]) && length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; }
 		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; }
-		my $isostarttime = $Y."-".$M."-".$D."T".$tempstart[1];
-		my $isoendtime = $eY."-".$eM."-".$eD."T".$tempend[1];
+		#berechnen verbleibender tage bis zum termin
 		my $eventDate = fhemTimeLocal(0,0,0,$D,$M-1,$Y-1900);
 		my $daysleft = floor(($eventDate - time) / 60 / 60 / 24 + 1);
 		my $daysleft_long;
