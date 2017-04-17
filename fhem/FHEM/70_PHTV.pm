@@ -73,7 +73,7 @@ sub PHTV_Define($$) {
         return $msg;
     }
 
-    $hash->{TYPE} = "PHTV";
+    $hash->{NOTIFYDEV} = "global";
 
     my $address = $a[2];
     $hash->{helper}{ADDRESS} = $address;
