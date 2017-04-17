@@ -1,31 +1,10 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     RESIDENTStk.pm
-#     Additional functions for 10_RESIDENTS.pm, 20_ROOMMATE.pm, 20_GUEST.pm
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
-sub RESIDENTStk_Initialize() {
-}
+# package main;
+# use strict;
+# use warnings;
+# use Data::Dumper;
+sub RESIDENTStk_Initialize() { }
 
 #####################################
 # PRE-DEFINITION: wakeuptimer
@@ -38,22 +17,20 @@ sub RESIDENTStk_Initialize() {
 sub RESIDENTStk_wakeupSet($$) {
     my ( $NAME, $n ) = @_;
     my ( $a,    $h ) = parseParams($n);
-    my $cmd     = shift @$a;
-    my $VALUE   = join( " ", @$a );
-    my $nextRun = ReadingsVal( $NAME, "nextRun", "07:00" );
+    my $cmd = shift @$a;
+    my $VALUE = join( " ", @$a );
+
+    $cmd =~ s/^state:\s*(.*)$/$1/;
+    return if ( $cmd =~ /^[A-Za-z]+:/ );
 
     # filter non-registered notifies
     if ( $cmd !~
-m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?|trigger|start|stop|end|reset|auto|wakeupResetdays|wakeupDays|wakeupHolidays|wakeupEnforced|wakeupDefaultTime)$/i
+m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?|trigger|start|stop|end|reset|auto|wakeupResetdays|wakeupDays|wakeupHolidays|wakeupEnforced|wakeupDefaultTime|wakeupOffset)$/i
       )
     {
         Log3 $NAME, 6,
-            "RESIDENTStk $NAME: "
-          . "received unspecified notify '"
-          . $cmd
-          . "' - nothing to do";
-
-        fhem "set $NAME nextRun $nextRun";
+          "RESIDENTStk $NAME: "
+          . "received unspecified notify '$cmd' - nothing to do";
         return;
     }
 
@@ -71,7 +48,8 @@ m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?
     my $wakeupResetdays =
       ReadingsVal( $NAME, "wakeupResetdays",
         AttrVal( $NAME, "wakeupResetdays", "" ) );
-    my $wakeupOffset = AttrVal( $NAME, "wakeupOffset", 0 );
+    my $wakeupOffset =
+      ReadingsVal( $NAME, "wakeupOffset", AttrVal( $NAME, "wakeupOffset", 0 ) );
     my $wakeupEnforced =
       ReadingsVal( $NAME, "wakeupEnforced",
         AttrVal( $NAME, "wakeupEnforced", 0 ) );
@@ -80,6 +58,7 @@ m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?
     my $room                = AttrVal( $NAME,    "room",                0 );
     my $userattr            = AttrVal( $NAME,    "userattr",            0 );
     my $lastRun = ReadingsVal( $NAME, "lastRun", "07:00" );
+    my $nextRun = ReadingsVal( $NAME, "nextRun", "07:00" );
     my $running = ReadingsVal( $NAME, "running", 0 );
     my $wakeupUserdeviceState = ReadingsVal( $wakeupUserdevice, "state", 0 );
     my $atName                = "at_" . $NAME;
@@ -113,6 +92,8 @@ m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?
             $wakeupUserdeviceRealname
         );
     }
+
+    RESIDENTStk_findDummySlaves($wakeupUserdevice);
 
     # check for required userattr attribute
     my $userattributes =
@@ -789,14 +770,31 @@ return;;\
         else {
 
             # conditional enforced wake-up:
+            # only if actual wake-up time is
+            # earlier than wakeupDefaultTime
+            if (   $wakeupEnforced == 3
+                && $wakeupDefaultTime
+                && RESIDENTStk_time2sec($wakeupDefaultTime) >
+                RESIDENTStk_time2sec($lastRun) )
+            {
+                Log3 $NAME, 4,
+                  "RESIDENTStk $NAME: "
+                  . "Enforcing wake-up because wake-up time is earlier than normal (wakeupDefaultTime=$wakeupDefaultTime > lastRun=$lastRun)";
+                $wakeupEnforced = 1;
+            }
+
+            # conditional enforced wake-up:
             # only if actual wake-up time is not wakeupDefaultTime
-            if (   $wakeupEnforced == 2
+            elsif ($wakeupEnforced == 2
                 && $wakeupDefaultTime
                 && $wakeupDefaultTime ne $lastRun )
             {
+                Log3 $NAME, 4,
+                  "RESIDENTStk $NAME: "
+                  . "Enforcing wake-up because wake-up is different from normal (wakeupDefaultTime=$wakeupDefaultTime =! lastRun=$lastRun)";
                 $wakeupEnforced = 1;
             }
-            elsif ( $wakeupEnforced == 2 ) {
+            elsif ( $wakeupEnforced > 1 ) {
                 $wakeupEnforced = 0;
             }
 
@@ -852,7 +850,7 @@ return;;\
     # wakeup attributes
     #
     elsif ( $cmd =~
-m/^(wakeupResetdays|wakeupDays|wakeupHolidays|wakeupEnforced|wakeupDefaultTime)$/
+m/^(wakeupResetdays|wakeupDays|wakeupHolidays|wakeupEnforced|wakeupDefaultTime|wakeupOffset)$/
       )
     {
         Log3 $NAME, 4, "RESIDENTStk $NAME: " . "setting $1 to '$VALUE'";
@@ -915,7 +913,6 @@ m/^(?:nextRun)?\s*(OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?$/i
         readingsBulkUpdateIfChanged( $defs{$wakeupUserdevice},
             "nextWakeup", $nextWakeup );
         readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
-
     }
 
     return undef;
@@ -926,11 +923,20 @@ m/^(?:nextRun)?\s*(OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?$/i
 #
 sub RESIDENTStk_wakeupGetBegin($;$) {
     my ( $NAME, $wakeupAtdevice ) = @_;
+
+    unless ( IsDevice($NAME) ) {
+        Log3 $NAME, 3,
+          "RESIDENTStk $NAME: "
+          . "Run function RESIDENTStk_wakeupGetBegin() for non-existing device!";
+        return "$NAME: Non-existing device";
+    }
+
     my $nextRun = ReadingsVal( $NAME, "nextRun", 0 );
     my $wakeupDefaultTime =
       ReadingsVal( $NAME, "wakeupDefaultTime",
         AttrVal( $NAME, "wakeupDefaultTime", 0 ) );
-    my $wakeupOffset = AttrVal( $NAME, "wakeupOffset", 0 );
+    my $wakeupOffset =
+      ReadingsVal( $NAME, "wakeupOffset", AttrVal( $NAME, "wakeupOffset", 0 ) );
     my $wakeupInitTime = (
           $wakeupDefaultTime && lc($wakeupDefaultTime) ne "off"
         ? $wakeupDefaultTime
@@ -1013,6 +1019,13 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
 sub RESIDENTStk_wakeupRun($;$) {
     my ( $NAME, $forceRun ) = @_;
 
+    unless ( IsDevice($NAME) ) {
+        Log3 $NAME, 3,
+          "RESIDENTStk $NAME: "
+          . "Run function RESIDENTStk_wakeupRun() for non-existing device!";
+        return "$NAME: Non-existing device";
+    }
+
     my $wakeupMacro = AttrVal( $NAME, "wakeupMacro", 0 );
     my $wakeupDefaultTime =
       ReadingsVal( $NAME, "wakeupDefaultTime",
@@ -1027,7 +1040,8 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $wakeupResetdays =
       ReadingsVal( $NAME, "wakeupResetdays",
         AttrVal( $NAME, "wakeupResetdays", "" ) );
-    my $wakeupOffset = AttrVal( $NAME, "wakeupOffset", 0 );
+    my $wakeupOffset =
+      ReadingsVal( $NAME, "wakeupOffset", AttrVal( $NAME, "wakeupOffset", 0 ) );
     my $wakeupEnforced =
       ReadingsVal( $NAME, "wakeupEnforced",
         AttrVal( $NAME, "wakeupEnforced", 0 ) );
@@ -1092,18 +1106,10 @@ sub RESIDENTStk_wakeupRun($;$) {
       if ( $wakeupResetdays ne "" );
     my %rdays = map { $_ => 1 } @rdays;
 
-    if ( !IsDevice($NAME) ) {
-        return "$NAME: Non existing device";
-    }
-    elsif ( IsDisabled($wakeupDevice) ) {
+    if ( IsDisabled($wakeupDevice) ) {
         Log3 $name, 4,
           "RESIDENTStk $NAME: "
-          . "device disabled - not triggering wake-up program";
-    }
-    elsif ( lc($nextRun) eq "off" && !$forceRun ) {
-        Log3 $NAME, 4,
-          "RESIDENTStk $NAME: "
-          . "alarm set to OFF - not triggering wake-up program";
+          . "wakeupDevice disabled - not triggering wake-up program";
     }
     elsif ( !$wakeupUserdevice ) {
         return "$NAME: missing attribute wakeupUserdevice";
@@ -1113,7 +1119,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     }
     elsif ( !IsDevice( $wakeupUserdevice, "RESIDENTS|ROOMMATE|GUEST" ) ) {
         return "$NAME: "
-          . "device $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
+          . "wakeupUserdevice $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
     }
     elsif ( IsDevice( $wakeupUserdevice, "GUEST" )
         && $wakeupUserdeviceState eq "none" )
@@ -1124,9 +1130,23 @@ sub RESIDENTStk_wakeupRun($;$) {
         fhem "set $NAME nextRun OFF";
         return;
     }
-    elsif ($wakeupHolidays eq ""
+    elsif ( IsDisabled($wakeupUserdevice) ) {
+        Log3 $name, 4,
+          "RESIDENTStk $NAME: "
+          . "wakeupUserdevice disabled - not triggering wake-up program";
+    }
+    elsif ( lc($nextRun) eq "off" && !$forceRun ) {
+        Log3 $NAME, 4,
+          "RESIDENTStk $NAME: "
+          . "wakeup timer set to OFF - not triggering wake-up program";
+    }
+    elsif (
+           !$forceRun
         && !$days{$today}
-        && !$forceRun )
+        && (   $wakeupHolidays eq ""
+            || $wakeupHolidays eq "andHoliday"
+            || $wakeupHolidays eq "andNoHoliday" )
+      )
     {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: "
@@ -1134,39 +1154,19 @@ sub RESIDENTStk_wakeupRun($;$) {
     }
     elsif (
         !$forceRun
-        && (   $wakeupHolidays eq "orHoliday"
-            || $wakeupHolidays eq "orNoHoliday" )
         && (
-            !$days{$today}
-            && (
-                ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
-                || (   $wakeupHolidays eq "orNoHoliday"
-                    && $holidayToday )
-            )
+            ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
+            || (   $wakeupHolidays eq "andNoHoliday"
+                && $holidayToday )
+            || ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
+            || (   $wakeupHolidays eq "orNoHoliday"
+                && $holidayToday )
         )
       )
     {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: "
-          . "neither weekday nor holiday restriction matched - not triggering wake-up program this time";
-    }
-    elsif (
-        !$forceRun
-        && (   $wakeupHolidays eq "andHoliday"
-            || $wakeupHolidays eq "andNoHoliday" )
-        && (
-            !$days{$today}
-            || (
-                ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
-                || (   $wakeupHolidays eq "andNoHoliday"
-                    && $holidayToday )
-            )
-        )
-      )
-    {
-        Log3 $NAME, 4,
-          "RESIDENTStk $NAME: "
-          . "weekday restriction in conjunction with $wakeupHolidays in use - not triggering wake-up program this time";
+          . "holiday restriction $wakeupHolidays in use - not triggering wake-up program this time";
     }
     elsif ($wakeupUserdeviceState eq "absent"
         || $wakeupUserdeviceState eq "gone"
@@ -1224,6 +1224,7 @@ sub RESIDENTStk_wakeupRun($;$) {
               . "won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastAwake (expLastAwake=$expLastAwake > nowRunSec=$nowRunSec)";
         }
         else {
+
             # conditional enforced wake-up:
             # only if actual wake-up time is
             # earlier than wakeupDefaultTime
@@ -1249,7 +1250,7 @@ sub RESIDENTStk_wakeupRun($;$) {
                   . "Enforcing wake-up because wake-up is different from normal (wakeupDefaultTime=$wakeupDefaultTime =! lastRun=$lastRun)";
                 $wakeupEnforced = 1;
             }
-            elsif ( $wakeupEnforced == 2 ) {
+            elsif ( $wakeupEnforced > 1 ) {
                 $wakeupEnforced = 0;
             }
 
@@ -1289,7 +1290,6 @@ sub RESIDENTStk_wakeupRun($;$) {
 
                 $running = 1;
             }
-
         }
     }
 
@@ -1348,11 +1348,9 @@ sub RESIDENTStk_wakeupRun($;$) {
 sub RESIDENTStk_AttrFnDummy(@) {
     my ( $cmd, $name, $aName, $aVal ) = @_;
 
-    # set attribute
-    if ( $init_done && $cmd eq "set" ) {
-
-        # wakeupResetSwitcher
-        if ( $aName eq "wakeupResetSwitcher" ) {
+    # wakeupResetSwitcher
+    if ( $aName eq "wakeupResetSwitcher" ) {
+        if ( $init_done && $cmd eq "set" ) {
             if ( !IsDevice($aVal) ) {
                 my $alias = AttrVal( $name, "alias", 0 );
                 my $group = AttrVal( $name, "group", 0 );
@@ -1360,7 +1358,7 @@ sub RESIDENTStk_AttrFnDummy(@) {
 
                 fhem "define $aVal dummy";
                 fhem "attr $aVal "
-                  . "comment Auto-created by RESIDENTS Toolkit: easy between on/off for auto time reset of wake-up timer $NAME";
+                  . "comment Auto-created by RESIDENTS Toolkit: easy switch between on/off for auto time reset of wake-up timer $NAME";
                 if ($alias) {
                     fhem "attr $aVal alias $alias Reset";
                 }
@@ -1381,14 +1379,12 @@ sub RESIDENTStk_AttrFnDummy(@) {
                 Log3 $name, 3,
                   "RESIDENTStk $name: new slave dummy device $aVal created";
             }
-            elsif ( !IsDevice( $aVal, "dummy" ) ) {
-                Log3 $name, 3,
-                  "RESIDENTStk $name: "
-                  . "Defined device name in attr $aName is not a dummy device";
-                return "Existing device $aVal is not a dummy!";
-            }
         }
 
+        my $wakeupUserdevice = AttrVal( $name, "wakeupUserdevice", undef );
+        if ( IsDevice( $wakeupUserdevice, "ROOMMATE|GUEST" ) ) {
+            RESIDENTStk_findDummySlaves($wakeupUserdevice);
+        }
     }
 
     return undef;
@@ -1423,18 +1419,13 @@ sub RESIDENTStk_wakeupGetNext($;$) {
     my $secNow = RESIDENTStk_time2sec( $hour . ":" . $min ) + $sec;
     my $definitiveNextToday;
     my $definitiveNextTomorrow;
-    my $definitiveNextTodayDev    = 0;
-    my $definitiveNextTomorrowDev = 0;
+    my $definitiveNextTodayDev;
+    my $definitiveNextTomorrowDev;
 
     my $holidayDevice = AttrVal( "global", "holiday2we", 0 );
 
     # check for each registered wake-up device
     for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
-        next if !$wakeupDevice;
-
-        my $ltoday    = $today;
-        my $ltomorrow = $tomorrow;
-
         if ( !IsDevice($wakeupDevice) ) {
             Log3 $name, 4,
               "RESIDENTStk $name: "
@@ -1454,25 +1445,16 @@ sub RESIDENTStk_wakeupGetNext($;$) {
 
             next;
         }
-        elsif ( IsDisabled($wakeupDevice) ) {
-            Log3 $name, 4,
-              "RESIDENTStk $name: "
-              . "00 - ignoring disabled wakeupDevice $wakeupDevice";
-            next;
-        }
 
-        Log3 $name, 4,
-          "RESIDENTStk $name: "
-          . "00 - checking for next wake-up candidate $wakeupDevice";
-
-        my $nextRun = ReadingsVal( $wakeupDevice, "nextRun", 0 );
-        my $wakeupAtdevice = AttrVal( $wakeupDevice, "wakeupAtdevice", 0 );
-        my $wakeupOffset   = AttrVal( $wakeupDevice, "wakeupOffset",   0 );
-        my $wakeupAtNTM    = (
+        my $wakeupAtdevice = AttrVal( $wakeupDevice, "wakeupAtdevice", undef );
+        my $wakeupOffset =
+          ReadingsVal( $wakeupDevice, "wakeupOffset",
+            AttrVal( $wakeupDevice, "wakeupOffset", 0 ) );
+        my $wakeupAtNTM = (
             IsDevice($wakeupAtdevice)
               && defined( $defs{$wakeupAtdevice}{NTM} )
             ? substr( $defs{$wakeupAtdevice}{NTM}, 0, -3 )
-            : 0
+            : undef
         );
         my $wakeupDays =
           ReadingsVal( $wakeupDevice, "wakeupDays",
@@ -1483,11 +1465,31 @@ sub RESIDENTStk_wakeupGetNext($;$) {
         my $holidayToday    = 0;
         my $holidayTomorrow = 0;
         my $nextRunSrc;
+        my $nextRun   = ReadingsVal( $wakeupDevice, "nextRun", undef );
+        my $ltoday    = $today;
+        my $ltomorrow = $tomorrow;
+
+        if (   IsDisabled($wakeupDevice)
+            || !$nextRun
+            || lc($nextRun) eq "off"
+            || $nextRun !~ /^([0-9]{2}:[0-9]{2})$/ )
+        {
+            Log3 $name, 4,
+              "RESIDENTStk $name: "
+              . "00 - ignoring disabled wakeupDevice $wakeupDevice";
+            next;
+        }
+
+        Log3 $name, 4,
+          "RESIDENTStk $name: "
+          . "00 - checking for next wake-up candidate $wakeupDevice";
 
         # get holiday status for today and tomorrow
-        if ( $wakeupHolidays ne ""
-            && IsDevice( $holidayDevice, "holiday" ) )
-        {
+        if ( $wakeupHolidays eq "" ) {
+            Log3 $name, 4,
+              "RESIDENTStk $wakeupDevice: 01 - Not considering any holidays";
+        }
+        elsif ( IsDevice( $holidayDevice, "holiday" ) ) {
             $holidayToday = 1
               unless (
                 ReadingsVal( $holidayDevice, "state", "none" ) eq "none" );
@@ -1497,11 +1499,7 @@ sub RESIDENTStk_wakeupGetNext($;$) {
 
             Log3 $name, 4,
               "RESIDENTStk $wakeupDevice: "
-              . "01 - Holidays to be considered - today=$holidayToday tomorrow=$holidayTomorrow";
-        }
-        else {
-            Log3 $name, 4,
-              "RESIDENTStk $wakeupDevice: 01 - Not considering any holidays";
+              . "01 - Holidays to be considered ($wakeupHolidays) - holidayToday=$holidayToday holidayTomorrow=$holidayTomorrow";
         }
 
         # set day scope for today
@@ -1516,117 +1514,78 @@ sub RESIDENTStk_wakeupGetNext($;$) {
           if ( $wakeupDays ne "" );
         my %daysTomorrow = map { $_ => 1 } @daysTomorrow;
 
-        if ( lc($nextRun) eq "off"
-            || $nextRun !~ /^([0-9]{2}:[0-9]{2})$/ )
+        Log3 $name, 4,
+          "RESIDENTStk $wakeupDevice: "
+          . "02 - possible candidate found - weekdayToday=$ltoday weekdayTomorrow=$ltomorrow";
+
+        my $nextRunSec;
+        my $nextRunSecTarget;
+
+        # Use direct information from at-device if possible
+        if (   $wakeupAtNTM
+            && $wakeupAtNTM =~ /^([0-9]{2}:[0-9]{2})$/ )
         {
-            Log3 $name, 4,
-              "RESIDENTStk $wakeupDevice: " . "02 - set to OFF so no candidate";
-            next;
-        }
-        else {
+            $nextRunSrc       = "at";
+            $nextRunSec       = RESIDENTStk_time2sec($wakeupAtNTM);
+            $nextRunSecTarget = $nextRunSec + $wakeupOffset * 60;
+
+            if ( $wakeupOffset && $nextRunSecTarget >= 86400 ) {
+                $nextRunSecTarget -= 86400;
+
+                $ltoday++;
+                $ltoday = $ltoday - 7
+                  if ( $ltoday > 6 );
+
+                $ltomorrow++;
+                $ltomorrow = $ltomorrow - 7
+                  if ( $ltomorrow > 6 );
+            }
 
             Log3 $name, 4,
               "RESIDENTStk $wakeupDevice: "
-              . "02 - possible candidate found - weekdayToday=$ltoday weekdayTomorrow=$ltomorrow";
+              . "03 - considering at-device value wakeupAtNTM=$wakeupAtNTM wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget";
+        }
+        else {
+            $nextRunSrc       = "dummy";
+            $nextRunSecTarget = RESIDENTStk_time2sec($nextRun);
+            $nextRunSec       = $nextRunSecTarget - $wakeupOffset * 60;
 
-            my $nextRunSec;
-            my $nextRunSecTarget;
+            if ( $wakeupOffset && $nextRunSec < 0 ) {
+                $nextRunSec += 86400;
 
-            # Use direct information from at-device if possible
-            if (   $wakeupAtNTM
-                && $wakeupAtNTM =~ /^([0-9]{2}:[0-9]{2})$/ )
-            {
-                $nextRunSrc       = "at";
-                $nextRunSec       = RESIDENTStk_time2sec($wakeupAtNTM);
-                $nextRunSecTarget = $nextRunSec + $wakeupOffset * 60;
+                $ltoday--;
+                $ltoday = $ltoday + 7
+                  if ( $ltoday < 0 );
 
-                if ( $wakeupOffset && $nextRunSecTarget >= 86400 ) {
-                    $nextRunSecTarget -= 86400;
-
-                    $ltoday++;
-                    $ltoday = $ltoday - 7
-                      if ( $ltoday > 6 );
-
-                    $ltomorrow++;
-                    $ltomorrow = $ltomorrow - 7
-                      if ( $ltomorrow > 6 );
-                }
-
-                Log3 $name, 4,
-                  "RESIDENTStk $wakeupDevice: "
-                  . "03 - considering at-device value wakeupAtNTM=$wakeupAtNTM wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget";
-            }
-            else {
-                $nextRunSrc       = "dummy";
-                $nextRunSecTarget = RESIDENTStk_time2sec($nextRun);
-                $nextRunSec       = $nextRunSecTarget - $wakeupOffset * 60;
-
-                if ( $wakeupOffset && $nextRunSec < 0 ) {
-                    $nextRunSec += 86400;
-
-                    $ltoday--;
-                    $ltoday = $ltoday + 7
-                      if ( $ltoday < 0 );
-
-                    $ltomorrow--;
-                    $ltomorrow = $ltomorrow + 7
-                      if ( $ltomorrow < 0 );
-                }
-
-                Log3 $name, 4,
-                  "RESIDENTStk $wakeupDevice: "
-                  . "03 - considering dummy-device value nextRun=$nextRun wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget (wakeupAtNTM=$wakeupAtNTM)";
+                $ltomorrow--;
+                $ltomorrow = $ltomorrow + 7
+                  if ( $ltomorrow < 0 );
             }
 
-            # still running today
-            if ( $nextRunSec > $secNow ) {
-                Log3 $name, 4,
-                  "RESIDENTStk $wakeupDevice: "
-                  . "04 - this is a candidate for today - weekdayToday=$ltoday";
+            Log3 $name, 4,
+              "RESIDENTStk $wakeupDevice: "
+              . "03 - considering dummy-device value nextRun=$nextRun wakeupOffset=$wakeupOffset nextRunSec=$nextRunSec nextRunSecTarget=$nextRunSecTarget (wakeupAtNTM=$wakeupAtNTM)";
+        }
 
-                # if today is in scope
-                if ( $days{$ltoday} ) {
+        # still running today
+        if ( $nextRunSec > $secNow ) {
+            Log3 $name, 4,
+              "RESIDENTStk $wakeupDevice: "
+              . "04 - this is a candidate for today - weekdayToday=$ltoday";
 
-                    # if we need to consider holidays in addition
-                    if (
-                        ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
-                        || (   $wakeupHolidays eq "andNoHoliday"
-                            && $holidayToday )
-                      )
-                    {
-                        Log3 $name, 4,
-                          "RESIDENTStk $wakeupDevice: "
-                          . "05 - no run today due to holiday based on combined weekday and holiday decision";
-                        next;
-                    }
+            # if today is in scope
+            if ( $days{$ltoday} ) {
 
-                    # easy if there is no holiday dependency
-                    elsif ( !$definitiveNextToday
-                        || $nextRunSec < $definitiveNextToday )
-                    {
-                        Log3 $name, 4,
-                          "RESIDENTStk $wakeupDevice: "
-                          . "05 - until now, will be NEXT WAKE-UP RUN today based on weekday decision";
-                        $definitiveNextToday    = $nextRunSec;
-                        $definitiveNextTodayDev = $wakeupDevice;
-                    }
-
-                }
-                else {
-                    Log3 $name, 4,
-                      "RESIDENTStk $wakeupDevice: "
-                      . "05 - won't be running today anymore based on weekday decision";
-                    next;
-                }
-
-                # if we need to consider holidays in parallel to weekdays
-                if (   ( $wakeupHolidays eq "orHoliday" && $holidayToday )
-                    || ( $wakeupHolidays eq "orNoHoliday" && !$holidayToday ) )
+                # if we need to consider holidays in addition
+                if (
+                    ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
+                    || (   $wakeupHolidays eq "andNoHoliday"
+                        && $holidayToday )
+                  )
                 {
-
                     Log3 $name, 4,
                       "RESIDENTStk $wakeupDevice: "
-                      . "06 - won't be running today based on holiday decision";
+                      . "05 - no run today due to holiday based on combined weekday and holiday decision";
                     next;
                 }
 
@@ -1636,82 +1595,111 @@ sub RESIDENTStk_wakeupGetNext($;$) {
                 {
                     Log3 $name, 4,
                       "RESIDENTStk $wakeupDevice: "
-                      . "06 - until now, will be NEXT WAKE-UP RUN today based on holiday decision";
+                      . "05 - until now, will be NEXT WAKE-UP RUN today based on weekday decision";
                     $definitiveNextToday    = $nextRunSec;
                     $definitiveNextTodayDev = $wakeupDevice;
                 }
-
             }
 
-            # running later
-            else {
+            elsif ($wakeupHolidays eq ""
+                || $wakeupHolidays eq "andHoliday"
+                || $wakeupHolidays eq "andNoHoliday" )
+            {
                 Log3 $name, 4,
                   "RESIDENTStk $wakeupDevice: "
-                  . "04 - this is a candidate for tomorrow or later - weekdayTomorrow=$ltomorrow";
+                  . "05 - won't be running today anymore based on weekday decision";
+                next;
+            }
 
-                # if tomorrow is in scope
-                if ( $daysTomorrow{$ltomorrow} ) {
+            # if we need to consider holidays in parallel to weekdays
+            elsif (( $wakeupHolidays eq "orHoliday" && !$holidayToday )
+                || ( $wakeupHolidays eq "orNoHoliday" && $holidayToday ) )
+            {
+                Log3 $name, 4,
+                  "RESIDENTStk $wakeupDevice: "
+                  . "06 - won't be running today based on holiday decision";
+                next;
+            }
 
-                    # if we need to consider holidays in addition
-                    if (
-                        (
-                            $wakeupHolidays eq "andHoliday"
-                            && !$holidayTomorrow
-                        )
-                        || (   $wakeupHolidays eq "andNoHoliday"
-                            && $holidayTomorrow )
-                      )
-                    {
-                        Log3 $name, 4,
-                          "RESIDENTStk $wakeupDevice: "
-                          . "05 - no run tomorrow due to holiday based on combined weekday and holiday decision";
-                        next;
-                    }
+            # easy if there is no holiday dependency
+            elsif ( !$definitiveNextToday
+                || $nextRunSec < $definitiveNextToday )
+            {
+                Log3 $name, 4,
+                  "RESIDENTStk $wakeupDevice: "
+                  . "06 - until now, will be NEXT WAKE-UP RUN today based on holiday decision";
+                $definitiveNextToday    = $nextRunSec;
+                $definitiveNextTodayDev = $wakeupDevice;
+            }
+        }
 
-                    # easy if there is no holiday dependency
-                    elsif ( !$definitiveNextTomorrow
-                        || $nextRunSec < $definitiveNextTomorrow )
-                    {
-                        Log3 $name, 4,
-                          "RESIDENTStk $wakeupDevice: "
-                          . "05 - until now, will be NEXT WAKE-UP RUN tomorrow based on weekday decision";
-                        $definitiveNextTomorrow    = $nextRunSec;
-                        $definitiveNextTomorrowDev = $wakeupDevice;
-                    }
+        # running later
+        else {
+            Log3 $name, 4,
+              "RESIDENTStk $wakeupDevice: "
+              . "04 - this is a candidate for tomorrow or later - weekdayTomorrow=$ltomorrow";
 
-                }
-                else {
-                    Log3 $name, 4,
-                      "RESIDENTStk $wakeupDevice: "
-                      . "05 - won't be running tomorrow based on weekday decision";
-                    next;
-                }
+            # if tomorrow is in scope
+            if ( $daysTomorrow{$ltomorrow} ) {
 
-                # if we need to consider holidays in parallel to weekdays
+                # if we need to consider holidays in addition
                 if (
-                    ( $wakeupHolidays eq "orHoliday" && $holidayTomorrow )
-                    || ( $wakeupHolidays eq "orNoHoliday"
-                        && !$holidayTomorrow )
+                    ( $wakeupHolidays eq "andHoliday" && !$holidayTomorrow )
+                    || (   $wakeupHolidays eq "andNoHoliday"
+                        && $holidayTomorrow )
                   )
                 {
                     Log3 $name, 4,
                       "RESIDENTStk $wakeupDevice: "
-                      . "06 - won't be running tomorrow based on holiday decision";
+                      . "05 - no run tomorrow due to holiday based on combined weekday and holiday decision";
                     next;
                 }
 
+                # easy if there is no holiday dependency
                 elsif ( !$definitiveNextTomorrow
                     || $nextRunSec < $definitiveNextTomorrow )
                 {
                     Log3 $name, 4,
                       "RESIDENTStk $wakeupDevice: "
-                      . "06 - until now, will be NEXT WAKE-UP RUN tomorrow based on holiday decision";
+                      . "05 - until now, will be NEXT WAKE-UP RUN tomorrow based on weekday decision";
                     $definitiveNextTomorrow    = $nextRunSec;
                     $definitiveNextTomorrowDev = $wakeupDevice;
                 }
-
             }
 
+            elsif ($wakeupHolidays eq ""
+                || $wakeupHolidays eq "andHoliday"
+                || $wakeupHolidays eq "andNoHoliday" )
+            {
+                Log3 $name, 4,
+                  "RESIDENTStk $wakeupDevice: "
+                  . "05 - won't be running tomorrow based on weekday decision";
+                next;
+            }
+
+            # if we need to consider holidays in parallel to weekdays
+            elsif (
+                ( $wakeupHolidays eq "orHoliday" && !$holidayTomorrow )
+                || (   $wakeupHolidays eq "orNoHoliday"
+                    && $holidayTomorrow )
+              )
+            {
+                Log3 $name, 4,
+                  "RESIDENTStk $wakeupDevice: "
+                  . "06 - won't be running tomorrow based on holiday decision";
+                next;
+            }
+
+            # easy if there is no holiday dependency
+            elsif ( !$definitiveNextTomorrow
+                || $nextRunSec < $definitiveNextTomorrow )
+            {
+                Log3 $name, 4,
+                  "RESIDENTStk $wakeupDevice: "
+                  . "06 - until now, will be NEXT WAKE-UP RUN tomorrow based on holiday decision";
+                $definitiveNextTomorrow    = $nextRunSec;
+                $definitiveNextTomorrowDev = $wakeupDevice;
+            }
         }
 
         if ($wakeupOffset) {
@@ -1900,10 +1888,29 @@ sub RESIDENTStk_RemoveInternalTimer($$) {
     }
 }
 
-sub RESIDENTStk_findResidentSlaves($) {
+sub RESIDENTStk_RG_StartInternalTimers($$) {
     my ($hash) = @_;
+
+    RESIDENTStk_RG_AutoGone($hash);
+    RESIDENTStk_RG_DurationTimer($hash);
+}
+
+sub RESIDENTStk_RG_StopInternalTimers($) {
+    my ($hash) = @_;
+
+    delete $hash->{AUTOGONE}      if ( $hash->{AUTOGONE} );
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+
+    RESIDENTStk_RemoveInternalTimer( "AutoGone",      $hash );
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+}
+
+sub RESIDENTStk_findResidentSlaves($;$) {
+    my ( $hash, $rgr_wakeupDevice ) = @_;
     return
       unless ( ref($hash) eq "HASH" && defined( $hash->{NAME} ) );
+
+    $hash->{NOTIFYDEV} = "";
 
     delete $hash->{ROOMMATES};
     foreach ( devspec2array("TYPE=ROOMMATE") ) {
@@ -1928,6 +1935,386 @@ sub RESIDENTStk_findResidentSlaves($) {
         $hash->{GUESTS} .= "," if ( $hash->{GUESTS} );
         $hash->{GUESTS} .= $_;
     }
+
+    $hash->{NOTIFYDEV} = $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
+    $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
+    $hash->{NOTIFYDEV} .= $hash->{GUESTS} if ( $hash->{GUESTS} );
+
+    RESIDENTStk_findDummySlaves( $hash->{NAME} );
+}
+
+sub RESIDENTStk_findDummySlaves($;$$) {
+    my ( $name, $wakeupDevice, $presenceDevices ) = @_;
+    my $hash   = $defs{$name};
+    my $TYPE   = GetType($name);
+    my $prefix = RESIDENTStk_GetPrefixFromType($name);
+
+    $wakeupDevice = AttrVal( $name, $prefix . "wakeupDevice", undef )
+      unless ( !$init_done || $wakeupDevice );
+    $presenceDevices = AttrVal( $name, $prefix . "presenceDevices", undef )
+      unless ( !$init_done || $presenceDevices );
+
+    $hash->{NOTIFYDEV} = "global" unless ( $prefix eq "rgr_" );
+
+    if ($wakeupDevice) {
+        $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
+        $hash->{NOTIFYDEV} .= $wakeupDevice;
+
+        my @wakeupdevs =
+          split( ',', $wakeupDevice );
+
+        foreach (@wakeupdevs) {
+            my $rsw;
+            next unless ( IsDevice($_) );
+
+            $rsw = AttrVal( $_, "wakeupResetSwitcher", "" ) if ($init_done);
+
+            if ( $rsw =~ /^[a-zA-Z\d._]+$/ ) {
+                $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
+                $hash->{NOTIFYDEV} .= $rsw;
+            }
+        }
+    }
+
+    if ($presenceDevices) {
+        $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
+        $hash->{NOTIFYDEV} .= $presenceDevices;
+    }
+}
+
+sub RESIDENTStk_GetPrefixFromType($) {
+    my ($name) = @_;
+    return "rgr_" if ( GetType($name) eq "RESIDENTS" );
+    return "rr_"  if ( GetType($name) eq "ROOMMATE" );
+    return "rg_"  if ( GetType($name) eq "GUEST" );
+    return "";
+}
+
+sub RESIDENTStk_RG_Attr(@) {
+    my ( $cmd, $name, $attribute, $value ) = @_;
+    my $hash   = $defs{$name};
+    my $prefix = RESIDENTStk_GetPrefixFromType($name);
+
+    if (   $attribute eq $prefix . "wakeupDevice"
+        || $attribute eq $prefix . "presenceDevices" )
+    {
+        return "Value for $attribute has invalid format"
+          unless ( $cmd eq "del"
+            || $value =~ /^([a-zA-Z\d._]+,?)([a-zA-Z\d._]+,?)*$/ );
+
+        $value = "" if ( $cmd eq "del" );
+
+        my $wakeupDevice =
+            $attribute eq $prefix . "wakeupDevice"
+          ? $value
+          : AttrVal( $name, $prefix . "wakeupDevice", undef );
+        my $presenceDevices =
+            $attribute eq $prefix . "presenceDevices"
+          ? $value
+          : AttrVal( $name, $prefix . "presenceDevices", undef );
+
+        RESIDENTStk_findDummySlaves( $name, $wakeupDevice, $presenceDevices );
+    }
+
+    elsif ( !$init_done ) {
+        return undef;
+    }
+
+    elsif ( $attribute eq "disable" ) {
+        if ( $value and $value == 1 ) {
+            $hash->{STATE} = "disabled";
+            RESIDENTStk_RG_StopInternalTimers($hash);
+        }
+        elsif ( $cmd eq "del" or !$value ) {
+            evalStateFormat($hash);
+            RESIDENTStk_RG_StartInternalTimers( $hash, 1 );
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "autoGoneAfter" ) {
+        if ($value) {
+            RESIDENTStk_RG_AutoGone($hash);
+        }
+        elsif ( !$value ) {
+            delete $hash->{AUTOGONE} if ( $hash->{AUTOGONE} );
+            RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "noDuration" ) {
+        if ($value) {
+            delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+            RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+        }
+        elsif ( !$value ) {
+            RESIDENTStk_RG_DurationTimer($hash);
+        }
+    }
+
+    elsif ( $attribute eq $prefix . "lang" ) {
+        my $lang =
+          $cmd eq "set" ? uc($value) : AttrVal( "global", "language", "EN" );
+
+        # for initial define, ensure fallback to EN
+        $lang = "EN"
+          if ( $cmd eq "init" && $lang !~ /^EN|DE$/i );
+
+        if ( $lang eq "DE" ) {
+            $attr{$name}{devStateIcon} =
+'.*zuhause:user_available:absent .*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+            $attr{$name}{eventMap} =
+"home:zuhause absent:abwesend gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+            $attr{$name}{widgetOverride} =
+"state:zuhause,bettfertig,schläft,aufgestanden,abwesend,verreist";
+        }
+        elsif ( $lang eq "EN" ) {
+            $attr{$name}{devStateIcon} =
+'.*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home';
+            delete $attr{$name}{eventMap}
+              if ( defined( $attr{$name}{eventMap} ) );
+            delete $attr{$name}{widgetOverride}
+              if ( defined( $attr{$name}{widgetOverride} ) );
+        }
+        else {
+            return "Unsupported language $lang";
+        }
+
+        evalStateFormat($hash);
+    }
+
+    return undef;
+}
+
+sub RESIDENTStk_RG_Notify($$) {
+    my ( $hash, $dev ) = @_;
+    my $name    = $hash->{NAME};
+    my $TYPE    = GetType($name);
+    my $prefix  = RESIDENTStk_GetPrefixFromType($name);
+    my $devName = $dev->{NAME};
+    return "" if ( IsDisabled($name) or IsDisabled($devName) );
+
+    if ( $devName eq "global" ) {
+        my $events = deviceEvents( $dev, 0 );
+        return ""
+          unless ( $events && grep( m/^INITIALIZED|REREADCFG$/, @{$events} ) );
+        RESIDENTStk_findDummySlaves($name);
+        return "";
+    }
+
+    delete $dev->{CHANGEDWITHSTATE};
+    my $events = deviceEvents( $dev, 1 );
+    return "" unless ($events);
+
+    # process wakeup devices
+    my @registeredWakeupdevs =
+      split( ',', AttrVal( $name, $prefix . "wakeupDevice", "" ) );
+    if (@registeredWakeupdevs) {
+
+        # if this is a notification of a registered wakeup device
+        if ( grep { m/^$devName$/ } @registeredWakeupdevs ) {
+
+            foreach my $event ( @{$events} ) {
+                next unless ( defined($event) );
+                RESIDENTStk_wakeupSet( $devName, $event );
+            }
+
+            return "";
+        }
+
+        # process sub-child notifies: *_wakeupDevice
+        foreach my $wakeupDev (@registeredWakeupdevs) {
+
+            # if this is a notification of a registered sub dummy device
+            # of one of our wakeup devices
+            if (   AttrVal( $wakeupDev, "wakeupResetSwitcher", "" ) eq $devName
+                && IsDevice( $devName, "dummy" ) )
+            {
+                foreach my $event ( @{$events} ) {
+                    next unless ( defined($event) );
+                    RESIDENTStk_wakeupSet( $wakeupDev, $event )
+                      unless ( $event =~ /^(?:state:\s*)?off$/i );
+                }
+
+                return "";
+            }
+        }
+
+        return "";
+    }
+
+    # process PRESENCE
+    my @presenceDevices =
+      split( ',', AttrVal( $name, $prefix . "presenceDevices", "" ) );
+    if ( @presenceDevices
+        && grep { /^[\s\t ]*$devName(:[A-Za-z\d_\.\-\/]*)?[\s\t ]*$/ }
+        @presenceDevices )
+    {
+
+        my $counter = {
+            absent  => 0,
+            present => 0,
+        };
+
+        for (@presenceDevices) {
+            my $r = "presence";
+            my $d = $_;
+            if ( $d =~
+                m/^[\s\t ]*([A-Za-z\d_\.\-\/]+):([A-Za-z\d_\.\-\/]+)?[\s\t ]*$/
+              )
+            {
+                $d = $1;
+                $r = $2;
+            }
+
+            my $presenceState =
+              ReadingsVal( $d, $r, ReadingsVal( $d, "state", "" ) );
+            next
+              unless ( $presenceState =~
+m/^(0|false|absent|disappeared|unavailable|unreachable|disconnected)|(1|true|present|appeared|available|reachable|connected|)$/i
+              );
+
+            $counter->{absent}++  if ($1);
+            $counter->{present}++ if ($2);
+        }
+
+        if ( $counter->{absent} && !$counter->{present} ) {
+            Log3 $name, 4,
+              "$TYPE $name: " . "Syncing status with $devName = absent";
+            fhem "set $name:FILTER=presence=present absent";
+        }
+        elsif ( $counter->{present} ) {
+            Log3 $name, 4,
+              "$TYPE $name: " . "Syncing status with $devName = present";
+            fhem "set $name:FILTER=presence=absent home";
+        }
+
+        return "";
+    }
+
+    return "";
+}
+
+sub RESIDENTStk_RG_AutoGone($;$) {
+    my ( $mHash, @a ) = @_;
+    my $hash          = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name          = $hash->{NAME};
+    my $TYPE          = GetType($name);
+    my $prefix        = RESIDENTStk_GetPrefixFromType($name);
+    my $autoGoneAfter = AttrVal( $hash->{NAME}, $prefix . "autoGoneAfter", 36 );
+    delete $hash->{AUTOGONE} if ( $hash->{AUTOGONE} );
+
+    RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
+
+    return if ( IsDisabled($name) || !$autoGoneAfter );
+
+    if ( ReadingsVal( $name, "state", "home" ) eq "absent" ) {
+        my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp,
+            $timeDiff );
+        my $timestampNow = gettimeofday();
+
+        ( $date, $time ) = split( ' ', $hash->{READINGS}{state}{TIME} );
+        ( $y,    $m,   $d )   = split( '-', $date );
+        ( $hour, $min, $sec ) = split( ':', $time );
+        $m -= 01;
+        $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
+        $timeDiff = $timestampNow - $timestamp;
+
+        if ( $timeDiff >= $autoGoneAfter * 3600 ) {
+            Log3 $name, 3,
+              "$TYPE $name: AutoGone timer changed state to 'gone'";
+            &{ $TYPE . "_Set" }( $hash, $name, "silentSet", "state", "gone" );
+        }
+        else {
+            my $runtime = $timestamp + $autoGoneAfter * 3600;
+            $hash->{AUTOGONE} = $runtime;
+            Log3 $name, 4, "$TYPE $name: AutoGone timer scheduled: $runtime";
+            RESIDENTStk_InternalTimer( "AutoGone", $runtime,
+                "RESIDENTStk_RG_AutoGone", $hash, 1 );
+        }
+    }
+
+    return undef;
+}
+
+sub RESIDENTStk_RG_DurationTimer($;$) {
+    my ( $mHash, @a ) = @_;
+    my $hash         = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name         = $hash->{NAME};
+    my $TYPE         = GetType($name);
+    my $prefix       = RESIDENTStk_GetPrefixFromType($name);
+    my $silent       = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
+    my $timestampNow = gettimeofday();
+    my $diff;
+    my $durPresence = "0";
+    my $durAbsence  = "0";
+    my $durSleep    = "0";
+    my $noDuration  = AttrVal( $name, $prefix . "noDuration", 0 );
+    delete $hash->{DURATIONTIMER} if ( $hash->{DURATIONTIMER} );
+
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
+
+    return if ( IsDisabled($name) || $noDuration );
+
+    # presence timer
+    if (   ReadingsVal( $name, "presence", "absent" ) eq "present"
+        && ReadingsVal( $name, "lastArrival", "-" ) ne "-" )
+    {
+        $durPresence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastArrival", "" ) );
+    }
+
+    # absence timer
+    if (   ReadingsVal( $name, "presence", "present" ) eq "absent"
+        && ReadingsVal( $name, "lastDeparture", "-" ) ne "-" )
+    {
+        $durAbsence =
+          $timestampNow -
+          time_str2num( ReadingsVal( $name, "lastDeparture", "" ) );
+    }
+
+    # sleep timer
+    if (   ReadingsVal( $name, "state", "home" ) eq "asleep"
+        && ReadingsVal( $name, "lastSleep", "-" ) ne "-" )
+    {
+        $durSleep =
+          $timestampNow - time_str2num( ReadingsVal( $name, "lastSleep", "" ) );
+    }
+
+    my $durPresence_hr =
+      ( $durPresence > 0 )
+      ? RESIDENTStk_sec2time($durPresence)
+      : "00:00:00";
+    my $durPresence_cr =
+      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+    my $durAbsence_hr =
+      ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
+    my $durAbsence_cr =
+      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+    my $durSleep_hr =
+      ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
+    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+
+    readingsBeginUpdate($hash) if ( !$silent );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence_cr",
+        $durPresence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerPresence",   $durPresence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence_cr", $durAbsence_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerAbsence",    $durAbsence_hr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep_cr",   $durSleep_cr );
+    readingsBulkUpdateIfChanged( $hash, "durTimerSleep",      $durSleep_hr );
+    readingsEndUpdate( $hash, 1 ) if ( !$silent );
+
+    $hash->{DURATIONTIMER} = $timestampNow + 60;
+
+    RESIDENTStk_InternalTimer(
+        "DurationTimer",
+        $hash->{DURATIONTIMER},
+        "RESIDENTStk_RG_DurationTimer",
+        $hash, 1
+    );
+
+    return undef;
 }
 
 1;
