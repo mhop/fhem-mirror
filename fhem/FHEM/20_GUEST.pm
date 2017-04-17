@@ -668,7 +668,8 @@ sub GUEST_Set($@) {
                     }
 
                     # trigger first update
-                    fhem "set $wakeuptimerName nextRun OFF";
+                    RESIDENTStk_findDummySlaves($name);
+                    fhem "sleep 1;set $wakeuptimerName nextRun OFF";
 
                     $created = 1;
                 }
