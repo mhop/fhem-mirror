@@ -125,6 +125,10 @@ STACKABLE_IOReadFn($) # used by synchronuous get
   my ($hash) = @_;
   my $me = $hash->{IODev};
   my $buf = "";
+  if($me->{IODev} && $me->{IODev}{PARTIAL}) {
+    $buf = $me->{IODev}{PARTIAL};
+    $me->{IODev}{PARTIAL} = "";
+  }
   while($buf !~ m/\n/) {
     $buf .= DevIo_SimpleRead($me->{IODev}); # may block
   }
