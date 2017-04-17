@@ -1,68 +1,29 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     70_PHTV.pm
-#     An FHEM Perl module for controlling Philips Televisons
-#     via network connection.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
 
-use 5.012;
 use strict;
 use warnings;
 use Data::Dumper;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Color;
-use SetExtensions;
 use Encode;
 
-sub PHTV_Set($@);
-sub PHTV_Get($@);
-sub PHTV_GetStatus($;$);
-sub PHTV_Define($$);
-sub PHTV_Notify($$);
-sub PHTV_Undefine($$);
-
-#########################
-# Forward declaration for remotecontrol module
-#sub PHTV_RClayout_TV();
-#sub PHTV_RCmakenotify($$);
-
-###################################
+# initialize ##################################################################
 sub PHTV_Initialize($) {
     my ($hash) = @_;
 
     Log3 $hash, 5, "PHTV_Initialize: Entering";
 
-    $hash->{GetFn}    = "PHTV_Get";
-    $hash->{SetFn}    = "PHTV_Set";
-    $hash->{NotifyFn} = "PHTV_Notify";
     $hash->{DefFn}    = "PHTV_Define";
     $hash->{UndefFn}  = "PHTV_Undefine";
+    $hash->{SetFn}    = "PHTV_Set";
+    $hash->{GetFn}    = "PHTV_Get";
+    $hash->{NotifyFn} = "PHTV_Notify";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField model wakeupCmd:textField channelsMax:slider,30,1,200 httpLoglevel:1,2,3,4,5 sslVersion device_id auth_key "
+"disable:0,1 disabledForIntervals do_not_notify:1,0 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField model wakeupCmd:textField channelsMax:slider,30,1,200 httpLoglevel:1,2,3,4,5 sslVersion device_id auth_key "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -88,170 +49,73 @@ sub PHTV_Initialize($) {
     };
 
     FHEM_colorpickerInit();
-
-    return;
 }
 
-#####################################
-sub PHTV_GetStatus($;$) {
-    my ( $hash, $update ) = @_;
-    my $name       = $hash->{NAME};
-    my $interval   = $hash->{INTERVAL};
-    my $presence   = ReadingsVal( $name, "presence", "absent" );
-    my $sequential = AttrVal( $name, "sequentialQuery", 0 );
-    my $querySent  = 0;
-
-    Log3 $name, 5, "PHTV $name: called function PHTV_GetStatus()";
-
-    $interval = $interval * 1.6
-      if ( ReadingsVal( $name, "ambiHue", "off" ) eq "on" );
-
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + $interval, "PHTV_GetStatus", $hash, 0 );
-
-    return
-      if ( IsDisabled($name) );
-
-    # try to fetch only some information to check device availability
-    if ( !$update ) {
-        PHTV_SendCommand( $hash, "audio/volume" ) if ( $presence eq "present" );
-        PHTV_SendCommand( $hash, "system" )       if ( $presence eq "absent" );
-
-       # in case we should query the device gently, mark we already sent a query
-        $querySent = 1 if $sequential;
-        $hash->{helper}{sequentialQueryCounter} = 1 if $sequential;
-    }
-
-    # fetch other info if device is on
-    if ( !$querySent
-        && ( ReadingsVal( $name, "state", "off" ) eq "on" || $update ) )
-    {
-
-        # Read device info every 15 minutes only
-        if (
-            !$querySent
-            && (
-                !defined( $hash->{helper}{lastFullUpdate} )
-                || (  !$update
-                    && $hash->{helper}{lastFullUpdate} + 900 le time() )
-            )
-          )
-        {
-            PHTV_SendCommand( $hash, "system" );
-            PHTV_SendCommand( $hash, "ambilight/topology" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-
-            # Update state
-            $hash->{helper}{lastFullUpdate} = time();
-        }
-
-        # read audio volume
-        if ( !$querySent && $update ) {
-            PHTV_SendCommand( $hash, "audio/volume" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-        }
-
-        # read ambilight details
-        if ( !$querySent ) {
-
-            # read ambilight mode
-            PHTV_SendCommand( $hash, "ambilight/mode" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-
-            # read ambilight RGB value
-            PHTV_SendCommand( $hash, "ambilight/cached" )
-              if ( ReadingsVal( $name, "ambiMode", "internal" ) ne "internal" );
-        }
-
-        # read all sources if not existing
-        if (
-            !$querySent
-            && (   !defined( $hash->{helper}{device}{sourceName} )
-                || !defined( $hash->{helper}{device}{sourceID} ) )
-          )
-        {
-            PHTV_SendCommand( $hash, "sources" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-        }
-
-        # otherwise read current source
-        elsif ( !$querySent ) {
-            PHTV_SendCommand( $hash, "sources/current" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-        }
-
-        # read all channels if not existing
-        if (
-            !$querySent
-            && (   !defined( $hash->{helper}{device}{channelName} )
-                || !defined( $hash->{helper}{device}{channelID} ) )
-          )
-        {
-            PHTV_SendCommand( $hash, "channels" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-        }
-
-        # otherwise read current channel
-        elsif ( !$querySent ) {
-            PHTV_SendCommand( $hash, "channels/current" );
-            $querySent = 1 if $sequential;
-            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
-        }
-
-    }
-
-    # Input alias handling
-    #
-    if ( AttrVal( $name, "inputs", "" ) ne "" ) {
-        my @inputs = split( ':', AttrVal( $name, "inputs", ":" ) );
-
-        if (@inputs) {
-            foreach (@inputs) {
-                if (m/[^,\s]+(,[^,\s]+)+/) {
-                    my @input_names = split( ',', $_ );
-                    $input_names[1] =~ s/\s/_/g;
-                    $hash->{helper}{device}{inputAliases}{ $input_names[0] } =
-                      $input_names[1];
-                    $hash->{helper}{device}{inputNames}{ $input_names[1] } =
-                      $input_names[0];
-                }
-            }
-        }
-    }
-
-    return;
-}
-
-###################################
-sub PHTV_Get($@) {
-    my ( $hash, @a ) = @_;
+# regular Fn ##################################################################
+sub PHTV_Define($$) {
+    my ( $hash, $def ) = @_;
+    my @a = split( "[ \t][ \t]*", $def );
     my $name = $hash->{NAME};
-    my $state = ReadingsVal( $name, "state", "Initialized" );
-    my $what;
 
-    Log3 $name, 5, "PHTV $name: called function PHTV_Get()";
+    Log3 $name, 5, "PHTV $name: called function PHTV_Define()";
 
-    return "argument is missing" if ( int(@a) < 2 );
-    return if ( $state =~ /^(pairing.*|initialized)$/i );
+    eval {
+        require JSON;
+        import JSON qw( decode_json encode_json );
+    };
+    return "Please install Perl JSON to use module PHTV"
+      if ($@);
 
-    $what = $a[1];
-
-    if ( $what =~ /^(power|input|volume|mute|rgb)$/ ) {
-        return ReadingsVal( $name, $what, "no such reading: $what" );
+    if ( int(@a) < 3 ) {
+        my $msg =
+          "Wrong syntax: define <name> PHTV <ip-or-hostname> [<poll-interval>]";
+        Log3 $name, 4, $msg;
+        return $msg;
     }
-    else {
-        return
-"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg rgb:noArg ";
+
+    $hash->{TYPE} = "PHTV";
+
+    my $address = $a[2];
+    $hash->{helper}{ADDRESS} = $address;
+
+    # use interval of 45sec if not defined
+    my $interval = $a[3] || 45;
+    $hash->{INTERVAL} = $interval;
+
+    readingsSingleUpdate( $hash, "ambiHue", "off", 0 )
+      if ( ReadingsVal( $name, "ambiHue", "" ) ne "off" );
+
+    $hash->{model} = ReadingsVal( $name, "model", undef )
+      if ( ReadingsVal( $name, "model", undef ) );
+
+    $hash->{swversion} = ReadingsVal( $name, "softwareversion", undef )
+      if ( ReadingsVal( $name, "softwareversion", undef ) );
+
+    # set default settings on first define
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' webCmd volume:input:rgb';
+        fhem 'attr ' . $name
+          . ' devStateIcon on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
+        fhem 'attr ' . $name . ' icon it_television';
+
+        PHTV_GetStatus($hash);
     }
+
+    return;
 }
 
-###################################
+sub PHTV_Undefine($$) {
+    my ( $hash, $arg ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "PHTV $name: called function PHTV_Undefine()";
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    return;
+}
+
 sub PHTV_Set($@) {
     my ( $hash, @a ) = @_;
     my $name       = $hash->{NAME};
@@ -1396,57 +1260,26 @@ sub PHTV_Set($@) {
     return;
 }
 
-###################################
-sub PHTV_Define($$) {
-    my ( $hash, $def ) = @_;
-    my @a = split( "[ \t][ \t]*", $def );
+sub PHTV_Get($@) {
+    my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
+    my $state = ReadingsVal( $name, "state", "Initialized" );
+    my $what;
 
-    Log3 $name, 5, "PHTV $name: called function PHTV_Define()";
+    Log3 $name, 5, "PHTV $name: called function PHTV_Get()";
 
-    eval {
-        require JSON;
-        import JSON qw( decode_json encode_json );
-    };
-    return "Please install Perl JSON to use module PHTV"
-      if ($@);
+    return "argument is missing" if ( int(@a) < 2 );
+    return if ( $state =~ /^(pairing.*|initialized)$/i );
 
-    if ( int(@a) < 3 ) {
-        my $msg =
-          "Wrong syntax: define <name> PHTV <ip-or-hostname> [<poll-interval>]";
-        Log3 $name, 4, $msg;
-        return $msg;
+    $what = $a[1];
+
+    if ( $what =~ /^(power|input|volume|mute|rgb)$/ ) {
+        return ReadingsVal( $name, $what, "no such reading: $what" );
     }
-
-    $hash->{TYPE} = "PHTV";
-
-    my $address = $a[2];
-    $hash->{helper}{ADDRESS} = $address;
-
-    # use interval of 45sec if not defined
-    my $interval = $a[3] || 45;
-    $hash->{INTERVAL} = $interval;
-
-    readingsSingleUpdate( $hash, "ambiHue", "off", 0 )
-      if ( ReadingsVal( $name, "ambiHue", "" ) ne "off" );
-
-    $hash->{model} = ReadingsVal( $name, "model", undef )
-      if ( ReadingsVal( $name, "model", undef ) );
-
-    $hash->{swversion} = ReadingsVal( $name, "softwareversion", undef )
-      if ( ReadingsVal( $name, "softwareversion", undef ) );
-
-    # set default settings on first define
-    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-        fhem 'attr ' . $name . ' webCmd volume:input:rgb';
-        fhem 'attr ' . $name
-          . ' devStateIcon on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
-        fhem 'attr ' . $name . ' icon it_television';
-
-        PHTV_GetStatus($hash);
+    else {
+        return
+"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg rgb:noArg ";
     }
-
-    return;
 }
 
 sub PHTV_Notify($$) {
@@ -1488,13 +1321,142 @@ sub PHTV_Notify($$) {
     return undef;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
+# module Fn ####################################################################
+sub PHTV_GetStatus($;$) {
+    my ( $hash, $update ) = @_;
+    my $name       = $hash->{NAME};
+    my $interval   = $hash->{INTERVAL};
+    my $presence   = ReadingsVal( $name, "presence", "absent" );
+    my $sequential = AttrVal( $name, "sequentialQuery", 0 );
+    my $querySent  = 0;
 
-###################################
+    Log3 $name, 5, "PHTV $name: called function PHTV_GetStatus()";
+
+    $interval = $interval * 1.6
+      if ( ReadingsVal( $name, "ambiHue", "off" ) eq "on" );
+
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + $interval, "PHTV_GetStatus", $hash, 0 );
+
+    return
+      if ( IsDisabled($name) );
+
+    # try to fetch only some information to check device availability
+    if ( !$update ) {
+        PHTV_SendCommand( $hash, "audio/volume" ) if ( $presence eq "present" );
+        PHTV_SendCommand( $hash, "system" )       if ( $presence eq "absent" );
+
+       # in case we should query the device gently, mark we already sent a query
+        $querySent = 1 if $sequential;
+        $hash->{helper}{sequentialQueryCounter} = 1 if $sequential;
+    }
+
+    # fetch other info if device is on
+    if ( !$querySent
+        && ( ReadingsVal( $name, "state", "off" ) eq "on" || $update ) )
+    {
+
+        # Read device info every 15 minutes only
+        if (
+            !$querySent
+            && (
+                !defined( $hash->{helper}{lastFullUpdate} )
+                || (  !$update
+                    && $hash->{helper}{lastFullUpdate} + 900 le time() )
+            )
+          )
+        {
+            PHTV_SendCommand( $hash, "system" );
+            PHTV_SendCommand( $hash, "ambilight/topology" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+
+            # Update state
+            $hash->{helper}{lastFullUpdate} = time();
+        }
+
+        # read audio volume
+        if ( !$querySent && $update ) {
+            PHTV_SendCommand( $hash, "audio/volume" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+        }
+
+        # read ambilight details
+        if ( !$querySent ) {
+
+            # read ambilight mode
+            PHTV_SendCommand( $hash, "ambilight/mode" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+
+            # read ambilight RGB value
+            PHTV_SendCommand( $hash, "ambilight/cached" )
+              if ( ReadingsVal( $name, "ambiMode", "internal" ) ne "internal" );
+        }
+
+        # read all sources if not existing
+        if (
+            !$querySent
+            && (   !defined( $hash->{helper}{device}{sourceName} )
+                || !defined( $hash->{helper}{device}{sourceID} ) )
+          )
+        {
+            PHTV_SendCommand( $hash, "sources" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+        }
+
+        # otherwise read current source
+        elsif ( !$querySent ) {
+            PHTV_SendCommand( $hash, "sources/current" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+        }
+
+        # read all channels if not existing
+        if (
+            !$querySent
+            && (   !defined( $hash->{helper}{device}{channelName} )
+                || !defined( $hash->{helper}{device}{channelID} ) )
+          )
+        {
+            PHTV_SendCommand( $hash, "channels" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+        }
+
+        # otherwise read current channel
+        elsif ( !$querySent ) {
+            PHTV_SendCommand( $hash, "channels/current" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+        }
+
+    }
+
+    # Input alias handling
+    #
+    if ( AttrVal( $name, "inputs", "" ) ne "" ) {
+        my @inputs = split( ':', AttrVal( $name, "inputs", ":" ) );
+
+        if (@inputs) {
+            foreach (@inputs) {
+                if (m/[^,\s]+(,[^,\s]+)+/) {
+                    my @input_names = split( ',', $_ );
+                    $input_names[1] =~ s/\s/_/g;
+                    $hash->{helper}{device}{inputAliases}{ $input_names[0] } =
+                      $input_names[1];
+                    $hash->{helper}{device}{inputNames}{ $input_names[1] } =
+                      $input_names[0];
+                }
+            }
+        }
+    }
+
+    return;
+}
+
 sub PHTV_SendCommandDelayed($) {
     my ($par) = @_;
 
@@ -1507,7 +1469,6 @@ sub PHTV_SendCommandDelayed($) {
         $par->{type} );
 }
 
-###################################
 sub PHTV_SendCommand($$;$$$) {
     my ( $hash, $service, $cmd, $type, $delay ) = @_;
     my $name      = $hash->{NAME};
@@ -1613,7 +1574,7 @@ sub PHTV_SendCommand($$;$$$) {
                 'Accept-Charset' => 'UTF-8',
             },
             sslargs => {
-                SSL_verify_mode => 0,
+                SSL_verify_mode => 'SSL_VERIFY_NONE',
             },
         }
     );
@@ -1621,7 +1582,6 @@ sub PHTV_SendCommand($$;$$$) {
     return;
 }
 
-###################################
 sub PHTV_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash       = $param->{hash};
@@ -3079,20 +3039,6 @@ m/^\s*(([{\[][\s\S]+[}\]])|(<html>\s*<head>\s*<title>\s*Ok\s*<\/title>\s*<\/head
     return;
 }
 
-###################################
-sub PHTV_Undefine($$) {
-    my ( $hash, $arg ) = @_;
-    my $name = $hash->{NAME};
-
-    Log3 $name, 5, "PHTV $name: called function PHTV_Undefine()";
-
-    # Stop the internal GetStatus-Loop and exit
-    RemoveInternalTimer($hash);
-
-    return;
-}
-
-###################################
 sub PHTV_GetStateAV($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -3114,7 +3060,6 @@ sub PHTV_GetStateAV($) {
     }
 }
 
-###################################
 sub PHTV_wake ($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -3153,8 +3098,6 @@ sub PHTV_wake ($) {
     return 1;
 }
 
-#####################################
-# Callback from 95_remotecontrol for command makenotify.
 sub PHTV_RCmakenotify($$) {
     my ( $nam, $ndev ) = @_;
     my $nname = "notify_$nam";
@@ -3164,10 +3107,6 @@ sub PHTV_RCmakenotify($$) {
     return "Notify created by PHTV: $nname";
 }
 
-#####################################
-# RC layouts
-
-# Philips TV with SVG
 sub PHTV_RClayout_SVG() {
     my @row;
 
@@ -3202,7 +3141,6 @@ sub PHTV_RClayout_SVG() {
     return @row;
 }
 
-# Philips TV with PNG
 sub PHTV_RClayout() {
     my @row;
 
@@ -3233,7 +3171,6 @@ sub PHTV_RClayout() {
     return @row;
 }
 
-###################################
 sub PHTV_GetRemotecontrolCommand($) {
     my ($command) = @_;
     my $commands = {
@@ -3305,26 +3242,22 @@ sub PHTV_GetRemotecontrolCommand($) {
     }
 }
 
-###################################
 sub PHTV_isinteger {
     defined $_[0] && $_[0] =~ /^[+-]?\d+$/;
 }
 
-###################################
 sub PHTV_bri2pct($) {
     my ($bri) = @_;
     return 0 if ( $bri <= 0 );
     return int( $bri / 255 * 100 + 0.5 );
 }
 
-###################################
 sub PHTV_pct2bri($) {
     my ($pct) = @_;
     return 0 if ( $pct <= 0 );
     return int( $pct / 100 * 255 + 0.5 );
 }
 
-###################################
 sub PHTV_hex2rgb($) {
     my ($hex) = @_;
     if ( uc($hex) =~ /^(..)(..)(..)$/ ) {
@@ -3339,7 +3272,6 @@ sub PHTV_hex2rgb($) {
     }
 }
 
-###################################
 sub PHTV_rgb2hex($$$) {
     my ( $r, $g, $b ) = @_;
     my $return = sprintf( "%2.2X%2.2X%2.2X", $r, $g, $b );
@@ -3347,7 +3279,6 @@ sub PHTV_rgb2hex($$$) {
     return uc($return);
 }
 
-###################################
 sub PHTV_hex2hsb($;$) {
     my ( $hex, $type ) = @_;
     $type = lc($type) if ( defined( ($type) && $type ne "" ) );
@@ -3364,14 +3295,12 @@ sub PHTV_hex2hsb($;$) {
     }
 }
 
-###################################
 sub PHTV_hsb2hex($$$) {
     my ( $h, $s, $b ) = @_;
     my $rgb = PHTV_hsb2rgb( $h, $s, $b );
     return PHTV_rgb2hex( $rgb->{r}, $rgb->{g}, $rgb->{b} );
 }
 
-###################################
 sub PHTV_rgb2hsb ($$$) {
     my ( $r, $g, $b ) = @_;
 
@@ -3393,7 +3322,6 @@ sub PHTV_rgb2hsb ($$$) {
     };
 }
 
-###################################
 sub PHTV_hsb2rgb ($$$) {
     my ( $h, $s, $bri ) = @_;
 
@@ -3415,7 +3343,6 @@ sub PHTV_hsb2rgb ($$$) {
     };
 }
 
-###################################
 sub PHTV_rgb2hsv($$$) {
     my ( $r, $g, $b ) = @_;
     my ( $M, $m, $c, $h, $s, $v );
@@ -3457,7 +3384,6 @@ sub PHTV_rgb2hsv($$$) {
     };
 }
 
-###################################
 sub PHTV_hsv2rgb($$$) {
     my ( $h, $s, $v ) = @_;
     my $r = 0.0;
@@ -3518,7 +3444,6 @@ sub PHTV_hsv2rgb($$$) {
     };
 }
 
-###################################
 sub PHTV_max {
     my ( $max, @vars ) = @_;
     for (@vars) {
@@ -3528,7 +3453,6 @@ sub PHTV_max {
     return $max;
 }
 
-###################################
 sub PHTV_min {
     my ( $min, @vars ) = @_;
     for (@vars) {
@@ -3537,7 +3461,6 @@ sub PHTV_min {
     return $min;
 }
 
-###################################
 sub PHTV_createDeviceId() {
     my $deviceid;
     my @chars = ( "A" .. "Z", "a" .. "z", 0 .. 9 );
@@ -3545,7 +3468,6 @@ sub PHTV_createDeviceId() {
     return $deviceid;
 }
 
-###################################
 sub PHTV_createAuthSignature($$$) {
     my ( $timestamp, $pin, $secretkey ) = @_;
     my $base64 = 0;

@@ -1,30 +1,7 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     59_Wunderground.pm
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 # http://api.wunderground.com/weather/api
-
+#
 package main;
 
 use strict;
@@ -36,9 +13,7 @@ use Encode qw(encode_utf8 decode_utf8);
 use Unit;
 use Data::Dumper;
 
-sub Wunderground_Hash2Readings($$;$);
-
-###################################
+# initialize ##################################################################
 sub Wunderground_Initialize($) {
     my ($hash) = @_;
 
@@ -47,15 +22,15 @@ sub Wunderground_Initialize($) {
     my $webhookFWinstance =
       join( ",", devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') );
 
-    $hash->{SetFn}         = "Wunderground_Set";
     $hash->{DefFn}         = "Wunderground_Define";
-    $hash->{AttrFn}        = "Wunderground_Attr";
     $hash->{UndefFn}       = "Wunderground_Undefine";
+    $hash->{SetFn}         = "Wunderground_Set";
+    $hash->{AttrFn}        = "Wunderground_Attr";
     $hash->{DbLog_splitFn} = "Unit_DbLog_split";
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl wu_pws:1,0 wu_bestfct:1,0 stateReadings stateReadingsFormat:0,1 "
+"disable:0,1 disabledForIntervals do_not_notify:1,0 timeout:1,2,3,4,5 pollInterval:300,450,600,750,900 wu_lang:en,de,at,ch,nl,fr,pl wu_pws:1,0 wu_bestfct:1,0 stateReadings stateReadingsFormat:0,1 "
       . "wu_features:multiple-strict,alerts,almanac,astronomy,conditions,currenthurricane,forecast,forecast10day,hourly,hourly10day "
       . $readingFnAttributes;
 
@@ -228,11 +203,116 @@ sub Wunderground_Initialize($) {
         'wind_speed'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'wind_speed_mph' => { rtype => 'mph', formula_symbol => 'Ws' }
     };
-
-    return;
 }
 
-#####################################
+# regular Fn ##################################################################
+sub Wunderground_Define($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name  = $hash->{NAME};
+    my $infix = "Wunderground";
+
+    Log3 $name, 5, "Wunderground $name: called function Wunderground_Define()";
+
+    eval {
+        require JSON;
+        import JSON qw( decode_json );
+    };
+    return "Please install Perl JSON to use module Wunderground"
+      if ($@);
+
+    if ( int(@$a) < 2 ) {
+        my $msg = "Wrong syntax: define <name> Wunderground <api-key> <pws-id>";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
+
+    $hash->{TYPE} = "Wunderground";
+
+    $hash->{API_KEY} = @$a[2];
+    $hash->{QUERY}   = @$a[3];
+
+    $hash->{QUERY} = "pws:" . $hash->{QUERY}
+      if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{1,}$/ );
+
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' stateReadings temp_c humidity';
+        fhem 'attr ' . $name . ' stateReadingsFormat 1';
+        fhem 'attr ' . $name . ' wu_features astronomy,conditions,forecast';
+    }
+
+    # start the status update timer
+    Wunderground_GetStatus( $hash, 2 );
+
+    return undef;
+}
+
+sub Wunderground_Undefine($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name = $hash->{NAME};
+
+    if ( defined( $hash->{fhem}{infix} ) ) {
+        Wunderground_removeExtension( $hash->{fhem}{infix} );
+    }
+
+    Log3 $name, 5,
+      "Wunderground $name: called function Wunderground_Undefine()";
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    # release reverse pointer
+    delete $modules{Wunderground}{defptr}{$name};
+
+    return undef;
+}
+
+sub Wunderground_Set($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "Wunderground $name: called function Wunderground_Set()";
+
+    return "Argument is missing" if ( int(@$a) < 1 );
+
+    my $usage = "Unknown argument " . @$a[1] . ", choose one of update:noArg";
+
+    my $cmd = '';
+    my $result;
+
+    # update
+    if ( lc( @$a[1] ) eq "update" ) {
+        Log3 $name, 3, "Wunderground set $name " . @$a[1];
+        Wunderground_GetStatus($hash);
+    }
+
+    # return usage hint
+    else {
+        return $usage;
+    }
+
+    return $result;
+}
+
+sub Wunderground_Attr(@) {
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my $hash = $defs{$name};
+
+    Log3 $name, 5, "Wunderground $name: called function Wunderground_Attr()";
+
+    return
+"Invalid value for attribute $attrName: minimum value is 1 second, maximum 5 seconds"
+      if ( $attrVal
+        && $attrName eq "timeout"
+        && ( $attrVal < 1 || $attrVal > 5 ) );
+
+    return
+      "Invalid value for attribute $attrName: minimum value is 300 seconds"
+      if ( $attrVal && $attrName eq "pollInterval" && $attrVal < 300 );
+
+    return undef;
+}
+
+# module Fn ####################################################################
 sub Wunderground_GetStatus($;$) {
     my ( $hash, $delay ) = @_;
     my $name = $hash->{NAME};
@@ -286,102 +366,6 @@ sub Wunderground_GetStatus($;$) {
     return;
 }
 
-###################################
-sub Wunderground_Set($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name = $hash->{NAME};
-
-    Log3 $name, 5, "Wunderground $name: called function Wunderground_Set()";
-
-    return "Argument is missing" if ( int(@$a) < 1 );
-
-    my $usage = "Unknown argument " . @$a[1] . ", choose one of update:noArg";
-
-    my $cmd = '';
-    my $result;
-
-    # update
-    if ( lc( @$a[1] ) eq "update" ) {
-        Log3 $name, 3, "Wunderground set $name " . @$a[1];
-        Wunderground_GetStatus($hash);
-    }
-
-    # return usage hint
-    else {
-        return $usage;
-    }
-
-    return $result;
-}
-
-###################################
-sub Wunderground_Define($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name  = $hash->{NAME};
-    my $infix = "Wunderground";
-
-    Log3 $name, 5, "Wunderground $name: called function Wunderground_Define()";
-
-    eval {
-        require JSON;
-        import JSON qw( decode_json );
-    };
-    return "Please install Perl JSON to use module Wunderground"
-      if ($@);
-
-    if ( int(@$a) < 2 ) {
-        my $msg = "Wrong syntax: define <name> Wunderground <api-key> <pws-id>";
-        Log3 $name, 4, $msg;
-        return $msg;
-    }
-
-    $hash->{TYPE} = "Wunderground";
-
-    $hash->{API_KEY} = @$a[2];
-    $hash->{QUERY}   = @$a[3];
-
-    $hash->{QUERY} = "pws:" . $hash->{QUERY}
-      if ( $hash->{QUERY} =~ /^[A-Z]{3,}\d{1,}$/ );
-
-    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-        fhem 'attr ' . $name . ' stateReadings temp_c humidity';
-        fhem 'attr ' . $name . ' stateReadingsFormat 1';
-        fhem 'attr ' . $name . ' wu_features astronomy,conditions,forecast';
-    }
-
-    # start the status update timer
-    Wunderground_GetStatus( $hash, 2 );
-
-    return;
-}
-
-###################################
-sub Wunderground_Attr(@) {
-    my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $defs{$name};
-
-    Log3 $name, 5, "Wunderground $name: called function Wunderground_Attr()";
-
-    return
-"Invalid value for attribute $attrName: minimum value is 1 second, maximum 5 seconds"
-      if ( $attrVal
-        && $attrName eq "timeout"
-        && ( $attrVal < 1 || $attrVal > 5 ) );
-
-    return
-      "Invalid value for attribute $attrName: minimum value is 300 seconds"
-      if ( $attrVal && $attrName eq "pollInterval" && $attrVal < 300 );
-
-    return undef;
-}
-
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
-
-###################################
 sub Wunderground_SendCommand($$) {
     my ( $hash, $features ) = @_;
     my $name   = $hash->{NAME};
@@ -420,7 +404,6 @@ sub Wunderground_SendCommand($$) {
     return;
 }
 
-###################################
 sub Wunderground_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
@@ -495,7 +478,8 @@ sub Wunderground_ReceiveCommand($$$) {
     return;
 }
 
-###################################
+sub Wunderground_Hash2Readings($$;$);
+
 sub Wunderground_Hash2Readings($$;$) {
     my ( $hash, $h, $r ) = @_;
     my $name = $hash->{NAME};
@@ -989,27 +973,6 @@ sub Wunderground_Hash2Readings($$;$) {
     }
 
     return "ok" if ( !$loop );
-}
-
-###################################
-sub Wunderground_Undefine($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name = $hash->{NAME};
-
-    if ( defined( $hash->{fhem}{infix} ) ) {
-        Wunderground_removeExtension( $hash->{fhem}{infix} );
-    }
-
-    Log3 $name, 5,
-      "Wunderground $name: called function Wunderground_Undefine()";
-
-    # Stop the internal GetStatus-Loop and exit
-    RemoveInternalTimer($hash);
-
-    # release reverse pointer
-    delete $modules{Wunderground}{defptr}{$name};
-
-    return;
 }
 
 1;

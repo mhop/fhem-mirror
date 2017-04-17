@@ -1,50 +1,13 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     70_ONKYO_AVR_ZONE.pm
-#     An FHEM Perl module for controlling ONKYO A/V receivers
-#     via network connection.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
+
 use strict;
 use warnings;
-use Time::HiRes qw(usleep);
-use Symbol qw<qualify_to_ref>;
 use Data::Dumper;
+use Symbol qw<qualify_to_ref>;
 
-$Data::Dumper::Sortkeys = 1;
-
-sub ONKYO_AVR_ZONE_Set($$$);
-sub ONKYO_AVR_ZONE_Get($$$);
-sub ONKYO_AVR_ZONE_Define($$$);
-sub ONKYO_AVR_ZONE_Undefine($$);
-
-#########################
-# Forward declaration for remotecontrol module
-sub ONKYO_AVR_ZONE_RClayout_TV();
-sub ONKYO_AVR_ZONE_RCmakenotify($$);
-
-###################################
+# initialize ##################################################################
 sub ONKYO_AVR_ZONE_Initialize($) {
     my ($hash) = @_;
 
@@ -52,22 +15,17 @@ sub ONKYO_AVR_ZONE_Initialize($) {
 
     require "$attr{global}{modpath}/FHEM/ONKYOdb.pm";
 
-    $hash->{Match} = ".+";
-
     $hash->{DefFn}   = "ONKYO_AVR_ZONE_Define";
     $hash->{UndefFn} = "ONKYO_AVR_ZONE_Undefine";
-
-    #    $hash->{DeleteFn} = "ONKYO_AVR_ZONE_Delete";
-    $hash->{SetFn} = "ONKYO_AVR_ZONE_Set";
-    $hash->{GetFn} = "ONKYO_AVR_ZONE_Get";
-
-    #    $hash->{AttrFn}   = "ONKYO_AVR_ZONE_Attr";
-    #    $hash->{NotifyFn} = "ONKYO_AVR_ZONE_Notify";
+    $hash->{SetFn}   = "ONKYO_AVR_ZONE_Set";
+    $hash->{GetFn}   = "ONKYO_AVR_ZONE_Get";
     $hash->{ParseFn} = "ONKYO_AVR_ZONE_Parse";
 
+    $hash->{Match} = ".+";
+
     $hash->{AttrList} =
-        "IODev do_not_notify:1,0 "
-      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model wakeupCmd:textField "
+        "IODev disable:0,1 disabledForIntervals do_not_notify:1,0 "
+      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs model wakeupCmd:textField "
       . $readingFnAttributes;
 
     #    $data{RC_layout}{ONKYO_AVR_ZONE_SVG} = "ONKYO_AVR_ZONE_RClayout_SVG";
@@ -90,7 +48,7 @@ sub ONKYO_AVR_ZONE_Initialize($) {
     $hash->{parseParams} = 1;
 }
 
-###################################
+# regular Fn ##################################################################
 sub ONKYO_AVR_ZONE_Define($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name = $hash->{NAME};
@@ -125,8 +83,8 @@ sub ONKYO_AVR_ZONE_Define($$$) {
           . $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone}{NAME};
     }
     elsif ( !defined($IOhash) ) {
-        return
-"No matching I/O device found, please define a ONKYO_AVR device first";
+        return "No matching I/O device found, "
+          . "please define a ONKYO_AVR device first";
     }
     elsif ( !defined( $IOhash->{TYPE} ) || !defined( $IOhash->{NAME} ) ) {
         return "IODev does not seem to be existing";
@@ -182,10 +140,9 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
     ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
 
-    return;
+    return undef;
 }
 
-###################################
 sub ONKYO_AVR_ZONE_Undefine($$) {
     my ( $hash, $name ) = @_;
     my $zone   = $hash->{ZONE};
@@ -207,300 +164,6 @@ sub ONKYO_AVR_ZONE_Undefine($$) {
     return undef;
 }
 
-#############################
-sub ONKYO_AVR_ZONE_Parse($$) {
-    my ( $IOhash, $msg ) = @_;
-    my @matches;
-    my $IOname = $IOhash->{NAME};
-    my $zone = $msg->{zone} || "";
-
-    delete $msg->{zone} if ( defined( $msg->{zone} ) );
-
-    Log3 $IOname, 5,
-      "ONKYO_AVR $IOname: called function ONKYO_AVR_ZONE_Parse()";
-
-    foreach my $d ( keys %defs ) {
-        my $hash  = $defs{$d};
-        my $name  = $hash->{NAME};
-        my $state = ReadingsVal( $name, "power", "off" );
-
-        if (   $hash->{TYPE} eq "ONKYO_AVR_ZONE"
-            && $hash->{IODev} eq $IOhash
-            && ( $zone eq "" || $hash->{ZONE} eq $zone ) )
-        {
-            push @matches, $d;
-
-            # Update readings
-            readingsBeginUpdate($hash);
-
-            foreach my $cmd ( keys %{$msg} ) {
-                my $value = $msg->{$cmd};
-
-                $hash->{INPUT}   = $value and next if ( $cmd eq "INPUT_RAW" );
-                $hash->{CHANNEL} = $value and next if ( $cmd eq "CHANNEL_RAW" );
-
-                Log3 $name, 4, "ONKYO_AVR_ZONE $name: rcv $cmd = $value";
-
-                # presence
-                if ( $cmd eq "presence" && $value eq "present" ) {
-                    ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
-                    ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
-                    ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
-                    ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
-                }
-
-                # input
-                elsif ( $cmd eq "input" ) {
-
-                    # Input alias handling
-                    if (
-                        defined(
-                            $hash->{helper}{receiver}{input_aliases}{$value}
-                        )
-                      )
-                    {
-                        Log3 $name, 4,
-                            "ONKYO_AVR_AVR $name: Input aliasing '$value' to '"
-                          . $hash->{helper}{receiver}{input_aliases}{$value}
-                          . "'";
-                        $value =
-                          $hash->{helper}{receiver}{input_aliases}{$value};
-                    }
-
-                }
-
-                # power
-                elsif ( $cmd eq "power" ) {
-                    readingsBulkUpdate( $hash, "presence", "present" )
-                      if ( ReadingsVal( $name, "presence", "-" ) ne "present" );
-                }
-
-                # balance
-                elsif ( $cmd eq "balance" ) {
-                    my $prefix = "";
-                    $prefix = "-" if ( $value =~ /^\-.*/ );
-                    $value = substr( $value, 1 ) if ( $value =~ /^[\+|\-].*/ );
-
-                    $value = $prefix . ONKYO_AVR_hex2dec($value);
-                }
-
-                # preset
-                elsif ( $cmd eq "preset" ) {
-
-                    if ( defined( $IOhash->{helper}{receiver}{preset} ) ) {
-
-                        foreach my $id (
-                            sort keys %{ $IOhash->{helper}{receiver}{preset} } )
-                        {
-                            my $presetName =
-                              $IOhash->{helper}{receiver}{preset}{$id};
-                            next if ( !$presetName || $presetName eq "" );
-
-                            $presetName =~ s/\s/_/g;
-
-                            if ( $id eq ONKYO_AVR_dec2hex($value) ) {
-                                $value = $presetName;
-                                last;
-                            }
-                        }
-                    }
-
-                    $value = "" if ( $value eq "0" );
-                }
-
-                # tone
-                if ( $cmd =~ /^tone/ ) {
-                    if ( $value =~ /^B(..)T(..)$/ ) {
-                        my $bass         = $1;
-                        my $treble       = $2;
-                        my $bassName     = $cmd . "-bass";
-                        my $trebleName   = $cmd . "-treble";
-                        my $prefixBass   = "";
-                        my $prefixTreble = "";
-
-                        # tone-bass
-                        $prefixBass = "-" if ( $bass =~ /^\-.*/ );
-                        $bass = substr( $bass, 1 ) if ( $bass =~ /^[\+|\-].*/ );
-                        $bass = $prefixBass . ONKYO_AVR_hex2dec($bass);
-                        readingsBulkUpdate( $hash, $bassName, $bass )
-                          if ( ReadingsVal( $name, $bassName, "-" ) ne $bass );
-
-                        # tone-treble
-                        $prefixTreble = "-" if ( $treble =~ /^\-.*/ );
-                        $treble = substr( $treble, 1 )
-                          if ( $treble =~ /^[\+|\-].*/ );
-                        $treble = $prefixTreble . ONKYO_AVR_hex2dec($treble);
-                        readingsBulkUpdate( $hash, $trebleName, $treble )
-                          if (
-                            ReadingsVal( $name, $trebleName, "-" ) ne $treble );
-                    }
-                }
-
-                # all other commands
-                else {
-                    readingsBulkUpdate( $hash, $cmd, $value )
-                      if ( ReadingsVal( $name, $cmd, "-" ) ne $value
-                        || $cmd =~ /^currentAlbumArt.*/ );
-                }
-            }
-
-            # stateAV
-            my $stateAV = ONKYO_AVR_ZONE_GetStateAV($hash);
-            readingsBulkUpdate( $hash, "stateAV", $stateAV )
-              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
-
-            readingsEndUpdate( $hash, 1 );
-            last;
-        }
-    }
-    return @matches if (@matches);
-    return "UNDEFINED ONKYO_AVR_ZONE";
-}
-
-###################################
-sub ONKYO_AVR_ZONE_Get($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name             = $hash->{NAME};
-    my $zone             = $hash->{ZONE};
-    my $IOhash           = $hash->{IODev};
-    my $IOname           = $IOhash->{NAME};
-    my $state            = ReadingsVal( $name, "power", "off" );
-    my $presence         = ReadingsVal( $name, "presence", "absent" );
-    my $commands         = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
-    my $commands_details = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
-    my $return;
-
-    Log3 $name, 5, "ONKYO_AVR_ZONE $name: called function ONKYO_AVR_ZONE_Get()";
-
-    return "Argument is missing" if ( int(@$a) < 1 );
-
-    # readings
-    return $hash->{READINGS}{ @$a[1] }{VAL}
-      if ( defined( $hash->{READINGS}{ @$a[1] } ) );
-
-    return "Device is offline and cannot be controlled at that stage."
-      if ( $presence eq "absent" );
-
-    # statusRequest
-    if ( lc( @$a[1] ) eq "statusrequest" ) {
-        Log3 $name, 3, "ONKYO_AVR_ZONE get $name " . @$a[1];
-
-        ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
-        ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
-        ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
-        ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
-    }
-
-    # remoteControl
-    elsif ( lc( @$a[1] ) eq "remotecontrol" ) {
-
-        # Output help for commands
-        if ( !defined( @$a[2] ) || @$a[2] eq "help" || @$a[2] eq "?" ) {
-
-            my $valid_commands =
-                "Usage: <command> <value>\n\nValid commands in zone$zone:\n\n\n"
-              . "COMMAND\t\t\tDESCRIPTION\n\n";
-
-            # For each valid command
-            foreach my $command ( sort keys %{$commands} ) {
-                my $command_raw = $commands->{$command};
-
-                # add command including description if found
-                if ( defined( $commands_details->{$command_raw}{description} ) )
-                {
-                    $valid_commands .=
-                        $command
-                      . "\t\t\t"
-                      . $commands_details->{$command_raw}{description} . "\n";
-                }
-
-                # add command only
-                else {
-                    $valid_commands .= $command . "\n";
-                }
-            }
-
-            $valid_commands .=
-"\nTry '&lt;command&gt; help' to find out well known values.\n\n\n";
-
-            $return = $valid_commands;
-        }
-        else {
-            # Reading values for command from HASH table
-            my $values =
-              ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
-                $commands->{ @$a[2] } );
-
-            @$a[3] = "query"
-              if ( !defined( @$a[3] ) && defined( $values->{query} ) );
-
-            # Output help for values
-            if ( !defined( @$a[3] ) || @$a[3] eq "help" || @$a[3] eq "?" ) {
-
-                # Get all details for command
-                my $command_details =
-                  ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
-                    $commands->{ @$a[2] } );
-
-                my $valid_values =
-                    "Usage: "
-                  . @$a[2]
-                  . " <value>\n\nWell known values:\n\n\n"
-                  . "VALUE\t\t\tDESCRIPTION\n\n";
-
-                # For each valid value
-                foreach my $value ( sort keys %{$values} ) {
-
-                    # add value including description if found
-                    if ( defined( $command_details->{description} ) ) {
-                        $valid_values .=
-                            $value
-                          . "\t\t\t"
-                          . $command_details->{description} . "\n";
-                    }
-
-                    # add value only
-                    else {
-                        $valid_values .= $value . "\n";
-                    }
-                }
-
-                $valid_values .= "\n\n\n";
-
-                $return = $valid_values;
-            }
-
-            # normal processing
-            else {
-                Log3 $name, 3,
-                    "ONKYO_AVR_ZONE get $name "
-                  . @$a[1] . " "
-                  . @$a[2] . " "
-                  . @$a[3]
-                  if ( !@$a[4] || @$a[4] ne "quiet" );
-
-                ONKYO_AVR_ZONE_SendCommand( $hash, @$a[2], @$a[3] );
-                $return = "Sent command: " . @$a[2] . " " . @$a[3]
-                  if ( !@$a[4] || @$a[4] ne "quiet" );
-            }
-        }
-    }
-
-    else {
-        $return =
-          "Unknown argument " . @$a[1] . ", choose one of statusRequest:noArg";
-
-        # remoteControl
-        $return .= " remoteControl:";
-        foreach my $command ( sort keys %{$commands} ) {
-            $return .= "," . $command;
-        }
-    }
-
-    return $return if ($return);
-}
-
-###################################
 sub ONKYO_AVR_ZONE_Set($$$) {
     my ( $hash, $a, $h ) = @_;
     my $IOhash   = $hash->{IODev};
@@ -1443,13 +1106,298 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     return $return;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
+sub ONKYO_AVR_ZONE_Get($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name             = $hash->{NAME};
+    my $zone             = $hash->{ZONE};
+    my $IOhash           = $hash->{IODev};
+    my $IOname           = $IOhash->{NAME};
+    my $state            = ReadingsVal( $name, "power", "off" );
+    my $presence         = ReadingsVal( $name, "presence", "absent" );
+    my $commands         = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
+    my $commands_details = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
+    my $return;
 
-###################################
+    Log3 $name, 5, "ONKYO_AVR_ZONE $name: called function ONKYO_AVR_ZONE_Get()";
+
+    return "Argument is missing" if ( int(@$a) < 1 );
+
+    # readings
+    return $hash->{READINGS}{ @$a[1] }{VAL}
+      if ( defined( $hash->{READINGS}{ @$a[1] } ) );
+
+    return "Device is offline and cannot be controlled at that stage."
+      if ( $presence eq "absent" );
+
+    # statusRequest
+    if ( lc( @$a[1] ) eq "statusrequest" ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE get $name " . @$a[1];
+
+        ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
+    }
+
+    # remoteControl
+    elsif ( lc( @$a[1] ) eq "remotecontrol" ) {
+
+        # Output help for commands
+        if ( !defined( @$a[2] ) || @$a[2] eq "help" || @$a[2] eq "?" ) {
+
+            my $valid_commands =
+                "Usage: <command> <value>\n\nValid commands in zone$zone:\n\n\n"
+              . "COMMAND\t\t\tDESCRIPTION\n\n";
+
+            # For each valid command
+            foreach my $command ( sort keys %{$commands} ) {
+                my $command_raw = $commands->{$command};
+
+                # add command including description if found
+                if ( defined( $commands_details->{$command_raw}{description} ) )
+                {
+                    $valid_commands .=
+                        $command
+                      . "\t\t\t"
+                      . $commands_details->{$command_raw}{description} . "\n";
+                }
+
+                # add command only
+                else {
+                    $valid_commands .= $command . "\n";
+                }
+            }
+
+            $valid_commands .=
+"\nTry '&lt;command&gt; help' to find out well known values.\n\n\n";
+
+            $return = $valid_commands;
+        }
+        else {
+            # Reading values for command from HASH table
+            my $values =
+              ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
+                $commands->{ @$a[2] } );
+
+            @$a[3] = "query"
+              if ( !defined( @$a[3] ) && defined( $values->{query} ) );
+
+            # Output help for values
+            if ( !defined( @$a[3] ) || @$a[3] eq "help" || @$a[3] eq "?" ) {
+
+                # Get all details for command
+                my $command_details =
+                  ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
+                    $commands->{ @$a[2] } );
+
+                my $valid_values =
+                    "Usage: "
+                  . @$a[2]
+                  . " <value>\n\nWell known values:\n\n\n"
+                  . "VALUE\t\t\tDESCRIPTION\n\n";
+
+                # For each valid value
+                foreach my $value ( sort keys %{$values} ) {
+
+                    # add value including description if found
+                    if ( defined( $command_details->{description} ) ) {
+                        $valid_values .=
+                            $value
+                          . "\t\t\t"
+                          . $command_details->{description} . "\n";
+                    }
+
+                    # add value only
+                    else {
+                        $valid_values .= $value . "\n";
+                    }
+                }
+
+                $valid_values .= "\n\n\n";
+
+                $return = $valid_values;
+            }
+
+            # normal processing
+            else {
+                Log3 $name, 3,
+                    "ONKYO_AVR_ZONE get $name "
+                  . @$a[1] . " "
+                  . @$a[2] . " "
+                  . @$a[3]
+                  if ( !@$a[4] || @$a[4] ne "quiet" );
+
+                ONKYO_AVR_ZONE_SendCommand( $hash, @$a[2], @$a[3] );
+                $return = "Sent command: " . @$a[2] . " " . @$a[3]
+                  if ( !@$a[4] || @$a[4] ne "quiet" );
+            }
+        }
+    }
+
+    else {
+        $return =
+          "Unknown argument " . @$a[1] . ", choose one of statusRequest:noArg";
+
+        # remoteControl
+        $return .= " remoteControl:";
+        foreach my $command ( sort keys %{$commands} ) {
+            $return .= "," . $command;
+        }
+    }
+
+    return $return;
+}
+
+sub ONKYO_AVR_ZONE_Parse($$) {
+    my ( $IOhash, $msg ) = @_;
+    my @matches;
+    my $IOname = $IOhash->{NAME};
+    my $zone = $msg->{zone} || "";
+
+    delete $msg->{zone} if ( defined( $msg->{zone} ) );
+
+    Log3 $IOname, 5,
+      "ONKYO_AVR $IOname: called function ONKYO_AVR_ZONE_Parse()";
+
+    foreach my $d ( keys %defs ) {
+        my $hash  = $defs{$d};
+        my $name  = $hash->{NAME};
+        my $state = ReadingsVal( $name, "power", "off" );
+
+        if (   $hash->{TYPE} eq "ONKYO_AVR_ZONE"
+            && $hash->{IODev} eq $IOhash
+            && ( $zone eq "" || $hash->{ZONE} eq $zone ) )
+        {
+            push @matches, $d;
+
+            # Update readings
+            readingsBeginUpdate($hash);
+
+            foreach my $cmd ( keys %{$msg} ) {
+                my $value = $msg->{$cmd};
+
+                $hash->{INPUT}   = $value and next if ( $cmd eq "INPUT_RAW" );
+                $hash->{CHANNEL} = $value and next if ( $cmd eq "CHANNEL_RAW" );
+
+                Log3 $name, 4, "ONKYO_AVR_ZONE $name: rcv $cmd = $value";
+
+                # presence
+                if ( $cmd eq "presence" && $value eq "present" ) {
+                    ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
+                    ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
+                    ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
+                    ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
+                }
+
+                # input
+                elsif ( $cmd eq "input" ) {
+
+                    # Input alias handling
+                    if (
+                        defined(
+                            $hash->{helper}{receiver}{input_aliases}{$value}
+                        )
+                      )
+                    {
+                        Log3 $name, 4,
+                            "ONKYO_AVR_AVR $name: Input aliasing '$value' to '"
+                          . $hash->{helper}{receiver}{input_aliases}{$value}
+                          . "'";
+                        $value =
+                          $hash->{helper}{receiver}{input_aliases}{$value};
+                    }
+
+                }
+
+                # power
+                elsif ( $cmd eq "power" ) {
+                    readingsBulkUpdate( $hash, "presence", "present" )
+                      if ( ReadingsVal( $name, "presence", "-" ) ne "present" );
+                }
+
+                # balance
+                elsif ( $cmd eq "balance" ) {
+                    my $prefix = "";
+                    $prefix = "-" if ( $value =~ /^\-.*/ );
+                    $value = substr( $value, 1 ) if ( $value =~ /^[\+|\-].*/ );
+
+                    $value = $prefix . ONKYO_AVR_hex2dec($value);
+                }
+
+                # preset
+                elsif ( $cmd eq "preset" ) {
+
+                    if ( defined( $IOhash->{helper}{receiver}{preset} ) ) {
+
+                        foreach my $id (
+                            sort keys %{ $IOhash->{helper}{receiver}{preset} } )
+                        {
+                            my $presetName =
+                              $IOhash->{helper}{receiver}{preset}{$id};
+                            next if ( !$presetName || $presetName eq "" );
+
+                            $presetName =~ s/\s/_/g;
+
+                            if ( $id eq ONKYO_AVR_dec2hex($value) ) {
+                                $value = $presetName;
+                                last;
+                            }
+                        }
+                    }
+
+                    $value = "" if ( $value eq "0" );
+                }
+
+                # tone
+                if ( $cmd =~ /^tone/ ) {
+                    if ( $value =~ /^B(..)T(..)$/ ) {
+                        my $bass         = $1;
+                        my $treble       = $2;
+                        my $bassName     = $cmd . "-bass";
+                        my $trebleName   = $cmd . "-treble";
+                        my $prefixBass   = "";
+                        my $prefixTreble = "";
+
+                        # tone-bass
+                        $prefixBass = "-" if ( $bass =~ /^\-.*/ );
+                        $bass = substr( $bass, 1 ) if ( $bass =~ /^[\+|\-].*/ );
+                        $bass = $prefixBass . ONKYO_AVR_hex2dec($bass);
+                        readingsBulkUpdate( $hash, $bassName, $bass )
+                          if ( ReadingsVal( $name, $bassName, "-" ) ne $bass );
+
+                        # tone-treble
+                        $prefixTreble = "-" if ( $treble =~ /^\-.*/ );
+                        $treble = substr( $treble, 1 )
+                          if ( $treble =~ /^[\+|\-].*/ );
+                        $treble = $prefixTreble . ONKYO_AVR_hex2dec($treble);
+                        readingsBulkUpdate( $hash, $trebleName, $treble )
+                          if (
+                            ReadingsVal( $name, $trebleName, "-" ) ne $treble );
+                    }
+                }
+
+                # all other commands
+                else {
+                    readingsBulkUpdate( $hash, $cmd, $value )
+                      if ( ReadingsVal( $name, $cmd, "-" ) ne $value
+                        || $cmd =~ /^currentAlbumArt.*/ );
+                }
+            }
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_ZONE_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+            readingsEndUpdate( $hash, 1 );
+            last;
+        }
+    }
+    return @matches if (@matches);
+    return "UNDEFINED ONKYO_AVR_ZONE";
+}
+
+# module Fn ####################################################################
 sub ONKYO_AVR_ZONE_SendCommand($$$) {
     my ( $hash, $cmd, $value ) = @_;
     my $IOhash = $hash->{IODev};
@@ -1523,7 +1471,6 @@ sub ONKYO_AVR_ZONE_SendCommand($$$) {
     return;
 }
 
-###################################
 sub ONKYO_AVR_ZONE_GetStateAV($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};

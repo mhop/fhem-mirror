@@ -1,30 +1,5 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     74_THINKINGCLEANER.pm
-#     An FHEM Perl module for controlling ThinkingCleaner connected
-#     Roomba vacuum cleaning robot.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
 
 use strict;
@@ -34,15 +9,7 @@ use HttpUtils;
 use Encode;
 use Data::Dumper;
 
-no warnings "all";
-
-sub THINKINGCLEANER_Set($@);
-sub THINKINGCLEANER_GetStatus($;$);
-sub THINKINGCLEANER_Attr($@);
-sub THINKINGCLEANER_Define($$);
-sub THINKINGCLEANER_Undefine($$);
-
-###################################
+# initialize ##################################################################
 sub THINKINGCLEANER_Initialize($) {
     my ($hash) = @_;
 
@@ -51,14 +18,14 @@ sub THINKINGCLEANER_Initialize($) {
     my $webhookFWinstance =
       join( ",", devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') );
 
-    $hash->{SetFn}       = "THINKINGCLEANER_Set";
     $hash->{DefFn}       = "THINKINGCLEANER_Define";
-    $hash->{AttrFn}      = "THINKINGCLEANER_Attr";
     $hash->{UndefFn}     = "THINKINGCLEANER_Undefine";
+    $hash->{SetFn}       = "THINKINGCLEANER_Set";
+    $hash->{AttrFn}      = "THINKINGCLEANER_Attr";
     $hash->{parseParams} = 1;
 
     $hash->{AttrList} =
-"disable:0,1 timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg "
+"disable:0,1 disabledForIntervals timeout:1,2,3,4,5 pollInterval:30,45,60,75,90 pollMultiplierWebhook pollMultiplierCleaning model webhookHttpHostname webhookPort webhookFWinstance:$webhookFWinstance restart:noArg "
       . $readingFnAttributes;
 
     # 98_powerMap.pm support
@@ -89,50 +56,82 @@ sub THINKINGCLEANER_Initialize($) {
             },
         },
     };
-
-    return;
 }
 
-#####################################
-sub THINKINGCLEANER_GetStatus($;$) {
-    my ( $hash, $delay ) = @_;
-    my $name = $hash->{NAME};
-    $hash->{INTERVAL_MULTIPLIER} = (
-        ReadingsVal( $name, "state", "off" ) ne "off"
-          && ReadingsVal( $name, "state", "absent" ) ne "absent"
-          && ReadingsVal( $name, "state", "standby" ) ne "standby"
-        ? AttrVal( $name, "pollMultiplierCleaning", "0.5" )
-        : (
-            $hash->{WEBHOOK_REGISTER} eq "success"
-            ? AttrVal( $name, "pollMultiplierWebhook", "2" )
-            : "1"
-        )
-    );
-
-    $hash->{INTERVAL} =
-      AttrVal( $name, "pollInterval", "45" ) * $hash->{INTERVAL_MULTIPLIER};
-    my $interval = (
-          $delay
-        ? $delay
-        : $hash->{INTERVAL}
-    );
+# regular Fn ##################################################################
+sub THINKINGCLEANER_Define($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name  = $hash->{NAME};
+    my $infix = "THINKINGCLEANER";
 
     Log3 $name, 5,
-      "THINKINGCLEANER $name: called function THINKINGCLEANER_GetStatus()";
+      "THINKINGCLEANER $name: called function THINKINGCLEANER_Define()";
 
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + $interval,
-        "THINKINGCLEANER_GetStatus", $hash, 0 );
+    eval {
+        require JSON;
+        import JSON qw( decode_json );
+    };
+    return "Please install Perl JSON to use module THINKINGCLEANER"
+      if ($@);
 
-    return
-      if ( $delay || AttrVal( $name, "disable", 0 ) == 1 );
+    if ( int(@$a) < 2 ) {
+        my $msg =
+          "Wrong syntax: define <name> THINKINGCLEANER <ip-or-hostname>";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
 
-    THINKINGCLEANER_SendCommand( $hash, "full_status.json" );
+    $hash->{TYPE} = "THINKINGCLEANER";
 
-    return;
+    my $address = @$a[2];
+    $hash->{DeviceName} = $address;
+
+    # set reverse pointer
+    $modules{THINKINGCLEANER}{defptr}{$name} = \$hash;
+
+    # set default settings on first define
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        $attr{$name}{cmdIcon} =
+'on-max:text_max on-spot:refresh on-delayed:time_timer dock:measure_battery_50 locate:rc_SEARCH';
+        $attr{$name}{devStateIcon} =
+'on-delayed:rc_STOP@green:off on-max:rc_BLUE@green:off on-spot:rc_GREEN@red:off on.*:rc_GREEN@green:off dock:rc_GREEN@orange:off off:rc_STOP:on standby|remote:rc_YELLOW:on locate:rc_YELLOW .*:rc_RED';
+        $attr{$name}{icon}   = 'scene_cleaning';
+        $attr{$name}{webCmd} = 'on-max:on-spot:on-delayed:dock:locate';
+    }
+
+    if ( THINKINGCLEANER_addExtension( $name, "THINKINGCLEANER_CGI", $infix ) )
+    {
+        $hash->{fhem}{infix} = $infix;
+    }
+
+    $hash->{WEBHOOK_REGISTER} = "unregistered";
+
+    # start the status update timer
+    THINKINGCLEANER_GetStatus( $hash, 2 );
+
+    return undef;
 }
 
-###################################
+sub THINKINGCLEANER_Undefine($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name = $hash->{NAME};
+
+    if ( defined( $hash->{fhem}{infix} ) ) {
+        THINKINGCLEANER_removeExtension( $hash->{fhem}{infix} );
+    }
+
+    Log3 $name, 5,
+      "THINKINGCLEANER $name: called function THINKINGCLEANER_Undefine()";
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    # release reverse pointer
+    delete $modules{THINKINGCLEANER}{defptr}{$name};
+
+    return undef;
+}
+
 sub THINKINGCLEANER_Set($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name         = $hash->{NAME};
@@ -842,64 +841,9 @@ sub THINKINGCLEANER_Set($$$) {
         return $usage;
     }
 
-    return;
+    return undef;
 }
 
-###################################
-sub THINKINGCLEANER_Define($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name  = $hash->{NAME};
-    my $infix = "THINKINGCLEANER";
-
-    Log3 $name, 5,
-      "THINKINGCLEANER $name: called function THINKINGCLEANER_Define()";
-
-    eval {
-        require JSON;
-        import JSON qw( decode_json );
-    };
-    return "Please install Perl JSON to use module THINKINGCLEANER"
-      if ($@);
-
-    if ( int(@$a) < 2 ) {
-        my $msg =
-          "Wrong syntax: define <name> THINKINGCLEANER <ip-or-hostname>";
-        Log3 $name, 4, $msg;
-        return $msg;
-    }
-
-    $hash->{TYPE} = "THINKINGCLEANER";
-
-    my $address = @$a[2];
-    $hash->{DeviceName} = $address;
-
-    # set reverse pointer
-    $modules{THINKINGCLEANER}{defptr}{$name} = \$hash;
-
-    # set default settings on first define
-    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-        $attr{$name}{cmdIcon} =
-'on-max:text_max on-spot:refresh on-delayed:time_timer dock:measure_battery_50 locate:rc_SEARCH';
-        $attr{$name}{devStateIcon} =
-'on-delayed:rc_STOP@green:off on-max:rc_BLUE@green:off on-spot:rc_GREEN@red:off on.*:rc_GREEN@green:off dock:rc_GREEN@orange:off off:rc_STOP:on standby|remote:rc_YELLOW:on locate:rc_YELLOW .*:rc_RED';
-        $attr{$name}{icon}   = 'scene_cleaning';
-        $attr{$name}{webCmd} = 'on-max:on-spot:on-delayed:dock:locate';
-    }
-
-    if ( THINKINGCLEANER_addExtension( $name, "THINKINGCLEANER_CGI", $infix ) )
-    {
-        $hash->{fhem}{infix} = $infix;
-    }
-
-    $hash->{WEBHOOK_REGISTER} = "unregistered";
-
-    # start the status update timer
-    THINKINGCLEANER_GetStatus( $hash, 2 );
-
-    return;
-}
-
-###################################
 sub THINKINGCLEANER_Attr(@) {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
@@ -1004,7 +948,7 @@ sub THINKINGCLEANER_Attr(@) {
     return undef;
 }
 
-###################################
+# module Fn ####################################################################
 sub THINKINGCLEANER_addExtension($$$) {
     my ( $name, $func, $link ) = @_;
 
@@ -1023,7 +967,6 @@ sub THINKINGCLEANER_addExtension($$$) {
     return 1;
 }
 
-###################################
 sub THINKINGCLEANER_removeExtension($) {
     my ($link) = @_;
 
@@ -1034,13 +977,88 @@ sub THINKINGCLEANER_removeExtension($) {
     delete $data{FWEXT}{$url};
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
+sub THINKINGCLEANER_CGI() {
+    my ($request) = @_;
 
-###################################
+    # data received
+    if ( defined( $FW_httpheader{UUID} ) ) {
+        if ( defined( $modules{THINKINGCLEANER}{defptr} ) ) {
+            while ( my ( $key, $value ) =
+                each %{ $modules{THINKINGCLEANER}{defptr} } )
+            {
+
+                my $uuid = ReadingsVal( $key, "uuid", undef );
+                next if ( !$uuid || $uuid ne $FW_httpheader{UUID} );
+
+                $defs{$key}{WEBHOOK_COUNTER}++;
+                $defs{$key}{WEBHOOK_LAST} = TimeNow();
+
+                Log3 $key, 4,
+"THINKINGCLEANER $key: Received webhook for matching UUID at device $key";
+
+                my $delay = undef;
+
+# we need some delay as to the Robo seems to send webhooks but it's status does
+# not really reflect the change we'd expect to get here already so give 'em some
+# more time to think about it...
+                $delay = "2"
+                  if ( defined( $defs{$key}{LAST_COMMAND} )
+                    && time() - time_str2num( $defs{$key}{LAST_COMMAND} ) < 3 );
+
+                THINKINGCLEANER_GetStatus( $defs{$key}, $delay );
+                last;
+            }
+        }
+
+        return ( undef, undef );
+    }
+
+    # no data received
+    else {
+        Log3 undef, 5, "THINKINGCLEANER: received malformed request\n$request";
+    }
+
+    return ( "text/plain; charset=utf-8", "Call failure: " . $request );
+}
+
+sub THINKINGCLEANER_GetStatus($;$) {
+    my ( $hash, $delay ) = @_;
+    my $name = $hash->{NAME};
+    $hash->{INTERVAL_MULTIPLIER} = (
+        ReadingsVal( $name, "state", "off" ) ne "off"
+          && ReadingsVal( $name, "state", "absent" ) ne "absent"
+          && ReadingsVal( $name, "state", "standby" ) ne "standby"
+        ? AttrVal( $name, "pollMultiplierCleaning", "0.5" )
+        : (
+            $hash->{WEBHOOK_REGISTER} eq "success"
+            ? AttrVal( $name, "pollMultiplierWebhook", "2" )
+            : "1"
+        )
+    );
+
+    $hash->{INTERVAL} =
+      AttrVal( $name, "pollInterval", "45" ) * $hash->{INTERVAL_MULTIPLIER};
+    my $interval = (
+          $delay
+        ? $delay
+        : $hash->{INTERVAL}
+    );
+
+    Log3 $name, 5,
+      "THINKINGCLEANER $name: called function THINKINGCLEANER_GetStatus()";
+
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + $interval,
+        "THINKINGCLEANER_GetStatus", $hash, 0 );
+
+    return
+      if ( $delay || AttrVal( $name, "disable", 0 ) == 1 );
+
+    THINKINGCLEANER_SendCommand( $hash, "full_status.json" );
+
+    return;
+}
+
 sub THINKINGCLEANER_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
     my $name            = $hash->{NAME};
@@ -1166,7 +1184,6 @@ sub THINKINGCLEANER_SendCommand($$;$$) {
     return;
 }
 
-###################################
 sub THINKINGCLEANER_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash     = $param->{hash};
@@ -1728,73 +1745,6 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
     return;
 }
 
-###################################
-sub THINKINGCLEANER_CGI() {
-    my ($request) = @_;
-
-    # data received
-    if ( defined( $FW_httpheader{UUID} ) ) {
-        if ( defined( $modules{THINKINGCLEANER}{defptr} ) ) {
-            while ( my ( $key, $value ) =
-                each %{ $modules{THINKINGCLEANER}{defptr} } )
-            {
-
-                my $uuid = ReadingsVal( $key, "uuid", undef );
-                next if ( !$uuid || $uuid ne $FW_httpheader{UUID} );
-
-                $defs{$key}{WEBHOOK_COUNTER}++;
-                $defs{$key}{WEBHOOK_LAST} = TimeNow();
-
-                Log3 $key, 4,
-"THINKINGCLEANER $key: Received webhook for matching UUID at device $key";
-
-                my $delay = undef;
-
-# we need some delay as to the Robo seems to send webhooks but it's status does
-# not really reflect the change we'd expect to get here already so give 'em some
-# more time to think about it...
-                $delay = "2"
-                  if ( defined( $defs{$key}{LAST_COMMAND} )
-                    && time() - time_str2num( $defs{$key}{LAST_COMMAND} ) < 3 );
-
-                THINKINGCLEANER_GetStatus( $defs{$key}, $delay );
-                last;
-            }
-        }
-
-        return ( undef, undef );
-    }
-
-    # no data received
-    else {
-        Log3 undef, 5, "THINKINGCLEANER: received malformed request\n$request";
-    }
-
-    return ( "text/plain; charset=utf-8", "Call failure: " . $request );
-}
-
-###################################
-sub THINKINGCLEANER_Undefine($$$) {
-    my ( $hash, $a, $h ) = @_;
-    my $name = $hash->{NAME};
-
-    if ( defined( $hash->{fhem}{infix} ) ) {
-        THINKINGCLEANER_removeExtension( $hash->{fhem}{infix} );
-    }
-
-    Log3 $name, 5,
-      "THINKINGCLEANER $name: called function THINKINGCLEANER_Undefine()";
-
-    # Stop the internal GetStatus-Loop and exit
-    RemoveInternalTimer($hash);
-
-    # release reverse pointer
-    delete $modules{THINKINGCLEANER}{defptr}{$name};
-
-    return;
-}
-
-###################################
 sub THINKINGCLEANER_time2sec($) {
     my ($timeString) = @_;
     my @time = split /:/, $timeString;
@@ -1802,7 +1752,6 @@ sub THINKINGCLEANER_time2sec($) {
     return $time[0] * 3600 + $time[1] * 60;
 }
 
-###################################
 sub THINKINGCLEANER_sec2time($) {
     my ($sec) = @_;
 
@@ -1818,6 +1767,7 @@ sub THINKINGCLEANER_sec2time($) {
 
     return "$hours:$minutes:$seconds";
 }
+
 1;
 
 =pod

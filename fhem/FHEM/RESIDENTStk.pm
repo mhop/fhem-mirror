@@ -541,10 +541,10 @@ return;;\
                 Log3 $NAME, 3,
                   "RESIDENTStk $NAME: "
                   . "new notify macro device $macroRNameGotosleep created";
-                fhem
-"define $macroRNameGotosleep notify $macroRNameGotosleep $templateGotosleep";
-                fhem
-"attr $macroRNameGotosleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are gettin' ready for bed";
+                fhem "define $macroRNameGotosleep "
+                  . "notify $macroRNameGotosleep $templateGotosleep";
+                fhem "attr $macroRNameGotosleep "
+                  . "comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are gettin' ready for bed";
                 fhem "attr $macroRNameGotosleep room $room"
                   if ($room);
             }
@@ -2061,15 +2061,19 @@ sub RESIDENTStk_RG_Attr(@) {
 
         if ( $lang eq "DE" ) {
             $attr{$name}{devStateIcon} =
-'.*zuhause:user_available:absent .*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
+                '.*zuhause:user_available:absent '
+              . '.*anwesend:user_available:absent .*abwesend:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schlaeft:scene_sleeping:awoken .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown:home';
             $attr{$name}{eventMap} =
-"home:zuhause absent:abwesend gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+                "home:zuhause absent:abwesend gone:verreist "
+              . "gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
             $attr{$name}{widgetOverride} =
-"state:zuhause,bettfertig,schläft,aufgestanden,abwesend,verreist";
+                "state:zuhause,bettfertig,schläft,"
+              . "aufgestanden,abwesend,verreist";
         }
         elsif ( $lang eq "EN" ) {
             $attr{$name}{devStateIcon} =
-'.*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home';
+                '.*home:user_available:absent .*absent:user_away:home '
+              . '.*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home';
             delete $attr{$name}{eventMap}
               if ( defined( $attr{$name}{eventMap} ) );
             delete $attr{$name}{widgetOverride}

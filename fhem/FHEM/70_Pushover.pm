@@ -1,24 +1,22 @@
-# $Id$
 ###############################################################################
-#
-# Also see API documentation:
+# $Id$
 # https://pushover.net/api
-
+#
 package main;
 
 use HttpUtils;
 use utf8;
 use Data::Dumper;
 use HttpUtils;
-use SetExtensions;
 use Encode;
 
-#------------------------------------------------------------------------------
+# initialize ##################################################################
 sub Pushover_Initialize($$) {
     my ($hash) = @_;
     $hash->{DefFn}   = "Pushover_Define";
     $hash->{UndefFn} = "Pushover_Undefine";
     $hash->{SetFn}   = "Pushover_Set";
+
     $hash->{AttrList} =
 "disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire "
       . $readingFnAttributes;
@@ -27,39 +25,7 @@ sub Pushover_Initialize($$) {
     $hash->{'.msgParams'} = { parseParams => 1, };
 }
 
-#------------------------------------------------------------------------------
-sub Pushover_addExtension($$$) {
-    my ( $name, $func, $link ) = @_;
-
-    my $url = "/$link";
-
-    return 0
-      if ( defined( $data{FWEXT}{$url} )
-        && $data{FWEXT}{$url}{deviceName} ne $name );
-
-    Log3 $name, 2,
-      "Pushover $name: Registering Pushover for webhook URI $url ...";
-    $data{FWEXT}{$url}{deviceName} = $name;
-    $data{FWEXT}{$url}{FUNC}       = $func;
-    $data{FWEXT}{$url}{LINK}       = $link;
-    $name->{HASH}{FHEMWEB_URI}     = $url;
-
-    return 1;
-}
-
-#------------------------------------------------------------------------------
-sub Pushover_removeExtension($) {
-    my ($link) = @_;
-
-    my $url  = "/$link";
-    my $name = $data{FWEXT}{$url}{deviceName};
-    Log3 $name, 2,
-      "Pushover $name: Unregistering Pushover for webhook URI $url...";
-    delete $data{FWEXT}{$url};
-    delete $name->{HASH}{FHEMWEB_URI};
-}
-
-#------------------------------------------------------------------------------
+# regular Fn ##################################################################
 sub Pushover_Define($$) {
     my ( $hash, $def ) = @_;
 
@@ -67,8 +33,8 @@ sub Pushover_Define($$) {
     my $name = shift @a;
     my $type = shift @a;
 
-    return
-"Invalid number of arguments: define <name> Pushover <token> <user> [<infix>]"
+    return "Invalid number of arguments: "
+      . "define <name> Pushover <token> <user> [<infix>]"
       if ( int(@a) < 2 );
 
     my ( $token, $user, $infix ) = @a;
@@ -107,9 +73,10 @@ sub Pushover_Define($$) {
     else {
         return "App or user/group token missing.";
     }
+
+    return undef;
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_Undefine($$) {
     my ( $hash, $name ) = @_;
 
@@ -122,7 +89,6 @@ sub Pushover_Undefine($$) {
     return undef;
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
     my ( $a, $h ) = parseParams( join " ", @args );
@@ -169,9 +135,199 @@ sub Pushover_Set($@) {
 
     return Pushover_SetMessage( $hash, @args )
       if ( $cmd eq 'msg' );
+
+    return undef;
 }
 
-#------------------------------------------------------------------------------
+# module Fn ####################################################################
+sub Pushover_addExtension($$$) {
+    my ( $name, $func, $link ) = @_;
+
+    my $url = "/$link";
+
+    return 0
+      if ( defined( $data{FWEXT}{$url} )
+        && $data{FWEXT}{$url}{deviceName} ne $name );
+
+    Log3 $name, 2,
+      "Pushover $name: Registering Pushover for webhook URI $url ...";
+    $data{FWEXT}{$url}{deviceName} = $name;
+    $data{FWEXT}{$url}{FUNC}       = $func;
+    $data{FWEXT}{$url}{LINK}       = $link;
+    $name->{HASH}{FHEMWEB_URI}     = $url;
+
+    return 1;
+}
+
+sub Pushover_removeExtension($) {
+    my ($link) = @_;
+
+    my $url  = "/$link";
+    my $name = $data{FWEXT}{$url}{deviceName};
+    Log3 $name, 2,
+      "Pushover $name: Unregistering Pushover for webhook URI $url...";
+    delete $data{FWEXT}{$url};
+    delete $name->{HASH}{FHEMWEB_URI};
+}
+
+sub Pushover_CGI() {
+    my ($request) = @_;
+
+    my $hash;
+    my $name = "";
+    my $link = "";
+    my $URI  = "";
+
+    # data received
+    if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
+        $link = $1;
+        $URI  = $2;
+
+        # get device name
+        $name = $data{FWEXT}{$link}{deviceName} if ( $data{FWEXT}{$link} );
+        $hash = $defs{$name};
+
+        # return error if no such device
+        return ( "text/plain; charset=utf-8",
+            "NOK No Pushover device for callback $link" )
+          unless ($name);
+
+        Log3 $name, 4, "Pushover $name callback: link='$link' URI='$URI'";
+
+        my $webArgs;
+        my $receipt = "";
+        my %revReadings;
+
+        # extract values from URI
+        foreach my $pv ( split( "&", $URI ) ) {
+            next if ( $pv eq "" );
+            $pv =~ s/\+/ /g;
+            $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
+            my ( $p, $v ) = split( "=", $pv, 2 );
+
+            $webArgs->{$p} = $v;
+        }
+
+        if ( defined( $webArgs->{receipt} ) ) {
+            $receipt = $webArgs->{receipt};
+        }
+        elsif ( defined( $webArgs->{FhemCallbackId} ) ) {
+            $receipt = $webArgs->{FhemCallbackId};
+        }
+        else {
+            return ( "text/plain; charset=utf-8",
+                "NOK missing argument receipt or FhemCallbackId" );
+        }
+
+        # search for existing receipt
+        keys %{ $hash->{READINGS} };
+        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
+            $revReadings{ $value->{VAL} } = $1
+              if ( defined( $value->{VAL} ) && $key =~ /^cb_(\d+)$/ );
+        }
+
+        if ( defined( $revReadings{$receipt} ) ) {
+            my $rAct      = "cbAct_" . $revReadings{$receipt};
+            my $rAck      = "cbAck_" . $revReadings{$receipt};
+            my $rAckAt    = "cbAckAt_" . $revReadings{$receipt};
+            my $rAckBy    = "cbAckBy_" . $revReadings{$receipt};
+            my $rCancelId = "cbCancelId_" . $revReadings{$receipt};
+            my $rDev      = "cbDev_" . $revReadings{$receipt};
+
+            return ( "text/plain; charset=utf-8",
+                "NOK " . $receipt . ": invalid argument 'acknowledged'" )
+              if ( !defined( $webArgs->{acknowledged} )
+                || $webArgs->{acknowledged} ne "1" );
+
+            return ( "text/plain; charset=utf-8",
+                "NOK " . $receipt . ": invalid argument 'acknowledged_by'" )
+              if ( !defined( $webArgs->{acknowledged_by} )
+                || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
+
+            if ( ReadingsVal( $name, $rAck, "1" ) eq "0"
+                && $revReadings{$receipt} > int( time() ) )
+            {
+                delete $hash->{READINGS}{$rCancelId}
+                  if ( defined( $hash->{READINGS}{$rCancelId} ) );
+
+                readingsBeginUpdate($hash);
+
+                readingsBulkUpdate( $hash, $rAck, "1" );
+                readingsBulkUpdate( $hash, $rAckBy,
+                    $webArgs->{acknowledged_by} );
+
+                if ( defined( $webArgs->{acknowledged_at} )
+                    && $webArgs->{acknowledged_at} ne "" )
+                {
+                    readingsBulkUpdate( $hash, $rAckAt,
+                        $webArgs->{acknowledged_at} );
+                }
+                else {
+                    readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
+                }
+
+                my $redirect = "";
+
+                # run FHEM command if desired
+                if ( ReadingsVal( $name, $rAct, "pushover://" ) !~
+                    /^[\w-]+:\/\/.*$/ )
+                {
+                    $redirect = "pushover://";
+
+                    fhem ReadingsVal( $name, $rAct, "" );
+                    readingsBulkUpdate( $hash, $rAct,
+                        "executed: " . ReadingsVal( $name, $rAct, "" ) );
+                }
+
+                # redirect to presented URL
+                if ( ReadingsVal( $name, $rAct, "none" ) =~ /^[\w-]+:\/\/.*$/ )
+                {
+                    $redirect = ReadingsVal( $name, $rAct, "" );
+                }
+
+                readingsEndUpdate( $hash, 1 );
+
+                return (
+                    "text/html; charset=utf-8",
+                    "<html><head><meta http-equiv=\"refresh\" content=\"0;url="
+                      . $redirect
+                      . "\"></head><body><a href=\""
+                      . $redirect
+                      . "\">Click here to get redirected to your destination"
+                      . "</a></body></html>"
+                ) if ( $redirect ne "" );
+
+            }
+            else {
+                Log3 $name, 4,
+                  "Pushover $name callback: " . $receipt . " has expired";
+                return (
+                    "text/plain; charset=utf-8",
+                    "NOK " . $receipt . " has expired"
+                );
+            }
+
+        }
+        else {
+            Log3 $name, 4,
+              "Pushover $name callback: unable to find existing receipt "
+              . $receipt;
+            return ( "text/plain; charset=utf-8",
+                "NOK unable to find existing receipt " . $receipt );
+        }
+
+    }
+
+    # no data received
+    else {
+        Log3 $name, 5,
+          "Pushover $name callback: received malformed request\n$request";
+        return ( "text/plain; charset=utf-8", "NOK malformed request" );
+    }
+
+    return ( "text/plain; charset=utf-8", "OK" );
+}
+
 sub Pushover_SendCommand($$;$\%) {
     my ( $hash, $service, $cmd, $type ) = @_;
     my $name            = $hash->{NAME};
@@ -267,6 +423,10 @@ sub Pushover_SendCommand($$;$\%) {
                     Accept           => 'application/json;charset=UTF-8',
                     'Accept-Charset' => 'UTF-8',
                 },
+
+                # sslargs => {
+                #     SSL_verify_mode => 'SSL_verify_PEER',
+                # },
             }
         );
 
@@ -316,7 +476,6 @@ sub Pushover_SendCommand($$;$\%) {
     return;
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash    = $param->{hash};
@@ -711,7 +870,6 @@ sub Pushover_ReceiveCommand($$$) {
     return;
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_ValidateUser ($;$) {
     my ( $hash, $update ) = @_;
     my $name = $hash->{NAME};
@@ -739,7 +897,6 @@ sub Pushover_ValidateUser ($;$) {
     }
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_SetMessage {
     my $hash   = shift;
     my $name   = $hash->{NAME};
@@ -843,7 +1000,6 @@ sub Pushover_SetMessage {
     return Pushover_SetMessage2( $hash, "msg", undef, \%values );
 }
 
-#------------------------------------------------------------------------------
 sub Pushover_SetMessage2 ($$$$) {
     my ( $hash, $cmd, $a, $h ) = @_;
     my $name   = $hash->{NAME};
@@ -1234,165 +1390,6 @@ sub Pushover_CancelMessage ($$$$) {
 
     return "Invalid cancel_id" unless ($success);
     return $return;
-}
-
-#------------------------------------------------------------------------------
-sub Pushover_CGI() {
-    my ($request) = @_;
-
-    my $hash;
-    my $name = "";
-    my $link = "";
-    my $URI  = "";
-
-    # data received
-    if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
-        $link = $1;
-        $URI  = $2;
-
-        # get device name
-        $name = $data{FWEXT}{$link}{deviceName} if ( $data{FWEXT}{$link} );
-        $hash = $defs{$name};
-
-        # return error if no such device
-        return ( "text/plain; charset=utf-8",
-            "NOK No Pushover device for callback $link" )
-          unless ($name);
-
-        Log3 $name, 4, "Pushover $name callback: link='$link' URI='$URI'";
-
-        my $webArgs;
-        my $receipt = "";
-        my %revReadings;
-
-        # extract values from URI
-        foreach my $pv ( split( "&", $URI ) ) {
-            next if ( $pv eq "" );
-            $pv =~ s/\+/ /g;
-            $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
-            my ( $p, $v ) = split( "=", $pv, 2 );
-
-            $webArgs->{$p} = $v;
-        }
-
-        if ( defined( $webArgs->{receipt} ) ) {
-            $receipt = $webArgs->{receipt};
-        }
-        elsif ( defined( $webArgs->{FhemCallbackId} ) ) {
-            $receipt = $webArgs->{FhemCallbackId};
-        }
-        else {
-            return ( "text/plain; charset=utf-8",
-                "NOK missing argument receipt or FhemCallbackId" );
-        }
-
-        # search for existing receipt
-        keys %{ $hash->{READINGS} };
-        while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            $revReadings{ $value->{VAL} } = $1
-              if ( defined( $value->{VAL} ) && $key =~ /^cb_(\d+)$/ );
-        }
-
-        if ( defined( $revReadings{$receipt} ) ) {
-            my $rAct      = "cbAct_" . $revReadings{$receipt};
-            my $rAck      = "cbAck_" . $revReadings{$receipt};
-            my $rAckAt    = "cbAckAt_" . $revReadings{$receipt};
-            my $rAckBy    = "cbAckBy_" . $revReadings{$receipt};
-            my $rCancelId = "cbCancelId_" . $revReadings{$receipt};
-            my $rDev      = "cbDev_" . $revReadings{$receipt};
-
-            return ( "text/plain; charset=utf-8",
-                "NOK " . $receipt . ": invalid argument 'acknowledged'" )
-              if ( !defined( $webArgs->{acknowledged} )
-                || $webArgs->{acknowledged} ne "1" );
-
-            return ( "text/plain; charset=utf-8",
-                "NOK " . $receipt . ": invalid argument 'acknowledged_by'" )
-              if ( !defined( $webArgs->{acknowledged_by} )
-                || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
-
-            if ( ReadingsVal( $name, $rAck, "1" ) eq "0"
-                && $revReadings{$receipt} > int( time() ) )
-            {
-                delete $hash->{READINGS}{$rCancelId}
-                  if ( defined( $hash->{READINGS}{$rCancelId} ) );
-
-                readingsBeginUpdate($hash);
-
-                readingsBulkUpdate( $hash, $rAck, "1" );
-                readingsBulkUpdate( $hash, $rAckBy,
-                    $webArgs->{acknowledged_by} );
-
-                if ( defined( $webArgs->{acknowledged_at} )
-                    && $webArgs->{acknowledged_at} ne "" )
-                {
-                    readingsBulkUpdate( $hash, $rAckAt,
-                        $webArgs->{acknowledged_at} );
-                }
-                else {
-                    readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
-                }
-
-                my $redirect = "";
-
-                # run FHEM command if desired
-                if ( ReadingsVal( $name, $rAct, "pushover://" ) !~
-                    /^[\w-]+:\/\/.*$/ )
-                {
-                    $redirect = "pushover://";
-
-                    fhem ReadingsVal( $name, $rAct, "" );
-                    readingsBulkUpdate( $hash, $rAct,
-                        "executed: " . ReadingsVal( $name, $rAct, "" ) );
-                }
-
-                # redirect to presented URL
-                if ( ReadingsVal( $name, $rAct, "none" ) =~ /^[\w-]+:\/\/.*$/ )
-                {
-                    $redirect = ReadingsVal( $name, $rAct, "" );
-                }
-
-                readingsEndUpdate( $hash, 1 );
-
-                return (
-                    "text/html; charset=utf-8",
-                    "<html><head><meta http-equiv=\"refresh\" content=\"0;url="
-                      . $redirect
-                      . "\"></head><body><a href=\""
-                      . $redirect
-                      . "\">Click here to get redirected to your destination"
-                      . "</a></body></html>"
-                ) if ( $redirect ne "" );
-
-            }
-            else {
-                Log3 $name, 4,
-                  "Pushover $name callback: " . $receipt . " has expired";
-                return (
-                    "text/plain; charset=utf-8",
-                    "NOK " . $receipt . " has expired"
-                );
-            }
-
-        }
-        else {
-            Log3 $name, 4,
-              "Pushover $name callback: unable to find existing receipt "
-              . $receipt;
-            return ( "text/plain; charset=utf-8",
-                "NOK unable to find existing receipt " . $receipt );
-        }
-
-    }
-
-    # no data received
-    else {
-        Log3 $name, 5,
-          "Pushover $name callback: received malformed request\n$request";
-        return ( "text/plain; charset=utf-8", "NOK malformed request" );
-    }
-
-    return ( "text/plain; charset=utf-8", "OK" );
 }
 
 1;

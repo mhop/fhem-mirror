@@ -1,68 +1,28 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     70_ENIGMA2.pm
-#     An FHEM Perl module for controlling ENIGMA2 based TV receivers
-#     via network connection.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
-
-#use 5.012;
 use strict;
 use warnings;
 use Data::Dumper;
+use Time::Local;
+use Encode qw(encode_utf8 decode_utf8);
+
 use HttpUtils;
-use Encode;
 
-no if $] >= 5.017011, warnings => 'experimental';
-
-no warnings "all";
-
-sub ENIGMA2_Set($@);
-sub ENIGMA2_Get($@);
-sub ENIGMA2_GetStatus($;$);
-sub ENIGMA2_Define($$);
-sub ENIGMA2_Undefine($$);
-
-#########################
-# Forward declaration for remotecontrol module
-sub ENIGMA2_RClayout_TV();
-sub ENIGMA2_RCmakenotify($$);
-
-###################################
+# initialize ##################################################################
 sub ENIGMA2_Initialize($) {
     my ($hash) = @_;
 
     Log3 $hash, 5, "ENIGMA2_Initialize: Entering";
 
-    $hash->{parseParams} = 1;
-    $hash->{GetFn}       = "ENIGMA2_Get";
-    $hash->{SetFn}       = "ENIGMA2_Set";
     $hash->{DefFn}       = "ENIGMA2_Define";
     $hash->{UndefFn}     = "ENIGMA2_Undefine";
+    $hash->{SetFn}       = "ENIGMA2_Set";
+    $hash->{GetFn}       = "ENIGMA2_Get";
+    $hash->{parseParams} = 1;
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField model wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
+"disable:1,0 disabledForIntervals do_not_notify:1,0 https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField model wakeupCmd:textField WOL_useUdpBroadcast WOL_port WOL_mode:EW,UDP,BOTH "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -76,16 +36,10 @@ sub ENIGMA2_Initialize($) {
     $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10_SVG} =
       "ENIGMA2_RClayout_RC10_SVG";
     $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10} = "ENIGMA2_RClayout_RC10";
-
-#  $data{RC_layout}{ENIGMA2_VUplus_Solo2_SVG}  = "ENIGMA2_RClayout_VUplusSolo2_SVG";
-#  $data{RC_layout}{ENIGMA2_VUplus_Solo2}  = "ENIGMA2_RClayout_VUplusSolo2";
     $data{RC_layout}{ENIGMA2_VUplus_Duo2_SVG} =
       "ENIGMA2_RClayout_VUplusDuo2_SVG";
     $data{RC_layout}{ENIGMA2_VUplus_Duo2} = "ENIGMA2_RClayout_VUplusDuo2";
-
-#  $data{RC_layout}{ENIGMA2_VUplus_Ultimo_SVG}  = "ENIGMA2_RClayout_VUplusUltimo_SVG";
-#  $data{RC_layout}{ENIGMA2_VUplus_Ultimo}  = "ENIGMA2_RClayout_VUplusUltimo";
-    $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
+    $data{RC_makenotify}{ENIGMA2}         = "ENIGMA2_RCmakenotify";
 
     # 98_powerMap.pm support
     $hash->{powerMap} = {
@@ -104,76 +58,105 @@ sub ENIGMA2_Initialize($) {
             },
         },
     };
-
-    return;
 }
 
-#####################################
-sub ENIGMA2_GetStatus($;$) {
-    my ( $hash, $update ) = @_;
-    my $name     = $hash->{NAME};
-    my $interval = $hash->{INTERVAL};
-
-    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_GetStatus()";
-
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 );
-
-    return
-      if ( AttrVal( $name, "disable", 0 ) == 1 );
-
-    if ( !$update ) {
-        ENIGMA2_SendCommand( $hash, "powerstate" );
-    }
-    else {
-        ENIGMA2_SendCommand( $hash, "getcurrent" );
-    }
-
-    return;
-}
-
-###################################
-sub ENIGMA2_Get($@) {
+# regular Fn ##################################################################
+sub ENIGMA2_Define($$) {
     my ( $hash, $a, $h ) = @_;
     my $name = shift @$a;
-    my $what;
+    my $type = shift @$a;
 
-    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Get()";
+    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Define()";
 
-    return "argument is missing" if ( int(@$a) < 1 );
+    eval { require XML::Simple; };
+    return "Please install Perl XML::Simple to use module ENIGMA2"
+      if ($@);
 
-    $what = shift @$a;
+    if ( int(@$a) < 1 ) {
+        my $msg =
+            "Wrong syntax: "
+          . "define <name> ENIGMA2 <ip-or-hostname> [[[[<port>] [<poll-interval>]] [<http-user]] [<http-password>]]";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
 
-    if ( $what =~
-/^(power|input|volume|mute|channel|currentMedia|currentTitle|nextTitle|providername|servicevideosize)$/
-      )
-    {
-        if ( ReadingsVal( $name, $what, "" ) ne "" ) {
-            return ReadingsVal( $name, $what, "" );
+    $hash->{URL} = shift @$a;
+
+    # use port 80 if not defined
+    my $port = shift @$a || 80;
+    return "Port parameter needs to be of type integer"
+      unless ( $port =~ /^\d+$/ );
+
+    # use interval of 45sec if not defined
+    my $interval = shift @$a || 45;
+    return "Interval parameter needs to be of type integer"
+      unless ( $interval =~ /^\d+$/ );
+    $hash->{INTERVAL} = $interval;
+
+    my $http_user   = shift @$a;
+    my $http_passwd = shift @$a;
+    $hash->{URL} = "$http_user:$http_passwd@" . $hash->{URL}
+      if ( $hash->{URL} !~ /^https?:\/\//
+        && $hash->{URL} !~ /^\w+(:\w+)?\@/
+        && $http_user
+        && $http_passwd );
+    $hash->{URL} = "$http_user@" . $hash->{URL}
+      if ( $hash->{URL} !~ /^https?:\/\//
+        && $hash->{URL} !~ /^\w+(:\w+)?\@/
+        && $http_user
+        && !$http_passwd );
+    $hash->{URL} = "http://" . $hash->{URL}
+      unless ( $hash->{URL} =~ /^https?:\/\// || $port eq "443" );
+    $hash->{URL} = "https://" . $hash->{URL}
+      if ( $hash->{URL} !~ /^https?:\/\// && $port eq "443" );
+    $hash->{URL} .= ":$port"
+      unless ( $hash->{URL} =~ /:\d+$/ || $port eq "80" || $port eq "443" );
+    $hash->{URL} .= "/" unless ( $hash->{URL} =~ /\/$/ );
+
+    # set default settings on first define
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+
+        # use http-method POST for FritzBox environment as GET does not seem to
+        # work properly. Might restrict use to newer
+        # ENIGMA2 Webif versions or use of OWIF only.
+        if ( exists $ENV{CONFIG_PRODUKT_NAME}
+            && defined $ENV{CONFIG_PRODUKT_NAME} )
+        {
+            $attr{$name}{"http-method"} = 'POST';
         }
+
+        # default method is GET and should be compatible to most
+        # ENIGMA2 Webif versions
         else {
-            return "no such reading: $what";
+            $attr{$name}{"http-method"} = 'GET';
         }
+        $attr{$name}{webCmd} = 'channel:input';
+        $attr{$name}{devStateIcon} =
+          'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
+        $attr{$name}{icon} = 'dreambox';
     }
 
-    # streamUrl
-    elsif ( $what eq "streamUrl" ) {
-        my $device = "etc";
-        $device = "phone" if ( defined $a->[0] );
-        return
-            $hash->{URL}
-          . "/web/stream.m3u?ref="
-          . urlEncode( ReadingsVal( $name, "servicereference", "-" ) )
-          . "&device=$device";
-    }
+    # start the status update timer
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 1 );
 
-    else {
-        return
-"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg nextTitle:noArg providername:noArg servicevideosize:noArg streamUrl:,mobile ";
-    }
+    return undef;
 }
 
-###################################
+sub ENIGMA2_Undefine($$) {
+    my ( $hash, $arg ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Undefine()";
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    return undef;
+}
+
+sub ENIGMA2_Set($@);
+
 sub ENIGMA2_Set($@) {
     my ( $hash, $a, $h ) = @_;
     my $name        = shift @$a;
@@ -359,8 +342,8 @@ sub ENIGMA2_Set($@) {
                 return "wake-up command sent to MAC $macAddr";
             }
             else {
-                return
-"Device MAC address unknown. Please turn on the device manually once or set attribute macaddr.";
+                return "Device MAC address unknown. "
+                  . "Please turn on the device manually once or set attribute macaddr.";
             }
         }
         else {
@@ -423,8 +406,8 @@ sub ENIGMA2_Set($@) {
                 $cmd = "set=set" . $a->[0];
             }
             else {
-                return
-"Argument does not seem to be a valid integer between 0 and 100";
+                return "Argument does not seem to be a "
+                  . "valid integer between 0 and 100";
             }
             $result = ENIGMA2_SendCommand( $hash, "vol", $cmd );
         }
@@ -507,8 +490,8 @@ sub ENIGMA2_Set($@) {
                 $timeout = $timeout2;
             }
 
-            return
-"No type argument given, choose one of yesno info message attention"
+            return "No type argument given, "
+              . "choose one of yesno info message attention"
               unless ( defined($type) );
 
             return "No timeout argument given"
@@ -605,8 +588,8 @@ sub ENIGMA2_Set($@) {
     # channel
     elsif ( lc($set) eq "channel" ) {
 
-        return
-"No argument given, choose one of channel channelNumber servicereference "
+        return "No argument given, "
+          . "choose one of channel channelNumber servicereference "
           if ( !defined( $a->[0] ) );
 
         if (   defined( $a->[0] )
@@ -773,98 +756,52 @@ sub ENIGMA2_Set($@) {
         return $usage;
     }
 
-    return;
+    return undef;
 }
 
-###################################
-sub ENIGMA2_Define($$) {
+sub ENIGMA2_Get($@) {
     my ( $hash, $a, $h ) = @_;
     my $name = shift @$a;
-    my $type = shift @$a;
+    my $what;
 
-    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Define()";
+    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Get()";
 
-    eval { require XML::Simple; };
-    return "Please install Perl XML::Simple to use module ENIGMA2"
-      if ($@);
+    return "argument is missing" if ( int(@$a) < 1 );
 
-    if ( int(@$a) < 1 ) {
-        my $msg =
-"Wrong syntax: define <name> ENIGMA2 <ip-or-hostname> [[[[<port>] [<poll-interval>]] [<http-user]] [<http-password>]]";
-        Log3 $name, 4, $msg;
-        return $msg;
-    }
+    $what = shift @$a;
 
-    $hash->{URL} = shift @$a;
-
-    # use port 80 if not defined
-    my $port = shift @$a || 80;
-    return "Port parameter needs to be of type integer"
-      unless ( $port =~ /^\d+$/ );
-
-    # use interval of 45sec if not defined
-    my $interval = shift @$a || 45;
-    return "Interval parameter needs to be of type integer"
-      unless ( $interval =~ /^\d+$/ );
-    $hash->{INTERVAL} = $interval;
-
-    my $http_user   = shift @$a;
-    my $http_passwd = shift @$a;
-    $hash->{URL} = "$http_user:$http_passwd@" . $hash->{URL}
-      if ( $hash->{URL} !~ /^https?:\/\//
-        && $hash->{URL} !~ /^\w+(:\w+)?\@/
-        && $http_user
-        && $http_passwd );
-    $hash->{URL} = "$http_user@" . $hash->{URL}
-      if ( $hash->{URL} !~ /^https?:\/\//
-        && $hash->{URL} !~ /^\w+(:\w+)?\@/
-        && $http_user
-        && !$http_passwd );
-    $hash->{URL} = "http://" . $hash->{URL}
-      unless ( $hash->{URL} =~ /^https?:\/\// || $port eq "443" );
-    $hash->{URL} = "https://" . $hash->{URL}
-      if ( $hash->{URL} !~ /^https?:\/\// && $port eq "443" );
-    $hash->{URL} .= ":$port"
-      unless ( $hash->{URL} =~ /:\d+$/ || $port eq "80" || $port eq "443" );
-    $hash->{URL} .= "/" unless ( $hash->{URL} =~ /\/$/ );
-
-    # set default settings on first define
-    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-
-        # use http-method POST for FritzBox environment as GET does not seem to
-        # work properly. Might restrict use to newer
-        # ENIGMA2 Webif versions or use of OWIF only.
-        if ( exists $ENV{CONFIG_PRODUKT_NAME}
-            && defined $ENV{CONFIG_PRODUKT_NAME} )
-        {
-            $attr{$name}{"http-method"} = 'POST';
+    if ( $what =~
+/^(power|input|volume|mute|channel|currentMedia|currentTitle|nextTitle|providername|servicevideosize)$/
+      )
+    {
+        if ( ReadingsVal( $name, $what, "" ) ne "" ) {
+            return ReadingsVal( $name, $what, "" );
         }
-
-        # default method is GET and should be compatible to most
-        # ENIGMA2 Webif versions
         else {
-            $attr{$name}{"http-method"} = 'GET';
+            return "no such reading: $what";
         }
-        $attr{$name}{webCmd} = 'channel:input';
-        $attr{$name}{devStateIcon} =
-          'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
-        $attr{$name}{icon} = 'dreambox';
     }
 
-    # start the status update timer
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 1 );
+    # streamUrl
+    elsif ( $what eq "streamUrl" ) {
+        my $device = "etc";
+        $device = "phone" if ( defined $a->[0] );
+        return
+            $hash->{URL}
+          . "/web/stream.m3u?ref="
+          . urlEncode( ReadingsVal( $name, "servicereference", "-" ) )
+          . "&device=$device";
+    }
 
-    return;
+    else {
+        return "Unknown argument $what, "
+          . "choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg nextTitle:noArg providername:noArg servicevideosize:noArg streamUrl:,mobile ";
+    }
+    
+    return undef;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
-
-###################################
+# module Fn ####################################################################
 sub ENIGMA2_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
     my $name            = $hash->{NAME};
@@ -930,7 +867,7 @@ sub ENIGMA2_SendCommand($$;$$) {
                     'Accept-Charset' => 'UTF-8',
                 },
                 sslargs => {
-                    SSL_verify_mode => 0,
+                    SSL_verify_mode => 'SSL_VERIFY_NONE',
                 },
             }
         );
@@ -967,7 +904,7 @@ sub ENIGMA2_SendCommand($$;$$) {
                     'Accept-Charset' => 'UTF-8',
                 },
                 sslargs => {
-                    SSL_verify_mode => 0,
+                    SSL_verify_mode => 'SSL_VERIFY_NONE',
                 },
             }
         );
@@ -984,7 +921,6 @@ sub ENIGMA2_SendCommand($$;$$) {
     return;
 }
 
-###################################
 sub ENIGMA2_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash     = $param->{hash};
@@ -1059,7 +995,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                     if ( !defined($cmd) || $cmd eq "" ) {
                         Log3 $name, 5,
-"ENIGMA2 $name: RES ERROR $service - unable to parse malformed XML: $@\n"
+                            "ENIGMA2 $name: "
+                          . "RES ERROR $service - unable to parse malformed XML: $@\n"
                           . $data;
                     }
                     else {
@@ -1547,7 +1484,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
             }
             else {
                 Log3 $name, 2,
-"ENIGMA2 $name: ERROR: boxinfo could not be read - /about sent malformed response";
+                  "ENIGMA2 $name: "
+                  . "ERROR: boxinfo could not be read - /about sent malformed response";
             }
         }
 
@@ -1580,7 +1518,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             || $return->{e2service}{$e2reading} eq "True" )
                         {
                             Log3 $name, 5,
-"ENIGMA2 $name: transforming value of $reading to lower case";
+                              "ENIGMA2 $name: "
+                              . "transforming value of $reading to lower case";
 
                             $return->{e2service}{$e2reading} =
                               lc( $return->{e2service}{$e2reading} );
@@ -1615,7 +1554,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                 && $servicetype[2] ne "10" )
                             {
                                 Log3 $name, 5,
-"ENIGMA2 $name: detected servicereference type: tv";
+                                  "ENIGMA2 $name: "
+                                  . "detected servicereference type: tv";
                                 readingsBulkUpdate( $hash, "input", "tv" )
                                   if (
                                     ReadingsVal( $name, "input", "" ) ne "tv" );
@@ -1628,19 +1568,22 @@ sub ENIGMA2_ReceiveCommand($$$) {
                               )
                             {
                                 Log3 $name, 5,
-"ENIGMA2 $name: detected servicereference type: radio";
+                                  "ENIGMA2 $name: "
+                                  . "detected servicereference type: radio";
                                 readingsBulkUpdateIfChanged( $hash, "input",
                                     "radio" );
                             }
                             else {
                                 Log3 $name, 2,
-"ENIGMA2 $name: ERROR: servicereference type could not be detected (neither 'tv' nor 'radio')";
+                                  "ENIGMA2 $name: "
+                                  . "ERROR: servicereference type could not be detected (neither 'tv' nor 'radio')";
                             }
                         }
                     }
                     else {
                         Log3 $name, 5,
-"ENIGMA2 $name: received no value for reading $reading";
+                          "ENIGMA2 $name: "
+                          . "received no value for reading $reading";
 
                         if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
                             readingsBulkUpdate( $hash, $reading, "-" );
@@ -1692,7 +1635,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             && $eventNow->{$e2reading} ne "" )
                         {
                             Log3 $name, 5,
-"ENIGMA2 $name: detected valid reading $e2reading for current event";
+                              "ENIGMA2 $name: "
+                              . "detected valid reading $e2reading for current event";
 
                             if ( ReadingsVal( $name, $reading, "" ) ne
                                 $eventNow->{$e2reading} )
@@ -1708,7 +1652,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         }
                         else {
                             Log3 $name, 5,
-"ENIGMA2 $name: no valid reading $e2reading found for current event";
+                              "ENIGMA2 $name: "
+                              . "no valid reading $e2reading found for current event";
 
                             if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
                                 readingsBulkUpdate( $hash, $reading, "-" );
@@ -1727,7 +1672,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             && $eventNext->{$e2reading} ne "" )
                         {
                             Log3 $name, 5,
-"ENIGMA2 $name: detected valid reading $e2reading for next event";
+                              "ENIGMA2 $name: "
+                              . "detected valid reading $e2reading for next event";
 
                             if ( ReadingsVal( $name, $readingN, "" ) ne
                                 $eventNext->{$e2reading} )
@@ -1743,7 +1689,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         }
                         else {
                             Log3 $name, 5,
-"ENIGMA2 $name: no valid reading $e2reading found for next event";
+                              "ENIGMA2 $name: "
+                              . "no valid reading $e2reading found for next event";
 
                             if ( ReadingsVal( $name, $readingN, "" ) ne "-" ) {
                                 readingsBulkUpdate( $hash, $readingN, "-" );
@@ -1823,7 +1770,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
             }
             else {
                 Log3 $name, 2,
-"ENIGMA2 $name: ERROR: current service info could not be read - /getcurrent sent malformed response";
+                  "ENIGMA2 $name: "
+                  . "ERROR: current service info could not be read - /getcurrent sent malformed response";
             }
 
         }
@@ -2018,13 +1966,13 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     $readingname = "recordings" . $ri . "_servicename";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
                       if ( $recordings{$ri}{servicename} =~
-/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
+m/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
                       );
 
                     $readingname = "recordings" . $ri . "_name";
                     readingsBulkUpdateIfChanged( $hash, $readingname, $2 )
                       if ( $recordings{$ri}{name} =~
-/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
+m/^(\s*[\[\(\{].*[\]\)\}]\s*)?([\s\w\(\)_-]+)(\s*[\[\(\{].*[\]\)\}]\s*)?$/
                       );
                 }
             }
@@ -2192,20 +2140,29 @@ sub ENIGMA2_ReceiveCommand($$$) {
     return;
 }
 
-###################################
-sub ENIGMA2_Undefine($$) {
-    my ( $hash, $arg ) = @_;
-    my $name = $hash->{NAME};
+sub ENIGMA2_GetStatus($;$) {
+    my ( $hash, $update ) = @_;
+    my $name     = $hash->{NAME};
+    my $interval = $hash->{INTERVAL};
 
-    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Undefine()";
+    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_GetStatus()";
 
-    # Stop the internal GetStatus-Loop and exit
     RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 );
+
+    return
+      if ( AttrVal( $name, "disable", 0 ) == 1 );
+
+    if ( !$update ) {
+        ENIGMA2_SendCommand( $hash, "powerstate" );
+    }
+    else {
+        ENIGMA2_SendCommand( $hash, "getcurrent" );
+    }
 
     return;
 }
 
-###################################
 sub ENIGMA2_GetStateAV($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -2227,316 +2184,6 @@ sub ENIGMA2_GetStateAV($) {
     }
 }
 
-###################################
-sub ENIGMA2_wake ($$) {
-    if ( !$modules{WOL}{LOADED}
-        && -f "$attr{global}{modpath}/FHEM/98_WOL.pm" )
-    {
-        my $ret = CommandReload( undef, "98_WOL" );
-        return $ret if ($ret);
-    }
-    elsif ( !-f "$attr{global}{modpath}/FHEM/98_WOL.pm" ) {
-        return "Missing module: $attr{global}{modpath}/FHEM/98_WOL.pm";
-    }
-
-    my ( $name, $mac ) = @_;
-    my $hash = $defs{$name};
-    my $host =
-      AttrVal( $name, "WOL_useUdpBroadcast",
-        AttrVal( $name, "useUdpBroadcast", "255.255.255.255" ) );
-    my $port = AttrVal( $name, "WOL_port", "9" );
-    my $mode = lc( AttrVal( $name, "WOL_mode", "UDP" ) );
-
-    Log3 $name, 4,
-      "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
-      . $mac;
-
-    if ( $mode eq "both" || $mode eq "ew" ) {
-        WOL_by_ew( $hash, $mac );
-    }
-    if ( $mode eq "both" || $mode eq "udp" ) {
-        WOL_by_udp( $hash, $mac, $host, $port );
-    }
-}
-
-#####################################
-# Callback from 95_remotecontrol for command makenotify.
-sub ENIGMA2_RCmakenotify($$) {
-    my ( $nam, $ndev ) = @_;
-    my $nname = "notify_$nam";
-
-    fhem( "define $nname notify $nam set $ndev remoteControl " . '$EVENT', 1 );
-    Log3 undef, 2, "[remotecontrol:ENIGMA2] Notify created: $nname";
-    return "Notify created by ENIGMA2: $nname";
-}
-
-#####################################
-# RC layouts
-
-# Dreambox DM500 + DM800 with SVG
-sub ENIGMA2_RClayout_DM800_SVG() {
-    my @row;
-
-    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
-    $row[8] =
-      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
-    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
-
-    $row[14] =
-"RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
-    $row[15] =
-"TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
-
-    $row[16] = "attr rc_iconpath icons/remotecontrol";
-    $row[17] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-# Dreambox DM500 + DM800 with PNG
-sub ENIGMA2_RClayout_DM800() {
-    my @row;
-
-    $row[0] = ":blank,:blank,POWER:POWEROFF";
-    $row[1] = ":blank,:blank,:blank";
-
-    $row[2] = "1,2,3";
-    $row[3] = "4,5,6";
-    $row[4] = "7,8,9";
-    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-    $row[6] = ":blank,:blank,:blank";
-
-    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
-    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
-    $row[9] = ":blank,:blank,:blank";
-
-    $row[10] = "INFO,UP,MENU";
-    $row[11] = "LEFT,OK,RIGHT";
-    $row[12] = "AUDIO,DOWN,VIDEO";
-    $row[13] = ":blank,:blank,:blank";
-
-    $row[14] = "RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
-    $row[15] = "TV:TVstop,RADIO:RADIOred,TEXT,HELP";
-
-    $row[16] = "attr rc_iconpath icons/remotecontrol";
-    $row[17] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-# Dreambox DM800se + DM8000 with SVG
-sub ENIGMA2_RClayout_DM8000_SVG() {
-    my @row;
-
-    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
-    $row[8] =
-      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
-    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
-
-    $row[14] =
-      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-    $row[15] =
-"REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
-    $row[16] =
-      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
-
-    $row[17] = "attr rc_iconpath icons/remotecontrol";
-    $row[18] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-# Dreambox DM800se + DM8000 with PNG
-sub ENIGMA2_RClayout_DM8000() {
-    my @row;
-
-    $row[0] = ":blank,:blank,POWER:POWEROFF";
-    $row[1] = ":blank,:blank,:blank";
-
-    $row[2] = "1,2,3";
-    $row[3] = "4,5,6";
-    $row[4] = "7,8,9";
-    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-    $row[6] = ":blank,:blank,:blank";
-
-    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
-    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
-    $row[9] = ":blank,:blank,:blank";
-
-    $row[10] = "INFO,UP,MENU";
-    $row[11] = "LEFT,OK,RIGHT";
-    $row[12] = "AUDIO,DOWN,VIDEO";
-    $row[13] = ":blank,:blank,:blank";
-
-    $row[14] = "RED,GREEN,YELLOW,BLUE";
-    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
-    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
-
-    $row[17] = "attr rc_iconpath icons/remotecontrol";
-    $row[18] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-# Dreambox RC10 with SVG
-sub ENIGMA2_RClayout_RC10_SVG() {
-    my @row;
-
-    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-    $row[6] =
-      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-    $row[7] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[8]  = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-    $row[9]  = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-    $row[10] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-    $row[11] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
-
-    $row[12] = "VOLUMEUP:rc_VOLPLUS.svg,:rc_BLANK.svg,CHANNELUP:rc_UP.svg";
-    $row[13] =
-      "VOLUMEDOWN:rc_VOLMINUS.svg,MUTE:rc_MUTE.svg,CHANNELDOWN:rc_DOWN.svg";
-    $row[14] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[15] =
-"REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
-    $row[16] =
-      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
-
-    $row[17] = "attr rc_iconpath icons";
-    $row[18] = "attr rc_iconprefix rc_";
-    return @row;
-}
-
-# Dreambox RC10 with PNG
-sub ENIGMA2_RClayout_RC10() {
-    my @row;
-
-    $row[0] = ":blank,:blank,POWER:POWEROFF";
-    $row[1] = ":blank,:blank,:blank";
-
-    $row[2] = "1,2,3";
-    $row[3] = "4,5,6";
-    $row[4] = "7,8,9";
-    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-    $row[6] = "RED,GREEN,YELLOW,BLUE";
-    $row[7] = ":blank,:blank,:blank";
-
-    $row[8]  = "INFO,UP,MENU";
-    $row[9]  = "LEFT,OK,RIGHT";
-    $row[10] = "AUDIO,DOWN,VIDEO";
-    $row[11] = ":blank,EXIT,:blank";
-
-    $row[12] = "VOLUMEUP:VOLUP,:blank,CHANNELUP:CHUP2";
-    $row[13] = "VOLUMEDOWN:VOLDOWN,MUTE,CHANNELDOWN:CHDOWN2";
-    $row[14] = ":blank,:blank,:blank";
-
-    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
-    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
-
-    $row[17] = "attr rc_iconpath icons/remotecontrol";
-    $row[18] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-# VU+ Duo2 with SVG
-sub ENIGMA2_RClayout_VUplusDuo2_SVG() {
-    my @row;
-
-    $row[0] = ":rc_BLANK.svg,MUTE:rc_MUTE.svg,POWER:rc_POWER.svg";
-    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[2] = "REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,FASTFORWARD:rc_FF.svg";
-    $row[3] = "RECORD:rc_REC.svg,STOP:rc_STOP.svg,VIDEO:rc_VIDEO.svg";
-    $row[4] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[5] = "TV:rc_TV.svg,AUDIO:rc_AUDIO.svg,RADIO:rc_RADIO.svg";
-    $row[6] = "TEXT:rc_TEXT.svg,HELP:rc_HELP.svg,AV:rc_AV.svg";
-    $row[7] = "INFO:rc_EPG.svg,MENU:rc_MENU.svg,EXIT:rc_EXIT.svg";
-    $row[8] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[9]  = "VOLUMEUP:rc_VOLPLUS.svg,UP:rc_UP.svg,CHANNELUP:rc_PLUS.svg";
-    $row[10] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-    $row[11] =
-      "VOLUMEDOWN:rc_VOLMINUS.svg,DOWN:rc_DOWN.svg,CHANNELDOWN:rc_MINUS.svg";
-
-    $row[12] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
-
-    $row[13] =
-      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-    $row[14] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-    $row[15] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-    $row[16] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-    $row[17] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-
-    $row[18] = "attr rc_iconpath icons";
-    $row[19] = "attr rc_iconprefix rc_";
-    return @row;
-}
-
-# VU+ Duo2 with PNG
-sub ENIGMA2_RClayout_VUplusDuo2() {
-    my @row;
-
-    $row[0] = ":blank,MUTE,POWER:POWEROFF";
-    $row[1] = ":blank,:blank,:blank";
-
-    $row[2] = "REWIND,PLAY,FASTFORWARD:FF";
-    $row[3] = "RECORD:REC,STOP,VIDEO";
-    $row[4] = ":blank,:blank,:blank";
-
-    $row[5] = "TV,AUDIO,RADIO:RADIO";
-    $row[6] = "TEXT,HELP,AV";
-    $row[7] = "INFO,MENU,EXIT";
-    $row[8] = ":blank,:blank,:blank";
-
-    $row[9]  = "VOLUMEUP:VOLUP,UP,CHANNELUP:CHUP2";
-    $row[10] = "LEFT,OK,RIGHT";
-    $row[11] = "VOLUMEDOWN:VOLDOWN,DOWN,CHANNELDOWN:CHDOWN2";
-
-    $row[12] = ":blank,:blank,:blank";
-
-    $row[13] = "RED,GREEN,YELLOW,BLUE";
-    $row[14] = "1,2,3";
-    $row[15] = "4,5,6";
-    $row[16] = "7,8,9";
-    $row[17] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-
-    $row[18] = "attr rc_iconpath icons/remotecontrol";
-    $row[19] = "attr rc_iconprefix black_btn_";
-    return @row;
-}
-
-###################################
 sub ENIGMA2_GetRemotecontrolCommand($) {
     my ($command) = @_;
     my $commands = {
@@ -2853,6 +2500,306 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     else {
         return "";
     }
+}
+
+sub ENIGMA2_wake ($$) {
+    if ( !$modules{WOL}{LOADED}
+        && -f "$attr{global}{modpath}/FHEM/98_WOL.pm" )
+    {
+        my $ret = CommandReload( undef, "98_WOL" );
+        return $ret if ($ret);
+    }
+    elsif ( !-f "$attr{global}{modpath}/FHEM/98_WOL.pm" ) {
+        return "Missing module: $attr{global}{modpath}/FHEM/98_WOL.pm";
+    }
+
+    my ( $name, $mac ) = @_;
+    my $hash = $defs{$name};
+    my $host =
+      AttrVal( $name, "WOL_useUdpBroadcast",
+        AttrVal( $name, "useUdpBroadcast", "255.255.255.255" ) );
+    my $port = AttrVal( $name, "WOL_port", "9" );
+    my $mode = lc( AttrVal( $name, "WOL_mode", "UDP" ) );
+
+    Log3 $name, 4,
+      "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
+      . $mac;
+
+    if ( $mode eq "both" || $mode eq "ew" ) {
+        WOL_by_ew( $hash, $mac );
+    }
+    if ( $mode eq "both" || $mode eq "udp" ) {
+        WOL_by_udp( $hash, $mac, $host, $port );
+    }
+}
+
+sub ENIGMA2_RCmakenotify($$) {
+    my ( $nam, $ndev ) = @_;
+    my $nname = "notify_$nam";
+
+    fhem( "define $nname notify $nam set $ndev remoteControl " . '$EVENT', 1 );
+    Log3 undef, 2, "[remotecontrol:ENIGMA2] Notify created: $nname";
+    return "Notify created by ENIGMA2: $nname";
+}
+
+sub ENIGMA2_RClayout_DM800_SVG() {
+    my @row;
+
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+    $row[8] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+    $row[14] =
+        "RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,"
+      . "YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
+    $row[15] =
+        "TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,"
+      . "TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
+
+    $row[16] = "attr rc_iconpath icons/remotecontrol";
+    $row[17] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_DM800() {
+    my @row;
+
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
+
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = ":blank,:blank,:blank";
+
+    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+    $row[9] = ":blank,:blank,:blank";
+
+    $row[10] = "INFO,UP,MENU";
+    $row[11] = "LEFT,OK,RIGHT";
+    $row[12] = "AUDIO,DOWN,VIDEO";
+    $row[13] = ":blank,:blank,:blank";
+
+    $row[14] = "RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
+    $row[15] = "TV:TVstop,RADIO:RADIOred,TEXT,HELP";
+
+    $row[16] = "attr rc_iconpath icons/remotecontrol";
+    $row[17] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_DM8000_SVG() {
+    my @row;
+
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+    $row[8] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+    $row[14] =
+        "RED:rc_RED.svg,GREEN:rc_GREEN.svg,"
+      . "YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[15] =
+        "REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,"
+      . "STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+    $row[16] =
+      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_DM8000() {
+    my @row;
+
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
+
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = ":blank,:blank,:blank";
+
+    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+    $row[9] = ":blank,:blank,:blank";
+
+    $row[10] = "INFO,UP,MENU";
+    $row[11] = "LEFT,OK,RIGHT";
+    $row[12] = "AUDIO,DOWN,VIDEO";
+    $row[13] = ":blank,:blank,:blank";
+
+    $row[14] = "RED,GREEN,YELLOW,BLUE";
+    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
+    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
+
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_RC10_SVG() {
+    my @row;
+
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] =
+      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[7] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[8]  = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[9]  = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[10] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[11] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+    $row[12] = "VOLUMEUP:rc_VOLPLUS.svg,:rc_BLANK.svg,CHANNELUP:rc_UP.svg";
+    $row[13] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,MUTE:rc_MUTE.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[14] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[15] =
+        "REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,"
+      . "STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+    $row[16] =
+      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+
+    $row[17] = "attr rc_iconpath icons";
+    $row[18] = "attr rc_iconprefix rc_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_RC10() {
+    my @row;
+
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
+
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = "RED,GREEN,YELLOW,BLUE";
+    $row[7] = ":blank,:blank,:blank";
+
+    $row[8]  = "INFO,UP,MENU";
+    $row[9]  = "LEFT,OK,RIGHT";
+    $row[10] = "AUDIO,DOWN,VIDEO";
+    $row[11] = ":blank,EXIT,:blank";
+
+    $row[12] = "VOLUMEUP:VOLUP,:blank,CHANNELUP:CHUP2";
+    $row[13] = "VOLUMEDOWN:VOLDOWN,MUTE,CHANNELDOWN:CHDOWN2";
+    $row[14] = ":blank,:blank,:blank";
+
+    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
+    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
+
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_VUplusDuo2_SVG() {
+    my @row;
+
+    $row[0] = ":rc_BLANK.svg,MUTE:rc_MUTE.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[2] = "REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,FASTFORWARD:rc_FF.svg";
+    $row[3] = "RECORD:rc_REC.svg,STOP:rc_STOP.svg,VIDEO:rc_VIDEO.svg";
+    $row[4] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[5] = "TV:rc_TV.svg,AUDIO:rc_AUDIO.svg,RADIO:rc_RADIO.svg";
+    $row[6] = "TEXT:rc_TEXT.svg,HELP:rc_HELP.svg,AV:rc_AV.svg";
+    $row[7] = "INFO:rc_EPG.svg,MENU:rc_MENU.svg,EXIT:rc_EXIT.svg";
+    $row[8] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[9]  = "VOLUMEUP:rc_VOLPLUS.svg,UP:rc_UP.svg,CHANNELUP:rc_PLUS.svg";
+    $row[10] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[11] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,DOWN:rc_DOWN.svg,CHANNELDOWN:rc_MINUS.svg";
+
+    $row[12] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+    $row[13] =
+      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[14] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[15] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[16] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[17] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+
+    $row[18] = "attr rc_iconpath icons";
+    $row[19] = "attr rc_iconprefix rc_";
+    return @row;
+}
+
+sub ENIGMA2_RClayout_VUplusDuo2() {
+    my @row;
+
+    $row[0] = ":blank,MUTE,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
+
+    $row[2] = "REWIND,PLAY,FASTFORWARD:FF";
+    $row[3] = "RECORD:REC,STOP,VIDEO";
+    $row[4] = ":blank,:blank,:blank";
+
+    $row[5] = "TV,AUDIO,RADIO:RADIO";
+    $row[6] = "TEXT,HELP,AV";
+    $row[7] = "INFO,MENU,EXIT";
+    $row[8] = ":blank,:blank,:blank";
+
+    $row[9]  = "VOLUMEUP:VOLUP,UP,CHANNELUP:CHUP2";
+    $row[10] = "LEFT,OK,RIGHT";
+    $row[11] = "VOLUMEDOWN:VOLDOWN,DOWN,CHANNELDOWN:CHDOWN2";
+
+    $row[12] = ":blank,:blank,:blank";
+
+    $row[13] = "RED,GREEN,YELLOW,BLUE";
+    $row[14] = "1,2,3";
+    $row[15] = "4,5,6";
+    $row[16] = "7,8,9";
+    $row[17] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+
+    $row[18] = "attr rc_iconpath icons/remotecontrol";
+    $row[19] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 1;

@@ -1,41 +1,11 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     97_msgConfig.pm
-#     Global configuration settings for FHEM msg command.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
-
 use strict;
 use warnings;
 use Data::Dumper;
 
-sub msgConfig_Set($@);
-sub msgConfig_Get($@);
-sub msgConfig_Define($$);
-sub msgConfig_Undefine($$);
-
-###################################
+# initialize ##################################################################
 sub msgConfig_Initialize($) {
     my ($hash) = @_;
 
@@ -173,7 +143,7 @@ sub msgConfig_Initialize($) {
     }
 }
 
-###################################
+# regular Fn ##################################################################
 sub msgConfig_Define($$) {
 
     my ( $hash, $def ) = @_;
@@ -212,7 +182,6 @@ sub msgConfig_Define($$) {
     return undef;
 }
 
-###################################
 sub msgConfig_Undefine($$) {
 
     my ( $hash, $name ) = @_;
@@ -223,7 +192,6 @@ sub msgConfig_Undefine($$) {
     return undef;
 }
 
-###################################
 sub msgConfig_Set($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
@@ -275,7 +243,7 @@ sub msgConfig_Set($@) {
         $attr{$device}{userattr} .= " msgLocationName"
           if ( defined( $attr{$device}{userattr} )
             && $attr{$device}{userattr} !~
-/^msgLocationName$|^msgLocationName\s|\smsgLocationName\s|\smsgLocationName$/
+m/^msgLocationName$|^msgLocationName\s|\smsgLocationName\s|\smsgLocationName$/
           );
         $attr{$device}{userattr} = "msgLocationName"
           if ( !defined( $attr{$device}{userattr} ) );
@@ -399,9 +367,10 @@ sub msgConfig_Set($@) {
         return
 "Unknown argument $what, choose one of cleanReadings addLocation createSwitcherDev:de,en createResidentsDev:de,en";
     }
+
+    return undef;
 }
 
-###################################
 sub msgConfig_Get($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
@@ -578,9 +547,11 @@ sub msgConfig_Get($@) {
         return
 "Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen,queue";
     }
+
+    return undef;
 }
 
-########################################
+# module Fn ####################################################################
 sub MSG_FindAttrVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
     $msgType = "" unless ($msgType);
@@ -636,7 +607,6 @@ sub MSG_FindAttrVal($$$$) {
       );
 }
 
-########################################
 sub msgConfig_FindReadingsVal($$$$) {
     my ( $d, $n, $msgType, $default ) = @_;
     $msgType = ucfirst($msgType) if ($msgType);
@@ -664,7 +634,6 @@ sub msgConfig_FindReadingsVal($$$$) {
       );
 }
 
-########################################
 sub msgConfig_QueueAdd(@) {
     my (
         $msgA,          $params,   $datetime,  $msgID,
@@ -703,7 +672,6 @@ sub msgConfig_QueueAdd(@) {
     return 1;
 }
 
-########################################
 sub msgConfig_QueueReleaseMsgId($$) {
     my ( $recipient, $msgID ) = @_;
 
