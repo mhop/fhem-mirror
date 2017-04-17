@@ -271,25 +271,25 @@ sub PHILIPS_AUDIO_Set
       my @favoriteNumber;
       foreach my $readings (keys % {$hash->{READINGS}})
       {
-        push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(.*)/);
-        push @favoriteNumber, $1 if($readings =~ m/^.inetRadioFavorite_(.*)/);
+        push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(..)$/);
+        push @favoriteNumber, $1 if($readings =~ m/^.inetRadioFavorite_(..)/);
       }
       
       (s/\*/\[asterisk\]/g) for @favoriteList; # '*' not shown correctly
-      (s/#/\[hash\]/g)     for @favoriteList; # '#' not shown correctly
-      (s/[ :;,']/_/g)      for @favoriteList; # Replace not allowed characters
+      (s/#/\[hash\]/g)      for @favoriteList; # '#' not shown correctly
+      (s/[ :;,'.\\]/_/g)    for @favoriteList; # Replace not allowed characters
            
       my @presetList;
       my @presetNumber;
       foreach my $readings (keys % {$hash->{READINGS}})
       {
-        push @presetList, $1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioPreset_(.*)/);
-        push @presetNumber, $1 if($readings =~ m/^.inetRadioPreset_(.*)/);
+        push @presetList, $1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioPreset_(..)/);
+        push @presetNumber, $1 if($readings =~ m/^.inetRadioPreset_(..)/);
       }
       
       (s/\*/\[asterisk\]/g) for @presetList; # '*' not shown correctly
-      (s/#/\[hash\]/g)     for @presetList; # '#' not shown correctly
-      (s/[ :;,']/_/g)      for @presetList; # Replace not allowed characters           
+      (s/#/\[hash\]/g)      for @presetList; # '#' not shown correctly
+      (s/[ :;,'.\\]/_/g)    for @presetList; # Replace not allowed characters           
             
       $usage .= "selectFavorite:"        .join(",",("---",(sort @favoriteList))) . " ";
       $usage .= "selectPreset:"          .join(",",("---",(sort @presetList)))   . " ";		   
@@ -312,8 +312,8 @@ sub PHILIPS_AUDIO_Set
       }
 		  
       @selectStream = sort map{s/\*/\[asterisk\]/g;$_;} grep/._..*$/,@selectStream; # Replace *
-      @selectStream = sort map{s/#/\[hash\]/g;$_;}     grep/._..*$/,@selectStream; # Replace #
-		  @selectStream = sort map{s/[ :;,']/_/g;$_;}      grep/._..*$/,@selectStream; # Replace not allowed characters
+      @selectStream = sort map{s/#/\[hash\]/g;$_;}      grep/._..*$/,@selectStream; # Replace #
+		  @selectStream = sort map{s/[ :;,'.\\]/_/g;$_;}    grep/._..*$/,@selectStream; # Replace not allowed characters
 		  
 		  $usage .= "selectStream:".join(",",("---",(sort @selectStream))) . " ";
     
@@ -1887,10 +1887,7 @@ sub PHILIPS_AUDIO_ParseResponse
             #} 
             
             $data =~ s/\R//g;        # Remove new lines
-			
-            # Delete old readings			
-            delete $hash->{READINGS}{$_} foreach (grep /.inetRadioFavorite_..$/, keys %{$hash->{READINGS}});
-                  
+			      
             while($data =~ /{'title':'(.+?)',/g)
             {            
               $favoriteName = $1;
