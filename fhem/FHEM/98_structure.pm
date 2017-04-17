@@ -88,6 +88,7 @@ structure_Define($$)
   my $stype   = shift(@a);
 
   $hash->{ATTR} = $stype;
+  $hash->{CHANGEDCNT} = 0;
 
   my %list;
   my $aList = "$stype ${stype}_map structexclude";
@@ -285,6 +286,7 @@ structure_Notify($$)
                                 structure_getChangedDevice($dev->{NAME}), 0);
   readingsBulkUpdate($hash, "state", $newState);
   readingsEndUpdate($hash, 1);
+  $hash->{CHANGEDCNT}++;
 
   delete($hash->{INNTFY});
   undef;
@@ -395,11 +397,17 @@ structure_Set($@)
     my $sret;
     if($filter) {
       my $ret;
-      if(defined($defs{$list[0]}) && $defs{$list[0]}{TYPE} eq "structure") {
-        AnalyzeCommand(undef, "set $list[0] [$filter] ".
+      my $dl0 = $defs{$list[0]};
+      if(defined($dl0) && $dl0->{TYPE} eq "structure") {
+        my ($ostate,$ocnt) = ($dl0->{STATE}, $dl0->{CHANGEDCNT});
+        $ret = AnalyzeCommand(undef, "set $list[0] [$filter] ".
                                 join(" ", @list[1..@list-1]) );
+        if($dl0->{CHANGEDCNT} == $ocnt) { # Forum #70488
+          $dl0->{STATE} = $dl0->{READINGS}{state}{VAL} = $ostate;
+          structure_Notify($hash, $dl0);
+        }
       } else {
-        AnalyzeCommand(undef, "set $list[0]:$filter ".
+        $ret = AnalyzeCommand(undef, "set $list[0]:$filter ".
                                 join(" ", @list[1..@list-1]) );
       }
       $sret .= $ret if( $ret );
