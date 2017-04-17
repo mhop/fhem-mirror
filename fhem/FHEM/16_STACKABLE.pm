@@ -130,7 +130,9 @@ STACKABLE_IOReadFn($) # used by synchronuous get
     $me->{IODev}{PARTIAL} = "";
   }
   while($buf !~ m/\n/) {
-    $buf .= DevIo_SimpleRead($me->{IODev}); # may block
+    my $ret = DevIo_SimpleReadWithTimeout($me->{IODev}, 1); # may block
+    return undef if(!defined($ret));
+    $buf .= $ret;
   }
 
   my $mName = $me->{NAME};
