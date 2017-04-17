@@ -802,10 +802,16 @@ sub HP1000_CGI() {
     }
 
     # temperatureCondition
-    if ( defined( $webArgs->{outtemp} ) ) {
-        my ( $v, $rgb ) = UConv::c2condition( $webArgs->{outtemp} );
-        readingsBulkUpdateIfChanged( $hash, "temperatureCondition",     $v );
-        readingsBulkUpdateIfChanged( $hash, "temperatureCondition_rgb", $rgb );
+    if ( defined( $webArgs->{windchill} ) ) {
+        my $avg =
+          HP1000_GetAvg( $hash, "windchill", 600, $webArgs->{windchill} );
+
+        if ( $hash->{INTERVAL} > 0 ) {
+            my ( $cond, $rgb ) = UConv::c2condition($avg);
+            readingsBulkUpdateIfChanged( $hash, "temperatureCondition", $cond );
+            readingsBulkUpdateIfChanged( $hash, "temperatureCondition_rgb",
+                $rgb );
+        }
     }
 
     # indoorTemperatureCondition
@@ -1035,7 +1041,7 @@ sub HP1000_CGI() {
         }
 
         if ( $hash->{INTERVAL} > 0 && $uptime >= 120 ) {
-            my $v2 = round( HP1000_GetAvg( $hash, "winddir", 120, -1 ), 0 );
+            my $v2 = round( HP1000_GetAvg( $hash, "winddir", 120 ), 0 );
             $webArgs->{winddir_avg2m} = $v2;
             readingsBulkUpdateIfChanged( $hash, "wind_direction_avg2m",
                 $webArgs->{winddir_avg2m} );
@@ -1482,58 +1488,55 @@ sub HP1000_ReturnWU($$$) {
     return;
 }
 
-sub HP1000_GetSum($$$$) {
+sub HP1000_GetAvg($$;$$) {
     my ( $hash, $t, $s, $v ) = @_;
-    return HP1000_GetHistory( $hash, $t, $s, $v );
+    return HP1000_HistoryDb( $hash, $t, $s, $v, 1 );
 }
 
-sub HP1000_GetAvg($$$$) {
+sub HP1000_GetMax($$;$$) {
     my ( $hash, $t, $s, $v ) = @_;
-    return HP1000_GetHistory( $hash, $t, $s, $v, 1 );
+    return HP1000_HistoryDb( $hash, $t, $s, $v, 2 );
 }
 
-sub HP1000_GetMax($$$$) {
-    my ( $hash, $t, $s, $v ) = @_;
-    return HP1000_GetHistory( $hash, $t, $s, $v, 2 );
-}
-
-sub HP1000_GetHistory($$$$;$) {
+sub HP1000_HistoryDb($$;$$$) {
     my ( $hash, $t, $s, $v, $type ) = @_;
     my $name = $hash->{NAME};
 
     return $v if ( $type && $type == 1 && $hash->{INTERVAL} < 1 );
     return "0" if ( $hash->{INTERVAL} < 1 );
 
-    my $max = round( $s / $hash->{INTERVAL}, 0 );
-    $max = "1" if ( $max < 1 );
-    my $return = $v;
+    my $historySize = $s ? round( $s / $hash->{INTERVAL}, 0 ) : undef;
+    $historySize = "1" if ( defined($historySize) && $historySize < 1 );
 
-    my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v
-      unless ( $v < 0 || ( !$type && $v <= 0 ) );
-    my $v3 = splice @{ $hash->{helper}{history}{$t} }, $max unless ( $v < 0 );
+    if ( defined($v) && looks_like_number($v) ) {
+        my $v2 = unshift @{ $hash->{helper}{history}{$t} }, $v
+          unless ( !$type && $v <= 0 );
+        my $v3 = splice @{ $hash->{helper}{history}{$t} }, $historySize
+          if ($historySize);
 
-    Log3 $name, 5, "HP1000 $name: Updated history for $t:"
-      . Dumper( $hash->{helper}{history}{$t} );
-
-    if ( !$type ) {
-        $return = round( sum( @{ $hash->{helper}{history}{$t} } ), 1 );
-        Log3 $name, 5, "HP1000 $name: Sum for $t: $return";
+        Log3 $name, 5, "HP1000 $name: Added $v to history for $t:"
+          . Dumper( @{ $hash->{helper}{history}{$t} } );
     }
-    elsif ( $type == 1 ) {
-        $return = round(
-            sum( @{ $hash->{helper}{history}{$t} } ) /
-              @{ $hash->{helper}{history}{$t} },
-            1
-        );
 
-        Log3 $name, 5, "HP1000 $name: Average for $t: $return";
+    my $asize = scalar @{ $hash->{helper}{history}{$t} };
+    return $v unless ($asize);
+
+    $historySize = $asize if ( !$historySize || $asize < $historySize );
+    $historySize--;
+
+    my @a =
+      $historySize
+      ? @{ $hash->{helper}{history}{$t} }[ 0 .. $historySize ]
+      : @{ $hash->{helper}{history}{$t} }[0];
+
+    if ( $type == 1 ) {
+        return round( sum(@a) / @a, 1 );
     }
     elsif ( $type == 2 ) {
-        $return = maxNum( 0, @{ $hash->{helper}{history}{$t} } );
-        Log3 $name, 5, "HP1000 $name: Max for $t: $return";
+        return maxNum( 0, @a );
     }
 
-    return $return;
+    return undef;
 }
 
 1;
