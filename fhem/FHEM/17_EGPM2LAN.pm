@@ -3,7 +3,7 @@
 #
 #  based / modified Version 98_EGPMS2LAN from ericl
 #
-#  (c) 2013, 2014 Copyright: Alex Storny (moselking at arcor dot de)
+#  (c) 2013 - 2017 Copyright: Alex Storny (moselking at arcor dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -74,7 +74,7 @@ EGPM2LAN_Set($@)
   my ($hash, @a) = @_; 
 
   return "no set value specified" if(int(@a) < 2); 
-  return "Unknown argument $a[1], choose one of on:1,2,3,4,all off:1,2,3,4,all toggle:1,2,3,4 clearreadings:noArg statusrequest:noArg" if($a[1] eq "?"); 
+  return "Unknown argument $a[1], choose one of on:1,2,3,4,all off:1,2,3,4,all toggle:1,2,3,4 clearreadings:noArg statusrequest:noArg password" if($a[1] eq "?"); 
 
   my $name = shift @a; 
   my $setcommand = shift @a; 
@@ -118,6 +118,11 @@ EGPM2LAN_Set($@)
   { 
 	   EGPM2LAN_Statusrequest($hash, $logLevel, 1); 
   }
+  elsif($setcommand eq "password")
+  {
+           delete $hash->{PASSWORD} if($params eq "" && defined($hash->{PASSWORD}));
+           EGPM2LAN_StorePassword($hash, $params);
+  }
   elsif($setcommand eq "clearreadings") 
   { 
 	   delete $hash->{READINGS};
@@ -135,6 +140,87 @@ EGPM2LAN_Set($@)
   
   return undef; 
 } 
+
+################################
+sub EGPM2LAN_StorePassword($$)
+{
+    my ($hash, $password) = @_;
+
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+
+    my $enc_pwd = "";
+
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+
+    Log 3, "EGPM2LAN write password to file uniqueID";
+    my $err = setKeyValue($index, $enc_pwd);
+    if(defined($err)){
+       #Fallback, if file is not available
+       $hash->{PASSWORD}=$password;
+       return "EGPM2LAN write Password failed!";
+    }
+    $hash->{PASSWORD}="***";
+    return "Password saved.";
+} 
+
+################################
+sub EGPM2LAN_ReadPassword($)
+{
+   my ($hash) = @_;
+
+   #password available?
+   return undef if (!defined($hash->{PASSWORD}));
+   
+   #for old installations/fallback
+   if($hash->{PASSWORD} ne "***"){
+      return $hash->{PASSWORD};
+   }
+
+   my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+   my $key = getUniqueId().$index;
+   my ($password, $err);
+
+   Log 3, "EGPM2LAN Read password from file uniqueID";
+   ($err, $password) = getKeyValue($index);
+
+   if ( defined($err) ) {
+      Log 1, "EGPM2LAN unable to read password from file: $err";
+      return undef;
+   }
+
+   if (defined($password) ) {
+      if ( eval "use Digest::MD5;1" ) {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+
+      for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g)) {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+
+      return $dec_pwd;
+   }
+   else {
+      Log 1, "EGPM2LAN No password in file";
+      return undef;
+   }
+}
 
 ################################
 sub EGPM2LAN_Switch($$$$) { 
@@ -162,8 +248,10 @@ sub EGPM2LAN_Login($$) {
 
   Log $logLevel,"EGPM2LAN try to Login @".$hash->{IP};
 
+  my $passwd = EGPM2LAN_ReadPassword($hash);
+
   eval{
-      GetFileFromURLQuiet("http://".$hash->{IP}."/login.html", 5,"pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""),0 ,$logLevel);
+      GetFileFromURLQuiet("http://".$hash->{IP}."/login.html", 5,"pw=" .(defined($passwd) ? $passwd : ""),0 ,$logLevel);
   }; 
   if ($@){ 
       ### catch block 
@@ -293,6 +381,7 @@ sub EGPM2LAN_Statusrequest($$$) {
    return undef; 
 } 
 
+################################
 sub EGPM2LAN_Logoff($$) {
   my ($hash, $logLevel) = @_; 
 
@@ -300,23 +389,19 @@ sub EGPM2LAN_Logoff($$) {
   return 1; 
 } 
 
-sub 
-EGPM2LAN_Define($$) 
+################################
+sub EGPM2LAN_Define($$) 
 { 
   my ($hash, $def) = @_; 
   my @a = split("[ \t][ \t]*", $def); 
-  
-  my $u = "wrong syntax: define <name> EGPM2LAN IP Password"; 
+  my $u = "wrong syntax: define <name> EGPM2LAN IP [Password]"; 
   return $u if(int(@a) < 2); 
     
   $hash->{IP} = $a[2];
   if(int(@a) == 4) 
   { 
-    $hash->{PASSWORD} = $a[3];  
-    }
-  else 
-  { 
-    $hash->{PASSWORD} = "";
+    EGPM2LAN_StorePassword($hash, $a[3]);
+    $hash->{DEF} = $a[2]; ## remove password
   } 
   my $result = EGPM2LAN_Login($hash, 3);
   if($result == 1)
@@ -333,7 +418,7 @@ EGPM2LAN_Define($$)
 
 =pod
 =item device
-=item summary    controls a LAN-Socket device from Gembird
+=item summary controls a LAN-Socket device from Gembird
 =item summary_DE steuert eine LAN-Steckdosenleiste von Gembird
 =begin html
 
@@ -344,16 +429,21 @@ EGPM2LAN_Define($$)
   <a name="EGPM2LANdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
+    <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt;</code><br>
     <br>
     Creates a Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
     If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface first.
     The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.<br>
+    Create a <a href="#EGPM">EGPM-Module</a> to control a single socket with additional features.<br>
     <b>EG-PMS2-LAN with surge protector feature was not tested until now.</b>
 </ul><br>
   <a name="EGPM2LANset"></a>
   <b>Set</b>
   <ul>
+    <code>set &lt;name&gt; password [&lt;one-word&gt;]</code><br>
+    Encrypt and store device-password in FHEM. Leave empty to remove the password.<br>
+    Before 04/2017, the password was stored in clear-text using the DEFINE-Command, but it should not be stored in the config-file.<br>
+    <br>
     <code>set &lt;name&gt; &lt;[on|off|toggle]&gt &lt;socketnr.&gt;</code><br>
     Switch the socket on or off.<br>
     <br>
@@ -369,8 +459,10 @@ EGPM2LAN_Define($$)
   </ul>
   <br>
   <a name="EGPM2LANget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
-
+  <b>Get</b>
+  <ul><code>get &lt;name&gt; state</code><br>
+  Returns a text like this: "1: off 2: on 3: off 4: off" or the last error-message if something went wrong.<br>
+  </ul><br>
   <a name="EGPM2LANattr"></a>
   <b>Attributes</b>
   <ul>
@@ -388,7 +480,8 @@ EGPM2LAN_Define($$)
 
     Example:
     <ul>
-      <code>define mainswitch EGPM2LAN 10.192.192.20 SecretGarden</code><br>
+      <code>define mainswitch EGPM2LAN 10.192.192.20</code><br>
+      <code>set mainswitch password SecretGarden</code><br>
       <code>set mainswitch on 1</code><br>
     </ul>
 </ul>
@@ -403,7 +496,7 @@ EGPM2LAN_Define($$)
   <a name="EGPM2LANdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
+    <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt;</code><br>
     <br>
     Das Modul erstellt eine Verbindung zu einer Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> Steckdosenleiste und steuert 4 angeschlossene Ger&auml;te..
     Falls mehrere Steckdosenleisten &uuml;ber das Netzwerk gesteuert werden, ist es ratsam, diese zuerst &uuml;ber die Web-Oberfl&auml;che zu konfigurieren und die einzelnen Steckdosen zu benennen. Die Namen werden dann automatisch in die
@@ -418,6 +511,10 @@ EGPM2LAN_Define($$)
     <code>set &lt;name&gt; &lt;[on|off]&gt &lt;all&gt;</code><br>
     Schaltet alle Steckdosen gleichzeitig ein oder aus.<br>
     <br>
+    <code>set &lt;name&gt; password [&lt;mein-passwort&gt;]</code><br>
+    Speichert das Passwort verschl&uuml;sselt in FHEM ab. Zum Entfernen eines vorhandenen Passworts den Befehl ohne Parameter aufrufen.<br>
+    Vor 04/2017 wurde das Passwort im Klartext gespeichert und mit dem DEFINE-Command &uuml;bergeben.<br>
+    <br>
     <code>set &lt;name&gt; &lt;staterequest&gt;</code><br>
     Aktualisiert die Statusinformation der Steckdosenleiste.<br>
     Wenn das globale Attribut <a href="#autocreate">autocreate</a> aktiviert ist, wird f&uuml;r jede Steckdose ein <a href="#EGPM">EGPM</a>-Eintrag erstellt.<br>
@@ -427,7 +524,10 @@ EGPM2LAN_Define($$)
   </ul>
   <br>
   <a name="EGPM2LANget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b>
+  <ul><code>get &lt;name&gt; state</code><br>
+  Gibt einen Text in diesem Format aus: "1: off 2: on 3: off 4: off" oder enth&auml;lt die letzte Fehlermeldung.<br>
+  </ul><br>
 
   <a name="EGPM2LANattr"></a>
   <b>Attribute</b>
@@ -442,10 +542,10 @@ EGPM2LAN_Define($$)
   <br>
 <br>
    <br>
-
     Beispiel:
     <ul>
-      <code>define sleiste EGPM2LAN 10.192.192.20 SecretGarden</code><br>
+      <code>define sleiste EGPM2LAN 10.192.192.20</code><br>
+      <code>set sleiste password SecretGarden</code><br>
       <code>set sleiste on 1</code><br>
     </ul>
 </ul>
