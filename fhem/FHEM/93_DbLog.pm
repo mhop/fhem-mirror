@@ -10,13 +10,15 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-# redesign 2017 by DS_Starter with credits by
+# redesigned 2017 by DS_Starter with credits by
 # JoeAllb, DeeSpe
 #
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
-# 2.16.3     07.042017        evaluate reading in DbLog_AddLog as regular expression
+# 2.16.5     16.04.2017       checkUsePK changed again, new attribute noSupportPK
+# 2.16.4     15.04.2017       commandref completed, checkUsePK changed (@usepkh = "", @usepkc = "")
+# 2.16.3     07.04.2017       evaluate reading in DbLog_AddLog as regular expression
 # 2.16.2     06.04.2017       sub DbLog_cutCol for cutting fields to maximum length, return to "$lv = "" if(!$lv);" because
 #                             of problems with MinIntervall, DbLogType-Logging in database cycle verbose 5, make $TIMESTAMP
 #                             changable by valueFn
@@ -119,7 +121,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.16.3";
+my $DbLogVersion = "2.16.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -160,6 +162,7 @@ sub DbLog_Initialize($)
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
 							  "cacheLimit ".
+							  "noSupportPK:1,0 ".
 							  "syncEvents:1,0 ".
 							  "showNotifyTime:1,0 ".
 							  "timeout ".
@@ -1235,9 +1238,10 @@ sub DbLog_Push(@) {
   my ($hash, $vb4show, @row_array) = @_;
   my $name       = $hash->{NAME};
   my $DbLogType  = AttrVal($name, "DbLogType", "History");
-  my $errorh      = 0;
-  my $errorc      = 0;
-  my $error       = 0;
+  my $supk       = AttrVal($name, "noSupportPK", 0);
+  my $errorh     = 0;
+  my $errorc     = 0;
+  my $error      = 0;
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
   my $dbh;
   
@@ -1272,7 +1276,12 @@ sub DbLog_Push(@) {
   Log3 ($name, 4, "DbLog $name -> DbLogType is: $DbLogType");
   
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
-  my ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+  my ($usepkh,$usepkc,$pkh,$pkc);
+  if (!$supk) {
+      ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+  } else {
+      Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
+  }
   
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
   my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
@@ -1606,6 +1615,7 @@ sub DbLog_PushAsync(@) {
   my $dbuser      = $hash->{dbuser};
   my $dbpassword  = $attr{"sec$name"}{secret};
   my $DbLogType   = AttrVal($name, "DbLogType", "History");
+  my $supk        = AttrVal($name, "noSupportPK", 0);
   my $errorh      = 0;
   my $errorc      = 0;
   my $error       = 0;
@@ -1629,7 +1639,12 @@ sub DbLog_PushAsync(@) {
   }
   
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
-  my ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+  my ($usepkh,$usepkc,$pkh,$pkc);
+  if (!$supk) {
+      ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+  } else {
+      Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
+  }
   
   my $rowldec = decode_base64($rowlist);
   my @row_array = split('§', $rowldec);
@@ -3936,20 +3951,23 @@ sub checkUsePK ($$){
   my ($hash,$dbh) = @_;
   my $name   = $hash->{NAME};
   my $dbconn = $hash->{dbconn};
-  my @usepkh = 0;
-  my @usepkc = 0;
+  my $upkh = 0;
+  my $upkc = 0;
+  my (@pkh,@pkc);
   
   my $db = (split("=",(split(";",$dbconn))[0]))[1];
-  eval {@usepkh = $dbh->primary_key( undef, undef, 'history' );};
-  eval {@usepkc = $dbh->primary_key( undef, undef, 'current' );};
-  my $pkh = @usepkh?join(",",@usepkh):"none";
-  my $pkc = @usepkc?join(",",@usepkc):"none";
+  eval {@pkh = $dbh->primary_key( undef, undef, 'history' );};
+  eval {@pkc = $dbh->primary_key( undef, undef, 'current' );};
+  my $pkh = (!@pkh || @pkh eq "")?"none":join(",",@pkh);
+  my $pkc = (!@pkc || @pkc eq "")?"none":join(",",@pkc);
   $pkh =~ tr/"//d;
   $pkc =~ tr/"//d;
+  $upkh = 1 if(@pkh && @pkh ne "none");
+  $upkc = 1 if(@pkc && @pkc ne "none");
   Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
   Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
 
-  return (scalar(@usepkh),scalar(@usepkc),$pkh,$pkc);
+  return ($upkh,$upkc,$pkh,$pkc);
 }
 
 1;
@@ -3979,8 +3997,8 @@ sub checkUsePK ($$){
     <br><br>
 	
 	DbLog distinguishes between the synchronous (default) and asynchronous logmode. The logmode is adjustable by the  
-	<a href="#DbLogattr">attribute</a> asyncMode. Since version 2.13.5 DbLog is supporting primary key set in table 
-	current	or history.
+	<a href="#DbLogattr">attribute</a> asyncMode. Since version 2.13.5 DbLog is supporting primary key (PK) set in table 
+	current	or history. If you want use PostgreSQL with PK it has to be at lest version 9.5.  
     <br><br>
 
     The modules <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code>
@@ -4038,8 +4056,7 @@ sub checkUsePK ($$){
       Optionally you can enter a "Value" that is used as reading value for the dataset. If the value isn't specified (default),
 	  the current value of the specified reading will be inserted into the database. The field "$EVENT" will be filled automatically
 	  by "addLog". The device can be declared by a <a href="#devspec">device specification (devspec)</a>. 
-	  "Reading" will be evaluated as regular expression. If $TIMESTAMP 
-	  should be changed, it must meet condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't be changed.
+	  "Reading" will be evaluated as regular expression.
 	  By the addLog-command NO additional events will be created !<br><br>
       
 	  <b>Examples:</b> <br>
@@ -4541,6 +4558,17 @@ sub checkUsePK ($$){
   </ul>
   <br>
   
+  <ul><b>noSupportPK</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; noSupportPK [1|0]
+	   </code><br>
+	   
+       Deactivates the support of a set primary key by the module.<br>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>syncEvents</b>
     <ul>
 	  <code>attr &lt;device&gt; syncEvents [1|0]
@@ -4630,6 +4658,8 @@ sub checkUsePK ($$){
 	   Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (value of reading) and 
 	   $UNIT (unit of reading value).
        It also has readonly-access to $EVENT for evaluation in your expression. <br>
+	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
+	   be changed.
 	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
 	   
 	  <b>Examples</b> <br>
@@ -4696,7 +4726,8 @@ sub checkUsePK ($$){
 	
 	DbLog unterscheidet den synchronen (Default) und asynchronen Logmodus. Der Logmodus ist über das 
 	<a href="#DbLogattr">Attribut</a> asyncMode einstellbar. Ab Version 2.13.5 unterstützt DbLog einen gesetzten
-	Primary Key (PK) in den Tabellen Current und History.
+	Primary Key (PK) in den Tabellen Current und History. Soll PostgreSQL mit PK genutzt werden, muss PostgreSQL mindestens
+	Version 9.5 sein.
     <br><br>
 
     Die Perl-Module <code>DBI</code> und <code>DBD::&lt;dbtype&gt;</code>
@@ -4754,8 +4785,6 @@ sub checkUsePK ($$){
       Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
       Wert des Readings in die DB eingefügt. Das Feld "$EVENT" wird automatisch mit "addLog" belegt. Das Device kann 
 	  als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. "Reading" wird als regulärer Ausdruck ausgewertet.
-	  Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
-	  geänderte $timestamp nicht übernommen.
 	  Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
       
 	  <b>Beispiele:</b> <br>
@@ -5292,7 +5321,18 @@ sub checkUsePK ($$){
 	   attr &lt;device&gt; noNotifyDev [1|0]
 	   </code><br>
 	   
-       Erzwingt dass NOTIFYDEV nicht gesetzt und somit nicht verwendet wird .<br>
+       Erzwingt dass NOTIFYDEV nicht gesetzt und somit nicht verwendet wird.<br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>noSupportPK</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; noSupportPK [1|0]
+	   </code><br>
+	   
+       Deaktiviert die programmtechnische Unterstützung eines gesetzten Primary Key durch das Modul.<br>
      </ul>
   </ul>
   <br>
@@ -5377,7 +5417,9 @@ sub checkUsePK ($$){
 	   Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (Wert des Readings) und 
 	   $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
        Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
-	   Diese Variablen können aber nicht verändert werden. <br>
+	   Diese Variable kann aber nicht verändert werden. <br>
+	   Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
+	   geänderte $timestamp nicht übernommen.
 	   Zusätzlich kann durch Setzen der Variable "$IGNORE=1" ein Datensatz vom Logging ausgeschlossen werden. <br><br>
 	   
 	  <b>Beispiele</b> <br>
