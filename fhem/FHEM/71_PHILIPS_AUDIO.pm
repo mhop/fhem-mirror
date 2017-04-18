@@ -130,8 +130,8 @@ sub PHILIPS_AUDIO_GetStatus
   # Check for Presets availability
   if
   (
-    (not defined($hash->{READINGS}{"totalPresets"})) and
-    (ReadingsVal($name, "presence", "no")  eq "present")     and
+    (not defined($hash->{READINGS}{"totalPresets"}))      and
+    (ReadingsVal($name, "presence", "no")  eq "present")  and
     (AttrVal($name, "autoGetPresets", "0") eq "1")
   )
   {
@@ -146,8 +146,8 @@ sub PHILIPS_AUDIO_GetStatus
   # Check for Favorites availability
   if
   (
-    (not defined($hash->{READINGS}{"totalFavorites"})) and
-    (ReadingsVal($name, "presence", "no")  eq "present")        and
+    (not defined($hash->{READINGS}{"totalFavorites"}))    and
+    (ReadingsVal($name, "presence", "no")  eq "present")  and
     (AttrVal($name, "autoGetFavorites", "0") eq "1")
   )
   {
@@ -158,17 +158,6 @@ sub PHILIPS_AUDIO_GetStatus
     PHILIPS_AUDIO_ResetTimer($hash, 10); # Scan takes approx 8 sec.
     return;
   }
-  
-  # Don't interfere with manual operation. Will cause wrong responses from device.
-  #if
-  #(
-  #  (ReadingsVal($name, "playerListStatus", "ready") eq "ready") and
-  #  ($hash->{helper}{manualOperation} == 0)                and
-  #  ($hash->{helper}{playerState} eq "home")
-  #) 
-  #{
-  #  #PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
-  #}
   
   PHILIPS_AUDIO_ResetTimer($hash) if(not ($local == 1)); # getStatus
   return;
@@ -269,38 +258,50 @@ sub PHILIPS_AUDIO_Set
 
       my @favoriteList;
       my @favoriteNumber;
+      
       foreach my $readings (keys % {$hash->{READINGS}})
       {
-        push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(..)$/);
-        push @favoriteNumber, $1 if($readings =~ m/^.inetRadioFavorite_(..)/);
+        #                         $1            $2
+        if($readings =~ m/(.inetRadioFavorite_)(..)$/)
+        {
+          push @favoriteList,   $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25);
+          push @favoriteNumber, $2;
+        }
       }
       
       (s/\*/\[asterisk\]/g) for @favoriteList; # '*' not shown correctly
       (s/#/\[hash\]/g)      for @favoriteList; # '#' not shown correctly
-      (s/[ :;,'.\\]/_/g)    for @favoriteList; # Replace not allowed characters
+      (s/[\\]//g)           for @favoriteList; # Replace \
+      (s/[ :;,']/_/g)       for @favoriteList; # Replace not allowed characters
            
       my @presetList;
       my @presetNumber;
+      
       foreach my $readings (keys % {$hash->{READINGS}})
       {
-        push @presetList, $1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioPreset_(..)/);
-        push @presetNumber, $1 if($readings =~ m/^.inetRadioPreset_(..)/);
+        #                         $1          $2                               
+        if($readings =~ m/(.inetRadioPreset_)(..)$/)
+        {
+          push @presetList,   $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25);
+          push @presetNumber, $2;
+        }
       }
       
       (s/\*/\[asterisk\]/g) for @presetList; # '*' not shown correctly
       (s/#/\[hash\]/g)      for @presetList; # '#' not shown correctly
-      (s/[ :;,'.\\]/_/g)    for @presetList; # Replace not allowed characters           
+      (s/[\\]//g)           for @presetList; # Replace \           
+      (s/[ :;,']/_/g)       for @presetList; # Replace not allowed characters           
             
-      $usage .= "selectFavorite:"        .join(",",("---",(sort @favoriteList))) . " ";
-      $usage .= "selectPreset:"          .join(",",("---",(sort @presetList)))   . " ";		   
-      $usage .= "selectPresetByNumber:"  .join(",",("---",(sort @presetNumber)))   . " ";
-      $usage .= "selectFavoriteByNumber:".join(",",("---",(sort @favoriteNumber)))   . " ";
+      $usage .= "selectFavorite:"        .join(",",("---",(sort @favoriteList)))  . " ";
+      $usage .= "selectPreset:"          .join(",",("---",(sort @presetList)))    . " ";		   
+      $usage .= "selectPresetByNumber:"  .join(",",("---",(sort @presetNumber)))  . " ";
+      $usage .= "selectFavoriteByNumber:".join(",",("---",(sort @favoriteNumber))). " ";
 
       # Direct stream selection if any
-		   
-		  my @selectStream;
       
-		  for(my $lvl = 1; $lvl < int(ReadingsVal($name, ".listDepthLevel", "1") - 1); $lvl++)
+      my @selectStream;
+      
+	  for(my $lvl = 1; $lvl < int(ReadingsVal($name, ".listDepthLevel", "1") - 1); $lvl++)
       {
         my $listLevelName = $hash->{READINGS}{".lvl_".$lvl."_name"};
         push @selectStream, "lvl_".$lvl."_".$listLevelName;
@@ -308,14 +309,16 @@ sub PHILIPS_AUDIO_Set
       
       foreach my $readings (keys % {$hash->{READINGS}})
       {
-        push @selectStream,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^listItem_(.*)/);			
+        #                                                                                                 $1       $2
+        push @selectStream, $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/(listItem_)(...)$/);			
       }
-		  
-      @selectStream = sort map{s/\*/\[asterisk\]/g;$_;} grep/._..*$/,@selectStream; # Replace *
-      @selectStream = sort map{s/#/\[hash\]/g;$_;}      grep/._..*$/,@selectStream; # Replace #
-		  @selectStream = sort map{s/[ :;,'.\\]/_/g;$_;}    grep/._..*$/,@selectStream; # Replace not allowed characters
-		  
-		  $usage .= "selectStream:".join(",",("---",(sort @selectStream))) . " ";
+      
+      (s/\*/\[asterisk\]/g) for @selectStream; # '*' not shown correctly
+      (s/#/\[hash\]/g)      for @selectStream; # '#' not shown correctly
+      (s/[\\]//g)           for @selectStream; # Replace \           
+      (s/[ :;,']/_/g)       for @selectStream; # Replace not allowed characters
+	  
+      $usage .= "selectStream:".join(",",("---",(sort @selectStream))) . " ";
     
   Log3 $name, 5, "PHILIPS_AUDIO ($name) - set ".join(" ", @a);
   
@@ -793,21 +796,6 @@ sub PHILIPS_AUDIO_Define
     PHILIPS_AUDIO_ResetTimer($hash, 0);
   
     return;
-}
-
-sub PHILIPS_AUDIO_Notify
-{
-  my ($hash, $dev) = @_;
-  my $name = $hash->{NAME};
-  return "" if ($dev->{NAME} ne "global");
-
-  my $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
-  
-  return if(!$events); # Some previous notify deleted the array.
-  #
-  # Code to be executed on notify
-  #
-  return;
 }
 
 sub PHILIPS_AUDIO_Attr
@@ -1717,15 +1705,15 @@ sub PHILIPS_AUDIO_ParseResponse
           my $address = $hash->{IP_ADDRESS};
           my $port    = "";
           
-          if ($hash->{MODEL} eq "NP3700")
+          if (uc($hash->{MODEL}) eq "NP3700")
           {
             $port = 7123;
           }
-          elsif($hash->{MODEL} eq "NP3900")
+          elsif(uc($hash->{MODEL}) eq "NP3900")
           {
             $port = 49153;
           }
-          elsif($hash->{MODEL} eq "AW9000")
+          elsif(uc($hash->{MODEL}) eq "AW9000")
           {
             $port = "";
           }
@@ -1789,30 +1777,22 @@ sub PHILIPS_AUDIO_ParseResponse
               #Log3 $name, 5, "ListedItems: $listedItems";
             }
             
-            #if ($data =~ /'totalitems':(.+),/)
-            #{
-            #  $listedItems = $1;
-            #} 
-            
             $data =~ s/\R//g;        # Remove new lines			
             
             while ($data =~ /{'title':'(.+?)',/g)
             {            
               
               $presetName = $1;
-                           
+
               if($data =~ /'id':(.+?),/g)
               {
                 $presetID = $1;
-                #Log3 $name, 5, "PresetIDLoop: $presetID"; 
               }
               if ($presetID ne "" and $presetName ne "")
               {
                 readingsBulkUpdate($hash, sprintf(".inetRadioPreset_%02d", $presetID), $presetName);
               }                                                                      
             }
-
-            #Log3 $name, 5, "PresetIDNachLoop: $presetID"; 
 
             if($presetID < ($hash->{helper}{TOTALINETRADIOPRESETS})) # Maximum listed items = 8. Get the next items by sending the nextreqURL
             {
@@ -1878,25 +1858,17 @@ sub PHILIPS_AUDIO_ParseResponse
             {
               $hash->{helper}{TOTALINETRADIOFAVORITES} = $1;
               readingsBulkUpdate($hash, "totalFavorites", $1);
-              #Log3 $name, 5, "ListedItems: $listedItems";
             }
-            
-            #if ($data =~ /'totalitems':(.+),/)
-            #{
-            #  $listedItems = $1;
-            #} 
             
             $data =~ s/\R//g;        # Remove new lines
 			      
             while($data =~ /{'title':'(.+?)',/g)
             {            
               $favoriteName = $1;
-              #Log3 $name, 5, "FavoriteName: $favoriteName";
                 
               if($data =~ /'id':(.+?),/g)
               {
                 $favoriteID = $1;
-                #Log3 $name, 5, "FavoriteIDLoop: $favoriteID"; 
               }
               if ($favoriteID ne "" and $favoriteName ne "")
               {
@@ -1926,7 +1898,6 @@ sub PHILIPS_AUDIO_ParseResponse
       }      
       elsif($cmd =~ /input|selectStream/)
       {
-        
         $data =~ s/\R//g;        # Remove new lines for regex
         
         if($arg eq "---")
@@ -1963,8 +1934,6 @@ sub PHILIPS_AUDIO_ParseResponse
             {
               $errorMessage = $1;
             }
-            
-            #Log3 $name, 3, "PHILIPS_AUDIO ($name) - Player response: Media Library change not successful ($errorMessage).";
             # Delete old readings			
             delete $hash->{READINGS}{$_} foreach (grep /listItem_...$/, keys %{$hash->{READINGS}});
             delete $hash->{READINGS}{$_} foreach (grep /.listItemTarget_...$/, keys %{$hash->{READINGS}});
@@ -2298,15 +2267,19 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
   my $url = "";
   my $port = "";
   
-  if ($hash->{MODEL} eq "NP3500")
+  if(uc($hash->{MODEL}) eq "NP3500")
   {
     # TBD
   }
-  elsif($hash->{MODEL} eq "NP3700")
+  elsif(uc($hash->{MODEL}) eq "NP3700")
   {
     $url = "http://$hash->{IP_ADDRESS}:7123/DeviceDescription.xml";
   }
-  elsif(($hash->{MODEL} eq "NP3900") or ($hash->{MODEL} eq "AW9000"))
+  elsif
+  (
+    (uc($hash->{MODEL}) eq "NP3900") or
+    (uc($hash->{MODEL}) eq "AW9000")
+  )
   {
     $url = "http://$hash->{IP_ADDRESS}:49153/nmrDescription.xml";
   }
@@ -2403,7 +2376,7 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
       <li><b>selectFavoriteByNumber [ number ]</b> &ndash; Selects a favorite by its number. Empty if no favorites found. (see also getFavorites)</li>
       <li><b>selectPreset [ name ]</b> &ndash; Selects a preset. Empty if no presets found. (see also getPresets)</li>
       <li><b>selectPresetByNumber [ number ]</b> &ndash; Selects a preset by its number. Empty if no presets found. (see also getPresets)</li>
-      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. Selects a stream depending on the current input and player list content</li>
+      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. Selects a stream depending on the current input and player list content. A 'c'-prefix represents a 'container' (directory). An 'i'-prefix represents an 'item' (audio stream).</li>
       <li><b>shuffle [ on | off ]</b> &ndash; Sets the shuffle mode</li>
       <li><b>standbyButton</b> &ndash; Emulates the standby button. Toggles between standby and power on</li>
       <li><b>volume</b> &ndash; Sets the relative volume 0...100%</li>
@@ -2544,7 +2517,7 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
       <li><b>selectFavoriteByNumber [ number ]</b> &ndash; W&auml;hlt einen Favoriten anhand seiner Speichernummer. Leer falls keine Favoriten vorhanden (s. getFavorites)</li>
       <li><b>selectPreset [ name ]</b> &ndash; W&auml;hlt einen Preset. Leer falls keine Presets vorhanden (s. getPresets)</li>
       <li><b>selectPresetByNumber [ number ]</b> &ndash; W&auml;hlt einen Preset anhand seiner Speichernummer. Leer falls keine Presets vorhanden (see also getPresets)</li>
-      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. W&auml;hlt einen Audiostream. H&auml;ngt vom aktuellen Inhalt der Playerlist ab.</li>
+      <li><b>selectStream [ name ]</b> &ndash; Context-sensitive. W&auml;hlt einen Audiostream. H&auml;ngt vom aktuellen Inhalt der Playerlist ab. Ein 'c'-Pr&auml;fix repr&auml;sentiert einen 'Container' (Directory). ein 'i'-Pr&auml;fix repr&auml;sentiert ein 'Item' (audio stream).</li></li>
       <li><b>shuffle [ on | off ]</b> &ndash; W&auml;hlt den gew&uuml;nschten Shuffle Modus</li>
       <li><b>standbyButton</b> &ndash; Emuliert den standby-Knopf. Toggelt zwischen standby und power on</li>
       <li><b>volume</b> &ndash; Setzt die relative Lautst&auml;rke 0...100%</li>
@@ -2614,3 +2587,4 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
 =end html_DE
 
 =cut
+
