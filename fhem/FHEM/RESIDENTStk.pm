@@ -2000,7 +2000,9 @@ sub RESIDENTStk_RG_Attr(@) {
     {
         return "Value for $attribute has invalid format"
           unless ( $cmd eq "del"
-            || $value =~ /^([a-zA-Z\d._]+,?)([a-zA-Z\d._]+,?)*$/ );
+            || $value =~
+m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)*$/
+          );
 
         $value = "" if ( $cmd eq "del" );
 
