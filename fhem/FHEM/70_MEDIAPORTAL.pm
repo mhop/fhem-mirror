@@ -5,7 +5,7 @@
 #
 # $Id$
 #
-# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in March 2017
+# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in April 2017
 # Original Copyright by Andreas Kwasnik (gemx)
 #
 # Fhem is free software: you can redistribute it and/or modify
@@ -23,6 +23,10 @@
 #
 ########################################################################################
 # Changelog
+# 18.04.2017
+#	Es gibt ein neues Reading "PositionPercent", welches die aktuelle Postion als Prozentangabe enthält
+#	Bei einem Disconnect wird nun 3x versucht eine neue Verbindung aufzubauen
+#	Es wurde ein Fehlerhandling eingebaut, wenn keine Plugins geladen werden konnten.
 # 12.03.2017
 #	Es gibt einen neuen Getter "plugins", der das Reading "Plugins" mit den aktuell verfügbaren Plugins und deren WindowIds belegt
 #	Es gibt einen neuen Setter "window" der als Parameter eine WindowId oder einen Pluginnamen (URL-Encoded mit %20 für Leerzeichen!) erhält
@@ -66,6 +70,7 @@ sub MEDIAPORTAL_Set($@);
 sub MEDIAPORTAL_Log($$$);
 
 my $MEDIAPORTAL_HeartbeatInterval = 15;
+my $MEDIAPORTAL_MaxGraceRetries = 3;
 
 ########################################################################################
 #
@@ -113,7 +118,7 @@ sub MEDIAPORTAL_Define($$) {
 	$hash->{STATE} = 'disconnected';
 	
 	my $ret = undef;
-	$ret = DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit') if AttrVal($hash->{NAME}, 'disable', 0);
+	$ret = DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit') if (!AttrVal($hash->{NAME}, 'disable', 0));
 	
 	return $ret;
 }
@@ -192,6 +197,7 @@ sub MEDIAPORTAL_DoInit($) {
 	readingsSingleUpdate($hash, 'state', 'Connecting...', 1);
 	$hash->{helper}{buffer} = '';
 	$hash->{helper}{LastStatusTimestamp} = time();
+	$hash->{GraceRetries} = 0;
 	
 	# Versuch, die MAC-Adresse des Ziels selber herauszufinden...
 	if (AttrVal($hash->{NAME}, 'macaddress', '') eq '') {
@@ -267,8 +273,18 @@ sub MEDIAPORTAL_GetStatus($) {
 sub MEDIAPORTAL_GetIntervalStatus($) {
 	my ($hash) = @_;
 	
-	return undef if (ReadingsVal($hash->{NAME}, 'state', 'disconnected') eq 'disconnected');
+	# Heartbeat-Prüfung nur machen, wenn es auch gewünscht wurde...
 	return undef if (!AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval));
+	
+	# Ein "Disconnected" wird erst nach einigen Fehlversuchen hingenommen...
+	if (ReadingsVal($hash->{NAME}, 'state', 'disconnected') eq 'disconnected') {
+		$hash->{GraceRetries}++;
+		return undef if ($hash->{GraceRetries} > $MEDIAPORTAL_MaxGraceRetries);
+		
+		# Reconnect veranlassen...
+		MEDIAPORTAL_Set($hash, ($hash->{NAME}, 'reconnect'));
+		InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
+	}
 	
 	# Prüfen, wann der letzte Status zugestellt wurde...
 	if (time() - $hash->{helper}{LastStatusTimestamp} > (2 * $MEDIAPORTAL_HeartbeatInterval + 5)) {
@@ -337,6 +353,11 @@ sub MEDIAPORTAL_Set($@) {
 		
 		if ($macaddress ne '') {
 			MEDIAPORTAL_Wakeup($macaddress);
+			
+			$hash->{GraceRetries} = 0;
+			MEDIAPORTAL_Set($hash, ($hash->{NAME}, 'reconnect'));
+			InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
+			
 			return 'WakeUp-Signal sent!';
 		} else {
 			return 'No MacAddress set! No WakeUp-Signal sent!';
@@ -410,7 +431,10 @@ sub MEDIAPORTAL_Set($@) {
 		}
 		$cmd = "{\"Type\":\"window\",\"Window\":$param}\r\n";
 	} else {
-		my %plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+		my %plugins = ();
+		eval {
+			%plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+		};
 		return "Unknown command '$cname', choose one of wakeup:noArg sleep:noArg connect:noArg reconnect:noArg command:".join(',', split(/ /, $mpcommands))." key Volume:slider,0,1,100 powermode:".join(',', split(/ /, $powermodes))." playfile playchannel playradiochannel playlist window".((scalar(keys(%plugins)) != 0) ? ':'.join(',', map { s/ /%20/g; $_; } sort(keys(%plugins))) : '');
 	}
 	
@@ -436,6 +460,7 @@ sub MEDIAPORTAL_Read($) {
 	
 	return undef if AttrVal($hash->{NAME}, 'disable', 0);
 	
+	$hash->{GraceRetries} = 0;
 	MEDIAPORTAL_Log $hash->{NAME}, 5, "RAW MSG: $buf";
 	
 	# Zum Buffer hinzufügen
@@ -533,6 +558,11 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			
 			readingsBulkUpdate($hash, 'Duration', MEDIAPORTAL_ConvertSecondsToTime($json->{Duration}));
 			readingsBulkUpdate($hash, 'Position', MEDIAPORTAL_ConvertSecondsToTime($json->{Position}));
+			if ($json->{Duration}) {
+				readingsBulkUpdate($hash, 'PositionPercent', $json->{Position} / $json->{Duration});
+			} else {
+				readingsBulkUpdate($hash, 'PositionPercent', 0);
+			}
 			readingsBulkUpdate($hash, 'File', $json->{File});
 			
 			readingsBulkUpdate($hash, 'Title', '');
@@ -592,11 +622,16 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			MEDIAPORTAL_Log $hash->{NAME}, 4, 'DIALOG received.';
 		} elsif ($json->{Type} eq "plugins") {
 			MEDIAPORTAL_Log $hash->{NAME}, 1, 'Plugins received.';
-			my %plugins = ();
-			foreach (@{$json->{Plugins}}) {
-				$plugins{$_->{Name}} = $_->{WindowId};
+			eval {
+				my %plugins = ();
+				foreach (@{$json->{Plugins}}) {
+					$plugins{$_->{Name}} = $_->{WindowId};
+				}
+				readingsSingleUpdate($hash, 'Plugins', MEDIAPORTAL_Dumper(\%plugins), 1);
+			};
+			if ($@) {
+				MEDIAPORTAL_Log $hash->{NAME}, 1, "Error during processing of plugins: $@";
 			}
-			readingsSingleUpdate($hash, 'Plugins', MEDIAPORTAL_Dumper(\%plugins), 1);
 		} else {
 			MEDIAPORTAL_Log $hash->{NAME}, 1, "Unhandled message received: MessageType '$json->{Type}'";
 		}
@@ -774,7 +809,7 @@ sub MEDIAPORTAL_Dumper($) {
 
 ########################################################################################
 #
-#  MEDIAPORTAL_Log - Log to the normal Log-command with the prefix 'SONOSPLAYER'
+#  MEDIAPORTAL_Log - Log to the normal Log-command with the prefix 'MEDIAPORTAL'
 #
 ########################################################################################
 sub MEDIAPORTAL_Log($$$) {
