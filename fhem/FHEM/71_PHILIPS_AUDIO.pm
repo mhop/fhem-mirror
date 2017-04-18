@@ -256,69 +256,57 @@ sub PHILIPS_AUDIO_Set
            #" home:noArg".
            " mute:on,off ";   
 
-      my @favoriteList;
-      my @favoriteNumber;
-      
-      foreach my $readings (keys % {$hash->{READINGS}})
-      {
-        #                         $1            $2
-        if($readings =~ m/(.inetRadioFavorite_)(..)$/)
-        {
-          push @favoriteList,   $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25);
-          push @favoriteNumber, $2;
-        }
-      }
-      
-      (s/\*/\[asterisk\]/g) for @favoriteList; # '*' not shown correctly
-      (s/#/\[hash\]/g)      for @favoriteList; # '#' not shown correctly
-      (s/[\\]//g)           for @favoriteList; # Replace \
-      (s/[ :;,']/_/g)       for @favoriteList; # Replace not allowed characters
-           
-      my @presetList;
-      my @presetNumber;
-      
-      foreach my $readings (keys % {$hash->{READINGS}})
-      {
-        #                         $1          $2                               
-        if($readings =~ m/(.inetRadioPreset_)(..)$/)
-        {
-          push @presetList,   $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25);
-          push @presetNumber, $2;
-        }
-      }
-      
-      (s/\*/\[asterisk\]/g) for @presetList; # '*' not shown correctly
-      (s/#/\[hash\]/g)      for @presetList; # '#' not shown correctly
-      (s/[\\]//g)           for @presetList; # Replace \           
-      (s/[ :;,']/_/g)       for @presetList; # Replace not allowed characters           
-            
-      $usage .= "selectFavorite:"        .join(",",("---",(sort @favoriteList)))  . " ";
-      $usage .= "selectPreset:"          .join(",",("---",(sort @presetList)))    . " ";		   
-      $usage .= "selectPresetByNumber:"  .join(",",("---",(sort @presetNumber)))  . " ";
-      $usage .= "selectFavoriteByNumber:".join(",",("---",(sort @favoriteNumber))). " ";
-
-      # Direct stream selection if any
-      
-      my @selectStream;
-      
-	  for(my $lvl = 1; $lvl < int(ReadingsVal($name, ".listDepthLevel", "1") - 1); $lvl++)
-      {
-        my $listLevelName = $hash->{READINGS}{".lvl_".$lvl."_name"};
-        push @selectStream, "lvl_".$lvl."_".$listLevelName;
-      }
-      
-      foreach my $readings (keys % {$hash->{READINGS}})
-      {
-        #                                                                                                 $1       $2
-        push @selectStream, $2."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/(listItem_)(...)$/);			
-      }
-      
-      (s/\*/\[asterisk\]/g) for @selectStream; # '*' not shown correctly
-      (s/#/\[hash\]/g)      for @selectStream; # '#' not shown correctly
-      (s/[\\]//g)           for @selectStream; # Replace \           
-      (s/[ :;,']/_/g)       for @selectStream; # Replace not allowed characters
-	  
-      $usage .= "selectStream:".join(",",("---",(sort @selectStream))) . " ";
+  my @favoriteList;
+  my @favoriteNumber;
+  foreach my $readings (keys % {$hash->{READINGS}})
+  {
+    push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(..)$/);
+    push @favoriteNumber, $1 if($readings =~ m/^.inetRadioFavorite_(..)/);
+  }
+ 
+  (s/\*/\[asterisk\]/g) for @favoriteList; # '*' not shown correctly
+  (s/#/\[hash\]/g)      for @favoriteList; # '#' not shown correctly
+  (s/[\\]//g)           for @favoriteList;
+  (s/[ :;,']/_/g)       for @favoriteList; # Replace not allowed characters
+       
+  my @presetList;
+  my @presetNumber;
+  foreach my $readings (keys % {$hash->{READINGS}})
+  {
+    push @presetList, $1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioPreset_(..)/);
+    push @presetNumber, $1 if($readings =~ m/^.inetRadioPreset_(..)/);
+  }
+ 
+  (s/\*/\[asterisk\]/g) for @presetList; # '*' not shown correctly
+  (s/#/\[hash\]/g)      for @presetList; # '#' not shown correctly
+  (s/[\\]//g)           for @presetList; # Replace \   
+  (s/[ :;,']/_/g)       for @presetList; # Replace not allowed characters           
+       
+  $usage .= "selectFavorite:"        .join(",",("---",(sort @favoriteList))) . " ";
+  $usage .= "selectPreset:"          .join(",",("---",(sort @presetList)))   . " ";           
+  $usage .= "selectPresetByNumber:"  .join(",",("---",(sort @presetNumber)))   . " ";
+  $usage .= "selectFavoriteByNumber:".join(",",("---",(sort @favoriteNumber)))   . " ";
+  # Direct stream selection if any
+               
+  my @selectStream;
+ 
+  for(my $lvl = 1; $lvl < int(ReadingsVal($name, ".listDepthLevel", "1") - 1); $lvl++)
+  {
+    my $listLevelName = $hash->{READINGS}{".lvl_".$lvl."_name"};
+    push @selectStream, "lvl_".$lvl."_".$listLevelName;
+  }
+ 
+  foreach my $readings (keys % {$hash->{READINGS}})
+  {
+    push @selectStream,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^listItem_(.*)/);                 
+  }
+             
+  @selectStream = sort map{s/\*/\[asterisk\]/g;$_;} grep/._..*$/, @selectStream; # Replace *
+  @selectStream = sort map{s/#/\[hash\]/g;$_;}      grep/._..*$/, @selectStream; # Replace #
+  @selectStream = sort map{s/[\\]//g;$_;}           grep/._..*$/, @selectStream; # Replace not allowed characters
+  @selectStream = sort map{s/[ :;,']/_/g;$_;}       grep/._..*$/, @selectStream; # Replace not allowed characters
+             
+  $usage .= "selectStream:".join(",",("---",(sort @selectStream))) . " ";
     
   Log3 $name, 5, "PHILIPS_AUDIO ($name) - set ".join(" ", @a);
   
