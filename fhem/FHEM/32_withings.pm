@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 02 / 2017-02-27
+# Release 03 / 2017-04-14
 
 package main;
 
@@ -340,7 +340,7 @@ sub withings_Define($$) {
 
     CommandAttr(undef,"$name IODev $a[4]");
 
-  } elsif( @a == 4 && $a[2] =~ m/^\d+$/ && $a[3] =~ m/^[\w]+$/i  ) {
+  } elsif( @a == 4 && $a[2] =~ m/^\d+$/ && $a[3] =~ m/^[\w-]+$/i  ) {
     $subtype = "USER";
 
     my $user = $a[2];
@@ -666,6 +666,7 @@ sub withings_connect($) {
   withings_getSessionKey( $hash );
 
   foreach my $d (keys %defs) {
+    next if(!defined($defs{$d}));
     next if($defs{$d}{TYPE} ne "autocreate");
     return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
   }
@@ -3017,6 +3018,8 @@ sub withings_setAuraDebug($$;$) {
 
 sub withings_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  return undef if(!defined($defs{$name}));
 
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "intervalData" or $attrName eq "intervalAlert" or $attrName eq "intervalProperties" or $attrName eq "intervalDebug");
