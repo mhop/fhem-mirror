@@ -59,6 +59,7 @@ SVG_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     captionLeft:1,0"
+    captionPos:right,left,auto
     endPlotNow
     endPlotToday
     fixedoffset
@@ -75,6 +76,7 @@ SVG_Initialize($)
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
   $hash->{SetFn}    = "SVG_Set";
+  $hash->{AttrFn}   = "SVG_AttrFn";
   $hash->{RenameFn} = "SVG_Rename";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -137,6 +139,19 @@ SVG_Set($@)
     addStructChange("modify", $me, "$me $hash->{DEF}")
   }
   return $err;
+}
+
+sub
+SVG_AttrFn(@)
+{
+  my ($cmd,$name,$aName,$aVal) = @_;
+
+  if($aName eq "captionLeft" && $cmd eq "set") {
+    my $dir = (!defined($aVal) || $aVal) ? "left" : "right";
+    AnalyzeCommand(undef, "attr $name captionPos $dir");
+    return "attr $name captionLeft converted to attr $name captionPos $dir";
+  }
+  return undef;
 }
 
 sub
@@ -1466,10 +1481,6 @@ SVG_render($$$$$$$$$$)
   }
   $xtics = defined($conf{xtics}) ? $conf{xtics} : "";
 
-  my $caption_left = AttrVal($name, "captionLeft", 0);
-  my ($txtoff1,$txtoff2) = ($off1, $off2);
-  $txtoff1 = $nr_left_axis*$axis_width+$th if( $caption_left );
-
   ######################
   # Loop over the input, digest dates, calculate min/max values
   my ($fromsec, $tosec);
@@ -2112,11 +2123,38 @@ SVG_render($$$$$$$$$$)
 
   ######################
   # Plot caption (title) at the end, should be draw on top of the lines
-  my $caption_anchor = $caption_left?"beginning":"end";
+  my $caption_pos = SVG_Attr($parent_name, $name, "captionPos", 'right');
+  my( $li,$ri ) = (0,0);
   for my $i (0..int(@{$conf{lTitle}})-1) {
+    my $caption_anchor = "end";
+    if( $caption_pos eq 'auto' ) {
+      my $a = $conf{lAxis}[$i];
+      my $axis = 1; $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
+      if( $axis <= $nr_left_axis ) {
+        $caption_anchor = "beginning";
+      } else {
+        $caption_anchor = "end";
+      }
+    } elsif( $caption_pos eq 'left' ) {
+      $caption_anchor = "beginning";
+    }
+
+    my $txtoff1 = $nr_left_axis*$axis_width + $w - $th/2;
+    $txtoff1 = $nr_left_axis*$axis_width+$th/2
+        if($caption_anchor eq 'beginning');
+
     my $j = $i+1;
     my $t = $conf{lTitle}[$i];
     next if( !$t );
+    my $txtoff2;
+    if( $caption_anchor eq 'beginning' ) {
+      $txtoff2 = $off2 + $th/1.3 + $th * $li;
+      ++$li;
+    } else {
+      $txtoff2 = $off2 + $th/1.3 + $th * $ri;
+      ++$ri;
+    }
+
     my $desc = "";
     if(defined($data{"min$j"})     && $data{"min$j"}     ne "undef" &&
        defined($data{"currval$j"}) && $data{"currval$j"} ne "undef") {
@@ -2430,7 +2468,16 @@ plotAsPng(@)
 
     <a name="captionLeft"></a>
     <li>captionLeft<br>
-      Show the legend on the left side.
+      Show the legend on the left side (deprecated, will be autoconverted to
+      captionPos)
+      </li><br>
+
+    <a name="captionPos"></a>
+    <li>captionPos<br>
+      right - Show the legend on the right side (default)<br>
+      left - Show the legend on the left side<br>
+      auto - Show the legend labels on the left or on the right side depending
+      on the axis it belongs to<br>
       </li><br>
 
     <a name="fixedrange"></a>
@@ -2641,7 +2688,16 @@ plotAsPng(@)
   <ul>
     <a name="captionLeft"></a>
     <li>captionLeft<br>
-      Anzeigen der Legende auf der linken Seite
+      Anzeigen der Legende auf der linken Seite. &Uuml;berholt, wird
+      automatisch nach captionPos konvertiert.
+      </li><br>
+
+    <a name="captionPos"></a>
+    <li>captionPos<br>
+      right - Anzeigen der Legende auf der rechten Seite (default)<br>
+      left - Anzeigen der Legende auf der linken Seite<br>
+      auto - Anzeigen der Labels der Legende auf der linken oder rechten Seite
+      je nach Achsenzugeh&ouml;rigkeit<br>
       </li><br>
 
     <li><a href="#endPlotNow">endPlotNow</a></li><br>
