@@ -337,7 +337,7 @@ sub RESIDENTStk_Set($@) {
                   split( /,/, $guests );
 
                 foreach my $guest (@registeredGuests) {
-                    fhem "sleep 1;set $guest silentSet state $newstate"
+                    fhem "set $guest silentSet state $newstate"
                       if ( ReadingsVal( $guest, "state", "initialized" ) ne
                         $newstate );
                 }
@@ -700,7 +700,7 @@ sub RESIDENTStk_Set($@) {
                   unless ( defined( $attr{$rg_name}{comment} )
                     && $attr{$rg_name}{comment} eq "Auto-created by $name" );
 
-                fhem "set $rg_name silentSet state home";
+                fhem "sleep 1;set $rg_name silentSet state home";
                 Log3 $name, 3, "$TYPE $name: created new device $rg_name";
             }
         }
