@@ -1,82 +1,25 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     98_GEOFANCY.pm
-#     An FHEM Perl module to receive geofencing webhooks from geofancy.com.
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     Based on HTTPSRV from Dr. Boris Neubert
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
-
 package main;
-
 use strict;
 use warnings;
-use vars qw(%data);
-use HttpUtils;
-use Time::Local;
 use Data::Dumper;
+use Time::Local;
 
-sub GEOFANCY_Set($@);
-sub GEOFANCY_Define($$);
-sub GEOFANCY_Undefine($$);
+use HttpUtils;
 
-#########################
-sub GEOFANCY_addExtension($$$) {
-    my ( $name, $func, $link ) = @_;
-
-    my $url = "/$link";
-    Log3 $name, 2, "Registering GEOFANCY $name for URL $url...";
-    $data{FWEXT}{$url}{deviceName} = $name;
-    $data{FWEXT}{$url}{FUNC}       = $func;
-    $data{FWEXT}{$url}{LINK}       = $link;
-}
-
-#########################
-sub GEOFANCY_removeExtension($) {
-    my ($link) = @_;
-
-    my $url  = "/$link";
-    my $name = $data{FWEXT}{$url}{deviceName};
-    Log3 $name, 2, "Unregistering GEOFANCY $name for URL $url...";
-    delete $data{FWEXT}{$url};
-}
-
-###################################
+# initialize ##################################################################
 sub GEOFANCY_Initialize($) {
     my ($hash) = @_;
-
-    Log3 $hash, 5, "GEOFANCY_Initialize: Entering";
-
-    $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{DefFn}    = "GEOFANCY_Define";
     $hash->{UndefFn}  = "GEOFANCY_Undefine";
+    $hash->{SetFn}    = "GEOFANCY_Set";
     $hash->{AttrList} = "devAlias disable:0,1 " . $readingFnAttributes;
 }
 
-###################################
+# regular Fn ##################################################################
 sub GEOFANCY_Define($$) {
-
     my ( $hash, $def ) = @_;
-
     my @a = split( "[ \t]+", $def, 5 );
 
     return "Usage: define <name> GEOFANCY <infix>"
@@ -94,17 +37,12 @@ sub GEOFANCY_Define($$) {
     return undef;
 }
 
-###################################
 sub GEOFANCY_Undefine($$) {
-
     my ( $hash, $name ) = @_;
-
     GEOFANCY_removeExtension( $hash->{fhem}{infix} );
-
     return undef;
 }
 
-###################################
 sub GEOFANCY_Set($@) {
     my ( $hash, @a ) = @_;
     my $name  = $hash->{NAME};
@@ -145,13 +83,7 @@ sub GEOFANCY_Set($@) {
     return undef;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
-
-###################################
+# module Fn ####################################################################
 sub GEOFANCY_CGI() {
 
 # Locative.app (https://itunes.apple.com/us/app/locative/id725198453?mt=8)
@@ -606,15 +538,12 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
             || lc($entry) eq "test" );
         $locName = $id if ( $locName eq "" );
 
-        ROOMMATE_SetLocation(
+        RESIDENTStk_SetLocation(
             $deviceAlias, $locName, $trigger, $id, $time,
             $lat,         $long,    $address, $device
-        ) if ( $defs{$deviceAlias}{TYPE} eq "ROOMMATE" );
-
-        GUEST_SetLocation(
-            $deviceAlias, $locName, $trigger, $id, $time,
-            $lat,         $long,    $address, $device
-        ) if ( $defs{$deviceAlias}{TYPE} eq "GUEST" );
+          )
+          if ( $defs{$deviceAlias}{TYPE} eq "ROOMMATE"
+            || $defs{$deviceAlias}{TYPE} eq "GUEST" );
     }
 
     $msg = lc($entry) . " OK";
@@ -622,6 +551,25 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
       if ( lc($entry) eq "test" );
 
     return ( "text/plain; charset=utf-8", $msg );
+}
+
+sub GEOFANCY_addExtension($$$) {
+    my ( $name, $func, $link ) = @_;
+
+    my $url = "/$link";
+    Log3 $name, 2, "Registering GEOFANCY $name for URL $url...";
+    $data{FWEXT}{$url}{deviceName} = $name;
+    $data{FWEXT}{$url}{FUNC}       = $func;
+    $data{FWEXT}{$url}{LINK}       = $link;
+}
+
+sub GEOFANCY_removeExtension($) {
+    my ($link) = @_;
+
+    my $url  = "/$link";
+    my $name = $data{FWEXT}{$url}{deviceName};
+    Log3 $name, 2, "Unregistering GEOFANCY $name for URL $url...";
+    delete $data{FWEXT}{$url};
 }
 
 sub GEOFANCY_ISO8601UTCtoLocal ($) {
