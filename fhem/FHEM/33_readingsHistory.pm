@@ -25,6 +25,11 @@ use warnings;
 
 use POSIX qw(strftime);
 
+use vars qw(%defs);
+use vars qw(%attr);
+sub Log;
+sub Log3;
+
 use vars qw($FW_ME);
 use vars qw($FW_wname);
 use vars qw($FW_subdir);
