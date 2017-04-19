@@ -337,7 +337,7 @@ sub RESIDENTStk_Set($@) {
                   split( /,/, $guests );
 
                 foreach my $guest (@registeredGuests) {
-                    fhem "set $guest silentSet state $newstate"
+                    fhem "sleep 1;set $guest silentSet state $newstate"
                       if ( ReadingsVal( $guest, "state", "initialized" ) ne
                         $newstate );
                 }
@@ -640,7 +640,7 @@ sub RESIDENTStk_Set($@) {
                   unless ( defined( $attr{$rr_name}{comment} )
                     && $attr{$rr_name}{comment} eq "Auto-created by $name" );
 
-                fhem "set $rr_name silentSet state home";
+                fhem "sleep 1;set $rr_name silentSet state home";
                 Log3 $name, 3, "$TYPE $name: created new device $rr_name";
             }
         }
@@ -1083,7 +1083,7 @@ sub RESIDENTStk_Notify($$) {
         foreach ( @{$events} ) {
 
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
-            if ( $_ =~ m/^INITIALIZED|REREADCFG|MODIFIED|UNDEFINED$/ ) {
+            if ( $_ =~ m/^INITIALIZED|REREADCFG|MODIFIED|(?:UN)?DEFINED.*$/ ) {
                 RESIDENTStk_findResidentSlaves($hash)
                   if ( $TYPE eq "RESIDENTS" );
                 RESIDENTStk_findDummySlaves($name)
