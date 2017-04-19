@@ -177,17 +177,17 @@ sub myRemoveInternalTimer($$) {
    }
 }
 ################################################################################
-sub myRemoveInternalTimerByName($){
-  my ($name) = @_;
-  foreach my $a (keys %intAt) {
-     my $nam = "";
-     my $arg = $intAt{$a}{ARG};
-        if (ref($arg) eq "HASH" && defined($arg->{NAME})  ) {
-           $nam = $arg->{NAME} if (ref($arg) eq "HASH" && defined($arg->{NAME})  );
-        }
-     delete($intAt{$a}) if($nam =~  m/^$name/g);
-  }
-}
+#sub myRemoveInternalTimerByName($){
+#  my ($name) = @_;
+#  foreach my $a (keys %intAt) {
+#     my $nam = "";
+#     my $arg = $intAt{$a}{ARG};
+#        if (ref($arg) eq "HASH" && defined($arg->{NAME})  ) {
+#           $nam = $arg->{NAME} if (ref($arg) eq "HASH" && defined($arg->{NAME})  );
+#        }
+#     delete($intAt{$a}) if($nam =~  m/^$name/g);
+#  }
+#}
 ################################################################################
 sub myGetHashIndirekt ($$) {
   my ($myHash, $function) = @_;
@@ -206,24 +206,26 @@ sub Twilight_midnight_seconds($) {
   return $secs;
 }
 ################################################################################
-sub Twilight_ssTimeAsEpoch($) {
-   my ($zeit) = @_; 
-   my ($hour, $min, $sec) = split(":",$zeit);
-
-   my $days=0;
-   if ($hour>=24) {$days = 1; $hour -=24}; 
-   
-   my @jetzt_arr = localtime(time());
-   #Stunden               Minuten               Sekunden
-   $jetzt_arr[2]  = $hour; $jetzt_arr[1] = $min; $jetzt_arr[0] = $sec;
-   $jetzt_arr[3] += $days;
-   my $next = timelocal_nocheck(@jetzt_arr);
-
-   return $next;
-}
+#sub Twilight_ssTimeAsEpoch($) {
+#   my ($zeit) = @_; 
+#   my ($hour, $min, $sec) = split(":",$zeit);
+#
+#   my $days=0;
+#   if ($hour>=24) {$days = 1; $hour -=24}; 
+#   
+#   my @jetzt_arr = localtime(time());
+#   #Stunden               Minuten               Sekunden
+#   $jetzt_arr[2]  = $hour; $jetzt_arr[1] = $min; $jetzt_arr[0] = $sec;
+#   $jetzt_arr[3] += $days;
+#   my $next = timelocal_nocheck(@jetzt_arr);
+#
+#   return $next;
+#}
 ################################################################################
 sub Twilight_calc($$) {
    my ($deg, $idx) = @_;
+   
+   my $midnight = time() - Twilight_midnight_seconds(time());
 
    my $sr = sunrise_abs("Horizon=$deg");
    my $ss = sunset_abs ("Horizon=$deg");
@@ -231,12 +233,13 @@ sub Twilight_calc($$) {
    my ($srhour, $srmin, $srsec) = split(":",$sr); $srhour -= 24 if($srhour>=24);
    my ($sshour, $ssmin, $sssec) = split(":",$ss); $sshour -= 24 if($sshour>=24); 
 
-   my $sr1 = 3600*$srhour+60*$srmin+$srsec;
-   my $ss1 = 3600*$sshour+60*$ssmin+$sssec;
+   my $sr1 = $midnight + 3600*$srhour+60*$srmin+$srsec;
+   my $ss1 = $midnight + 3600*$sshour+60*$ssmin+$sssec;
    
    return (0,0) if (abs ($sr1 - $ss1) < 30);   
-   return Twilight_ssTimeAsEpoch($sr) + 0.01*$idx,
-          Twilight_ssTimeAsEpoch($ss) - 0.01*$idx; 
+   #return Twilight_ssTimeAsEpoch($sr) + 0.01*$idx,
+   #       Twilight_ssTimeAsEpoch($ss) - 0.01*$idx; 
+   return ($sr1 + 0.01*$idx), ($ss1 - 0.01*$idx);
 }
 ################################################################################
 sub Twilight_TwilightTimes(@) {
@@ -413,7 +416,7 @@ sub Twilight_WeatherCallback(@) {
     $result = undef;
   } else {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
-     Log3 $hash, 4, "[$hash->{NAME}] answer=$result" if defined $result;
+     Log3 $hash, 5, "[$hash->{NAME}] answer=$result" if defined $result;
   }
   
   Twilight_getWeatherHorizon($hash, $result);
