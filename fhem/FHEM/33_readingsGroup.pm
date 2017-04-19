@@ -257,6 +257,8 @@ rgVal2Num($)
 {
   my ($val) = @_;
 
+  return $val if( !defined($val) );
+
   #$val =~ s/[^-\.\d]//g if( defined($val) );
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
 
@@ -1380,8 +1382,6 @@ readingsGroup_Notify($$)
           }
 
           my $value_style = lookup2($hash->{helper}{valueStyle},$n,$reading,$value);
-
-          my $value = $value;
 
           my $value_orig = $value;
           if( my $value_format = $hash->{helper}{valueFormat} ) {
