@@ -640,8 +640,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
     var isDef = true;
 
-    if(newDef == undefined ||
-       $(this).attr("value").indexOf("modify") != 0) {
+    if(newDef == undefined || $(this).attr("value").indexOf("modify") != 0) {
       isDef = false;
       var div = $(this).closest("div.makeSelect");
       var devName = $(div).attr("dev"),
@@ -651,13 +650,13 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       var ifid = (devName+"-"+arg).replace(/([^_a-z0-9])/gi,
                                    function(m){ return "\\"+m });
       if($(".dval[informid="+ifid+"]").length == 0) {
-        console.log(this);
+        log("PSC reload");
         $(this).unbind('click').click();// No element found to replace, reload
         return;
       }
       newDef = $(this).closest("form").find("input:text").val();
       if(newDef == undefined)
-        newDef = $(this).closest("form").find("select:last").val();
+        newDef = $(this).closest("form").find("input[name^=val]").val();
       cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
     }
 

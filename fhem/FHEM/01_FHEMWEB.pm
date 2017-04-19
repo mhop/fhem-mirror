@@ -1241,7 +1241,7 @@ FW_makeTable($$$@)
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
         } else {
           $t = "" if(!$t);
-          FW_pO "<td><div informId=\"$name-$n\">$v</div></td>";
+          FW_pO "<td><div class=\"dval\" informId=\"$name-$n\">$v</div></td>";
           FW_pO "<td><div informId=\"$name-$n-ts\">$t</div></td>";
         }
       } else {
