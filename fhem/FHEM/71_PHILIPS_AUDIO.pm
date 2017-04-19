@@ -74,8 +74,17 @@ sub PHILIPS_AUDIO_GetStatus
   
   # First run
   $hash->{helper}{networkRequest} = "idle"  if (not defined($hash->{helper}{networkRequest}));
-  PHILIPS_AUDIO_getMediaRendererDesc($hash) if(not defined($hash->{helper}{dInfo}{UUID}));
-  #$hash->{helper}{manualOperation} = 0 if(not defined($hash->{helper}{manualOperation}));
+  
+  # Try to get additional info from the device.
+  # Only if device already implemented.
+  # Otherwise possible timeout due to wrong ports and device description links  
+  if(not defined($hash->{helper}{dInfo}{UUID}))
+  {
+    if (grep {$_ eq $hash->{MODEL}} @{$hash->{helper}{DevDescImplementedModels}})
+    {
+      PHILIPS_AUDIO_getMediaRendererDesc($hash);
+    }
+  }
   
   if (not defined($hash->{helper}{playerState}))
   {
@@ -135,7 +144,7 @@ sub PHILIPS_AUDIO_GetStatus
     (AttrVal($name, "autoGetPresets", "0") eq "1")
   )
   {
-	  readingsSingleUpdate($hash, "Reading_presets" , "May take some time...", 1);
+	readingsSingleUpdate($hash, "Reading_presets" , "May take some time...", 1);
     # Hierarchichal navigation through the contents mandatory
     $hash->{helper}{cmdStep} = 1;    
     PHILIPS_AUDIO_SendCommand($hash, "/index", "", "getPresets", "noArg") if((ReadingsVal($name, "playerListStatus", "ready") eq "ready") and (ReadingsVal($name, "readingPresets", "no") eq "no"));    
@@ -223,6 +232,7 @@ sub PHILIPS_AUDIO_Set
   my $usage = "";
   
   my $model = $hash->{MODEL};
+  
   $hash->{helper}{dInfo}{MODEL}       = $model;
   $hash->{helper}{dInfo}{NAME}        = $name;
   $hash->{helper}{dInfo}{PORT}        = $port;
@@ -242,7 +252,7 @@ sub PHILIPS_AUDIO_Set
            ((uc($model) eq "AW9000") ? "digital1Coaxial," : ""). # Input implemented in AW9000 only
            ((uc($model) eq "AW9000") ? "digital2Optical," : ""). # Input implemented in AW9000 only
            
-           # Input not implelemnted in the AW9000. Only as DLNA renderer
+           # Input not implemented in the AW9000. Only as DLNA renderer
            ((uc($model) ne "AW9000") ? "mediaLibrary," : ""). 
            
            "internetRadio,onlineServices,mp3Link ". # Available in all devices
@@ -260,7 +270,7 @@ sub PHILIPS_AUDIO_Set
   my @favoriteNumber;
   foreach my $readings (keys % {$hash->{READINGS}})
   {
-    push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(..)$/);
+    push @favoriteList,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^.inetRadioFavorite_(..)/);
     push @favoriteNumber, $1 if($readings =~ m/^.inetRadioFavorite_(..)/);
   }
  
@@ -292,13 +302,13 @@ sub PHILIPS_AUDIO_Set
  
   for(my $lvl = 1; $lvl < int(ReadingsVal($name, ".listDepthLevel", "1") - 1); $lvl++)
   {
-    my $listLevelName = $hash->{READINGS}{".lvl_".$lvl."_name"};
+    my $listLevelName = ReadingsVal($name, ".lvl_".$lvl."_name", "");
     push @selectStream, "lvl_".$lvl."_".$listLevelName;
   }
  
   foreach my $readings (keys % {$hash->{READINGS}})
   {
-    push @selectStream,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^listItem_(.*)/);                 
+    push @selectStream,$1."_".substr($hash->{READINGS}{$readings}{VAL}, 0, 25) if($readings =~ m/^listItem_(...)/);                 
   }
              
   @selectStream = sort map{s/\*/\[asterisk\]/g;$_;} grep/._..*$/, @selectStream; # Replace *
@@ -353,9 +363,13 @@ sub PHILIPS_AUDIO_Set
     }
     elsif($a[2] eq "mp3Link")
     {
-      readingsSingleUpdate($hash, "input", "MP3-Link", 1);
+      
       $hash->{helper}{playerState}   = "home";
-      readingsSingleUpdate($hash, "playerState", "home", 1);
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "input", "MP3-Link");      
+      readingsBulkUpdate($hash, "playerState", "home");
+      readingsEndUpdate($hash, 1);
+      
       if(uc($model) eq "AW9000")
       {
         PHILIPS_AUDIO_SendCommand($hash, "/mp3link", "", $what, $a[2]);      
@@ -367,24 +381,30 @@ sub PHILIPS_AUDIO_Set
     }
     elsif($a[2] eq "digital1Coaxial")
     {
-      readingsSingleUpdate($hash, "input", "Digital-in 1 (coaxial)", 1);
-      $hash->{helper}{playerState}   = "home";
-      readingsSingleUpdate($hash, "playerState", "home", 1);
-	    PHILIPS_AUDIO_SendCommand($hash, "/digin_coaxial", "",$what, $a[2]);
+      $hash->{helper}{playerState} = "home";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "input", "Digital-in 1 (coaxial)");      
+      readingsBulkUpdate($hash, "playerState", "home");
+      readingsEndUpdate($hash, 1);
+      
+	  PHILIPS_AUDIO_SendCommand($hash, "/digin_coaxial", "",$what, $a[2]);
       
     }
     elsif($a[2] eq "digital2Optical")
     {
-      readingsSingleUpdate($hash, "input", "Digital-in 2 (optical)", 1);
-      $hash->{helper}{playerState}   = "home";
-      readingsSingleUpdate($hash, "playerState", "home", 1);
+      $hash->{helper}{playerState} = "home";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "input", "Digital-in 2 (optical)");      
+      readingsBulkUpdate($hash, "playerState", "home");
+      readingsEndUpdate($hash, 1);
+      
       PHILIPS_AUDIO_SendCommand($hash, "/digin_optical", "",$what, $a[2]);      
     }
     elsif($a[2]  eq "mediaLibrary")
     {
       readingsSingleUpdate($hash, "playerListStatus", "busy", 1);
       #readingsSingleUpdate($hash, "input", "Media Library", 1);
-	    PHILIPS_AUDIO_SendCommand($hash, "/nav\$02\$01\$001\$0", "", $what, $a[2]);      
+	  PHILIPS_AUDIO_SendCommand($hash, "/nav\$02\$01\$001\$0", "", $what, $a[2]);      
     }
     elsif($a[2]  eq "internetRadio")
     {
@@ -553,9 +573,10 @@ sub PHILIPS_AUDIO_Set
     else
     {
       $hash->{helper}{targetVolume} = int($a[2]);
-      readingsSingleUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume}, 1);
-      readingsSingleUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}), 1);
-      
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+      readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
+      readingsEndUpdate($hash, 1);      
       PHILIPS_AUDIO_SendCommand($hash, "/VOLUME\$VAL\$".$a[2], "",$what, $a[2]);      
     }
   }
@@ -570,8 +591,10 @@ sub PHILIPS_AUDIO_Set
     
     $hash->{helper}{targetVolume} = $targetVolume;
     
-    readingsSingleUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume}, 1);
-    readingsSingleUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}), 1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+    readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
+    readingsEndUpdate($hash, 1);
     
     PHILIPS_AUDIO_SendCommand($hash, "/VOLUME\$VAL\$" . $hash->{helper}{targetVolume}, "",$what, $hash->{helper}{targetVolume});
   }
@@ -585,9 +608,11 @@ sub PHILIPS_AUDIO_Set
     }
     
     $hash->{helper}{targetVolume} = $targetVolume;
-        
-    readingsSingleUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume}, 1);
-    readingsSingleUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}), 1);
+    
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+    readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
+    readingsEndUpdate($hash, 1);
     
     PHILIPS_AUDIO_SendCommand($hash, "/VOLUME\$VAL\$" . $hash->{helper}{targetVolume}, "",$what, $hash->{helper}{targetVolume});
   }
@@ -601,8 +626,10 @@ sub PHILIPS_AUDIO_Set
     {
       $hash->{helper}{targetVolume} = PHILIPS_AUDIO_volume_rel2abs($hash, $a[2]);
       
-      readingsSingleUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume}, 1);
-      readingsSingleUpdate($hash, "volume", $a[2], 1);
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+      readingsBulkUpdate($hash, "volume", $a[2]);
+      readingsEndUpdate($hash, 1);
       
       PHILIPS_AUDIO_SendCommand($hash, "/VOLUME\$VAL\$".$hash->{helper}{targetVolume}, "",$what, $hash->{helper}{targetVolume});
     }
@@ -618,8 +645,11 @@ sub PHILIPS_AUDIO_Set
   }
   elsif($what eq "getPresets")
   {
-    readingsSingleUpdate($hash, "playerListStatus", "busy", 1);
-    readingsSingleUpdate($hash, "readingPresets", "yes", 1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "playerListStatus", "busy");
+    readingsBulkUpdate($hash, "readingPresets", "yes");
+    readingsEndUpdate($hash, 1);
+    
     # Delete old redings
     delete $hash->{READINGS}{$_} foreach (grep /.inetRadioPreset_..$/, keys %{$hash->{READINGS}});    
 	
@@ -629,8 +659,11 @@ sub PHILIPS_AUDIO_Set
   }
   elsif($what eq "getFavorites")
   {
-    readingsSingleUpdate($hash, "playerListStatus", "busy", 1);
-    readingsSingleUpdate($hash, "readingFavorites", "yes", 1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "playerListStatus", "busy");
+    readingsBulkUpdate($hash, "readingFavorites", "yes");
+    readingsEndUpdate($hash, 1);
+    
     # Delete old redings
     delete $hash->{READINGS}{$_} foreach (grep /.inetRadioFavorite_..$/, keys %{$hash->{READINGS}});
 		
@@ -641,7 +674,7 @@ sub PHILIPS_AUDIO_Set
   elsif($what eq "selectStream")
   {
     
-    # The player list selection has been designed for GUI.
+    # The player list selection has been designed for a GUI/touchscreen
     # Virtually scrolling down to last item and choosing the first one
     # arises an error. Needs to navigate back to the corresponding page
     # consisting of 8 items per page
@@ -675,7 +708,7 @@ sub PHILIPS_AUDIO_Set
       if($a[2] =~ /(\d{3})_(.+?)_(.*)/)
       {
         my $currentListLevel = ReadingsVal($name, ".listDepthLevel", "");
-        $hash->{READINGS}{".lvl_".$currentListLevel."_name"} = "$2_$3";
+        readingsSingleUpdate($hash, ".lvl_".$currentListLevel."_name", "$2_$3", 1);
         
         if(int(ReadingsVal($name, "playerListTotalCount", "8")) > 8)
         {
@@ -720,6 +753,9 @@ sub PHILIPS_AUDIO_Define
     my @a = split("[ \t][ \t]*", $def);
     my $name = $hash->{NAME};
     
+    # Implemented devices for reading Device Description
+    @{$hash->{helper}{DevDescImplementedModels}} = qw( AW9000 NP3500 NP3700 NP3900 );
+    
     $hash->{helper}{sendCommandBuffer} = [];
     
     delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
@@ -742,14 +778,14 @@ sub PHILIPS_AUDIO_Define
     $hash->{IP_ADDRESS} = $a[3];
     $hash->{PORT}       = 8889;
     
-    # if an update interval was given which is greater than zero, use it.
+    # if an update interval >= 5 use it.
     if(defined($a[4]) and $a[4] > 0)
     {
       $hash->{helper}{OFF_INTERVAL} = $a[4];
-      # Minimum interval 3 sec
-      if($hash->{helper}{OFF_INTERVAL} < 3)
+      # Minimum interval 5 sec
+      if($hash->{helper}{OFF_INTERVAL} < 5)
       {
-        $hash->{helper}{OFF_INTERVAL} = 3;
+        $hash->{helper}{OFF_INTERVAL} = 5;
       }
     }
     else
@@ -760,10 +796,10 @@ sub PHILIPS_AUDIO_Define
     if(defined($a[5]) and $a[5] > 0)
     {
       $hash->{helper}{ON_INTERVAL} = $a[5];
-      # Minimum interval 3 sec
-      if($hash->{helper}{ON_INTERVAL} < 3)
+      # Minimum interval 5 sec
+      if($hash->{helper}{ON_INTERVAL} < 5)
       {
-        $hash->{helper}{ON_INTERVAL} = 3;
+        $hash->{helper}{ON_INTERVAL} = 5;
       }
     }
     else
@@ -778,8 +814,7 @@ sub PHILIPS_AUDIO_Define
     }
     
     # start the status update timer
-    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
-    
+    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));    
     
     PHILIPS_AUDIO_ResetTimer($hash, 0);
   
@@ -871,7 +906,7 @@ sub PHILIPS_AUDIO_SendCommandBuffer
   my ($hash) = @_;
   
   my $firstCommand = "";
-  my ($url, $data, $cmd, $arg) = ("","","","");
+  my ($url, $data, $cmd, $arg) = ("", "", "", "");
   
   
   # Get first command from buffer
@@ -893,6 +928,7 @@ sub PHILIPS_AUDIO_SendCommandBuffer
   {
     
     $hash->{helper}{comeFromSendBuffer} = 1;
+    
     PHILIPS_AUDIO_SendCommand(
                               $hash,
                               $url,
@@ -901,6 +937,8 @@ sub PHILIPS_AUDIO_SendCommandBuffer
                               $arg
                              );
                              
+    
+    # Check if buffer empty
     if
     (
       (@{$hash->{helper}{sendCommandBuffer}})
@@ -933,8 +971,6 @@ sub PHILIPS_AUDIO_SendCommand
   
   $hash->{helper}{networkRequest}     = "idle" if(not defined($hash->{helper}{networkRequest}));   # First run
   $hash->{helper}{comeFromSendBuffer} = 0    if(not defined($hash->{helper}{comeFromSendBuffer})); # First run
-  
-  # $hash->{helper}{networkRequest} = "ready"; # !!!! Disable fhem side buffering !!!
   
   # buffer command and wait a second in case device busy 
   if ($hash->{helper}{networkRequest} eq "busy")
@@ -978,13 +1014,14 @@ sub PHILIPS_AUDIO_SendCommand
      $hash->{helper}{comeFromSendBuffer}        = 0;
      
      readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash, "networkRequest", "idle");
-     readingsBulkUpdate($hash, "networkError", "buffer timed out");
-     readingsEndUpdate($hash, 1);
+     readingsBulkUpdate ($hash, "networkRequest", "idle");
+     readingsBulkUpdate ($hash, "networkError", "buffer timed out");
+     readingsEndUpdate  ($hash, 1);
      
      Log3 $name, 3, "PHILIPS_AUDIO ($name) - HTTP buffer timeout. Please, check your network connection, ip-address etc. Device switched off?";
      
      PHILIPS_AUDIO_ResetTimer($hash);
+     
      return;
     }
     
@@ -1012,7 +1049,6 @@ sub PHILIPS_AUDIO_SendCommand
     }
     
     PHILIPS_AUDIO_ResetTimer($hash); # getStatus
-        
   }
   
   $hash->{helper}{timeoutCounter}  = 0;
@@ -1047,11 +1083,9 @@ sub PHILIPS_AUDIO_ParseResponse
     my ($param, $err, $data ) = @_;    
     
     my $hash = $param->{hash};
-    my $name = $hash->{NAME};
+    my $name = $hash ->{NAME};
     my $cmd  = $param->{cmd};
     my $arg  = $param->{arg};
-    
-    readingsBeginUpdate($hash);
     
     if(exists($param->{code}))
     {
@@ -1060,10 +1094,11 @@ sub PHILIPS_AUDIO_ParseResponse
     
     if($err ne "")
     {
+      readingsBeginUpdate($hash);
       
       Log3 $name, 5, "PHILIPS_AUDIO ($name) - Could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
       
-      # Release the flag
+      # Release the busy flag
       $hash->{helper}{networkRequest} = "idle";
       readingsBulkUpdate($hash, "networkRequest", "idle");
       
@@ -1075,10 +1110,10 @@ sub PHILIPS_AUDIO_ParseResponse
         readingsBulkUpdate($hash, "state", "absent");
         $hash->{STATE} = "absent";
       }
-      $hash->{helper}{AVAILABLE} = 0;
       
-      $hash->{helper}{timeoutCounter}            = 0;      
-      $hash->{helper}{comeFromSendBuffer}        = 0;      
+      $hash->{helper}{AVAILABLE}          = 0;
+      $hash->{helper}{timeoutCounter}     = 0;      
+      $hash->{helper}{comeFromSendBuffer} = 0;      
       
       # Close HTTP connection
       HttpUtils_Close($param);
@@ -1087,9 +1122,11 @@ sub PHILIPS_AUDIO_ParseResponse
       $hash->{helper}{playerState}   = "home";
       readingsBulkUpdate($hash, "playerState", "home");
       readingsBulkUpdate($hash, "playerListStatus", "ready");
+      
       readingsEndUpdate($hash, 1);
       
-      # Device firware "somehow buggy". Reanimate device after timeout.
+      # Device firware "somehow buggy".
+      # Try to reanimate the device after timeout.
       # Go to /index
       PHILIPS_AUDIO_SendCommand($hash, "/index", "","home", "noArg");
       
@@ -1098,9 +1135,12 @@ sub PHILIPS_AUDIO_ParseResponse
     }
     elsif($data ne "")
     {
+      
       Log3 $name, 5, "PHILIPS_AUDIO ($name) - got response for \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $data";
       
       delete $hash->{READINGS}{networkError};
+      
+      readingsBeginUpdate($hash);
       
       if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0)
       {
@@ -1112,7 +1152,10 @@ sub PHILIPS_AUDIO_ParseResponse
       
       readingsBulkUpdate($hash, "power", "on");
       readingsBulkUpdate($hash, "state","on");
+      
       $hash->{STATE} = "on";
+      
+      readingsEndUpdate($hash, 1);
       
       if($cmd eq "standbyButton")
       {
@@ -1127,25 +1170,27 @@ sub PHILIPS_AUDIO_ParseResponse
       {
         if($data =~ /'devicename'/) # Device responded correctly
         {
-          $hash->{helper}{playerState}   = "home";
-          readingsBulkUpdate($hash, "playerState", "home");
-          readingsBulkUpdate($hash, "playerListStatus", "ready");
+          $hash->{helper}{playerState} = "home";
+          
+          readingsBeginUpdate($hash);          
+          readingsBulkUpdate ($hash, "playerState", "home");
+          readingsBulkUpdate ($hash, "playerListStatus", "ready");
+          readingsEndUpdate  ($hash, 1);
         }
       }
       elsif($cmd eq "mute")
       {
         if($data =~ /SUCCESS/)
         {
-          readingsBulkUpdate($hash, "mute", "on");
+          readingsSingleUpdate($hash, "mute", "on", 1);
         }
       }
       elsif($cmd eq "unmute")
       {
         if($data =~ /SUCCESS/)
         {
-          readingsBulkUpdate($hash, "mute", "off");
+          readingsSingleUpdate($hash, "mute", "off", 1);
         }
-        
       }
       elsif($cmd eq "favoriteRemove")
       {
@@ -1197,8 +1242,9 @@ sub PHILIPS_AUDIO_ParseResponse
           
           # Preset select
           PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioPreset})."\$1", "","selectPreset", $hash->{helper}{inetRadioPreset});
+          
           $hash->{helper}{playerState} = "playing";
-          readingsBulkUpdate($hash, "playerState", "playing");          
+          readingsSingleUpdate($hash, "playerState", "playing", 1);          
         }
                
       }      
@@ -1231,8 +1277,9 @@ sub PHILIPS_AUDIO_ParseResponse
           
           # Favorite Preset select
           PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioFavorite})."\$1", "","selectFavorite", $hash->{helper}{inetRadioFavorite});
+          
           $hash->{helper}{playerState} = "playing";
-          readingsBulkUpdate($hash, "playerState", "playing");       
+          readingsSingleUpdate($hash, "playerState", "playing", 1);       
         }
       }
       elsif($cmd eq "play_pause")
@@ -1241,13 +1288,16 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           if(ReadingsVal($name, "playerPlaying", "") eq "no")
           {
-            readingsBulkUpdate($hash, "playerPlaying", "yes");
+            readingsSingleUpdate($hash, "playerPlaying", "yes", 1);
           }
           else
           {
             delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
+            
+            readingsBeginUpdate($hash);            
             readingsBulkUpdate($hash, "playerPlaying", "no");
-            readingsBulkUpdate($hash, "input", "-");                        
+            readingsBulkUpdate($hash, "input", "-");
+            readingsEndUpdate($hash, 1);
           }          
         }        
       }
@@ -1256,17 +1306,23 @@ sub PHILIPS_AUDIO_ParseResponse
         if($data =~ /STOP/)
         {
           delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
+          
+          readingsBeginUpdate($hash);
           readingsBulkUpdate($hash, "playerPlaying", "no");
           readingsBulkUpdate($hash, "input", "-");
+          readingsEndUpdate($hash, 1);
         }
       }      
       elsif($cmd =~ m/^(volumeStraight|volumeUp|volumeDown)/)
       {        
         if($data =~ /SUCCESS/)
         {
-          readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
           my $targetVolume = $hash->{helper}{targetVolume};
-          readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $targetVolume));          
+          
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});          
+          readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $targetVolume));
+          readingsEndUpdate($hash, 1);          
         }
       }
       elsif($cmd eq "elapse")
@@ -1276,12 +1332,14 @@ sub PHILIPS_AUDIO_ParseResponse
           if($1 eq "NOWPLAY")
           {
             # New player status information available
-            readingsBulkUpdate($hash, "playerPlaying", "yes");
+            readingsSingleUpdate($hash, "playerPlaying", "yes", 1);
             PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
           }
           elsif($1 eq "ELAPSE")
           {
+            readingsBeginUpdate($hash);
             readingsBulkUpdate($hash, "playerPlaying", "yes");
+            
             if($data =~ /'value':(.+),/)
             {
               # Sometimes the device does not refresh the ELAPSE -> NOWPLAY request
@@ -1363,20 +1421,27 @@ sub PHILIPS_AUDIO_ParseResponse
               readingsBulkUpdate($hash, "volumeStraight", $1);
               readingsBulkUpdate($hash, "volume", PHILIPS_AUDIO_volume_abs2rel($hash, $1));          
             }
+            
+            readingsEndUpdate($hash, 1);  
+            
             if($data =~ /'play':(.+),/)
             {
               if(int($1) == 1)
               {
-                readingsBulkUpdate($hash, "playerPlaying", "yes");
                 $hash->{helper}{playerState}   = "playing";
-                readingsBulkUpdate($hash, "playerState", "playing");
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate ($hash, "playerPlaying", "yes");
+                readingsBulkUpdate ($hash, "playerState", "playing");
+                readingsEndUpdate  ($hash, 1);
               }        
               else
               {
                 delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-                readingsBulkUpdate($hash, "playerPlaying", "no");
-                $hash->{helper}{playerState}   = "home";
-                readingsBulkUpdate($hash, "playerState", "home");
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate ($hash, "playerPlaying", "no");
+                readingsBulkUpdate ($hash, "playerState", "home");
+                readingsEndUpdate  ($hash, 1);
               }
             }
           }
@@ -1389,23 +1454,34 @@ sub PHILIPS_AUDIO_ParseResponse
           if($1 eq "NOTHING")
           {
             delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-            readingsBulkUpdate($hash, "playerPlaying", "no");
-            readingsBulkUpdate($hash, "playerState", "home");
-            $hash->{helper}{playerState} = "home";            
+            
+            $hash->{helper}{playerState} = "home";
+            
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate ($hash, "playerPlaying", "no");
+            readingsBulkUpdate ($hash, "playerState", "home");
+            readingsEndUpdate  ($hash, 1);
           }
         }
         elsif($data =~ /window.location = \"\/index\"/)
         {
           delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-          readingsBulkUpdate($hash, "playerPlaying", "no");
-          readingsBulkUpdate($hash, "playerState", "home");
+          
           $hash->{helper}{playerState} = "home";
+          
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate ($hash, "playerPlaying", "no");
+          readingsBulkUpdate ($hash, "playerState", "home");
+          readingsEndUpdate  ($hash, 1);          
         }
         else
         {
-          readingsBulkUpdate($hash, "playerPlaying", "yes");
-          readingsBulkUpdate($hash, "playerState", "playing");
           $hash->{helper}{playerState} = "playing";
+          
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate ($hash, "playerPlaying", "yes");
+          readingsBulkUpdate ($hash, "playerState", "playing");
+          readingsEndUpdate  ($hash, 1);          
         }
         
         if($data =~ /'devicename':'(.*?)'/)
@@ -1416,6 +1492,8 @@ sub PHILIPS_AUDIO_ParseResponse
             $hash->{helper}{dInfo}{FRIENDLY_NAME} = $1;
           }          
         }
+        
+        readingsBeginUpdate($hash);
         
         if ($data =~ /'defaultAlbumArt':'res\/Internet_radio.jpg'/)
         {
@@ -1464,16 +1542,18 @@ sub PHILIPS_AUDIO_ParseResponse
           readingsBulkUpdate($hash, "input", "Online Services"); 
         }        
         
+        readingsEndUpdate($hash, 1);
+        
         if($data =~ /'title':'\\'(.+)\\''/)
         {
           if((ReadingsVal($name, "input", "") eq "Media Library") or (ReadingsVal($name, "input", "") eq "Spotify"))
           {
-            readingsBulkUpdate($hash, "playerTitle", PHILIPS_AUDIO_html2txt($1));
+            readingsSingleUpdate($hash, "playerTitle", PHILIPS_AUDIO_html2txt($1), 1);
             delete $hash->{READINGS}{playerRadioStationInfo};
           }
           elsif(ReadingsVal($name, "input", "") eq "Internet Radio")
           {
-           readingsBulkUpdate($hash, "playerRadioStationInfo", PHILIPS_AUDIO_html2txt($1));
+           readingsSingleUpdate($hash, "playerRadioStationInfo", PHILIPS_AUDIO_html2txt($1), 1);
            delete $hash->{READINGS}{playerTitle};           
           }
         }
@@ -1481,12 +1561,12 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           if((ReadingsVal($name, "input", "") eq "Media Library") or (ReadingsVal($name, "input", "") eq "Spotify"))
           {
-            readingsBulkUpdate($hash, "playerTitle", PHILIPS_AUDIO_html2txt($1));
+            readingsSingleUpdate($hash, "playerTitle", PHILIPS_AUDIO_html2txt($1), 1);
             delete $hash->{READINGS}{playerRadioStationInfo};
           }
           elsif(ReadingsVal($name, "input", "") eq "Internet Radio")
           {
-           readingsBulkUpdate($hash, "playerRadioStationInfo", PHILIPS_AUDIO_html2txt($1));
+           readingsSingleUpdate($hash, "playerRadioStationInfo", PHILIPS_AUDIO_html2txt($1), 1);
            delete $hash->{READINGS}{playerTitle};           
           }
         }
@@ -1500,12 +1580,12 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           if((ReadingsVal($name, "input", "") eq "Media Library") or (ReadingsVal($name, "input", "") eq "Spotify"))
           {
-            readingsBulkUpdate($hash, "playerAlbum", PHILIPS_AUDIO_html2txt($1));
+            readingsSingleUpdate($hash, "playerAlbum", PHILIPS_AUDIO_html2txt($1), 1);
             delete $hash->{READINGS}{playerRadioStation};
           }
           else
           {
-            readingsBulkUpdate($hash, "playerRadioStation", PHILIPS_AUDIO_html2txt($1));
+            readingsSingleUpdate($hash, "playerRadioStation", PHILIPS_AUDIO_html2txt($1), 1);
             delete $hash->{READINGS}{playerAlbum};
           }          
         }
@@ -1517,12 +1597,14 @@ sub PHILIPS_AUDIO_ParseResponse
         
         if($data =~ /'albumArt':'(.+)'/)
         {
-          readingsBulkUpdate($hash, "playerAlbumArt", $1);
+          readingsSingleUpdate($hash, "playerAlbumArt", $1, 1);
         }
         else
         {
           delete $hash->{READINGS}{playerAlbumArt};
         }
+        
+        readingsBeginUpdate($hash);
         
         if($data =~ /'volume':(.+),/)
         {
@@ -1535,15 +1617,17 @@ sub PHILIPS_AUDIO_ParseResponse
           readingsBulkUpdate($hash, "volume", "0");  
         }
         
+        readingsEndUpdate($hash, 1);
+        
         if($data =~ /'elapsetime':(.+),/)
         {
           if(int($1) < 3600)
           {
-            readingsBulkUpdate($hash, "playerPlayTime", strftime("%M:\%S", gmtime($1)));
+            readingsSingleUpdate($hash, "playerPlayTime", strftime("%M:\%S", gmtime($1)), 1);
           }
           else
           {
-            readingsBulkUpdate($hash, "playerPlayTime", strftime("\%H:\%M:\%S", gmtime($1)));
+            readingsSingleUpdate($hash, "playerPlayTime", strftime("\%H:\%M:\%S", gmtime($1)), 1);
           }
         }
         else
@@ -1560,11 +1644,11 @@ sub PHILIPS_AUDIO_ParseResponse
           }
           elsif(int($1) < 3600)
           {
-            readingsBulkUpdate($hash, "playerTotalPlayTime", strftime("%M:\%S", gmtime($1)));
+            readingsSingleUpdate($hash, "playerTotalPlayTime", strftime("%M:\%S", gmtime($1)), 1);
           }
           else
           {
-            readingsBulkUpdate($hash, "playerTotalPlayTime", strftime("\%H:\%M:\%S", gmtime($1)));
+            readingsSingleUpdate($hash, "playerTotalPlayTime", strftime("\%H:\%M:\%S", gmtime($1)), 1);
           }          
         }
         else
@@ -1576,11 +1660,11 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           if($1 == 1)
           {
-            readingsBulkUpdate($hash, "mute", "on");
+            readingsSingleUpdate($hash, "mute", "on", 1);
           }
           else
           {
-            readingsBulkUpdate($hash, "mute", "off");
+            readingsSingleUpdate($hash, "mute", "off", 1);
           }
         }
         
@@ -1589,18 +1673,18 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           if($1 == 1)
           {
-            readingsBulkUpdate($hash, "playerPlaying", "yes");
+            readingsSingleUpdate($hash, "playerPlaying", "yes", 1);
           }        
           else
           {
             delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-            readingsBulkUpdate($hash, "playerPlaying", "no");            
+            readingsSingleUpdate($hash, "playerPlaying", "no", 1);            
           }
         }
         else
         {
           delete $hash->{READINGS}{$_} foreach (grep /player/, keys %{$hash->{READINGS}});
-          readingsBulkUpdate($hash, "playerPlaying", "no");
+          readingsSingleUpdate($hash, "playerPlaying", "no", 1);
         }
       }
       elsif($cmd eq "homestatus")
@@ -1612,7 +1696,6 @@ sub PHILIPS_AUDIO_ParseResponse
       }
       elsif ($cmd eq "getMediaRendererDesc")
       {
-        
         if($data =~ /<manufacturer>(.+)<\/manufacturer>/)
         {
           $hash->{helper}{dInfo}{MANUFACTURER} = $1;
@@ -1663,12 +1746,6 @@ sub PHILIPS_AUDIO_ParseResponse
           $hash->{helper}{dInfo}{MODEL_NUMBER} = $1;
         }
         
-        
-        #if(($modelName ne "") and ($modelNumber ne ""))
-        #{
-        #  $hash->{MODEL} = $modelName . $modelNumber;
-        #}
-        
         if($data =~ /<serialNumber>(.+)<\/serialNumber>/)
         {
           $hash->{helper}{dInfo}{SERIAL_NUMBER} = uc($1);
@@ -1697,13 +1774,14 @@ sub PHILIPS_AUDIO_ParseResponse
           {
             $port = 7123;
           }
-          elsif(uc($hash->{MODEL}) eq "NP3900")
+          elsif
+          (
+            (uc($hash->{MODEL}) eq "NP3500") or
+            (uc($hash->{MODEL}) eq "NP3900") or
+            (uc($hash->{MODEL}) eq "AW9000")
+          )
           {
             $port = 49153;
-          }
-          elsif(uc($hash->{MODEL}) eq "AW9000")
-          {
-            $port = "";
           }
           
           my $i = 1;
@@ -1747,7 +1825,7 @@ sub PHILIPS_AUDIO_ParseResponse
             # In case on presets defined the player returns an Error
             # Do nothing
             $hash->{helper}{TOTALINETRADIOPRESETS} = 0;
-            readingsBulkUpdate($hash, "totalPresets", "0");
+            readingsSingleUpdate($hash, "totalPresets", "0", 1);
             delete $hash->{READINGS}{Reading_presets};
           }
           else
@@ -1761,11 +1839,13 @@ sub PHILIPS_AUDIO_ParseResponse
             if ($data =~ /'totalListCount':(.+),/)
             {
               $hash->{helper}{TOTALINETRADIOPRESETS} = $1;
-              readingsBulkUpdate($hash, "totalPresets", $1);
+              readingsSingleUpdate($hash, "totalPresets", $1, 1);
               #Log3 $name, 5, "ListedItems: $listedItems";
             }
             
             $data =~ s/\R//g;        # Remove new lines			
+            
+            readingsBeginUpdate($hash);
             
             while ($data =~ /{'title':'(.+?)',/g)
             {            
@@ -1781,6 +1861,7 @@ sub PHILIPS_AUDIO_ParseResponse
                 readingsBulkUpdate($hash, sprintf(".inetRadioPreset_%02d", $presetID), $presetName);
               }                                                                      
             }
+            readingsEndUpdate($hash, 1);
 
             if($presetID < ($hash->{helper}{TOTALINETRADIOPRESETS})) # Maximum listed items = 8. Get the next items by sending the nextreqURL
             {
@@ -1790,7 +1871,7 @@ sub PHILIPS_AUDIO_ParseResponse
             }
             else
             {
-              readingsBulkUpdate($hash, "playerListStatus", "ready");
+              readingsSingleUpdate($hash, "playerListStatus", "ready", 1);
               delete $hash->{READINGS}{Reading_presets};
               delete $hash->{READINGS}{readingPresets};
               $hash->{helper}{cmdStep} = 4;
@@ -1823,7 +1904,7 @@ sub PHILIPS_AUDIO_ParseResponse
             # In case on presets defined the player returns an Error
             # Do nothing
             $hash->{helper}{TOTALINETRADIOFAVORITES} = 0;
-            readingsBulkUpdate($hash, "totalFavorites", "0");
+            readingsSingleUpdate($hash, "totalFavorites", "0", 1);
             delete $hash->{READINGS}{Reading_favorites};
           }
           else
@@ -1845,11 +1926,13 @@ sub PHILIPS_AUDIO_ParseResponse
             if ($data =~ /'totalListCount':(.+),/)
             {
               $hash->{helper}{TOTALINETRADIOFAVORITES} = $1;
-              readingsBulkUpdate($hash, "totalFavorites", $1);
+              readingsSingleUpdate($hash, "totalFavorites", $1, 1);
             }
             
             $data =~ s/\R//g;        # Remove new lines
-			      
+            
+            readingsBeginUpdate($hash);
+            
             while($data =~ /{'title':'(.+?)',/g)
             {            
               $favoriteName = $1;
@@ -1863,6 +1946,8 @@ sub PHILIPS_AUDIO_ParseResponse
                 readingsBulkUpdate($hash, sprintf(".inetRadioFavorite_%02d", $favoriteID), $favoriteName);
               }
             }
+            
+            readingsEndUpdate($hash, 1);
 
             #Log3 $name, 5, "FavoriteIDNachLoop: $favoriteID"; 
 
@@ -1875,7 +1960,7 @@ sub PHILIPS_AUDIO_ParseResponse
             }
             else
             {
-              readingsBulkUpdate($hash, "playerListStatus", "ready");
+              readingsSingleUpdate($hash, "playerListStatus", "ready", 1);
               delete $hash->{READINGS}{Reading_favorites};
               delete $hash->{READINGS}{readingFavorites};
               $hash->{helper}{cmdStep} = 4;
@@ -1900,14 +1985,19 @@ sub PHILIPS_AUDIO_ParseResponse
             if ($2 eq "i")
             {
               $hash->{helper}{networkRequest} = "idle";
-              readingsBulkUpdate($hash, "networkRequest", "idle");  
-              readingsBulkUpdate($hash, "playerListStatus", "ready");
               $hash->{helper}{playerState}   = "playing";
-              readingsBulkUpdate($hash, "playerState", "playing");
               # Stream selected. Manual operation finished.
               $hash->{helper}{manualOperation} = 0;
-              readingsBulkUpdate($hash, ".manualOperation", "no");
+              
+              readingsBeginUpdate($hash);
+              readingsBulkUpdate ($hash, "networkRequest", "idle");  
+              readingsBulkUpdate ($hash, "playerListStatus", "ready");
+              readingsBulkUpdate ($hash, "playerState", "playing");
+              readingsBulkUpdate ($hash, ".manualOperation", "no");
+              readingsEndUpdate  ($hash, 1);
+              
               PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
+              
               # Stream selected trigger getStatus
               PHILIPS_AUDIO_ResetTimer($hash); # getStatus              
               return;
@@ -1925,16 +2015,17 @@ sub PHILIPS_AUDIO_ParseResponse
             # Delete old readings			
             delete $hash->{READINGS}{$_} foreach (grep /listItem_...$/, keys %{$hash->{READINGS}});
             delete $hash->{READINGS}{$_} foreach (grep /.listItemTarget_...$/, keys %{$hash->{READINGS}});
+            
             $hash->{helper}{networkRequest} = "idle";
-            readingsBulkUpdate($hash, "networkRequest", "idle");            
-            readingsBulkUpdate($hash, "listItem_001", "$errorMessage");
-            readingsBulkUpdate($hash, ".listItemTarget_001", "$hash->{helper}{currentNavUrl}");
-            readingsBulkUpdate($hash, "playerListStatus", "ready");
-            
             $hash->{helper}{manualOperation} = 0;
-            readingsBulkUpdate($hash, ".manualOperation", "no");            
             
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate($hash);            
+            readingsBulkUpdate ($hash, "networkRequest", "idle");            
+            readingsBulkUpdate ($hash, "listItem_001", "$errorMessage");
+            readingsBulkUpdate ($hash, ".listItemTarget_001", "$hash->{helper}{currentNavUrl}");
+            readingsBulkUpdate ($hash, "playerListStatus", "ready");
+            readingsBulkUpdate ($hash, ".manualOperation", "no");            
+            readingsEndUpdate  ($hash, 1);
             
             return "Player response: $errorMessage.";
           }
@@ -1943,6 +2034,8 @@ sub PHILIPS_AUDIO_ParseResponse
           my $playerListTotalCount = 0;
           my $listId = 0;
           my $listItems = "";
+          
+          readingsBeginUpdate($hash);
           
           if($data =~ /var listdetails = \{(.*)\};/)
           {
@@ -1999,6 +2092,8 @@ sub PHILIPS_AUDIO_ParseResponse
               }
             }			
             
+            readingsEndUpdate($hash, 1);
+            
             $listItems = $listItems_temp;
             
             if($listItems =~ /'items': \[(.*)\]/)
@@ -2009,6 +2104,8 @@ sub PHILIPS_AUDIO_ParseResponse
               delete $hash->{READINGS}{$_} foreach (grep /.listItemTarget_...$/, keys %{$hash->{READINGS}});
               
               # Predefine all listItem readings with "reading..."
+              
+              readingsBeginUpdate($hash);
               
               for(my $i = 1; ($i < int($hash->{helper}{playerListTotalCount}) + 1) and ($i < AttrVal($name, "maxListItems", 100) + 1); $i++)
               {
@@ -2024,7 +2121,7 @@ sub PHILIPS_AUDIO_ParseResponse
                 
                 if($item =~ /'title':'(.*?)',/)
                 {
-                  $title = $1;				 
+                  $title = PHILIPS_AUDIO_html2txt($1);				 
                 }
                 
                 if($item =~ /'id':(.*?),/)
@@ -2036,32 +2133,38 @@ sub PHILIPS_AUDIO_ParseResponse
                 if($item =~ /'target':'(.*?)'/)
                 {
                   $itemTarget = $1;
-                  readingsBulkUpdate($hash, ".listItemTarget_".sprintf("%03s", $listId), $1);
+                  readingsBulkUpdate($hash, ".listItemTarget_".sprintf("%03s", int($listId)), $1);
                 }				
                 if(substr($itemTarget, -1) eq "1")
                 {
-                  $title = "i_$title"; # item
+                  $title = "i_" . $title; # item
                 }
                 else
                 {
-                  $title = "c_$title"; # container
+                  $title = "c_" . $title; # container
                 }				
-                readingsBulkUpdate($hash, "listItem_".sprintf("%03s", $listId), PHILIPS_AUDIO_html2txt($title));
+                readingsBulkUpdate($hash, "listItem_".sprintf("%03s", int($listId)), $title);
               }
+              
+              readingsEndUpdate($hash, 1);
+              
             }
           }
           if($listId < $hash->{helper}{playerListTotalCount})
           {
             # External Command. Not from buffer timer.
             $hash->{helper}{fromSendCommandBuffer} = 0;
-            
             PHILIPS_AUDIO_SendCommand($hash, "$hash->{helper}{nextUrl}", "", "selectStream", "list");
           }
           else
           {
             $hash->{helper}{networkRequest} = "idle";
-            readingsBulkUpdate($hash, "networkRequest", "idle"); 
-            readingsBulkUpdate($hash, "playerListStatus", "ready");            
+            
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate ($hash, "networkRequest", "idle"); 
+            readingsBulkUpdate ($hash, "playerListStatus", "ready");
+            readingsEndUpdate  ($hash, 1);            
+            
           }
         }        
         elsif($arg =~ /list/)
@@ -2069,12 +2172,14 @@ sub PHILIPS_AUDIO_ParseResponse
           if ($data =~ /{'command':'NOTHING','value':0}|<title>Error<\/title>/)
           {
             $hash->{helper}{networkRequest} = "idle";
-            readingsBulkUpdate($hash, "networkRequest", "idle");
+            readingsSingleUpdate($hash, "networkRequest", "idle", 1);
             Log3 $name, 3, "PHILIPS_AUDIO ($name) - Player response: Media Library change not successful.";
             return "Player response: Media Library change not successful.";
           }
           
           $hash->{helper}{networkRequest} = "busy";
+          
+          readingsBeginUpdate($hash);
           readingsBulkUpdate($hash, "networkRequest", "busy");
           
           $data =~ s/\R//g;        # Remove new lines for regex
@@ -2122,7 +2227,7 @@ sub PHILIPS_AUDIO_ParseResponse
               my $title = "";
               if($item =~ /'title':'(.*?)',/)
               {
-                $title = $1;				 
+                $title = PHILIPS_AUDIO_html2txt($1);				 
               }
               $item = $item_temp;
               if($item =~ /'id':(.*?),/)
@@ -2135,18 +2240,18 @@ sub PHILIPS_AUDIO_ParseResponse
               if($item =~ /'target':'(.*?)'/)
               {
                 $itemTarget = $1;
-                readingsBulkUpdate($hash, ".listItemTarget_".sprintf("%03s", $listId), $1);
+                readingsBulkUpdate($hash, ".listItemTarget_".sprintf("%03s", int($listId)), $1);
               }	
               
               if(substr($itemTarget, -1) eq "1")
               {
-                $title = "i_$title"; # item
+                $title = "i_" . $title; # item
               }
               else
               {
-                $title = "c_$title"; # container
+                $title = "c_" . $title; # container
               }				
-              readingsBulkUpdate($hash, "listItem_".sprintf("%03s", $listId), PHILIPS_AUDIO_html2txt($title));
+              readingsBulkUpdate($hash, "listItem_".sprintf("%03s", int($listId)), $title);
               
               last if($listId eq AttrVal($name, "maxListItems", 100));
             }
@@ -2164,17 +2269,16 @@ sub PHILIPS_AUDIO_ParseResponse
             $hash->{helper}{networkRequest} = "idle";
             readingsBulkUpdate($hash, "networkRequest", "idle");
             readingsBulkUpdate($hash, "playerListStatus", "ready");            
-          }          
+          }
+          
+          readingsEndUpdate($hash, 1);
         }       
                
-      }
+      }      
       
       $hash->{helper}{networkRequest} = "idle";
-      readingsBulkUpdate($hash, "networkRequest", "idle");
-    }
-    
-    readingsEndUpdate($hash, 1);
-    
+      readingsSingleUpdate($hash, "networkRequest", "idle", 1);
+    }    
     return;
 }
 
@@ -2224,6 +2328,7 @@ sub PHILIPS_AUDIO_ResetTimer
 
 #############################
 # convert all HTML entities into UTF-8 equivalent
+
 sub PHILIPS_AUDIO_html2txt
 {
   my ($string) = @_;
@@ -2255,16 +2360,13 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
   my $url = "";
   my $port = "";
   
-  if(uc($hash->{MODEL}) eq "NP3500")
-  {
-    # TBD
-  }
-  elsif(uc($hash->{MODEL}) eq "NP3700")
+  if(uc($hash->{MODEL}) eq "NP3700")
   {
     $url = "http://$hash->{IP_ADDRESS}:7123/DeviceDescription.xml";
   }
   elsif
   (
+    (uc($hash->{MODEL}) eq "NP3500") or
     (uc($hash->{MODEL}) eq "NP3900") or
     (uc($hash->{MODEL}) eq "AW9000")
   )
@@ -2291,7 +2393,6 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
 }
 
 1;
-
 
 =pod
 =item device
@@ -2325,6 +2426,8 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
       # With custom "off"-interval of 60 seconds and "on"-interval of 10 seconds<br>
       define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60 10</b><br>
       </code>
+      <br>
+      <i>Note: Due to slow command processing by the player itself the minimum interval is <b>limited to 5 seconds</b>. More frequent polling might cause device freezes.</i>
     </ul>   
   </ul>
   <br>  
@@ -2465,7 +2568,9 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
         <br>
         # 60 Sekunden Intervall f&uuml;r "off" und 10 Sekunden f&uuml;r "on"<br>
         define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60 10</b>
-        </code>
+        </code>        
+        <br><br>
+      <i>Bemerkung: Aufgrund der relativ langsamen Verarbeitung von Befehlen durch den Player selbst wurde das minimale Intervall <b>auf 5 Sekunden limitiert</b>. Dadurch sollten potentielle Ger&auml;tefreezes reduziert werden.</i>
     </ul>   
   </ul><br>  
   <a name="PHILIPS_AUDIOset"></a>
@@ -2575,4 +2680,3 @@ sub PHILIPS_AUDIO_getMediaRendererDesc
 =end html_DE
 
 =cut
-
