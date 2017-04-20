@@ -2057,6 +2057,7 @@ sub BOSEST_finishedDiscovery($) {
     
     #start discovery again after 67s
     InternalTimer(gettimeofday()+67, "BOSEST_startDiscoveryProcess", $hash, 1);
+    Log3 $hash, 5, "BOSEST: finished discovery";
 
     for($i = 1; $i < @commands; $i = $i+2) {
         my $command = $commands[$i];
@@ -2306,9 +2307,11 @@ sub BOSEST_checkWebSocketConnection($) {
     my ($hash) = @_;
     if(defined($hash->{helper}{bosewebsocket})) {
         #run mojo loop not longer than 0.5ms
+        Log3 $hash, 5, "BOSEST: run mojo loop";
         my $id = Mojo::IOLoop->timer(0.0005 => sub {});
         Mojo::IOLoop->one_tick;
         Mojo::IOLoop->remove($id);
+        Log3 $hash, 5, "BOSEST: finished mojo loop";
     }
     
     InternalTimer(gettimeofday()+0.7, "BOSEST_checkWebSocketConnection", $hash, 1);
