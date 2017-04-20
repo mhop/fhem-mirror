@@ -1223,90 +1223,93 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
     my $events = deviceEvents( $dev, 1 );
     return "" unless ($events);
 
-    # process wakeup devices
     my @registeredWakeupdevs =
       split( ',', AttrVal( $name, $prefix . "wakeupDevice", "" ) );
-    if (@registeredWakeupdevs) {
-
-        # if this is a notification of a registered wakeup device
-        if ( grep { m/^$devName$/ } @registeredWakeupdevs ) {
-
-            foreach my $event ( @{$events} ) {
-                next unless ( defined($event) );
-                RESIDENTStk_wakeupSet( $devName, $event );
-            }
-
-            return "";
-        }
-
-        # process sub-child notifies: *_wakeupDevice
-        foreach my $wakeupDev (@registeredWakeupdevs) {
-
-            # if this is a notification of a registered sub dummy device
-            # of one of our wakeup devices
-            if (   AttrVal( $wakeupDev, "wakeupResetSwitcher", "" ) eq $devName
-                && IsDevice( $devName, "dummy" ) )
-            {
-                foreach my $event ( @{$events} ) {
-                    next unless ( defined($event) );
-                    RESIDENTStk_wakeupSet( $wakeupDev, $event )
-                      unless ( $event =~ /^(?:state:\s*)?off$/i );
-                }
-
-                return "";
-            }
-        }
-
-        return "";
-    }
-
-    # process PRESENCE
     my @presenceDevices =
       split( ',', AttrVal( $name, $prefix . "presenceDevices", "" ) );
-    if ( @presenceDevices
-        && grep { /^[\s\t ]*$devName(:[A-Za-z\d_\.\-\/]*)?[\s\t ]*$/ }
-        @presenceDevices )
-    {
 
-        my $counter = {
-            absent  => 0,
-            present => 0,
-        };
+    foreach my $event ( @{$events} ) {
+        next unless ( defined($event) );
+        my $found = 0;
 
-        for (@presenceDevices) {
-            my $r = "presence";
-            my $d = $_;
-            if ( $d =~
-                m/^[\s\t ]*([A-Za-z\d_\.\-\/]+):([A-Za-z\d_\.\-\/]+)?[\s\t ]*$/
-              )
-            {
-                $d = $1;
-                $r = $2;
+        # process wakeup devices
+        if (@registeredWakeupdevs) {
+
+            # if this is a notification of a registered wakeup device
+            if ( grep { m/^$devName$/ } @registeredWakeupdevs ) {
+                RESIDENTStk_wakeupSet( $devName, $event );
+                next;
             }
 
-            my $presenceState =
-              ReadingsVal( $d, $r, ReadingsVal( $d, "state", "" ) );
+            # process sub-child notifies: *_wakeupDevice
+            foreach my $wakeupDev (@registeredWakeupdevs) {
+
+                # if this is a notification of a registered sub dummy device
+                # of one of our wakeup devices
+                if (
+                    AttrVal( $wakeupDev, "wakeupResetSwitcher", "" ) eq $devName
+                    && IsDevice( $devName, "dummy" ) )
+                {
+                    RESIDENTStk_wakeupSet( $wakeupDev, $event )
+                      unless ( $event =~ /^(?:state:\s*)?off$/i );
+                    $found = 1;
+                    last;
+                }
+            }
+            next if ($found);
+        }
+
+        # process PRESENCE
+        if (   @presenceDevices
+            && ( grep { /^$devName(:[A-Za-z\d_\.\-\/]+)?$/ } @presenceDevices )
+            && $event =~ /^(?:([A-Za-z\d_\.\-\/]+): )?(.+)$/ )
+        {
+            my $reading = $1;
+            my $value   = $2;
+
+            # early exit if unexpected event value
             next
-              unless ( $presenceState =~
-m/^(0|false|absent|disappeared|unavailable|unreachable|disconnected)|(1|true|present|appeared|available|reachable|connected|)$/i
+              unless ( $value =~
+m/^0|false|absent|disappeared|unavailable|unreachable|disconnected|1|true|present|appeared|available|reachable|connected$/i
               );
 
-            $counter->{absent}++  if ($1);
-            $counter->{present}++ if ($2);
-        }
+            my $counter = {
+                absent  => 0,
+                present => 0,
+            };
 
-        if ( $counter->{absent} && !$counter->{present} ) {
-            Log3 $name, 4,
-              "$TYPE $name: " . "Syncing status with $devName = absent";
-            fhem "set $name:FILTER=presence=present absent";
-        }
-        elsif ( $counter->{present} ) {
-            Log3 $name, 4,
-              "$TYPE $name: " . "Syncing status with $devName = present";
-            fhem "set $name:FILTER=presence=absent home";
-        }
+            for (@presenceDevices) {
+                my $r = "presence";
+                my $d = $_;
+                if ( $d =~ m/^([a-zA-Z\d._]+)(?::([A-Za-z\d_\.\-\/]*))?$/ ) {
+                    $d = $1;
+                    $r = $2;
+                }
 
-        return "";
+                my $presenceState =
+                  ReadingsVal( $d, $r, ReadingsVal( $d, "state", "" ) );
+
+                # ignore device if it has unexpected state
+                next
+                  unless ( $presenceState =~
+m/^(0|false|absent|disappeared|unavailable|unreachable|disconnected)|(1|true|present|appeared|available|reachable|connected|)$/i
+                  );
+
+                $counter->{absent}++  if ( defined($1) );
+                $counter->{present}++ if ( defined($2) );
+            }
+
+            if ( $counter->{absent} && !$counter->{present} ) {
+                Log3 $name, 4,
+                  "$TYPE $name: " . "Syncing status with $devName = absent";
+                fhem "set $name:FILTER=presence=present absent";
+            }
+            elsif ( $counter->{present} ) {
+                Log3 $name, 4,
+                  "$TYPE $name: " . "Syncing status with $devName = present";
+                fhem "set $name:FILTER=presence=absent home";
+            }
+        }
     }
 
     return "";
@@ -3511,10 +3514,7 @@ sub RESIDENTStk_findDummySlaves($) {
         $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
         $hash->{NOTIFYDEV} .= $wakeupDevice;
 
-        my @wakeupdevs =
-          split( ',', $wakeupDevice );
-
-        foreach (@wakeupdevs) {
+        foreach ( split( ',', $wakeupDevice ) ) {
             my $rsw;
             next unless ( IsDevice($_) );
 
@@ -3528,8 +3528,12 @@ sub RESIDENTStk_findDummySlaves($) {
     }
 
     if ($presenceDevices) {
-        $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
-        $hash->{NOTIFYDEV} .= $presenceDevices;
+        foreach ($presenceDevices) {
+            my $d = $_;
+            $d =~ s/:.*$//g;
+            $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
+            $hash->{NOTIFYDEV} .= $d;
+        }
     }
 }
 
