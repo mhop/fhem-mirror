@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 34_ESPEasy: urlEncode text for display commands
   - feature:  71_PHILIPS_AUDIO: Added NP3500 support. "lvl" Reading bugfix.
   - change:  93_DbLog: version 2.16.5 primary key evaluation changed
   - bugfix:  32_withings: updated for new account key characters

@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.01;       # Version of this module
+my $module_version    = 1.03;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -48,6 +48,9 @@ my $d_colorpickerCTcw = 6000;       # color temp for cw (kelvin)
 my $d_maxHttpSessions = 3;          # concurrent connects to a single esp
 my $d_maxQueueSize    = 250;        # max queue size,
 my $d_resendFailedCmd = 0;          # resend failed http requests by default?
+
+my $d_displayTextEncode = 1;        # urlEncode Text for Displays
+my $d_displayTextWidth  = 0;        # display width, 0 => disable formating
 
 # ------------------------------------------------------------------------------
 # "setCmds" => "min. number of parameters"
@@ -214,6 +217,8 @@ sub ESPEasy_Initialize($)
                        ."colorpicker:RGB,HSV,HSVp "
                        ."deniedIPs "
                        ."disable:1,0 "
+                       ."displayTextEncode:1,0 "
+                       ."displayTextWidth "
                        ."do_not_notify:0,1 "
                        ."httpReqTimeout "
                        ."IODev "
@@ -483,6 +488,9 @@ sub ESPEasy_Set($$@)
       Log3 $name, 2, "$type $name: Unknown set command $cmd" if $cmd ne "?";
       return "Unknown argument $cmd, choose one of ". $clist;
     }
+
+    # urlEncode <text> parameter
+    @params = ESPEasy_urlEncodeDisplayText($hash,$cmd,@params);
 
     # pin mapping (eg. D8 -> 15)
     my $pp = ESPEasy_paramPos($cmd,'<pin>');
@@ -859,6 +867,7 @@ sub ESPEasy_Attr(@)
   if (defined $hash->{SUBTYPE} && $hash->{SUBTYPE} eq "bridge" 
   && ($aName =~ m/^(Interval|pollGPIOs|IODev|setState|readingSwitchText)$/
   ||  $aName =~ m/^(readingPrefixGPIO|readingSuffixGPIOState|adjustValue)$/
+  ||  $aName =~ m/^(displayTextEncode|displayTextWidth)$/
   ||  $aName =~ m/^(presenceCheck|parseCmdResponse|rgbGPIOs|colorpicker)$/
   ||  $aName =~ m/^(wwcwGPIOs|colorpickerCTww|colorpickerCTcw|mapLightCmds)$/)) {
     Log3 $name, 2, "$type $name: Attribut '$aName' can not be used by bridge";
@@ -875,7 +884,8 @@ sub ESPEasy_Attr(@)
   }
 
   elsif ($aName =~ m/^(autosave|autocreate|authentication|disable)$/
-      || $aName =~ m/^(presenceCheck|readingSwitchText|resendFailedCmd)$/) {
+      || $aName =~ m/^(presenceCheck|readingSwitchText|resendFailedCmd)$/
+      || $aName =~ m/^(displayTextEncode)$/) {
     $ret = "0,1" if ($cmd eq "set" && not $aVal =~ m/^(0|1)$/)}
 
   elsif ($aName eq "combineDevices") {
@@ -910,6 +920,10 @@ sub ESPEasy_Attr(@)
 
   elsif ($aName eq "setState") {
     $ret = "integer" 
+      if ($cmd eq "set" && not $aVal =~ m/^(\d+)$/)}
+
+  elsif ($aName eq "displayTextWidth") {
+    $ret = "number of charaters per line" 
       if ($cmd eq "set" && not $aVal =~ m/^(\d+)$/)}
 
   elsif ($aName eq "readingPrefixGPIO") {
@@ -2043,6 +2057,47 @@ sub ESPEasy_adjustValue($$$)
 
 
 # ------------------------------------------------------------------------------
+sub ESPEasy_urlEncodeDisplayText($$@)
+{
+  my ($hash, $cmd, @params) = @_;
+  my $name = $hash->{NAME};
+  my $enc = AttrVal($name, "displayTextEncode", $d_displayTextEncode);
+  my $pp = ESPEasy_paramPos($cmd,'<text>');
+
+  if ($enc && $pp) {
+    my (@p, @t);
+    my $c = scalar @params;
+
+    # leading parameters
+    for (my $i=0; $i<$pp-1; $i++)  { 
+      push( @p, $params[$i] ) 
+    }
+
+    # collect all texts parameters
+    for (my $i=$pp-1; $i<$c; $i++) { 
+      $params[$i] =~ s/,/./g;             # comma is http url parameter splitter
+      #$params[$i] =~ s/[\x00-\x1F\x7F-\xFF]//g;  # remove non-printable chrs
+      push( @t, $params[$i] ) 
+    }
+    my $text = join(" ", @t);
+
+    # fill line with leading/trailing spaces
+    my $width = AttrVal($name,"displayTextWidth", $d_displayTextWidth);
+    if ($width) {
+      $text = " " x ($p[1]-1) .$text. " " x ($width - length($text) - $p[1]+1);
+      $text = substr($text, 0, $width);
+      $p[1] = 1;
+    }
+    
+    push(@p, urlEncode($text));
+    return @p;
+  }
+
+  return @params;
+}
+
+
+# ------------------------------------------------------------------------------
 sub ESPEasy_isPmInstalled($$)
 {
   my ($hash,$pm) = @_;
@@ -2852,7 +2907,7 @@ sub ESPEasy_removeGit($)
       </ul>
       Default: none<br>
       Eg. <code>attr ESPxx adjustValue humidity:+0.1 
-      temperature+*:($VALUE-32)*5/9</code><br>
+      temperature*:($VALUE-32)*5/9</code><br>
       Eg. <code>attr ESPxx adjustValue 
       .*:my_OwnFunction($NAME,$READING,$VALUE)</code><br>
       <br>
@@ -2883,6 +2938,22 @@ sub ESPEasy_removeGit($)
       Used to disable device<br>
       Possible values: 0,1<br>
       Default: 0</li><br>
+
+    <li><a name="ESPEasy_displayTextEncode">displayTextEncode</a><br>
+      Used to disable url encoding for text that is send to oled/lcd displays.
+      Useful if you want to encode the text by yourself.<br>
+      Possible values: 0,1<br>
+      Default: 1 (enabled)</li><br>
+
+    <li><a name="ESPEasy_displayTextWidth">displayTextWidth</a><br>
+      Used to specify number of characters per display line.<br>
+      If set then all characters before and after the text on the same line will
+      be overwritten with spaces. Attribute 
+      <a href="#ESPEasy_displayTextEncode">displayTextEncode</a> must not be
+      disabled to use this feature. A 128x64px display has 16 characters per
+      line if you are using a 8px font.<br>
+      Possible values: integer<br>
+      Default: 0 (disabled)</li><br>
 
     <li><a name="ESPEasy_Interval">Interval</a><br>
       Used to set polling interval for presence check and GPIOs polling in
