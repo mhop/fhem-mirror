@@ -13,8 +13,8 @@ use vars qw(%modules);
 use vars qw(%defs);
 use vars qw(%attr);
 use vars qw($readingFnAttributes);
-sub Log;
-sub Log3;
+sub Log($$);
+sub Log3($$$);
 
 sub
 alexa_Initialize($)

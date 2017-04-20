@@ -29,8 +29,8 @@ use vars qw(%defs);
 use vars qw(%attr);
 use vars qw($readingFnAttributes);
 use vars qw($init_done);
-sub Log;
-sub Log3;
+sub Log($$);
+sub Log3($$$);
 
 sub readingsProxy_Initialize($)
 {

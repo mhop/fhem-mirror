@@ -28,8 +28,8 @@ use vars qw(%defs);
 use vars qw(%attr);
 use vars qw($init_done);
 use vars qw($lastDefChange);
-sub Log;
-sub Log3;
+sub Log($$);
+sub Log3($$$);
 
 use vars qw(%data);
 use vars qw($FW_ME);
