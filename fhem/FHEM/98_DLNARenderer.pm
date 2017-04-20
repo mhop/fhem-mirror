@@ -2,6 +2,11 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.4 - 20170421
+# - FEATURE: support $readingFnAttributes
+# - BUGFIX:  fix some freezes
+# - BUGFIX:  retry UPnP call 3 times if it fails (error 500)
+#
 # v2.0.3 - 20160918
 # - BUGFIX: fixed SyncPlay for CaskeId players
 #
@@ -152,6 +157,7 @@ sub DLNARenderer_Initialize($) {
   $hash->{ReadFn}    = "DLNARenderer_Read";
   $hash->{UndefFn}   = "DLNARenderer_Undef";
   $hash->{AttrFn}    = "DLNARenderer_Attribute";
+  $hash->{AttrList}  = $readingFnAttributes;
 }
 
 sub DLNARenderer_Attribute {
@@ -178,7 +184,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.3";
+    my $VERSION = "v2.0.4";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -342,7 +348,7 @@ sub DLNARenderer_channel {
     };
 
     if($@) {
-      Log3 $hash, 2, "DLNARenderer: Incorrect DIDL-Lite format, $@"; 
+      Log3 $hash, 2, "DLNARenderer: Incorrect DIDL-Lite format, $@";
     }
   }
   DLNARenderer_stream($hash, $stream, $meta);
@@ -915,22 +921,26 @@ sub DLNARenderer_upnpCall {
   my ($hash, $service, $method, @args) = @_;
   my $upnpService = DLNARenderer_upnpGetService($hash, $service);
   my $ret = undef;
+  my $i = 0;
   
-  eval {
-    my $upnpServiceCtrlProxy = $upnpService->controlProxy();
-    my $methodExists = $upnpService->getAction($method);
-    if($methodExists) {
-      $ret = $upnpServiceCtrlProxy->$method(@args);
-      Log3 $hash, 5, "DLNARenderer: $service, $method(".join(",",@args).") succeed.";
-    } else {
-      Log3 $hash, 4, "DLNARenderer: $service, $method(".join(",",@args).") does not exist.";
+  do {
+    eval {
+      my $upnpServiceCtrlProxy = $upnpService->controlProxy();
+      my $methodExists = $upnpService->getAction($method);
+      if($methodExists) {
+        $ret = $upnpServiceCtrlProxy->$method(@args);
+        Log3 $hash, 5, "DLNARenderer: $service, $method(".join(",",@args).") succeed.";
+      } else {
+        Log3 $hash, 4, "DLNARenderer: $service, $method(".join(",",@args).") does not exist.";
+      }
+    };
+
+    if($@) {
+      Log3 $hash, 3, "DLNARenderer: $service, $method(".join(",",@args).") failed, $@";
     }
-  };
+    $i = $i+1;
+  } while(!defined($ret) && $i < 3);
   
-  if($@) {
-    Log3 $hash, 3, "DLNARenderer: $service, $method(".join(",",@args).") failed, $@";
-    return undef;
-  }
   return $ret;
 }
 
@@ -1320,18 +1330,20 @@ sub DLNARenderer_addedDevice {
       readingsSingleUpdate($DLNARendererHash, "presentationURL", $dev->presentationURL(), 1);
       readingsSingleUpdate($DLNARendererHash, "manufacturer", $dev->manufacturer(), 1);
       
+      if(!$foundDevice) {
       #register callbacks
       #urn:upnp-org:serviceId:AVTransport
       if(DLNARenderer_upnpGetService($DLNARendererHash, "AVTransport")) {
-        $DLNARendererHash->{helper}{avTransportSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "AVTransport")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); });
+        $DLNARendererHash->{helper}{avTransportSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "AVTransport")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); }, 1);
       }
       #urn:upnp-org:serviceId:RenderingControl
       if(DLNARenderer_upnpGetService($DLNARendererHash, "RenderingControl")) {
-        $DLNARendererHash->{helper}{renderingControlSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "RenderingControl")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); });
+        $DLNARendererHash->{helper}{renderingControlSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "RenderingControl")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); }, 1);
       }
       #urn:pure-com:serviceId:SpeakerManagement
       if(DLNARenderer_upnpGetService($DLNARendererHash, "SpeakerManagement")) {
-        $DLNARendererHash->{helper}{speakerManagementSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "SpeakerManagement")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); });
+        $DLNARendererHash->{helper}{speakerManagementSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "SpeakerManagement")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); }, 1);
+      }
       }
       
       #set online
@@ -1553,7 +1565,7 @@ sub DLNARenderer_addSocketsToMainloop {
   #check if new sockets need to be added to mainloop
   foreach my $s (@sockets) {
     #create chash and add to selectlist
-    my $chash = DLNARenderer_newChash($hash, $s, {NAME => "DLNASocket-".$s->fileno()});
+    my $chash = DLNARenderer_newChash($hash, $s, {NAME => "DLNASocket-".$hash->{NAME}."-".$s->fileno()});
   }
   
   return undef;
