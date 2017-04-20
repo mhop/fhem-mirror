@@ -1015,7 +1015,7 @@ AnalyzeCommandChain($$;$)
   my $subcmd;
   while(defined($subcmd = shift @cmdList)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
-    my $lret = AnalyzeCommand($c, $subcmd);
+    my $lret = AnalyzeCommand($c, $subcmd, "ACC");
     push(@ret, $lret) if(defined($lret));
   }
   @cmdList = @saveCmdList;
@@ -1077,14 +1077,17 @@ AnalyzePerlCommand($$;$)
 sub
 AnalyzeCommand($$;$)
 {
-  my ($cl, $cmd) = @_; # third parmeter is deprecated
+  my ($cl, $cmd, $calledFromChain) = @_;
 
   $cmd = "" if(!defined($cmd)); # Forum #29963
   $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
 
   Log 5, "Cmd: >$cmd<";
-  return undef if(!$cmd);
+  if(!$cmd) {
+    $evalSpecials = undef if(!$calledFromChain || $calledFromChain ne "ACC");
+    return undef;
+  }
 
   if($cmd =~ m/^{.*}$/s) {              # Perl code
     return AnalyzePerlCommand($cl, $cmd, 1);
@@ -1094,6 +1097,7 @@ AnalyzeCommand($$;$)
     return "Forbidden command $cmd." if($cl && !Authorized($cl,"cmd","shell"));
     if($evalSpecials) {
       map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
+      $evalSpecials = undef if(!$calledFromChain || $calledFromChain ne "ACC");
     }
     my $out = "";
     $out = ">> $currlogfile 2>&1" if($currlogfile ne "-" && $^O ne "MSWin32");
@@ -1105,6 +1109,7 @@ AnalyzeCommand($$;$)
   if($evalSpecials) {
     map { my $n = substr($_,1); my $v = $evalSpecials->{$_};
           $cmd =~ s/\$$n/$v/g; } keys %{$evalSpecials};
+    $evalSpecials = undef if(!$calledFromChain || $calledFromChain ne "ACC");
   }
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
   return undef if(!$fn);
@@ -1685,8 +1690,10 @@ ReplaceSetMagic($$@)       # Forum #38276
   $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/
          rsmVal($1,$2,$3,$4,$5)/eg;
 
+  my $esDef = ($evalSpecials ? 1 : 0);
   $evalSpecials->{'%DEV'} = $hash->{NAME};
   $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
+  $evalSpecials = undef if(!$esDef);;
 
   return (undef, @_) if($oa eq $a);
   return (undef, split(/ /, $a, $nsplit));
