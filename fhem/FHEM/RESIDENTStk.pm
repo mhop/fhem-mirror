@@ -1083,7 +1083,9 @@ sub RESIDENTStk_Notify($$) {
         foreach ( @{$events} ) {
 
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
-            if ( $_ =~ m/^INITIALIZED|REREADCFG|MODIFIED|(?:UN)?DEFINED.*$/ ) {
+            if ( $_ =~
+                m/^INITIALIZED|REREADCFG|DEFINED.+|MODIFIED.+|DELETED.+$/ )
+            {
                 RESIDENTStk_findResidentSlaves($hash)
                   if ( $TYPE eq "RESIDENTS" );
                 RESIDENTStk_findDummySlaves($name)
@@ -1091,7 +1093,7 @@ sub RESIDENTStk_Notify($$) {
                 return "";
             }
 
-            # only process attribute events from slave devices
+            # only process attribute events
             next
               unless ( $_ =~
 m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
@@ -1106,7 +1108,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             # filter attributes to be processed
             next
               unless ( $attr eq $prefix . "wakeupDevice"
-                || $attr eq $prefix . "presenceDevice"
+                || $attr eq $prefix . "presenceDevices"
                 || $attr eq $prefix . "wakeupResetSwitcher" );
 
             # when attributes of RESIDENTS, ROOMMATE or GUEST were changed
