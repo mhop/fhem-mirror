@@ -3269,18 +3269,22 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             $definitiveNextTomorrow += $wakeupOffset * 60
               if ( defined($definitiveNextTomorrow) );
 
-            if ( $definitiveNextToday >= 86400 ) {
-                $definitiveNextToday -= 86400;
+            # correct change over midnight
+            if ( defined($definitiveNextToday) ) {
+                if ( $definitiveNextToday >= 86400 ) {
+                    $definitiveNextToday -= 86400;
+                }
+                elsif ( $definitiveNextToday < 0 ) {
+                    $definitiveNextToday += 86400;
+                }
             }
-            elsif ( $definitiveNextToday < 0 ) {
-                $definitiveNextToday += 86400;
-            }
-
-            if ( $definitiveNextTomorrow >= 86400 ) {
-                $definitiveNextTomorrow -= 86400;
-            }
-            elsif ( $definitiveNextTomorrow < 0 ) {
-                $definitiveNextTomorrow += 86400;
+            if ( defined($definitiveNextTomorrow) ) {
+                if ( $definitiveNextTomorrow >= 86400 ) {
+                    $definitiveNextTomorrow -= 86400;
+                }
+                elsif ( $definitiveNextTomorrow < 0 ) {
+                    $definitiveNextTomorrow += 86400;
+                }
             }
         }
     }
