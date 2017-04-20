@@ -27,8 +27,6 @@ package main;
   use strict;
   use warnings;
 
-  use Encode qw(decode encode);
-
   use HttpUtils;
 
 # forward declarations ########################################################
@@ -42,9 +40,7 @@ sub LuftdatenInfo_Attr(@);
 sub LuftdatenInfo_GetHttpResponse($$);
 sub LuftdatenInfo_ParseHttpResponse($);
 
-sub LuftdatenInfo_readPassword($);
 sub LuftdatenInfo_statusRequest($);
-sub LuftdatenInfo_storePassword($$);
 
 # initialize ##################################################################
 sub LuftdatenInfo_Initialize($) {
@@ -89,6 +85,8 @@ sub LuftdatenInfo_Define($$) {
     return("Usage: define <name> $TYPE <SDS011sensorID> [<DHT22sensorID>]")
       if(@id != 1 && @id != 2);
 
+    $hash->{SENSORIDS} = (@id == 2) ? "explicit" : "implicit";
+
     $id[1] = $id[0] + 1 unless($id[1]);
 
     $hash->{SENSORID1} = $id[0];
@@ -107,8 +105,13 @@ sub LuftdatenInfo_Define($$) {
   my $interval = AttrVal($SELF, "interval", $minInterval);
   $interval = $minInterval unless(looks_like_number($interval));
   $interval = $minInterval if($interval < $minInterval);
+  my $minTimeout = 5;
+  my $timeout = AttrVal($SELF, "timeout", $minTimeout);
+  $timeout = $minTimeout unless(looks_like_number($timeout));
+  $timeout = $minTimeout if($timeout < $minTimeout);
 
   $hash->{INTERVAL} = $interval;
+  $hash->{TIMEOUT} = $timeout;
 
   readingsSingleUpdate($hash, "state", "active", 1);
 
@@ -179,6 +182,14 @@ sub LuftdatenInfo_Attr(@) {
 
     $hash->{INTERVAL} = $interval;
   }
+  elsif($attribute eq "timeout"){
+    my $minTimeout = 5;
+    my $timeout = $cmd eq "set" ? $value : $minTimeout;
+    $timeout = $minTimeout unless(looks_like_number($timeout));
+    $timeout = $minTimeout if($timeout < $minTimeout);
+
+    $hash->{TIMEOUT} = $timeout;
+  }
 
   return;
 }
@@ -188,7 +199,7 @@ sub LuftdatenInfo_GetHttpResponse($$) {
   my ($hash, $id) = @_;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
-  my $timeout = 5;
+  my $timeout = $hash->{TIMEOUT};
   my $connection = $hash->{CONNECTION};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering LuftdatenInfo_GetHttpResponse");
@@ -234,7 +245,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     readingsSingleUpdate($hash, "state", "error", 1);
   }
   elsif($data eq "[]"){
-    if(index($param->{url}, $hash->{SENSORID2}) > -1){
+    if(   index($param->{url}, $hash->{SENSORID2}) > -1
+       && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
+    ){
       delete($hash->{SENSORID2});
 
       Log3($SELF, 2, "$TYPE ($SELF) - no second sensor found");
@@ -279,7 +292,7 @@ sub LuftdatenInfo_ParseHttpResponse($) {
                 "http://nominatim.openstreetmap.org/reverse?"
               . "format=json&lat=$latitude&lon=$longitude"
             ,
-            timeout  => 5,
+            timeout  => $hash->{TIMEOUT},
             hash     => $hash,
             method   => "GET",
             header   => "Accept: application/json",
@@ -314,11 +327,10 @@ sub LuftdatenInfo_ParseHttpResponse($) {
       elsif($sensor_type eq "DHT22"){
         Log3 $SELF, 5, "$TYPE ($SELF) - parsing $sensor_type data";
 
-        if(
-             $sensor->{location}{latitude} ne
-             ReadingsVal($SELF, "latitude", "")
-          || $sensor->{location}{longitude} ne
-             ReadingsVal($SELF, "longitude", "")
+        if(   $sensor->{location}{latitude} ne
+              ReadingsVal($SELF, "latitude", "")
+           || $sensor->{location}{longitude} ne
+              ReadingsVal($SELF, "longitude", "")
         ){
           delete($hash->{SENSORID2});
 
@@ -521,6 +533,11 @@ sub LuftdatenInfo_statusRequest($) {
         Interval in seconds in which queries are performed.<br>
         The default and minimum value is 300 seconds.
       </li>
+      <li>
+        <code>timeout &lt;seconds&gt;</code><br>
+        Timeout in seconds for the queries.<br>
+        The default and minimum value is 5 seconds.
+      </li>
     </ul>
   </ul>
 </div>
@@ -633,6 +650,11 @@ sub LuftdatenInfo_statusRequest($) {
         <code>interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden in dem Abfragen durchgef&uuml;hrt werden.<br>
         Der Vorgabe- und Mindestwert betr&auml;gt 300 Sekunden.
+      </li>
+      <li>
+        <code>timeout &lt;seconds&gt;</code><br>
+        Timeout in Sekunden für die Abfragen.<br>
+        Der Vorgabe- und Mindestwert betr&auml;gt 5 Sekunden.
       </li>
     </ul>
   </ul>
