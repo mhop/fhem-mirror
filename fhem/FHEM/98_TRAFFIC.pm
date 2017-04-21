@@ -40,9 +40,17 @@
 #   2016-12-15 adding reverseWaypoints attribute, adding weblink with auto create route via gmaps on verbose 5
 #   2017-04-21 reduced log entries if verbose is not set, fixed JSON error, Map available through FHEM-Web-toggle, and direct link
 #              Map https, with APIKey, Traffic & customizable, new attributes  GoogleMapsStyle,GoogleMapsSize,GoogleMapsLocation,GoogleMapsStroke,GoogleMapsDisableUI
+#   2017-04-21 added buttons to save current map settings, renamed attribute GoogleMapsLocation to GoogleMapsCenter
 #
 ##############################################################################
 
+
+#next:  
+#
+#   typo on update your map
+#   optional map zoom
+#
+#
 
 package main;
 
@@ -68,7 +76,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3';
+my $TRVersion = '1.3.1';
 
 sub TRAFFIC_Initialize($){
 
@@ -80,7 +88,7 @@ sub TRAFFIC_Initialize($){
 
     $hash->{AttrFn}     = "TRAFFIC_Attr";
     $hash->{AttrList}   = 
-      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule GoogleMapsStyle:default,silver,dark,night GoogleMapsSize GoogleMapsLocation GoogleMapsStroke GoogleMapsTrafficLayer:0,1 GoogleMapsDisableUI:0,1 " .
+      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule GoogleMapsStyle:default,silver,dark,night GoogleMapsSize GoogleMapsZoom GoogleMapsCenter GoogleMapsStroke GoogleMapsTrafficLayer:0,1 GoogleMapsDisableUI:0,1 " .
       $readingFnAttributes;  
 
     $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC";
@@ -165,6 +173,26 @@ sub TRAFFIC_fhemwebFn($$$$) {
     if (ReadingsVal($device,".map","off") eq "on") {
         $web .= TRAFFIC_GetMap($device);
         $web .= TRAFFIC_weblink($device);
+
+        $web .= "<form method=\"$FW_formmethod\" action=\"$FW_ME$FW_subdir\" >";
+        $web .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+        $web .= FW_hidden("detail", $device);
+        $web .= FW_hidden("dev.attr$device", $device);
+        $web .= "<input style='display:none' type='submit' value='save Zoom' class='attr' id='currentMapZoomSubmit'>";
+        $web .= "<input type='hidden' name='val.attr$device' value='' id='currentMapZoom'>";
+        $web .= "<input type='hidden' name='cmd.attr$device' value='attr'>";
+        $web .= "<input type='hidden' name='arg.attr$device' value='GoogleMapsZoom'>";
+        $web .= "</form>";
+
+        $web .= "<form method=\"$FW_formmethod\" action=\"$FW_ME$FW_subdir\" >";
+        $web .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+        $web .= FW_hidden("detail", $device);
+        $web .= FW_hidden("dev.attr$device", $device);
+        $web .= "<input style='display:none'  type='submit' value='save Center' class='attr' id='currentMapCenterSubmit'>";
+        $web .= "<input type='hidden' name='val.attr$device' value='' id='currentMapCenter'>";
+        $web .= "<input type='hidden' name='cmd.attr$device' value='attr'>";
+        $web .= "<input type='hidden' name='arg.attr$device' value='GoogleMapsCenter'>";
+        $web .= "</form>";
     }
     return $web;
 }
@@ -176,10 +204,10 @@ sub TRAFFIC_GetMap($@){
     
     my $debugPoly       = $hash->{helper}{'Poly'};
     my $returnDebugPoly = $hash->{helper}{'return_Poly'};
-    my $GoogleMapsLocation = AttrVal($name, "GoogleMapsLocation", $hash->{helper}{'GoogleMapsLocation'});
+    my $GoogleMapsCenter = AttrVal($name, "GoogleMapsCenter", $hash->{helper}{'GoogleMapsCenter'});
 
-    if(!$debugPoly || !$GoogleMapsLocation){
-        return "<div>please update your map first</div>";
+    if(!$debugPoly || !$GoogleMapsCenter){
+        return "<div>please update your device first</div>";
     }
     
     my%GoogleMapsStyles=(
@@ -190,10 +218,11 @@ sub TRAFFIC_GetMap($@){
     );
     my $selectedGoogleMapsStyle = $GoogleMapsStyles{ AttrVal($name, "GoogleMapsStyle", 'default' )};
     
-    my ( $GoogleMapsWidth )   = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/(\d+),\d+/;
-    my ( $GoogleMapsHeight )  = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/\d+,(\d+)/;
-    my ( $GoogleMapsStroke1 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/(#[a-zA-z0-9]+),#[a-zA-z0-9]+/;
-    my ( $GoogleMapsStroke2 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/#[a-zA-z0-9]+,(#[a-zA-z0-9]+)/;
+    # load map scale and zoom from attr, override if empty/na
+    my ( $GoogleMapsWidth, $GoogleMapsHeight )   = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/(\d+),(\d+)/;
+    my ( $GoogleMapsZoom )   = AttrVal($name, "GoogleMapsZoom", '10');
+    
+    my ( $GoogleMapsStroke1, $GoogleMapsStroke2 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/(#[a-zA-z0-9]+),(#[a-zA-z0-9]+)/;
     
     my $GoogleMapsDisableUI;
     $GoogleMapsDisableUI = "disableDefaultUI: true," if AttrVal($name, "GoogleMapsDisableUI", 0) eq 1;
@@ -210,10 +239,11 @@ sub TRAFFIC_GetMap($@){
             #map {width:'.$GoogleMapsWidth.'px;height:'.$GoogleMapsHeight.'px;}
         </style>
         <script type="text/javascript">
+
         function initialize() {
-            var myLatlng = new google.maps.LatLng('.$GoogleMapsLocation.');
+            var myLatlng = new google.maps.LatLng('.$GoogleMapsCenter.');
             var myOptions = {
-                zoom: 10,
+                zoom: '.$GoogleMapsZoom.',
                 center: myLatlng,
                 '.$GoogleMapsDisableUI.'
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
@@ -245,8 +275,17 @@ sub TRAFFIC_GetMap($@){
     $map .= 'var trafficLayer = new google.maps.TrafficLayer();
              trafficLayer.setMap(map);' if AttrVal($name, "GoogleMapsTrafficLayer", 0) eq 1;
 
-    $map .='   
+    $map .='
+            map.addListener("zoom_changed", function() {
+                document.getElementById("currentMapZoom").value = map.getZoom();
+                document.getElementById("currentMapZoomSubmit").style.display = "block";
+            });
+            map.addListener("dragend", function() {
+                document.getElementById("currentMapCenter").value = map.getCenter().lat() + "," + map.getCenter().lng();
+                document.getElementById("currentMapCenterSubmit").style.display = "block";
+            });
         }
+        
         function decodeLevels(encodedLevelsString) {
             var decodedLevels = [];
             for (var i = 0; i < encodedLevelsString.length; ++i) {
@@ -504,7 +543,7 @@ sub TRAFFIC_DoUpdate(){
     $returnJSON->{'READINGS'}->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
     
     $returnJSON->{'HELPER'}->{'Poly'}                     = encode_base64 ($json->{'routes'}[0]->{overview_polyline}->{points});
-    $returnJSON->{'HELPER'}->{'GoogleMapsLocation'}       = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng};
+    $returnJSON->{'HELPER'}->{'GoogleMapsCenter'}       = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng};
     
     if($duration_in_traffic_sec && $duration_sec){
         $returnJSON->{'READINGS'}->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
