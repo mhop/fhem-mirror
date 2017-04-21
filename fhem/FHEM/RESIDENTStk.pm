@@ -1084,14 +1084,13 @@ sub RESIDENTStk_Notify($$) {
 
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
             if ( $_ =~
-m/^INITIALIZED|REREADCFG|DEFINED.+|MODIFIED.+|RENAMED.+|DELETED.+$/
+m/^(INITIALIZED|REREADCFG|DEFINED|MODIFIED|RENAMED|DELETED)(?:\s+(.*))?$/
               )
             {
                 RESIDENTStk_findResidentSlaves($hash)
                   if ( $TYPE eq "RESIDENTS" );
                 RESIDENTStk_findDummySlaves($name)
                   if ( $TYPE ne "RESIDENTS" && $TYPE ne "dummy" );
-                return "";
             }
 
             # only process attribute events
@@ -3530,6 +3529,16 @@ sub RESIDENTStk_findDummySlaves($) {
             $hash->{NOTIFYDEV} .= $d;
         }
     }
+
+    # finish initialization
+    if ( $hash->{'.READY'} ) {
+        DoTrigger( "global", "MODIFIED $name", 1 );
+    }
+    else {
+        $hash->{'.READY'} = 1;
+        DoTrigger( "global", "INITIALIZED $name", 1 );
+    }
+    return "";
 }
 
 sub RESIDENTStk_GetPrefixFromType($) {
