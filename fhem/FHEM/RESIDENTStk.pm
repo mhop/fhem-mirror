@@ -54,7 +54,8 @@ sub RESIDENTStk_Define($$) {
         || $a[2] =~ /^[A-Za-z\d._]+(?:,[A-Za-z\d._]*)*$/ );
 
     $modules{$TYPE}{defptr}{$name} = \$hash;
-    $hash->{NOTIFYDEV} = "global";
+    $hash->{'.READY'}              = 0;
+    $hash->{NOTIFYDEV}             = "global";
     $hash->{RESIDENTGROUPS} = $a[2] if ( defined( $a[2] ) );
 
     # set default settings on first define
@@ -114,6 +115,7 @@ sub RESIDENTStk_Undefine($$) {
     my ( $hash, $name ) = @_;
 
     RESIDENTStk_StopInternalTimers($hash);
+    return undef unless ($init_done);
 
     # update parent residents
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
@@ -1077,20 +1079,41 @@ sub RESIDENTStk_Notify($$) {
     my $devType = GetType($devName);
 
     if ( $devName eq "global" ) {
+        delete $dev->{CHANGEDWITHSTATE};
         my $events = deviceEvents( $dev, 0 );
         return "" unless ($events);
 
         foreach ( @{$events} ) {
 
+            # module internal notifications
+            if ( $_ =~ m/^$TYPE(?:\s+(.*))?$/ ) {
+
+                # internal init completed by all defined devices
+                if ( $1 && $1 eq "INITIALIZED" && !$hash->{'.READY'} ) {
+                    $hash->{'.READY'} = 1;
+                    DoTrigger( "global", "INITIALIZED $name", 1 );
+                }
+            }
+
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
-            if ( $_ =~
+            elsif ( $_ =~
 m/^(INITIALIZED|REREADCFG|DEFINED|MODIFIED|RENAMED|DELETED)(?:\s+(.*))?$/
               )
             {
-                RESIDENTStk_findResidentSlaves($hash)
-                  if ( $TYPE eq "RESIDENTS" );
-                RESIDENTStk_findDummySlaves($name)
-                  if ( $TYPE ne "RESIDENTS" && $TYPE ne "dummy" );
+                next if ( $1 eq "INITIALIZED" && $2 );
+                next if ( $2 && $2 eq $name );
+
+                if ( $1 eq "REREADCFG" ) {
+                    next unless ( $modules{$TYPE}{READY} );
+                    $modules{$TYPE}{READY} = 0;
+                }
+
+                if ( $TYPE eq "RESIDENTS" ) {
+                    RESIDENTStk_findResidentSlaves($hash);
+                }
+                else {
+                    RESIDENTStk_findDummySlaves($name);
+                }
             }
 
             # only process attribute events
@@ -3454,8 +3477,8 @@ sub RESIDENTStk_StopInternalTimers($) {
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 }
 
-sub RESIDENTStk_findResidentSlaves($;$) {
-    my ( $hash, $rgr_wakeupDevice ) = @_;
+sub RESIDENTStk_findResidentSlaves($) {
+    my ($hash) = @_;
     return
       unless ( ref($hash) eq "HASH" && defined( $hash->{NAME} ) );
 
@@ -3497,8 +3520,6 @@ sub RESIDENTStk_findDummySlaves($) {
     my $TYPE   = GetType($name);
     my $prefix = RESIDENTStk_GetPrefixFromType($name);
 
-    return undef unless ($init_done);
-
     my $wakeupDevice    = AttrVal( $name, $prefix . "wakeupDevice",    undef );
     my $presenceDevices = AttrVal( $name, $prefix . "presenceDevices", undef );
 
@@ -3530,14 +3551,19 @@ sub RESIDENTStk_findDummySlaves($) {
         }
     }
 
-    # finish initialization
-    if ( $hash->{'.READY'} ) {
-        DoTrigger( "global", "MODIFIED $name", 1 );
+    # finish module initialization
+    if ( $modules{$TYPE}{READY} == 0 ) {
+        Log 1, "DEBUG+++ module $TYPE INITIALIZED";
+        $modules{$TYPE}{READY} = 1;
+        DoTrigger( "global", "$TYPE INITIALIZED", 1 );
     }
-    else {
-        $hash->{'.READY'} = 1;
-        DoTrigger( "global", "INITIALIZED $name", 1 );
+
+    # internal modification
+    elsif ( $hash->{'.READY'} ) {
+        Log 1, "DEBUG+++ $name CHANGED_CONFIG";
+        DoTrigger( "global", "CHANGED_CONFIG $name", 1 );
     }
+
     return "";
 }
 
