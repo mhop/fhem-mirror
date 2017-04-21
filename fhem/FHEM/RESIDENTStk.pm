@@ -1685,35 +1685,27 @@ m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?
     my $macroNameGotosleep    = "Macro_" . $wakeupUserdevice . "_gotosleep";
     my $macroNameAsleep       = "Macro_" . $wakeupUserdevice . "_asleep";
     my $macroNameAwoken       = "Macro_" . $wakeupUserdevice . "_awoken";
+    my $TYPE                  = GetType($wakeupUserdevice);
+    my $prefix = RESIDENTStk_GetPrefixFromType($wakeupUserdevice);
 
     my $wakeupUserdeviceRealname = "Bewohner";
 
-    if ( IsDevice( $wakeupUserdevice, "ROOMMATE" ) ) {
+    if ( $TYPE eq "RESIDENTS" ) {
         $wakeupUserdeviceRealname = AttrVal(
             AttrVal( $NAME, "wakeupUserdevice", "" ),
             AttrVal(
-                AttrVal( $NAME, "wakeupUserdevice", "" ), "rr_realname",
-                "group"
+                AttrVal( $NAME, "wakeupUserdevice", "" ),
+                $prefix . "realname", "alias"
             ),
             $wakeupUserdeviceRealname
         );
     }
-    elsif ( IsDevice( $wakeupUserdevice, "GUEST" ) ) {
+    else {
         $wakeupUserdeviceRealname = AttrVal(
             AttrVal( $NAME, "wakeupUserdevice", "" ),
             AttrVal(
-                AttrVal( $NAME, "wakeupUserdevice", "" ), "rg_realname",
-                "alias"
-            ),
-            $wakeupUserdeviceRealname
-        );
-    }
-    elsif ( IsDevice( $wakeupUserdevice, "RESIDENTS" ) ) {
-        $wakeupUserdeviceRealname = AttrVal(
-            AttrVal( $NAME, "wakeupUserdevice", "" ),
-            AttrVal(
-                AttrVal( $NAME, "wakeupUserdevice", "" ), "rgr_realname",
-                "alias"
+                AttrVal( $NAME, "wakeupUserdevice", "" ),
+                $prefix . "realname", "group"
             ),
             $wakeupUserdeviceRealname
         );

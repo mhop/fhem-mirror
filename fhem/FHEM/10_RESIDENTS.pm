@@ -350,7 +350,7 @@ sub RESIDENTS_UpdateReadings (@) {
         $state_guestDev++;
 
         my $guestName =
-          AttrVal( $guest, AttrVal( $guest, "rg_realname", "alias" ), "" );
+          AttrVal( $guest, AttrVal( $guest, "rg_realname", "group" ), "" );
 
         Log3 $name, 5, "RESIDENTS $name: considering $guest for state change";
 
