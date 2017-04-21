@@ -31,12 +31,14 @@ package main;
 sub monitoring_Initialize($);
 
 sub monitoring_Define($$);
+sub monitoring_Undefine($$);
 sub monitoring_Set($@);
 sub monitoring_Get($@);
 sub archetype_Attr(@);
 sub monitoring_Notify($$);
 
 sub monitoring_modify($);
+sub monitoring_RemoveInternalTimer($);
 sub monitoring_return($$);
 sub monitoring_setActive($);
 
@@ -46,6 +48,7 @@ sub monitoring_Initialize($) {
   my $TYPE = "monitoring";
 
   $hash->{DefFn}    = $TYPE."_Define";
+  $hash->{UndefFn}  = $TYPE."_Undefine";
   $hash->{SetFn}    = $TYPE."_Set";
   $hash->{GetFn}    = $TYPE."_Get";
   $hash->{AttrFn}   = $TYPE."_Attr";
@@ -84,6 +87,14 @@ sub monitoring_Define($$) {
   return;
 }
 
+sub monitoring_Undefine($$) {
+  my ($hash, $arg) = @_;
+
+  monitoring_RemoveInternalTimer($hash);
+
+  return;
+}
+
 sub monitoring_Set($@) {
   my ($hash, @a) = @_;
   my $TYPE = $hash->{TYPE};
@@ -115,7 +126,10 @@ sub monitoring_Set($@) {
   }
   elsif($argument eq "inactive"){
     readingsSingleUpdate($hash, "state", $argument, 0);
+
     Log3($SELF, 3, "$SELF ($TYPE) set $SELF inactive");
+
+    monitoring_RemoveInternalTimer($hash);
   }
   elsif($argument eq "clear"){
     readingsBeginUpdate($hash);
@@ -124,14 +138,22 @@ sub monitoring_Set($@) {
       readingsBulkUpdate($hash, "warning", "", 0);
 
       foreach my $r (keys %{$hash->{READINGS}}){
-        delete $hash->{READINGS}{$r} if($r =~ m/warningAdd_(.+)/);
+        if($r =~ m/(warning)Add_(.+)/){
+          RemoveInternalTimer("$SELF|$1|add|$2");
+
+          delete $hash->{READINGS}{$r};
+        }
       }
     }
     if($value =~ m/^(error|all)$/){
       readingsBulkUpdate($hash, "error", "", 0);
 
       foreach my $r (keys %{$hash->{READINGS}}){
-        delete $hash->{READINGS}{$r} if($r =~ m/errorAdd_(.+)/);
+        if($r =~ m/(error)Add_(.+)/){
+          RemoveInternalTimer("$SELF|$1|add|$2");
+
+          delete $hash->{READINGS}{$r};
+        }
       }
     }
 
@@ -374,11 +396,12 @@ sub monitoring_Notify($$) {
 # module Fn ###################################################################
 sub monitoring_modify($) {
   my ($SELF, $list, $operation, $value, $wait) = split("\\|", shift);
+  my ($hash) = $defs{$SELF};
 
+  return unless(defined($hash));
   return if(IsDisabled($SELF));
 
   my $at = eval($wait + gettimeofday()) if($wait);
-  my $hash = $defs{$SELF};
   my $TYPE = $hash->{TYPE};
   my (@change, %readings);
   %readings = map{$_, 1} split(",", ReadingsVal($SELF, $list, ""));
@@ -429,6 +452,18 @@ sub monitoring_modify($) {
   return;
 }
 
+sub monitoring_RemoveInternalTimer($) {
+  my ($hash) = @_;
+  my $SELF = $hash->{NAME};
+
+  foreach my $reading (sort(keys %{$hash->{READINGS}})){
+    RemoveInternalTimer("$SELF|$1|add|$2")
+      if($reading =~ m/(error|warning)Add_(.+)/);
+  }
+
+  return;
+}
+
 sub monitoring_return($$) {
   my ($hash, $list) = @_;
   my $SELF = $hash->{NAME};
@@ -459,9 +494,9 @@ sub monitoring_setActive($) {
       $wait -= gettimeofday();
 
       if($wait > 0){
-        Log3($SELF, 4
-          , "$TYPE ($SELF) restore Timer \"$SELF|$1|add|$2\""
-        );
+        Log3($SELF, 4 , "$TYPE ($SELF) restore Timer \"$SELF|$1|add|$2\"");
+
+        monitoring_modify("$SELF|$1|add|$2|$wait");
       }
       else{
         monitoring_modify("$SELF|$1|add|$2");
