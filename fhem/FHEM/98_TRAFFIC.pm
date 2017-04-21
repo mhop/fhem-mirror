@@ -38,6 +38,10 @@
 #   2016-10-15 adding attribute updateSchedule to provide flexible updates, changed internal interval to INTERVAL
 #   2016-12-13 adding travelMode, fixing stateReading with value 0
 #   2016-12-15 adding reverseWaypoints attribute, adding weblink with auto create route via gmaps on verbose 5
+#   2017-04-21 reduced log entries if verbose is not set, fixed JSON error, Map available through FHEM-Web-toggle, and direct link
+#              Map https, with APIKey, Traffic & customizable, new attributes  GoogleMapsStyle,GoogleMapsSize,GoogleMapsLocation,GoogleMapsStroke,GoogleMapsDisableUI
+#
+##############################################################################
 
 
 package main;
@@ -49,6 +53,7 @@ use Time::HiRes qw(gettimeofday);
 use LWP::Simple qw($ua get);
 use Blocking;
 use POSIX;
+use JSON;
 die "MIME::Base64 missing!" unless(eval{require MIME::Base64});
 die "JSON missing!" unless(eval{require JSON});
 
@@ -63,7 +68,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.2';
+my $TRVersion = '1.3';
 
 sub TRAFFIC_Initialize($){
 
@@ -72,13 +77,16 @@ sub TRAFFIC_Initialize($){
     $hash->{DefFn}      = "TRAFFIC_Define";
     $hash->{UndefFn}    = "TRAFFIC_Undef";
     $hash->{SetFn}      = "TRAFFIC_Set";
+
     $hash->{AttrFn}     = "TRAFFIC_Attr";
     $hash->{AttrList}   = 
-      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule " .
+      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule GoogleMapsStyle:default,silver,dark,night GoogleMapsSize GoogleMapsLocation GoogleMapsStroke GoogleMapsTrafficLayer:0,1 GoogleMapsDisableUI:0,1 " .
       $readingFnAttributes;  
-    $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC_debug";
+
+    $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC";
     $data{FWEXT}{"/TRAFFIC"}{FORKABLE} = 1; 
 
+    $hash->{FW_detailFn} = "TRAFFIC_fhemwebFn";
 }
 
 sub TRAFFIC_Define($$){
@@ -106,13 +114,21 @@ sub TRAFFIC_Define($$){
         delete($hash->{READINGS}{$clearReading}); 
     }
     
+    #clear all helpers
+    foreach my $helperName ( keys %{$hash->{helper}}){
+        delete($hash->{helper}{$helperName});
+    }
+    
+    # clear weblink
+    FW_fC("delete ".$name."_weblink");
+    
     # basic update INTERVAL
     if(scalar(@apiDefs) > 3 && $apiDefs[3] =~ m/^\d+$/){
         $hash->{INTERVAL} = $apiDefs[3];
     }else{
         $hash->{INTERVAL} = 3600;
     }
-    Log3 $hash, 3, "TRAFFIC: ($name) defined ".$hash->{NAME}.' with interval set to '.$hash->{INTERVAL};
+    Log3 $hash, 4, "TRAFFIC: ($name) defined ".$hash->{NAME}.' with interval set to '.$hash->{INTERVAL};
     
     # put in default verbose level
     $attr{$name}{"verbose"} = 1 if !$attr{$name}{"verbose"};
@@ -138,7 +154,114 @@ sub TRAFFIC_Undef($$){
     return undef;                  
 }    
 
+sub TRAFFIC_fhemwebFn($$$$) {
+    my ($FW_wname, $device, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+    my $name = $device;
+    my $hash = $defs{$name};
 
+    my $mapState = ReadingsVal($device,".map", "off") eq "on" ? "off" : "on";
+    my $web = "<span><a href=\"$FW_ME?detail=$device&amp;cmd.$device=setreading $device .map $mapState$FW_CSRF\">toggle Map</a>&nbsp;&nbsp;</span><br>";
+    
+    if (ReadingsVal($device,".map","off") eq "on") {
+        $web .= TRAFFIC_GetMap($device);
+        $web .= TRAFFIC_weblink($device);
+    }
+    return $web;
+}
+
+sub TRAFFIC_GetMap($@){
+    my $device = shift();
+    my $name = $device;
+    my $hash = $defs{$name};
+    
+    my $debugPoly       = $hash->{helper}{'Poly'};
+    my $returnDebugPoly = $hash->{helper}{'return_Poly'};
+    my $GoogleMapsLocation = AttrVal($name, "GoogleMapsLocation", $hash->{helper}{'GoogleMapsLocation'});
+
+    if(!$debugPoly || !$GoogleMapsLocation){
+        return "<div>please update your map first</div>";
+    }
+    
+    my%GoogleMapsStyles=(
+        'default'   => "[]",
+        'silver'    => '[{"elementType":"geometry","stylers":[{"color":"#f5f5f5"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#616161"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#f5f5f5"}]},{"featureType":"administrative.land_parcel","elementType":"labels.text.fill","stylers":[{"color":"#bdbdbd"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#eeeeee"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#e5e5e5"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#9e9e9e"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},{"featureType":"road.arterial","elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#dadada"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#616161"}]},{"featureType":"road.local","elementType":"labels.text.fill","stylers":[{"color":"#9e9e9e"}]},{"featureType":"transit.line","elementType":"geometry","stylers":[{"color":"#e5e5e5"}]},{"featureType":"transit.station","elementType":"geometry","stylers":[{"color":"#eeeeee"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#c9c9c9"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#9e9e9e"}]}]',
+        'dark'      => '[{"elementType":"geometry","stylers":[{"color":"#212121"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#212121"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#757575"}]},{"featureType":"administrative.country","elementType":"labels.text.fill","stylers":[{"color":"#9e9e9e"}]},{"featureType":"administrative.land_parcel","stylers":[{"visibility":"off"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#bdbdbd"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#181818"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#616161"}]},{"featureType":"poi.park","elementType":"labels.text.stroke","stylers":[{"color":"#1b1b1b"}]},{"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#2c2c2c"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#8a8a8a"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#373737"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3c3c3c"}]},{"featureType":"road.highway.controlled_access","elementType":"geometry","stylers":[{"color":"#4e4e4e"}]},{"featureType":"road.local","elementType":"labels.text.fill","stylers":[{"color":"#616161"}]},{"featureType":"transit","elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#3d3d3d"}]}]',
+        'night'     => '[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]}]',
+    );
+    my $selectedGoogleMapsStyle = $GoogleMapsStyles{ AttrVal($name, "GoogleMapsStyle", 'default' )};
+    
+    my ( $GoogleMapsWidth )   = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/(\d+),\d+/;
+    my ( $GoogleMapsHeight )  = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/\d+,(\d+)/;
+    my ( $GoogleMapsStroke1 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/(#[a-zA-z0-9]+),#[a-zA-z0-9]+/;
+    my ( $GoogleMapsStroke2 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/#[a-zA-z0-9]+,(#[a-zA-z0-9]+)/;
+    
+    my $GoogleMapsDisableUI;
+    $GoogleMapsDisableUI = "disableDefaultUI: true," if AttrVal($name, "GoogleMapsDisableUI", 0) eq 1;
+    
+    Log3 $hash, 4, "TRAFFIC: ($name) drawing map in style ".AttrVal($name, "GoogleMapsStyle", 'default' )." in $GoogleMapsWidth x $GoogleMapsHeight px";
+
+    my $map;
+    $map .= '<div><script type="text/javascript" src="https://maps.google.com/maps/api/js?key='.$hash->{APIKEY}.'&libraries=geometry&amp"></script>
+        <input size="200" type="hidden" id="path" value="'.decode_base64($debugPoly).'">';
+    $map .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64($returnDebugPoly).'">' if decode_base64($returnDebugPoly);
+    $map .= '
+        <div id="map"></div>
+        <style>
+            #map {width:'.$GoogleMapsWidth.'px;height:'.$GoogleMapsHeight.'px;}
+        </style>
+        <script type="text/javascript">
+        function initialize() {
+            var myLatlng = new google.maps.LatLng('.$GoogleMapsLocation.');
+            var myOptions = {
+                zoom: 10,
+                center: myLatlng,
+                '.$GoogleMapsDisableUI.'
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                styles: '.$selectedGoogleMapsStyle.'
+            }
+            var map = new google.maps.Map(document.getElementById("map"), myOptions);
+            var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path").value); 
+            var decodedLevels = decodeLevels("");
+            var setRegion = new google.maps.Polyline({
+                path: decodedPath,
+                levels: decodedLevels,
+                strokeColor: "'.$GoogleMapsStroke1.'",
+                strokeOpacity: 1.0,
+                strokeWeight: 6,
+                map: map
+            });';
+
+    $map .= 'var decodedPathR = google.maps.geometry.encoding.decodePath(document.getElementById("pathR").value); 
+            var decodedLevelsR = decodeLevels("");
+            var setRegionR = new google.maps.Polyline({
+                path: decodedPathR,
+                levels: decodedLevels,
+                strokeColor: "'.$GoogleMapsStroke2.'",
+                strokeOpacity: 1.0,
+                strokeWeight: 2,
+                map: map
+            });' if decode_base64($returnDebugPoly );
+
+    $map .= 'var trafficLayer = new google.maps.TrafficLayer();
+             trafficLayer.setMap(map);' if AttrVal($name, "GoogleMapsTrafficLayer", 0) eq 1;
+
+    $map .='   
+        }
+        function decodeLevels(encodedLevelsString) {
+            var decodedLevels = [];
+            for (var i = 0; i < encodedLevelsString.length; ++i) {
+                var level = encodedLevelsString.charCodeAt(i) - 63;
+                decodedLevels.push(level);
+            }
+            return decodedLevels;
+        }
+        initialize();
+        </script></div>';
+        
+    return $map;
+}
+
+  
 #
 # Attr command 
 #########################################################################
@@ -151,22 +274,11 @@ sub TRAFFIC_Attr(@){
 
     if ($cmd eq "set") {        
         addToDevAttrList($name, $attrName);
-        Log3 $hash, 3, "TRAFFIC: ($name)  attrName $attrName set to attrValue $attrValue";
+        Log3 $hash, 4, "TRAFFIC: ($name)  attrName $attrName set to attrValue $attrValue";
     }
     if($attrName eq "disable" && $attrValue eq "1"){
         readingsSingleUpdate( $hash, "state", "disabled", 1 );
     }
-    
-    if($attrName eq "verbose" && $attrValue eq "5"){
-        if (!defined $defs{$name."_weblink"}) {
-            FW_fC("define ".$name."_weblink weblink htmlCode {TRAFFIC_weblink(\"".$name."\",0)}");
-            FW_fC("attr ".$name."_weblink room TRAFFIC_debug");
-            Log3 $hash, 5, "TRAFFIC: ($name) weblink created";
-        }
-    }elsif($attrName eq "verbose" && $attrValue < 5){
-        FW_fC("delete ".$name."_weblink");
-    }
-    
     
     if($attrName eq "outputReadings" || $attrName eq "includeReturn" || $attrName eq "verbose"){
         #clear all readings
@@ -224,8 +336,6 @@ sub TRAFFIC_Set($@){
         InternalTimer($updateTrigger, "TRAFFIC_StartUpdate", $hash, 0);            
 
         return undef;
-    }elsif($set =~ m/debug/){
-        # TRAFFIC_widget();
     }
 
 }
@@ -268,11 +378,11 @@ sub TRAFFIC_StartUpdate($){
                     if($hour >= $upFrom && $hour < $upTo){
                         if(!$upDay || $upDay == $wday ){
                             $nextTrigger = gettimeofday() + $upInterval;
-                            Log3 $hash, 3, "TRAFFIC: ($name) schedule from $upFrom to $upTo (on day $upDay) every $upInterval seconds, matches (current hour $hour), nextTrigger set to $nextTrigger";
+                            Log3 $hash, 4, "TRAFFIC: ($name) schedule from $upFrom to $upTo (on day $upDay) every $upInterval seconds, matches (current hour $hour), nextTrigger set to $nextTrigger";
                             $hash->{UPDATESCHEDULE} = $upSched;
                             last;
                         }else{
-                            Log3 $hash, 3, "TRAFFIC: ($name) $upSched does match the time but not the day ($wday)";
+                            Log3 $hash, 4, "TRAFFIC: ($name) $upSched does match the time but not the day ($wday)";
                         }
                     }else{
                         Log3 $hash, 5, "TRAFFIC: ($name) schedule $upSched does not match ($hour)";
@@ -288,13 +398,13 @@ sub TRAFFIC_StartUpdate($){
         }elsif(defined($hash->{BURSTCOUNT}) && $hash->{BURSTCOUNT} == 0){
             delete($hash->{BURSTCOUNT});
             delete($hash->{BURSTINTERVAL});
-            Log3 $hash, 3, "TRAFFIC: ($name) burst update is done";
+            Log3 $hash, 4, "TRAFFIC: ($name) burst update is done";
         }
         
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
         InternalTimer($nextTrigger, "TRAFFIC_StartUpdate", $hash, 0);            
-        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call StartUpdate again at " . $hash->{TRIGGERTIME_FMT};
+        Log3 $hash, 4, "TRAFFIC: ($name) internal interval timer set to call StartUpdate again at " . $hash->{TRIGGERTIME_FMT};
     }
 
     
@@ -328,7 +438,7 @@ sub TRAFFIC_DoUpdate(){
     my $name = $hash->{NAME};
     my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
 
-    Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_DoUpdate start";
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_DoUpdate start";
 
     if ( $hash->{INTERVAL}) {
         RemoveInternalTimer ($hash);
@@ -336,7 +446,7 @@ sub TRAFFIC_DoUpdate(){
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
         InternalTimer($nextTrigger, "TRAFFIC_DoUpdate", $hash, 0);            
-        Log3 $hash, 3, "TRAFFIC: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{INTERVAL}). " seconds";
+        Log3 $hash, 4, "TRAFFIC: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{INTERVAL}). " seconds";
     }
     
     my $returnJSON;
@@ -352,17 +462,17 @@ sub TRAFFIC_DoUpdate(){
     if(defined(AttrVal($name,"waypoints",undef))){
         $TRwaypoints = '&waypoints=via:' . join('|via:', split('\|', AttrVal($name,"waypoints",undef)));
     }else{
-        Log3 $hash, 3, "TRAFFIC: ($name) no waypoints specified";
+        Log3 $hash, 4, "TRAFFIC: ($name) no waypoints specified";
     }
     if($direction eq "return"){
         if(defined(AttrVal($name,"returnWaypoints",undef))){
             $TRwaypoints = '&waypoints=via:' . join('|via:', split('\|', AttrVal($name,"returnWaypoints",undef)));
-            Log3 $hash, 3, "TRAFFIC: ($name) using returnWaypoints";
+            Log3 $hash, 4, "TRAFFIC: ($name) using returnWaypoints";
         }elsif(defined(AttrVal($name,"waypoints",undef))){
             $TRwaypoints = '&waypoints=via:' . join('|via:', reverse split('\|', AttrVal($name,"waypoints",undef)));    
-            Log3 $hash, 3, "TRAFFIC: ($name) reversing waypoints";
+            Log3 $hash, 4, "TRAFFIC: ($name) reversing waypoints";
         }else{
-            Log3 $hash, 3, "TRAFFIC: ($name) no waypoints for return specified";
+            Log3 $hash, 4, "TRAFFIC: ($name) no waypoints for return specified";
         }
     }
     
@@ -376,7 +486,7 @@ sub TRAFFIC_DoUpdate(){
     }
     
     my $url = 'https://maps.googleapis.com/maps/api/directions/json?origin='.$origin.'&destination='.$destination.'&mode='.$travelMode.$TRlanguage.'&departure_time=now'.$TRwaypoints.'&key='.$hash->{APIKEY};
-    Log3 $hash, 2, "TRAFFIC: ($name) using $url";
+    Log3 $hash, 4, "TRAFFIC: ($name) using $url";
     
     my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
     $ua->default_header("HTTP_REFERER" => "www.google.de");
@@ -386,29 +496,29 @@ sub TRAFFIC_DoUpdate(){
     my $duration_sec            = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'value'} ;
     my $duration_in_traffic_sec = $json->{'routes'}[0]->{'legs'}[0]->{'duration_in_traffic'}->{'value'};
 
-    $returnJSON->{'duration'}               = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'text'}             if AttrVal($name, "outputReadings", "" ) =~ m/text/;
-    $returnJSON->{'duration_in_traffic'}    = $json->{'routes'}[0]->{'legs'}[0]->{'duration_in_traffic'}->{'text'}  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
-    $returnJSON->{'distance'}               = $json->{'routes'}[0]->{'legs'}[0]->{'distance'}->{'text'}             if AttrVal($name, "outputReadings", "" ) =~ m/text/;
-    $returnJSON->{'state'}                  = $json->{'status'};
-    $returnJSON->{'status'}                 = $json->{'status'};
-    $returnJSON->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
+    $returnJSON->{'READINGS'}->{'duration'}               = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'text'}             if AttrVal($name, "outputReadings", "" ) =~ m/text/;
+    $returnJSON->{'READINGS'}->{'duration_in_traffic'}    = $json->{'routes'}[0]->{'legs'}[0]->{'duration_in_traffic'}->{'text'}  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
+    $returnJSON->{'READINGS'}->{'distance'}               = $json->{'routes'}[0]->{'legs'}[0]->{'distance'}->{'text'}             if AttrVal($name, "outputReadings", "" ) =~ m/text/;
+    $returnJSON->{'READINGS'}->{'state'}                  = $json->{'status'};
+    $returnJSON->{'READINGS'}->{'status'}                 = $json->{'status'};
+    $returnJSON->{'READINGS'}->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
     
-    $returnJSON->{'debugLocation'}      = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng} if AttrVal($name, "verbose", 0 ) == 5;
-    $returnJSON->{'debugPoly'}          = encode_base64 ($json->{'routes'}[0]->{overview_polyline}->{points}) if AttrVal($name, "verbose", 0 ) == 5;
+    $returnJSON->{'HELPER'}->{'Poly'}                     = encode_base64 ($json->{'routes'}[0]->{overview_polyline}->{points});
+    $returnJSON->{'HELPER'}->{'GoogleMapsLocation'}       = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng};
     
     if($duration_in_traffic_sec && $duration_sec){
-        $returnJSON->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
-        Log3 $hash, 3, "TRAFFIC: ($name) delay in seconds = $duration_in_traffic_sec - $duration_sec";
+        $returnJSON->{'READINGS'}->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
+        Log3 $hash, 4, "TRAFFIC: ($name) delay in seconds = $duration_in_traffic_sec - $duration_sec";
         
         if (AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_in_traffic_sec) && defined($duration_sec)){
-            $returnJSON->{'delay_min'} = int($duration_in_traffic_sec - $duration_sec);
+            $returnJSON->{'READINGS'}->{'delay_min'} = int($duration_in_traffic_sec - $duration_sec);
         }
-        if(defined($returnJSON->{'delay_min'})){
-            if( ( $returnJSON->{'delay_min'} && $returnJSON->{'delay_min'} =~ m/^-/ ) || $returnJSON->{'delay_min'} < 60){
-                Log3 $hash, 5, "TRAFFIC: ($name) delay_min was negative or less than 1min (".$returnJSON->{'delay_min'}."), set to 0";
-                $returnJSON->{'delay_min'} = 0;
+        if(defined($returnJSON->{'READINGS'}->{'delay_min'})){
+            if( ( $returnJSON->{'READINGS'}->{'delay_min'} && $returnJSON->{'READINGS'}->{'delay_min'} =~ m/^-/ ) || $returnJSON->{'READINGS'}->{'delay_min'} < 60){
+                Log3 $hash, 5, "TRAFFIC: ($name) delay_min was negative or less than 1min (".$returnJSON->{'READINGS'}->{'delay_min'}."), set to 0";
+                $returnJSON->{'READINGS'}->{'delay_min'} = 0;
             }else{
-                $returnJSON->{'delay_min'} = int($returnJSON->{'delay_min'} / 60 + 0.5); #divide 60 and round
+                $returnJSON->{'READINGS'}->{'delay_min'} = int($returnJSON->{'READINGS'}->{'delay_min'} / 60 + 0.5); #divide 60 and round
             }
         }
     }else{
@@ -417,33 +527,33 @@ sub TRAFFIC_DoUpdate(){
     }
     
     # condition based values
-    $returnJSON->{'error_message'} = $json->{'error_message'} if $json->{'error_message'};
+    $returnJSON->{'READINGS'}->{'error_message'} = $json->{'error_message'} if $json->{'error_message'};
     # output readings
-    $returnJSON->{'duration_min'}               = int($duration_sec / 60  + 0.5)            if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_sec);
-    $returnJSON->{'duration_in_traffic_min'}    = int($duration_in_traffic_sec / 60  + 0.5) if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_in_traffic_sec);
-    $returnJSON->{'duration_sec'}               = $duration_sec                             if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
-    $returnJSON->{'duration_in_traffic_sec'}    = $duration_in_traffic_sec                  if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
+    $returnJSON->{'READINGS'}->{'duration_min'}               = int($duration_sec / 60  + 0.5)            if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_sec);
+    $returnJSON->{'READINGS'}->{'duration_in_traffic_min'}    = int($duration_in_traffic_sec / 60  + 0.5) if AttrVal($name, "outputReadings", "" ) =~ m/min/ && defined($duration_in_traffic_sec);
+    $returnJSON->{'READINGS'}->{'duration_sec'}               = $duration_sec                             if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
+    $returnJSON->{'READINGS'}->{'duration_in_traffic_sec'}    = $duration_in_traffic_sec                  if AttrVal($name, "outputReadings", "" ) =~ m/sec/; 
     # raw data (seconds)
-    $returnJSON->{'distance'} = $json->{'routes'}[0]->{'legs'}[0]->{'distance'}->{'value'}  if AttrVal($name, "raw_data", 0);
+    $returnJSON->{'READINGS'}->{'distance'} = $json->{'routes'}[0]->{'legs'}[0]->{'distance'}->{'value'}  if AttrVal($name, "raw_data", 0);
     
 
     # average readings
     if(AttrVal($name, "outputReadings", "" ) =~ m/average/){
         
         # calc average
-        $returnJSON->{'average_duration_min'}               = int($hash->{READINGS}{'average_duration_min'}{VAL} + $returnJSON->{'duration_min'}) / 2                        if $returnJSON->{'duration_min'};
-        $returnJSON->{'average_duration_in_traffic_min'}    = int($hash->{READINGS}{'average_duration_in_traffic_min'}{VAL} + $returnJSON->{'duration_in_traffic_min'}) / 2  if $returnJSON->{'duration_in_traffic_min'};
-        $returnJSON->{'average_delay_min'}                  = int($hash->{READINGS}{'average_delay_min'}{VAL} + $returnJSON->{'delay_min'}) / 2                              if $returnJSON->{'delay_min'};
+        $returnJSON->{'READINGS'}->{'average_duration_min'}               = int($hash->{READINGS}{'average_duration_min'}{VAL} + $returnJSON->{'READINGS'}->{'duration_min'}) / 2                        if $returnJSON->{'READINGS'}->{'duration_min'};
+        $returnJSON->{'READINGS'}->{'average_duration_in_traffic_min'}    = int($hash->{READINGS}{'average_duration_in_traffic_min'}{VAL} + $returnJSON->{'READINGS'}->{'duration_in_traffic_min'}) / 2  if $returnJSON->{'READINGS'}->{'duration_in_traffic_min'};
+        $returnJSON->{'READINGS'}->{'average_delay_min'}                  = int($hash->{READINGS}{'average_delay_min'}{VAL} + $returnJSON->{'READINGS'}->{'delay_min'}) / 2                              if $returnJSON->{'READINGS'}->{'delay_min'};
         
         # override if this is the first average
-        $returnJSON->{'average_duration_min'}               = $returnJSON->{'duration_min'}             if !$hash->{READINGS}{'average_duration_min'}{VAL};
-        $returnJSON->{'average_duration_in_traffic_min'}    = $returnJSON->{'duration_in_traffic_min'}  if !$hash->{READINGS}{'average_duration_in_traffic_min'}{VAL};
-        $returnJSON->{'average_delay_min'}                  = $returnJSON->{'delay_min'}                if !$hash->{READINGS}{'average_delay_min'}{VAL};
+        $returnJSON->{'READINGS'}->{'average_duration_min'}               = $returnJSON->{'READINGS'}->{'duration_min'}             if !$hash->{READINGS}{'average_duration_min'}{VAL};
+        $returnJSON->{'READINGS'}->{'average_duration_in_traffic_min'}    = $returnJSON->{'READINGS'}->{'duration_in_traffic_min'}  if !$hash->{READINGS}{'average_duration_in_traffic_min'}{VAL};
+        $returnJSON->{'READINGS'}->{'average_delay_min'}                  = $returnJSON->{'READINGS'}->{'delay_min'}                if !$hash->{READINGS}{'average_delay_min'}{VAL};
     }
     
     
     Log3 $hash, 5, "TRAFFIC: ($name) returning from TRAFFIC_DoUpdate: ".encode_json($returnJSON);
-    Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_DoUpdate done";
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_DoUpdate done";
     return "$name;;;$direction;;;".encode_json($returnJSON);
 }
 
@@ -453,17 +563,30 @@ sub TRAFFIC_FinishUpdate($){
     my %sensors;
     my $dotrigger = 1;
 
-    Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_FinishUpdate start";
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate start";
 
-    my $json = decode_json($rawJson); 
+    my $json = decode_json($rawJson);
     readingsBeginUpdate($hash);
+    
+    my $readings = $json->{'READINGS'};
+    my $helper = $json->{'HELPER'};
 
-    foreach my $readingName (keys %{$json}){
-        Log3 $hash, 3, "TRAFFIC: ($name) ReadingsUpdate: $readingName - ".$json->{$readingName};
+    foreach my $helperName (keys %{$helper}){
         if($direction eq 'return'){
-            readingsBulkUpdate($hash,'return_'.$readingName,$json->{$readingName});
+            Log3 $hash, 4, "TRAFFIC: ($name) HelperUpdate: return_".$helperName." - ".$helper->{$helperName};
+            $hash->{helper}{'return_'.$helperName} = $helper->{$helperName}; #testme        
         }else{
-            readingsBulkUpdate($hash,$readingName,$json->{$readingName});
+            Log3 $hash, 4, "TRAFFIC: ($name) HelperUpdate: $helperName - ".$helper->{$helperName};
+            $hash->{helper}{$helperName} = $helper->{$helperName}; #testme        
+        }
+    }
+    
+    foreach my $readingName (keys %{$readings}){
+        Log3 $hash, 4, "TRAFFIC: ($name) ReadingsUpdate: $readingName - ".$readings->{$readingName};
+        if($direction eq 'return'){
+            readingsBulkUpdate($hash,'return_'.$readingName,$readings->{$readingName});
+        }else{
+            readingsBulkUpdate($hash,$readingName,$readings->{$readingName});
         }
     }
     
@@ -481,82 +604,24 @@ sub TRAFFIC_FinishUpdate($){
         }
     }
     readingsEndUpdate($hash, $dotrigger);
-    Log3 $hash, 3, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
+    Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
+    Log3 $hash, 5, "TRAFFIC: ($name) Helper: ".Dumper($hash->{helper}); 
 }
 
 sub TRAFFIC_weblink{
     my $name = shift();
-    my $return = shift();
-    return "<a href='/fhem/TRAFFIC_debug?name=$name&return=$return'>open Map for TRAFFIC $name </a><br>";
+    return "<a href='$FW_ME/TRAFFIC?name=$name'>$FW_ME/TRAFFIC?name=$name</a><br>";
 }
 
-sub TRAFFIC_debug(){
+sub TRAFFIC(){
     my $name    = $FW_webArgs{name};
-    my $return  = $FW_webArgs{return};
     return if(!defined($name));
 
     $FW_RETTYPE = "text/html; charset=UTF-8";
     $FW_RET="";
 
-    Log 1,"[traffic debug] called for $name";
+    my $web .= TRAFFIC_GetMap($name);
 
-    my $debugPoly = 'debugPoly';
-    my $debugLocation = 'debugLocation';
-    if($return eq 1){
-        $debugPoly = 'return_'.$debugPoly;
-        $debugLocation = 'return_'.$debugLocation;
-    }
-
-    my $web = '<script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&amp;sensor=false"></script>
-<input size="200" type="hidden" id="path" value="'.decode_base64(ReadingsVal($name, "debugPoly", undef) ).'">';
-$web .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64(ReadingsVal($name, "return_debugPoly", undef) ).'">' if decode_base64(ReadingsVal($name, "return_debugPoly", undef) );
-$web .= '
-<div id="map"></div>
-<style>
-    #map {width:800px;height:800px;}
-</style>
-<script type="text/javascript">
-function initialize() {
-    var myLatlng = new google.maps.LatLng('.ReadingsVal($name, "$debugLocation", undef ).');
-    var myOptions = {
-        zoom: 10,
-        center: myLatlng,
-        mapTypeId: google.maps.MapTypeId.ROADMAP
-    }
-    var map = new google.maps.Map(document.getElementById("map"), myOptions);
-    var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path").value); 
-    var decodedLevels = decodeLevels("");
-    var setRegion = new google.maps.Polyline({
-        path: decodedPath,
-        levels: decodedLevels,
-        strokeColor: "#4cde44",
-        strokeOpacity: 1.0,
-        strokeWeight: 6,
-        map: map
-    });';
-    
-    $web .= 'var decodedPathR = google.maps.geometry.encoding.decodePath(document.getElementById("pathR").value); 
-    var decodedLevelsR = decodeLevels("");
-    var setRegionR = new google.maps.Polyline({
-        path: decodedPathR,
-        levels: decodedLevels,
-        strokeColor: "#FF0000",
-        strokeOpacity: 1.0,
-        strokeWeight: 2,
-        map: map
-    });' if decode_base64(ReadingsVal($name, "return_debugPoly", undef) );
-$web .='   
-}
-function decodeLevels(encodedLevelsString) {
-    var decodedLevels = [];
-    for (var i = 0; i < encodedLevelsString.length; ++i) {
-        var level = encodedLevelsString.charCodeAt(i) - 63;
-        decodedLevels.push(level);
-    }
-    return decodedLevels;
-}
-initialize();
-</script>';
     FW_pO $web;
     return ($FW_RETTYPE, $FW_RET);
 }
