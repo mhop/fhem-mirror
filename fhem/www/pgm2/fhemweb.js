@@ -656,7 +656,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       }
       newDef = $(this).closest("form").find("input:text").val();
       if(newDef == undefined)
-        newDef = $(this).closest("form").find("input[name^=val]").val();
+        newDef = $(this).closest("form").find("[name^=val]").val();
       cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
     }
 
