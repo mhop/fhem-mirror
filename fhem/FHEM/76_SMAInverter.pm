@@ -28,6 +28,8 @@
 #################################################################################################################
 # Versions History done by DS_Starter
 #
+# 2.8.3    19.04.2017      enhanced inverter Type-Hash
+# 2.8.2    23.03.2017      changed SMA_logon sub
 # 2.8.1    06.12.2016      SMAInverter version as internal 
 # 2.8      05.12.2016      changed commandsections to make sure getting only data from inverters with preset
 #                          $inv_susyid and $inv_serial
@@ -76,7 +78,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.8.1";
+my $SMAInverterVersion = "2.8.3";
 
 # Inverter Data fields and supported commands flags.
 # $inv_susyid
@@ -172,6 +174,16 @@ my %SMAInverter_devtypes = (
 9158 => "Sunny Island 2224",
 9159 => "Sunny Island 5048",
 9160 => "SB 3600TL-20",
+9168 => "SC630HE-11",
+9169 => "SC500HE-11",
+9170 => "SC400HE-11",
+9171 => "WB 3000TL-21",
+9172 => "WB 3600TL-21",
+9173 => "WB 4000TL-21",
+9174 => "WB 5000TL-21",
+9175 => "SC 250",
+9176 => "SMA Meteo Station",
+9177 => "SB 240-10",
 9171 => "WB 3000TL-21",
 9172 => "WB 3600TL-21",
 9173 => "WB 4000TL-21",
@@ -180,6 +192,17 @@ my %SMAInverter_devtypes = (
 9180 => "Multigate-US-10",
 9181 => "STP 20000TLEE-10",
 9182 => "STP 15000TLEE-10",
+9183 => "SB 2000TLST-21",
+9184 => "SB 2500TLST-21",
+9185 => "SB 3000TLST-21",
+9186 => "WB 2000TLST-21",
+9187 => "WB 2500TLST-21",
+9188 => "WB 3000TLST-21",
+9189 => "WTP 5000TL-20",
+9190 => "WTP 6000TL-20",
+9191 => "WTP 7000TL-20",
+9192 => "WTP 8000TL-20",
+9193 => "WTP 9000TL-20",
 9254 => "Sunny Island 3324",
 9255 => "Sunny Island 4.0M",
 9256 => "Sunny Island 4248",
@@ -195,6 +218,13 @@ my %SMAInverter_devtypes = (
 9283 => "STP 12000TL-20",
 9284 => "STP 20000TL-30",
 9285 => "STP 25000TL-30",
+9301 => "SB1.5-1VL-40",
+9302 => "SB2.5-1VL-40",
+9303 => "SB2.0-1VL-40",
+9304 => "SB5.0-1SP-US-40",
+9305 => "SB6.0-1SP-US-40",
+9306 => "SB8.0-1SP-US-40",
+9307 => "Energy Meter",
 );
 
 # Wechselrichter Class-Hash DE
@@ -1312,7 +1342,7 @@ sub SMA_logon($$$) {
         my $r_cmd_ID = unpack("V*", substr $data, 42, 4);
         my $r_error  = unpack("V*", substr $data, 36, 4);
 
-        if (($r_susyid ne $mysusyid) || ($r_serial ne $myserialnumber) || ($r_pkt_ID ne $pkt_ID) || ($r_cmd_ID ne 0xFFFD040D) || ($r_error ne 0)) {
+        if (($r_pkt_ID ne $pkt_ID) || ($r_cmd_ID ne 0xFFFD040D) || ($r_error ne 0)) {
             # Response does not match the parameters we have sent, maybe different target
             Log3 $name, 1, "$name - Inverter answer does not match our parameters.";
             Log3 $name, 5, "$name - Request/Response: SusyID $mysusyid/$r_susyid, Serial $myserialnumber/$r_serial, Packet ID $hash->{HELPER}{PKT_ID}/$r_pkt_ID, Command 0xFFFD040D/$r_cmd_ID, Error $r_error";

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  76_SMAInverter: changed SMA_logon, enhanced inverter Types
   - feature: 98_DLNARenderer: support $readingFnAttributes
   - feature: 34_ESPEasy: urlEncode text for display commands
   - feature:  71_PHILIPS_AUDIO: Added NP3500 support. "lvl" Reading bugfix.
