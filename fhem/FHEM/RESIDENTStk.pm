@@ -1079,7 +1079,6 @@ sub RESIDENTStk_Notify($$) {
     my $devType = GetType($devName);
 
     if ( $devName eq "global" ) {
-        delete $dev->{CHANGEDWITHSTATE};
         my $events = deviceEvents( $dev, 0 );
         return "" unless ($events);
 
@@ -1100,8 +1099,8 @@ sub RESIDENTStk_Notify($$) {
 m/^(INITIALIZED|REREADCFG|DEFINED|MODIFIED|RENAMED|DELETED)(?:\s+(.*))?$/
               )
             {
+                # ignore module internal init events
                 next if ( $1 eq "INITIALIZED" && $2 );
-                next if ( $2 && $2 eq $name );
 
                 if ( $1 eq "REREADCFG" ) {
                     next unless ( $modules{$TYPE}{READY} );
@@ -3482,7 +3481,7 @@ sub RESIDENTStk_findResidentSlaves($) {
     return
       unless ( ref($hash) eq "HASH" && defined( $hash->{NAME} ) );
 
-    $hash->{NOTIFYDEV} = "global";
+    my $n = "global";
 
     delete $hash->{ROOMMATES};
     foreach ( devspec2array("TYPE=ROOMMATE") ) {
@@ -3508,14 +3507,20 @@ sub RESIDENTStk_findResidentSlaves($) {
         $hash->{GUESTS} .= $_;
     }
 
-    $hash->{NOTIFYDEV} .= "," . $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
-    $hash->{NOTIFYDEV} .= "," . $hash->{GUESTS}    if ( $hash->{GUESTS} );
+    $n .= "," . $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
+    $n .= "," . $hash->{GUESTS}    if ( $hash->{GUESTS} );
 
-    RESIDENTStk_findDummySlaves( $hash->{NAME} );
+    if ( $hash->{NOTIFYDEV} ne $n ) {
+        $hash->{NOTIFYDEV} = $n;
+        RESIDENTStk_findDummySlaves( $hash->{NAME}, 1 );
+    }
+    else {
+        RESIDENTStk_findDummySlaves( $hash->{NAME} );
+    }
 }
 
 sub RESIDENTStk_findDummySlaves($) {
-    my ($name) = @_;
+    my ( $name, $trigger ) = @_;
     my $hash   = $defs{$name};
     my $TYPE   = GetType($name);
     my $prefix = RESIDENTStk_GetPrefixFromType($name);
@@ -3523,11 +3528,12 @@ sub RESIDENTStk_findDummySlaves($) {
     my $wakeupDevice    = AttrVal( $name, $prefix . "wakeupDevice",    undef );
     my $presenceDevices = AttrVal( $name, $prefix . "presenceDevices", undef );
 
-    $hash->{NOTIFYDEV} = "global" if ( $TYPE ne "RESIDENTS" );
+    my $n = $hash->{NOTIFYDEV};
+    $n = "global" if ( $TYPE ne "RESIDENTS" );
 
     if ($wakeupDevice) {
-        $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
-        $hash->{NOTIFYDEV} .= $wakeupDevice;
+        $n .= "," if ( $n ne "" );
+        $n .= $wakeupDevice;
 
         foreach ( split( ',', $wakeupDevice ) ) {
             my $rsw;
@@ -3536,8 +3542,8 @@ sub RESIDENTStk_findDummySlaves($) {
             $rsw = AttrVal( $_, "wakeupResetSwitcher", "" );
 
             if ( $rsw =~ /^[a-zA-Z\d._]+$/ ) {
-                $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
-                $hash->{NOTIFYDEV} .= $rsw;
+                $n .= "," if ( $n ne "" );
+                $n .= $rsw;
             }
         }
     }
@@ -3546,22 +3552,25 @@ sub RESIDENTStk_findDummySlaves($) {
         foreach ($presenceDevices) {
             my $d = $_;
             $d =~ s/:.*$//g;
-            $hash->{NOTIFYDEV} .= "," if ( $hash->{NOTIFYDEV} ne "" );
-            $hash->{NOTIFYDEV} .= $d;
+            $n .= "," if ( $n ne "" );
+            $n .= $d;
         }
     }
 
+    if ( $hash->{NOTIFYDEV} ne $n ) {
+        $hash->{NOTIFYDEV} = $n;
+        $trigger = 1;
+    }
+
     # finish module initialization
-    if ( $modules{$TYPE}{READY} == 0 ) {
-        Log 1, "DEBUG+++ module $TYPE INITIALIZED";
+    if ( !$modules{$TYPE}{READY} ) {
         $modules{$TYPE}{READY} = 1;
         DoTrigger( "global", "$TYPE INITIALIZED", 1 );
     }
 
     # internal modification
-    elsif ( $hash->{'.READY'} ) {
-        Log 1, "DEBUG+++ $name CHANGED_CONFIG";
-        DoTrigger( "global", "CHANGED_CONFIG $name", 1 );
+    elsif ( $trigger && $hash->{'.READY'} ) {
+        DoTrigger( "global", "CONFIG_CHANGED $name", 1 );
     }
 
     return "";
