@@ -19,6 +19,7 @@ sub GUEST_Initialize($) {
     $hash->{AttrFn}   = "RESIDENTStk_Attr";
     $hash->{NotifyFn} = "RESIDENTStk_Notify";
 
+    $hash->{NotifyOrderPrefix} = "35-";
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,none "

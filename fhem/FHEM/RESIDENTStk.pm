@@ -1084,7 +1084,8 @@ sub RESIDENTStk_Notify($$) {
 
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
             if ( $_ =~
-                m/^INITIALIZED|REREADCFG|DEFINED.+|MODIFIED.+|DELETED.+$/ )
+m/^INITIALIZED|REREADCFG|DEFINED.+|MODIFIED.+|RENAMED.+|DELETED.+$/
+              )
             {
                 RESIDENTStk_findResidentSlaves($hash)
                   if ( $TYPE eq "RESIDENTS" );
