@@ -55,7 +55,7 @@ use constant DEFAULT_RSSI_THRESHOLD     => 10;
 use constant RSSI_WINDOW                => 10;
 
 use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.8';
+use constant VERSION                    => '0.81';
 
 use constant PIDFILE                    => '/var/run/' . ME . '.pid';
 
@@ -150,6 +150,7 @@ sub update_device($$$) {
     }
     $devices{$mac}{'rssi'} = $rssi;
     $devices{$mac}{'reported_rssi'} = $rssi if (!defined($devices{$mac}{'reported_rssi'}));
+    $devices{$mac}{'prevtimestamp'} = $devices{$mac}{'timestamp'};
     $devices{$mac}{'timestamp'} = time();
   }
   #dump_devices();
@@ -408,8 +409,12 @@ for(;;) {
   # For performance reasons, a maximum of one task is performed per loop
   if (my @due_clients = grep { time() >= $_->{'next_check'} } @clients) {
     foreach my $client (@due_clients) {
-      if (defined($devices{$client->{'mac'}}) && time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'}) {
-        syslogw(LOG_DEBUG, "Sending update for mac address %s, age: %i, max age: %i, rssi: %i, result: present.", $client->{'mac'}, time()-$devices{$client->{'mac'}}{'timestamp'}, $client->{'interval'}, $devices{$client->{'mac'}}{'rssi'});
+      if (
+          defined($devices{$client->{'mac'}}) &&
+          time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'} && 
+          defined($devices{$client->{'mac'}}{prevtimestamp}) && time()-$devices{$client->{'mac'}}{prevtimestamp} <= $client->{'interval'}
+        ) {
+        syslogw(LOG_DEBUG, "Sending update for mac address %s, ages: %i/%i, max age: %i, rssi: %i, result: present.", $client->{'mac'}, time()-$devices{$client->{'mac'}}{'timestamp'}, time()-$devices{$client->{'mac'}}{'prevtimestamp'}, $client->{'interval'}, $devices{$client->{'mac'}}{'rssi'});
         printf {$client->{'handle'}} "present;device_name=%s;rssi=%s;daemon=%s V%s\n", $devices{$client->{'mac'}}{name}, $devices{$client->{'mac'}}{'rssi'}, ME, VERSION;
       } else {
         syslogw(LOG_DEBUG, "Sending update for mac address %s, max age: %i, result: absence.", $client->{'mac'}, $client->{'interval'});
