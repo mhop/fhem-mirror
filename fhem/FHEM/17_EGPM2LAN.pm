@@ -36,7 +36,7 @@ EGPM2LAN_Initialize($)
   $hash->{GetFn}     = "EGPM2LAN_Get";
   $hash->{SetFn}     = "EGPM2LAN_Set"; 
   $hash->{DefFn}     = "EGPM2LAN_Define"; 
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 stateDisplay:sockNumber,sockName autocreate:on,off"; 
+  $hash->{AttrList}  = "stateDisplay:sockNumber,sockName autocreate:on,off"; 
 } 
 
 ###################################
@@ -79,10 +79,10 @@ EGPM2LAN_Set($@)
   my $name = shift @a; 
   my $setcommand = shift @a; 
   my $params = join(" ", @a);
-  my $logLevel = GetLogLevel($name,4); 
-  Log $logLevel, "EGPM2LAN set $name (". $hash->{IP}. ") $setcommand $params";
+  
+  Log3 "EGPM2LAN", 4, "set $name (". $hash->{IP}. ") $setcommand $params";
  
-  EGPM2LAN_Login($hash, $logLevel); 
+  EGPM2LAN_Login($hash); 
   
   if($setcommand eq "on" || $setcommand eq "off") 
   { 
@@ -90,18 +90,18 @@ EGPM2LAN_Set($@)
 	  { #switch all Sockets; thanks to eric!
   	  for (my $count = 1; $count <= 4; $count++)
       {
-   	    EGPM2LAN_Switch($hash, $setcommand, $count, $logLevel);
+   	    EGPM2LAN_Switch($hash, $setcommand, $count);
       }
 	  }
 	  else
 	  {  #switch single Socket
-       EGPM2LAN_Switch($hash, $setcommand, $params, $logLevel);
+       EGPM2LAN_Switch($hash, $setcommand, $params);
     }
-    EGPM2LAN_Statusrequest($hash, $logLevel, 1); 
+    EGPM2LAN_Statusrequest($hash, 1); 
   }   
   elsif($setcommand eq "toggle") 
   { 
-    my $currentstate = EGPM2LAN_Statusrequest($hash, $logLevel, 1);
+    my $currentstate = EGPM2LAN_Statusrequest($hash, 1);
     if(defined($currentstate))
     {
     	my @powerstates = split(",", $currentstate);
@@ -110,29 +110,34 @@ EGPM2LAN_Set($@)
     	{
     	   $newcommand="on";
     	}
-      EGPM2LAN_Switch($hash, $newcommand, $params, $logLevel);
-	    EGPM2LAN_Statusrequest($hash, $logLevel, 0); 
+      EGPM2LAN_Switch($hash, $newcommand, $params);
+	    EGPM2LAN_Statusrequest($hash, 0); 
     } 
   } 
   elsif($setcommand eq "statusrequest") 
   { 
-	   EGPM2LAN_Statusrequest($hash, $logLevel, 1); 
+	   EGPM2LAN_Statusrequest($hash, 1); 
   }
   elsif($setcommand eq "password")
   {
-           delete $hash->{PASSWORD} if($params eq "" && defined($hash->{PASSWORD}));
-           EGPM2LAN_StorePassword($hash, $params);
+         my $result =  EGPM2LAN_StorePassword($hash, $params);
+         Log3 "EGPM2LAN", 1,$result;
+         if($params eq ""){
+            delete $hash->{PASSWORD} if(defined($hash->{PASSWORD}));
+         } else {
+            $params="***";
+         }
   }
   elsif($setcommand eq "clearreadings") 
   { 
-	   delete $hash->{READINGS};
+         delete $hash->{READINGS};
   } 
   else 
   { 
      return "unknown argument $setcommand, choose one of on, off, toggle, statusrequest, clearreadings"; 
-  } 
+  } 	
   
-  EGPM2LAN_Logoff($hash, $logLevel); 
+  EGPM2LAN_Logoff($hash); 
 
   $hash->{CHANGED}[0] = $setcommand; 
   $hash->{READINGS}{lastcommand}{TIME} = TimeNow(); 
@@ -164,15 +169,15 @@ sub EGPM2LAN_StorePassword($$)
         $key=$encode.$key;
     }
 
-    Log 3, "EGPM2LAN write password to file uniqueID";
+    Log3 "EGPM2LAN", 4, "write password to file uniqueID";
     my $err = setKeyValue($index, $enc_pwd);
     if(defined($err)){
        #Fallback, if file is not available
        $hash->{PASSWORD}=$password;
-       return "EGPM2LAN write Password failed!";
+       return "EGPM2LAN: Write Password failed!";
     }
-    $hash->{PASSWORD}="***";
-    return "Password saved.";
+    $hash->{PASSWORD}="***" if($password ne "");
+    return "EGPM2LAN: Password saved.";
 } 
 
 ################################
@@ -180,11 +185,8 @@ sub EGPM2LAN_ReadPassword($)
 {
    my ($hash) = @_;
 
-   #password available?
-   return undef if (!defined($hash->{PASSWORD}));
-   
-   #for old installations/fallback
-   if($hash->{PASSWORD} ne "***"){
+   #for old installations/fallback to clear-text PWD
+   if(defined($hash->{PASSWORD}) && $hash->{PASSWORD} ne "***"){
       return $hash->{PASSWORD};
    }
 
@@ -192,11 +194,11 @@ sub EGPM2LAN_ReadPassword($)
    my $key = getUniqueId().$index;
    my ($password, $err);
 
-   Log 3, "EGPM2LAN Read password from file uniqueID";
+   Log3 "EGPM2LAN", 3, "Read password from file uniqueID";
    ($err, $password) = getKeyValue($index);
 
    if ( defined($err) ) {
-      Log 1, "EGPM2LAN unable to read password from file: $err";
+      Log3 "EGPM2LAN",0, "unable to read password from file: $err";
       return undef;
    }
 
@@ -214,60 +216,58 @@ sub EGPM2LAN_ReadPassword($)
          $key=$decode.$key;
       }
 
+      $hash->{PASSWORD}="***";
       return $dec_pwd;
    }
    else {
-      Log 1, "EGPM2LAN No password in file";
-      return undef;
+      Log3 "EGPM2LAN",4 ,"No password in file";
+      return "";
    }
 }
 
 ################################
-sub EGPM2LAN_Switch($$$$) { 
-  my ($hash, $state, $port, $logLevel) = @_; 
+sub EGPM2LAN_Switch($$$) { 
+  my ($hash, $state, $port) = @_; 
   $state = ($state eq "on" ? "1" : "0");
   
   my $fritz = 0; #may be important for FritzBox-users
   my $data = "cte1=" . ($port == "1" ? $state : "") . "&cte2=" . ($port == "2" ? $state : "") . "&cte3=" . ($port == "3" ? $state : "") . "&cte4=". ($port == "4" ? $state : ""); 
-  Log $logLevel, "EGPM2LAN $data"; 
+  Log3 "EGPM2LAN",5 , $data; 
   eval {
     # Parameter:    $url, $timeout, $data, $noshutdown, $loglevel
-    GetFileFromURL("http://".$hash->{IP}."/", 5,$data ,$fritz ,$logLevel);
+    GetFileFromURL("http://".$hash->{IP}."/", 5,$data ,$fritz);
   }; 
   if ($@){ 
     ### catch block 
-    Log $logLevel, "EGPM2LAN error: $@"; 
+    Log3 "EGPM2LAN", 1 ,"error: $@"; 
   }; 
 
   return 1; 
 } 
 
 ################################
-sub EGPM2LAN_Login($$) { 
-  my ($hash, $logLevel) = @_; 
-
-  Log $logLevel,"EGPM2LAN try to Login @".$hash->{IP};
+sub EGPM2LAN_Login($) { 
+  my ($hash) = @_; 
+  my $name = $hash->{NAME};
 
   my $passwd = EGPM2LAN_ReadPassword($hash);
 
+  Log3 $name,4 , "EGPM2LAN: try to connect ".$hash->{IP};
   eval{
-      GetFileFromURLQuiet("http://".$hash->{IP}."/login.html", 5,"pw=" .(defined($passwd) ? $passwd : ""),0 ,$logLevel);
+      GetFileFromURLQuiet("http://".$hash->{IP}."/login.html", 5,"pw=" .(defined($passwd) ? $passwd : ""),0 );
   }; 
   if ($@){ 
       ### catch block 
-      Log 1, "EGPM2LAN Login error: $@";
+      Log3 $name, 0, "EGPM2LAN Login error: $@";
       return 0; 
   }; 
 
-  Log $logLevel,"EGPM2LAN Login successful!";
-    
-return 1; 
+  return 1; 
 } 
 
 ################################
 sub EGPM2LAN_GetDeviceInfo($$) { 
   my ($hash, $input) = @_;
-  my $logLevel = GetLogLevel($hash->{NAME},4); 
 
   #try to read Device Name
   my ($devicename) = $input =~ m/<h2>(.+)<\/h2><\/div>/si;
@@ -287,7 +287,7 @@ sub EGPM2LAN_GetDeviceInfo($$) {
   foreach my $entry (@socketlist)
   {
 	next unless $seen{$entry}++;
-        Log $logLevel, "EGPM2LAN Sorry! Can't use devicenames. ".trim($entry)." is duplicated.";
+        Log3 "EGPM2LAN", 1, "Sorry! Can't use devicenames. ".trim($entry)." is duplicated.";
 	@socketlist = qw(Socket_1 Socket_2 Socket_3 Socket_4);
   } 
   if(int(@socketlist) < 4)
@@ -298,16 +298,22 @@ sub EGPM2LAN_GetDeviceInfo($$) {
 }
 
 ################################
-sub EGPM2LAN_Statusrequest($$$) { 
-  my ($hash, $logLevel, $autoCr) = @_;
+sub EGPM2LAN_Statusrequest($$) { 
+  my ($hash, $autoCr) = @_;
   my $name = $hash->{NAME}; 
   
-  my $response = GetFileFromURL("http://".$hash->{IP}."/", 5,"" , 0 ,$logLevel);
-  #Log 1,$response;
-	if(defined($response) && $response =~ /.,.,.,./) 
+  my $response = GetFileFromURL("http://".$hash->{IP}."/", 5,"" , 0);
+  if(not defined($response)){
+     Log3 $name, 0, "EGPM2LAN: Cant connect to ".$hash->{IP};
+     $hash->{STATE} = "Connection failed";
+     return 0
+  }
+  Log3 $name, 5, "EGPM2LAN: $response";
+
+	if($response =~ /.,.,.,./) 
         { 
           my $powerstatestring = $&; 
-          Log $logLevel, "EGPM2LAN Powerstate: " . $powerstatestring; 
+          Log3 $name, 2, "EGPM2LAN Powerstate: " . $powerstatestring; 
           my @powerstates = split(",", $powerstatestring);
 
           if(int(@powerstates) == 4) 
@@ -337,12 +343,12 @@ sub EGPM2LAN_Statusrequest($$$) {
 		{
 		   if(Value("autocreate") eq "active")
 		   {
-		  	Log $logLevel, "EGPM2LAN: Autocreate EGPM for Socket $index";
+		  	Log3 $name, 1, "EGPM2LAN: Autocreate EGPM for Socket $index";
 	                CommandDefine(undef, $name."_".$socketlist[$index-1]." EGPM $name $index");
 		   }
 		   else
 		   {
-			Log 2, "EGPM2LAN: Autocreate disabled in globals section";
+			Log3 $name, 2, "EGPM2LAN: Autocreate disabled in globals section";
                         $attr{$name}{autocreate} = "off"; 
 		   }
 		}
@@ -352,7 +358,7 @@ sub EGPM2LAN_Statusrequest($$$) {
 		{
 		   if (ReadingsVal($defptr->{NAME},"state","") ne ($powerstates[$index-1] ? "on" : "off"))
 		   {  #check for chages and update -> trigger event
-		 		  Log $logLevel, "Update State of ".$defptr->{NAME};
+		      Log3 $name, 3, "EGPM2LAN: Update State of ".$defptr->{NAME};
           readingsSingleUpdate($defptr, "state", ($powerstates[$index-1] ? "on" : "off") ,1);
        }
 		   $defptr->{DEVICENAME} = $hash->{DEVICENAME};
@@ -369,23 +375,23 @@ sub EGPM2LAN_Statusrequest($$$) {
           } 
           else 
           { 
-            Log $logLevel, "EGPM2LAN: Failed to parse powerstate";
+            Log3 $name, 0,"EGPM2LAN: Failed to parse powerstate";
           } 
         }
 	else
 	{
-     $hash->{STATE} = "Login failed";
-	   Log $logLevel, "EGPM2LAN: Login failed";
+           $hash->{STATE} = "Login failed";
+	   Log3 $name, 0,"EGPM2LAN: Login failed";
 	}
    #something went wrong :-( 
    return undef; 
 } 
 
 ################################
-sub EGPM2LAN_Logoff($$) {
-  my ($hash, $logLevel) = @_; 
+sub EGPM2LAN_Logoff($) {
+  my ($hash) = @_; 
 
-  GetFileFromURL("http://".$hash->{IP}."/login.html", 5,"" ,0 ,$logLevel);
+  GetFileFromURL("http://".$hash->{IP}."/login.html", 5,"" ,0 ,3);
   return 1; 
 } 
 
@@ -403,12 +409,12 @@ sub EGPM2LAN_Define($$)
     EGPM2LAN_StorePassword($hash, $a[3]);
     $hash->{DEF} = $a[2]; ## remove password
   } 
-  my $result = EGPM2LAN_Login($hash, 3);
+  my $result = EGPM2LAN_Login($hash);
   if($result == 1)
   { 
     $hash->{STATE} = "initialized";
-    EGPM2LAN_Statusrequest($hash, 4, 0);
-    EGPM2LAN_Logoff($hash, 4); 
+    EGPM2LAN_Statusrequest($hash,0);
+    EGPM2LAN_Logoff($hash); 
   }
 
   return undef; 

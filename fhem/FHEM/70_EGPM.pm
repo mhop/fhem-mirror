@@ -1,7 +1,7 @@
 ############################################## 
 # $Id$ 
 #
-#  (c) 2013, 2014 Copyright: Alex Storny (moselking at arcor dot de)
+#  (c) 2013, 2017 Copyright: Alex Storny (moselking at arcor dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -36,7 +36,7 @@ EGPM_Initialize($)
   $hash->{SetFn}     = "EGPM_Set";
   $hash->{GetFn}     = "EGPM_Get";
   $hash->{DefFn}     = "EGPM_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 $readingFnAttributes ";
+  $hash->{AttrList}  = "$readingFnAttributes ";
   $hash->{UndefFn}   = "EGPM_Undef";
 }
 
@@ -47,7 +47,6 @@ EGPM_Set($@)
   my ($hash, @a) = @_;
   my $name = shift @a;
   my $parent = $hash->{IODEV};
-  my $loglevel = GetLogLevel($name,4);
   my $cmdList = "off:noArg on:noArg toggle:noArg";
 
   return "no set value specified" if(int(@a) < 1);
@@ -56,18 +55,18 @@ EGPM_Set($@)
   if(not Value($parent))
   {
     my $u = "$parent device not found. Please define EGPM2LAN device.";
-    Log $loglevel, $u;
+    Log3 $name, 1, $u;
     return $u;
   }
 
   if($a[0] =~ /^(on|off|toggle)$/)
   {
-    my $v = join(" ", @a);
-    Log $loglevel, "EGPM set $name $v";
+     my $v = join(" ", @a);
+     Log3 $name, 4, "EGPM set $name $v";
      CommandSet(undef,$hash->{IODEV}." $v ".$hash->{SOCKETNR});
      return undef;
   } else {
-     Log $loglevel, "EGPM set $name $a[0]";
+     Log3 $name, 4, "EGPM set $name $a[0]";
      return SetExtensions($hash,$cmdList,$name,@a);
   }
 }
@@ -149,7 +148,7 @@ EGPM_Undef($$)
   my $parent = $hash->{IODEV};
   my $socket = $hash->{SOCKETNR};
 
-      Log GetLogLevel($name,4), "Delete ".$parent.$socket;
+      Log3 $name, 3 ,"EGPM: Delete ".$parent.$socket;
       delete $modules{EGPM}{defptr}{$parent.$socket} ;   
   
   return undef;
@@ -158,6 +157,9 @@ EGPM_Undef($$)
 1;
 
 =pod
+=item device
+=item summary controls a single Socket of EGPM2LAN-Module
+=item summary_DE steuert eine Steckdose von der EGPM2LAN-Steckdosenleiste
 =begin html
 
 <a name="EGPM"></a>
@@ -197,7 +199,6 @@ EGPM_Undef($$)
   <a name="EGPMattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -249,7 +250,6 @@ EGPM_Undef($$)
   <a name="EGPMattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
