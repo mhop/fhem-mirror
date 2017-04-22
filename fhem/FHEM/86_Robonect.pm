@@ -20,6 +20,8 @@
 # ABU 20161126 added summary
 # ABU 20161129 fixed hash issues which prevents the module from loading
 # ABU 20170301 fixed hybernate-check in set
+# ABU 20170406 fixed hybernate-check in timer
+# ABU 20170422 fixed doku
 
 package main;
 
@@ -486,7 +488,7 @@ sub Robonect_GetUpdate($)
 	#evaluate reading hybernate
 	my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
 	#supress sending, if hybernate is set
-	if (!defined ($hybernate) or ($hybernate =~ m/off/))
+	if (!defined ($hybernate) or ($hybernate =~ m/off/) or ($hybernate = 0))
 	{
 		#get status	
 		my @callAttr;
@@ -882,11 +884,11 @@ sub Robonect_getCmdList ($$$)
 	You can supply username and password plain or base-64-encoded. For a base64-encoder, use google.
       <p>Example:</p>
       <pre>
-      define myMower 192.168.5.1
+      define myMower Robonect 192.168.5.1
 	  attr myMower basicAuth me:mySecret
       </pre>    
 	  <pre>
-      define myMower 192.168.5.1
+      define myMower Robonect 192.168.5.1
 	  attr myMower basicAuth bWU6bXlTZWNyZXQ=
       </pre>    
   </ul>	
@@ -986,11 +988,11 @@ sub Robonect_getCmdList ($$$)
 	Hier werden die Zugangsinformationen entweder im Klartext oder base-64-codiert übergeben. Base64-encoder gibts bei google.
       <p>Example:</p>
       <pre>
-      define myMower 192.168.5.1
+      define myMower Robonect 192.168.5.1
 	  attr myMower basicAuth me:mySecret
       </pre>    
 	  <pre>
-      define myMower 192.168.5.1
+      define myMower Robonect 192.168.5.1
 	  attr myMower basicAuth bWU6bXlTZWNyZXQ=
       </pre>    
   </ul>	
