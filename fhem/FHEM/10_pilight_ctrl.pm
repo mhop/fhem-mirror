@@ -48,6 +48,7 @@
 # V 1.21 2016-11-13 - NEW: support contact sensors 
 # V 1.22 2017-04-08 - NEW: support contact sensor GW-iwds07
 # V 1.23 2017-04-08 - NEW: support new temperature protocols bmp085 and bmp180
+# V 1.23 2017-04-08 - FIX: GS-iwds07 support
 ############################################## 
 package main;
 
@@ -793,6 +794,12 @@ sub pilight_ctrl_Parse($$)
     $state =~ s/closed/off/g;
     Log3 $me, 4, "$me(Parse): contact as switch for $id";
   }
+  
+  # some protocols have no id but unit(code) e.q. ev1527, GS-iwds07
+  $id = $unit if ($id eq "" && $unit ne "");   
+  $unit = "all" if ($unit eq "" && $all ne "");
+  
+  Log3 $me, 5, "$me(Parse): protocol:$proto,id:$id,unit:$unit";
         
   my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
   
@@ -815,12 +822,7 @@ sub pilight_ctrl_Parse($$)
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"rcv_raw",$rmsg);
   readingsEndUpdate($hash, 1);
-  
-  # some protocols have no id but unit(code) e.q. ev1527
-  $id = $unit if ($id eq "" && $unit ne ""); 
-  
-  $unit = "all" if ($unit eq "" && $all ne "");
-  
+    
   my $protoID = -1;  
   switch($proto){
     #switch
@@ -843,7 +845,7 @@ sub pilight_ctrl_Parse($$)
     case m/contact/     {$protoID = 3;}
     case m/ev1527/      {$protoID = 3;}
     case m/sc2262/      {$protoID = 3;}
-    case m/GW-iwds07/   {$protoID = 3; $id = $unit;} #protocol has no id
+    case m/GS-iwds07/   {$protoID = 3;} 
     
     #Weather Stations temperature, humidity
     case m/alecto/      {$protoID = 4;}

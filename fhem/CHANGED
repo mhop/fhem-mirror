@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  10_pilight_ctrl: fix GS-iwds07
   - feature: 98_TRAFFIC: v1.3.1, attribute change, map setting save buttons 
   - feature: 98_TRAFFIC: v1.3, map customizable, enhancements, fix JSON error
   - change:  76_SMAInverter: changed SMA_logon, enhanced inverter Types
