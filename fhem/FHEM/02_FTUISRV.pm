@@ -74,6 +74,8 @@
 #   more tolerance on spaces around =
 #   doc change on ftui-if
 
+#   FIX: changed replaceSetmagic to hand over real device hash
+#   
 #   
 ################################################################
 #TODO:
@@ -268,6 +270,9 @@ sub FTUISRV_CGI() {
     
     # get device name
     $name= $data{FWEXT}{$link}{deviceName}; 
+    
+    # get corresponding hash
+    my $hash = $defs{$name};
 
     # check system / device loglevel
     my $logLevel = $attr{global}{verbose};
@@ -299,7 +304,7 @@ sub FTUISRV_CGI() {
             $filename = $1;
             $value    = $4;
             Log3 $name, 5, "$name: set Reading $reading = $value";
-            readingsSingleUpdate($defs{$name}, $reading, $value, 1);
+            readingsSingleUpdate($hash, $reading, $value, 1);
         }
     };
     
@@ -316,12 +321,12 @@ sub FTUISRV_CGI() {
     my $parhash = {};
     my $validatehash = {};
     
-    my ($err, $validated, $content) = FTUISRV_handletemplatefile( $name, $filename, $parhash, $validatehash );
+    my ($err, $validated, $content) = FTUISRV_handletemplatefile( $hash, $filename, $parhash, $validatehash );
 
     # Validate HTML Result after parsing
     my $validate = AttrVal($name,'validateResult',0);
     if ( ( $validate ) && ( ( $filename =~ /\.html?$/i ) || ( $filename =~ /\.part?$/i )  ) && ( ! $validated ) ) {
-      FTUISRV_validateHtml( $name, $content, $validate, $filename );
+      FTUISRV_validateHtml( $hash, $content, $validate, $filename );
     }
     
     return("text/plain; charset=utf-8", "Error in filehandling: $err") if ( defined($err) );
@@ -354,7 +359,8 @@ sub FTUISRV_CGI() {
 #   optional: check FTUI 
 sub FTUISRV_validateHtml( $$$$ ) {
 
-  my ($name, $content, $validateLevel, $filename ) = @_;   
+  my ($hash, $content, $validateLevel, $filename ) = @_;   
+  my $name = $hash->{NAME}; 
 
   # state: 0: normal  / 1: in tag  / 2: in comment   / 3: in quotes  / 4: in dquotes  / 5: in ptag
   #
@@ -640,7 +646,8 @@ sub popTag( $$ ) {
 #   contents
 sub FTUISRV_replaceKeys( $$$$ ) {
 
-  my ($name, $filename, $content, $parhash) = @_;
+  my ($hash, $filename, $content, $parhash) = @_;
+  my $name = $hash->{NAME}; 
 
   # make replacements of keys from hash
   while ( $content =~ /<\?ftui-key=([^\s]+)\s*\?>/g ) {
@@ -675,7 +682,8 @@ sub FTUISRV_replaceKeys( $$$$ ) {
 #   contents
 sub FTUISRV_handleIf( $$$ ) {
 
-  my ($name, $filename, $content) = @_;
+  my ($hash, $filename, $content) = @_;
+  my $name = $hash->{NAME}; 
 
   # Look for if expression
   my $done = "";
@@ -687,7 +695,7 @@ sub FTUISRV_handleIf( $$$ ) {
   my $rest = $3;
 
   # handle rest to check recursively for further ifs
-  $rest = FTUISRV_handleIf( $name, $filename, $rest );
+  $rest = FTUISRV_handleIf( $hash, $filename, $rest );
   
   # identify then and else parts
   my $then;
@@ -708,7 +716,7 @@ sub FTUISRV_handleIf( $$$ ) {
   
   # check expression
   my %dummy;
-  my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $expr ) );
+  my ($err, @a) = ReplaceSetMagic($hash, 0, ( $expr ) );
   if ( $err ) {
     Log3 $name, 1, "$name: FTUISRV_handleIf failed on ReplaceSetmagic with :$err: on header :$expr:";
   } else {
@@ -743,8 +751,9 @@ sub FTUISRV_handleIf( $$$ ) {
 #   contents
 sub FTUISRV_handleInc( $$$$$$ ) {
 
-  my ($name, $filename, $curdir, $content, $parhash, $validatehash) = @_;
-
+  my ($hash, $filename, $curdir, $content, $parhash, $validatehash) = @_;
+  my $name = $hash->{NAME}; 
+  
   # Look for if expression
   my $done = "";
   my $rest = $content;
@@ -761,7 +770,7 @@ sub FTUISRV_handleInc( $$$$$$ ) {
     # replace [device:reading] or even perl expressions with replaceSetMagic 
     my %dummy;
     Log3 $name, 4, "$name: FTUISRV_handleInc ReplaceSetmagic INC before :$values:";
-    my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $values ) );
+    my ($err, @a) = ReplaceSetMagic($hash, 0, ( $values ) );
       
     if ( $err ) {
       Log3 $name, 1, "$name: FTUISRV_handleInc ($filename) failed on ReplaceSetmagic with :$err: on INC :$values:";
@@ -790,7 +799,7 @@ sub FTUISRV_handleInc( $$$$$$ ) {
     Log3 $name, 4, "$name: start handling include (rec) :$incfile:";
     my $inccontent;
     my $dummy;
-    ($err, $dummy, $inccontent) = FTUISRV_handletemplatefile( $name, $incfile, $incparhash, $validatehash );
+    ($err, $dummy, $inccontent) = FTUISRV_handletemplatefile( $hash, $incfile, $incparhash, $validatehash );
       
     Log3 $name, 4, "$name: done handling include (rec) :$incfile: ".(defined($err)?"Err: ".$err:"ok");
 
@@ -823,7 +832,8 @@ sub FTUISRV_handleInc( $$$$$$ ) {
 #   contents
 sub FTUISRV_handleLoopInc( $$$$$$ ) {
 
-  my ($name, $filename, $curdir, $content, $parhash, $validatehash) = @_;
+  my ($hash, $filename, $curdir, $content, $parhash, $validatehash) = @_;
+  my $name = $hash->{NAME}; 
 
   # Look for if expression
   my $done = "";
@@ -851,7 +861,7 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
     # replace [device:reading] or even perl expressions with replaceSetMagic 
     my %dummy;
     Log3 $name, 4, "$name: FTUISRV_handleLoopInc ReplaceSetmagic INC before :$values:";
-    my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $values ) );
+    my ($err, @a) = ReplaceSetMagic($hash, 0, ( $values ) );
       
     if ( $err ) {
       Log3 $name, 1, "$name: FTUISRV_handleLoopInc ($filename) failed on ReplaceSetmagic with :$err: on INC :$values:";
@@ -889,7 +899,7 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
       Log3 $name, 4, "$name: start handling include (rec) :$incfile: with value $key = :$loopvariable:";
       my $inccontent;
       my $dummy;
-      ($err, $dummy, $inccontent) = FTUISRV_handletemplatefile( $name, $incfile, $loopincparhash, $validatehash );
+      ($err, $dummy, $inccontent) = FTUISRV_handletemplatefile( $hash, $incfile, $loopincparhash, $validatehash );
         
       Log3 $name, 4, "$name: done handling include (rec) :$incfile: ".(defined($err)?"Err: ".$err:"ok");
 
@@ -923,7 +933,8 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
 #   contents
 sub FTUISRV_handletemplatefile( $$$$ ) {
 
-  my ($name, $filename, $parhash, $validatehash) = @_;
+  my ($hash, $filename, $parhash, $validatehash) = @_;
+  my $name = $hash->{NAME}; 
 
   my $content;
   my $err;
@@ -939,7 +950,7 @@ sub FTUISRV_handletemplatefile( $$$$ ) {
   if ( ( $validate ) && ( ! defined($validatehash->{$filename} ) ) && ( ( $filename =~ /\.html?$/i ) || ( $filename =~ /\.part?$/i )  ) ) {
     $validated = 1;
     $validatehash->{$filename} = 1 if ( ! defined($validatehash->{$filename} ) );
-    FTUISRV_validateHtml( $name, $content, $validate, $filename );
+    FTUISRV_validateHtml( $hash, $content, $validate, $filename );
   }
     
   
@@ -969,10 +980,10 @@ sub FTUISRV_handletemplatefile( $$$$ ) {
           # replace escaped > (i.e. \>) by > for key replacement
           $sval =~ s/\?\\>/\?>/g;
           
-          $sval = FTUISRV_replaceKeys( $name, $filename." header", $sval, $parhash );
+          $sval = FTUISRV_replaceKeys( $hash, $filename." header", $sval, $parhash );
           Log3 $name, 4, "$name: FTUISRV_handletemplatefile default value for key :$skey: after replace :".$sval.":";
 
-          my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $sval ) );
+          my ($err, @a) = ReplaceSetMagic($hash, 0, ( $sval ) );
           if ( $err ) {
             Log3 $name, 1, "$name: FTUISRV_handletemplatefile failed on ReplaceSetmagic with :$err: on header :$sval:";
           } else {
@@ -991,19 +1002,19 @@ sub FTUISRV_handletemplatefile( $$$$ ) {
     }
 
     # replace the keys first before loop/if
-    $content = FTUISRV_replaceKeys( $name, $filename, $content, $parhash );
+    $content = FTUISRV_replaceKeys( $hash, $filename, $content, $parhash );
 
     # eval if else endif expressions
-    $content = FTUISRV_handleIf( $name, $filename, $content );
+    $content = FTUISRV_handleIf( $hash, $filename, $content );
 
     # Handle includes
     Log3 $name, 4, "$name: look for includes :$filename:";
 
-    ( $err, $content ) = FTUISRV_handleInc( $name, $filename, $curdir, $content, $parhash, $validatehash );
+    ( $err, $content ) = FTUISRV_handleInc( $hash, $filename, $curdir, $content, $parhash, $validatehash );
     # error will always result in stopping recursion
     return ($err, $validated, $content) if ( defined($err) );
 
-    ( $err, $content ) = FTUISRV_handleLoopInc( $name, $filename, $curdir, $content, $parhash, $validatehash );
+    ( $err, $content ) = FTUISRV_handleLoopInc( $hash, $filename, $curdir, $content, $parhash, $validatehash );
     # error will always result in stopping recursion
     return ($err, $validated, $content) if ( defined($err) );
 
