@@ -56,6 +56,7 @@ sub RESIDENTStk_Define($$) {
     $modules{$TYPE}{defptr}{$name} = \$hash;
     $hash->{'.READY'}              = 0;
     $hash->{NOTIFYDEV}             = "global";
+    delete $hash->{RESIDENTGROUPS} if ( $hash->{RESIDENTGROUPS} );
     $hash->{RESIDENTGROUPS} = $a[2] if ( defined( $a[2] ) );
 
     # set default settings on first define
@@ -117,43 +118,29 @@ sub RESIDENTStk_Undefine($$) {
     RESIDENTStk_StopInternalTimers($hash);
     return undef unless ($init_done);
 
-    # update parent residents
-    if ( defined( $hash->{RESIDENTGROUPS} ) ) {
-        my $old = $hash->{RESIDENTGROUPS};
-        delete $hash->{RESIDENTGROUPS};
-        foreach ( split( /,/, $old ) ) {
-            RESIDENTStk_findResidentSlaves( $defs{$_} )
-              if ( IsDevice( $_, "RESIDENTS" ) );
+    # delete child roommates
+    if ( defined( $hash->{ROOMMATES} )
+        && $hash->{ROOMMATES} ne "" )
+    {
+        my @registeredRoommates =
+          split( /,/, $hash->{ROOMMATES} );
+
+        foreach my $child (@registeredRoommates) {
+            fhem( "delete " . $child );
+            Log3 $name, 3, "RESIDENTS $name: deleted device $child";
         }
     }
 
-    else {
-        RESIDENTStk_findResidentSlaves($hash);
+    # delete child guests
+    if ( defined( $hash->{GUESTS} )
+        && $hash->{GUESTS} ne "" )
+    {
+        my @registeredGuests =
+          split( /,/, $hash->{GUESTS} );
 
-        # delete child roommates
-        if ( defined( $hash->{ROOMMATES} )
-            && $hash->{ROOMMATES} ne "" )
-        {
-            my @registeredRoommates =
-              split( /,/, $hash->{ROOMMATES} );
-
-            foreach my $child (@registeredRoommates) {
-                fhem( "delete " . $child );
-                Log3 $name, 3, "RESIDENTS $name: deleted device $child";
-            }
-        }
-
-        # delete child guests
-        if ( defined( $hash->{GUESTS} )
-            && $hash->{GUESTS} ne "" )
-        {
-            my @registeredGuests =
-              split( /,/, $hash->{GUESTS} );
-
-            foreach my $child (@registeredGuests) {
-                fhem( "delete " . $child );
-                Log3 $name, 3, "RESIDENTS $name: deleted device $child";
-            }
+        foreach my $child (@registeredGuests) {
+            fhem( "delete " . $child );
+            Log3 $name, 3, "RESIDENTS $name: deleted device $child";
         }
     }
 
@@ -1078,41 +1065,40 @@ sub RESIDENTStk_Notify($$) {
     my $devName = $dev->{NAME};
     my $devType = GetType($devName);
 
+    # do not process notfies during module initialization
+    return "" if ( $modules{$TYPE}{INIT} || $modules{$TYPE}{REREADCFG} );
+
     if ( $devName eq "global" ) {
+        delete $dev->{CHANGEDWITHSTATE};
         my $events = deviceEvents( $dev, 0 );
         return "" unless ($events);
 
         foreach ( @{$events} ) {
 
-            # module internal notifications
-            if ( $_ =~ m/^$TYPE(?:\s+(.*))?$/ ) {
-
-                # internal init completed by all defined devices
-                if ( $1 && $1 eq "INITIALIZED" && !$hash->{'.READY'} ) {
-                    $hash->{'.READY'} = 1;
-                    DoTrigger( "global", "INITIALIZED $name", 1 );
-                }
-            }
-
             # init RESIDENTS, ROOMMATE or GUEST devices after boot
-            elsif ( $_ =~
-m/^(INITIALIZED|REREADCFG|DEFINED|MODIFIED|RENAMED|DELETED)(?:\s+(.*))?$/
+            if ( $_ =~
+m/^INITIALIZED|REREADCFG|DEFINED.+|MODIFIED.+|RENAMED.+|DELETED.+$/
               )
             {
-                # ignore module internal init events
-                next if ( $1 eq "INITIALIZED" && $2 );
+                # only let first device of the module do initialization
+                next if ( $_ eq "INITIALIZED" && $modules{$TYPE}{READY} );
 
-                if ( $1 eq "REREADCFG" ) {
-                    next unless ( $modules{$TYPE}{READY} );
-                    $modules{$TYPE}{READY} = 0;
+                my $REREADCFG;
+                if ( $_ eq "REREADCFG" ) {
+                    next if ( $modules{$TYPE}{REREADCFG} );
+                    $modules{$TYPE}{READY}     = 0;
+                    $modules{$TYPE}{REREADCFG} = 1;
+                    $REREADCFG                 = 1;
                 }
 
                 if ( $TYPE eq "RESIDENTS" ) {
                     RESIDENTStk_findResidentSlaves($hash);
                 }
                 else {
-                    RESIDENTStk_findDummySlaves($name);
+                    RESIDENTStk_findDummySlaves($hash);
                 }
+
+                delete $modules{$TYPE}{REREADCFG} if ($REREADCFG);
             }
 
             # only process attribute events
@@ -1137,7 +1123,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             if ( $d eq $name ) {
                 RESIDENTStk_findResidentSlaves($hash)
                   if ( $TYPE eq "RESIDENTS" );
-                RESIDENTStk_findDummySlaves($name)
+                RESIDENTStk_findDummySlaves($hash)
                   if ( $TYPE ne "RESIDENTS" && $TYPE ne "dummy" );
                 return "";
             }
@@ -1185,7 +1171,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
 
                     RESIDENTStk_findResidentSlaves($hash)
                       if ( $TYPE eq "RESIDENTS" );
-                    RESIDENTStk_findDummySlaves($name)
+                    RESIDENTStk_findDummySlaves($hash)
                       if ( $TYPE eq "ROOMMATE" || $TYPE eq "GUEST" );
                 }
 
@@ -3479,11 +3465,11 @@ sub RESIDENTStk_StopInternalTimers($) {
 sub RESIDENTStk_findResidentSlaves($) {
     my ($hash) = @_;
     return
-      unless ( ref($hash) eq "HASH" && defined( $hash->{NAME} ) );
+      unless ( ref($hash) eq "HASH"
+        && defined( $hash->{TYPE} )
+        && defined( $hash->{NAME} ) );
 
-    my $n = "global";
-
-    delete $hash->{ROOMMATES};
+    my $ROOMMATES;
     foreach ( devspec2array("TYPE=ROOMMATE") ) {
         next
           unless (
@@ -3491,11 +3477,11 @@ sub RESIDENTStk_findResidentSlaves($) {
             && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
-        $hash->{ROOMMATES} .= "," if ( $hash->{ROOMMATES} );
-        $hash->{ROOMMATES} .= $_;
+        $ROOMMATES .= "," if ($ROOMMATES);
+        $ROOMMATES .= $_;
     }
 
-    delete $hash->{GUESTS};
+    my $GUESTS;
     foreach ( devspec2array("TYPE=GUEST") ) {
         next
           unless (
@@ -3503,74 +3489,104 @@ sub RESIDENTStk_findResidentSlaves($) {
             && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
-        $hash->{GUESTS} .= "," if ( $hash->{GUESTS} );
-        $hash->{GUESTS} .= $_;
+        $GUESTS .= "," if ($GUESTS);
+        $GUESTS .= $_;
     }
 
-    $n .= "," . $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
-    $n .= "," . $hash->{GUESTS}    if ( $hash->{GUESTS} );
+    if ( !$ROOMMATES && $hash->{ROOMMATES} ) {
+        delete $hash->{ROOMMATES};
+    }
+    elsif ( $ROOMMATES
+        && ( !$hash->{ROOMMATES} || $hash->{ROOMMATES} ne $ROOMMATES ) )
+    {
+        $hash->{ROOMMATES} = $ROOMMATES;
+    }
 
-    if ( $hash->{NOTIFYDEV} ne $n ) {
-        $hash->{NOTIFYDEV} = $n;
-        RESIDENTStk_findDummySlaves( $hash->{NAME}, 1 );
+    if ( !$GUESTS && $hash->{GUESTS} ) {
+        delete $hash->{GUESTS};
     }
-    else {
-        RESIDENTStk_findDummySlaves( $hash->{NAME} );
+    elsif ( $GUESTS && ( !$hash->{GUESTS} || $hash->{GUESTS} ne $GUESTS ) ) {
+        $hash->{GUESTS} = $GUESTS;
     }
+
+    $hash->{NOTIFYDEV} = "global";
+    $hash->{NOTIFYDEV} .= "," . $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
+    $hash->{NOTIFYDEV} .= "," . $hash->{GUESTS}    if ( $hash->{GUESTS} );
+
+    RESIDENTStk_findDummySlaves($hash);
 }
 
 sub RESIDENTStk_findDummySlaves($) {
-    my ( $name, $trigger ) = @_;
-    my $hash   = $defs{$name};
-    my $TYPE   = GetType($name);
-    my $prefix = RESIDENTStk_GetPrefixFromType($name);
+    my ($hash) = @_;
+    return
+      unless ( ref($hash) eq "HASH"
+        && defined( $hash->{TYPE} )
+        && defined( $hash->{NAME} ) );
 
-    my $wakeupDevice    = AttrVal( $name, $prefix . "wakeupDevice",    undef );
+    my $name            = $hash->{NAME};
+    my $TYPE            = $hash->{TYPE};
+    my $prefix          = RESIDENTStk_GetPrefixFromType($name);
+    my $wakeupDevice    = AttrVal( $name, $prefix . "wakeupDevice", undef );
     my $presenceDevices = AttrVal( $name, $prefix . "presenceDevices", undef );
+    my $NOTIFYDEV       = $hash->{NOTIFYDEV};
+    $NOTIFYDEV = "global" if ( $TYPE ne "RESIDENTS" );
 
-    my $n = $hash->{NOTIFYDEV};
-    $n = "global" if ( $TYPE ne "RESIDENTS" );
-
+    # add r_*wakeupDevice
     if ($wakeupDevice) {
-        $n .= "," if ( $n ne "" );
-        $n .= $wakeupDevice;
+        $NOTIFYDEV .= "," if ( $NOTIFYDEV ne "" );
+        $NOTIFYDEV .= $wakeupDevice;
 
+        # wakeupResetSwitcher
         foreach ( split( ',', $wakeupDevice ) ) {
-            my $rsw;
-            next unless ( IsDevice($_) );
-
-            $rsw = AttrVal( $_, "wakeupResetSwitcher", "" );
-
+            my $rsw = AttrVal( $_, "wakeupResetSwitcher", "" );
             if ( $rsw =~ /^[a-zA-Z\d._]+$/ ) {
-                $n .= "," if ( $n ne "" );
-                $n .= $rsw;
+                $NOTIFYDEV .= "," if ( $NOTIFYDEV ne "" );
+                $NOTIFYDEV .= $rsw;
             }
         }
     }
 
+    # add r_*presenceDevices
     if ($presenceDevices) {
         foreach ($presenceDevices) {
             my $d = $_;
             $d =~ s/:.*$//g;
-            $n .= "," if ( $n ne "" );
-            $n .= $d;
+            $NOTIFYDEV .= "," if ( $NOTIFYDEV ne "" );
+            $NOTIFYDEV .= $d;
         }
     }
 
-    if ( $hash->{NOTIFYDEV} ne $n ) {
-        $hash->{NOTIFYDEV} = $n;
-        $trigger = 1;
-    }
-
     # finish module initialization
-    if ( !$modules{$TYPE}{READY} ) {
+    if ( !$modules{$TYPE}{READY} && !$modules{$TYPE}{INIT} ) {
+        $modules{$TYPE}{INIT} = 1;
+
+        foreach ( devspec2array("TYPE=$TYPE") ) {
+            $defs{$_}{'.READY'} = 0;
+            RESIDENTStk_findResidentSlaves( $defs{$_} )
+              if ( $TYPE eq "RESIDENTS" );
+            RESIDENTStk_findDummySlaves( $defs{$_} )
+              if ( $TYPE ne "RESIDENTS" );
+        }
+
+        Log 5, "$TYPE: module initialization completed";
+        delete $modules{$TYPE}{INIT};
         $modules{$TYPE}{READY} = 1;
-        DoTrigger( "global", "$TYPE INITIALIZED", 1 );
+        DoTrigger( "global", "$TYPE:INITIALIZED", 1 );
     }
 
-    # internal modification
-    elsif ( $trigger && $hash->{'.READY'} ) {
-        DoTrigger( "global", "CONFIG_CHANGED $name", 1 );
+    # finish device initialization
+    elsif ( !$hash->{'.READY'} ) {
+        Log3 $name, 5, "$TYPE $name: device initialization completed";
+        $hash->{NOTIFYDEV} = $NOTIFYDEV;
+        $hash->{'.READY'} = 1;
+        DoTrigger( "global", "$TYPE:INITIALIZED $name", 1 );
+    }
+
+    # device setup changed during runtime
+    elsif ( $hash->{NOTIFYDEV} ne $NOTIFYDEV ) {
+        $hash->{NOTIFYDEV} = $NOTIFYDEV;
+        Log3 $name, 5, "$TYPE $name: device re-configuration completed";
+        DoTrigger( "global", "$TYPE:MODIFIED $name", 1 );
     }
 
     return "";
