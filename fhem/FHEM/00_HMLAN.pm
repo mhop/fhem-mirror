@@ -1091,7 +1091,7 @@ sub HMLAN_condUpdate($$) {#####################################################
   my($hash,$HMcnd) = @_;
   my $name = $hash->{NAME};
   if (AttrVal($name,"dummy",undef)){
-    readingsUpdateSingle($hash,"state","disconnected");
+    readingsSingleUpdate($hash,"state","disconnected",1);
     $hash->{XmitOpen} = 0;
     return;
   }
@@ -1455,6 +1455,5 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul>
 
 </ul>
-=end html
-
+=end html_DE
 =cut
