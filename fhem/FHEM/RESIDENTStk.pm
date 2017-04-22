@@ -1065,7 +1065,7 @@ sub RESIDENTStk_Notify($$) {
     my $devName = $dev->{NAME};
     my $devType = GetType($devName);
 
-    # do not process notfies during module initialization
+    # do not process events during module initialization
     return "" if ( $modules{$TYPE}{INIT} || $modules{$TYPE}{REREADCFG} );
 
     if ( $devName eq "global" ) {
@@ -1183,7 +1183,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
 
     return "" if ( IsDisabled($name) or IsDisabled($devName) );
 
-    # process notifications from ROOMMATE or GUEST devices
+    # process events from ROOMMATE or GUEST devices
     # only when they hit RESIDENTS devices
     if ( $TYPE eq "RESIDENTS" && $devType =~ /^ROOMMATE|GUEST$/ ) {
 
@@ -1245,16 +1245,16 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
         # process wakeup devices
         if (@registeredWakeupdevs) {
 
-            # if this is a notification of a registered wakeup device
+            # if this is an event of a registered wakeup device
             if ( grep { m/^$devName$/ } @registeredWakeupdevs ) {
                 RESIDENTStk_wakeupSet( $devName, $event );
                 next;
             }
 
-            # process sub-child notifies: *_wakeupDevice
+            # process sub-child events: *_wakeupDevice
             foreach my $wakeupDev (@registeredWakeupdevs) {
 
-                # if this is a notification of a registered sub dummy device
+                # if this is an event of a registered sub dummy device
                 # of one of our wakeup devices
                 if (
                     AttrVal( $wakeupDev, "wakeupResetSwitcher", "" ) eq $devName
@@ -1646,14 +1646,14 @@ sub RESIDENTStk_wakeupSet($$) {
     $cmd =~ s/^state:\s*(.*)$/$1/;
     return if ( $cmd =~ /^[A-Za-z]+:/ );
 
-    # filter non-registered notifies
+    # filter non-registered events
     if ( $cmd !~
 m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?|trigger|start|stop|end|reset|auto|wakeupResetdays|wakeupDays|wakeupHolidays|wakeupEnforced|wakeupDefaultTime|wakeupOffset)$/i
       )
     {
         Log3 $NAME, 6,
           "RESIDENTStk $NAME: "
-          . "received unspecified notify '$cmd' - nothing to do";
+          . "received unspecified event '$cmd' - nothing to do";
         return;
     }
 
@@ -2775,7 +2775,8 @@ sub RESIDENTStk_wakeupRun($;$) {
           . "weekday restriction in use - not triggering wake-up program this time";
     }
     elsif (
-        !$forceRun
+           !$forceRun
+        && !$days{$today}
         && (
             ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
             || (   $wakeupHolidays eq "andNoHoliday"
