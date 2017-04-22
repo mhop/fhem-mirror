@@ -268,7 +268,10 @@ sub LuftdatenInfo_ParseHttpResponse($) {
       my $address = $data->{address};
 
       readingsSingleUpdate(
-        $hash, "location", "$address->{postcode} $address->{city}", 1
+          $hash, "location"
+        , "$address->{postcode} "
+        . ($address->{city} ? $address->{city} : $address->{town})
+        , 1
       );
     }
     elsif($connection eq "remote"){
