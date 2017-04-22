@@ -327,7 +327,7 @@ sub LuftdatenInfo_ParseHttpResponse($) {
         LuftdatenInfo_GetHttpResponse($hash, $SENSORID2)
           if(defined($SENSORID2));
       }
-      elsif($sensor_type eq "DHT22"){
+      elsif($sensor_type ne "SDS011"){
         Log3 $SELF, 5, "$TYPE ($SELF) - parsing $sensor_type data";
 
         if(   $sensor->{location}{latitude} ne
@@ -339,7 +339,8 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
           Log3(
               $SELF, 2
-            , "$TYPE ($SELF) - DHT22 position differs from SDS011 position"
+            , "$TYPE ($SELF) - "
+            . "$sensor_type position differs from SDS011 position"
           );
 
           return;
@@ -356,6 +357,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
             }
             elsif($_->{value_type} eq "humidity"){
               readingsBulkUpdate($hash, "humidity", $1);
+            }
+            elsif($_->{value_type} eq "pressure"){
+              readingsBulkUpdate($hash, "pressure", $1);
             }
           }
 
@@ -375,6 +379,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
         }
         elsif($_->{value_type} eq "humidity"){
           readingsBulkUpdate($hash, "humidity", $1);
+        }
+        elsif($_->{value_type} eq "pressure"){
+          readingsBulkUpdate($hash, "pressure", $1);
         }
         elsif($_->{value_type} eq "SDS_P1"){
           readingsBulkUpdate($hash, "PM10", $1);
@@ -456,7 +463,9 @@ sub LuftdatenInfo_statusRequest($) {
     <ul>
       <code>
         define &lt;name&gt; LuftdatenInfo
-        (&lt;SDS011sensorID&gt; [&lt;DHT22sensorID&gt;]|&lt;ip&gt;)
+        (&lt;SDS011sensorID&gt;
+         [&lt;DHT22sensorID&gt;|&lt;BME280sensorID&gt;]
+        |&lt;ip&gt;)
       </code><br>
       To query the data from the server, the SDS011 SensorID must be
       specified.<br>
@@ -497,6 +506,11 @@ sub LuftdatenInfo_statusRequest($) {
       <li>
         <code>humidity</code><br>
         Relative humidity in%
+      </li>
+      <li>
+        <code>pressure</code><br>
+        Pressure in hPa<br>
+        Only available with BME280 sensor.
       </li>
       <li>
         <code>latitude</code><br>
@@ -575,7 +589,9 @@ sub LuftdatenInfo_statusRequest($) {
     <ul>
       <code>
         define &lt;name&gt; LuftdatenInfo
-        (&lt;SDS011sensorID&gt; [&lt;DHT22sensorID&gt;]|&lt;ip&gt;)
+        (&lt;SDS011sensorID&gt;
+         [&lt;DHT22sensorID&gt;|&lt;BME280sensorID&gt;]
+        |&lt;ip&gt;)
       </code><br>
       F&uuml;r eine Abfrage der Daten vom Server muss die SensorID von dem
       SDS011 Sensor angegeben werden. Diese steht rechts auf der Seite
@@ -615,6 +631,11 @@ sub LuftdatenInfo_statusRequest($) {
       <li>
         <code>humidity</code><br>
         Relative Luftfeuchtgkeit in %
+      </li>
+      <li>
+        <code>pressure</code><br>
+        Luftdruck in hPa<br>
+        Nur bei einem BME280 Sensor verf&uuml;gbar.
       </li>
       <li>
         <code>latitude</code><br>
