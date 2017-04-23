@@ -40,6 +40,7 @@ sub LaCrosseGateway_Initialize($) {
                            ." disable:0,1"
                            ." tftFile"
                            ." kvp:dispatch,readings,both"
+                           ." loopTimeReadings:1,0"
                            ." ownSensors:dispatch,readings,both"
                            ." mode:USB,WiFi,Cable"
                            ." usbFlashCommand"
@@ -473,6 +474,7 @@ sub LaCrosseGateway_DeleteKVPReadings($) {
 #=======================================================================================
 sub LaCrosseGateway_HandleKVP($$) {
   my ($hash, $kvp) = @_;
+  my $name = $hash->{NAME};
   
   readingsBeginUpdate($hash);
   
@@ -493,6 +495,18 @@ sub LaCrosseGateway_HandleKVP($$) {
   }
   if($kvp =~ m/OLED=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "OLED", $1);
+  }
+  
+  if(AttrVal($name, "loopTimeReadings", "0") == "1") {
+    if($kvp =~ m/LD\.Min=(.*?)(\,|\ ,)/) {
+      readingsBulkUpdate($hash, "LD.Min", $1);
+    }
+    if($kvp =~ m/LD\.Avg=(.*?)(\,|\ ,)/) {
+      readingsBulkUpdate($hash, "LD.Avg", $1);
+    }
+    if($kvp =~ m/LD\.Max=(.*?)(\,|\ ,)/) {
+      readingsBulkUpdate($hash, "LD.Max", $1);
+    }
   }
   
   readingsEndUpdate($hash, 1);
