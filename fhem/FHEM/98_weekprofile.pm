@@ -853,8 +853,8 @@ sub weekprofile_Notify($$)
       
       next if(!defined($s));
       my ($what,$who) = split(' ',$s);
-      
-      if ($what =~ m/INITIALIZED/ || $what =~ m/REREADCFG/) {
+           
+      if ($what =~ m/^INITIALIZED$/ || $what =~ m/REREADCFG/) {
         delete $own->{PROFILES};
         weekprofile_refreshSendDevList($own);
         weekprofile_assignDev($own);
@@ -862,7 +862,7 @@ sub weekprofile_Notify($$)
         weekprofile_updateReadings($own);
       }
       
-      if ($what =~ m/DEFINED/ || $what =~ m/DELETED/) {
+      if ($what =~ m/DEFINED/ || $what =~ m/^DELETED/) {
         weekprofile_refreshSendDevList($own);
       }
     }
