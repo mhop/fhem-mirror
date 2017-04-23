@@ -2,7 +2,7 @@
 # $Id$# 
 #
 # This file is part of fhem.
-# 
+#
 # Fhem is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 2 of the License, or
@@ -11,7 +11,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -30,7 +30,7 @@ DOIF_delTimer($)
   my ($hash) = @_;
   RemoveInternalTimer($hash);
   foreach my $key (keys %{$hash->{triggertime}}) {
-    RemoveInternalTimer (\$hash->{triggertime}{$key}); 
+    RemoveInternalTimer (\$hash->{triggertime}{$key});
   }
 }
 
@@ -61,8 +61,7 @@ DOIF_delAll($)
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
     delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
   }
-
-}   
+}
 
 #########################
 sub
@@ -78,8 +77,8 @@ DOIF_Initialize($)
 }
 
 
- 
-sub 
+
+sub
 GetBlockDoIf ($$)
 {
   my ($cmd,$match) = @_;
@@ -99,7 +98,7 @@ GetBlockDoIf ($$)
       $err="right bracket without left bracket";
       return ("",substr($cmd,pos($cmd)-1),$err,"");
     }
-    
+
     if ($count == 0) {
       $last_pos=pos($cmd);
       last;
@@ -115,39 +114,39 @@ GetBlockDoIf ($$)
     return ($cmd,"","","");
   }
 }
-sub 
+sub
 GetCommandDoIf ($$)
 {
   my ($separator,$tailBlock) = @_;
-   my $char;
+  my $char;
   my $beginning;
   my $currentBlock;
   my $err;
   my $cmd="";
-  while ($tailBlock=~ /^([^$separator^"^\[^\{^\(]*)/g) { 
+  while ($tailBlock=~ /^([^$separator^"^\[^\{^\(]*)/g) {
        $char=substr($tailBlock,pos($tailBlock),1);
-       if ($char eq $separator) {  
+       if ($char eq $separator) {
          $cmd=$cmd.substr($tailBlock,0,pos($tailBlock));
          $tailBlock=substr($tailBlock,pos($tailBlock)+1);
          return($cmd,$tailBlock,"");
        } elsif ($char eq '{') {
          ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
          return ($currentBlock,$tailBlock,$err) if ($err);
-         $cmd=$cmd.$beginning."{$currentBlock}";         
+         $cmd=$cmd.$beginning."{$currentBlock}";
        } elsif ($char eq '(') {
-         ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\(\)]'); 
+         ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\(\)]');
          return ($currentBlock,$tailBlock,$err) if ($err);
-         $cmd=$cmd.$beginning."($currentBlock)"; 
+         $cmd=$cmd.$beginning."($currentBlock)";
        } elsif ($char eq '[') {
          ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\[\]]');
          return ($currentBlock,$tailBlock,$err) if ($err);
-         $cmd=$cmd.$beginning."[$currentBlock]"; 
+         $cmd=$cmd.$beginning."[$currentBlock]";
        } elsif ($char eq '"') {
          if ($tailBlock =~ /(^[^"]*"[^"]*")(.*)/) {
            $cmd=$cmd.$1;
            $tailBlock=$2;
          }
-       } 
+       }
   }
   if ($cmd eq "") {
     $cmd=$tailBlock;
@@ -159,10 +158,10 @@ GetCommandDoIf ($$)
 
 sub EvalValueDoIf($$$)
 {
-my ($hash,$attr,$value)=@_;
-return "" if (!defined($value) or $value eq "");
-my $err="";
-my $pn=$hash->{NAME};
+  my ($hash,$attr,$value)=@_;
+  return "" if (!defined($value) or $value eq "");
+  my $err="";
+  my $pn=$hash->{NAME};
    $value =~ s/\$SELF/$pn/g;
   ($value,$err)=ReplaceAllReadingsDoIf($hash,$value,-1,1);
   if ($err) {
@@ -186,9 +185,9 @@ my $pn=$hash->{NAME};
 
 sub EvalCmdStateDoIf($$)
 {
-my ($hash,$state)=@_; 
-my $err;
-my $pn=$hash->{NAME};
+  my ($hash,$state)=@_;
+  my $err;
+  my $pn=$hash->{NAME};
   ($state,$err)=ReplaceAllReadingsDoIf($hash,$state,-1,1);
   if ($err) {
     Log3 $pn,4 , "$pn: error in state: $err" if ($err);
@@ -200,24 +199,24 @@ my $pn=$hash->{NAME};
       $state=$err;
     }
   }
-  return($state)  
+  return($state)
 }
 
 sub
 SplitDoIf($$)
 {
-my ($separator,$tailBlock)=@_;
-my @commands;
-my $cmd;
-my $err;
-if (defined $tailBlock) {
-  while ($tailBlock ne "") {
-    ($cmd,$tailBlock,$err)=GetCommandDoIf($separator,$tailBlock);
-    #return (@commands,$err) if ($err);
-    push(@commands,$cmd);
+  my ($separator,$tailBlock)=@_;
+  my @commands;
+  my $cmd;
+  my $err;
+  if (defined $tailBlock) {
+    while ($tailBlock ne "") {
+      ($cmd,$tailBlock,$err)=GetCommandDoIf($separator,$tailBlock);
+      #return (@commands,$err) if ($err);
+      push(@commands,$cmd);
+    }
   }
-}
-return(@commands);
+  return(@commands);
 }
 
 sub
@@ -232,7 +231,7 @@ EventCheckDoif($$$$)
   my $ret = 0;
   if ($NotifyExp eq "") {
     return 1 ;
-  } 
+  }
   for (my $i = 0; $i < $max; $i++) {
     $s = $eventa->[$i];
     $s = "" if(!defined($s));
@@ -245,10 +244,169 @@ EventCheckDoif($$$$)
 }
 
 sub
+AggrIntDoIf
+{
+  my ($hash,$modeType,$device,$reading,$cond,$default)=@_;
+  my $num=0;
+  my $value="";
+  my $sum=0;
+  my $average;
+  my $extrem;
+  my $name;
+  my $err;
+  my $ret;
+  my $result;
+  my @devices;
+  my $group;
+  my $room;
+  my $STATE;
+  my $TYPE;
+  my $warning=0;
+  my $mode=substr($modeType,0,1);
+  my $type;
+  my $dec;
+  my $place;
+  my $number;
+  
+  if ($modeType =~ /.(sum|average|max|min)?[:]?(d(\d)?)?/) {
+    $type = (defined $1)? $1 : "";
+    $dec= $2;
+    $place= $3;
+  }
+  
+  if (defined $default) {
+    if ($default =~ /^"(.*)"$/) {
+      $default = $1;
+    } else {
+      $default=EvalValueDoIf($hash,"default",$default);
+    }
+  }
+  foreach my $name (($device eq "") ? keys %defs:grep {/$device/} keys %defs) {
+    next if($attr{$name} && $attr{$name}{ignore});
+    $value="";
+    $number="";
+    if ($reading) {
+      if (defined $defs{$name}{READINGS}{$reading}) {
+        $value=$defs{$name}{READINGS}{$reading}{VAL};
+        $number = ($value =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+      } else {
+        next;
+      }
+    }
+    if ($cond) {
+      if ($cond =~ /^"(.*)"$/) {
+         if (defined $defs{$name}{READINGS}{$reading}) {
+           $ret=($value =~ /$1/); 
+         }
+      } else {
+        $_=$value;
+        $STATE=Value($name);
+        $TYPE=$defs{$name}{TYPE};
+        $group=AttrVal($name,"group","");
+        $room=AttrVal($name,"room","");
+        $lastWarningMsg="";
+        $ret = eval $cond;
+        if ($@) {
+          $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
+          if (defined $hash) {
+             Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: error in condition: $cond, $@");
+          }
+          return("error in aggregate function: ".$@);
+        }
+        if ($lastWarningMsg) {
+          $warning=1;
+          $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+          Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: warning in condition: $cond, Device: $name");
+          readingsSingleUpdate ($hash, "warning_aggr", "condition: $cond , device: $name, $lastWarningMsg",0);
+        } 
+        $lastWarningMsg="";
+      }
+    } else {
+      $ret=1;
+    }
+    if ($ret) {
+      if ($type eq ""){
+        $num++;
+        push (@devices,$name);
+      } elsif (defined $value) {
+        if ($type eq "sum" or $type eq "average") {
+           $num++;
+           push (@devices,$name);
+          $sum+=$number;
+        } elsif ($type eq "max") {
+            if (!defined $extrem or $number>$extrem) {
+              $extrem=$number;
+              @devices=($name);
+            }  
+        } elsif ($type eq "min") {
+            if (!defined $extrem or $number<$extrem) {
+              $extrem=$number;
+              @devices=($name);
+            }
+        }
+      }
+    }
+  }
+  
+  delete ($defs{$hash->{NAME}}{READINGS}{warning_aggr}) if ($warning==0);
+  
+  if ($type eq "max" or $type eq "min") {
+    $extrem=0 if (!defined $extrem);  
+    $result=$extrem;
+  } elsif ($type eq "sum") {
+    $result= $sum;
+  } elsif ($type eq "average") {
+    if ($num>0) {
+      $result=($sum/$num)
+    }
+  } else {
+    $result=$num;
+  }
+  if ($mode eq "#") {
+    if (defined $dec) {
+      $result = ($result =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+      $result = round ($result,$place) if (defined $place);
+    } 
+    if ($num==0 and defined $default) {
+      return ($default);
+    } else {    
+      return ($result);
+    }
+  } elsif ($mode eq "@") {
+    if ($num==0 and defined $default) {
+      @devices =($default);
+    }
+    return (sort @devices);
+  }
+  return 0;
+}
+
+sub
+AggrDoIf
+{
+  my ($modeType,$device,$reading,$cond,$default)=@_;
+  return (AggrIntDoIf(undef,$modeType,$device,$reading,$cond,$default));
+}
+
+sub
+AggregateDoIf
+{
+  my ($hash,$modeType,$device,$reading,$cond,$default)=@_;
+  my $mode=substr($modeType,0,1);
+  my $type=substr($modeType,1);
+  if ($mode eq "#") {
+    return (AggrIntDoIf($hash,$modeType,$device,$reading,$cond,$default));
+  } elsif ($mode eq "@") {
+    return (join (",",AggrIntDoIf($hash,$modeType,$device,$reading,$cond,$default)));
+  }
+  return ("");
+}
+
+sub
 EventDoIf
 {
   my ($n,$hash,$NotifyExp,$check,$filter,$output,$default)=@_;
-  
+
   my $dev=$hash->{helper}{triggerDev};
   my $eventa=$hash->{helper}{triggerEvents};
   if ($check) {
@@ -273,7 +431,7 @@ EventDoIf
   my $ret = 0;
   if ($NotifyExp eq "") {
     return 1 if (!defined $filter);
-  } 
+  }
   my $s;
   my $found;
   my $element;
@@ -292,7 +450,7 @@ EventDoIf
               Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
               readingsSingleUpdate ($hash, "error", $@,0);
               return(undef);
-            } 
+            }
           }
           return ($element);
         }
@@ -315,7 +473,7 @@ EventDoIf
 
 sub
 InternalDoIf
-{ 
+{
   my ($hash,$name,$internal,$default,$regExp,$output)=@_;
 
   $default=AttrVal($hash->{NAME},'notexist','') if (!defined $default);
@@ -359,7 +517,7 @@ sub
 ReadingValDoIf
 {
   my ($hash,$name,$reading,$default,$regExp,$output)=@_;
-  
+
   $default=AttrVal($hash->{NAME},'notexist','') if (!defined $default);
   $output='' if (!defined $output);
   $regExp='' if (!defined $regExp);
@@ -371,11 +529,18 @@ ReadingValDoIf
   my $r;
   my $element;
     return ($default) if (!defined $defs{$name});
-    return ($default) if (!defined $defs{$name}{READINGS}{$reading}{VAL});
+    return ($default) if (!defined $defs{$name}{READINGS});
+    return ($default) if (!defined $defs{$name}{READINGS}{$reading});
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     $r="" if (!defined($r));
     if ($regExp) {
-	  "" =~ /()()()()()()()()()/; #reset $1, $2....
+      if ($regExp =~ /^d(\d)?/) {
+        my $round=$1;
+        $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+        $r = round ($r,$round) if (defined $round); 
+        $regExp="(.*)";
+      }
+      "" =~ /()()()()()()()()()/; #reset $1, $2...
       $element = ($r =~  /$regExp/) ? $1 : "";
       if ($output) {
         $element= eval $output;
@@ -383,7 +548,7 @@ ReadingValDoIf
           Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
           readingsSingleUpdate ($hash, "error", $@,0);
           return(undef);
-        }  
+        }
       }
     } else {
       $element=$r;
@@ -424,6 +589,57 @@ EvalAllDoIf($$)
   }
   return ($cmd,"");
 }
+
+sub ReplaceAggregateDoIf($$$)
+{
+  my ($hash,$block,$condition) = @_;
+  my $exp;
+  my $nameExp;
+  my $notifyExp;
+  my $match;
+  my $reading;
+  my $aggrType;
+  my $default;
+  
+  ($block,$default)=SplitDoIf(",",$block);
+  
+  if ($block =~ /^([^"]*)(.*)/) {
+    $aggrType=$1;
+    $block=$2;
+  }
+  
+  ($exp,$reading,$match)=SplitDoIf(":",$block);
+  if ($exp =~ /^"(.*)"/){
+    $exp=$1;
+    if ($exp =~ /([^\:]*):(.*)/) {
+      $nameExp=$1;
+      $notifyExp=$2;
+    } else {
+      $nameExp=$exp;
+    }
+  }
+  $nameExp="" if (!defined $nameExp);
+  $notifyExp="" if (!defined $notifyExp);
+  
+  if (defined $default) {
+    $match="" if (!defined $match);
+    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match','$default')";
+  } elsif (defined $match) {
+    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading','$match')";
+  } elsif (defined $reading) {
+    $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp','$reading')";
+  } else {
+     $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp')";
+  }
+  
+  if (!($condition >= 0)) {
+    my $ret = eval $block;
+    return($block." ",$@) if ($@);
+    $block=$ret;
+  }
+  return ($block,undef);
+}
+
 
 sub ReplaceEventDoIf($)
 {
@@ -467,11 +683,11 @@ sub ReplaceEventDoIf($)
     if (defined $filter) {
       return ($block,"default value must be defined")
     } else {
-      $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0)";  
+      $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0)";
       return ($block,undef);
-    } 
+    }
   }
-  $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0,'$filter','$output','$default')";  
+  $block="EventDoIf('$nameExp',".'$hash,'."'$notifyExp',0,'$filter','$output','$default')";
   return ($block,undef);
 }
 
@@ -490,7 +706,7 @@ sub ReplaceReadingDoIf($)
   my $default;
   my $param="";
 
-  
+
   ($exp,$default)=SplitDoIf(",",$element);
   $default="" if (!defined($default));
 
@@ -525,16 +741,16 @@ sub ReplaceReadingDoIf($)
           $regExp=$1;
           $output=$2;
           return ($regExp,"no round brackets in regular expression") if ($regExp !~ /.*\(.*\)/);
-        } elsif ($format =~ /^d[^:]*(?::(.*))?/) {
-          $regExp = '(-?\d+(\.\d+)?)';
-          $output=$1;
+        } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
+          $regExp =$1;
+          $output=$2;
         }
           else {
           return($format,"unknown expression format");
-        }  
-      } 
+        }
+      }
       $output="" if (!defined($output));
-      
+
       if ($output) {
         $param=",'$default','$regExp','$output'";
       } elsif ($regExp) {
@@ -568,7 +784,7 @@ sub ReplaceReadingEvalDoIf($$$)
     my $ret = eval $block;
     return($block." ",$@) if ($@);
     $block=$ret;
-  } 
+  }
   return ($block,"",$device,$reading,$internal);
 }
 
@@ -583,11 +799,11 @@ sub AddItemDoIf($$)
   return $items;
 }
 
-sub AddRegexpTriggerDoIf($$$)   
+sub AddRegexpTriggerDoIf($$$)
 {
   my ($hash,$regexp,$condition)= @_;
   my $max_regexp=keys %{$hash->{regexp}{$condition}};
-  for (my $i=0; $i<$max_regexp;$i++) 
+  for (my $i=0; $i<$max_regexp;$i++)
   {
     if ($hash->{regexp}{$condition}{$i} eq $regexp) {
       return;
@@ -595,7 +811,7 @@ sub AddRegexpTriggerDoIf($$$)
   }
   $hash->{regexp}{$condition}{$max_regexp}=$regexp;
   $max_regexp=keys %{$hash->{regexp}{all}};
-  for (my $i=0; $i<$max_regexp;$i++) 
+  for (my $i=0; $i<$max_regexp;$i++)
   {
     if ($hash->{regexp}{all}{$i} eq $regexp) {
       return;
@@ -603,6 +819,21 @@ sub AddRegexpTriggerDoIf($$$)
   }
   $hash->{regexp}{all}{$max_regexp}=$regexp;
 }
+
+sub AddRegexpStateDoIf($$)
+{
+  my ($hash,$regexp)= @_;
+  my $max_regexp=keys %{$hash->{state}{STATE}};
+  for (my $i=0; $i<$max_regexp;$i++)
+  {
+    if ($hash->{state}{STATE}{$i} eq $regexp) {
+      return;
+    }
+  }
+  $hash->{state}{STATE}{$max_regexp}=$regexp;
+}
+
+
 
 sub ReplaceAllReadingsDoIf($$$$)
 {
@@ -622,27 +853,39 @@ sub ReplaceAllReadingsDoIf($$$$)
   my $trigger=1;
   if (!defined $tailBlock) {
     return ("","");
-  } 
+  }
   $tailBlock =~ s/\$SELF/$hash->{NAME}/g;
   while ($tailBlock ne "") {
-    $trigger=1;
     ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\[\]]');
     return ($block,$err) if ($err);
     if ($block ne "") {
-      if ($block =~ /^"([^"]*)"/){
-	    if ($condition>=0) {
-		  ($block,$err)=ReplaceEventDoIf($block);
-		  return ($block,$err) if ($err);
-		  AddRegexpTriggerDoIf($hash,$1,$condition);
-	      $event=1;
-		} else {
-           $block="[".$block."]";
-		}
+      if (substr($block,0,1) eq "?") {
+            $block=substr($block,1);
+            $trigger=0;
       } else {
-        if (substr($block,0,1) eq "?") {
-          $block=substr($block,1);
-          $trigger=0;
+        $trigger=1;
+      }
+      if ($block =~ /^(?:(?:#|@)[^"]*)"([^"]*)"/) {
+        ($block,$err)=ReplaceAggregateDoIf($hash,$block,$condition);
+        return ($block,$err) if ($err);
+        if ($trigger) {
+          if ($condition >= 0) {
+            AddRegexpTriggerDoIf($hash,$1,$condition);
+            $event=1;
+          } elsif ($condition == -2) {
+            AddRegexpStateDoIf($hash,$1);
+          }
         }
+      } elsif ($block =~ /^"([^"]*)"/) {
+        if ($condition>=0) {
+          ($block,$err)=ReplaceEventDoIf($block);
+          return ($block,$err) if ($err);
+          AddRegexpTriggerDoIf($hash,$1,$condition);
+          $event=1;
+        } else {
+          $block="[".$block."]";
+        }
+      } else {
         $trigger=0 if (substr($block,0,1) eq "\$");
         if ($block =~ /^\$?[a-z0-9._]*[a-z._]+[a-z0-9._]*($|:.+$|,.+$)/i) {
           ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($hash,$block,$eval);
@@ -658,7 +901,7 @@ sub ReplaceAllReadingsDoIf($$$$)
             $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading) and $trigger);
             $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
             $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
-            
+
           } elsif ($condition == -2) {
               $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device); #if ($device ne $hash->{NAME});
           } elsif ($condition == -3) {
@@ -703,7 +946,7 @@ ParseCommandsDoIf($$$)
   }
   while ($tailBlock ne "") {
     if ($tailBlock=~ /^\s*\{/) { # perl block
-      ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]'); 
+      ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
       return ($currentBlock,$err) if ($err);
       if ($currentBlock ne "") {
          ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
@@ -729,13 +972,13 @@ ParseCommandsDoIf($$$)
       }
       $currentBlock=$ifcmd;
     } else {
-      if ($tailBlock =~ /^\s*\(/) { # remove bracket  
-          ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\(\)]'); 
+      if ($tailBlock =~ /^\s*\(/) { # remove bracket
+          ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\(\)]');
           return ($currentBlock,$err) if ($err);
           #$tailBlock=substr($tailBlock,pos($tailBlock)) if ($tailBlock =~ /^\s*,/g);
       } else {
         ($currentBlock,$tailBlock)=GetCommandDoIf(',',$tailBlock);
-      } 
+      }
       if ($currentBlock ne "") {
        ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
        return ($currentBlock,$err) if ($err);
@@ -768,7 +1011,7 @@ sub DOIF_weekdays($$)
   for (my $i=0;$i<@days;$i++)
   {
     $weekdays =~ s/$days[$i]/$i/;
-  } 
+  }
   return($weekdays);
 }
 
@@ -790,34 +1033,34 @@ DOIF_CheckTimers($$$$)
   my ($hash,$timer,$condition,$trigger)=@_;
   $timer =~ s/\s//g;
   while ($timer ne "") {
-     if ($timer=~ /^\+\(/) { 
-      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]'); 
+     if ($timer=~ /^\+\(/) {
+      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]');
       return ($time,$err) if ($err);
       $time="+(".$time.")";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\(/) { 
-      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]'); 
+    } elsif ($timer=~ /^\(/) {
+      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]');
       return ($time,$err) if ($err);
       $time="(".$time.")";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\{/) { 
-      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]'); 
+    } elsif ($timer=~ /^\{/) {
+      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]');
       return ($time,$err) if ($err);
       $time="{".$time."}";
     } elsif ($timer=~ m/^\+\[([0-9]+)\]:([0-5][0-9])/g) {
       $pos=pos($timer);
       $time=substr($timer,0,$pos);
       $timer=substr($timer,$pos);
-    } elsif ($timer=~ /^\+\[/) { 
-      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]'); 
+    } elsif ($timer=~ /^\+\[/) {
+      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]');
       return ($time,$err) if ($err);
       $time="+[".$time."]";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\[/) { 
-      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]'); 
+    } elsif ($timer=~ /^\[/) {
+      ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]');
       return ($time,$err) if ($err);
       $time="[".$time."]";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
@@ -841,8 +1084,8 @@ DOIF_CheckTimers($$$$)
       } else {
         return ($timer,"wrong time format");
       }
-    }      
-  }  
+    }
+  }
   $days = "" if (!defined ($days));
   for (my $j=0; $j<$i;$j++) {
     $nr=$nrs[$j];
@@ -853,14 +1096,14 @@ DOIF_CheckTimers($$$$)
     $hash->{timeCond}{$nr}=$condition;
     $hash->{days}{$nr}=$days if ($days ne "");
     if ($init_done) {
-      DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr); 
+      DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr);
       #$err=(DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr));
       #return($hash->{time}{$nr},$err) if ($err);
     }
     $hash->{timers}{$condition}.=" $nr " if ($trigger);
   }
   if ($i == 2) {
-    if ($days eq "") { 
+    if ($days eq "") {
       $block='DOIF_time($hash,'.$nrs[0].','.$nrs[1].',$wday,$hms)';
     } else {
       $block='DOIF_time($hash,'.$nrs[0].','.$nrs[1].',$wday,$hms,"'.$days.'")';
@@ -868,11 +1111,11 @@ DOIF_CheckTimers($$$$)
     $hash->{interval}{$nrs[0]}=-1;
     $hash->{interval}{$nrs[1]}=$nrs[0];
   } else {
-    if ($days eq "") { 
+    if ($days eq "") {
       $block='DOIF_time_once($hash,'.$nrs[0].',$wday)';
     } else {
       $block='DOIF_time_once($hash,'.$nrs[0].',$wday,"'.$days.'")';
-    } 
+    }
   }
   return ($block,"");
 }
@@ -900,22 +1143,22 @@ DOIF_time
   my $we=DOIF_we($wday);
   if ($end gt $begin) {
     if ($hms ge $begin and $hms lt $end) {
-      $ret=1; 
-    }    
+      $ret=1;
+    }
   } else {
     if ($hms ge $begin) {
       $ret=1;
     } elsif ($hms lt $end) {
       $wday=6 if ($wday-- == 0);
       $we=DOIF_we($wday);
-      $ret=1; 
-    } 
+      $ret=1;
+    }
   }
   if ($ret == 1) {
     return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
   }
   return 0;
-}  
+}
 
 sub
 DOIF_time_once
@@ -936,8 +1179,8 @@ DOIF_time_once
   if ($flag) {
     return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
   }
-  return 0;  
-}  
+  return 0;
+}
 
 ############################
 sub
@@ -991,7 +1234,7 @@ DOIF_SetState($$$$$)
       delete ($defs{$hash->{NAME}}{READINGS}{error});
     }
   }
-  
+
  # if ($state and !defined $hash->{do}{$nr}{$subnr+1}) {
  if ($state) {
     my $stateblock='\['.$pn.'\]';
@@ -1000,7 +1243,7 @@ DOIF_SetState($$$$$)
   } else {
     $state=$cmd;
   }
-  
+
   readingsBulkUpdate($hash, "state", $state);
   readingsEndUpdate    ($hash, 1);
 }
@@ -1052,7 +1295,7 @@ DOIF_CheckCond($$)
       #  ($dev,$reading)=(split(":",$devReading));
       #  return (-1,"device does not exist: [$dev:$reading]") if ($devReading and !defined ($defs{$dev}));
       #  return (-1,"reading does not exist: [$dev:$reading]") if ($devReading and !defined($defs{$dev}{READINGS}{$reading}{VAL}));
-      #}   
+      #}
     }
   }
   if (defined ($hash->{internals}{$condition})) {
@@ -1099,7 +1342,7 @@ DOIF_CheckCond($$)
   }
   $lastWarningMsg="";
   $cmdFromAnalyze = undef;
-  
+
   return ($ret,$err);
 }
 
@@ -1115,7 +1358,7 @@ DOIF_cmd ($$$$)
   my $err="";
   my $repeatnr;
   my $last_cmd=ReadingsVal($pn,"cmd_nr",0)-1;
- 
+
   my @cmdpause=SplitDoIf(':',AttrVal($pn,"cmdpause",""));
   my @sleeptimer=SplitDoIf(':',AttrVal($pn,"repeatcmd",""));
   my ($seconds, $microseconds) = gettimeofday();
@@ -1161,13 +1404,13 @@ DOIF_cmd ($$$$)
           readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
           return undef;
         }
-      } 
+      }
       delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
     }
   }
-  if ($hash->{do}{$nr}{$subnr}) { 
+  if ($hash->{do}{$nr}{$subnr}) {
      $cmd=$hash->{do}{$nr}{$subnr};
-     
+
      my $eventa=$hash->{helper}{triggerEvents};
      my $events="";
      if ($eventa) {
@@ -1212,7 +1455,7 @@ sub CheckiTimerDoIf($$$)
   my $found;
   return 1 if ($itimer =~ /\[$device(\]|,.+\])/);
   for (my $j = 0; $j < $max; $j++) {
-    if ($eventa->[$j] =~ "^(.+): ") { 
+    if ($eventa->[$j] =~ "^(.+): ") {
       $found = ($itimer =~ /\[$device:$1(\]|:.+\]|,.+\])/);
       if ($found) {
         return 1;
@@ -1232,7 +1475,7 @@ sub CheckReadingDoIf($$)
   my $found=0;
   my $device;
   my $reading;
-  
+
   if (!defined $readings) {
     return 1;
   }
@@ -1254,20 +1497,25 @@ sub CheckReadingDoIf($$)
 
 sub CheckRegexpDoIf($$$$)
 {
-  my ($hash,$name,$eventa,$condition)=@_;
-  my $cond=($condition == -1) ? "all" : $condition;
-  my $max_regexp=keys %{$hash->{regexp}{$cond}};
+  my ($hash,$name,$eventa,$cond)=@_;
+  my $type;
+  if ($cond eq "STATE") {
+    $type="state";
+  } else {
+    $type="regexp";
+  }
+  my $max_regexp=keys %{$hash->{$type}{$cond}};
   my $c;
   my $nameExp;
   my $notifyExp;
-  
-  for (my $i=0; $i<$max_regexp;$i++) 
+
+  for (my $i=0; $i<$max_regexp;$i++)
   {
-    if ($hash->{regexp}{$cond}{$i} =~ /([^\:]*):(.*)/) {
+    if ($hash->{$type}{$cond}{$i} =~ /([^\:]*):(.*)/) {
       $nameExp=$1;
       $notifyExp=$2;
     } else {
-      $nameExp=$hash->{regexp}{$cond}{$i};
+      $nameExp=$hash->{$type}{$cond}{$i};
     }
     $nameExp="" if (!$nameExp);
     $notifyExp="" if (!$notifyExp);
@@ -1276,9 +1524,9 @@ sub CheckRegexpDoIf($$$$)
       my $events="";
       if ($eventa) {
         $events=join(",",@{$eventa});
-      }       
+      }
       if ($notifyExp eq "") {
-        if ($cond ne "all") {
+        if ($cond ne "all" and $cond ne "STATE") {
           $c=$cond+1;
           readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),"$events",0);
         }
@@ -1292,7 +1540,7 @@ sub CheckRegexpDoIf($$$$)
         $s = "" if(!defined($s));
         $found = ($s =~ m/$notifyExp/);
         if ($found) {
-          if ($cond ne "all") {
+          if ($cond ne "all" and $cond ne "STATE") {
             $c=$cond+1;
           readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),$s,0);
           }
@@ -1302,7 +1550,7 @@ sub CheckRegexpDoIf($$$$)
     }
   }
   return 0;
-} 
+}
 
 sub
 DOIF_Trigger ($$)
@@ -1335,7 +1583,7 @@ DOIF_Trigger ($$)
             $found=1;
             $timerNr=$j;
             last;
-          }  
+          }
         }
       }
       next if (!$found and AttrVal($pn, "checkall", 0) !~ "1|all|timer");
@@ -1345,7 +1593,7 @@ DOIF_Trigger ($$)
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      if (!CheckRegexpDoIf($hash, $device, $hash->{helper}{triggerEvents}, $i)) { 
+      if (!CheckRegexpDoIf($hash, $device, $hash->{helper}{triggerEvents}, $i)) {
         if (AttrVal($pn, "checkall", 0) !~ "1|all|event") {
           next if (!defined ($hash->{devices}{$i}));
           next if ($hash->{devices}{$i} !~ / $device /);
@@ -1406,7 +1654,7 @@ DOIF_Notify($$)
   my $err;
   my $eventa;
   my $eventas;
-  $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0)); 
+  $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
   if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,"INITIALIZED") or EventCheckDoif($dev->{NAME},"global",$eventa,"REREADCFG")))
   {
@@ -1429,23 +1677,23 @@ DOIF_Notify($$)
 		readingsEndUpdate($hash, 0);
     }
   }
- 
-  
+
+
   return "" if (!$hash->{helper}{globalinit});
-  return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !$hash->{state}{device} and !$hash->{regexp}{all});
+  return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !$hash->{state}{device} and !keys %{$hash->{state}{STATE}} and !keys %{$hash->{regexp}{all}});
   
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
-  for (my $j=0; $j<$hash->{helper}{last_timer};$j++) { 
+  for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
 	  if (CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)) {
         DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
   }
-  
+
   return "" if (defined $hash->{helper}{cur_cmd_nr});
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
-  
-  if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,-1)){
+
+  if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"all") or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"STATE")){
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
     #my $events = deviceEvents($dev, AttrVal($dev->{NAME}, "addStateEvent", 0));
@@ -1453,7 +1701,7 @@ DOIF_Notify($$)
     if ($hash->{readings}{all}) {
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
-        if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{READINGS}{$reading})) { 
+        if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{READINGS}{$reading})) {
           if (!AttrVal($pn, "checkReadingEvent", 0) or CheckReadingDoIf ("$item",$eventas)) {
             readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0);
           }
@@ -1477,7 +1725,7 @@ DOIF_Notify($$)
     $hash->{helper}{event}=join(",",@{$eventa});
     $ret=DOIF_Trigger($hash,$dev->{NAME});
   }
-  if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
+  if ((($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"STATE")) and !$ret) {
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
@@ -1487,8 +1735,8 @@ DOIF_Notify($$)
   }
   delete $hash->{helper}{cur_cmd_nr};
   return undef;
-} 
-  
+}
+
 sub
 DOIF_TimerTrigger ($)
 {
@@ -1497,7 +1745,7 @@ DOIF_TimerTrigger ($)
   my $pn = $hash->{NAME};
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
-  
+
   my $ret;
   my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
@@ -1519,7 +1767,7 @@ DOIF_TimerTrigger ($)
       }
     }
   }
-  $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled"); 
+  $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled");
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
     $hash->{timer}{$j}=0;
     if (defined $hash->{localtime}{$j} and $hash->{localtime}{$j} == $localtime) {
@@ -1627,11 +1875,11 @@ DOIF_CalcTime($$)
     $relGlobal=1;
     #$pos=pos($block);
     $block=substr($block,1);
-  } 
+  }
   if ($block =~ /^\(/) {
     ($beginning,$tailBlock,$err,$tailBlock)=GetBlockDoIf($block,'[\(\)]');
     return ($tailBlock,$err) if ($err);
-  } else { 
+  } else {
     if ($block =~ /^\[/) {
       ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($block,'[\[\]]');
       return ($block,$err) if ($err);
@@ -1697,24 +1945,24 @@ DOIF_SetTimer($$$)
     if (!$found) {
       RemoveInternalTimer(\$hash->{triggertime}{$old_lt});
       delete ($hash->{triggertime}{$old_lt});
-    }    
+    }
   }
   my ($second,$err, $rel)=DOIF_CalcTime($hash,$timeStr);
   my $timernr=sprintf("timer_%02d_c%02d",($nr+1),($cond+1));
   if ($err)
-  {   
+  {
       readingsSingleUpdate ($hash,$timernr,"error: ".$err,AttrVal($hash->{NAME},"timerevent","")?1:0);
       Log3 $hash->{NAME},4 , "$hash->{NAME} ".$timernr." error: ".$err;
       #RemoveInternalTimer($timer);
       #$hash->{realtime}{$nr} = "00:00:00" if (!defined $hash->{realtime}{$nr});
       return $err;
   }
-  
+
   if ($second < 0 and $rel) {
     readingsSingleUpdate ($hash,$timernr,"time offset: $second, negativ offset is not allowed",AttrVal($hash->{NAME},"timerevent","")?1:0);
     return($timernr,"time offset: $second, negativ offset is not allowed");
   }
-  
+
   my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
   my $isdst_now=$isdst;
@@ -1726,7 +1974,7 @@ DOIF_SetTimer($$$)
   } else {
     $next_time = $midnight+$second;
   }
-  
+
   if ($second <= $sec_today and !$rel) {
     $next_time+=86400;
     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($next_time);
@@ -1738,7 +1986,7 @@ DOIF_SetTimer($$$)
       }
     }
   }
-  
+
   my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
   $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
   readingsSingleUpdate ($hash,$timernr,$next_time_str,AttrVal($hash->{NAME},"timerevent","")?1:0);
@@ -1748,7 +1996,7 @@ DOIF_SetTimer($$$)
     $hash->{triggertime}{$next_time}{hash}=$hash;
     $hash->{triggertime}{$next_time}{localtime}=$next_time;
 	InternalTimer($next_time, $func, \$hash->{triggertime}{$next_time}, 0);
-  }  
+  }
   return undef;
 }
 
@@ -1761,7 +2009,7 @@ DOIF_SetSleepTimer($$$$$$$)
   my @waitdel=SplitDoIf(':',AttrVal($pn,"waitdel",""));
   my @waitdelsubnr=SplitDoIf(',',defined $waitdel[$sleeptimer] ? $waitdel[$sleeptimer] : "");
   my $err;
-  
+
   if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdelsubnr[$subnr]))) {
     RemoveInternalTimer($hash);
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
@@ -1770,25 +2018,25 @@ DOIF_SetSleepTimer($$$$$$$)
     $subnr=$hash->{helper}{sleepsubtimer} if ($hash->{helper}{sleepsubtimer}!=-1 and $sleeptimer == $nr);
     return 0 if ($sleeptimer == $nr and $waitdelsubnr[$subnr]);
   }
-    
+
   if ($timerNr >= 0 and !AttrVal($pn,"timerWithWait","")) {#Timer
     if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"repeatsame","")) {
       return 1;
     } else {
       return 0;
     }
-  } 
-  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or $subnr > 0 
-      or AttrVal($pn,"do","") eq "always" 
-      or AttrVal($pn,"do","") eq "resetwait" 
-      or AttrVal($pn,"repeatsame","") 
+  }
+  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or $subnr > 0
+      or AttrVal($pn,"do","") eq "always"
+      or AttrVal($pn,"do","") eq "resetwait"
+      or AttrVal($pn,"repeatsame","")
       or defined($repeatcmd))) {
     my $sleeptime=0;
     if (defined ($repeatcmd)) {
       $sleeptime=$repeatcmd;
     } else {
       my @sleeptimer=SplitDoIf(':',AttrVal($pn,"wait",""));
-      if ($waitdelsubnr[$subnr]) { 
+      if ($waitdelsubnr[$subnr]) {
         $sleeptime = $waitdelsubnr[$subnr];
       } else {
         my @sleepsubtimer=SplitDoIf(',',defined $sleeptimer[$nr]? $sleeptimer[$nr]: "");
@@ -1817,7 +2065,7 @@ DOIF_SetSleepTimer($$$$$$$)
     } elsif (defined($repeatcmd)){
       return 0;
     } else {
-      return 1;   
+      return 1;
     }
   } else {
     return 0;
@@ -1871,7 +2119,7 @@ CmdDoIf($$)
     $tail =~ s/(##.*\n)|(##.*$)|\n/ /g;
     $tail =~ s/\$SELF/$hash->{NAME}/g;
   }
-   
+
 #def modify
   if ($init_done)
   {
@@ -1883,19 +2131,19 @@ CmdDoIf($$)
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
   }
-  
+
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
 
   return("","") if ($tail =~ /^ *$/);
-  
+
   while ($tail ne "") {
     return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
     #condition
     ($beginning,$cond,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-    return ($cond,$err) if ($err); 
+    return ($cond,$err) if ($err);
     ($cond,$err)=ReplaceAllReadingsDoIf($hash,$cond,$i,0);
-    return ($cond,$err) if ($err); 
+    return ($cond,$err) if ($err);
     return ($tail,"no condition") if ($cond eq "");
     $hash->{condition}{$i}=$cond;
     #DOIF
@@ -1914,8 +2162,8 @@ CmdDoIf($$)
       return ($if_cmd,$err) if ($err);
       #return ($tail,"no commands") if ($if_cmd eq "");
       $hash->{do}{$i}{$j++}=$if_cmd_ori;
-    } 
-    $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets 
+    }
+    $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets
     $last_do=$i;
     $tail =~ s/^\s*$//g;
     if (length($tail)) {
@@ -1990,11 +2238,11 @@ DOIF_Attr(@)
     DOIF_delAll ($hash);
     readingsSingleUpdate ($hash,"state","deactivated",1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
-      delete ($hash->{state}{device});
+      delete $hash->{state};
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
       return $err if ($err);
   } elsif($a[0] eq "del" && $a[2] eq "state") {
-      delete ($hash->{state}{device});
+      delete $hash->{state};
   } elsif($a[0] eq "set" && $a[2] eq "wait") {
       RemoveInternalTimer($hash);
       #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
@@ -2110,7 +2358,7 @@ DOIF_Set($@)
 
 =pod
 =item helper
-=item summary    universal module, it works event- and time-controlled   
+=item summary    universal module, it works event- and time-controlled
 =item summary_DE universelles Modul, welches ereignis- und zeitgesteuert Anweisungen ausführt
 =begin html
 
@@ -2208,7 +2456,7 @@ Kombinierte Ereignis- und Zeitsteuerung<br>
 <br>
 <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 </ol><br>
-Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgelesen werden: 
+Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgelesen werden:
 <a href="https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Erste_Schritte_mit_DOIF:_Zeit-_und_Ereignissteuerung">Erste Schritte mit DOIF</a><br><br>
 <br>
 <a name="DOIF_Inhaltsuebersicht"></a>
@@ -2220,6 +2468,8 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Teilausdruecke_abfragen">Teilausdrücke abfragen</a><br>
   <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
   <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
+  <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
+  <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
   <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
   <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
   <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet">Zeitangaben nach Zeitraster ausgerichtet</a><br>
@@ -2234,7 +2484,6 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Nutzung_von_Readings_Status_oder_Internals_im_Ausfuehrungsteil">Nutzung von Readings, Status oder Internals im Ausführungsteil</a><br>
   <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
   <a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a><br>
-  <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
   <a href="#DOIF_wait">Verzögerungen</a><br>
   <a href="#DOIF_timerWithWait">Verzögerungen von Timern</a><br>
   <a href="#DOIF_do_resetwait">Zurücksetzen des Waittimers für das gleiche Kommando</a><br>
@@ -2253,7 +2502,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
   <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
-  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>  
+  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
   <a href="#DOIF_cmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
   <a href="#DOIF_Initialisieren_des_Moduls">Initialisieren des Moduls</a><br>
   <a href="#DOIF_Weitere_Anwendungsbeispiele">Weitere Anwendungsbeispiele</a><br>
@@ -2345,7 +2594,7 @@ Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein
 Ausgewertet wird hier der Zustand des Status von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
 Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Die nächste mögliche Ausführung ist "set garage off", wenn Fernbedienung "off" liefert.
 <a name="DOIF_do_always"></a>
-Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat, 
+Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat,
 weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
 <br>
 
@@ -2432,7 +2681,7 @@ Rollladen auf Lüften stellen<br>
 <br>
 attr di_air do always</code><br>
 <br>
-Hier werden alle Fensterkontakte, die mit dem Device-Namen "window_contact_" beginnen auf "open" oder "tilted" im Event überwacht 
+Hier werden alle Fensterkontakte, die mit dem Device-Namen "window_contact_" beginnen auf "open" oder "tilted" im Event überwacht
 und der entsprechende Rollladen mit der gleichen Endung auf Lüften per <code>set shutters_&lt;postfix&gt; 10</code> gestellt.
 In diesem Beispiel wird die Möglichkeit genutzt bei FHEM-Befehlen Perlcode innerhalb der Klammern {(...)} einzufügen. Siehe <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
 <br>
@@ -2462,7 +2711,7 @@ Batteriewarnung per E-Mail verschicken<br>
   <ol>({DebianMail('yourname@gmail.com', 'FHEM - battery warning from device: $DEVICE')}, setreading $SELF B_$DEVICE low)</ol>
 DOELSEIF ([":battery: ok"] and [?$SELF:B_$DEVICE] ne "ok")<br>
   <ol>(setreading $SELF B_$DEVICE ok)</ol>
-<br>  
+<br>
 attr di_battery do always</code><br>
 <br>
 Eine aktuelle Übersicht aller Batterie-Status entsteht gleichzeitig in den Readings des di_battery-DOIF-Moduls.<br>
@@ -2490,11 +2739,56 @@ Syntax:<br>
 <br>
 Regex-Filter- und Output-Parameter sind optional. Der Default-Wert ist verpflichtend.<br>
 <br>
-Die Angaben zum Filter und Output funktionieren, wie die beim Reading-Filter. Siehe: <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br><br>
+Die Angaben zum Filter und Output funktionieren, wie die beim Reading-Filter. Siehe: <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
 <br>
 Wenn kein Filter, wie obigen Beispiel, angegeben wird, so wird intern folgende Regex vorbelegt: "[^\:]*: (.*)"  Damit wird der Wert hinter der Readingangabe genommen.
 Durch eigene Regex-Filter-Angaben kann man beliebige Teile des Events herausfiltern, ggf. über Output formatieren und in der Bedingung entsprechend auswerten,
  ohne auf Readings zurückgreifen zu müssen.<br>
+<br>
+<a name="DOIF_Filtern_nach_Zahlen"></a>
+<b>Filtern nach Ausdrücken mit Ausgabeformatierung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Syntax: <code>[&lt;device&gt;:&lt;reading&gt;|&lt;internal&gt;:d&lt;number&gt|"&lt;regex&gt;":&lt;output&gt;]</code><br>
+<br>
+d - Der Buchstabe "d" ist ein Synonym für das Filtern nach Dezimalzahlen, es entspricht intern dem regulären Ausdruck "(-?\d+(\.\d+)?)". Ebenfalls lässt sich eine Dezimalzahl auf eine bestimmte Anzahl von Nachkommastellen runden. Dazu wird an das "d" eine Ziffer angehängt. Mit der Angabe d0 wird die Zahl auf ganze Zahlen gerundet.<br>
+&lt;Regex&gt;- Der reguläre Ausdruck muss in Anführungszeichen angegeben werden. Dabei werden Perl-Mechanismen zu regulären Ausdrücken mit Speicherung der Ergebnisse in Variablen $1, $2 usw. genutzt.<br>
+&lt;Output&gt; - ist ein optionaler Parameter, hier können die in den Variablen $1, $2, usw. aus der Regex-Suche gespeicherten Informationen für die Aufbereitung genutzt werden. Sie werden in Anführungszeichen bei Texten oder in Perlfunktionen angegeben. Wird kein Output-Parameter angegeben, so wird automatisch $1 genutzt.<br>
+<br>
+Beispiele:<br>
+<br>
+Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahlenwert für den Vergleich genutzt werden:<br>
+<br>
+<code>define di_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
+<br>
+Alternativen für die Nutzung der Syntax am Beispiel des Filterns nach Zahlen:<br>
+<br>
+<code>[mydevice:myreading:d]</code><br>
+entspricht:<br>
+<code>[mydevice:myreading:"(-?\d+(\.\d+)?)"]</code><br>
+entspricht:<br>
+<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":$1]</code><br>
+entspricht:<br>
+<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":"$1"]</code><br>
+entspricht:<br>
+<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":sprintf("%s":$1)]</code><br>
+<br>
+Es soll die Zahl aus einem Reading auf 3 Nachkommastellen formatiert werden:<br>
+<br>
+<code>[mydevice:myreading:d3]</code><br>
+<br>
+Es soll aus einem Text eine Zahl herausgefiltert werden und anschließend gerundet auf zwei Nachkommastellen mit der Einheit °C ausgeben werden:<br>
+<br>
+<code>... (set mydummy [mydevice:myreading:d2:"$1 °C"])</code><br>
+<br>
+Es sollen aus einem Reading der Form "HH:MM:SS" die Stunden, Minuten und Sekunden separieret werden:<br>
+<br>
+<code>[mydevice:myreading:"(\d\d):(\d\d):(\d\d)":"hours: $1, minutes $2, seconds: $3"]</code><br>
+<br>
+Der Inhalt des Dummys Alarm soll in einem Text eingebunden werden:<br>
+<br>
+<code>[alarm:state:"(.*)":"state of alarm is $1"]</code><br>
+<br>
+Die Definition von regulären Ausdrücken mit Nutzung der Perl-Variablen $1, $2 usw. kann in der Perldokumentation nachgeschlagen werden.<br>
 <br>
 <a name="DOIF_Angaben_im_Ausfuehrungsteil"></a>
 <b>Angaben im Ausführungsteil</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -2510,6 +2804,161 @@ Perlbefehle werden in geschweifte Klammern gesetzt: <code>... {system ("wmail Pe
 Perlcode kann im DEF-Editor wie gewohnt programmiert werden: <code>...{my $name="Peter"; system ("wmail $name is at home");}</code><br>
 <br>
 FHEM-Befehle lassen sich mit Perl-Befehlen kombinieren: <code>... ({system ("wmail Peter is at home")}, set lamp on)</code><br>
+<br>
+<a name="DOIF_aggregation"></a><br>
+<b>Aggregieren von Werten</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Mit Hilfe der Aggregationsfunktion können mehrere gleichnamige Readings im System ausgewertet werden, die einem bestimmten Kriterium entsprechen. Sie wird in eckigen Klammern durch ein # (aggregierter Wert) oder @ (Liste der passeden Devices) eingeleitet.
+Es kann bestimmt werden: die Anzahl der Readings bzw. Devices, Durchschnittswert, Summe, höchster Wert, niedrigster Wert oder eine Liste der dazugehörigen Devices.
+Die Aggregationsfunktion kann in einer DOIF-Bedingungen, im Ausführungsteil oder mit Hilfe des state-Attributs im Status angegeben werden. In der Bedingung und im Status reagiert sie auf Ereignistrigger. Das lässt sich durch ein vorangestelltes Fragezeichen unterbinden.
+Die Angabe des Readings kann weggelassen werden, dann wird lediglich nach entsprechenden Devices gesucht.<br>
+<br>
+Syntax:<br>
+<br>
+<code>[&lt;function&gt;:"&lt;regex device&gt;:&lt;regex event&gt;":&lt;reading&gt;:&lt;condition&gt;,&lt;default&gt;]</code><br>
+<br>
+&lt;function&gt;:<br>
+<br>
+<b>#</b>  Anzahl der betroffenen Devices, der folgende Doppelpunkt kann weggelassen werden<br>
+<b>@</b>  kommagetrennte Liste Devices, der folgende Doppelpunkt kann weggelassen werden<br>
+<b>#sum</b> Summe <br>
+<b>#max</b>  höchster Wert<br>
+<b>#min</b>  niedrigster Wert<br>
+<b>#average</b>  Durchschnitt<br>
+<b>@max</b>  Device des höchsten Wertes<br>
+<b>@min</b>  Device de niedrigsten Wertes<br>
+<br>
+&lt;function&gt;:d&lt;number&gt optional kann das Ergebnis auf Nachkommastellen gerundet werden, dazu wird an die Funktion getrennt durch einen Doppelpunkt der Buchstabe "d" gefolgt von einer Ziffer (&lt;number&gt) angegeben. Die Ziffer gibt die Anzahl der Nachkommastellen an.<br>
+<br> 
+"&lt;regex Device&gt;:&lt;regex Event&gt;" spezifiziert sowohl die betroffenen Devices, als auch den Ereignistrigger, die Syntax entspricht der DOIF-Syntax für Ereignistrigger.<br>
+Die Angabe &lt;regex Event&gt; ist im Ausführungsteil nicht sinnvoll und sollte weggelassen werden.<br>
+<br>
+&lt;reading&gt; Reading, welches überprüft werden soll<br>
+<br>
+&lt;condition&gt;  Aggregations-Bedingung, $_ ist der Platzhalter für den aktuellen Wert des internen Schleifendurchlaufs, Angaben in Anführungszeichen der Art "&lt;value&gt;" entsprechen $_ =~ "&lt;value&gt;" , hier sind alle Perloperatoren möglich.<br>
+<br>
+&lt;default&gt; Default-Wert, falls kein Device gefunden wird, entspricht der Syntax des Default-Wertes bei Readingangaben<br>
+<br>
+&lt;reading&gt;, &lt;condition&gt;,  &lt;default&gt; sind optional<br>
+<br>
+<u>Syntax-Beispiele im Ausführungteil</u><br>
+<br>
+Anzahl der Devices, die mit "window" beginnen:<br>
+<br>
+<code>[#"^window"]</code><br>
+<br>
+Liste der Devices, die mit "window" beginnen:<br>
+<br>
+<code>[@"^window"]</code><br>
+<br>
+Liste der Devices, die mit "windows" beginnen und ein Reading "myreading" beinhalten:<br>
+<br>
+<code>[@"^window":myreading]</code><br>
+<br>
+Liste der Devices, die mit "windows" beginnen und im Status das Wort "open" vorkommt:<br>
+<br>
+<code>[@"^window":state:"open"]</code><br>
+<br>
+entspricht:<br>
+<br>
+<code>[@"^window":state:$_ =~ "open"]</code> siehe Aggregationsbedingung.<br>
+<br>
+In der Aggregationsbedingung <condition> können alle in FHEM definierten Perlfunktionen genutzt werden. Folgende Variablen sind vorbelegt und können ebenfalls benutzt werden:<br>
+<br>
+<b>$_</b> Inhalt des angegebenen Readings (s.o.)<br>
+<b>$number</b>  Nach Zahl gefilteres Reading<br>
+<b>$name</b>  Name des Devices<br>
+<b>$TYPE</b>  Devices-Typ<br>
+<b>$STATE</b>  Status des Devices (nicht das Reading state)<br>
+<b>$room</b>  Raum des Devices<br>
+<b>$group</b>  Gruppe des Devices<br>
+<br>
+<u>Beispiele für Definition der Aggregationsbedingung &lt;condition&gt;:</u><br>
+<br>
+Liste der Devices, die mit "rooms" enden und im Reading "temperature" einen Wert größer 20 haben:<br>
+<br>
+<code>[@"rooms$":temperature:$_ > 20]</code><br>
+<br>
+Liste der Devices im Raum "livingroom", die mit "rooms" enden und im Reading "temperature" einen Wert größer 20 haben:<br>
+<br>
+<code>[@"rooms$":temperature:$_ > 20 and $room eq "livingroom"]</code><br>
+<br>
+Liste der Devices in der Gruppe "windows", die mit "rooms" enden, deren Status (nicht state-Reading) "on" ist:<br>
+<br>
+<code>[@"rooms$"::$STATE eq "on" and $group eq "windows"]</code><br>
+<br>
+Liste der Devices, deren state-Reading "on" ist und das Attribut disable nicht auf "1" gesetzt ist:<br>
+<br>
+<code>[@"":state:$_ eq "on" and AttrVal($name,"disable","") ne "1"]</code><br>
+<br>
+<br>
+Aggregationsangaben in der DOIF-Bedingung reagieren zusätzlich auf Ereignistrigger, hier sollte die regex-Angabe für das Device um eine regex-Angabe für das zu triggernde Event erweitert werden.<br>
+<br>
+Anzahl der Devices, die mit "window" beginnen. Getriggert wird, wenn eine Eventzeile beginnend mit "window" und dem Wort "open" vorkommt:<br>
+<br>
+<code>[#"^window:open"]</code><br>
+<br>
+<u>Anwendungsbeispiele</u><br>
+<br>
+Statusanzeige: Offene Fenster:<br>
+<br>
+<code>define di_window DOIF<br>
+<br>
+attr di_window state Offene Fenster: [@"^window:open":state:"open","keine"]</code><br>
+<br>
+Statusanzeige: Alle Devices, deren Batterie nicht ok ist:<br>
+<br>
+<code>define di_battery DOIF<br>
+<br>
+attr di_battery state [@":battery":battery:$_ ne "ok","alle OK"]</code><br>
+<br>
+Statusanzeige: Durchschnittstemperatur aller Temperatursensoren in der Gruppe "rooms":<br>
+<br>
+<code>define di_average_temp DOIF<br>
+<br>
+attr di_average_temp state [#average:d2:":temperature":temperature:$group eq "rooms"]</code><br>
+<br>
+Fenster Status/Meldung:<br>
+<br>
+<code>define di_Fenster DOIF (["^Window:open"]) <br>
+(push "Fenster $DEVICE wurde geöffnet. Es sind folgende Fenster offen: [@"^Window":state:"open"]")<br>
+DOELSEIF ([#"^Window:closed":state:"open"] == 0)<br>
+(push "alle Fenster geschlossen")</code><br>
+<br>
+attr di_Fenster do always<br>
+attr di_Fenster cmdState $DEVICE zuletzt geöffnet|alle geschlossen</code><br>
+<br>
+Raumtemperatur-Überwachung:<br>
+<br>
+<code>define di_temp DOIF (([08:00] or [20:00]) and [?#"^Rooms":temperature: $_ < 20] != 0)<br>
+  (push "In folgenden Zimmern ist zu kalt [@"^Rooms":temperature:$_ < 20,"keine"]")<br>
+DOELSE<br>
+  (push "alle Zimmmer sind warm")<br>  
+<br>
+attr di_temp do always<br>
+attr di_Raumtemp state In folgenden Zimmern ist zu kalt: [@"^Rooms":temperature:$_ < 20,"keine"])</code><br>
+<br>
+Es soll beim Öffnen eines Fensters eine Meldung über alle geöffneten Fenster erfolgen:<br>
+<br>
+<code>define di_Fenster DOIF (["^Window:open"]) (push "Folgende Fenster: [@"^Window:state:"open"] sind geöffnet")</code><br>
+<br>
+attr di_Fenster do always<br>
+<br>
+Wenn im Wohnzimmer eine Lampe ausgeschaltet wird, sollen alle anderen Lampen im Wohnzimmer ebenfalls ausgeschaltet werden, die noch an sind:<br>
+<br>
+<code>define di_lamp DOIF (["^lamp_livingroom: off"]) (set [@"^lamp_livingroom":state:"on","defaultdummy"] off)<br>
+<br>
+attr di_lamp DOIF do always</code><br>
+<br>
+Mit der Angabe des Default-Wertes "defaultdummy", wird verhindert, dass der set-Befehl eine Fehlermeldung liefert, wenn die Device-Liste leer ist. Der angegebene Default-Dummy muss zuvor definiert werden.<br>
+<br>
+Für reine Perlangaben gibt es eine entsprechende Perlfunktion namens <code>AggrDoIf(&lt;function&gt;,&lt;regex Device&gt;,&lt;reading&gt;,&lt;condition&gt;,&lt;default&gt;)</code> diese liefert bei der Angabe @ ein Array statt einer Stringliste,  dadurch lässt sie sich gut bei foreach-Schleifen verwenden.<br>
+<br>
+<u>Beispiele</u><br>
+<br>
+<code>define di_Fenster DOIF (["^Window:open"]) {foreach (AggrDoIf('@','^windows','state','"open"')) {Log3 "di_Fenster",3,"Das Fenster $_ ist noch offen"}}</code><br>
+<br>
+<code>define di_Temperature DOIF (["^room:temperature"]) {foreach (AggrDoIf('@','^room','temperature','$_ < 15')) {Log3 "di_Temperatur",3,"im Zimmer $_ ist zu kalt"}}</code><br>
 <br>
 <a name="DOIF_Zeitsteuerung"></a>
 <b>Zeitsteuerung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -2705,7 +3154,7 @@ Indirekte Zeitangaben können auch als Übergabeparameter für Zeitfunktionen, w
 <br>
 Bei einer Änderung des angegebenen Status oder Readings wird die geänderte Zeit sofort im Modul aktualisiert.<br>
 <br>
-Angabe eines Readings als Zeitangabe. Beispiel: Schalten anhand eines Twilight-Readings:<br> 
+Angabe eines Readings als Zeitangabe. Beispiel: Schalten anhand eines Twilight-Readings:<br>
 <br>
 <code>define di_time DOIF ([[myTwilight:ss_weather]])(set lamp on)</code><br>
 <br>
@@ -2738,7 +3187,7 @@ Lampe wird nach Sonnenuntergang zwischen 900 und 1500 (900+600) Sekunden zufäll
 DOELSEIF ([([23:00]+int(rand(600)))])<br>
    <ol>(set lamp off) </ol></code>
 <br>
-Zeitberechnung können ebenfalls in Zeitintervallen genutzt werden.<br> 
+Zeitberechnung können ebenfalls in Zeitintervallen genutzt werden.<br>
 <br>
 Licht soll eine Stunde vor gegebener Zeit eingeschaltet werden und eine Stunde danach wieder ausgehen:<br>
 <br>
@@ -2759,7 +3208,7 @@ DOELSE<br>
  <ol>(set lampe off)</ol>
  </code>
 <br>
-Ein Änderung des Dummys Fixtime z. B. durch "set Fixtime ...", führt zur sofortiger Neuberechnung der Timer im DOIF-Modul.<br> 
+Ein Änderung des Dummys Fixtime z. B. durch "set Fixtime ...", führt zur sofortiger Neuberechnung der Timer im DOIF-Modul.<br>
 <br>
 Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Berechnung der Zeit keine Grenzen gesetzt.<br>
 <br>
@@ -2833,51 +3282,6 @@ so lässt sich das über das Attribut <code>notexist</code> bewerkstelligen. Ein
 <br>
 Syntax: <code>attr &lt;DOIF-module&gt; notexist "&lt;default value&gt;"</code> <br>
 <br>
-<a name="DOIF_Filtern_nach_Zahlen"></a>
-<b>Filtern nach Ausdrücken mit Ausgabeformatierung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
-<br>
-Syntax: <code>[&lt;Device&gt;:&lt;Reading&gt;|&lt;Internal&gt;:d|"&lt;Regex&gt;":&lt;Output&gt;]</code><br>
-<br>
-d - Der Buchstabe "d" ist ein Synonym für das Filtern nach Dezimalzahlen, es entspricht intern dem regulären Ausdruck "(-?\d+(\.\d+)?)"<br>
-&lt;Regex&gt;- Der reguläre Ausdruck muss in Anführungszeichen angegeben werden. Dabei werden Perl-Mechanismen zu regulären Ausdrücken mit Speicherung der Ergebnisse in Variablen $1, $2 usw. genutzt.<br>
-&lt;Output&gt; - ist ein optionaler Parameter, hier können die in den Variablen $1, $2, usw. aus der Regex-Suche gespeicherten Informationen für die Aufbereitung genutzt werden. Sie werden in Anführungszeichen bei Texten oder in Perlfunktionen angegeben. Wird kein Output-Parameter angegeben, so wird automatisch $1 genutzt.<br>
-<br>
-Beispiele:<br>
-<br>
-Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahlenwert für den Vergleich genutzt werden:<br>
-<br>
-<code>define di_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
-<br>
-Alternativen für die Nutzung der Syntax am Beispiel des Filterns nach Zahlen:<br>
-<br>
-<code>[mydevice:myreading:d]</code><br>
-entspricht:<br>
-<code>[mydevice:myreading:"(-?\d+(\.\d+)?)"]</code><br>
-entspricht:<br>
-<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":$1]</code><br>
-entspricht:<br>
-<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":"$1"]</code><br>
-entspricht:<br>
-<code>[mydevice:myreading:"(-?\d+(\.\d+)?)":sprintf("%s":$1)]</code><br>
-<br>
-Es soll aus einem Text eine Zahl herausgefiltert werden und anschließend die Einheit °C angehängt werden:<br>
-<br>
-<code>... (set mydummy [mydevice:myreading:d:"$1 °C"])</code><br>
-<br>
-Es soll die Zahl aus einem Reading auf 2 Nachkommastellen formatiert werden:<br>
-<br>
-<code>[mydevice:myreading:d:sprintf("%.2f",$1)]</code><br>
-<br>
-Es sollen aus einem Reading der Form "HH:MM:SS" die Stunden, Minuten und Sekunden separieret werden:<br>
-<br>
-<code>[mydevice:myreading:"(\d\d):(\d\d):(\d\d)":"hours: $1, minutes $2, seconds: $3"]</code><br>
-<br>
-Der Inhalt des Dummys Alarm soll in einem Text eingebunden werden:<br>
-<br>
-<code>[alarm:state:"(.*)":"state of alarm is $1"]</code><br>
-<br>
-Die Definition von regulären Ausdrücken mit Nutzung der Perl-Variablen $1, $2 usw. kann in der Perldokumentation nachgeschlagen werden.<br>
-<br>
 <a name="DOIF_wait"></a>
 <b>Verzögerungen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -2892,7 +3296,7 @@ Beispiel: Bei einer Befehlssequenz, hier: <code>(set lamp1 on, set lamp2 on)</co
 Die Befehlsfolge muss zunächst mit Hilfe von Klammerblöcke in eine Befehlssequenz aufgespalten werden: <code>(set lamp1 on)(set lamp2 on)</code>.
 Nun kann mit dem wait-Attribut nicht nur für den Beginn der Sequenz, sondern für jeden Klammerblock eine Verzögerung, getrennt mit Komma, definieren werden,
  hier also: <code>wait 0,1</code>. Damit wird <code>lamp1</code> sofort, <code>lamp2</code> eine Sekunde danach geschaltet. Die Verzögerungszeit bezieht sich immer auf den vorherigen Befehl.<br>
-<br> 
+<br>
 Beispieldefinition bei mehreren DO-Blöcken mit Befehlssequenzen:<br>
 <br>
 <code>DOIF (Bedingung1)<br>
@@ -3251,7 +3655,7 @@ Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (u
 <b>Deaktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
-Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;DOIF-modul&gt; disable</code> geschehen. 
+Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;DOIF-modul&gt; disable</code> geschehen.
 Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerding werden keine Befehle ausgeführt.
 Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deaktiviert wird. In beiden Fällen bleibt der Zustand nach dem Neustart erhalten, das Modul bleibt deaktiviert.<br>
 <br>
@@ -3293,6 +3697,7 @@ attr di_lamp setList on off<br>
 <br>
 <code>set di_lamp on</code> entspricht hier <code>set di_lamp cmd_1</code> und <code>set di_lamp off set di_lamp cmd_2</code><br>
 Zusätzlich führt die Definition von <code>setList</code> zur Ausführung von <code>set di_lamp on/off</code> durch das Anlicken des Lampensymbols wie im vorherigen Beispiel.<br>
+<br>
 <br>
 <a name="DOIF_Weitere_Anwendungsbeispiele"></a>
 <b>Weitere Anwendungsbeispiele</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
