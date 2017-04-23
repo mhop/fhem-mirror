@@ -88,9 +88,9 @@ sub apptime_getTiming($$$@) {
         !$defs{$e}{helper}{bm} ||
         !$defs{$e}{helper}{bm}{$fnName} ){
     
-      %{$defs{$e}{helper}{bm}{$fnName}} =(max =>0, mAr =>"",
-                                          cnt =>1, tot =>0,
-                                          dmx =>0);
+      %{$defs{$e}{helper}{bm}{$fnName}} =(max => 0, mAr => "",
+                                          cnt => 1, tot => 0,
+                                          dmx => 0, mTS => "");
     
       $h = $defs{$e}{helper}{bm}{$fnName};
     }
@@ -114,6 +114,7 @@ sub apptime_getTiming($$$@) {
     if ($ts1 && $h->{max} < $ts1){
       $h->{max} = $ts1;
       $h->{mAr} = \@arg;
+      $h->{mTS}= strftime("%d.%m. %H:%M:%S", localtime());
     }
     
     $h->{tot} += $ts1;
@@ -164,8 +165,8 @@ sub apptime_CommandDispTiming($$@) {
               ${$h->{mAr}}[$i] = "HASH(".${$h->{mAr}}[$i]->{NAME}.")";
             }
           }
-          $arg = join ("; ",@{$h->{mAr}});
-        }
+          $arg = join ("; ", map { $_ // "(undef)" } @{$h->{mAr}});
+         }
       
         push @bmArr,[($n,$t
                      ,$h->{max}
@@ -173,6 +174,7 @@ sub apptime_CommandDispTiming($$@) {
                      ,$h->{tot}
                      ,$h->{tot} /$h->{cnt}
                      ,$h->{dmx}
+                     ,$h->{mTS}
                      ,$arg
                     )];
       }
@@ -182,12 +184,12 @@ sub apptime_CommandDispTiming($$@) {
   if ($field>1){@bmArr = sort { $b->[$field] <=> $a->[$field] } @bmArr;}
   else         {@bmArr = sort { $b->[$field] cmp $a->[$field] } @bmArr;}
   my $ret = ($apptimeStatus ? "" : "------ apptime PAUSED data collection ----------\n")
-            .sprintf("\n %35s %20s %6s %6s %8s %8s %s",
-                     "name","function","max","count","total","average","maxDly","param Max call");
+            .sprintf("\n %-40s %-35s %6s %6s %8s %8s %6s %-15s %s",
+                     "name","function","max","count","total","average","maxDly","TS Max call","param Max call");
   my $end = ($top && $top eq "top")?20:@bmArr-1;
   $end = @bmArr-1 if ($end>@bmArr-1);
 
-  $ret .= sprintf("\n %35s %20s %6d %6d %8d %8.2f %6d %s",@{$bmArr[$_]})for (0..$end);
+  $ret .= sprintf("\n %-40s %-35s %6d %6d %8d %8.2f %6d %-15s %s",@{$bmArr[$_]})for (0..$end);
   return $ret;
 }
 
