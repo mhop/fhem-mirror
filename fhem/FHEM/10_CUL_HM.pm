@@ -7314,6 +7314,7 @@ sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
  # Will store result in device helper
   my $hash = shift;
   $hash = CUL_HM_getDeviceHash($hash);
+  return "" if (!$hash->{NAME});
   my $mId = $hash->{helper}{mId};
   if (!$mId){
     my $model = AttrVal($hash->{NAME}, "model", "");
