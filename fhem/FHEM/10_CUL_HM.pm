@@ -3333,6 +3333,40 @@ sub CUL_HM_parseCommon(@){#####################################################
       CUL_HM_updtRegDisp($mhp->{cHash},$list,$peerID);
       $ret= "parsed";
     }
+    elsif($mhp->{mStp} eq "05"){ #ParamChange===================================
+                                        #m:1E A010 4CF663 1743BF 0500(00000000)(07)(00)  # finish
+                                        #m:1E A010 4CF663 1743BF 0500(00000000)(07)(62)(2120212020EA36F643)
+      my($mCh,$peerID,$list,$addr) = ($1,$2,$3,hex($4)) if($mhp->{p} =~ m/^05(..)(........)(..)(..)/);
+      CUL_HM_m_setCh($mhp,$mCh);
+      my $fch = CUL_HM_shC($mhp->{cHash},$list,$mhp->{chnHx});
+      my $fHash = $modules{CUL_HM}{defptr}{$mhp->{src}.$fch};
+      $fHash = $mhp->{devH} if (!$fHash);
+      my $fName = $fHash->{NAME};
+      
+      if(!$addr){#update finished - update display
+        my $peer = ($peerID ne "00000000")?CUL_HM_peerChName($peerID,"000000"):"";
+        CUL_HM_updtRegDisp($fHash,$list,$peer);
+      }
+      else{
+        my ($data) = ($4) if($mhp->{p} =~ m/^05..(........)(..)(..)(.*)/);
+        my $regLNp = "RegL_".$list.".".CUL_HM_id2Name($peerID);
+        $regLNp =~ s/broadcast//;
+        $regLNp =~ s/ /_/g; #remove blanks
+        my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
+        
+        $data =~s/(..)/$1:/g;
+        my $rCur = ReadingsVal($fName,$regLN,"");
+        if ($rCur){# if list not present we cannot update
+          foreach my $d1 (split(":",$data)){
+            my $addrH = sprintf("%02X:",$addr);
+            $rCur =~ s/$addrH../$addrH$d1/;
+          }
+          CUL_HM_UpdtReadSingle($fHash,$regLN,$rCur,0);
+        }
+      }
+    }
+    
+    
     elsif($mhp->{mStp} eq "06"){ #reply to status request=======================
       my $rssi = substr($mhp->{p},8,2);
       CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
@@ -7790,7 +7824,7 @@ sub CUL_HM_updtRegDisp($$$) {
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
   # ---  handle specifics -  Devices with abnormal or long register
-  if ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#handle temperature readings
+  if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#handle temperature readings
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) &&
                       substr($hash->{DEF},6,2) eq "02");
   }
@@ -12113,6 +12147,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   </ul><br>
   <br>
   </ul>
-=end html
+=end html_DE
 
 =cut
