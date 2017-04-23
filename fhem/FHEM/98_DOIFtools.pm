@@ -595,13 +595,13 @@ sub DOIFtools_Notify($$) {
       CommandTrigger(undef,"$hash->{TYPE}Log $trig");
     }
     # DOIFtools DEF addition
-    if ($sn eq "global" and $event =~ "MODIFIED|INITIALIZED|DEFINED|DELETED|RENAMED|UNDEFINED") {
-    my @doifList = devspec2array("TYPE=DOIF");
+    if ($sn eq "global" and $event =~ "^INITIALIZED\$|^MODIFIED|^DEFINED|^DELETED|^RENAMED|^UNDEFINED") {
+      my @doifList = devspec2array("TYPE=DOIF");
       $hash->{DEF} = "associated DOIF: ".join(" ",sort @doifList);
       readingsSingleUpdate($hash,"DOIF_version",fhem("version 98_DOIF.pm noheader",1),0);
     }
     # get DOIF version, FHEM revision and default values
-    if ($sn eq "global" and $event =~ "INITIALIZED|MODIFIED $pn") {
+    if ($sn eq "global" and $event =~ "^INITIALIZED\$|^MODIFIED $pn") {
       readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"DOIF_version",fhem("version 98_DOIF.pm noheader",1));
         readingsBulkUpdate($hash,"FHEM_revision",fhem("version revision noheader",1));
@@ -629,7 +629,7 @@ sub DOIFtools_Notify($$) {
       CommandSave(undef,undef);
     }
     # Event monitor in DOIF
-    if ($modules{DOIF}{LOADED} and !defined $modules{DOIF}->{FW_detailFn} and $sn eq "global" and $event =~ "INITIALIZED" and AttrVal($pn,"DOIFtoolsEventMonitorInDOIF","")) {
+    if ($modules{DOIF}{LOADED} and !defined $modules{DOIF}->{FW_detailFn} and $sn eq "global" and $event =~ "^INITIALIZED\$" and AttrVal($pn,"DOIFtoolsEventMonitorInDOIF","")) {
       $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM" if (!defined $modules{DOIF}->{FW_detailFn});
       readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
       $modules{DOIF}->{FW_deviceOverview} = 1;

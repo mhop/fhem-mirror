@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_DOIFtools: more precise regexp for INITIALIZED event because
+                there is more than one initialisation event now
   - feature: 82_LGTV_WebOS: Version 0.6.0, pingPresence, Bugfixes
   - bugfix:  02_FTUISRV: fix replacesetMagic to use hash - fhem.pl warning
   - bugfix:  10_pilight_ctrl: fix GS-iwds07
