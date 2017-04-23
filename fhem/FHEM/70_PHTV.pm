@@ -116,6 +116,8 @@ sub PHTV_Undefine($$) {
     return;
 }
 
+sub PHTV_Set($@);
+
 sub PHTV_Set($@) {
     my ( $hash, @a ) = @_;
     my $name       = $hash->{NAME};
@@ -1310,8 +1312,9 @@ sub PHTV_Notify($$) {
             next unless ( defined($event) );
 
             # initialize
-            if ( $event =~ /^(INITIALIZED|MODIFIED)(\s(.*))?$/ ) {
-                PHTV_GetStatus($hash);
+            if ( $event =~ /^(INITIALIZED|MODIFIED)(?:\s+(.+))?$/ ) {
+                PHTV_GetStatus($hash)
+                  if ( $1 eq "INITIALIZED" || $2 && $2 eq $name );
             }
         }
 
