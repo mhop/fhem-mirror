@@ -532,7 +532,7 @@ DUOFERNSTICK_Notify($$)
     next if(!defined($s));
     my ($what,$who) = split(' ',$s);
     
-    if ($what && ($what =~ m/INITIALIZED/)) {
+    if ($what && ($what =~ m/^INITIALIZED$/)) {
       DUOFERNSTICK_DoInit($own);
     }
   }
