@@ -48,7 +48,8 @@
 # V 1.21 2016-11-13 - NEW: support contact sensors 
 # V 1.22 2017-04-08 - NEW: support contact sensor GW-iwds07
 # V 1.23 2017-04-08 - NEW: support new temperature protocols bmp085 and bmp180
-# V 1.23 2017-04-08 - FIX: GS-iwds07 support
+# V 1.24 2017-04-22 - FIX: GS-iwds07 support
+# V 1.25 2017-04-23 - FIX: react only of global::INITIALIZED m/^INITIALIZED$/
 ############################################## 
 package main;
 
@@ -598,7 +599,7 @@ sub pilight_ctrl_Notify($$)
     next if(!defined($s));
     my ($what,$who) = split(' ',$s);
     
-    if ( $what =~ m/INITIALIZED/ ) {
+    if ( $what =~ m/^INITIALIZED$/  ) {
       Log3 $me, 4, "$me(Notify): create white list for $s";
       pilight_ctrl_createWhiteList($own);
     } elsif ( $what =~ m/DEFINED/ ){
