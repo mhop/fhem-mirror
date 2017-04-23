@@ -1323,6 +1323,7 @@ sub HMinfo_GetFn($@) {#########################################################
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
     if ($hash->{CL}){
+      $defs{$name}{helper}{cfgChkResult} = "";
       my $id = ++$hash->{nb}{cnt};
       my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
                             "HMinfo_bpPost", 30, 
@@ -1334,6 +1335,9 @@ sub HMinfo_GetFn($@) {#########################################################
       (undef,undef,undef,$ret) = split(";",HMinfo_configCheck (join(",",("$name;;",$opt,$filter))),4);
       $ret =~s/-ret-/\n/g;
     }
+  }
+  elsif($cmd eq "configChkResult"){##check peers and register----------------------
+    return $defs{$name}{helper}{cfgChkResult} ? $defs{$name}{helper}{cfgChkResult} :"no results available";
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $id = ++$hash->{nb}{cnt};
@@ -1474,15 +1478,22 @@ sub HMinfo_GetFn($@) {#########################################################
 
   else{
     my @cmdLst =     
-           ( "help"
-            ,"configCheck","param","peerCheck","peerXref"
-            ,"protoEvents","msgStat"
+           ( "help:noArg"
+            ,"configCheck"
+            ,"configChkResult:noArg"
+            ,"param"
+            ,"peerCheck"
+            ,"peerXref"
+            ,"protoEvents"
+            ,"msgStat"
             ,"rssi rssiG:full,reduced"
             ,"models"
 #            ,"overview"
-            ,"regCheck","register"
+            ,"regCheck"
+            ,"register"
             ,"templateList:".join(",",("all",sort keys%HMConfig::culHmTpl))
-            ,"templateChk","templateUsg"
+            ,"templateChk"
+            ,"templateUsg"
             );
             
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
@@ -1518,10 +1529,19 @@ sub HMinfo_SetFn($@) {#########################################################
         delete $modules{CUL_HM}{stat}{s}{$_};
       }
     }
-    if ($type ne "msgStat"){
-      return "unknown parameter - use msgEvents, readings, msgStat, register, rssi, attack or all"
-            if ($type !~ m/^(msgEvents|readings|register|oldRegs|rssi|all|attack|trigger)$/);
-      $opt .= "d" if ($type =~ m/(msgEvents|rssi)/);# readings apply to all, others device only
+    if ($type eq "msgErrors"){#clear message events for all devices which has problems
+      my @devL = split(",",InternalVal($hash->{NAME},"W__protoNames",""));
+      push @devL,split(",",InternalVal($hash->{NAME},"CRI__protoNames",""));
+      push @devL,split(",",InternalVal($hash->{NAME},"ERR__protoNames",""));
+    
+      foreach my $dName (HMinfo_noDup(@devL)){
+        CUL_HM_Set($defs{$dName},$dName,"clear","msgEvents");
+      }
+    }
+    elsif ($type ne "msgStat"){
+      return "unknown parameter - use msgEvents, msgErrors, msgStat, readings, register, rssi, attack or all"
+            if ($type !~ m/^(msgEvents|msgErrors|readings|register|oldRegs|rssi|all|attack|trigger)$/);
+      $opt .= "d" if ($type =~ m/(msgE|rssi)/);# readings apply to all, others device only
       my @entities;
       foreach my $dName (HMinfo_getEntities($opt,$filter)){
         push @entities,$dName;
@@ -1638,7 +1658,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my @cmdLst =     
            ( "autoReadReg"
             ,"clear"    #:msgStat,msgEvents,all,rssi,register,trigger,readings"  
-            ,"clearG:msgEvents,readings,register,oldRegs,rssi,msgStat,trigger,attack,all"
+            ,"clearG:msgEvents,msgErrors,msgStat,readings,register,oldRegs,rssi,trigger,attack,all"
             ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
             ,"update"
             ,"cpRegs"
@@ -1682,6 +1702,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set clear[G] [-typeFilter-] [msgEvents|readings|msgStat|register|rssi]"
            ."\n                       # delete readings selective"
            ."\n          msgEvents    # delete all protocol-events , msg events"
+           ."\n          msgErrors    # delete protoevents for all devices which had errors"
            ."\n          readings     # all readings"
            ."\n          register     # all register-readings"
            ."\n          oldRegs      # outdated register (cleanup) "
@@ -2199,6 +2220,7 @@ sub HMinfo_bpPost($) {#bp finished ############################################
     }
   }
   delete $defs{$name}{nb}{$id};
+  $defs{$name}{helper}{cfgChkResult} = $ret;
   return;
 }
 sub HMinfo_bpAbort($) {#bp timeout ############################################
@@ -2719,6 +2741,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a consistency check of HM settings. It includes regCheck and peerCheck
       </li>
+      <li><a name="#HMinfoconfigChkResult">configChkResult</a><br>
+          returns the results of a previous executed configCheck
+      </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
       </li>
@@ -2773,6 +2798,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           executes a set clear ...  on all HM entities<br>
           <ul>
           <li>protocol relates to set clear msgEvents</li>
+          <li>set clear msgEvents for all device with protocol errors</li>
           <li>readings relates to set clear readings</li>
           <li>rssi clears all rssi counters </li>
           <li>msgStat clear HM general message statistics</li>
@@ -3167,6 +3193,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           Plausibilit&auml;tstest aller HM Einstellungen inklusive regCheck und peerCheck
       </li>
+      <li><a name="#HMinfoconfigChkResult">configChkResult</a><br>
+          gibt das Ergebnis eines vorher ausgeführten configCheck zurück
+      </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           zeigt eine Liste von Vorlagen. Ist kein Name angegeben, werden alle Vorlagen angezeigt<br>
       </li>
@@ -3218,10 +3247,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           Aktiviert das automatische Lesen der Konfiguration f&uuml;r ein CUL_HM Ger&auml;t, wenn das Attribut autoReadReg auf 1 oder h&ouml;her steht.
       </li>
-      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|readings|msgStat|register|rssi]<br>
+      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|msgErrors|readings|msgStat|register|rssi]<br>
           F&uuml;hrt ein set clear ... f&uuml;r alle HM Instanzen aus<br>
           <ul>
           <li>Protocol bezieht sich auf set clear msgEvents</li>
+          <li>Protocol set clear msgEvents fuer alle devices mit protokoll Fehlern</li>
           <li>readings bezieht sich auf set clear readings</li>
           <li>rssi l&ouml;scht alle rssi Z&auml;hler</li>
           <li>msgStat l&ouml;scht die HM Meldungsstatistik</li>
