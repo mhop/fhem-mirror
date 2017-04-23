@@ -50,12 +50,13 @@ use IO::Socket::INET;
 use Digest::SHA qw(sha1_hex);
 use JSON qw(decode_json encode_json);
 use Encode qw(encode_utf8);
+use Blocking;
 
 
 
 
 
-my $version = "0.2.0";
+my $version = "0.6.0";
 
 
 
@@ -88,6 +89,10 @@ sub LGTV_WebOS_ParseMsg($$);
 sub LGTV_WebOS_Get3DStatus($);
 sub LGTV_WebOS_GetChannelProgramInfo($);
 sub LGTV_WebOS_FormartStartEndTime($);
+sub LGTV_WebOS_Presence($);
+sub LGTV_WebOS_PresenceRun($);
+sub LGTV_WebOS_PresenceDone($);
+sub LGTV_WebOS_PresenceAborted($);
 
 
 
@@ -194,6 +199,7 @@ sub LGTV_WebOS_Initialize($) {
     $hash->{AttrFn}     = "LGTV_WebOS_Attr";
     $hash->{AttrList}   = "disable:1 ".
                           "channelGuide:1 ".
+                          "pingPresence:1 ".
                           $readingFnAttributes;
 
 
@@ -228,17 +234,15 @@ sub LGTV_WebOS_Define($$) {
 
     $attr{$name}{devStateIcon} = 'on:10px-kreis-gruen:off off:10px-kreis-rot:on' if( !defined( $attr{$name}{devStateIcon} ) );
     $attr{$name}{room} = 'LGTV' if( !defined( $attr{$name}{room} ) );
-    
-    readingsSingleUpdate($hash,'state','off', 1);
+    CommandDeleteReading(undef,$name . ' presence') if( AttrVal($name,'pingPresence', 0) == 0 );
     
     
     $modules{LGTV_WebOS}{defptr}{$hash->{HOST}} = $hash;
     
-    
     if( $init_done ) {
-        LGTV_WebOS_Open($hash);
+        LGTV_WebOS_TimerStatusRequest($hash);
     } else {
-        InternalTimer( gettimeofday()+15, "LGTV_WebOS_Open", $hash, 0 );
+        InternalTimer( gettimeofday()+15, "LGTV_WebOS_TimerStatusRequest", $hash, 0 );
     }
     
     return undef;
@@ -314,8 +318,8 @@ sub LGTV_WebOS_TimerStatusRequest($) {
 
         
         readingsBulkUpdate($hash, 'state', 'on');
-        readingsBulkUpdate($hash, 'presence', 'present');
-
+        LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
+        
         if($hash->{helper}{device}{channelguide}{counter} > 2 and AttrVal($name,'channelGuide', 0) == 1 and ReadingsVal($name,'launchApp', 'TV') eq 'TV' ) {
         
             LGTV_WebOS_GetChannelProgramInfo($hash);
@@ -331,13 +335,16 @@ sub LGTV_WebOS_TimerStatusRequest($) {
         }
     
     } elsif( IsDisabled($name) ) {
-        readingsBulkUpdate($hash, 'state', 'disabled');
+    
+        LGTV_WebOS_Close($hash);
         $hash->{helper}{device}{runsetcmd}              = 0;
+        readingsBulkUpdate($hash, 'state', 'disabled');
     
     } else {
-    
+        
+        LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
+        
         readingsBulkUpdate($hash, 'state', 'off');
-        readingsBulkUpdate($hash, 'presence', 'absent');
         
         readingsBulkUpdate($hash,'channel','-');
         readingsBulkUpdate($hash,'channelName','-');
@@ -582,11 +589,6 @@ sub LGTV_WebOS_Close($) {
     delete($hash->{CD});
     delete($selectlist{$name});
     
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, 'state', 'off',);
-    readingsBulkUpdate($hash, 'presence', 'absent');
-    readingsEndUpdate($hash, 1);
-    
     Log3 $name, 4, "LGTV_WebOS ($name) - Socket Disconnected";
 }
 
@@ -617,11 +619,12 @@ sub LGTV_WebOS_Read($) {
     
     Log3 $name, 4, "LGTV_WebOS ($name) - ReadFn gestartet";
 
-    $len = sysread($hash->{CD},$buf,10240);          # die genaue Puffergröße wird noch ermittelt
+    $len = sysread($hash->{CD},$buf,10240);
     
     if( !defined($len) or !$len ) {
-        Log3 $name, 4, "LGTV_WebOS ($name) - connection closed by remote Host";
+
         LGTV_WebOS_Close($hash);
+
         return;
     }
     
@@ -1323,7 +1326,73 @@ sub LGTV_WebOS_FormartStartEndTime($) {
     return "$timeArray[0]-$timeArray[1]-$timeArray[2] $timeArray[3]:$timeArray[4]:$timeArray[5]";
 }
 
+############ Presence Erkennung Begin #################
+sub LGTV_WebOS_Presence($) {
 
+    my $hash    = shift;    
+    my $name    = $hash->{NAME};
+    
+    
+    $hash->{helper}{RUNNING_PID} = BlockingCall("LGTV_WebOS_PresenceRun", $name.'|'.$hash->{HOST}, "LGTV_WebOS_PresenceDone", 5, "LGTV_WebOS_PresenceAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}) );
+}
+
+sub LGTV_WebOS_PresenceRun($) {
+
+    my $string          = shift;
+    my ($name, $host)   = split("\\|", $string);
+    
+    my $tmp;
+    my $response;
+
+    
+    $tmp = qx(ping -c 3 -w 2 $host 2>&1);
+
+    if(defined($tmp) and $tmp ne "") {
+    
+        chomp $tmp;
+        Log3 $name, 5, "LGTV_WebOS ($name) - ping command returned with output:\n$tmp";
+        $response = "$name|".(($tmp =~ /\d+ [Bb]ytes (from|von)/ and not $tmp =~ /[Uu]nreachable/) ? "present" : "absent");
+    
+    } else {
+    
+        $response = "$name|Could not execute ping command";
+    }
+    
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceRun ($name) - Sub finish, Call LGTV_WebOS_PresenceDone";
+    return $response;
+}
+
+sub LGTV_WebOS_PresenceDone($) {
+
+    my ($string)            = @_;
+    
+    my ($name,$response)    = split("\\|",$string);
+    my $hash                = $defs{$name};
+    
+    
+    delete($hash->{helper}{RUNNING_PID});
+    
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - Der Helper ist diabled. Daher wird hier abgebrochen" if($hash->{helper}{DISABLED});
+    return if($hash->{helper}{DISABLED});
+    
+    readingsSingleUpdate($hash, 'presence', $response, 1);
+    
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - Abschluss!";
+}
+
+sub LGTV_WebOS_PresenceAborted($) {
+
+    my ($hash)  = @_;
+    my $name    = $hash->{NAME};
+
+    
+    delete($hash->{helper}{RUNNING_PID});
+    readingsSingleUpdate($hash,'presence','pingPresence timedout', 1);
+    
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceAborted ($name) - The BlockingCall Process terminated unexpectedly. Timedout!";
+}
+
+####### Presence Erkennung Ende ############
 
 
 
@@ -1418,6 +1487,12 @@ sub LGTV_WebOS_FormartStartEndTime($) {
             <li>channelGuide</li>
             Optional attribute to deactivate the recurring TV Guide update. Depending on TV and FHEM host, this causes significant network traffic and / or CPU load</br>
             Valid Values: 0 =&gt; no recurring TV Guide updates, 1 =&gt; recurring TV Guide updates.
+        </ul>
+    </ul>
+    <ul>
+        <ul>
+            <li>pingPresence</li>
+            current state of ping presence from TV. create a reading presence with values absent or present.
         </ul>
     </ul>
 </ul>
