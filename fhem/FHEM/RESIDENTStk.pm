@@ -1078,11 +1078,12 @@ m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?
 
 sub RESIDENTStk_Notify($$) {
     my ( $hash, $dev ) = @_;
-    my $name    = $hash->{NAME};
-    my $TYPE    = GetType($name);
-    my $prefix  = RESIDENTStk_GetPrefixFromType($name);
-    my $devName = $dev->{NAME};
-    my $devType = GetType($devName);
+    my $name      = $hash->{NAME};
+    my $TYPE      = GetType($name);
+    my $prefix    = RESIDENTStk_GetPrefixFromType($name);
+    my $devName   = $dev->{NAME};
+    my $devPrefix = RESIDENTStk_GetPrefixFromType($devName);
+    my $devType   = GetType($devName);
 
     if ( $devName eq "global" ) {
         my $events = deviceEvents( $dev, 1 );
@@ -1222,11 +1223,9 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             if ( $event !~ /^[a-zA-Z\d._]+:/ || $event =~ /^state:/ ) {
 
                 # get user realname
-                my $aliasAttr = "group";
-                $aliasAttr = "alias" if ( $prefix eq "rg_" );
                 my $realname =
                   AttrVal( $devName,
-                    AttrVal( $devName, $prefix . "realname", $aliasAttr ),
+                    AttrVal( $devName, $devPrefix . "realname", "group" ),
                     $devName );
 
                 # update statistics
