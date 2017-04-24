@@ -4226,6 +4226,9 @@ readingsEndUpdate($$)
         $value = "Error evaluating $name userReading $reading: $@";
         Log 1, $value;
         $result= $value;
+      } elsif(!defined($value)) {
+        warn("$name userReadings $reading evaluated to undef");
+        next;
       } elsif($modifier eq "none") {
         $result= $value;
       } elsif($modifier eq "difference") {
