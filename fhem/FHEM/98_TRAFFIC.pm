@@ -41,16 +41,9 @@
 #   2017-04-21 reduced log entries if verbose is not set, fixed JSON error, Map available through FHEM-Web-toggle, and direct link
 #              Map https, with APIKey, Traffic & customizable, new attributes  GoogleMapsStyle,GoogleMapsSize,GoogleMapsLocation,GoogleMapsStroke,GoogleMapsDisableUI
 #   2017-04-21 added buttons to save current map settings, renamed attribute GoogleMapsLocation to GoogleMapsCenter
+#   2017-04-22 v1.3.2 stroke supports weight and opacity, minor fixes
 #
 ##############################################################################
-
-
-#next:  
-#
-#   typo on update your map
-#   optional map zoom
-#
-#
 
 package main;
 
@@ -76,7 +69,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.1';
+my $TRVersion = '1.3.2';
 
 sub TRAFFIC_Initialize($){
 
@@ -217,14 +210,27 @@ sub TRAFFIC_GetMap($@){
         'night'     => '[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]}]',
     );
     my $selectedGoogleMapsStyle = $GoogleMapsStyles{ AttrVal($name, "GoogleMapsStyle", 'default' )};
+    if(!$selectedGoogleMapsStyle){$selectedGoogleMapsStyle = $GoogleMapsStyles{'default'}}; #catch attribute mistake here
     
     # load map scale and zoom from attr, override if empty/na
     my ( $GoogleMapsWidth, $GoogleMapsHeight )   = AttrVal($name, "GoogleMapsSize", '800,600') =~ m/(\d+),(\d+)/;
     my ( $GoogleMapsZoom )   = AttrVal($name, "GoogleMapsZoom", '10');
     
-    my ( $GoogleMapsStroke1, $GoogleMapsStroke2 ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,#FF0000') =~ m/(#[a-zA-z0-9]+),(#[a-zA-z0-9]+)/;
+    my ( $GoogleMapsStroke1Color, $GoogleMapsStroke1Weight, $GoogleMapsStroke1Opacity, $GoogleMapsStroke2Color, $GoogleMapsStroke2Weight, $GoogleMapsStroke2Opacity ) = AttrVal($name, "GoogleMapsStroke", '#4cde44,6,100,#FF0000,1,100') =~ m/^(#[a-zA-z0-9]+),?(\d*),?(\d*),?(#[a-zA-z0-9]+)?,?(\d*),?(\d*)/;
     
-    my $GoogleMapsDisableUI;
+    # catch incomplete configuration here and put in defaults
+    $GoogleMapsStroke1Color     = '#4cde44' if !$GoogleMapsStroke1Color;
+    $GoogleMapsStroke1Weight    = '6'       if !$GoogleMapsStroke1Weight;
+    $GoogleMapsStroke1Opacity   = '100'     if !$GoogleMapsStroke1Opacity;
+    $GoogleMapsStroke2Color     = '#FF0000' if !$GoogleMapsStroke2Color;
+    $GoogleMapsStroke2Weight    = '1'       if !$GoogleMapsStroke2Weight;
+    $GoogleMapsStroke2Opacity   = '100'     if !$GoogleMapsStroke2Opacity;
+    
+    # make percent value to 50 to 0.5 etc
+    $GoogleMapsStroke1Opacity = ($GoogleMapsStroke1Opacity / 100); 
+    $GoogleMapsStroke2Opacity = ($GoogleMapsStroke2Opacity / 100);
+    
+    my $GoogleMapsDisableUI = '';
     $GoogleMapsDisableUI = "disableDefaultUI: true," if AttrVal($name, "GoogleMapsDisableUI", 0) eq 1;
     
     Log3 $hash, 4, "TRAFFIC: ($name) drawing map in style ".AttrVal($name, "GoogleMapsStyle", 'default' )." in $GoogleMapsWidth x $GoogleMapsHeight px";
@@ -232,7 +238,7 @@ sub TRAFFIC_GetMap($@){
     my $map;
     $map .= '<div><script type="text/javascript" src="https://maps.google.com/maps/api/js?key='.$hash->{APIKEY}.'&libraries=geometry&amp"></script>
         <input size="200" type="hidden" id="path" value="'.decode_base64($debugPoly).'">';
-    $map .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64($returnDebugPoly).'">' if decode_base64($returnDebugPoly);
+    $map .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64($returnDebugPoly).'">' if $returnDebugPoly && decode_base64($returnDebugPoly);
     $map .= '
         <div id="map"></div>
         <style>
@@ -255,9 +261,9 @@ sub TRAFFIC_GetMap($@){
             var setRegion = new google.maps.Polyline({
                 path: decodedPath,
                 levels: decodedLevels,
-                strokeColor: "'.$GoogleMapsStroke1.'",
-                strokeOpacity: 1.0,
-                strokeWeight: 6,
+                strokeColor: "'.$GoogleMapsStroke1Color.'",
+                strokeOpacity: '.$GoogleMapsStroke1Opacity.',
+                strokeWeight: '.$GoogleMapsStroke1Weight.',
                 map: map
             });';
 
@@ -266,11 +272,11 @@ sub TRAFFIC_GetMap($@){
             var setRegionR = new google.maps.Polyline({
                 path: decodedPathR,
                 levels: decodedLevels,
-                strokeColor: "'.$GoogleMapsStroke2.'",
-                strokeOpacity: 1.0,
-                strokeWeight: 2,
+                strokeColor: "'.$GoogleMapsStroke2Color.'",
+                strokeOpacity: '.$GoogleMapsStroke2Opacity.',
+                strokeWeight: '.$GoogleMapsStroke2Weight.',
                 map: map
-            });' if decode_base64($returnDebugPoly );
+            });' if $returnDebugPoly && decode_base64($returnDebugPoly );
 
     $map .= 'var trafficLayer = new google.maps.TrafficLayer();
              trafficLayer.setMap(map);' if AttrVal($name, "GoogleMapsTrafficLayer", 0) eq 1;
@@ -324,6 +330,10 @@ sub TRAFFIC_Attr(@){
         foreach my $clearReading ( keys %{$hash->{READINGS}}){
             Log3 $hash, 5, "TRAFFIC: ($name) READING: $clearReading deleted";
             delete($hash->{READINGS}{$clearReading}); 
+        }
+        #clear all helpers
+        foreach my $helperName ( keys %{$hash->{helper}}){
+            delete($hash->{helper}{$helperName});
         }
         # start update
         InternalTimer(gettimeofday() + 1, "TRAFFIC_StartUpdate", $hash, 0); 
@@ -530,7 +540,23 @@ sub TRAFFIC_DoUpdate(){
     my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
     $ua->default_header("HTTP_REFERER" => "www.google.de");
     my $body = $ua->get($url);
+    
+    
+    # test json decode and catch error nicely
+    eval {
+        my $testJson = decode_json($body->decoded_content); 
+        1;
+    };
+    if($@) {
+        my $e = $@;
+        Log3 $hash, 1, "TRAFFIC: ($name) decode_json on googles return failed, cant continue";
+        my %errorreturn = ('status' => 'API error');
+        return "$name;;;$direction;;;".encode_json(\%errorreturn);
+    };
     my $json = decode_json($body->decoded_content);
+    
+    
+    
     
     my $duration_sec            = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'value'} ;
     my $duration_in_traffic_sec = $json->{'routes'}[0]->{'legs'}[0]->{'duration_in_traffic'}->{'value'};
@@ -629,21 +655,21 @@ sub TRAFFIC_FinishUpdate($){
         }
     }
     
-    if($json->{'status'} eq 'UNKNOWN_ERROR'){ # UNKNOWN_ERROR indicates a directions request could not be processed due to a server error. The request may succeed if you try again.
+    if(defined($json->{'READINGS'}->{'status'}) && $json->{'READINGS'}->{'status'} eq 'UNKNOWN_ERROR'){ # UNKNOWN_ERROR indicates a directions request could not be processed due to a server error. The request may succeed if you try again.
         InternalTimer(gettimeofday() + 3, "TRAFFIC_StartUpdate", $hash, 0); 
     }
 
     if(my $stateReading = AttrVal($name,"stateReading",undef)){
         Log3 $hash, 5, "TRAFFIC: ($name) stateReading defined, override state";
-        if(defined($json->{$stateReading})){
-            readingsBulkUpdate($hash,'state',$json->{$stateReading});
+        if(defined($json->{'READINGS'}->{$stateReading})){
+            readingsBulkUpdate($hash,'state',$json->{'READINGS'}->{$stateReading});
         }else{
             
             Log3 $hash, 1, "TRAFFIC: ($name) stateReading $stateReading not found";
         }
     }
     readingsEndUpdate($hash, $dotrigger);
-    Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
     Log3 $hash, 5, "TRAFFIC: ($name) Helper: ".Dumper($hash->{helper}); 
 }
 
@@ -740,7 +766,7 @@ sub prettySeconds {
     <li>one-time-burst, specify the amount and interval between updates</li>
     <li>different Travel Modes (driving, walking, bicycling and transit)</li>
     <li>flexible update schedule</li>
-    <li>integrated Map to visualize configured route at verbose 5</li>
+    <li>integrated Map to visualize configured route or embed to external GUI</li>
   </ul>
   <br>
   <br>
@@ -767,7 +793,13 @@ sub prettySeconds {
     <li>"outputReadings" - define what kind of readings you want to get: text, min, sec, average</li>
     <li>"updateSchedule" - define a flexible update schedule, syntax &lt;starthour&gt;-&lt;endhour&gt; [&lt;day&gt;] &lt;seconds&gt; , multiple entries by sparated by |<br> <i>example:</i> 7-9 1 120 - Monday between 7 and 9 every 2minutes <br> <i>example:</i> 17-19 120 - every Day between 17 and 19 every 2minutes <br> <i>example:</i> 6-8 1 60|6-8 2 60|6-8 3 60|6-8 4 60|6-8 5 60 - Monday till Friday, 60 seconds between 6 and 8 am</li>
     <li>"travelMode" - default: driving, options walking, bicycling or transit </li>
-    <li>"includeReturn" - 0:1</li>
+    <li>"GoogleMapsStyle" - choose your colors from: default,silver,dark,night</li>
+    <li>"GoogleMapsSize" - Map size in pixel, &lt;width&gt;,&lt;height&gt;</li>
+    <li>"GoogleMapsCenter" - Lat, Long coordinates of your map center, spearated by ,</li>
+    <li>"GoogleMapsZoom" - sets your map zoom level</li>
+    <li>"GoogleMapsStroke" - customize your map poly-strokes in color, weight and opacity <br> &lt;hex-color-code&gt;,[stroke-weight],[stroke-opacity],&lt;hex-color-code-of-return&gt;,[stroke-weight-of-return],[stroke-opacity-of-return]<br>must beginn with #color of each stroke, weight and opacity is optional<br><i>example:</i> #019cdf,#ffeb19<br><i>example:</i> #019cdf,20,#ffeb19<br><i>example:</i> #019cdf,20,#ffeb19,15<br><i>example:</i> #019cdf,#ffeb19,15<br><i>example:</i> #019cdf,20,80,#ffeb19<br><i>example:</i> #019cdf,#ffeb19,15,50<br><i>example:</i> #019cdf,20,80<br><i>default:</i> #4cde44,6,100,#FF0000,1,100</li>
+    <li>"GoogleMapsTrafficLayer" - enable the basic Google Maps Traffic Layer</li>
+    <li>"GoogleMapsDisableUI" - hide the map controls</li>
   </ul>
   <br>
   <br>
