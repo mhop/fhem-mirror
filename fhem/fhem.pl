@@ -2720,10 +2720,20 @@ CommandAttr($$)
       }
     }
 
-    if($attrName eq "suppressReading") {
-      return "Argument must be a valid regexp" if(!$a[2] || $a[2] =~ /^\*/);
-      eval { "Hallo" =~ m/^$a[2]$/ };
-      return "Bad regexp: $@" if($@);
+    my %ra = ("suppressReading"            => 1,
+              "event-on-update-reading"    => 1,
+              "event-on-change-reading"    => 2,
+              "timestamp-on-change-reading"=> 1,
+              "event-min-interval"         => 2);
+    if(defined($a[2]) && $ra{$attrName}) {
+      my $lval = $a[2];
+      $lval =~ s/:.*// if($ra{$attrName} == 2);
+      for my $v (split(",", $lval)) {
+        my $err = "Argument $v for attr $sdev $a[1] is not a valid regexp";
+        return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
+        eval { "Hallo" =~ m/^$v$/ };
+        return "$err: $@" if($@);
+      }
     }
 
     $ret = CallFn($sdev, "AttrFn", "set", @a);
