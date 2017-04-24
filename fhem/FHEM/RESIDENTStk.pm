@@ -73,7 +73,7 @@ sub RESIDENTStk_Define($$) {
         || !defined( $a[2] )
         || $a[2] =~ /^[A-Za-z\d._]+(?:,[A-Za-z\d._]*)*$/ );
 
-    $modules{$TYPE}{defptr}{$name} = \$hash;
+    $hash->{MOD_INIT}  = 1;
     $hash->{NOTIFYDEV} = "global";
     delete $hash->{RESIDENTGROUPS} if ( $hash->{RESIDENTGROUPS} );
     $hash->{RESIDENTGROUPS} = $a[2] if ( defined( $a[2] ) );
@@ -162,9 +162,6 @@ sub RESIDENTStk_Undefine($$) {
             Log3 $name, 3, "RESIDENTS $name: deleted device $child";
         }
     }
-
-    # release reverse pointer
-    delete $modules{ $hash->{TYPE} }{defptr}{$name};
 
     return undef;
 }
@@ -1093,19 +1090,36 @@ sub RESIDENTStk_Notify($$) {
 
             next if ( $_ =~ m/^[A-Za-z\d_-]+:/ );
 
-            if ( $_ =~ m/^INITIALIZED|REREADCFG|DELETED.+$/ ) {
+            # module and device initialization
+            if ( $_ =~ m/^INITIALIZED|REREADCFG$/ ) {
                 if ( !defined( &{'DoInitDev'} ) ) {
-                    RESIDENTStk_DoInitDev($name);
+                    if ( $_ eq "REREADCFG" ) {
+                        delete $modules{$TYPE}{READY};
+                        delete $modules{$TYPE}{INIT};
+                    }
+                    RESIDENTStk_DoInitDev(
+                        devspec2array("TYPE=$TYPE:FILTER=MOD_INIT=.+") );
                 }
-                next;
             }
 
-            # init RESIDENTS, ROOMMATE or GUEST devices after boot
-            if ( $_ =~ m/^(DEFINED|MODIFIED|RENAMED)\s+([A-Za-z\d_-]+)$/ ) {
+            # if any of our monitored devices was modified,
+            # recalculate monitoring status
+            elsif ( $_ =~
+                m/^(DEFINED|MODIFIED|RENAMED|DELETED)\s+([A-Za-z\d_-]+)$/ )
+            {
                 if ( defined( &{'DoInitDev'} ) ) {
+
+                    # DELETED would normally be handled by fhem.pl and imply
+                    # DoModuleTrigger instead of DoInitDev to update module
+                    # init state
+                    next if ($_ =~ /^DELETED/);
                     DoInitDev($name);
                 }
                 else {
+
+                    # for DELETED, we normally would want to use
+                    # DoModuleTrigger() but we miss the deleted
+                    # device's TYPE at this state :-(
                     RESIDENTStk_DoInitDev($name);
                 }
             }
@@ -2292,8 +2306,8 @@ return;;\
 \
 ## In 90 minutes, switch House Mode to 'day' and\
 ## play voice announcement via SONOS\
-#if (!defined($defs{\"atTmp_HouseMode_day\"})) {\
-#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \\\@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
+#unless (IsDevice(\"atTmpHouseMode_day\")) {\
+#	fhem \"define atTmpHouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \\\@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
 #}\
 \
 return;;\
@@ -3567,7 +3581,7 @@ sub RESIDENTStk_findDummySlaves($;$) {
 
 sub RESIDENTStk_GetPrefixFromType($) {
     my ($name) = @_;
-    return "" unless ($name);
+    return "" unless ( defined($name) );
     return "rgr_" if ( GetType($name) eq "RESIDENTS" );
     return "rr_"  if ( GetType($name) eq "ROOMMATE" );
     return "rg_"  if ( GetType($name) eq "GUEST" );
@@ -3579,8 +3593,7 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
     $TYPE = $hash->{TYPE} unless ( defined($TYPE) );
 
     return ""
-      unless ( $init_done
-        && defined($TYPE)
+      unless ( defined($TYPE)
         && defined( $modules{$TYPE} )
         && defined($newState)
         && $newState =~
@@ -3601,7 +3614,7 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
     my @rets;
     $hash = $defs{$d};
 
-    if ( !$hash ) {
+    if ( !$hash || !ref($hash) ) {
         $dret = "device was deleted"
           unless ( $e eq "DELETED" );
         $e = "DELETED";
@@ -3611,13 +3624,13 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
         || ( $modules{$TYPE}{READY} && $hash->{MOD_INIT} ) )
     {
         $dret = "device initialization started";
-        Log 4, "$TYPE $d: device initialization started";
+        Log 4, "$TYPE $d: $dret";
         $hash->{MOD_INIT} = 1;
         $e = "INITIALIZING";
     }
     elsif ( $hash->{MOD_INIT} ) {
         $dret = "pending device initialization";
-        Log 4, "$TYPE $d: pending device initialization";
+        Log 4, "$TYPE $d: $dret";
     }
     elsif ( !$hash->{READY} ) {
         $e = "INITIALIZED";

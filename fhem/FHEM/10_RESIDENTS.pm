@@ -19,7 +19,6 @@ sub RESIDENTS_Initialize($) {
     $hash->{AttrFn}    = "RESIDENTStk_Attr";
     $hash->{NotifyFn}  = "RESIDENTStk_Notify";
 
-    $hash->{NotifyOrderPrefix} = "45-";
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_lang:EN,DE rgr_noDuration:0,1 rgr_showAllStates:0,1 rgr_wakeupDevice "
