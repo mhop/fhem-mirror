@@ -132,6 +132,8 @@ sub THINKINGCLEANER_Undefine($$$) {
     return undef;
 }
 
+sub THINKINGCLEANER_Set($$$);
+
 sub THINKINGCLEANER_Set($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name         = $hash->{NAME};
@@ -1317,6 +1319,7 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
                         $rPrefix = "sensor"  if ( $r eq "sensors" );
 
                         foreach my $r2 ( keys %{ $return->{$r} } ) {
+                            next unless ( $r2 && $r2 ne "" );
 
                             # INTERNALS or dynamic values
                             if ( $r2 eq "cleaning" ) {
@@ -1517,9 +1520,8 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
                             $readingName =~ s/_(state|button|current)$//;
                             $readingName =~ s/[-_](\w)/\U\1/g;
 
-                            readingsBulkUpdate( $hash, $readingName, $v )
-                              if (
-                                ReadingsVal( $name, $readingName, "" ) ne $v );
+                            readingsBulkUpdateIfChanged( $hash, $readingName,
+                                $v );
                         }
                     }
                 }
