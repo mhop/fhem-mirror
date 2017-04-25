@@ -4,17 +4,19 @@
 #
 #  $Id$
 #
-#  Version 4.0
+#  Version 4.0.001
 #
-#  Configuration parameters for Homematic devices.
+#  Configuration parameters for HomeMatic devices.
 #
-#  (c) 2016 zap (zap01 <at> t-online <dot> de)
+#  (c) 2017 by zap (zap01 <at> t-online <dot> de)
 #
-#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR.*, SABOTAGE and FAULT.* must
-#  not be specified in ccureadingfilter. They are always stored as readings.
+#  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR.*, SABOTAGE and FAULT.*
+#  must not be specified in attribute ccureadingfilter. They are always
+#  stored as readings.
 #  Datapoints LOWBAT, LOW_BAT and UNREACH must not be specified in
-#  substitute because they are substituted by default.
-#  See attributes ccudef-readingname and ccudef-substitute in module HMCCU.
+#  attribute substitute because they are substituted by default.
+#  See also documentation of attributes ccudef-readingname and
+#  ccudef-substitute in module HMCCU.
 #
 #########################################################################
 
@@ -135,6 +137,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "press:true",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
+	"HM-SwI-3-FM" => {
+	_description     => "Funk-Schalterschnittstelle",
+	_channels        => "1,2,3",
+	ccureadingfilter => "PRESS",
+	statedatapoint   => "PRESS",
+	statevals        => "press:true",
+	substitute       => "PRESS!(1|true):pressed,(0|false):released"
+	},
 	"HM-LC-Sw1PBU-FM" => {
 	_description     => "Unterputz Schaltaktor für Markenschalter",
 	_channels        => "1",
@@ -153,6 +163,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "STATE",
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off"
+	},
+	"HM-MOD-Re-8" => {
+	_description     => "8 Kanal Empfangsmodul",
+	_channels        => "1,2,3,4,5,6,7,8",
+	ccureadingfilter => "(STATE|WORKING)",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off;WORKING!(1|true):yes,(0|false):no"	
 	},
 	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM" => {
 	_description     => "1 Kanal Funk-Schaltaktor",
@@ -199,6 +217,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "(^HUMIDITY|^TEMPERATURE)",
 	statedatapoint   => "TEMPERATURE",
 	stripnumber      => 1
+	},
+	"HM-WDS100-C6-O-2" => {
+	_description     => "Funk-Kombisensor",
+	_channels        => "1",
+	ccureadingfilter => "(HUMIDITY|TEMPERATURE|WIND|RAIN|SUNSHINE|BRIGHTNESS)",
+	statedatapoint   => "TEMPERATURE",
+	stripnumber      => 1,
+	substitute       => "RAINING!(1|true):yes,(0|false):no"
 	},
 	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3" => {
 	_description     => "Bewegungsmelder",
@@ -421,6 +447,12 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
+	"HM-SwI-3-FM" => {
+	_description     => "Funk-Schalterschnittstelle",
+	ccureadingfilter => "PRESS",
+	statevals        => "press:true",
+	substitute       => "PRESS!(1|true):pressed,(0|false):released"
+	},
 	"HM-LC-Sw1PBU-FM" => {
 	_description     => "Unterputz Schaltaktor für Markenschalter",
 	ccureadingfilter => "STATE",
@@ -436,6 +468,12 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "STATE",
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off"
+	},
+	"HM-MOD-Re-8" => {
+	_description     => "8 Kanal Empfangsmodul",
+	ccureadingfilter => "(STATE|WORKING)",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off;WORKING!(1|true):yes,(0|false):no"	
 	},
 	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2" => {
 	_description     => "Jalousienaktor",
@@ -507,6 +545,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "(^HUMIDITY|^TEMPERATURE)",
 	statedatapoint   => "1.TEMPERATURE",
 	stripnumber      => 1
+	},
+	"HM-WDS100-C6-O-2" => {
+	_description     => "Funk-Kombisensor",
+	ccureadingfilter => "(HUMIDITY|TEMPERATURE|WIND|RAIN|SUNSHINE|BRIGHTNESS)",
+	statedatapoint   => "1.TEMPERATURE",
+	stripnumber      => 1,
+	substitute       => "RAINING!(1|true):yes,(0|false):no"
 	},
 	"HM-ES-TX-WM" => {
 	_description     => "Energiezaehler Sensor",
@@ -640,59 +685,258 @@ use vars qw(%HMCCU_SCRIPTS);
 );
 
 ######################################################################
-# Homematic scripts
+# Homematic scripts.
+# Scripts can be executed via HMCCU set command 'hmscript'. Script
+# name must be preceeded by a '!'.
+# Example:
+#  set mydev hmscript !CreateStringVariable MyVar test "Test variable"
 ######################################################################
 
 %HMCCU_SCRIPTS = (
-   "CreateVariable" => {
-   	_description => "Create CCU system variable of type STRING, NUMBER, BOOL or LIST",
-   	_pardesc     => "Type, Name, Unit, Init, Desc [, { Min, Max | Val1, Val2 | ValList } ]",
-   	parameters   => 6,
-   	code         => qq(
+	"ActivateProgram" => {
+		description => "Activate or deactivate a CCU program",
+		syntax      => "name, mode",
+		parameters  => 2,
+		code        => qq(
+object oPR = dom.GetObject("\$name");
+if (oPR) {
+  oPR.Active(\$mode);
+}
+		)
+	},
+	"CreateStringVariable" => {
+		description => "Create CCU system variable of type STRING",
+		syntax      => "name, init, desc",
+		parameters  => 3,
+		code        => qq(
+object oSV = dom.GetObject("\$name");
+if (!oSV){   
+  object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
+  oSV = dom.CreateObject(OT_VARDP);
+  oSysVars.Add(svObj.ID());
+  oSV.Name("\$name");
+  oSV.ValueType(ivtString);
+  oSV.ValueSubType(istChar8859);
+  oSV.DPInfo("\$desc");
+  oSV.ValueUnit("");
+  oSV.State("\$init");
+  oSV.Internal(false);
+  oSV.Visible(true);
+  dom.RTUpdate(false);
+}
+else {
+  oSV.State("\$init");
+}
+		)
+	},
+	"CreateNumericVariable" => {
+		description => "Create CCU system variable of type FLOAT",
+		syntax      => "name, unit, init, desc, min, max",
+		parameters  => 6,
+		code        => qq(
+object oSV = dom.GetObject("\$name");
+if (!oSV){   
+  object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
+  oSV = dom.CreateObject(OT_VARDP);
+  oSysVars.Add(svObj.ID());
+  oSV.Name("\$name");
+  oSV.ValueType(ivtFloat);
+  oSV.ValueSubType(istGeneric);
+  oSV.ValueMin(\$min);
+  oSV.ValueMax(\$max);
+  oSV.DPInfo("\$desc");
+  oSV.ValueUnit("\$unit");
+  oSV.State("\$init");
+  oSV.Internal(false);
+  oSV.Visible(true);
+  dom.RTUpdate(false);
+}
+else {
+  oSV.State("\$init");
+}
+		)
+	},
+	"CreateBoolVariable" => {
+		description => "Create CCU system variable of type BOOL",
+		syntax      => "name, init, desc, value1, value2",
+		parameters  => 5,
+		code        => qq(
+object oSV = dom.GetObject("\$name");
+if (!oSV){   
+  object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
+  oSV = dom.CreateObject(OT_VARDP);
+  oSysVars.Add(svObj.ID());
+  oSV.Name("\$name");
+  oSV.ValueType(ivtBinary);
+  oSV.ValueSubType(istBool);
+  oSV.ValueName0("\$value1");
+  oSV.ValueName1("\$value2");    
+  oSV.DPInfo("\$desc");
+  oSV.State("\$init");
+  dom.RTUpdate(false);
+}
+else {
+  oSV.State("\$init");
+}
+		)
+	},
+	"CreateListVariable" => {
+		description => "Create CCU system variable of type LIST",
+		syntax      => "name, unit, init, desc, list",
+		parameters  => 5,
+		code        => qq(
 object oSV = dom.GetObject("p2");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
   oSysVars.Add(svObj.ID());
-  oSV.Name("p2");
-  if ("p1" = "STRING") {
-    oSV.ValueType(ivtString);
-    oSV.ValueSubType(istChar8859);
-  }
-  if ("p1" = "NUMBER") {
-    oSV.ValueType(ivtFloat);
-    oSV.ValueSubType(istGeneric);
-    oSV.ValueMin(p6);
-    oSV.ValueMax(p7);
-  }
-  if ("p1" = "BOOL") {
-    oSV.ValueType(ivtBinary);
-    oSV.ValueSubType(istBool);
-    oSV.ValueName0("p6");
-    oSV.ValueName1("p7");    
-  }
-  if ("p1" = "LIST") {
-    oSV.ValueType(ivtInteger);
-    oSV.ValueSubType(istEnum);
-    oSV.ValueList("p6");
-  }
-  oSV.DPInfo("p5");
-  oSV.ValueUnit("p3");
-  oSV.State("p4");
-  oSV.Internal(false);
-  oSV.Visible(true);
+  oSV.Name("\$name");
+  oSV.ValueType(ivtInteger);
+  oSV.ValueSubType(istEnum);
+  oSV.ValueList("\$list");
+  oSV.DPInfo("\$desc");
+  oSV.ValueUnit("\$unit");
+  oSV.State("\$init");
   dom.RTUpdate(false);
 }
-   	)
-   },
+else {
+  oSV.State("\$init");
+}
+		)
+	},
 	"DeleteVariable" => {
-		_description => "Delete CCU system variable",
-		parameters   => 1,
-		code         => qq(
-object oSV = dom.GetObject("p1");
+		description => "Delete CCU system variable",
+		syntax      => "name",
+		parameters  => 1,
+		code        => qq(
+object oSV = dom.GetObject("\$name");
 if (oSV) {
   dom.DeleteObject(oSV.ID());
 }
+		)
+	},
+	"GetVariables" => {
+		description => "Query system variables",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+object osysvar;
+string ssysvarid;
+foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs())
+{
+   osysvar = dom.GetObject(ssysvarid);
+   WriteLine (osysvar.Name() # "=" # osysvar.Variable() # "=" # osysvar.Value());
+}
+		)
+	},
+	"GetDeviceInfo" => {
+		description => "Query device info",
+		syntax      => "devname, ccuget",
+		parameters  => 2,
+		code        => qq(
+string chnid;
+string sDPId;
+object odev = dom.GetObject ("\$devname");
+if (odev) {
+  foreach (chnid, odev.Channels()) {
+    object ochn = dom.GetObject(chnid);
+    if (ochn) {
+      foreach(sDPId, ochn.DPs()) {
+        object oDP = dom.GetObject(sDPId);
+        if (oDP) {
+          integer op = oDP.Operations();
+          string flags = "";
+          if (OPERATION_READ & op) { flags = flags # "R"; }
+          if (OPERATION_WRITE & op) { flags = flags # "W"; }
+          if (OPERATION_EVENT & op) { flags = flags # "E"; }
+          WriteLine ("C;" # ochn.Address() # ";" # ochn.Name() # ";" # oDP.Name() # ";" # oDP.ValueType() # ";" # oDP.\$ccuget() # ";" # flags);
+        }
+      }
+    }
+  }
+}
+else {
+  WriteLine ("ERROR: Device not found");
+}
+		)
+	},
+	"GetDeviceList" => {
+		description => "Query CCU devices and channels",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string devid;
+string chnid;
+foreach(devid, root.Devices().EnumUsedIDs()) {
+   object odev=dom.GetObject(devid);
+   string intid=odev.Interface();
+   string intna=dom.GetObject(intid).Name();
+   integer cc=0;
+   foreach (chnid, odev.Channels()) {
+      object ochn=dom.GetObject(chnid);
+      WriteLine("C;" # ochn.Address() # ";" # ochn.Name());
+      cc=cc+1;
+   }
+   WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+}
+		)
+	},
+	"GetDatapointsByChannel" => {
+		description => "Query datapoints of channel list",
+		syntax      => "list, ccuget",
+		parameters  => 2,
+		code        => qq(
+string sDPId;
+string sChnName;
+string sChnList = "\$list";
+integer c = 0;
+foreach (sChnName, sChnList.Split(",")) {
+  object oChannel = dom.GetObject (sChnName);
+  if (oChannel) {
+    foreach(sDPId, oChannel.DPs()) {
+      object oDP = dom.GetObject(sDPId);
+      if (oDP) {
+        if (OPERATION_READ & oDP.Operations()) {
+          WriteLine (sChnName # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+          c = c+1;
+        }
+      }
+    }
+  }
+}
+WriteLine (c);
+		)
+	},
+	"GetDatapointsByDevice" => {
+		description => "Query datapoints of device list",
+		syntax      => "list, ccuget",
+		parameters  => 2,
+		code        => qq(
+string chnid;
+string sDPId;
+string sDevName;
+string sDevList = "\$list";
+integer c = 0;
+foreach (sDevName, sDevList.Split(",")) {
+  object odev = dom.GetObject (sDevName);
+  if (odev) {
+    foreach (chnid, odev.Channels()) {
+	   object ochn = dom.GetObject(chnid);
+      if (ochn) {
+		  foreach(sDPId, ochn.DPs()) {
+		    object oDP = dom.GetObject(sDPId);
+          if (oDP) {
+            if (OPERATION_READ & oDP.Operations()) {
+              WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+              c = c+1;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+WriteLine (c);
 		)
 	}
 );

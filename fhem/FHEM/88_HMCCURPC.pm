@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.94 beta
+#  Version 0.95 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.94 beta';
+my $HMCCURPC_VERSION = '0.95 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -162,7 +162,7 @@ sub HMCCURPC_StartRPCServer ($);
 sub HMCCURPC_CleanupThreads ($$$);
 sub HMCCURPC_CleanupThreadIO ($);
 sub HMCCURPC_TerminateThreads ($$);
-sub HMCCURPC_CheckThreadState ($$$);
+sub HMCCURPC_CheckThreadState ($$$$);
 sub HMCCURPC_IsRPCServerRunning ($);
 sub HMCCURPC_Housekeeping ($);
 sub HMCCURPC_StopRPCServer ($);
@@ -234,7 +234,7 @@ sub HMCCURPC_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "rpcInterfaces:multiple-strict,".join(',',sort keys %HMCCURPC_RPC_PORT).
-		" ccuflags:multiple-strict,expert rpcMaxEvents rpcQueueSize rpcTriggerTime". 
+		" ccuflags:multiple-strict,expert,keepThreads rpcMaxEvents rpcQueueSize rpcTriggerTime". 
 		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
 		" rpcConnTimeout rpcWaitTime rpcStatistics ".
 		$readingFnAttributes;
@@ -352,7 +352,7 @@ sub HMCCURPC_Attr ($@)
 	my $rc = 0;
 
 	if ($attrname eq 'rpcInterfaces') {
-		my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running');
+		my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running', undef);
 		return 'Stop RPC server before modifying rpcInterfaces' if ($run > 0);
 	}
 	
@@ -415,26 +415,26 @@ sub HMCCURPC_Set ($@)
 					
 		return HMCCURPC_SetError ($hash, "RPC request failed") if (!defined ($response));
 
-		my $result = '';
-		if (ref ($response) eq 'ARRAY') {
-			$result = join "\n", @$response;
-		}
-		elsif (ref ($response) eq 'HASH') {
-			foreach my $k (keys %$response) {
-				$result .= "$k = ".$response->{$k}."\n";
-			}
-		}
-		elsif (ref ($response) eq 'SCALAR') {
-			$result = $$response;
-		}
-		else {
-			if (ref ($response)) {
-				$result = "Unknown response from CCU of type ".ref ($response);
-			}
-			else {
-				$result = ($response eq '') ? 'Request returned void' : $response;
-			}
-		}
+		my $result = HMCCU_RefToString ($response);
+# 		if (ref ($response) eq 'ARRAY') {
+# 			$result = join "\n", @$response;
+# 		}
+# 		elsif (ref ($response) eq 'HASH') {
+# 			foreach my $k (keys %$response) {
+# 				$result .= "$k = ".$response->{$k}."\n";
+# 			}
+# 		}
+# 		elsif (ref ($response) eq 'SCALAR') {
+# 			$result = $$response;
+# 		}
+# 		else {
+# 			if (ref ($response)) {
+# 				$result = "Unknown response from CCU of type ".ref ($response);
+# 			}
+# 			else {
+# 				$result = ($response eq '') ? 'Request returned void' : $response;
+# 			}
+# 		}
 				
 		return $result;
 	}
@@ -470,6 +470,8 @@ sub HMCCURPC_Get ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
+
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $options = "rpcevents:noArg rpcstate:noArg";
 
 	if ($opt ne 'rpcstate' && HMCCURPC_IsRPCStateBlocking ($hash)) {
@@ -866,8 +868,8 @@ sub HMCCURPC_ProcessEvent ($$)
 		if ($t[0] == $rh->{$clkey}{tid}) {
 			Log3 $name, 1, "HMCCURPC: Received SL event. RPC server $clkey enters server loop";
 			$rh->{$clkey}{state} = $clkey eq 'DATA' ? 'running' : 'working';
-			my ($run, $alld) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_DATA, "running");
-			my ($work, $alls) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_SERVER, 'working');
+			my ($run, $alld) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_DATA, 'running', undef);
+			my ($work, $alls) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_SERVER, 'working', undef);
 			if ($work == $alls && $run == $alld) {
 				Log3 $name, 1, "HMCCURPC: All threads working";
 				HMCCURPC_RegisterCallback ($hash);
@@ -893,7 +895,7 @@ sub HMCCURPC_ProcessEvent ($$)
 		$rh->{$clkey}{state} = "running";
 		
 		# Set binary RPC interfaces to 'running' if all ascii interfaces are in state 'running'
-		my ($runa, $alla) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ASCII, 'running');
+		my ($runa, $alla) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ASCII, 'running', undef);
 		if ($runa == $alla) {
 			foreach my $sn (keys %{$rh}) {
 				$rh->{$sn}{state} = "running"
@@ -902,7 +904,7 @@ sub HMCCURPC_ProcessEvent ($$)
 		}
 				
 		# Check if all RPC servers were initialized. Set overall status
-		my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running');
+		my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running', undef);
 		if ($run == $all) {
 			$hash->{hmccu}{rpcstarttime} = 0;
 			HMCCURPC_SetRPCState ($hash, "running", "All RPC servers running");
@@ -934,17 +936,16 @@ sub HMCCURPC_ProcessEvent ($$)
 		if ($clkey ne 'DATA') {
 			($stopped, $all) = HMCCURPC_CleanupThreads ($hash, $HMCCURPC_THREAD_SERVER, 'stopped');
 			if ($stopped == $all) {
-				# Terminate data processing thread
+				# Terminate data processing thread if all server threads stopped
 				Log3 $name, 2, "HMCCURPC: All RPC servers stopped. Terminating data processing thread";
 				HMCCURPC_TerminateThreads ($hash, $HMCCURPC_THREAD_DATA);
 				sleep (1);
 			}
 		}
 		else {
-			# Vielleicht besser außerhalb von Read() löschen
-			HMCCURPC_CleanupThreadIO ($hash);
 			($stopped, $all) = HMCCURPC_CleanupThreads ($hash, $HMCCURPC_THREAD_DATA, '.*');
 			if ($stopped == $all) {
+				HMCCURPC_CleanupThreadIO ($hash);
 				HMCCURPC_ResetRPCState ($hash, "OK");
 				RemoveInternalTimer ($hash);
 				Log3 $name, 1, "HMCCURPC: All threads stopped";
@@ -1159,8 +1160,6 @@ sub HMCCURPC_DeRegisterCallback ($)
 		if (exists ($rpchash->{cburl}) && $rpchash->{cburl} ne '') {
 			Log3 $name, 1, "HMCCURPC: Deregistering RPC server ".$rpchash->{cburl}.
 			   " with ID $clkey at ".$rpchash->{clurl};
-# 			my $rpcclient = RPC::XML::Client->new ($rpchash->{clurl});
-# 			$rpcclient->send_request ("init", $rpchash->{cburl});
 			if (HMCCURPC_IsAscRPCPort ($rpchash->{port})) {
 				HMCCURPC_SendRequest ($hash, $rpchash->{port}, "init", $rpchash->{cburl});
 			}
@@ -1406,7 +1405,7 @@ sub HMCCURPC_StartRPCServer ($)
 	sleep (1);
 	
 	# Cleanup if one or more threads are not initialized (ignore thread state)
-	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, '.*');
+	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, '.*', undef);
 	if ($run != $all) {
 		Log3 $name, 0, "HMCCURPC: Only $run from $all threads are running. Cleaning up";
 		HMCCURPC_Housekeeping ($hash);
@@ -1439,8 +1438,8 @@ sub HMCCURPC_CleanupThreadIO ($)
 	my $pid = $$;
 	if (exists ($selectlist{"RPC.$name.$pid"})) {
 		Log3 $name, 2, "HMCCURPC: Stop I/O handling";
-		delete $hash->{FD};
 		delete $selectlist{"RPC.$name.$pid"};
+		delete $hash->{FD} if (defined ($hash->{FD}));
 	}
 	if (defined ($hash->{hmccu}{sockchild})) {
 		Log3 $name, 2, "HMCCURPC: Close child socket";
@@ -1498,6 +1497,8 @@ sub HMCCURPC_CleanupThreads ($$$)
 	my ($hash, $mode, $state) = @_;
 	my $name = $hash->{NAME};
 	
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	
 	my $count = 0;
 	my $all = 0;
 	
@@ -1515,9 +1516,15 @@ sub HMCCURPC_CleanupThreads ($$$)
 						" still running. Can't delete it";
 					next;
 				}
-				Log3 $name, 2, "HMCCURPC: Thread $clkey with TID=".$thr->tid ().
-					" has been stopped. Deleting it";
-#				undef $hash->{hmccu}{rpc}{$clkey}{child};
+				if ($hash->{hmccu}{rpc}{$clkey}{state} eq 'stopped' && $ccuflags !~ /keepThreads/) {
+					Log3 $name, 2, "HMCCURPC: Thread $clkey with TID=".$thr->tid ().
+						" has been stopped. Deleting it";
+					undef $hash->{hmccu}{rpc}{$clkey}{child};
+				}
+				else {
+					Log3 $name, 2, "HMCCURPC: Thread $clkey with TID=".$thr->tid ().
+						" is in state ".$hash->{hmccu}{rpc}{$clkey}{state}.". Can't delete it";
+				}
 #				delete $hash->{hmccu}{rpc}{$clkey};
 			}
 		}
@@ -1531,20 +1538,21 @@ sub HMCCURPC_CleanupThreads ($$$)
 # Count threads in specified state.
 # Parameter state is a regular expression.
 # Parameter mode specifies which threads should be counted:
-#   1 - Count data processing thread
-#   2 - Count server threads
-#   3 - Count all threads
 # If state is empty thread state is ignored and only running threads
 # are counted by calling thread function is_running().
 # Return number of threads in specified state and total number of
-# threads.
+# threads. Also return IDs of running threads if parameter tids is
+# defined and parameter state is 'running' or '.*'.
 ######################################################################
 
-sub HMCCURPC_CheckThreadState ($$$)
+sub HMCCURPC_CheckThreadState ($$$$)
 {
-	my ($hash, $mode, $state) = @_;
+	my ($hash, $mode, $state, $tids) = @_;
 	my $count = 0;
 	my $all = 0;
+
+	$mode = $HMCCURPC_THREAD_ALL if (!defined ($mode));
+	$state = '' if (!defined ($state));
 	
 	foreach my $clkey (keys %{$hash->{hmccu}{rpc}}) {
 		next if ($hash->{hmccu}{rpc}{$clkey}{state} eq 'inactive');
@@ -1553,8 +1561,11 @@ sub HMCCURPC_CheckThreadState ($$$)
 		if ($state eq 'running' || $state eq '.*') {
 			next if (!exists ($hash->{hmccu}{rpc}{$clkey}{child}));
 			my $thr = $hash->{hmccu}{rpc}{$clkey}{child};
-			$count++ if (defined ($thr) && $thr->is_running () &&
-				$hash->{hmccu}{rpc}{$clkey}{state} =~ /$state/);
+			if (defined ($thr) && $thr->is_running () &&
+				($state eq '' || $hash->{hmccu}{rpc}{$clkey}{state} =~ /$state/)) {
+				$count++;
+				push (@$tids, $thr->tid()) if (defined ($tids));
+			}
 		}
 		else {
 			$count++ if ($hash->{hmccu}{rpc}{$clkey}{state} =~ /$state/);
@@ -1574,7 +1585,7 @@ sub HMCCURPC_IsRPCServerRunning ($)
 	my $name = $hash->{NAME};
 	
 	Log3 $name, 2, "HMCCURPC: Checking if all threads are running";
-	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running');
+	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running', undef);
 	if ($run != $all) {
 		Log3 $name, 1, "HMCCURPC: Only $run of $all threads are running. Cleaning up";
 		HMCCURPC_Housekeeping ($hash);
@@ -1596,8 +1607,11 @@ sub HMCCURPC_Housekeeping ($)
 	my $name = $hash->{NAME};
 
 	Log3 $name, 1, "HMCCURPC: Housekeeping called. Cleaning up RPC environment";
-	
-	# I/O Handling beenden
+
+	# Deregister callback URLs in CCU
+	HMCCURPC_DeRegisterCallback ($hash);
+
+	# Stop I/O handling
 	HMCCURPC_CleanupThreadIO ($hash);
 	
  	my $count = HMCCURPC_TerminateThreads ($hash, $HMCCURPC_THREAD_ALL);
@@ -1623,7 +1637,7 @@ sub HMCCURPC_StopRPCServer ($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running');
+	my ($run, $all) = HMCCURPC_CheckThreadState ($hash, $HMCCURPC_THREAD_ALL, 'running', undef);
 	if ($run > 0) {
 		HMCCURPC_SetRPCState ($hash, "stopping", "Found $run threads. Stopping ...");
 
@@ -1889,6 +1903,8 @@ sub HMCCURPC_HandleConnection ($$$$)
 	foreach my $et (@eventtypes) {
 		Log3 $name, 4, "CCURPC: $clkey event type = $et: ".$rpcsrv->{hmccu}{rec}{$et};
 	}
+	
+	return;
 }
 
 ######################################################################
@@ -2085,9 +2101,9 @@ sub HMCCURPC_HexDump ($$)
 # Callback functions
 ######################################################################
 
-##################################################
+######################################################################
 # Callback for new devices
-##################################################
+######################################################################
 
 sub HMCCURPC_NewDevicesCB ($$$)
 {
@@ -2095,15 +2111,17 @@ sub HMCCURPC_NewDevicesCB ($$$)
 	my $name = $server->{hmccu}{name};
 	my $devcount = scalar (@$a);
 	
-	Log3 $name, 2, "CCURPC: $cb NewDevice received $devcount device specifications";	
+	Log3 $name, 2, "CCURPC: $cb NewDevice received $devcount device and channel specifications";	
 	foreach my $dev (@$a) {
 		my $msg = '';
 		if ($dev->{ADDRESS} =~ /:[0-9]{1,2}$/) {
 			$msg = "C|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|null|null";
 		}
 		else {
+			# Wired devices do not have a RX_MODE attribute
+			my $rx = exists ($dev->{RX_MODE}) ? $dev->{RX_MODE} : 'null';
 			$msg = "D|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|".
-				$dev->{FIRMWARE}."|".$dev->{RX_MODE};
+				$dev->{FIRMWARE}."|".$rx;
 		}
 		HMCCURPC_Write ($server, "ND", $cb, $msg);
 	}
@@ -2727,6 +2745,7 @@ sub HMCCURPC_DecodeResponse ($)
 		<li><b>ccuflags { expert }</b><br/>
 			Set flags for controlling device behaviour. Meaning of flags is:<br/>
 				expert - Activate expert mode<br/>
+				keepThreads - Do not delete thread objects after RPC server has been stopped<br/>
 		</li><br/>
 		<li><b>rpcAcceptTimeout &lt;seconds&gt;</b><br/>
 			Specify timeout for accepting incoming connections. Default is 1 second. Increase this 

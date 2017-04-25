@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0
+#  Version 4.0.001
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -383,7 +383,7 @@ sub HMCCUDEV_Set ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 		Log3 $name, 2, "HMCCU: set toggle: GetDatapoint returned $rc, $result"
 			if ($ccuflags =~ /trace/);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 
 		my $objvalue = '';
 		my $st = 0;
@@ -588,7 +588,7 @@ sub HMCCUDEV_Get ($@)
 		my $objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.'.$sd;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'datapoint') {
@@ -611,7 +611,7 @@ sub HMCCUDEV_Get ($@)
 		$objname = $ccuif.'.'.$ccuaddr.':'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $result;
@@ -663,7 +663,7 @@ sub HMCCUDEV_Get ($@)
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);		
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);		
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $res;
 	}
@@ -681,7 +681,7 @@ sub HMCCUDEV_Get ($@)
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);		
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;
 	}
@@ -700,7 +700,7 @@ sub HMCCUDEV_Get ($@)
 		}
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;
 	}

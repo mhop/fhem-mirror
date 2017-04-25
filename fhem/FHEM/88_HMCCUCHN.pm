@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0
+#  Version 4.0.001
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -66,7 +66,6 @@ sub HMCCUCHN_Define ($@);
 sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
-sub HMCCUCHN_SetError ($$);
 
 ##################################################
 # Initialize module
@@ -286,7 +285,7 @@ sub HMCCUCHN_Set ($@)
 
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 
 		my $objvalue = '';
 		my $st = 0;
@@ -487,7 +486,7 @@ sub HMCCUCHN_Get ($@)
 
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'datapoint') {
@@ -500,7 +499,7 @@ sub HMCCUCHN_Get ($@)
 
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'update') {
@@ -536,7 +535,7 @@ sub HMCCUCHN_Get ($@)
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		return $ccureadings ? undef : $res;
 	}
 	elsif ($opt eq 'configlist') {
@@ -551,7 +550,7 @@ sub HMCCUCHN_Get ($@)
 		$par = '.*' if (!defined ($par));
 
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		return $res;
 	}
 	elsif ($opt eq 'configdesc') {
@@ -562,7 +561,7 @@ sub HMCCUCHN_Get ($@)
 		}
 		
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		return $res;
 	}
 	elsif ($opt eq 'defaults') {
@@ -582,36 +581,6 @@ sub HMCCUCHN_Get ($@)
 	}
 }
 
-#####################################
-# Set error status
-#####################################
-
-sub HMCCUCHN_SetError ($$)
-{
-	my ($hash, $text) = @_;
-	my $name = $hash->{NAME};
-	my $msg;
-	my %errlist = (
-		-1 => 'Channel name or address invalid',
-		-2 => 'Execution of CCU script failed',
-		-3 => 'Cannot detect IO device',
-		-4 => 'Device deleted in CCU',
-		-5 => 'No response from CCU',
-		-6 => 'Update of readings disabled. Set attribute ccureadings first'
-	);
-
-	if (exists ($errlist{$text})) {
-		$msg = $errlist{$text};
-	}
-	else {
-		$msg = $text;
-	}
-
-	$msg = "HMCCUCHN: ".$name." ". $msg;
-	readingsSingleUpdate ($hash, "state", "Error", 1);
-	Log3 $name, 1, $msg;
-	return $msg;
-}
 
 1;
 
