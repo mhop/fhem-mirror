@@ -484,6 +484,8 @@ sub _btIP_imgData {
   my $height   = $info->{height};
   $width  =~ s/px//;
   $height =~ s/px//;
+  $width  =~ s/pt//;
+  $height =~ s/pt//;
   ($width,$height)= _btIP_imgRescale($width,$height,$scale);
   my $mimetype = $info->{file_media_type};
   
