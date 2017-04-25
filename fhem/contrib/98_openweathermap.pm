@@ -309,7 +309,7 @@ sub OWO_GetStatus($;$){
 			if(defined($paraVal)){
 				($p, $s, $v, $o) = split(":", AttrVal($name, $paraName, ""));
 				$o = 0 if(!defined($o));
-				$v = ReadingsVal($s, $v, "?") + $o;
+				$v = ReadingsVal($s, $v, 0) + $o;
 				$dataString = $dataString."&$p=$v";
 				Log3($name, 4, "owo $name: reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
