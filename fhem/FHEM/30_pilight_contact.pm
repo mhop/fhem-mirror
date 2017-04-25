@@ -81,9 +81,7 @@ sub pilight_contact_Parse($$)
   my $backend = $mhash->{NAME};
 
   Log3 $backend, 4, "pilight_contact_Parse ($backend): RCV -> $rmsg";
-  
-  Log3 $backend, 4, "pilight_contact_Parse ($backend): RCV -> $rmsg";
-  
+   
   my ($dev,$protocol,$id,$unit,$state,@args) = split(",",$rmsg);
   return () if($dev ne "PICONTACT");
   
@@ -101,8 +99,14 @@ sub pilight_contact_Parse($$)
   }
   
   return () if (!defined($chash->{NAME}));
-
+  
   readingsBeginUpdate($chash);
+  
+  foreach my $arg (@args){
+    my($feature,$value) = split(":",$arg);
+    readingsBulkUpdate($chash,$feature,$value);
+  }
+    
   readingsBulkUpdate($chash,"state",$state);
   readingsEndUpdate($chash, 1);
   

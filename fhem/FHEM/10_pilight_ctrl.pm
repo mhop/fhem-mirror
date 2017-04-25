@@ -896,7 +896,13 @@ sub pilight_ctrl_Parse($$)
       Log3 $me, 4, "$me(Dispatch): $msg";
       return Dispatch($hash, $msg ,undef);
     }
-    case 3 { return Dispatch($hash, "PICONTACT,$proto,$id,$unit,$state",undef); }
+    case 3 { 
+		my $piTempData = "";
+        $piTempData .= ",battery:$data->{$s}{battery}"          if (defined($data->{$s}{battery}));
+        my $msg = "PICONTACT,$proto,$id,$unit,$state$piTempData";
+        Log3 $me, 4, "$me(Dispatch): $msg";
+		return Dispatch($hash, $msg,undef);		
+	}
     case 4 {      
         my $piTempData = "";
         $piTempData .= ",temperature:$data->{$s}{temperature}"  if (defined($data->{$s}{temperature}));
