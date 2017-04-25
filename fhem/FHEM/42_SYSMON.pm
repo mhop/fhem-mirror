@@ -3623,20 +3623,23 @@ sub SYSMON_PowerAcInfo($$) {
   
   my $type="ac";
   my $base = "cat /sys/class/power_supply/".$type."/";
+   
+  my $d_online_t = SYSMON_execute($hash, $base."online");
+  if($d_online_t) {
+    my $d_online = trim($d_online_t);
+    my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+    my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
+    if(defined $d_current) {$d_current/=1000;} else {return $map;}
+    my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
+    if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
     
-  my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
-  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
-  if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
-  if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
-  
-  #$map->{"power_".$type."_online"}=$d_online;
-  #$map->{"power_".$type."_present"}=$d_present;
-  #$map->{"power_".$type."_current"}=$d_current;
-  #$map->{"power_".$type."_voltage"}=$d_voltage;
-  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
+    #$map->{"power_".$type."_online"}=$d_online;
+    #$map->{"power_".$type."_present"}=$d_present;
+    #$map->{"power_".$type."_current"}=$d_current;
+    #$map->{"power_".$type."_voltage"}=$d_voltage;
+    $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
+    $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
+  }
   return $map;
 }
 
