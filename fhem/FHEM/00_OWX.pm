@@ -1124,6 +1124,40 @@ sub OWX_WDBG($$$) {
     main::Log3($name, 1, $msg);
 }
 
+#######################################################################################
+#
+# OWX_WDBG - Write a debug message according to verbosity level
+#
+# Parameter $name= device name
+#           $lvl = verbosity level
+#           $msg = string message
+#           $bin = binary message
+#           
+########################################################################################
+
+sub OWX_WDBGL($$$$) {
+  my ($name,$lvl,$msg,$bin) = @_;
+     
+  if(defined($name) &&
+    defined($attr{$name}) &&
+    defined (my $devlevel = $attr{$name}{verbose})) {
+    return if($lvl > $devlevel);
+
+  } else {
+    return if($lvl > $attr{global}{verbose});
+  }
+
+  my ($i,$j,$k);
+    if( $bin ){ 
+      for($i=0;$i<length($bin);$i++){
+        $j=int(ord(substr($bin,$i,1))/16);
+        $k=ord(substr($bin,$i,1))%16;
+        $msg.=sprintf "0x%1x%1x ",$j,$k;
+      }
+    }
+    main::Log3($name, 1, $msg);
+}
+
 ########################################################################################
 #
 # The following subroutines in alphabetical order are only for direct serial bus interface
@@ -2480,6 +2514,8 @@ sub OWX_Verify_CCC ($$) {
 1;
 
 =pod
+=item device
+=item summary backend module for the OWX system
 =begin html
 
 <a name="OWX"></a>
