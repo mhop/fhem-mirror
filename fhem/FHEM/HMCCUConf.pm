@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.001
+#  Version 4.0.002
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -713,7 +713,7 @@ object oSV = dom.GetObject("\$name");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
-  oSysVars.Add(svObj.ID());
+  oSysVars.Add(oSV.ID());
   oSV.Name("\$name");
   oSV.ValueType(ivtString);
   oSV.ValueSubType(istChar8859);
@@ -738,7 +738,7 @@ object oSV = dom.GetObject("\$name");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
-  oSysVars.Add(svObj.ID());
+  oSysVars.Add(oSV.ID());
   oSV.Name("\$name");
   oSV.ValueType(ivtFloat);
   oSV.ValueSubType(istGeneric);
@@ -765,7 +765,7 @@ object oSV = dom.GetObject("\$name");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
-  oSysVars.Add(svObj.ID());
+  oSysVars.Add(oSV.ID());
   oSV.Name("\$name");
   oSV.ValueType(ivtBinary);
   oSV.ValueSubType(istBool);
@@ -789,7 +789,7 @@ object oSV = dom.GetObject("p2");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
-  oSysVars.Add(svObj.ID());
+  oSysVars.Add(oSV.ID());
   oSV.Name("\$name");
   oSV.ValueType(ivtInteger);
   oSV.ValueSubType(istEnum);

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.001
+#  Version 4.0.002
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -36,7 +36,7 @@
 #  get <name> dump {devtypes|datapoints} [<filter>]
 #  get <name> dutycycle
 #  get <name> exportdefaults {filename}
-#  get <name> firmware [list]
+#  get <name> firmware
 #  get <name> parfile [<parfile>]
 #  get <name> rpcevents
 #  get <name> rpcstate
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.0.001';
+my $HMCCU_VERSION = '4.0.002';
 
 # RPC Ports and URL extensions
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -4589,17 +4589,18 @@ sub HMCCU_GetVariables ($$)
 
 	my $ccureadings = AttrVal ($hash->{NAME}, 'ccureadings', 1);
 
-	my $script = qq(
-object osysvar;
-string ssysvarid;
-foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs())
-{
-   osysvar = dom.GetObject(ssysvarid);
-   WriteLine (osysvar.Name() # "=" # osysvar.Variable() # "=" # osysvar.Value());
-}
-	);
-
-	my $response = HMCCU_HMScript ($hash, $script);
+# 	my $script = qq(
+# object osysvar;
+# string ssysvarid;
+# foreach (ssysvarid, dom.GetObject(ID_SYSTEM_VARIABLES).EnumUsedIDs())
+# {
+#    osysvar = dom.GetObject(ssysvarid);
+#    WriteLine (osysvar.Name() # "=" # osysvar.Variable() # "=" # osysvar.Value());
+# }
+# 	);
+# 
+# 	my $response = HMCCU_HMScript ($hash, $script);
+	my $response = HMCCU_HMScriptExt ($hash, "!GetVariables", undef);
 	return (-2, $result) if ($response eq '');
   
 	readingsBeginUpdate ($hash) if ($ccureadings);
@@ -4894,20 +4895,21 @@ sub HMCCU_RPCGetConfig ($$$$)
 		HMCCU_Trace ($hash, 2, "HMCCU: $fnc: Method=$method Addr=$addr Port=$port", $ccuflags);
 		$res = HMCCURPC_SendBinRequest ($defs{$rpcdev}, $port, $method, $BINRPC_STRING, $addr,
 			$BINRPC_STRING, "MASTER");
-		if ($ccuflags =~ /trace/ && defined ($res)) {
-			Log3 $name, 2, "HMCCU: $fnc: Dump of binary RPC request $method $addr:";
-			Log3 $name, 2, HMCCU_RefToString ($res);
-		}
 	}
 	else {	
 		my $url = "http://".$hmccu_hash->{host}.":".$port."/";
 		$url .= $HMCCU_RPC_URL{$port} if (exists ($HMCCU_RPC_URL{$port}));
 		HMCCU_Trace ($hash, 2, "HMCCU: $fnc: Method=$method Addr=$addr Port=$port", $ccuflags);
 		my $client = RPC::XML::Client->new ($url);
-		my $res = $client->simple_request ($method, $addr, "MASTER");
+		$res = $client->simple_request ($method, $addr, "MASTER");
 	}
-	
+
 	return (-5, "Function not available") if (!defined ($res));
+
+	if ($ccuflags =~ /trace/ && defined ($res)) {
+		Log3 $name, 2, "HMCCU: $fnc: Dump of RPC request $method $addr. Result type=".ref($res);
+		Log3 $name, 2, HMCCU_RefToString ($res);
+	}
 
 	if (ref ($res) eq 'HASH') {
 		my $parcount = scalar (keys %$res);
