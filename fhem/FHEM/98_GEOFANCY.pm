@@ -341,63 +341,49 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
     # update ROOMMATE devices associated with this device UUID
     my $matchingResident = 0;
     delete $hash->{ROOMMATES};
-    if ( defined( $modules{ROOMMATE}{defptr} ) ) {
-        Log3 $name, 5, "GEOFANCY $name: found defptr for ROOMMATE\n"
-          . Dumper( $modules{ROOMMATE}{defptr} );
+    foreach my $gdev ( devspec2array("rr_geofenceUUIDs=.+") ) {
+        next unless ( IsDevice( $gdev, "ROOMMATE" ) );
+        Log3 $name, 5, "GEOFANCY $name: Checking rr_geofenceUUIDs for $gdev";
+        my $geofenceUUIDs = AttrVal( $gdev, "rr_geofenceUUIDs", undef );
 
-        while ( my ( $key, $value ) = each %{ $modules{ROOMMATE}{defptr} } ) {
-            Log3 $name, 5, "GEOFANCY $name: Checking rr_geofenceUUIDs for $key";
+        $hash->{ROOMMATES} .= ",$gdev" if $hash->{ROOMMATES};
+        $hash->{ROOMMATES} = $gdev if !$hash->{ROOMMATES};
 
-            my $geofenceUUIDs = AttrVal( $key, "rr_geofenceUUIDs", undef );
-            next if !$geofenceUUIDs;
-
-            Log3 $name, 5,
-"GEOFANCY $name: ROOMMATE device $key has assigned UUIDs: $geofenceUUIDs";
-
-            $hash->{ROOMMATES} .= ",$key" if $hash->{ROOMMATES};
-            $hash->{ROOMMATES} = $key if !$hash->{ROOMMATES};
-
-            my @UUIDs = split( ',', $geofenceUUIDs );
-
-            if (@UUIDs) {
-                foreach (@UUIDs) {
-                    if ( $_ eq $device ) {
-                        Log3 $name, 4,
-"GEOFANCY $name: Found matching UUID at ROOMMATE device $key";
-                        $deviceAlias      = $key;
-                        $matchingResident = 1;
-                        last;
-                    }
+        my @UUIDs = split( ',', $geofenceUUIDs );
+        if (@UUIDs) {
+            foreach (@UUIDs) {
+                if ( $_ eq $device ) {
+                    Log3 $name, 4,
+                      "GEOFANCY $name: "
+                      . "Found matching UUID at ROOMMATE device $gdev";
+                    $deviceAlias      = $gdev;
+                    $matchingResident = 1;
+                    last;
                 }
             }
         }
     }
 
-    delete $hash->{GUESTS};
-
     # update GUEST devices associated with this device UUID
-    if ( $matchingResident == 0 && defined( $modules{GUEST}{defptr} ) ) {
-        while ( my ( $key, $value ) = each %{ $modules{GUEST}{defptr} } ) {
-            my $geofenceUUIDs = AttrVal( $key, "rg_geofenceUUIDs", undef );
-            next if !$geofenceUUIDs;
+    delete $hash->{GUESTS};
+    foreach my $gdev ( devspec2array("rg_geofenceUUIDs=.+") ) {
+        next unless ( IsDevice( $gdev, "GUEST" ) );
+        Log3 $name, 5, "GEOFANCY $name: Checking rg_geofenceUUIDs for $gdev";
+        my $geofenceUUIDs = AttrVal( $gdev, "rg_geofenceUUIDs", undef );
 
-            Log3 $name, 5,
-"GEOFANCY $name: GUEST device $key has assigned UUIDs: $geofenceUUIDs";
+        $hash->{GUESTS} .= ",$gdev" if $hash->{GUESTS};
+        $hash->{GUESTS} = $gdev if !$hash->{GUESTS};
 
-            $hash->{GUESTS} .= ",$key" if $hash->{GUESTS};
-            $hash->{GUESTS} = $key if !$hash->{GUESTS};
-
-            my @UUIDs = split( ',', $geofenceUUIDs );
-
-            if (@UUIDs) {
-                foreach (@UUIDs) {
-                    if ( $_ eq $device ) {
-                        Log3 $name, 4,
-"GEOFANCY $name: Found matching UUID at GUEST device $key";
-                        $deviceAlias      = $key;
-                        $matchingResident = 1;
-                        last;
-                    }
+        my @UUIDs = split( ',', $geofenceUUIDs );
+        if (@UUIDs) {
+            foreach (@UUIDs) {
+                if ( $_ eq $device ) {
+                    Log3 $name, 4,
+                      "GEOFANCY $name: "
+                      . "Found matching UUID at GUESTS device $gdev";
+                    $deviceAlias      = $gdev;
+                    $matchingResident = 1;
+                    last;
                 }
             }
         }
@@ -410,18 +396,13 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
     delete $hash->{helper}{device_names}
       if $hash->{helper}{device_names};
 
-    if ( defined( $attr{$name}{devAlias} ) ) {
-        my @devices = split( ' ', $attr{$name}{devAlias} );
-
-        if (@devices) {
-            foreach (@devices) {
-                my @device = split( ':', $_ );
-                $hash->{helper}{device_aliases}{ $device[0] } =
-                  $device[1];
-                $hash->{helper}{device_names}{ $device[1] } =
-                  $device[0];
-            }
-        }
+    my @devices = split( ' ', AttrVal( $name, "devAlias", "" ) );
+    foreach (@devices) {
+        my @device = split( ':', $_ );
+        $hash->{helper}{device_aliases}{ $device[0] } =
+          $device[1];
+        $hash->{helper}{device_names}{ $device[1] } =
+          $device[0];
     }
 
     $deviceAlias = $hash->{helper}{device_aliases}{$device}
@@ -497,22 +478,16 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
             # backup last known location if not "underway"
             $currReading = "currLoc_" . $deviceAlias;
-            if ( defined( $hash->{READINGS}{$currReading}{VAL} )
-                && $hash->{READINGS}{$currReading}{VAL} ne "underway" )
-            {
+            my $currVal = ReadingsVal( $name, $currReading, undef );
+            if ( $currVal && $currVal ne "underway" ) {
                 foreach ( 'Loc', 'LocLat', 'LocLong', 'LocAddr' ) {
                     $currReading = "curr" . $_ . "_" . $deviceAlias;
                     $lastReading = "last" . $_ . "_" . $deviceAlias;
-                    readingsBulkUpdate( $hash, $lastReading,
-                        $hash->{READINGS}{$currReading}{VAL} )
-                      if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+                    readingsBulkUpdate( $hash, $lastReading, $currVal );
                 }
                 $currReading = "currLocTime_" . $deviceAlias;
-                readingsBulkUpdate(
-                    $hash,
-                    "lastLocArr_" . $deviceAlias,
-                    $hash->{READINGS}{$currReading}{VAL}
-                ) if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+                readingsBulkUpdate( $hash, "lastLocArr_" . $deviceAlias,
+                    $currVal );
                 readingsBulkUpdate( $hash, "lastLocDep_" . $deviceAlias,
                     $time );
             }
@@ -541,9 +516,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         RESIDENTStk_SetLocation(
             $deviceAlias, $locName, $trigger, $id, $time,
             $lat,         $long,    $address, $device
-          )
-          if ( $defs{$deviceAlias}{TYPE} eq "ROOMMATE"
-            || $defs{$deviceAlias}{TYPE} eq "GUEST" );
+        ) if ( IsDevice( $deviceAlias, "ROOMMATE|GUEST" ) );
     }
 
     $msg = lc($entry) . " OK";
