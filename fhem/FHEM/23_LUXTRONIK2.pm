@@ -3,7 +3,7 @@
 #
 #  23_LUXTRONIK2.pm 
 #
-#  (c) 2012,2014 Torsten Poitzsch (torsten poitzsch at gmx . de)
+#  (c) 2012-2017 Torsten Poitzsch
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar at fessel . org)
 #
 #  Copyright notice
@@ -48,9 +48,9 @@ sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
 sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 
-  #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
-  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
+#List of firmware versions that are known to be compatible with this modul
+my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
+my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -135,6 +135,7 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{statBoilerHeatUpStep} = 0;
   $hash->{fhem}{statBoilerCoolDownStep} = 0;
   $hash->{fhem}{defrost}{mode}="none";
+  $hash->{fhem}{hotWaterLastRun} = 0;
  
   $hash->{fhem}{modulVersion} = '$Date$';
        
@@ -829,7 +830,7 @@ LUXTRONIK2_UpdateDone($)
    my $returnTemperature = LUXTRONIK2_CalcTemp($a[16]);
    my $returnTemperatureTarget = LUXTRONIK2_CalcTemp($a[17]);
    my $returnTempHyst = LUXTRONIK2_CalcTemp($a[68]);
-   my $returnTemperatureTargetMin = LUXTRONIK2_CalcTemp($a[63]);
+   my $returnTemperatureTargetMin = ($a[63] eq "no"?15:LUXTRONIK2_CalcTemp($a[63]) );
    my $compressor1 = $a[6]; #Ausgang Verdichter 1
    my $heatSourceMotor = $a[64]; #Ausgang Ventilator_BOSUP
    my $defrostValve = $a[67]; #AVout
@@ -1000,6 +1001,14 @@ LUXTRONIK2_UpdateDone($)
          }
          
       }
+      
+   # Determine last real heatings system return temperature
+     $hash->{fhem}{hotWaterLastRun} = time()     if $hotWaterBoilerValve;
+     $hash->{fhem}{heatingPumpLastStop} = time()     if !$heatingSystemCircPump;
+     readingsBulkUpdate( $hash, "returnTemperatureHeating", $returnTemperature)
+         if $heatingSystemCircPump && !$hotWaterBoilerValve 
+            && time() - $hash->{fhem}{hotWaterLastRun} >= 180 
+            && time() - $hash->{fhem}{heatingPumpLastStop} >= 120;
       
    # Device and reading times, delays and durations
      $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
@@ -1309,7 +1318,7 @@ sub LUXTRONIK2_SetParameter ($$$)
     #limit temperature range
     $realValue = 0.5 if( $realValue < 0.5 );
     $realValue = 3.0 if( $realValue > 3.0 );
-    #Allow only integer temperatures
+    #Allow only temperatures with decimal .1
     $setValue = int($realValue * 10);
     $realValue = $setValue / 10;
   }
@@ -1320,8 +1329,8 @@ sub LUXTRONIK2_SetParameter ($$$)
     #limit temperature range
     $realValue = -5 if( $realValue < -5 );
     $realValue = 5 if( $realValue > 5 );
-    #Allow only integer temperature or with decimal .5
-    $setValue = int($realValue * 2) * 5;
+    #Allow only temperatures with decimal .1
+    $setValue = int($realValue * 10);
     $realValue = $setValue / 10;
   }
 
@@ -1399,11 +1408,12 @@ sub LUXTRONIK2_synchronizeClock (@)
   $maxDelta = 600 unless $maxDelta <= 600;
          
    LUXTRONIK2_Log $name, 5, "Open telnet connection to $host";
-     my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return');
-      if (!$telnet) {
-       LUXTRONIK2_Log $name, 1, $telnet->errmsg;
-        return "$name synchronizeDeviceClock-Error: ".$telnet->errmsg;
-      }
+   my $telnet = new Net::Telnet ( host=>$host, port => 23, timeout=>10, errmode=>'return');
+   if (!$telnet) {
+      my $msg = "Could not open telnet connection to $host: $!";
+      LUXTRONIK2_Log $name, 1, $msg;
+      return "$name synchronizeDeviceClock-Error: ".$msg;
+   }
   
     LUXTRONIK2_Log $name, 5, "Log into $host";
       if (!$telnet->login('root', '')) {
@@ -2117,7 +2127,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperature&gt;</code>
          <br>
-         Decreasing or increasing of the returnTemperatureTarget by -5 K till + 5 K
+         Decreasing or increasing of the returnTemperatureTarget by -5 K till + 5 K. Adjustable in 0.1 steps.
          </li><br>
       <li><code>statusRequest</code><br>
          Update device information
@@ -2249,7 +2259,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
-         Absenkung oder Anhebung der R&uuml;cklauftemperatur von -5&deg;C bis + 5&deg;C
+         Absenkung oder Anhebung der R&uuml;cklauftemperatur von -5 K bis + 5K. In 0.1er Schritten einstellbar.
          </li><br>
      <li><code>INTERVAL &lt;Sekunden&gt;</code>
          <br>
