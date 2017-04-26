@@ -55,8 +55,8 @@ sub Nmap_Initialize($) {
   $hash->{SetFn}    = $TYPE."_Set";
   $hash->{AttrFn}   = $TYPE."_Attr";
 
-  $hash->{AttrList} =
-      "absenceThreshold "
+  $hash->{AttrList} = ""
+    . "absenceThreshold "
     . "args "
     . "deleteOldReadings "
     . "devAlias:textField-long "
@@ -182,10 +182,7 @@ sub Nmap_Attr(@) {
   if($attribute eq "args"){
     $hash->{ARGS} = $cmd eq "set" ? $value : "-sn";
   }
-  elsif(
-       $attribute eq "devAlias"
-    && $cmd eq "set"
-  ){
+  elsif($attribute eq "devAlias" && $cmd eq "set"){
     return(
         "$SELF: Value \"$value\" is not allowed for devAlias!\n"
       . "Must be \"&lt;ID>:<ALIAS> &lt;ID2>:<ALIAS2> ...\", "
@@ -282,9 +279,8 @@ sub Nmap_statusRequest($) {
     return;
   }
 
-  if(
-       AttrVal($SELF, "sudo", 0) == 1
-    && qx(sudo -n $path -V 2>&1 > /dev/null)
+  if(   AttrVal($SELF, "sudo", 0) == 1
+     && qx(sudo -n $path -V 2>&1 > /dev/null)
   ){
     readingsSingleUpdate($hash, "state", "aborted", 1);
     Log3($SELF, 1, "$TYPE ($SELF) - sudo password required");
@@ -413,9 +409,8 @@ sub Nmap_done($) {
 
         last;
       }
-      if(
-           $oldMetaReading
-        && ReadingsVal($SELF, $oldMetaReading."_ip", "") ne $ip
+      if(   $oldMetaReading
+         && ReadingsVal($SELF, $oldMetaReading."_ip", "") ne $ip
       ){
         Log3($SELF, 4, "$TYPE ($SELF) - new IP: $hostname ($ip)");
 
@@ -429,9 +424,8 @@ sub Nmap_done($) {
       DoTrigger($SELF, "new host: $hostname ($ip)");
     }
 
-    if(
-         $oldMetaReading && $oldMetaReading ne $metaReading
-      && AttrVal($SELF, "keepReadings", 0) == 0
+    if(   $oldMetaReading && $oldMetaReading ne $metaReading
+       && AttrVal($SELF, "keepReadings", 0) == 0
     ){
       delete $knownHosts{$oldMetaReading};
       CommandDeleteReading(undef, "$SELF $oldMetaReading.*");
@@ -453,9 +447,8 @@ sub Nmap_done($) {
   }
 
   foreach (keys %knownHosts){
-    next if(
-         $knownHosts{$_} == 1
-      || ReadingsVal($SELF, $_."_state", "present") eq "absent"
+    next if(   $knownHosts{$_} == 1
+            || ReadingsVal($SELF, $_."_state", "present") eq "absent"
     );
 
     my $absenceThreshold = ReadingsVal($SELF, ".".$_."_absenceThreshold", 1);
@@ -616,7 +609,9 @@ sub Nmap_updateUptime($$;$) {
       Nmap will scan all IP addresses where the first numbits match those of
       the given IP or host name. For example, 192.168.10.0/24 would scan the
       256 hosts between 192.168.10.0 and 192.168.10.255. 192.168.10.40/24 would
-      scan exactly the same targets.<br>
+      scan exactly the same targets. It's also possible to scan multiple
+      networks at the same time. For example 192.168.1.0/24 192.168.2.0/24
+      would scan the 512 hosts between 192.168.1.0 and 192.168.2.255.<br>
       See
       <a href="https://nmap.org/man/de/man-target-specification.html">
         <u>Nmap Manpage (Specifying Destinations)</u>
@@ -879,7 +874,9 @@ sub Nmap_updateUptime($$;$) {
       IP oder des gegebenen Hostnamens &uuml;bereinstimmen. Zum Beispiel
       w&uuml;rde 192.168.10.0/24 die 256 Hosts zwischen 192.168.10.0 und
       192.168.10.255 scannen. 192.168.10.40/24 w&uuml;rde genau dieselben Ziele
-      scannen.<br>
+      scannen. Es ist auch möglich mehrere Netzwerke zur gleichen Zeit zu
+      scannen. Zum Beispiel w&uuml;rde 192.168.1.0/24 192.168.2.0/24 die 512
+      Hosts zwischen 192.168.1.0 und 192.168.2.255 scannen.<br>
       Siehe
       <a href="https://nmap.org/man/de/man-target-specification.html">
         <u>Nmap Man Page (Angabe von Zielen)</u>
