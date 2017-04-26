@@ -253,6 +253,7 @@ AggrIntDoIf
   my $average;
   my $extrem;
   my $name;
+  my $devname;
   my $err;
   my $ret;
   my $result;
@@ -264,13 +265,13 @@ AggrIntDoIf
   my $warning=0;
   my $mode=substr($modeType,0,1);
   my $type;
-  my $dec;
+  my $format;
   my $place;
   my $number;
   
-  if ($modeType =~ /.(sum|average|max|min)?[:]?(d(\d)?)?/) {
+if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
     $type = (defined $1)? $1 : "";
-    $dec= $2;
+    $format= (defined $2)? $2 : "";
     $place= $3;
   }
   
@@ -324,31 +325,36 @@ AggrIntDoIf
     } else {
       $ret=1;
     }
+    if ($format eq "a") {
+      $devname=AttrVal($name,"alias",$name);
+    } else {
+      $devname=$name;
+    }
     if ($ret) {
       if ($type eq ""){
         $num++;
-        push (@devices,$name);
+        push (@devices,$devname);
       } elsif (defined $value) {
         if ($type eq "sum" or $type eq "average") {
-           $num++;
-           push (@devices,$name);
+          $num++;
+          push (@devices,$devname);
           $sum+=$number;
         } elsif ($type eq "max") {
             if (!defined $extrem or $number>$extrem) {
               $extrem=$number;
-              @devices=($name);
+              @devices=($devname);
             }  
         } elsif ($type eq "min") {
             if (!defined $extrem or $number<$extrem) {
               $extrem=$number;
-              @devices=($name);
+              @devices=($devname);
             }
         }
       }
     }
   }
   
-  delete ($defs{$hash->{NAME}}{READINGS}{warning_aggr}) if ($warning==0);
+  delete ($defs{$hash->{NAME}}{READINGS}{warning_aggr}) if (defined $hash and $warning==0);
   
   if ($type eq "max" or $type eq "min") {
     $extrem=0 if (!defined $extrem);  
@@ -363,7 +369,7 @@ AggrIntDoIf
     $result=$num;
   }
   if ($mode eq "#") {
-    if (defined $dec) {
+    if ($format eq "d") {
       $result = ($result =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
       $result = round ($result,$place) if (defined $place);
     } 
@@ -394,10 +400,14 @@ AggregateDoIf
   my ($hash,$modeType,$device,$reading,$cond,$default)=@_;
   my $mode=substr($modeType,0,1);
   my $type=substr($modeType,1);
+  my $splittoken=",";
+  if ($modeType =~ /.(?:sum|average|max|min)?[:]?[^s]*(?:s\((.*)\))?/) {
+    $splittoken=$1 if (defined $1);
+  } 
   if ($mode eq "#") {
     return (AggrIntDoIf($hash,$modeType,$device,$reading,$cond,$default));
   } elsif ($mode eq "@") {
-    return (join (",",AggrIntDoIf($hash,$modeType,$device,$reading,$cond,$default)));
+    return (join ($splittoken,AggrIntDoIf($hash,$modeType,$device,$reading,$cond,$default)));
   }
   return ("");
 }
@@ -2815,7 +2825,7 @@ Die Angabe des Readings kann weggelassen werden, dann wird lediglich nach entspr
 <br>
 Syntax:<br>
 <br>
-<code>[&lt;function&gt;:"&lt;regex device&gt;:&lt;regex event&gt;":&lt;reading&gt;:&lt;condition&gt;,&lt;default&gt;]</code><br>
+<code>[&lt;function&gt;:&lt;format&gt;:"&lt;regex device&gt;:&lt;regex event&gt;":&lt;reading&gt;:&lt;condition&gt;,&lt;default&gt;]</code><br>
 <br>
 &lt;function&gt;:<br>
 <br>
@@ -2828,7 +2838,7 @@ Syntax:<br>
 <b>@max</b>  Device des höchsten Wertes<br>
 <b>@min</b>  Device de niedrigsten Wertes<br>
 <br>
-&lt;function&gt;:d&lt;number&gt optional kann das Ergebnis auf Nachkommastellen gerundet werden, dazu wird an die Funktion getrennt durch einen Doppelpunkt der Buchstabe "d" gefolgt von einer Ziffer (&lt;number&gt) angegeben. Die Ziffer gibt die Anzahl der Nachkommastellen an.<br>
+&lt;format&gt; <code>d&lt;number&gt</code> zum Runden des Wertes mit Nachkommastellen, <code>a</code> für Aliasnamen bei Devicelisten, <code>s(&lt;splittoken&gt)</code> &lt;splittoken&gt sind Trennzeichen in der Device-Liste<br> 
 <br> 
 "&lt;regex Device&gt;:&lt;regex Event&gt;" spezifiziert sowohl die betroffenen Devices, als auch den Ereignistrigger, die Syntax entspricht der DOIF-Syntax für Ereignistrigger.<br>
 Die Angabe &lt;regex Event&gt; ist im Ausführungsteil nicht sinnvoll und sollte weggelassen werden.<br>
@@ -2839,7 +2849,7 @@ Die Angabe &lt;regex Event&gt; ist im Ausführungsteil nicht sinnvoll und sollte
 <br>
 &lt;default&gt; Default-Wert, falls kein Device gefunden wird, entspricht der Syntax des Default-Wertes bei Readingangaben<br>
 <br>
-&lt;reading&gt;, &lt;condition&gt;,  &lt;default&gt; sind optional<br>
+&lt;format&gt;, &lt;reading&gt;, &lt;condition&gt;,  &lt;default&gt; sind optional<br>
 <br>
 <u>Syntax-Beispiele im Ausführungteil</u><br>
 <br>
@@ -2850,6 +2860,10 @@ Anzahl der Devices, die mit "window" beginnen:<br>
 Liste der Devices, die mit "window" beginnen:<br>
 <br>
 <code>[@"^window"]</code><br>
+<br>
+Liste der Devices, die mit "window" beginnen, es werden Aliasnamen ausgegeben, falls definiert:<br>
+<br>
+<code>[@:a"^window"]</code><br>
 <br>
 Liste der Devices, die mit "windows" beginnen und ein Reading "myreading" beinhalten:<br>
 <br>
