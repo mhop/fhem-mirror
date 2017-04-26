@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.0alpha8";
+my $version = "2.0alpha9";
 
 #-- these we may get on request
 my %gets = (
@@ -597,9 +597,9 @@ sub DoorPi_GetLockstate($) {
     }
   }
   if( $ret =~ /^locked.*/){
-    DoorPi_Cmd($hash,"locked");
+    DoorPi_Cmd($hash,"doorlocked");
   }elsif( $ret =~ /^unlocked.*/){
-    DoorPi_Cmd($hash,"unlocked");
+    DoorPi_Cmd($hash,"doorunlocked");
   } 
   readingsSingleUpdate($hash,"lockstate",$ret,1);
   return $ret;
@@ -654,7 +654,8 @@ sub DoorPi_GetConfig {
   my $keyboards = $jhash0->{"config"}->{"keyboards"};
   my $fskey;
   my $fscmds;
-  foreach my $key (sort(keys $keyboards)) {
+
+  foreach my $key (sort(keys %{$keyboards})) {
     $fskey = $key
       if( $keyboards->{$key} eq "filesystem");
   }
@@ -673,8 +674,7 @@ sub DoorPi_GetConfig {
     #-- initialize command list
     @{$hash->{HELPER}->{CMDS}} = ();
       
-    foreach my $key (sort(keys $fscmds)) {
-    
+    foreach my $key (sort(keys %{$fscmds})) {
       #-- check for door buttons
       if($key =~ /dooropen/){
         push(@{ $hash->{HELPER}->{CMDS}},"$door");
