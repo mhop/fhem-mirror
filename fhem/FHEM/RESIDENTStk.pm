@@ -1030,7 +1030,7 @@ m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?
                 $attr{$name}{alias} = "Bewohner"
                   if ( !defined( $attr{$name}{alias} )
                     || $attr{$name}{alias} eq "Residents" );
-                $attr{$name}{group} = "Haus Status"
+                $attr{$name}{group} = "Zuhause Status"
                   if ( !defined( $attr{$name}{group} )
                     || $attr{$name}{group} eq "Home State" );
             }
@@ -1052,7 +1052,7 @@ m/^([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?)([a-zA-Z\d._]+(:[A-Za-z\d_\.\-\/]+)?,?
                     || $attr{$name}{alias} eq "Bewohner" );
                 $attr{$name}{group} = "Home State"
                   if ( !defined( $attr{$name}{group} )
-                    || $attr{$name}{group} eq "Haus Status" );
+                    || $attr{$name}{group} eq "Zuhause Status" );
             }
 
             $attr{$name}{devStateIcon} =
@@ -1112,7 +1112,7 @@ sub RESIDENTStk_Notify($$) {
                     # DELETED would normally be handled by fhem.pl and imply
                     # DoModuleTrigger instead of DoInitDev to update module
                     # init state
-                    next if ($_ =~ /^DELETED/);
+                    next if ( $_ =~ /^DELETED/ );
                     DoInitDev($name);
                 }
                 else {
@@ -1318,9 +1318,9 @@ m/^0|false|absent|disappeared|unavailable|unreachable|disconnected|1|true|presen
             for (@presenceDevices) {
                 my $r = "presence";
                 my $d = $_;
-                if ( $d =~ m/^([a-zA-Z\d._]+)(?::([A-Za-z\d_\.\-\/]*))?$/ ) {
+                if ( $d =~ m/^([a-zA-Z\d._]+):(?:([A-Za-z\d_\.\-\/]*))?$/ ) {
                     $d = $1;
-                    $r = $2;
+                    $r = $2 if ($2 && $2 ne "");
                 }
 
                 my $presenceState =
@@ -3490,8 +3490,16 @@ sub RESIDENTStk_StopInternalTimers($) {
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 }
 
-sub RESIDENTStk_findResidentSlaves($) {
+sub RESIDENTStk_findHomestateSlaves($) {
     my ($hash) = @_;
+    my $ret = "";
+    $ret .= AttrVal( $hash->{NAME}, "rh_residentsDevice", "" );
+
+    return $ret;
+}
+
+sub RESIDENTStk_findResidentSlaves($;$) {
+    my ( $hash, $ret ) = @_;
     my $ROOMMATES;
     foreach ( devspec2array("TYPE=ROOMMATE") ) {
         next
@@ -3532,7 +3540,8 @@ sub RESIDENTStk_findResidentSlaves($) {
         $hash->{GUESTS} = $GUESTS;
     }
 
-    my $ret = "";
+    $ret = "" unless ($ret);
+    $ret .= "," unless ( $ret eq "" );
     $ret .= $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
     $ret .= "," unless ( $ret eq "" );
     $ret .= $hash->{GUESTS} if ( $hash->{GUESTS} );
@@ -3582,6 +3591,7 @@ sub RESIDENTStk_findDummySlaves($;$) {
 sub RESIDENTStk_GetPrefixFromType($) {
     my ($name) = @_;
     return "" unless ( defined($name) );
+    return "rh_"  if ( GetType($name) eq "HOMESTATE" );
     return "rgr_" if ( GetType($name) eq "RESIDENTS" );
     return "rr_"  if ( GetType($name) eq "ROOMMATE" );
     return "rg_"  if ( GetType($name) eq "GUEST" );
