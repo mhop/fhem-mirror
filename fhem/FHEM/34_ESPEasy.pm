@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.03;       # Version of this module
+my $module_version    = 1.04;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -2426,8 +2426,8 @@ sub ESPEasy_removeGit($)
       defined.
     </li>
     <li>You have to configure your ESP to use "FHEM HTTP" controller protocol.
-      Furthermore the ESP controller port and the FHEM ESPEasy bridge port must
-      be the same, of cause.
+      Furthermore ESP controller IP must match FHEM's IP address. ESP controller
+      port and the FHEM ESPEasy bridge port must be the same.
     </li>
     <br>
   </ul>
@@ -2480,8 +2480,8 @@ sub ESPEasy_removeGit($)
       <br>
       
     <li><a name="">queueSize</a><br>
-      returns number of entries for each queue (<ip>:number [<ip>:number] 
-      [...]).
+      returns number of entries for each queue (&lt;ip&gt;:number 
+      [&lt;ip&gt;:number] [...]).
       </li><br>
 
     <li><a name="">user</a><br>
@@ -2502,17 +2502,21 @@ sub ESPEasy_removeGit($)
       required values: <code>help|pass|user</code></li><br>
       
     <li><a name="">clearQueue</a><br>
-      Used to erase command queues.<br>
+      Used to erase all command queues.<br>
       required value: <code>&lt;none&gt;</code><br>
       eg. : <code>set ESPBridge clearQueue</code></li><br>
 
     <li><a name="">pass</a><br>
       Specifies password used by basic authentication for incoming requests.<br>
+      Note that attribute <a href="#ESPEasy_authentication">authentication</a>
+      must be set to enable basic authentication, too.<br>
       required value: <code>&lt;password&gt;</code><br>
       eg. : <code>set ESPBridge pass secretpass</code></li><br>
       
     <li><a name="">user</a><br>
       Specifies username used by basic authentication for incoming requests.<br>
+      Note that attribute <a href="#ESPEasy_authentication">authentication</a>
+      must be set to enable basic authentication, too.<br>
       required value: <code>&lt;username&gt;</code><br>
       eg. : <code>set ESPBridge user itsme</code></li><br>
   </ul>
@@ -2534,7 +2538,7 @@ sub ESPEasy_removeGit($)
       Eg. fe80::/10,2001:1a59:50a9::/48,2002:1a59:50a9::,2003:1a59:50a9:acdc::36
       </li><br>
 
-    <li><a name="">authentication</a><br>
+    <li><a name="ESPEasy_authentication">authentication</a><br>
       Used to enable basic authentication for incoming requests.<br>
       Note that user, pass and authentication attribute must be set to activate
       basic authentication<br>
@@ -2543,13 +2547,17 @@ sub ESPEasy_removeGit($)
 
     <li><a name="">autocreate</a><br>
       Used to overwrite global autocreate setting.<br>
+      Global autocreate setting will be detected by global attribut 
+      'autoload_undefined_devices'<br>
       Possible values: 0,1<br>
-      Default: not set</li><br>
+      Default: 0 (disabled)</li><br>
       
     <li><a name="">autosave</a><br>
       Used to overwrite global autosave setting.<br>
+      Global autosave setting will be detected by global attribut 'autosave'.
+      <br>
       Possible values: 0,1<br>
-      Default: not set</li><br>
+      Default: 0 (disabled)</li><br>
       
     <li><a name="ESPEasy_combineDevices">combineDevices</a><br>
       Used to gather all ESP devices of a single ESP into 1 FHEM device even if
@@ -2673,7 +2681,7 @@ sub ESPEasy_removeGit($)
     <li><a name="">&lt;reading&gt;</a><br>
       returns the value of the specified reading</li><br>
       
-    <li><a name="">pinMap</a><br>
+    <li><a name="ESPEasy_pinMap">pinMap</a><br>
       returns possible alternative pin names that can be used in commands</li>
       <br>
   </ul>
@@ -2687,7 +2695,7 @@ sub ESPEasy_removeGit($)
     - Users of Wemos D1 mini or NodeMCU can use Arduino pin names instead of
     GPIO numbers:<br>
     &nbsp;&nbsp;D1 =&gt; GPIO5, D2 =&gt; GPIO4, ...,TX =&gt; GPIO1 (see: get
-    pinMap)<br>
+    <a href="#ESPEasy_pinMap">pinMap</a>)<br>
     - low/high state can be written as 0/1 or on/off
     <br><br>
 
@@ -2969,7 +2977,7 @@ sub ESPEasy_removeGit($)
       Enable the following commands and map them to the specified ESPEasy
       command: rgb, ct, pct, on, off, toggle<br>
       Needed if you want to use FHEM's colorpickers to control a rgb/ct ESPEasy
-      plugin.
+      plugin.<br>
       required values: <code>a valid set command</code><br>
       eg. <code>attr &lt;esp&gt; mapLightCmds Lights</code></li><br>
 
@@ -2977,7 +2985,7 @@ sub ESPEasy_removeGit($)
       Used to enable/disable presence check for ESPs<br>
       Presence check determines the presence of a device by readings age. If any
       reading of a device is newer than <a href="#ESPEasy_Interval">interval</a>
-      seconds than it is marked as being present. This kind of check works for
+      seconds then it is marked as being present. This kind of check works for
       ESP devices in deep sleep too but require at least 1 reading that is
       updated regularly.<br>
       Possible values: 0,1<br>
@@ -2990,8 +2998,8 @@ sub ESPEasy_removeGit($)
 
     <li><a name="">setState</a><br>
       Summarize received values in state reading.<br>
-      A positive number determines the number of characters used for reading
-      names. Only readings with an age less than 
+      A positive number determines the number of characters used for abbreviated
+      reading names. Only readings with an age less than 
       <a href="#ESPEasy_Interval">interval</a> will be considered. If your are
       not satisfied with format or behavior of setState then disable this
       attribute (set to 0) and use global attributes userReadings and/or
