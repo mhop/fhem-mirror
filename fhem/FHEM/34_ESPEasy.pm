@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.04;       # Version of this module
+my $module_version    = 1.05;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -82,6 +82,8 @@ my %ESPEasy_setCmds = (
   "help"           => "1",
   "lights"         => "1",
   "dots"           => "1",
+  "tone"           => "3",
+  "rtttl"          => "1"
 );
 
 # ------------------------------------------------------------------------------
@@ -116,6 +118,8 @@ my %ESPEasy_setCmdsUsage = (
   "help"           => "help <".join("|", sort keys %ESPEasy_setCmds).">",
   "lights"         => "light <rgb|ct|pct|on|off|toggle> [color] [fading time] [pct]",
   "dots"           => "dots <params>",
+  "tone"           => "tone <pin> <freq> <duration>",
+  "rtttl"          => "rtttl <RTTTL>",
 
   #Lights
   "rgb"            => "rgb <rrggbb> [fading time]",
@@ -2835,6 +2839,20 @@ sub ESPEasy_removeGit($)
       of hex code&gt;
       </code><br>
       eg. <code>irsend NEC 7E81542B 32</code>
+      </li><br>
+      
+    <li><a name="">tone</a><br>
+      Play a tone on a pin via a speaker or piezo element (ESPEasy &gt;= 
+      2.0.0-dev6)
+      <br>
+      required arguments: &lt;pin&gt; &lt;freq&gt; &lt;duration&gt;
+      </li><br>
+      
+    <li><a name="">rtttl</a><br>
+      Play melodies via <a target="_NEW" href="https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language#Technical_specification">RTTTL</a>
+      (ESPEasy &gt;= 2.0.0-dev6)
+      <br>
+      required arguments: &lt;pin&gt; &lt;freq&gt; &lt;duration&gt;
       </li><br>
       
     <li><a name="">status</a><br>
