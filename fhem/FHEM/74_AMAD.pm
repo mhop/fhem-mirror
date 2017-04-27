@@ -37,7 +37,7 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.6.12";
+my $modulversion = "2.6.13";
 my $flowsetversion = "2.6.12";
 
 
@@ -1326,7 +1326,9 @@ sub AMAD_CommBridge_Read($) {
     if( defined($fhemcmd) and ($fhemcmd) ) {
         if ( $fhemcmd =~ /setreading\b/ ) {
             my $tv = $data[1];
-
+            return Log3 $bname, 3, "AMAD ($bname) - AMAD_CommBridge: processing receive no reading values from Device: $device"
+            unless( defined($tv) and ($tv) );
+            
             Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: processing receive reading values - Device: $device Data: $tv";
     
             AMAD_ResponseProcessing($dhash,$tv);
