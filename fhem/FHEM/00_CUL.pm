@@ -423,7 +423,8 @@ CUL_Get($@)
   } else {
 
     CUL_SimpleWrite($hash, $gets{$a[1]}[0] . $arg);
-    ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, $gets{$a[1]}[1]);
+    my $mtch = defined($a[3]) ? $a[3] : $gets{$a[1]}[1]; # optional
+    ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, $mtch);
     if(!defined($msg)) {
       DevIo_Disconnected($hash);
       $msg = "No answer";
