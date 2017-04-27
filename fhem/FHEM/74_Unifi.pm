@@ -63,6 +63,8 @@ sub Unifi_Initialize($$) {
     $hash->{NotifyFn}  = "Unifi_Notify";
     $hash->{AttrList}  = "disable:1,0 "
                          ."devAlias "
+                         ."ignoreWiredClients:1,0 "
+                         ."ignoreWirelessClients:1,0 "
                          ."httpLoglevel:1,2,3,4,5 "
                          ."eventPeriod "
                          .$readingFnAttributes;
@@ -802,19 +804,29 @@ sub Unifi_SetClientReadings($) {
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
     
-    my ($apName,$clientName,$apRef,$clientRef);
-    
+    my $apNames = {};
+    for my $apID (keys %{$hash->{accespoints}}) {
+      my $apRef = $hash->{accespoints}->{$apID};
+      $apNames->{$apRef->{mac}} = $apRef->{name} ? $apRef->{name} : $apRef->{ip};
+    }
+
+    my $ignoreWired = AttrVal($name,"ignoreWiredClients",undef);
+    my $ignoreWireless = AttrVal($name,"ignoreWirelessClients",undef);
+
+    my ($apName,$clientName,$clientRef);
     for my $clientID (keys %{$hash->{clients}}) {
         $clientRef = $hash->{clients}->{$clientID};
         $clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
         
-        for my $apID (keys %{$hash->{accespoints}}) {
-            $apRef = $hash->{accespoints}->{$apID};
-            if (defined $apRef->{mac} && defined $clientRef->{ap_mac}
-                && $apRef->{mac} eq $clientRef->{ap_mac}) {
-                $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
-                last;
-            }
+        next if( $ignoreWired && $clientRef->{is_wired} );
+        next if( $ignoreWireless && !$clientRef->{is_wired} );
+
+        $apName = "unknown";
+        if ($clientRef->{is_wired}
+            &&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
+          $apName = $apNames->{$clientRef->{sw_mac}};
+        } elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
+          $apName = $apNames->{$clientRef->{ap_mac}};
         }
         
         if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
