@@ -469,13 +469,16 @@ Log 1, Dumper $characteristicsOfIntent;
             $intent_name = "FHEMperlCodeIntent$nr";
           }
 
-Log 1, $intent_name;
+          my $slot_names = {};
           my $u = $utterance;
           while( $u =~ /\{(.*?)\}/g ) {
             my $slot = $1;
             my ($name, $values) = split( /:|=/, $slot, 2 );
 
             my $slot_name = "${intent_name}_${name}";
+            next if( $slot_names->{$slot_name} );
+            $slot_names->{$slot_name} = 1;
+
             if( $values ) {
               if( $values && $values =~ /^AMAZON/ ) {
                 push @{$slots}, { name => $slot_name, type => $values };
