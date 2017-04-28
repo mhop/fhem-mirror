@@ -2129,7 +2129,7 @@ SVG_render($$$$$$$$$$)
     my $caption_anchor = "end";
     if( $caption_pos eq 'auto' ) {
       my $a = $conf{lAxis}[$i];
-      my $axis = 1; $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
+      my $axis = 1; $axis = $1 if( $a && $a =~ m/x\d+y(\d+)/ );
       if( $axis <= $nr_left_axis ) {
         $caption_anchor = "beginning";
       } else {
@@ -2148,10 +2148,10 @@ SVG_render($$$$$$$$$$)
     next if( !$t );
     my $txtoff2;
     if( $caption_anchor eq 'beginning' ) {
-      $txtoff2 = $off2 + $th/1.3 + $th * $li;
+      $txtoff2 = $y + 3 + $th/1.3 + $th * $li;
       ++$li;
     } else {
-      $txtoff2 = $off2 + $th/1.3 + $th * $ri;
+      $txtoff2 = $y + 3 + $th/1.3 + $th * $ri;
       ++$ri;
     }
 
