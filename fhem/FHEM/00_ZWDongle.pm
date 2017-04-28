@@ -1062,13 +1062,14 @@ ZWDongle_Ready($)
     stopFailed: stop createNewPrimary and report an error
     </li>
 
-  <li>createNode &lt;decimal nodeId&gt;<br>
+  <li>createNode &lt;device&gt;<br>
     Request the class information for the specified node, and create
     a FHEM device upon reception of the answer. Used to create FHEM devices for
     nodes included with another software or if the fhem.cfg got lost. For the
     node id see the get nodeList command below.  Note: the node must be "alive",
     i.e. for battery based devices you have to press the "wakeup" button 1-2
-    seconds before entering this command in FHEM.
+    seconds before entering this command in FHEM.<br>
+    &lt;device&gt; is either device name or decimal nodeId.
     </li>
 
   <li>factoryReset yes<br>
@@ -1084,10 +1085,12 @@ ZWDongle_Ready($)
     Assign a homeId, nodeId and receive/store nodeList and routing infos.
     </li>
 
-  <li>removeFailedNode &lt;decimal nodeId&gt;<br>
+  <li>removeFailedNode &lt;device&gt;<br>
     Remove non-responding node -that must be on the failed node list-
     from the routing table in controller. Instead, always use removeNode if
-    possible. Note: the corresponding FHEM device have to be deleted manually.
+    possible. Note: the corresponding FHEM device have to be deleted 
+    manually.<br>
+    &lt;device&gt; is either device name or decimal nodeId.
     </li>
 
   <li>removeNode onNw|on|off<br>
@@ -1101,15 +1104,22 @@ ZWDongle_Ready($)
     First close and then open the device. Used for debugging purposes.
     </li>
 
-  <li>replaceFailedNode &lt;decimal nodeId&gt;<br>
+  <li>replaceFailedNode &lt;device&gt;<br>
     Replace a non-responding node with a new one. The non-responding node
-    must be on the failed node list.</li>
+    must be on the failed node list.<br>
+    &lt;device&gt; is either device name or decimal nodeId.
+    </li>
 
   <li>routeFor &lt;device&gt; &lt;hop1&gt; &lt;hop2&gt; &lt;hop3&gt;
                &lt;hop4&gt; &lt;speed&gt;<br>
     set priority routing for &ltdevice&gt. &ltdevice&gt and &lt;hopN&gt are
     either device name or decimal nodeId or 0 for unused.<br>
     &lt;speed&gt;: 1=9,6kbps; 2=40kbps; 3=100kbps
+    </li>
+
+  <li>sendNIF &lt;device&gt;<br>
+    Send NIF to the specified &lt;device&g.
+    &lt;device&gt; is either device name or decimal nodeId.
     </li>
 
   <li>sucNodeId &lt;decimal nodeId&gt; &lt;sucState&gt;
@@ -1138,8 +1148,9 @@ ZWDongle_Ready($)
     return the six hex-digit homeId of the controller.
     </li>
 
-  <li>isFailedNode &lt;decimal nodeId&gt;<br>
-    return if a node is stored in the failed node list.
+  <li>isFailedNode &lt;device&gt;<br>
+    return if a node is stored in the failed node list. &lt;device&gt; is
+    either device name or decimal nodeId.
     </li>
 
   <li>caps, ctrlCaps, version<br>
@@ -1147,15 +1158,16 @@ ZWDongle_Ready($)
     only.
     </li>
 
-  <li>neighborList [excludeDead] [onlyRep] &lt;decimal nodeId&gt;<br>
-    return neighborList of the decimal nodeId.<br>
+  <li>neighborList [excludeDead] [onlyRep] &lt;device&gt;<br>
+    return neighborList of the &lt;device&gt;.<br>
+    &lt;device&gt; is either device name or decimal nodeId.<br>
     With onlyRep the result will include only nodes with repeater
     functionality.
     </li>
 
-  <li>nodeInfo &lt;decimal nodeId&gt;<br>
-    return node specific information.
-    Needed by developers only.
+  <li>nodeInfo &lt;device&gt;<br>
+    return node specific information. &lt;device&gt; is either device name or 
+    decimal nodeId.
     </li>
 
   <li>nodeList<br>
@@ -1172,9 +1184,9 @@ ZWDongle_Ready($)
     Send raw data &lt;hex&gt; to the controller. Developer only.
     </li>
 
-  <li>routeFor node<br>
-    request priority routing for node
-    </li>
+  <li>routeFor &lt;device&gt;<br>
+    request priority routing for &lt;device&gt;. &lt;device&gt; is either 
+    device name or decimal nodeId.</li>
 
   <li>sucNodeId<br>
     return the currently registered decimal SUC nodeId.
