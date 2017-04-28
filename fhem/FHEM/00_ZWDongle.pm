@@ -44,6 +44,8 @@ my %sets = (
                           param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
   "reopen"           => { cmd => "" },
   "replaceFailedNode"=> { cmd => "63%02x@" },  # ZW_REPLACE_FAILED_NODE
+  "routeFor"         => { cmd => "93%02x%02x%02x%02x%02x%02x" },
+                                              # ZW_SET_PRIORITY_ROUTE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
@@ -363,6 +365,15 @@ ZWDongle_Set($@)
       } elsif($hash->{CL}) {
         $hash->{addCL} = $hash->{CL};
       }
+    }
+  }
+
+  if($type eq "routeFor") {
+    for(@a = @a) {
+      $_ =~ s/^UNKNOWN_//;
+      $_ = hex($defs{$_}{nodeIdHex})
+        if($defs{$_} && $defs{$_}{nodeIdHex});
+      return "$_ is neither a device nor a decimal id" if($_ !~ m/\d+/);
     }
   }
 
@@ -1094,9 +1105,16 @@ ZWDongle_Ready($)
     Replace a non-responding node with a new one. The non-responding node
     must be on the failed node list.</li>
 
+  <li>routeFor &lt;device&gt; &lt;hop1&gt; &lt;hop2&gt; &lt;hop3&gt;
+               &lt;hop4&gt; &lt;speed&gt;<br>
+    set priority routing for &ltdevice&gt. &ltdevice&gt and &lt;hopN&gt are
+    either device name or decimal nodeId or 0 for unused.<br>
+    &lt;speed&gt;: 1=9,6kbps; 2=40kbps; 3=100kbps
+    </li>
+
   <li>sucNodeId &lt;decimal nodeId&gt; &lt;sucState&gt;
                 &lt;capabilities&gt;<br>
-    &lt;Configure a controller node to be a SUC/SIS or not.<br>
+    Configure a controller node to be a SUC/SIS or not.<br>
     &lt;nodeId&gt;: decimal nodeId to be SUC/SIS<br>
     &lt;sucState&gt;: 0 = deactivate; 1 = activate<br>
     &lt;capabilities&gt;: 0 = basic SUC; 1 = SIS
