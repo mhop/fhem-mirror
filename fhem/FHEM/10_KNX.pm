@@ -26,6 +26,10 @@
 # ABU 20170110 removed mod for extended adressing
 # ABU 20100114 fixed dpt9-regex
 # ABU 20100116 fixed dpt9-regex again
+# ABU 20170427 reintegrated mechanism for extended adressing
+# ABU 20170427 integrated setExtensions
+# ABU 20170427 added dpt1.010 (start/stop)
+# ABU 20170427 added dpt2
 
 package main;
 
@@ -68,10 +72,9 @@ my $id = 'C';
 #regex patterns
 my $PAT_GAD = qr/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/;
 #old syntax
-my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
+#my $PAT_GAD_HEX = qr/^[0-9a-f]{4}$/;
 #new syntax for extended adressing
-#removed, seems to be broken
-#my $PAT_GAD_HEX = qr/^[0-9a-f]{5}$/;
+my $PAT_GAD_HEX = qr/^[0-9a-f]{5}$/;
 my $PAT_GNO = qr/[gG][1-9][0-9]?/;
 
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
@@ -87,8 +90,12 @@ my %dpttypes = (
 	"dpt1.003" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(([eE][nN]|[dD][iI][sS])[aA][bB][lL][eE])|(0?1)|(0?0)/, MIN=>"disable", MAX=>"enable"},
 	"dpt1.008" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([uU][pP])|([dD][oO][wW][nN])|(0?1)|(0?0)/, MIN=>"up", MAX=>"down"},
 	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"open", MAX=>"closed"},
+	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([sS][tT][aA][rR][tT])|([sS][tT][oO][pP])|(0?1)|(0?0)/, MIN=>"stop", MAX=>"start"},
 	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"closed", MAX=>"open"},
-  
+
+	#Step value (two-bit)
+	"dpt2" 			=> {CODE=>"dpt2", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([oO][nN])|([oO][fF][fF])|([fF][oO][rR][cC][eE][oO][nN])|([fF][oO][rR][cC][eE][oO][fF][fF])/, MIN=>undef, MAX=>undef},
+	  
 	#Step value (four-bit)
 	"dpt3" 			=> {CODE=>"dpt3", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/, MIN=>-100, MAX=>100},
 
@@ -257,9 +264,9 @@ KNX_Define($$) {
 				
 		#convert to string, if supplied in Hex
 		#old syntax
-		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{4}$/i);
+		#$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{4}$/i);
 		#new syntax for extended adressing
-		#$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{5}$/i);
+		$group = KNX_hexToName ($group) if ($group =~ m/^[0-9a-f]{5}$/i);
 
 		$groupc = KNX_nameToHex ($group);
 		
@@ -415,8 +422,9 @@ KNX_Set($@) {
 	
 	#create response, if cmd is wrong or gui asks
 	my $cmdTemp = KNX_getCmdList ($hash, $cmd, %mySets);
-	return $cmdTemp if (defined ($cmdTemp)); 
-
+	#return "Unknown argument $cmd, choose one of " . $cmdTemp if (defined ($cmdTemp)); 
+	return SetExtensions($hash, $cmdTemp, $name, $cmd, @a) if (defined ($cmdTemp));
+	
 	#the command can be send to any of the defined groups indexed starting by 1
 	#optional last argument starting with g indicates the group
 	#default
@@ -530,8 +538,8 @@ KNX_Set($@) {
 	#set value <value>	
 	elsif ($cmd =~ m/$VALUE/)
 	{
-		#return "\"value\" not allowed for dpt1 and dpt16" if (($code eq "dpt1") or ($code eq "dpt16"));
-		return "\"value\" not allowed for dpt1 and dpt16" if ($code eq "dpt16");
+		return "\"value\" not allowed for dpt1, dpt16 and dpt232" if (($code eq "dpt1") or ($code eq "dpt16") or ($code eq "dpt232"));
+		#return "\"value\" not allowed for dpt1 and dpt16" if ($code eq "dpt16");
 		return "no data for cmd $cmd" if ($lastArg < 2);
 		
 		$value = $a[2];
@@ -749,10 +757,9 @@ KNX_Parse($$) {
 	#split message into parts
 
 	#old syntax
-	$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
+	#$msg =~ m/^$id(.{4})(.{1})(.{4})(.*)$/;
 	#new syntax for extended adressing
-	#removed, seems to be broken
-	#$msg =~ m/^$id(.{5})(.{1})(.{5})(.*)$/;
+	$msg =~ m/^$id(.{5})(.{1})(.{5})(.*)$/;
 	my $src = $1;
 	my $cmd = $2;
 	my $dest = $3;
@@ -906,15 +913,14 @@ KNX_hexToName ($)
 	my $v = shift;
 	
 	#old syntax
-	my $p1 = hex(substr($v,0,1));
-	my $p2 = hex(substr($v,1,1));
-	my $p3 = hex(substr($v,2,2));
+	#my $p1 = hex(substr($v,0,1));
+	#my $p2 = hex(substr($v,1,1));
+	#my $p3 = hex(substr($v,2,2));
 
 	#new syntax for extended adressing
-	#removed, seems to be broken
-	#my $p1 = hex(substr($v,0,2));
-	#my $p2 = hex(substr($v,2,1));
-	#my $p3 = hex(substr($v,3,2));
+	my $p1 = hex(substr($v,0,2));
+	my $p2 = hex(substr($v,2,1));
+	my $p3 = hex(substr($v,3,2));
   
 	my $r = sprintf("%d/%d/%d", $p1,$p2,$p3);
 	
@@ -932,10 +938,9 @@ KNX_nameToHex ($)
 	if($v =~ /^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{1,3})$/) 
 	{
 		#old syntax
-		$r = sprintf("%01x%01x%02x",$1,$2,$3);
+		#$r = sprintf("%01x%01x%02x",$1,$2,$3);
 		#new syntax for extended adressing
-		#removed, seems to be broken
-		#$r = sprintf("%02x%01x%02x",$1,$2,$3);
+		$r = sprintf("%02x%01x%02x",$1,$2,$3);
 	}
 	#elsif($v =~ /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{1,3})$/) 
 	#{
@@ -1045,6 +1050,16 @@ KNX_encodeByDpt ($$$) {
 		
 		$hexval = $numval;
 	}
+	#Step value (two-bit) 
+	elsif ($code eq "dpt2")
+	{
+		$numval = "00" if ($value =~ m/[oO][fF][fF]/);
+		$numval = "01" if ($value =~ m/[oO][nN]/);
+		$numval = "02" if ($value =~ m/[fF][oO][rR][cC][eE][oO][fF][fF]/);		
+		$numval = "03" if ($value =~ m/[fF][oO][rR][cC][eE][oO][nN]/);
+		
+		$hexval = $numval;
+	}	
 	#Step value (four-bit) 
 	elsif ($code eq "dpt3")
 	{
@@ -1330,6 +1345,17 @@ KNX_decodeByDpt ($$$) {
 		$numval = $max if (lc($value) eq "01");
 		$state = $numval;
 	}
+	#Step value (two-bit) 
+	elsif ($code eq "dpt2")
+	{
+		#get numeric value
+		$numval = hex ($value);
+
+		$state = "off" if ($numval == 0);
+		$state = "on" if ($numval == 1);
+		$state = "forceOff" if ($numval == 2);
+		$state = "forceOn" if ($numval == 3);
+	}	
 	#Step value (four-bit) 
 	elsif ($code eq "dpt3")
 	{
@@ -1551,14 +1577,14 @@ sub KNX_getCmdList ($$$)
 		Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
 	}
 	
-	if (!defined ($retVal))
-	{
-		$retVal = "error while parsing set-table" ;
-	}
-	else
-	{
-		$retVal = "Unknown argument $cmd, choose one of " . $retVal;	
-	}
+	#if (!defined ($retVal))
+	#{
+	#	$retVal = "error while parsing set-table" ;
+	#}
+	#else
+	#{
+	#	$retVal = "Unknown argument $cmd, choose one of " . $retVal;	
+	#}
 	
 		
 	return $retVal;
@@ -1776,7 +1802,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.003 enable, disable<br>	
 	dpt1.008 up, down<br>
 	dpt1.009 open, closed<br>	
+	dpt1.010 start, stop<br>	
 	dpt1.019 closed, open<br>
+	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
 	dpt5.001 0..100	%<br>
@@ -2040,7 +2068,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.003 enable, disable<br>	
 	dpt1.008 up, down<br>
 	dpt1.009 open, closed<br>	
+	dpt1.010 start, stop<br>		
 	dpt1.019 closed, open<br>
+	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
 	dpt5.001 0..100	%<br>
