@@ -22,6 +22,7 @@
 # ABU 20170301 fixed hybernate-check in set
 # ABU 20170406 fixed hybernate-check in timer
 # ABU 20170422 fixed doku
+# ABU 20170427 fixed numerich undefs
 
 package main;
 
@@ -562,7 +563,7 @@ sub Robonect_callback ($)
 			readingsBulkUpdate($hash, $key, $value);
 			$value = 0;
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "duration", undef);
-			readingsBulkUpdate($hash, $key, sprintf ("%d", $value/3600));				
+			readingsBulkUpdate($hash, $key, sprintf ("%d", $value/3600)) if (defined($value) and ($value =~ m/(?:\d*\.)?\d+/));			
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "hours", undef);
 			readingsBulkUpdate($hash, $key, $value);
 
@@ -578,7 +579,7 @@ sub Robonect_callback ($)
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "wlan", "signal", undef);
 			readingsBulkUpdate($hash, $key, $value);			
 			
-			if (defined($value))
+			if (defined($value) and ($value =~ m/(?:\d*\.)?\d+/))
 			{
 				$value = sprintf ("%d", ($value + 95) / 0.6);
 				readingsBulkUpdate($hash, $key . "-prozent", $value);
