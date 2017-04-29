@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  22_HOMEMODE: Use of uninitialized value $d in hash element
+             minor commandref fix
   - new:     22_HOMEMODE: initial SVN check-in v1.0.0
   - bugfix:  74_AMAD: fix Use of uninitialized value,no Flowset update nececcary
   - feature: 34_ESPEasy: added ESPEasy commands: tone and rtttl

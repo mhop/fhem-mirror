@@ -2198,7 +2198,7 @@ sub HOMEMODE_TriggerState($;$$$)
   my $amode = ReadingsVal($name,"modeAlarm","");
   foreach my $sensor (devspec2array($contacts))
   {
-    my ($oread,$tread) = split " ",AttrVal($_,"HomeReadings",AttrVal($name,"HomeSensorsContactReadings","state sabotageError")),2;
+    my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsContactReadings","state sabotageError")),2;
     my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsContactValues","open|tilted|on"));
     my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
     my $ostate = ReadingsVal($sensor,$oread,"");
@@ -2247,7 +2247,7 @@ sub HOMEMODE_TriggerState($;$$$)
   }
   foreach my $sensor (devspec2array($motions))
   {
-    my ($oread,$tread) = split " ",AttrVal($_,"HomeReadings",AttrVal($name,"HomeSensorsMotionReadings","state sabotageError")),2;
+    my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsMotionReadings","state sabotageError")),2;
     my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsMotionValues","open|on"));
     my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
     my $ostate = ReadingsVal($sensor,$oread,"");
