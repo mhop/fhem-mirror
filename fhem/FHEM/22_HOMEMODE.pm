@@ -2870,7 +2870,7 @@ sub HOMEMODE_checkIP($;$)
       All automations triggered by external events (other devices monitored by HOMEMODE) and the execution of the HomeCMD attributes will not be delayed.
     </li>
     <li>
-      Each created timer will be created as temporary at device and its name will start with "atTmp_" and end with "_<name of your HOMEMODE device>". You may list them with "list TYPE=at:FILTER=NAME=atTmp_.*_<name of your HOMEMODE device>".
+      Each created timer will be created as temporary at device and its name will start with "atTmp_" and end with "_&lt;name of your HOMEMODE device&gt;". You may list them with "list TYPE=at:FILTER=NAME=atTmp_.*_&lt;name of your HOMEMODE device&gt;".
     </li>
     <li>
       Seasons can also be adjusted (date and text) in attribute HomeSeasons
