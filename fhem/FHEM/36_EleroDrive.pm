@@ -68,6 +68,8 @@ sub EleroDrive_Undef($$) {
   
   RemoveInternalTimer($hash); 
   delete( $modules{EleroDrive}{defptr}{$channel} );
+  
+  return undef;
 }
 
 
@@ -132,7 +134,7 @@ sub EleroDrive_ToFixPosition($$) {
     
     my $byteMsg = $head.$msgLength.$msgCmd.$firstChannels.$secondChannels.$payload.$checksum;
     
-    ###debugLog($name, "EleroDrive_Set->IOWrite: byteMsg=$byteMsg");
+    ###debugLog("EleroDrive_Set->IOWrite: byteMsg=$byteMsg");
     IOWrite($hash, "send", $byteMsg); 
     
   }
@@ -145,7 +147,7 @@ sub EleroDrive_ToAnyPosition($$) {
   my ( $hash, $position) = @_;
   my $name = $hash->{NAME};
 
-  ###debugLog($name, "ToAnyPosition: $position");
+  ###debugLog("ToAnyPosition: $position");
 }
 
 #=======================================================================================
@@ -277,7 +279,7 @@ sub EleroDrive_Parse($$) {
     my $rname = $rhash->{NAME};
       
     if($modules{EleroDrive}{defptr}{$channel}) {
-      ###debugLog($name, "$rname -> parsed $msg for channel $channel: $newstate");
+      ###debugLog("$rname -> parsed $msg for channel $channel: $newstate");
        
       readingsBeginUpdate($rhash);
       readingsBulkUpdate($rhash, "state", $newstate);
@@ -292,7 +294,7 @@ sub EleroDrive_Parse($$) {
       return @list;
     }
     else {
-      ###debugLog($name, "$name -> AUTOCREATE " . $hash->{IODev}->{NAME});
+      ###debugLog("$name -> AUTOCREATE " . $hash->{IODev}->{NAME});
       return "UNDEFINED EleroDrive_$channel EleroDrive $channel";
     }
   }
