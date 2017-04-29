@@ -850,13 +850,14 @@ sub IsLeapYear (;$) {
     #     leap year. (Works for Julian calendar,
     #     established in 1582)
 
-    my $year = shift;
+    my $y = shift;
     if ( !$year || $year !~ /^[1-2]\d{3}$/ ) {
         my (
-            $tsec,  $tmin,  $thour, $tmday, $tmon,
-            $tyear, $twday, $tyday, $tisdst
-        ) = GetTimeinfo($year);
-        $year = $tyear + 1900;
+            $sec,      $min,  $hour, $mday,    $month,
+            $monthISO, $year, $week, $weekISO, $wday,
+            $wdayISO,  $yday, $isdst
+        ) = GetCalendarInfo($y);
+        $y = $year;
     }
 
     # If $year is not evenly divisible by 4, it is
@@ -867,7 +868,7 @@ sub IsLeapYear (;$) {
     #     If there is a remainder then $year is
     #     not evenly divisible by 4.)
 
-    return 0 if $year % 4;
+    return 0 if $y % 4;
 
     # At this point, we know $year is evenly divisible
     #     by 4. Therefore, if it is not evenly
@@ -875,7 +876,7 @@ sub IsLeapYear (;$) {
     #     we return the value 1 and do no further
     #     calculations in this subroutine.
 
-    return 1 if $year % 100;
+    return 1 if $y % 100;
 
     # At this point, we know $year is evenly divisible
     #     by 4 and also evenly divisible by 100. Therefore,
@@ -883,7 +884,7 @@ sub IsLeapYear (;$) {
     #     not leap year -- we return the value 0 and do no
     #     further calculations in this subroutine.
 
-    return 0 if $year % 400;
+    return 0 if $y % 400;
 
     # Now we know $year is evenly divisible by 4, evenly
     #     divisible by 100, and evenly divisible by 400.
