@@ -1778,6 +1778,7 @@ sub BRAVIA_GetRemotecontrolCommand($) {
         'SYNCMENU'    => "AAAAAgAAABoAAABYAw==",
         'SCENESELECT' => "AAAAAgAAABoAAAB4Aw==",
         'NETFLIX'     => "AAAAAgAAABoAAAB8Aw==",
+        'PICTUREMODE' => "AAAAAQAAAAEAAABkAw==",
     };
 
     if ( defined( $commands->{$command} ) ) {
