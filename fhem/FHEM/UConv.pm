@@ -5,80 +5,33 @@ sub UConv_Initialize() { }
 
 package UConv;
 use Scalar::Util qw(looks_like_number);
+use POSIX qw(strftime);
 use Data::Dumper;
 
 ####################
 # Translations
 
-my %compasspoint_txt = (
-    "en" => [
+my %compasspoints = (
+    en => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
     ],
-    "de" => [
+    de => [
         'N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
     ],
-    "nl" => [
+    nl => [
         'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
         'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
     ],
-    "fr" => [
+    fr => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
     ],
-    "pl" => [
+    pl => [
         'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
     ],
-);
-
-my %wdays_txt_en = (
-    "en" => {
-        'Mon' => 'Mon',
-        'Tue' => 'Tue',
-        'Wed' => 'Wed',
-        'Thu' => 'Thu',
-        'Fri' => 'Fri',
-        'Sat' => 'Sat',
-        'Sun' => 'Sun',
-    },
-    "de" => {
-        'Mon' => 'Mo',
-        'Tue' => 'Di',
-        'Wed' => 'Mi',
-        'Thu' => 'Do',
-        'Fri' => 'Fr',
-        'Sat' => 'Sa',
-        'Sun' => 'So',
-    },
-    "nl" => {
-        'Mon' => 'Maa',
-        'Tue' => 'Din',
-        'Wed' => 'Woe',
-        'Thu' => 'Don',
-        'Fri' => 'Vri',
-        'Sat' => 'Zat',
-        'Sun' => 'Zon',
-    },
-    "fr" => {
-        'Mon' => 'Lun',
-        'Tue' => 'Mar',
-        'Wed' => 'Mer',
-        'Thu' => 'Jeu',
-        'Fri' => 'Ven',
-        'Sat' => 'Sam',
-        'Sun' => 'Dim',
-    },
-    "pl" => {
-        'Mon' => 'Pon',
-        'Tue' => 'Wt',
-        'Wed' => 'Śr',
-        'Thu' => 'Czw',
-        'Fri' => 'Pt',
-        'Sat' => 'Sob',
-        'Sun' => 'Nie',
-    },
 );
 
 #################################
@@ -145,8 +98,7 @@ sub hpa2psi($;$) {
 
 # Speed: convert km/h (kilometer per hour) to mph (miles per hour)
 sub kph2mph($;$) {
-    my ( $data, $rnd ) = @_;
-    return roundX( $data * 0.621, $rnd );
+    return km2mi(@_);
 }
 
 # Speed: convert m/s (meter per seconds) to mph (miles per hour)
@@ -171,6 +123,12 @@ sub cm2in($;$) {
 sub m2ft($;$) {
     my ( $data, $rnd ) = @_;
     return roundX( $data * 3.2808, $rnd );
+}
+
+# Length: convert km (kilometer) to miles (mi)
+sub km2mi($;$) {
+    my ( $data, $rnd ) = @_;
+    return roundX( $data * 0.621371192, $rnd );
 }
 
 #################################
@@ -219,8 +177,7 @@ sub psi2hpa($;$) {
 
 # Speed: convert mph (miles per hour) to km/h (kilometer per hour)
 sub mph2kph($;$) {
-    my ( $data, $rnd ) = @_;
-    return roundX( $data * 1.609344, $rnd );
+    return mi2km(@_);
 }
 
 # Speed: convert mph (miles per hour) to m/s (meter per seconds)
@@ -247,6 +204,12 @@ sub ft2m($;$) {
     return roundX( $data / 3.2808, $rnd );
 }
 
+# Length: convert mi (miles) to km (kilometer)
+sub mi2km($;$) {
+    my ( $data, $rnd ) = @_;
+    return roundX( $data * 1.609344, $rnd );
+}
+
 #################################
 ### Angular conversions
 ###
@@ -254,14 +217,13 @@ sub ft2m($;$) {
 # convert direction in degree to point of the compass
 sub direction2compasspoint($;$) {
     my ( $azimuth, $lang ) = @_;
-
     my $directions_txt_i18n;
 
-    if ( $lang && defined( $compasspoint_txt{$lang} ) ) {
-        $directions_txt_i18n = $compasspoint_txt{$lang};
+    if ( $lang && defined( $compasspointss{ lc($lang) } ) ) {
+        $directions_txt_i18n = $compasspointss{ lc($lang) };
     }
     else {
-        $directions_txt_i18n = $compasspoint_txt{en};
+        $directions_txt_i18n = $compasspointss{en};
     }
 
     return @$directions_txt_i18n[
@@ -419,8 +381,243 @@ sub mph2bft($) {
 }
 
 #################################
+### Differential conversions
+###
+
+sub distance($$$$;$) {
+    my ( $lat1, $lng1, $lat2, $lng2, $miles ) = @_;
+    use constant M_PI => 4 * atan2( 1, 1 );
+    my $pi80 = M_PI / 180;
+    $lat1 *= $pi80;
+    $lng1 *= $pi80;
+    $lat2 *= $pi80;
+    $lng2 *= $pi80;
+
+    my $r    = 6372.797;        # mean radius of Earth in km
+    my $dlat = $lat2 - $lat1;
+    my $dlng = $lng2 - $lng1;
+    my $a =
+      sin( $dlat / 2 ) * sin( $dlat / 2 ) +
+      cos($lat1) * cos($lat2) * sin( $dlng / 2 ) * sin( $dlng / 2 );
+    my $c = 2 * atan2( sqrt($a), sqrt( 1 - $a ) );
+    my $km = $r * $c;
+
+    return ( $miles ? km2mi($km) : $km );
+}
+
+#################################
 ### Textual unit conversions
 ###
+
+######## %hr_formats #########################################
+# What  : used by functions humanReadable and machineReadable
+my %hr_formats = (
+
+    # 1 234 567.89
+    std => {
+        delim => "\x{2009}",
+        sep   => ".",
+    },
+
+    # 1 234 567,89
+    'std-fr' => {
+        delim => "\x{2009}",
+        sep   => ",",
+    },
+
+    # 1,234,567.89
+    'old-english' => {
+        delim => ",",
+        sep   => ".",
+    },
+
+    # 1.234.567,89
+    'old-european' => {
+        delim => ".",
+        sep   => ",",
+    },
+
+    # 1'234'567.89
+    ch => {
+        delim => "'",
+        sep   => ".",
+    },
+
+    ### lang ref ###
+    #
+
+    en => {
+        ref => "std",
+    },
+
+    de => {
+        ref => "std-fr",
+    },
+
+    de_at => {
+        ref => "std-fr",
+        min => 4,
+    },
+
+    de_ch => {
+        ref => "std",
+    },
+
+    nl => {
+        ref => "std-fr",
+    },
+
+    fr => {
+        ref => "std-fr",
+    },
+
+    pl => {
+        ref => "std-fr",
+    },
+
+    ### number ref ###
+    #
+
+    0 => {
+        ref => "std",
+    },
+    1 => {
+        ref => "std-fr",
+    },
+    2 => {
+        ref => "old-english",
+    },
+    3 => {
+        ref => "old-european",
+    },
+    4 => {
+        ref => "ch",
+    },
+    5 => {
+        ref => "std-fr",
+        min => 4,
+    },
+
+);
+
+######## humanReadable #########################################
+# What  : Formats a number or text string to be more readable for humans
+# Syntax: { humanReadable( <value>, [ <format> ] ) }
+# Call  : { humanReadable(102345.6789) }
+#         { humanReadable(102345.6789, 3) }
+#         { humanReadable(102345.6789, "DE") }
+#         { humanReadable(102345.6789, "si-fr") }
+#         { humanReadable(102345.6789, {
+#                      group=>3, delim=>".", sep=>"," } ) }
+#         { humanReadable("DE44500105175407324931", {
+#                      group=>4, rev=>0 } ) }
+# Source: https://en.wikipedia.org/wiki/Decimal_mark
+#         https://de.wikipedia.org/wiki/Schreibweise_von_Zahlen
+#         https://de.wikipedia.org/wiki/Dezimaltrennzeichen
+#         https://de.wikipedia.org/wiki/Zifferngruppierung
+sub humanReadable($;$) {
+    my ( $v, $f ) = @_;
+    my $l =
+      $attr{global}{humanReadable} ? $attr{global}{humanReadable}
+      : (
+        $attr{global}{language} ? $attr{global}{language}
+        : "EN"
+      );
+
+    my $h =
+      !$f || ref($f) || !$hr_formats{$f} ? $f
+      : (
+          $hr_formats{$f}{ref} ? $hr_formats{ $hr_formats{$f}{ref} }
+        : $hr_formats{$f}
+      );
+    my $min =
+      ref($h)
+      && defined( $h->{min} )
+      ? $h->{min}
+      : ( !ref($f) && $hr_formats{$f}{min} ? $hr_formats{$f}{min} : 5 );
+    my $group =
+      ref($h)
+      && defined( $h->{group} )
+      ? $h->{group}
+      : ( !ref($f) && $hr_formats{$f}{group} ? $hr_formats{$f}{group} : 3 );
+    my $delim =
+      ref($h)
+      && $h->{delim}
+      ? $h->{delim}
+      : $hr_formats{ ( $l =~ /^de|nl|fr|pl/i ? "std-fr" : "std" ) }{delim};
+    my $sep =
+      ref($h)
+      && $h->{sep}
+      ? $h->{sep}
+      : $hr_formats{ ( $l =~ /^de|nl|fr|pl/i ? "std-fr" : "std" ) }{sep};
+    my $reverse = ref($h) && defined( $h->{rev} ) ? $h->{rev} : 1;
+
+    my @p = split( /\./, $v, 2 );
+
+    if ( length( $p[0] ) < $min && length( $p[1] ) < $min ) {
+        $v =~ s/\./$sep/g;
+        return $v;
+    }
+
+    $v =~ s/\./\*/g;
+
+    # digits after thousands separator
+    if ( ( $delim eq "\x{202F}" || $delim eq " " ) && length( $p[1] ) >= $min )
+    {
+        $v =~ s/(\w{$group})(?=\w)(?!\w*\*)/$1$delim/g;
+    }
+
+    # digits before thousands separator
+    if ( length( $p[0] ) >= $min ) {
+        $v = reverse $v if ($reverse);
+        $v =~ s/(\w{$group})(?=\w)(?!\w*\*)/$1$delim/g;
+        if ($reverse) {
+            $v =~ s/\*/$sep/g;
+            return scalar reverse $v;
+        }
+    }
+
+    $v =~ s/\*/$sep/g;
+    return $v;
+}
+
+# ######## machineReadable #########################################
+# # What  : find the first matching number in a string and make it
+# #         machine readable.
+# # Syntax: { machineReadable( <value>, [ <global>, [ <format> ]] ) }
+# # Call  : { machineReadable("102 345,6789") }
+# sub machineReadable($;$) {
+#     my ( $v, $g ) = @_;
+#
+#     sub mrVal($$) {
+#         my ( $n, $n2 ) = @_;
+#         $n .= "." . $n2 if ($n2);
+#         $n =~ s/[^\d\.]//g;
+#         return $n;
+#     }
+#
+#
+#     foreach ( "std", "std-fr" ) {
+#         my $delim = '\\' . $hr_formats{$_}{delim};
+#         $delim .= ' ' if ($_ =~ /^std/);
+#
+#         if (   $g
+#             && $v =~
+# s/((-?)((?:\d+(?:[$delim]\d)*)+)([\.\,])((?:\d+(?:[$delim]\d)*)+)?)/$2.mrVal($3, $5)/eg
+#           )
+#         {
+#             last;
+#         }
+#         elsif ( $v =~
+#             m/^((\-?)((?:\d(?:[$delim]\d)*)+)(?:([\.\,])((?:\d(?:[$delim]\d)*)+))?)/ )
+#         {
+#             $v = $2 . mrVal( $3, $5 );
+#             last;
+#         }
+#     }
+#
+#     return $v;
+# }
 
 # Condition: convert temperature (Celsius) to temperature condition
 sub c2condition($;$) {
@@ -597,23 +794,282 @@ sub values2weathercondition($$$$$) {
     return $val;
 }
 
-#TODO rewrite for Unit.pm
-sub fmtTime($) {
-    my ($val) = @_;
-    my $suffix = ' s';
+#################################
+### Chronological conversions
+###
 
-    if ( $val >= 60 ) {
-        $val = sprintf( "%.1f", $val / 60 );
-        $suffix = ' min';
+sub hms2s($) {
+    my $in = shift;
+    my @a = split( ":", $in );
+    return 0 if ( scalar @a < 2 || $in !~ m/^[\d:]*$/ );
+    return $a[0] * 3600 + $a[1] * 60 + ( $a[2] ? $a[2] : 0 );
+}
 
-        if ( $val >= 60 ) {
-            $val = sprintf( "%.1f", $val / 60 );
-            $suffix = ' h';
-        }
+sub hms2m($) {
+    return hms2s(@_) / 60;
+}
+
+sub hms2h($) {
+    return hms2m(@_) / 60;
+}
+
+sub s2hms($) {
+    my ($in) = @_;
+    my ( $h, $m, $s );
+    $h = int( $in / 3600 );
+    $m = int( ( $in - $h * 3600 ) / 60 );
+    $s = int( $in - $h * 3600 - $m * 60 );
+    return ( $h, $m, $s ) if (wantarray);
+    return sprintf( "%02d:%02d:%02d", $h, $m, $s );
+}
+
+sub m2hms($) {
+    my ($in) = @_;
+    my ( $h, $m, $s );
+    $h = int( $in / 60 );
+    $m = int( $in - $h * 60 );
+    $s = int( 60 * ( $in - $h * 60 - $m ) );
+    return ( $h, $m, $s ) if (wantarray);
+    return sprintf( "%02d:%02d:%02d", $h, $m, $s );
+}
+
+sub h2hms($) {
+    my ($in) = @_;
+    my ( $h, $m, $s );
+    $h = int($in);
+    $m = int( 60 * ( $in - $h ) );
+    $s = int( 3600 * ( $in - $h ) - 60 * $m );
+    return ( $h, $m, $s ) if (wantarray);
+    return sprintf( "%02d:%02d:%02d", $h, $m, $s );
+}
+
+sub IsLeapYear (;$) {
+
+    # Either the value 0 or the value 1 is returned.
+    #     If 0, it is not a leap year. If 1, it is a
+    #     leap year. (Works for Julian calendar,
+    #     established in 1582)
+
+    my $year = shift;
+    if ( !$year || $year !~ /^[1-2]\d{3}$/ ) {
+        my (
+            $tsec,  $tmin,  $thour, $tmday, $tmon,
+            $tyear, $twday, $tyday, $tisdst
+        ) = GetTimeinfo($year);
+        $year = $tyear + 1900;
     }
 
-    return ( $val, $suffix ) if (wantarray);
-    return $val . $suffix;
+    # If $year is not evenly divisible by 4, it is
+    #     not a leap year; therefore, we return the
+    #     value 0 and do no further calculations in
+    #     this subroutine. ("$year % 4" provides the
+    #     remainder when $year is divided by 4.
+    #     If there is a remainder then $year is
+    #     not evenly divisible by 4.)
+
+    return 0 if $year % 4;
+
+    # At this point, we know $year is evenly divisible
+    #     by 4. Therefore, if it is not evenly
+    #     divisible by 100, it is a leap year --
+    #     we return the value 1 and do no further
+    #     calculations in this subroutine.
+
+    return 1 if $year % 100;
+
+    # At this point, we know $year is evenly divisible
+    #     by 4 and also evenly divisible by 100. Therefore,
+    #     if it is not also evenly divisible by 400, it is
+    #     not leap year -- we return the value 0 and do no
+    #     further calculations in this subroutine.
+
+    return 0 if $year % 400;
+
+    # Now we know $year is evenly divisible by 4, evenly
+    #     divisible by 100, and evenly divisible by 400.
+    #     We return the value 1 because it is a leap year.
+
+    return 1;
+}
+
+sub IsDst (;$) {
+    my (
+        $sec,      $min,  $hour, $mday,    $month,
+        $monthISO, $year, $week, $weekISO, $wday,
+        $wdayISO,  $yday, $isdst
+    ) = GetCalendarInfo(@_);
+    return $isdst;
+}
+
+sub IsWeekend (;$) {
+    my (
+        $sec,      $min,  $hour,  $mday,    $month,
+        $monthISO, $year, $week,  $weekISO, $wday,
+        $wdayISO,  $yday, $isdst, $iswe
+    ) = GetCalendarInfo(@_);
+    return $iswe;
+}
+
+sub IsHoliday (;$) {
+    my (
+        $sec,            $min,     $hour,
+        $mday,           $month,   $monthISO,
+        $year,           $week,    $weekISO,
+        $wday,           $wdayISO, $yday,
+        $isdst,          $iswe,    $isHolidayYesterday,
+        $isHolidayToday, $isHolidayTomorrow
+    ) = GetCalendarInfo(@_);
+    return $isHolidayToday;
+}
+
+sub IsHolidayTomorrow (;$) {
+    my (
+        $sec,            $min,     $hour,
+        $mday,           $month,   $monthISO,
+        $year,           $week,    $weekISO,
+        $wday,           $wdayISO, $yday,
+        $isdst,          $iswe,    $isHolidayYesterday,
+        $isHolidayToday, $isHolidayTomorrow
+    ) = GetCalendarInfo(@_);
+    return $isHolidayTomorrow;
+}
+
+sub IsHolidayYesterday (;$) {
+    my (
+        $sec,            $min,     $hour,
+        $mday,           $month,   $monthISO,
+        $year,           $week,    $weekISO,
+        $wday,           $wdayISO, $yday,
+        $isdst,          $iswe,    $isHolidayYesterday,
+        $isHolidayToday, $isHolidayTomorrow
+    ) = GetCalendarInfo(@_);
+    return $isHolidayYesterday;
+}
+
+sub GetCalendarInfo(;$$) {
+    my ( $time, $holidayDev ) = @_;
+
+    my @t;
+    @t = localtime($time) if ($time);
+    @t = localtime() unless ($time);
+    my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = @t;
+    my $monthISO = $month + 1;
+    $year += 1900;
+
+    # ISO 8601 weekday as number with Monday as 1 (1-7)
+    my $wdayISO = strftime( '%u', @t );
+
+    # Week number with the first Sunday as the first day of week one (00-53)
+    my $week = strftime( '%U', @t );
+
+    # ISO 8601 week number (00-53)
+    my $weekISO = strftime( '%V', @t );
+
+    my $iswe = ( $wday == 0 || $wday == 6 ) ? 1 : 0;
+    my $isHolidayYesterday;
+    my $isHolidayToday;
+    my $isHolidayTomorrow;
+
+    $holidayDev = undef unless ( main::IsDevice( $holidayDev, "holiday" ) );
+    $holidayDev = $main::attr{global}{holiday2we}
+      if ( !$holidayDev
+        && main::IsDevice( $main::attr{global}{holiday2we}, "holiday" ) );
+
+    if ($holidayDev) {
+        if ( main::ReadingsVal( $holidayDev, "state", "none" ) ne "none" ) {
+            $iswe           = 1;
+            $isHolidayToday = 1;
+        }
+        $isHolidayYesterday = 1
+          if (
+            main::ReadingsVal( $holidayDev, "yesterday", "none" ) ne "none" );
+        $isHolidayTomorrow = 1
+          if ( main::ReadingsVal( $holidayDev, "tomorrow", "none" ) ne "none" );
+    }
+
+    return (
+        $sec,            $min,     $hour,
+        $mday,           $month,   $monthISO,
+        $year,           $week,    $weekISO,
+        $wday,           $wdayISO, $yday,
+        $isdst,          $iswe,    $isHolidayYesterday,
+        $isHolidayToday, $isHolidayTomorrow
+    );
+}
+
+# Get current stage of the daytime based on temporal hours
+# https://de.wikipedia.org/wiki/Temporale_Stunden
+sub GetDaytimeStage(@) {
+    my ( $date, $totalTemporalHours, @srParams ) = @_;
+    $date               = time unless ($date);
+    $totalTemporalHours = 12   unless ($totalTemporalHours);
+
+    # today
+    my (
+        $sec,            $min,     $hour,
+        $mday,           $month,   $monthISO,
+        $year,           $week,    $weekISO,
+        $wday,           $wdayISO, $yday,
+        $isdst,          $iswe,    $isHolidayYesterday,
+        $isHolidayToday, $isHolidayTomorrow
+    ) = GetCalendarInfo($date);
+
+    # tomorrow
+    my (
+        $tsec,            $tmin,     $thour,
+        $tmday,           $tmonth,   $tmonthISO,
+        $tyear,           $tweek,    $tweekISO,
+        $twday,           $twdayISO, $tyday,
+        $tisdst,          $tiswe,    $tisHolidayYesterday,
+        $tisHolidayToday, $tisHolidayTomorrow
+    ) = GetCalendarInfo( $date + 24 * 60 * 60 );
+
+    my $secSr = hms2s( main::sunrise_abs_dat( $date, @srParams ) );
+    my $secSs     = hms2s( main::sunset_abs_dat( $date, @srParams ) );
+    my $secNow    = hms2s("$hour:$min:$sec") - $secSr;
+    my $dlength   = $secSs - $secSr;
+    my $slength   = $dlength / $totalTemporalHours;
+    my $currStage = int( $secNow / $slength );
+
+    my $dateSr = main::time_str2num("$year-$monthISO-$mday 00:00:00") + $secSr;
+    my %events;
+    my $i = 0;
+    until ( $i == $totalTemporalHours ) {
+        $events{$i}{timestamp} = int( $dateSr + 0.5 );
+        $i++;
+        $dateSr += $slength;
+    }
+    $events{$totalTemporalHours}{timestamp} = int(
+        main::time_str2num("$year-$monthISO-$mday 00:00:00") + $secSs + 0.5 );
+
+    my $dateSrTomorrow =
+      main::time_str2num("$tyear-$tmonthISO-$tmday 00:00:00") +
+      hms2s( main::sunrise_abs_dat( $date + 86400, @srParams ) );
+    my %eventsTomorrow;
+    $i = 0;
+    until ( $i == $totalTemporalHours ) {
+        $eventsTomorrow{$i}{timestamp} = int( $dateSrTomorrow + 0.5 );
+        $i++;
+        $dateSrTomorrow += $slength;
+    }
+
+    # early day after midnight
+    if ( $currStage < 0 ) {
+        return ( $totalTemporalHours, $slength, \%events )
+          if (wantarray);
+        return $totalTemporalHours;
+    }
+
+    # late day before midnight
+    elsif ( $currStage > $totalTemporalHours ) {
+        return ( $totalTemporalHours, $slength, \%eventsTomorrow )
+          if (wantarray);
+        return $totalTemporalHours;
+    }
+
+    # daytime
+    return ( $currStage, $slength, \%events ) if (wantarray);
+    return $currStage;
 }
 
 ####################

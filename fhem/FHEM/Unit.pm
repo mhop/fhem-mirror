@@ -802,32 +802,32 @@ my $rtypes = {
     weekday => {
         ref_base => 900,
         symbol   => {
-            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa',  'So' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' ],
         },
         txt => {
-            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa',  'So' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' ],
         },
         txt_long => {
             de => [
                 'Sonntag',    'Montag',  'Dienstag', 'Mittwoch',
-                'Donnerstag', 'Freitag', 'Samstag'
+                'Donnerstag', 'Freitag', 'Samstag',  'Sonntag'
             ],
             en => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+                'Sunday',   'Monday', 'Tuesday',  'Wednesday',
+                'Thursday', 'Friday', 'Saturday', 'Sunday'
             ],
         },
         scope => {
             de => [
-                '^(So|Son|Sonntag|0)$',    '^(Mo|Mon|Montag|1)$',
+                '^(So|Son|Sonntag|0|7)$',  '^(Mo|Mon|Montag|1)$',
                 '^(Di|Die|Dienstag|2)$',   '^(Mi|Mit|Mittwoch|3)$',
                 '^(Do|Don|Donnerstag|4)$', '^(Fr|Fre|Freitag|5)$',
-                '^(Sa|Sam|Samstag|6)$'
+                '^(Sa|Sam|Samstag|6)$',
             ],
             en => [
-                '^(Sun|Su|Sunday|0)$',   '^(Mon|Mo|Monday|1)$',
+                '^(Sun|Su|Sunday|0|7)$', '^(Mon|Mo|Monday|1)$',
                 '^(Tue|Tu|Tuesday|2)$',  '^(Wed|We|Wednesday|3)$',
                 '^(Thu|Th|Thursday|4)$', '^(Fri|Fr|Friday|5)$',
                 '^(Sat|Sa|Saturday|6)$'
@@ -846,35 +846,35 @@ my $rtypes = {
     weekday_iso => {
         ref_base => 900,
         symbol   => {
-            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa',  'So' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' ],
         },
         txt => {
-            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa' ],
-            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
+            de => [ 'So',  'Mo',  'Di',  'Mi',  'Do',  'Fr',  'Sa',  'So' ],
+            en => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' ],
         },
         txt_long => {
             de => [
                 'Sonntag',    'Montag',  'Dienstag', 'Mittwoch',
-                'Donnerstag', 'Freitag', 'Samstag'
+                'Donnerstag', 'Freitag', 'Samstag',  'Sonntag'
             ],
             en => [
-                'Sunday',   'Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday'
+                'Sunday',   'Monday', 'Tuesday',  'Wednesday',
+                'Thursday', 'Friday', 'Saturday', 'Sunday'
             ],
         },
         scope => {
             de => [
-                '^(So|Son|Sonntag|6)$',    '^(Mo|Mon|Montag|0)$',
-                '^(Di|Die|Dienstag|1)$',   '^(Mi|Mit|Mittwoch|2)$',
-                '^(Do|Don|Donnerstag|3)$', '^(Fr|Fre|Freitag|4)$',
-                '^(Sa|Sam|Samstag|5)$'
+                '^(So|Son|Sonntag|7)$',    '^(Mo|Mon|Montag|1)$',
+                '^(Di|Die|Dienstag|2)$',   '^(Mi|Mit|Mittwoch|3)$',
+                '^(Do|Don|Donnerstag|4)$', '^(Fr|Fre|Freitag|5)$',
+                '^(Sa|Sam|Samstag|6)$'
             ],
             en => [
-                '^(Sun|Su|Sunday|6)$',   '^(Mon|Mo|Monday|0)$',
-                '^(Tue|Tu|Tuesday|1)$',  '^(Wed|We|Wednesday|2)$',
-                '^(Thu|Th|Thursday|3)$', '^(Fri|Fr|Friday|4)$',
-                '^(Sat|Sa|Saturday|5)$'
+                '^(Sun|Su|Sunday|7)$',   '^(Mon|Mo|Monday|1)$',
+                '^(Tue|Tu|Tuesday|2)$',  '^(Wed|We|Wednesday|3)$',
+                '^(Thu|Th|Thursday|4)$', '^(Fri|Fr|Friday|5)$',
+                '^(Sat|Sa|Saturday|6)$'
             ],
         },
         tmpl              => '%txt%',
@@ -1038,6 +1038,18 @@ my $rtypes = {
                 'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
             ],
+            nl => [
+                'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
+                'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
+            ],
+            fr => [
+                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
+            ],
+            pl => [
+                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+            ],
         },
         txt_long => {
             de => [
@@ -1055,6 +1067,18 @@ my $rtypes = {
                 'Southwest', 'West-Southwest',
                 'West',      'West-Northwest',
                 'Northwest', 'North-Northwest'
+            ],
+            nl => [
+                'N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
+                'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW'
+            ],
+            fr => [
+                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'
+            ],
+            pl => [
+                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
             ],
         },
 

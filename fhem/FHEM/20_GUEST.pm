@@ -20,13 +20,15 @@ sub GUEST_Initialize($) {
     $hash->{AttrFn}    = "RESIDENTStk_Attr";
     $hash->{NotifyFn}  = "RESIDENTStk_Notify";
 
+    $hash->{AttrPrefix} = "rg_";
+
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,none "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {
-        $hash->{AttrList} .= " rg_" . $_;
+        $hash->{AttrList} .= " " . $hash->{AttrPrefix} . $_;
     }
 }
 

@@ -20,13 +20,15 @@ sub ROOMMATE_Initialize($) {
     $hash->{AttrFn}    = "RESIDENTStk_Attr";
     $hash->{NotifyFn}  = "RESIDENTStk_Notify";
 
+    $hash->{AttrPrefix} = "rr_";
+
     $hash->{AttrList} =
         "disable:1,0 disabledForIntervals do_not_notify:1,0 "
       . "rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone "
       . $readingFnAttributes;
 
     foreach (@RESIDENTStk_attr) {
-        $hash->{AttrList} .= " rr_" . $_;
+        $hash->{AttrList} .= " " . $hash->{AttrPrefix} . $_;
     }
 }
 

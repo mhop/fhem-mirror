@@ -6,6 +6,7 @@ use warnings;
 use Data::Dumper;
 use Time::Local;
 
+use Unit;
 our (@RESIDENTStk_attr);
 
 # module variables ############################################################
@@ -1320,7 +1321,7 @@ m/^0|false|absent|disappeared|unavailable|unreachable|disconnected|1|true|presen
                 my $d = $_;
                 if ( $d =~ m/^([a-zA-Z\d._]+):(?:([A-Za-z\d_\.\-\/]*))?$/ ) {
                     $d = $1;
-                    $r = $2 if ($2 && $2 ne "");
+                    $r = $2 if ( $2 && $2 ne "" );
                 }
 
                 my $presenceState =
@@ -1446,16 +1447,15 @@ sub RESIDENTStk_DurationTimer($;$) {
 
     my $durPresence_hr =
       ( $durPresence > 0 )
-      ? RESIDENTStk_sec2time($durPresence)
+      ? UConv::s2hms($durPresence)
       : "00:00:00";
     my $durPresence_cr =
       ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
     my $durAbsence_hr =
-      ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
+      ( $durAbsence > 0 ) ? UConv::s2hms($durAbsence) : "00:00:00";
     my $durAbsence_cr =
       ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
-    my $durSleep_hr =
-      ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
+    my $durSleep_hr = ( $durSleep > 0 ) ? UConv::s2hms($durSleep) : "00:00:00";
     my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
 
     readingsBeginUpdate($hash) if ( !$silent );
@@ -2424,8 +2424,7 @@ return;;\
             # earlier than wakeupDefaultTime
             if (   $wakeupEnforced == 3
                 && $wakeupDefaultTime
-                && RESIDENTStk_time2sec($wakeupDefaultTime) >
-                RESIDENTStk_time2sec($lastRun) )
+                && UConv::hms2s($wakeupDefaultTime) > UConv::hms2s($lastRun) )
             {
                 Log3 $NAME, 4,
                   "RESIDENTStk $NAME: "
@@ -2649,15 +2648,15 @@ sub RESIDENTStk_wakeupGetBegin($;$) {
     }
 
     # Recalculate new wake-up value
-    my $seconds = RESIDENTStk_time2sec($wakeupTime) - $wakeupOffset * 60;
+    my $seconds = UConv::hms2s($wakeupTime) - $wakeupOffset * 60;
     if ( $seconds < 0 ) { $seconds = 86400 + $seconds }
 
     Log3 $NAME, 4,
         "RESIDENTStk $NAME: "
       . "wakeupGetBegin result: $wakeupTime = $seconds s - $wakeupOffset m = "
-      . RESIDENTStk_sec2time($seconds);
+      . UConv::s2hms($seconds);
 
-    return RESIDENTStk_sec2time($seconds);
+    return UConv::s2hms($seconds);
 }
 
 sub RESIDENTStk_wakeupRun($;$) {
@@ -2880,8 +2879,7 @@ sub RESIDENTStk_wakeupRun($;$) {
             # earlier than wakeupDefaultTime
             if (   $wakeupEnforced == 3
                 && $wakeupDefaultTime
-                && RESIDENTStk_time2sec($wakeupDefaultTime) >
-                RESIDENTStk_time2sec($lastRun) )
+                && UConv::hms2s($wakeupDefaultTime) > UConv::hms2s($lastRun) )
             {
                 Log3 $NAME, 4,
                   "RESIDENTStk $NAME: "
@@ -2933,7 +2931,7 @@ sub RESIDENTStk_wakeupRun($;$) {
                   "RESIDENTStk $NAME: "
                   . "created at-device $wakeupStopAtdevice to stop wake-up program in $wakeupOffset minutes";
                 fhem "define $wakeupStopAtdevice at +"
-                  . RESIDENTStk_sec2time( $wakeupOffset * 60 + 1 )
+                  . UConv::s2hms( $wakeupOffset * 60 + 1 )
                   . " set $NAME:FILTER=running=1 stop triggerpost";
                 fhem "attr $wakeupStopAtdevice "
                   . "comment Auto-created by RESIDENTS Toolkit: temp. at-device to stop wake-up program of timer $NAME when wake-up time is reached";
@@ -3008,7 +3006,7 @@ sub RESIDENTStk_wakeupGetNext($;$) {
 
     my $tomorrow = $today + 1;
     $tomorrow = 0 if ( $tomorrow == 7 );
-    my $secNow = RESIDENTStk_time2sec( $hour . ":" . $min ) + $sec;
+    my $secNow = UConv::hms2s( $hour . ":" . $min ) + $sec;
     my $definitiveNextToday;
     my $definitiveNextTomorrow;
     my $definitiveNextTodayDev;
@@ -3118,7 +3116,7 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             && $wakeupAtNTM =~ /^([0-9]{2}:[0-9]{2})$/ )
         {
             $nextRunSrc       = "at";
-            $nextRunSec       = RESIDENTStk_time2sec($wakeupAtNTM);
+            $nextRunSec       = UConv::hms2s($wakeupAtNTM);
             $nextRunSecTarget = $nextRunSec + $wakeupOffset * 60;
 
             if ( $wakeupOffset && $nextRunSecTarget >= 86400 ) {
@@ -3139,7 +3137,7 @@ sub RESIDENTStk_wakeupGetNext($;$) {
         }
         else {
             $nextRunSrc       = "dummy";
-            $nextRunSecTarget = RESIDENTStk_time2sec($nextRun);
+            $nextRunSecTarget = UConv::hms2s($nextRun);
             $nextRunSec       = $nextRunSecTarget - $wakeupOffset * 60;
 
             if ( $wakeupOffset && $nextRunSec < 0 ) {
@@ -3327,24 +3325,24 @@ sub RESIDENTStk_wakeupGetNext($;$) {
     {
         Log3 $name, 4,
             "RESIDENTStk $name: 07 - next wake-up result: today at "
-          . RESIDENTStk_sec2time($definitiveNextToday)
+          . UConv::s2hms($definitiveNextToday)
           . ", wakeupDevice="
           . $definitiveNextTodayDev;
 
         return ( $definitiveNextTodayDev,
-            substr( RESIDENTStk_sec2time($definitiveNextToday), 0, -3 ) );
+            substr( UConv::s2hms($definitiveNextToday), 0, -3 ) );
     }
     elsif (defined($definitiveNextTomorrowDev)
         && defined($definitiveNextTomorrow) )
     {
         Log3 $name, 4,
             "RESIDENTStk $name: 07 - next wake-up result: tomorrow at "
-          . RESIDENTStk_sec2time($definitiveNextTomorrow)
+          . UConv::s2hms($definitiveNextTomorrow)
           . ", wakeupDevice="
           . $definitiveNextTomorrowDev;
 
         return ( $definitiveNextTomorrowDev,
-            substr( RESIDENTStk_sec2time($definitiveNextTomorrow), 0, -3 ) );
+            substr( UConv::s2hms($definitiveNextTomorrow), 0, -3 ) );
     }
 
     return ( undef, undef );
@@ -3358,12 +3356,12 @@ sub RESIDENTStk_TimeSum($$) {
         return $val1;
     }
     else {
-        $timestamp1 = RESIDENTStk_time2sec($val1);
+        $timestamp1 = UConv::hms2s($val1);
     }
 
     if ( $val2 =~ /^([\+\-])([0-9]{2}):([0-9]{2})$/ ) {
         $math       = $1;
-        $timestamp2 = RESIDENTStk_time2sec("$2:$3");
+        $timestamp2 = UConv::hms2s("$2:$3");
     }
     elsif ( $val2 =~ /^([\+\-])([0-9]*)$/ ) {
         $math       = $1;
@@ -3374,12 +3372,10 @@ sub RESIDENTStk_TimeSum($$) {
     }
 
     if ( $math eq "-" ) {
-        return
-          substr( RESIDENTStk_sec2time( $timestamp1 - $timestamp2 ), 0, -3 );
+        return substr( UConv::s2hms( $timestamp1 - $timestamp2 ), 0, -3 );
     }
     else {
-        return
-          substr( RESIDENTStk_sec2time( $timestamp1 + $timestamp2 ), 0, -3 );
+        return substr( UConv::s2hms( $timestamp1 + $timestamp2 ), 0, -3 );
     }
 
 }
@@ -3405,32 +3401,7 @@ sub RESIDENTStk_TimeDiff ($$;$) {
       if ( defined($format) && $format eq "min" );
 
     # return human readable format
-    return RESIDENTStk_sec2time( round( $timeDiff, 0 ) );
-}
-
-sub RESIDENTStk_sec2time($) {
-    my ($sec) = @_;
-
-    # return human readable format
-    my $hours =
-      ( abs($sec) < 3600 ? 0 : int( abs($sec) / 3600 ) );
-    $sec -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
-    my $minutes = ( abs($sec) < 60 ? 0 : int( abs($sec) / 60 ) );
-    my $seconds = abs($sec) % 60;
-
-    $hours   = "0" . $hours   if ( $hours < 10 );
-    $minutes = "0" . $minutes if ( $minutes < 10 );
-    $seconds = "0" . $seconds if ( $seconds < 10 );
-
-    return "$hours:$minutes:$seconds";
-}
-
-sub RESIDENTStk_time2sec($) {
-    my ($s) = @_;
-    my @t = split /:/, $s;
-    $t[2] = 0 unless ( $t[2] );
-
-    return $t[0] * 3600 + $t[1] * 60 + $t[2];
+    return UConv::s2hms( round( $timeDiff, 0 ) );
 }
 
 sub RESIDENTStk_InternalTimer($$$$$) {
@@ -3490,17 +3461,11 @@ sub RESIDENTStk_StopInternalTimers($) {
     RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 }
 
-sub RESIDENTStk_findHomestateSlaves($) {
-    my ($hash) = @_;
-    my $ret = "";
-    $ret .= AttrVal( $hash->{NAME}, "rh_residentsDevice", "" );
-
-    return $ret;
-}
-
 sub RESIDENTStk_findResidentSlaves($;$) {
     my ( $hash, $ret ) = @_;
-    my $ROOMMATES;
+    my @slaves;
+
+    my @ROOMMATES;
     foreach ( devspec2array("TYPE=ROOMMATE") ) {
         next
           unless (
@@ -3508,11 +3473,10 @@ sub RESIDENTStk_findResidentSlaves($;$) {
             && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
-        $ROOMMATES .= "," if ($ROOMMATES);
-        $ROOMMATES .= $_;
+        push @ROOMMATES, $_;
     }
 
-    my $GUESTS;
+    my @GUESTS;
     foreach ( devspec2array("TYPE=GUEST") ) {
         next
           unless (
@@ -3520,31 +3484,31 @@ sub RESIDENTStk_findResidentSlaves($;$) {
             && grep { $hash->{NAME} eq $_ }
             split( /,/, $defs{$_}{RESIDENTGROUPS} )
           );
-        $GUESTS .= "," if ($GUESTS);
-        $GUESTS .= $_;
+        push @GUESTS, $_;
     }
 
-    if ( !$ROOMMATES && $hash->{ROOMMATES} ) {
+    if ( scalar @ROOMMATES ) {
+        $hash->{ROOMMATES} = join( ",", @ROOMMATES );
+    }
+    elsif ( $hash->{ROOMMATES} ) {
         delete $hash->{ROOMMATES};
     }
-    elsif ( $ROOMMATES
-        && ( !$hash->{ROOMMATES} || $hash->{ROOMMATES} ne $ROOMMATES ) )
-    {
-        $hash->{ROOMMATES} = $ROOMMATES;
-    }
 
-    if ( !$GUESTS && $hash->{GUESTS} ) {
+    if ( scalar @GUESTS ) {
+        $hash->{GUESTS} = join( ",", @GUESTS );
+    }
+    elsif ( $hash->{GUESTS} ) {
         delete $hash->{GUESTS};
     }
-    elsif ( $GUESTS && ( !$hash->{GUESTS} || $hash->{GUESTS} ne $GUESTS ) ) {
-        $hash->{GUESTS} = $GUESTS;
-    }
 
-    $ret = "" unless ($ret);
-    $ret .= "," unless ( $ret eq "" );
-    $ret .= $hash->{ROOMMATES} if ( $hash->{ROOMMATES} );
-    $ret .= "," unless ( $ret eq "" );
-    $ret .= $hash->{GUESTS} if ( $hash->{GUESTS} );
+    if ( $hash->{ROOMMATES} ) {
+        $ret .= "," if ($ret);
+        $ret .= $hash->{ROOMMATES};
+    }
+    if ( $hash->{GUESTS} ) {
+        $ret .= "," if ($ret);
+        $ret .= $hash->{GUESTS};
+    }
 
     return RESIDENTStk_findDummySlaves( $hash, $ret );
 }
@@ -3590,11 +3554,12 @@ sub RESIDENTStk_findDummySlaves($;$) {
 
 sub RESIDENTStk_GetPrefixFromType($) {
     my ($name) = @_;
-    return "" unless ( defined($name) );
-    return "rh_"  if ( GetType($name) eq "HOMESTATE" );
-    return "rgr_" if ( GetType($name) eq "RESIDENTS" );
-    return "rr_"  if ( GetType($name) eq "ROOMMATE" );
-    return "rg_"  if ( GetType($name) eq "GUEST" );
+    return $modules{ $defs{$name}{TYPE} }{AttrPrefix}
+      if ( $defs{$name}
+        && $defs{$name}{TYPE}
+        && $modules{ $defs{$name}{TYPE} }
+        && $modules{ $defs{$name}{TYPE} }{AttrPrefix} );
+    return "";
 }
 
 sub RESIDENTStk_DoModuleTrigger($$@) {
