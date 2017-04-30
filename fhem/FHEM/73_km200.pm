@@ -2829,7 +2829,7 @@ sub km200_ParseHttpResponseDyn($)
 			my $TempServiceIndex = 0;
 
 			### Sort list by timestamps descending
-#			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+			my @TempSortedErrorList =  sort { $b->{t} cmp $a->{t} } @{ $json->{values} };
 			my @TempSortedErrorList =  sort ( @{ $json->{values} } );
 
 
