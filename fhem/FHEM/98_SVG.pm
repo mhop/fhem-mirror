@@ -2130,7 +2130,7 @@ SVG_render($$$$$$$$$$)
     if( $caption_pos eq 'auto' ) {
       my $a = $conf{lAxis}[$i];
       my $axis = 1; $axis = $1 if( $a && $a =~ m/x\d+y(\d+)/ );
-      if( $axis <= $nr_left_axis ) {
+      if( $axis <= $use_left_axis ) {
         $caption_anchor = "beginning";
       } else {
         $caption_anchor = "end";
