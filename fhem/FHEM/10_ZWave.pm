@@ -4378,6 +4378,11 @@ ZWave_Parse($$@)
       return "";
     }
 
+    if($cmd eq "ZW_SET_PRIORITY_ROUTE" && $arg =~ m/(..)(..)/) {
+      DoTrigger($ioName, "$cmd node $1 result $2");
+      return "";
+    }
+
     Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
   }

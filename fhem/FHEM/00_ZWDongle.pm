@@ -1280,6 +1280,9 @@ ZWDongle_Ready($)
             failedNodeRemoveFail|nodeOk|failedNodeReplace|
             failedNodeReplaceDone|failedNodeRemoveFailed]</li>
 
+  <br><b>routeFor</b>
+  <li>ZW_SET_PRIORITY_ROUTE node $nodeId result $nr</li>
+
   <br><b>sucNetworkUpdate</b>
   <li>ZW_REQUEST_NETWORK_UPDATE [started|selfOrNoSUC|done|abort|wait|diabled|
                                  overflow]</li>
