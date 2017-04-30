@@ -740,7 +740,7 @@ FB_CALLMONITOR_reverseSearch($$)
             {
                 Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
 
-                $result = GetFileFromURL("http://www.dasschnelle.at/result/index/results?PerPage=5&pageNum=1&what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
+                $result = GetFileFromURL("http://www.dasschnelle.at/ergebnisse?what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
                 if(not defined($result))
                 {
                     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -752,11 +752,11 @@ FB_CALLMONITOR_reverseSearch($$)
                 else
                 {
                     #Log 2, $result;
-                    if($result =~ /name\s+:\s+"(.+?)",/)
+                    if($result =~ /"name"\s*:\s*"([^"]+)",/)
                     {
                         $invert_match = "";
 
-                        while($result =~ /name\s+:\s+"(.+?)",/g)
+                        while($result =~ /"name"\s*:\s*"([^"]+)",/g)
                         {
                             $invert_match = $1 if(length($1) > length($invert_match));
                         }
