@@ -2,6 +2,9 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.5 - 20170430
+# - BUGFIX:  fix "readings not updated"
+#
 # v2.0.4 - 20170421
 # - FEATURE: support $readingFnAttributes
 # - BUGFIX:  fix some freezes
@@ -184,7 +187,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.4";
+    my $VERSION = "v2.0.5";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -1330,7 +1333,6 @@ sub DLNARenderer_addedDevice {
       readingsSingleUpdate($DLNARendererHash, "presentationURL", $dev->presentationURL(), 1);
       readingsSingleUpdate($DLNARendererHash, "manufacturer", $dev->manufacturer(), 1);
       
-      if(!$foundDevice) {
       #register callbacks
       #urn:upnp-org:serviceId:AVTransport
       if(DLNARenderer_upnpGetService($DLNARendererHash, "AVTransport")) {
@@ -1343,7 +1345,6 @@ sub DLNARenderer_addedDevice {
       #urn:pure-com:serviceId:SpeakerManagement
       if(DLNARenderer_upnpGetService($DLNARendererHash, "SpeakerManagement")) {
         $DLNARendererHash->{helper}{speakerManagementSubscription} = DLNARenderer_upnpGetService($DLNARendererHash, "SpeakerManagement")->subscribe(sub { DLNARenderer_subscriptionCallback($DLNARendererHash, @_); }, 1);
-      }
       }
       
       #set online
