@@ -29,6 +29,7 @@ my %Hyperion_sets =
   "mode"              => "clearall,effect,off,rgb",
   "off"               => "noArg",
   "on"                => "noArg",
+  "reopen"            => "noArg",
   "rgb"               => "colorpicker,RGB",
   "toggle"            => "noArg",
   "toggleMode"        => "noArg",
@@ -57,6 +58,7 @@ sub Hyperion_Initialize($)
   $hash->{SetFn}      = "Hyperion_Set";
   $hash->{UndefFn}    = "Hyperion_Undef";
   $hash->{AttrList}   = "disable:1,0 ".
+                        "disabledForIntervals ".
                         "hyperionBin ".
                         "hyperionConfigDir ".
                         "hyperionCustomEffects:textField-long ".
@@ -90,18 +92,16 @@ sub Hyperion_Define($$)
   }
   $hash->{IP}     = $host;
   $hash->{PORT}   = $port;
-  $hash->{DeviceName} = "$host:$port";
-  $interval       = undef unless defined $interval;
   $interval       = 5 if ($interval && $interval < 5);
+  $hash->{NOTIFYDEV} = "global";
+  $hash->{DeviceName} = "$host:$port";
   RemoveInternalTimer($hash);
-  Hyperion_OpenDev($hash);
   if ($init_done && !defined $hash->{OLDDEF})
   {
     $attr{$name}{alias} = "Ambilight";
     $attr{$name}{cmdIcon} = "on:general_an off:general_aus dimDown:dimdown dimUp:dimup";
-    $attr{$name}{"event-on-change-reading"} = ".*";
-    $attr{$name}{"event-on-update-reading"} = "serverResponse";
     $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
+    $attr{$name}{"event-on-change-reading"} = ".*";
     $attr{$name}{group} = "colordimmer";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
     $attr{$name}{icon} = "light_led_stripe_rgb";
@@ -109,44 +109,29 @@ sub Hyperion_Define($$)
     $attr{$name}{room} = "Hyperion";
     $attr{$name}{webCmd} = $Hyperion_webCmd;
     $attr{$name}{widgetOverride} = "dimUp:noArg dimDown:noArg";
-    addToDevAttrList($name,"lightSceneParamsToSave") if (index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
-    addToDevAttrList($name,"homebridgeMapping") if (index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+    addToDevAttrList($name,"lightSceneParamsToSave") if (!grep /^lightSceneParamsToSave/,split(" ",$attr{"global"}{userattr}));
+    addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",$attr{"global"}{userattr}));
   }
-  if ($init_done)
-  {
-    Hyperion_GetUpdate($hash);
-  }
-  else
-  {
-    InternalTimer(gettimeofday() + $interval,"Hyperion_GetUpdate",$hash);
-  }
-  return undef;
-}
-
-sub Hyperion_DoInit($)
-{
-  my ($hash) = @_;
-  DevIo_SimpleWrite($hash,encode_json($Hyperion_serverinfo)."\n",2);
-  return undef;
+  return Hyperion_OpenDev($hash);
 }
 
 sub Hyperion_Notify($$)
 {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
-  return if ($dev->{NAME} ne "global");
-  return if (!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-  return undef if (IsDisabled($name));
-  Hyperion_Read($hash);
-  return undef;
+  return if (!grep /^REREADCFG|MODIFIED\s$name$/,@{$dev->{CHANGED}});
+  return if (IsDisabled($name));
+  return Hyperion_OpenDev($hash);
 }
 
 sub Hyperion_OpenDev($)
 {
   my ($hash) = @_;
-  $hash->{STATE} = DevIo_OpenDev($hash,0,"Hyperion_DoInit",sub($$$)
+  DevIo_CloseDev($hash);
+  DevIo_OpenDev($hash,1,DevIo_SimpleWrite($hash,encode_json($Hyperion_serverinfo),2,1),sub($$$)
   {
     my ($h,$err) = @_;
+    InternalTimer(gettimeofday() + 5,"Hyperion_GetUpdate",$hash);
     if ($err)
     {
       readingsBeginUpdate($hash);
@@ -154,10 +139,13 @@ sub Hyperion_OpenDev($)
       readingsBulkUpdate($hash,"serverResponse","ERROR");
       readingsBulkUpdate($hash,"state","ERROR");
       readingsEndUpdate($hash,1);
+      return "ERROR: $err";
     }
-    return $err ? "Error: $err" : $hash->{DeviceName}." connected";
+    else
+    {
+      return $hash->{DeviceName}." connected";
+    }
   });
-  return undef;
 }
 
 sub Hyperion_Undef($$)
@@ -165,7 +153,7 @@ sub Hyperion_Undef($$)
   my ($hash,$name) = @_;
   RemoveInternalTimer($hash);
   DevIo_CloseDev($hash);
-  return undef;                  
+  return;                  
 }
 
 sub Hyperion_list2array($$)
@@ -183,7 +171,7 @@ sub Hyperion_list2array($$)
 sub Hyperion_isLocal($)
 {
   my ($hash) = @_;
-  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1)$/)?1:undef;
+  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1)$/) ? 1 : undef;
 }
 
 sub Hyperion_Get($@)
@@ -217,18 +205,18 @@ sub Hyperion_Read($)
   my ($hash)  = @_;
   my $name    = $hash->{NAME};
   my $buf     = DevIo_SimpleRead($hash);
-  return undef if (!$buf);
-  my $result  = $hash->{PARTIAL}?$hash->{PARTIAL}.$buf:$buf;
+  return if (!$buf);
+  my $result  = $hash->{PARTIAL} ? $hash->{PARTIAL}.$buf : $buf;
   $hash->{PARTIAL} = $result;
-  return undef if ($buf !~ /(^.+"success":(true|false)\}$)/);
-  Log3 $name,5,"$name: url ".$hash->{DeviceName}." returned result: $result";
+  return if ($buf !~ /(^.+"success":(true|false)\}$)/);
+  Log3 $name,5,"$name: url $hash->{DeviceName} returned result: $result";
   delete $hash->{PARTIAL};
   $result =~ /(\s+)?\/{2,}.*|(?:[\t ]*(?:\r?\n|\r))+/gm;
   if ($result =~ /^\{"success":true\}$/)
   {
     fhem "sleep 1; get $name statusRequest"
       if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
-    return undef;
+    return;
   }
   elsif ($result =~ /^\{"info":\{.+\},"success":true\}$/)
   {
@@ -250,13 +238,13 @@ sub Hyperion_Read($)
       if ($error)
       {
         $error = "ATTENTION!!! $error Please update your hyperion to V$Hyperion_requiredVersion at least using HyperCon...";
-        Log3 $name, 1, $error;
+        Log3 $name,1,$error;
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"serverResponse","ERROR");
         readingsBulkUpdate($hash,"lastError",$error);
         readingsBulkUpdate($hash,"state","ERROR");
         readingsEndUpdate($hash,1);
-        return undef;
+        return;
       }
     }
     my $vers        = $data->{hyperion_build}->[0]->{version} ? $data->{hyperion_build}->[0]->{version} : "";
@@ -340,7 +328,7 @@ sub Hyperion_Read($)
           $effname = $e->{name} if (JSON->new->convert_blessed->canonical->encode($e->{args}) eq $effargs);
         }
       }
-      $effname = $effname?$effname:$tempname;
+      $effname = $effname ? $effname : $tempname;
       $effname =~ s/ /_/g;
       readingsBulkUpdate($hash,"effect",$effname);
       readingsBulkUpdate($hash,"mode","effect");
@@ -389,7 +377,7 @@ sub Hyperion_Read($)
     readingsBulkUpdate($hash,"state","ERROR");
     readingsEndUpdate($hash,1);
   }
-  return undef;
+  return;
 }
 
 sub Hyperion_GetConfigs($)
@@ -413,7 +401,7 @@ sub Hyperion_GetConfigs($)
     $cmd .= " $user\@$ip $com";
     @files = Hyperion_listFilesInDir($hash,$cmd);
   }
-  return "No files found on server $ip in directory $dir. Maybe the wrong directory? If SSH is used, has the user ".AttrVal($name,"hyperionSshUser","pi")." been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?"
+  return "No files found on server \"$ip\" in directory \"$dir\".\nMaybe the wrong directory?\n\nIf SSH is used, has the user \"".AttrVal($name,"hyperionSshUser","pi")."\" been configured to log in without\nentering a password (http://www.linuxproblem.org/art_9.html)?"
     if (@files == 0);
   if (@files > 1)
   {
@@ -425,12 +413,12 @@ sub Hyperion_GetConfigs($)
   {
     fhem "deletereading $name .configs" if (defined ReadingsVal($name,".configs",undef));
     $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
-    return "Found just one config file. Please add at least one more config file to properly use this function."
+    return "Found just one config file.\nPlease add at least one more config file to properly use this function."
       if (@files == 1);
     return "No config files found!";
   }
   Hyperion_GetUpdate($hash);
-  return "Found ".@files." config files. Please refresh this page to see the result.";
+  return "Found ".@files." config files.\nPlease refresh this page to see the result.";
 }
 
 sub Hyperion_listFilesInDir($$)
@@ -439,9 +427,9 @@ sub Hyperion_listFilesInDir($$)
   my $name = $hash->{NAME};
   my $fh;
   my @filelist;
-  if (open($fh,"$cmd|"))
+  if (open(FH,"$cmd|"))
   {
-    my @files = <$fh>;
+    my @files = <FH>;
     for (my $i = 0; $i < @files; $i++)
     {
       my $file = $files[$i];
@@ -451,7 +439,7 @@ sub Hyperion_listFilesInDir($$)
       push @filelist,$file;
       Log3 $name,4,"$name: Hyperion_listFilesInDir matching file: \"$file\"";
     }
-    close $fh;
+    close FH;
   }
   return @filelist;
 }
@@ -461,13 +449,15 @@ sub Hyperion_GetUpdate(@)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   RemoveInternalTimer($hash);
-  if ($hash->{INTERVAL})
+  return if (IsDisabled($name));
+  InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash) if ($hash->{INTERVAL});
+  if (!$hash->{FD})
   {
-    InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash);
+    Hyperion_OpenDev($hash);
+    return;
   }
-  return if ($attr{$name}{disable});
   Hyperion_Call($hash);
-  return undef;
+  return;
 }
 
 sub Hyperion_Set($@)
@@ -475,7 +465,7 @@ sub Hyperion_Set($@)
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
   my $value = (defined($args[0])) ? $args[0] : undef;
-  return if ($attr{$name}{disable} && $cmd ne "?");
+  return if (IsDisabled($name) && $cmd ne "?");
   return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
@@ -520,10 +510,10 @@ sub Hyperion_Set($@)
     my $fh;
     if (Hyperion_isLocal($hash))
     {
-      if (open($fh,"$command|"))
+      if (open(FH,"$command|"))
       {
-        $status = <$fh>;
-        close $fh;
+        $status = <FH>;
+        close FH;
       }
     }
     else
@@ -531,10 +521,10 @@ sub Hyperion_Set($@)
       my $com = qx(which ssh);
       chomp $com;
       $com .= " $user\@$ip '$command'";
-      if (open($fh,"$com|"))
+      if (open(FH,"$com|"))
       {
-        $status = <$fh>;
-        close $fh;
+        $status = <FH>;
+        close FH;
       }
     }
     if (!$status)
@@ -542,7 +532,7 @@ sub Hyperion_Set($@)
       Log3 $name,4,"$name: restarted Hyperion with $binpath $confdir$value";
       $value =~ s/\.config\.json$//;
       readingsSingleUpdate($hash,"configFile",$value,1);
-      return undef;
+      return;
     }
     else
     {
@@ -597,7 +587,7 @@ sub Hyperion_Set($@)
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
     my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 1;
     $cmd eq "dimUp" ? fhem "set $name dim $dimUp" : fhem "set $name dim $dimDown";
-    return undef;
+    return;
   }
   elsif ($cmd eq "effect")
   {
@@ -634,7 +624,7 @@ sub Hyperion_Set($@)
     return "Value of $cmd has to be between 0 and 65536 in steps of 1"
       if (defined $value && $value !~ /^(\d+)$/ || $1 > 65536);
     $obj{command} = $cmd;
-    $value = defined $1?$1:AttrVal($name,"hyperionDefaultPriority",0);
+    $value = defined $1 ? $1 : AttrVal($name,"hyperionDefaultPriority",0);
     $obj{priority} = $value*1;
   }
   elsif ($cmd eq "off")
@@ -663,7 +653,7 @@ sub Hyperion_Set($@)
     {
       fhem "set ".$name." clearall";
     }
-    return undef;
+    return;
   }
   elsif ($cmd eq "toggle")
   {
@@ -671,7 +661,7 @@ sub Hyperion_Set($@)
     my $state = Value($name);
     my $nstate = $state ne "off" ? "off" : "on";
     fhem "set $name $nstate";
-    return undef;
+    return;
   }
   elsif ($cmd eq "toggleMode")
   {
@@ -683,9 +673,9 @@ sub Hyperion_Set($@)
     {
       $nmode = $i < @modeorder - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
     }
-    $nmode = $nmode?$nmode:$modeorder[0];
+    $nmode = $nmode ? $nmode : $modeorder[0];
     fhem "set $name mode $nmode";
-    return undef;
+    return;
   }
   elsif ($cmd eq "mode")
   {
@@ -711,7 +701,7 @@ sub Hyperion_Set($@)
     {
       fhem "set $name $rmode";
     }
-    return undef;
+    return;
   }
   elsif ($cmd =~ /^(luminanceGain|luminanceMinimum|saturationGain|saturationLGain|valueGain)$/)
   {
@@ -764,7 +754,7 @@ sub Hyperion_Set($@)
     my $gainUp = ($gain + $gainStep < 5) ? $gain + $gainStep : 5;
     my $gainDown = ($gain - $gainStep > 0) ? $gain - $gainStep : 0.1;
     $cmd eq "valueGainUp" ? fhem "set $name valueGain $gainUp" : fhem "set $name valueGain $gainDown";
-    return undef;
+    return;
   }
   elsif ($cmd eq "addEffect")
   {
@@ -780,14 +770,19 @@ sub Hyperion_Set($@)
     $effs .= "\r\n" if ($effs);
     $effs .= '{"name":"'.$value.'","oname":"'.$eff.'","args":'.ReadingsVal($name,"effectArgs","").'}';
     $attr{$name}{hyperionCustomEffects} = $effs;
-    return undef;
+    return;
   }
-  if (scalar keys %obj)
+  elsif ($cmd eq "reopen")
+  {
+    Hyperion_OpenDev($hash);
+    return;
+  }
+  if (keys %obj)
   {
     Log3 $name,5,"$name: $cmd obj json: ".encode_json(\%obj);
     SetExtensionsCancel($hash);
     Hyperion_Call($hash,\%obj);
-    return undef;
+    return;
   }
   return SetExtensions($hash,$params,$name,@aa);
 }
@@ -796,7 +791,7 @@ sub Hyperion_Attr(@)
 {
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash  = $defs{$name};
-  my $err   = undef;
+  my $err;
   my $local = Hyperion_isLocal($hash);
   if ($cmd eq "set")
   {
@@ -891,55 +886,48 @@ sub Hyperion_Attr(@)
     elsif ($attr_name eq "disable")
     {
       $err = "Invalid value $attr_value for attribute $attr_name. Must be 1 if set, default is 0." if ($attr_value !~ /^0|1$/);
-      return $err if (defined $err);
-      if ($attr_value eq "1")
+      return $err if ($err);
+      if ($attr_value == 1)
       {
         RemoveInternalTimer($hash);
         DevIo_Disconnected($hash);
-        DevIo_CloseDev($hash);
       }
       else
       {
-        Hyperion_GetUpdate($hash);
+        Hyperion_OpenDev($hash);
       }
     }
   }
   else
   {
     delete $hash->{helper}{customeffects} if ($attr_name eq "hyperionCustomEffects");
-    Hyperion_GetUpdate($hash) if (!IsDisabled($hash));
+    Hyperion_GetUpdate($hash) if (!IsDisabled($name));
+    Hyperion_OpenDev($hash) if ($attr_name eq "disable");
   }
-  return $err if (defined $err);
-  return undef;
+  return $err if ($err);
+  return;
 }
 
 sub Hyperion_Call($;$)
 {
   my ($hash,$obj) = @_;
-  $obj = ($obj) ? $obj : $Hyperion_serverinfo;
+  $obj = $obj ? $obj : $Hyperion_serverinfo;
   my $name = $hash->{NAME};
   my $json = encode_json($obj);
-  return undef if (IsDisabled($name));
-  if (!$hash->{FD})
-  {
-    DevIo_CloseDev($hash);
-    DevIo_Disconnected($hash);
-    Hyperion_OpenDev($hash);
-    return undef;
-  }
+  return if (IsDisabled($name));
   Log3 $name,5,"$name: Hyperion_Call: json object: $json";
-  DevIo_SimpleWrite($hash,$json."\n",2);
+  DevIo_SimpleWrite($hash,$json,2,1);
 }
 
 sub Hyperion_devStateIcon($;$)
 {
   my ($hash,$state) = @_; 
   $hash = $defs{$hash} if (ref $hash ne "HASH");
-  return undef if (!$hash);
+  return if (!$hash);
   my $name = $hash->{NAME};
   my $rgb = ReadingsVal($name,"rgb","");
   my $dim = ReadingsVal($name,"dim",10);
-  my $ico = (int($dim / 10) * 10 < 10)?10:int($dim / 10) * 10;
+  my $ico = int($dim / 10) * 10 < 10 ? 10 : int($dim / 10) * 10;
   return ".*:off:toggle"
     if (Value($name) eq "off");
   return ".*:light_exclamation"
@@ -1089,6 +1077,10 @@ sub Hyperion_devStateIcon($;$)
       set the light on and restore previous state
     </li>
     <li>
+      <i>reopen</i><br>
+      reopen the connection to the hyperion server
+    </li>
+    <li>
       <i>rgb &lt;RRGGBB&gt; [duration] [priority]</i><br>
       set color in RGB hex format with optional duration in seconds and priority
     </li>
@@ -1153,6 +1145,11 @@ sub Hyperion_devStateIcon($;$)
       <i>disable</i><br>
       stop polling and disconnect<br>
       default: 0
+    </li>
+    <li>
+      <i>disabledForIntervals</i><br>
+      stop polling in given time frames<br>
+      default:
     </li>
     <li>
       <i>hyperionBin</i><br>
