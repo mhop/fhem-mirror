@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix   73_km200.pm: Errorlist unsorted timestamp
   - bugfix:  72_FB_CALLMONITOR: fix reverse-search of dasschnelle.at
   - feature: 70_BRAVIA: command remoteControl supports 'PictureMode'
   - bugfix:  22_HOMEMODE: Use of uninitialized value $d in hash element
