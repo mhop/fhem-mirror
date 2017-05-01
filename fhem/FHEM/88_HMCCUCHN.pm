@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.001
+#  Version 4.0.002
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -51,7 +51,7 @@
 #  attr <name> substitute <subst-rule>[;...]
 #
 ################################################################
-#  Requires module 88_HMCCU.pm
+#  Requires modules 88_HMCCU.pm, HMCCUConf.pm
 ################################################################
 
 package main;
@@ -756,13 +756,18 @@ sub HMCCUCHN_Get ($@)
          If set to 1 state will be set to result of command (i.e. 'OK'). Otherwise state is only
          updated if value of state datapoint has changed.
       </li><br/>
-      <li><b>ccucalculate &lt;value&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
+      <li><b>ccucalculate &lt;value-type&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
       	Calculate special values like dewpoint based on datapoints specified in
       	<i>dp-list</i>. The result is stored in <i>reading</i>. The following <i>values</i>
       	are supported:<br/>
       	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
-      	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,
-      	&lt;humidity&gt;<br/>
+      	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
+      	inc = increment datapoint value considering reset of datapoint, <i>dp-list</i> = &lt;counter-datapoint&gt;<br/>
+      	inc = increment datapoint value considering reset of datapoint, <i>dp-list</i> = &lt;counter-datapoint&gt;<br/>
+      	min = calculate minimum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
+      	max = calculate maximum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
+      	sum = calculate sum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
+      	avg = calculate average continuously, <i>dp-list</i> = &lt;datapoint&gt;
       	Example:<br/>
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>

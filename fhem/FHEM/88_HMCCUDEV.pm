@@ -1,14 +1,14 @@
-#####################################################################
+######################################################################
 #
 #  88_HMCCUDEV.pm
 #
 #  $Id$
 #
-#  Version 4.0.001
+#  Version 4.0.002
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
-#####################################################################
+######################################################################
 #
 #  define <name> HMCCUDEV {<ccudev>|virtual} [<statechannel>] [readonly] [defaults]
 #     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}] [iodev=<iodevname>]
@@ -37,6 +37,7 @@
 #  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
 #  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
+#  attr <name> ccupeer [channel.]datapoint oper expr:{ hmccu:object=value | fhem:command }
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address[lc] | name[lc] | datapoint[lc] }
 #  attr <name> ccureadingfilter <filter-rule>[,...]
@@ -52,9 +53,9 @@
 #  attr <name> substexcl <reading-expr>
 #  attr <name> substitute <subst-rule>[;...]
 #
-#####################################################################
-#  Requires module 88_HMCCU
-#####################################################################
+######################################################################
+#  Requires modules 88_HMCCU.pm, HMCCUConf.pm
+######################################################################
 
 package main;
 
@@ -84,7 +85,12 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel statedatapoint controldatapoint stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate:textField-long ". 
+		"ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ".
+		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ".
+		"ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 ".
+		"hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel ".
+		"statedatapoint controldatapoint stripnumber ccupeer:textField-long ".$readingFnAttributes;
 }
 
 #####################################
@@ -96,9 +102,10 @@ sub HMCCUDEV_Define ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
 	
-	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] " .
-		"['readonly'] ['defaults'] [iodev={iodev-name}] [{groupexp=regexp|group={device|channel}[,...]]";
-	return $usage if (@$a < 3);
+	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] ".
+		"['readonly'] ['defaults'] [iodev={iodev-name}] ".
+		"[{groupexp=regexp|group={device|channel}[,...]]";
+	return $usage if (scalar (@$a) < 3);
 
 	my $devname = shift @$a;
 	my $devtype = shift @$a;
@@ -121,8 +128,7 @@ sub HMCCUDEV_Define ($@)
 		foreach my $d (sort keys %defs) {
 			my $ch = $defs{$d};
 			next if (!exists ($ch->{TYPE}));
-			next if ($ch->{TYPE} ne 'HMCCUDEV');
-			next if ($d eq $name);
+			next if ($ch->{TYPE} ne 'HMCCUDEV' || $d eq $name);
 			next if ($ch->{ccuif} ne 'VirtualDevices' || $ch->{ccuname} ne 'none');
 			$no++;
 		}
@@ -905,12 +911,8 @@ sub HMCCUDEV_Get ($@)
       <li><b>ccuackstate {<u>0</u> | 1}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
-      <li><b>ccucalculate &lt;value&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
-      	Calculate special values like dewpoint based on datapoints specified in
-      	<i>dp-list</i>. Datapoints in <i>dp-list</i> must be specified in format 
-      	&lt;channelno&gt;.&lt;datapoint&gt;. The result is stored in <i>reading</i>. 
-      	The following <i>values</i> are supported:<br/>
-      	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;
+      <li><b>ccucalculate &lt;value-type&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
+      	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
       <li><b>ccuflags {nochn0, trace}</b><br/>
       	<a href="#HMCCUCHNattr">see HMCCUCHN</a>
