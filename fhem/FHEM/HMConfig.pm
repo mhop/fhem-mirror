@@ -256,7 +256,6 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00BD" => {name=>"HM-CC-RT-DN-BoM"         ,alias=>"HM-CC-RT-DN"}
  ,"00BE" => {name=>"HM-MOD-Re-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:8",}
  ,"00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2",}
- ,"004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00C0" => {name=>"HM-SEC-MDIR-2"           ,alias=>"HM-SEC-MDIR"}
  ,"00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
@@ -673,6 +672,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   sunThresh       =>{a=>  5  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Sunshine threshold"},
   stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0    ,max=>200    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
   stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0    ,max=>200    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
+  windSpeedRsltSrc=>{a=> 10  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"wind result source"                   ,lit=>{average=>0,max=>1}},
 # others                                            
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable"                   ,lit=>{off=>0,on=>200}},
 
@@ -1029,6 +1029,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,displayInvert   =>1}
  
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
+ ,"HM-WDS100-C6-O-2"  =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1
+                         ,windSpeedRsltSrc=>1,peerNeedsBurst  =>1,localResDis     =>1}
  ,"HM-OU-LED16"       =>{ brightness      =>1,energyOpt       =>1,localResDis     =>1}
  ,"HM-OU-CFM-PL"      =>{ localResetDis   =>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
@@ -1177,7 +1179,6 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"}   = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"}   = $culHmRegModel{"HM-CC-VD"};
                                         
 $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
-                                        
 
 
 %culHmRegChan = (# if channelspecific then enter them here
