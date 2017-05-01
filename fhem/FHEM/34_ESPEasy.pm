@@ -29,6 +29,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use MIME::Base64;
+#use Encode qw(encode_utf8);
 use TcpServerUtils;
 use HttpUtils;
 use Color;
@@ -36,7 +37,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.05;       # Version of this module
+my $module_version    = 1.06;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -636,9 +637,10 @@ sub ESPEasy_Read($) {
 
     eval {$json = decode_json($data[1]);1;};
     if ($@) {
-      Log3 $bname, 2, "$btype $name: WARNING: deformed JSON data, check your ESP config ($peer)";
-      Log3 $bname, 2, "$btype $name: $@";
-     return;
+      Log3 $bname, 2, "$btype $name: WARNING: invalid JSON data or utf-8 "
+                    . "encoding failed ($peer).";
+      Log3 $bname, 2, "$btype $name: WARNING: $@";
+      return;
     }
 
     # check that ESPEasy software is new enough
@@ -666,8 +668,9 @@ sub ESPEasy_Read($) {
 
     # push internals in @values (and in bridge helper for support reason, only)
     my @values;
-    my @intVals = qw(unit sleep build);
+    my @intVals = qw(unit sleep build build_git build_notes version node_type_id);
     foreach my $intVal (@intVals) {
+      next if !defined $json->{data}{ESP}{$intVal};
       push(@values,"i||".$intVal."||".$json->{data}{ESP}{$intVal}."||0");
       $bhash->{helper}{received}{$peer}{$intVal} = $json->{data}{ESP}{$intVal};
     }
@@ -1172,7 +1175,16 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
 
       # --- setInternal ---------------------------------------------
       elsif ($cmd eq "i") {
+        # add human readable text to node_type_id
+        $value .= defined $ESPEasy_build_id{$value}{type}
+          ? ": " . $ESPEasy_build_id{$value}{type}
+          : ": unknown node type id"
+            if $reading eq "node_type_id";
+
+        # set internal
         $hash->{"ESP_".uc($reading)} = $value;
+
+        # add to log
         push(@logInternals,"$reading:$value");
       }
 
@@ -2852,7 +2864,7 @@ sub ESPEasy_removeGit($)
       Play melodies via <a target="_NEW" href="https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language#Technical_specification">RTTTL</a>
       (ESPEasy &gt;= 2.0.0-dev6)
       <br>
-      required arguments: &lt;pin&gt; &lt;freq&gt; &lt;duration&gt;
+      required arguments: &lt;rtttl&gt;
       </li><br>
       
     <li><a name="">status</a><br>
