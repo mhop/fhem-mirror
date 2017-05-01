@@ -1457,15 +1457,17 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,$sM];
     }
     elsif ($mh{mTp} eq "41"){
-      my ($cnt,$state)=(hex($1),$2) if($mh{p} =~ m/^..(..)(..)/);
+      my ($chn,$state)=(hex($mI[0]),$mI[2]);
+      #my $cnt = hex($mI[1]);
       my $txt;
       if    ($mh{cHash}->{helper}{lm} && $mh{cHash}->{helper}{lm}{hex($state)}){$txt = $mh{cHash}->{helper}{lm}{hex($state)}}
-      elsif ($lvlStr{md}{$mh{md}})                                         {$txt = $lvlStr{md}{$mh{md}}{$state}}
-      elsif ($lvlStr{st}{$mh{st}})                                         {$txt = $lvlStr{st}{$mh{st}}{$state}}
-      else                                                             {$txt = "unknown:$state"}
+      elsif ($lvlStr{md}{$mh{md}})                                             {$txt = $lvlStr{md}{$mh{md}}{$state}}
+      elsif ($lvlStr{st}{$mh{st}})                                             {$txt = $lvlStr{st}{$mh{st}}{$state}}
+      else                                                                     {$txt = "unknown:$state"}
       push @evtEt,[$mh{cHash},1,"storm:$txt"];
       push @evtEt,[$mh{devH},1,"trig_$mh{chnHx}:$mh{dstN}"];
-      #push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )]; has no battery
+      my $err = $chn & 0x80;
+      push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )] if {$mh{md} eq "HM-WDS100-C6-O-2"}; #has no battery
     }
     else {
       push @evtEt,[$mh{shash},1,"unknown:$mh{p}"];
@@ -1834,15 +1836,15 @@ sub CUL_HM_Parse($$) {#########################################################
     if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) ||  # handle Ack_Status
         ($mh{mTp} eq "10" && $mh{p} =~ m/^06/) ||  #or Info_Status message here
         ($mh{mTp} eq "41"))                {
-      my $lvl = substr($mh{p},4,2);
-      my $err = hex(substr($mh{p},6,2));
+      my $lvl = $mI[2];
+      my $err = ($mh{mTp} eq "41") ? hex($mI[0]) : ($mI[3] ? hex($mI[3]) : "");
       if    ($lvlStr{md}{$mh{md}}){$lvl = $lvlStr{md}{$mh{md}}{$lvl}}
       elsif ($lvlStr{st}{$mh{st}}){$lvl = $lvlStr{st}{$mh{st}}{$lvl} }
       else                    {$lvl = hex($lvl)/2}
 
       push @evtEt,[$mh{shash},1,"level:$lvl"] if($mh{md} eq "HM-Sen-Wa-Od");
       push @evtEt,[$mh{shash},1,"state:$lvl"];
-      push @evtEt,[$mh{devH},1,"battery:".($err&0x80?"low":"ok")] if (defined $err);
+      push @evtEt,[$mh{devH} ,1,"battery:".($err&0x80?"low":"ok")] if ($err ne "");
     }
   }
   elsif($mh{md} eq "KFM-Sensor") { ############################################
@@ -2249,9 +2251,10 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
     else{# could be an Em8
-      my($chn,$cnt,$state,$err);
+      my($chn,$state,$err);
       if($mh{mTp} eq "41"){
-        ($chn,$cnt,$state)=(hex($mI[0]),$mI[1],$mI[2]);
+        ($chn,$state)=(hex($mI[0]),$mI[2]);
+        #my $cnt = hex($mI[1]);
         my $err = $chn & 0x80;
         $chn = sprintf("%02X",$chn & 0x3f);
         $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
@@ -2267,6 +2270,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{devH},1,"alive:yes"];
         push @evtEt,[$mh{devH},1,"battery:". (($err&0x80)?"low"  :"ok"  )];
       }
+      
       if (defined($state) && $chn ne "00"){# if state was detected post events
         my $txt;
         if    ($mh{shash}->{helper}{lm} && $mh{shash}->{helper}{lm}{hex($state)}){$txt = $mh{shash}->{helper}{lm}{hex($state)}}
@@ -2771,7 +2775,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $state = " (uncertain)";
       }
       push @evtEt,[$mh{shash},1,"unknown:40"] if($err&0x40);
-      push @evtEt,[$mh{devH},1,"battery:"   .(($err&0x80) ? "low":"ok")];
+      push @evtEt,[$mh{devH} ,1,"battery:"   .(($err&0x80) ? "low":"ok")];
       push @evtEt,[$mh{shash},1,"uncertain:" .(($err&0x30) ? "yes":"no")];
       push @evtEt,[$mh{shash},1,"direction:" .$dir{($err>>4)&3}];
       push @evtEt,[$mh{shash},1,"error:" .    ($error)];
@@ -3306,67 +3310,55 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
       $ret = "done";
     }
-    elsif($mhp->{mStp} eq "04"){ #ParamChange===================================
-      my($peerID,$list,$data) = ($1,$2,$3,$4) if($mhp->{p} =~ m/^04..(........)(..)(.*)/);
-      CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
-      my $regLNp = "RegL_".$list.".".CUL_HM_id2Name($peerID);
-      $regLNp =~ s/broadcast//;
-      $regLNp =~ s/ /_/g; #remove blanks
-      my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
-
-      $data =~ s/(..)(..)/ $1:$2/g;
-
-      my $lN = ReadingsVal($mhp->{cHash}{NAME},$regLN,"");
-      my $sdH = CUL_HM_shH($mhp->{cHash},$list,$mhp->{dst});
-      my $shdwReg = $sdH->{helper}{shadowReg}{$regLNp};
-      foreach my $entry(split(' ',$data)){
-        my ($a,$d) = split(":",$entry);
-        last if ($a eq "00");
-        if ($lN =~m/$a:/){$lN =~ s/$a:../$a:$d/;
-        }else{            $lN .= " ".$entry;}
-        $shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
-      }
-      $sdH->{helper}{shadowReg}{$regLNp} = $shdwReg; # todo possibley needs change
-      $lN = join(' ',sort(split(' ',$lN)));# re-order
-      if ($lN =~ s/00:00//){$lN .= " 00:00"};
-      CUL_HM_UpdtReadSingle($mhp->{cHash},$regLN,$lN,0);
-      CUL_HM_updtRegDisp($mhp->{cHash},$list,$peerID);
-      $ret= "parsed";
-    }
-    elsif($mhp->{mStp} eq "05"){ #ParamChange===================================
+    elsif($mhp->{mStp} eq "04" ||$mhp->{mStp} eq "05"){ #ParamChange============
                                         #m:1E A010 4CF663 1743BF 0500(00000000)(07)(00)  # finish
                                         #m:1E A010 4CF663 1743BF 0500(00000000)(07)(62)(2120212020EA36F643)
-      my($mCh,$peerID,$list,$addr) = ($1,$2,$3,hex($4)) if($mhp->{p} =~ m/^05(..)(........)(..)(..)/);
+      my($mCh,$peerID,$list,$data) = ($1,$2,$3,$4) if($mhp->{p} =~ m/^0.(..)(........)(..)(.*)/);
       CUL_HM_m_setCh($mhp,$mCh);
       my $fch = CUL_HM_shC($mhp->{cHash},$list,$mhp->{chnHx});
       my $fHash = $modules{CUL_HM}{defptr}{$mhp->{src}.$fch};
       $fHash = $mhp->{devH} if (!$fHash);
       my $fName = $fHash->{NAME};
+      my $peer = ($peerID ne "00000000") ? CUL_HM_peerChName($peerID,"000000") : "";
       
-      if(!$addr){#update finished - update display
-        my $peer = ($peerID ne "00000000")?CUL_HM_peerChName($peerID,"000000"):"";
+      if($data eq "00"){#update finished for mStp 05. Now update display
         CUL_HM_updtRegDisp($fHash,$list,$peer);
       }
       else{
-        my ($data) = ($4) if($mhp->{p} =~ m/^05..(........)(..)(..)(.*)/);
-        my $regLNp = "RegL_".$list.".".CUL_HM_id2Name($peerID);
+        my $regLNp = "RegL_".$list.".".$peer;
         $regLNp =~ s/broadcast//;
         $regLNp =~ s/ /_/g; #remove blanks
         my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
-        
-        $data =~s/(..)/$1:/g;
         my $rCur = ReadingsVal($fName,$regLN,"");
+        
         if ($rCur){# if list not present we cannot update
-          foreach my $d1 (split(":",$data)){
-            my $addrH = sprintf("%02X:",$addr);
-            $rCur =~ s/$addrH../$addrH$d1/;
+          if ($mhp->{mStp} eq "05"){ # generate $data identical for 04 and 05
+            $data = "";
+            my ($addr,$data1) = (hex($3),$4) if($mhp->{p} =~ m/^05..(........)(..)(..)(.*)/);
+            foreach my $d1 ($data1 =~ m/.{2}/g){
+              $data .= sprintf(" %02X:%s",$addr++,$d1);
+            }
+          }
+          else{
+            $data =~ s/(..)(..)/ $1:$2/g;
+          }
+        
+          my $sdH = CUL_HM_shH($mhp->{cHash},$list,$mhp->{dst});
+          my $shdwReg = $sdH->{helper}{shadowReg}{$regLNp};
+          
+          foreach my $entry (split(" ",$data)){
+            my ($a,$d) = split(":",$entry);
+            last if ($a eq "00");
+            if ($rCur =~m/$a:/){ $rCur =~ s/$a:../$a:$d/;}
+            else               { $rCur .= " ".$entry;}
+            $shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
           }
           CUL_HM_UpdtReadSingle($fHash,$regLN,$rCur,0);
+          CUL_HM_updtRegDisp($fHash,$list,$peer) if ($mhp->{mStp} eq "04");
         }
       }
-    }
-    
-    
+      $ret= "parsed"; # send ACK 
+    }    
     elsif($mhp->{mStp} eq "06"){ #reply to status request=======================
       my $rssi = substr($mhp->{p},8,2);
       CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
@@ -12151,3 +12143,4 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 =end html_DE
 
 =cut
+
