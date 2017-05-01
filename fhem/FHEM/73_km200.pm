@@ -1777,8 +1777,9 @@ sub km200_GetSingleService($)
 				my $TempErrorList    = "";
 				
 				### Sort list by timestamps descending
-				my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
-
+				my @TempSortedErrorList =  sort { $b->{t} cmp $a->{t} } @{ $json->{values} };
+#				my @TempSortedErrorList =  @{ $json->{values} } ;
+			
 				### For every notification do
 				foreach my $item (@TempSortedErrorList)
 				{					
@@ -2331,10 +2332,9 @@ sub km200_ParseHttpResponseInit($)
 			
 			### Sort list by timestamps descending
 			my $TempServiceIndex = 0;
-#			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
-			my @TempSortedErrorList =  sort ( @{ $json->{values} } );
-
-
+			my @TempSortedErrorList =  sort { $b->{t} cmp $a->{t} } @{ $json->{values} };
+#			my @TempSortedErrorList =  @{ $json->{values} };
+			
 			foreach my $item (@TempSortedErrorList)
 			{
 				### Increment Service-Index
@@ -2830,9 +2830,8 @@ sub km200_ParseHttpResponseDyn($)
 
 			### Sort list by timestamps descending
 			my @TempSortedErrorList =  sort { $b->{t} cmp $a->{t} } @{ $json->{values} };
-			my @TempSortedErrorList =  sort ( @{ $json->{values} } );
-
-
+#			my @TempSortedErrorList =  @{ $json->{values} } ;
+			
 			### For every notification do
 			foreach my $item (@TempSortedErrorList)
 			{
