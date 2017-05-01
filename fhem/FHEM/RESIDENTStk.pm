@@ -2801,15 +2801,28 @@ sub RESIDENTStk_wakeupRun($;$) {
           . "weekday restriction in use - not triggering wake-up program this time";
     }
     elsif (
-           !$forceRun
-        && !$days{$today}
+        !$forceRun
+
+        #   && !$days{$today}
+        #   && (
+        #       ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
+        #       || (   $wakeupHolidays eq "andNoHoliday"
+        #           && $holidayToday )
+        #       || ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
+        #       || (   $wakeupHolidays eq "orNoHoliday"
+        #           && $holidayToday )
+        #   )
         && (
-            ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
-            || (   $wakeupHolidays eq "andNoHoliday"
-                && $holidayToday )
-            || ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
-            || (   $wakeupHolidays eq "orNoHoliday"
-                && $holidayToday )
+            (
+                $days{$today}
+                && (   ( $wakeupHolidays eq "andHoliday" && !$holidayToday )
+                    || ( $wakeupHolidays eq "andNoHoliday" && $holidayToday ) )
+            )
+            || (
+                !$days{$today}
+                && (   ( $wakeupHolidays eq "orHoliday" && !$holidayToday )
+                    || ( $wakeupHolidays eq "orNoHoliday" && $holidayToday ) )
+            )
         )
       )
     {
@@ -3579,7 +3592,8 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
     my $d = $2;
 
     return "DoModuleTrigger() can only handle module related events"
-      if ( ( $hash->{NAME} && $hash->{NAME} eq "global" ) || $d eq "global" );
+      if ( ( $hash->{NAME} && $hash->{NAME} eq "global" )
+        || $d eq "global" );
     return DoTrigger( "global", "$TYPE:$newState", $noreplace )
       unless ( $e =~ /^INITIALIZED|INITIALIZING|MODIFIED|DELETED$/ );
     return "$e: missing device name"
@@ -3617,7 +3631,8 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
     }
 
     my $ret = DoTrigger( "global", "$TYPE:$e $d", $noreplace )
-      if ( $e ne "DELETED" && ( !$hash->{MOD_INIT} || $e eq "INITIALIZING" ) );
+      if ( $e ne "DELETED"
+        && ( !$hash->{MOD_INIT} || $e eq "INITIALIZING" ) );
     push @rets, $ret if ( defined($ret) && $ret ne "" );
 
     ####
@@ -3681,8 +3696,10 @@ sub RESIDENTStk_DoModuleTrigger($$@) {
 
 sub RESIDENTStk_DoInitDev(@) {
     my (@devices) = @_;
+
     my @rets;
     foreach my $d (@devices) {
+        $d = $d->{NAME} if ( ref($d) eq "HASH" );
         next unless ( $defs{$d} );
         $defs{$d}{MOD_INIT} = 1;
         my $ret = CallFn( $d, "InitDevFn", $defs{$d} );
