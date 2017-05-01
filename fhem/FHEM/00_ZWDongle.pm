@@ -68,7 +68,7 @@ my %gets = (
   "raw"             => "%s",      # hex
   "routeFor"        => "92%02x",  # hex
   "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
-  "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
+#  "timeouts"        => "06",     # Forum #71333
   "version"         => "15",      # ZW_GET_VERSION
 );
 
