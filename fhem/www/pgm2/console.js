@@ -28,7 +28,8 @@ consUpdate(evt)
   var errstr = "Connection lost, trying a reconnect every 5 seconds.";
   var new_content = "";
 
-  if(typeof WebSocket == "function" && evt && evt.target instanceof WebSocket) {
+  if((typeof WebSocket == "function" || typeof WebSocket == "object") && evt &&
+     evt.target instanceof WebSocket) {
     if(evt.type == 'close') {
       FW_errmsg(errstr, 4900);
       cons_closeConn();
