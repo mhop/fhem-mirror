@@ -814,7 +814,7 @@ IsDisabled($)
     my $dhms = sprintf("%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec);
     foreach my $ft (split(" ", $dfi)) {
       my ($from, $to) = split("-", $ft);
-      if($from && $to) {
+      if(defined($from) && defined($to)) {
         $from = "$wday\@$from" if(index($from,"@") < 0);
         $to   = "$wday\@$to"   if(index($to,  "@") < 0);
         return 2 if($from le $dhms && $dhms le $to);
