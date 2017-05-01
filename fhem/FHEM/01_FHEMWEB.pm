@@ -499,6 +499,10 @@ FW_Read($$)
 
     my $me = $FW_chash;
     my ($cmd, $cmddev) = FW_digestCgi($arg);
+    if($FW_id) {
+      $me->{FW_ID} = $FW_id;
+      $me->{canAsyncOutput} = 1;
+    }
     FW_initInform($me, 0) if($FW_inform);
     return -1;
   }
