@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.002
+#  Version 4.0.003
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,22 +105,29 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.0.002';
+my $HMCCU_VERSION = '4.0.003';
 
-# RPC Ports and URL extensions
+# Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
 
+# RPC port name by port number
 my %HMCCU_RPC_NUMPORT = (
 	2000 => 'BidCos-Wired', 2001 => 'BidCos-RF', 2010 => 'HmIP-RF', 9292 => 'VirtualDevices',
 	2003 => 'Homegear', 8701 => 'CUxD'
 );
+
+# RPC port number by port name
 my %HMCCU_RPC_PORT = (
    'BidCos-Wired', 2000, 'BidCos-RF', 2001, 'HmIP-RF', 2010, 'VirtualDevices', 9292,
    'Homegear', 2003, 'CUxD', 8701
 );
+
+# RPC URL extensions by port number
 my %HMCCU_RPC_URL = (
 	9292, 'groups'
 );
+
+# RPC protocol types by port name. A=ASCII, B=Binary
 my %HMCCU_RPC_PROT = (
    2000 => 'A', 2001 => 'A', 2010 => 'A', 9292 => 'A', 2003 => 'A', 8701 => 'B'
 );
@@ -171,15 +178,12 @@ my $HMCCU_FLAG_FULLADDR  = 32;
 # Valid flag combinations
 my $HMCCU_FLAGS_IACD = $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_ADDRESS |
 	$HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAPOINT;
-my $HMCCU_FLAGS_IAC = $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_ADDRESS |
-	$HMCCU_FLAG_CHANNEL;
-my $HMCCU_FLAGS_ACD = $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL |
-	$HMCCU_FLAG_DATAPOINT;
+my $HMCCU_FLAGS_IAC = $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL;
+my $HMCCU_FLAGS_ACD = $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAPOINT;
 my $HMCCU_FLAGS_AC = $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL;
 my $HMCCU_FLAGS_ND = $HMCCU_FLAG_NAME | $HMCCU_FLAG_DATAPOINT;
 my $HMCCU_FLAGS_NC = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL;
-my $HMCCU_FLAGS_NCD = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL |
-	$HMCCU_FLAG_DATAPOINT;
+my $HMCCU_FLAGS_NCD = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAPOINT;
 
 # Binary RPC data types
 my $BINRPC_INTEGER = 1;
@@ -222,6 +226,7 @@ sub HMCCU_UpdateDeviceTable ($$);
 sub HMCCU_UpdateSingleDatapoint ($$$$);
 sub HMCCU_UpdateSingleDevice ($$$);
 sub HMCCU_UpdateMultipleDevices ($$);
+sub HMCCU_UpdatePeers ($$$$$);
 sub HMCCU_GetRPCPortList ($);
 sub HMCCU_RPCRegisterCallback ($);
 sub HMCCU_RPCDeRegisterCallback ($);
@@ -2145,8 +2150,12 @@ sub HMCCU_UpdateDeviceTable ($$)
 		$nm = $devices->{$da}{name} if (defined ($devices->{$da}{name}));
 
 		if ($devices->{$da}{flag} eq 'N' && defined ($nm)) {
+			my $at = HMCCU_IsChnAddr ($da, 0) ? 'chn' : 'dev';
+			Log3 $name, 2, "HMCCU: Duplicate name for device/channel $nm address=$da in CCU." 			
+				if (exists ($hash->{hmccu}{adr}{$nm}) && $at ne $hash->{hmccu}{adr}{$nm}{addtype});
+
 			# Updated or new device/channel
-			$hash->{hmccu}{dev}{$da}{addtype}   = HMCCU_IsChnAddr ($da, 0) ? 'chn' : 'dev';
+			$hash->{hmccu}{dev}{$da}{addtype}   = $at;
 			$hash->{hmccu}{dev}{$da}{name}      = $nm if (defined ($nm));
 			$hash->{hmccu}{dev}{$da}{valid}     = 1;
 			$hash->{hmccu}{dev}{$da}{channels}  = $devices->{$da}{channels}
@@ -2436,6 +2445,44 @@ sub HMCCU_UpdateMultipleDevices ($$)
 	}
 
 	return $c;
+}
+
+######################################################################
+# Update peer devices.
+# Syntax of peer definitions is:
+# [channel.]datapoint oper value:{hmccu:object=expr|fhem:command}
+######################################################################
+
+sub HMCCU_UpdatePeers ($$$$$)
+{
+	my ($clt_hash, $chn, $dpt, $val, $peerattr) = @_;
+
+	my @rules = split (/[;\n]+/, $peerattr);
+	foreach my $r (@rules) {
+		my ($cond, $type, $act) = split (/:/, $r, 3);
+		next if (!defined ($act));
+		my ($src, $oper, $expr) = split (/ /, $cond, 3);
+		next if (!defined ($expr));
+		my ($cchn, $cdpt) = split (/\./, $src, 2);
+		next if (!defined ($cchn));
+		if (!defined ($cdpt)) {
+			$cdpt = $cchn;
+			$cchn = '';
+		}
+		next if ($chn ne '' || $cchn ne '' || $cchn ne $chn || $cdpt ne $dpt);
+		my $e = eval "$val $oper $expr";
+		next if (!defined ($e) || $e eq '');
+
+		if ($type eq 'hmccu') {
+			my ($aobj, $aexp) = split (/=/, $act);
+			$aexp =~ s/\$value/$val/g;
+			HMCCU_SetDatapoint ($clt_hash, $aobj, $aexp);
+		}
+		elsif ($type eq 'fhem') {
+			$act =~ s/\$value/$val/g;
+			AnalyzeCommandChain (undef, $act);
+		}
+	}
 }
 
 ######################################################################
@@ -2993,7 +3040,7 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 	%{$hash->{hmccu}{adr}} = ();
 	$hash->{hmccu}{updatetime} = time ();
 
-#  Hash elements:
+#  Device hash elements for HMCCU_UpdateDeviceTable():
 #
 #  {address}{flag}      := [N, D, R]
 #  {address}{addtype}   := [chn, dev]
@@ -3020,7 +3067,7 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
 			$objects{$hmdata[2]}{type}      = ($hmdata[2] =~ /^CUX/) ? "CUX-".$hmdata[4] : $hmdata[4];
 			# Count used interfaces
 			$hash->{hmccu}{iface}{$hmdata[1]}++;
-			# CCU information
+			# CCU information (address = BidCoS-RF)
 			if ($hmdata[2] eq 'BidCoS-RF') {
 				$hash->{ccuname} = $hmdata[3];
 				$hash->{ccuaddr} = $hmdata[2];
@@ -5246,9 +5293,11 @@ sub HMCCU_GetTimeSpec ($)
 }
 
 ######################################################################
-# Calculate special readings. Requires hash of client device and
-# channel number and datapoint.
-# Return readings.
+# Calculate special readings. Requires hash of client device, channel
+# number and datapoint. Supported functions:
+#  dewpoint, absolute humidity, increasing/decreasing counters,
+#  minimum/maximum, average, sum.
+# Return readings array with reading/value pairs.
 ######################################################################
 
 sub HMCCU_CalculateReading ($$$)
@@ -5261,12 +5310,13 @@ sub HMCCU_CalculateReading ($$$)
 	my $ccucalculate = AttrVal ($name, 'ccucalculate', '');
 	return @result if ($ccucalculate eq '');
 	
-	my @calclist = split (';', $ccucalculate);
+	my @calclist = split (/[;\n]+/, $ccucalculate);
 	foreach my $calculation (@calclist) {
-		my ($valuetype, $reading, $datapoints) = split (':', $calculation);
-		next if (!defined ($reading));
+		my ($vt, $rn, $dpts) = split (':', $calculation);
+		next if (!defined ($rn));
 
-		my @dplist = defined ($datapoints) ? split (',', $datapoints) : ();
+		# Get parameters values stored in device hash
+		my @dplist = defined ($dpts) ? split (',', $dpts) : ();
 		next if (@dplist > 0 && !(grep { $_ eq "$chnno.$dpt"} @dplist));
 		my @pars = ();
 		foreach my $dp (@dplist) {
@@ -5275,8 +5325,9 @@ sub HMCCU_CalculateReading ($$$)
 			}
 		}
 		
-		if ($valuetype eq 'dewpoint' || $valuetype eq 'abshumidity') {
-			next if (@pars < 2);
+		if ($vt eq 'dewpoint' || $vt eq 'abshumidity') {
+			# Dewpoint and absolute humidity
+			next if (scalar (@pars) < 2);
 			my ($tmp, $hum) = @pars;
 			if ($tmp >= 0.0) {
 				$a = 7.5;
@@ -5289,15 +5340,56 @@ sub HMCCU_CalculateReading ($$$)
 
 			my $sdd = 6.1078*(10.0**(($a*$tmp)/($b+$tmp)));
 			my $dd = $hum/100.0*$sdd;
-			if ($valuetype eq 'dewpoint') {
+			if ($vt eq 'dewpoint') {
 				my $v = log($dd/6.1078)/log(10.0);
 				my $td = $b*$v/($a-$v);
-				push (@result, $reading, (sprintf "%.1f", $td));
+				push (@result, $rn, (sprintf "%.1f", $td));
 			}
 			else {
 				my $af = 100000.0*18.016/8314.3*$dd/($tmp+273.15);
-				push (@result, $reading, (sprintf "%.1f", $af));
+				push (@result, $rn, (sprintf "%.1f", $af));
 			}
+		}
+		elsif ($vt eq 'min' || $vt eq 'max') {
+			# Minimum or maximum values
+			next if (scalar (@pars) < 1);
+			my $newval = shift @pars;
+			my $curval = ReadingsVal ($name, $rn, 0);
+			$curval = $newval if ($vt eq 'min' && $newval < $curval);
+			$curval = $newval if ($vt eq 'max' && $newval > $curval);
+			push (@result, $rn, $curval);
+		}
+		elsif ($vt eq 'inc' || $vt eq 'dec') {
+			# Increasing or decreasing values without reset
+			next if (scalar (@pars) < 1);
+			my $newval = shift @pars;
+			my $oldval = ReadingsVal ($name, $rn."_old", 0);
+			my $curval = ReadingsVal ($name, $rn, 0);
+			if (($vt eq 'inc' && $newval < $curval) || ($vt eq 'dec' && $newval > $curval)) {
+				$oldval = $curval;
+				push (@result, $rn."_old", $oldval);
+			}
+			$curval = $newval+$oldval;
+			push (@result, $rn, $curval);
+ 		}
+		elsif ($vt eq 'avg') {
+			# Average value
+			next if (scalar (@pars) < 1);
+			my $newval = shift @pars;
+			my $cnt = ReadingsVal ($name, $rn."_cnt", 0);
+			my $sum = ReadingsVal ($name, $rn."_sum", 0);
+			$cnt++;
+			$sum += $newval;
+			my $curval = $sum/$cnt;
+			push (@result, $rn."_cnt", $cnt, $rn."_sum", $sum, $rn, $curval);
+		}
+		elsif ($vt eq 'sum') {
+			# Sum of values
+			next if (scalar (@pars) < 1);
+			my $newval = shift @pars;
+			my $curval = ReadingsVal ($name, $rn, 0);
+			$curval += $newval;
+			push (@result, $rn, $curval);
 		}
 	}
 	
@@ -5312,9 +5404,9 @@ sub HMCCU_CalculateReading ($$$)
 #  msg := parameter=value[,...]
 #
 #  text1-3=Text
-#  icon1-3=Icon
-#  sound=
-#  signal=
+#  icon1-3=IconName
+#  sound=SoundName
+#  signal=SignalName
 #  pause=1-160
 #  repeat=0-15
 #
@@ -5485,7 +5577,7 @@ sub HMCCU_ExprNotMatch ($$$)
 }
 
 ######################################################################
-# Read duty cycles of interfaces 2001 and 2010.
+# Read duty cycles of interfaces 2001 and 2010 and update readings.
 ######################################################################
 
 sub HMCCU_GetDutyCycle ($)
