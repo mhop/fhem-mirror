@@ -1517,11 +1517,18 @@ sub THINKINGCLEANER_ReceiveCommand($$$) {
                                 $readingName = $r2;
                             }
 
-                            $readingName =~ s/_(state|button|current)$//;
-                            $readingName =~ s/[-_](\w)/\U\1/g;
+                            if ($readingName && $readingName ne "") {
+                                $readingName =~ s/_(state|button|current)$//;
+                                $readingName =~ s/[-_](\w)/\U$1/g;
 
-                            readingsBulkUpdateIfChanged( $hash, $readingName,
-                                $v );
+                                readingsBulkUpdateIfChanged( $hash,
+                                    $readingName, $v );
+                            }
+                            else {
+                                Log3 $name, 4,
+                                  "THINKINGCLEANER $name: "
+                                  . "ERROR: variable readingName is not initialized - r=$r r2=$r2 v=$v".Dumper($return);
+                            }
                         }
                     }
                 }
