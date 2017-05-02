@@ -367,8 +367,8 @@ sub HP1000_Get($$$) {
 
     # createWUforecast
     if ( lc( @$a[1] ) eq "createwuforecast" ) {
-        return
-"Attribute wu_id does not contain a PWS ID to create a Wunderground device"
+        return "Attribute wu_id "
+          . "does not contain a PWS ID to create a Wunderground device"
           if ( $wu_id eq "" );
 
         my @wudev = devspec2array("TYPE=Wunderground:FILTER=PWS_ID=$wu_id");
@@ -583,8 +583,10 @@ sub HP1000_CGI() {
         my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
-        Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
         $webArgs->{$k} = UConv::f2c( $webArgs->{$_} );
+        Log3 $name, 5,
+          "HP1000: "
+          . "Adding calculated value for $k=$webArgs->{$k} from $_=$webArgs->{$_}";
     }
 
     # calculate hPa based values based on inHg
@@ -592,8 +594,10 @@ sub HP1000_CGI() {
         my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
-        Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
         $webArgs->{$k} = UConv::inhg2hpa( $webArgs->{$_} );
+        Log3 $name, 5,
+          "HP1000: "
+          . "Adding calculated value for $k=$webArgs->{$k} from $_=$webArgs->{$_}";
     }
 
     # calculate milimeter based values based on inch
@@ -605,8 +609,10 @@ sub HP1000_CGI() {
         my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
-        Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
         $webArgs->{$k} = UConv::in2mm( $webArgs->{$_} );
+        Log3 $name, 5,
+          "HP1000: "
+          . "Adding calculated value for $k=$webArgs->{$k} from $_=$webArgs->{$_}";
     }
 
     # calculate kph based values based on mph
@@ -614,18 +620,21 @@ sub HP1000_CGI() {
         my $k = $HP1000_pwsMappingEquivalent_rev{$_};
         next unless ( $webArgs->{$_} && $k && !defined( $webArgs->{$k} ) );
 
-        Log3 $name, 5, "HP1000: Adding calculated value for $k from $_";
         $webArgs->{$k} = UConv::mph2mps( $webArgs->{$_} );
+        Log3 $name, 5,
+          "HP1000: "
+          . "Adding calculated value for $k=$webArgs->{$k} from $_=$webArgs->{$_}";
     }
 
     # windgust in km/h (convert from windgustmps)
     if ( defined( $webArgs->{windgustmps} )
         && !defined( $webArgs->{windgust} ) )
     {
-        Log3 $name, 5,
-          "HP1000: Adding calculated value for windgust from windgustmps";
         $webArgs->{windgust} =
           UConv::mps2kph( $webArgs->{windgustmps} );
+        Log3 $name, 5,
+          "HP1000: "
+          . "Adding calculated value for windgust=$webArgs->{windgust} from windgustmps=$webArgs->{windgustmps}";
     }
 
     # windspeed in km/h (convert from windspeedmps)
@@ -1561,7 +1570,7 @@ sub HP1000_HistoryDb($$;$$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Provides webhook receiver for Wifi-based weather station which support <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS protocol</a> from Weather Underground (e.g. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950, WH3000 of <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - sometimes also known as <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/"froggit</a> or by <a href="http://www.conrad.de/">Conrad</a> under it's brand name Renkforce.<br>
+          Provides webhook receiver for Wifi-based weather station which support <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS protocol</a> from Weather Underground (e.g. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 of <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - sometimes also known as <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI or similar). In Germany, these devices are commonly distributed by <a href="http://www.froggit.de/">froggit</a> or by <a href="http://www.conrad.de/">Conrad</a> under it's brand name Renkforce.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
           No other name will work as it's hardcoded in the weather station device itself!<br>
           If necessary, this module will create a matching FHEMWEB instance named WEBweatherstation during initial definition.<br>
@@ -1634,7 +1643,7 @@ sub HP1000_HistoryDb($$;$$$) {
       <ul>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS</a> Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950, WH3000 Wetterstation von <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - manchmal auch bekannt als <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/"froggit</a> oder bei <a href="http://www.conrad.de/">Conrad</a> unter dem Markennamen Renkforce vertrieben.<br>
+          Stellt einen Webhook f&uuml;r WLAN-basierte Wetterstationen bereit, die das <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">PWS</a> Protokoll von Weather Underground verwenden (z.B. HP1000, WH2600, WH2601, WH2621, WH2900, WH2950 Wetterstation von <a href="http://www.foshk.com/Wifi_Weather_Station/">Fine Offset Electronics</a> - manchmal auch bekannt als <a href="http://www.ambientweather.com/peorhowest.html">Ambient Weather</a> WS-1001-WIFI oder &auml;hnliches). In Deutschland werden die Ger&auml;te zumeist von <a href="http://www.froggit.de/">froggit</a> oder von <a href="http://www.conrad.de/">Conrad</a> unter dem Markennamen Renkforce vertrieben.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
           Kein anderer Name funktioniert, da dieser fest in der Wetterstation hinterlegt ist!<br>
           Sofern notwendig, erstellt dieses Modul eine passende FHEMWEB Instanz namens WEBweatherstation w&auml;hrend der initialen Definition.<br>
