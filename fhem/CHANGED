@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  70_ENIGMA2: HDD capacity is now re-calculated to GB if unit can be
+                         determined
   - bugfix:  88_HMCCU: Fixed bug during FHEM start
   - feature: 88_HMCCU: New reading based calculation modes
   - feature: 34_ESPEasy.pm: Added ESPeasy Mega internals build.*
