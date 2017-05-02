@@ -797,7 +797,7 @@ sub ENIGMA2_Get($@) {
         return "Unknown argument $what, "
           . "choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg nextTitle:noArg providername:noArg servicevideosize:noArg streamUrl:,mobile ";
     }
-    
+
     return undef;
 }
 
@@ -1384,19 +1384,37 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             my @value =
                               split( / /,
                                 $return->{e2about}{e2hddinfo}[$i]{capacity} );
-                            readingsBulkUpdate( $hash, $readingname, $value[0] )
-                              if ( @value
-                                && ReadingsVal( $name, $readingname, "" ) ne
-                                $value[0] );
+                            if (@value) {
+                                if ( $value[0] =~ /^\d+(?:\.\d+)?$/ ) {
+                                    $value[0] = round( $value[0] * 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /TB/i );
+                                    $value[0] = round( $value[0] / 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /MB/i );
+                                    $value[0] =
+                                      round( $value[0] / 1024 / 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /KB/i );
+                                }
+                                readingsBulkUpdateIfChanged( $hash,
+                                    $readingname, $value[0] );
+                            }
 
                             $readingname = "hdd" . $counter . "_free";
                             @value =
                               split( / /,
                                 $return->{e2about}{e2hddinfo}[$i]{free} );
-                            readingsBulkUpdate( $hash, $readingname, $value[0] )
-                              if ( @value
-                                && ReadingsVal( $name, $readingname, "" ) ne
-                                $value[0] );
+                            if (@value) {
+                                if ( $value[0] =~ /^\d+(?:\.\d+)?$/ ) {
+                                    $value[0] = round( $value[0] * 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /TB/i );
+                                    $value[0] = round( $value[0] / 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /MB/i );
+                                    $value[0] =
+                                      round( $value[0] / 1024 / 1024, 1 )
+                                      if ( $value[1] && $value[1] =~ /KB/i );
+                                }
+                                readingsBulkUpdateIfChanged( $hash,
+                                    $readingname, $value[0] );
+                            }
 
                             $i++;
                         }
@@ -1413,18 +1431,34 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         $readingname = "hdd1_capacity";
                         my @value =
                           split( / /, $return->{e2about}{e2hddinfo}{capacity} );
-                        readingsBulkUpdate( $hash, $readingname, $value[0] )
-                          if ( @value
-                            && ReadingsVal( $name, $readingname, "" ) ne
-                            $value[0] );
+                        if (@value) {
+                            if ( $value[0] =~ /^\d+(?:\.\d+)?$/ ) {
+                                $value[0] = round( $value[0] * 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /TB/i );
+                                $value[0] = round( $value[0] / 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /MB/i );
+                                $value[0] = round( $value[0] / 1024 / 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /KB/i );
+                            }
+                            readingsBulkUpdateIfChanged( $hash,
+                                $readingname, $value[0] );
+                        }
 
                         $readingname = "hdd1_free";
                         @value =
                           split( / /, $return->{e2about}{e2hddinfo}{free} );
-                        readingsBulkUpdate( $hash, $readingname, $value[0] )
-                          if ( @value
-                            && ReadingsVal( $name, $readingname, "" ) ne
-                            $value[0] );
+                        if (@value) {
+                            if ( $value[0] =~ /^\d+(?:\.\d+)?$/ ) {
+                                $value[0] = round( $value[0] * 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /TB/i );
+                                $value[0] = round( $value[0] / 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /MB/i );
+                                $value[0] = round( $value[0] / 1024 / 1024, 1 )
+                                  if ( $value[1] && $value[1] =~ /KB/i );
+                            }
+                            readingsBulkUpdateIfChanged( $hash,
+                                $readingname, $value[0] );
+                        }
                     }
                     else {
                         Log3 $name, 5,
