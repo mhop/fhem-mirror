@@ -1157,7 +1157,7 @@ sub ONKYO_AVR_Set($$$) {
     }
 
     # implicit commands through available readings
-    elsif ( grep $_ eq lc( @$a[1] ), @implicit_cmds ) {
+    elsif ( grep $_ eq @$a[1], @implicit_cmds ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
         if ( !defined( @$a[2] ) ) {
