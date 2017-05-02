@@ -431,11 +431,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         else {
             if ( $state eq "off" ) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-                $return .= fhem "sleep 5;set $name channel " . @$a[2];
+                my $ret = fhem "sleep 5;set $name channel " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( $hash->{INPUT} ne "2B" ) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
-                $return .= fhem "sleep 1;set $name channel " . @$a[2];
+                my $ret = fhem "sleep 1;set $name channel " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( ReadingsVal( $name, "channel", "" ) ne @$a[2]
                 || ( defined( @$a[3] ) && defined( @$a[4] ) ) )
@@ -445,8 +447,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                 my $channelname = @$a[2];
 
                 if (
-                       defined( $hash->{helper}{receiver} )
-                    && ref( $hash->{helper}{receiver} ) eq "HASH"
+                       defined( $IOhash->{helper}{receiver} )
+                    && ref( $IOhash->{helper}{receiver} ) eq "HASH"
                     && defined(
                         $IOhash->{helper}{receiver}{device}{netservicelist}
                           {count}
@@ -489,7 +491,6 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                             "1", "net-service"
                         )
                     );
-
                     $servicename = $channels->{$channelname}
                       if ( defined( $channels->{$channelname} ) );
                 }
@@ -503,10 +504,9 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                 $servicename .= "0"          if ( !defined( @$a[3] ) );
                 $servicename .= "1" . @$a[3] if ( defined( @$a[3] ) );
                 $servicename .= @$a[4]       if ( defined( @$a[4] ) );
-
+                Debug "net-service $servicename";
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, "net-service",
-                    $servicename );
+                  ONKYO_AVR_SendCommand( $IOhash, "net-service", $servicename );
             }
         }
     }
@@ -515,11 +515,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "channeldown" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 5;set $name channelDown";
+            my $ret = fhem "sleep 5;set $name channelDown";
+            $return .= $ret if ($ret);
         }
         elsif ( $hash->{INPUT} ne "2B" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
-            $return .= fhem "sleep 1;set $name channelDown";
+            my $ret = fhem "sleep 1;set $name channelDown";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
@@ -531,11 +533,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "channelup" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 5;set $name channelUp";
+            my $ret = fhem "sleep 5;set $name channelUp";
+            $return .= $ret if ($ret);
         }
         elsif ( $hash->{INPUT} ne "2B" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
-            $return .= fhem "sleep 1;set $name channelUp";
+            my $ret = fhem "sleep 1;set $name channelUp";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
@@ -570,16 +574,18 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
         else {
             if ( $state eq "off" ) {
-                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
-                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
+                my $ret = fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( $hash->{INPUT} ne "2B" ) {
-                $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
-                $return .= fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
+                my $ret = fhem "sleep 5;set $name " . @$a[1] . " " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( @$a[2] =~ /^\d*$/ ) {
                 Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-                $return = ONKYO_AVR_SendCommand(
+                $return = ONKYO_AVR_ZONE_SendCommand(
                     $hash,
                     lc( @$a[1] ),
                     ONKYO_AVR_dec2hex( @$a[2] )
@@ -599,11 +605,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         else {
             if ( $state eq "off" ) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-                $return .= fhem "sleep 5;set $name preset " . @$a[2];
+                my $ret = fhem "sleep 5;set $name preset " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "24" );
-                $return .= fhem "sleep 1;set $name preset " . @$a[2];
+                my $ret = fhem "sleep 1;set $name preset " . @$a[2];
+                $return .= $ret if ($ret);
             }
             elsif ( lc( @$a[2] ) eq "up" ) {
                 Log3 $name, 3,
@@ -656,11 +664,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "presetdown" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 5;set $name presetDown";
+            my $ret = fhem "sleep 5;set $name presetDown";
+            $return .= $ret if ($ret);
         }
         elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "24" );
-            $return .= fhem "sleep 1;set $name presetDown";
+            my $ret = fhem "sleep 1;set $name presetDown";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
@@ -672,11 +682,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "presetup" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 5;set $name presetUp";
+            my $ret = fhem "sleep 5;set $name presetUp";
+            $return .= $ret if ($ret);
         }
         elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "24" );
-            $return .= fhem "sleep 1;set $name presetUp";
+            my $ret = fhem "sleep 1;set $name presetUp";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
@@ -1049,7 +1061,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         else {
             if ( $state eq "off" ) {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-                $return .= fhem "sleep 2;set $name input " . @$a[2];
+                my $ret = fhem "sleep 2;set $name input " . @$a[2];
+                $return .= $ret if ($ret);
             }
             else {
                 Log3 $name, 3,
@@ -1063,7 +1076,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "inputup" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 2;set $name inputUp";
+            my $ret = fhem "sleep 2;set $name inputUp";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
@@ -1075,7 +1089,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "inputdown" ) {
         if ( $state eq "off" ) {
             $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
-            $return .= fhem "sleep 2;set $name inputDown";
+            my $ret = fhem "sleep 2;set $name inputDown";
+            $return .= $ret if ($ret);
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
