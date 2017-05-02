@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Fixed bug during FHEM start
   - feature: 88_HMCCU: New reading based calculation modes
   - feature: 34_ESPEasy.pm: Added ESPeasy Mega internals build.*
   - bugfix   73_km200.pm: Errorlist unsorted timestamp

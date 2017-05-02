@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.003
+#  Version 4.0.004
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.0.003';
+my $HMCCU_VERSION = '4.0.004';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -2141,6 +2141,7 @@ sub HMCCU_UpdateClients ($$$$)
 sub HMCCU_UpdateDeviceTable ($$)
 {
 	my ($hash, $devices) = @_;
+	my $name = $hash->{NAME};
 	my $devcount = 0;
 	my $chncount = 0;
 
@@ -4496,7 +4497,8 @@ sub HMCCU_GetDatapoint ($@)
 }
 
 ######################################################################
-# Set datapoint on CCU
+# Set datapoint on CCU.
+# Parameter param is a valid CCU datapoint specification.
 ######################################################################
 
 sub HMCCU_SetDatapoint ($$$)
