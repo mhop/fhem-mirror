@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.0alpha9";
+my $version = "2.0alpha10";
 
 #-- these we may get on request
 my %gets = (
@@ -223,10 +223,12 @@ sub DoorPi_Set ($@) {
   #-- if only hash as parameter, this is acting as timer callback
   if( !@a ){
     Log 5,"[DoorPi_Set] delayed action started with ".$hash->{DELAYED};
+    #-- delayed switching off light
     if( $hash->{DELAYED} eq "light"){
       @a=($hash->{NAME},"light","off");
+    #-- delayed door opening
     }elsif( $hash->{DELAYED} eq "door_time"){
-      @a=($hash->{NAME},"door","opened");
+      @a=($hash->{NAME},"door","open");
     }
     $hash->{DELAYED} = "";
   }
@@ -236,7 +238,7 @@ sub DoorPi_Set ($@) {
 
   #-- commands
   my $door     = AttrVal($name, "doorbutton", "door");
-  my $doorsubs = "opened";
+  my $doorsubs = "open,opened";
     $doorsubs .= ",locked"
     if(AttrVal($name, "doorlockcmd",undef));
   $doorsubs   .= ",unlocked"
@@ -259,6 +261,7 @@ sub DoorPi_Set ($@) {
     $newkeys = join(" ",@{ $hash->{HELPER}->{CMDS} });
     #Log3 $name, 1,"=====> newkeys before subs $newkeys";
     $newkeys =~ s/$door/$door:$doorsubs/;                 # FHEMWEB sugar
+    $newkeys =~ s/,opened//;                              # FHEMWEB sugar
     $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;  # FHEMWEB sugar
     $newkeys =~ s/$dashlight/$dashlight:on,off/;          # FHEMWEB sugar
     $newkeys =~ s/$stream/$stream:on,off/;                # FHEMWEB sugar
@@ -434,18 +437,23 @@ sub DoorPi_Door {
   my $door      = AttrVal($name, "doorbutton", "door");
   my $lockstate = DoorPi_GetLockstate($hash);
   
-  #-- BRANCH 1: opened from FHEM, door opening, forward to DoorPi 
-  if( (($cmd) && ($cmd eq "opened")) || ((!$cmd) && ($hash->{DELAYED} =~ /^open.*/)) ){
+  #-- "opened" => BRANCH 1.1: opening confirmation from DoorPi 
+  if( ($cmd) && ($cmd eq "opened") ){
+    Log3 $name, 1,"[DoorPi_Door 1.1] received 'door opened' confirmation from DoorPi";
+    readingsSingleUpdate($hash,$door,"opened",1);
+    
+  #-- "open" => BRANCH 1.0: door opening from FHEM, forward to DoorPi 
+  }elsif( (($cmd) && ($cmd eq "open")) || ((!$cmd) && ($hash->{DELAYED} =~ /^open.*/)) ){
     $hash->{DELAYED} = "";
     #-- doit
     $v=DoorPi_Cmd($hash,"dooropen");
-    Log3 $name, 1,"[DoorPi_Door 1] sent 'dooropen' command to DoorPi";
-    readingsSingleUpdate($hash,$door,"opened",1);
+    Log3 $name, 1,"[DoorPi_Door 1.0] sent 'dooropen' command to DoorPi";
+    readingsSingleUpdate($hash,$door,"opened (pending)",0);
     #-- extra fhem command
     $fhemcmd = AttrVal($name, "dooropencmd",undef);
     fhem($fhemcmd)
       if($fhemcmd);
-   
+  
   #-- BRANCH 2: unlockandopen from DoorPi: door has to be unlocked if necessary
   }elsif( $cmd eq "unlockandopen" ){
     #-- unlocking the door now, delayed opening
@@ -478,10 +486,10 @@ sub DoorPi_Door {
     }elsif ($lockstate =~ /^unlocked.*/){
       Log3 $name, 1,"[DoorPi_Door] BRANCH 2.2 cmd=$cmd lockstate=$lockstate";
       #-- doit
-      $v=DoorPi_Cmd($hash,"doorunlocked");
       $v=DoorPi_Cmd($hash,"dooropen");
+      $v=DoorPi_Cmd($hash,"doorunlocked");
       Log3 $name, 1,"[DoorPi_Door 2.2] reset DoorPi to proper state and sent 'dooropen' command";       
-      readingsSingleUpdate($hash,$door,"opened",1);
+      readingsSingleUpdate($hash,$door,"opened (pending)",1);
       #-- extra fhem command
       $fhemcmd = AttrVal($name, "dooropencmd",undef);
       fhem($fhemcmd)
@@ -1455,6 +1463,8 @@ sub DoorPi_list($;$){
                     <br/>
                     If the third parameter is a nonempty string, this additional command is skipped. Can be useful, if the
                     locked/unlocked command comes from the door itself. 
+                    <br/>
+                    DoorPi will confirm reception of the dooropen command by calling <code>set &lt;DoorPi-Device&gt; door <b>opened</b></code>
                     </li>
             <li><a name="doorpi_snapshot">
                     <code>set &lt;DoorPi-Device&gt; snapshot </code></a><br />

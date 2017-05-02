@@ -4,9 +4,9 @@
 #
 # Script file to perform various external tasks for DoorPi
 #
-# Prof. Dr. Peter A. Henning, 2016
+# Prof. Dr. Peter A. Henning, 2017
 # 
-#  $Id: FHEMHelper 2016-05 - pahenning $
+#  $Id: FHEMHelper 2017-05 - pahenning $
 #
 ########################################################################################
 #
@@ -41,16 +41,16 @@ checkstream() {
 }
 
 FHEMDP="A.Door.Pi"              # FHEM Devicename for DoorPi
-FHEMIP="192.168.x.y"           # IP address for DoorPi
+FHEMIP="XX.XX.XX.XX"            # IP address for DoorPi
 FHEMPORT="8083"                 # Port number for DoorPi
-FHEMHTTPS="false"                # true for HTTPS, false without HTTPS
+FHEMHTTPS="false"               # true for HTTPS, false without HTTPS
 curlprog="curl"
 curlargs=""	                    # -k to disable HTTPS certificate check, 
                                 # -u user:password for user and password 	
 HOME="/home/doorpi"             # Doorpi Standard /usr/local/etc/DoorPi/ 
-default_target="yyyyy"         # default telephone number to be called
+default_target="xxxxxx"         # default telephone number to be called
 FHEMTTS="true"                  # true for TTS output, false without TTS
-FHEMTTSDEVICE="GalaxyTab"       # FHEM Devicename for TTS device
+FHEMTTSDEVICE="AllTablets"      # FHEM Devicename for TTS device
 
 ### FHEM path ###
 if [ $FHEMHTTPS = "true" ]; then
@@ -62,7 +62,7 @@ if [ $FHEMHTTPS = "true" ]; then
 ### execute commands ##
 case $1 in 
 
-init) #-- send current target to FHEM
+ init) #-- send current target to FHEM
        target=`cat $HOME/calltarget`
        $curlprog $curlargs "$FHEM=setreading%20$FHEMDP%20call_target%20$target" &
        #-- send state of mjpg_streamer to FHEM
@@ -75,17 +75,21 @@ init) #-- send current target to FHEM
        ;;
 
  doorunlockandopen) 
-       if [ $FHEMTTS = "true" ]; then
-	     $curlprog $curlargs "$FHEM=set%20$FHEMTTSDEVICE%20ttsSay%20Ein%20Bewohner%20betritt%20das%20Haus" &			
-	   fi
        $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20unlockandopen" &
+       if [ $FHEMTTS = "true" ]; then
+	     $curlprog $curlargs "$FHEM=set%20$FHEMTTSDEVICE%20audioPlay%20Music/066_zutrittbewohner.mp3" &			
+       fi
+       ;;
+
+ dooropened) 
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20opened" &
        ;;
 
  wrongid)
-	   if [ $FHEMTTS = "true" ]; then
-		   $curlprog $curlargs "$FHEM=set%20FHEMTTSDEVICE%20ttsSay%20Unerlaubter%20Zutrittsversuch" &
-	   fi
-	   $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20wrong_id" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20call%20wrong_id" &
+       if [ $FHEMTTS = "true" ]; then
+	   $curlprog $curlargs "$FHEM=set%20$FHEMTTSDEVICE%20audioPlay%20Music/065_zutrittsversuch.mp3" &
+       fi
        ;;
 
  softlock)
@@ -101,15 +105,20 @@ init) #-- send current target to FHEM
        ;;
 
  purge)
-       find $HOME/records/ -type f -ctime 1 -delete
+       find $HOME/records/ -type f -ctime +1 -delete
        ;;
 
  movement)
-       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20movement" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20call%20movement" &
        ;;
 
  sabotage)
-       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20door%20sabotage" &
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20call%20sabotage" &
        ;;
+
+ alive)
+       $curlprog $curlargs "$FHEM=set%20$FHEMDP%20call%20alive" &
+       ;;
+
 
 esac

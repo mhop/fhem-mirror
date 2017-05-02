@@ -1,3 +1,30 @@
+#
+# doorpi.ini
+#
+# Configuration file for DoorPi
+#
+# Prof. Dr. Peter A. Henning, 2017
+# 
+#  $Id: doorpi.ini 2017-05 - pahenning $
+#
+########################################################################################
+#
+#  This programm is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#########################################################################################
 [DoorPi]
 base_path = /usr/local/etc/DoorPi
 snapshot_path = /home/doorpi/records
@@ -9,7 +36,7 @@ last_snapshot =
 [DoorPiWeb]
 indexfile = index.html
 loginfile = login.html
-#online_fallback = http://192.168.x.y:8083/fhem?detail=A.Door.Pi
+#online_fallback = URLURL:8083/fhem?detail=A.Door.Pi
 port = 80
 public = AREA_public
 www = /home/doorpi/records
@@ -49,7 +76,7 @@ administrators = dashboard,status,config
 guests = dashboard
 
 [AdminNumbers]
-**xxx = active
+**621 = active
 
 [DTMF]
 "#" = out:door,1,0,3
@@ -61,10 +88,10 @@ local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = xxxxxxxxx
+sipserver_password = XXXXXXXXXXXXX
 sipserver_realm = fritz.box
-sipserver_server = 192.168.x.y
-sipserver_username = yyy
+sipserver_server = IPIPIP
+sipserver_username = 620
 stun_server =
 #
 max_call_time = 300
@@ -92,14 +119,13 @@ video_size = vga
 10 = sleep:1
 20 = os_execute:/home/doorpi/FHEMHelper.sh init
 20 = os_execute:/home/doorpi/FHEMHelper.sh call init
-#30 = out:audio,1
 
 [EVENT_BeforeSipPhoneMakeCall]
 10 = out:irlight,1
 20 = take_snapshot
 30 = os_execute:/home/doorpi/FHEMHelper.sh call started
 40 = out:irlight,0
-#30 = mailto:haus271828@henning-weingarten.de,DoorPi,DoorPi initiating call
+50 = os_execute:/home/doorpi/sendphoto call
 
 #[EVENT_OnCallStateConnect]
 #10 = out:audio,0
@@ -118,7 +144,7 @@ video_size = vga
 
 [EVENT_OnTimeMinuteEvery5]
 10 = statuswatchdog:/tmp/doorpi.watchdog
-#20 = out:audio,1
+20 = os_execute:/home/doorpi/FHEMHelper.sh alive
 
 ####################### Keyboards ##############################
 [keyboards]
@@ -132,14 +158,13 @@ base_path_output = /home/doorpi/keyboard/outputs/
 reset_input=false
 
 [webservice_InputPins]
-dooropen        = out:door,1,0,3 
+dooropen        = sleep:0
 doorlocked      = out:hardlock,1
 doorunlocked    = out:hardlock,0
 snapshot        = sleep:0 
 streamon        = sleep:0
 streamoff       = sleep:0
 lighton         = out:light,1
-#lightonfortimer = out:light,1,0,60
 lightoff        = out:light,0
 dashlighton     = out:dashlight,1
 dashlightoff    = out:dashlight,0
@@ -149,12 +174,18 @@ clear           = sleep:0
 button1         = sleep:0
 button2         = sleep:0
 
-#-- communicate to FHEM that a snapshot has been taken
+#-- open door and communicate to FHEM that door has been opened
+[EVENT_OnKeyPressed_webservice.dooropen]
+10 = out:door,1,0,3
+20 = os_execute:/home/doorpi/FHEMHelper.sh dooropened
+
+#-- taks snapshot and communicate to FHEM that a snapshot has been taken
 [EVENT_OnKeyPressed_webservice.snapshot]
 10 = out:irlight,1
 20 = os_execute:/home/doorpi/FHEMHelper.sh call snapshot
 30 = take_snapshot
 40 = out:irlight,0
+50 = os_execute:/home/doorpi/sendphoto.sh snapshot
 
 #-- start video stream
 [EVENT_OnKeyPressed_webservice.streamon]
@@ -203,16 +234,18 @@ pull_up_down = PUD_UP
 6 = sleep:0
 7 = sleep:0
 
-#-- RING THE BELL 
+#-- Ring the bell 
 [EVENT_OnKeyPressed_onboardpins.0]
-20 = file_call_value:/home/doorpi/calltarget
+10 = file_call_value:/home/doorpi/calltarget
 
 #-- DoorOpen pin from Arduino
 [EVENT_OnKeyPressed_onboardpins.1]
-#10 = out:audio,0
-20 = os_execute:/home/doorpi/FHEMHelper.sh doorunlockandopen
-30 = os_execute:aplay -D plughw:1,0 /home/doorpi/sounds/067_willkommen.wav
-#40 = out:audio,1
+10 = os_execute:/home/doorpi/FHEMHelper.sh doorunlockandopen
+20 = os_execute:aplay -D plughw:1,0 /home/doorpi/sounds/067_willkommen.wav
+
+#-- Open the door
+#[EVENT_OnKeyPressed_onboardpins.2]
+#10 =  out:door,1,0,5
 
 #-- WrongID pin from Arduino
 [EVENT_OnKeyPressed_onboardpins.4]
@@ -220,6 +253,7 @@ pull_up_down = PUD_UP
 20 = os_execute:/home/doorpi/FHEMHelper.sh wrongid
 30 = take_snapshot
 40 = out:irlight,0
+50 = os_execute:/home/doorpi/sendphoto.sh wrongid
 
 #-- LockState pin from Arduino - FHEM will transform softlock into hardlock
 [EVENT_OnKeyPressed_onboardpins.5]
