@@ -1855,7 +1855,7 @@ FW_parseColumns()
   foreach my $roomgroup (split("[ \t\r\n]+", AttrVal($FW_wname,"column",""))) {
     my ($room, $groupcolumn)=split(":",$roomgroup,2);
     $room =~ s/%20/ /g; # Space
-    next if(!defined($groupcolumn) || $room ne $FW_room);
+    next if(!defined($groupcolumn) || $FW_room !~ m/$room/);
     $colNo = 1;
     foreach my $groups (split(/\|/,$groupcolumn)) {
       my $lineNo = 1;
@@ -1865,6 +1865,7 @@ FW_parseColumns()
       }
       $colNo++;
     }
+    last;
   }
   return (\%columns, $colNo);
 }
@@ -3310,7 +3311,7 @@ FW_widgetOverride($$)
       This attribute can be used to sort the groups in a room, just specify
       the groups in one column.
       Space in the room and group name has to be written as %20 for this
-      attribute.
+      attribute. The room name is a regeular expression.
       </li>
       <br>
 
@@ -4076,7 +4077,7 @@ FW_widgetOverride($$)
         href="#group">group</a> stehen. Dieses Attribut kann man zum sortieren
         der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
         Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
-        %20 zu schreiben.
+        %20 zu schreiben. Raumname is ein regul&auml;rer Ausdruck.
         </li><br>
 
     <a name="confirmDelete"></a>
