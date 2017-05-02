@@ -45,8 +45,8 @@ sub ONKYO_AVR_Initialize($) {
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
 
-    #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
-    #    $data{RC_layout}{ONKYO_AVR}     = "ONKYO_AVR_RClayout";
+    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
+    $data{RC_layout}{ONKYO_AVR}     = "ONKYO_AVR_RClayout";
     $data{RC_makenotify}{ONKYO_AVR} = "ONKYO_AVR_RCmakenotify";
 
     # 98_powerMap.pm support
@@ -3149,60 +3149,41 @@ sub ONKYO_AVR_RClayout_SVG() {
     my @row;
 
     $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,power toggle:rc_POWER.svg";
-    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-    $row[5] = ":rc_BLANK.svg,0:rc_0.svg,:rc_BLANK.svg";
-    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[1] =
+"volume level-up:rc_VOLUP.svg,mute toggle:rc_MUTE.svg,preset up:rc_UP.svg";
+    $row[2] =
+"volume level-down:rc_VOLDOWN.svg,sleep:time_timer.svg,preset down:rc_DOWN.svg";
 
-    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
-    $row[8] =
-      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
-    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[3] = ":rc_BLANK.svg,tuning up:rc_UP.svg,:rc_BLANK.svg";
+    $row[4] = "left:rc_LEFT.svg,enter:rc_OK.svg,right:rc_RIGHT.svg";
+    $row[5] =
+"input usb:rc_USB.svg,tuning down:rc_DOWN.svg,input dlna:rc_MEDIAMENU.svg";
 
-    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+    $row[6] = "input tv-cd:rc_TV.svg,input fm:rc_RADIO.svg,input pc:it_pc.svg";
 
-    $row[14] =
-"RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
-    $row[15] =
-"TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
-
-    $row[16] = "attr rc_iconpath icons/remotecontrol";
-    $row[17] = "attr rc_iconprefix black_btn_";
+    $row[7] = "attr rc_iconpath icons/remotecontrol";
+    $row[8] = "attr rc_iconprefix black_btn_";
     return @row;
 }
 
 sub ONKYO_AVR_RClayout() {
     my @row;
 
-    $row[0] = ":blank,:blank,power toggle:POWEROFF";
-    $row[1] = ":blank,:blank,:blank";
+    $row[0] =
+      "hdmi-output 01:HDMI_main,hdmi-output 02:HDMI_sub,power toggle:POWEROFF";
 
-    $row[2] = "1,2,3";
-    $row[3] = "4,5,6";
-    $row[4] = "7,8,9";
-    $row[5] = ":blank,0:0,:blank";
-    $row[6] = ":blank,:blank,:blank";
+    $row[1] = "volume level-up:VOLUP,mute toggle:MUTE,preset up:UP";
+    $row[2] = "volume level-down:VOLDOWN,sleep:SLEEP,preset down:DOWN";
 
-    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
-    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
-    $row[9] = ":blank,:blank,:blank";
+    $row[3] = ":blank,tuning up:UP,:blank";
+    $row[4] = "left:LEFT,enter:OK,right:RIGHT";
+    $row[5] = "input usb:SOURCE,tuning down:DOWN,input dlna:DLNA";
 
-    $row[10] = "INFO,UP,MENU";
-    $row[11] = "LEFT,OK,RIGHT";
-    $row[12] = "AUDIO,DOWN,VIDEO";
-    $row[13] = ":blank,:blank,:blank";
+    $row[6] = "input tv-cd:TV,input fm:FMRADIO,input pc:PC";
 
-    $row[14] = "RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
-    $row[15] = "TV:TVstop,RADIO:RADIOred,TEXT,HELP";
-
-    $row[16] = "attr rc_iconpath icons/remotecontrol";
-    $row[17] = "attr rc_iconprefix black_btn_";
+    $row[7] = "attr rc_iconpath icons/remotecontrol";
+    $row[8] = "attr rc_iconprefix black_btn_";
     return @row;
 }
 
