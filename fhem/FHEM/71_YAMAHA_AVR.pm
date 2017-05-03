@@ -1634,7 +1634,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdate($hash, "input", YAMAHA_AVR_Param2Fhem(lc($1), 0));
                     
-                    if($data =~ /<Src_Name>(.+?)<\/Src_Name>/)
+                    if($data =~ /<Power>On<\/Power>/ and $data =~ /<Src_Name>(.+?)<\/Src_Name>/)
                     {
                         $hash->{helper}{LAST_INPUT_TAG} = $hash->{helper}{CURRENT_INPUT_TAG} if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
                         $hash->{helper}{CURRENT_INPUT_TAG} = $1;
