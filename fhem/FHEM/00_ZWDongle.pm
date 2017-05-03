@@ -781,9 +781,16 @@ ZWDongle_Read($@)
       last;
     }
 
+    last if(length($data) < 4);
+
     my $len = substr($data, 2, 2);
     my $l = hex($len)*2;
-    last if(!$l || length($data) < $l+4);       # Message not yet complete
+    last if(length($data) < $l+4);       # Message not yet complete
+
+    if($l < 4) {       # Bogus messages, forget the rest
+      $data = "";
+      last;
+    }
 
     $msg = substr($data, 4, $l-2);
     my $rcs  = substr($data, $l+2, 2);          # Received Checksum
