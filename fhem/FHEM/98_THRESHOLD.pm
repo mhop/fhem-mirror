@@ -174,7 +174,7 @@ THRESHOLD_Define($$$)
        $attr{$pn}{state_cmd1_gt}="off";
        $attr{$pn}{state_cmd2_lt}="on";
        $attr{$pn}{state_format} = "_sc";
-       $hysteresis = 0;
+       $hysteresis = 0 if (!$hysteresis);
        $cmd_default = 0;
     } else {
       $cmd1_gt = "set $actor off";
@@ -626,6 +626,9 @@ THRESHOLD_setValue($$)
 1;
 
 =pod
+=item helper
+=item summary simulation of a thermostat or humidistat
+=item summary_DE Simulation eines Zweipunktreglers
 =begin html
 
 <a name="THRESHOLD"></a>
