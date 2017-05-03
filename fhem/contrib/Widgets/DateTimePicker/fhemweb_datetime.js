@@ -11,7 +11,7 @@ FW_datetimeCreate(elName, devName, vArr, currVal, set, params, cmd)
   var widgetId = "datetimepicker-"+devName+"-"+set;
   
   var newEl = $("<div style='display:inline-block'>").get(0);
-  $(newEl).append('<input type="text" id="'+widgetId+'" onfocus="blur();" >');
+  $(newEl).append('<input type="text" class="datetimepicker-'+devName+'" id="'+widgetId+'" onfocus="blur();" >');
   var inp = $(newEl).find("input");
   if(elName)
     $(inp).attr("name", elName);
