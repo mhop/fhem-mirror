@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     36_Vallox: support Vallox DigitSE ventilation system
   - feature: 71_YAMAHA_AVR: new set command & readings for displayBrightness,
              extraBass, surroundDecoder and ypaoVolume
   - change:  70_ENIGMA2: HDD capacity is now re-calculated to GB if unit can be
