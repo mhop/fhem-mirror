@@ -137,7 +137,7 @@ my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 So};
  
 my %userType = qw{1 IP 2 PC-User 3 Default 4 Guest};
 
-my @mohtype = qw(default sound customer);
+my %mohtype = (0=>"default", 1=>"sound", 2=>"customer", "err"=>"" );
 
 my %landevice = ();
 
@@ -443,7 +443,7 @@ sub FRITZBOX_Set($$@)
          $resultStr = FRITZBOX_SetMOH $hash, @val;
          if ($resultStr =~ /^[012]$/ )
          {
-            readingsSingleUpdate($hash,"box_guestWlan",$mohtype[$resultStr], 1);
+            readingsSingleUpdate($hash,"box_guestWlan",$mohtype{$resultStr}, 1);
             return undef;
          }
          else
@@ -1590,6 +1590,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # Alarm clock
    $runNo = 1;
    foreach ( @{ $result->{alarmClock} } ) {
+      next  if $_->{Name} eq "er";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo, $_->{Name};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_state", $_->{Active}, "onoff";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_time",  $_->{Time}, "altime";
@@ -1926,8 +1927,7 @@ sub FRITZBOX_Readout_Format($$$)
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
    } 
    elsif ($format eq "mohtype") {
-      $readout = $mohtype[$readout] if defined $mohtype[$readout];
-      $readout = "" if $readout eq "er";
+      $readout = $mohtype{$readout} if defined $mohtype{$readout};
    } 
    elsif ($format eq "nounderline") {
       $readout =~ s/_/ /g;
@@ -3467,17 +3467,15 @@ sub FRITZBOX_SetMOH($@)
 
    return "Error: Fritz!Box has no music on hold" unless defined $hash->{READINGS}{box_moh};
 
-   if (lc $type eq lc $mohtype[0] || $type eq "0")
-   {
+   if (lc $type eq lc $mohtype{0} || $type eq "0") {
       FRITZBOX_Shell_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 0');
       return 0;
    }
-   elsif (lc $type eq lc $mohtype[1] || $type eq "1")
-   {
+   elsif (lc $type eq lc $mohtype{1} || $type eq "1") {
       FRITZBOX_Shell_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 1');
       return 1;
    }
-   return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype[2] || $type eq "2";
+   return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype{2} || $type eq "2";
 
 # Load customer MOH file
 
