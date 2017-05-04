@@ -352,13 +352,13 @@ sub LuftdatenInfo_ParseHttpResponse($) {
           foreach (@{$sensor->{sensordatavalues}}){
             $_->{value} =~ m/^(\S+)(\s|$)/;
 
-            if($_->{value_type} eq "temperature"){
+            if($_->{value_type} =~ /temperature$/){
               readingsBulkUpdate($hash, "temperature", $1);
             }
-            elsif($_->{value_type} eq "humidity"){
+            elsif($_->{value_type} =~ /humidity$/){
               readingsBulkUpdate($hash, "humidity", $1);
             }
-            elsif($_->{value_type} eq "pressure"){
+            elsif($_->{value_type} =~ /pressure$/){
               readingsBulkUpdate($hash, "pressure", $1);
             }
           }
@@ -370,17 +370,20 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     }
     elsif($connection eq "local"){
       readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged(
+        $hash, "softwareVersion", $data->{software_version}
+      );
 
       foreach (@{$data->{sensordatavalues}}){
         $_->{value} =~ m/^(\S+)(\s|$)/;
 
-        if($_->{value_type} eq "temperature"){
+        if($_->{value_type} =~ /temperature$/){
           readingsBulkUpdate($hash, "temperature", $1);
         }
-        elsif($_->{value_type} eq "humidity"){
+        elsif($_->{value_type} =~ /humidity$/){
           readingsBulkUpdate($hash, "humidity", $1);
         }
-        elsif($_->{value_type} eq "pressure"){
+        elsif($_->{value_type} =~ /pressure$/){
           readingsBulkUpdate($hash, "pressure", $1);
         }
         elsif($_->{value_type} eq "SDS_P1"){
