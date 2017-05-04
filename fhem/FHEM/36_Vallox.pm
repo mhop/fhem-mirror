@@ -1,8 +1,7 @@
-# $Id$
-
 ###############################################################
+# $Id$
 #
-# @File36_Vallox.pm
+# @File 36_Vallox.pm
 #
 # @Author Skjall
 # @Created 21.07.2016 10:18:23
@@ -194,9 +193,60 @@ my %Vallox_faultTable = (
 "08" => "Extract air sensor fault",
 "09" => "Water radiator danger of freezing",
 "0A" => "Exhaust air sensor fault",
-
 );
 my %Vallox_faultTableReverse = reverse %Vallox_faultTable;
+
+##################################
+# Mapping of the MultiReadings with R/W
+# TODO: Find s.th. more elegant for all MR
+##################################
+my %Vallox_multiReadingTable_realcmd = (
+"SupplyFan" => "MultiPurpose2",
+"ExhaustFan" => "MultiPurpose2",
+"CO2HigherSpeedRequest" => "Flags2",
+"CO2LowerRatePublicInvitation" => "Flags2",
+"HumidityLowerRatePublicInvitation" => "Flags2",
+"SwitchLowerSpeedRequest" => "Flags2",
+"CO2Alarm" => "Flags2",
+"FrostAlarmSensor" => "Flags2",
+"FrostAlarmWaterRadiator" => "Flags4",
+"MasterSlaveSelection" => "Flags4",
+"PreHeatingStatus" => "Flags5",
+"FireplaceSwitchActivation" => "Flags6",
+"PowerState" => "Select",
+"CO2AdjustState" => "Select",
+"RHAdjustState" => "Select",
+"HeatingState" => "Select",
+"AutomaticHumidityBasicLevelSeekerState" => "Program",
+"BoostSwitchMode" => "Program",
+"RadiatorType" => "Program",
+"CascadeAdjust" => "Program",
+"MaxSpeedLimitFunction" => "Program2",
+);
+
+my %Vallox_multiReadingTable_digit = (
+"SupplyFan" => 3,
+"ExhaustFan" => 5,
+"CO2HigherSpeedRequest" => 0,
+"CO2LowerRatePublicInvitation" => 1,
+"HumidityLowerRatePublicInvitation" => 2,
+"SwitchLowerSpeedRequest" => 3,
+"CO2Alarm" => 6,
+"FrostAlarmSensor" => 7,
+"FrostAlarmWaterRadiator" => 4,
+"MasterSlaveSelection" => 7,
+"PreHeatingStatus" => 7,
+"FireplaceSwitchActivation" => 5,
+"PowerState" => 0,
+"CO2AdjustState" => 1,
+"RHAdjustState" => 2,
+"HeatingState" => 3,
+"AutomaticHumidityBasicLevelSeekerState" => 4,
+"BoostSwitchMode" => 5,
+"RadiatorType" => 6,
+"CascadeAdjust" => 7,
+"MaxSpeedLimitFunction" => 0,
+);
 
 
 ##################################
@@ -267,8 +317,27 @@ sub Vallox_ValidateStream ($@)
 		#Log3 ($name, 5, "Vallox: Debug: DO ".$domain." - SE ".$sender." - RE ".$receiver." - D1 ".$data_1." - D2 ".$data_2." - CS ".$checksum." NE ".$bufferRead);
 		return 0;
 	}
-		
+}
 
+##############################################
+# Change bit in MultiReading
+# (bitnumber = 0 (rightest) - 7 (leftest)!)
+##############################################
+sub Vallox_ReplaceBit ($@) {
+	my ($hash, $bitstring, $bitnumber, $value) = @_;
+    
+	return substr($bitstring,0,8-$bitnumber-1).$value.substr($bitstring,8-$bitnumber,$bitnumber);
+}
+
+##############################################
+# Update reading bulk for binary reading
+##############################################
+sub Vallox_readingsBulkUpdateMultiReading($@) {
+	my ($hash, $rawReadingType, $readingname, $bitnumber,) = @_;
+	
+	readingsBulkUpdate($hash, $readingname, substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1)) if (ReadingsVal($hash->{NAME},$readingname,"unknown") ne substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1));
+	return;
+	
 }
 
 ##############################################
@@ -411,7 +480,7 @@ sub Vallox_Set($@)
     my $name = shift @a;
     my $cmd = shift @a;
     my $arg = shift @a;
-
+	
     my $datatype;
     my $datavalue;
   
@@ -423,6 +492,20 @@ sub Vallox_Set($@)
 	$setCommands .= " FanSpeed:1,2,3,4,5,6,7,8";
 	$setCommands .= " BasicHumidityLevel:slider,0,1,100";
 	$setCommands .= " HeatRecoveryCellBypassSetpointTemperature:slider,0,1,20";
+	
+	foreach my $MR_key (keys %Vallox_multiReadingTable_realcmd) {
+		$setCommands .= " ".$MR_key.":0,1";
+	}
+	
+	# MR: Prepare Values and Command for datagram
+	if (exists($Vallox_multiReadingTable_realcmd{$cmd})) {
+		# TODO: Integrate get before set;
+		return "Vallox: Internal ".$Vallox_multiReadingTable_realcmd{$cmd}." empty (".$hash->{"MR_".$cmd}."). Read ".$Vallox_multiReadingTable_realcmd{$cmd}." first!" if ($hash->{"MR_".$Vallox_multiReadingTable_realcmd{$cmd}} eq "");
+		
+		$arg = Vallox_ReplaceBit($hash, $hash->{"MR_".$cmd}, $Vallox_multiReadingTable_digit{$cmd}, $arg);
+		$cmd = $Vallox_multiReadingTable_realcmd{$cmd}
+	}
+	
  ## TODO 
     if (exists $Vallox_datatypesReverse{$cmd}) {
         
@@ -434,6 +517,8 @@ sub Vallox_Set($@)
 			$datavalue = hex "0x".$Vallox_percentageTableReverse{$arg};
 		} elsif ($datatype == 0xaf) {
 			$datavalue = hex "0x".$Vallox_temperatureTableReverse{$arg};
+		} else {
+			$datavalue = hex "0x".$arg;
 		}
         
     } elsif ($cmd eq "raw") {
@@ -573,208 +658,173 @@ sub Vallox_Read($)
 			# FanSpeed-Relays 
 			} elsif ($rawReadingType eq "06") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 								
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "Speed1", substr($bits,0,1)) if (ReadingsVal($name,"Speed1","unknown") ne substr($bits,0,1));
-				readingsBulkUpdate($hash, "Speed2", substr($bits,1,1)) if (ReadingsVal($name,"Speed2","unknown") ne substr($bits,1,1));
-				readingsBulkUpdate($hash, "Speed3", substr($bits,2,1)) if (ReadingsVal($name,"Speed3","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "Speed4", substr($bits,3,1)) if (ReadingsVal($name,"Speed4","unknown") ne substr($bits,3,1));
-				readingsBulkUpdate($hash, "Speed5", substr($bits,4,1)) if (ReadingsVal($name,"Speed5","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "Speed6", substr($bits,5,1)) if (ReadingsVal($name,"Speed6","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "Speed7", substr($bits,6,1)) if (ReadingsVal($name,"Speed7","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "Speed8", substr($bits,7,1)) if (ReadingsVal($name,"Speed8","unknown") ne substr($bits,7,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed1", 0); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed2", 1); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed3", 2); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed4", 3); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed5", 4); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed6", 5); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed7", 6); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed8", 7); #RO
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed-Relays): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed-Relays): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 				
 			# MultiPurpose1
 			} elsif ($rawReadingType eq "07") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				#readingsBulkUpdate($hash, "", substr($bits,1,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,1,1));
-				#readingsBulkUpdate($hash, "", substr($bits,2,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,2,1));
-				#readingsBulkUpdate($hash, "", substr($bits,3,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,3,1));
-				#readingsBulkUpdate($hash, "", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "PostHeating", substr($bits,5,1)) if (ReadingsVal($name,"PostHeating","unknown") ne substr($bits,5,1));
-				#readingsBulkUpdate($hash, "", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				#readingsBulkUpdate($hash, "", substr($bits,7,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,7,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PostHeating", 5); # RO
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose1): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose1): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			#MultiPurpose2
 			} elsif ($rawReadingType eq "08") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				readingsBulkUpdate($hash, "DamperMotorPosition", substr($bits,1,1)) if (ReadingsVal($name,"DamperMotorPosition","unknown") ne substr($bits,1,1));
-				readingsBulkUpdate($hash, "FaultSignalRelay", substr($bits,2,1)) if (ReadingsVal($name,"FaultSignalRelay","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "SupplyFan", substr($bits,3,1)) if (ReadingsVal($name,"SupplyFan","unknown") ne substr($bits,3,1));
-				readingsBulkUpdate($hash, "PreHeating", substr($bits,4,1)) if (ReadingsVal($name,"PreHeating","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "ExhaustFan", substr($bits,5,1)) if (ReadingsVal($name,"ExhaustFan","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "FireplaceBooster", substr($bits,6,1)) if (ReadingsVal($name,"FireplaceBooster","unknown") ne substr($bits,6,1));
-				#readingsBulkUpdate($hash, "", substr($bits,7,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,7,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "DamperMotorPosition", 1); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultSignalRelay", 2); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "SupplyFan", 3);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeating", 4); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "ExhaustFan", 5);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBooster", 6); #RO
 				readingsEndUpdate($hash, 1);
-				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits $bits)");
+								
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			#MachineInstalledCO2Sensor 
 			} elsif ($rawReadingType eq "2D") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				readingsBulkUpdate($hash, "CO2Sensor1", substr($bits,1,1)) if (ReadingsVal($name,"CO2Sensor1","unknown") ne substr($bits,1,1));
-				readingsBulkUpdate($hash, "CO2Sensor2", substr($bits,2,1)) if (ReadingsVal($name,"CO2Sensor2","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "CO2Sensor3", substr($bits,3,1)) if (ReadingsVal($name,"CO2Sensor3","unknown") ne substr($bits,3,1));
-				readingsBulkUpdate($hash, "CO2Sensor4", substr($bits,4,1)) if (ReadingsVal($name,"CO2Sensor4","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "CO2Sensor5", substr($bits,5,1)) if (ReadingsVal($name,"CO2Sensor5","unknown") ne substr($bits,5,1));
-				#readingsBulkUpdate($hash, "", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				#readingsBulkUpdate($hash, "", substr($bits,7,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,7,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor1", 1); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor2", 2); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor3", 3); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor4", 4); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor5", 5); #RO
 				readingsEndUpdate($hash, 1);
-				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits $bits)");
+								
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 				
 			#Flags2
 			} elsif ($rawReadingType eq "6D") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "CO2HigherSpeedRequest", substr($bits,0,1)) if (ReadingsVal($name,"CO2HigherSpeedRequest","unknown") ne substr($bits,0,1));
-				readingsBulkUpdate($hash, "CO2LowerRatePublicInvitation", substr($bits,1,1)) if (ReadingsVal($name,"CO2LowerRatePublicInvitation","unknown") ne substr($bits,1,1));
-				readingsBulkUpdate($hash, "HumidityLowerRatePublicInvitation ", substr($bits,2,1)) if (ReadingsVal($name,"HumidityLowerRatePublicInvitation","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "SwitchLowerSpeedRequest", substr($bits,3,1)) if (ReadingsVal($name,"SwitchLowerSpeedRequest","unknown") ne substr($bits,3,1));
-				#readingsBulkUpdate($hash, "", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				#readingsBulkUpdate($hash, "", substr($bits,5,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "CO2Alarm", substr($bits,6,1)) if (ReadingsVal($name,"CO2Alarm","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "FrostAlarmSensor", substr($bits,7,1)) if (ReadingsVal($name,"FrostAlarm","unknown") ne substr($bits,5,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2HigherSpeedRequest", 0);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2LowerRatePublicInvitation", 1);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HumidityLowerRatePublicInvitation", 2);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "SwitchLowerSpeedRequest", 3);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Alarm", 6);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmSensor", 7);
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags2): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			#Flags4
 			} elsif ($rawReadingType eq "6F") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				#readingsBulkUpdate($hash, "", substr($bits,1,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,1,1));
-				#readingsBulkUpdate($hash, "", substr($bits,2,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "FrostAlarmWaterRadiator", substr($bits,3,1)) if (ReadingsVal($name,"FrostAlarmWaterRadiator","unknown") ne substr($bits,3,1));
-				#readingsBulkUpdate($hash, "", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				#readingsBulkUpdate($hash, "", substr($bits,5,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
-				#readingsBulkUpdate($hash, "", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "MasterSlaveSelection", substr($bits,7,1)) if (ReadingsVal($name,"MasterSlaveSelection","unknown") ne substr($bits,5,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmWaterRadiator", 4);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "MasterSlaveSelection", 7);
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags4): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags4): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			#Flags5
 			} elsif ($rawReadingType eq "70") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				#readingsBulkUpdate($hash, "", substr($bits,1,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,1,1));
-				#readingsBulkUpdate($hash, "", substr($bits,2,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,2,1));
-				#readingsBulkUpdate($hash, "", substr($bits,3,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,3,1));
-				#readingsBulkUpdate($hash, "", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				#readingsBulkUpdate($hash, "", substr($bits,5,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
-				#readingsBulkUpdate($hash, "", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "PreHeatingStatus", substr($bits,7,1)) if (ReadingsVal($name,"PreHeatingStatus","unknown") ne substr($bits,5,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeatingStatus", 7);
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags5): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags5): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 						
 			#Flags6
 			} elsif ($rawReadingType eq "71") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, "", substr($bits,0,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,0,1));
-				#readingsBulkUpdate($hash, "", substr($bits,1,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,1,1));
-				#readingsBulkUpdate($hash, "", substr($bits,2,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,2,1));
-				#readingsBulkUpdate($hash, "", substr($bits,3,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,3,1));
-				readingsBulkUpdate($hash, "RemoteMonitoringControl", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "FireplaceSwitchActivation", substr($bits,5,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "FireplaceBoosterStatus", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				#readingsBulkUpdate($hash, "", substr($bits,7,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RemoteMonitoringControl", 4); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceSwitchActivation", 5);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBoosterStatus", 6); #RO
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags6): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags6): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			# Select
 			} elsif ($rawReadingType eq "A3") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "ServiceReminderIndicator", substr($bits,0,1)) if (ReadingsVal($name,"ServiceReminderIndicator","unknown") ne substr($bits,0,1));
-				readingsBulkUpdate($hash, "FaultIndicator", substr($bits,1,1)) if (ReadingsVal($name,"FaultIndicator","unknown") ne substr($bits,1,1));
-				readingsBulkUpdate($hash, "HeatingIndicator", substr($bits,2,1)) if (ReadingsVal($name,"HeatingIndicator","unknown") ne substr($bits,2,1));
-				readingsBulkUpdate($hash, "FilterGuardIndicator", substr($bits,3,1)) if (ReadingsVal($name,"FilterGuardIndicator","unknown") ne substr($bits,3,1));
-				readingsBulkUpdate($hash, "HeatingState", substr($bits,4,1)) if (ReadingsVal($name,"HeatingState","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "RHAdjustState", substr($bits,5,1)) if (ReadingsVal($name,"RHAdjustState","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "CO2AdjustState", substr($bits,6,1)) if (ReadingsVal($name,"CO2AdjustState","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "PowerState", substr($bits,7,1)) if (ReadingsVal($name,"PowerState","unknown") ne substr($bits,7,1));
+				
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PowerState", 0);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2AdjustState", 1);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RHAdjustState", 2);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingState", 3);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FilterGuardIndicator", 4); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingIndicator", 5); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultIndicator", 6); #RO
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "ServiceReminderIndicator", 7); #RO
+				
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Select): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Select): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 				
 			# Program
 			} elsif ($rawReadingType eq "AA") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "HumidityCO2AdjustmentInterval", oct("0b"."0000".substr($bits,0,4))) if (ReadingsVal($name,"HumidityCO2AdjustmentInterval","unknown") ne oct("0b"."0000".substr($bits,0,4)));
-				readingsBulkUpdate($hash, "AutomaticHumidityBasicLevelSeekerState", substr($bits,4,1)) if (ReadingsVal($name,"AutomaticHumidityBasicLevelSeekerState","unknown") ne substr($bits,4,1));
-				readingsBulkUpdate($hash, "BoostSwitchMode", substr($bits,5,1)) if (ReadingsVal($name,"BoostSwitchMode","unknown") ne substr($bits,5,1));
-				readingsBulkUpdate($hash, "RadiatorType", substr($bits,6,1)) if (ReadingsVal($name,"RadiatorType","unknown") ne substr($bits,6,1));
-				readingsBulkUpdate($hash, "CascadeAdjust ", substr($bits,7,1)) if (ReadingsVal($name,"CascadeAdjust","unknown") ne substr($bits,7,1));
+				# ----xxxx - Nibble is one value // # TODO: Adopt Function
+				readingsBulkUpdate($hash, "HumidityCO2AdjustmentInterval", oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4))) if (ReadingsVal($name,"HumidityCO2AdjustmentInterval","unknown") ne oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4)));
+
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "AutomaticHumidityBasicLevelSeekerState", 4);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "BoostSwitchMode", 5);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RadiatorType", 6);
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CascadeAdjust", 7);
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Program): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Program): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 					
 			# Program2
 			} elsif ($rawReadingType eq "B5") {
 				
-				my $bits = sprintf('%08b', hex("0x".$rawReadingValue));
+				$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
 				
 				$singlereading = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "MaxSpeedLimitFunction", substr($bits,0,1)) if (ReadingsVal($name,"MaxSpeedLimitFunction","unknown") ne substr($bits,0,1));
-				#readingsBulkUpdate($hash, "", substr($bits,1,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,1,1));
-				#readingsBulkUpdate($hash, "", substr($bits,2,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,2,1));
-				#readingsBulkUpdate($hash, "", substr($bits,3,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,3,1));
-				#readingsBulkUpdate($hash, "", substr($bits,4,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,4,1));
-				#readingsBulkUpdate($hash, "", substr($bits,5,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
-				#readingsBulkUpdate($hash, "", substr($bits,6,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,6,1));
-				#readingsBulkUpdate($hash, "", substr($bits,7,1)) if (ReadingsVal($name,"","unknown") ne substr($bits,5,1));
+				Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "MaxSpeedLimitFunction", 0);
 				readingsEndUpdate($hash, 1);
 				
-				Log3 ($name, 4, "Vallox: Incoming Status-Info (Program2): $datagram (Bits $bits)");
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Program2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
 			
 			# Convert Unused Binarys to bits (Just not to have Hex Readings)
 			} elsif ($rawReadingType eq "6C" || $rawReadingType eq "6E") {
@@ -802,6 +852,7 @@ sub Vallox_Read($)
 						Log3 ($name, 5, "Vallox: Reading not changed: $fineReadingValue - Doing nothing.");
 					}
 				}
+				
 			} else {
 				Log3 ($name, 4, "Vallox: Datagram not in Datatypes-Table: ".$datagram);
 			}
