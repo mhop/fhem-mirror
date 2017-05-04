@@ -13,7 +13,7 @@
 #  - based on an Idea by SpenZerX and HDO
 #  - Waldmensch for various improvements
 #  - sbfspot (https://sbfspot.codeplex.com/)
-#  - rewritten by Thomas Schoedl (sct14675) with inputs from Volker, waldmensch and DS_starter
+#  - rewritten by Thomas Schoedl (sct14675) with inputs from Volker, waldmensch and DS_Starter
 # 
 #  Description:
 #  This is an FHEM-Module for SMA Inverters.
@@ -28,6 +28,8 @@
 #################################################################################################################
 # Versions History done by DS_Starter
 #
+# 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
+# 2.9.0    23.04.2017      fixed issue #22: wrong logon command for SunnyBoy systems
 # 2.8.3    19.04.2017      enhanced inverter Type-Hash
 # 2.8.2    23.03.2017      changed SMA_logon sub
 # 2.8.1    06.12.2016      SMAInverter version as internal 
@@ -78,11 +80,9 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.8.3";
+my $SMAInverterVersion = "2.9.1";
 
 # Inverter Data fields and supported commands flags.
-# $inv_susyid
-# $inv_serial
 # $inv_SPOT_ETODAY                # Today yield
 # $inv_SPOT_ETOTAL                # Total yield
 # $inv_SPOT_PDC1                  # DC power input 1
@@ -119,9 +119,9 @@ my $SMAInverterVersion = "2.8.3";
 # $inv_GRIDRELAY                  # Grid Relay/Contactor Status
 # $inv_STATUS                     # Inverter Status
 
-
 # Aufbau Wechselrichter Type-Hash
 my %SMAInverter_devtypes = (
+0000 => "Unknown Inverter Type",
 9015 => "SB 700",
 9016 => "SB 700U",
 9017 => "SB 1100",
@@ -213,6 +213,7 @@ my %SMAInverter_devtypes = (
 9261 => "Sunny Island 5048U",
 9262 => "Sunny Island 6048U",
 9278 => "Sunny Island 3.0M",
+9279 => "Sunny Island 4.4M",
 9281 => "STP 10000TL-20",
 9282 => "STP 11000TL-20",
 9283 => "STP 12000TL-20",
@@ -1109,7 +1110,7 @@ sub SMA_command($$$$$) {
 			
  if($data_ID eq 0x251E) {
      $inv_SPOT_PDC1 = unpack("V*", substr $data, 62, 4);
-	 $inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4);
+	 if($size < 90) {$inv_SPOT_PDC2 = 0; } else {$inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
 	 $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 == 2147483648) ? 0 : $inv_SPOT_PDC1;
 	 $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 == 2147483648) ? 0 : $inv_SPOT_PDC2;
 	 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1 and SPOT_PDC2=$inv_SPOT_PDC2";
@@ -1156,9 +1157,16 @@ sub SMA_command($$$$$) {
 
  if($data_ID eq 0x451F) {
      $inv_SPOT_UDC1 = unpack("l*", substr $data, 62, 4);
-	 $inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
-	 $inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
-	 $inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
+	 # catch shorter responses in case not second string supported
+	 if($size < 146) {
+		$inv_SPOT_UDC2 = 0;
+		$inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
+		$inv_SPOT_IDC2 = 0;	 
+	 } else {
+		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+		$inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
+		$inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
+	 }
 	 if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } else {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
 	 if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } else {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
 	 if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } else {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
@@ -1217,7 +1225,14 @@ sub SMA_command($$$$$) {
 
  if($data_ID eq 0x821E) {
      $inv_CLASS = unpack("V*", substr $data, 102, 4) & 0x00FFFFFF;
-	 $inv_TYPE = unpack("V*", substr $data, 142, 4) & 0x00FFFFFF;
+	 $i = 142;		# start address of INV_TYPE
+	 $inv_TYPE = 0; # initialize to unknown inverter type
+	 do {
+		$temp = unpack("V*", substr $data, $i, 4);
+		if(($temp & 0xFF000000) eq 0x01000000) { $inv_TYPE = $temp & 0x00FFFFFF; }				# in some models a catalogue is transmitted, right model marked with: 0x01000000 OR INV_Type
+		$i = $i+4;
+	 } while ((unpack("V*", substr $data, $i, 4) ne 0x00FFFFFE) && ($i<$size));			# 0x00FFFFFE is the end marker for attributes
+
 	 Log3 $name, 5, "$name - Found Data CLASS=$inv_CLASS and TYPE=$inv_TYPE";
 	 return (1,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial);
  }
@@ -1277,7 +1292,11 @@ sub SMA_logon($$$) {
  my $encpasswd = "888888888888888888888888"; # template for password	
  for my $index (0..length $pass )	     # encode password
  {
-     substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
+     if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
+		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
+	} else {
+		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);	
+	}
  }
 
  # Get current timestamp in epoch format (unix format)

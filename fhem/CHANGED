@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  76_SMAInverter: version 2.9.1, issues for some inverter types 
+                             e.g. SunnyBoy systems
   - bugfix:  36_Vallox: Correction of binary reading interpretations. Optimized.
                 Added Set for binary values.
   - feature: 34_ESPEasy: add use of encode_utf8 for json_decode
