@@ -30,6 +30,7 @@
 # ABU 20170427 integrated setExtensions
 # ABU 20170427 added dpt1.010 (start/stop)
 # ABU 20170427 added dpt2
+# ABU 20170503 corrected DPT1.010
 
 package main;
 
@@ -90,7 +91,7 @@ my %dpttypes = (
 	"dpt1.003" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(([eE][nN]|[dD][iI][sS])[aA][bB][lL][eE])|(0?1)|(0?0)/, MIN=>"disable", MAX=>"enable"},
 	"dpt1.008" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([uU][pP])|([dD][oO][wW][nN])|(0?1)|(0?0)/, MIN=>"up", MAX=>"down"},
 	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"open", MAX=>"closed"},
-	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([sS][tT][aA][rR][tT])|([sS][tT][oO][pP])|(0?1)|(0?0)/, MIN=>"stop", MAX=>"start"},
+	"dpt1.010" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([sS][tT][aA][rR][tT])|([sS][tT][oO][pP])|(0?1)|(0?0)/, MIN=>"stop", MAX=>"start"},
 	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"closed", MAX=>"open"},
 
 	#Step value (two-bit)
