@@ -29,7 +29,6 @@ use strict;
 use warnings;
 use Data::Dumper;
 use MIME::Base64;
-#use Encode qw(encode_utf8);
 use TcpServerUtils;
 use HttpUtils;
 use Color;
@@ -37,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.06;       # Version of this module
+my $module_version    = 1.07;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -293,6 +292,9 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   $hash->{VERSION}   = $module_version;
   $hash->{NOTIFYDEV} = "global";
   
+  eval "use Encode qw(encode_utf8);";
+  $hash->{helper}{pmEncode} = $@ ? 0 : 1;
+  
   #--- BRIDGE -------------------------------------------------
   if ($hash->{HOST} eq "bridge") {
     $hash->{SUBTYPE} = "bridge";
@@ -315,6 +317,9 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
 
     $hash->{MAX_HTTP_SESSIONS} = $d_maxHttpSessions;
     $hash->{MAX_QUEUE_SIZE}    = $d_maxQueueSize;
+    
+    Log3 $name, 2, "$type $name: WARNING: Perl module Encode not installed. No utf-8 encoding available."
+      if !$hash->{helper}{pmEncode};
 
     ESPEasy_removeGit($hash);
   } 
@@ -632,14 +637,16 @@ sub ESPEasy_Read($) {
   my $json;
   if (defined $data[1] && $data[1] =~ m/"module":"ESPEasy"/) {
 
-    # remove illegal chars but keep JSON relevant chars.
-    $data[1] =~ s/[^A-Za-z\d_\.\-\/\{}:,"]/_/g;
-
-    eval {$json = decode_json($data[1]);1;};
+    # use encode_utf8 if available else replace any disturbing chars
+    if ( $bhash->{helper}{pmEncode} ) {
+      eval { $json = decode_json( encode_utf8($data[1]) ); 1; } 
+    }
+    else { 
+      eval { $json = decode_json( $data[1] =~ s/[^\x20-\x7E]/_/gr ); 1; }
+    };
     if ($@) {
-      Log3 $bname, 2, "$btype $name: WARNING: invalid JSON data or utf-8 "
-                    . "encoding failed ($peer).";
-      Log3 $bname, 2, "$btype $name: WARNING: $@";
+      Log3 $bname, 2, "$btype $name: WARNING: Invalid JSON received. "
+                    . "Check your ESP configuration ($peer).\n$@";
       return;
     }
 
@@ -1181,6 +1188,9 @@ sub ESPEasy_dispatchParse($$$) # called by logical device (defined by
           : ": unknown node type id"
             if $reading eq "node_type_id";
 
+        # no value given
+        $value = "not defined" if !defined $value || $value eq "";
+
         # set internal
         $hash->{"ESP_".uc($reading)} = $value;
 
@@ -1366,7 +1376,13 @@ sub ESPEasy_httpReqParse($$$)
                   ."cmd:'$param->{cmd},$param->{plist}' => '$logData'";
     if ($data =~ m/^{/) { #it could be json...
       my $res;
-      eval {$res = decode_json($data);1;};
+
+      if ( $hash->{helper}{pmEncode} ) {
+        eval { $res = decode_json( encode_utf8($data) ); 1; };
+      }
+      else {
+        eval { $res = decode_json( $data =~ s/[^\x20-\x7E]/_/gr ); 1; };
+      }
       if ($@) {
         Log3 $name, 2, "$type $name: WARNING: deformed JSON data received "
                       ."from $param->{host} requested by $param->{ident}.";
