@@ -5453,6 +5453,15 @@ s2Hex($)
   <li>stop<br>
     stop dimming/operation</li>
 
+  <br><br><b>Class THERMOSTAT_FAN_MODE</b>
+  <li>fanAutoLow</li>
+  <li>fanLow</li>
+  <li>fanAutoMedium</li>
+  <li>fanMedium</li>
+  <li>fanAutoHigh</li>
+  <li>fanHigh<br>
+    set the fan mode.</li>
+
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
   <li>tmEnergySaveHeating</li>
@@ -5867,6 +5876,16 @@ s2Hex($)
   <br><br><b>Class SWITCH_MULTILEVEL</b>
   <li>swmStatus<br>
     return the status of the node, as state:on, state:off or state:dim value.
+    </li>
+
+  <br><br><b>Class THERMOSTAT_FAN_MODE</b>
+  <li>fanMode<br>
+    request the mode
+    </li>
+
+  <br><br><b>Class THERMOSTAT_FAN_STATE</b>
+  <li>fanMode<br>
+    request the state
     </li>
 
   <br><br><b>Class THERMOSTAT_MODE</b>
@@ -6366,29 +6385,25 @@ s2Hex($)
                 Start: $sl Duration: $dur Step: $step</li>
   <li>state:swmEnd</li>
 
+  <br><br><b>Class THERMOSTAT_FAN_MODE</b>
+  <li>fanMode:[fanAutoLow | fanLow | fanAutoHigh | fanHigh | fanAutoMedium |
+               fanMedium]
+      </li>
+
+  <br><br><b>Class THERMOSTAT_FAN_STATE</b>
+  <li>fanState:[off | low | high | medium | circulation | humidityCirc | 
+                fanrightLeftCirc | upDownCirc | quietCirc]</li>
+
   <br><br><b>Class THERMOSTAT_MODE</b>
-  <li>off</li>
-  <li>cooling</li>
-  <li>heating</li>
-  <li>manual</li>
-  <li>setTmOff</li>
-  <li>setTmHeating</li>
-  <li>setTmCooling</li>
-  <li>setTmManual</li>
+  <li>thermostatMode:[off | cooling | heating | fanOnly | 
+                      energySaveHeating | manual | setTmOff | setTmHeating | 
+                      setTmEnergySaveHeating | setTmManual</li>
   
   <br><br><b>Class THERMOSTAT_OPERATING_STATE</b>
-  <li>idle</li>
-  <li>heating</li>
-  <li>cooling</li>
-  <li>fanOnly</li>
-  <li>pendingHeat</li>
-  <li>pendingCooling</li>
-  <li>ventEconomizer</li>
-  <li>auxHeating</li>
-  <li>2ndStageHeating</li>
-  <li>2ndStageCooling</li>
-  <li>2ndStageAuxHeat</li>
-  <li>3rdStageAuxHeat</li>
+  <li>thermostatOperatingState:[idle | heating | cooling | fanOnly |
+        pendingHeat| pendingCooling | ventEconomizer | auxHeating |
+        2ndStageHeating | 2ndStageCooling | 2ndStageAuxHeat |
+        3rdStageAuxHeat]</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointTemp:$temp $scale $type<br>
