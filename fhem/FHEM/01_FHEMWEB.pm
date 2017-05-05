@@ -33,7 +33,7 @@ sub FW_pF($@);
 sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
-sub FW_parseColumns();
+sub FW_parseColumns($);
 sub FW_readIcons($);
 sub FW_readIconsFrom($$);
 sub FW_returnFileAsStream($$$$$);
@@ -1797,7 +1797,7 @@ FW_showRoom()
   my %extPage = ();
   my $nameDisplay = AttrVal($FW_wname,"nameDisplay",undef);
 
-  my ($columns, $maxc) = FW_parseColumns();
+  my ($columns, $maxc) = FW_parseColumns(\%group);
   FW_pO "<tr class=\"column\">" if($maxc != -1);
   for(my $col=1; $col < ($maxc==-1 ? 2 : $maxc); $col++) {
     FW_pO "<td><table class=\"column tblcol_$col\">" if($maxc != -1);
@@ -1847,8 +1847,9 @@ FW_showRoom()
 
 # Room1:col1group1,col1group2|col2group1,col2group2 Room2:...
 sub
-FW_parseColumns()
+FW_parseColumns($)
 {
+  my ($aGroup) = @_;
   my %columns;
   my $colNo = -1;
 
@@ -1857,11 +1858,19 @@ FW_parseColumns()
     $room =~ s/%20/ /g; # Space
     next if(!defined($groupcolumn) || $FW_room !~ m/$room/);
     $colNo = 1;
+    my @grouplist = keys %$aGroup;
+    my %handled;
+
     foreach my $groups (split(/\|/,$groupcolumn)) {
       my $lineNo = 1;
       foreach my $group (split(",",$groups)) {
         $group =~ s/%20/ /g; # Forum #33612
-        $columns{$group} = [$lineNo++, $colNo]; # Forum #23212
+        $group = "^$group\$"; #71381
+        foreach my $g (grep /$group/ ,@grouplist) {
+          next if($handled{$g});
+          $handled{$g} = 1;
+          $columns{$g} = [$lineNo++, $colNo]; #23212
+        }
       }
       $colNo++;
     }
@@ -3311,7 +3320,7 @@ FW_widgetOverride($$)
       This attribute can be used to sort the groups in a room, just specify
       the groups in one column.
       Space in the room and group name has to be written as %20 for this
-      attribute. The room name is a regeular expression.
+      attribute. Both the room name and the groups are a regular expression.
       </li>
       <br>
 
@@ -4077,7 +4086,8 @@ FW_widgetOverride($$)
         href="#group">group</a> stehen. Dieses Attribut kann man zum sortieren
         der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
         Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
-        %20 zu schreiben. Raumname is ein regul&auml;rer Ausdruck.
+        %20 zu schreiben. Raum- und Gruppenspezifikation ist jeweils ein
+        %regul&auml;rer Ausdruck.
         </li><br>
 
     <a name="confirmDelete"></a>
