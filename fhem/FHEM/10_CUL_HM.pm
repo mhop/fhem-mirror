@@ -2422,18 +2422,14 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($mh{st} eq "powerMeter") {#############################################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006")) {  #    or Info_Status message here
-
-      my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
-      $chn = sprintf("%02X",$chn&0x3f);
-      my $chId = $mh{src}.$chn;
+      # powerOn
+      # m:01 A45F 36D06A 123ABC 8000000000000000090CFE
+      # m:02 A410 36D06A 123ABC 06010000
+      my ($val,$err) = (hex($mI[2])/2,hex($mI[3]));
+      my $chId = $mh{src}.$mh{chnHx};
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
-
-      if($chn == "00" && $mh{devH}->{helper}{PONtest}){
-        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
-        $mh{devH}->{helper}{PONtest} = 0;
-      }
 
       #--    if timed on is set possibly show this in a state --
       my ($timedOn,$stateExt)=("off","");
@@ -2443,7 +2439,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       push @evtEt,[$mh{shash},1,"level:$val"];
       push @evtEt,[$mh{shash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
-      push @evtEt,[$mh{shash},1,"deviceMsg:$vs$target"] if($chn ne "00");
+      push @evtEt,[$mh{shash},1,"deviceMsg:$vs$target"] if($mh{chnHx} ne "00");
       push @evtEt,[$mh{shash},1,"state:$vs$stateExt"];
       push @evtEt,[$mh{shash},1,"timedOn:$timedOn"];
     }
@@ -2928,8 +2924,9 @@ sub CUL_HM_parseCommon(@){#####################################################
   # VD wakes up with 8202
   #                  9610
   my $rxt = CUL_HM_getRxType($mhp->{shash});
-  $devHlpr->{PONtest} = 1 if($mhp->{mNo} eq "00" &&
-                             $devHlpr->{HM_CMDNR} < 250);# this is power on
+  $devHlpr->{PONtest} = 1 if($mhp->{mNo} =~ m/0[012]/ &&
+                             $devHlpr->{HM_CMDNR} < 250 && 
+                             $devHlpr->{HM_CMDNR} > 5);# this is power on
   $devHlpr->{HM_CMDNR} = hex($mhp->{mNo});# sync msgNo prior to any sending
   if($rxt & 0x08){ #wakeup device
     if(($mhp->{mFlgH} & 0xA2) == 0x82){ #wakeup signal
@@ -3361,7 +3358,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     }    
     elsif($mhp->{mStp} eq "06"){ #reply to status request=======================
       my $rssi = substr($mhp->{p},8,2);
-      CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
+
       push @evtEt,[$mhp->{cHash},0,"recentStateType:info"];
       CUL_HM_storeRssi( $mhp->{devN}
                        ,$mhp->{dstN}
