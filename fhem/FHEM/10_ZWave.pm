@@ -6365,7 +6365,7 @@ s2Hex($)
 
 
   <br><br><b>Class SWITCH_ALL</b>
-  <li>swa:[none|on|off|on off]</li>
+  <li>swa:[ none | on | off | on off ]</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
@@ -6381,29 +6381,29 @@ s2Hex($)
   <li>state:dim value</li>
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
-  <li>state:swm [Decrement|Increment] [Up|Down]
+  <li>state:swm [ Decrement | Increment ] [ Up | Down ]
                 Start: $sl Duration: $dur Step: $step</li>
   <li>state:swmEnd</li>
 
   <br><br><b>Class THERMOSTAT_FAN_MODE</b>
-  <li>fanMode:[fanAutoLow | fanLow | fanAutoHigh | fanHigh | fanAutoMedium |
-               fanMedium]
+  <li>fanMode:[ fanAutoLow | fanLow | fanAutoHigh | fanHigh | fanAutoMedium |
+                fanMedium ]
       </li>
 
   <br><br><b>Class THERMOSTAT_FAN_STATE</b>
-  <li>fanState:[off | low | high | medium | circulation | humidityCirc | 
-                fanrightLeftCirc | upDownCirc | quietCirc]</li>
+  <li>fanState:[ off | low | high | medium | circulation | humidityCirc | 
+                fanrightLeftCirc | upDownCirc | quietCirc ]</li>
 
   <br><br><b>Class THERMOSTAT_MODE</b>
-  <li>thermostatMode:[off | cooling | heating | fanOnly | 
-                      energySaveHeating | manual | setTmOff | setTmHeating | 
-                      setTmEnergySaveHeating | setTmManual</li>
+  <li>thermostatMode:[ off | cooling | heating | fanOnly | 
+                       energySaveHeating | manual | setTmOff | setTmHeating | 
+                       setTmEnergySaveHeating | setTmManual ]</li>
   
   <br><br><b>Class THERMOSTAT_OPERATING_STATE</b>
-  <li>thermostatOperatingState:[idle | heating | cooling | fanOnly |
-        pendingHeat| pendingCooling | ventEconomizer | auxHeating |
+  <li>thermostatOperatingState:[ idle | heating | cooling | fanOnly |
+        pendingHeat | pendingCooling | ventEconomizer | auxHeating |
         2ndStageHeating | 2ndStageCooling | 2ndStageAuxHeat |
-        3rdStageAuxHeat]</li>
+        3rdStageAuxHeat ]</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointTemp:$temp $scale $type<br>
