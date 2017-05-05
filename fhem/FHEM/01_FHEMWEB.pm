@@ -3320,7 +3320,7 @@ FW_widgetOverride($$)
       This attribute can be used to sort the groups in a room, just specify
       the groups in one column.
       Space in the room and group name has to be written as %20 for this
-      attribute. Both the room name and the groups are a regular expression.
+      attribute. Both the room name and the groups are regular expressions.
       </li>
       <br>
 
