@@ -817,8 +817,8 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "levelRange" ){
     if ($cmd eq "set"){
-      return "use $attrName only for dimmer" if (CUL_HM_Get($defs{$name},$name,"param","subType") ne "dimmer"
-                                                 && $init_done );
+      return "use $attrName only for dimmer" if ((CUL_HM_Get($defs{$name},$name,"param","subType") ne "dimmer")
+                                                  && $init_done );
       my ($min,$max) = split (",",$attrVal);
       return "use format min,max" if (!defined $max);
       return "min:$min must be between 0 and 100" if ($min<0 || $min >100);
