@@ -144,7 +144,7 @@ FHEM/30_pilight_raw.pm       risiko               http://forum.fhem.de Sonstige 
 FHEM/30_pilight_smoke.pm     risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_contact.pm   risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
-FHEM/31_PLAYBULB.pm	         CoolTux		      http://forum.fhem.de Beleuchtung
+FHEM/31_PLAYBULB.pm	     CoolTux		  http://forum.fhem.de Beleuchtung
 FHEM/31_MilightDevice.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
@@ -302,7 +302,7 @@ FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstue
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/74_NUKIBridge.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_AMAD.pm              CoolTux              http://forum.fhem.de Unterstuetzende Dienste
-FHEM/74_HOMBOT.pm	         CoolTux              http://forum.fhem.de Unterstuetzende Dienste
+FHEM/74_HOMBOT.pm	     CoolTux              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/74_NUKIDevice.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_Nmap.pm              igami                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/74_XiaomiFlowerSens     CoolTux              http://forum.fhem.de Sonstige Systeme
@@ -314,8 +314,8 @@ FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatis
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_SMAInverter.pm       DS_Starter           http://forum.fhem.de Sonstige Systeme
 FHEM/77_UWZ.pm               CoolTux              http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
-FHEM/77_SMAEM.pm	         VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
-FHEM/77_SMASTP.pm	         VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
+FHEM/77_SMAEM.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
+FHEM/77_SMASTP.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
 FHEM/79_BDKM.pm              arnoaugustin         http://forum.fhem.de Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              neubert              http://forum.fhem.de Sonstige Systeme
 FHEM/80_xxLG7000.pm          markusbloch          http://forum.fhem.de Multimedia
@@ -356,7 +356,7 @@ FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
-FHEM/96_SIP.pm		         wzut,plin            http://forum.fhem.de Sonstiges
+FHEM/96_SIP.pm		     wzut,plin            http://forum.fhem.de Sonstiges
 FHEM/96_Snapcast.pm          unimatrix            http://forum.fhem.de Multimedia
 FHEM/97_TrashCal.pm          Tobias               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/97_SprinkleControl.pm   Tobias               http://forum.fhem.de Unterstuetzende Dienste
