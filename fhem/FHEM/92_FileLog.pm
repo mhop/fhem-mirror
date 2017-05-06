@@ -276,6 +276,7 @@ FileLog_Set($@)
       $fh->close();
       if($cmd eq "clear") {
         $fh = new IO::File(">$cn");
+        setReadingsVal($hash, "linesInTheFile", 0, TimeNow());
       } else {
         $fh = new IO::File(">>$cn");
       }
