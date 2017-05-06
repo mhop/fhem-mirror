@@ -373,7 +373,16 @@ my %zwave_class = (
     },
   APPLIANCE                => { id => '64' },
   DMX                      => { id => '65' },
-  BARRIER_OPERATOR         => { id => '66' },
+  BARRIER_OPERATOR         => { id => '66',
+    set   => { barrierClose=> "0100",
+               barrierOpen => "01ff" },
+    get   => { barrierState=> "02" },
+    parse => { "..6603(..)"=> '($1 eq "00" ? "barrierState:closed" :
+                               ($1 eq "fc" ? "barrierState:closing" :
+                               ($1 eq "fd" ? "barrierState:stopped" :
+                               ($1 eq "fe" ? "barrierState:opening" :
+                               ($1 eq "ff" ? "barrierState:open" :
+                                             "barrierState:".hex($1))))))'} },
   ENTRY_CONTROL            => { id => '6f' },
   CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
@@ -5118,6 +5127,13 @@ s2Hex($)
     Alias for basicValue, to make mapping from the incoming events easier.
     </li>
 
+  <br><br><b>Class BARRIER_OPERATOR</b>
+  <li>barrierClose<br>
+    start closing the barrier.</li>
+  <li>barrierOpen<br>
+    start opening the barrier.
+    </li>
+
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
     Starts closing the window cover. Moving stops if blinds are fully closed or
@@ -5620,6 +5636,11 @@ s2Hex($)
   <li>associationGroupCmdList groupId<br>
     return Command Classes and Commands that will be sent to associated
     devices in this group<br>
+    </li>
+
+  <br><br><b>Class BARRIER_OPERATOR</b>
+  <li>barrierState<br>
+    request state of the barrier.
     </li>
 
   <br><br><b>Class BASIC</b>
@@ -6130,6 +6151,9 @@ s2Hex($)
   <br><br><b>Class ASSOCIATION_GRP_INFO</b>
   <li>assocGroupName_X:name</li>
   <li>assocGroupCmdList_X:AABBCCDD...</li>
+
+  <br><br><b>Class BARRIER_OPERATOR</b>
+  <li>barrierState:[ closed | [%] | closing | stopped | opening | open ]</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicReport:X (for version 1), basicReport:X target y duration z 
