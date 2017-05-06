@@ -1643,7 +1643,7 @@ YAMAHA_AVR_ParseResponse($$$)
                         {
                             Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
                         
-                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1}});
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1, input_tag => $1}});
                             
                             if(!exists($hash->{helper}{LAST_INPUT_TAG}) or ($hash->{helper}{LAST_INPUT_TAG} ne $hash->{helper}{CURRENT_INPUT_TAG}) or $hash->{helper}{SUPPORT_SHUFFLE_REPEAT})
                             {
@@ -1667,6 +1667,7 @@ YAMAHA_AVR_ParseResponse($$$)
                         readingsBulkUpdateIfChanged($hash, "currentStation", "");
                         readingsBulkUpdateIfChanged($hash, "currentStationFrequency","");
                         readingsBulkUpdateIfChanged($hash, "currentArtist", "");
+                        readingsBulkUpdateIfChanged($hash, "playStatus", "stopped");
                     }
                 }
                 
@@ -1820,10 +1821,16 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdateIfChanged($hash, "currentTitle", "");
                 }
-                
+
                 if($data =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
                 {
-                    readingsBulkUpdate($hash, "playStatus", lc($1));
+                    readingsBulkUpdate($hash, "playStatus", "stopped") if($1 eq "Stop");
+                    readingsBulkUpdate($hash, "playStatus", "playing") if($1 eq "Play");
+                    readingsBulkUpdate($hash, "playStatus", "paused") if($1 eq "Pause");
+                }
+                elsif($options->{input_tag} eq "Tuner")
+                {
+                    readingsBulkUpdate($hash, "playStatus", "playing");
                 }
                 
                 if($data =~ /<Tuning>.*?<Freq><Current><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Current>.*?<\/Tuning>/ or (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
