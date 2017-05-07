@@ -244,6 +244,13 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
     readingsSingleUpdate($hash, "state", "error", 1);
   }
+  elsif($data !~ /^\[.*\]$/s){
+    Log3(
+      $SELF, 2, "$TYPE ($SELF) - error while request: malformed JSON string"
+    );
+
+    readingsSingleUpdate($hash, "state", "error", 1);
+  }
   elsif($data eq "[]"){
     if(   index($param->{url}, $hash->{SENSORID2}) > -1
        && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
