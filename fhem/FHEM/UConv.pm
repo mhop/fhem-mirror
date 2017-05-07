@@ -1242,10 +1242,13 @@ sub GetDaytime(;$$$$) {
     # Midnight
     $ret->{events}{ $ret->{midnight_t} }{TIME} =
       main::FmtDateTime( $ret->{midnight_t} );
-    $ret->{events}{ $ret->{midnight_t} }{DESC} = "Begin new calendar day";
+    $ret->{events}{ $ret->{midnight_t} }{DESC} =
+      "Begin night time and new calendar day";
     $ret->{events}{ $ret->{1}{midnight_t} }{TIME} =
       main::FmtDateTime( $ret->{1}{midnight_t} );
-    $ret->{events}{ $ret->{1}{midnight_t} }{DESC} = "Begin new calendar day";
+    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} =~ s/00:00:00/24:00:00/;
+    $ret->{events}{ $ret->{1}{midnight_t} }{DESC} =
+      "End calendar day and begin night time";
 
     # Holidays
     $ret->{events}{ $ret->{midnight_t} }{DESC} .=
@@ -1287,7 +1290,7 @@ sub GetDaytime(;$$$$) {
         my $t = int( $b + 0.5 );
         $ret->{events}{$t}{TIME} = main::FmtDateTime($t);
         if ( $i == $ret->{daytimeStages} + 1 ) {
-            $ret->{events}{$t}{DESC} = "Begin nighttime";
+            $ret->{events}{$t}{DESC} = "Begin midevening time";
         }
         else {
             $ret->{events}{$t}{DESC} = "Begin daytime stage $i"
@@ -1821,10 +1824,6 @@ sub _time(;$$$) {
 }
 
 sub _GetIndexFromArray($$) {
-
-    # my ( $string, @array ) = @_;
-    # my ($index) = grep { $array[$_] =~ /^$string$/i } ( 0 .. @array - 1 );
-    # return defined $index ? $index : undef;
     my ( $string, $array ) = @_;
     return undef unless ( ref($array) eq "ARRAY" );
     my ($index) = grep { $array->[$_] =~ /^$string$/i } ( 0 .. @$array - 1 );
