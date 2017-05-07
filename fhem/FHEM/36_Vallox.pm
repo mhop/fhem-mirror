@@ -5,6 +5,7 @@
 #
 # @Author Skjall
 # @Created 21.07.2016 10:18:23
+# @Version 1.2.0
 #
 #  The modul reads and writes parameters via RS485 from and to a Vallox
 #  ventilation bus.
@@ -845,11 +846,87 @@ sub Vallox_Read($)
 			
 			if($Vallox_datatypes{$rawReadingType}) {
 				if ($singlereading == 1) {
-					if (ReadingsVal($name,$Vallox_datatypes{$rawReadingType},"unknown") ne $fineReadingValue) {
-						Log3 ($name, 5, "Vallox: Update Reading: $fineReadingValue");
-						readingsSingleUpdate($hash,$Vallox_datatypes{$rawReadingType}, $fineReadingValue, 1) ;
-					} else {
-						Log3 ($name, 5, "Vallox: Reading not changed: $fineReadingValue - Doing nothing.");
+					Log3 ($name, 5, "Vallox: Update Reading: $fineReadingValue");
+					
+					readingsSingleUpdate($hash,$Vallox_datatypes{$rawReadingType}, $fineReadingValue, 1);
+					
+					# Efficiency Calculation
+					#Is this Reading a Temp?
+					if (substr($Vallox_datatypes{$rawReadingType},0,4) eq "Temp") {
+						
+						# If HRC is in Bypass - Efficiency is 0
+						if (ReadingsVal($name,"DamperMotorPosition",0) == 1) {
+							readingsSingleUpdate($hash,"EfficiencyIn", 0, 1);
+							readingsSingleUpdate($hash,"EfficiencyOut", 0, 1);
+							readingsSingleUpdate($hash,"EfficiencyAverage", 0, 1);
+							Log3 ($name, 5, "Vallox: Efficiency Override: HRC Bypass");
+							
+						} else {
+						
+							my ($EfficiencyIn,$EfficiencyOut,$TempIncoming,$TempOutside,$TempInside,$TempExhaust) = 0;
+						
+							# Efficiency on Keep Temp Inside
+							# Do we have all nessecary Readings?
+							if (ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
+								ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
+								ReadingsVal($name,"TempInside","unknown") ne "unknown") {
+								
+								
+								$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
+								$TempOutside = ReadingsVal($name,"TempOutside",-100);
+								$TempInside = ReadingsVal($name,"TempInside",-100);
+								
+								
+								# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
+								if ($TempInside-$TempOutside != 0) {
+									$EfficiencyIn = ($TempIncoming-$TempOutside)/($TempInside-$TempOutside)*100;
+									
+									$EfficiencyIn = 100 if ($EfficiencyIn > 100);
+									
+									Log3 ($name, 5, "Vallox: Efficiency Inside: (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = ".$EfficiencyIn);
+									readingsSingleUpdate($hash,"EfficiencyIn", $EfficiencyIn, 1);
+								} else {
+									Log3 ($name, 5, "Vallox: Efficiency Inside (DIV/0 Prevention): (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = 100");
+									readingsSingleUpdate($hash,"EfficiencyIn", 100, 1);
+								}
+							}
+							
+							# Efficiency on Keep Temp Outside
+							# Do we have all nessecary Readings?
+							if (ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
+								ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
+								ReadingsVal($name,"TempExhaust","unknown") ne "unknown") {
+								
+								$TempOutside = ReadingsVal($name,"TempOutside",-100);
+								$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
+								$TempExhaust = ReadingsVal($name,"TempExhaust",-100);
+								
+								# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
+								if ($TempOutside-$TempIncoming != 0) {
+									$EfficiencyOut = ($TempExhaust-$TempIncoming)/($TempOutside-$TempIncoming)*100;
+									$EfficiencyOut = 100 if ($EfficiencyOut > 100);
+									Log3 ($name, 5, "Vallox: Efficiency Outside: (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = ".$EfficiencyOut);
+									readingsSingleUpdate($hash,"EfficiencyOut", $EfficiencyOut, 1);
+								} else {
+									Log3 ($name, 5, "Vallox: Efficiency Outside (DIV/0 Protection): (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = 100");
+									readingsSingleUpdate($hash,"EfficiencyOut", 100, 1);
+								}
+							}
+							
+							# Average Efficiency
+							if (ReadingsVal($name,"EfficiencyIn","unknown") ne "unknown" &&
+								ReadingsVal($name,"EfficiencyOut","unknown") ne "unknown") {
+								$EfficiencyIn = ReadingsVal($name,"EfficiencyIn",-100);
+								$EfficiencyOut = ReadingsVal($name,"EfficiencyOut",-100);
+								
+								my $EfficiencyAverage = ($EfficiencyIn+$EfficiencyOut) / 2; 
+								Log3 ($name, 5, "Vallox: Efficiency Average: (".$EfficiencyIn."+".$EfficiencyOut.")/2 = ".$EfficiencyAverage);
+
+								readingsSingleUpdate($hash,"EfficiencyAverage", $EfficiencyAverage, 1);
+							} else {
+								Log3 ($name, 5, "Vallox: Efficiency Average unknown: (".ReadingsVal($name,"EfficiencyIn","unknown")."+".ReadingsVal($name,"EfficiencyOut","unknown").")/2");
+							}
+						}
 					}
 				}
 				

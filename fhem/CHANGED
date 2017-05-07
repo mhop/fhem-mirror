@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  36_Vallox: Changed way readings are updated.
+                Added efficiency calculation and readings for HRC.
   - change:  71_YAMAHA_AVR: changing values of reading values conform
              to FHEM AV guidelines ("stopped", "playing" or "paused")
   - bugfix   73_km200.pm: Errorlist unsorted timestamp part 3
