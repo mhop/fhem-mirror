@@ -1,4 +1,5 @@
 # $Id$
+# $Id$
 ################################################################
 #
 #  Copyright notice
@@ -43,6 +44,8 @@
 # 2017-01-24 V 0212 Attribut interval used to disable or enable refreshAllstates
 # 2017-01-24 V 0212 Setup changes recognized for reading places
 # 2017-03-23 V 0213 username and password stored encrypted
+# 2017-05-07 V 0214 encryption can be disabled by new attribut cryptLoginData
+# 2017-05-07 V 0214 correct parameters of setClosureAndLinearSpeed caused syntax error
 
 package main;
 
@@ -83,6 +86,7 @@ sub tahoma_Initialize($)
                       "url ".
                       "placeClasses ".
                       "levelInvert ".
+                      "cryptLoginData ".
                       "userAgent ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
@@ -95,7 +99,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0213";
+  my $ModuleVersion = "0214";
   
   my $subtype;
   my $name = $a[0];
@@ -150,12 +154,10 @@ sub tahoma_Define($$)
   } elsif( $a[2] eq "ACCOUNT" && @a == 5 ) {
     $subtype = "ACCOUNT";
 
-    my $username = tahoma_encrypt($a[@a-2]);
-    my $password = tahoma_encrypt($a[@a-1]);
-
+    my $username = $a[@a-2];
+    my $password = $a[@a-1];
+    
     $hash->{Clients} = ":tahoma:";
-
-    $hash->{DEF} = "$subtype $username $password";
 
     $hash->{helper}{username} = $username;
     $hash->{helper}{password} = $password;
@@ -193,6 +195,24 @@ sub tahoma_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
+  if( $hash->{SUBTYPE} eq "ACCOUNT" )
+  {
+    my $name = $hash->{NAME};
+    my $username = $hash->{helper}{username};
+    my $password = $hash->{helper}{password};
+    if ((defined $attr{$name}{cryptLoginData}) && (not $attr{$name}{cryptLoginData}))
+    {
+      $username = tahoma_decrypt($username);
+      $password = tahoma_decrypt($password);
+    }
+    else
+    {
+      $username = tahoma_encrypt($username);
+      $password = tahoma_encrypt($password);
+    }
+    $hash->{DEF} = "$hash->{SUBTYPE} $username $password";
+  }
+  
   tahoma_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
   tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
   tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "PLACE" );
@@ -683,6 +703,8 @@ sub tahoma_applyRequest($$$)
     $dataHead .= ' - Schliessen - iPhone","actions":[';
   } elsif ($commandChecked eq 'open') {
     $dataHead .= ' - Oeffnen - iPhone","actions":[';
+  } elsif ($commandChecked eq 'setClosureAndLinearSpeed') {                                         #neu fuer setClosureAndLinearSpeed
+    $dataHead .= ' - Positionieren auf '.(split(',',$valueChecked))[0].' % - iPhone","actions":[';  #neu fuer setClosureAndLinearSpeed
   } else {
     $dataHead .= " - $commandChecked $valueChecked".' - iPhone","actions":[';
   }
@@ -1454,6 +1476,8 @@ sub tahoma_decrypt($)
   my $key = getUniqueId();
   my $decoded;
 
+  return $encoded if not ( $encoded =~ /^crypt:(.*)/ );
+  
   $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
 
   for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
@@ -1513,6 +1537,10 @@ sub tahoma_decrypt($)
     <ul>
       Normally, the web commands will be send asynchron, and this can be forced to wait of the result by blocking=1<br>
       <code>attr tahoma1 blocking 1</code><br>
+    </ul>
+    <ul>
+      Normally, the login data is stored encrypted after the first start, but this functionality can be disabled by cryptLoginData=0<br>
+      <code>attr tahoma1 cryptLoginData 0</code><br>
     </ul>
     <br>
     <b>local Attributes for DEVICE:</b>
