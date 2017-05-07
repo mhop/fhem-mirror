@@ -23,6 +23,16 @@
 # ABU 20170406 fixed hybernate-check in timer
 # ABU 20170422 fixed doku
 # ABU 20170427 fixed numerich undefs
+# ABU 20170428 do not delete private hash data in undef
+# ABU 20170428 do not define defptr in define
+# ABU 20170428 fixed in define section: removed me and my secret, removed IP-check for DNS-Support
+# ABU 20170428 removed setting attributes in define (eventonchange and pollInterval)
+# ABU 20170428 masked decode_json in eval and added error-path
+# ABU 20170501 added setkey/getkey for username and password
+# ABU 20170501 added eval-error-logging
+# ABU 20170501 changed verbose 3 to verbose 4
+# ABU 20170501 tuned documentation
+
 
 package main;
 
@@ -40,6 +50,8 @@ my $START = "start";
 my $STOP = "stop";
 my $OFFLINE = "offline";
 my $HYBERNATE = "winterschlaf";
+my $USER = "benutzername";
+my $PW = "passwort";
 
 #available get cmds
 my %gets = (
@@ -48,13 +60,15 @@ my %gets = (
 
 #available set cmds
 my %sets = (
-	"feierabend" => "noArg",
+	$EOD => "noArg",
 	$HOME => "noArg",
 	$AUTO => "noArg",
 	$MANUAL => "noArg",
 	$START => "noArg",
 	$STOP => "noArg",
-	$HYBERNATE => "on,off"
+	$HYBERNATE => "on,off",
+	$USER => "",
+	$PW => ""
 );
 
 my %commands = (
@@ -151,29 +165,31 @@ sub Robonect_Define($$)
 	Log3 ($name, 5, "define $name: enter $hash, attributes: $tempStr");
 	
 	#too less arguments
-	return "wrong syntax - define <name> Robonect <ip-adress> [<user> <password>]" if (int(@a) < 3);
+	#return "wrong syntax - define <name> Robonect <ip-adress> [<user> <password>]" if (int(@a) < 3);
+	return "wrong syntax - define <name> Robonect <ip-adress>" if (int(@a) < 3);
 
 	#check IP
 	my $ip = $a[2];
 	#remove whitespaces
 	$ip =~ s/^\s+|\s+$//g;
+	#removed IP-check - can also be a name
 	#Syntax ok
-	if ($ip =~ m/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)
-	{
-		my @octs = split (".", $ip);
-		
-		foreach my $octet (@octs)
-		{
-			return "wrong syntax - $octet has an invalid range. Allowed is 0..255" if (($octet >= 256) or ($octet <= -1));
-		}
-	}
-	else
-	{
-		return "wrong syntax - IP must be supplied correctly <0..254>.<0..254>.<0..254>.<0..254>";
-	}
+	#if ($ip =~ m/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)
+	#{
+	#	my @octs = split (".", $ip);
+	#	
+	#	foreach my $octet (@octs)
+	#	{
+	#		return "wrong syntax - $octet has an invalid range. Allowed is 0..255" if (($octet >= 256) or ($octet <= -1));
+	#	}
+	#}
+	#else
+	#{
+	#	return "wrong syntax - IP must be supplied correctly <0..254>.<0..254>.<0..254>.<0..254>";
+	#}
 	
 	#wrong syntax for IP
-	return "wrong syntax - IP must be supplied correctly <0..254>.<0..254>.<0..254>.<000..254>" if (int(@a) < 3);
+	#return "wrong syntax - IP must be supplied correctly <0..254>.<0..254>.<0..254>.<000..254>" if (int(@a) < 3);
 		    
 	#assign name and port
     $hash->{NAME} = $name;
@@ -186,12 +202,15 @@ sub Robonect_Define($$)
 
 	#finally create decice
 	#defptr is needed to supress FHEM input
-	$modules{Robonect}{defptr}{$name} = $hash;
+	#removed according Rudis recommendation
+	#$modules{Robonect}{defptr}{$name} = $hash;
 
 	#default event-on-changed-reading for all readings
-	$attr{$name}{"event-on-change-reading"} = ".*";
-	#defaul poll-interval
-	$attr{$name}{"pollInterval"} = 90;
+	#removed according Rudis recommendation
+	#$attr{$name}{"event-on-change-reading"} = ".*";
+	#default poll-interval
+	#removed according Rudis recommendation
+	#$attr{$name}{"pollInterval"} = 90;
 	
 	Log3 ($name, 5, "exit define");
 	return undef;	
@@ -215,10 +234,11 @@ sub Robonect_Undef($$)
 	#remove module. Refer to DevName, because module may be renamed
 	delete $modules{KNX}{defptr}{$hash->{DEVNAME}};
 
+	#removed according to Rudis recommendation
 	#remove name
-	delete $hash->{NAME};
+	#delete $hash->{NAME};
 	#remove backuped name
-	delete $hash->{DEVNAME};
+	#delete $hash->{DEVNAME};
 		
 	Log3 ($name, 5, "exit undef");
 	return undef;
@@ -331,7 +351,7 @@ sub Robonect_Set($@)
 	#if command is hybernate, do this
 	if ($cmd eq lc($HYBERNATE))
 	{
-		Log3 ($name, 5, "got hybernate for set-command");
+		Log3 ($name, 5, "set - got hybernate for set-command");
 			
 		my $val = lc($a[2]);
 		$val = "off" if (!defined ($val));
@@ -339,18 +359,30 @@ sub Robonect_Set($@)
 		if ($val =~ m/on/)
 		{
 			readingsSingleUpdate($hash, $HYBERNATE, "on", 1);
-			Log3 ($name, 5, "activated hybernate");
+			Log3 ($name, 5, "set - activated hybernate");
 		}
 		elsif ($val =~ m/off/)
 		{
 			readingsSingleUpdate($hash, $HYBERNATE, "off", 1);
-			Log3 ($name, 5, "deactivated hybernate");
+			Log3 ($name, 5, "set - deactivated hybernate");
 		}
 		else
 		{
 			return "only on or off are supported for $HYBERNATE";
 		}	
 	}
+	#if command is user
+	if ($cmd eq lc($USER))
+	{
+		setKeyValue("ROBONECT_USER_$name", $a[2]);
+		Log3 ($name, 5, "set - wrote username");
+	}
+	#if command is password
+	if ($cmd eq lc($PW))
+	{
+		setKeyValue("ROBONECT_PW_$name", $a[2]);
+		Log3 ($name, 5, "set - wrote password");
+	}	
 	#else proceed with communication to mower
 	#execute it
 	elsif (defined ($decodedCmd))
@@ -516,7 +548,7 @@ sub Robonect_callback ($)
 	#wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
     if($err ne "")
     {
-        Log3 ($name, 3, "callback - error while requesting ".$param->{url}." - $err");
+        Log3 ($name, 4, "callback - error while requesting ".$param->{url}." - $err");
 		$hash->{LAST_COMM_STATUS} = $err;
 		#set reading with failure - notify only, when state has not changed
         readingsSingleUpdate($hash, "state", $OFFLINE, 1);
@@ -524,15 +556,29 @@ sub Robonect_callback ($)
 	#wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
     elsif($data ne "")
     {
-        Log3 ($name, 3, "callback - url ".$param->{url}." returned: $data");
+        Log3 ($name, 4, "callback - url ".$param->{url}." returned: $data");
 		
 		#repair V5.0b
 		$data =~ s/:"/,"/g;
 		$data = "" if (!defined($data));
 		
-		my $answer = decode_json (encode_utf8($data));
+		#execute in eval to be safe - therefore $answer may be undef
+		my $answer = undef;
+		eval '$answer = decode_json (encode_utf8($data))';
 		
-		Log3 ($name, 3, "callback - url ".$param->{url}." repaired: $data");
+		#backup error from eval
+		my $evalErr = $@;
+		
+		if (not defined($answer))
+		{
+			my $err = "callback - error while decoding content";
+			$err = $err . ": " . $evalErr if (defined ($evalErr));
+			Log3 ($name, 2, $err);
+			readingsSingleUpdate($hash, "fehler_aktuell", "cannot decode content", 1);
+			return undef;
+		}
+		
+		Log3 ($name, 4, "callback - url ".$param->{url}." repaired: $data");
 		
 		my ($key, $value) = Robonect_decodeContent ($hash, $answer, "successful", undef, undef);
 		
@@ -543,8 +589,9 @@ sub Robonect_callback ($)
 		
 		#my %tmp = %$answer;
 		#print "answer: ", %tmp, "\n";
-		
+				
 		#status-readings
+		#answer may be undefined due to eval
 		if ($answer->{successful} =~ m/(true)|(1)/)
 		{
 			Log3 ($name, 5, "callback - update readings");
@@ -589,6 +636,7 @@ sub Robonect_callback ($)
 		}
 		
 		#error?
+		#answer may be undefined due to eval
 		my $errorOccured = $answer->{status}->{status};
 		if (defined ($errorOccured) and ($errorOccured  =~ m/7/))
 		{
@@ -707,8 +755,20 @@ sub Robonect_getCredentials ($)
 	my $name = $hash->{NAME};
 	my $userName = undef;
 	my $passWord = undef;
+
+	#use username and password previously defined with set and stored in "registry"
+	my ($errUsr, $user) = getKeyValue("ROBONECT_USER_$name");
+	Log3 ($name, 4, "credentials - Error while getting value USER: " . $errUsr) if (defined ($errUsr));
+	my ($errPw, $password) = getKeyValue("ROBONECT_PW_$name");
+	Log3 ($name, 4, "credentials - Error while getting value PASSWORD: " . $errPw) if (defined ($errPw));
+
+	if (defined ($user) and defined ($password))
+	{
+		Log3 ($name, 5, "credentials - found with key-value");
+		return $userName, $passWord;
+	}
 	
-	#parse basicAuth
+	#parse basicAuth - overrules getKeyValue
 	my $basicAuth = AttrVal ($name, "basicAuth", undef);
 	if (defined ($basicAuth))
 	{
@@ -728,7 +788,7 @@ sub Robonect_getCredentials ($)
 			$userName = $plainAuth[0];
 			$passWord = $plainAuth[1];
 			
-			Log3 ($name, 5, "credentials - found plain data");
+			Log3 ($name, 5, "credentials - found plain or decrypted data");
 		}
 		else
 		{
@@ -736,7 +796,7 @@ sub Robonect_getCredentials ($)
 		}
 	}
 	
-	#parse credential-File - overrules basicAuth
+	#parse credential-File - overrules basicAuth ang getKeyValue
 	my $credentials = AttrVal ($name, "credentials", undef);
 	if(defined($credentials)) 
 	{
@@ -814,7 +874,7 @@ sub Robonect_getCmdList ($$$)
 
   <p><a name="RobonectDefine"></a> <b>Define</b></p>
   <ul>
-    <code>define &lt;name&gt; Robonect &lt;ip-adress&gt [&lt;user&gt; &lt;password&gt;]</code>
+    <code>define &lt;name&gt; Robonect &lt;ip-adress or name&gt;</code>
     
 	<p>Setting Winterschlaf prevents communicating with the mower.</p>
 	
@@ -822,23 +882,49 @@ sub Robonect_getCmdList ($$$)
 
     <p>Example:</p>
       <pre>
-      define myMower Robonect 192.168.13.5 test tmySecret
+      define myMower Robonect 192.168.13.5
+	  define myMower Robonect myMowersDNSName
       </pre>
   </ul>
   
   <p><a name="RobonectSet"></a> <b>Set</b></p>
   <ul>
-	Switch the mower to automatic-timer:
-    <code>set &lt;name&gt; auto</code>
-	Send the mower home - prevents further runs triggered by timer (persistent):
-    <code>set &lt;name&gt; home</code>
-	Sends the mower home for the actual timer-slot. The next timer-slot starts the mower again:
-    <code>set &lt;name&gt; feierabend</code>
-	Start the mower (only needed after a manual stop:
-    <code>set &lt;name&gt; start</code>
-	Stop the mower immediately:
-    <code>set &lt;name&gt; stop</code>
+	<b>Set</b>
+	<ul>
+		<li>auto<br>
+			Sets the mower to automatic mode. The mower follows the internal timer, until another mode is chosen. The mower can be stopped with stop at any time. After using stop: be aware, that it continues 
+			mowing only if the timer supplies an active slot AND start is executed before.
+		</li>
+		<li>manuell<br>
+			This sets the mower to manual mode. The internal timer is ignored. Mowing starts with start and ends with stop.
+		</li>
+		<li>home<br>
+			This sends the mower directly home. Until you switch to auto or manuell, no further mowing work is done.
+		</li>	
+		<li>feierabend<br>
+			This sends the mower home for the rest of the actual timeslot. At the next active timeslot mowing is continued automatically.
+		</li>	
+		<li>start<br>
+			Start mowing in manual mode or in automatic mode at active timer-slot.
+		</li>	
+		<li>stop<br>
+			Stops mowing immediately. The mower does not drive home. It stands there, until battery is empty. Use with care!
+		</li>	
+		<li>winterschlaf &lt;on, off&gt;<br>
+			If set to on, no polling is executet. Please use this during winter.
+		</li>	
+		<li>user &ltuser&gt;<br>
+			One alternative to store authentication: username for robonect-logon is stored in FhemUtils or database (not encrypted).<br
+			If set, the attributes regarding authentication are ignored.
+		</li>		
+		<li>password &lt;password&gt;<br>
+			One alternative to store authentication: password for robonect-logon is stored in FhemUtils or database (not encrypted).<br
+			If set, the attributes regarding authentication are ignored.
+		</li>
+	</ul>
   </ul>
+
+
   <p><a name="RobonectGet"></a> <b>Get</b></p>
   <ul>  
   <p>Gets the actual state of the mower - normally not needed, because the status is polled cyclic.</p>
@@ -913,39 +999,64 @@ sub Robonect_getCmdList ($$$)
 <a name="Robonect"></a> 
 <h3>Robonect</h3>
 <ul>
-<p>Robonect ist ein Nachrüstmodul für automower, die auf der Husky-G3-Steuerung basieren. Es wurde von Fabian H. entwickelt und kann unter www.robonect.de bezogen werden. Dieses Modul gibt Euch Zugriff auf die nötigsten Kommandos. Dieses Modul benötigt libjson-perl. Bitte NICHT VERGESSEN zu installieren!</p>
+<p>Robonect ist ein Nachr&uml;stmodul für automower, die auf der Husky-G3-Steuerung basieren. Es wurde von Fabian H. entwickelt und kann unter www.robonect.de bezogen werden. Dieses Modul gibt Euch Zugriff auf die n&ouml;tigsten Kommandos. Dieses Modul ben&ouml;tigt libjson-perl. Bitte NICHT VERGESSEN zu installieren!</p>
 
 
   <p><a name="RobonectDefine"></a> <b>Define</b></p>
   <ul>
-    <code>define &lt;name&gt; Robonect &lt;ip-adress&gt [&lt;user&gt; &lt;password&gt;]</code>
+    <code>define &lt;name&gt; Robonect &lt;IP-Adresse oder Name&gt;</code>
     
-	<p>Mit gesetztem Winterschlaf wird die Kommunikation zum Mäher unterbunden.</p>
+	<p>Mit gesetztem Winterschlaf wird die Kommunikation zum M&auml;her unterbunden.</p>
 	
-	<p>Die Zugangsinformationen können im Klartext bei der Definition angegeben werden. Wahlweise auch per Attribut. Standardmäßig wird der Status vom RObonect alle 90s aktualisiert.</p>
+	<p>Die Zugangsinformationen können im Klartext bei der Definition angegeben werden. Wahlweise auch per Attribut. Standardm&auml;ßig wird der Status vom RObonect alle 90s aktualisiert.</p>
 
     <p>Beispiel:</p>
       <pre>
-      define myMower Robonect 192.168.13.5 test tmySecret
+      define myMower Robonect 192.168.13.5
+	  define myMower Robonect myMowersDNSName
       </pre>
   </ul>
   
   <p><a name="RobonectSet"></a> <b>Set</b></p>
   <ul>
-	Versetzt den Mäher in den timerbasierten Automatikmodus:
-    <code>set &lt;name&gt; auto</code>
-	Schickt den Mäher nach hause. Ein erneutes Starten per Timer wird verhindert (persistent):
-    <code>set &lt;name&gt; home</code>
-	Schickt den Mäher nach Hause. Beim nächsten Timerstart fährt der Mäher wieder regulär:
-    <code>set &lt;name&gt; feierabend</code>
-	Startet den Mäher (wird nur nach einem manuellen Stop benötigt):
-    <code>set &lt;name&gt; start</code>
-	Stoppt den Mäher:
-    <code>set &lt;name&gt; stop</code>
+	<b>Set</b>
+	<ul>
+		<li>auto<br>
+			Dies versetzt den M&auml;her in den Automatikmodus. Der M&auml;her reagiert nur auf den internen Timer, bis eine andere Betriebsart gew&auml;hlt wird. Der M&auml;her kann mit Stop jederzeit
+			angehalten werden. Es wird erst wieder begonnen zu m&auml;hen, wenn der Timer (wieder) ein aktives Fenster hat UND Start gesendet wurde.
+		</li>
+		<li>manuell<br>
+			Dies versetzt den M&auml;her in den manuellen modus. Der interne Timer wird nicht beachtet. Der M&auml;her reagiert nur auf Start oder Stopp Befehle von FHEM. 
+		</li>
+		<li>home<br>
+			Dies schickt den M&auml;her direkt nach hause. Weiteres m&auml;hen wird verhindert, bis auf manuell oder auto umgeschalten wird.
+		</li>	
+		<li>feierabend<br>
+			Dies schickt den M&auml;her für den aktuellen Timerslot direkt nach hause. Beim n&auml;chsten aktiven Timerslot wird weitergemäht.
+		</li>	
+		<li>start<br>
+			Startet den M&auml;hvorgang im manuellen Modus oder im Automatikmodus bei aktivem Zeitslot.
+		</li>	
+		<li>stop<br>
+			Beendet den M&auml;hvorgang. Der M&auml;her f&auml;hrt nicht nach Hause und beginnt nicht wieder zu m&auml;hen. Er bleibt stehen, bis die Batterie leer ist. Nur mit Bedacht benutzen!
+		</li>	
+		<li>winterschlaf &lt;on, off&gt;<br>
+			Wenn aktiviert, wird das Pollen unterbunden. Empfiehlt sich für die Winterpause.
+		</li>	
+		<li>user &ltuser&gt;<br>
+			Alternativ zur Angabe per Argument kann per Set-Befehl der Benutzername zur Anmeldung am Robonect hier einmalig eingegeben werden. Er wird im Klartext in FhemUtils oder der DB gespeichert.<br>
+			Wenn angegeben, werden die Attribute zur Authentisierung ignoriert.
+		</li>		
+		<li>password &lt;password&gt;<br>
+			Alternativ zur Angabe per Argument kann per Set-Befehl das Passwort zur Anmeldung am Robonect hier einmalig eingegeben werden. Er wird im Klartext in FhemUtils oder der DB gespeichert.<br>
+			Wenn angegeben, werden die Attribute zur Authentisierung ignoriert.
+		</li>
+	</ul>
   </ul>
+
   <p><a name="RobonectGet"></a> <b>Get</b></p>
   <ul>  
-  <p>Holt den aktuellen Status des Mähers. Wird normalerweise nicht benötigt, da automatisch gepolled wird.</p>
+  <p>Holt den aktuellen Status des M&auml;hers. Wird normalerweise nicht benötigt, da automatisch gepolled wird.</p>
   </ul>
   
   <p><a name="RobonectAttr"></a> <b>Attributes</b></p>
