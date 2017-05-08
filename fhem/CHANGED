@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_ElectricityCalculator: SiPrefix multiplier instead divider
+  - bugfix:  73_GasCalculator: SiPrefix multiplier instead divider
+  - bugfix   73_km200: Errorlist unsorted timestamp part 4
   - change:  36_Vallox: Changed way readings are updated.
                 Added efficiency calculation and readings for HRC.
   - change:  71_YAMAHA_AVR: changing values of reading values conform
