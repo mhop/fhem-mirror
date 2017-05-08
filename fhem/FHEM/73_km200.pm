@@ -1785,7 +1785,7 @@ sub km200_GetSingleService($)
 				{					
 					### Create message string with fixed blocksize
 					my $TempTime      = $item->{t};
-					   $TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;
+					if ($TempTime) {$TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;}
 					my $TempErrorCode = $item->{dcd};
 					   $TempErrorCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(3 -length($1)))/e;
 					my $TempAddCode   = $item->{ccd};    
@@ -2840,7 +2840,7 @@ sub km200_ParseHttpResponseDyn($)
 				
 				### Create message string with fixed blocksize
 				my $TempTime      = $item->{t};
-				   $TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;
+				if ($TempTime) {$TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;}
 				my $TempErrorCode = $item->{dcd};
 				   $TempErrorCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(3 -length($1)))/e;
 				my $TempAddCode   = $item->{ccd};    
