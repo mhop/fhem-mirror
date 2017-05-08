@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: new version 2.1.3, change of internal processes, new 
+             get scanVirgin command
   - bugfix:  73_ElectricityCalculator: SiPrefix multiplier instead divider
   - bugfix:  73_GasCalculator: SiPrefix multiplier instead divider
   - bugfix   73_km200: Errorlist unsorted timestamp part 4
