@@ -15,7 +15,7 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 
-my $HOMEMODE_version = "1.0.3";
+my $HOMEMODE_version = "1.0.4";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -2514,18 +2514,19 @@ sub HOMEMODE_UWZCommands($$)
 {
   my ($hash,$events) = @_;
   my $name = $hash->{NAME};
-  my $prev = ReadingsVal($name,"uwz_warnCount","");
+  my $prev = ReadingsNum($name,"uwz_warnCount",-1);
   my $uwz = $attr{$name}{HomeUWZ};
   my $count;
   my $warning;
   foreach my $evt (@{$events})
   {
-    $count = $evt if (grep /^WarnCount$/,$evt)
+    next unless (grep /^WarnCount:\s[0-9]$/,$evt);
+    $count = $evt;
+    $count =~ s/^WarnCount:\s//;
   }
   if (defined $count)
   {
-    $count =~ s/^WarnCount:\s//;
-    if ($count ne $prev)
+    if ($count != $prev)
     {
       my $se = $count > 0 ? "begin" : "end";
       my @cmds;
@@ -2534,7 +2535,7 @@ sub HOMEMODE_UWZCommands($$)
       {
         my $textShort;
         my $textLong;
-        for (my $i = 0; $i <= $count; $i++)
+        for (my $i = 0; $i < $count; $i++)
         {
           my $read = "Warn_$i";
           $textShort .= " " if ($i > 0);
