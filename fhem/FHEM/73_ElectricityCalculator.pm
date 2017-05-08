@@ -689,15 +689,15 @@ sub ElectricityCalculator_Notify($$)
 		my $ElectricityCountReadingTimestampDelta = $ElectricityCountReadingTimestampCurrentRelative - $ElectricityCountReadingTimestampPreviousRelative;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingTimestampDelta            : " . $ElectricityCountReadingTimestampDelta . " s";
 
-		### Continue with calculations only if time difference is larger than 10 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
-		if ($ElectricityCountReadingTimestampDelta > 10)
+		### Continue with calculations only if time difference is larger than 30 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
+		if ($ElectricityCountReadingTimestampDelta > 30)
 		{
 			### Calculate DW (electric Energy difference) of previous and current value / [kWh]
 			my $ElectricityCountReadingValueDelta = sprintf('%.3f', ($ElectricityCountReadingValueCurrent - $ElectricityCountReadingValuePrevious));
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValueDelta                : " . $ElectricityCountReadingValueDelta;
 
-			### Calculate Current Power P = DW/Dt[kWh/s] * 3600[s/h] * 1000 [1/k] * SiPrefixPowerFactor
-			my $ElectricityCalcPowerCurrent    = ($ElectricityCountReadingValueDelta / $ElectricityCountReadingTimestampDelta) * 3600 * 1000 * $ElectricityCalcDev->{system}{SiPrefixPowerFactor};
+			### Calculate Current Power P = DW/Dt[kWh/s] * 3600[s/h] * 1000 [1/k] / SiPrefixPowerFactor
+			my $ElectricityCalcPowerCurrent    = ($ElectricityCountReadingValueDelta / $ElectricityCountReadingTimestampDelta) * 3600 * 1000 / $ElectricityCalcDev->{system}{SiPrefixPowerFactor};
 			
 			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
 			my $ElectricityCalcPowerDaySum     = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",   "0") + $ElectricityCalcPowerCurrent;
