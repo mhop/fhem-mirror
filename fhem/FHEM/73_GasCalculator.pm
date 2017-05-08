@@ -658,8 +658,8 @@ sub GasCalculator_Notify($$)
 			my $GasCountReadingValueDelta = sprintf('%.3f', ($GasCountReadingValueCurrent - $GasCountReadingValuePrevious));
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValueDelta                : " . $GasCountReadingValueDelta . " " . $attr{$GasCalcName}{Volume};
 
-			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h] * SiPrefixPowerFactor
-			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600 * $GasCalcDev->{system}{SiPrefixPowerFactor};
+			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h] / SiPrefixPowerFactor
+			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600 / $GasCalcDev->{system}{SiPrefixPowerFactor};
 			
 			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
 			my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
