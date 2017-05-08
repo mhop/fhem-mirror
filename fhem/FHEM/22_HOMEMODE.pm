@@ -242,7 +242,7 @@ sub HOMEMODE_Notify($$)
   {
     HOMEMODE_UWZCommands($hash,$events);
   }
-  if ($devtype =~ /^($prestype)$/ && grep /^presence:\s(absent|present|appeared|disappeared)$/,@{$events} && AttrVal($name,"HomeAutoPresence",0) == 1)
+  if ($devtype =~ /^($prestype)$/ && grep(/^presence:\s(absent|present|appeared|disappeared)$/,@{$events}) && AttrVal($name,"HomeAutoPresence",0))
   {
     my $resident;
     my $residentregex;
