@@ -218,7 +218,7 @@ sequence_Undef($$)
     Ein sequence kann verwendet werden, um ein neues Event zu generieren, wenn
     eine bestimmte Folge von anderen Events in einem festgelegten Zeitraum
     eingetroffen ist. Z.Bsp. um eine Lampe dann einzuschalten, falls Btn1:on,
-    dann Btn2:off und zum Schluss Btn3:on innerhalb einer Sekunde gedr&uuml;ckt
+    dann Btn2:off und zum Schluss Btn1:on innerhalb einer Sekunde gedr&uuml;ckt
     wurde, definiert man folgendes:<br>
     <ul>
       <code>
