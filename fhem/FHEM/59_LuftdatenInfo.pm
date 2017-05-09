@@ -244,7 +244,10 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
     readingsSingleUpdate($hash, "state", "error", 1);
   }
-  elsif($data !~ /^\[.*\]$/s){
+  elsif(
+    $connection eq "remote" && $data !~ /^\[.*\]$/s
+    || $connection eq "local" && $data !~ /^\{.*\}$/s
+  ){
     Log3(
       $SELF, 2, "$TYPE ($SELF) - error while request: malformed JSON string"
     );
