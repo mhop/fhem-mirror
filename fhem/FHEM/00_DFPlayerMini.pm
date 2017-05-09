@@ -287,6 +287,7 @@ DFPlayerMini_Define($$)
     $ret = DevIo_OpenDev($hash, 0, "DFPlayerMini_DoInit", 'DFPlayerMini_Connect');
     
   } else {
+    DFPlayerMini_DoInit($hash);
     $hash->{DevState} = 'initialized';
     readingsSingleUpdate($hash, "state", "opened", 1);
   }
@@ -361,7 +362,7 @@ DFPlayerMini_createCmd($$;$$)
   $par2 = 0 if !defined $par2; 
   
   my $requestAck = AttrVal($hash->{NAME}, "requestAck", 0) || $cmd == DFP_C_Acknowledge;
-
+  
   my $checksum = -(DFP_Version_Byte+DFP_Command_Length+$cmd+$requestAck+$par1+$par2);
   return pack('CCCCCCCnC', DFP_Start_Byte,DFP_Version_Byte, DFP_Command_Length, $cmd, $requestAck, $par1, $par2, $checksum, DFP_End_Byte);
   
@@ -1046,6 +1047,7 @@ DFPlayerMini_DoInit($)
 
   @{$hash->{PLAYQUEUE}} = ();
   @{$hash->{TTSQUEUE}} = ();
+  $hash->{waitForAck} = 0;
 
   return;
   #return undef;
@@ -1138,7 +1140,7 @@ sub DFPlayerMini_AddSendQueue($$)
   
   #Log3 $hash, 3,"$name: AddSendQueue: " . $hash->{NAME} . ": $msg";
   
-  if (gettimeofday() - $hash->{LAST_SEND_TS}  > DFP_MIN_WAITTIME) {
+  if (!$hash->{waitForAck} && gettimeofday() - $hash->{LAST_SEND_TS}  > DFP_MIN_WAITTIME) {
     # minimal wait time before next command exceeded, can write immediately
     DFPlayerMini_SimpleWrite($hash, $msg);
   } else {
@@ -1146,31 +1148,15 @@ sub DFPlayerMini_AddSendQueue($$)
     push(@{$hash->{QUEUE}}, $msg);
   
     #Log3 $hash , 5, Dumper($hash->{QUEUE});
-  
-    InternalTimer(gettimeofday() + DFP_MIN_WAITTIME, "DFPlayerMini_HandleWriteQueue", "HandleWriteQueue:$name", 1);
+    if ($hash->{waitForAck} == 0) {
+      # if we don't have to wait for an acknowledge from dfp we have at least to wait 20ms
+      InternalTimer(gettimeofday() + DFP_MIN_WAITTIME, "DFPlayerMini_HandleWriteQueue", "HandleWriteQueue:$name", 1);
+    } else {
+      Log3 $hash, 5, "delayed send, waiting for ack";
+    }
   }
 }
 
-
-sub
-DFPlayerMini_SendFromQueue($$)
-{
-  my ($hash, $msg) = @_;
-  my $name = $hash->{NAME};
-  
-  if($msg ne "") {
-    #DevIo_SimpleWrite($hash, $msg,2);
-    
-    DFPlayerMini_SimpleWrite($hash,$msg);
-    
-  }
-
-  ##############
-  if (AttrVal($name, "requestAck", 0) == 0) {
-    # Write the next buffer not earlier than 20ms, which is the fastest time the DFP can process commands
-    InternalTimer(gettimeofday() + DFP_MIN_WAITTIME, "DFPlayerMini_HandleWriteQueue", "HandleWriteQueue:$name", 1);
-  }
-}
 
 ####################################
 sub
@@ -1183,12 +1169,13 @@ DFPlayerMini_HandleWriteQueue($)
   #my @arr = @{$hash->{QUEUE}};
   
   if(@{$hash->{QUEUE}}) {
-    my $msg= shift(@{$hash->{QUEUE}});
+    my $msg = shift(@{$hash->{QUEUE}});
 
     if($msg eq "") {
       DFPlayerMini_HandleWriteQueue("x:$name");
     } else {
-      DFPlayerMini_SendFromQueue($hash, $msg);
+
+      DFPlayerMini_SimpleWrite($hash,$msg);
     }
   } else {
      Log3 $name, 4, "$name/HandleWriteQueue: nothing to send, stopping timer";
@@ -1213,11 +1200,11 @@ DFPlayerMini_Read($)
 
   #Log3 $name, 5, "$name: DFPlayerMini_Read ($name) - received data: " . $hash->{PARTIAL};    
 
-  # Daten an den Puffer anh&auml;ngen
+  # Daten an den Puffer anhängen
   $hash->{helper}{BUFFER} .= $buf;
   #Log3 $name, 5, "$name: DFPlayerMini_Read ($name) - current buffer content: " . unpack('H*', $hash->{helper}{BUFFER});
 
-  # pr&uuml;fen, ob im Buffer ein vollst&auml;ndiger Frame mit 10 Bytes zur Verarbeitung vorhanden ist.
+  # prufen, ob im Buffer ein vollstä;ndiger Frame mit 10 Bytes zur Verarbeitung vorhanden ist.
   while (length($hash->{helper}{BUFFER}) >= DFP_FrameLength) 
   {
     if (unpack("C",substr($hash->{helper}{BUFFER},0,1)) == DFP_Start_Byte && unpack("C", substr($hash->{helper}{BUFFER},9,1)) == DFP_End_Byte) {
@@ -1305,10 +1292,9 @@ DFPlayerMini_Parse($$)
       # ToDo: Special case: DFP_C_GetNoTracksFolder will return DFP_E_TrackNotFound if the folder is empty
       readingsSingleUpdate($hash, "state", $error, 1);
   } elsif ($cmd == DFP_C_Acknowledge) {
-    if (AttrVal($name, "requestAck", 0)) {
-      # send next command
-      DFPlayerMini_HandleWriteQueue("x:$name");
-    }
+    # send next command if one is in the queue
+    $hash->{waitForAck} = 0;
+    DFPlayerMini_HandleWriteQueue("x:$name");
   } elsif ($cmd == DFP_C_GetStorage) {
     if ($par2 & 0x01) {
       push @storage, "USB";
@@ -1410,6 +1396,7 @@ DFPlayerMini_SimpleWrite(@)
   my $hexMsg = unpack ('H*', $msg);
   Log3 $name, 5, "$name SW: $hexMsg";
   
+
   my $sendCmd = AttrVal($name, "sendCmd", undef);
   if (defined $sendCmd) {
     $sendCmd =~ s/\$msg/${hexMsg}/;
@@ -1428,7 +1415,13 @@ DFPlayerMini_SimpleWrite(@)
 
   # remember time the command was sent
   $hash->{LAST_SEND_TS} = gettimeofday();
-
+  # evaluate requestAck byte in command 
+  # if it is set an acknowledge must be received before 
+  # sending the next command from the queue
+  $hash->{waitForAck} = unpack('C', substr($msg,4,1));
+  Log3 $name, 5, "current cmd waitForAck " . $hash->{waitForAck};
+  
+  
 }
 
 sub
@@ -1597,7 +1590,8 @@ sub DFPlayerMini_Notify($$)
   </li>
   <li>requestAck<br>
     The DFPlayer can send a response to any command sent to it to acknowledge that is has received the command. As this increases the communication
-    overhead it can be switched off if the communication integrity is ensured by other means.
+    overhead it can be switched off if the communication integrity is ensured by other means. If set the next command is only sent if the last one was
+    acknowledged by the DFPlayer. This ensures that no command is lost if the the DFPlayer is busy/sleeping.
   </li>
   <li>sendCmd<br>
     A fhem command that is used to send the command data generated by this module to the DFPlayer hardware. If this is set, no other way of communication with the DFP is used. 
@@ -1821,7 +1815,8 @@ sub DFPlayerMini_Notify($$)
   </li>
   <li>requestAck<br>
     Der DFPlayer kann f&uuml; jedes Kommando eine Best&auml;tigung senden. Da das zu erh&ouml;hter Kommunikation f&uuml;hrt kann es &uuml;ber dieses
-    Attribut abgeschaltet werden.
+    Attribut abgeschaltet werden. Wenn es eingeschaltet ist wird das n&auml;chste Kommando erst dann zum DFPlayer wenn das vorherige best&auml;tigt wurde.
+    Das stellt sicher, dass kein Kommando verloren geht selbst wenn der DFPlayer ausgelastet oder im Schlafzustand ist. 
   </li>
   <li>sendCmd<br>
     Ein fhem Kommando das verwendet wird um ein durch diese Modul erzeugtes DFPlayer Kommando an die DFPlayer Hardware zu senden.
