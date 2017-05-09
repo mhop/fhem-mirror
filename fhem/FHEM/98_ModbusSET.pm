@@ -47,6 +47,7 @@
 #
 #   2015-02-26  defaultpoll und defaultpolldelay umbenannt
 #               attribute für timing umbenannt
+#   2017-05-09  added documentation summary
 #
 
 package main;
@@ -168,6 +169,9 @@ ModbusSET_Initialize($)
 1;
 
 =pod
+=item device
+=item summary Module for heat pumps from SET or others using iChill IC121
+=item summary_DE Modul für SET Wärmepumpen und andere mit iChill IC121
 =begin html
 
 <a name="ModbusSET"></a>
