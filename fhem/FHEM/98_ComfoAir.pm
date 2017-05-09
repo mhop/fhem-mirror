@@ -39,6 +39,7 @@
 #   2016-04-06  Testmode Protokollbefehle hinzugefügt
 #   2016-11-13  korrektur bei set / get / readanswer. Set liefert bei Erfolg undef statt Text
 #   2017-02-12  Doku ergänzt
+#   2017-05-09  Text-Kodierung für summary korrigiert
 #
 #
 # Todo / Ideas:
@@ -66,7 +67,7 @@ sub ComfoAir_HandleSendQueue($);
 sub ComfoAir_SendAck($);
 sub ComfoAir_TimeoutSend($);
 
-my $ComfoAir_Version = '1.5 - 18.2.2017';
+my $ComfoAir_Version = '1.51 - 9.5.2017';
 
 # %parseInfo:
 # replyCode => msgHashRef
