@@ -274,12 +274,12 @@ LightScene_Notify($$)
       $reading = "state";
       $value = $s;
 
-      if( $hash->{mayBeVisible} ) {
+      if( $hash->{mayBeVisible} || $hash->{followDevices} ) {
         my $room = AttrVal($name, "room", "");
         my %extPage = ();
         (undef, undef, $value) = FW_devState($dev->{NAME}, $room, \%extPage);
 
-        DoTrigger( $name, "$dev->{NAME}.$reading: <html>$value</html>" ) if( $hash->{mayBeVisible} );
+        DoTrigger( $name, "$dev->{NAME}.$reading: <html>$value</html>" );
       }
 
       if( $hash->{followDevices} ) {
