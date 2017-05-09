@@ -244,16 +244,6 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
     readingsSingleUpdate($hash, "state", "error", 1);
   }
-  elsif(
-    $connection eq "remote" && $data !~ /^\[.*\]$/s
-    || $connection eq "local" && $data !~ /^\{.*\}$/s
-  ){
-    Log3(
-      $SELF, 2, "$TYPE ($SELF) - error while request: malformed JSON string"
-    );
-
-    readingsSingleUpdate($hash, "state", "error", 1);
-  }
   elsif($data eq "[]"){
     if(   index($param->{url}, $hash->{SENSORID2}) > -1
        && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
@@ -272,7 +262,16 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     Log3 $SELF, 4, "$TYPE ($SELF) - returned data: $data";
 
     $data = encode('UTF-8', $data);
-    $data = JSON->new->utf8->decode($data);
+
+    $data = eval{decode_json($data)};
+
+    if($@){
+      Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
+
+      readingsSingleUpdate($hash, "state", "error", 1);
+
+      return;
+    }
 
     if($param->{url} =~ m/openstreetmap/){
       my $address = $data->{address};
@@ -361,15 +360,16 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
           foreach (@{$sensor->{sensordatavalues}}){
             $_->{value} =~ m/^(\S+)(\s|$)/;
+            $_->{value} = $1;
 
             if($_->{value_type} =~ /temperature$/){
-              readingsBulkUpdate($hash, "temperature", $1);
+              readingsBulkUpdate($hash, "temperature", $_->{value});
             }
             elsif($_->{value_type} =~ /humidity$/){
-              readingsBulkUpdate($hash, "humidity", $1);
+              readingsBulkUpdate($hash, "humidity", $_->{value});
             }
             elsif($_->{value_type} =~ /pressure$/){
-              readingsBulkUpdate($hash, "pressure", $1);
+              readingsBulkUpdate($hash, "pressure", $_->{value});
             }
           }
 
