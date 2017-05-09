@@ -135,7 +135,9 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{statBoilerHeatUpStep} = 0;
   $hash->{fhem}{statBoilerCoolDownStep} = 0;
   $hash->{fhem}{defrost}{mode}="none";
-  $hash->{fhem}{hotWaterLastRun} = 0;
+  $hash->{fhem}{hotWaterLastRun} = time();
+  $hash->{fhem}{heatingPumpLastStop} = time();
+  $hash->{fhem}{heatingPumpLastRun} = time();
  
   $hash->{fhem}{modulVersion} = '$Date$';
        
@@ -999,16 +1001,19 @@ LUXTRONIK2_UpdateDone($)
          if ($opStateHeatPump3 == 16) { 
             readingsBulkUpdate( $hash, "heatSourceDefrostLastTimeout", "Amb: ".$hash->{fhem}{defrost}{amb}." hsIN: ".$hash->{fhem}{defrost}{hsIn}." hsOUT: ".$hash->{fhem}{defrost}{hsOut});
          }
-         
       }
       
-   # Determine last real heatings system return temperature
+   # Determine last real heatings system return temperature, circulation needs to run at least 3 min or has been stopped less than 2 min ago
      $hash->{fhem}{hotWaterLastRun} = time()     if $hotWaterBoilerValve;
      $hash->{fhem}{heatingPumpLastStop} = time()     if !$heatingSystemCircPump;
+     $hash->{fhem}{heatingPumpLastRun} = time()     if $heatingSystemCircPump;
      readingsBulkUpdate( $hash, "returnTemperatureHeating", $returnTemperature)
-         if $heatingSystemCircPump && !$hotWaterBoilerValve 
-            && time() - $hash->{fhem}{hotWaterLastRun} >= 180 
-            && time() - $hash->{fhem}{heatingPumpLastStop} >= 120;
+         if ( $heatingSystemCircPump && !$hotWaterBoilerValve 
+              && time() - $hash->{fhem}{hotWaterLastRun} >= 180 
+              && time() - $hash->{fhem}{heatingPumpLastStop} >= 120);
+#           || ( !$heatingSystemCircPump && !$hotWaterBoilerValve 
+#              && time() - $hash->{fhem}{hotWaterLastRun} >= 180 
+#              && time() - $hash->{fhem}{heatingPumpLastRun} < $hash->{INTERVAL}+10);
       
    # Device and reading times, delays and durations
      $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
