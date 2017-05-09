@@ -505,6 +505,8 @@ sub OBIS_Parse($$)
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 												if($1==1) {
+    								Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0)));
+
 													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
 												} elsif ($1==2) {
 													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
@@ -786,9 +788,12 @@ sub OBIS_decodeTL($){
 			$msgLength-=1;
 		}
 		$msgLength-=1;
-		my $valu=substr($msg,0,$msgLength*2);
-		$tmp.=$valu;
+		my $valu;
+		if (length($msg)>$msgLength*2) {
+			$valu=substr($msg,0,$msgLength*2);
+			$tmp.=$valu;
 		$msg=substr($msg,$msgLength*2);
+		}
 #		Log 3,"   Split Msg: $tmp $msg";
 	return $msgLength,$msgType,$valu,$msg,$tmp;
 	};
