@@ -1,6 +1,6 @@
 ############################################################################
 # $Id$
-# fhem Modul f¸r Impulsz‰hler auf Basis von Arduino mit ArduCounter Sketch
+# fhem Modul f√ºr Impulsz√§hler auf Basis von Arduino mit ArduCounter Sketch
 #   
 #     This file is part of fhem.
 # 
@@ -43,6 +43,7 @@
 #   2017-01-06  avoid reopening when disable=0 is set during startup
 #   2017-02-06  Doku korrigiert
 #   2017-02-18  fixed a bug that caused a missing open when the device is defined while fhem is already initialized
+#   2017-05-09  fixed character encoding for documentation text
 
 # ideas / todo:
 # 
@@ -65,7 +66,7 @@ my %ArduCounter_gets = (
     "info"  =>  ""
 );
 
-my $ArduCounter_Version = '4.7 - 18.2.2017';
+my $ArduCounter_Version = '4.71 - 9.5.2017';
 
 #
 # FHEM module intitialisation
@@ -353,7 +354,7 @@ sub ArduCounter_Attr(@)
                 my $vgl = $1;           # attribute name in list - probably a regex
                 my $opt = $2;           # attribute hint in list
                 if ($aName =~ $vgl) {   # yes - the name in the list now matches as regex
-                    # $aName ist eine Auspr‰gung eines wildcard attrs
+                    # $aName ist eine Auspr√§gung eines wildcard attrs
                     addToDevAttrList($name, "$aName" . $opt);    # create userattr with hint to allow changing by click in fhemweb
                     if ($opt) {
                         # remove old entries without hint
@@ -875,7 +876,7 @@ sub ArduCounter_Ready($)
 =pod
 =item device
 =item summary Module for consumption counter based on an arduino with the ArduCounter sketch
-=item summary_DE Modul f¸r Strom / Wasserz‰hler auf Arduino-Basis mit ArduCounter Sketch
+=item summary_DE Modul f√ºr Strom / Wasserz√§hler auf Arduino-Basis mit ArduCounter Sketch
 =begin html
 
 <a name="ArduCounter"></a>
