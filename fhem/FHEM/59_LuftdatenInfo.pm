@@ -386,24 +386,25 @@ sub LuftdatenInfo_ParseHttpResponse($) {
 
       foreach (@{$data->{sensordatavalues}}){
         $_->{value} =~ m/^(\S+)(\s|$)/;
+        $_->{value} = $1;
 
         if($_->{value_type} =~ /temperature$/){
-          readingsBulkUpdate($hash, "temperature", $1);
+          readingsBulkUpdate($hash, "temperature", $_->{value});
         }
         elsif($_->{value_type} =~ /humidity$/){
-          readingsBulkUpdate($hash, "humidity", $1);
+          readingsBulkUpdate($hash, "humidity", $_->{value});
         }
         elsif($_->{value_type} =~ /pressure$/){
-          readingsBulkUpdate($hash, "pressure", $1);
+          readingsBulkUpdate($hash, "pressure", $_->{value});
         }
         elsif($_->{value_type} eq "SDS_P1"){
-          readingsBulkUpdate($hash, "PM10", $1);
+          readingsBulkUpdate($hash, "PM10", $_->{value});
         }
         elsif($_->{value_type} eq "SDS_P2"){
-          readingsBulkUpdate($hash, "PM2.5", $1);
+          readingsBulkUpdate($hash, "PM2.5", $_->{value});
         }
         elsif($_->{value_type} eq "signal"){
-          readingsBulkUpdate($hash, "signal", $1);
+          readingsBulkUpdate($hash, "signal", $_->{value});
         }
       }
 
