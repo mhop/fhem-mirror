@@ -1675,16 +1675,18 @@ sub HMUARTLGW_CheckCmdResp($)
 
 	#The data we wait for might have already been received but never
 	#read from the FD. Do a last check now and process new data.
-	my $rin = '';
-	vec($rin, $hash->{FD}, 1) = 1;
-	my $n = select($rin, undef, undef, 0);
-	if ($n > 0) {
-		Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
-		     "HMUARTLGW ${name} HMUARTLGW_CheckCmdResp: FD is readable, this might be the data we are looking for!");
-		#We will be back very soon!
-		InternalTimer(gettimeofday()+0, "HMUARTLGW_CheckCmdResp", $hash, 0);
-		HMUARTLGW_Read($hash);
-		return;
+	if (defined($hash->{FD})) {
+		my $rin = '';
+		vec($rin, $hash->{FD}, 1) = 1;
+		my $n = select($rin, undef, undef, 0);
+		if ($n > 0) {
+			Log3($hash, HMUARTLGW_getVerbLvl($hash, undef, undef, 5),
+			     "HMUARTLGW ${name} HMUARTLGW_CheckCmdResp: FD is readable, this might be the data we are looking for!");
+			#We will be back very soon!
+			InternalTimer(gettimeofday()+0, "HMUARTLGW_CheckCmdResp", $hash, 0);
+			HMUARTLGW_Read($hash);
+			return;
+		}
 	}
 
 	if ($hash->{DevState} == HMUARTLGW_STATE_SEND) {
