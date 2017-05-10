@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.0";
+my $version = "1.2.2";
 
 
 
@@ -53,6 +53,7 @@ my %playbulbModels = (
         BTL201M_V16     => {'aColor' => '0x25'  ,'aEffect' => '0x23'    ,'aBattery' => 'none'   ,'aDevicename' => '0x7'},   # Smart (1/2017)
         BTL505_v1       => {'aColor' => '0x23'  ,'aEffect' => '0x21'    ,'aBattery' => 'none'   ,'aDevicename' => '0x29'},  # Stripe
         BTL400M_v18     => {'aColor' => '0x23'  ,'aEffect' => '0x21'    ,'aBattery' => '0x2e'   ,'aDevicename' => '0x7'},   # Garden
+        BTL400M_v37     => {'aColor' => '0x1b'  ,'aEffect' => '0x19'    ,'aBattery' => '0x24'   ,'aDevicename' => '0x7'},   # Garden neue Version
         BTL100C_v10     => {'aColor' => '0x1b'  ,'aEffect' => '0x19'    ,'aBattery' => 'none'   ,'aDevicename' => 'none'},  # Color LED
     );
 
@@ -85,7 +86,7 @@ sub PLAYBULB_Run($$$);
 sub PLAYBULB_BlockingRun($);
 sub PLAYBULB_gattCharWrite($$$$$$$$$);
 sub PLAYBULB_gattCharRead($$$);
-sub PLAYBULB_readBattery($$);
+sub PLAYBULB_readBattery($$$);
 sub PLAYBULB_stateOnOff($$);
 sub PLAYBULB_readDevicename($$);
 sub PLAYBULB_writeDevicename($$$);
@@ -105,7 +106,7 @@ sub PLAYBULB_Initialize($) {
     $hash->{DefFn}	    = "PLAYBULB_Define";
     $hash->{UndefFn}	= "PLAYBULB_Undef";
     $hash->{AttrFn}	    = "PLAYBULB_Attr";
-    $hash->{AttrList} 	= "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL100C_v10 ".
+    $hash->{AttrList} 	= "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL400M_v37,BTL100C_v10 ".
                             $readingFnAttributes;
 
 
@@ -196,6 +197,9 @@ sub PLAYBULB_firstRun($) {
     RemoveInternalTimer($hash);
     
     PLAYBULB_Run($hash,"statusRequest",undef);
+    
+    ### Für kurze Zeit da neue Readings
+    CommandDeleteReading(undef,"$name battery") if( defined(ReadingsVal($name,'battery',undef)) );
 }
 
 sub PLAYBULB_Set($$@) {
@@ -238,7 +242,7 @@ sub PLAYBULB_Set($$@) {
     
     } else {
         my $list = "on:noArg off:noArg rgb:colorpicker,RGB sat:slider,0,5,255 effect:Flash,Pulse,RainbowJump,RainbowFade,Candle,none speed:slider,170,50,20 color:on,off statusRequest:noArg ";
-        $list .= "deviceName " if( $attr{$name}{model} ne "BTL400M_v18" or $attr{$name}{model} ne "BTL100C_v10" );
+        $list .= "deviceName " if( $attr{$name}{model} ne "BTL400M_v18" or $attr{$name}{model} ne "BTL100C_v10" or $attr{$name}{model} ne "BTL400M_v37" );
         return SetExtensions($hash, $list, $name, $cmd, $arg);
     }
     
@@ -330,7 +334,7 @@ sub PLAYBULB_BlockingRun($) {
         if( $cmd eq "statusRequest" ) {
         
             ###### Batteriestatus einlesen    
-            $blevel = PLAYBULB_readBattery($mac,$ab) if( $ab ne "none" );
+            $blevel = PLAYBULB_readBattery($name,$mac,$ab) if( $ab ne "none" );
             
             ###### Status ob An oder Aus
             $stateOnoff = PLAYBULB_stateOnOff($ccc,$cec);
@@ -360,7 +364,7 @@ sub PLAYBULB_BlockingRun($) {
         $stateOnoff = PLAYBULB_stateOnOff($cc,$ec) if( !defined($dname) );
     
         ###### Batteriestatus einlesen
-        $blevel = PLAYBULB_readBattery($mac,$ab) if( $ab ne "none" and !defined($dname) );
+        $blevel = PLAYBULB_readBattery($name,$mac,$ab) if( $ab ne "none" and !defined($dname) );
         
         
         Log3 $name, 4, "(Sub PLAYBULB_Run - $name) - Rückgabe an Auswertungsprogramm beginnt";
@@ -434,14 +438,22 @@ sub PLAYBULB_gattCharRead($$$) {
     return ($cc,$ec,$sat,$rgb,$effect,$speed);
 }
 
-sub PLAYBULB_readBattery($$) {
+sub PLAYBULB_readBattery($$$) {
 
-    my ($mac,$ab)   = @_;
+    my ($name,$mac,$ab)   = @_;
+    my $blevel;
     
     chomp(my @blevel  = split(": ",qx(gatttool -b $mac --char-read -a $ab)));
-    my $blevel = substr(join("",split(" ",$blevel[1])),0,2);
-
-    return hex($blevel);
+    
+    ### Bei den Garden Bulbs gibt es noch den Status wird geladen oder wird nicht geladen
+    ### Beispielausgabe "Characteristic value/descriptor: 51 01" in diesem Beispiel steht 01 für wird geladen
+    if( AttrVal($name,'model','none') eq 'BTL400M_v18' or AttrVal($name,'model','none') eq 'BTL400M_v37' ) {
+        $blevel = substr(join("",split(" ",$blevel[1])),0,4);
+    } else {
+        $blevel = substr(join("",split(" ",$blevel[1])),0,2);
+    }
+    
+    return ($blevel);
 }
 
 sub PLAYBULB_stateOnOff($$) {
@@ -523,6 +535,8 @@ sub PLAYBULB_BlockingDone($) {
     my $hash    = $defs{$name};
     my $state;
     my $color;
+    my $powerLevel;
+    my $powerCharge;
     
     
     
@@ -549,9 +563,17 @@ sub PLAYBULB_BlockingDone($) {
             $color = "off"; } else { $color = "on"; }
     }
     
+    if( AttrVal($name,'model','none') eq 'BTL400M_v18' or AttrVal($name,'model','none') eq 'BTL400M_v37' ) {
+        $powerLevel      = hex(substr($response_json->{blevel},0,2));
+        $powerCharge    = hex(substr($response_json->{blevel},3,3));
+    } else {
+        $powerLevel      = hex($response_json->{blevel});
+    }
+    
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "color", "$color") if( !defined($hash->{helper}{setDeviceName}) );
-    readingsBulkUpdate($hash, "battery", $response_json->{blevel}) if( $response_json->{blevel} != 1000 and !defined($hash->{helper}{setDeviceName}) );
+    readingsBulkUpdate($hash, "powerLevel", $powerLevel) if( $powerLevel != 1000 and !defined($hash->{helper}{setDeviceName}) );
+    readingsBulkUpdate($hash, "powerCharge", $powerCharge) if( $powerLevel != 1000 and !defined($hash->{helper}{setDeviceName}) and defined($powerCharge) );
     readingsBulkUpdate($hash, "deviceName", $response_json->{dname});
     readingsBulkUpdate($hash, "onoff", $response_json->{stateOnoff});
     readingsBulkUpdate($hash, "sat", $response_json->{sat}) if( $response_json->{stateOnoff} != 0 and $color ne "off" );
@@ -625,7 +647,8 @@ sub PLAYBULB_BlockingAborted($) {
 <ul>
 <ul>
 <ul>
-<li>battery - percentage of batterylevel</li>
+<li>powerLevel - percentage of batterylevel</li>
+<li>powerCharge - state of charging (Playbulb Garden only)</li>
 <li>color - indicates if colormode is on or off</li>
 <li>devicename - given name of the device</li>
 <li>effect - indicates which effect is selected (Flash; Pulse; RainbowJump; RainbowFade; Candle; none)</li>
