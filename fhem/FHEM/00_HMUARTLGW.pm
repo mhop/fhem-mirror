@@ -296,7 +296,7 @@ sub HMUARTLGW_Undefine($$;$)
 		delete($hash->{keepAlive});
 	}
 
-	if (defined($hash->{FD}) && (!$noclose)) {
+	if (!$noclose) {
 		DevIo_CloseDev($hash);
 		Log3($hash, 3, "${name} device closed") if (!defined($hash->{FD}));
 	}
@@ -349,7 +349,7 @@ sub HMUARTLGW_Shutdown($)
 		if ($hash->{DevState} > HMUARTLGW_STATE_ENTER_APP);
 
 	DevIo_CloseDev($hash->{keepAlive}) if ($hash->{keepAlive});
-	DevIo_CloseDev($hash) if (defined($hash->{FD}));
+	DevIo_CloseDev($hash);
 
 	return undef;
 }
