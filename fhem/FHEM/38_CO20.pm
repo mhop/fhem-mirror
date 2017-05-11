@@ -165,10 +165,10 @@ CO20_Connect($)
 
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
-  Log3 $name, 5, "$name: start CO20 connect";
+  Log3 $name, 4, "$name: start CO20 connect";
 
   delete $hash->{DEV};
-  Log3 $name, 5, "$name: delete CO20 dev";
+  Log3 $name, 4, "$name: delete CO20 dev";
 
   $hash->{USB} = Device::USB->new() if( !$hash->{USB} );
   Log3 $name, 3, "$name: CO20 USB connect";
@@ -184,7 +184,7 @@ CO20_Connect($)
         next if( $device->idVendor() != $VENDOR );
         next if( $device->idProduct() != $PRODUCT );
         next if( $device->{filename} != $filename );
-        Log3 $name, 5, "$name: found CO20 device with id";
+        Log3 $name, 4, "$name: found CO20 device with id";
         $hash->{DEV} = $device;
         last;
       }
@@ -200,8 +200,6 @@ CO20_Connect($)
         next if( $device->idProduct() != $PRODUCT );
         $hash->{DEV} = $device;
         $hash->{DEV}->open();
-        $hash->{manufacturer} = $hash->{DEV}->manufacturer();
-        $hash->{product} = $hash->{DEV}->product();
         $hash->{DEV}->detach_kernel_driver_np(0) if( $hash->{DEV}->get_driver_np(0) );
         my $ret = $hash->{DEV}->claim_interface( 0 );
         if( $ret == -16 ) {
@@ -212,15 +210,26 @@ CO20_Connect($)
           CO20_Disconnect($hash);
           return;
         }
-        Log3 $name, 5, "$name: claimed CO20 device on identify";
+        Log3 $name, 4, "$name: claimed CO20 device on identify";
         my $buf;
         $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
-        Log3 $name, 5, "$name: read CO20 device on identify";
+        Log3 $name, 4, "$name: read CO20 device on identify";
         my $currentid = CO20_identify($hash);
+        if(!$currentid)
+        {
+          Log3 $name, 2, "$name: found CO20 device without id while looking for ".$hash->{SERIALNUMBER};
+        }
+        elsif($currentid ne $hash->{SERIALNUMBER})
+        {
         Log3 $name, 2, "$name: found CO20 device with id $currentid while looking for ".$hash->{SERIALNUMBER};
-        last if($currentid eq $hash->{SERIALNUMBER});
+        }
+        else
+        {
+          Log3 $name, 2, "$name: found CO20 device with id $currentid";
+          last;
+        }
         $hash->{DEV}->release_interface(0);
-        Log3 $name, 5, "$name: released interface on identify";
+        Log3 $name, 4, "$name: released interface on identify";
 
         delete $hash->{DEV};
         delete $hash->{manufacturer};
@@ -231,9 +240,9 @@ CO20_Connect($)
   } 
   else 
   {
-    Log3 $name, 5, "$name: searching CO20 device on identify";
+    Log3 $name, 4, "$name: searching CO20 device on identify";
     $hash->{DEV} = $hash->{USB}->find_device( $VENDOR, $PRODUCT );
-    Log3 $name, 5, "$name: found CO20 device on identify";
+    Log3 $name, 4, "$name: found CO20 device on identify";
   }
 
   if( !$hash->{DEV} ) {
@@ -243,7 +252,7 @@ CO20_Connect($)
   } 
   else 
   {
-    Log3 $name, 5, "$name: found one CO20 device on identify";
+    Log3 $name, 4, "$name: found one CO20 device on identify";
     if( !$hash->{ID} ) {
     foreach my $bus ($hash->{USB}->list_busses()) {
       foreach my $device (@{$bus->{devices}}) {
@@ -262,11 +271,14 @@ CO20_Connect($)
 
     $hash->{DEV}->open();
 
-    $hash->{manufacturer} = $hash->{DEV}->manufacturer();
-    $hash->{product} = $hash->{DEV}->product();
-    $hash->{SERIAL} = $hash->{DEV}->serial_number() if($hash->{DEV}->serial_number() ne "?");
+    my $dev_man = $hash->{DEV}->manufacturer();
+    my $dev_pro = $hash->{DEV}->product();
+    my $dev_ser = $hash->{DEV}->serial_number();
+    $hash->{manufacturer} = $dev_man if(defined($dev_man));
+    $hash->{product} = $dev_pro if(defined($dev_pro));
+    $hash->{SERIAL} = $dev_ser if(defined($dev_ser) && $dev_ser ne "?");
 
-    if( $hash->{manufacturer} && $hash->{product} ) {
+    if( $dev_man && $dev_pro ) {
        $hash->{DEV}->detach_kernel_driver_np(0) if( $hash->{DEV}->get_driver_np(0) );
        my $ret = $hash->{DEV}->claim_interface( 0 );
        if( $ret == -16 ) {
@@ -287,7 +299,7 @@ CO20_Connect($)
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 0);
 
-      Log3 $name, 5, "$name: polling CO20 device on identify";
+      Log3 $name, 4, "$name: polling CO20 device on identify";
 
       my $buf;
       $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
@@ -312,15 +324,15 @@ CO20_Disconnect($)
   if( !$hash->{USB} )
   {
     $hash->{STATE} = "disconnected";
-  if( $hash->{manufacturer} && $hash->{product} ) {
-      Log3 $name, 5, "$name: disconnected release";
+    if( $hash->{manufacturer} && $hash->{product} ) {
+      Log3 $name, 4, "$name: disconnected release";
       $hash->{DEV}->release_interface(0) if($hash->{DEV});
     }
     return;
   }
   
   if( $hash->{manufacturer} && $hash->{product} ) {
-    Log3 $name, 5, "$name: disconnect release";
+    Log3 $name, 4, "$name: disconnect release";
     $hash->{DEV}->release_interface(0) if($hash->{DEV});
   }
 
@@ -355,6 +367,7 @@ CO20_identify($)
 {
   my ($hash) = @_;
   CO20_dataread($hash,"stickdata",1);
+  return $hash->{SERIALNUMBER};
 }
 
 sub
@@ -404,7 +417,7 @@ CO20_poll($)
       }
       $data.=$buf;
     }
-    Log3 $name, 4, "$name got ".unpack('H*', $data)." / ".length($data)." / ".ord(substr($data,0,1));
+    Log3 $name, 5, "$name got ".unpack('H*', $data)." / ".length($data)." / ".ord(substr($data,0,1));
 
     if( $ret != 16 and $ret != 0 and length($data) < 16 ) {
       $hash->{STATE} = "error";
@@ -515,7 +528,7 @@ CO20_dataread($$;$)
       for( $a = 1; $a <= $retcount; $a = $a + 1 ){
         $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{helper}{timeout});
         $data.=$buf;
-        Log3 $name, 4, "getdata read $ret" if($ret != 16);
+        Log3 $name, 5, "getdata read $ret" if($ret != 16);
         $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1)) if(length($buf) > 15);
         Log3 $name, 5, "$intdata\n$buf";
       }
@@ -642,17 +655,17 @@ CO20_dataset($$$)
 
 
     my $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,0,16), 0x0000010, $hash->{helper}{timeout});
-    Log3 $name, 4, "setdata write $ret" if($ret != 16);
+    Log3 $name, 5, "setdata write $ret" if($ret != 16);
 
 
     if($ret == 16 and ($buflen > 16 or $cmd eq "reset_device")) {
       $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,16,16), 0x0000010, $hash->{helper}{timeout});
-      Log3 $name, 4, "setdata write $ret" if($ret != 16);
+      Log3 $name, 5, "setdata write $ret" if($ret != 16);
     }
 
     if($ret == 16 and $buflen > 32) {
       $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,32,16), 0x0000010, $hash->{helper}{timeout});
-      Log3 $name, 4, "setdata write $ret" if($ret != 16);
+      Log3 $name, 5, "setdata write $ret" if($ret != 16);
     }
 
 
@@ -663,7 +676,7 @@ CO20_dataset($$$)
       if($buflen > 15)
       {
       my $intdata .= ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
-      Log3 $name, 4, "$buf";
+      Log3 $name, 5, "$buf";
       }
     } else {
       Log3 $name, 4, "set data failed: $buf";

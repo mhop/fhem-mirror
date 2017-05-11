@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_CO20: fixed definition with serial number
   - bugfix:  32_withings: safer json decoding
   - feature: 38_netatmo: home notification settings
   - feature: 98_alarmclock: New feature RepRoutine
