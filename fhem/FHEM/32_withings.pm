@@ -362,7 +362,7 @@ sub withings_Define($$) {
 
     my $username = withings_encrypt($user);
     my $password = withings_encrypt($pass);
-    Log3 $name, 3, "$name: encrypt $user/$pass to $username/$password";
+    Log3 $name, 3, "$name: encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
 
     #$hash->{DEF} =~ s/$user/$username/g;
     #$hash->{DEF} =~ s/$pass/$password/g;
@@ -500,8 +500,13 @@ sub withings_getToken($) {
   #my $response = $agent->request($request);
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 "withings", 2, "withings: json evaluation error on getToken ".$@;
+    return undef;
+  }
+
   my $once = $json->{body}{once};
   $hash->{Once} = $once;
   my $hashstring = withings_decrypt($hash->{helper}{username}).':'.md5_hex(withings_decrypt($hash->{helper}{password})).':'.$once;
@@ -625,8 +630,12 @@ sub withings_getSessionKey($) {
 
     if( $data =~ m/^{.*}$/ )
     {
-      my $json = ();
-      $json = JSON->new->utf8(0)->decode($data);
+      my $json = eval { JSON->new->utf8(0)->decode($data) };
+      if($@)
+      {
+        Log3 $name, 2, "$name: json evaluation error on getSessionKey ".$@;
+        return undef;
+      }
 
       foreach my $account (@{$json->{body}{account}}) {
           next if( !defined($account->{id}) );
@@ -929,8 +938,12 @@ sub withings_getUsers($) {
   #my $response = $ua->request($request);
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getUsers ".$@;
+    return undef;
+  }
 
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
@@ -965,8 +978,12 @@ sub withings_getDevices($) {
   #my $response = $ua->request($request);
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );;
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getDevices ".$@;
+    return undef;
+  }
   Log3 "withings", 5, "$name: getdevices ".Dumper($json);
 
   my @devices = ();
@@ -998,8 +1015,12 @@ sub withings_getDeviceDetail($) {
   #Log3 "withings", 5, "$name: getdevicedetaildata ".Dumper($data);
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getDeviceDetail ".$@;
+    return undef;
+  }
 
   if($json)
   {
@@ -1045,8 +1066,12 @@ sub withings_getDeviceLink($) {
   #my $response = $ua->request($request);
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getDeviceLink ".$@;
+    return undef;
+  }
 
   return $json->{body};
 }
@@ -1308,8 +1333,12 @@ sub withings_getVideoLink($) {
   });
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getVideoLink ".$@;
+    return undef;
+  }
 
   if(defined($json->{body}{device}))
   {
@@ -1340,8 +1369,12 @@ sub withings_getS3Credentials($) {
   });
   return undef if(!defined($data));
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getS3Credentials ".$@;
+    return undef;
+  }
 
   if(defined($json->{body}{sts}))
   {
@@ -1397,8 +1430,12 @@ sub withings_getUserDetail($) {
   });
 
   return undef if(!defined($data));
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($data) if( $data =~ m/^{.*}$/ );
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getUserDetail ".$@;
+    return undef;
+  }
 
   return $json->{body}{users}[0];
 }
@@ -3080,8 +3117,12 @@ sub withings_Dispatch($$$) {
       return undef;
     }
 
-    my $json;
-    $json = JSON->new->utf8(0)->decode($data);
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    if($@)
+    {
+      Log3 $name, 2, "$name: json evaluation error on dispatch type ".$param->{type}." ".$@;
+      return undef;
+    }
 
     Log3 $name, 4, "$name: json returned: ".Dumper($json);
 

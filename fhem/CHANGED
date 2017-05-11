@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  32_withings: safer json decoding
   - feature: 38_netatmo: home notification settings
   - feature: 98_alarmclock: New feature RepRoutine
   - feature: 31_PLAYBULB: support for new Garden Model, move battery Reading to
