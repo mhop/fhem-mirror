@@ -79,9 +79,9 @@ qw(
     OffRoutine:textField-long
     HardAlarmRoutine:textField-long
     SnoozeRoutine:textField-long
-	RepRoutine1:textField-long
-	RepRoutine2:textField-long
-	RepRoutine3:textField-long
+    RepRoutine1:textField-long
+    RepRoutine2:textField-long
+    RepRoutine3:textField-long
 );
 
 
@@ -119,21 +119,21 @@ sub alarmclock_Initialize($)
                         . " SnoozeRoutine"
                         . " HolidayDevice"
                         . " HolidayCheck:1,0"
-						. " RepRoutine1"
-						. " RepRoutine1WaitInSec"
-						. " RepRoutine1Repeats"
-						. " RepRoutine1Mode:Alarm,PreAlarm,off"
-						. " RepRoutine1Stop:Snooze,off"
-						. " RepRoutine2"
-						. " RepRoutine2WaitInSec"
-						. " RepRoutine2Repeats"
-						. " RepRoutine2Mode:Alarm,PreAlarm,off"
-						. " RepRoutine2Stop:Snooze,off"
-						. " RepRoutine3"
-						. " RepRoutine3WaitInSec"
-						. " RepRoutine3Repeats"
-						. " RepRoutine3Mode:Alarm,PreAlarm,off"
-						. " RepRoutine3Stop:Snooze,off"
+                        . " RepRoutine1"
+                        . " RepRoutine1WaitInSec"
+                        . " RepRoutine1Repeats"
+                        . " RepRoutine1Mode:Alarm,PreAlarm,off"
+                        . " RepRoutine1Stop:Snooze,off"
+                        . " RepRoutine2"
+                        . " RepRoutine2WaitInSec"
+                        . " RepRoutine2Repeats"
+                        . " RepRoutine2Mode:Alarm,PreAlarm,off"
+                        . " RepRoutine2Stop:Snooze,off"
+                        . " RepRoutine3"
+                        . " RepRoutine3WaitInSec"
+                        . " RepRoutine3Repeats"
+                        . " RepRoutine3Mode:Alarm,PreAlarm,off"
+                        . " RepRoutine3Stop:Snooze,off"
                         . " disable:1,0"
                         . " $readingFnAttributes";
 
@@ -653,16 +653,16 @@ sub alarmclock_alarmroutine_start($)
 {
 
     my ($hash) = @_;
-	my $Mode = "Alarm";
-	
+    my $Mode = "Alarm";
+    
     fhem("".AttrVal($hash->{NAME},"AlarmRoutine",""));      
     readingsSingleUpdate( $hash,"state", "Alarm is running", 1 );
     alarmclock_hardalarm_timer($hash);
     alarmclock_maxalarmduration_timer($hash);
-	alarmclock_reproutine($hash, $Mode);
+    alarmclock_reproutine($hash, $Mode);
     Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - AlarmRoutine started.";
-	
-	    
+    
+        
 }
 
 
@@ -697,11 +697,11 @@ sub alarmclock_prealarmroutine_start($)
 {
 
     my ($hash) = @_;
-	my $Mode = "PreAlarm";
+    my $Mode = "PreAlarm";
 
     fhem("".AttrVal($hash->{NAME},"PreAlarmRoutine",""));
     readingsSingleUpdate( $hash,"state", "PreAlarm is running", 1 );
-	alarmclock_reproutine($hash, $Mode);
+    alarmclock_reproutine($hash, $Mode);
     Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - PreAlarmRoutine started.";  
 
 }
@@ -717,7 +717,7 @@ sub alarmclock_snooze_start($)
 {
 
     my ($hash) = @_;
-	my $Mode = "Snooze";
+    my $Mode = "Snooze";
     
     if((AttrVal($hash->{NAME},"SnoozeTimeInSec","NONE")) =~ /^([0-9]?[0-9]?[0-9]?[0-9])$/)
     {
@@ -727,7 +727,7 @@ sub alarmclock_snooze_start($)
         readingsSingleUpdate( $hash,"state", "Snooze for $SnoozeTime sec", 1 );
         RemoveInternalTimer($hash, "alarmclock_hardalarmroutine_start");
         RemoveInternalTimer($hash, "alarmclock_alarmroutine_stop");
-		alarmclock_reproutine_stop($hash, $Mode);
+        alarmclock_reproutine_stop($hash, $Mode);
         Log3 $hash->{NAME}, 5, "alarmclock: $hash->{NAME} - snooze-timer created with $SnoozeTime sec.";
     }
 
@@ -823,142 +823,142 @@ sub alarmclock_hardalarmroutine_start($)
 
 ########################################################################################
 #
-#	RepRoutine
+#   RepRoutine
 #
 ########################################################################################
 
 sub alarmclock_reproutine($$)
 {
 
-	my ($hash, $Mode) = @_;
+    my ($hash, $Mode) = @_;
 
-	if(((AttrVal($hash->{NAME},"RepRoutine1","NONE")) ne "NONE") && 
-		(AttrVal($hash->{NAME},"RepRoutine1Mode","off")) eq $Mode)
-	{
-		$hash->{helper}{Repeat1} = 0;
-		my $WaitTime1 = AttrVal($hash->{NAME},"RepRoutine1WaitInSec","10");
-		InternalTimer(gettimeofday()+$WaitTime1, "alarmclock_reproutine1_start", $hash, 0);
-	}	
-	if(((AttrVal($hash->{NAME},"RepRoutine2","NONE")) ne "NONE") && 
-		(AttrVal($hash->{NAME},"RepRoutine2Mode","off")) eq $Mode)
-	{
-		$hash->{helper}{Repeat2} = 0;
-		my $WaitTime2 = AttrVal($hash->{NAME},"RepRoutine2WaitInSec","10");
-		InternalTimer(gettimeofday()+$WaitTime2, "alarmclock_reproutine2_start", $hash, 0);
-	}
-	if(((AttrVal($hash->{NAME},"RepRoutine3","NONE")) ne "NONE") && 
-		(AttrVal($hash->{NAME},"RepRoutine3Mode","off")) eq $Mode)
-	{
-		$hash->{helper}{Repeat3} = 0;
-		my $WaitTime3 = AttrVal($hash->{NAME},"RepRoutine3WaitInSec","10");
-		InternalTimer(gettimeofday()+$WaitTime3, "alarmclock_reproutine3_start", $hash, 0);
-	}
-	
-}	
+    if(((AttrVal($hash->{NAME},"RepRoutine1","NONE")) ne "NONE") && 
+        (AttrVal($hash->{NAME},"RepRoutine1Mode","off")) eq $Mode)
+    {
+        $hash->{helper}{Repeat1} = 0;
+        my $WaitTime1 = AttrVal($hash->{NAME},"RepRoutine1WaitInSec","10");
+        InternalTimer(gettimeofday()+$WaitTime1, "alarmclock_reproutine1_start", $hash, 0);
+    }   
+    if(((AttrVal($hash->{NAME},"RepRoutine2","NONE")) ne "NONE") && 
+        (AttrVal($hash->{NAME},"RepRoutine2Mode","off")) eq $Mode)
+    {
+        $hash->{helper}{Repeat2} = 0;
+        my $WaitTime2 = AttrVal($hash->{NAME},"RepRoutine2WaitInSec","10");
+        InternalTimer(gettimeofday()+$WaitTime2, "alarmclock_reproutine2_start", $hash, 0);
+    }
+    if(((AttrVal($hash->{NAME},"RepRoutine3","NONE")) ne "NONE") && 
+        (AttrVal($hash->{NAME},"RepRoutine3Mode","off")) eq $Mode)
+    {
+        $hash->{helper}{Repeat3} = 0;
+        my $WaitTime3 = AttrVal($hash->{NAME},"RepRoutine3WaitInSec","10");
+        InternalTimer(gettimeofday()+$WaitTime3, "alarmclock_reproutine3_start", $hash, 0);
+    }
+    
+}   
 
 
 ########################################################################################
 #
-#	RepRoutine stop
+#   RepRoutine stop
 #
 ########################################################################################
 
 sub alarmclock_reproutine_stop($$)
 {
 
-	my ($hash, $Mode) = @_;
+    my ($hash, $Mode) = @_;
 
-	if((AttrVal($hash->{NAME},"RepRoutine1Stop","Snooze")) eq $Mode)
-	{
-		RemoveInternalTimer($hash, "alarmclock_reproutine1_start");
-	}	
-	if((AttrVal($hash->{NAME},"RepRoutine2Stop","Snooze")) eq $Mode)
-	{
-		RemoveInternalTimer($hash, "alarmclock_reproutine2_start");
-	}	
-	if((AttrVal($hash->{NAME},"RepRoutine3Stop","Snooze")) eq $Mode)
-	{
-		RemoveInternalTimer($hash, "alarmclock_reproutine3_start");
-	}
-	
-}	
+    if((AttrVal($hash->{NAME},"RepRoutine1Stop","Snooze")) eq $Mode)
+    {
+        RemoveInternalTimer($hash, "alarmclock_reproutine1_start");
+    }   
+    if((AttrVal($hash->{NAME},"RepRoutine2Stop","Snooze")) eq $Mode)
+    {
+        RemoveInternalTimer($hash, "alarmclock_reproutine2_start");
+    }   
+    if((AttrVal($hash->{NAME},"RepRoutine3Stop","Snooze")) eq $Mode)
+    {
+        RemoveInternalTimer($hash, "alarmclock_reproutine3_start");
+    }
+    
+}   
 
 
 ########################################################################################
 #
-#	RepRoutine1 wird gestartet
+#   RepRoutine1 wird gestartet
 #
 ########################################################################################
 
 sub alarmclock_reproutine1_start($)
 {
 
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	my $WaitTime = AttrVal($hash->{NAME},"RepRoutine1WaitInSec","10");
-	my $Repeats = AttrVal($hash->{NAME},"RepRoutine1Repeats","2");
-	my $RNow = $hash->{helper}{Repeat1};
-	
-	if ($Repeats > $RNow)	
-	{
-		my $RNext = $RNow + 1;
-		$hash->{helper}{Repeat1} = $RNext;
-		fhem("".AttrVal($hash->{NAME},"RepRoutine1",""));
-		Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep1: $hash->{helper}{Repeat1}";
-		InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine1_start", $hash, 0);
-	}	
+    my $WaitTime = AttrVal($hash->{NAME},"RepRoutine1WaitInSec","10");
+    my $Repeats = AttrVal($hash->{NAME},"RepRoutine1Repeats","2");
+    my $RNow = $hash->{helper}{Repeat1};
+    
+    if ($Repeats > $RNow)   
+    {
+        my $RNext = $RNow + 1;
+        $hash->{helper}{Repeat1} = $RNext;
+        fhem("".AttrVal($hash->{NAME},"RepRoutine1",""));
+        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep1: $hash->{helper}{Repeat1}";
+        InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine1_start", $hash, 0);
+    }   
 }
 
 
 ########################################################################################
 #
-#	RepRoutine2 wird gestartet
+#   RepRoutine2 wird gestartet
 #
 ########################################################################################
 
 sub alarmclock_reproutine2_start($)
 {
 
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	my $WaitTime = AttrVal($hash->{NAME},"RepRoutine2WaitInSec","10");
-	my $Repeats = AttrVal($hash->{NAME},"RepRoutine2Repeats","2");
-	my $RNow = $hash->{helper}{Repeat2};
-	
-	if ($Repeats > $RNow)	
-	{
-		my $RNext = $RNow + 1;
-		$hash->{helper}{Repeat2} = $RNext;
-		fhem("".AttrVal($hash->{NAME},"RepRoutine2",""));
-		Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep2: $hash->{helper}{Repeat2}";
-		InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine2_start", $hash, 0);
-	}	
+    my $WaitTime = AttrVal($hash->{NAME},"RepRoutine2WaitInSec","10");
+    my $Repeats = AttrVal($hash->{NAME},"RepRoutine2Repeats","2");
+    my $RNow = $hash->{helper}{Repeat2};
+    
+    if ($Repeats > $RNow)   
+    {
+        my $RNext = $RNow + 1;
+        $hash->{helper}{Repeat2} = $RNext;
+        fhem("".AttrVal($hash->{NAME},"RepRoutine2",""));
+        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep2: $hash->{helper}{Repeat2}";
+        InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine2_start", $hash, 0);
+    }   
 }
 
 
 ########################################################################################
 #
-#	RepRoutine3 wird gestartet
+#   RepRoutine3 wird gestartet
 #
 ########################################################################################
 
 sub alarmclock_reproutine3_start($)
 {
 
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	my $WaitTime = AttrVal($hash->{NAME},"RepRoutine3WaitInSec","10");
-	my $Repeats = AttrVal($hash->{NAME},"RepRoutine3Repeats","2");
-	my $RNow = $hash->{helper}{Repeat3};
-	
-	if ($Repeats > $RNow)	
-	{
-		my $RNext = $RNow + 1;
-		$hash->{helper}{Repeat3} = $RNext;
-		fhem("".AttrVal($hash->{NAME},"RepRoutine3",""));
-		Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep3: $hash->{helper}{Repeat3}";
-		InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine3_start", $hash, 0);
-	}	
+    my $WaitTime = AttrVal($hash->{NAME},"RepRoutine3WaitInSec","10");
+    my $Repeats = AttrVal($hash->{NAME},"RepRoutine3Repeats","2");
+    my $RNow = $hash->{helper}{Repeat3};
+    
+    if ($Repeats > $RNow)   
+    {
+        my $RNext = $RNow + 1;
+        $hash->{helper}{Repeat3} = $RNext;
+        fhem("".AttrVal($hash->{NAME},"RepRoutine3",""));
+        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep3: $hash->{helper}{Repeat3}";
+        InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine3_start", $hash, 0);
+    }   
 }
 
 
@@ -1134,14 +1134,14 @@ sub alarmclock_Notify($$)
             </li>
             <li><b>HolidayDevice</b> <br>
                 Name of the holiday device.<br>
-				There are 3 possibilities:<br>
+                There are 3 possibilities:<br>
                 1.holiday device from Typ holiday.<br>
                 &lt;devicename&gt; Example: attr &lt;name&gt; HolidayDevice Feiertage <br>
-				AlarmTime 8_Holiday accesses when state is not none <br>
+                AlarmTime 8_Holiday accesses when state is not none <br>
                 2.On state of a device.For example a dummy <br>
                 &lt;devicename&gt;:&lt;value&gt; Example: attr &lt;name&gt; HolidayDevice MyDummy:Holiday <br>
-				Here the AlarmTime 8_Holiday takes effect when the state of the dummy has the value Holiday <br>
-				3.On a reading of a device. <br>
+                Here the AlarmTime 8_Holiday takes effect when the state of the dummy has the value Holiday <br>
+                3.On a reading of a device. <br>
                 &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; Example: attr &lt;name&gt; HolidayDevice MyDummy:Today:Holiday <br>
             </li>
             <li><b>HolidayCheck</b> <br>
