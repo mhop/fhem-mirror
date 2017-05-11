@@ -361,12 +361,13 @@ netatmo_Define($$)
     delete($hash->{refresh_token_app});
     delete($hash->{expires_at});
     delete($hash->{expires_at_app});
+    delete($hash->{csrf_token});
 
     my $user = $a[@a-4];
     my $pass = $a[@a-3];
     my $username = netatmo_encrypt($user);
     my $password = netatmo_encrypt($pass);
-    Log3 $name, 2, "$name: encrypt $user/$pass to $username/$password" if($user ne $username);
+    Log3 $name, 2, "$name: encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
 
     my $client_id = $a[@a-2];
     my $client_secret = $a[@a-1];
@@ -511,7 +512,7 @@ netatmo_Set($$@)
   $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   #$list .= " unban:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   $list = "home:noArg away:noArg" if ($hash->{SUBTYPE} eq "PERSON");
-  $list = "empty:noArg" if ($hash->{SUBTYPE} eq "HOME");
+  $list = "empty:noArg notify_movements:never,empty,always notify_unknowns:empty,always record_movements:never,empty,always record_alarms:never,empty,always presence_record_humans:ignore,record,record_and_notify presence_record_vehicles:ignore,record,record_and_notify presence_record_animals:ignore,record,record_and_notify presence_record_movements:ignore,record,record_and_notify presence_record_alarms:ignore,record,record_and_notify gone_after presence_enable_notify_from_to:empty,always presence_notify_from presence_notify_to smart_notifs:on,off" if ($hash->{SUBTYPE} eq "HOME");
   $list = "enable disable irmode:auto,always,never led_on_live:on,off mirror:off,on audio:on,off" if ($hash->{SUBTYPE} eq "CAMERA");
   $list = "enable disable light_mode:auto,on,off floodlight intensity:slider,0,1,100 night_always:true,false night_person:true,false night_vehicle:true,false night_animal:true,false night_movement:true,false" if ($hash->{SUBTYPE} eq "CAMERA" && defined($hash->{model}) && $hash->{model} eq "NOC");
   $list = "calibrate:noArg" if ($hash->{SUBTYPE} eq "TAG");
@@ -550,6 +551,10 @@ netatmo_Set($$@)
   }
   elsif( $cmd eq "empty" ) {
     return netatmo_setPresence($hash, "empty");
+    return undef;
+  }
+  elsif( $cmd =~ /^notify_/ || $cmd =~ /^record_/ || $cmd =~ /^presence_/  || $cmd eq "gone_after"  || $cmd eq "smart_notifs" ) {
+    return netatmo_setNotifications($hash, $cmd, $parameters[0]);
     return undef;
   }
   elsif( $cmd eq "enable" ) {
@@ -764,6 +769,7 @@ netatmo_refreshAppToken($;$)
     return undef;
   }
 
+  delete($hash->{csrf_token});
   Log3 $name, 3, "$name: refreshing app token";
 
   my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmN6bzFObU5qTmpSaU56azBOak5oT1RrMU9HSTNOREF4TkRjeVpEbGxNREUxT0E9PQ==";
@@ -851,7 +857,12 @@ netatmo_parseConnection($$$)
         Log3 $name, 2, "$name: invalid json on connection check";
         return undef;
       }
-      my $json = JSON->new->utf8(0)->decode($data);
+      my $json = eval { JSON->new->utf8(0)->decode($data) };
+      if($@)
+      {
+        Log3 $name, 2, "$name: invalid json evaluation on connection check ".$@;
+        return undef;
+      }
       $hash->{network} = "ok" if($json->{status} eq "ok");
     }
   return undef;
@@ -1782,6 +1793,93 @@ netatmo_setPresence($$)
 
 }
 
+
+sub
+netatmo_setNotifications($$$)
+{
+  my ($hash,$setting,$value) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if( !defined($hash->{IODev}) );
+
+  my $iohash = $hash->{IODev};
+  netatmo_refreshAppToken($iohash, defined($iohash->{access_token_app}));
+
+  return Log3 $name, 1, "$name: No access token was found! (setNotifications)" if(!defined($iohash->{access_token_app}));
+
+  if( !defined($iohash->{csrf_token}) )
+  {
+    my($err0,$data0) = HttpUtils_BlockingGet({
+      url => "https://auth.netatmo.com/access/checklogin",
+      timeout => 10,
+      noshutdown => 1,
+    });
+    if($err0 || !defined($data0))
+    {
+      Log3 $name, 1, "$name: csrf call failed! ".$err0;
+      return undef;
+    }
+    $data0 =~ /ci_csrf_netatmo" value="(.*)"/;
+    my $tmptoken = $1;
+    $iohash->{csrf_token} = $tmptoken;
+    if(!defined($iohash->{csrf_token})) {
+      Log3 $name, 1, "$name: CSRF ERROR ";
+      return undef;
+    }
+    Log3 $name, 4, "$name: csrf_token ".$iohash->{csrf_token};
+  }  
+  
+  my $homeid = $hash->{Home};
+
+  my %data;
+  
+  if($setting eq "presence_notify_from" || $setting eq "presence_notify_to" || $setting eq "gone_after")
+  {
+    my @timevalue = split(":",$value);
+    if(defined($timevalue[1]))
+    {
+      $value = int($timevalue[0])*3600 + int($timevalue[1])*60;
+    }
+    else
+    {
+      $value *= 60;
+    }
+    $value = 0 if($value < 0);
+    $value = 86400 if($value > 86400 && $setting ne "gone_after");
+  }
+  elsif($setting eq "smart_notifs")
+  {
+    $value = (($value eq "on") ? "true" : "false");
+  }
+
+  if($setting eq "presence_enable_notify_from_to" || $setting =~ /^presence_record_/ || $setting =~ /^presence_notify_/ )
+  {
+    %data = (home_id => $homeid, 'presence_settings['.$setting.']' => $value, ci_csrf_netatmo => $iohash->{csrf_token});
+  }
+  else
+  {
+    %data = (home_id => $homeid, $setting => $value, ci_csrf_netatmo => $iohash->{csrf_token});
+  }
+
+  Log3 $name, 5, "$name: setNotifications ($setting $value)";
+
+
+  HttpUtils_NonblockingGet({
+    url => "https://my.netatmo.com/api/updatehome",
+    timeout => 20,
+    noshutdown => 1,
+    method => "POST",
+    header => "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\nAuthorization: Bearer ".$iohash->{access_token_app},
+    data => \%data,
+    hash => $hash,
+    type => 'sethomesettings',
+    callback => \&netatmo_dispatch,
+  });
+
+
+}
+
+
 sub
 netatmo_setCamera($$$)
 {
@@ -2263,8 +2361,12 @@ netatmo_dispatch($$$)
     $hash->{network} = "ok" if($hash->{SUBTYPE} eq "ACCOUNT");
     $hash->{IODev}->{network} = "ok" if($hash->{SUBTYPE} ne "ACCOUNT");
 
-    my $json;
-    $json = JSON->new->utf8(0)->decode($data);
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    if($@)
+    {
+      Log3 $name, 2, "$name: invalid json evaluation on dispatch type ".$param->{type}." ".$@;
+      return undef;
+    }
 
     Log3 "unknown", 2, "unknown (no name) ".Dumper($hash) if(!defined($name));
     Log3 $name, 4, "$name: dispatch return: ".$param->{type};
@@ -2334,6 +2436,8 @@ netatmo_dispatch($$$)
       return netatmo_webhookStatus($hash,$json,"added");
     } elsif( $param->{type} eq 'dropwebhook' ) {
       return netatmo_webhookStatus($hash,$json,"dropped");
+    } elsif( $param->{type} eq 'sethomesettings' ) {
+      return netatmo_refreshHomeSettings($hash);
     } else {
       Log3 $name, 1, "$name: unknown '$param->{type}' ".Dumper($json);
     }
@@ -2960,9 +3064,18 @@ netatmo_parseReadings($$;$)
               $hash->{helper}{NEXT_POLL} = $nextdata;
               Log3 $name, 3, "$name: next dynamic update from device ($requested) at ".FmtDateTime($nextdata);
             } else {
+              $nextdata += $step_time;
+              if($nextdata >= (gettimeofday()+155))
+              {
+                RemoveInternalTimer($hash, "netatmo_poll");
+                InternalTimer($nextdata, "netatmo_poll", $hash);
+                $hash->{helper}{NEXT_POLL} = $nextdata;
+                Log3 $name, 3, "$name: next extended dynamic update from device ($requested) at ".FmtDateTime($nextdata);
+              } else {
               Log3 $name, 2, "$name: invalid time for dynamic update from device ($requested): ".FmtDateTime($nextdata);
             }
           }
+        }
         }
         elsif($nextdata >= (gettimeofday()+280))
         {
@@ -2971,8 +3084,17 @@ netatmo_parseReadings($$;$)
           $hash->{helper}{NEXT_POLL} = $nextdata;
           Log3 $name, 3, "$name: next dynamic update ($requested) at ".FmtDateTime($nextdata);
         } else {
+          $nextdata += $step_time;
+          if($nextdata >= (gettimeofday()+280))
+          {
+            RemoveInternalTimer($hash, "netatmo_poll");
+            InternalTimer($nextdata, "netatmo_poll", $hash);
+            $hash->{helper}{NEXT_POLL} = $nextdata;
+            Log3 $name, 3, "$name: next extended dynamic update ($requested) at ".FmtDateTime($nextdata);
+          } else {
           Log3 $name, 2, "$name: invalid time for dynamic update ($requested): ".FmtDateTime($nextdata);
         }
+      }
       }
   
     }
@@ -3478,6 +3600,25 @@ netatmo_parseHomeReadings($$;$)
 
         readingsSingleUpdate($hash, "name", encode_utf8($homedata->{name}), 1) if(defined($homedata->{name}));
 
+        readingsSingleUpdate($hash, "presence_record_humans", $homedata->{presence_record_humans}, 1) if(defined($homedata->{presence_record_humans}));
+        readingsSingleUpdate($hash, "presence_record_vehicles", $homedata->{presence_record_vehicles}, 1) if(defined($homedata->{presence_record_vehicles}));
+        readingsSingleUpdate($hash, "presence_record_animals", $homedata->{presence_record_animals}, 1) if(defined($homedata->{presence_record_animals}));
+        readingsSingleUpdate($hash, "presence_record_movements", $homedata->{presence_record_movements}, 1) if(defined($homedata->{presence_record_movements}));
+        readingsSingleUpdate($hash, "presence_record_alarms", $homedata->{presence_record_alarms}, 1) if(defined($homedata->{presence_record_alarms}));
+
+        readingsSingleUpdate($hash, "gone_after", sprintf("%02d",(int($homedata->{gone_after}/60)/60)).":".sprintf("%02d",(int($homedata->{gone_after}/60)%60)), 1) if(defined($homedata->{gone_after}));
+        readingsSingleUpdate($hash, "smart_notifs", ($homedata->{smart_notifs} eq "1")?"on":"off", 1) if(defined($homedata->{smart_notifs}));
+
+        readingsSingleUpdate($hash, "presence_enable_notify_from_to", $homedata->{presence_enable_notify_from_to}, 1) if(defined($homedata->{presence_enable_notify_from_to}));
+        readingsSingleUpdate($hash, "presence_notify_from", sprintf("%02d",(int($homedata->{presence_notify_from}/60)/60)).":".sprintf("%02d",(int($homedata->{presence_notify_from}/60)%60)), 1) if(defined($homedata->{presence_notify_from}));
+        readingsSingleUpdate($hash, "presence_notify_to", sprintf("%02d",(int($homedata->{presence_notify_to}/60)/60)).":".sprintf("%02d",(int($homedata->{presence_notify_to}/60)%60)), 1) if(defined($homedata->{presence_notify_to}));
+
+        readingsSingleUpdate($hash, "notify_unknowns", $homedata->{notify_unknowns}, 1) if(defined($homedata->{notify_unknowns}));
+        readingsSingleUpdate($hash, "notify_movements", $homedata->{notify_movements}, 1) if(defined($homedata->{notify_movements}));
+        readingsSingleUpdate($hash, "record_alarms", $homedata->{record_alarms}, 1) if(defined($homedata->{record_alarms}));
+        readingsSingleUpdate($hash, "record_movements", $homedata->{record_movements}, 1) if(defined($homedata->{record_movements}));
+
+
         if( $homedata->{place} ) {
           $hash->{country} = encode_utf8($homedata->{place}{country}) if(defined($homedata->{place}{country}));
           $hash->{bssid} = $homedata->{place}{bssid} if(defined($homedata->{place}{bssid}));
@@ -3975,6 +4116,19 @@ netatmo_parseHomeReadings($$;$)
 
 
 }
+
+
+sub 
+netatmo_refreshHomeSettings($)
+{
+  my($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  InternalTimer(gettimeofday()+5, "netatmo_poll", $hash);
+  
+  return undef;
+}
+
 
 sub
 netatmo_parseCameraPing($$;$)
@@ -5520,8 +5674,12 @@ sub netatmo_Webhook() {
 
   Log3 $name, 5, "Netatmo webhook JSON:\n".$data;
 
-  my $json = JSON->new->utf8(0)->decode($data);
-
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: invalid json evaluation for webhook ".$@;
+    return undef;
+  }
 
   readingsBeginUpdate($hash);
   
