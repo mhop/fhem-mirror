@@ -1665,7 +1665,7 @@ FW_alias($)
 sub
 FW_makeDeviceLine($$$$$)
 {
-  my( $d,$row,$extPage,$nameDisplay,$usuallyAtEnd) = @_;;
+  my ($d,$row,$extPage,$nameDisplay,$usuallyAtEnd) = @_;
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
@@ -1822,6 +1822,15 @@ FW_showRoom()
         $extPage{group} = $g;
 
         FW_makeDeviceLine($d,$row,\%extPage,$nameDisplay,\%usuallyAtEnd);
+
+        if($modules{$type}{FW_addDetailToSummary}) {
+          no strict "refs";
+          my $txt = &{$modules{$type}{FW_detailFn}}($FW_wname, $d, $FW_room);
+          use strict "refs";
+          if(defined($txt)) {
+            FW_pO "<tr class='".($row&1?"odd":"even")."'><td>$txt</td></tr>";
+          }
+        }
         $row++;
       }
       FW_pO "</table>";
