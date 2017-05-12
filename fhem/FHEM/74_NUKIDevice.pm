@@ -456,13 +456,13 @@ sub NUKIDevice_WriteReadings($$) {
         my ($state,$lockState);
         
         
-        if( $decode_json->{success} eq "true" ) {
+        if( defined($decode_json->{success}) and $decode_json->{success} eq "true" ) {
         
             $state = $hash->{helper}{lockAction};
             $lockState = $hash->{helper}{lockAction};
             NUKIDevice_ReadFromNUKIBridge($hash, "lockState", undef, $hash->{NUKIID} ) if( ReadingsVal($hash->{IODev}->{NAME},'bridgeType','Software') eq 'Software' );
             
-        } elsif ( $decode_json->{success} eq "false" ) {
+        } elsif ( defined($decode_json->{success}) and $decode_json->{success} eq "false" ) {
         
             $state = "error";
             NUKIDevice_ReadFromNUKIBridge($hash, "lockState", undef, $hash->{NUKIID} );
