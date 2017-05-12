@@ -96,6 +96,9 @@ for(;;) {
       } elsif($cmd eq "T01"){
         push @msg, $stars."0000";
 
+      } elsif($cmd =~ m/^is/){
+        push @msg, $stars.$cmd;
+
       } elsif($cmd eq "?") {
         push @msg, $stars."? (? is unknown) Use one of t u x";
 

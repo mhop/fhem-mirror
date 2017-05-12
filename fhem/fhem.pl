@@ -1732,7 +1732,8 @@ DoSet(@)
   if(defined($hash->{".triggerUsed"}) && $hash->{".triggerUsed"} == 0) {
     shift @a;
     # set arg if the module did not triggered events
-    my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
+    my $arg;
+    $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
     DoTrigger($dev, $arg, 0);
   }
   delete($hash->{".triggerUsed"});
@@ -3808,7 +3809,8 @@ ReplaceEventMap($$$)
   }
 
   my $dname = shift @{$str} if(!$dir);
-  my $nstr = join(" ", @{$str}) if(!$dir);
+  my $nstr;
+  $nstr = join(" ", @{$str}) if(!$dir);
 
   my $changed;
   foreach my $rv (@emList) {
