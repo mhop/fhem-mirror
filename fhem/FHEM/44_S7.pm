@@ -57,7 +57,7 @@ sub S7_Initialize($) {    #S5_OK
 	$hash->{SetFn}   = "S7_Set";
 	
 	$hash->{AttrFn}   = "S7_Attr";
-	$hash->{AttrList} = "MaxMessageLength Intervall " . $readingFnAttributes;
+	$hash->{AttrList} = "MaxMessageLength Intervall receiveTimeoutMs " . $readingFnAttributes;
 
 	#	$hash->{AttrList} = join( " ", @areasconfig )." PLCTime";
 }
@@ -157,6 +157,8 @@ sub S7_reconnect($) {                #S5 OK
 	my $hash = shift @_;
 	S7_disconnect($hash) if ( defined( $hash->{S7PLCClient} ) );
 
+	
+	
 	if ( $hash->{S7TYPE} eq "S5" ) {
 		$hash->{S7PLCClient} = S5Client->new();
 	}
@@ -239,7 +241,7 @@ sub S7_Define($$) {                  # S5 OK
 	$hash->{LocalTSAP}    = $LocalTSAP;
 	$hash->{RemoteTSAP}   = $RemoteTSAP;
 	$hash->{maxPDUlength} = $PDUlength;     #initial PDU length
-
+    $hash->{receiveTimeoutMs} = 500; #default receiving timeout = 500ms
 	Log3 $name, 4,
 "S7: define $name PLC_address=$PLC_address,LocalTSAP=$LocalTSAP, RemoteTSAP=$RemoteTSAP ";
 
@@ -325,7 +327,21 @@ sub S7_Attr(@) {
 
 				Log3( $name, 3, "$name S7_Attr: setting Intervall= $aVal" );
 			}			
+		} elsif ($aName eq "receiveTimeoutMs") {
+			if ( $aVal > 100 &&  $aVal < 10000) {
+
+				$hash->{receiveTimeoutMs} = $aVal;
+
+				Log3( $name, 3, "$name S7_Attr: setting receiveTimeoutMs= $aVal" );
+				
+				#reconnect with the new receiving timeout
+
+				$hash->{S7PLCClient}->setRecvTimeout($hash->{receiveTimeoutMs}) if ( defined( $hash->{S7PLCClient} ) );				
+			}			
+		
 		}
+		
+		
 		###########
 
 		if (   $aName eq "WriteInputs-Config"
@@ -1101,80 +1117,111 @@ sub S7_readFromPLC($) {    #S5 OK
 
 1;
 
+
 =pod
 =item summary basic interface to a SIEMENS S7 / S5
 =item summary_DE Schnittstelle zu einer Siemens S7 / S5
 =begin html
 
-<a name="S7"></a>
+<p><a name="S7"></a></p>
 <h3>S7</h3>
 <ul>
-This module connects a SIEMENS PLC (Note: also SIEMENS Logo is supported).
-The TCP communication module is based on settimino (http://settimino.sourceforge.net)
-
-You can found a german wiki here: httl://www.fhemwiki.de/wiki/S7
-
-<br><br>
-For the communication the following modules have been implemented:
 <ul>
-<li>S7        … sets up the communication channel to the PLC</li>
-<li>S7_ARead  … Is used for reading integer Values from the PLC</li>
-<li>S7_AWrite … Is used for write integer Values to the PLC</li>
-<li>S7_DRead  … Is used for read bits </li>
-<li>S7_DWrite … Is used for writing bits.</li>
+<ul>This module connects a SIEMENS PLC (S7,S5,SIEMENS Logo!). The TCP communication (S7, Siemens LOGO!) module is based on settimino (http://settimino.sourceforge.net). The serial Communication is based on a libnodave portation.</ul>
 </ul>
-<br>
-<br>
-Reading work flow:
-<br>
-<br>
-
-The S7 module reads periodically the configured DB areas from the PLC and stores the data in an internal buffer. Then all reading client modules are informed. Each client module extracts his data and the corresponding readings are set.
-<brl>
-<brl>
-Writing work flow:
-<br>
-<br>
-At the S7 module you need to configure the PLC writing target. Also the S7 module holds a writing buffer. Which contains a master copy of the data needs to send. 
-<br>
-(Note: after configuration of the writing area a copy from the PLC is read and used as initial fill-up of the writing buffer)
-<br>
-Note: The S7 module will send always the whole data block to the PLC.
-When data on the clients modules is set then the client module updates the internal writing buffer on the S7 module and triggers the writing to the PLC.
-<br>
-<br>
-
-<a name="S7define"></a>
-<b>Define</b>
+</ul>
+<p>&nbsp;</p>
 <ul>
-<code>define &lt;name&gt; S7 &lt;PLC_address&gt; &lt;rack&gt; &lt;slot&gt; [&lt;Interval&gt;] </code><br><br>
-
-<code>define logo S7 10.0.0.241 2 0 </code><br>
-
+<ul>You can found a german wiki here: httl://www.fhemwiki.de/wiki/S7</ul>
+</ul>
+<p><br /><br /></p>
 <ul>
-<li>PLC_address … IP address of the S7 PLC (For S5 see below)</li>
-<li>rack       … rack of the PLC</li>
-<li>slot       … slot of the PLC</li>
-<li>Interval   … Intervall how often the modul should check if a reading is required</li>
-<br>
+<ul>For the communication the following modules have been implemented:
+<ul>
+<li>S7 &hellip; sets up the communication channel to the PLC</li>
+<li>S7_ARead &hellip; Is used for reading integer Values from the PLC</li>
+<li>S7_AWrite &hellip; Is used for write integer Values to the PLC</li>
+<li>S7_DRead &hellip; Is used for read bits</li>
+<li>S7_DWrite &hellip; Is used for writing bits.</li>
 </ul>
-Note: For Siemens logo you should use a alternative (more simply configuration method):<br>
-define logo S7 LOGO7 10.0.0.241 
-<br>
-Note: For Siemens S5 you must use a alternative (more simply configuration method):<br>
-define logo S7 S5 /dev/tty1
-
-in this case the PLC_address is the serial port number 
 </ul>
-
-<br><br>
-<b>Attr</b><br>
-The following attributes are supported:<br>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>Reading work flow:</ul>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>The S7 module reads periodically the configured DB areas from the PLC and stores the data in an internal buffer. Then all reading client modules are informed. Each client module extracts his data and the corresponding readings are set. Writing work flow:</ul>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>At the S7 module you need to configure the PLC writing target. Also the S7 module holds a writing buffer. Which contains a master copy of the data needs to send.</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>(Note: after configuration of the writing area a copy from the PLC is read and used as initial fill-up of the writing buffer)</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>Note: The S7 module will send always the whole data block to the PLC. When data on the clients modules is set then the client module updates the internal writing buffer on the S7 module and triggers the writing to the PLC.</ul>
+</ul>
+<p><br /><br /><a name="S7define"></a><strong>Define</strong><code>define &lt;name&gt; S7 &lt;PLC_address&gt; &lt;rack&gt; &lt;slot&gt; [&lt;Interval&gt;] </code><br /><br /><code>define logo S7 10.0.0.241 2 0 </code></p>
+<ul>
+<ul>
+<ul>
+<ul>
+<li>PLC_address &hellip; IP address of the S7 PLC (For S5 see below)</li>
+<li>rack &hellip; rack of the PLC</li>
+<li>slot &hellip; slot of the PLC</li>
+<li>Interval &hellip; Intervall how often the modul should check if a reading is required</li>
+</ul>
+</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>Note: For Siemens logo you should use a alternative (more simply configuration method):</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul><code>define logo S7 LOGO7 10.0.0.241</code></ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>Note: For Siemens S5 you must use a alternative (more simply configuration method):</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>define logo S7 S5 /dev/tty1 in this case the PLC_address is the serial port number</ul>
+</ul>
+</ul>
+<p><br /><br /><strong>Attr</strong></p>
+<ul>
+<ul>The following attributes are supported:</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
 <ul>
 <li>MaxMessageLength</li>
-<br>
-MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package
+<li>receiveTimeoutMs</li>
+<li>Intervall</li>
 </ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package</ul>
+<ul>receiveTimeoutMs ... timeout in ms for TCP receiving packages. Default Value 500ms.&nbsp;</ul>
+<ul>Intervall ... polling&nbsp;intervall in s&nbsp;</ul>
 </ul>
 
 =end html
@@ -1182,77 +1229,106 @@ MaxMessageLength ... restricts the packet length if lower than the negioated PDU
 =begin html_DE
 
 
-<a name="S7"></a>
+<p><a name="S7"></a></p>
 <h3>S7</h3>
 <ul>
-This module connects a SIEMENS PLC (Note: also SIEMENS Logo is supported).
-The TCP communication module is based on settimino (http://settimino.sourceforge.net)
-
-You can found a german wiki here: httl://www.fhemwiki.de/wiki/S7
-
-<br><br>
-For the communication the following modules have been implemented:
 <ul>
-<li>S7        … sets up the communication channel to the PLC</li>
-<li>S7_ARead  … Is used for reading integer Values from the PLC</li>
-<li>S7_AWrite … Is used for write integer Values to the PLC</li>
-<li>S7_DRead  … Is used for read bits </li>
-<li>S7_DWrite … Is used for writing bits.</li>
+<ul>This module connects a SIEMENS PLC (S7,S5,SIEMENS Logo!). The TCP communication (S7, Siemens LOGO!) module is based on settimino (http://settimino.sourceforge.net). The serial Communication is based on a libnodave portation.</ul>
 </ul>
-<br>
-<br>
-Reading work flow:
-<br>
-<br>
-
-The S7 module reads periodically the configured DB areas from the PLC and stores the data in an internal buffer. Then all reading client modules are informed. Each client module extracts his data and the corresponding readings are set.
-<brl>
-<brl>
-Writing work flow:
-<br>
-<br>
-At the S7 module you need to configure the PLC writing target. Also the S7 module holds a writing buffer. Which contains a master copy of the data needs to send. 
-<br>
-(Note: after configuration of the writing area a copy from the PLC is read and used as initial fill-up of the writing buffer)
-<br>
-Note: The S7 module will send always the whole data block to the PLC.
-When data on the clients modules is set then the client module updates the internal writing buffer on the S7 module and triggers the writing to the PLC.
-<br>
-<br>
-
-<a name="S7define"></a>
-<b>Define</b>
+</ul>
+<p>&nbsp;</p>
 <ul>
-<code>define &lt;name&gt; S7 &lt;PLC_address&gt; &lt;rack&gt; &lt;slot&gt; [&lt;Interval&gt;] </code><br><br>
-
-<code>define logo S7 10.0.0.241 2 0 </code><br>
-
+<ul>You can found a german wiki here: httl://www.fhemwiki.de/wiki/S7</ul>
+</ul>
+<p><br /><br /></p>
 <ul>
-<li>PLC_address … IP address of the S7 PLC (For S5 see below)</li>
-<li>rack       … rack of the PLC</li>
-<li>slot       … slot of the PLC</li>
-<li>Interval   … Intervall how often the modul should check if a reading is required</li>
-<br>
+<ul>For the communication the following modules have been implemented:
+<ul>
+<li>S7 &hellip; sets up the communication channel to the PLC</li>
+<li>S7_ARead &hellip; Is used for reading integer Values from the PLC</li>
+<li>S7_AWrite &hellip; Is used for write integer Values to the PLC</li>
+<li>S7_DRead &hellip; Is used for read bits</li>
+<li>S7_DWrite &hellip; Is used for writing bits.</li>
 </ul>
-Note: For Siemens logo you should use a alternative (more simply configuration method):<br>
-define logo S7 LOGO7 10.0.0.241 
-<br>
-Note: For Siemens S5 you must use a alternative (more simply configuration method):<br>
-define logo S7 S5 /dev/tty1
-
-in this case the PLC_address is the serial port number 
 </ul>
-
-<br><br>
-<b>Attr</b><br>
-The following attributes are supported:<br>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>Reading work flow:</ul>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>The S7 module reads periodically the configured DB areas from the PLC and stores the data in an internal buffer. Then all reading client modules are informed. Each client module extracts his data and the corresponding readings are set. Writing work flow:</ul>
+</ul>
+<p><br /><br /></p>
+<ul>
+<ul>At the S7 module you need to configure the PLC writing target. Also the S7 module holds a writing buffer. Which contains a master copy of the data needs to send.</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>(Note: after configuration of the writing area a copy from the PLC is read and used as initial fill-up of the writing buffer)</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>Note: The S7 module will send always the whole data block to the PLC. When data on the clients modules is set then the client module updates the internal writing buffer on the S7 module and triggers the writing to the PLC.</ul>
+</ul>
+<p><br /><br /><a name="S7define"></a><strong>Define</strong><code>define &lt;name&gt; S7 &lt;PLC_address&gt; &lt;rack&gt; &lt;slot&gt; [&lt;Interval&gt;] </code><br /><br /><code>define logo S7 10.0.0.241 2 0 </code></p>
+<ul>
+<ul>
+<ul>
+<ul>
+<li>PLC_address &hellip; IP address of the S7 PLC (For S5 see below)</li>
+<li>rack &hellip; rack of the PLC</li>
+<li>slot &hellip; slot of the PLC</li>
+<li>Interval &hellip; Intervall how often the modul should check if a reading is required</li>
+</ul>
+</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>Note: For Siemens logo you should use a alternative (more simply configuration method):</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul><code>define logo S7 LOGO7 10.0.0.241</code></ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>Note: For Siemens S5 you must use a alternative (more simply configuration method):</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<ul>define logo S7 S5 /dev/tty1 in this case the PLC_address is the serial port number</ul>
+</ul>
+</ul>
+<p><br /><br /><strong>Attr</strong></p>
+<ul>
+<ul>The following attributes are supported:</ul>
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>
 <ul>
 <li>MaxMessageLength</li>
-<br>
-MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package
+<li>receiveTimeoutMs</li>
+<li>Intervall</li>
 </ul>
 </ul>
-
+</ul>
+<p>&nbsp;</p>
+<ul>
+<ul>MaxMessageLength ... restricts the packet length if lower than the negioated PDULength. This could be used to increate the processing speed. 2 small packages may be smaler than one large package</ul>
+<ul>receiveTimeoutMs ... timeout in ms for TCP receiving packages. Default Value 500ms.&nbsp;</ul>
+<ul>Intervall ... polling&nbsp;intervall in s&nbsp;</ul>
+</ul>
 =end html_DE
 
 =cut

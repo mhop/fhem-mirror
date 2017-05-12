@@ -419,6 +419,14 @@ sub PutFloatAt {
 	return $self->setFloatAt( $Buffer, $index, $value );
 }
 
+
+#-----------------------------------------------------------------------------
+sub setRecvTimeout {
+
+	my ( $self, $newRecvTimeout ) = @_;
+	
+	$self->{RecvTimeout} = $newRecvTimeout;
+}
 #-----------------------------------------------------------------------------
 
 sub version {
@@ -426,6 +434,8 @@ sub version {
 }
 
 #-----------------------------------------------------------------------------
+
+
 
 sub getErrorStr {
 
