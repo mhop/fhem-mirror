@@ -1828,7 +1828,8 @@ FW_showRoom()
           my $txt = &{$modules{$type}{FW_detailFn}}($FW_wname, $d, $FW_room);
           use strict "refs";
           if(defined($txt)) {
-            FW_pO "<tr class='".($row&1?"odd":"even")."'><td>$txt</td></tr>";
+            FW_pO "<tr class='".($row&1?"odd":"even").
+                "'><td colspan='3'>$txt</td></tr>";
           }
         }
         $row++;
