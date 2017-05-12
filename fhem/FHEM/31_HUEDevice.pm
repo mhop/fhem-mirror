@@ -1291,6 +1291,8 @@ HUEDevice_Parse($$)
       if( defined($hueModels{$attr{$name}{model}}{subType}) ) {
         $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType};
 
+        HUEDeviceSetIcon($hash) if( $hash->{helper}{fromAutocreate} );
+
       } elsif( $attr{$name}{model} =~ m/TW$/ ) {
         $attr{$name}{subType} = 'ctdimmer';
 
@@ -1302,10 +1304,10 @@ HUEDevice_Parse($$)
 
       }
 
-      HUEDeviceSetIcon($hash) if( $hash->{helper}{fromAutocreate} );
       delete $hash->{helper}{fromAutocreate};
+    }
 
-    } elsif( $hash->{type} ) {
+    if( !defined($attr{$name}{subType}) && $hash->{type} ) {
       if( $hash->{type} eq "Extended color light" ) {
         $attr{$name}{subType} = 'extcolordimmer';
 
