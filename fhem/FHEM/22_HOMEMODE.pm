@@ -255,6 +255,7 @@ sub HOMEMODE_Notify($$)
       $residentregex = $regex;
     }
     return if (!$resident);
+    $hash->{helper}{lar} = $resident;
     if (ReadingsVal($devname,"presence","") !~ /^maybe/)
     {
       my @presentdevicespresent;
@@ -265,6 +266,10 @@ sub HOMEMODE_Notify($$)
       }
       if (grep /^.*:\s(present|appeared)$/,@{$events})
       {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"lastActivityByPresenceDevice",$devname);
+        readingsBulkUpdate($hash,"lastPresentByPresenceDevice",$devname);
+        readingsEndUpdate($hash,1);
         push @commands,$attr{$name}{"HomeCMDpresence-present-device"} if ($attr{$name}{"HomeCMDpresence-present-device"});
         push @commands,$attr{$name}{"HomeCMDpresence-present-$resident-device"} if ($attr{$name}{"HomeCMDpresence-present-$resident-device"});
         push @commands,$attr{$name}{"HomeCMDpresence-present-$resident-$devname"} if ($attr{$name}{"HomeCMDpresence-present-$resident-$devname"});
@@ -273,13 +278,13 @@ sub HOMEMODE_Notify($$)
         {
           CommandSet(undef,"$resident:FILTER=state!=home state home");
         }
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"lastActivityByPresenceDevice",$devname);
-        readingsBulkUpdate($hash,"lastPresentByPresenceDevice",$devname);
-        readingsEndUpdate($hash,1);
       }
       elsif (grep /^.*:\s(absent|disappeared)$/,@{$events})
       {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"lastActivityByPresenceDevice",$devname);
+        readingsBulkUpdate($hash,"lastAbsentByPresenceDevice",$devname);
+        readingsEndUpdate($hash,1);
         push @commands,$attr{$name}{"HomeCMDpresence-absent-device"} if ($attr{$name}{"HomeCMDpresence-absent-device"});
         push @commands,$attr{$name}{"HomeCMDpresence-absent-$resident-device"} if ($attr{$name}{"HomeCMDpresence-absent-$resident-device"});
         push @commands,$attr{$name}{"HomeCMDpresence-absent-$resident-$devname"} if ($attr{$name}{"HomeCMDpresence-absent-$resident-$devname"});
@@ -291,10 +296,6 @@ sub HOMEMODE_Notify($$)
         {
           CommandSet(undef,"$resident:FILTER=state!=absent state absent");
         }
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"lastActivityByPresenceDevice",$devname);
-        readingsBulkUpdate($hash,"lastAbsentByPresenceDevice",$devname);
-        readingsEndUpdate($hash,1);
       }
     }
   }
@@ -780,6 +781,8 @@ sub HOMEMODE_set_modeAlarm($$$)
 {
   my ($name,$option,$amode) = @_;
   my $hash = $defs{$name};
+  my $resident = $hash->{helper}{lar} ? $hash->{helper}{lar} : ReadingsVal($name,"lastActivityByResident","");
+  delete $hash->{helper}{lar} if ($hash->{helper}{lar});
   my @commands;
   push @commands,$attr{$name}{"HomeCMDmodeAlarm"} if ($attr{$name}{"HomeCMDmodeAlarm"});
   push @commands,$attr{$name}{"HomeCMDmodeAlarm-$option"} if ($attr{$name}{"HomeCMDmodeAlarm-$option"});
@@ -788,7 +791,7 @@ sub HOMEMODE_set_modeAlarm($$$)
   readingsBulkUpdate($hash,"modeAlarm",$option);
   readingsEndUpdate($hash,1);
   HOMEMODE_TriggerState($hash) if ($hash->{SENSORSCONTACT} || $hash->{SENSORSMOTION});
-  HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands);
+  HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands),$resident) if (@commands);
 }
 
 sub HOMEMODE_execCMDs_belated($$$)
