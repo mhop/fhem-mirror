@@ -70,6 +70,7 @@ CO20_Define($$)
   $hash->{NAME} = $name;
 
   $hash->{FAIL} = 0;
+  $hash->{RECONNECT} = 0;
   $hash->{helper}{seq2} = 0x67;
   $hash->{helper}{seq4} = 0x0001;
 
@@ -81,8 +82,8 @@ CO20_Define($$)
   if( $init_done ) {
     CO20_Disconnect($hash);
     CO20_Connect($hash);
-  } elsif( $hash->{STATE} ne "???" ) {
-    $hash->{STATE} = "Initialized";
+  } else {
+    readingsSingleUpdate($hash, 'state', 'initialized', 1 );
   }
 
   return undef;
@@ -266,7 +267,7 @@ CO20_Connect($)
     }}
 
     #
-    $hash->{STATE} = "found";
+    readingsSingleUpdate($hash, 'state', 'found', 1 );
     Log3 $name, 3, "$name: CO20 device found";
 
     $hash->{DEV}->open();
@@ -282,16 +283,17 @@ CO20_Connect($)
        $hash->{DEV}->detach_kernel_driver_np(0) if( $hash->{DEV}->get_driver_np(0) );
        my $ret = $hash->{DEV}->claim_interface( 0 );
        if( $ret == -16 ) {
-         $hash->{STATE} = "waiting";
+         readingsSingleUpdate($hash, 'state', 'waiting', 1 );
          Log3 $name, 3, "$name: waiting for CO20 device";
          return;
        } elsif( $ret != 0 ) {
+         readingsSingleUpdate($hash, 'state', 'error', 1 );
          Log3 $name, 3, "$name: failed to claim CO20 device";
          CO20_Disconnect($hash);
          return;
        }
 
-      $hash->{STATE} = "opened";
+      readingsSingleUpdate($hash, 'state', 'opened', 1 );
       Log3 $name, 3, "$name: CO20 device opened";
 
       $hash->{INTERVAL} = AttrVal($name, "interval", 300);
@@ -323,7 +325,7 @@ CO20_Disconnect($)
 
   if( !$hash->{USB} )
   {
-    $hash->{STATE} = "disconnected";
+    readingsSingleUpdate($hash, 'state', 'disconnected', 1 );
     if( $hash->{manufacturer} && $hash->{product} ) {
       Log3 $name, 4, "$name: disconnected release";
       $hash->{DEV}->release_interface(0) if($hash->{DEV});
@@ -344,7 +346,7 @@ CO20_Disconnect($)
   delete( $hash->{BLOCKED} );
   delete $hash->{FIRMWARE};
 
-  $hash->{STATE} = "disconnected";
+  readingsSingleUpdate($hash, 'state', 'disconnected', 1 );
   Log3 $name, 3, "$name: disconnected";
   CO20_SetStickData($hash,"X");
 
@@ -393,17 +395,19 @@ CO20_poll($)
 
     my $ret = $hash->{DEV}->interrupt_write(0x00000002, $buf, 0x0000010, $hash->{helper}{timeout});
     if( $ret != 16 ) {
-      $hash->{STATE} = "error";
       my $ret2 = $hash->{DEV}->interrupt_write(0x00000002, "@@@@@@@@@@@@@@@@", 0x0000010, $hash->{helper}{timeout});
       $hash->{FAIL} = $hash->{FAIL}+1;
       Log3 $name, 3, "$name: write error $ret/$ret2 ($hash->{FAIL})";
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+30, "CO20_poll", $hash, 1);
       if($hash->{FAIL} >= $hash->{helper}{retries}) {
+        readingsSingleUpdate($hash, 'state', 'reconnect', 1 );
         $hash->{FAIL} = 0;
         CO20_Disconnect($hash);
-        $hash->{RECONNECT} = 1;
+        $hash->{RECONNECT} = $hash->{RECONNECT}+1;
         CO20_Connect($hash);
+      } else {
+        readingsSingleUpdate($hash, 'state', 'retry', 1 );
       }
       return undef;
     }
@@ -420,16 +424,18 @@ CO20_poll($)
     Log3 $name, 5, "$name got ".unpack('H*', $data)." / ".length($data)." / ".ord(substr($data,0,1));
 
     if( $ret != 16 and $ret != 0 and length($data) < 16 ) {
-      $hash->{STATE} = "error";
       $hash->{FAIL} = $hash->{FAIL}+1;
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+30, "CO20_poll", $hash, 1);
       Log3 $name, 4, "$name: readloop error $ret ($hash->{FAIL})";
       if($hash->{FAIL} >= $hash->{helper}{retries}) {
+        readingsSingleUpdate($hash, 'state', 'reconnect', 1 );
         $hash->{FAIL} = 0;
         CO20_Disconnect($hash);
-        $hash->{RECONNECT} = 1;
+        $hash->{RECONNECT} = $hash->{RECONNECT}+1;
         CO20_Connect($hash);
+      } else {
+        readingsSingleUpdate($hash, 'state', 'retry', 1 );
       }
       return undef;
     }
@@ -459,14 +465,16 @@ CO20_poll($)
       #      Log3 $name, 5, "$name: read 1 success\n$bufdec";
 
     } else {
-      $hash->{STATE} = "error";
       $hash->{FAIL} = $hash->{FAIL}+1;
       Log3 $name, 2, "$name: read failed $ret ($hash->{FAIL})";
       if($hash->{FAIL} >= $hash->{helper}{retries}) {
+        readingsSingleUpdate($hash, 'state', 'reconnect', 1 );
         $hash->{FAIL} = 0;
         CO20_Disconnect($hash);
-        $hash->{RECONNECT} = 1;
+        $hash->{RECONNECT} = $hash->{RECONNECT}+1;
         CO20_Connect($hash);
+      } else {
+        readingsSingleUpdate($hash, 'state', 'retry', 1 );
       }
     }
 
@@ -475,7 +483,7 @@ CO20_poll($)
     Log3 $name, 2, "$name: no device";
     $hash->{FAIL} = 0;
     CO20_Disconnect($hash);
-    $hash->{RECONNECT} = 1;
+    $hash->{RECONNECT} = $hash->{RECONNECT}+1;
     CO20_Connect($hash);
   }
 }
