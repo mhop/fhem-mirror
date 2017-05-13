@@ -1628,7 +1628,7 @@ sub HOMEMODE_Attr(@)
       CommandDeleteReading(undef,"$name .*humidity.*") if (!$attr{$name}{HomeYahooWeatherDevice} && $attr_name eq "HomeSensorHumidityOutside");
       HOMEMODE_updateInternals($hash,1);
     }
-    elsif ($attr_name =~ /^(HomeDaytimes|HomeSeasons|HomeSpecialLocations|HomeSpecialModes)$/ && $init_done)
+    elsif ($attr_name =~ /^(HomeDaytimes|HomeSeasons|HomeSpecialLocations|HomeSpecialModes)$/)
     {
       HOMEMODE_userattr($hash);
     }
