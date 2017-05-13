@@ -24,7 +24,7 @@
 #
 # This module interacts with TelegramBot and PostMe devices
 #
-# Discussed in FHEM Forum: <not yet> TODO
+# Discussed in FHEM Forum: https://forum.fhem.de/index.php/topic,67976.0.html
 #
 # $Id$
 #
@@ -62,6 +62,13 @@
 #   make unsolicited entries configurable
 #   handle multiline entries --> remove line ends
 #   handle multiline entries --> multiple entries to be created
+# 0.3 2017-03-16 
+
+#   Fix: undef errors in listhandler resolved
+#   Menu für gesamte Liste
+#   Sortierung A-Z und Z-A für Liste
+#   allow double entries and correct handling
+# 0.3 2017-05-13 Menu / Sort und fixes 
 
 #   
 #   
@@ -102,8 +109,6 @@ sub TBot_List_Undef($$);
 
 sub TBot_List_Set($@);
 sub TBot_List_Get($@);
-
-sub TBot_List_ReplacePattern( $$;$ );
 
 sub TBot_List_handler( $$$$;$ );
 
@@ -720,7 +725,7 @@ sub TBot_List_handler($$$$;$)
 
     @list = TBot_List_getList( $hash );
   }
-  Log3 $name, 4, "JVLISTMGR_handler: $name - after prefetch peer :$peer:  chatId :$chatId:   msgId :$msgId: ";
+  Log3 $name, 4, "JVLISTMGR_handler: $name - after prefetch peer :$peer:  chatId :$chatId:   msgId :".($msgId?$msgId:"<undef>").": ";
   
   #####################  
   if ( $ret ) {
@@ -783,14 +788,13 @@ sub TBot_List_handler($$$$;$)
     
     $inline .= ") " if ( $double == 2 );
 
-    $inline .= "(ok:".$name."\%"."list_ok|leeren:".$name."\%"."list_askclr|hinzu:".$name."\%"."list_askadd)";
+    $inline .= "(ok:".$name."\%"."list_ok|ändern:".$name."\%"."list_menu|hinzu:".$name."\%"."list_askadd)";
     
     my $textmsg = "Liste ".$lname;
     $textmsg .= " ist leer " if ( scalar(@list) == 0 );
     $textmsg .= " : $arg " if ( defined($arg) );
     
     if ( $cmd eq "list" ) {
-    
     
       # remove msgId if existing
       if ( defined($msgId ) ) {
@@ -799,7 +803,7 @@ sub TBot_List_handler($$$$;$)
       } else {
         # there might be still a dialog in another chat
         my $oldchatId = TBot_List_getMsgId( $hash, $tbot, $peer, "chat" );
-        TBot_List_handler( $hash,  "list_done", $tbot, $peer, "wurde beendet" ) if ( defined( TBot_List_getMsgId( $hash, $tbot, $oldchatId ) ) );
+        TBot_List_handler( $hash,  "list_done", $tbot, $peer, "wurde beendet" ) if ( $oldchatId && ( defined( TBot_List_getMsgId( $hash, $tbot, $oldchatId ) ) ) );
       }
       
       # store text msg to recognize msg id in dummy
@@ -846,12 +850,16 @@ sub TBot_List_handler($$$$;$)
     my $no = $1;
     
     if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
+    
       my $topentry = $list[$no];
-      my $text = $topentry;
-      foreach my $entry (  @list ) {
-        $text .= ",".$entry if ( $entry ne $topentry );
-      }
-       
+      # remove from array the entry with the index 
+      splice(@list, $no, 1);    
+      
+      # add it at the beginning
+      unshift @list, $topentry;
+
+      my $text = join(",", @list );
+      
       fhem( "set ".TBot_List_getConfigPostMe($hash)." clear $lname " );
       fhem( "set ".TBot_List_getConfigPostMe($hash)." add $lname $text" );
     
@@ -884,13 +892,64 @@ sub TBot_List_handler($$$$;$)
     
     if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
     
-      fhem( "set ".TBot_List_getConfigPostMe($hash)." remove $lname ".$list[$no] );
+      # remove from array the entry with the index 
+      splice(@list, $no, 1);    
 
+      my $text = join(",", @list );
+      
+      fhem( "set ".TBot_List_getConfigPostMe($hash)." clear $lname " );
+      fhem( "set ".TBot_List_getConfigPostMe($hash)." add $lname $text" );
+      
       # show updated list -> call recursively
       TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Eintrag geloescht" );
     
     }
     
+  #####################  
+  } elsif ( $cmd eq "list_menu" ) {
+    # post new msg to ask what to do on list
+    if ( defined($msgId ) ) {
+      # show menu
+      my $textmsg = "Liste ".$lname." ?";
+      # show menu msg 
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Sortieren:".$name."\%"."list_asksrt|Leeren:".$name."\%"."list_askclr|Zurück:".$name."\%"."list_edit) $textmsg" );
+    } else {
+      $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
+    }
+
+  #####################  
+  } elsif ( $cmd eq "list_asksrt" ) {
+    # post new msg to ask for srt
+    if ( defined($msgId ) ) {
+      # show ask for sort
+      my $textmsg = "Liste ".$lname." sortieren ?";
+      # show ask msg 
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Ja - von A-Z:".$name."\%"."list_srtyes1|Ja - von Z-A:".$name."\%"."list_srtyes2|Nein:".$name."\%"."list_edit) $textmsg" );
+    } else {
+      $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
+    }
+
+  #####################  
+  } elsif ( $cmd =~ /list_srtyes(\d)/ ) {
+    my $stype = $1;
+    # means sort all entries - now it is confirmed
+    
+    # sort depending on stype
+    if ( scalar(@list) > 0 )  {
+      if ( $stype == 1 ) {
+        @list = sort {$a cmp $b} @list;
+      } else {
+        @list = sort {$b cmp $a} @list;
+      }
+      my $text = join( ",", @list );
+      fhem( "set ".TBot_List_getConfigPostMe($hash)." clear $lname " );
+      fhem( "set ".TBot_List_getConfigPostMe($hash)." add $lname $text" );     
+    }
+    
+    # show updated list -> call recursively
+    TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Liste sortiert" );
+    
+          
   #####################  
   } elsif ( $cmd eq "list_askclr" ) {
     # post new msg to ask for clr
@@ -1062,18 +1121,6 @@ sub TBot_List_handler($$$$;$)
 ##############################################################################
 ##############################################################################
 
-
-#####################################
-#  INTERNAL: get pattern replaced
-# TODO - adapt for texts
-sub TBot_List_ReplacePattern( $$;$ ) {
-  my ( $pattern, $id, $name ) = @_;
-
- $pattern =~ s/q_id_q/$id/g if ( defined($id) );
- $pattern =~ s/q_name_q/$name/g if ( defined($name) );
-
- return $pattern;
-}
 
 #####################################
 #  notify function provide dev and 
