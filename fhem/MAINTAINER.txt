@@ -203,6 +203,8 @@ FHEM/44_S7_AWrite.pm         charlie71            http://forum.fhem.de Sonstige 
 FHEM/44_S7_Client.pm         charlie71            http://forum.fhem.de Sonstige Systeme
 FHEM/44_S7_DRead.pm          charlie71            http://forum.fhem.de Sonstige Systeme
 FHEM/44_S7_DWrite.pm         charlie71            http://forum.fhem.de Sonstige Systeme
+FHEM/44_S7_S5Client.pm       charlie71            http://forum.fhem.de Sonstige Systeme
+FHEM/44_S7_S7Client.pm       charlie71            http://forum.fhem.de Sonstige Systeme
 FHEM/44_TEK603.pm            eisler               http://forum.fhem.de Sonstige Systeme
 FHEM/45_Plugwise.pm          icinger              http://forum.fhem.de Sonstige Systeme
 FHEM/45_TRX.pm               wherzig              http://forum.fhem.de RFXTRX
