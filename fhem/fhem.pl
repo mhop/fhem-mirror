@@ -3597,7 +3597,8 @@ Dispatch($$$)
   }
 
   if(!int(@found) || !defined($found[0])) {
-    my $h = $hash->{MatchList}; $h = $module->{MatchList} if(!$h);
+    my $h = $hash->{MatchList};
+    $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
         if($dmsg =~ m/$h->{$m}/) {
@@ -3808,8 +3809,8 @@ ReplaceEventMap($$$)
                   map { $_ =~ s/.*?=//s; $_ =~ s/.*?://s; "$_:noArg" } @emList);
   }
 
-  my $dname = shift @{$str} if(!$dir);
-  my $nstr;
+  my ($dname, $nstr);
+  $dname = shift @{$str} if(!$dir);
   $nstr = join(" ", @{$str}) if(!$dir);
 
   my $changed;
@@ -4237,14 +4238,16 @@ readingsEndUpdate($$)
       } elsif($modifier eq "difference") {
         $result= $value - $oldvalue if(defined($oldvalue));
       } elsif($modifier eq "differential") {
-        my $deltav= $value - $oldvalue if(defined($oldvalue));
-        my $deltat= $hash->{".updateTime"} - $oldt if(defined($oldt));
+        my ($deltav, $deltat);
+        $deltav = $value - $oldvalue if(defined($oldvalue));
+        $deltat = $hash->{".updateTime"} - $oldt if(defined($oldt));
         if(defined($deltav) && defined($deltat) && ($deltat>= 1.0)) {
           $result= $deltav/$deltat;
         }
       } elsif($modifier eq "integral") {
         if(defined($oldt) && defined($oldvalue)) {
-          my $deltat= $hash->{".updateTime"} - $oldt if(defined($oldt));
+          my $deltat;
+          $deltat = $hash->{".updateTime"} - $oldt if(defined($oldt));
           my $avgval= ($value + $oldvalue) / 2;
           $result = ReadingsVal($name,$reading,$value);
           if(defined($deltat) && $deltat>= 1.0) {
