@@ -15,7 +15,7 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 
-my $HOMEMODE_version = "1.0.5";
+my $HOMEMODE_version = "1.0.6";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -1362,7 +1362,7 @@ sub HOMEMODE_Attr(@)
         "Invalid value $attr_value for attribute $attr_name. Numbers from 0 to 9999 are allowed only!";
       return $trans if ($attr_value !~ /^\d{1,4}$/);
     }
-    elsif ($attr_name =~ /^(HomeSpecialModes|HomeSpecialLocations)$/)
+    elsif ($attr_name =~ /^(HomeSpecialModes|HomeSpecialLocations)$/ && $init_done)
     {
       $trans = $HOMEMODE_de?
         "Ungültiger Wert $attr_value für Attribut $attr_name. Muss eine Komma separierte Liste von Wörtern sein!":
@@ -1628,7 +1628,7 @@ sub HOMEMODE_Attr(@)
       CommandDeleteReading(undef,"$name .*humidity.*") if (!$attr{$name}{HomeYahooWeatherDevice} && $attr_name eq "HomeSensorHumidityOutside");
       HOMEMODE_updateInternals($hash,1);
     }
-    elsif ($attr_name =~ /^(HomeDaytimes|HomeSeasons|HomeSpecialLocations|HomeSpecialModes)$/)
+    elsif ($attr_name =~ /^(HomeDaytimes|HomeSeasons|HomeSpecialLocations|HomeSpecialModes)$/ && $init_done)
     {
       HOMEMODE_userattr($hash);
     }
@@ -2602,8 +2602,8 @@ sub HOMEMODE_PowerEnergy($;$$$)
   }
   else
   {
-    my $power;
-    my $energy;
+    my $power = 0;
+    my $energy = 0;
     my ($pr,$er) = split " ",AttrVal($name,"HomeSensorsPowerEnergyReadings","power energy");
     foreach (split /,/,$hash->{SENSORSENERGY})
     {
