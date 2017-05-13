@@ -239,7 +239,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:b'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2.3p.7p,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",}
- ,"00AE" => {name=>"HM-WDS100-C6-O-2"        ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:b'  ,lst=>'p,1:1.1p,4'   ,chn=>"",}
+ ,"00AE" => {name=>"HM-WDS100-C6-O-2"        ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p,1,1:1p,4'   ,chn=>"",}# odd: list one with and without peer on one channel
  ,"00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
  ,"00B1" => {name=>"HM-SEC-SC-2"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00B2" => {name=>"HM-SEC-WDS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}
