@@ -1,4 +1,4 @@
-REV 14261
+REV 14267
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-05-13_07:45:02 197240 ./CHANGED
+UPD 2017-05-13_13:47:35 197318 ./CHANGED
 UPD 2017-03-25_07:45:02 36411 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-05-13_07:45:04 133545 ./fhem.pl
@@ -134,7 +134,7 @@ UPD 2017-03-09_07:45:02 31405 FHEM/21_OWVAR.pm
 UPD 2017-04-05_07:45:02 107851 FHEM/21_SONOSPLAYER.pm
 UPD 2017-01-07_07:45:02 92019 FHEM/21_VBUSDEV.pm
 UPD 2015-07-28_14:05:31 4865 FHEM/22_ALL3076.pm
-UPD 2017-05-13_07:45:02 161493 FHEM/22_HOMEMODE.pm
+UPD 2017-05-13_13:47:35 161515 FHEM/22_HOMEMODE.pm
 UPD 2015-07-28_14:05:31 6433 FHEM/23_ALL4027.pm
 UPD 2016-02-29_07:45:12 37829 FHEM/23_KOSTALPIKO.pm
 UPD 2017-05-10_07:45:02 99568 FHEM/23_LUXTRONIK2.pm
@@ -314,7 +314,7 @@ UPD 2017-05-09_07:45:02 89288 FHEM/73_ElectricityCalculator.pm
 UPD 2017-05-09_07:45:02 81574 FHEM/73_GasCalculator.pm
 UPD 2017-01-27_07:45:02 88049 FHEM/73_MPD.pm
 UPD 2017-05-12_07:45:02 30582 FHEM/73_NUKIBridge.pm
-UPD 2017-01-21_07:45:02 84316 FHEM/73_PRESENCE.pm
+UPD 2017-05-13_13:47:35 84630 FHEM/73_PRESENCE.pm
 UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
 UPD 2017-04-28_07:45:02 80978 FHEM/74_AMAD.pm
 UPD 2016-06-10_07:45:12 39790 FHEM/74_HOMBOT.pm
@@ -771,10 +771,6 @@ UPD 2015-07-28_14:05:34 2199 www/images/default/black_FS20.off.png
 UPD 2015-07-28_14:05:34 2348 www/images/default/black_FS20.on.png
 UPD 2015-07-28_14:05:34 2567 www/images/default/black_Steckdose.off.png
 UPD 2015-07-28_14:05:34 2983 www/images/default/black_Steckdose.on.png
-UPD 2017-05-13_07:45:02 735 www/images/default/black_btn_DLNA.png
-UPD 2017-05-13_07:45:02 1113 www/images/default/black_btn_HDMI_main.png
-UPD 2017-05-13_07:45:02 1109 www/images/default/black_btn_HDMI_sub.png
-UPD 2017-05-13_07:45:02 834 www/images/default/black_btn_PC.png
 UPD 2015-07-28_14:05:34 898 www/images/default/black_down.png
 UPD 2015-07-28_14:05:34 888 www/images/default/black_up.png
 UPD 2015-07-28_14:05:34 689 www/images/default/close.png
@@ -916,6 +912,7 @@ UPD 2015-07-28_14:05:34 837 www/images/default/remotecontrol/black_btn_CONTENTS.
 UPD 2015-07-28_14:05:34 5146 www/images/default/remotecontrol/black_btn_CONTENTS2.png
 UPD 2015-10-25_07:45:14 1007 www/images/default/remotecontrol/black_btn_DIRECT.png
 UPD 2015-10-25_07:45:14 1379 www/images/default/remotecontrol/black_btn_DISCMENU.png
+UPD 2017-05-13_13:47:35 735 www/images/default/remotecontrol/black_btn_DLNA.png
 UPD 2015-07-28_14:05:34 898 www/images/default/remotecontrol/black_btn_DOWN.png
 UPD 2015-07-28_14:05:34 7265 www/images/default/remotecontrol/black_btn_DOWN3.png
 UPD 2015-10-25_07:45:14 1395 www/images/default/remotecontrol/black_btn_DSPMODE.png
@@ -937,6 +934,8 @@ UPD 2015-07-28_14:05:34 1556 www/images/default/remotecontrol/black_btn_GREEN.pn
 UPD 2015-07-28_14:05:34 865 www/images/default/remotecontrol/black_btn_GUIDE.png
 UPD 2015-07-28_14:05:34 5156 www/images/default/remotecontrol/black_btn_GUIDE2.png
 UPD 2015-07-28_14:05:34 850 www/images/default/remotecontrol/black_btn_HDMI.png
+UPD 2017-05-13_13:47:35 1113 www/images/default/remotecontrol/black_btn_HDMI_main.png
+UPD 2017-05-13_13:47:35 1109 www/images/default/remotecontrol/black_btn_HDMI_sub.png
 UPD 2015-07-28_14:05:34 883 www/images/default/remotecontrol/black_btn_HELP.png
 UPD 2016-04-18_07:45:12 707 www/images/default/remotecontrol/black_btn_HOMEDroid.png
 UPD 2015-07-28_14:05:34 1161 www/images/default/remotecontrol/black_btn_HOMEsym.png
@@ -963,6 +962,7 @@ UPD 2015-07-28_14:05:34 1079 www/images/default/remotecontrol/black_btn_PAGEDOWN
 UPD 2015-07-28_14:05:34 1017 www/images/default/remotecontrol/black_btn_PAGEUP.png
 UPD 2015-07-28_14:05:34 863 www/images/default/remotecontrol/black_btn_PAUSE.png
 UPD 2015-07-28_14:05:34 943 www/images/default/remotecontrol/black_btn_PAUSEyellow.png
+UPD 2017-05-13_13:47:35 834 www/images/default/remotecontrol/black_btn_PC.png
 UPD 2015-10-25_07:45:14 989 www/images/default/remotecontrol/black_btn_PHONO.png
 UPD 2015-07-28_14:05:34 1024 www/images/default/remotecontrol/black_btn_PICTURE_SIZE.png
 UPD 2015-07-28_14:05:34 840 www/images/default/remotecontrol/black_btn_PIP.png
