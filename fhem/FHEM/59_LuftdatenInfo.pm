@@ -24,6 +24,7 @@
 
 # packages ####################################################################
 package main;
+  use Encode;
   use strict;
   use warnings;
 
@@ -262,7 +263,6 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     Log3 $SELF, 4, "$TYPE ($SELF) - returned data: $data";
 
     $data = encode('UTF-8', $data);
-
     $data = eval{decode_json($data)};
 
     if($@){
