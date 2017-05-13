@@ -1409,7 +1409,7 @@ sub LUXTRONIK2_synchronizeClock (@)
   my $delay = 0;
   my $returnStr = "";
 
-  $maxDelta = 60 unless $maxDelta >= 0;
+  $maxDelta = 60 unless defined $maxDelta || $maxDelta >= 0;
   $maxDelta = 600 unless $maxDelta <= 600;
          
    LUXTRONIK2_Log $name, 5, "Open telnet connection to $host";
