@@ -1289,7 +1289,8 @@ sub PRESENCE_ProcessState($$)
         {
             if(++$count >= $absenceThreshold)
             {
-                readingsBulkUpdate($hash, ".absenceThresholdCounter", 0);
+                readingsBulkUpdate($hash, ".presenceThresholdCounter", 0);
+                readingsBulkUpdate($hash, ".absenceThresholdCounter", ($count-1));
                 readingsBulkUpdate($hash, "state", "absent");
                 readingsBulkUpdate($hash, "presence", "absent");
             }
@@ -1297,6 +1298,7 @@ sub PRESENCE_ProcessState($$)
             {
                 $hash->{helper}{ABSENT_COUNT} = $count;
                 
+                readingsBulkUpdate($hash, ".presenceThresholdCounter", 0);
                 readingsBulkUpdate($hash, ".absenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe absent");
                 readingsBulkUpdate($hash, "presence", "maybe absent");
@@ -1334,7 +1336,8 @@ sub PRESENCE_ProcessState($$)
         {
             if(++$count >= $presenceThreshold)
             {
-                readingsBulkUpdate($hash, ".presenceThresholdCounter", "0");
+                readingsBulkUpdate($hash, ".absenceThresholdCounter", 0);
+                readingsBulkUpdate($hash, ".presenceThresholdCounter", ($count-1));
                 readingsBulkUpdate($hash, "state", "present");
                 readingsBulkUpdate($hash, "presence", "present");
                 
@@ -1344,6 +1347,7 @@ sub PRESENCE_ProcessState($$)
             {
                 $hash->{helper}{PRESENT_COUNT} = $count;
                 
+                readingsBulkUpdate($hash, ".absenceThresholdCounter", 0);
                 readingsBulkUpdate($hash, ".presenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe present");
                 readingsBulkUpdate($hash, "presence", "maybe present");
