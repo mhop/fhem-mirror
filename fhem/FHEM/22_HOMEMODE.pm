@@ -15,7 +15,7 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 
-my $HOMEMODE_version = "1.0.6";
+my $HOMEMODE_version = "1.0.7";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -926,7 +926,7 @@ sub HOMEMODE_RESIDENTS($;$)
           CommandDefine(undef,"atTmp_awoken_".$dev."_$name at +$hours set $dev:FILTER=state=awoken state home");
         }
       }
-      if ($usermode eq "home" && ReadingsVal($dev,"lastState","") =~ /^(absent|gone)$/ && $attr{$name}{HomeAutoArrival})
+      if ($usermode eq "home" && ReadingsVal($dev,"lastState","") =~ /^(absent|[gn]one)$/ && $attr{$name}{HomeAutoArrival})
       {
         my $hours = HOMEMODE_hourMaker($attr{$name}{HomeAutoArrival});
         AnalyzeCommandChain(undef,"sleep 0.1; set $dev:FILTER=location!=arrival location arrival");
@@ -2541,10 +2541,11 @@ sub HOMEMODE_UWZCommands($$)
         for (my $i = 0; $i < $count; $i++)
         {
           my $read = "Warn_$i";
+          my $ii = $i + 1;
           $textShort .= " " if ($i > 0);
           $textLong .= " " if ($i > 0);
-          $textShort .= $i + 1 . ". " if ($count > 1);
-          $textLong .= $i + 1 . ". " if ($count > 1);
+          $textShort .= $ii.". " if ($count > 1);
+          $textLong .= $ii.". " if ($count > 1);
           $textShort .= ReadingsVal($uwz,$read."_ShortText","");
           $textLong .= ReadingsVal($uwz,$read."_LongText","");
         }
