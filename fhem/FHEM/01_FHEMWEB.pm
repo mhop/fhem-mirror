@@ -1771,8 +1771,8 @@ FW_showRoom()
 
   # array of all device names in the room (exception weblinks without group
   # attribute)
-  my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
-                      !IsIgnored($_) } keys %defs;
+  my @devs= grep { (($FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_}) ||
+                    $FW_room eq "all") && !IsIgnored($_) } keys %defs;
   my (%group, @atEnds, %usuallyAtEnd, %sortIndex);
   foreach my $dev (@devs) {
     if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
