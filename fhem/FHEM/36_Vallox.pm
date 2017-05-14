@@ -336,7 +336,7 @@ sub Vallox_ReplaceBit ($@) {
 sub Vallox_readingsBulkUpdateMultiReading($@) {
 	my ($hash, $rawReadingType, $readingname, $bitnumber,) = @_;
 	
-	readingsBulkUpdate($hash, $readingname, substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1)) if (ReadingsVal($hash->{NAME},$readingname,"unknown") ne substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1));
+	readingsBulkUpdate($hash, $readingname, substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1)); # if (ReadingsVal($hash->{NAME},$readingname,"unknown") ne substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1));
 	return;
 	
 }
