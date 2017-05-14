@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, April 2017
+# SONOSPLAYER.pm (c) by Reiner Leins, Mai 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -58,6 +58,13 @@ sub Log($$);
 sub Log3($$$);
 sub SONOSPLAYER_Log($$$);
 
+
+########################################################
+# Standards aus FHEM einbinden
+########################################################
+use vars qw{%modules %defs};
+
+
 ########################################################################################
 # Variable Definitions
 ########################################################################################
@@ -99,6 +106,8 @@ my %sets = (
 	'StartRadio' => 'radioname',
 	'PlayURI' => 'songURI [Volume]',
 	'PlayURITemp' => 'songURI [Volume]',
+	'LoadHandle' => 'Handle',
+	'StartHandle' => 'Handle',
 	'AddURIToQueue' => 'songURI',
 	'Speak' => 'volume(0..100) language text',
 	'OutputFixed' => 'state',
@@ -178,8 +187,13 @@ sub SONOSPLAYER_Initialize ($) {
 	$hash->{SetFn} = "SONOSPLAYER_Set";
 	$hash->{StateFn} = "SONOSPLAYER_State";
 	$hash->{AttrFn}  = 'SONOSPLAYER_Attribute';
+	$hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	
-	$hash->{AttrList} = "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,TrackProvider,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackProvider,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents getTitleInfoFromMaster:1,0 stopSleeptimerInAction:1,0 saveSleeptimerInAction:1,0 ".$readingFnAttributes;
+	$hash->{FW_detailFn} = 'SONOSPLAYER_Detail';
+	$hash->{FW_deviceOverview} = 1;
+	#$hash->{FW_addDetailToSummary} = 1;
+	
+	$hash->{AttrList} = "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,TrackProvider,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackProvider,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents getTitleInfoFromMaster:1,0 stopSleeptimerInAction:1,0 saveSleeptimerInAction:1,0 simulateCurrentTrackPosition:0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,45,60 simulateCurrentTrackPositionPercentFormat suppressControlButtons:1,0 ".$readingFnAttributes;
 	
 	return undef;
 }
@@ -193,8 +207,6 @@ sub SONOSPLAYER_Initialize ($) {
 ########################################################################################
 sub SONOSPLAYER_Define ($$) {
 	my ($hash, $def) = @_;
-	
-	# $hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	  
 	# define <name> SONOSPLAYER <udn>
 	# e.g.: define Sonos_Wohnzimmer SONOSPLAYER RINCON_000EFEFEFEF401400
@@ -209,13 +221,64 @@ sub SONOSPLAYER_Define ($$) {
 	# check syntax
 	return "SONOSPLAYER: Wrong syntax, must be define <name> SONOSPLAYER <udn>" if(int(@a) < 3);
 	
+	$hash->{NOTIFYDEV} = $name;
+	$hash->{helper}->{simulateCurrentTrackPosition} = 0;
+	
 	readingsSingleUpdate($hash, "state", 'init', 1);
 	readingsSingleUpdate($hash, "presence", 'disappeared', 0); # Grund-Initialisierung, falls der Player sich nicht zurückmelden sollte...
+	
+	# RoomDarstellung für alle Player festlegen
+	$modules{$hash->{TYPE}}->{FW_addDetailToSummary} = (AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'deviceRoomView', 'Both') =~ m/(Both)/i);
 	
 	$hash->{UDN} = $udn;
 	readingsSingleUpdate($hash, "state", 'initialized', 1);
 	
 	return undef; 
+}
+
+########################################################################################
+#
+# SONOSPLAYER_Detail - Returns the Detailview
+#
+########################################################################################
+sub SONOSPLAYER_Detail($$$;$) {
+	my ($FW_wname, $d, $room, $withRC) = @_;
+	$withRC = 1 if (!defined($withRC));
+	
+	my $hash = $defs{$d};
+	
+	return '' if (!ReadingsVal($d, 'IsMaster', 0) || (ReadingsVal($d, 'playerType', '') eq 'ZB100'));
+	
+	# Open incl. Inform-Div
+	my $html .= '<html><div informId="'.$d.'-display_covertitle">';
+	
+	# Cover-/TitleView
+	$html .= '<div style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';
+	$html .= SONOS_getCoverTitleRG($d);
+	$html .= '</div>';
+	
+	# Close Inform-Div
+	$html .= '</div>';
+	
+	# Control-Buttons
+	if (!AttrVal($d, 'suppressControlButtons', 0) && ($withRC)) {
+		$html.= '<div class="rc_body" style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';
+		$html .= '<table style="text-align: center;"><tr>';
+		$html .= '<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Previous\')">'.FW_makeImage('rc_PREVIOUS.svg', 'Previous', 'rc-button').'</a></td> 
+			<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Play\')">'.FW_makeImage('rc_PLAY.svg', 'Play', 'rc-button').'</a></td> 
+			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Pause\')">'.FW_makeImage('rc_PAUSE.svg', 'Pause', 'rc-button').'</a></td> 
+			<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Next\')">'.FW_makeImage('rc_NEXT.svg', 'Next', 'rc-button').'</a></td> 
+			<td><a style="padding-left: 20px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' VolumeD\')">'.FW_makeImage('rc_VOLDOWN.svg', 'VolDown', 'rc-button').'</a></td>
+			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' MuteT\')">'.FW_makeImage('rc_MUTE.svg', 'Mute', 'rc-button').'</a></td>
+			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' VolumeU\')">'.FW_makeImage('rc_VOLUP.svg', 'VolUp', 'rc-button').'</a></td>';
+		$html .= '</tr></table>';
+		$html .= '</div>';
+	}
+	
+	# Close
+	$html .= '</html>';
+	
+	return $html;
 }
 
 ########################################################################################
@@ -262,7 +325,6 @@ sub SONOSPLAYER_State($$$$) {
 	my ($hash, $time, $name, $value) = @_; 
 	
 	# Die folgenden Readings müssen immer neu initialisiert verwendet werden, und dürfen nicht aus dem Statefile verwendet werden
-	#return 'Reading '.$hash->{NAME}."->$name must not be used out of statefile. This is not an error! This happens due to restrictions of Fhem." if ($name eq 'presence') || ($name eq 'LastActionResult') || ($name eq 'AlarmList') || ($name eq 'AlarmListIDs') || ($name eq 'AlarmListVersion');
 	if (($name eq 'presence') || ($name eq 'LastActionResult') || ($name eq 'AlarmList') || ($name eq 'AlarmListIDs') || ($name eq 'AlarmListVersion')) {
 		SONOSPLAYER_Log undef, 4, 'StateFn-Call. Ignore the following Reading: '.$hash->{NAME}.'->'.$name.'('.(defined($value) ? $value : '').')';
 	
@@ -280,24 +342,62 @@ sub SONOSPLAYER_State($$$$) {
 #  SONOSPLAYER_Notify - Implements NotifyFn function 
 #
 ########################################################################################
-sub SONOSPLAYER_Notify() {
+sub SONOSPLAYER_Notify($$) {
 	my ($hash, $notifyhash) = @_;
 	
-	return undef;
+	my $events = deviceEvents($notifyhash, 1);
+	return if(!$events);
 	
-	# Das folgende habe ich erstmal wieder entfernt, da man ja öfter im laufenden Betrieb die Einstellungen speichert, und den Sonos-Komponenten dann immer wichtige Informationen für den Betrieb fehlen (nicht jedes Save wird vor dem Neustart von Fhem ausgeführt)
-	#if (($notifyhash->{NAME} eq 'global') && (($notifyhash->{CHANGED}[0] eq 'SAVE') || ($notifyhash->{CHANGED}[0] eq 'SHUTDOWN'))) {
-	#	SONOSPLAYER_Log undef, 3, $hash->{NAME}.' has detected a global:'.$notifyhash->{CHANGED}[0].'-Event. Clear out some readings before...';
-	#	
-	#	# Einige Readings niemals speichern
-	#	delete($defs{$hash->{NAME}}{READINGS}{presence});
-	#	delete($defs{$hash->{NAME}}{READINGS}{LastActionResult});
-	#	delete($defs{$hash->{NAME}}{READINGS}{AlarmList});
-	#	delete($defs{$hash->{NAME}}{READINGS}{AlarmListIDs});
-	#	delete($defs{$hash->{NAME}}{READINGS}{AlarmListVersion});
-	#}
-	#
-	#return undef;
+	foreach my $event (@{$events}) {
+		next if(!defined($event));
+		
+		if ($event =~ m/transportState: (.+)/i) {
+			SONOSPLAYER_Log $hash->{NAME}, 5, 'Notify: '.$event;
+			if ($1 eq 'PLAYING') {
+				$hash->{helper}->{simulateCurrentTrackPosition} = AttrVal($hash->{NAME}, 'simulateCurrentTrackPosition', 0);
+				
+				# Wiederholungskette für die Aktualisierung sofort anstarten...
+				InternalTimer(gettimeofday(), 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
+			} else {
+				$hash->{helper}->{simulateCurrentTrackPosition} = 0;
+				
+				# Einmal noch etwas später aktualisieren...
+				InternalTimer(gettimeofday() + 0.1, 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
+			}
+		}
+	}
+	
+	return undef;
+}
+
+########################################################################################
+#
+#  SONOSPLAYER_SimulateCurrentTrackPosition - Implements the Simulation for the currentTrackPosition
+#
+########################################################################################
+sub SONOSPLAYER_SimulateCurrentTrackPosition() {
+	my ($hash) = @_;
+	
+	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
+	
+	readingsBeginUpdate($hash);
+	
+	my $trackDurationSec = SONOS_GetTimeSeconds(ReadingsVal($hash->{NAME}, 'currentTrackDuration', 0)) - 1;
+	my $trackPositionSec = time - SONOS_GetTimeFromString(ReadingsTimestamp($hash->{NAME}, 'currentTrackPositionSec', 0)) + ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
+	readingsBulkUpdate($hash, 'currentTrackPositionSimulated', SONOS_ConvertSecondsToTime($trackPositionSec));
+	readingsBulkUpdate($hash, 'currentTrackPositionSimulatedSec', $trackPositionSec);
+	
+	if ($trackDurationSec) {
+		readingsBulkUpdateIfChanged($hash, 'currentTrackPositionSimulatedPercent', sprintf(AttrVal($hash->{NAME}, 'simulateCurrentTrackPositionPercentFormat', '%.1f'), 100 * $trackPositionSec / $trackDurationSec));
+	} else {
+		readingsBulkUpdateIfChanged($hash, 'currentTrackPositionSimulatedPercent', sprintf(AttrVal($hash->{NAME}, 'simulateCurrentTrackPositionPercentFormat', '%.1f'), 0.0));
+	}
+	
+	readingsEndUpdate($hash, 1);
+		
+	if ($hash->{helper}->{simulateCurrentTrackPosition}) {
+		InternalTimer(gettimeofday() + $hash->{helper}->{simulateCurrentTrackPosition}, 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
+	}
 }
 
 ########################################################################################
@@ -786,7 +886,19 @@ sub SONOSPLAYER_Set($@) {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
 		
-		SONOS_DoWork($udn, 'playURITemp', $value, $value2); 
+		SONOS_DoWork($udn, 'playURITemp', $value, $value2);
+	} elsif ($key =~ m/(start|load)handle/i) {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		# Hier die komplette restliche Zeile in den Text-Parameter packen, da damit auch Leerzeichen möglich sind
+		my $text = '';
+		for(my $i = 2; $i < @a; $i++) {
+			$text .= ' ' if ($i > 2);
+			$text .= $a[$i];
+		}
+		
+		SONOS_DoWork($udn, 'startHandle', $text, (lc($key) eq 'loadhandle'));
 	} elsif (lc($key) eq 'adduritoqueue') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1453,6 +1565,8 @@ sub SONOSPLAYER_Log($$$) {
 </a><br /> One of (0,1). Enables a slider for volumecontrol in detail view.</li>
 <li><a name="SONOSPLAYER_attribut_getAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Initializes a callback-method for Alarms. This included the information of the DailyIndexRefreshTime.</li>
+<li><a name="SONOSPLAYER_attribut_suppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
+</a><br /> One of (0,1). Enables the control-section shown under the Cover-/Titleview.</li>
 <li><a name="SONOSPLAYER_attribut_volumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Defines the stepwidth for subsequent calls of <code>VolumeU</code> and <code>VolumeD</code>.</li>
 </ul></li>
@@ -1467,6 +1581,10 @@ sub SONOSPLAYER_Log($$$) {
 </a><br /> Generates the reading 'InfoSummarize4' with the given format. More Information on this in the examples-section.</li>
 <li><a name="SONOSPLAYER_attribut_getTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gets the current Playing-Informations from the Masterplayer (if one is present).</li>
+<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
+</a><br /> One of (0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,45,60). Starts an internal Timer which refreshs the current trackposition into the Readings <code>currentTrackPositionSimulated</code> and <code>currentTrackPositionSimulatedSec</code>. At the same time the Reading <code>currentTrackPositionSimulatedPercent</code> (between 0.0 and 100.0) will also be refreshed.</li>
+<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
+</a><br /> Defines the format of the percentformat in the Reading <code>currentTrackPositionSimulatedPercent</code>.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
 </a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,<br />InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
 </ul></li>
@@ -1828,6 +1946,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 </a><br /> One of (0,1). Aktiviert einen Slider für die Lautstärkekontrolle in der Detailansicht.</li>
 <li><a name="SONOSPLAYER_attribut_getAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Richtet eine Callback-Methode für Alarme ein. Damit wird auch die DailyIndexRefreshTime automatisch aktualisiert.</li>
+<li><a name="SONOSPLAYER_attribut_suppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
+</a><br /> One of (0,1). Gibt an, ob die Steuerbuttons unter der Cover-/Titelanzeige angezeigt werden sollen (=1) oder nicht (=0).</li>
+</ul></li>
 <li><a name="SONOSPLAYER_attribut_volumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die Schrittweite für die Aufrufe von <code>VolumeU</code> und <code>VolumeD</code>.</li>
 </ul></li>
@@ -1841,7 +1962,11 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize4' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
 <li><a name="SONOSPLAYER_attribut_getTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
-</a><br /> Eins aus (0, 1). Bringt das Device dazu, seine aktuellen Abspielinformationen vom aktuellen Gruppenmaster zu holen, wenn es einen solchen gibt.</li>
+</a><br /> Eins aus (0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,45,60). Bringt das Device dazu, seine aktuellen Abspielinformationen vom aktuellen Gruppenmaster zu holen, wenn es einen solchen gibt.</li>
+<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
+</a><br /> Eins aus (0, 1). Bringt das Device dazu, seine aktuelle Abspielposition simuliert weiterlaufen zu lassen. Dazu werden die Readings <code>currentTrackPositionSimulated</code> und <code>currentTrackPositionSimulatedSec</code> gesetzt. Gleichzeitig wird auch das Reading <code>currentTrackPositionSimulatedPercent</code> (zwischen 0.0 und 100.0) gesetzt.</li>
+<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
+</a><br /> Definiert das Format für die sprintf-Prozentausgabe im Reading <code>currentTrackPositionSimulatedPercent</code>.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
 </a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,I<br />nfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
 </ul></li>

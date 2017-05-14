@@ -78,11 +78,25 @@ sub new {
 	$self->{_subscriptionPort} = $self->{_subscriptionSocket}->sockport();;
 
 	# Create the socket on which we'll listen for SSDP Notifications.
-	$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
-													 Proto => 'udp',
-													 Reuse => 1,
-													 LocalPort => SSDP_PORT) ||
-	croak("Error creating SSDP multicast listen socket: $!\n");
+	# First try with ReusePort...
+	eval {
+		$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
+														 Proto => 'udp',
+														 Reuse => 1,
+														 ReusePort => 1,
+														 LocalPort => SSDP_PORT) ||
+		carp("Error creating SSDP multicast listen socket: $!\n");
+	};
+	if ($@ =~ /Your vendor has not defined Socket macro SO_REUSEPORT/i) {
+		$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
+														 Proto => 'udp',
+														 Reuse => 1,
+														 LocalPort => SSDP_PORT) ||
+		carp("Error creating SSDP multicast listen socket: $!\n");
+	} else {
+		# Weiterwerfen...
+		carp($@);
+	}
 	my $ip_mreq = inet_aton(SSDP_IP) . INADDR_ANY;
 	setsockopt($self->{_ssdpMulticastSocket}, 
 			   IP_LEVEL,
