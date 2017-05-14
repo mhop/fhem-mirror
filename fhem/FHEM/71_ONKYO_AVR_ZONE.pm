@@ -25,12 +25,12 @@ sub ONKYO_AVR_ZONE_Initialize($) {
 
     $hash->{AttrList} =
         "IODev disable:0,1 disabledForIntervals do_not_notify:1,0 "
-      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs model wakeupCmd:textField "
+      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs wakeupCmd:textField "
       . $readingFnAttributes;
 
-    #    $data{RC_layout}{ONKYO_AVR_ZONE_SVG} = "ONKYO_AVR_ZONE_RClayout_SVG";
-    #    $data{RC_layout}{ONKYO_AVR_ZONE}     = "ONKYO_AVR_ZONE_RClayout";
-    $data{RC_makenotify}{ONKYO_AVR_ZONE} = "ONKYO_AVR_RCmakenotify";
+    $data{RC_layout}{ONKYO_AVR_ZONE_SVG} = "ONKYO_AVR_ZONE_RClayout_SVG";
+    $data{RC_layout}{ONKYO_AVR_ZONE}     = "ONKYO_AVR_ZONE_RClayout";
+    $data{RC_makenotify}{ONKYO_AVR_ZONE} = "ONKYO_AVR_ZONE_RCmakenotify";
 
     # 98_powerMap.pm support
     $hash->{powerMap} = {
@@ -1509,6 +1509,57 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
     }
 }
 
+sub ONKYO_AVR_ZONE_RCmakenotify($$) {
+    my ( $name, $ndev ) = @_;
+    my $nname = "notify_$name";
+
+    fhem( "define $nname notify $name set $ndev remoteControl " . '$EVENT', 1 );
+    Log3 undef, 2, "[remotecontrol:ONKYO_AVR_ZONE] Notify created: $nname";
+    return "Notify created by ONKYO_AVR_ZONE: $nname";
+}
+
+sub ONKYO_AVR_ZONE_RClayout_SVG() {
+    my @row;
+
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,power toggle:rc_POWER.svg";
+
+    $row[1] =
+"volume level-up:rc_VOLUP.svg,mute toggle:rc_MUTE.svg,preset up:rc_UP.svg";
+    $row[2] =
+"volume level-down:rc_VOLDOWN.svg,sleep:time_timer.svg,preset down:rc_DOWN.svg";
+
+    $row[3] = ":rc_BLANK.svg,tuning up:rc_UP.svg,:rc_BLANK.svg";
+    $row[4] = "left:rc_LEFT.svg,enter:rc_OK.svg,right:rc_RIGHT.svg";
+    $row[5] =
+"input usb:rc_USB.svg,tuning down:rc_DOWN.svg,input dlna:rc_MEDIAMENU.svg";
+
+    $row[6] = "input tv-cd:rc_TV.svg,input fm:rc_RADIO.svg,input pc:it_pc.svg";
+
+    $row[7] = "attr rc_iconpath icons/remotecontrol";
+    $row[8] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
+sub ONKYO_AVR_ZONE_RClayout() {
+    my @row;
+
+    $row[0] =
+      "hdmi-output 01:HDMI_main,hdmi-output 02:HDMI_sub,power toggle:POWEROFF";
+
+    $row[1] = "volume level-up:VOLUP,mute toggle:MUTE,preset up:UP";
+    $row[2] = "volume level-down:VOLDOWN,sleep:SLEEP,preset down:DOWN";
+
+    $row[3] = ":blank,tuning up:UP,:blank";
+    $row[4] = "left:LEFT,enter:OK,right:RIGHT";
+    $row[5] = "input usb:SOURCE,tuning down:DOWN,input dlna:DLNA";
+
+    $row[6] = "input tv-cd:TV,input fm:FMRADIO,input pc:PC";
+
+    $row[7] = "attr rc_iconpath icons/remotecontrol";
+    $row[8] = "attr rc_iconprefix black_btn_";
+    return @row;
+}
+
 1;
 
 =pod
@@ -1547,6 +1598,7 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
         </ul>
       </ul><br>
       <br>
+
       <a name="ONKYO_AVRset" id="ONKYO_AVRset"></a> <b>Set</b>
       <ul>
         <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
@@ -1642,6 +1694,7 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
         </ul>
       </ul><br>
       <br>
+
       <a name="ONKYO_AVRget" id="ONKYO_AVRget"></a> <b>Get</b>
       <ul>
         <code>get &lt;name&gt; &lt;what&gt;</code><br>
@@ -1658,6 +1711,23 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
         </ul>
       </ul><br>
       <br>
+
+      <a name="ONKYO_AVRattr" id="ONKYO_AVRattr"></a> <b>Attributes</b>
+      <ul>
+        <ul>
+          <li>
+            <b>inputs</b> &nbsp;&nbsp;-&nbsp;&nbsp; List of inputs, auto-generated after first connection to the device. Inputs may be deleted or re-ordered as required. To rename an input, one needs to put a comma behind the current name and enter the new name.
+          </li>
+          <li>
+            <b>volumeSteps</b> &nbsp;&nbsp;-&nbsp;&nbsp; When using set commands volumeUp or volumeDown, the volume will be increased or decreased by these steps. Defaults to 1.
+          </li>
+          <li>
+            <b>wakeupCmd</b> &nbsp;&nbsp;-&nbsp;&nbsp; In case the device is unreachable and one is sending set command "on", this FHEM command will be executed before the actual "on" command is sent. E.g. may be used to turn on a switch before the device becomes available via network.
+          </li>
+        </ul>
+      </ul><br>
+      <br>
+
       <b>Generated Readings/Events:</b><br>
       <ul>
         <li>

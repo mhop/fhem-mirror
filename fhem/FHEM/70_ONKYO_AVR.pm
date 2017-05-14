@@ -3156,7 +3156,7 @@ sub ONKYO_AVR_RCmakenotify($$) {
 
     fhem( "define $nname notify $name set $ndev remoteControl " . '$EVENT', 1 );
     Log3 undef, 2, "[remotecontrol:ONKYO_AVR] Notify created: $nname";
-    return "Notify created by ENIGMA2: $nname";
+    return "Notify created by ONKYO_AVR: $nname";
 }
 
 sub ONKYO_AVR_RClayout_SVG() {
@@ -3248,6 +3248,7 @@ sub ONKYO_AVR_RClayout() {
         </ul>
       </ul><br>
       <br>
+
       <a name="ONKYO_AVRset" id="ONKYO_AVRset"></a> <b>Set</b>
       <ul>
         <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
@@ -3346,6 +3347,7 @@ sub ONKYO_AVR_RClayout() {
         </ul>
       </ul><br>
       <br>
+
       <a name="ONKYO_AVRget" id="ONKYO_AVRget"></a> <b>Get</b>
       <ul>
         <code>get &lt;name&gt; &lt;what&gt;</code><br>
@@ -3365,6 +3367,29 @@ sub ONKYO_AVR_RClayout() {
         </ul>
       </ul><br>
       <br>
+
+      <a name="ONKYO_AVRattr" id="ONKYO_AVRattr"></a> <b>Attributes</b>
+      <ul>
+        <ul>
+          <li>
+            <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pings the device every X seconds to verify connection status. Defaults to 60 seconds.
+          </li>
+          <li>
+            <b>inputs</b> &nbsp;&nbsp;-&nbsp;&nbsp; List of inputs, auto-generated after first connection to the device. Inputs may be deleted or re-ordered as required. To rename an input, one needs to put a comma behind the current name and enter the new name.
+          </li>
+          <li>
+            <b>model</b> &nbsp;&nbsp;-&nbsp;&nbsp; Contains the model name of the device. Cannot not be changed manually as it is going to be overwritten be the module.
+          </li>
+          <li>
+            <b>volumeSteps</b> &nbsp;&nbsp;-&nbsp;&nbsp; When using set commands volumeUp or volumeDown, the volume will be increased or decreased by these steps. Defaults to 1.
+          </li>
+          <li>
+            <b>wakeupCmd</b> &nbsp;&nbsp;-&nbsp;&nbsp; In case the device is unreachable and one is sending set command "on", this FHEM command will be executed before the actual "on" command is sent. E.g. may be used to turn on a switch before the device becomes available via network.
+          </li>
+        </ul>
+      </ul><br>
+      <br>
+
       <b>Generated Readings/Events:</b><br>
       <ul>
         <li>
