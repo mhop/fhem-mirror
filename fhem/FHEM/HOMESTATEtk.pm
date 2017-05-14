@@ -14,9 +14,9 @@ my %stateSecurity = (
     de =>
       [ 'unverriegelt', 'verriegelt', 'geschützt', 'gesichert', 'überwacht' ],
     icons => [
-        'status_open',  'status_standby',
-        'status_night', 'status_locked',
-        'building_security'
+        'status_open@yellow', 'status_standby@yellow@green',
+        'status_night@green', 'status_locked@green',
+        'building_security@green'
     ],
 );
 
@@ -391,10 +391,10 @@ sub HOMESTATEtk_Set($$$) {
     my $name = shift @$a;
     my $lang =
       lc( AttrVal( $name, "Lang", AttrVal( "global", "language", "EN" ) ) );
-    my $langUc    = uc($lang);
-    my $residents = ( $hash->{RESIDENTS} ? $hash->{RESIDENTS} : undef );
-    my $state     = ReadingsVal( $name, "state", "" );
-    my $mode      = ReadingsVal( $name, "mode", "" );
+    my $langUc   = uc($lang);
+    my $state    = ReadingsVal( $name, "state", "" );
+    my $mode     = ReadingsVal( $name, "mode", "" );
+    my $security = ReadingsVal( $name, "security", "" );
     my $autoMode =
       HOMESTATEtk_GetIndexFromArray( ReadingsVal( $name, "autoMode", "on" ),
         $stateOnoff{en} );
@@ -453,6 +453,10 @@ sub HOMESTATEtk_Set($$$) {
     $usage .= " $usageL" unless ( $lang eq "en" );
     return "Set usage: choose one of $usage"
       unless ( $cmd && $cmd ne "?" );
+
+    return
+      "Device is currently $security and cannot be controlled at this state"
+      unless ( $security =~ m/^unlocked|locked$/ );
 
     # mode
     if (   $cmd eq "state"
@@ -670,8 +674,13 @@ sub HOMESTATEtk_Get($$$) {
 
 sub HOMESTATEtk_Attr(@) {
     my ( $cmd, $name, $attribute, $value ) = @_;
-    my $hash = $defs{$name};
-    my $TYPE = $hash->{TYPE};
+    my $hash     = $defs{$name};
+    my $TYPE     = $hash->{TYPE};
+    my $security = ReadingsVal( $name, "security", "" );
+
+    return
+      "Device is currently $security and attributes cannot be changed at this state"
+      unless ( !$init_done || $security =~ m/^unlocked|locked$/ );
 
     if ( $attribute eq "HomestateDevices" ) {
         return "Value for $attribute has invalid format"
@@ -815,11 +824,10 @@ sub HOMESTATEtk_Attr(@) {
 
 sub HOMESTATEtk_Notify($$) {
     my ( $hash, $dev ) = @_;
-    my $name      = $hash->{NAME};
-    my $TYPE      = $hash->{TYPE};
-    my $devName   = $dev->{NAME};
-    my $devPrefix = RESIDENTStk_GetPrefixFromType($devName);
-    my $devType   = GetType($devName);
+    my $name    = $hash->{NAME};
+    my $TYPE    = $hash->{TYPE};
+    my $devName = $dev->{NAME};
+    my $devType = GetType($devName);
 
     if ( $devName eq "global" ) {
         my $events = deviceEvents( $dev, 1 );
@@ -917,6 +925,8 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             if (   $event !~ /^[a-zA-Z\d._]+:/
                 || $event =~ /^state:/
                 || $event =~ /^presence:/
+                || $event =~ /^mode:/
+                || $event =~ /^security:/
                 || $event =~ /^wayhome:/
                 || $event =~ /^wakeup:/ )
             {
@@ -1092,7 +1102,7 @@ sub HOMESTATEtk_GetDaySchedule($;$$$$$) {
     foreach my $holidayDev ( split( /,/, $holidayDevs ) ) {
         next
           unless ( IsDevice( $holidayDev, "holiday" )
-            && AttVal( "global", "holiday2we", "" ) ne $holidayDev );
+            && AttrVal( "global", "holiday2we", "" ) ne $holidayDev );
 
         my $date = sprintf( "%02d-%02d", $ret->{monISO}, $ret->{mday} );
         my $tod = holiday_refresh( $holidayDev, $date );
