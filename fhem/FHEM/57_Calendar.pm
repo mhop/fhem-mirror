@@ -876,23 +876,26 @@ sub addproperty($$) {
   my ($key,$parts,$parameter);
   if($line =~ /^([\w\d\-]+)(;(.*))?:(.*)$/) {
     $key= $1;
-    $parts= defined($3) ? $3 : "";
-    $parameter= defined($4) ? $4 : "";
+    $parts= $3 // "";
+    $parameter= $4 // "";
   } else {
     return;
   }
   return unless($key);
+  #main::Debug "addproperty for key $key";
   
   # ignore some properties
-  my @ignores= qw(TRANSP STATUS ATTENDEE);
-  return if($key ~~ @ignores);
-  return if($key =~ /^X-/);
+  # commented out: it is faster to add the property than to do the check
+  # return if(($key eq "ATTENDEE") or ($key eq "TRANSP") or ($key eq "STATUS")); 
+  return if(substr($key,0,2) eq "^X-");
 
-  if(($key eq "EXDATE") or ($key eq "RDATE")) {
+  if(($key eq "RDATE") or ($key eq "EXDATE")) {
+        #main::Debug "addproperty for dates";
         # handle multiple properties
         my @values;
         @values= @{$self->values($key)} if($self->hasKey($key));
         push @values, $parameter;
+        #main::Debug "addproperty pushed parameter $parameter to key $key";
         $self->{properties}{$key}= {
             multiple => 1,
             VALUES => \@values,
@@ -908,35 +911,35 @@ sub addproperty($$) {
 }
 
 sub parse($$) {
-  my ($self,@ical)= @_;
-  return $self->parseSub(0, @ical);
+  my ($self,$ics)= @_;
+  
+  my @ical= split /\R/, $ics;
+  return $self->parseSub(0, \@ical);
 }
 
 sub parseSub($$$) {
-  my ($self,$ln,@ical)= @_;
+  my ($self,$ln,$icalref)= @_;
+  my $len= scalar @$icalref;
+  #main::Debug "lines= $len";
   #main::Debug "ENTER @ $ln";
-  while($ln<$#ical) {
-    my $line= $ical[$ln];
-    chomp $line;
-    $line =~ s/[\x0D]$//; # chomp will not remove the CR
+  while($ln< $len) {
+    my $line= $$icalref[$ln];
     $ln++;
     # check for and handle continuation lines (4.1 on page 12)
-    while($ln<$#ical) {
-      my $line1= $ical[$ln];
-      last unless($line1 =~ /^\s(.*)/);
-      $line.= $1;
-      chomp $line;
-      $line =~ s/[\x0D]$//; # chomp will not remove the CR
+    while($ln< $len) {
+      my $line1= $$icalref[$ln];
+      last if(substr($line1,0,1) ne " ");
+      $line.= substr($line1,1);
       $ln++;
     };
     #main::Debug "$ln: $line";
     next if($line eq ""); # ignore empty line
-    last if($line =~ m/^END:.*$/);
-    if($line =~ m/^BEGIN:(.*)$/) {
-      my $entry= ICal::Entry->new($1);
+    last if(substr($line,0,4) eq "END:");
+    if(substr($line,0,6) eq "BEGIN:") {
+      my $entry= ICal::Entry->new(substr($line,6));
       $entry->{ln}= $ln;
       push @{$self->{entries}}, $entry;
-      $ln= $entry->parseSub($ln,@ical);
+      $ln= $entry->parseSub($ln,$icalref);
     } else {
       $self->addproperty($line);
     }
@@ -2201,13 +2204,9 @@ sub Calendar_UpdateCalendar($$$$) {
   Log3 $hash, 4, "Calendar $name: parsing data"; 
   #main::Debug "Calendar $name: parsing data"; 
 
-  
-  # we remove disturbing CRs from the file
-  $ics =~ s/[\r\n]+/\n/g; 
-  
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
-  $ical->parse(split("\n",$ics));
+  $ical->parse($ics);
   
   #main::Debug "*** Result:";
   #main::Debug $ical->asString();
@@ -2223,7 +2222,7 @@ sub Calendar_UpdateCalendar($$$$) {
     else {
       Log3 $hash, 4, "Calendar $name: unzipping data"; 
       $ics = Compress::Zlib::memGunzip($ics);
-      $ical->parse(split("\n",$ics));
+      $ical->parse($ics);
       @entries= @{$ical->{entries}};
     }
   };
