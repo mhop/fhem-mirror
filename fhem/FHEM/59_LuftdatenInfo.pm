@@ -57,6 +57,7 @@ sub LuftdatenInfo_Initialize($) {
     . "disable:1,0 "
     . "disabledForIntervals "
     . "interval "
+    . "timeout "
     . $readingFnAttributes
   ;
 }
