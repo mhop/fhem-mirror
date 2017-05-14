@@ -3419,7 +3419,7 @@ FW_widgetOverride($$)
         </ul>
         Second form:<br>
         <ul>
-        Perl regexp enclosed in {}. If the code returns undef, then the default
+        Perl code enclosed in {}. If the code returns undef, then the default
         icon is used, if it retuns a string enclosed in <>, then it is
         interpreted as an html string. Else the string is interpreted as a
         devStateIcon of the first fom, see above.

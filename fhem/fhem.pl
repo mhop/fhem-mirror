@@ -2721,15 +2721,16 @@ CommandAttr($$)
       }
     }
 
-    my %ra = ("suppressReading"            => 1,
-              "event-on-update-reading"    => 1,
-              "event-on-change-reading"    => 2,
-              "timestamp-on-change-reading"=> 1,
-              "event-min-interval"         => 2);
+    my %ra = ("suppressReading"            => { s=>"\n" },
+              "event-on-update-reading"    => { s=>"," },
+              "event-on-change-reading"    => { s=>",", r=>":.*" },
+              "timestamp-on-change-reading"=> { s=>"," },
+              "event-min-interval"         => { s=>",", r=>";.*" },
+              "devStateIcon"               => { s=>" ", r=>":.*" } );
     if(defined($a[2]) && $ra{$attrName}) {
       my $lval = $a[2];
-      $lval =~ s/:.*// if($ra{$attrName} == 2);
-      for my $v (split(",", $lval)) {
+      for my $v (split($ra{$attrName}{s}, $lval)) {
+        $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
         my $err = "Argument $v for attr $sdev $a[1] is not a valid regexp";
         return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
         eval { "Hallo" =~ m/^$v$/ };
