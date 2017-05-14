@@ -2256,7 +2256,7 @@ sub SYSMON_getRamAndSwap($$) {
   if($hash->{helper}->{excludes}{'ramswap'}) {return $map;}
 
   #my @speicher = qx(free -m);
-  my @speicher = SYSMON_execute($hash, "free");
+  my @speicher = SYSMON_execute($hash, "LANG=en free");
 
   if(!@speicher) {
     return $map;
@@ -2300,11 +2300,18 @@ sub SYSMON_getRamAndSwap($$) {
     if(defined($cached)) {
       $cached  = $cached / 1024;
     } else {
-      # Bei FritzBox wird dieser Wert nicht ausgageben
+      # Bei FritzBox wird dieser Wert nicht ausgegeben
       $cached  = 0;
     }
-    $used_clean = $used - $buffers - $cached;
-    $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free + $buffers + $cached));
+    #$used_clean = $used - $buffers - $cached;
+    #$ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free + $buffers + $cached));
+    if ($total > 2048) {
+       $used_clean = $used;
+       $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free));
+     } else {
+       $used_clean = $used - $buffers - $cached;
+       $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free + $buffers + $cached));
+     }
   }
   else
   {
@@ -2832,8 +2839,10 @@ sub SYSMON_getNetworkInfo ($$$) {
       }
       
       my $speed;
-      if ($nName eq "wlan0") {
-        my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nName 2>/dev/null");
+      #if ($nName eq "wlan0") {
+      if($nName=~m/wlan/) {
+        #my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nName 2>/dev/null");
+        my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nDef 2>/dev/null");
         foreach (@iwData) {
           if($_=~ m/Bit\sRate+(=|:)*(\S*)/) {
             $speed=$2;
