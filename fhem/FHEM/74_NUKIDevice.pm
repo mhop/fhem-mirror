@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 
 
-my $version = "0.6.0";
+my $version = "0.6.1";
 
 
 
@@ -456,13 +456,13 @@ sub NUKIDevice_WriteReadings($$) {
         my ($state,$lockState);
         
         
-        if( defined($decode_json->{success}) and $decode_json->{success} eq "true" ) {
+        if( defined($decode_json->{success}) and ($decode_json->{success} eq "true" or $decode_json->{success} eq "1") ) {
         
             $state = $hash->{helper}{lockAction};
             $lockState = $hash->{helper}{lockAction};
             NUKIDevice_ReadFromNUKIBridge($hash, "lockState", undef, $hash->{NUKIID} ) if( ReadingsVal($hash->{IODev}->{NAME},'bridgeType','Software') eq 'Software' );
             
-        } elsif ( defined($decode_json->{success}) and $decode_json->{success} eq "false" ) {
+        } elsif ( defined($decode_json->{success}) and ($decode_json->{success} eq "false" or $decode_json->{success} eq "0") ) {
         
             $state = "error";
             NUKIDevice_ReadFromNUKIBridge($hash, "lockState", undef, $hash->{NUKIID} );

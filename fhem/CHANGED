@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_NUKIDevice: fix success Reading num
   - bugfix:  42_SYSMON: wlan speed, memory usage detection
   - update:  57_Calender: optimization for speed
   - bugfix:  36_Vallox: Changed way multireadings are updated.
