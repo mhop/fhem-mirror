@@ -51,7 +51,11 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
-# 13.05.2017
+# 15.05.2017
+#	Bei der Ermittlung der Masterplayer werden "unsichtbare" Player (wie Bridge o.ä.) nun unterdrückt.
+#	An einer Stelle wurde ein fehlerhafter Default-Wert für 'currentTrackPositionSec' eingesetzt, was zu Folgefehlern führte.
+#	Die Wiederverwendung von Ports für die UPnP-Erkennung muss nun mittels dem Attribut 'reusePorts' aktiviert werden.
+# 14.05.2017
 #	FHEMWEB-Anzeige der Player auf die neu möglichen, nicht quadratischen, Radiocover angepasst.
 #	In der Datei ControlPoint.pm wurde beim Öffnen des SSDP-Ports das Attribut ReusePort hinzugefügt (sofern das Betriebssystem das unterstützt).
 #	Es gibt ein neues Reading "currentEnqueuedTransportHandle", welches zur Weitergabe der aktuellen Quelle des aktuellen Titels verwendet werden kann.
@@ -94,10 +98,6 @@
 #	Interne Aufräumarbeiten: Mittlerweile überflüssige Codeteile wurden entfernt, und einige Single-Readingsupdates zu einem Bulk-Readingsupdate zusammengefasst.
 #	Die Readings "currentFavouriteNameMasked", "currentPlaylistNameMasked" und "currentRadioNameMasked" werden automatisch gesetzt, wenn das Attribut "getListsDirectlyToReadings" gesetzt ist.
 #	Tippfehler bei den Readings "RadioList" und "RadioListAlias" korrigiert. Korrekt ist nun "RadiosList" und "RadiosListAlias" (also Mehrzahl bei Radios).
-# 19.03.2017
-#	Es gibt ein neues Attribut "getListsDirectlyToReadings", mit welchem die UserReadings bzgl. Favourites, Playlists und Radios (sowie currentTrackPosition) obsolet werden, da sie dann direkt in die passenden Readings geschrieben werden. Wenn man selber beeinflussen möchte, auf welche Weise und mit welchem Namen diese Readings gefüllt werden, dann darf dieses Attribut nicht gesetzt werden (es bleibt dann das bisherige Verhalten)
-#	Es gibt zwei neue Getter "Queue" und "QueueWithCovers", welche die aktuelle Abspielliste liefern. Diese können wieder mit UserReadings oder dem neuen Attribut "getListsDirectlyToReadings" in entsprechende Readings übertragen werden. Hierbei werden auch zwei neue Readings "QueueDuration" und "QueueDurationSec" gefüllt, die die gesamte Abspieldauer der Abspielliste enthalten.
-#	Die Prozedur "SONOS_getGroupsRG()" wurde umgebaut, da FW_makeImage von FhemWeb scheinbar die Variable "$_" verändert.
 #
 ########################################################################################
 #
@@ -165,6 +165,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 ########################################################
 my %ignoredIPs = ();
 my %usedonlyIPs = ();
+my $reusePort = 0;
 
 
 ########################################################
@@ -242,7 +243,7 @@ my %sets = (
 );
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
-my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout getListsDirectlyToReadings getTitleInfoFromMaster stopSleeptimerInAction saveSleeptimerInAction);
+my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout getListsDirectlyToReadings getTitleInfoFromMaster stopSleeptimerInAction saveSleeptimerInAction webname);
 my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble TruePlay SurroundEnable SurroundLevel SubEnable SubGain SubPolarity AudioDelay AudioDelayLeftRear AudioDelayRightRear NightMode DialogLevel AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupState ZoneGroupID fieldType IsBonded ZoneGroupName roomName roomNameAlias roomIcon currentTransportState transportState TransportState LineInConnected presence currentAlbum currentArtist currentTitle currentStreamAudio GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash GroupMasterPlayer ShareIndexInProgress DirectControlClientID DirectControlIsSuspended DirectControlAccountID IsMaster MasterPlayer SlavePlayer ButtonState ButtonLockState AllPlayer LineInName LineInIcon MusicServicesListVersion MusicServicesList);
 
 # Communication between the two "levels" of threads
@@ -376,7 +377,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 getListsDirectlyToReadings:1,0 deviceRoomView:Both,DeviceLineOnly '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 getListsDirectlyToReadings:1,0 deviceRoomView:Both,DeviceLineOnly reusePort:1,0 webname '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -487,7 +488,7 @@ sub SONOS_getCoverTitleRG($;$$) {
 	$transportState = FW_makeImage('audio_pause', 'Paused', 'SONOS_Transportstate') if ($transportState eq 'PAUSED_PLAYBACK');
 	$transportState = FW_makeImage('audio_stop', 'Stopped', 'SONOS_Transportstate') if ($transportState eq 'STOPPED');
 	
-	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$device.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$device.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'\';"><div style="position: absolute; top: 10px; left: 5px; display: inline-block; height: 35px; width: 35px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><div style="display: inline-block; height: calc(100% - 70px); width: 100%; background-image: url('.((lc($presence) eq 'disappeared') ? '/fhem/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.((lc($presence) eq 'disappeared') ? 'Player disappeared' : ReadingsVal($device, 'infoSummarize1', '')).'</div><div id="hash_'.$device.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$device.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$device.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$device.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$device.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$device.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
+	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$device.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$device.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'\';"><div style="position: absolute; top: 10px; left: 5px; display: inline-block; height: 35px; width: 35px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><div style="display: inline-block; height: calc(100% - 70px); width: 100%; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.((lc($presence) eq 'disappeared') ? 'Player disappeared' : ReadingsVal($device, 'infoSummarize1', '')).'</div><div id="hash_'.$device.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$device.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$device.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$device.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$device.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$device.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
 	
 	my $javascriptTimer = 'function refreshTime'.$device.'() {
 		var playing = document.getElementById("prog_playing_'.$device.'");
@@ -560,7 +561,7 @@ sub SONOS_getCoverRG($;$) {
 	my $presence = ReadingsVal($device, 'presence', 'disappeared');
 	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
 	
-	return '<div informid="'.$device.'-display_coverrg"><div style="display: inline-block; margin-right: 5px; border: 1px solid lightgray; height: '.$height.'; width: '.$height.'; background-image: url('.((lc($presence) eq 'disappeared') ? '/fhem/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: 0px; left: 2px; display: inline-block; height: 15px; width: 15px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></div>';
+	return '<div informid="'.$device.'-display_coverrg"><div style="display: inline-block; margin-right: 5px; border: 1px solid lightgray; height: '.$height.'; width: '.$height.'; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: 0px; left: 2px; display: inline-block; height: 15px; width: 15px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></div>';
 }
 
 ########################################################################################
@@ -1323,7 +1324,7 @@ sub SONOS_Read($) {
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbum", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentOriginalTrackNumber", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbumArtist", '');
-			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbumArtURL", '/fhem/sonos/cover/empty.jpg');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbumArtURL", '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentSender", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentSenderCurrent", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentSenderInfo", '');
@@ -1337,7 +1338,7 @@ sub SONOS_Read($) {
 			SONOS_readingsBulkUpdateIfChanged($hash, "nextArtist", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbum", '');
 			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbumArtist", '');
-			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbumArtURL", '/fhem/sonos/cover/empty.jpg');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbumArtURL", '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg');
 			SONOS_readingsBulkUpdateIfChanged($hash, "nextOriginalTrackNumber", '');
 			
 			# End the Bulk-Update, and trigger events...
@@ -1466,7 +1467,7 @@ sub SONOS_Read($) {
 				
 				if ($current{StreamAudio} && ($oldTransportState eq $current{TransportState})) {
 					SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPosition", '0:00:00');
-					SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPositionSec", '0:00:00');
+					SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPositionSec", '0');
 				} else {
 					readingsBulkUpdate($hash, "currentTrackPosition", $current{TrackPosition});
 					readingsBulkUpdate($hash, "currentTrackPositionSec", $current{TrackPositionSec});
@@ -1660,10 +1661,10 @@ sub SONOS_Read($) {
 				# Die URL noch beim aktuellen Titel mitspeichern
 				my $URL = $srcURI;
 				if ($URL =~ m/\/lib\/UPnP\/sonos_(.*)/i) {
-					$URL = '/fhem/sonos/cover/'.$1;
+					$URL = '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/'.$1;
 				} else {
 					my $sonosName = SONOS_getSonosPlayerByName()->{NAME};
-					$URL = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($URL) if (AttrVal($sonosName, 'generateProxyAlbumArtURLs', 0));
+					$URL = '/'.AttrVal($sonosName, 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($URL) if (AttrVal($sonosName, 'generateProxyAlbumArtURLs', 0));
 				}
 				
 				if ($nextReading eq 'next') {
@@ -1856,7 +1857,7 @@ sub SONOS_InitClientProcess($) {
 	}
 	
 	# Grundsätzliche Informationen bzgl. der konfigurierten Player übertragen...
-	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', $SONOS_DEFAULTPINGTYPE).':'.AttrVal($hash->{NAME}, 'usedonlyIPs', '').':'.AttrVal($hash->{NAME}, 'ignoredIPs', '').':'.join(',', @playername).':'.join(',', @playerudn);
+	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', $SONOS_DEFAULTPINGTYPE).':'.AttrVal($hash->{NAME}, 'usedonlyIPs', '').':'.AttrVal($hash->{NAME}, 'ignoredIPs', '').':'.AttrVal($hash->{NAME}, 'reusePort', 0).':'.join(',', @playername).':'.join(',', @playerudn);
 	SONOS_Log undef, 5, $setDataString;
 	DevIo_SimpleWrite($hash, $setDataString."\n", 0);
 	
@@ -4306,7 +4307,7 @@ sub SONOS_Discover() {
 		$SONOS_RestartControlPoint = 0;
 		
 		eval {
-			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 30, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs);
+			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 30, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs, ReusePort => $reusePort);
 			$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
 			$SONOS_Controlpoint->handle;
 		};
@@ -4618,7 +4619,7 @@ sub SONOS_MakeCoverURL($$) {
 		$search = 'SQ:'.$1 if ($search =~ m/#(\d+)/i);
 		
 		# Default, if nothing could be retreived...
-		$resURL = '/fhem/sonos/cover/playlist.jpg';
+		$resURL = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/playlist.jpg';
 		
 		if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
 			my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse($search, 'BrowseDirectChildren', '', 0, 15, '');
@@ -4671,7 +4672,7 @@ sub SONOS_MakeCoverURL($$) {
 	}
 	
 	# Alles über Fhem als Proxy laufen lassen?
-	$resURL = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($resURL) if (($resURL !~ m/^\//) && SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+	$resURL = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($resURL) if (($resURL !~ m/^\//) && SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
 	
 	SONOS_Log $udn, 0, 'MakeCoverURL-After: '.$resURL;
 	
@@ -5018,7 +5019,7 @@ sub SONOS_RestoreOldPlaystate() {
 	SONOS_Log undef, 1, 'Restore-Thread gestartet. Warte auf Arbeit...';
 	
 	my $runEndlessLoop = 1;
-	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 20, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs);
+	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 20, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs, ReusePort => $reusePort);
 	
 	$SIG{'PIPE'} = 'IGNORE';
 	$SIG{'CHLD'} = 'IGNORE';
@@ -5240,15 +5241,15 @@ sub SONOS_GetTrackProvider($;$) {
 	} elsif ($songURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
 		my $elem = 'LineIn';
 		$elem = $songTitle if (defined($songTitle) && $songTitle);
-		return ($elem.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/fhem/sonos/cover/linein_round.png', '/fhem/sonos/cover/linein_quadratic.jpg');
+		return ($elem.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/linein_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/linein_quadratic.jpg');
 	} elsif ($songURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
-		return ('Dock-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/fhem/sonos/cover/dock_round.png', '/fhem/sonos/cover/dock_quadratic.jpg');
+		return ('Dock-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/dock_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/dock_quadratic.jpg');
 	} elsif ($songURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
-		return ('SPDIF-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/fhem/sonos/cover/playbar_round.png', '/fhem/sonos/cover/playbar_quadratic.jpg');
+		return ('SPDIF-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1), '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/playbar_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/playbar_quadratic.jpg');
 	} elsif (($songURI =~ m/^http:(\/\/.*)/) || ($songURI =~ m/^aac:(\/\/.*)/) || ($songURI =~ m/x-rincon-mp3radio:\/\//)) {
-		return ('Radio', '/fhem/sonos/cover/tunein_round.png', '/fhem/sonos/cover/tunein_quadratic.jpg');
+		return ('Radio', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/tunein_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/tunein_quadratic.jpg');
 	} elsif ($songURI =~ m/^\/\//) {
-		return ('Bibliothek', '/fhem/sonos/cover/bibliothek_round.png', '/fhem/sonos/cover/bibliothek_quadratic.jpg');
+		return ('Bibliothek', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/bibliothek_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/bibliothek_quadratic.jpg');
 	}
 	
 	my $result = '';
@@ -6298,6 +6299,9 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 			my $coordinator = $2;
 			my $member = $3;
 			
+			# Keine Bridge o.ä. verwenden...
+			next if ($member =~ m/IsZoneBridge="1"/i);
+			
 			$masterPlayerName = SONOS_Client_Data_Retreive($coordinator.'_MR', 'def', 'NAME', $coordinator.'_MR');
 			
 			# Ist dieser Player in einem ChannelMapSet (also einer Paarung) enthalten?
@@ -6904,7 +6908,7 @@ sub SONOS_TransportCallback($$) {
 				}
 				SONOS_Client_Notifier('SetCurrent:Artist:');
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_default.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_default.jpg:');
 			} elsif ($currentTrackURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
 				# Dock-Wiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentAlbum', SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1)));
@@ -6916,7 +6920,7 @@ sub SONOS_TransportCallback($$) {
 				
 				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle);
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_dock.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_dock.jpg:');
 			} elsif ($currentTrackURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
 				# LineIn-Wiedergabe der Playbar feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
@@ -6925,7 +6929,7 @@ sub SONOS_TransportCallback($$) {
 				
 				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = 'SPDIF-Wiedergabe von '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_tv.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_tv.jpg:');
 			} else {
 				# Titel ermitteln
 				if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i) {
@@ -8316,6 +8320,10 @@ sub SONOS_AnalyzeTopologyForMasterPlayer($;$) {
 		my $udn = $1.'_MR';
 		my $zoneGroup = $2;
 		my $name = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', '~~~DELETE~~~');
+		
+		# Keine Bridge o.ä. verwenden...
+		next if ($2 =~ m/IsZoneBridge="1"/i);
+		
 		$masterPlayer{$udn} = $udn;
 		if ($name ne '~~~DELETE~~~') {
 			push(@allplayer, $name) if (!SONOS_isInList($name, @allplayer));
@@ -8741,10 +8749,10 @@ sub SONOS_MusicServicesCallback($$) {
 				$musicServices{$id}{ServiceType} = $serviceTypes[$servicepos++];
 				
 				$musicServices{$id}{IconQuadraticURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-400x400.png';
-				$musicServices{$id}{IconQuadraticURL} = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconQuadraticURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+				$musicServices{$id}{IconQuadraticURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconQuadraticURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
 				
 				$musicServices{$id}{IconRoundURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-72x72.png';
-				$musicServices{$id}{IconRoundURL} = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconRoundURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+				$musicServices{$id}{IconRoundURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconRoundURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
 				
 				$musicServices{$id}{SMAPI} = $smapi;
 				$musicServices{$id}{Resolution} = $resolution;
@@ -9937,7 +9945,7 @@ sub SONOS_Client_ConsumeMessage($$) {
 		$SONOS_Client_Selector->remove($client);
 		shutdown($client, 2);
 		close($client);
-	} elsif ($msg =~ m/SetData:(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*)/i) {
+	} elsif ($msg =~ m/SetData:(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*)/i) {
 		$SONOS_Client_Data{SonosDeviceName} = $1;
 		$SONOS_Client_LogLevel = $2;
 		$SONOS_Client_Data{pingType} = $3;
@@ -9954,10 +9962,12 @@ sub SONOS_Client_ConsumeMessage($$) {
 			$ignoredIPs{SONOS_Trim($elem)} = 1;
 		}
 		
-		my @names = split(/,/, $6);
+		$reusePort = $6;
+		
+		my @names = split(/,/, $7);
 		$SONOS_Client_Data{PlayerNames} = shared_clone(\@names);
 		
-		my @udns = split(/,/, $7);
+		my @udns = split(/,/, $8);
 		$SONOS_Client_Data{PlayerUDNs} = shared_clone(\@udns);
 		
 		my @playeralive = ();
@@ -10351,6 +10361,8 @@ The order in the sublists are important, because the first entry defines the so-
 </a><br />With this attribute you can define IP-addresses, which has to be ignored by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
+<li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
+</a><br /> One of (0,1). If defined the socket-Attribute 'reuseport' will be used for SSDP Discovery-Port. Can solve restart-problems. If you don't have such problems don't use this attribute.</li>
 <li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />With this attribute you can define IP-addresses, which has to be exclusively used by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 </ul></li>
@@ -10369,6 +10381,8 @@ The order in the sublists are important, because the first entry defines the so-
 </a><br />Defines a directory where the cached Coverfiles can be placed. If not defined "/tmp" will be used.</li>
 <li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br />A time in seconds. With a definition other than "0" the caching mechanism of the internal Sonos-Module-Proxy will be activated. If the filetime of the chached cover is older than this time, it will be reloaded from the Sonosplayer.</li>
+<li><a name="SONOS_attribut_webname"><b><code>webname &lt;String&gt;</code></b>
+</a><br /> With the attribute you can define the used webname for coverlinks. Defaults to 'fhem' if not given.</li>
 </ul></li>
 <li><b>Speak Configuration</b><ul>
 <li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
@@ -10533,6 +10547,8 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die vom UPnP-System ignoriert werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
+<li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
+</a><br /> Eines von (0,1). Gibt an, ob die Portwiederwendung für SSDP aktiviert werden soll, oder nicht. Kann Restart-Probleme lösen. Wenn man diese Probleme nicht hat, sollte man das Attribut nicht setzen.</li>
 <li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die ausschließlich vom UPnP-System berücksichtigt werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 </ul></li>
@@ -10551,6 +10567,8 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 </a><br /> Hiermit wird das Verzeichnis festgelegt, in dem die Cober zwischengespeichert werden. Wenn nicht festegelegt, so wird "/tmp" verwendet.</li>
 <li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br /> Mit einer Angabe ungleich 0 wird der Caching-Mechanismus des Sonos-Modul-Proxy-Servers aktiviert. Dabei werden Cover, die im Cache älter sind als diese Zeitangabe in Sekunden, neu vom Sonosplayer geladen, alle anderen direkt ausgeliefert, ohne den Player zu fragen.</li>
+<li><a name="SONOS_attribut_webname"><b><code>webname &lt;String&gt;</code></b>
+</a><br /> Hiermit kann der zu verwendende Webname für die Cover-Link-Erzeugung angegeben werden. Da vom Modul Links zu Cover u.ä. erzeugt werden, ohne dass es einen FhemWeb-Aufruf dazu gibt, kann das Modul diesen Pfad nicht selber herausfinden. Wenn das Attribut nicht angegeben wird, dann wird 'fhem' angenommen.</li>
 </ul></li>
 <li><b>Sprachoptionen</b><ul>
 <li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>

@@ -62,6 +62,9 @@ sub new {
 	my $maxWait = $args{MaxWait} || 3;
 	%IGNOREIP = %{$args{IgnoreIP}};
 	%USEDONLYIP = %{$args{UsedOnlyIP}};
+	
+	my $reuseport = $args{ReusePort};
+	$reuseport = 0 if (!defined($reuseport));
 
 	# Create the socket on which search requests go out
     $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp', LocalPort => $searchPort) || croak("Error creating search socket: $!\n");
@@ -78,12 +81,12 @@ sub new {
 	$self->{_subscriptionPort} = $self->{_subscriptionSocket}->sockport();;
 
 	# Create the socket on which we'll listen for SSDP Notifications.
-	# First try with ReusePort...
+	# First try with ReusePort (if given as parameter)...
 	eval {
 		$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
 														 Proto => 'udp',
 														 Reuse => 1,
-														 ReusePort => 1,
+														 ReusePort => $reuseport,
 														 LocalPort => SSDP_PORT) ||
 		carp("Error creating SSDP multicast listen socket: $!\n");
 	};
