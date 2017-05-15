@@ -6299,9 +6299,6 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 			my $coordinator = $2;
 			my $member = $3;
 			
-			# Keine Bridge o.ä. verwenden...
-			next if ($member =~ m/IsZoneBridge="1"/i);
-			
 			$masterPlayerName = SONOS_Client_Data_Retreive($coordinator.'_MR', 'def', 'NAME', $coordinator.'_MR');
 			
 			# Ist dieser Player in einem ChannelMapSet (also einer Paarung) enthalten?
