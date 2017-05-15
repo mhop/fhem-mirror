@@ -613,7 +613,11 @@ sub cfgDB_MigrationImport() {
 	@def = _cfgDB_findDef('TYPE=holiday','NAME');
 	foreach $filename (@def) {
 		next unless $filename;
-		push @files, "$modpath/FHEM/".$filename.".holiday";
+		if(defined($defs{$filename}{HOLIDAYFILE})) {
+           push @files, $defs{$filename}{HOLIDAYFILE};
+		} else {
+           push @files, "$modpath/FHEM/".$filename.".holiday";
+		}
 	}
 
 # import uniqueID file
