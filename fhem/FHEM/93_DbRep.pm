@@ -25,6 +25,7 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #  Credits:
+#  - viegener for some input
 #  - some proposals to boost and improve SQL-Statements by JoeALLb
 #
 ###########################################################################################################
@@ -40,6 +41,24 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 4.14.0       15.05.2017       UserExitFn added as separate sub (userexit) and attr userExitFn defined,
+#                               new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, 
+#                               ReadingsSingleUpdateValue, commandref revised
+# 4.13.7       11.05.2017       attribute sqlResultSingleFormat became sqlResultFormat, sqlResultSingle deleted and 
+#                               sqlCmd contains now all format possibilities (separated,mline,sline,table), 
+#                               commandref revised 
+# 4.13.6       10.05.2017       minor changes
+# 4.13.5       09.05.2017       cover dbh prepare in eval to avoid crash (sqlResult_DoParse)
+# 4.13.4       09.05.2017       attribute sqlResultSingleFormat: mline sline table, attribute "allowDeletion" is now
+#                               also valid for sqlResult, sqlResultSingle and delete command is forced
+# 4.13.3       09.05.2017       flexible format of reading SqlResultRow_xxx for proper and sort sequence 
+# 4.13.2       09.05.2017       sqlResult, sqlResultSingle are able to execute delete, insert, update commands
+#                               error corrections
+# 4.13.1       09.05.2017       change substitution in sqlResult, sqlResult_DoParse
+# 4.13.0       09.05.2017       acceptance of viegener change with some corrections (separating lines with ]|[ in Singleline)
+# viegener     07.05.2017       New sets sqlSelect execute arbitrary sql command returning each row as single reading (fields separated with |)
+#                               allowing replacement of timestamp values according to attribute definition --> §timestamp_begin§ etc
+#                               and sqlSelectSingle for executing an sql command returning a single reading (separating lines with §) 
 # 4.12.2       17.04.2017       DbRep_checkUsePK changed
 # 4.12.1       07.04.2017       get tableinfo changed for MySQL
 # 4.12.0       31.03.2017       support of primary key for insert functions
@@ -183,7 +202,9 @@ use Blocking;
 use Time::Local;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $DbRepVersion = "4.12.2";
+sub sqlexec($$;$);
+
+my $DbRepVersion = "4.14.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -204,6 +225,7 @@ sub DbRep_Initialize($) {
  $hash->{SetFn}        = "DbRep_Set";
  $hash->{GetFn}        = "DbRep_Get";
  $hash->{AttrFn}       = "DbRep_Attr";
+ $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} =   "disable:1,0 ".
                        "reading ".                       
@@ -220,11 +242,13 @@ sub DbRep_Initialize($) {
                        "showVariables ".
                        "showStatus ".
                        "showTableInfo ".
+					   "sqlResultFormat:separated,mline,sline,table ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
                        "timeOlderThan ".
                        "timeout ".
+					   "userExitFn ".
                        $readingFnAttributes;
   
 return undef;   
@@ -240,8 +264,7 @@ sub DbRep_Define($@) {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
- return "Error: Perl module ".$DbRepMMDBI." is missing. 
-        Install it on Debian with: sudo apt-get install libdbi-perl" if($DbRepMMDBI);
+ return "Error: Perl module ".$DbRepMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl" if($DbRepMMDBI);
   
   my @a = split("[ \t][ \t]*", $def);
   
@@ -263,7 +286,7 @@ sub DbRep_Define($@) {
   InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
   
   Log3 ($name, 4, "DbRep $name - initialized");
-  readingsSingleUpdate($hash, 'state', 'initialized', 1);
+  ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
    
 return undef;
 }
@@ -295,6 +318,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:noArg ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
+				(($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:noArg ":"");
   
   return if(IsDisabled($name));
@@ -396,11 +420,23 @@ sub DbRep_Set($@) {
       }
       sqlexec($hash,$opt);
       
-  }  
-  else  
-  {
+  } elsif ($opt eq "sqlCmd") {
+      # Execute a generic sql command
+      return "\"set $opt\" needs at least an argument" if ( @a < 3 );
+      # remove arg 0, 1 to get SQL command
+      shift @a;
+      shift @a;
+      my $sqlcmd = join( " ", @a );
+	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
+          return " Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
+      }  
+ 
+      sqlexec($hash,$opt,$sqlcmd);
+	 
+  } else {
       return "$setlist";
   }  
+  
 $hash->{LASTCMD} = "$opt";
 return undef;
 }
@@ -431,12 +467,12 @@ sub DbRep_Get($@) {
   
   if ($opt eq "dbvars" || $opt eq "dbstatus" || $opt eq "tableinfo") {
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
-      readingsSingleUpdate($hash, "state", "running", 1);
+	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
   } elsif ($opt eq "svrinfo") {
       delread($hash); 
-      readingsSingleUpdate($hash, "state", "running", 1);
+      ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);      
   }
   else 
@@ -462,7 +498,7 @@ sub DbRep_Attr($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
     
-    # nicht erlaubte / zu löschende Attribute wenn role = Agent
+    # nicht erlaubte / nicht setzbare Attribute wenn role = Agent
     my @agentnoattr = qw(aggregation
                          allowDeletion
                          reading
@@ -475,6 +511,7 @@ sub DbRep_Attr($$$$) {
                          timestamp_end
                          timeDiffToNow
                          timeOlderThan
+						 sqlResultFormat
                          );
     
     if ($aName eq "disable") {
@@ -484,7 +521,7 @@ sub DbRep_Attr($$$$) {
         $do = 0 if($cmd eq "del");
         my $val   = ($do == 1 ?  "disabled" : "initialized");
   
-        readingsSingleUpdate($hash, "state", $val, 1);
+		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
         
         if ($do == 0) {
             RemoveInternalTimer($hash);
@@ -508,6 +545,18 @@ sub DbRep_Attr($$$$) {
             $hash->{HELPER}{RDPFDEL} = $aVal;
         } else {
             delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
+        }
+    }
+	
+	if ($aName eq "userExitFn") {
+        if($cmd eq "set") {
+            if(!$aVal) {return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";}
+			my @a = split(/ /,$aVal,2);
+            $hash->{HELPER}{USEREXITFN} = $a[0];
+			$hash->{HELPER}{UEFN_REGEXP} = $a[1] if($a[1]);
+        } else {
+            delete $hash->{HELPER}{USEREXITFN} if($hash->{HELPER}{USEREXITFN});
+			delete $hash->{HELPER}{UEFN_REGEXP} if($hash->{HELPER}{UEFN_REGEXP});
         }
     }
     
@@ -588,7 +637,7 @@ sub DbRep_Attr($$$$) {
                     return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
                 }
             }
-        }
+		}
     }  
 return undef;
 }
@@ -622,8 +671,8 @@ sub DbRep_Notify($$) {
 #      InternalTimer(time+1, "browser_refresh", $own_hash, 0);
 #    }
      
-     # wenn Rolle "Agent" Verbeitung von RENAMED Events
      if ($own_hash->{ROLE} eq "Agent") {
+	     # wenn Rolle "Agent" Verbeitung von RENAMED Events
          next if ($event !~ /RENAMED/);
          
          my $strucChanged;
@@ -661,9 +710,9 @@ sub DbRep_Notify($$) {
              }
          }
      # if ($strucChanged) {CommandSave("","")};
-     }
+     } 
  }
-
+return;
 }
 
 ###################################################################################
@@ -697,7 +746,7 @@ if ($init_done == 1) {
   
   if ( !DbRep_Connect($hash) ) {
       Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
-      readingsSingleUpdate($hash, "state", "disconnected", 1);
+	  ReadingsSingleUpdateValue ($hash, "state", "disconnected", 1);
   } else {
       Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful");
       my $dbh = $hash->{DBH}; 
@@ -732,7 +781,7 @@ sub DbRep_Connect($) {
     RemoveInternalTimer($hash);
     Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser");
     
-    readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+    ReadingsSingleUpdateValue ($hash, 'state', 'disconnected', 1);
     
     InternalTimer(time+5, 'DbRep_Connect', $hash, 0);
     
@@ -743,7 +792,7 @@ sub DbRep_Connect($) {
 
   $hash->{DBH} = $dbh;
 
-  readingsSingleUpdate($hash, "state", "connected", 1);
+  ReadingsSingleUpdateValue ($hash, "state", "connected", 1);
   Log3 ($name, 3, "DbRep $name - connected");
   
   return 1;
@@ -753,8 +802,8 @@ sub DbRep_Connect($) {
 #  Hauptroutine "Set"
 ################################################################################################################
 
-sub sqlexec($$) {
- my ($hash,$opt) = @_;
+sub sqlexec($$;$) {
+ my ($hash,$opt,$cmd) = @_;
  my $name        = $hash->{NAME}; 
  my $to          = AttrVal($name, "timeout", "60");
  my $reading     = AttrVal($name, "reading", undef);
@@ -773,7 +822,7 @@ sub sqlexec($$) {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  delread($hash);
  
- readingsSingleUpdate($hash, "state", "running", 1);
+ ReadingsSingleUpdateValue ($hash, "state", "running", 1);
  
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
@@ -1079,6 +1128,10 @@ $hash->{HELPER}{CV} = \%cv;
  } elsif ($opt eq "deviceRename" || $opt eq "readingRename") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
          
+ } elsif ($opt eq "sqlCmd" ) {
+    # Execute a generic sql command
+         
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$cmd", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
  }
 
 return;
@@ -1230,8 +1283,8 @@ sub averval_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_ParseDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
       return;
@@ -1258,13 +1311,10 @@ sub averval_ParseDone($) {
           $reading_runtime_string = $rsf.$ds.$rds."AVERAGE__".$runtime_string;
       }
          
-     readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
+	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
 
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
-  
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");  
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -1392,8 +1442,8 @@ sub count_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_ParseDone");
   
    if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
       return;
@@ -1422,12 +1472,10 @@ sub count_ParseDone($) {
           $reading_runtime_string = $rsf.$ds.$rds."COUNT__".$runtime_string;
       }
          
-     readingsBulkUpdate($hash, $reading_runtime_string, $c?$c:"-");
+	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?$c:"-");
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -1622,8 +1670,8 @@ sub maxval_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_ParseDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
       return;
@@ -1654,12 +1702,11 @@ sub maxval_ParseDone($) {
           $reading_runtime_string = $rsf.$ds.$rds."MAX__".$k[0];
       }
       my $rv = $k[1];
-      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
+
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));              
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -1855,8 +1902,8 @@ sub minval_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_ParseDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall minval_ParseDone finished");
       return;
@@ -1887,12 +1934,11 @@ sub minval_ParseDone($) {
           $reading_runtime_string = $rsf.$ds.$rds."MIN__".$k[0];
       }
       my $rv = $k[1];
-      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
+	  
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));              
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2200,8 +2246,8 @@ sub diffval_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
   
    if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
       return;
@@ -2247,14 +2293,15 @@ sub diffval_ParseDone($) {
           $reading_runtime_string = $rts.$ds.$rds."DIFF__".$k[0];
       }
       my $rv = $k[1];
-      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
+
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");
     
   }
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));           
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
-  readingsBulkUpdate($hash, "less_data_in_period", $ncpstr) if($ncpstr);
-  readingsBulkUpdate($hash, "state", ($ncpstr||$rowsrej)?"Warning":"done");
+
+  ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
+  ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":"done");
+  
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2382,8 +2429,8 @@ sub sumval_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_ParseDone");
   
    if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
       return;
@@ -2410,12 +2457,10 @@ sub sumval_ParseDone($) {
           $reading_runtime_string = $rsf.$ds.$rds."SUM__".$runtime_string;
       }
          
-      readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
+	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});  
@@ -2519,8 +2564,8 @@ sub del_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
   
    if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
       return;
@@ -2544,15 +2589,14 @@ sub del_ParseDone($) {
   }
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, $reading_runtime_string, $rows);
+
+  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rows);
          
   $rows = $ds.$rds.$rows;
-  
   Log3 ($name, 3, "DbRep $name - Entries of database $hash->{DATABASE} deleted: $rows");  
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));     
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done"); 
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2681,8 +2725,8 @@ sub insert_Done($) {
   my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
       return;
@@ -2692,11 +2736,11 @@ sub insert_Done($) {
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "number_lines_inserted", $irow);    
-  readingsBulkUpdate($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);  
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done"); 
+    
+  ReadingsBulkUpdateValue ($hash, "number_lines_inserted", $irow);    
+  ReadingsBulkUpdateValue ($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit); 
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  
   readingsEndUpdate($hash, 1);
   
   Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{DATABASE} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
@@ -2816,8 +2860,8 @@ sub devren_Done($) {
   my $renmode = delete $hash->{HELPER}{RENMODE};
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Done finished");
       return;
@@ -2827,18 +2871,20 @@ sub devren_Done($) {
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "number_lines_updated", $urow);
+  ReadingsBulkUpdateValue ($hash, "number_lines_updated", $urow);
+  
   if($renmode eq "devren") {
-      readingsBulkUpdate($hash, "device_renamed", "old: ".$old." to new: ".$new) if($urow != 0);
-	  readingsBulkUpdate($hash, "device_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) if($urow == 0);
+	  ReadingsBulkUpdateValue ($hash, "device_renamed", "old: ".$old." to new: ".$new) if($urow != 0);
+      ReadingsBulkUpdateValue ($hash, "device_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) 
+	      if($urow == 0);
   }
   if($renmode eq "readren") {
-      readingsBulkUpdate($hash, "reading_renamed", "old: ".$old." to new: ".$new)  if($urow != 0);
-	  readingsBulkUpdate($hash, "reading_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) if ($urow == 0);
+	  ReadingsBulkUpdateValue ($hash, "reading_renamed", "old: ".$old." to new: ".$new)  if($urow != 0);
+      ReadingsBulkUpdateValue ($hash, "reading_not_renamed", "WARNING - old: ".$old." not found, not renamed to new: ".$new) 
+	      if ($urow == 0);
   }
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done"); 
+  
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
   if ($urow != 0) {
@@ -2959,8 +3005,8 @@ sub fetchrows_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_ParseDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
       return;
@@ -2987,12 +3033,10 @@ sub fetchrows_ParseDone($) {
                  $reading_runtime_string = $ts."__".$dev."__".$rea;
              }
              
-             readingsBulkUpdate($hash, $reading_runtime_string, $val);
+			 ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $val);
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));          
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3113,8 +3157,8 @@ sub expfile_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_ParseDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
       return;
@@ -3131,10 +3175,8 @@ sub expfile_ParseDone($) {
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, $export_string, $nrows); 
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done"); 
+  ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
   my $rows = $ds.$rds.$nrows;
@@ -3324,8 +3366,8 @@ sub impfile_PushDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_PushDone");
   
   if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
       return;
@@ -3337,10 +3379,8 @@ sub impfile_PushDone($) {
   my $import_string = " -- ROWS IMPORTED FROM FILE -- ";
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, $import_string, $irowdone); 
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done"); 
+  ReadingsBulkUpdateValue ($hash, $import_string, $irowdone);
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
@@ -3350,6 +3390,210 @@ sub impfile_PushDone($) {
   
 return;
 }
+
+####################################################################################################
+# nichtblockierende DB-Abfrage sqlCmd - generischer SQL-Befehl - name | opt | sqlcommand
+####################################################################################################
+# set logdbrep sqlCmd select count(*) from history
+# set logdbrep sqlCmd select DEVICE,count(*) from history group by DEVICE HAVING count(*) > 10000
+sub sqlCmd_DoParse($) {
+  my ($string) = @_;
+  my ($name, $opt, $runtime_string_first, $runtime_string_next, $cmd) = split("\\|", $string);
+  my $hash       = $defs{$name};
+  my $dbloghash  = $hash->{dbloghash};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $err;
+
+  # Background-Startzeit
+  my $bst = [gettimeofday];
+
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_DoParse");
+
+  my $dbh;
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+  if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
+     return "$name|''|$opt|$cmd|''|''|$err";
+  }
+     
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+
+  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";"; 
+  # Allow inplace replacement of keywords for timings (use time attribute syntax)
+  $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
+  $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
+
+#  Debug "SQL :".$sql.":";
+  
+  Log3($name, 4, "DbRep $name - SQL execute: $sql");        
+
+  # SQL-Startzeit
+  my $st = [gettimeofday];
+  
+  my $sth;
+  
+  eval {$sth = $dbh->prepare($sql);
+        $sth->execute();
+       }; 
+  
+  if ($@) {
+     # error bei sql-execute
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - Error - $@");
+     $dbh->disconnect;
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
+     return "$name|''|$opt|$sql|''|''|$err";       
+  }
+ 
+  my @rows;
+  my $nrows = 0;
+  if($sql =~ m/^\s*select/is) {
+    while (my @line = $sth->fetchrow_array()) {
+      Log3 ($name, 4, "DbRep $name - SQL result: @line");
+      my $row = join("|", @line);
+      
+	  # im Ergebnis immer § ersetzen (wegen join Delimiter "§")
+	  $row =~ s/§/|°escaped°|/g;
+      
+      push(@rows, $row);
+      # Anzahl der Datensätze
+      $nrows++;
+    }
+  } else {
+     $nrows = $sth->rows;
+     eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
+         return "$name|''|$opt|$sql|''|''|$err";       
+     }
+	 
+	 push(@rows, " ");
+	 my $com = (split(" ",$sql, 2))[0];
+	 Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");  
+  }
+  
+  $sth->finish;
+
+  # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);
+
+  $dbh->disconnect;
+ 
+  # Daten müssen als Einzeiler zurückgegeben werden
+  my $rowstring = join("§", @rows); 
+  $rowstring = encode_base64($rowstring,"");
+
+  Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
+
+  # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);
+
+  $rt = $rt.",".$brt;
+ 
+  return "$name|$rowstring|$opt|$sql|$nrows|$rt|$err";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Abfrage sqlCmd
+####################################################################################################
+sub sqlCmd_ParseDone($) {
+  my ($string)   = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $rowstring  = decode_base64($a[1]);
+  my $opt        = $a[2];
+  my $cmd        = $a[3];
+  my $nrows      = $a[4];
+  my $bt         = $a[5];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[6]?decode_base64($a[6]):undef;
+  my $srf        = AttrVal($name, "sqlResultFormat", "separated");
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_ParseDone");
+  
+  if ($err) {
+    ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+    ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+    delete($hash->{HELPER}{RUNNING_PID});
+    Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_ParseDone finished");
+    return;
+  }
+  
+  Log3 ($name, 5, "DbRep $name - SQL result decoded: $rowstring") if($rowstring);
+  
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+
+  ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd); 
+  ReadingsBulkUpdateValue ($hash, "SqlResultNumRows", $nrows);
+  
+  if ($srf eq "sline") {
+      $rowstring =~ s/§/]|[/g;
+      $rowstring =~ s/\|°escaped°\|/§/g;
+      ReadingsBulkUpdateValue ($hash, "SqlResult", $rowstring);
+    
+  } elsif ($srf eq "table") {
+	  my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
+	  my @rows = split( /§/, $rowstring );
+      my $row;
+	  foreach $row ( @rows ) {
+	      $row =~ s/\|°escaped°\|/§/g;
+		  $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
+          $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
+      }
+	  $row .= $res."</table></html>";
+	  
+	  ReadingsBulkUpdateValue ($hash,"SqlResult", $row);	
+	  
+  } elsif ($srf eq "mline") {
+      my $res = "<html>";
+	  my @rows = split( /§/, $rowstring );
+      my $row;
+	  foreach $row ( @rows ) {
+	      $row =~ s/\|°escaped°\|/§/g;
+          $res .= $row."<br>";
+      }
+	  $row .= $res."</html>";
+	  
+      ReadingsBulkUpdateValue ($hash, "SqlResult", $row );
+	  
+  } elsif ($srf eq "separated") {
+      my @rows = split( /§/, $rowstring );
+	  my $bigint = @rows;
+	  my $numd = ceil(log10($bigint));
+	  my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
+      my $i = 0;
+      foreach my $row ( @rows ) {
+          $i++;
+          $row =~ s/\|°escaped°\|/§/g;
+	      my $fi = sprintf($formatstr, $i);
+		  ReadingsBulkUpdateValue ($hash, "SqlResultRow_".$fi, $row);
+      }
+  }
+
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  readingsEndUpdate($hash, 1);
+  
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
+  
+return;
+}
+
 
 ####################################################################################################
 # nichtblockierende DB-Abfrage get db Metadaten
@@ -3558,8 +3802,8 @@ sub dbmeta_ParseDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_ParseDone");
   
    if ($err) {
-      readingsSingleUpdate($hash, "errortext", $err, 1);
-      readingsSingleUpdate($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
       return;
@@ -3583,12 +3827,10 @@ sub dbmeta_ParseDone($) {
       my @a = split(" ", $row);
       my $k = $a[0];
       my $v = $a[1];
-      readingsBulkUpdate($hash, $pre.$k, $v);
+	  ReadingsBulkUpdateValue ($hash, $pre.$k, $v);
   }
   
-  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef)); 
-  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
-  readingsBulkUpdate($hash, "state", "done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
   # InternalTimer(time+0.5, "browser_refresh", $hash, 0);
@@ -3603,13 +3845,91 @@ return;
 # Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
 sub ParseAborted($) {
-my ($hash) = @_;
-my $name = $hash->{NAME};
-my $dbh = $hash->{DBH}; 
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dbh = $hash->{DBH}; 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
   $dbh->disconnect() if(defined($dbh));
-  readingsSingleUpdate($hash, "state", "timeout", 1);
+  ReadingsSingleUpdateValue ($hash, "state", "timeout", 1);
   delete($hash->{HELPER}{RUNNING_PID});
+  
+return;
+}
+
+####################################################################################################
+#    ReadingsSingleUpdate für Reading, Value, Event
+####################################################################################################
+sub ReadingsSingleUpdateValue ($$$$) {
+ my ($hash,$reading,$val,$ev) = @_;
+ my $name = $hash->{NAME};
+ 
+ readingsSingleUpdate($hash, $reading, $val, $ev);
+ userexit($name, $reading, $val);
+
+return;
+}
+
+####################################################################################################
+#    Readingsbulkupdate für Reading, Value
+#    readingsBeginUpdate und readingsEndUpdate muss vor/nach Funktionsaufruf gesetzt werden
+####################################################################################################
+sub ReadingsBulkUpdateValue ($$$) {
+ my ($hash,$reading,$val) = @_;
+ my $name = $hash->{NAME};
+ 
+ readingsBulkUpdate($hash, $reading, $val);
+ userexit($name, $reading, $val);
+
+return;
+}
+
+####################################################################################################
+#    Readingsbulkupdate für processing_time, state
+#    readingsBeginUpdate und readingsEndUpdate muss vor/nach Funktionsaufruf gesetzt werden
+####################################################################################################
+sub ReadingsBulkUpdateTimeState ($$$$) {
+ my ($hash,$brt,$rt,$sval) = @_;
+ my $name = $hash->{NAME};
+ 
+ if(AttrVal($name, "showproctime", undef)) {
+     readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)); 
+     userexit($name, "background_processing_time", sprintf("%.4f",$brt)); 
+     readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
+     userexit($name, "sql_processing_time", sprintf("%.4f",$rt));
+ }
+  
+ readingsBulkUpdate($hash, "state", $sval);
+ userexit($name, "state", $sval);
+
+return;
+}
+
+####################################################################################################
+#    userexit - Funktion um userspezifische Programmaufrufe nach Aktualisierung eines Readings
+#    zu ermöglichen, arbeitet OHNE Event abhängig vom Attr userExitFn
+#
+#    Aufruf der <UserExitFn> mit $name,$reading,$value
+####################################################################################################
+sub userexit ($$$) {
+ my ($name,$reading,$value) = @_;
+ my $hash = $defs{$name};
+ 
+ return if(!$hash->{HELPER}{USEREXITFN});
+ 
+ if(!defined($reading)) {$reading = "";}
+ if(!defined($value))   {$value   = "";}
+ $value =~ s/\\/\\\\/g;  # escapen of chars for evaluation
+ $value =~ s/'/\\'/g; 
+ 
+ my $re = $hash->{HELPER}{UEFN_REGEXP}?$hash->{HELPER}{UEFN_REGEXP}:".*:.*";
+			 
+ if("$reading:$value" =~ m/^$re$/ ) {
+     my @res;
+	 my $cmd = $hash->{HELPER}{USEREXITFN}."('$name','$reading','$value')";
+     $cmd  = "{".$cmd."}";
+	 my $r = AnalyzeCommandChain(undef, $cmd);
+ }
+return;
 }
 
 ####################################################################################################
@@ -3877,7 +4197,7 @@ my $name = $hash->{NAME};
 
  if ( !DbRep_Connect($hash) ) {
      Log3 ($name, 2, "DbRep $name - DB connect failed. Database down ? ");
-     readingsSingleUpdate($hash, "state", "disconnected", 1);
+     ReadingsSingleUpdateValue ($hash, "state", "disconnected", 1);
      return;
  } else {
      my $dbh = $hash->{DBH};
@@ -3945,11 +4265,17 @@ return;
      <li> import of datasets from file (CSV-Format). </li>
      <li> rename of device names in datasets </li>
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
+	 <li> Execution of arbitrary user specific SQL-commands </li>
      </ul></ul>
      <br>
      
   To activate the function "Autorename" the attribute "role" has to be assigned to a defined DbRep-device. The standard role after DbRep definition is "Client.
   Please read more in section <a href="#DbRepAutoRename">DbRep-Agent</a> . <br><br>
+  
+  DbRep provides a UserExit function. By that interface the user can execute own program code dependent from free 
+  definable Reading/Value-combinations (Regex). The interface works without respectively independent from event 
+  generation.
+  Further informations you can find as described at <a href="#DbRepattr">attribute</a> "userExitFn". <br><br>
   
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting and Management of database content (DbLog)</a>.<br><br>
@@ -3959,7 +4285,7 @@ return;
   <b>Preparations </b> <br><br>
   
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. (currently tested with MySQL and SQLite). <br>
-  Only the content of table "history" will be included. <br><br>
+  Only the content of table "history" will be included (except command "sqlCmd"). <br><br>
   
   Overview which other Perl-modules DbRep is using: <br><br>
     
@@ -4007,7 +4333,20 @@ return;
                                  
     <li><b> countEntries </b> -  provides the number of DB-entries between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. 
                                  If timestamp-attributes are not set, all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
-    
+                           
+    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
+	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
+                                 
+                                 <ul>
+                                 "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
+                                 "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
+                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br><br>
+                                 
+                                 Due to security reasons the attribute "allowDeletion" needs to be set to unlock the delete-function. <br>
+                                 </li>
+								 <br>
+                                 </ul>
+								 
     <li><b> deviceRename </b> -  renames the device name of a device inside the connected database (Internal DATABASE).
                                  The devicename will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
                                  <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
@@ -4020,20 +4359,30 @@ return;
                                  <br><br>
                                  </li> <br>
                                  </ul>     
-
-    <li><b> readingRename </b> - renames the reading name of a device inside the connected database (see Internal DATABASE).
-                                 The readingname will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
-                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
-                                 
-                                 <ul>
-                                 <b>input format: </b>  set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
-                                 # The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
-                                 # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
-                                 # Appropriate entries will be written to Logfile if verbose >= 3 is set.
-                                 <br><br>
-                                 </li> <br>
-                                 </ul>   								 
     
+    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+                                 The reading to evaluate must be defined using attribute "reading". 
+                                 This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
+                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
+								 specified time linits/aggregation, in which a balanced difference value of the previous aggregation period will be transfered to the
+								 following aggregation period in case this period contains a value. <br>
+								 An possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br><br>
+								 
+								 If only one dataset will be found within the evalution period, the difference can be calculated only in combination with the balanced
+								 difference of the previous aggregation period. In this case a logical inaccuracy according the assignment of the difference to the particular aggregation period
+								 can be possible. Hence in warning in "state" will be placed and the reading "less_data_in_period" with a list of periods
+								 with only one dataset found in it will be created. 
+								 <br><br>
+								 
+                                 <ul>
+                                 <b>Note: </b><br>								 
+								 Within the evaluation respectively aggregation period (day, week, month, etc.) you should make available at least one dataset 
+                                 at the beginning and one dataset at the end of each aggregation period to take the difference calculation as much as possible.
+                                 <br>
+                                 <br>
+                                 </li>
+                                 </ul>
+
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
                                  The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile" . </li> <br>
@@ -4074,8 +4423,6 @@ return;
                                  </li> <br>
                                  </ul>    
     
-    <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
-    
     <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
                                  The evaluation contains the timestamp of the <b>last</b> appearing of the identified maximum value within the given period.  </li> <br>
@@ -4083,48 +4430,69 @@ return;
     <li><b> minValue </b>     -  calculates the miniimum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
                                  The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum value within the given period.  </li> <br>    
-    
-    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
-                                 The reading to evaluate must be defined using attribute "reading". 
-                                 This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
-                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
-								 specified time linits/aggregation, in which a balanced difference value of the previous aggregation period will be transfered to the
-								 following aggregation period in case this period contains a value. <br>
-								 An possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br>
-								 If only one dataset will be found within the evalution period, the difference can be calculated only in combination with the balanced
-								 difference of the previous aggregation period. In this case a logical inaccuracy according the assignment of the difference to the particular aggregation period
-								 can be possible. Hence in warning in "state" will be placed and the reading "less_data_in_period" with a list of periods
-								 with only one dataset found in it will be created. <br><br>
-								 
-								 
-								 no difference can be calculated  
-								 and the reading "less_data_in_period" with a list of concerned periods will be generated in that case. <br><br>
-								 
-                                 <ul>
-                                 <b>Note: </b><br>								 
-								 Within the evaluation respectively aggregation period (day, week, month, etc.) you should make available at least one dataset 
-                                 at the beginning and one dataset at the end of each aggregation period to take the difference calculation as much as possible.
-                                 <br>
-                                 <br>
-                                 </li>
-                                 </ul>
-                                 
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
-	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
+
+    <li><b> readingRename </b> - renames the reading name of a device inside the connected database (see Internal DATABASE).
+                                 The readingname will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
+                                 <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
-                                 "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br><br>
-                                 
-                                 Due to security reasons the attribute "allowDeletion" needs to be set to unlock the delete-function. <br>
-                                 </li>
+                                 <b>input format: </b>  set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
+                                 # The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
+                                 # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
+                                 # Appropriate entries will be written to Logfile if verbose >= 3 is set.
+                                 <br><br>
+                                 </li> <br>
+                                 </ul> 
+
+	<li><b> sqlCmd </b>        - executes an arbitrary user specific command. <br>
+                                 If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
+								 "allowDeletion" has to be set for security reason. <br>
+                                 The statement doesn't consider limitations by attributes device and/or reading. <br>
+								 If the <a href="#DbRepattr">attributes</a> "timestamp_begin" respectively "timestamp_end" 
+								 should assumed in the statement, you can use the placeholder "<b>§timestamp_begin§</b>" respectively
+								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
+								 
+	                             <ul>
+                                 <b>Examples of SQL-statements: </b> <br><br> 
+								 <ul>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
+								 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
+                                 <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM `history` where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
+                                 <li>set &lt;name&gt; sqlCmd delete from current  </li>
+                                 <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
+                                 <li>set &lt;name&gt; sqlCmd update history set VALUE='TestVa$$ue$' WHERE VALUE='TestValue' </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
+                                 <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
                                  </ul>
+								 <br>
+								 
+								 The result of the statement will be shown in <a href="#DbRepReadings">Reading</a> "SqlResult".
+								 By <a href="#DbRepattr">attribut</a> "sqlResultFormat" the fomatting can be choosen. <br><br>
+								 
+								 <b>Note:</b> <br>
+                                 Even though the module works non-blocking regarding to database operations, a huge 
+								 sample space (number of rows/readings) could block the browser session respectively 
+								 FHEMWEB.								 
+								 If you are unsure about the result of the statement, you should preventively add a limit to 
+								 the statement. <br><br>
                                  
+								 </li><br>
+                                 </ul>  								 
+
+	<li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by 
+	                             <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or 
+								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
+								 "reading". Using this function is mostly reasonable if value-differences of readings 
+								 are written to the database. </li> <br>  
+               
   <br>
   </ul></ul>
   
-  <b>For all evaluation variants applies: </b> <br>
+  <b>For all evaluation variants (except sqlCmd) applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
   If the time limit attributes are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.
   <br><br>
@@ -4209,7 +4577,7 @@ return;
                                  </li> 
                                  <br><br>
                                  </ul>                                                      
-                                                     
+                  a                                  
   <br>
   </ul></ul>
   
@@ -4223,20 +4591,26 @@ return;
 <ul>
   Using the module specific attributes you are able to define the scope of evaluation and the aggregation. <br><br>
   
-  <b>Hint to SQL-Wildcard Usage:</b> <br>
+  <b>Note for SQL-Wildcard Usage:</b> <br>
   Within the attribute values of "device" and "reading" you may use SQL-Wildcards, "%" and "_". The character "%" stands for any some characters, but  
   the character "_" = stands for only one.  <br>
   This rule is valid to all functions <b>except</b> "insert", "deviceRename" and "delEntries". <br>
   The function "insert" doesn't allow setting the mentioned attributes containing the wildcard "%", the character "_" will evaluated as a normal character.<br>
-  The deletion function "delEntries" evaluates both characters "$", "_" <b>NOT</b> as wildcards and delete device/readings only if they are entered in the 
+  The deletion function "delEntries" evaluates both characters "%", "_" <b>NOT</b> as wildcards and delete device/readings only if they are entered in the 
   attribute as exactly as they are stored in the database . 
   In readings the wildcard character "%" will be replaced by "/" to meet the rules of allowed characters in readings.
   <br><br>
   
   <ul><ul>
-  <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". Delivers e.g. the count of database entries for a day (countEntries), Summation of difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
+  <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible is hour, day, week, month or "no". 
+                                Delivers e.g. the count of database entries for a day (countEntries), Summation of 
+								difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an 
+								aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
+
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
+
   <li><b>device </b>          - selection of a particular device   </li> <br>
+
   <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated difference between two 
                                 straight sequently datasets should be commenly accepted (default = 20). <br>
                                 Hence faulty DB entries with a disproportional high difference value will be eliminated and don't tamper the result.
@@ -4246,60 +4620,84 @@ return;
                                 logfile. 								
 								</li><br> 
 
-                              <ul>
-							  Example report in logfile if threshold of diffAccept=10 overruns: <br><br>
+                                <ul>
+							    Example report in logfile if threshold of diffAccept=10 overruns: <br><br>
 							  
-                              DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
-							  2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
+                                DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
+							    2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
 							  
-                              # The first dataset with a value of 0.0340 is untypical low compared to the next value of 13.3440 and results a untypical
-							    high difference value. <br>
-							  # Now you have to decide if the (second) dataset should be deleted, ignored of the attribute diffAccept should be adjusted. 
-                              </ul><br> 
+                                # The first dataset with a value of 0.0340 is untypical low compared to the next value of 13.3440 and results a untypical
+							      high difference value. <br>
+							    # Now you have to decide if the (second) dataset should be deleted, ignored of the attribute diffAccept should be adjusted. 
+                                </ul><br> 
 							  
   <li><b>disable </b>         - deactivates the module  </li> <br>
+
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
+
   <li><b>reading </b>         - selection of a particular reading   </li> <br>
+
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
-  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". The role "Agent" is described in section <a href="#DbRepAutoRename">DbRep-Agent</a>. </li> <br>    
-  <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a new operation starts  </li> <br>
-  <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated for a single sql-statement, but the summary of all sql-statements necessara for within an executed DbRep-function in background.   </li> <br>
+
+  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". The role "Agent" is described 
+                                in section <a href="#DbRepAutoRename">DbRep-Agent</a>. </li> <br>    
+
+  <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a 
+                                       new operation starts  </li> <br>
+
+  <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) 
+                                for the sql-requests. This is not calculated for a single sql-statement, but the summary 
+								of all sql-statements necessara for within an executed DbRep-function in background. </li> <br>
+
   <li><b>showStatus </b>      - limits the sample space of command "get ... dbstatus". SQL-Wildcards (% _) can be used.    </li> <br>
 
-                              <ul>
-                              Example:    attr ... showStatus %uptime%,%qcache%  <br>
-                              # Only readings with containing "uptime" and "qcache" in name will be shown <br>
-                              </ul><br>  
+                                <ul>
+                                Example:    attr ... showStatus %uptime%,%qcache%  <br>
+                                # Only readings with containing "uptime" and "qcache" in name will be shown <br>
+                                </ul><br>  
   
-  <li><b>showVariables </b>   - limits the sample space of command "get ... dbvars". SQL-Wildcards (% _) can be used.   </li> <br>
+  <li><b>showVariables </b>   - limits the sample space of command "get ... dbvars". SQL-Wildcards (% _) can be used. </li> <br>
 
-                              <ul>
-                              Example:    attr ... showVariables %version%,%query_cache% <br>
-                              # Only readings with containing "version" and "query_cache" in name will be shown <br>
-                              </ul><br>  
+                                <ul>
+                                Example:    attr ... showVariables %version%,%query_cache% <br>
+                                # Only readings with containing "version" and "query_cache" in name will be shown <br>
+                                </ul><br>  
                               
   <li><b>showSvrInfo </b>     - limits the sample space of command "get ... svrinfo". SQL-Wildcards (% _) can be used.    </li> <br>
 
-                              <ul>
-                              Example:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
-                              # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
-                              </ul><br>  
+                                <ul>
+                                Example:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                                # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
+                                </ul><br>  
                               
-  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get ... tableinfo". SQL-Wildcards (% _) can be used.   </li> <br>
+  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get ... tableinfo". SQL-Wildcards 
+                                (% _) can be used.   </li> <br>
 
-                              <ul>
-                              Example:    attr ... showTableInfo current,history  <br>
-                              # Only informations about tables "current" and "history" will be shown <br>
-                              </ul><br>  
+                                <ul>
+                                Example:    attr ... showTableInfo current,history  <br>
+                                # Only informations about tables "current" and "history" will be shown <br>
+                                </ul><br>  
+								
+
+  <li><b>sqlResultFormat </b> - determines the formatting of the "set ... sqlCmd" command result. </li> <br>
+  
+                                possible options are: <br>
+								<ul>
+                                <b>separated </b> - every line of the result will be generated sequentially in a single 
+								                    reading. (default) <br> 
+                                <b>mline </b>     - the result will be generated as multiline in 
+								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
+													Field separator is "|". <br>	
+                                <b>sline </b>     - the result will be generated as singleline in 
+								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
+													Field separator is "|" and the dataset is separated by "]|[". <br>
+                                <b>table </b>     - the result will be generated as an table in 
+								                    <a href="#DbRepReadings">Reading</a> SqlResult. <br>													
+                                </ul><br>  
                               
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
-  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*)  </li> <br>
-  <li><b>timeDiffToNow </b>   - the begin of data selection will be set to the timestamp "&lt;current time&gt; - &lt;timeDiffToNow&gt;" dynamically (in seconds). Thereby always the last  &lt;timeDiffToNow&gt;-seconds will be considered (e.g. if set to 86400, always the last 24 hours should assumed). The Timestamp calculation will be done dynamically at execution time.     </li> <br>  
-  <li><b>timeOlderThan </b>   - the end of data selection will be set to the timestamp "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" dynamically (in seconds). Always the datasets up to timestamp "&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 86400, all datasets older than one day will be considered). The Timestamp calculation will be done dynamically at execution time. </li> <br> 
-
-  <li><b>timeout </b>         - sets the timeout-value for Blocking-Call Routines in background (default 60 seconds)  </li> <br>
-  </ul></ul>
-  <br>
+  
+  <li><b>timestamp_end </b>   - end of data selection. If not set the current date/time combination will be used. (*) </li> <br>
   
   (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
   you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
@@ -4325,14 +4723,70 @@ return;
                               <b>previous_hour_begin</b>    : "&lt;previous hour&gt;:00:00"                 <br>
                               <b>previous_hour_end</b>      : "&lt;previous hour&gt;:59:59"                 <br>                              </ul><br>
   
-  Make sure that timestamp_begin < timestamp_end is fulfilled. <br><br>
+  Make sure that "timestamp_begin" < "timestamp_end" is fulfilled. <br><br>
   
   <b>Note </b> <br>
   
   If the attribute "timeDiffToNow" will be set, the attributes "timestamp_begin" respectively "timestamp_end" will be deleted if they were set before.
   The setting of "timestamp_begin" respectively "timestamp_end" causes the deletion of attribute "timeDiffToNow" if it was set before as well.
   <br><br>
+  
+  <li><b>timeDiffToNow </b>   - the begin of data selection will be set to the timestamp "&lt;current time&gt; - 
+                                &lt;timeDiffToNow&gt;" dynamically (in seconds). Thereby always the last  
+								&lt;timeDiffToNow&gt;-seconds will be considered (e.g. if set to 86400, always the last 
+								24 hours should assumed). The Timestamp calculation will be done dynamically at execution 
+								time.     </li> <br>  
 
+  <li><b>timeOlderThan </b>   - the end of data selection will be set to the timestamp "&lt;aktuelle Zeit&gt; - 
+                                &lt;timeOlderThan&gt;" dynamically (in seconds). Always the datasets up to timestamp 
+								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
+								86400, all datasets older than one day will be considered). The Timestamp calculation 
+								will be done dynamically at execution time. </li> <br> 
+
+  <li><b>timeout </b>         - sets the timeout-value for Blocking-Call Routines in background (default 60 seconds)  </li> <br>
+
+  <li><b>userExitFn   </b>   - proveds an interface to execute user specific program code. <br>
+                               To activate the interfaace at first you should implement the subroutine which will be 
+                               called by the interface in your 99_myUtls.pm as shown in by the example:     <br>
+
+		<pre>
+        sub UserExitFn {
+          my ($name,$reading,$value) = @_;
+          my $hash = $defs{$name};
+          ...
+          # z.B. übergebene Daten loggen
+          Log3 $name, 1, "UserExitFn $name called - transfer parameter are Reading: $reading, Value: $value " ;
+          ...
+        return;
+        }
+  	    </pre>        
+							   The interface activation takes place by setting the subroutine name in the attribute.
+                               Optional you may set a Reading:Value combination (Regex) as argument. If no Regex is 
+							   specified, all value combinations will be evaluated as "true" (related to .*:.*). 
+							   <br><br>
+							   
+							   <ul>
+							   <b>Example:</b> <br>
+                               attr <device> userExitFn UserExit UserExit .*:.* <br>
+                               # "UserExit" is the name of subroutine in 99_myUtils.pm.
+							   </ul>
+							   <br>
+							   
+							   The interface works generally without and independent from Events.
+							   If the attribute is set, after every reading generation the Regex will be evaluated.
+							   If the evaluation was "true", set subroutine will be called. 
+							   For further processing following parameters will be forwarded to the function: <br><br>
+                               
+							   <ul>
+                               <li>$hash - the hash of the DbRep-Device </li>
+                               <li>$reading - the name of the created reading </li>
+                               <li>$value - the value of the reading </li>
+							   
+							   </ul>
+							   </li>
+							   <br><br> 
+
+</ul></ul>
 </ul>
 
 <a name="DbRepReadings"></a>
@@ -4346,15 +4800,26 @@ return;
   In addition the following readings will be created: <br><br>
   
   <ul><ul>
-  <li><b>state                      </b>  - contains the current state of evaluation. If warnings are occured (state = Warning) compare Readings
-                                            "diff_overrun_limit_&lt;diffLimit&gt;" and "less_data_in_period"  </li> <br>
-  <li><b>errortext                  </b>     - description about the reason of an error state </li> <br>
+  <li><b>state  </b>                         - contains the current state of evaluation. If warnings are occured (state = Warning) compare Readings
+                                               "diff_overrun_limit_&lt;diffLimit&gt;" and "less_data_in_period"  </li> <br>
+  
+  <li><b>errortext </b>                      - description about the reason of an error state </li> <br>
+  
   <li><b>background_processing_time </b>     - the processing time spent for operations in background/forked operation </li> <br>
-  <li><b>sql_processing_time        </b>     - the processing time wasted for all sql-statements used for an operation </li> <br>
+  
+  <li><b>sql_processing_time </b>            - the processing time wasted for all sql-statements used for an operation </li> <br>
+  
   <li><b>diff_overrun_limit_&lt;diffLimit&gt;</b>  - contains a list of pairs of datasets which have overrun the threshold (&lt;diffLimit&gt;) 
                                                      of calculated difference each other determined by attribute "diffAccept" (default=20). </li> <br>
-  <li><b>less_data_in_period</b>    - contains a list of time periods within only one dataset was found.  The difference calculation considers
-                                            the last value of the aggregation period before the current one. Valid for function "diffValue". </li> <br>	
+  
+  <li><b>less_data_in_period </b>            - contains a list of time periods within only one dataset was found.  The difference calculation considers
+                                               the last value of the aggregation period before the current one. Valid for function "diffValue". </li> <br>	
+
+  <li><b>SqlResult </b>                      - result of the last executed sqlCmd-command. The formatting can be specified
+                                               by <a href="#DbRepattr">attribute</a> "sqlResultFormat" </li> <br>
+											
+  <li><b>sqlCmd </b>                         - contains the last executed sqlCmd-command </li> <br>
+  
   </ul></ul>
   <br><br>
 
@@ -4432,32 +4897,44 @@ return;
   Alle vorhandenen Readings werden vor einer neuen Operation gelöscht. Durch das Attribut "readingPreventFromDel" kann eine Komma separierte Liste von Readings 
   angegeben werden die nicht gelöscht werden sollen. <br><br>
   
-  Zur Zeit werden folgende Operationen unterstützt: <br><br>
+  Aktuell werden folgende Operationen unterstützt: <br><br>
   
      <ul><ul>
      <li> Selektion aller Datensätze innerhalb einstellbarer Zeitgrenzen. </li>
      <li> Darstellung der Datensätze einer Device/Reading-Kombination innerhalb einstellbarer Zeitgrenzen. </li>
      <li> Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
-     <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen und verschiedenen Aggregationen. </li>
-     <li> Die Berechnung von Summen- , Differenz- , Maximum- , Minimum- und Durchschnittswerten von numerischen Readings in Zeitgrenzen und verschiedenen Aggregationen. </li>
-     <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
+     <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen 
+	      und verschiedenen Aggregationen. </li>
+     <li> Die Berechnung von Summen- , Differenz- , Maximum- , Minimum- und Durchschnittswerten von numerischen Readings 
+	      in Zeitgrenzen und verschiedenen Aggregationen. </li>
+     <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder 
+	      dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
      <li> Export von Datensätzen in ein File im CSV-Format </li>
      <li> Import von Datensätzen aus File im CSV-Format </li>
      <li> Umbenennen von Device-Namen in Datenbanksätzen </li>
-     <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
-     </ul></ul>
+     <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" 
+	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
+	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
+     
+	 </ul></ul>
      <br>
      
   Zur Aktivierung der Funktion "Autorename" wird dem definierten DbRep-Device mit dem Attribut "role" die Rolle "Agent" zugewiesen. Die Standardrolle nach Definition
   ist "Client". Mehr ist dazu im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben. <br><br>
+  
+  DbRep stellt dem Nutzer einen UserExit zur Verfügung. Über diese Schnittstelle kann der Nutzer in Abhängigkeit von 
+  frei definierbaren Reading/Value-Kombinationen (Regex) eigenen Code zur Ausführung bringen. Diese Schnittstelle arbeitet
+  unabhängig von einer Eventgenerierung. Weitere Informationen dazu ist unter <a href="#DbRepattr">Attribut</a> 
+  "userExitFn" beschrieben. <br><br>
   
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting und Management von Datenbankinhalten (DbLog)</a>.<br><br>
  
   <b>Voraussetzungen </b> <br><br>
   
-  Das Modul setzt den Einsatz einer oder mehrerer DBLog-Instanzen voraus. Es werden die Zugangsdaten dieser Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
-  Es werden nur Inhalte der Tabelle "history" berücksichtigt. <br><br>
+  Das Modul setzt den Einsatz einer oder mehrerer DbLog-Instanzen voraus. Es werden die Zugangsdaten dieser 
+  Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
+  Es werden nur Inhalte der Tabelle "history" (Ausnahme Kommando "sqlCmd") berücksichtigt. <br><br>
   
   Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
     
@@ -4500,16 +4977,38 @@ return;
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
+    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen 
+	                             Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
+								 angegeben sein.  </li> <br>
                                  
-    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
+    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den gegebenen Zeitgrenzen 
+	                             (siehe <a href="#DbRepattr">Attribute</a>). 
                                  Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. 
-                                 Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+                                 Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen 
+								 in die Selektion mit ein.  </li> <br>
 
-    <li><b> deviceRename </b> -  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal DATABASE) um.
-                                 Der Gerätename wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte Zeitgrenzen oder Beschränkungen 
-                                 durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading werden nicht berücksichtigt.  <br><br>
+    <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
+	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
+								 folgendermaßen: <br><br>
+                                 
+                                 <ul>
+                                 "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
+                                 "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
+                                 beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
+                                 
+                                 <br>
+                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
+								 gesetzt sein um die Löschfunktion freizuschalten. <br>
+                                 </li>
+								 <br>
+                                 </ul>
+								 
+    <li><b> deviceRename </b> -  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal 
+	                             DATABASE) um.
+                                 Der Gerätename wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte 
+								 Zeitgrenzen oder Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. 
+								 Reading werden nicht berücksichtigt.  <br><br>
                                  
                                  <ul>
                                  <b>Eingabeformat: </b>  set &lt;name&gt; deviceRename &lt;alter Devicename&gt;,&lt;neuer Devicename&gt;  <br>               
@@ -4519,76 +5018,7 @@ return;
                                  <br><br>
                                  </li> <br>
                                  </ul>
-								 
-    <li><b> readingRename </b> - benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
-                                 Der Readingname wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte Zeitgrenzen oder Beschränkungen 
-                                 durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading werden nicht berücksichtigt.  <br><br>
-                                 
-                                 <ul>
-                                 <b>Eingabeformat: </b>  set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
-                                 # Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" ausgegeben. <br>
-                                 # Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "reading_not_renamed" ausgegeben. <br>
-                                 # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
-                                 <br><br>
-                                 </li> <br>
-                                 </ul>  								 
-                                 
-    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
-                                 Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
-                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li> <br>
-                                 
-    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
-                                 
-    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
-                                 
-                                 <ul>
-                                 <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br>
-                                 # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
-                                 
-                                 <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
-                                 # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
-                                 <br>
-								 
-								 <b>Hinweis: </b><br>
-                                 Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
-								 Datensätze für die Funktion diffValue zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue 
-								 gibt in diesem Fall "0" in der betroffenen Periode aus !
-                                 <br>
-                                 <br>
-								 </li>
-                                 </ul>
-    
-    <li><b> importFromFile </b> - importiert Datensätze im CSV-Format aus einem File in die Datenbank. Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br><br>
-                                 
-                                 <ul>
-                                 <b>Datensatzformat: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
-                                 # Die Felder "TIMESTAMP","DEVICE","TYPE","EVENT","READING" und "VALUE" müssen gesetzt sein. Das Feld "UNIT" ist optional.
-                                 Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
-                                 Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
-                                 das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte. <br><br>
-                                 
-                                 <b>Beispiel: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
-                                 <br>
-                                 </li> <br>
-                                 </ul>    
-    
-    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
-                                 Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
-    
-    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
-                                 Die Auswertung enthält den Zeitstempel des ermittelten Maximumwertes innerhalb der Aggregation bzw. Zeitgrenzen.  
-                                 Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
-                                 
-    <li><b> minValue </b>     -  berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. 
-                                 Die Auswertung enthält den Zeitstempel des ermittelten Minimumwertes innerhalb der Aggregation bzw. Zeitgrenzen.  
-                                 Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
-                                 
+          
     <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
                                  Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
@@ -4610,23 +5040,133 @@ return;
                                  <br>
                                  </li>
                                  </ul>
-    
-    <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt folgendermaßen: <br><br>
+                                 
+    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
+                                 Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
+                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li> <br>
+        
+    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
+       
+    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
+                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
-                                 "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
-                                 beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
+                                 <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
+                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br>
+                                 # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
+                                 <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
                                  <br>
-                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein um die Löschfunktion freizuschalten. <br>
-                                 </li>
+								 
+								 <b>Hinweis: </b><br>
+                                 Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
+								 Datensätze für die Funktion diffValue zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue 
+								 gibt in diesem Fall "0" in der betroffenen Periode aus !
+                                 <br>
+                                 <br>
+								 </li>
                                  </ul>
+    
+    <li><b> importFromFile </b> - importiert Datensätze im CSV-Format aus einem File in die Datenbank. Der Filename wird 
+	                              durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br><br>
                                  
+                                 <ul>
+                                 <b>Datensatzformat: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
+                                 # Die Felder "TIMESTAMP","DEVICE","TYPE","EVENT","READING" und "VALUE" müssen gesetzt sein. Das Feld "UNIT" ist optional.
+                                 Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
+                                 Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
+                                 das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte. <br><br>
+                                 
+                                 <b>Beispiel: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
+                                 <br>
+                                 </li> <br>
+                                 </ul>    
+    
+    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
+								 angegeben sein. 
+                                 Die Auswertung enthält den Zeitstempel des ermittelten Maximumwertes innerhalb der 
+								 Aggregation bzw. Zeitgrenzen.  
+                                 Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben
+								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+                                 
+    <li><b> minValue </b>     -  berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
+								 angegeben sein. 
+                                 Die Auswertung enthält den Zeitstempel des ermittelten Minimumwertes innerhalb der 
+								 Aggregation bzw. Zeitgrenzen.  
+                                 Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben 
+								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+                                                         				 
+    <li><b> readingRename </b> - benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
+                                 Der Readingname wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell 
+								 gesetzte Zeitgrenzen oder Beschränkungen durch die <a href="#DbRepattr">Attribute</a> 
+								 Device bzw. Reading werden nicht berücksichtigt.  <br><br>
+                                 
+                                 <ul>
+                                 <b>Eingabeformat: </b>  set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
+                                 # Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" 
+								   ausgegeben. <br>
+                                 # Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine 
+								   WARNUNG im Reading "reading_not_renamed" ausgegeben. <br>
+                                 # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
+                                 <br><br>
+                                 </li> <br>
+                                 </ul>  								 
+ 
+    <li><b> sqlCmd </b>        - führt ein beliebiges Benutzer spezifisches Kommando aus. <br>
+                                 Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das 
+								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
+                                 Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
+                                 device und/oder reading berücksichtigt. <br>
+								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
+								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
+								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
+								 
+	                             <ul>
+                                 <b>Beispiele für Statements: </b> <br><br> 
+								 <ul>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
+								 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
+                                 <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM `history` where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
+                                 <li>set &lt;name&gt; sqlCmd delete from current  </li>
+                                 <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
+                                 <li>set &lt;name&gt; sqlCmd update history set VALUE='TestVa$$ue$' WHERE VALUE='TestValue' </li>
+                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
+                                 <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
+                                 </ul>
+								 <br>
+								 
+								 Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
+								 Die Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt werden. <br><bR>
+								 
+								 <b>Hinweis:</b> <br>
+                                 Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
+								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
+								 blockieren. Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit 
+								 hinzufügen. <br><br>
+                                 </li> <br>
+								 
+                                 </ul>
+								 
+    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
+								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
+								 Readings in die Datenbank geschrieben werden.  </li> <br>
+								                              
   <br>
   </ul></ul>
   
-  <b>Für alle Auswertungsvarianten gilt: </b> <br>
+  <b>Für alle Auswertungsvarianten (Ausnahme sqlCmd) gilt: </b> <br>
   Zusätzlich zu dem auszuwertenden Reading kann das Device mit angegeben werden um das Reporting nach diesen Kriterien einzuschränken. 
   Sind keine Zeitgrenzen-Attribute angegeben, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als Zeitgrenze genutzt. 
   <br><br>
@@ -4730,7 +5270,7 @@ return;
   viele Zeichen und "_" = ein Zeichen.  <br>
   Dies gilt für alle Funktionen <b>außer</b> "insert", "deviceRename" und "delEntries". <br>
   Die Funktion "insert" erlaubt nicht dass die genannten Attribute das Wildcard "%" enthalten, "_" wird als normales Zeichen gewertet.<br>
-  Die Löschfunktion "delEntries" wertet die Zeichen "$", "_" <b>NICHT</b> als Wildcards und löscht nur Device/Readings die exakt wie in den Attributen angegeben 
+  Die Löschfunktion "delEntries" wertet die Zeichen "%", "_" <b>NICHT</b> als Wildcards und löscht nur Device/Readings die exakt wie in den Attributen angegeben 
   in der DB gespeichert sind. <br>
   In den Readings wird das Wildcardzeichen "%" durch "/" ersetzt um die Regeln für erlaubte Zeichen in Readings einzuhalten.
   <br><br>
@@ -4759,47 +5299,71 @@ return;
                               </ul><br> 
 							  
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
+  
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
-  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>              
-  <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben   </li> <br>
-  <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen  </li> <br>
-  <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>  
-  <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen Funktion betrachtet.   </li> <br>
+  
+  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>  
+  
+  <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben  </li> <br>
+  
+  <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht 
+                                werden sollen  </li> <br>
+								
+  <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt 
+                                <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>
+								
+  <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) 
+                                für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes 
+								SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen 
+								Funktion betrachtet.   </li> <br>
+								
   <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get ... dbstatus" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
 
-                              <ul>
-                              Bespiel:    attr ... showStatus %uptime%,%qcache%  <br>
-                              # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
-                              </ul><br>  
+                                <ul>
+                                Bespiel:    attr ... showStatus %uptime%,%qcache%  <br>
+                                # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
+                                </ul><br>  
   
   <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get ... dbvars" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
 
-                              <ul>
-                              Bespiel:    attr ... showVariables %version%,%query_cache% <br>
-                              # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
-                              </ul><br>  
+                                <ul>
+                                Bespiel:    attr ... showVariables %version%,%query_cache% <br>
+                                # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
+                                </ul><br>  
                               
   <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get ... svrinfo" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
 
-                              <ul>
-                              Bespiel:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
-                              # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
-                              </ul><br>  
+                                <ul>
+                                Bespiel:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                                # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
+                                </ul><br>  
                               
   <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get ... tableinfo" ein. Es können SQL-Wildcards (% _) verwendet werden.    </li> <br>
 
-                              <ul>
-                              Bespiel:    attr ... showTableInfo current,history  <br>
-                              # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
-                              </ul><br>  
+                                <ul>
+                                Bespiel:    attr ... showTableInfo current,history  <br>
+                                # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
+                                </ul><br>  
                               
+  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses von "set ... sqlResult" fest.   </li> <br>
+  
+                                mögliche Optionen sind: <br>
+								<ul>
+                                <b>separated </b> - die Ergebniszeilen werden als einzelne Readings fortlaufend 
+                                                    generiert. (default)<br> 
+                                <b>mline </b>     - das Ergebnis wird als Mehrzeiler im <a href="#DbRepReadings">Reading</a>
+                                                    sqlCmd dargestellt. Feldtrenner ist "|". <br>	
+                                <b>sline </b>     - das Ergebnis wird als Singleline im <a href="#DbRepReadings">Reading</a>
+                                                    sqlCmd dargestellt. Feldtrenner ist "|", Satztrenner ist"]|[". <br>
+                                <b>table </b>     - das Ergebnis wird als Tabelle im <a href="#DbRepReadings">Reading</a>
+                                                    sqlCmd dargestellt. <br>													
+                                </ul><br>  
+  
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
-  <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
-  <li><b>timeDiffToNow </b>   - der Selektionsbeginn wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;" gesetzt (in Sekunden). Es werden immer die letzten &lt;timeDiffToNow&gt;-Sekunden berücksichtigt (z.b. 86400 wenn immer die letzten 24 Stunden in die Selektion eingehen sollen). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>  
-  <li><b>timeOlderThan </b>   - das Selektionsende wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" gesetzt (in Sekunden). Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt werden alle Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. </li> <br> 
-  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 60) in Sekunden  </li> <br>
-  </ul></ul>
-  <br>
+  
+  <li><b>timestamp_end </b>   - das zeitliche Ende für die Datenselektion. Wenn nicht gesetzt wird immer die aktuelle 
+                                Datum/Zeit-Kombi für das Ende der Selektion eingesetzt. (*)  </li> <br>
+															
   
   (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
   kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
@@ -4826,14 +5390,70 @@ return;
                               <b>previous_hour_end</b>      : "&lt;vorherige Stunde&gt;:59:59"                 <br>
                               </ul><br>
   
-  Natürlich sollte man immer darauf achten dass timestamp_begin < timestamp_end ist.  <br><br>
+  Natürlich sollte man immer darauf achten dass "timestamp_begin" < "timestamp_end" ist.  <br><br>
   
   <b>Hinweis </b> <br>
   
   Wird das Attribut "timeDiffToNow" gesetzt, werden die evtentuell gesetzten Attribute "timestamp_begin" bzw. "timestamp_end" gelöscht.
   Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von Attribut "timeDiffToNow" wenn es vorher gesetzt war.
   <br><br>
+  
+  <li><b>timeDiffToNow </b>   - der Selektionsbeginn wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;" 
+                                gesetzt (in Sekunden). Es werden immer die letzten &lt;timeDiffToNow&gt;-Sekunden 
+								berücksichtigt (z.b. 86400 wenn immer die letzten 24 Stunden in die Selektion eingehen 
+								sollen). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.     </li> <br>
+								
+  <li><b>timeOlderThan </b>   - das Selektionsende wird auf den Zeitpunkt "&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;" 
+                                gesetzt (in Sekunden). Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
+								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt werden alle
+								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
+								dynamisch zum Ausführungszeitpunkt. </li> <br> 
+								
+  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 60) in 
+                                Sekunden  </li> <br>
+  <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
+                                Um die Schnittstelle zu aktivieren, wird zunächst die aufzurufende Subroutine in 
+							    99_myUtls.pm nach folgendem Muster erstellt:     <br>
 
+		<pre>
+        sub UserExitFn {
+          my ($name,$reading,$value) = @_;
+          my $hash = $defs{$name};
+          ...
+          # z.B. übergebene Daten loggen
+          Log3 $name, 1, "UserExitFn $name called - transfer parameter are Reading: $reading, Value: $value " ;
+          ...
+        return;
+        }
+  	    </pre>
+	                           
+							   Die Aktivierung der Schnittstelle erfogt durch Setzen des Funktionsnames im Attribut. 
+							   Optional kann ein Reading:Value Regex als Argument angegeben werden. Wird kein Regex 
+							   angegeben, werden alle Wertekombinationen als "wahr" gewertet (entspricht .*:.*). 
+							   <br><br>
+							   
+							   <ul>
+							   <b>Beispiel:</b> <br>
+                               attr <device> userExitFn UserExit UserExit .*:.* <br>
+                               # "UserExit" ist die Subroutine in 99_myUtils.pm.
+							   </ul>
+							   <br>
+							   
+							   Grundsätzlich arbeitet die Schnittstelle OHNE Eventgenerierung bzw. benötigt zur Funktion keinen
+							   Event. Sofern das Attribut gesetzt ist, erfolgt Die Regexprüfung NACH der Erstellung eines
+							   Readings. Ist die Prüfung WAHR, wird die angegebene Funktion aufgerufen. 
+							   Zur Weiterverarbeitung werden der aufgerufenenen Funktion folgende Variablen übergeben: <br><br>
+                               
+							   <ul>
+                               <li>$hash - der Hash des DbRep-Devices </li>
+                               <li>$reading - der Namen des erstellen Readings </li>
+                               <li>$value - der Wert des Readings </li>
+							   
+							   </ul>
+							   </li>
+							   <br><br> 
+
+</ul></ul>
 </ul>
 
 <a name="DbRepReadings"></a>
@@ -4847,16 +5467,26 @@ return;
   Zusätzlich werden folgende Readings erzeugt: <br><br>
   
   <ul><ul>
-  <li><b>state                      </b>  - enthält den aktuellen Status der Auswertung. Wenn Warnungen auftraten (state = Warning) vergleiche Readings
+  <li><b>state  </b>                      - enthält den aktuellen Status der Auswertung. Wenn Warnungen auftraten (state = Warning) vergleiche Readings
                                             "diff_overrun_limit_&lt;diffLimit&gt;" und "less_data_in_period"  </li> <br>
-  <li><b>errortext                  </b>  - Grund eines Fehlerstatus </li> <br>
+
+  <li><b>errortext  </b>                  - Grund eines Fehlerstatus </li> <br>
+
   <li><b>background_processing_time </b>  - die gesamte Prozesszeit die im Hintergrund/Blockingcall verbraucht wird </li> <br>
-  <li><b>sql_processing_time        </b>  - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten Operation verbraucht wird </li> <br>
+
   <li><b>diff_overrun_limit_&lt;diffLimit&gt;</b>  - enthält eine Liste der Wertepaare die eine durch das Attribut "diffAccept" festgelegte Differenz
                                                      &lt;diffLimit&gt; (Standard: 20) überschreiten. Gilt für Funktion "diffValue". </li> <br>
-  <li><b>less_data_in_period</b>    - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde. Die
-                                            Differenzberechnung berücksichtigt den letzten Wert der Vorperiode.  Gilt für Funktion "diffValue". </li> <br>													 
-													
+
+  <li><b>less_data_in_period </b>         - enthält eine Liste der Zeitperioden in denen nur ein einziger Datensatz gefunden wurde. Die
+                                            Differenzberechnung berücksichtigt den letzten Wert der Vorperiode.  Gilt für Funktion "diffValue". </li> <br>	
+
+  <li><b>sql_processing_time </b>         - der Anteil der Prozesszeit die für alle SQL-Statements der ausgeführten 
+                                            Operation verbraucht wird </li> <br>
+											
+  <li><b>SqlResult </b>                   - Ergebnis des letzten sqlCmd-Kommandos. Die Formatierung erfolgt entsprechend
+                                            des <a href="#DbRepattr">Attributes</a> "sqlResultFormat" </li> <br>
+											
+  <li><b>sqlCmd </b>                      - das letzte ausgeführte sqlCmd-Kommando </li> <br>											
   </ul></ul>
   <br>
 
