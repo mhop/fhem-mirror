@@ -16,6 +16,13 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.16.10    15.05.2017       commandref revised
+# 2.16.9.1   11.05.2017       set userCommand changed - 
+#                             Forum: https://forum.fhem.de/index.php/topic,71808.msg633607.html#msg633607
+# 2.16.9     07.05.2017       addlog syntax changed to "addLog devspec:Reading [Value]"
+# 2.16.8     06.05.2017       in valueFN $VALUE and $UNIT can now be set to '' or 0
+# 2.16.7     20.04.2017       fix $now at addLog
+# 2.16.6     18.04.2017       AddLog set lasttime, lastvalue of dev_name, dev_reading
 # 2.16.5     16.04.2017       checkUsePK changed again, new attribute noSupportPK
 # 2.16.4     15.04.2017       commandref completed, checkUsePK changed (@usepkh = "", @usepkc = "")
 # 2.16.3     07.04.2017       evaluate reading in DbLog_AddLog as regular expression
@@ -121,7 +128,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.16.5";
+my $DbLogVersion = "2.16.10";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -443,8 +450,8 @@ sub DbLog_Set($@) {
         }
     }	
 	elsif ($a[1] eq 'addLog') {		
-        unless ($a[2]) { return " The argument of $a[1] is not valid. Use a pair of <devicespec>,reading,[value] you want to create a log entry from";}
-        DbLog_AddLog($hash,$a[2]);
+        unless ($a[2]) { return " The argument of $a[1] is not valid. Use a pair of <devicespec>,reading [value] you want to create a log entry from";}
+		DbLog_AddLog($hash,$a[2],$a[3]);
 	}
     elsif ($a[1] eq 'reopen') {		
 		if ($dbh) {
@@ -665,7 +672,9 @@ sub DbLog_Set($@) {
             $sql = join(" ",@cmd);
             readingsSingleUpdate($hash, 'userCommand', $sql, 1);
             $c = $dbh->selectrow_array($sql);
-            readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+			my $res = (defined($c))?$c:"no result";
+			Log3($name, 4, "DbLog $name: DBLog_Set - userCommand - result: $res");
+            readingsSingleUpdate($hash, 'userCommandResult', $res ,1);
 			$dbh->disconnect();
 			
 			InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
@@ -1168,8 +1177,8 @@ sub DbLog_Log($$) {
  				      $dev_name  = $DEVICE     if($DEVICE ne '');
  				      $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
  				      $reading   = $READING    if($READING ne '');
- 		  	          $value     = $VALUE      if($VALUE ne '');
- 				      $unit      = $UNIT       if($UNIT ne '');
+ 		  	          $value     = $VALUE      if(defined $VALUE);
+ 				      $unit      = $UNIT       if(defined $UNIT);
                   }
 
 				  # Daten auf maximale Länge beschneiden
@@ -2673,8 +2682,8 @@ DbLog_Get($@)
 # Addlog - einfügen des Readingwertes eines gegebenen Devices
 #
 #########################################################################################
-sub DbLog_AddLog($$) {
-  my ($hash,$str)= @_;
+sub DbLog_AddLog($$$) {
+  my ($hash,$devrdspec,$value)= @_;
   my $name     = $hash->{NAME};
   my $async    = AttrVal($name, "asyncMode", undef);
   my $value_fn = AttrVal( $name, "valueFn", "" );
@@ -2691,8 +2700,13 @@ sub DbLog_AddLog($$) {
       $value_fn = '';
   }
   
-  my $ts = TimeNow();
-  my ($devspec,$rdspec,$value) = split(",",$str);
+  my $ts   = TimeNow();
+  my $now  = gettimeofday(); 
+  
+  my $rdspec = (split ":",$devrdspec)[-1];
+  my @dc = split(":",$devrdspec);
+  pop @dc;
+  my $devspec = join(':',@dc);
   
   my @exdvs = devspec2array($devspec);
   foreach (@exdvs) {
@@ -2731,6 +2745,9 @@ sub DbLog_AddLog($$) {
           if(!defined $read_val) {$read_val = "";}
           if(!defined $ut || $ut eq "") {$ut = AttrVal("$dev_name", "unit", "");}   
           $event       = "addLog";
+		  
+		  $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME}  = $now;
+          $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE} = $read_val;
 	  
 	      # Anwender spezifische Funktion anwenden 
           if($value_fn ne '') {
@@ -2751,8 +2768,8 @@ sub DbLog_AddLog($$) {
  	          $dev_name     = $DEVICE     if($DEVICE ne '');
 	          $dev_type     = $DEVICETYPE if($DEVICETYPE ne '');
  	          $dev_reading  = $READING    if($READING ne '');
- 	          $read_val     = $VALUE      if($VALUE ne '');
- 	          $ut           = $UNIT       if($UNIT ne '');
+ 		  	  $read_val     = $VALUE      if(defined $VALUE);
+ 			  $ut           = $UNIT       if(defined $UNIT);
           }
 	  
           # Daten auf maximale Länge beschneiden
@@ -4051,7 +4068,7 @@ sub checkUsePK ($$){
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;,&lt;Reading&gt;,[Value] </code><br><br>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] </code><br><br>
     <ul> Inserts an additional log entry of a device/reading combination into the database.
       Optionally you can enter a "Value" that is used as reading value for the dataset. If the value isn't specified (default),
 	  the current value of the specified reading will be inserted into the database. The field "$EVENT" will be filled automatically
@@ -4060,11 +4077,11 @@ sub checkUsePK ($$){
 	  By the addLog-command NO additional events will be created !<br><br>
       
 	  <b>Examples:</b> <br>
-	  set &lt;name&gt; addLog SMA_Energymeter,Bezug_Wirkleistung <br>
-	  set &lt;name&gt; addLog TYPE=SSCam,state <br>
-	  set &lt;name&gt; addLog MyWetter,(fc10.*|fc8.*) <br>
-	  set &lt;name&gt; addLog MyWetter,(wind|wind_ch.*),20 <br>
-	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|),(measured-temp|desired-temp|actuator) <br>
+	  set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
+	  set &lt;name&gt; addLog TYPE=SSCam:state <br>
+	  set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
+	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br>
     </ul><br>
 	
     <code>set &lt;name&gt; clearReadings </code><br><br>
@@ -4153,7 +4170,12 @@ sub checkUsePK ($$){
 	  
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
-          Perform any (!!!) sql statement on connected database. Useercommand and result will be written into corresponding readings.<br/>
+          Performs any (!!!) sql statement on connected database. Usercommand and result will be written into 
+		  corresponding readings.</br>
+		  The result can only be a single line. If the SQL-Statement seems to deliver a multiline result, it can be suitable
+		  to use the analysis module <a href=https://fhem.de/commandref.html#DbRep>DbRep</a>.</br>
+		  If the database interface delivers no result (undef), the reading "userCommandResult" contains the message 
+		  "no result".
       </ul><br/>
 
   </ul><br>
@@ -4780,7 +4802,7 @@ sub checkUsePK ($$){
   <a name="DbLogset"></a>
   <b>Set</b> 
   <ul>
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;,&lt;Reading&gt;,[Value] </code><br><br>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] </code><br><br>
     <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein.
       Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
       Wert des Readings in die DB eingefügt. Das Feld "$EVENT" wird automatisch mit "addLog" belegt. Das Device kann 
@@ -4788,11 +4810,11 @@ sub checkUsePK ($$){
 	  Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
       
 	  <b>Beispiele:</b> <br>
-	  set &lt;name&gt; addLog SMA_Energymeter,Bezug_Wirkleistung <br>
-	  set &lt;name&gt; addLog TYPE=SSCam,state <br>
-	  set &lt;name&gt; addLog MyWetter,(fc10.*|fc8.*) <br>
-	  set &lt;name&gt; addLog MyWetter,(wind|wind_ch.*),20 <br>
-	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|),(measured-temp|desired-temp|actuator) <br>
+	  set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
+	  set &lt;name&gt; addLog TYPE=SSCam:state <br>
+	  set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
+	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br>
     </ul><br>
 	  
     <code>set &lt;name&gt; clearReadings </code><br><br>
@@ -4869,7 +4891,8 @@ sub checkUsePK ($$){
           </ul><br>
 		  
     <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br><br>
-      <ul>Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
+	      <ul>
+	      Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
 	      mehr blockiert da diese Funktion non-blocking implementiert ist ! <br>
           </ul><br>
 		  
@@ -4889,7 +4912,13 @@ sub checkUsePK ($$){
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>BENUTZE DIESE FUNKTION NUR, WENN DU WIRKLICH (WIRKLICH!) WEISST, WAS DU TUST!!!</b><br/><br/>
-          F&uuml;hrt einen beliebigen (!!!) sql Befehl in der Datenbank aus. Der Befehl und ein zur&uuml;ckgeliefertes Ergebnis werden in entsprechende Readings geschrieben.<br/>
+          Führt einen beliebigen (!!!) sql Befehl in der Datenbank aus. Der Befehl und ein zurückgeliefertes 
+		  Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur 
+		  einzeilig sein. 
+		  Für SQL-Statements, die mehrzeilige Ergebnisse liefern, kann das Auswertungsmodul 
+		  <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
+		  Wird von der Datenbankschnittstelle kein Ergebnis (undef) zurückgeliefert, erscheint die Meldung "no result"
+		  im Reading "userCommandResult".
       </ul><br>
 
   </ul><br>
