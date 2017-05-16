@@ -31,6 +31,8 @@
 # ABU 20170427 added dpt1.010 (start/stop)
 # ABU 20170427 added dpt2
 # ABU 20170503 corrected DPT1.010
+# ABU 20170503 changed regex for all dpt9
+# ABU 20170507 changed regex for all dpt9
 
 package main;
 
@@ -125,20 +127,20 @@ my %dpttypes = (
 	"dpt8.011" 		=> {CODE=>"dpt8", UNIT=>"&deg;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/, MIN=>-32768, MAX=>32768},
 
 	# 2-Octet Float value
-	"dpt9"	 		=> {CODE=>"dpt9", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},
-	"dpt9.001"	 	=> {CODE=>"dpt9", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.004"	 	=> {CODE=>"dpt9", UNIT=>"lux", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.006"	 	=> {CODE=>"dpt9", UNIT=>"Pa", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.005"	 	=> {CODE=>"dpt9", UNIT=>"m/s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.007"	 	=> {CODE=>"dpt9", UNIT=>"%", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.008"	 	=> {CODE=>"dpt9", UNIT=>"ppm", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},		
-	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.026"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},	
-	"dpt9.028"	 	=> {CODE=>"dpt9", UNIT=>"km/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]\d{1,2}/, MIN=>-670760, MAX=>670760},		
+	"dpt9"	 		=> {CODE=>"dpt9", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},
+	"dpt9.001"	 	=> {CODE=>"dpt9", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.004"	 	=> {CODE=>"dpt9", UNIT=>"lux", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.006"	 	=> {CODE=>"dpt9", UNIT=>"Pa", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.005"	 	=> {CODE=>"dpt9", UNIT=>"m/s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.007"	 	=> {CODE=>"dpt9", UNIT=>"%", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.008"	 	=> {CODE=>"dpt9", UNIT=>"ppm", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},		
+	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.026"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},	
+	"dpt9.028"	 	=> {CODE=>"dpt9", UNIT=>"km/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/, MIN=>-670760, MAX=>670760},		
   
 	# Time of Day
 	"dpt10"			=> {CODE=>"dpt10", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9]))|([nN][oO][wW])/, MIN=>undef, MAX=>undef},
