@@ -1,0 +1,40 @@
+#
+# Display the measured wind direction and wind speed of Oregon sensors
+#
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
+# Filelog example:
+# define FileLog_WTGR800_A_cf FileLog /var/log/fhem/WTGR800_A_cf-%Y.log WTGR800_A_cf
+#
+#
+# Logfile record example:
+# 2010-08-10_17:57:14 WTGR800_A_cf wind_speed: 3.2
+# 2010-08-10_17:57:14 WTGR800_A_cf wind_dir: 270
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Windspeed m/s"
+set ylabel "Wind Dir"
+
+#FileLog 4:wind_speed:0:
+#FileLog 4:wind_dir:0:
+
+plot \
+  "< awk $3=="wind_speed:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Wind Speed' with lines,\
+  "< awk $3=="wind_dir:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Wind Direction' with points\

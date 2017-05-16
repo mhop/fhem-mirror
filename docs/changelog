@@ -1,0 +1,14 @@
+fhem (5.0-1) unstable; urgency=low
+
+  * Making .dep compatible for Debian Squeeze and for Ubuntu Lucid
+    init script is copied from contrib/initscripts
+    prerm deletes the initscripts
+
+ -- Alex Peuchert <fhem@peuchert.de>  Thu, 30 Sep 2010 11:00:00 +0200
+
+fhem (4.10) unstable; urgency=low
+
+  * Trying to make Debian package lintian clean.
+  * First release
+
+ -- Rudolf Koenig <r.koenig@koeniglich.de>  Sun, 1 Aug 2010 00:00:00 +0200

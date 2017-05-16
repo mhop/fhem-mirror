@@ -1,0 +1,33 @@
+.TH FHEM 1 "2010-08-01" "4.9" "fhem"
+.SH NAME
+fhem \- GPL'd perl server for house automation.
+.SH SYNOPSIS
+.B fhem.pl
+.IR /etc/fhem.cfg
+.br
+.B fhem.pl
+.IR [host:]
+.I port cmd
+.SH DESCRIPTION
+.B fhem
+is used to automate some common tasks in the household like switching lamps
+shutters / heating / etc. and to log events like temperature/humidity/power
+consumption.
+.br
+For more details see the fhem homepage (http://fhem.de) or the supplied documentation
+in the /usr/share/doc/fhem directory.
+.SH FILES
+.TP
+.I /etc/fhem.cfg
+configuration file.
+.TP
+.I /usr/share/fhem
+FHEM Module directory, contrib files
+.TP
+.I /var/log/fhem
+Logfiles
+.I index
+database cache.
+.TP
+.I /usr/share/doc/fhem
+Documentation

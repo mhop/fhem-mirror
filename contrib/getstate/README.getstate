@@ -1,0 +1,50 @@
+NAME
+    getstate.pm - Copyright (c)2008 Martin Fischer <m_fischer@gmx.de>
+
+SYNOPSIS
+    getstate <devspec>
+
+DESCRIPTION
+    The module getstate.pm extends FHEM to support a short status output of
+    a device. It is useful for monitoring the device in e.g. Cacti.
+
+INSTALLATION
+    Copy the script 99_getstate.pm to FHEM modules directory, e.g.
+
+        'cp 99_getstate.pm /usr/share/fhem/FHEM'
+
+    and restart FHEM.
+
+EXAMPLES
+    Output a short string of the "READINGS" for <devspec>.
+
+      Example for a FS20-Device:
+      fhem> getstate EG.sz.SD.Tv
+      state:0
+
+      Example for a FHT-Device:
+      fhem> getstate EG.wz.HZ
+      actuator:0 day-temp:21.5 desired-temp:21.5 lowtemp-offset:4.0 [...]
+
+      Example for a KS300/555-Device:
+      fhem> getstate GH.ga.WE.01
+      humidity:93 israining:0 rain:207.8 rain_raw:815 temperature:5.1 [...]
+
+      Example for a HMS-Device:
+      fhem> getstate NN.xx.RM.01
+      smoke_detect:0
+
+CONTRIB
+    You can use the example script contrib/fhem-getstate as a "Data Input
+    Method" for your Cacti graphs.
+
+LEGALESE
+    License GPLv3+: GNU GPL version 3 or later
+    <http://gnu.org/licenses/gpl.html>.
+
+    This is free software: you are free to change and redistribute it. There
+    is NO WARRANTY, to the extent permitted by law.
+
+AUTHOR
+    Copyright (C) 2008 Martin Fischer <m_fischer@gmx.de>
+

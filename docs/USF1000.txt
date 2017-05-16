@@ -1,0 +1,41 @@
+2009-06-20bn
+
+This document describes the protocol for the ultrasound fill-meter USF 1000 S.
+
+Datagram is of FS20 sensor message type:
+
+81 0C 04 ?? 01 01 A0 01 A5 CE AA 00 cc xx
+
+81: 		begin of FS20/FHT communication
+0C: 		remaining length of datagram (12 bytes)
+04: 		type of datagram
+??: 		checksum
+01 01 A0 01: 	FS20 fix sequence, always 01 01 A0 01
+A5 CE: 		FS20 housecode, always A5CE
+AA: 		FS20 command, always AA
+00:		always 00
+cc:		code, see below
+xx:		measured distance in cm
+
+code:
+
+	hex	bin
+	37	00110111	30min message interval, normal operation
+	B7	10110111	3s message interval, normal operation
+	F7	11110111	3s message interval, battery low
+		|||+++++-- 0x17 always 0x17
+		||+------- 0x20 always 1 (= value byte follows)
+		|+-------- 0x40 battery warning
+		+--------- 0x80 test mode (3s message interval)
+
+
+measured distance from ultrasound sender/transmitter:
+
+	distance	hex	dec
+	0.50 m		0x30	48
+	1.00 m		0x60	96
+	1.50 m		0x92	146
+	2.00 m		0xC4	196
+
+It is assumed that xx is the distance in centimeters from the top of the box
+(4 cm box height + 1 cm height of ultrasound sender/transmitter).

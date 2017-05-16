@@ -1,0 +1,24 @@
+rotateShiftWork.sh - Copyright (c)2008 Martin Fischer <m_fischer@gmx.de>
+
+Description:
+  The script rotateShiftWork.sh rotates a defined heating plan for
+  one or more FHT devices to odd or even weeks.
+
+Installation:
+  Copy the script rotateShiftWork.sh to a directory of your choice,
+  e.g.:
+    'cp rotateShiftWork.sh /usr/local/bin'
+  and make it executable:
+    'chmod 775 /usr/local/bin/rotateShiftWork.sh'
+
+  Edit the file rotateShiftWork.sh to your personal preferences.
+
+  Edit your FHEM configuration file and add a line like this:
+  define <timername> at *00:15:00 "<path_to_script>/rotateShiftWork.sh <fht-device>"
+
+  where
+    <timername> is a name of your choice, e.g.: timerEGwzHeizung
+    <path_to_script> is /usr/local/bin in this example
+    <fht-device> one ore more FHT device(s) e.g.: EGwzHeizung
+
+  At last restart FHEM or do a rereadcfg.

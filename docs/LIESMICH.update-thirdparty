@@ -1,0 +1,145 @@
+# $Id$
+LIESMICH.update-thirdparty - Bereitstellung von Fremdpaketen
+
+Beschreibung
+
+  Der in FHEM integrierte Updateprozess unterstützt die Installation von Paketen
+  die kein Bestandteil der Distribution sind. Dies soll die Verteilung von
+  Erweiterungen ermöglichen, die nicht in den regulären Aktualisierungsvorgang
+  aufgenommen werden können oder sollen. Entwicklern wird damit die Möglichkeit
+  angeboten ihre Pakete über ein eigenes Repository zu verteilen.
+
+Updateprozess
+
+  Eine Aktualisierung wird in der FHEM Befehlszeile (alternativ über das
+  Eingabefeld von FHEMWEB) über den Befehl 'update' angestossen. Der Anwender
+  kann dabei das Verhalten über Parameter beeinflussen.
+
+  Der 'update' Befehl unterstützt dabei die optionale Angabe des BRANCH stable
+  oder development. Je nach Angabe wird die Aktualisierung aus dem entsprechendem
+  Updatepfad auf fhem.de (stable / development) vorgenommen. Zur Zeit unterstützt
+  FHEM nur Aktualisierungen aus dem Entwicklungszweig.
+
+  Darüber hinaus unterstützt der 'update' Befehl die Bereitstellung von FHEM
+  eigenen Paketen. Diese Funktionalität wurde im Rahmen der Entwicklung
+  bereitgestellt um z.B. eine getrennte Installation der FHEM-core Dateien und
+  FHEMWEB zu ermöglichen. Aktuell wird nur das Paket "fhem" angeboten das alle
+  Dateien der jeweiligen Release beinhaltet.
+
+  Im jeweiligem Repository (stable / development) wird eine Steuerungsdatei
+  vorgehalten. Diese Steuerungsdatei hat die Bezeichnung 'controls_<name>.txt',
+  wobei <name> als Platzhalter für das entsprechende Paket steht. Im Beispiel
+  von FHEM lautet die Steuerungsdatei 'controls_fhem.txt'.
+
+  Damit sich der Anwender vor einer Aktualisierung über Neuerungen informieren
+  kann, wird neben der zwingend notwendigen Steuerungsdatei ein Changelog über
+  die Datei CHANGED bereitgestellt.
+
+  Unmittelbar nach dem Aufruf des 'update' Befehls wird die Steuerungsdatei auf
+  das lokale System übertragen und auf Inkonsistenzen im Aufbau überprüft. Zur
+  Zeit werden folgende Steuerbefehle unterstützt:
+
+  UPD - Zu aktualisierende Datei
+  DIR - Zu erstellendes Verzeichnis
+  MOV - Zu verschiebende Datei(en)
+  DEL - Zu löschende Datei(en) / Verzeichnisse
+
+  Durch die Integration des FHEM Befehls 'notice' besteht die Möglichkeit vor
+  oder nach der Verabeitung der Steuerdatei Hinweise anzeigen zu lassen und
+  bei Bedarf eine Bestätigung des Nutzers einzuholen. 'notice' unterstützt dabei
+  ebenfalls die Abfrage von Variablen. Weiterführende Informationen sind der
+  Anleitung von 'notice' zu entnehmen.
+
+  Nach dem alle zu aktualisierenden Dateien installiert wurden, wird abschliessend
+  ein 'Housekeeping' vorgenommen. In diesem Schritt werden die Steuerbefehle
+  DIR, MOV, DEL (in genau dieser Reihenfolge) verarbeitet.
+
+Struktur des Update-Repository
+
+  Das Repository beinhaltet die komplett abzubildene Struktur des zu installierenden
+  Paketes. Es wird empfohlen auf dem Webserver ein eigenes Verzeichnis für jedes
+  Paket bereit zu stellen.
+
+  Beispielstruktur für das Paket 'mypackage':
+
+  CHANGED
+  controls_mypackage.txt
+  FHEM/FhemUtils/mypackage-20130222-001
+  FHEM/98_myPackageModule.pm
+  www/myPackage/index.html
+
+  Um das Paket 'mypackage' über den 'update' Befehl zu installieren, benötigt der
+  Anwender die URL inkl. der Pfadangabe zur Steuerungsdatei sowie den Paketnamen.
+  Die URL beinhaltet nicht die Angabe der Steuerungsdatei, der Paketname sollte
+  in Kleinbuchstaben weitergegeben werden.
+  Beispiel:
+  'update http://my_domain.tld/my_package_path mypackage'
+
+Struktur der Steuerungsdatei
+
+  Die Steuerungsdatei beinhaltet die zu aktualisierenden Dateien und ggf. zu
+  erstellende Verzeichnisse. Dabei ist der Aufbau exakt dem Beispiel zu entnehmen.
+  Die Steuerungsdatei muss den Namen des Paketes beinhalten. Der Installationspfad
+  einzelner Dateien kann sich nur unterhalb des Pfades gemäß dem globalen Attribut
+  'modpath' befinden (zum Schutz der Installationsumgebung).
+
+  Inhalt der Steuerungsdatei 'controls_mypackage.txt' für das Paket 'mypackage':
+
+  DIR www/myPackage
+  UPD 2013-02-22_20:15:00 46 www/myPackage/index.html
+  UPD 2013-02-22_20:15:00 257 FHEM/98_myPackage.pm
+  UPD 2013-02-22_20:15:00 246 FHEM/FhemUtils/mypackage-20130222-001
+
+  In diesem Beispiel wird das Verzeichnis 'www/myPackage' unterhalb von 'modpath'
+  erzeugt. Es wird geprüft ob die Dateien
+
+    www/myPackage/index.html
+    FHEM/98_myPackage.pm
+    FHEM/FhemUtils/mypackage-20130222-001
+
+  nicht vorhanden oder älter als der angegebene Zeitstempel sind. Trifft einer der
+  Fälle zu, wird die entsprechende Datei aktualisiert (UPD).
+
+  Dabei sind folgende Vorgaben einzuhalten:
+
+  UPD
+    benötigt die Angabe eines Zeitstempels, der Dateigröße sowie dem Dateinamen
+    inkl. dem Pfad. Dabei ist die Schreibweise des Zeitstempels beizubehalten.
+    Beispiel:
+    UPD 2013-02-22_20:15:00 257 FHEM/98_myPackage.pm
+
+  DIR
+    benötigt den Pfad unterhalb von 'modpath' des zu erzeugenden Verzeichnisses.
+    Beispiel:
+    DIR www/myPackage
+
+  DEL
+    benötigt die Angabe des Dateinamens (alternativ Glob) inkl. Pfad der zu
+    löschenden Datei(en).
+    Beispiel:
+    DEL www/myPackage/*.bak
+
+  MOV
+    benötigt die Angabe der Quelle und des Zieles. Glob wird unterstützt.
+    Beispiel:
+    MOV www/myPackage/*.jpg www/myPackage/images
+
+Hinweis für Anbieter von Fremdpaketen
+
+  Anbieter von Paketen die nicht zur FHEM Distribution gehören achten bitte
+  eigenverantwortlich darauf, das die zur FHEM Distribution gehörenden Dateien
+  nicht gelöscht, verändert, o.ä. werden ohne den Anwender darauf aufmerksam
+  zu machen. Ein solcher Eingriff sollte nur mit Bedacht und der Sicherstellung
+  der Funktionalität von FHEM vorgenommen werden. Dabei sind auch eventuelle
+  Seiteneffekte zu berücksichtigen. Ein (ungetesteter) Eingriff in die FHEM
+  Umgebung kann zu einem erhöhtem Supportaufwand führen. Die Fehlersuche wird
+  ggf. für anderen Entwickler erschwert. Ebenfalls sollte der Einsatz von
+  Hinweisen über den Befehl 'notice' wohl dosiert erfolgen.
+
+  FHEM steht unter der GNU General Public License v2 oder höher. Anbieter haben
+  bei der Verteilung von Software ebenfalls eigenverantwortlich auf die
+  Einhaltung der jeweiligen Lizenzen und gültige Rechtsgrundlagen zu achten.
+
+Autor
+  Martin Fischer (m_fischer at gmx dot de), Februar 2013
+

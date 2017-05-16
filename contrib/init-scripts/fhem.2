@@ -1,0 +1,27 @@
+#!/bin/sh
+# by Matthias Bauer
+
+cd /opt/fhem
+
+case "$1" in
+  start)
+    echo "Starting $0"
+    perl fhem.pl fhem.cfg
+    ;;
+  stop)
+    echo "Stopping $0"
+    killall fhem.pl
+    ;;
+  status)
+    cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
+    if [ "$cnt" -eq "0" ] ; then
+      echo "$0 is not running"
+    else
+      echo "$0 is running"
+    fi
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status}"
+  exit 1
+esac
+exit 0

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+home=/var/InternerSpeicher/fhem
+
+cd $home
+
+trap "" SIGHUP
+modprobe cdc_acm
+modprobe ftdi_sio
+sleep 2
+
+ln -sf $home/FHEM/fhemcmd.sh /var/fhemcmd
+
+PATH=$home:$PATH
+export PATH
+
+export LD_LIBRARY_PATH=$home/lib
+export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+
+# add user fhem with uid of boxusr80/boxusr99 (== ftpuser)
+# Comment/delete everything between START and END to run FHEM as root
+
+perl fhem.pl fhem.cfg

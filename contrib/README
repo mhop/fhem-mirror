@@ -1,0 +1,73 @@
+- 11_FHT8V.pm
+  Module to control FHT8V valve servos via CUL/CUN
+  precondition: support must be added to 00_CUL.pm. This support is primary
+  tested with a modified send-method of the culfw.
+- 23_LUXTRONIK2.pm
+  Support for the heatpump controller LUXTRONIK2 used by Alpha-Innotec
+  and Siemens and probably some other vendors, too.  LUX2.gplot is one 
+  example plotting template.
+- 70_SCIVT.pm
+  Support for an SCD series solar controler device. Details see 
+  http://english.ivt-hirschau.de/content.php?parent_id=CAT_64&doc_id=DOC_118
+- 86_FS10.pm
+  Support for FS10. Read README.FS10, you have to install pcwsd first.
+- 91_DbLog.pm
+  Example to log data in a (DBI supported) database (MySQL, Oracle, etc)
+  see dblog for a full-featured database log
+- 95_PachLog.pm
+  Pachube module from Axel
+- 97_GROUP.pm
+  Helper for FHEMWEB to display different groups of device READINGS at once
+- 99_dumpdef.pm
+  Debugging helpers from Axel
+- 99_ALARM.pm
+  Example for a Low Budget ALARM System by Martin
+- 99_SUNRISE.pm
+  The "original" (i.e. old) Sunrise/Sunset support. Needs the hard-to-install
+  DateTime::Event::Sunrise perl module. Use the 99_SUNRISE_EL.pm module instead.
+- 99_PID
+  Direct 8v controlling with the help of Temp sensors by Alexander
+
+- checkmsg.pl
+  Check header/function/crc of an FS20 hex message
+- crc.pl
+  Computing CRC16 in perl
+- dblog/*
+  Support for a full-featured database log by Boris. See the README.
+- em1010.pl / em1010.gnuplot
+  Standalone EM1010PC reader program and a gnuplot file to plot em1010 data
+- fhem2fht-bulkupdate.sh
+  Bulkupdate for FHTs
+- four2hex
+  Convert housecode from  ELV notation (4) to fhem.pl notation (hex)
+  Not needed any more, as current fhem versions understand both.
+- fs20_holidays.sh
+  STefan's "presence simulator" for holidays
+- garden.pl
+  Garden irrigation regulator with weather dependency (KS300 temp + rain)
+- fhem-speech
+  Martins instructions on how to make FHEM talk using the MBROLA speech
+  synthesizer
+- init-scripts
+  RC scripts to be put into /etc/init.d and then symlinked to /etc/rc3.d or
+  similar.
+- ks300avg.pl
+  Computing daily/monthly avarage values from a KS300 log
+- rolwzo_not_off.sh
+  Martin's "don't lock me out" program: look at the comment
+- rotateShiftWork
+  Shellskript for changing am/pm temperatures when working on a shift
+- rrd
+  Peter's RRD support. See the HOWTO
+- serial.pm
+  Serial line analyzer
+- km271.pl
+  Plain Buderus Logamatic 2107 communication module (KM271) logger
+  See the 00_KM271.pm fhem module for its successor.
+- RSSImonitor.pl
+  Produces an overview on the RSSI readings from a log. Good for checking
+  the signal quality at various locations for CUL and CUN. See begin of
+  script for usage instructions.
+- tcptee.pl
+  Used to connect e.g. a fhem and a CCU to a single HM-Lan config (the
+  correstponding fhem device should have the attribute dummy).

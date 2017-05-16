@@ -1,0 +1,27 @@
+############################
+# Display a CPU temperature log of the form
+# 2008-02-29_09:48:30 CPU 39.0 SYS 39.0 CORE 57.0 CPU_FAN 1068 CASE_FAN 0 HD_TEMP 46
+# We need a fake FileLog definition: 
+# define cpulog FileLog test2/temperature-history cpufake
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<TL>'
+set grid xtics y2tics
+
+set ylabel "Temperature in C"
+
+#FileLog 3:CPU:0:
+#FileLog 5:SYS:0:
+#FileLog 7:CORE:0:
+#FileLog 13:HD_TEMP:0:
+
+plot "<IN>" using 1:3 title 'CPU' with lines,\
+     "<IN>" using 1:5 title 'SYS' with lines,\
+     "<IN>" using 1:7 title 'CORE' with lines,\
+     "<IN>" using 1:13 title 'HDTEMP' with lines

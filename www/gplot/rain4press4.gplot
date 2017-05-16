@@ -1,0 +1,40 @@
+#
+# Display the measured temp and the pressure of Oregon sensors.
+#
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
+# Filelog example:
+# define FileLog_BTHR918N_2d FileLog /var/log/fhem/BTHR918N_2d-%Y.log BTHR918N_2d
+#
+# Logfile record example:
+# 2010-08-10_18:00:22 BTHR918N_2d temperature: 21.7
+# 2010-08-10_18:00:22 BTHR918N_2d pressure: 1007
+
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+set ylabel "Pressure in hPa"
+
+#FileLog 4:temperature:0:
+#FileLog 4:pressure:0:
+
+plot \
+  "< awk $3=="temperature:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines,\
+  "< awk $3=="pressure:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Pressure hPa' with lines

@@ -1,0 +1,23 @@
+############################
+# Display the power reported by the EM1010
+# Corresponding FileLog definition:
+# define <filelogname> FileLog /var/log/fhem/em-%Y.log <emdevname>:CNT:.*
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title '<L1>'
+set ylabel "Power (KW)"
+set y2label "Power (KW)"
+set grid
+set ytics
+set y2tics
+set format y "%.1f"
+set format y2 "%.1f"
+
+#FileLog 8::0:
+
+plot "<IN>" using 1:8 title 'Power' with lines

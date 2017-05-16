@@ -1,0 +1,30 @@
+############################
+# Display the power reported by the EM1000FM received bei CUL
+
+#set terminal png transparent size <SIZE> crop
+set terminal png size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel "Energiemonitor EM1000EM"
+
+set title '<L1>'
+set ylabel "Power (kW)"
+set y2label "Power (kWh)"
+set grid
+set ytics
+set y2tics
+set logscale y
+set logscale y2
+set format y "%.1f"
+set format y2 "%.1f"
+
+#FileLog 8::0:
+#FileLog 10::0:
+
+
+plot \
+  "< awk '/5MIN:/ {print $1, $8}' <IN>"\
+     using 1:2 axes x1y2 title 'kWh' with lines,\
+  "< awk '/TOP:/ {print $1, $10}' <IN>"\
+     using 1:2 axes x1y1 title 'Spitze kW' with lines

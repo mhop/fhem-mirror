@@ -1,0 +1,4 @@
+If the files are too big the system will be slower than usual.
+
+In the config.php it is now possible to automatic logrotate the HMS, FHT, KS300-Logs and others. But it is only possible if the user of the pgm3 (e.g. wwwrun) has the rights to write the logfiles from fhz1000.pl (user=???????)
+

@@ -1,0 +1,386 @@
+#!/usr/bin/perl
+##############################################################################
+# $Id$
+##############################################################################
+#
+#     presenced
+#     checks for one or multiple bluetooth devices for their presence state 
+#     and report this to the 73_PRESENCE.pm module.
+#
+#     Copyright by Markus Bloch
+#     e-mail: Notausstieg0309@googlemail.com
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+
+use IO::Socket;
+use IO::Select;
+use File::Basename;
+use Getopt::Long;
+use threads;
+use threads::shared;
+
+use warnings;
+use strict;
+
+
+my $new_client;
+my $server;
+my $client;
+my $buf;
+
+my $querylocker :shared = int(time() - 15);
+
+
+my $opt_d;
+my $opt_h;
+my $opt_v;
+my $opt_p = 5111;
+my $opt_P = "/var/run/".basename($0).".pid";
+my $opt_l;
+
+Getopt::Long::Configure('bundling');
+GetOptions(
+        "d"   => \$opt_d, "daemon"     => \$opt_d,
+        "v"   => \$opt_v, "verbose"     => \$opt_v,
+        "l=s"   => \$opt_l, "logfile=s"     => \$opt_l,
+        "p=i"   => \$opt_p, "port=i"     => \$opt_p,
+	"P=s"   => \$opt_P, "pid-file=s"     => \$opt_P,
+        "h"   => \$opt_h, "help"        => \$opt_h);
+
+
+
+if($opt_l)
+{
+open(STDOUT, ">>$opt_l") or die ("could not open logfile: $opt_l");
+
+print timestamp()."=================================================\n" if($opt_v);
+}
+
+
+print timestamp()."started with PID $$\n" if($opt_v);
+
+if(-e "$opt_P")
+{
+     	print timestamp()."another process already running (PID file found at $opt_P)\n";
+     	print timestamp()."aborted...\n";
+	exit 1;
+}
+
+
+
+
+
+sub print_usage () {
+        print "Usage:\n";
+        print "  presenced -d [-p <port>] [-P <filename>] \n";
+        print "  presenced [-h | --help]\n";
+	print "\n\nOptions:\n";
+        print "  -p, --port\n";
+        print "     TCP Port which should be used (Default: 5111)\n";
+        print "  -P, --pid-file\n";
+        print "     PID file for storing the local process id (Default: /var/run/".basename($0).".pid)\n";
+        print "  -d, --daemon\n";
+        print "     detach from terminal and run as background daemon\n";
+        print "  -v, --verbose\n";
+        print "     Print detailed log output\n";
+        print "  -h, --help\n";
+        print "     Print detailed help screen\n";
+ 
+}
+
+
+if($opt_d)
+{
+	daemonize();
+}
+
+if($opt_h)
+{
+	print_usage();
+	exit;
+}
+
+
+open(PIDFILE, ">$opt_P");
+print PIDFILE $$."\n";
+close PIDFILE;
+
+
+$server = new IO::Socket::INET (
+LocalPort => $opt_p,
+Proto => 'tcp',
+Listen => 5,
+Reuse => 1,
+Type => SOCK_STREAM,
+KeepAlive => 1,
+Blocking => 0
+) or die "error while creating socket: $!\n";
+
+print timestamp()."created socket on ".$server->sockhost()." with port ".$server->sockport()."\n" if($opt_v);
+
+my $listener = IO::Select->new();
+$listener->add($server);
+
+
+
+my @new_handles;
+my %child_handles;
+my %child_config;
+
+my $address;
+my $name;
+my $timeout;
+my $write_handle;
+my $server_pid;
+my @threads;
+
+my $sig_received = undef;
+
+$SIG{HUP} = sub { $sig_received = "SIGHUP"; };
+$SIG{INT} = sub { $sig_received = "SIGINT"; };
+$SIG{TERM} = sub { $sig_received = "SIGTERM"; };
+$SIG{KILL} = sub { $sig_received = "SIGKILL"; };
+$SIG{QUIT} = sub { $sig_received = "SIGQUIT"; };
+$SIG{ABRT} = sub { $sig_received = "SIGABRT"; };
+
+$server_pid = $$ unless(defined($server_pid));
+
+while(1)
+{
+
+		if(@new_handles = $listener->can_read(1))
+		{
+			foreach my $client (@new_handles)
+			{
+				if($client == $server)
+				{
+					$new_client = $server->accept();
+					
+					$listener->add($new_client);
+					print timestamp()."new connection from ".$new_client->peerhost()."\n" if($opt_v);
+
+				}
+				else
+				{
+					$buf = '';
+					$buf = <$client>;
+
+					if($buf)
+					{
+						
+                                                $buf =~ s/(^\s*|\s*$)//g;
+
+						
+						
+						if($buf =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*\|\s*\d+\s*$/)
+						{
+							$client->send("command accepted\n");
+							print timestamp()."received new command from ".$client->peerhost().": $buf\n" if($opt_v);
+							($address, $timeout) = split("\\|", $buf);
+
+							$address =~ s/\s*//g;
+							$timeout =~ s/\s*//g;
+
+							$write_handle = $client;
+                                              
+							if(defined($child_handles{$client}))
+							{
+								print timestamp()."killing thread ".$child_handles{$client}->tid()." for client ".$client->peerhost()."\n" if($opt_v); 
+								$child_handles{$client}->kill('KILL');
+								delete($child_handles{$client});
+							}
+						
+
+							my $new_thread = threads->new(\&doQuery, ($write_handle, $address, $timeout));
+							print timestamp()."created thread ".$new_thread->tid()." for processing device $address within $timeout seconds for peer ".$client->peerhost()."\n" if($opt_v); 	
+
+
+
+
+							$new_thread->detach();	
+					
+							$child_handles{$client} = $new_thread;
+						}
+						elsif(lc($buf) =~ /^\s*stop\s*$/)
+						{
+							print timestamp()."received stop command from client ".$client->peerhost()."\n" if($opt_v); 
+
+							if(defined($child_handles{$client}))
+							{
+								print timestamp()."killing thread ".$child_handles{$client}->tid()." for client ".$client->peerhost()."\n" if($opt_v); 
+								$child_handles{$client}->kill('KILL');
+								$client->send("command accepted\n");
+								delete($child_handles{$client});
+								
+							}
+							else
+							{
+								$client->send("no command running\n");
+							}
+						}
+						else
+						{		
+			
+							$client->send("command rejected\n");
+
+							print timestamp()."received invalid command >>$buf<< from client ".$client->peerhost()."\n" if($opt_v); 
+						}	
+
+					}
+					else
+					{
+						print timestamp()."closed connection from ".$client->peerhost()."\n" if($opt_v);
+						$listener->remove($client);
+						
+						if(defined($child_handles{$client}))
+						{
+							print timestamp()."killing thread ".$child_handles{$client}->tid()." for client ".$client->peerhost()."\n" if($opt_v); 
+							$child_handles{$client}->kill('KILL');
+							delete($child_handles{$client});
+						}
+
+						close $client;
+
+
+					}
+
+				}
+
+			}
+		}
+
+
+	if(defined($sig_received))
+	{
+		print timestamp()."Caught $sig_received exiting\n" if($opt_v);
+		unlink($opt_P); 
+		print timestamp()."removed PID-File $opt_P\n" if($opt_v);
+		print timestamp()."server shutdown\n" if($opt_v);
+		exit;
+	}
+
+}
+
+sub daemonize
+{
+use POSIX;
+POSIX::setsid or die "setsid $!";
+my $pid = fork();
+
+if($pid < 0)
+{
+	die "fork: $!";
+}
+elsif($pid)
+{
+     	print timestamp()."forked with PID $pid\n";
+	exit 0;
+}
+
+chdir "/";
+umask 0;
+
+foreach (0 .. (POSIX::sysconf (&POSIX::_SC_OPEN_MAX) || 1024)) { POSIX::close $_ }
+
+open (STDIN, "</dev/null");
+open (STDOUT, ">/dev/null");
+open (STDERR, ">&STDOUT");
+
+
+if($opt_l)
+{
+open(STDOUT, ">>$opt_l") or die ("could not open logfile: $opt_l");
+}
+
+
+}
+
+sub doQuery($$)
+{
+
+local $SIG{KILL} = sub {threads->exit();};
+
+my ($write_handle, $address, $timeout) = @_;
+my $return;
+my $hcitool;
+
+	if($address and $timeout)
+	{
+		while(1)
+		{
+				if($write_handle)
+				{
+					{
+					    lock($querylocker);
+					    if($querylocker gt (time() - 10))
+					    {
+						sleep int(rand(9) + 1);
+					    }
+					    $hcitool = qx(which hcitool);
+					    chomp $hcitool;
+					    if( -x "$hcitool")
+					    {
+						$return = qx(hcitool name $address 2>/dev/null);	
+					    }
+					    else
+					    {
+						$write_handle->send("error\n");
+					    }
+					    $querylocker = time();
+					}
+					chomp $return;
+					if(not $return =~ /^\s*$/)
+					{ 
+					    $write_handle->send("present;$return\n");
+					}
+					else
+					{
+					    $write_handle->send("absence\n");
+					}
+
+					sleep $timeout;
+				}
+	
+			
+		}
+	}
+}
+
+sub timestamp
+{
+
+my ($sec, $min, $hour, $day, $mon, $year, undef, undef, undef) = localtime(time);
+
+
+$mon++; 
+$year += 1900;
+
+$sec = ($sec < 10 ? "0".$sec : $sec);
+$min = ($min < 10 ? "0".$min : $min);
+$hour = ($hour < 10 ? "0".$hour : $hour);
+
+$day = ($day < 10 ? "0".$day : $day);
+
+$mon = ($mon < 10 ? "0".$mon : $mon);
+ 
+return "$year-$mon-$day $hour:$min:$sec - ";
+
+}
+
+

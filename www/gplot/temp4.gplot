@@ -1,0 +1,33 @@
+#
+# Display the measured temperature for Oregon sensors
+#
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
+# Filelog example:
+# define FileLog_THR128_08 FileLog /var/log/fhem/THR128_08-%Y.log THR128_08
+#
+# Logfile record example:
+#2010-08-10_18:00:01 THR128_04 temperature: 20.7
+#
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+
+#FileLog 4:T\x3a|temperature:0:
+
+plot \
+  "< egrep 'T:|temperature:' <IN>"\
+     using 1:4 axes x1y2 title 'Measured temperature' with lines

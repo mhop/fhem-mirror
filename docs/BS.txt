@@ -1,0 +1,22 @@
+2009-09-12bn
+
+This document describes the protocol for the brightness sensor BS.
+
+Datagram is of FS20 sensor message type:
+81 0c 04 ?? 01 01 a0 01 a5 cf xx 00 yy zz
+
+81: 		begin of FS20/FHT communication
+0c: 		remaining length of datagram (12 bytes)
+04: 		type of datagram
+??: 		checksum
+01 01 a0 01: 	FS20 fix sequence, always 01 01 a0 01
+a5 cf: 		FS20 housecode, always a5cf for brightness sensor BS
+xx: 		sensor #
+00:		always 00
+yy zz:		code, see below
+
+yy       zz
+76543210 76543210
+  |   ++ ++++++++----- 10 bit resolution brightness value (0..1023)
+  |
+  +------------------- 0x20 always 1 (= value byte follows)

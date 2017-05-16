@@ -1,0 +1,34 @@
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<TL>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+set ylabel "Vavle Position (%)"
+
+
+set y2range [5:25]
+set yrange [0:80]
+
+#FileLog 4:desiredTemperature:4.5:
+#FileLog 4:temperature:4.5:
+#FileLog 4:valveposition:0:
+
+plot \
+  "< egrep 'desiredTemperature' <IN>"\
+         using 1:4 axes x1y2 title 'Desired Temperature' with steps,\
+  "< egrep 'temperature' <IN>"\
+         using 1:4 axes x1y2 title 'Ist Temperature' with lines,\
+  "< egrep 'valveposition' <IN>"\
+        using 1:4 axes x1y1 title 'Valve position (%)' with steps

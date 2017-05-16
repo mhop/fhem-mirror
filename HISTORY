@@ -1,0 +1,526 @@
+- Rudi, Thu Feb  1 13:27:15 MET 2007
+  Created the file HISTORY and the file README.DEV
+
+- Pest, Thu Feb  1 20:45 MET 2007
+  Added description for attribute ,
+
+- Rudi, Sun Feb 11 18:56:05 MET 2007
+  - showtime added for pgm2 (useful for FS20 piri display)
+  - defattr command added, it makes easier to assign room, type, etc for a group
+    of devices.
+  - em1010.pl added to the contrib directory. It seems that we are able
+    to read out the EM1010PC. Not verified with multiple devices.
+
+- Pest, Thu Feb 11 23:35 MET 2007
+  - Added doc/linux.html (multiple USDB devices, udev links)
+  - Linked fhem.html and commandref.html to linux.html
+
+- Martin Haas, Fri Feb 23 10:18 MET 2007
+  - ARM-Section (NSLU2) added to doc/linux.html
+
+- Pest, Sat Feb 24 18:30 MET 2007
+  - doc/linux.html: Module build re-written.
+
+- Rudi, Sun Mar  4 11:18:10 MET 2007
+  Reorganization. Goal: making attribute adding/deleting more uniform
+  (,
+  possible (i.e. saving the configfile, list of possible devices etc).
+
+  Internal changes:
+  - %logmods,%devmods moved to %modules. Makes things more uniform
+  - %logs merged into %defs
+  - local state info (%readings) changed to global ($defs{$d}{READINGS})
+    -> No need for the listfn function in each module
+    -> User written scripts can more easily analyze device states
+
+  User visible changes:
+  - at/notify ,
+    modules. Now it is possible
+    - to have a further ,
+      (notify & filelog use the same interface)
+    - to have more than one notify for the same event
+    - to delete at commands without strange escapes.
+      The delete syntax changed (no more def/at/ntfy needed)
+    - at/notify can have attributes
+    Drawback: each at and notify must have a name, which is strange first.
+  - logfile/modpath/pidfile/port/verbose ,
+    Dumping and extending these attributes is easier, no special handling
+    required in the web-frontend.
+  - savefile renamed to ,
+  - configfile global attribute added.
+  - save command added, it writes the statefile and then the configfile.
+  - delattr added to delete single attributes
+  - list/xmllist format changed, they contain more information.
+  - ,
+    in the same format. This data is contained in the xmllist.
+  - disable attribute for at/notify/filelog
+  - rename added
+
+- Rudi, Tue Mar 27 20:43:15 MEST 2007
+  fhemweb.pl (webpgm2) changes:
+  - adopted to the new syntax
+  - better commandline support (return <pre> formatted)
+  - FileLog attribute logtype added, and 4 logtypes (== gnuplot files)
+    defined: fs20, fht, ks300_1, ks300_2
+  - links in the commandref.html file added
+  - device dependent attribute and set support
+
+- Pest, Sun Apr 08 17:55:15 MEST 2007
+  em1010.pl:
+  - Make difference between sensors 1..4 and 5..
+  - Checked values for sensor 5 (cur.energy + cur.power) - ok
+  - Checked values for sensor 5 cur.energy is ok, cur.power still off.
+    Correction factor needs to be determined.
+  - setTime: Without argument, now the current time of the PC is used.
+  - setRperKW: Factor of 10 required, 75 U/kWh -> 750.
+
+- Pest, Tue Apr 10 20:31:22 MEST 2007
+  em1010.pl:
+  - Introduced new double-word function (dw)
+  - getDevStatus: energy values kWh/h, kWh/d, total.
+
+- Rudi Sat Apr 14 10:34:36 MEST 2007
+  final documentations, release 4.0. Tagged as FHEM_4_0
+
+- Pest, Sat Apr 14 14:21:00 MEST 2007
+  - doc: linux.html (private udev-rules, not 50-..., ATTRS)
+
+- Pest, Sun Apr 15 14:54:30 MEST 2007
+  - doc: fhem.pl and commandref.html (notifyon -> notify, correction of examples)
+
+- Rudi, Tue Apr 24 08:10:43 MEST 2007
+  - feature: modify command added. It helps change e.g. only the time component
+    for an at command, without deleting and creating it again and then
+    reapplying all the attributes.
+  - feature: the ,
+    instead.  The - is used to separate ranges in the set command.
+
+- Rudi, Sun May 27 12:51:52 MEST 2007
+  - Archiving FileLogs. Added fhemweb.pl (pgm2) code, to show logs from the
+    archive directory. See the attributes archivedir/archivecmd.
+  - Added EM1010PC suppoort (right now only with EM1000WZ). Support added
+    for displaying logs in the fhemweb.pl (webfrontends/pgm2)
+
+- Pest, Mon May 28 19:39:22 MEST 2007
+  - Added 62_EMEM.pm to support EM1000-EM devices.
+  - doc: Update of commandref.htm (typos and EMEM).
+
+- Pest, Mon May 29 00:07:00 MEST 2007
+  - check-in changes of 60_EM.pm to make EMEM work.
+
+- Mon Jun  4 08:23:43 MEST 2007
+  - Small changes for EM logging
+
+- Pest Jun 10, 23:16:23 MEST 2007
+  - Set wrong values in 62_EMEM to -1
+
+- Pest Jun 12, 21:33:00 MEST 2007
+  - in 62_EMEM.pm: added energy_today and energy_total
+
+- Pest Jun 18, 20:06:23 MEST 2007
+  - in 62_EMEM.pm: Power units removed from value content added to name.
+
+- Rudi Sun Aug  5 10:59:51 MEST 2007
+  - WS300 Loglevel changed for KS300 device (from 2 to GetLogLevel or 5)
+  - First version of the FritzBox port:
+    - Perl binary/ftdi_sio module
+  - EM: added setTime, reset
+  - docs/fritzbox.html. Note: The fb_fhem_0.1.tar.gz won't be part of CVS
+    as it contains largee binaries (swapfile, perl mipsel executable, etc).
+
+- Rudi Mon Aug  6 20:15:00 MEST 2007
+  - archiving added to the main logs.
+    NOTE: The FileLog filename (INT attribute) is now also called logfile.
+
+- Rudi Wed Aug 29 08:28:34 MEST 2007
+  - archive attributes clarified in the doc
+
+- Rudi Mon Sep  3 15:47:59 MEST 2007
+  - 99_Sunrise_EL.pm checked in. Replaces 99_Sunrise.pm, and does not need
+    any Date module.
+
+- Rudi Sun Sep  9 08:43:03 MEST 2007
+  - mode holiday_short added + documentation. Not tested.
+    any Date module.
+
+- Rudi Wed Oct  3 18:21:36 MEST 2007
+  - weblinks added. Used by webpgm2 to display more than one plot at once
+  - webpgm2 output reformatted. Using CSS to divide the screen area in 3
+    parts: command line, room-list and rest
+
+- Dirk Wed Oct  7 12:45:09 MEST 2007
+  - FHT lime-protection code discovered
+
+- Dirk Wed Oct 18 23:28:00 MEST 2007
+  - Softwarebuffer for FHT devices with queuing unsent commands and
+    repeating commands by transmission failure
+  - FHT low temperatur warning and setting for lowtemp-offset
+  - Change naming for state into warnings
+    Tagged as dirkh_20071019_0
+
+- Martin Fri Dec 21 13:39:17 CET 2007
+  - voip2fhem added (contrib/)
+
+- Peter Sun Dec 23 19:59:00 MEST 2007
+  - linux.html: Introduction refinement.
+
+- Rudi Sat Dec 29 16:27:14 MET 2007
+  - delattr renamed to deleteattr, as del should complete to delete and not to
+    delattr
+  - defattr renamed to setdefaultattr (same as before for def)
+  - devicespec introduced:
+    it may contain a list of devices, a range of devices, or multiple devices
+    identified by regexp. Following commands take a devicespec as argument:
+    attr, deleteattr, delete, get, list, set, setstate, trigger
+
+- Boris Sat Dec 29 16:56:00 CET 2007
+  - %NAME, %EVENT, %TYPE parameters in notify definition, commandref.html update
+
+- Boris Sun Dec 30 22:35:00 CET 2007
+  - added dblog/93_DbLog.pm and samples in contrib directory, commandref.html
+    update
+
+- Rudi Mon Dec 31 15:37:19 MET 2007
+  - feature: webfrontend/pgm2 converted to a FHEM module
+    No more need for a webserver for basic WEB administration. For HTTPS or
+    password you still need apache or the like.
+    One step closer for complete fhem on the FritzBox.
+
+- Boris Sun Jan 06 13:35:00 CET 2008
+  - bugfix: 62_EMEM.pm:  changed reading energy_total_kWh to energy_kWh_w,
+    added energy_kWh (formerly energy_total_kWh)
+  - changed em1010.pl accordingly, added em1000em doc for getDevStatus reply
+    from device
+  - minor changes in fhem.html
+
+- Rudi Tue Jan  8 21:13:08 MET 2008
+  - feature: attr global allowfrom <ip-adresses/hostnames>
+    If set, only connects from these addresses are allowed. This is to
+    "simulate" a little bit of security.
+
+- Rudi Sat Jan 19 18:04:12 MET 2008
+  - FHT: multiple commands
+    Up to 8 commands in one set, these are transmitted at once to the FHT
+  - softbuffer changes
+    minfhtbuffer attribute, as otherwise nearly everything will be sent to
+    the FHT buffer, so ordering won't take effect.
+  - cmd rename
+    report1,report2. refreshvalues changed to report1 and report2. refreshvalues
+    won't be advertized but still replaced with "report1 255 report2 255"
+  - extensive documentation update for the FHT
+  - lime-protection changed, as it is an actuator subcommand. Further actuator
+    commands added.
+
+- Rudi Sun Jan 27 18:12:42 MET 2008
+  - em1010PC: sending a "67" after a reset skips the manual interaction:
+    automatic reset is now possible.
+
+- Peter S. Sat Feb 16 22:22:21 MET 2008
+  - linux.html: Note on kernel 2.6.24.2 (includes our changes)
+
+- Peter S. Wed Mar 19 08:24:00 MET 2008
+  - 00_FHZ.pm: DoTriger -> DoTrigger
+
+- Rudi Fri May  9 20:00:00 MEST 2008
+  - feature: FHEM modules may live on a filesystem with "ignorant" casing (FAT)
+    If you install FHEM on a USB-Stick (e.g. for the FritzBox) it may happen
+    that the filename casing is different from the function names inside the
+    file.
+    -> Fhem won't find the <module>_Initialize function. Fixed by searching all
+    function-names for a match with "ignore-case"
+  - feature: FileLog function "set reopen" impemented. In case you want to
+    delete some wrong entries from a current logfile, you must tell fhem to
+    reopen the file again
+  - feature: multiline commands are supported through the command line
+    Up till now multiline commands were supported only by "include". Now they
+    are supprted from the (tcp/ip) connection too, so they can be used by the
+    web frontends.
+  - feature: pgm2 installation changes, multiple instances, external css
+    pgm2 (FHEMWEB) is now a "real" fhem module:
+    - the configuration takes place via attributes
+    - the css file is external, and each FHEMWEB instance can use its own set
+    - the default location for pictures, gnuplot scripts and css is the FHEM
+      module directory
+    - multiline support for notify and at scripts.
+    - feature: FileLog "set reopen" for manual tweaking of logfiles.
+    - feature: multiline commands are supported through the command line
+    - feature: pgm2 installation changes, multiple instances, external css
+
+-tdressler Sa May  10 23:00:00 MEST 2008
+  - feature:add WS2000 Support new modul 87_ws2000.pm and standalone
+           reader/server ws2000_reader.pl
+  - doc: modified fhem.html/commandref.html reflectiing ws2000 device and
+    added windows support (tagged:before tdressler_20080510_1, after
+    tdressler_20080510_2)
+
+-tdressler So May 11 19:30:00 MEST 2008
+  - feature: add ReadyFn to fhem.pl in main loop to have an alternative for
+    select, which is not working on windows (thomas 11.05)
+  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever
+    (tagged tdressler_20080511_1/2)
+  - bugfix : WS2000:fixed serial port access on windows by replacing FD with
+    ReadyFn
+  - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
+  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and
+    Win32::SerialPort to get it running in Windows (sorry, untestet)
+
+ -tdressler So May 11 23:30:00 MEST 2008
+  - bugfix:  FileLog undefined $data in FileLog_Get
+  - feature: fhem.pl check modules for compiletime errors and do not initialize
+    them if any
+  - bugfix:  EM, WS300, FHZ scope of portobj variable
+
+ -tdressler Mo May 12 14:00:00 MEST 2008
+  - bugfix: FHZ with windows, use there ReadyFn if windows; small cosmetic
+    changes
+  - doc: add hint to virtual com port driver, modification for FHZ to use
+    default FTDI driver
+
+ -tdressler Mo May 12 19:00:00 MEST 2008
+  - feature : add windows support to M232
+
+-tdressler So May 18 13:30:00 MEST 2008
+  - feature : add ELV IPWE1 support
+
+- Peter S. Mon Jun 02 00:39 MET 2008
+  - linux.html: openSUSE 11 contains our changes.
+
+- Thu Jun 12 07:15:03 MEST 2008
+  - feature: FileLog get to read logfiles / webpgm2: gnuplot-scroll mode to
+    navigate/zoom in logfiles
+    webpgm2 uses the FileLog get to grep data for a given data range from a
+    logfile. Using this grep scrolling to a different date range / zooming
+    to another resolution (day/week/month/year) can be implemented.
+    The logfiles should be large, as scrolling across logfiles is not
+    implemented. To speed up the grep, a binary search with seek is used, and
+    seek positions are cached.
+
+- Thu Jul 11 07:15:03 MEST 2008
+  - feature: 99_SVG.pm for webpgm2: generates SVG from the logfile.
+    Generating SVG is configurable, the "old" gnuplot mode is still there.
+    Downside of the SVG: the browser must support SVG (Firefox/Opera does,
+    I.E. with the Adobe plugin), and the browsesr consumes more memory.
+    Upside: no gnuplot needed on the server, faster(?), less data to transfer
+    for daily data.
+    Tested with Firefox 3.0.
+    Todo: Test with IE+Adobe Plugin/Opera.
+  - feature: HOWTO for webpgm2 (first chapter)
+
+- Fri Jul 25 18:14:26 MEST 2008
+  - Autoloading modules. In order to make module installation easier and
+    to optimize memory usage, modules are loaded when the first device of a
+    certain category is defined. Exceptions are the modules prefixed with 99,
+    these are considered "utility" modules and are loaded at the beginning.
+    Some of the older 99_x modules were renamed (99_SVG, 99_dummy), and most
+    contrib modules were moved to the main FHEM directory.
+
+- Boris Sat Nov 01 CET 2008
+  - feature: new commands fullinit and reopen for FHZ, commandref.html update
+  - bugfix: avoid access to undefined NotifyFn in hash in fhem.pl
+
+- Boris Sun Nov 02 CET 2008
+  - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
+    devices in fhem
+  - feature: X10 support for pgm3
+
+- Sat Nov 15 10:23:56 MET 2008 (Rudi)
+  - Watchdog crash fixed: watchdog could insert itself more than once in the
+    internal timer queue. The first one deletes all occurances from the list,
+    but the loop over the list works on the cached keys -> the function/arg for
+    the second key is already removed.
+  - feature: X10 support for pgm3
+
+- Boris Sat Nov 15 CET 2008
+  - bugfix: correct correction factors for EMEM in 15_CUL_EM.pm
+
+- Wed Dec  3 18:36:56 MET 2008 (Rudi)
+  - reorder commandref.html, so that all aspects of a device
+    (define/set/get/attributes) are in one block. This makes possible to
+    "outsource" device documentation
+  - added "mobile" flag to the CUL definition, intended for a CUR, which is
+    a remote with a battery, so it is not connected all the time to fhem.
+    Without the flag fhem will block when the CUR is disconnected.
+    Note: we have to sleep after disconnect for 5 seconds, else the Linux
+    kernel sends us a SIGSEGV, and the USB device is gone till the next reboot.
+  - the fhem CUL part documented
+
+- Sun Dec  7 21:09 (Boris)
+  - reworked 15_CUL_EM.pm to account for timer wraparounds, more readings added
+  - speed gain through disabled refreshvalues query to all FHTs at definition;
+    if you want it back at a "set myFHT report1 255 report2 255" command to the
+    config file.
+
+- Mon Dec  8 21:26 MET 2008 (Rudi)
+  - Modules can now modify the cmds hash, i.e. modules can add / overwrite /
+    delete internal fhem commands. See 99_XmlList.pm for an example. Since this
+    modules is called 99_xxx, it will be always loaded, but user of webpgm2 do
+    not need it.
+
+- Wed Dec 17 19:48 (Boris)
+  - attribute rainadjustment for KS300 in 13_KS300.pm to account for random
+    switches in the rain counter (see commandref.html)
+
+- Fri Jan  2 10:29 2009 (Rudi)
+  - 00_CUL responds to CUR request. These are sent as long FS20 messages, with
+    a housecode stored in CUR_id_list attribute of the CUL device. If the ID
+    matches, the message is analyzed, and an FS20 message to the same address
+    is sent back. The CUR must have reception enabled.
+    Right now status/set time/set FHT desired temp are implemented.
+
+- Fri Jan  6 (Boris)
+  - daily/monthly cumulated values for EMWZ/EMGZ/EMWM with 15_CUL_EM by Klaus
+
+- Fri Jan  9
+  - Added a unified dispatch for CUL/FHZ and CM11, since all of them used the
+    same code.
+
+  - Addedd IODev attribute to FS20/FHT/HMS/KS300/CUL_WS/CUL/EMWZ/EMGZ/EMEM
+- Sun Jan 11 (Klaus)
+  - Added fixedrange option day|week|month|year (for pgm2)
+    e.g.: attr wlEnergiemonat fixedrange month
+  - Added multiple room assignments for one device (for pgm2):
+    e.g.: attr Heizvorlauftemp room Energie,Heizung
+  - Added attr title and label(s) for more flexible .gplot files (for pgm2)
+    e.g.: attr wl_KF title "Fenster:".$value{KellerFenster}.", Entfeuchter: ".$value{Entfeuchter}
+          .gplot: <TL> (is almost there!)
+          attr wl_KF label "Fenster":"Entfeuchter"
+          .gplot: <L0> ... <L9> (constant text is to be replaced individually)
+  - Added attr global logdir, used by wildcard %ld in perl.pm
+    e.g.: attr global logdir /var/tmp
+          define emGaslog FileLog %ld/emGas.log emGas:.*CNT.*
+
+- Sat Feb 15 2009 (Boris)
+  - added counter differential per time in 81_M232Counter.pm, commandref.html
+    updated
+
+- Thu Mar 29 2009 (MartinH)
+  - pgm3: bugfix, format table for userdef
+  - pgm3: feature X10_support, taillogorder optional with date
+  - pgm3: HMS100CO added, fhem.html relating pgm3 updated
+
+- Sat May 30 2009 (Rudi)
+  - 99_SUNRISE_EL: sunrise/sunset called in "at" computes correctly the next
+    event. New "sunrise()/sunset()" calls added, min max optional parameter.
+
+- Sun May 31 2009 (Boris)
+  - 81_M232Counter.pm: counter stops at 65536; workaround makes counter wraparound
+
+- Mon Jun 01 2009 (Boris)
+  - 59_Weather.pm: new virtual device for weather forecasts, documentation
+    updated.
+
+- Tue Jun 09 2009 (Boris)
+  - 11_FHT.pm: lazy attribute for FHT devices
+
+- Sun Jun 14 2009 (Rudi)
+  - 11_FHT.pm: tmpcorr attribute for FHT devices
+
+- Sat Jun 20 2009 (Boris)
+  - 09_USF1000.pm: new module to support USF1000S devices.
+
+- Fri Aug 08 2009 (Boris)
+  - 09_USF1000.pm: suppress inplausible readings from USF1000
+
+- Sat Sep 12 2009 (Boris)
+  - 00_CM11.pm: feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
+
+- Sun Sep 20 2009 (Boris)
+  - Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
+
+- Sat Oct 03 2009 (Boris)
+  - bugfix: missing blank in attribute list for FHT; exclude report from lazy
+  - typos and anchors in documentation corrected
+
+- Sun Oct 11 2009 (Boris)
+  - finalized 09_BS.pm and documentation
+
+- Tue Nov 10 2009 (Martin Haas)
+  - Bugfix: pgm3: Pulldown-Menu without selected FHTDEV not possible any more
+
+- Thu Nov 12 2009 (Rudi)
+  - The duplicate pool added. The check routine is called from the Dispatch
+    routine (so it will affecc CUL/FHZ and CM11), and for FS20 calls from
+    the CUL and FHZ Write function.
+    Duplicates within 0.5 seconds are filtered if they are not reported by the
+    same IO Unit. Existing check for IODev removed from BS USF1000 FS20 FHT HMS
+    KS300 CUL_WS CUL_EM X10.
+
+- Mon Nov 16 2009 (MartinH)
+  - pgm3: Google-Weather-Api added. Display of all Logs including the
+  FS20-devices (grep on fhem.log) The status of the batteries of FHT and HMS
+  are shown in the graphics. php4 disabled. Now only php5 is supported. A
+  lot of examples of the UserDefs are added. The pgm3-section of fhem.html was
+  changed.
+
+- Sat Dec 19 2009 (MartinH)
+  - pgm3: Automatic support for CUL_WS (S300TH) added
+
+- Mon Dec 21 2009 (Rudi)
+  - In order to support automatic device creation (coming 98_autocreate.pm),
+    the return value in case of an undefined device should contain parameters
+    for a correct define statement.
+
+- Fri Jan  1 2010
+  - my %defptr is no $modules{modname}{defptr} in order for CommandReload to
+    work. There is also a second parameter $modules{modname}{ldata} which will
+    be saved over a Reload, used by the FS20 for the follow feature.
+  - ignore attribute added to ignore devices of the neighbour
+
+- Fri Jan 8 2010 (MartinH)
+    Interface to fhem changes to stream_socket_client. Table-format on
+    Android-Browser optimized. Optimized for smartphones. Rooms possible for
+    Webcam and Google-Weather.  Output of html better formated and skinable --
+    change the colors.
+
+- Sat  Feb 6 2010 (Boris)
+  - feature: on-for-timer added for X10 modules and bug fixed for overlapping
+    on-till and on-for-timer commands (Boris)
+    
+- Thu Jun 30 2011 (Maz Rashid)
+  - Introducing 00_TUL.pm and 10_EIB.pm modules for connecting FHEM on EIB.
+  
+- Thu Aug 04 2011 (Boris)
+  - enabled logging for 59_Weather.pm
+
+- Thu Dec 01 2011 (Martin F.)
+  - Move JsonList from contrib to main modules. Jsonlist output is optimized
+    and now be more structured.
+
+- Sun Jan 29 2012 (Maz Rashid)
+  - Improving 10_EIB.pm by introducing Get and interpreting received value according 
+    to the selected model (based on datapoint types.)
+  - Introduced documentation for TUL / EIB modules.  
+
+- Fr Feb 24 2012 (Willi)
+  - New modules TRX for RFXCOM RFXtrx transceiver
+
+- So May 20 2012 (M. Fischer)
+  - Added support for a cleaner installation of pgm2 via updatefhem.
+
+- Sa May 26 2012 (M. Fischer)
+  - Added new command backup to separate this feature from updatefhem.
+
+- Thu May 31 2012 (M. Fischer)
+  - Added new global attribute <backupsymlink>
+
+- Fri Jun 01 2012 (M. Fischer)
+  - Added new global attribute <backupcmd>
+
+- Sat Jun 02 2012 (M. Fischer)
+  - Added new global attribute <backup_before_update>
+  - Backuproutine from updatefhem removed. updatefhem use the command backup from now.
+
+- Sun Jun 03 2012 (M. Fischer)
+  - Added new global attribute <exclude_from_update>
+  - Added new parameter <changed> to updatefhem
+
+- Sun Jun 17 2012 (M. Fischer)
+  - CULflash routine from updatefhem removed. CULflash is a standalone module from now.
+
+- Sat Aug 11 2012 (M. Fischer)
+  - Added new module IPCAM
+  
+- Tue Feb 19 2013 (Johannes)
+  - added new Javascript Frontend based on ExtJS (by Johannes)
+  - added example Setup SQL and configuration for SQLite
+  - extended the MySQL Setup SQL to use 512 characters in EVENT column

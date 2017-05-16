@@ -1,0 +1,58 @@
+#! /bin/sh
+
+root=/var/InternerSpeicher
+home=$root/fhem
+
+echo "########################### FHEM INSTALL BEGIN #######################"
+killall perl > /dev/null 2>&1
+sleep 1
+
+echo "########################### Extracting fhem.tar.gz ###################"
+cd $root
+rm -rf fhem.OLD
+if test -d fhem; then
+  mv fhem fhem.OLD
+fi
+
+gzip -cd /var/fhem.tar.gz | tar xf -
+
+# Save files from the AVM Style installation
+if test -f fhem.OLD/etc/fhem.cfg; then
+  echo "########################### Converting chroot style config ###########"
+  export LD_LIBRARY_PATH=$home/lib
+  export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+  cp fhem.OLD/etc/fhem.cfg fhem
+  fhem/perl -pi -e 's,/var/log/fhem,./log,g;
+                    s,/usr/share/fhem,.,;
+                    s,^#define autocreate,define autocreate,;
+                    s,^#attr autocreate,attr autocreate,;
+                    s,ttyACM(.)(@\d+)?,ttyACM$1\@38400,;' fhem/fhem.cfg
+  mv fhem.OLD/var/log/fhem/* fhem/log
+fi
+
+# Save files from our old version
+if test -f fhem.OLD/fhem.cfg; then
+  echo "########################### Copying non-chroot style config ##########"
+  mv fhem.OLD/FHEM/*.sh fhem/FHEM
+  mv fhem.OLD/FHEM/99.*Util.pm fhem/FHEM
+  mv fhem.OLD/log/* fhem/log
+  mv fhem.OLD/fhem.cfg fhem
+fi
+chown -R boxusr80:root $home
+
+cat /var/flash/debug.cfg > /var/nvi.tmp
+grep -q fhem /var/nvi.tmp
+r=$?
+if test $r != 0; then
+  echo "########################### Modifying the startup script #############"
+  echo $home/startfhem >> /var/nvi.tmp
+  cat /var/nvi.tmp > /var/flash/debug.cfg
+fi
+rm -f /var/nvi.tmp
+
+echo "########################### Starting fhem ############################"
+sync
+$home/startfhem
+
+echo "########################### FHEM INSTALL END #########################"
+exit 1 # INSTALL_SUCCESS_REBOOT

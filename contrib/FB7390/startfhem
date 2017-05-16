@@ -1,0 +1,39 @@
+#!/bin/sh
+
+home=/var/InternerSpeicher/fhem
+
+cd $home
+
+trap "" SIGHUP
+modprobe cdc_acm
+modprobe ftdi_sio
+sleep 2
+
+ln -sf $home/FHEM/fhemcmd.sh /var/fhemcmd
+
+PATH=$home:$PATH
+export PATH
+
+export LD_LIBRARY_PATH=$home/lib
+export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+
+# add user fhem with uid of boxusr80/boxusr99 (== ftpuser)
+# Comment/delete everything between START and END to run FHEM as root
+
+## START:fhem-user
+id fhem > /dev/null 2>&1
+if test "$?" -ne "0"; then
+  grep -q 1099 /etc/passwd;
+  if test $? -eq "0"; then
+    echo "fhem:any:1099:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
+  else
+    echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
+  fi
+  chown -R fhem FHEM docs log www
+  chown fhem . *
+  chown root dfu-programmer     
+  chmod u+s dfu-programmer
+fi 
+## END:fhem-user
+
+perl fhem.pl fhem.cfg

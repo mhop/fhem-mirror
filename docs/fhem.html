@@ -1,0 +1,418 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>Home of FHEM</title>
+  <link rel="stylesheet" type="text/css" href="../css/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+  <link rel="shortcut icon" href="favicon.ico"/>
+</head>
+
+
+<body>
+
+  <div id="logo"></div>
+  <div id="menu">
+    <table><tr><td> <!-- Playing with the width -->
+    <table id="room">
+      <tr><td></td></tr>
+      <tr><td><b>Content:</b></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Description">Description</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Download">Download</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Screenshots">Screenshots</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Features">Features</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Hardware">Hardware</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Documentation">Documentation</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Links">Links</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Installation">Installation</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#License">License</a></td></tr>
+      <tr><td></td></tr>
+    </table>
+    </td></tr></table>
+  </div>
+
+
+  <div id="right">
+
+    <a name="Description"></a>
+    <h3>Description</h3>
+    <ul>
+      Fhem is a GPL'd perl server for house automation. It is used to automate
+      some common tasks in the household like switching lamps / shutters /
+      heating / etc.  and to log events like temperature / humidity / power
+      consumption.<br><br>
+
+      The program runs as a server, you can control it via web or smartphone
+      frontends, telnet or TCP/IP directly.<br><br>
+
+      In order to use fhem you'll need a 24/7 server (Fritz!Box, NAS, RPi, PC,
+      MacMini, etc) with a perl interpreter and some attached hardware like the
+      CUL, FHZ1300PC, etc. to access the actors and sensors. See the "Supported
+      hardware" section below.</ul>
+
+
+    <a name="Download"></a>
+    <h3>Download</h3>
+    <ul>
+      Last released version: (as of =DATE=): 
+      <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
+      <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">fhem-=VERS=-fb7270.zip</a>
+      <br>
+      See the <a href="CHANGED">CHANGED</a> file for the change history.
+      <br>
+      Nightly SVN version: a 
+      <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
+      tarball</a>, or from the fhem commandline via <a
+      href="commandref.html#update">update</a>.  <br><br>
+
+
+      Please fill out our <a href="survey.pl">survey</a>,
+      as we'd like to know which FHEM modules are in use. Here are the <a
+      href="surveyresults.html">results</a>.<br>
+      Or use the NEW fheminfo command to automatically generate <a
+      href="/stats/statistics.cgi">this</a> statistics.
+      </ul>
+
+
+    <a name="Screenshots"></a>
+    <h3>Frontend screenshots</h3>
+    <ul>
+
+      Builtin (default) pgm2 / external pgm5 web frontend:
+      <a href="pgm2-1.png">overview</a>,
+      the same rendered for <a href="pgm2-4.png">smartphones</a>,
+      <a href="pgm2-2.png">detail</a>,
+      <a href="pgm2-3.png">SVG-plots</a>,
+      <a href="pgm2-5.png">dark style</a>.
+      <br><br>
+
+      The FHEM FLOORPLAN module: 
+        <a href="tirreG.jpg">Example1</a>,
+        <a href="Benji.png">Example2</a>.
+      <br><br>
+
+      pgm3 web frontend: <a
+      href="http://www.martin-haas.de/fhz/screenshots.html">screenshot
+      gallery</a>
+      <br><br>
+
+      myHCE: <a
+      href="http://www.fischer-net.de/hausautomation/myhce/screenshots.html">
+      screenshot gallery</a>
+      <br><br>
+
+      fheME: <a href="http://www.phynx.de/?p=108"> screenshot gallery</a>
+      <br><br>
+
+      HomeMini: <a
+      href="http://heimserver.nendzig.net/wiki/index.php/HomeMini">
+      screenshot & download</a>
+      <br><br>
+
+      iPhone frontends: 
+      <a href="itms://itunes.apple.com/us/app/fhemobile/id389951065?mt=8">Fhemobile</a> (native app),
+      <a href="http://www.dhs-computertechnik.de/support-iphone.html">
+      dhs-computertechnik</a> or
+      <a href="http://code.google.com/p/phyfhem/">phyfhem</a>
+      
+      <br><br>
+      Android frontends:
+      <a href="http://andFHEM.klass.li">andFHEM</a> (native app)
+    </ul>
+
+
+    <a name="Features"></a>
+    <h3>Features</h3>
+    <ul>
+      <li>support for a lot of protocols used in house automation like FS20,
+          HomeMatic, OneWire, X10, ZWave, EnOcean, KNX. See the <a
+          href="#Hardware">Hardware</a> section for more.
+          </li>
+      <li>autocreating devices/logs when receiving data from a new device:
+          start fhem and watch how the plots of your sensors are appearing
+          automatically.</li>
+      <li>logging events to files or databases, with regexp filters</li>
+      <li>notifying external programs or scripts when receiving certain
+          events</li>
+      <li>timed commands (e.g. switching a lamp on from sunset till midnight)
+          </li>
+      <li>watchdog (e.g. trigger if the HMS100-FIT is inactive for HH:MM:SS)
+          </li>
+      <li>lot of interfaces: simple text, JSON, XML, each of them over plain
+          TCP/IP, SSL or HTTP.
+      <li>modular architecture, easy to add your special device</li>
+      <li>lot of frontends, choose your favorite</li>
+    </ul>
+
+    <a name="Hardware"></a>
+    <h3>Supported hardware</h3>
+    <ul>
+      <li>Via an attached CUL or CUN (see <a
+        href="http://www.busware.de">www.busware.de</a>) access to the
+        following protocols: FS20 (all devices), EM (EM1000EM, EM1000GZ and
+        EM1000WZ), FHT80b, HMS, S300 (KS300, S300TH, KS555, S555TH, etc),
+        HomeMatic (<a href="commandref.html#CUL_HM">selected</a> devices),
+        La Crosse TX2/TX3.</li>
+        <div class="dist"></div>
+
+      <li>Via an attached FHZ1000 or FHZ1300 access to the following protocols:
+        FS20 (all devices), FHT80b, HMS, KS300. <b>Note:</b> For the WLAN
+        version of the FHZ1300 see this <a
+        href="http://www.thinkwiki.org/wiki/User:Akw/FHZ">
+        link</a>.
+        </li>
+        <div class="dist"></div>
+
+      <li>reading and sending X10 events via the CM11 module (with access
+        to a X10 computer interface)</li>
+        <div class="dist"></div>
+
+      <li>S300 devices via an attached WS300</li>
+        <div class="dist"></div>
+
+      <li>EM1010PC and attached EM1000WZ, EM1000EM or EM1000GZ</li>
+        <div class="dist"></div>
+
+      <li>reading attached SCIVT devices</li>
+        <div class="dist"></div>
+
+      <li>reading attached M232 devices</li>
+        <div class="dist"></div>
+
+      <li>reading attached WS2000/WS25000 devices, also via raw network
+        converters (xport)</li>
+        <div class="dist"></div>
+
+      <li>extract sensor data from IPWE networked weather data receiver</li>
+        <div class="dist"></div>
+
+      <li>Via an attached <a
+        href="http://owfs.org/index.php?page=usb-ds9490r">DS9490R</a> or <a
+        href="http://owfs.org/index.php?page=com-ds9097-passive">DS9097</a>
+        access to the following Dallas 1-wire sensors: DS18S20, DS1820,
+        DS18B20</li>
+        <div class="dist"></div>
+
+      <li>Via an attached KM271 access to the Buderus Logamatic 2107</li>
+        <div class="dist"></div>
+
+      <li>Allnet devices: Allnet 3076, Temperatures sensors and Allnet 4027
+        relay box connected to an Allnet 4000</li>
+        <div class="dist"></div>
+
+      <li>Davis VantagePro2 weatherstation</li>
+        <div class="dist"></div>
+
+      <li>Via the RFXCOM RFXtrx433 transceiver (433 Mhz) support for various
+         protocols (ANSLUT, ByeByeStandBy, Chacon EMW200, COCO, DomiaLite, Duewi,
+         ELRO AB400/AB600, HomeEasy EU, HomeEasy UK, IMPULS, Intertechno, KD101,
+         KlikAanKlikUit (KAKU), NEXA, Oregon Scientific, X10 security and
+         lighting, Visonic, Waveman, X10).</li>
+        <div class="dist"></div>
+
+      <li>Via the old RFXCOM USB or LAN based 433 Mhz RF receivers 
+         (order code 80002 and others) the following devices: 
+         Oregon Scientific weather sensors, RFXCOM RFXMeter, 
+         X10 security and X10 lighting devices.</li>
+        <div class="dist"></div>
+
+      <li>Via the ELV USB-WDE1 access to ELV sensors KS200/KS300, S300IA,
+          S300TH, ASH2200, PS 50 and Conrad sensors KS555, S555TH and
+          ASH555.</li>
+        <div class="dist"></div>
+
+      <li>Via an eQ-3 HomeMatic Lan Configurator access to selected HomeMatic
+          devices.
+        <div class="dist"></div>
+
+      <li>Via the eibd or a TUL (see <a
+          href="http://www.busware.de">www.busware.de</a>) access to the EIB/KNX
+          protocol.
+        <div class="dist"></div>
+
+      <li>Via a TCM120 (e.g. the BSC BOR) or a TCM310 (e.g. busware EUL) access
+      to the EnOcean protocol.
+        <div class="dist"></div>
+
+      <li>Via a ZWave USB Dongle (e.g. the Goodway WD6001) access to the ZWave protocol.
+        <div class="dist"></div>
+
+        <div class="dist"></div>
+        <div class="dist"></div>
+
+      A detailed description is to be found in the <a
+      href="commandref.html">fhem reference</a>.
+
+
+    </ul>
+
+    <a name="Documentation"></a>
+    <h3>Documentation</h3>
+    <ul>
+      <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
+      Heimautomatisierung-mit-fhem.pdf</a> (pdf, german)</div>
+
+      <div class="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
+      installation/configuration.</div> 
+
+      <div class="dist"><a href="commandref.html">commandref.html</a>
+      contains a detailed description of all features/modules.</div>
+
+      <div class="dist">Our wiki at <a
+      href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
+
+      <div class="dist">Frequently Asked Questions: <a
+      href="faq.html">faq.html</a></div>
+
+      <div class="dist">Forum: <a href="http://forum.fhem.de">
+      http://forum.fhem.de</a><br>Although most entries are in german here,
+      don't be afraid to ask something in english.</div>
+
+      <div class="dist"><a href="README.contrib">contrib/README</a> describes
+      some loosely coupled useful modules / scripts which can be used with
+      fhem.</div>
+
+    </ul>
+
+    <a name="Links"></a>
+    <h3>Links</h3>
+    <ul>
+      Homepage:  <a href="http://fhem.de/fhem.html">
+        http://fhem.de/fhem.html</a><br>
+      Development source at SVN@sourceforge: <a
+        href="http://fhem.svn.sourceforge.net">
+        http://fhem.svn.sourceforge.net</a><br>
+      <br>
+
+      Device/OS Specific installation guides:<br>
+      <ul>
+        <li>Instructions for the <a href="fritzbox.html">Fritz!Box</a></li>
+        <li>Instructions for Nas/Routers (NSLU2):
+          <a href="http://www.martin-haas.de/fhz/nslu2fhz">
+          http://www.martin-haas.de/fhz/nslu2fhz</a></li>
+        <li>Instructions for Synology Diskstation / Rackstation:
+          <a href="http://www.fischer-net.de/hausautomation/fhem.html">
+          http://www.fischer-net.de/hausautomation/fhem.html</a></li>
+        <li>Instructions for the Allnet all6250:
+          <a href="http://wiki.dungeon.de/all6250_opennas_mit_fhem">
+          http://wiki.dungeon.de/all6250_opennas_mit_fhem</a></li>
+        <li>Linux driver installation:
+          <a href="http://fhem.de/linux.html">
+          http://fhem.de/linux.html</a></li>
+        <li>Misc USB problems:
+          <a href="http://fhem.de/USB.html">
+          http://fhem.de/USB.html</a></li>
+        <li>Russels Blog for Windows user:
+          <a href="http://russellallen.info/category/FHEM.aspx">
+          http://russellallen.info/category/FHEM.aspx</a> <br>
+        <li>Windows driver installation:
+          <a href="http://fhz4linux.info/tiki-index.php?page=Driver%20installation">
+          http://fhz4linux.info/tiki-index.php?page=Driver%20installation</a> <br>
+           (use "Solution B", only COM1..COM9 is supported)</li>
+      </ul>
+      <br>
+
+      Commercial products:
+      <ul>
+        <li><a href="http://www.dhs-computertechnik.de/">
+          http://www.dhs-computertechnik.de</a>:
+          Integration of FHZ and NAS running FHEM. Using an enhanced
+          transmitter to achieve more distant transmission. Full integrated
+          solution for Home-Control and beyond (other service like UPS management,
+          etc. are also available).
+          <br>
+        <li>CUL:
+          <a href=http://shop.busware.de/product_info.php?products_id=29">
+          Hardware shop</a>,
+          <a href="http://culfw.de/culfw.html">firmware homepage</a>,
+          <a href="http://groups.google.com/group/cul-fans">
+          CUL fans google group</a></li>
+      </ul>
+    </ul>
+
+
+    <a name="Installation"></a>
+    <h3>Installation</h3>
+
+    <ul>
+    <h4>Fritz!Box</h4>
+    <ul>
+      <li>On the FB7390 install <a
+          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image. Note: it
+          is needed <i>additionally</i> to the OS image from AVM.<br>
+      <li>On the FB7270 unpack <a
+          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> zip file to a USB-Disk,
+          attach the disk to the FritzBox, log in, and start fhem from there.
+      <li>See also the detailed documentation <a href="fritzbox.html">here</a>.
+     </ul>
+
+    <h4>Debian/Ubuntu</h4>
+    <ul>
+      <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">this</a> package.
+      <b>Note:</b> For upgrading it is necessary to purge the old package (dpkg
+      -P fhem), as the directory structure has changed to be the same as with
+      .tar.gz or fritzbox.
+    </ul>
+
+    <h4>Unix / OSX</h4>
+    <ul>
+      <li>Make sure you have perl. Most certainly you will need the
+          Device::SerialPort fhem module, install it with "sudo cpan
+          Device::SerialPort" or "apt-get install libdevice-serialport-perl".
+          </li>
+      <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
+          .tar.gz</a> package, unpack it, and change to the unpacked directory.
+      <li>start fhem directly from this directory (perl fhem.pl fhem.cfg).
+    </ul>
+
+    <h4>Windows</h4>
+    <ul>
+      <b>Note:</b>If you are using cygwin for your perl installation you can
+      follow the guidelines for Unix.<br><br>
+
+      <li>Be sure you have perl.exe in your path (%PATH%), and the module
+          Win32::SerialPort is installed.</li>
+      <li>Make sure that you can access your device (CUL/FHZ/etc) via virtual
+          COM-Port or via socket (e.g. <code>COMX or xport:10001</code>).</li>
+      <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
+          .tar.gz</a> package, unpack it, and change to the unpacked directory.
+      <li>Start the server with <code>perl fhem.pl fhem.cfg</code></li>
+    </ul>
+
+    <br><br>
+    After installation follow the <a href="HOWTO.html">HOWTO</a> for adding devices.
+    </ul>
+
+    <a name="License"></a>
+    <h3>License:</h3>
+    <ul>
+      Copyright:<br>
+      <ul>
+        <li>Rudolf Koenig (r dot koenig at koeniglich dot de. Note: I <b>do
+        not</b> provide fhem-support via private mail, use the forum
+        instead)</li>
+        <li>Martin Haas (webfrontends/pgm3)</li>
+        <li>Olaf Droegehorn (webfrontends/pgm5)</li>
+        <li>Numerous other people with their fhem modules</li>
+      </ul>
+      License: GPL (v2)<br>
+      Thanks to TOSTi for inspiration and numerous other people for help. <br>
+    </ul>  
+
+
+
+  </body>
+
+  </html>

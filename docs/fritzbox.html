@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>fhem on the Fritz!Box</title>
+  <link rel="stylesheet" type="text/css" href="../css/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+</head>
+
+
+<body>
+
+  <div id="logo"></div>
+  <div id="menu">
+    <h3>Fhem on the Fritz!Box</h3>
+  </div>
+
+  <div id="right">
+
+<h2><a href="fhem.html">FHEM</a> on the Fritz!Box</h2>
+
+
+<h3>Fritz!Box 7390 (as of 2011-09-03)</h3>
+    <ul>
+    After the CeBIT 2011 AVM released an image for the Fritz!Box7390 containing
+    fhem, see <a href="http://www.avm.de/de/Service/Service-Portale/Labor/index.php"
+    >this</a> link. This image is to be installed in <b>addition</b> to the
+    normal firmware. You can upgrade/replace the normal firmware any time
+    without hurting the fhem installation and vice versa.  This fhem
+    installation configures 2 CUL devices, the first one talking FS20
+    ("SlowRF"), the second preconfigured for HomeMatic.  <br><br>
+
+    The AVM installation will start fhem in a chroot environment, in order to
+    minimize security concerns, but this also prevents fhem to trigger
+    arbitrary FritzBox functions, e.g. sending mail, enabling WLAN, etc. wont
+    be possible from fhem.<br><br>
+
+    <a href="fhem-=VERS=-fb7390.image">This</a> image from fhem.de contains
+    perl from the AVM fhem-image and of course fhem, the main difference is,
+    that fhem will be started in a normal (non-chroot) environment. 
+    When installing it, you have to confirm with an extra click that it does
+    not have a valid AVM signature.  </ul>
+
+<h3>Fritz!Box 7170/7270 (as of 2011-09-03)</h3>
+    <ul>
+    Due to Eyk's work there is also a <a
+    href="fhem-=VERS=-fb7270.zip">ZIP</a> file for the Fritz!Box 7170 and 7270
+    models. As the FB720/7170 has not enough internal storage to install fhem,
+    you have to use an external USB Drive:
+    <ul>
+      <li>First unzip the .ZIP file in the root directory of the USB-disk/USB-stick.
+      <li>Attach the stick to the FB
+      <li>open a telnet window, connect to the FB.
+      <li>With the command df check the name of the stick on the FB.
+      <li>Execute the following command in the FB telnet window to start fhem
+          when the FB reboots:<br>
+          echo "&lt;path-of-the-stick&gt;/fhem/startfhem" > /var/flash/debug.cfg
+      <li>Start fhem manually with "&lt;path-of-the-stick&gt;/fhem/startfhem"
+    </ul>
+    Since these devices have less memory than the FB7390, fhem may suffer from
+    memory-shortage, esp. inspecting large logs directly in the browser my lead
+    to a reboot.
+    </ul>
+
+</div>
+</body>
+
+</html>

@@ -1,0 +1,30 @@
+#!/bin/bash
+# this skript creates for e.g. the Siemens C470 IP a telephone book which can be read in by the webinterface of the telephone
+# The script reads the /etc/asterisk/extensions.conf and creates the /tmp/teledir.vcf
+# Martin Haas 071216
+#
+
+# you need the tool unix2dos :-( It is depending on your Distribution included in unix2dos or tofrodos
+
+telefonbook=/tmp/teledir.vcf
+
+rm -f $telefonbook
+
+grep System /etc/asterisk/extensions.conf | grep -v '^;' | \
+
+while read fhemdev
+do
+	number=$(echo $fhemdev | cut -d, -f1 | awk '{print $3}')
+	name=$(echo $fhemdev | cut -d\" -f2 | sed 's/\./ /g')
+
+	echo "BEGIN:VCARD" >>$telefonbook
+	echo "VERSION:2.1" >>$telefonbook
+	echo "FN:$name" >>$telefonbook
+	echo "N:$name" >>$telefonbook
+	echo "TEL;HOME:$number" >>$telefonbook
+	echo "END:VCARD" >>$telefonbook
+	echo  >>$telefonbook
+
+done
+
+unix2dos $telefonbook

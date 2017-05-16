@@ -1,0 +1,571 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>FHEM FAQ</title>
+  <link rel="stylesheet" type="text/css" href="../css/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+</head>
+
+
+<body>
+
+  <div id="logo"></div>
+  <div id="menu">
+    <h3>FHEM FAQ</h3>
+  </div>
+
+  <div id="right">
+
+<!--
+<div class="dist">
+<a href="#faq1">
+  1. I get a <code>Can't call method "opened"</code> message when starting
+  fhem. Why?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq2">
+  2. I get "undefined" messages in the log after upgrading fhem.pl</a>
+  </div>
+
+<div class="dist">
+<a href="#faq3">
+  3. I switched on a FS20 device directly (without the remote), but the
+  fhem.pl did not noticed it. Is it a bug?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq4">
+  4. I have some FS20/FHT/HMS devices. How do I know their housecode?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq5">
+  5. I have the code for my devices in the ELV notation, which contains 1,2,3
+  and 4, but you require a hex code. How should I convert it?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq6">
+  6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.  Help
+  me!</a>
+  </div>
+
+<div class="dist">
+<a href="#faq7">
+  7. I can specify an optional ml/raincounter for a KS300.  Why do you think
+  that 255 should be the default?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq8">
+  8. The time specification of the builtin <code>at</code> command is not very flexible.
+  Please add day/month/weekday to it.</a>
+  </div>
+
+<div class="dist">
+<a href="#faq9">
+  9. I defined my FS20STR as an FHT device, but I do not get any data from
+  it.</a>
+  </div>
+
+<div class="dist">
+<a href="#faq10">
+  10. How to convert the FHT80b code seen in its display to the hex code needed
+  by fhem.pl?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq11">
+  11. I'd like to use this sunrise/sunset stuff, can you help me?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq12">
+  12. I'd like to switch on the ventilator if the FHT tells me its too hot. How
+  to tell fhem to do that?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq13">
+  13. I'd like to see directly in the Web frontend if a window is open. How to
+  do that?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq14">
+  14. In the summer I get a lot of "actuator:lime-protection" messages from  my
+  FHT80b. How to switch back to the actuator:0% messages?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq15">
+  15. My notify/filelog does not work, help me!</a>
+  </div>
+
+<div class="dist">
+<a href="#faq16">
+  16. Setting auto-mode from manual for the FHT won't change the desired
+  temperature!</a>
+  </div>
+
+<div class="dist">
+<a href="#faq17">
+  17. I have problem receiving data, I get "Bad CRC" or "Oversized
+  message."</a>
+  </div>
+
+<div class="dist">
+<a href="#faq18">
+  18. My FHZ1X00PC gets all time automatically disconnected and reconnected. My
+  log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
+  What is wrong with my USB?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq19">
+  19. How do I set the dim100% from the at command?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq20">
+  20. Why do my Sunrise/Sunset times differ from the ones on website
+  XXX?</a>
+  </div>
+
+<div class="dist">
+<a href="#faq21">
+  21. What is "unknown message: EOB" from a CUL device?</a>
+  </div>
+
+
+
+<br/>
+<br/>
+-->
+
+<a name="faq1"></a>
+<h4>1. I get a <code>Can't call method "opened"</code> message when starting
+  fhem. Why?</h4>
+  <ul>
+    You need perl &gt;=5.6, on Unix with the Device::SerialPort (<a
+    href="http://search.cpan.org/dist/Device-SerialPort/">
+    http://search.cpan.org/dist/Device-SerialPort/</a>),
+    on Windows Win32::SerialPort (use ActiveState's ActivePerl)
+    module.
+    If this module reports <code>Can't call method "opened" on an undefined
+    value...</code> when starting the server, then you either may ignore
+    this message, or replace the mentioned line with:<pre>
+      $self->{HANDLE}->close if (defined($self->{HANDLE}) &&
+                                 $self->{HANDLE}->opened);</pre>
+  </ul>
+
+
+<a name="faq2"></a>
+<h4>2. I get "undefined" messages in the log after upgrading fhem.pl</h4>
+<ul>
+   Stop fhem.pl, delete the previous .save file and restart fhem.pl.
+   If the problem still exists, send a bugreport.
+</ul>
+
+
+<a name="faq3"></a>
+<h4>3. I switched on a FS20 device directly (without the remote), but
+   the fhem.pl did not noticed it.<br>Is it a bug?</h4>
+<ul>
+   The protocol used by the FS20 family is quite simple: it is <b>not</b>
+   encrypted in any way, and there is no feedback to the sender.  So if you
+   push any buttons on a pure receiver, no radio waves will be sent out, and
+   the FHZ1000 won't notice anything. The FHZ1000PC does not even know if
+   somebody received its message, it simply sends it out 3 times and hopes
+   for good luck.<br>
+   To answer the question: it is not a bug :-)
+</ul>
+
+
+<a name="faq4"></a>
+<h4>4. I have some FS20/FHT/HMS devices. How do I know their housecode?</h4>
+<ul>
+   If you already programmed some devices, then just start fhem.pl with one
+   of the example configuration files, and watch the log.  When activating a
+   device (e.g. with the remote) then it will be logged as an unknown device
+   with the housecode. Note: the verbose level must be 3 or higher.  KS300
+   devices do not have a proper code, so you can use anything.<p>
+   <p>
+   By the way, FS20 switches and dimmers are unidirectional. If you change their
+   states by pressing the connected hand switch, no information will be sent out.
+   You need to imprint it on a remote control or on fhem to set the housecode and 
+   buttoncode. Please read the manual that came with the device how to do it. In
+   fhem simply define the device with a housecode and buttoncode at your liking
+   and switch the device via fhem while the device is in learning mode. 
+</ul>
+
+
+<a name="faq5"></a>
+<h4>5. I have the code for my devices in the ELV notation, which contains 1,2,3
+and 4, but fhem requires a hex code. How should I convert it?</h4>
+
+<ul>
+   Note: current fhem versions accept FS20 codes in ELV notation.<br/><br/>
+
+   The code used by ELV is in the "quaternal" (?) system plus one added to each
+   digit, so you can even use the 4 button remote for programming. To convert,
+   you have two choices: the program four2hex in the contrib directory, or the
+   good old unix program bc.
+   <ul>
+     <li>From  quaternal (ELV Remote) to hex (fhem.pl):<br>
+	 <pre>
+	 % bc
+	 obase=16
+	 ibase=4
+	 &lt;elv number&gt;</pre>
+	 where &lt;elv number&gt; is the number used on the remote, but 1
+	 substracted from every digit (so each digit is between 0 and 3).</li>
+
+     <li>From hex (fhem.pl) to quaternal (ELV Remote):<br>
+	 <pre>
+         % bc
+	 ibase=16
+	 obase=4
+	 &lt;hex number&gt;</pre>
+	 Now add 1 to each digit of the result, and prepend it with 1's if
+	 it has less than 4 digits.</li> </ul>
+
+
+</ul>
+
+
+<a name="faq6"></a>
+<h4>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.
+Help me!</h4>
+<ul>
+   The FHT80b's are talking to a single FHZ1XXX device, which has a unique
+   "FHTcode". You have two choices: if you know the old FHTcode, then you can
+   set it,  or you can tell the FHT80b to forget the old FHZ, and start talking
+   with the new one.
+   <ul>
+     <li>Set the FHTcode: The problem with this method is that I don't know how
+     to read out the value [nothing discovered yet either -AndiM],
+     we just can change it with<br>
+     <code>set FHZ FHTcode &lt;hex-code&gt;</code> (1 byte, range 1 to 99)</li>
+     <li>Resync the FHT80b: Press PROG until "Sond" appears, then select "CEnt"
+     with the wheel, press PROG again, Select "nA" with the wheel, press PROG</li>
+
+   </ul>
+</ul>
+
+
+<a name="faq7"></a>
+<h4>7. I can specify an optional ml/raincounter for a KS300. Why do you think
+that 255 should be the default?</h4>
+<ul>
+   The manual talks about 0.3l resolution, but I wanted to calibrate my device.
+   So I filled a plastic bottle with 0.5 liter water from the measuring cup,
+   drilled a small hole in the bottom of the bottle, let the water flow slowly
+   in the KS300 rain-cup, and looked at the counter after the bottle was empty.<br>
+
+   The raincounter was incremented by 130 ticks. The diameter of my KS300
+   rain-cup is 13.9 cm, the area ca 151.75 cm<sup>2</sup>, which
+   is ca 1/65.9 m<sup>2</sup>.
+   The 0.5 liter corresponds to 32.95 liter per m<sup>2</sup>. 130 ticks
+   correspond to 32.95 l/m<sup>2</sup> -> 1 tick is ca 253 ml. I estimate
+   the error margin to +/- 2%<br>
+
+   You are welcome to do your own experiments, I am interested in the results.
+</ul>
+
+
+<a name="faq8"></a>
+<h4>8. The time specification of the builtin at command is not very
+flexible. Please add day/month/weekday to it.</h4>
+<ul>
+  Please take a look at the holiday device, and the perl helper variables (both
+  described in the commandref.html).
+</ul>
+
+
+<a name="faq9"></a>
+<h4>9. I defined my FS20STR as an FHT device, but I do not get any data from
+it.</h4>
+<ul>
+   The FS20STR is an FS20 device, even if it looks like an FHT80b.
+   You'll get "only" on-for-timer and off-for-timer events sent.
+</ul>
+
+
+<a name="faq10"></a>
+<h4>10. How to convert the FHT80b code seen in its display to the hex code needed
+by fhem.pl?</h4>
+
+<ul>
+   Convert the first 2 digits first from decimal to hex, then the next two.
+   Example:<br>
+	 <pre>
+         % bc
+	 obase=16
+	 &lt;first two digits&gt;
+	 &lt;last two digits&gt;</pre>
+   E.g The FHT80b code 1121 is 0b15 for the fhem.pl
+</ul>
+
+
+<a name="faq11"></a>
+<h4>11. I'd like to use this sunrise/sunset stuff, can you help me?</h4>
+<ul>
+   Look for the geographic coordinates of your home, e.g with a GPS
+   receiver or with googleearth. Compute the latitude/longitude as needed, and
+   set the latitude/longitude global attributes.
+   { sunrise() } now will return the time of the next sunrise,
+   in a HH:MM:SS format. Also note <a href="#faq20">faq20</a><br><br>
+
+   Note: 99_SUNRISE_EL.pm is the ExtraLight version of the original
+   99_SUNRISE.pm, which needs the DateTime::Event::Sunrise perl module, which
+   in turn is usually difficult to install.
+</ul>
+
+<a name="faq12"></a>
+<h4>12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</h4>
+<ul>
+
+  To get used to the methods, we do it step by step. Telnet to fhem, and type
+  the following:
+
+  <pre>
+  # Check simply the value. It is the same as seen in "list"
+  fhem> {Value(myfht)}
+  measured-temp: 23.8 (Celsius)
+
+  # Get the second word, so we can compare it.
+  fhem> { my @a = split(" ", Value(myfht));; $a[1] }
+  23.8
+
+  # Set the ventilator on now, if its too hot.
+  fhem> { my @a = split(" ", Value(myfht));; fhem("set ventilator on") if($a[1] > 25.0) }
+
+  # Now do this regularly
+  fhem> define chilldown at +*00:30:00 { my @a = split(" ", Value(myfht));; fhem("set ventilator on") if($a[1] > 25.0) }
+
+  # An alternative:
+  fhem> define chilldown at +*00:30:00 { fhem("set ventilator on") if(Value(myfht) gt "measured-temp: 25.0") }
+  </pre>
+
+</ul>
+
+<a name="faq13"></a>
+<h4>13. I'd like to see directly in the Web frontend if a window is open.
+How to do that? (by fwolff)</h4>
+<ul>
+
+  Just define a new (pseudo) FS20 device called "window" and use the following
+  notify settings:
+
+  <pre>
+  define window_open notify bad.*warnings.*Window.*open.* set window on
+  define window_close notify bad.*warnings.*none.* set window off
+  </pre>
+</ul>
+
+<a name="faq14"></a>
+<h4>14. In the summer I get a lot of "actuator:lime-protection
+messages from  my FHT80b. How to switch back to the actuator:0% messages?
+</h4>
+<ul>
+
+  (Thanks for Martin Fischer for researching)<br>
+  The problem happens if at the weekly lime-protection time (usually saturday
+  at 11:00 AM) the desired temperature is lower than the measured temperature.
+  I think this is an FHT80b firmware bug, a workaround is to set the desired
+  temperature for a short time higher than the measured temperature.
+  You can automate it with the following notify:
+<pre>
+  define lime_reset notify .*lime-protection {\
+    $d = ReadingsVal("@", "desired-temp", 0);;\
+    $m = ReadingsVal("@", "measured-temp", 0);;\
+    if($m gt $d) {\
+      fhem("set @ desired-temp 29");;\
+      fhem("set @ desired-temp $d");;\
+    }\
+  }
+</pre>
+
+</ul>
+
+<a name="faq15"></a>
+<h4>15. My notify/filelog does not work, help me!</h4>
+<ul>
+   First learn what are the trigger messages: telnet to your fhem (e.g. telnet
+   localhost 7072) and issue the command "inform on". If there is an
+   FS20/HMS/etc event, then you'll see a line of the form
+   "TYPE DEVICENAME EVENT". Some devicetypes generate more than one trigger
+   message for one event, e.g. HMS or KS300.<br>
+   Example: you have an FS20 device named piri, which sends a command
+   "on-for-timer 60". In this case you'll see: FS20 piri on-for-timer 60
+   <br><br>
+
+   Now define your notify/filelog. The regexp specified will be tested
+   against the DEVICENAME and against the DEVICENAME:EVENT strings. If they
+   match, then the action will be executed. For our example this would be:
+   define piri_ntfy notify piri:on.* some_command<br><br>
+
+   You can test the notify/filelog with the trigger command: issue "trigger
+   DEVICENAME EVENT" in the telnet prompt, and check if your notify/filelog
+   works as designed. Example: trigger piri on-for-timer 60<br>
+   Tip: you can test a new setup without a connected FHZ1x00. Create a new
+   config file, set the FHZ1x00 device to none, and generate events via
+   trigger.
+   <br><br>
+
+
+</ul>
+
+<a name="faq16"></a>
+<h4>16. Setting auto-mode from manual for the FHT won't change the desired temperature!</h4>
+<ul>
+   Thanks to Waldemar Porsche the following notify will take care of that:<br>
+   <pre>define ExtendedAutoMode notify .*mode.*auto {\
+    my $olddesired = ReadingsValue("@", "desired-temp", 0);;\
+    return if (!defined($olddesired));;\
+    my @@day = ("sun", "mon", "tue", "wed", "thu", "fri", "sat");;\
+    my $now = sprintf("%%02d:%%02d", $hour, $min);;\
+    my $wd = $day[$wday];;\
+    my $desired;;\
+    if (ReadingsVal("@", "warnings", "none") eq "Window open") {\
+      $desired = ReadingsVal("@", "windowopen-temp", 0);;\
+    } elsif (ReadingsVal("@", "$wd-from1", "") le $now && ReadingsVal("@", "$wd-to1", "") ge $now) {\
+      $desired = ReadingsVal("@", "day-temp", 0);;\
+    } elsif (ReadingsVal("@", "$wd-from2", "") le $now && ReadingsVal("@", "$wd-to2", "") ge $now) {\
+      $desired = ReadingsVal("@", "day-temp", 0);;\
+    } else {\
+      $desired = ReadingsVal("@", "night-temp", 0);;\
+    }\
+    fhem ("set @ desired-temp $desired") if (defined($desired) && $desired ne $olddesired);;\
+  }
+  attr ExtendedAutoMode comment Setzt fuer den Auto mode die desired-temp in Abhaengigkeit von Temperaturprofil und Fensterkontakt
+   </pre>
+</ul>
+
+<a name="faq17"></a>
+<h4>17. I have problem receiving data, I get "Bad CRC" or "Oversized
+   message."</h4>
+<ul>
+   Some Linux distibutions have problems with the settings of the serial USB
+   lines. Sometimes the 8.th bit is stripped, sometimes software flowcontrol
+   is enabled. Fhem tries to clear the serial line, but it is not always
+   successfull. Following command fixes the problem in some cases:
+
+   <pre>
+     stty < /dev/elv_fhz1300pc\
+        -parenb -parodd cs8 hupcl -cstopb -cread clocal\
+        -crtscts -ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr\
+        -igncr -icrnl -ixon -ixoff -iuclc -ixany -imaxbel -iutf8 -opost\
+        -olcuc -ocrnl -onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0\
+        bs0 vt0 ff0 -isig -icanon -iexten -echo -echoe -echok -echonl\
+        -noflsh -xcase -tostop -echoprt -echoctl -echoke
+   </pre>
+</ul>
+
+<a name="faq18"></a>
+<h4>18. My FHZ1X00PC gets all time automatically disconnected and
+reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
+What is wrong with my USB?
+</h4>
+<ul>
+Several fhem users are plagued by spontaneous disconnects/reconnects of USB
+devices. This is not an issue of fhem but a problem of hardware and/or USB drivers.
+See <a href="USB.html">USB compendium</a> for help.
+</ul>
+
+
+<a name="faq19"></a>
+<h4>19. How do I set the dim100% from the at command?</h4>
+<ul>
+  As the % and @ characters are special, they have to be escaped. See the
+  following list (copied here from the commandref.html, notify command
+  description).<br><br>
+
+  <li>The character <code>%</code> will be replaced with the received event,
+  e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
+  (Celsius)</code><br> It is advisable to put the <code>%</code> into double
+  quotes, else the shell may get a syntax error.</li>
+
+  <li>The character <code>@</code> will be replaced with the device
+  name.</li>
+
+  <li>To use % or @ in the text itself, use the double mode (%% or @@).</li>
+
+  <li>Instead of <code>%</code> and <code>@</code>, the parameters
+  <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code>
+  (same as <code>@</code>) and <code>%TYPE</code> (contains the device
+  type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
+  looses its special meaning if any of these parameters appears in the
+  definition.</li>
+</ul>
+
+<a name="faq20"></a>
+<h4>20. Why do my Sunrise/Sunset times differ from the ones on webseite XXX?</h4>
+<ul>
+  There are different ways of defining sunrise/sunset. To quote "perldoc
+  DateTime::Event::Sunrise" :<br>
+  <ul>
+    <li>0 degrees<br>
+        Center of Sun's disk touches a mathematical horizon
+    <li>-0.25 degrees<br>
+        Sun's upper limb touches a mathematical horizon
+    <li>-0.583 degrees<br>
+        Center of Sun's disk touches the horizon; atmospheric refraction
+        accounted for
+    <li>-0.833 degrees<br>
+        Sun's supper limb touches the horizon; atmospheric refraction
+        accounted for
+    <li>-6 degrees<br>
+        Civil twilight (one can no longer read outside without artificial
+        illumination)
+    <li>-12 degrees<br>
+        Nautical twilight (navigation using a sea horizon no longer possible)
+    <li>-15 degrees<br>
+        Amateur astronomical twilight (the sky is dark enough for most
+        astronomical observations)
+    <li>-18 degrees<br>
+        Astronomical twilight (the sky is completely dark)
+  </ul>
+  <br>
+  The default in fhem is -6, as we most often deal with lamps & reading. Most
+  websites use -0.833, the difference is normally about 30 minutes. You can
+  change it in 99_SUNRISE.pm by setting the $altit variable.
+
+</ul>
+
+<a name="faq21"></a>
+<h4>21. What is "unknown message: EOB" from a CUL device?</h4>
+<ul>
+  If too many messages for FHT devices are queued in CUL, the fht buffer
+  subsystem of CUL overflows. You get EOB (end of buffer) messages and
+  likely LOVF (limit overflow) messages, too. define <code>attr CUL fhtsoftbuffer 1</code>
+  to activate a quasi unlimited software buffer in fhem itself to avoid this
+  behavior.<br><br>
+
+  By the way, <code>set CUL raw T01abcd</code> (abcd= FHT house code) resets
+  the CUL FHT subsystem, no need to unplug/replug the CUL device in case of
+  the aforementioned issue.
+</ul>
+
+<a name="faq22"></a>
+<h4>22. My FHT80b device does not send temperature messages to my FHZ/CUL/CUN (any more).
+What can I do?</h4>
+<ul>
+  Please pair your FHT80b device withe FHZ/CUL/CUN as described in the
+  device manual.<br><br>
+  It is advisable to remind the FHT80b devices from time to time that there is
+  a FHZ/CUL/CUN device to report to. Adding the following line to your fhem config
+  file helps in most cases:<br>
+  <code>
+    define myReminder at *00:40:00 set TYPE=FHT time
+  </code>
+
+</ul>
+
+
+</body>
+</html>

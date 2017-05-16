@@ -1,0 +1,37 @@
+#!/bin/sh
+
+fw=$1
+if test ! -f ../../$fw.tar.gz; then
+  echo "usage: makeimage <fhem-VERSION>"
+  echo "../../<fhem-VERSION>.tar.gz must exist"
+  exit 1
+fi
+
+rm -rf var
+echo Extracting the fritzbox template
+unzip -qo ../../priv/fritzbox7270_template.zip
+rm -rf fhem/{FHEM,www,docs}
+
+echo Merging
+rm -rf $fw
+tar zxf ../../$fw.tar.gz
+
+cd $fw
+cp -rp fhem.pl fhem.cfg FHEM docs www ../fhem
+cd ..
+rm -rf $fw
+
+rm -rf fhem/docs/*.{odg,pdf,man,txt}
+cp fhemcmd.sh fhem/FHEM
+cp startfhem fhem
+cat >> fhem/fhem.cfg << 'EOF'
+attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr telnetPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+EOF
+
+
+echo Packing again
+zip -qr $fw-fb7270.zip fhem
+rm -rf fhem

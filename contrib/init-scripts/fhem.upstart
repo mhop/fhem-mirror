@@ -1,0 +1,15 @@
+# FHEM Service
+
+description     "fhem server"
+author          "Rudolf Koenig <r.koenig@koeniglich.de>"
+
+start on (net-device-up
+          and local-filesystems
+          and runlevel [2345])
+stop on runlevel [016]
+
+expect fork
+respawn
+
+chdir /opt/fhem
+exec perl fhem.pl fhem.cfg

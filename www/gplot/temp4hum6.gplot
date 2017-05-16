@@ -1,0 +1,33 @@
+#
+# Display the measured temp and the humidity.
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/hmsname-%Y.log <hmsname>:T:.*
+#
+# Logfile record example:
+# 2008-07-24_02:20:57 UGHygro T: 17.2  H: 77.6  Bat: ok
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+set ylabel "Humidity (%)"
+
+#FileLog 4:T\x3a:0:
+#FileLog 6:H\x3a:0:
+
+plot \
+  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y2 title 'Temperature' with lines,\
+  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 ls l2fill axes x1y1 title 'Humidity' with lines

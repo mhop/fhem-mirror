@@ -1,0 +1,227 @@
+PHP-Webfrontend pgm3 for FHEM (old: fhz1000.pl)
+
+
+Changelog
+
+2006-04-06 (0.1)
+- first php-version. It ist based on the new xmllist-mode inside the fhz1000-2.0.pl
+
+2006-04-08 (0.2.0)
+- CSS/optical review. Small Bugs were solved. Better gnuplot-picture. Pull-Down-Menu for FHT-Device (set desired-temp ). Lamp.gif for ST-Devices.
+
+2006-04-12 (0.2.1)
+-- predefined $forwardurl is not longer required
+-- gnuplot makes the png by itself. The program is now faster.
+
+2006-04-13 (0.2.2)
+-- only technical change: the xmllist will now be read directly from fhz1000.pl and not from a XML-file. The program ist now faster.
+
+2006-04-21 (0.2.3)
+-- HMS-Devices added
+-- History now possible (tail)
+-- optical changes
+-- better arrangement of the data on screen
+
+2006-05-14 (0.3.0)
+-- KS300-Devices added
+
+2006-05-18 (0.3.1)
+-- better arrangement of HMS devices
+
+2006-06-23 (0.3.2)
+-- adapted to fhz1000-2.3: LOGS added
+-- HMS-Device with a short list.
+
+2006-07-10 (0.4.0)
+-- Now we will use the php-graphic functions for nearly everything.
+
+2006-07-21 (0.4.1)
+-- better documentation, look at http://www.martin-haas.de/fhz/
+-- on-for-timer integration in fs20
+-- now running without php-problems on SuSE 10.0
+
+2006-07-24 (0.4.2)
+-- only KS300: small bug solved (hardcoded value)
+-- KS300: array adapted to fhz1000-2.4
+
+2006-08-14 (0.4.3)
+-- more details, some bugfixes
+-- now only online documentation and a Shockwave-presentation
+
+2006-08-27 (0.4.4)
+-- some fixes and optimizations
+-- now you can change the most values of the fs20-buttons in the config.php: size of the buttons, count of the buttons per line, size of the title (if you have long titles).
+
+2006-08-29 (0.4.5)
+-- bugfix: fs20-buttons with room had a problem
+-- rooms are now displayed on the graphics. Rooms with room "hidden" are now hidden. Example "attr hiddenroom room hidden"
+
+2006-09-15 (0.5.0)
+-- rooms are now automatically supported
+-- the avg_day and avg_month of ks300 are now displayed
+-- small bugfixes
+-- scripts for logrotate for the graphics-logs are optimized.
+
+2006-10-05 (0.5.1)
+-- feature: TrueType-Fonts added
+-- feature: more ks300-information
+-- small bugfixes: whitespace in logfiles eliminated
+-- better documentation
+-- small redesign (fonts, colors)
+
+
+2006-11-01 (0.5.2)
+-- feature: Pulldown menu for switching FS20-Devices added
+-- Bugfix : some older systems had problems to find the TrueTypeFonts
+
+2006-11-20 (0.6.0)
+-- feature: automatic Double-GNUPLOT-Pictures for HMS100T/HMS100TF/KS300/FHT
+-- feature: HMS-Device HMS100WD and HMS100MG are now supported (thanks to Juergen)
+-- feature: optional Kioskmode (only show but don't switch anything.)
+-- feature: gnuplot-pictures are now possible in room-view (not only in room ALL)
+
+2006-11-29 (0.6.1)
+-- feature: HMS-Device HMS100W and RM100-2 are now supported (thanks to PeterP)
+-- feature: external access -- now fhz1000.pl and pgm3 must not be any more on the same machine.
+--> ATTENTION, this now needs php5 (!). Use 0.6.0 if you cannot install php5.
+
+2006-12-14 (0.6.2)
+-- feature: automatic logrotate for HMS/FHT/KS300 is now possible (if the webserver has the rights to do that)
+-- feature: deleting of AT-Jobs with a click.
+-- feature: Pulldown-Menu for fs20 now with "at".
+-- bugfix: UTF-8 is now used (Grad Celsius).
+-- bugfix: automatic pull-down of fs20 now for non-rooms too.
+
+2007-01-07 (0.7.0)
+-- feature: pulldown-Menue for every FHT-order
+-- feature: now you can show or hide every window for LOGS/NOTIFICATIONS/AT_JOBS/tail in every view or room. You can deactivate them by default in the config.php
+-- feature: deleting every AT_JOB with a click including complex jobs
+-- feature: ks300 with a zero-line
+-- feature: ks300 with optional Beaufort (thanks to Boris Neubert)
+-- bugfix: ks300 with negative Temperature
+
+2007-02-14 (0.7.1)
+-- Bugfix: DEL Button for at-Jobs now works
+-- Now you can use php4 OR php5 (php5 is recommended)
+-- Feature: php-Pictures of FHT now inclusive "desired-temp"
+
+2007-03-29 (0.8.0)
+-- Feature: Now you can adjust the range of the Gnuplot-pictures of FHT in the config.php
+-- Feature: WS300 is now supported
+-- Internal: Adjusted to the new internal structure of FHEM. YOU MUST HAVE FHEM >=4.0
+-- Internal: random-device for one-time at-order (define <randdev> at set ...)
+-- Feature: new arrangement of the graphics, FHT-Pulldown will now called by "adjust", FHT-PHP-Graphics now with Temperature/desired-temp and actuator
+-- Bugfix:  $errormessage for php4, fs20pulldown (correct list of options)
+
+2007-06-13 (0.8.1)
+-- Bugfix: Section FHZ_DEVICE is now hidden if you dont want neither Pulldowns nor General.
+
+2007-09-04 (0.8.2)
+-- bugfix: HMS100WD is now aligned with other HMS-Devices
+-- feature: Now there is a warning if there are not sufficient data to draw a gnuplot graph
+-- feature: more information about new HMS-Devices
+
+2007-09-05 (cvs)
+-- feature: gnuplot pictures of FHT without all data (actuator, desired-temp) are shown with only measured temp
+
+2007-10-13 (0.8.3)
+-- feature: Now it is possible to attach selfmade logfiles from e.g. wired devices. Everthing is explained in config.php.
+It is not necessary to tell fhem that there are other logs.
+
+2007-10-14 (0.8.4)
+-- feature: User defined logs with several values in one file now supported.
+
+2007-10-16 (CVS)
+-- feature: User defined graphics now for Piri and FS20 too. Everthing is explained in the config.php.
+
+2007-10-18 (CVS)
+-- feature: User defined graphics for FS20 now with a full picture.
+
+2007-10-23 (071023cvs)
+-- feature: optimized speed for small devices (more than 50 percent on e.g a NSLU2)
+
+2007-10-24 (071024cvs)
+-- bugfix: at least one new picture per hour for userdefs (gnuplot picture)
+
+2007-10-25 (071025cvs)
+-- design: userdef-gnuoplot with transparent background
+
+2007-10-20 (071030cvs)
+-- fix: gnuplot for FS20 now only off or on
+
+2007-11-30 (071130)
+-- feature: RSS-Feeds added
+
+2007-12-03 (071203)
+-- change: rebuild picture of fht on every entry in the log (not only on change of measured-temp.
+
+2007-12-08 (071208)
+-- bugfix: Wrong display in MS IE. (Reported and solved by Boris)
+-- Feature: Drewpoint im HMS100TF (Boris)
+-- Feature: RSS-Feeds now new arranged 
+
+
+2007-12-21 (071221)
+ -- Feature: HMS-CO supported (Peter A.) ==> hms100.php
+ -- Feature: Webcams or local pictures added ==>index.php. config.php
+ -- Feature: ks300 mit Drewpoint (Boris) ==>functions.php, ks300.php, config.php
+
+2007-12-24 (071224)
+ -- Bugfix: UserDef with type "temperature" now with y1tics ==> gnuplot.php
+ -- Feature: Webcam/Pics now hideable ==> index.php, config.php
+
+2008-03-24  
+   -- Bugfix: FHT-View with the current CVS-FHEM was broken: Small changes in include/fht.php
+
+2008-03-24  
+   -- Bugfix: KS300-Log now possible with Full Log like define kslog FileLog /var/tmp/ks300.log ks300:.
+   	==> Small Changes in ks300.php
+
+2008-04-13
+   -- Bugfix: FHT: lime-protection not more in the field of actuator: Small Changes in fht.php
+
+2009-03-26
+   -- Bugfix: table-format for userdefs changed, small optical changes for userdef
+   -- Feature: HMS100CO added
+
+2009-11-10
+-- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
+	   Changed: index.php. Check for selected dhtdev
+
+2009-11-16
+	-- New version with Battery-check, Log-Pull-Down, Google-Weather-Api	
+	-- Changed Files: index.php, config.php, fhtpulldown.php, weather.php
+
+2009-12-19
+	-- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH). 
+	   Changed: index.php, hms100.php, gnuplot.php
+2010-01-08
+	-- Feature, Bugs look at HISTORY
+	   Changed: every php-File!
+2010-03-12
+	-- Bugfix: Better check of availability of Google-Weather
+	   Changed: weather.php
+	-- Feature: DBLog for everything except UserDefs 
+	   Changed: index.php, config.php, fht.php, hsm100.php, 
+	   	    fhtpulldown.php, ks300.php
+2010-04-26
+	-- Bugfix: userdefs.php: FS20-Type the first time with broken graphic
+
+2012-04-24
+	-- Bugfix: check for FHEM-Version not needed any more
+
+2012-04-25
+	-- Feature: debugging for xmllist included
+
+2012-05-02
+	-- Bugfix: getting xmllist from FHEM without \r\n, no netcat any more
+	   Changed: index.php, config.php
+
+2012-05-07
+	-- Bugfix: userdefs.php works with new gnuplot-version
+	  
+2012-05-08
+	-- Feature: homematic added, FS20-Buttons now different depending of the state
+2012-05-20
+	-- Feature: userdefs.php better gnuplot picture
+        --  Bugfix: index.php: time problem by notify commands wihtin fhem

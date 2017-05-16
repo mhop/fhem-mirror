@@ -1,0 +1,23 @@
+############################
+# Display the Wind and the Rain values of a KS300.
+# Corresponding FileLog definition:
+# define <filelogname> FileLog /var/log/fhem/hms-%Y.log <ks300name>:T:.*
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<L1>'
+set grid
+
+set ylabel "Wind (km/h)"
+set y2label "Humidity (%)"
+
+#FileLog 8:IR\x3a:0:
+#FileLog 6:IR\x3a:0:
+
+plot "<IN>" using 1:8 axes x1y1 title 'Wind' with lines,\
+     "<IN>" using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines

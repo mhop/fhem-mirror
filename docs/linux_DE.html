@@ -1,0 +1,199 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>fhem.pl - Hinweise zu GNU/Linux</title>
+  <link rel="stylesheet" type="text/css" href="../css/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=UTF-8"/>
+</head>
+
+<body>
+
+<div id="logo"></div>
+  <div id="menu">
+    <h3>fhem.pl - Hinweise zu GNU/Linux</h3>
+    Version: <a href="linux.html">EN</a>&nbsp;<b>DE</b>
+  </div>
+
+  <div id="right">
+
+
+<h2>fhem.pl - Hinweise zu GNU/Linux</h2>
+
+<table border=1><tr><td>
+  Anmerkung: Abhängig von der verwendteten Distribution (Debian, openSuSE, etc.) sowie der Version 
+  des Linux Kernels müssen Sie einige der im folgenden beschriebenen Schritte ausführen.<br>
+
+  Als <b>erstes</b> sollten Sie versuchen, die Anleitung ohne Änderungen 
+  zu befolgen.<br> Wir haben die Kernel-Entwickler davon überzeugt, alle 
+  (bekannten) ELV-Geräte standardmäßig freizuschalten. Ab Kernel 2.6.24.2 
+  (z.B. openSUSE 11) sind die folgenden Veränderungen <b>nicht</b> mehr notwendig. 
+  Sie können Ihre aktuelle Kernel-Version durch Aufruf von
+  <code><br>uname -r<br></code>
+  in Erfahrung bringen.
+</td></tr></table>
+
+<hr>
+
+<p><b><a name="onedevice">Ein Gerät</a></b><br>
+  Wenn Sie nur ein Gerät (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...) an 
+  Ihren GNU/Linux Server anschließen, können Sie das normale Kernelmodul 
+  <i>ftdi_sio</i> verwenden, das Gerät wird jedoch erstmal nicht erkannt werden.
+  Dazu müssen Sie den <i>Hersteller-</i> und den <i>Produkt-</i> Code herausfinden:
+  <code><br>
+  # lsusb<br>
+  ...<br>
+  Bus 002 Device 002: ID <b>0403</b>:<b>e0e8</b> Future Technology Devices International, Ltd <br>
+  ...<br>
+  </code><br>
+
+  Abhängig von Ihrer Distribution ändern Sie jetzt bitte die Datei
+  <code>/etc/modprobe.conf</code> oder <code>/etc/modprobe.conf.local</code>.
+  Fügen Sie folgende Zeile hinzu:<br>
+  <code><br>
+  options ftdi_sio vendor=0x<b>0403</b> product=0x<b>e0e8</b><br>
+  </code><br>
+  Ändern Sie Hersteller und Produkt entsprechend der Ausgabe von <i>lsusb</i>.
+  Anschließend laden Sie das Modul mit folgendem Aufruf neu:<br>
+  <code><br>
+  # modprobe ftdi_sio<br>
+  </code><br>
+
+<hr>
+
+
+<p><b><a name="multipledevices">Mehrere Geräte</a></b><br>
+Bei Verwendung mehrerer USB-Geräte (FHZ1000PC, FHZ1300PC, EM1010PC, WS300,
+...) funktioniert die oben beschriebene Methode nicht. Sie müssen das Kernelmodul 
+ftdi_sio kernel anpassen, damit es funktioniert. Das folgende Beispiel bezieht 
+sich auf openSuSE 10.1. Sie müssen die kernel-source-<i>version</i> (RPM) Ihres aktuellen Kernels 
+installieren (Ausgabe mit: <code>uname -r</code>). Danach gehen Sie wie folgt vor:<br>
+
+  <code><br>
+  # cd /usr/src/linux<br>
+  # make cloneconfig<br>
+  # make modules_prepare<br>
+  # cp /boot/symvers-2.6.*-default.gz /usr/src/linux<br>
+  # mv symvers-2.6.*-default.gz Module.symvers.gz<br>
+  # gunzip /usr/src/linux/Module.symvers.gz<br>
+  # make modules_prepare<br>
+  # cd drivers/usb/serial<br>
+  </code>
+
+  Für den EM1010PC ergänzen Sie gegebenfalls folgende Zeile:
+  <code><br>
+  # vi ftdi_sio.h<br>
+  ...<br>
+  #define FTDI_ELV_WS500_PID 0xE0E9   /* PC-Wetterstation (WS 500) */<br>
+  <b>#define FTDI_ELV_EM1010PC_PID 0xE0EF   /* EM 1010 PC */</b><br>
+  </code><br>
+  Entfernen Sie nun die Kommentarzeichen bei den entsprechenden Zeilen entfernt, um Ihre Geräte zu aktivieren:
+  <code><br>
+  # vi ftdi_sio.c<br>
+  ...<br>
+   { USB_DEVICE(FTDI_VID, FTDI_ELV_WS300PC_PID) }, <br>
+   { USB_DEVICE(FTDI_VID, FTDI_ELV_FHZ1300PC_PID) },<br>
+   { USB_DEVICE(FTDI_VID, FTDI_ELV_WS500_PID) }, <br>
+   { USB_DEVICE(FTDI_VID, FTDI_ELV_EM1010PC_PID) },<br>
+  ...<br>
+  </code><br>
+  Entfernen Sie <b>/*</b> and <b>*/</b> für Ihre Geräte und speichern Sie 
+  die Datei.
+  <br>
+  <code>
+  # cd /usr/src/linux<br>
+  </code>
+  Es gibt nun drei Möglichkeiten:<br>
+  <table border=1>
+  <tr><td>
+  <code>
+  # mv Module.symvers Module.symvers.notneeded<br>
+  # make M=drivers/usb/serial</code>
+  <td>
+  ... die verwendeten <i>usb serial</i> Module bauen.<br>
+  Auf Geräten mit geringer Rechenleistung wie der ARM-Based NSLU2 reicht 
+  es aus, nur die benötigten Module zu kompilieren.
+  </td></tr>
+  <td><code>
+  # make modules</code>
+  </td><td>
+  ... alle Module kompilieren (kann einige Zeit dauern).
+  </td></tr>
+  <tr><td>
+  <code>
+  # make driver/usb/serial/ftdi_sio.ko
+  </code>
+  </td><td>
+  ... nur das Modul <i>ftdi_sio.ko</i> zu bauen. Diese Methode scheint 
+  aber nicht immer zu funktionieren.
+
+  </td></tr>
+  </table><br>
+  Wenn Sie die Module erzeugt haben, führen Sie folgende Kommandos aus:<br>
+  <code><br>
+  # cd /lib/modules/<i>yourKernelVerion</i>/kernel/drivers/usb/serial<br>
+  # cp ftdi_sio.ko ftdi_sio.ko_backup<br>
+  # cp /usr/src/linux/drivers/usb/serial/ftdi_sio.ko .<br>
+  </code><br>
+  Zur Aktivierung müssen Sie Anwendungen (z.B. fhem) stoppen, die die Gerätedatei 
+  /dev/ttyUSB benutzen und das Modul entladen und erneut laden.<br>
+  <code><br>
+  # rmmod ftdi_so<br>
+  # modprobe ftdi_so<br>
+  </code><br>
+  Sie sollten nun verschiedene ttyUSB Gerätedateien sehen:
+  <code><br>
+  # ls -l /dev/ttyUSB*<br>
+  crw-rw---- 1 root uucp 188, 0 2007-02-11 23:00 /dev/ttyUSB0<br>
+  crw-rw---- 1 root uucp 188, 1 2007-02-11 23:00 /dev/ttyUSB1<br>
+  </code><br>
+<hr>
+
+<p><b><a name="devicelinks">Device links</a></b><br>
+  Wenn einzelne Geräte fehlen oder nach einem Reboot, kann es bei der Verwendung 
+  mehrerer USB-Geräte (FHZ, EM, WS...) passieren, dass sich die Reihenfolge 
+  der Liste /dev/ttyUSB<i>n</i> ändert.<br> Mit Hilfe von UDEV können ab Kernel-Version 2.6 
+  statt der Nummern virtuelle Bezeichnungen vergeben werden.<br>
+  Fügen Sie folgende Zeilen in die Datei <code>/etc/udev/rules.d/10-udev.rules</code> 
+  ein (evtl. müssen Sie die Datei erstellen): <br>
+
+  Bis udev-Version 103:<br>
+  <code>
+  KERNEL=="ttyUSB*", SYSFS{product}=="ELV FHZ 1300 PC", SYMLINK+="elv_fhz1300pc"<br>
+  KERNEL=="ttyUSB*", SYSFS{product}=="ELV EM 1010 PC", SYMLINK+="elv_em1010pc"<br>
+  </code><br>
+  Ab einschließlich Version 103 wurde "SYSFS" durch "ATTRS" ersetzt:
+  <br>
+  <code>
+  KERNEL=="ttyUSB*", ATTRS{product}=="ELV FHZ 1300 PC", SYMLINK+="elv_fhz1300pc"<br>
+  KERNEL=="ttyUSB*", ATTRS{product}=="ELV EM 1010 PC", SYMLINK+="elv_em1010pc"<br>
+  </code><br>
+
+  Um die Pfade <code><b>/dev/elv_fhz1300pc</b></code> oder <code><b>/dev/elv_em1010pc</b></code> in Ihrer FHEM Konfiguration verwenden zu können, 
+  muss das Kernel-Modul ftdio_sio per "rmmod"/"modprobe" neu geladen werden.
+
+<hr>
+<p><b><a name="log">Perl Device::SerialPort</a></b><br>
+  Unter debian müssen Sie evtl. das Perl-Modul "Device::SerialPort" nachinstallieren:
+  <pre>
+  apt-get install libdevice-serialport-perl
+  </pre>
+
+<hr>
+<p><b><a name="log">Logfile config</a></b><br>
+  Eine Rotation der Datei fhem.log (logrotation) erreichen Sie durch Erweitern 
+  der Datei /etc/logrotate.conf:<br>
+  <pre>
+  /var/log/fhem.log {
+    missingok
+    weekly
+    copytruncate
+    rotate 5
+    compress
+  }
+  </pre>
+  </div>
+
+</body>
+</html>

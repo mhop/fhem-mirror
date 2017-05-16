@@ -1,0 +1,37 @@
+86_FS10.pm is for reading ELV (www.elv.de) weather Sensors, using a Hardware
+(Part No. 68-390-61) and communicates with pcwsd from Sven Geggus.
+
+Currently temperature, windspeed, rain and brightness sensors are supported.
+
+For use with FHEM you have to compile pcwsd like usual, it can be found here
+  http://geggus.net/sven/pcwsd/
+
+Start pcwsd deamon with
+  pcwsd -d /dev/ttyUSB4 -ld /var/log/fs10- -tlf %Y-%m-%d_%T
+
+A few minutes later you should see files with temperature values.
+
+For use with FHEM define
+
+define fs10 FS10 127.0.0.1 4711 which means pcwsd run on localhost, port 4711 
+
+If you only interested in viewing temperature values with a FHEM frontend like
+pgm3, 86_FS10.pm can be ommited.
+
+To display a user defined FS10 temperature graphic in pgm3 define
+
+########################
+#
+$sortnumber=7;
+$userdef[$sortnumber]['name']='IndoorTemp';	
+$userdef[$sortnumber]['valuefield']=2;	
+$userdef[$sortnumber]['gnuplottype']='temperature';	
+$userdef[$sortnumber]['logpath']='/var/log/fs10/idtemp_7.gnu';   
+$userdef[$sortnumber]['room']='indoor';
+$userdef[$sortnumber]['semlong']='Temp indor'; 	
+$userdef[$sortnumber]['semshort']='°';
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
+$userdef[$sortnumber]['maxcount']=575;
+$userdef[$sortnumber]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['logrotatelines']=2050;  

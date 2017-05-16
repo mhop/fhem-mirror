@@ -1,0 +1,463 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>FHEM Howto</title>
+  <link rel="stylesheet" type="text/css" href="../css/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+</head>
+
+
+<body>
+
+  <div id="logo"></div>
+  <div id="menu">
+    <h3>FHEM Howto</h3>
+    Version: <b>EN</b>&nbsp;<a href="HOWTO_DE.html">DE</a>
+    <br>
+    <br>
+    <table id="room">
+      <tr><td></td></tr>
+      <tr><td><b>Content:</b></td></tr>
+      <tr><td><a href="#Description">Description</a></td></tr>
+      <tr><td><a href="#starting">Starting</a></td></tr>
+      <tr><td><a href="#attaching">USB device</a></td></tr>
+      <tr><td><a href="#sensors">Sensors</a></td></tr>
+      <tr><td><a href="#actors">Actors</a></td></tr>
+      <tr><td><a href="#at">At / Notify</a></td></tr>
+      <tr><td><a href="#logging">Logging data</a></td></tr>
+      <tr><td><a href="#plotting">Plotting</a></td></tr>
+      <tr><td><a href="#security">Security</a></td></tr>
+      <tr><td><a href="#fhemweb">Look &amp; Feel</a></td></tr>
+      <tr><td><a href="#structure">Structures</a></td></tr>
+    </table>
+  </div>
+
+
+  <div id="right">
+
+    <a name="starting"></a>
+    <h3>Starting fhem</h3>
+      <ul>
+
+      Skip this section if you installed fhem via the Debian <a
+      href="http://fhem.de/fhem-=VERS=.deb">package</a>, the Fritz!Box 7390
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">image</a>, or the FB
+      7170/7270 <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">zip file</a>.
+      <br><br>
+
+      Many fhem installations access the "outer world" via a USB device
+      connected to the fhem computer (CUL, FHZ1x00, TUL, EUL, etc), these
+      installations most probably need the perl serial module. See the
+      commandref section of your USB device, if this module is needed. You can
+      avoid this module by using a device which connects via Ethernet, e.g. a
+      HMLAN or a CUNO.  <br><br>
+
+      If you need this module, you can install it e.g. with <code>"sudo cpan
+      Device::SerialPort"</code>. There are also precompiled debian packages
+      (libdevice-serialport-perl), and this module is already installed on OSX
+      10.6. If you cannot install it, you then take a look at the @directio
+      option in the commandref.html as a last resort.<br><br>
+
+      The default configuration will install fhem into /opt/fhem, edit the
+      Makefile to change this. You can also start fhem directly from where you
+      unpacked it, installation is optional.
+
+      To install & start fhem type:<pre>
+      make
+      cd /opt/fhem
+      perl fhem.pl fhem.cfg</pre>
+
+      After starting, the fhem logfile in the log directory should look like:<pre>
+      2012.10.27 17:14:28 1: Including fhem.cfg
+      2012.10.27 17:14:28 3: WEB: port 8083 opened
+      2012.10.27 17:14:28 3: WEBphone: port 8084 opened
+      2012.10.27 17:14:28 3: WEBtablet: port 8085 opened
+      2012.10.27 17:14:28 1: Including /tmp/fhem.save
+      2012.10.27 17:14:28 3: telnetPort: port 7072 opened
+      2012.10.27 17:14:28 1: usb create starting
+      2012.10.27 17:14:28 1: usb create end
+      2012.10.27 17:14:28 2: SecurityCheck:  ...
+      2012.10.27 17:14:28 0: Server started (version Fhem 5.3 ...</pre>
+
+      The SecurityCheck warning tells you, that some of the fhem interfaces are
+      opened without a passwort. You should either set a password for each
+      device (see below), or set a global attribute to disable this message if
+      you are sure passwords are not needed.
+
+      </ul>
+
+    <a name="attaching"></a>
+    <h3>Attaching the USB device to the PC (CUL / FHZ1x00PC / etc)</h3>
+      <ul>
+      Connect to fhem with an internet browser:
+      <a href="http://localhost:8083/fhem">http://fhem-host:8083/fhem</a>
+      if you are using a normal desktop,
+      <a href="http://localhost:8084/fhem">http://fhem-host:8084/fhem</a> if
+      you are using a smartphone, or
+      <a href="http://localhost:8084/fhem">http://fhem-host:8085/fhem</a> if
+      you are using a tablet like the iPad.<br><br>
+
+      <b>Note:</b> On the FritzBox the default configuration enables password
+      checking on all interfaces: The username is ignored, and the passwort is
+      checked against the FritzBox password.<br><br>
+
+      In the default configuration, fhem will look for USB attached FHZ, CUL,
+      COC, ZWave and TCM devices on startup (unix/OSX only) and will create
+      appropriate fhem devices. Make your life easier by attaching the device
+      before starting fhem.<br><br>
+
+      On linux (esp. FB7390) fhem will try to flash an unflashed CUL, if it is
+      attached at startup. See the <a href="commandref.html#usb">usb</a> and <a
+      href="commandref.html#CULflash">CULflash</a> commands for details, and
+      check the "unsorted" room in FHEMWEB for the newly created devices. Note
+      that switching a CUL to HomeMatic mode is still has to be done manually.
+      <br><br>
+
+      For defining USB Input devices manually (or if fhem failed to discover
+      your device): Attach the USB device (CUL, FHZ1000PC/FHZ1300, TUL, EUL,
+      etc) to your computer, and look for the corresponding device in the /dev
+      directory. For <a href="commandref.html#CUL">CUL</a> a file named
+      /dev/ttyACM* will be created under Linux and /dev/cu.usbmodem* under OS
+      X. Note the exact name of the device.  Define it for fhem (by typing it
+      in the "Fhem cmd" input field in the browser):<pre>
+
+      define CUL1 CUL /dev/ttyACM0@9600 1234</pre>
+
+      You can find details about CUL define parameters <a
+      href="commandref.html#CUL">here</a>.<br><br>
+
+      The same is to be done for the <a href="commandref.html#FHZ">FHZ</a> with
+      slightly different parameters:<pre>
+      define FHZ1 FHZ /dev/ttyUSB0</pre>
+      <b>Notes:</b>
+      <ul>
+        <li>Don't forget to type "save" in the "Fhem cmd" input field of the
+        browser after defining a device or setting its attribute.  Otherwise
+        the changes will disappear after the next start.
+        <li>Execute commands by typing enter in the FHEMWEB input line.
+        Clicking on the save button won't execute your command.
+        <li>The CUL is arriving without a firmware. You can flash it via the
+        <a href="commandref.html#CULflash">CULflash</a> command, if the
+        dfu-programmer is installed. dfu-programmer is part of the FB7390 image.
+      </ul>
+      </ul>
+
+    <a name="sensors"></a>
+    <h3>Configuring transmitter devices (i.e. sensors)</h3>
+      <ul>
+      Many Radio devices will be created automatically in the default
+      configuration, due to the enabled <a href="commandref.html#autocreate">
+      autocreate</a> instance. This will automatically create fhem devices upon
+      reception of a message from this device (typically a sensor like S300 or
+      FHT). Just wait for a while, watch the log and re-check your browser for newly
+      appeared devices. You can use <a href="commandref.html#rename">
+      rename</a> to rename the automatically created device, e.g. type in the
+      input field of the web frontend:
+      <br><br>
+      <ul><code>
+      rename FHT_1234 fht.kitchen</pre> 
+      </code></ul>
+      <br>
+      <b>Note</b>: if you rename the device itself, the attached FileLog and
+      weblink will be renamed automatically. The other way round (renaming the
+      FileLog or weblink) will not rename the associated devices
+      automatically.<br><br>
+
+      If you want to do the same manually:<br>
+      Wait a while, until the transmitter sent some data. In the logfile
+      (browser window: "Unsorted -> Logs / Fhemlog / text) a line
+      will  appear:
+      <ul><code>
+      FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code
+      &lt;CDE&gt;, please define it
+      </code></ul>
+
+      Now define the fhem device:
+      <ul><code>
+      define piri1 FS20 &lt;HOUSECODE&gt; &lt;BTN&gt;
+      </code></ul>
+
+      Set the model attribute of the device:
+      <ul><code>
+      attr piri1 model fs20piri
+      </code></ul>
+
+      to get only the commands available for this device.
+      <a href="commandref.html#model">Here</a> is a complete list of FS20
+      models.<br> For other device types similar messages should appear.<br><br>
+
+      HomeMatic sensors do not need to be paired with fhem, on the other side
+      fhem will only autocreate such a device, when it receives a pairing
+      request. You still need to "set CUL hmPairForSec 600" to respond
+      to this request. The same is valid vor ZWave devices.
+      </ul>
+
+    <a name="actors"></a>
+    <h3>Configuring receivers (actors)</h3>
+      <ul>
+      Configure the <a href="commandref.html#FS20">FS20</a> device in
+      fhem first with:<pre>
+      define lamp1 FS20 1234 56</pre>
+
+      Now press the button on the real device for a while until its LED starts to
+      blink. Click on the "on" link in the fhem window to send a command. The
+      LED should terminate blinking, the device is programmed to housecode
+      1234, device code 56. You can also use the 4-base ELV notation.
+      Now set the model attribute of the device:<pre>
+      attr lamp1 model fs20st</pre>
+
+      to get only the commands available for this device.<br><br>
+
+      Other systems (EnOcean/HomeMatic/ZWave) require a more elaborate
+      procedure, and the corresponding USB device is to be set into a pairing
+      mode first. See the commandref entry for your device.
+      <br><br>
+
+      Creating a fhem FHT / HomeMatic / EnOcean device automatically or
+      manually does not imply that the CUL or the FHZ is paired with it. 
+      <ul>
+      <li>FHT:<br>
+        Set the FHT to accept new devices (Prog:Cent:N/A), and send a command
+        to it (e.g.  set fht.kitchen desired-temp 20).  If there is no signal
+        for a while, then check <a href="faq.html#faq6"> this</a> FAQ entry.
+        </li>
+      <li>HomeMatic:<br>
+        first set the CUL/HMLAN into pairing mode with
+        <ul><code>
+        set CUL hmPairForSec 600
+        </code></ul>
+        and then push the learning button on the HomeMatic device. If pairing was
+        successful, you'll see "CommandAccepted: yes" in the details window of the
+        device.
+      </ul>
+    </ul>
+
+
+    <a name="at"></a>
+    <h3>Timed commands (at) / Notification (notify,watchdog)</h3>
+      <ul>
+      To execute commands at a given time / periodically, you have to define
+      devices of the type <b>at</b>. See the definition and the examples
+      <a href="commandref.html#at">here</a>.
+      <br><br>
+
+      To execute commands if a device sent a message you have to define
+      devices of the type <a href="commandref.html#notify">notify</a> or
+      <a href="commandref.html#watchdog">watchdog</a>. In order to understand
+      the fhem events better you should open a telnet session to your fhem
+      <br><br><ul><code>
+      telnet &lt;fhemhost&gt; 7072
+      </code></ul><br>
+
+      and type
+      <br><br><ul><code>
+      inform timer
+      </code></ul><br>
+
+      Now you will receive in this telnet session all events, e.g.
+      <br><br><ul><code>
+        2011-12-16 21:51:55 FS20 myPiri on-for-timer 120
+      </code></ul><br>
+      so you can define an action like:
+      <br><br><ul><code>
+        define lampNotify notify myPiri set myLamp on
+      </code></ul>
+      or
+      <ul><code>
+        define lampNotify notify myPiri:on.* set myLamp on
+      </code></ul><br>
+      To test your notify you can simulate events by using the 
+      <a href="commandref.html#trigger">trigger</a> command:
+      <br><br><ul><code>
+      trigger myPiri on-for-timer 120
+      </code></ul><br>
+
+      at, notify and watchdog take either simple fhem commands, shell scripts
+      or "perl oneliners" as argument. For details and tips on the perl
+      oneliners read the <a href="commandref.html#perl">Perl specials</a>
+      section in the commandref.html</ul>
+
+
+    <a name="logging"></a>
+    <h3>Logging data</h3>
+      <ul>
+      To log messages into files, define devices of the type <a
+      href="commandref.html#FileLog">FileLog</a>. Autocreate will create
+      logfiles for newly detected devices, or you can use <a
+      href="commandref.html#createlog">createlog</a> in order to add a FileLog
+      later.<br>
+
+      To log messages into a
+      database, see the contrib/dblog directory in the fhem
+      distribution.<br><br>
+
+      FHEMWEB has builtin support for displaying FileLog type logs as plots,
+      see the <a href="#plot">plot</a> section below.<br><br>
+
+      The size of each logfile will be determined by its wildcard characters
+      (year/month/week/day), look at the <a href="commandref.html#FileLog">
+      FileLog</a> definition.
+      You can enable archiving with the <a
+      href="commandref.html#nrarchive">nrarchive</a> or <a
+      href="commandref.html#archivedir">archivecmd</a> attributes.
+      </ul>
+
+    <a name="plotting"></a>
+    <h3>Plotting logs</h3>
+      <ul>
+      Autocreate will create weblinks (i.e. plots) for newly detected devices.
+      The following section describes how to do it manually, e.g. if you want
+      to plot data from different sensors together.<br><br>
+
+      The data for a plot always comes from a single FileLog, change its regexp
+      so that it will collect all events you want to plot.  As the next step
+      set the <a href="commandref.html#logtype">logtype</a> attribute of the
+      FileLog, this will define which .gplot files to use.
+      Take a look at the available gnuplot files in the "Edit files" section,
+      they contain the corresponding FileLog definition examples.<br>
+      Note that the .gplot files are also used if you use SVG output and
+      not the gnuplot backend!<br>
+      The gnuplot files must have #FileLog entries in order to be useable
+      with gnuplot-scroll or SVG (these lines are treated as comment by
+      gnuplot, but not by fhem!), as the filtering happens with the FileLog get
+      function, see the supplied gnuplot files or the column_spec paragraph <a
+      href="commandref.html#FileLogget">here</a> for the syntax.<br><br>
+
+
+      Examples:<pre>
+        attr em1000log logtype power8:Power,text
+        attr fs20_log logtype fs20:Plot,text
+        attr hms100th_log logtype temp4hum6:Plot,text
+      </pre>
+
+      Display the plot by clicking on it, and create a <a
+      href="commandref.html#weblink">weblink</a>, which has its own attributes
+      (room, etc).
+      If the weblink refers to the current logfile, then it will be stored as a
+      CURRENT weblink, and it will always display the most recent log (you do
+      not have to redefine it if the logfile changes due to year/month/date
+      parameters in its name).
+
+      <br><br>
+
+
+      The logs can be converted to a plot either with gnuplot (which must be
+      installed and in your PATH), or via the builtin SVG module, in this case
+      your browser must support SVG. All browsers support SVG, the notable
+      exception is Internet Explorer prior to version 9 and Android prior to
+      version 3.0. For such Android devices try Opera or Firefox.<br><br>
+
+      SVG mode is the default, to change it set the <a
+      href="commandref.html#plotmode">plotmode</a> attribute to gnuplot or
+      gnuplot-scroll.<br><br>
+
+      In order to look at historic data, create another weblink and set its
+      fixedrange attribute, e.g.:
+      <ul><code>
+        attr weblink_1 fixedrange 2006-01-01 2007-01-01
+      </code></ul>
+      <br>
+
+      To display "foreign" (non fhem) files as a plot or just as plain text,
+      configure a fake logfile with the correct filename and an unused regexp,
+      e.g.<br><pre>
+      define messages FileLog /var/log/messages fakelog</pre>
+      </ul>
+      </ul>
+
+
+
+    <a name="security"></a>
+    <h3>Security</h3>
+      <ul>
+      <li>Both default TCP/IP interfaces in fhem (telnet and FHEMWEB) can be
+          secured by a password and additionally with encryption (HTTPS/SSL):
+          <ul>
+            <li>for <a href="commandref.html#FHEMWEB">FHEMWEB</a> see the 
+                <a href="commandref.html#basicAuth">basicAuth</a> and 
+                <a href="commandref.html#HTTPS">HTTPS</a> attributes
+            <li>for <a href="commandref.html#telnet">telnet</a> (which is more
+                or less a TCP/IP port) see the 
+                <a href="commandref.html#password">password</a> and 
+                <a href="commandref.html#SSL">SSL</a> attributes
+          </ul>
+          This is however not the default for most default configurations, and
+          this is the reason why you receive a SecurityCheck warning after
+          installation.
+          <br><br></li>
+
+      <li>Another way of secure access from the outside is to use a VPN connection.
+          Connecting e.g. to a FritzBox by VPN works both for iOS and Android
+          devices, although the latter is more complicated to set up.
+          <br><br></li>
+
+      <li>You can secure FHEMWEB also by using apache to implement basicAuth /
+          HTTPS by redirect a certain prefix to your FHEMWEB instance.
+          Add the following lines to your httpd.conf:<pre>
+      &lt;Proxy *&gt;
+        AuthType Basic
+        AuthName "Password Required"
+        AuthUserFile /home/httpd/etc/passwd
+        Require valid-user
+        Allow from 127.0.0.1
+      &lt;/Proxy&gt;
+      ProxyPass        /fhem  http://localhost:8083/fhem
+      ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
+
+        and then restart httpd with apachectl graceful. To create the password
+        file, execute<br>
+        htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
+        <br>
+        See also <a href="http://fhemwiki.de/wiki/Apache_Authentication_Proxy">
+        this</a> fhemwiki entry for a more detailed description.
+        <br><br>
+
+        To enable HTTPS, please check the web. In essence:<br>
+        <ul>
+        <li>Edit httpd.conf, add:<pre>
+    LoadModule ssl_module lib/apache/mod_ssl.so
+    Include /etc/httpd/conf/ssl.conf</pre></li>
+        <li>Create a server certificate</li>
+        <li>Start httpd with the startssl option (SSL or the like must be set in
+        one of your system files, look at /etc/init.d/httpd).</li>
+        </ul>
+      </ul>
+
+    <a name="fhemweb"></a>
+    <h3>FHEMWEB (pgm2) look and feel</h3>
+      <ul>
+      It makes sense to group your devices into rooms by setting the room or
+      group attribute. FHEMWEB puts devices without a room attribute into the
+      "Unsorted" room. Devices in the room "hidden" will not be shown.
+      <br><br>
+
+      You can also define a stripped down FHEMWEB instance, by defining the
+      Menu entries to be hidden in the <a
+      href="commandref.html#hiddenroom">hiddenroom</a> FHEMWEB attribute.
+      <br><br>
+
+      Edit the colors / fonts by changing the style.css ("Edit files" ->
+      style.css), or create you own style (see <a
+      href="commandref.html#stylesheetPrefix">stylesheetPrefix</a> , so it
+      won't be overwritten by the next <a
+      href="commandref.html#updatefhem">updatefhem</a> command.
+      <br><br>
+      </ul>
+
+
+    <a name="structure"></a>
+    <h3>Complex structures</h3>
+      <ul>
+      Put your devices in different rooms. You can now use the
+      room=&lt;roomname&gt; specification to set different devices at once.
+      See the <a href="commandref.html#devspec">devspec</a> paragraph for details.<br>
+      For more complex scenarios consider the <a href="commandref.html#structure">
+      structure</a> module. You can define different structure levels like
+      floors, buildings, etc. and set all elements of a given structure at once.
+      </ul>
+
+  </div>
+</body>
+</html>

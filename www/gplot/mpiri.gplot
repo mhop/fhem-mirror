@@ -1,0 +1,31 @@
+############################
+# Display a piri log with multiple units logging into the same file.
+# Corresponding FileLog definition:
+# define pirilog FileLog /var/log/fhem/piri-%Y-%m-%d.log piri.*
+# The devices are called piri.sz, piri.flo, piri.flu, prir.wz1 and piri.wz2
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Piri"
+set y2label "Piri"
+set title '<TL>'
+set ytics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
+set y2tics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
+set yrange [-0.1:0.9]
+set y2range [-0.1:0.9]
+
+#FileLog "0.8":sz:0.8:
+#FileLog "0.6":flo:0.6:
+#FileLog "0.4":flu:0.4:
+#FileLog "0.2":wz1:0.2:
+#FileLog "0.0":wz2:0.0:
+
+plot\
+  "< awk '/sz/ {print $1, 0.8; }' <IN>" using 1:2 notitle with points,\
+  "< awk '/flo/{print $1, 0.6; }' <IN>" using 1:2 notitle with points,\
+  "< awk '/flu/{print $1, 0.4; }' <IN>" using 1:2 notitle with points,\
+  "< awk '/wz1/{print $1, 0.2; }' <IN>" using 1:2 notitle with points,\
+  "< awk '/wz2/{print $1, 0.0; }' <IN>" using 1:2 notitle with points

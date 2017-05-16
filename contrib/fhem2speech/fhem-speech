@@ -1,0 +1,1169 @@
+#!/usr/bin/perl
+################################################################
+#
+#  $Id: fhem-speech,v 1.1 2009-01-12 10:26:50 rudolfkoenig Exp $
+#
+#  Copyright notice
+#
+#  (c) 2008 Copyright: Martin Fischer (m_fischer at gmx dot de)
+#  All rights reserved
+#
+#  This script free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+################################################################
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config no_ignore_case);;
+use Cwd;
+use IO::Socket::INET;
+use IO::File;
+use Pod::Usage;
+use JSON::XS;
+
+use vars qw{$call};
+use vars qw{%dev};
+use vars qw(%lang);
+use vars qw{%sys};
+use vars qw($VERSION);
+use vars qw($VERSION);
+
+##################################################
+# Variables
+
+###########################
+# FHEM
+$sys{fhem}{host}         = "192.168.1.100";
+$sys{fhem}{port}         = "7072";
+
+###########################
+# Mandatory external Files
+$sys{file}{mbrola}       = "/usr/local/bin/mbrola";
+$sys{file}{pipefilt}     = "/usr/local/bin/pipefilt";
+$sys{file}{play}         = "/usr/bin/play";
+$sys{file}{preproc}      = "/usr/local/bin/preproc";
+$sys{file}{preprocRules} = "/usr/share/mbrola/Rules.lst";
+$sys{file}{preprocShort} = "/usr/share/mbrola/Hadifix.abk";
+$sys{file}{sox}          = "/usr/bin/sox";
+$sys{file}{recode}       = "/usr/bin/recode";
+$sys{file}{txt2pho}      = "/usr/local/bin/txt2pho";
+$sys{file}{voiceFemale}  = "/usr/share/mbrola/de3/de3";
+$sys{file}{voiceMale}    = "/usr/share/mbrola/de2/de2";
+
+###########################
+# mbrola / txt2pho options
+$sys{speech}{sex}    = "f";
+$sys{speech}{male}   = "-f0.8 -t0.9 -l 15000";
+$sys{speech}{female} = "-f1.2 -t1.0 -l 22050";
+$sys{speech}{wav}    = "-t au - -r 8000 -c1";
+$sys{speech}{gsm}    = "-t au - -r 8000 -c1";
+
+###########################
+# FHEM Translation
+
+###########################
+# misc / default
+$lang{'comment'} = "Status %s";
+$lang{'room'} = "Raum %s";
+$lang{'battery'} = "Batterie %s";
+$lang{'state'} = "%s";
+$lang{'on'} = "an";
+$lang{'off'} = "aus";
+$lang{'yes'} = "ja";
+$lang{'no'} = "nein";
+$lang{'comma'} = "Komma";
+$lang{'error'} = "Status unbekannt";
+$lang{'zirkumflex'} = "Zirkumflex";
+$lang{'underline'} = "Unterstrich";
+$lang{'apostrophe'} = "Hochkomma";
+$lang{'degree'} = "Grad";
+$lang{'minus'} = "Minus";
+$lang{'plus'} = "Plus";
+$lang{'squareopen'} = "eckige Klammer auf";
+$lang{'squareclose'} = "eckige Klammer zu";
+$lang{'backtick'} = "Rueckwaerts geneigtes Hochkomma";
+$lang{'singlequote'} = "einfaches Anfuehrungszeichen";
+$lang{'quote'} = "Anfuehrungszeichen oben";
+$lang{'backslash'} = "umgekehrter Schraegstrich";
+$lang{'squaremm'} = "Quadratmilimeter";
+$lang{'squarecm'} = "Quadratzentimeter";
+$lang{'squarem'} = "Quadratmeter";
+$lang{'cubicmm'} = "Kubikmilimeter";
+$lang{'cubiccm'} = "Kubikzentimeter";
+$lang{'cubicm'} = "Kubikmeter";
+
+###########################
+# FHT
+# keys:
+$lang{'actuator'} = "Ventilstellung %s Prozent";
+$lang{'day-temp'} = "Temperatur Tag %s Grad";
+$lang{'desired-temp'} = "Angeforderte Temperatur %s Grad";
+$lang{'measured-temp'} = "Gemessene Temperatur %s Grad";
+$lang{'mode'} = "Modus %s";
+$lang{'night-temp'} = "Temperatur Nacht %s Grad";
+$lang{'windowopen-temp'} = "Temperatur Fenster offen %s Grad";
+# values:
+$lang{'auto'} = "Automatik";
+$lang{'holiday'} = "Urlaub";
+$lang{'holiday_short'} = "Kurzurlaub";
+$lang{'manual'} = "Manuell";
+###########################
+# KS300/KS555
+# keys:
+$lang{'humidity'} = "Luftfeuchtigkeit %s Prozent";
+$lang{'israining'} = "Niederschlag %s";
+$lang{'temperature'} = "Aussentemperatur %s Grad";
+$lang{'wind'} = "Windgeschwindigkeit %s km/h";
+###########################
+# HMS
+# keys:
+$lang{'smoke_detect'} = "Alarm %s"; 
+
+# End of Variables
+##################################################
+
+##################################################
+# Forward declaration
+sub sayFHEM;
+sub queryFHEM($);
+sub parseFHEM($$);
+sub translateKey;
+sub translateValue($$);
+sub text2speech($);
+sub isNumber;
+sub isInteger;
+sub isFloat;
+sub usage;
+sub usageShort;
+sub version;
+
+main();
+exit;
+
+##################################################
+# Main
+sub main {
+  $call = _call(); 
+    _debug($call,"called") if(grep(/debug/, @ARGV));
+  my $result;
+  # disable buffering
+  $|=1;
+
+  ###########################
+  # Variables
+  $VERSION = sprintf("%d.%02d", q$Revision: 1.1 $ =~ /(\d+)\.(\d+)/);
+  my $requiredOptions = "dft";
+
+  ###########################
+  # do some checks
+  # check for required files
+  foreach my $exec (sort keys %{$sys{file}}) {
+    _missing_file($sys{file}{$exec}) unless(-r $sys{file}{$exec});
+      _debug($call,"check file: '".$sys{file}{$exec}."'") if(grep(/debug/, @ARGV));
+  }
+  # check options
+  _missing_argv($requiredOptions) if(int(@ARGV) == 0);
+
+  ###########################
+  # get options
+  my $args = {
+    asterisk => 0,    # default false
+    cache    => "",   # default undef
+    debug    => 0,    # default false
+    device   => "",   # default undef
+    file     => "",   # default undef
+    force    => 0,    # default false
+    host     => "",   # default undef
+    out      => "",   # default undef
+    port     => "",   # default undef
+    prefix   => "",   # default undef
+    quiet    => 0,    # default false
+    set      => "",   # default undef
+    sex      => "",   # default undef
+    text     => "",   # default undef
+  };
+
+  eval {
+    local $SIG{__WARN__} = sub {};
+    GetOptions(
+      "asterisk|a" => \$args->{asterisk},
+      "cache|c=s"  => \$args->{cache},
+      "debug"      => \$args->{debug},
+      "device|d=s" => \$args->{device},
+      "file|f=s"   => \$args->{file},
+      "force"      => \$args->{force},
+      "host|h=s"   => \$args->{host},
+      "out|o=s"    => \$args->{out},
+      "port|p=i"   => \$args->{port},
+      "prefix=s"   => \$args->{prefix},
+      "quiet|q"    => \$args->{quiet},
+      "set=s"      => \$args->{set},
+      "sex|S=s"    => \$args->{sex},
+      "text|t=s"   => \$args->{text},
+      "H|?"        => sub { pod2usage( -exitval => 0, -verbose => 0); },
+      "help"       => sub { pod2usage( -exitval => 0, -verbose => 0); },
+      "man"        => sub { pod2usage( -exitval => 0, -verbose => 2); },
+      "version|V"  => sub { version(0) }
+    );
+  } or pod2usage();
+
+  # set global options
+  $sys{asterisk} = $args->{asterisk} if($args->{asterisk});
+  $sys{debug} = $args->{debug} if($args->{debug});
+  $sys{force} = $args->{force} if($args->{force});
+  $sys{prefix} = $args->{prefix} if($args->{prefix});
+  $sys{quiet} = $args->{quiet} if($args->{quiet});
+  $sys{speech}{sex} = $args->{sex} if($args->{sex});
+  $sys{speech}{cache} = $args->{cache} if($args->{cache});
+  $sys{speech}{out} = $args->{out} if($args->{out});
+  # check for dependent options
+  _wrong_set("-d or -f or -t") if($args->{device} && ($args->{file} || $args->{text}));
+  _wrong_set("-d or -f or -t") if($args->{device} && ($args->{file} && $args->{text}));
+  _wrong_set("-f [-acoqS]") if($args->{file} && ($args->{host} || $args->{port}));
+  _wrong_set("-f [-acoqS]") if($args->{file} && ($args->{host} && $args->{port}));
+  _wrong_set("-t [-acoqS]") if($args->{text} && ($args->{host} || $args->{port}));
+  _wrong_set("-t [-acoqS]") if($args->{text} && ($args->{host} && $args->{port}));
+  _wrong_set("-d <devspec> --set <state> [-hp]") if(
+                                    $args->{set} && ($args->{astersik} || $args->{cache} ||
+                                    $args->{file} || $args->{text} || $args->{force} ||
+                                    $args->{out} || $args->{prefix} || $args->{quiet} ||
+                                    $args->{sex})
+                                  );
+  _wrong_set("[-d|-f|-t] argument [-acopqS]") if($args->{asterisk} && ($args->{host} || $args->{port}));
+  # check for dependent options
+  _missing_required("-d") if(!$args->{device} && ($args->{host} || $args->{port}));
+  _missing_required("-d") if(!$args->{device} && ($args->{host} && $args->{port}));
+  _missing_required("-o") if(!$args->{out} && $args->{cache});
+  _missing_required("-c") if(!$args->{cache} && ($args->{prefix} || $args->{force}));
+  _missing_required("-c") if(!$args->{cache} && ($args->{prefix} && $args->{force}));
+  _missing_required("-c") if(!$args->{cache} && $args->{asterisk});
+
+  # listen to text
+  if($args->{text}) {
+    $sys{speech}{text} = $args->{text} if($args->{text});
+      _debug($call,"ARGV: \$sys{speech}{text}: '".$sys{speech}{text}."'") if($sys{debug});
+    $result = sayTEXT(); 
+  }
+
+  # listen to file
+  if($args->{file}) {
+    $sys{speech}{file} = $args->{file} if($args->{file});
+      _debug($call,"ARGV: \$sys{speech}{file}: '".$sys{speech}{file}."'") if($sys{debug} && $args->{file}); 
+    $result = sayFILE(); 
+  }
+
+  # let FHEM talk :-)
+  if($args->{device}) {
+      _debug($call,"ARGV is 'fhem'") if($sys{debug}); 
+    $sys{fhem}{device} = $args->{device};
+      _debug($call,"ARGV: \$sys{fhem}{device}: '".$sys{fhem}{device}."'") if($sys{debug}); 
+    $sys{fhem}{set} = $args->{set} if($args->{set});
+      _debug($call,"ARGV: \$sys{fhem}{set}: '".$sys{fhem}{set}."'") if($sys{debug}); 
+    $sys{fhem}{host} = $args->{host} if($args->{host});
+      _debug($call,"ARGV: \$sys{fhem}{host}: '".$sys{fhem}{host}."'") if($sys{debug}); 
+    $sys{fhem}{port} = $args->{port} if($args->{port});
+      _debug($call,"ARGV: \$sys{fhem}{port}: '".$sys{fhem}{port}."'") if($sys{debug}); 
+    
+    $result = sayFHEM() if(!$sys{fhem}{set});
+    $result = setFHEM() if($sys{fhem}{set});
+  }
+  return 0;
+}
+
+
+##################################################
+# Text
+
+###########################
+sub sayTEXT {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my $result;
+  my $say;
+
+  $say = $sys{speech}{text} if($sys{speech}{text});
+  $result = text2speech($say) if($say);
+}
+
+##################################################
+# File
+
+###########################
+sub sayFILE {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  STDOUT->autoflush(1);
+  my $content = "";
+  my $file = $sys{speech}{file};
+  my $result;
+
+  _file_error($file) if(!-e $file || -B $file);
+
+  my $fh = new IO::File($file, "r") or _file_error($file);
+    _debug($call,"read : '".$file."'") if($sys{debug});
+  while (my $line = $fh->getline()) {
+    $content = $content.$line;
+  }
+  $fh->close();
+
+  $result=text2speech($content);
+ 
+}
+
+##################################################
+# FHEM
+
+###########################
+sub setFHEM {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my $fhemCmd = "set ".$sys{fhem}{device}." ".$sys{fhem}{set};
+  my $result;
+
+  ###########################
+  # query FHEM and start working
+  $result = queryFHEM($fhemCmd);
+  chomp $result if($result);
+    _debug($call,"\$result: '".$result."'") if($sys{debug} && $result);
+  _fhem_error($result) if($result && $result =~ /No.*set/);
+}
+
+###########################
+sub sayFHEM {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my $fhemCmd = "jsonlist ".$sys{fhem}{device};
+  my $result;
+  my $fhemRaw;
+  my $say;  
+
+  ###########################
+  # query FHEM and start working
+  $result = queryFHEM($fhemCmd);
+  chomp $result;
+    _debug($call,"\$result: '".$result."'") if($sys{debug});
+  _fhem_error($result) if(!$result || $result =~ /No.*device/);
+
+  $fhemRaw = decode_json $result;
+  %dev = %{$fhemRaw->{ResultSet}->{Results}};
+
+  parseFHEM("room",$dev{ATTRIBUTES}{room}) if($dev{ATTRIBUTES}{room});
+  parseFHEM("comment",$dev{ATTRIBUTES}{comment}) if($dev{ATTRIBUTES}{comment});
+
+  while (my ($key,$value) = each %dev) {
+      _debug($call,"\$key: '".$key."'") if($sys{debug});
+    if($key eq "ATTRIBUTES" || $key eq "READINGS") {
+      while (my ($subKey,$subValue) = each %{$dev{$key}}) {
+        if($subKey ne "comment" && $subKey ne "room") {
+            _debug($call,"\$subKey: '".$subKey."'") if($sys{debug});
+          $say = parseFHEM($subKey,$subValue) if($key eq "ATTRIBUTES");
+          $say = parseFHEM($subKey,$subValue->{VAL}) if($key eq "READINGS");
+        }
+      }
+    } else {
+      $say = parseFHEM($key,$value);
+    }
+  }
+}
+  
+###########################
+sub queryFHEM($) {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my $host = $sys{fhem}{host} . ":" . $sys{fhem}{port};
+  my $cmd = shift;
+  my $result;
+  my $buf = "";
+
+  my $server = IO::Socket::INET->new(PeerAddr => $host);
+    _debug($call, "\$host: '".$sys{fhem}{host}.":".$sys{fhem}{port}."'") if($sys{debug});
+  die "Can't connect to server " . $sys{fhem}{host} . " port " . $sys{fhem}{port} . "\n" if(!$server);
+  syswrite($server, "$cmd;quit\n");
+    _debug($call, "\$cmd: '".$cmd."'") if($sys{debug});
+  while(sysread($server, $buf, 256) > 0) {
+    $result .= $buf;
+  }
+  close($server);
+  return $result;
+}
+
+###########################
+sub parseFHEM($$) {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my ($key,$value) = @_;
+  my $translatedKey;
+  my $translatedValue;
+  my @say;
+  my $result;
+
+  $result = translateKey($key);
+    _debug($call,"\$key: '".$key."' \$result = '<null>'") if($sys{debug} && !$result);
+
+  if($result) {
+    $translatedKey = $result;
+      _debug($call,"\$key: '".$key."' \$translatedKey: '".$translatedKey."'") if($sys{debug});
+
+    if($result ne "\%s") {
+      @say = split("\%s",$translatedKey);
+      text2speech($say[0]);
+      translateValue($key,$value);
+      text2speech($say[1]) if($say[1] && $say[1] ne ":");
+    } else {
+      translateValue($key,$value);
+    }
+  }
+}
+
+###########################
+sub translateKey {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+
+  return $lang{$_[0]} if(exists $lang{$_[0]});
+}
+
+###########################
+sub translateValue($$) {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  my ($key,$value) = @_;
+    _debug($call,"\$key: '".$key."' \$value: '".$value."'") if($sys{debug});
+  my $return;
+
+  $value = removeUnits($value);
+
+  # FS20
+  if($key eq "state" || $key eq "smoke_detect") {
+      _debug($call,"\$key: '".$key."' is on/off") if($sys{debug});
+    $value = $lang{'off'} if($value eq "off");
+    $value = $lang{'on'} if($value eq "on");
+  }
+  # KS300/KS555
+  if($key eq "israining") {
+      _debug($call,"\$value: '".$value."'") if($sys{debug});
+    $value = $lang{'no'} if($value eq "no (yes/no)");
+    $value = $lang{'yes'} if($value eq "yes (yes/no)");
+      _debug($call,"\$value converted to: '".$value."'") if($sys{debug});
+  }
+
+  if($value =~ m/^-/) {
+    text2speech($lang{'minus'});
+    $value = substr($value,1);
+  }
+  if(isInteger($value)) {
+    text2speech(decodeChar($value));
+  } elsif(isFloat($value)) {
+    my ($strLeft,$strRight) = split("\\.",$value);
+      _debug($call,"\$strLeft: '".$strLeft."' \$strRight '".$strRight."'") if($sys{debug});
+    text2speech(decodeChar($strLeft));
+    if($strRight !~ m/0+/) {
+      text2speech($lang{'comma'});
+      text2speech(decodeChar($strRight));
+    }
+  } else {
+    text2speech(decodeChar($value));
+  }
+
+}
+
+##################################################
+# mbrola
+
+###########################
+sub text2speech($) {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+
+  my $str = shift;
+  my $cmd;
+  my $voice;
+  my $options;
+  my $out;
+  my $result;
+
+  # define voice
+  if($sys{speech}{sex} eq "f") {
+    $voice = $sys{file}{voiceFemale};
+    $options = $sys{speech}{female};
+  }
+  if($sys{speech}{sex} eq "m") {
+    $voice = $sys{file}{voiceMale};
+    $options = $sys{speech}{male};
+  }
+  
+  # define extern commands
+  my $recode   = $sys{file}{recode} . " " . "UTF-8..lat1";
+  my $pipefilt = $sys{file}{pipefilt};
+  my $preproc  = $sys{file}{preproc} . " " . $sys{file}{preprocRules} . " " . $sys{file}{preprocShort};
+  my $txt2pho  = $sys{file}{txt2pho} . " -" . $sys{speech}{sex};
+  my $mbrola   = $sys{file}{mbrola} . " $options " . $voice . " - -.au";
+  my $sox      = $sys{file}{sox};
+
+  # set current dir for output if no directory defined
+  $sys{speech}{cache} = cwd() if(!$sys{speech}{cache} && $sys{speech}{out});
+
+  # sox options
+  if(defined($sys{speech}{out})) {
+    if($sys{speech}{out} eq "wav") {
+      # options for wav
+      $sys{speech}{soxOptions} = $sys{speech}{wav};
+    } elsif($sys{speech}{out} eq "gsm") {
+      # options for gsm
+      $sys{speech}{soxOptions} = $sys{speech}{gsm};
+#    } elsif($sys{speech}{out} eq "mp3") {
+#      # options for mp3
+#      $sys{speech}{soxOptions} = $sys{speech}{mp3};
+    } else {
+      _sox_format_error($sys{speech}{out});
+    }
+  }
+ 
+  # remove blanks
+    _debug($call,"remove bad chars") if($sys{debug});
+
+  # remove unwanted chars
+  $str = decodeChar($str);
+  
+  print $str . "\n" if(!$sys{quiet} && !$sys{asterisk});
+
+  # remove trailing slash
+  $sys{speech}{cache} =~ s/\/+$// if($sys{speech}{out});
+
+    _debug($call,"\$str: '".substr($str,0,40)."'") if($sys{debug});
+    _debug($call,"\$sys{speech}{sex}: '".$sys{speech}{sex}."'") if($sys{debug});
+
+  # build command string
+  $cmd  = "(echo \"$str\" | ";
+  # pipefilt | preproc | txt2pho | mbrola |
+  $cmd .= $recode . " | " . $pipefilt . " | " . $preproc . " | " . $txt2pho . " | " . $mbrola . " | ";
+
+  # append command string for play only
+  if(!$sys{speech}{out}) {
+    $cmd .= $sys{file}{play} . " -q -t au -)";
+    # let's get ready to rumble
+    $result = systemCmd($cmd);
+  }
+
+  # append command string for destination file
+  if($sys{speech}{out}) {
+    $out = substr($str,0,32);
+    $out =~ s/[^a-zA-Z0-9]/_/gi;
+    $out = $sys{prefix}.$out if($sys{prefix});
+      _debug($call,"\$sys{speech}{out}: '".$sys{speech}{out}."'") if($sys{debug});
+      _debug($call,"\$sys{speech}{cache}: '".$sys{speech}{cache}."' \$out: '".$out."'") if($sys{debug});
+    # sox
+    $cmd .= $sox . " " . $sys{speech}{soxOptions} . " " . $sys{speech}{cache} . "/" . $out . ".wav";
+    # extend cmd for gsm
+    if($sys{speech}{out} eq "gsm") {
+      $cmd .= "; ";
+      # sox imput from wav
+      $cmd .= $sox . " " . $sys{speech}{cache} . "/" . $out . ".wav" . " ";
+      # sox output to gsm
+      $cmd .= $sys{speech}{cache} . "/" . $out . "." . $sys{speech}{out} . "; ";
+      # remove temporary wav file
+      $cmd .= "rm " . $sys{speech}{cache} . "/" . $out . ".wav" . "; ";
+    }
+    # close cmd
+    $cmd .= ")";
+    # let's get ready to rumble
+    if($sys{force} || !-r $sys{speech}{cache} . "/" . $out . "." . $sys{speech}{out}) {
+      $result = systemCmd($cmd);
+    }
+    # print string for asterisk
+    if($sys{asterisk}) {
+      print "EXEC BACKGROUND ". $sys{speech}{cache} . "/" . $out . " \"\"\n";
+      $result = <STDIN>;
+    }
+    # play the result
+    if(!$sys{quiet}) {
+      $cmd  = $sys{file}{play} . " -q -t " . $sys{speech}{out} . " ";
+      $cmd .= $sys{speech}{cache} . "/" . $out . "." . $sys{speech}{out};
+      $result = systemCmd($cmd);
+    }
+  }
+}
+
+##################################################
+# misc
+
+#####################################
+sub version {
+  print <<EOT;
+\e[1mfhem-speech $VERSION\e[0m
+Copyright (C) 2008 Martin Fischer <m_fischer\@gmx.de>
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Martin Fischer
+EOT
+  exit($_[0]);
+}
+
+##################################################
+# helper
+
+#####################################
+sub systemCmd {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+    _debug($call,"system: '" . $_[0] . "'") if($sys{debug});
+  return system($_[0]) == 0 || die "failed: $?";
+}
+
+#####################################
+sub removeUnits {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+
+  $_[0] =~ s/\s\(Celsius\)//gi;
+  $_[0] =~ s/\s\(%\)//gi;
+  $_[0] =~ s/\s\(km\/h\)//gi;
+  $_[0] =~ s/%//gi;
+
+  return $_[0];
+}
+
+#####################################
+sub decodeChar {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+
+  $_[0] =~ s/^[\s\t]+//gi;
+  $_[0] =~ s/[\s\t]$//gi;
+  $_[0] =~ s/\^/ $lang{zirkumflex} /gi;
+  $_[0] =~ s/_/ $lang{underline} /gi;
+  $_[0] =~ s/'/ $lang{apostrophe} /gi;
+  $_[0] =~ s/°/ $lang{degree} /gi;
+  $_[0] =~ s/-/ $lang{minus} /gi;
+  $_[0] =~ s/\+/ $lang{plus} /gi;
+  $_[0] =~ s/\[/ $lang{squareopen} /gi;
+  $_[0] =~ s/\]/ $lang{squareclose} /gi;
+  $_[0] =~ s/`/ $lang{backtick} /gi;
+  $_[0] =~ s/\'/ $lang{singlequote} /gi;
+  $_[0] =~ s/"/ $lang{quote} /gi;
+  $_[0] =~ s/\\/ $lang{backslash} /gi;
+  $_[0] =~ s/mm²/$lang{squaremm} /gi;
+  $_[0] =~ s/cm²/$lang{squarecm} /gi;
+  $_[0] =~ s/m²/$lang{squarem} /gi;
+  $_[0] =~ s/mm³/$lang{cubicmm} /gi;
+  $_[0] =~ s/cm³/$lang{cubiccm} /gi;
+  $_[0] =~ s/m³/$lang{cubicm} /gi;
+  $_[0] =~ s/[\s\t]+/ /gi;
+  $_[0] =~ s/[[:cntrl:]]+//gi;
+  # convert to lowercase
+  $_[0] = lc($_[0]);;
+
+  return $_[0];
+}
+
+#####################################
+sub isNumber {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] =~ /^\d+$/
+}
+
+#####################################
+sub isInteger {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] =~ /^[+-]?\d+$/
+}
+
+#####################################
+sub isFloat {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] =~ /^[+-]?\d+\.?\d*$/
+}
+
+###########################
+sub _debug {
+  printf("\e[33m== debug:\e[37m \e[32m[%s]\e[37m \e[1m%s\e[0m\n",$_[0],$_[1]);
+}
+
+###########################
+sub _call {
+  (caller(1))[3];
+}
+
+#####################################
+sub _missing_file {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  warn "fhem-speech: Mandatory file `".$_[0]."` does not exist, or is not readable!\n";
+  warn "fhem-speech has been stopped. please fix this problem...\n";
+  exit(1);
+}
+
+#####################################
+sub _missing_argv {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  warn "fhem-speech: You must specify one of the `-".$_[0]."` options.\n";
+  warn "Try `fhem-speech --help` for more information.\n";
+  exit(1);
+}
+
+#####################################
+sub _wrong_set {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  warn "fhem-speech: Wrong combination! Usage: `".$_[0]."` for options!\n";
+  warn "Try `fhem-speech --help` for more information.\n";
+  exit(1);
+}
+
+#####################################
+sub _missing_required {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  warn "fhem-speech: Missing required option `".$_[0]."`!\n";
+  warn "Try `fhem-speech --help` for more information.\n";
+  exit(1);
+}
+
+#####################################
+sub _fhem_error {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] = $lang{'error'} if(!$_[0]);
+  chomp $_[0];
+  warn "fhem-speech: FHEM result: `".$_[0]."`\n";
+  #text2speech($_[0]);
+  exit(1);
+}
+
+#####################################
+sub _file_error {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] = $lang{'error'} if(!$_[0]);
+  warn "fhem-speech: File `".$_[0]."` is binary. This filetype is not supported!\n";
+  exit(1);
+}
+
+#####################################
+sub _sox_format_error {
+  $call = _call(); 
+    _debug($call,"called") if($sys{debug});
+  $_[0] = $lang{'error'} if(!$_[0]);
+  warn "fhem-speech: format `".$_[0]."` not supported!\n";
+  exit(1);
+}
+
+
+##################################################
+__END__
+
+=head1 NAME
+
+fhem-speech - Synthesized voice (based on MBROLA) extension for FHEM
+
+=head1 SYNOPSIS
+
+B<fhem-speech> B<-d> device [B<-achopqS>]
+
+B<fhem-speech> B<-d> device B<--set> state [B<-hp>]
+
+B<fhem-speech> B<-f> file [B<-acoqS>]
+
+B<fhem-speech> B<-t> "text" [B<-acoqS>]
+
+B<fhem-speech> [B<-HmV?>]
+
+Try `B<fhem-speech> B<--man>` for full manual!
+
+=head1 DESCRIPTION
+
+=head2 fhem-speech
+
+fhem-speech read the status of a FHEM device and talk using the MBROLA
+speech synthesizer. Furthermore it can read the content of a given file
+or text.
+
+=head2 FHEM
+
+FHEM is used to automate some common tasks in the household like switching
+lamps/shutters/heating/etc. and to log events like temperature/humidity/power
+consumption. Visit the FHEM's homepage L<http://www.koeniglich.de/fhem/fhem.html>
+for more information.
+
+=head2 The MBROLA project
+
+Central to the MBROLA project is MBROLA, a speech synthesizer based on the
+concatenation of diphones. It takes a list of phonemes as input, together
+with prosodic information, and produces speech samples on 16 bits (linear),
+at the sampling frequency of the diphone database used. This synthesizer
+is provided for free, for non commercial, non military applications
+only. Visit the MBROLA's homepage L<http://tcts.fpms.ac.be/synthesis/> for
+more information.
+
+=head2 Asterisk
+
+Optionally fhem-speech supports AGI commands to communicate with Asterisk.
+Visit the Asterisk(R) homepage L<http://www.asterisk.org/> for more information.
+
+=head1 OPTIONS
+
+Mandatory arguments to long options are mandatory for short options too.
+Ordering Options:
+
+=over
+
+=item B<-d>, B<--device> F<device>
+
+Run in FHEM mode. Specifies the FHEM device to be queried. The given device
+must be defined.
+
+=item B<-f>, B<--file> F<file-name>
+
+Run in file mode. fhem-speech will read the given file.
+
+=item B<-t>, B<--text> F<"TEXT">
+
+Run in Speaker's mode. fhem-speech will read the given "TEXT".
+
+=back
+
+Other options:
+
+=over
+
+=item B<-a>, B<--asterisk>
+
+Run in Asterisk mode. fhem-speech print out AGI-commands for direct usage in Asterisk.
+
+=item B<-c>, B<--cache> F<directory>
+
+Specifies the location of where the files should be saved if fhem-speech
+started with the -o or --out argument.
+
+Default location: current directory.
+
+=item B<--force>
+
+Overwrites existing files.
+
+=item B<-h>, B<--host> F<host>
+
+Specifies the hostaddress for FHEM.
+
+Default address: "localhost".
+
+=item B<-o>, B<--out> [F<gsm>|F<wav>]
+
+fhem-speech saves the output to a file with the specified output format.
+
+Default address: "localhost".
+
+=item B<-p>, B<--port> F<port>
+
+Communicate with FHEM on defined port.
+
+Default port: "7072".
+
+=item B<--prefix> F<prefix>
+
+Set the given prefix in front of filename.
+
+=item B<-q>, B<--quiet>
+
+Run in quiet mode.
+
+=item B<--set> F<state>
+
+Send <state> to device.
+
+=item B<-S>, B<--sex> [F<f>|F<m>]
+
+Specifies the sex for the voice. It depends on which voices for MBROLA
+have been installed.
+
+Default: "de3" for the German female voice and "de2" for the German
+male voice.
+
+=item B<-m>, B<--man>
+
+Show the manual page and exits.
+
+=item B<-H>, B<--help>
+
+Show a brief help message and exits.
+
+=item B<-V>, B<--version>
+
+Show fhem-speech's version number and exit.
+
+=back
+
+=head1 EXAMPLES
+
+Get status information for device <EG.wz.HZ> in quiet mode:
+
+  `fhem-speech -d EG.wz.HZ -q`
+
+Same as above with a male voice. FHEM runs on IP 192.168.1.100:
+
+  `fhem-speech -d EG.wz.HZ -S m -h 192.168.1.100`
+
+Get status information for device <EG.wz.HZ> in Asterisk mode:
+
+  `fhem-speech -d EG.wz.HZ -a -q -o gsm -c /var/lib/asterisk/sounds/fhem/`
+
+Read the file <foobar>:
+
+  `fhem-speech -f foobar`
+
+Read the given text "Geht nicht gibt's nicht.":
+
+  `fhem-speech -t "Geht nicht gibt's nicht."`
+
+Set the state for device <EG.wz.SD.01>:
+
+  `fhem-speech -d EG.wz.SD.01 --set on`
+
+=head1 INSTALLATION
+
+=head2 Requirements
+
+=head3 MBROLA
+
+You need MBROLA synthesizer, a synthesis voice, txt2pho and sox. For more
+information visit:
+
+o MBROLA project, L<http://tcts.fpms.ac.be/synthesis/>
+
+o hadifix, L<http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/>
+
+=head3 FHEM
+
+For FHEM mode you need FHEM 4.5+ and the command extension "jsonlist". For
+more information take a look at:
+
+<fhem_src_path>/F<contrib/JsonList/README.JsonList>
+
+or visit the FHEM's homepage:
+
+L<http://www.koeniglich.de/fhem/fhem.html>
+
+=head3 JSON::XS
+
+The required command extension "jsonlist" send the result as a JSON encoded
+string. fhem-speech need the Perl module JSON::XS to decode the information.
+
+There are several ways to install the module:
+
+You can download the last version at:
+
+L<http://search.cpan.org/~mlehmann/JSON-XS-2.231/XS.pm> 
+
+Or you can use the package from the L<contrib>-folder which was delivered
+with fhem-speech.
+
+You can use the L<cpan> command on bash-prompt.
+
+=head2 Installation
+
+This describes the installation on ubuntu:
+
+Make a temporarily directory for the needed files and change to the new
+directory, e.g.:
+
+  `mkdir /usr/local/src/mbrola; cd !$`
+
+Download the required files:
+
+  `wget http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/txt2pho.zip`
+  `wget http://tcts.fpms.ac.be/synthesis/mbrola/bin/pclinux/mbrola3.0.1h_i386.deb`
+
+Download at least one synthesis voice (e.g. German female voice):
+
+  `wget http://tcts.fpms.ac.be/synthesis/mbrola/dba/de3/de3.zip`
+
+=head2 txt2pho
+
+Install txt2pho:
+
+  `unzip txt2pho.zip -d /usr/share/`
+  `chmod 755 /usr/share/txt2pho/txt2pho`
+
+Edit txt2phorc:
+
+  `vi /usr/share/txt2pho/txt2phorc`
+
+and change the path for DATAPATH and INVPATH:
+
+  DATAPATH=/usr/share/txt2pho/data/
+  INVPATH=/usr/share/txt2pho/data/
+
+Copy txt2phorc to /etc/txt2pho:
+
+  `cp /usr/share/txt2pho/txt2phorc /etc/txt2pho`
+
+=head2 Synthesis Voice
+
+Install the synthesis voice (e.g. German female voice):
+
+  `unzip de7.zip -d /usr/share/mbrola/de7`
+
+fhem-speech use "de2" and "de3" as default voices. You can change this
+if you like.
+
+=head2 MBROLA
+
+Install MBROLA:
+
+  `dpkg -i mbrola3.0.1h_i386.deb`
+
+=head2 sox
+
+Install sox:
+
+  `apt-get install sox libsox-fmt-all`
+
+=head2 Test
+
+Test your installation:
+
+  `echo "Test" | /usr/share/txt2pho/txt2pho |\
+   mbrola /usr/share/mbrola/de7/de7 - -.au | play -q -t au -`
+
+=head2 fhem-speech
+
+Copy the script fhem-speech to a directory of your choice, e.g.:
+
+  `cp fhem-speech /usr/local/bin`
+
+and make it executable:
+
+  `chmod 775 /usr/local/bin/fhem-speech`
+
+=head2 Perl
+
+If you use the delivered module F<contrib/JSON-XS-2.231.tar.gz>:
+
+  `tar xzf JSON-XS-2.231.tar.gz`
+  `cd JSON-XS-2.231`
+  `perl Makefile.pl`
+  `make`
+  `make test`
+
+and as root:
+
+  `make install`
+
+=head1 CONFIGURATION
+
+Open fhem-speech with your prefered editor.
+
+=head2 FHEM host settings
+
+Change the default host, if you like:
+
+  ###########################
+  # FHEM
+  $sys{fhem}{host}         = "localhost";
+  $sys{fhem}{port}         = "7072";
+
+=head2 External commands
+
+Change the paths depending on the installed distribution:
+
+  ###########################
+  # Mandatory external Files
+  $sys{file}{mbrola}       = "/usr/local/bin/mbrola";
+  $sys{file}{pipefilt}     = "/usr/local/bin/pipefilt";
+  $sys{file}{play}         = "/usr/bin/play";
+  $sys{file}{preproc}      = "/usr/local/bin/preproc";
+  [...]
+
+Change the default settings for synthesis voice:
+
+  ###########################
+  # mbrola / txt2pho options
+  $sys{speech}{sex}    = "f";
+  $sys{speech}{male}   = "-f0.8 -t0.9 -l 15000";
+  $sys{speech}{female} = "-f1.2 -t1.0 -l 22050";
+
+=head2 Translation
+
+fhem-speech need the $lang{} settings to decide what messages from FHEM
+to be spoken. For example take a look at the FHT part:
+
+  ###########################
+  # FHEM Translation
+
+  [...]
+
+  ###########################
+  # FHT
+  # keys:
+  $lang{'actuator'} = "Ventilstellung: %s Prozent";
+  $lang{'day-temp'} = "Temperatur Tag: %s Grad";
+  $lang{'desired-temp'} = "Angeforderte Temperatur: %s Grad";
+  $lang{'measured-temp'} = "Gemessene Temperatur: %s Grad";
+  $lang{'mode'} = "Modus: %s";
+  $lang{'night-temp'} = "Temperatur Nacht: %s Grad";
+  $lang{'windowopen-temp'} = "Temperatur Fenster offen: %s Grad";
+  [...]
+
+On every FHEM response all of the defined $lang{} status information will
+be spoken. If you don't like status information for e.g. 'windowopen-temp' then comment this out:
+
+  # $lang{'windowopen-temp'} = "Temperatur Fenster offen: %s Grad";
+
+If you like to know the status for e.g. 'lowtemp-offset' add a line like this:
+
+  $lang{'lowtemp-offset'} = "Versatz Temperatur %s Grad";
+
+The '%s' stands as a placeholder for the value.
+
+=head1 OPTIONAL
+
+=head2 Asterisk
+
+fhem-speech support AGI commands for direct output in Asterisk. 
+
+=head3 Wrapper
+
+If you like fhem-speech for use in Asterisk, you have to install a wrapper around
+fhem-speech. You can use the example from F<contrib/fhem-speech.agi>.
+
+Copy the wrapper to your asterisk-environment, e.g:
+
+  `cp contrib/fhem-speech.agi /var/lib/asterisk/agi-bin/`
+
+=head3 extension.conf
+
+Take a look at the example from F<contrib/extension.conf>.
+
+=head1 LEGALESE
+
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+
+This is free software: you are free to change and redistribute it. There is
+NO WARRANTY, to the extent permitted by law.
+
+=head1 AUTHOR
+
+Copyright (C) 2008 Martin Fischer <m_fischer@gmx.de>
+
+=cut
+

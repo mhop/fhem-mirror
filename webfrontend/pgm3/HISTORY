@@ -1,0 +1,132 @@
+- Martin 2007-02-22 
+  - Now you can adjust the range of the Gnuplot-pictures of FHT in the config.php
+
+- Martin 2007-03-19
+  - Feature: WS300 ist now supported
+  - Adjusted to new structure of FHEM (IT NEEDS now FHZ1000/FHEM >= v3.4!)
+
+- Martin 2007-03-22
+  - New arrangement of the graphics.
+  - Better support for WS300
+  - FHT-Pulldown will now be called by the button "adjust"
+  - FHT-PHP-Grafics now with temperature, desired-temp and actuator
+
+- Martin 2007-03-29
+  - release pgm3 for fhem 4.0, pgm3 has now the verson 0.8.0
+
+- Martin 2007-04-10
+  - Minor Bugfixes (errormessage for php4, fhs20pulldown)
+ 
+- Martin 2007-07-13
+  - Section FHZ-DEVICES s now hidden if it is not needed
+
+- Martin 2007-09-04
+  - Small changes in gnuplot.php, config.php, index.php, hms100.php
+
+- Martin 2007-09-05
+  - Change in gnuplot.php: FHT: if there are not sufficient data (e.g. actuator) only measured-temp will be drawn
+
+- Martin 2007-10-13
+  - Now pgm3 shows other logfiles (like from wired devices) too. Changes in index.php, config.php, gnuplot.php, new userdefs.php)
+- Martin 2007-10-14
+ -  User defined logs with several values in one file now supported. Changes in index.php, gnuplot.php, userdefs.php and config.php.
+
+- Martin 2007-10-16
+ - User defined graphics now for Piri an FS20 too
+
+- Martin 2007-10-18
+ - User defined graphics for FS20 improved ("full" picture)
+
+- Martin 2007-10-23
+ - every module now checks if a redraw of the picture is really necessary. If not the old picture will be sent. The time to reload the screen now is down to less than 50 percent.
+
+- Martin 2007-10-24
+ - Change in userdefs.php. At least one new picture per hour for userdefs (gnuplot picture)
+
+- Martin 2007-10-25
+ - design: userdef-gnuplot with transparent background (userdef.php)
+
+- Martin 2007-10-30
+ -  fix: gnuplot for FS20 now only off or on
+
+- Martin 2007-11-30
+ -  feature: RSS-Feeds added. New include/rssfeeds.php. Changes in index.php and config.php
+
+- Martin 2007-12-03
+ -- minor bugfix: rebuild picture of fht on every entry in the log (not only on change of measured-temp. Changes in fht.php
+ -- logrotate: better warning if there are wrong rights for the pgm3-logrotate
+
+- Martin 2007-12-08
+ -- bugfix: Wrong display in MS IE. (Reported and solved by Boris)
+ -- Feature: Drewpoint im HMS100TF (Boris)
+ -- Feature: RSS-Feeds now new arranged
+
+- Martin 2007-12-21
+ -- Feature: HMS-CO supported (Peter A.)
+ -- Feature: Webcams or local pictures added
+ -- Feature: ks300 mit Drewpoint (Boris)
+
+- Martin 2007-12-24
+ -- Bugfix: Userdef-Gnuplot with type temperature now with y1tics
+ -- Feature: Webcam/Pics hideable
+
+- Martin 2008-03-24
+ -- Bugfix: FHT-View with the current CVS-FHEM was broken
+
+- Martin 2008-03-25
+ -- Bugfix: KS300-Log now possible with Full Log like define kslog FileLog /var/tmp/ks300.log ks300:.*
+
+- Martin 2008-14-13
+ -- Bugfix: FHT: lime-protection not more in the field of actuator
+
+- Martin 2009-03-26
+  -- Bugfix: table-format for userdefs changed
+  -- Feature: taillogorder optional with date (config.php)
+  -- Feature: HMS100CO added
+
+- Martin 2009-11-10
+  -- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
+
+- Martin 2009-11-16
+  -- Feature: Google-Weather-Api added. 
+  -- Feature: Dislay of all Logs including the FS20-devices (grep on fhem.log)
+  -- Feature: The status of the batteries of FHT and HMS are shown in the graphics
+  -- php4 disabled. Only php5 is supported.
+  -- A lot of examples of the UserDefs are added.
+
+- Martin 2009-12-19
+  -- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH)
+
+- Martin 2010-01-08
+  -- Feature: Interface to fhem changes to stream_socket_client
+  -- Bugfix: table-format on Android-Browser
+  -- Feature:  Optimized for smartphones
+  -- Feature: Rooms possible for Webcam and Google-Weather 
+  -- Misc: Output of html better formated
+  -- Feature. Skinable -- change the colors
+
+- Martin 2010-03-12
+  -- Bugfix: better check of availability of google-weather
+  -- Feature: DBLog added for everything except UserDefs
+-Martin 201004-26
+
+- Martin 2012-04-24
+  -- Bugfix: no need for checking FHEM-Version any more
+  -- Bugfxi: the FS20-Type from Userdef the first time with a broken graphic
+
+- Martin 2012-04-25
+  -- Feature: debugging for xmllist included
+
+- Martin 2012-05-03
+  -- Bugfix: getting xmllist from FHEM without \r\n
+
+- Martin 2012-05-07
+  -- bugfix: userdefs.php. Now wokrs with new Gnuplot (imagecopy)
+
+. Martin 2012-05-08
+  -- Feature: Homematic added, FS20-Buttons now depending of the state
+
+- Martin 20120-05-20
+  -- Bugfix: time problem with notify within fhem
+  -- Feature: userdefs.php better gnuplot pictures
+

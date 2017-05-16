@@ -1,0 +1,70 @@
+EM1000EM
+reply to request 0x7a
+
+of 
+fs ty
+et pe content
+----------------------
+00 w  counter 2 Hz, counts down from 600 to 0
+01 
+02 w  number of readings
+03 
+04 ?? ?
+05 ?? ?
+06 b  number of devices
+07 dw energy/Wh (total)
+08 
+09 
+10
+11 ?? ?
+12 ?? ?
+13 w  number of pulses
+14 
+15 w  number of pulses max (unsure)
+16 
+17 w  offset 1 
+18 
+19 w  offset 2
+20 
+21 ?? ? 
+22 ?? ?
+23 ?? ?
+24 ?? ?
+25 ?? ?
+26 ?? ?
+27 ?? ?
+28 ?? ?
+29 ?? ?
+30 ?? ?
+31 ?? ?
+32 ?? ?
+33 dw energy/Wh (h)
+34 
+35 
+36 
+37 dw energy/Wh (d)
+38 
+39 
+40 
+41 dw energy/Wh (w)
+42 
+43 
+44 
+45 w  power limit/W
+46 
+47 w  price/(EUR/kWh*10000)
+48
+49 w  revolutions/kWh (for EM1000WZ)
+50 
+
+Notes:
+1) types:
+   b	byte
+   w	word
+   dw	double word
+2) field 15 is unsure
+3) one can observe the following values for a freshly 
+   attached device (all readings 0):
+   a)  offset 2= offset 1 + number of readings
+   b)  fields 21..32 are zero
+4) fields 17..32 are probably further offsets to a buffer

@@ -1,0 +1,32 @@
+############################
+# Display the Water temperature and burner runtime values.
+# Corresponding FileLog definition:
+# define KM271 FileLog /var/log/fhem/km271-%Y.log KM271
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<L1>'
+set grid
+
+set y2label "Temperature in C"
+set format y "%0.1f"
+set ylabel "Minutes"
+set yrange [0:]
+
+#FileLog 4:WW_Isttemperatur:0:
+#FileLog 4:Brenner_Laufzeit1_Minuten\x3a:0:delta-h
+
+plot "<grep WW_Isttemperatur <IN>" using 1:4 axes x1y2 ls l0 title 'WW-Temp' with lines,\
+     "<grep Brenner_Laufzeit1_Minuten: <IN> | perl -ane '\
+        @a = split(\"[_:]\", $F[0]);\
+        if(defined($lh) && $lh ne $a[1])\
+          { printf(\"${ld}_$lh:30:00 %f\n\", $hv); $hv = 0; }\
+        if($lv) { $hv += ($F[3]-$lv); }\
+        $lh = $a[1]; $ld = $a[0]; $lv = $F[3];\
+        END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'"\
+     using 1:2 axes x1y1 ls l6fill title 'Runtime/h (Min)' with histeps

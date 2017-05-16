@@ -1,0 +1,46 @@
+#! /bin/sh -e
+#
+# 
+#
+# Written by Stefan Manteuffel
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin
+DAEMON=/usr/bin/fhem.pl
+PIDFILE=/var/run/fhem.pid
+
+# Arguments to atd
+#
+ARGS="/etc/fhem.cfg"
+
+test -x $DAEMON || exit 0
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    echo "Starting deferred execution scheduler..."
+    start-stop-daemon -b --start --quiet --pidfile $PIDFILE --startas $DAEMON -- $ARGS
+    log_end_msg $?
+    ;;
+  stop)
+    log_begin_msg "Stopping deferred execution scheduler..."
+    start-stop-daemon --oknodo --stop --quiet --retry 30 --pidfile $PIDFILE --name fhem.pl
+    
+    log_end_msg $?
+    ;;
+  force-reload|restart)
+    log_begin_msg "Restarting deferred execution scheduler..."
+    if start-stop-daemon --stop --quiet --retry 30 --pidfile $PIDFILE --name fhem.pl; then
+      start-stop-daemon -b --start --quiet --pidfile $PIDFILE --startas $DAEMON -- $ARGS
+      log_end_msg $?
+    else
+      log_end_msg 1
+    fi
+    ;;
+  *)
+    echo "Usage: /etc/init.d/fhem.pl {start|stop|restart|force-reload|reload}"
+    exit 1
+    ;;
+esac
+
+exit 0

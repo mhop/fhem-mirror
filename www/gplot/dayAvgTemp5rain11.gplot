@@ -1,0 +1,23 @@
+############################
+# Display the daily avarage temperature and rainfall from a KS300.
+# Corresponding FileLog definition:
+# define avglog FileLog /var/log/fhem/ks300-%Y.log ks300:.*avg.*
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<TL>'
+set grid
+
+set y2label "Temperature in C"
+set ylabel "Rain (l/m2)"
+
+#FileLog 5:avg_day:0:
+#FileLog 11:avg_day:0:
+
+plot "<grep avg_day <IN>" using 1:5 axes x1y2 title 'Temperature' with lines,\
+     "<grep avg_day <IN>" using 1:11 axes x1y1 title 'Rain' with histeps
