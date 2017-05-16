@@ -32,6 +32,7 @@
 # ABU 20170501 added eval-error-logging
 # ABU 20170501 changed verbose 3 to verbose 4
 # ABU 20170501 tuned documentation
+# ABU 20170516 removed useless print
 
 
 package main;
@@ -393,8 +394,6 @@ sub Robonect_Set($@)
 		$url = $url . "user=" . $userName . "&pass=" . $passWord . "&" if (defined ($userName) and defined ($passWord));
 		#append command
 		$url = $url . $decodedCmd;
-			
-		print "URL: $url\n";
 			
 		my $httpData;
 		$httpData->{url} = $url;
