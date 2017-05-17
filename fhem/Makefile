@@ -29,7 +29,7 @@ DESTDIR=fhem-$(VERS)
 all:
 	@echo "Use 'make <target>', where <target> is"
 	@echo "    install       - to install fhem"
-	@echo "    dist          - to create a .tar.gz file"
+	@echo "    dist          - to create a .tar.gz and a .zip file"
 	@echo "    deb           - to create a .deb file"
 	@echo "    synology      - to create an spk file"
 	@echo "    fb7390        - to create an AVM Fritz!Box 7390 imagefile"
@@ -89,6 +89,7 @@ dist:
 	rm -rf .f/www/SVGcache
 	mv .f $(DESTDIR)
 	tar cf - $(DESTDIR) | gzip -9 > $(DESTDIR).tar.gz
+	zip -r $(DESTDIR).zip $(DESTDIR)
 	rm -rf $(DESTDIR)
 
 deb:
