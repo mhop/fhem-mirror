@@ -2721,20 +2721,31 @@ CommandAttr($$)
       }
     }
 
-    my %ra = ("suppressReading"            => { s=>"\n" },
-              "event-on-update-reading"    => { s=>"," },
-              "event-on-change-reading"    => { s=>",", r=>":.*" },
-              "timestamp-on-change-reading"=> { s=>"," },
-              "event-min-interval"         => { s=>",", r=>";.*" },
-              "devStateIcon"               => { s=>" ", r=>":.*" } );
-    if(defined($a[2]) && $ra{$attrName}) {
-      my $lval = $a[2];
-      for my $v (split($ra{$attrName}{s}, $lval)) {
-        $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
-        my $err = "Argument $v for attr $sdev $a[1] is not a valid regexp";
-        return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
-        eval { "Hallo" =~ m/^$v$/ };
-        return "$err: $@" if($@);
+    my %ra = (
+      "suppressReading"            => { s=>"\n" },
+      "event-on-update-reading"    => { s=>"," },
+      "event-on-change-reading"    => { s=>",", r=>":.*" },
+      "timestamp-on-change-reading"=> { s=>"," },
+      "event-min-interval"         => { s=>",", r=>";.*" },
+      "devStateIcon"               => { s=>" ", r=>":.*", p=>"^{.*}\$",
+                                  pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
+    );
+
+    if(defined($a[2]) && $ra{$attrName} && $init_done) {
+      my ($lval,$rp) = ($a[2], $ra{$attrName}{p});
+
+      if($rp && $lval =~ m/$rp/) {
+        my $err = perlSyntaxCheck($a[2], %{$ra{$attrName}{pv}});
+        return "attr $sdev $a[1]: $err" if($err);
+
+      } else {
+        for my $v (split($ra{$attrName}{s}, $lval)) {
+          $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
+          my $err = "Argument $v for attr $sdev $a[1] is not a valid regexp";
+          return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
+          eval { "Hallo" =~ m/^$v$/ };
+          return "$err: $@" if($@);
+        }
       }
     }
 
