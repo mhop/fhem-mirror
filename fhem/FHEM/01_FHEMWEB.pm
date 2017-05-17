@@ -1829,7 +1829,7 @@ FW_showRoom()
           use strict "refs";
           if(defined($txt)) {
             FW_pO "<tr class='".($row&1?"odd":"even").
-                "'><td colspan='3'>$txt</td></tr>";
+                "'><td colspan='50'>$txt</td></tr>";
           }
         }
         $row++;
