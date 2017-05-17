@@ -25,7 +25,7 @@ sub ONKYO_AVR_ZONE_Initialize($) {
 
     $hash->{AttrList} =
         "IODev disable:0,1 disabledForIntervals do_not_notify:1,0 "
-      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs wakeupCmd:textField "
+      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volumeMax:uzsu,slider,0,1,100 inputs wakeupCmd:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{ONKYO_AVR_ZONE_SVG} = "ONKYO_AVR_ZONE_RClayout_SVG";
@@ -998,6 +998,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             $return = "No argument given";
         }
         else {
+            my $volm = AttrVal( $name, "volumeMax", 0 );
+            @$a[2] = $volm if ( $volm && @$a[2] > $volm );
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
             if ( $state eq "on" ) {
@@ -1720,6 +1722,9 @@ sub ONKYO_AVR_ZONE_RClayout() {
           </li>
           <li>
             <b>volumeSteps</b> &nbsp;&nbsp;-&nbsp;&nbsp; When using set commands volumeUp or volumeDown, the volume will be increased or decreased by these steps. Defaults to 1.
+          </li>
+          <li>
+            <b>volumeMax</b> &nbsp;&nbsp;1...100&nbsp;&nbsp; When set, any volume higher than this is going to be replaced by this value.
           </li>
           <li>
             <b>wakeupCmd</b> &nbsp;&nbsp;-&nbsp;&nbsp; In case the device is unreachable and one is sending set command "on", this FHEM command will be executed before the actual "on" command is sent. E.g. may be used to turn on a switch before the device becomes available via network.
