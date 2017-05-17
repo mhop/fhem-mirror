@@ -33,12 +33,14 @@
 # ABU 20170503 corrected DPT1.010
 # ABU 20170503 changed regex for all dpt9
 # ABU 20170507 changed regex for all dpt9
+# ABU 20170517 added useSetExtensions
 
 package main;
 
 use strict;
 use warnings;
 use Encode;
+use SetExtensions;
 
 #set to 1 for debug
 my $debug = 0;
