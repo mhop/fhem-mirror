@@ -99,7 +99,12 @@ sub TPLinkHS110_Get($$)
 	        Type     => SOCK_STREAM,
        		Timeout  => $hash->{TIMEOUT} )
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-	$socket->send($c);
+	eval {
+		$socket->send($c);
+	} or do {
+		Log3 $hash, 2, "TPLinkHS110: $name error sending. Retrying one more time.";
+		$socket->send($c);
+	};
 	my $data;
 	my $retval = $socket->recv($data,8192);
 	$socket->close();
@@ -134,7 +139,12 @@ sub TPLinkHS110_Get($$)
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($rc);
+		eval {
+			$socket->send($c);
+		} or do {
+			Log3 $hash, 2, "TPLinkHS110: $name error sending. Retrying one more time.";
+			$socket->send($c);
+		};
 		my $rdata;
 		$retval = $socket->recv($rdata,8192);
 		$socket->close();
@@ -164,7 +174,12 @@ sub TPLinkHS110_Get($$)
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($c);
+		eval {
+			$socket->send($c);
+		} or do {
+			Log3 $hash, 2, "TPLinkHS110: $name error sending. Retrying one more time.";
+			$socket->send($c);
+		};
 		my $data;
 		$retval = $socket->recv($data,8192);
 		$socket->close();
@@ -221,7 +236,12 @@ sub TPLinkHS110_Set($$)
 	        Type     => SOCK_STREAM,
        		Timeout  => $hash->{TIMEOUT})
 	        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-	$socket->send($c);
+	eval {
+		$socket->send($c);
+	} or do {
+		Log3 $hash, 2, "TPLinkHS110: $name error sending. Retrying one more time.";
+		$socket->send($c);
+	};
 	my $data;
 	my $retval = $socket->recv($data,8192);
 	$socket->close();
@@ -310,7 +330,12 @@ sub TPLinkHS110_Attr {
 		        Type     => SOCK_STREAM,
 	       		Timeout  => $hash->{TIMEOUT} )
 		        or return "Couldn't connect to $remote_host:$remote_port: $@\n";
-		$socket->send($c);
+		eval {
+			$socket->send($c);
+		} or do {
+			Log3 $hash, 2, "TPLinkHS110: $name error sending. Retrying one more time.";
+			$socket->send($c);
+		};
 		my $data;
 		my $retval = $socket->recv($data,8192);
 		$socket->close();
