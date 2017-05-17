@@ -1386,7 +1386,7 @@ FW_doDetail($)
   if($modules{$t}{FW_detailFn}) {
     no strict "refs";
     my $txt = &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room);
-    FW_pO "$txt<br>" if(defined($txt));
+    FW_pO "</td></tr><tr><td>$txt<br>" if(defined($txt));
     use strict "refs";
   }
 
