@@ -2507,7 +2507,7 @@ ZWave_configParseModel($;$)
     return 0;
   }
 
-  my ($ret, $line, $class, %hash, $cmdName, %classInfo, %group);
+  my ($ret, $line, $class, %hash, $cmdName, %classInfo, %group, $origName);
   while($gz->gzreadline($line)) {       # Search the "file" entry
     if($line =~ m/^\s*<Product.*sourceFile="$cfg"/) {
       $ret = 1;
@@ -2537,9 +2537,15 @@ ZWave_configParseModel($;$)
       $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
       $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
       my ($cmd,$shortened) = ZWave_cleanString($h{label}, $h{index}, 0);
-      $cmdName = "config$cmd";
+      $origName = "config$cmd";
+      $cmdName = $origName;
+      my $index = 1;
+      while($hash{$cmdName}) {
+        $cmdName = $origName."_".(++$index);
+      }
       $h{Help} = "";
-      $h{Help} .= "Full text for $cmdName is: $h{label}<br>" if($shortened);
+      $h{Help} .= "Full text for $cmdName is: $h{label}<br>"
+        if($shortened || $origName ne $cmdName);
       $hash{$cmdName} = \%h;
     }
 
