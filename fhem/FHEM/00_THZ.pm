@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 03/2017
-my $thzversion = "0.157";
+# by immi 05/2017
+my $thzversion = "0.159";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -293,7 +293,7 @@ my %sets439technician =(
 
 
 
-my %sets439 = (
+my %sets439539common = (
   "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
   "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
   "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
@@ -324,7 +324,6 @@ my %sets439 = (
   "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
   "p09FanStageStandby"			=> {cmd2=>"0A056F", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
   "p99FanStageParty"			=> {cmd2=>"0A0570", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
-  "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""},
   "p21Hyst1"				=> {cmd2=>"0A05C0", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p22Hyst2"				=> {cmd2=>"0A05C1", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p23Hyst3"				=> {cmd2=>"0A05C2", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
@@ -345,7 +344,7 @@ my %sets439 = (
   "p40Fanstage1AirflowOutlet"		=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
   "p41Fanstage2AirflowOutlet"		=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
   "p42Fanstage3AirflowOutlet"		=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
-  "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "11", argMax =>   "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
+  "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "10", argMax =>   "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
   "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin => "0.5", argMax =>    "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
   "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1",  argMax =>   "24",	type =>"1clean",  unit =>""},
@@ -498,7 +497,14 @@ my %sets439 = (
   );
 
   
+  
+  
+my %sets439only =(
+  "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""}   
+ );
+  
 my %sets539only =(
+  "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "4",	type =>"1clean",  unit =>""},    
   "p99PumpRateHC"				=> {cmd2=>"0A02CB", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"},  
   "p99PumpRateDHW"				=> {cmd2=>"0A02CC", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"}  
 );
@@ -613,7 +619,7 @@ my %getsonly214 = (
  );
 
 
-my %sets=%sets439;
+my %sets=%sets439539common;
 my %gets=(%getsonly439, %sets);
 my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
@@ -1564,19 +1570,19 @@ sub THZ_Attr(@) {
       }
       elsif ($attrVal eq "5.39") {
         THZ_RemoveInternalTimer("THZ_GetRefresh");
-        %sets=(%sets439, %sets539only);
+        %sets=(%sets439539common, %sets539only);
         %gets=(%getsonly539, %sets);
         THZ_Refresh_all_gets($hash);
       }
       elsif ($attrVal eq "4.39technician") {
         THZ_RemoveInternalTimer("THZ_GetRefresh");
-        %sets=(%sets439, %sets439technician);
+        %sets=(%sets439539common, %sets439only, %sets439technician);
         %gets=(%getsonly439, %sets);
         THZ_Refresh_all_gets($hash);
       }
       else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
         THZ_RemoveInternalTimer("THZ_GetRefresh");
-        %sets=%sets439;
+        %sets=(%sets439539common, %sets439only);
         %gets=(%getsonly439, %sets);
         THZ_Refresh_all_gets($hash);
       }
