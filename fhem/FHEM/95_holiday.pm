@@ -61,6 +61,8 @@ holiday_refresh($;$)
     @fd = localtime(mktime(1,1,1,$d,$m-1,$lt[5],0,0,-1));
   }
 
+  Log3 $name, 5, "holiday_refresh $name called for $fordate";
+
   my $fname = $attr{global}{modpath} . "/FHEM/" . $hash->{NAME} . ".holiday";
   my ($err, @holidayfile) = FileRead($fname);
   return $err if($err);
