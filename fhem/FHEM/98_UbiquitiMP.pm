@@ -21,7 +21,7 @@
 #
 ################################################################
 #  Changelog:
-#  25.3.15 add force for set on and off
+#  25.03.15 add force for set on and off
 #  10.04.15 add enable/disable 
 #  18.04.15 add toggle
 #  20.04.15 add Groups
@@ -29,6 +29,7 @@
 #  23.04.15 add Set Extensions for 1 Port Ubi , change Client to UbiquitiOut, 
 #  25.06.15 add german docu, fix some timing problems
 #  02.05.15 fix groupPorts change at runtime
+#  19.05.17 change decode_json
 
 package main;
 
@@ -40,6 +41,7 @@ use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 use SetExtensions;
 use Net::Telnet;
 use JSON;
+#use Data::Dumper;
 
 my %sets = ();
 my $setcmds = "on,off,toggle,enable,disable,lock,unlock,reset";
@@ -547,11 +549,24 @@ sub UbiquitiMP_Status($$@)
   my $sum_energy;
   my @ener;
 
-  my $json = ();
-  $json = JSON->new->utf8(0)->decode($js);
+  #my $json = ();
+  #my %json = JSON->new->utf8(0)->decode($js);
+  my $json = eval{decode_json($js)};
 
-  my $sensors = scalar keys $json->{sensors};
+  if($@)
+  {
+   Log3 $name, 2, "$name, error decode JSON: ".$@;
+   readingsSingleUpdate($hash, "state", "error", 1);
+   return undef;
+  }
 
+  my $sensors = 0; # es gibt z.Z. in Deutschland nur die Ausführungen mit 1,3 & 6 Port
+  $sensors    = 1 if defined($json->{sensors}[0]);
+  $sensors    = 3 if defined($json->{sensors}[2]);
+  $sensors    = 6 if defined($json->{sensors}[5]);
+
+  Log3 $name, 2, "$name - sensors  : $sensors";
+ 
   if ((!$hash->{PORTS}) && ($sensors > 0)) # nur einmal zu Begin bzw nach reload
   {
     $hash->{PORTS} = $sensors;
@@ -580,8 +595,7 @@ sub UbiquitiMP_Status($$@)
    my $lock        = $json->{sensors}[$i]{lock};
    my $label       = $json->{sensors}[$i]{label}; 
    my $enabled     = $json->{sensors}[$i]{enabled}; # wann wird das angefasst ?
-   my $energy      = (defined($ener[$i])) ? sprintf("%.2f",$ener[$i]*0.3125) : 0; 
-      $energy      += 0;
+   my $energy      = (defined($ener[$i])) ? sprintf("%.2f",$ener[$i]*0.3125) : 0; $energy += 0; #kW/h
 
    my $eState ="E:$energy P:$power I:$current U:$voltage i:$powerfactor";
    
@@ -724,7 +738,7 @@ sub UbiquitiMP_Info($$)
    $hash->{BNAME}       = $val if ($var eq "board.name");
    $hash->{SNAME}       = $val if ($var eq "board.shortname");
    $hash->{VERSION}     = $val if ($var eq "version");
-   $hash->{MAC}         = $val if ($var eq "board.hwaddr");
+   $hash->{MAC}         = lc($val) if ($var eq "board.hwaddr");
   }
 
   if (($board_id) && (!$hash->{PORTS}))
@@ -910,27 +924,27 @@ sub UbiquitiMP_createSets($)
 1;
 
 =pod
+=item device
+=item summary controls Ubiquiti mPower 1 to 6 port WLAN switches
+=item summary_DE steuert Ubiquiti mPower 1-6 Port WLAN Schaltsteckdosen
 =begin html
 
 <a name="UbiquitiMP"></a>
 <h3>UbiquitiMP</h3>
 <ul>
-  <table>
-  <tr><td>
   FHEM module for the Ubiquiti mFi mPower modules<br>
-  Please read also the <a href="http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower">Wiki</a> at http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower<br>
+  Please read also the <a href="https://wiki.fhem.de/wiki/Ubiquit_mFi/mPower">Wiki</a> at https://wiki.fhem.de/wiki/Ubiquit_mFi/mPower<br>
   FHEM Forum : http://forum.fhem.de/index.php/topic,35722.0.html 
-  </td></tr></table>
   <a name="UbiquitiMPdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; UbiquitiMP &lt;IP or FQDN&gt;</code><br> 
     example :<br>
-    define myPM UbiquitiMP 192.168.0.100<br>
-    define myPM UbiquitiMP myhost.dyndns.org<br>
+    define myUbi UbiquitiMP 192.168.0.100<br>
+    define myUbi UbiquitiMP myhost.mynet.net<br>
     Perl Net::Telnet and JSON module are required. On a Raspberry you can install them with :<br>
-    apt-get install libjson-perl<br>
-    apt-get install libnet-telnet-perl
+    sudo apt-get install libjson-perl<br>
+    sudo apt-get install libnet-telnet-perl
   </ul>
   <br>
   <a name="UbiquitiMPset"></a>
@@ -973,23 +987,20 @@ sub UbiquitiMP_createSets($)
 <a name="UbiquitiMP"></a>
 <h3>UbiquitiMP</h3>
 <ul>
-  <table>
-  <tr><td>
   FHEM Modul f&uuml;r die Ubiquiti mFi mPower Schaltsteckdosen<br>
-  Mehr Informationen zu den verschiedenen mPower Modellen im <a href="http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower">Wiki</a> unter http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower<br>
+  Mehr Informationen zu den verschiedenen mPower Modellen im <a href="https://wiki.fhem.de/wiki/Ubiquit_mFi/mPower">Wiki</a> unter https://wiki.fhem.de/wiki/Ubiquit_mFi/mPower<br>
   FHEM Forum : http://forum.fhem.de/index.php/topic,35722.0.html 
-  </td></tr></table>
   <a name="UbiquitiMPdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; UbiquitiMP &lt;IP or FQDN&gt;</code><br> 
+    <code>define &lt;name&gt; UbiquitiMP &lt;IP oder FQDN&gt;</code><br> 
     Beispiel :<br>
-    define Ubi UbiquitiMP 192.168.0.100<br>
-    define Ubi UbiquitiMP myhost.dyndns.org<br>
-    Perl Net::Telnet und das Perl JSON Modul werden ben&ouml;tigt. 
-    Bei einem Raspberry Pi k&ouml;nnen diese leicht mit den folgenden beiden Befehlen installiert werden:<br>
-    apt-get install libjson-perl<br>
-    apt-get install libnet-telnet-perl
+    define myUbi UbiquitiMP 192.168.0.100<br>
+    define myUbi UbiquitiMP myhost.mynet.net<br>
+    Das Perl Net::Telnet und sowie das JSON Modul werden unbedingt ben&ouml;tigt. 
+    Auf einem Raspberry Pi k&ouml;nnen diese mit den folgenden beiden Kommandos installiert werden:<br>
+    sudo apt-get install libjson-perl<br>
+    sudo apt-get install libnet-telnet-perl
   </ul>
   <br>
   <a name="UbiquitiMPset"></a>
