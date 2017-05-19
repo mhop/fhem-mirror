@@ -288,7 +288,8 @@ sub
 harmony_Set($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
-  my ($param, $param2) = @params;
+  my ($a, $h) = parseParams(\@params);
+  my ($param, $param2) = @{$a};
   #$cmd = lc( $cmd );
 
   my $list = "";
@@ -403,12 +404,17 @@ harmony_Set($$@)
       return "unknown command $param2" if( !$action );
     }
 
-    Log3 $name, 4, "$name: sending $action->{command} for ". harmony_labelOfDevice($hash, $action->{deviceId} );
+    my $duration = $h->{duration};
+    return "duration musst be numeric" if( defined($duration) && $duration !~ m/^([\d-.])+$/ );
+    $duration = 0.1 if( !$duration || $duration < 0 );
+    $duration = 5 if $duration > 5;
+
+    Log3 $name, 4, "$name: sending $action->{command} for ${duration}s for ". harmony_labelOfDevice($hash, $action->{deviceId} );
 
     my $payload = "status=press:action={'command'::'$action->{command}','type'::'$action->{type}','deviceId'::'$action->{deviceId}'}:timestamp=0";
     harmony_sendEngineRender($hash, "holdAction", $payload);
-    select(undef, undef, undef, (0.1));
-    $payload = "status=release:action={'command'::'$action->{command}','type'::'$action->{type}','deviceId'::'$action->{deviceId}'}:timestamp=100";
+    select(undef, undef, undef, ($duration));
+    $payload = "status=release:action={'command'::'$action->{command}','type'::'$action->{type}','deviceId'::'$action->{deviceId}'}:timestamp=".$duration*1000;
     harmony_sendEngineRender($hash, "holdAction", $payload);
 
     return undef;
@@ -1848,7 +1854,7 @@ harmony_decrypt($)
       switch to this activit and optionally switch to &lt;channel&gt;</li>
     <li>channel &lt;channel&gt;<br>
       switch to &lt;channel&gt; in the current activity</li>
-    <li>command [&lt;id&gt;|&ltname&gt;] &lt;command&gt;<br>
+    <li>command [&lt;id&gt;|&ltname&gt;] &lt;command&gt; [duration=&lt;duration&gt;]<br>
       send the given ir command for the current activity or for the given device</li>
     <li>getConfig<br>
       request the configuration from the hub</li>
