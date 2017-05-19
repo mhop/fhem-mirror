@@ -675,7 +675,9 @@ sub LUXTRONIK2_DoUpdate($)
   # 64 - heatSourceMotor
    $return_str .= "|". ($heatpump_visibility[54]==1 ? $heatpump_values[43] : "no");
   # 65 - typeSerial
-   $return_str .= "|".substr($heatpump_parameters[874],0,4)."/".substr($heatpump_parameters[874],4)."-".sprintf("%03X",$heatpump_parameters[875]);
+  $return_str .= "|";
+  $return_str .= substr($heatpump_parameters[874],0,4)."/".substr($heatpump_parameters[874],4).= "-".sprintf("%03X",$heatpump_parameters[875])
+        if $heatpump_parameters[874] || $heatpump_parameters[875] ;
   # 66 - heatSourceDefrostTimer
    $return_str .= "|". ($heatpump_visibility[219]==1 ? $heatpump_values[141] : "no");
   # 67 - defrostValve
@@ -1112,7 +1114,7 @@ LUXTRONIK2_UpdateDone($)
      $value = $wpType{$a[31]};
      $value = "unbekannt (".$a[31].")" unless $value;
      readingsBulkUpdate($hash,"typeHeatpump",$value);
-     readingsBulkUpdate($hash,"typeSerial",$a[65]);
+     readingsBulkUpdate($hash,"typeSerial",$a[65])       if $a[65] ne "";
 
    # Solar
      if ($a[50] !~ /no/) {readingsBulkUpdate($hash, "solarCollectorTemperature", LUXTRONIK2_CalcTemp($a[50]));}
@@ -1409,7 +1411,8 @@ sub LUXTRONIK2_synchronizeClock (@)
   my $delay = 0;
   my $returnStr = "";
 
-  $maxDelta = 60 unless defined $maxDelta || $maxDelta >= 0;
+  $maxDelta = 60 unless defined $maxDelta;
+  $maxDelta = 60 unless $maxDelta >= 0;
   $maxDelta = 600 unless $maxDelta <= 600;
          
    LUXTRONIK2_Log $name, 5, "Open telnet connection to $host";
