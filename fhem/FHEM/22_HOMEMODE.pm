@@ -2,7 +2,7 @@
 # $Id$
 #
 # Usage
-# 
+#
 # define <name> HOMEMODE [RESIDENTS-MASTER-DEVICE]
 #
 #####################################################################################
@@ -14,8 +14,9 @@ use warnings;
 use POSIX;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
+use vars qw{%attr %defs %modules};
 
-my $HOMEMODE_version = "1.0.7";
+my $HOMEMODE_version = "1.1.0";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -33,15 +34,19 @@ sub HOMEMODE_Initialize($)
   $hash->{GetFn}        = "HOMEMODE_Get";
   $hash->{SetFn}        = "HOMEMODE_Set";
   $hash->{UndefFn}      = "HOMEMODE_Undef";
+  $hash->{FW_detailFn}  = "HOMEMODE_Details";
   $hash->{AttrList}     = HOMEMODE_Attributes($hash);
   $hash->{NotifyOrderPrefix} = "51-";
+  $hash->{FW_deviceOverview} = 1;
+  $hash->{FW_addDetailToSummary} = 1;
 }
 
 sub HOMEMODE_Define($$)
 {
   my ($hash,$def) = @_;
-  $HOMEMODE_de = 1 if (AttrVal("global","language","EN") eq "DE");
   my @args = split " ",$def;
+  my ($name,$type,$resdev) = @args;
+  $HOMEMODE_de = (AttrVal("global","language","EN") eq "DE" || AttrVal($name,"HomeLanguage","EN") eq "DE") ? 1 : 0;
   my $trans;
   if (@args < 2 || @args > 3)
   {
@@ -51,7 +56,6 @@ sub HOMEMODE_Define($$)
     return $trans;
   }
   RemoveInternalTimer($hash);
-  my ($name,$type,$resdev) = @args;
   if (!$resdev)
   {
     my @resdevs;
@@ -145,7 +149,7 @@ sub HOMEMODE_Notify($$)
     }
   }
   return if ($devname eq "global");
-  
+
   Log3 $name,5,"$name: Events from monitored device $devname: ". join " --- ",@{$events};
 
   my @commands;
@@ -220,6 +224,34 @@ sub HOMEMODE_Notify($$)
       HOMEMODE_ReadingTrend($hash,"humidity",$val);
     }
   }
+  if ($attr{$name}{HomeSensorWindspeed} && $devname eq (split /:/,$attr{$name}{HomeSensorWindspeed})[0])
+  {
+    my $read = (split /:/,$attr{$name}{HomeSensorWindspeed})[1];
+    if (grep /^$read:\s(.*)$/,@{$events})
+    {
+      foreach my $evt (@{$events})
+      {
+        next unless ($evt =~ /^$read:\s(.*)$/);
+        my $val = (split " ",$1)[0];
+        readingsSingleUpdate($hash,"wind",$val,1);
+        HOMEMODE_ReadingTrend($hash,"wind",$val);
+      }
+    }
+  }
+  if ($attr{$name}{HomeSensorAirpressure} && $devname eq (split /:/,$attr{$name}{HomeSensorAirpressure})[0])
+  {
+    my $read = (split /:/,$attr{$name}{HomeSensorAirpressure})[1];
+    if (grep /^$read:\s(.*)$/,@{$events})
+    {
+      foreach my $evt (@{$events})
+      {
+        next unless ($evt =~ /^$read:\s(.*)$/);
+        my $val = (split " ",$1)[0];
+        readingsSingleUpdate($hash,"pressure",$val,1);
+        HOMEMODE_ReadingTrend($hash,"pressure",$val);
+      }
+    }
+  }
   if ($hash->{SENSORSENERGY} && grep(/^$devname$/,split /,/,$hash->{SENSORSENERGY}))
   {
     my $read = AttrVal($name,"HomeSensorsPowerEnergyReadings","power energy");
@@ -238,9 +270,53 @@ sub HOMEMODE_Notify($$)
       HOMEMODE_EventCommands($hash,$devname,$1);
     }
   }
-  if ($attr{$name}{HomeUWZ} && $devname eq $attr{$name}{HomeUWZ} && grep /^WarnCount:/,@{$events})
+  if ($attr{$name}{HomeUWZ} && $devname eq $attr{$name}{HomeUWZ} && grep /^WarnCount:\s/,@{$events})
   {
     HOMEMODE_UWZCommands($hash,$events);
+  }
+  if ($hash->{SENSORSBATTERY} && grep(/^$devname$/,split /,/,$hash->{SENSORSBATTERY}))
+  {
+    my $read = AttrVal($name,"HomeSensorsBatteryReading","battery");
+    if (grep /^$read:\s/,@{$events})
+    {
+      my @lowOld = split /,/,ReadingsVal($name,"batteryLow","");
+      my @low;
+      @low = @lowOld if (@lowOld);
+      foreach my $evt (@{$events})
+      {
+        next unless ($evt =~ /^$read:\s(.*)$/);
+        my $val = $1;
+        if (($val =~ /^(\d{1,3})(%|\s%)?$/ && $1 <= AttrVal($name,"HomeSensorsBatteryLowPercentage",50)) || $val =~ /^(nok|low)$/)
+        {
+          push @low,$devname if (!grep /^$devname$/,@low);
+        }
+        elsif (grep /^$devname$/,@low)
+        {
+          my @lown;
+          foreach (@low)
+          {
+            push @lown,$_ if ($_ ne $devname);
+          }
+          @low = @lown;
+        }
+      }
+      readingsBeginUpdate($hash);
+      if (@low)
+      {
+        readingsBulkUpdateIfChanged($hash,"batteryLow",join(",",@low));
+        readingsBulkUpdateIfChanged($hash,"batteryLow_ct",scalar @low);
+        readingsBulkUpdateIfChanged($hash,"batteryLow_hr",HOMEMODE_makeHR($hash,1,@low));
+        readingsBulkUpdateIfChanged($hash,"lastBatteryLow",$devname) if (grep(/^$devname$/,@low) && !grep(/^$devname$/,@lowOld));
+        push @commands,$attr{$name}{HomeCMDbatteryLow} if ($attr{$name}{HomeCMDbatteryLow} && grep(/^$devname$/,@low) && !grep(/^$devname$/,@lowOld));
+      }
+      else
+      {
+        readingsBulkUpdateIfChanged($hash,"batteryLow","");
+        readingsBulkUpdateIfChanged($hash,"batteryLow_ct",scalar @low);
+        readingsBulkUpdateIfChanged($hash,"batteryLow_hr","");
+      }
+      readingsEndUpdate($hash,1);
+    }
   }
   if ($devtype =~ /^($prestype)$/ && grep(/^presence:\s(absent|present|appeared|disappeared)$/,@{$events}) && AttrVal($name,"HomeAutoPresence",0))
   {
@@ -307,7 +383,6 @@ sub HOMEMODE_Notify($$)
 sub HOMEMODE_updateInternals($;$)
 {
   my ($hash,$force) = @_;
-  $HOMEMODE_de = 1 if (AttrVal("global","language","EN") eq "DE");
   my $name = $hash->{NAME};
   my $resdev = $hash->{DEF};
   my $trans;
@@ -334,6 +409,7 @@ sub HOMEMODE_updateInternals($;$)
     delete $hash->{SENSORSMOTION};
     delete $hash->{SENSORSENERGY};
     delete $hash->{SENSORSLUMINANCE};
+    delete $hash->{SENSORSBATTERY};
     $hash->{VERSION} = $HOMEMODE_version;
     my @residents;
     push @residents,$defs{$resdev}->{ROOMMATES} if ($defs{$resdev}->{ROOMMATES});
@@ -434,13 +510,25 @@ sub HOMEMODE_updateInternals($;$)
       my ($p,$e) = split " ",AttrVal($name,"HomeSensorsPowerEnergyReadings","power energy");
       foreach my $s (devspec2array($power))
       {
-        if (defined ReadingsVal($s,$p,undef) && defined ReadingsVal($s,$e,undef))
-        {
-          push @sensors,$s;
-          push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
-        }
+        next unless (defined ReadingsVal($s,$p,undef) && defined ReadingsVal($s,$e,undef));
+        push @sensors,$s;
+        push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
       }
       $hash->{SENSORSENERGY} = join(",",sort @sensors) if (@sensors);
+    }
+    my $battery = HOMEMODE_AttrCheck($hash,"HomeSensorsBattery");
+    if ($battery)
+    {
+      my @sensors;
+      foreach my $s (devspec2array($battery))
+      {
+        my $read = AttrVal($name,"HomeSensorsBatteryReading","battery");
+        my $val = ReadingsVal($s,$read,undef);
+        next unless (defined $val && $val =~ /^(ok|low|nok|\d{1,3})(%|\s%)?$/);
+        push @sensors,$s;
+        push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
+      }
+      $hash->{SENSORSBATTERY} = join(",",sort @sensors) if (@sensors);
     }
     my $weather = HOMEMODE_AttrCheck($hash,"HomeYahooWeatherDevice");
     push @allMonitoredDevices,$weather if ($weather && !grep /^$weather$/,@allMonitoredDevices);
@@ -478,12 +566,14 @@ sub HOMEMODE_updateInternals($;$)
       }
       $hash->{SENSORSLUMINANCE} = join(",",sort @sensors) if (@sensors);
     }
+    push @allMonitoredDevices,(split /:/,HOMEMODE_AttrCheck($hash,"HomeSensorAirpressure"))[0] if (HOMEMODE_AttrCheck($hash,"HomeSensorAirpressure"));
+    push @allMonitoredDevices,(split /:/,HOMEMODE_AttrCheck($hash,"HomeSensorWindspeed"))[0] if (HOMEMODE_AttrCheck($hash,"HomeSensorWindspeed"));
     Log3 $name,5,"$name: new monitored device count: ".@allMonitoredDevices;
     Log3 $name,5,"$name: old monitored device count: ".@oldMonitoredDevices;
     @allMonitoredDevices = sort @allMonitoredDevices;
     $hash->{NOTIFYDEV} = join(",",@allMonitoredDevices);
     HOMEMODE_GetUpdate($hash);
-    return if (!$force && @oldMonitoredDevices eq @allMonitoredDevices);
+    return if (!@allMonitoredDevices);
     HOMEMODE_RESIDENTS($hash);
     HOMEMODE_userattr($hash);
     HOMEMODE_TriggerState($hash) if ($hash->{SENSORSCONTACT} || $hash->{SENSORSMOTION});
@@ -582,6 +672,7 @@ sub HOMEMODE_Get($@)
 sub HOMEMODE_Set($@)
 {
   my ($hash,$name,@aa) = @_;
+  $HOMEMODE_de = (AttrVal("global","language","EN") eq "DE" || AttrVal($name,"HomeLanguage","EN") eq "DE") ? 1 : 0;
   my ($cmd,@args) = @aa;
   my $trans = $HOMEMODE_de?
     "\"set $name\" benötigt mindestens ein und maximal drei Argumente":
@@ -809,31 +900,35 @@ sub HOMEMODE_alarmTriggered($@)
   my ($hash,@triggers) = @_;
   my $name = $hash->{NAME};
   my @commands;
-  my $text = HOMEMODE_makeHR($hash,@triggers);
-  readingsSingleUpdate($hash,"alarmTriggered_ct",scalar @triggers,1);
+  my $text = HOMEMODE_makeHR($hash,0,@triggers);
+  readingsBeginUpdate($hash);
+  readingsBulkUpdateIfChanged($hash,"alarmTriggered_ct",scalar @triggers);
   if ($text)
   {
     push @commands,$attr{$name}{"HomeCMDalarmTriggered-on"} if ($attr{$name}{"HomeCMDalarmTriggered-on"});
-    readingsSingleUpdate($hash,"alarmTriggered",$text,1);
+    readingsBulkUpdateIfChanged($hash,"alarmTriggered",join ",",@triggers);
+    readingsBulkUpdateIfChanged($hash,"alarmTriggered_hr",$text);
   }
   else
   {
     push @commands,$attr{$name}{"HomeCMDalarmTriggered-off"} if ($attr{$name}{"HomeCMDalarmTriggered-off"} && ReadingsVal($name,"alarmTriggered",""));
-    readingsSingleUpdate($hash,"alarmTriggered","",1);
+    readingsBulkUpdateIfChanged($hash,"alarmTriggered","");
+    readingsBulkUpdateIfChanged($hash,"alarmTriggered_hr","");
   }
+  readingsEndUpdate($hash,1);
   HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands && ReadingsAge($name,"modeAlarm","") > 5);
 }
 
-sub HOMEMODE_makeHR($@)
+sub HOMEMODE_makeHR($$@)
 {
-  my ($hash,@names) = @_;
+  my ($hash,$noart,@names) = @_;
   my $name = $hash->{NAME};
   my @aliases;
   my $and = (split /\|/,AttrVal($name,"HomeTextAndAreIs","and|are|is"))[0];
   my $text;
   foreach (@names)
   {
-    my $alias = HOMEMODE_name2alias($_,1);
+    my $alias = $noart ? HOMEMODE_name2alias($_) : HOMEMODE_name2alias($_,1);
     push @aliases,$alias;
   }
   if (@aliases > 0)
@@ -860,7 +955,7 @@ sub HOMEMODE_alarmTampered($@)
   my ($hash,@triggers) = @_;
   my $name = $hash->{NAME};
   my @commands;
-  my $text = HOMEMODE_makeHR($hash,@triggers);
+  my $text = HOMEMODE_makeHR($hash,0,@triggers);
   if ($text)
   {
     push @commands,$attr{$name}{"HomeCMDalarmTampered-on"} if ($attr{$name}{"HomeCMDalarmTampered-on"});
@@ -908,7 +1003,7 @@ sub HOMEMODE_RESIDENTS($;$)
         $um =~ s/.*:\s//;
         next if (!grep /^$um$/,split /,/,$HOMEMODE_UserModesAll);
         $usermode = $um;
-      } 
+      }
     }
     if ($usermode)
     {
@@ -987,6 +1082,7 @@ sub HOMEMODE_Attributes($)
   my @attribs;
   push @attribs,"disable:1,0";
   push @attribs,"disabledForIntervals";
+  push @attribs,"HomeAdvancedDetails:none,detail,both,room";
   push @attribs,"HomeAdvancedUserAttr:1,0";
   push @attribs,"HomeAutoAlarmModes:0,1";
   push @attribs,"HomeAutoArrival";
@@ -1000,6 +1096,7 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeCMDalarmTampered-on:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-on:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-off:textField-long";
+  push @attribs,"HomeCMDbatteryLow:textField-long";
   push @attribs,"HomeCMDcontact:textField-long";
   push @attribs,"HomeCMDcontactClosed:textField-long";
   push @attribs,"HomeCMDcontactOpen:textField-long";
@@ -1060,12 +1157,18 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeDaytimes:textField-long";
   push @attribs,"HomeEventsHolidayDevices";
   push @attribs,"HomeIcewarningOnOffTemps";
+  push @attribs,"HomeLanguage:DE,EN";
   push @attribs,"HomeModeAlarmArmDelay";
   push @attribs,"HomeModeAbsentBelatedTime";
   push @attribs,"HomePresenceDeviceType";
   push @attribs,"HomePublicIpCheckInterval";
   push @attribs,"HomeResidentCmdDelay";
   push @attribs,"HomeSeasons:textField-long";
+  push @attribs,"HomeSensorAirpressure";
+  push @attribs,"HomeSensorWindspeed";
+  push @attribs,"HomeSensorsBattery";
+  push @attribs,"HomeSensorsBatteryLowPercentage";
+  push @attribs,"HomeSensorsBatteryReading";
   push @attribs,"HomeSensorsContact";
   push @attribs,"HomeSensorsContactReadings";
   push @attribs,"HomeSensorsContactValues";
@@ -1085,6 +1188,7 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeSpecialModes";
   push @attribs,"HomeTextAndAreIs";
   push @attribs,"HomeTextClosedOpen";
+  push @attribs,"HomeTextRisingConstantFalling";
   push @attribs,"HomeTextTodayTomorrowAfterTomorrow";
   push @attribs,"HomeTextWeatherForecastToday:textField-long";
   push @attribs,"HomeTextWeatherForecastTomorrow:textField-long";
@@ -1251,11 +1355,37 @@ sub HOMEMODE_Attr(@)
         "Invalid value $attr_value for attribute $attr_name. Must be a number from 0 to 5999.99.";
       return $trans if ($attr_value !~ /^(\d{1,4})(\.\d{1,2})?$/ || $1 >= 6000 || $1 < 0);
     }
+    elsif ($attr_name eq "HomeLanguage")
+    {
+      $trans = $HOMEMODE_de?
+        "Ungültiger Wert $attr_value für Attribut $attr_name. Kann nur \"EN\" oder \"DE\" sein, Vorgabewert ist Sprache aus global.":
+        "Invalid value $attr_value for attribute $attr_name. Must be \"EN\" or \"DE\", default is language from global.";
+      return $trans if ($attr_value !~ /^(DE|EN)$/);
+      $HOMEMODE_de = 1 if ($attr_value eq "DE");
+      $HOMEMODE_de = undef if ($attr_value eq "EN");
+    }
+    elsif ($attr_name eq "HomeAdvancedDetails")
+    {
+      $trans = $HOMEMODE_de?
+        "Ungültiger Wert $attr_value für Attribut $attr_name. Kann nur \"none\", \"detail\", \"both\" oder \"room\" sein, Vorgabewert ist \"none\".":
+        "Invalid value $attr_value for attribute $attr_name. Must be \"none\", \"detail\", \"both\" or \"room\", default is \"none\".";
+      return $trans if ($attr_value !~ /^(none|detail|both|room)$/);
+      if ($attr_value eq "detail")
+      {
+        $modules{HOMEMODE}->{FW_deviceOverview} = 1;
+        $modules{HOMEMODE}->{FW_addDetailToSummary} = 0;
+      }
+      else
+      {
+        $modules{HOMEMODE}->{FW_deviceOverview} = 1;
+        $modules{HOMEMODE}->{FW_addDetailToSummary} = 1;
+      }
+    }
     elsif ($attr_name =~ /^(disable|HomeAdvancedUserAttr|HomeAutoDaytime|HomeAutoAlarmModes|HomeAutoPresence)$/)
     {
       $trans = $HOMEMODE_de?
         "Ungültiger Wert $attr_value für Attribut $attr_name. Kann nur 1 oder 0 sein, Vorgabewert ist 0.":
-        "Invalid value $attr_value for attribute $attr_name. Must be 1 or 0 set, default is 0.";
+        "Invalid value $attr_value for attribute $attr_name. Must be 1 or 0, default is 0.";
       return $trans if ($attr_value !~ /^[01]$/);
       RemoveInternalTimer($hash) if ($attr_name eq "disable" && $attr_value == 1);
       HOMEMODE_GetUpdate($hash) if ($attr_name eq "disable" && !$attr_value);
@@ -1281,7 +1411,7 @@ sub HOMEMODE_Attr(@)
       }
       else
       {
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name =~ /^(HomePresenceDeviceType)$/ && $init_done)
@@ -1386,7 +1516,7 @@ sub HOMEMODE_Attr(@)
       if ($attr_value_old ne $attr_value)
       {
         CommandDeleteReading(undef,"$name lastContact|prevContact|contacts.*");
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
         HOMEMODE_addSensorsuserattr($hash,$attr_value,$attr_value_old);
       }
     }
@@ -1398,7 +1528,7 @@ sub HOMEMODE_Attr(@)
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value));
       if ($attr_value_old ne $attr_value)
       {
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
         HOMEMODE_addSensorsuserattr($hash,$attr_value,$attr_value_old);
       }
     }
@@ -1411,7 +1541,7 @@ sub HOMEMODE_Attr(@)
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$p) || !HOMEMODE_CheckIfIsValidDevspec($attr_value,$e));
       if ($attr_value_old ne $attr_value)
       {
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name eq "HomeTwilightDevice" && $init_done)
@@ -1423,7 +1553,7 @@ sub HOMEMODE_Attr(@)
       if ($attr_value_old ne $attr_value)
       {
         CommandDeleteReading(undef,"$name light|twilight|twilightEvent");
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name eq "HomeYahooWeatherDevice" && $init_done)
@@ -1437,7 +1567,7 @@ sub HOMEMODE_Attr(@)
         CommandDeleteReading(undef,"$name pressure|condition|wind|wind_chill");
         CommandDeleteReading(undef,"$name temperature") if (!$attr{$name}{HomeSensorTemperatureOutside});
         CommandDeleteReading(undef,"$name humidity") if (!$attr{$name}{HomeSensorHumidityOutside});
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name eq "HomeSensorTemperatureOutside" && $init_done)
@@ -1450,7 +1580,7 @@ sub HOMEMODE_Attr(@)
       if ($attr_value_old ne $attr_value)
       {
         CommandDeleteReading(undef,"$name temperature") if (!$attr{$name}{HomeYahooWeatherDevice});
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name eq "HomeSensorHumidityOutside" && $init_done)
@@ -1466,7 +1596,7 @@ sub HOMEMODE_Attr(@)
       if ($attr_value_old ne $attr_value)
       {
         CommandDeleteReading(undef,"$name humidity") if (!$attr{$name}{HomeYahooWeatherDevice});
-        HOMEMODE_updateInternals($hash,1);
+        HOMEMODE_updateInternals($hash);
       }
     }
     elsif ($attr_name eq "HomeDaytimes" && $init_done)
@@ -1536,7 +1666,7 @@ sub HOMEMODE_Attr(@)
         "$attr_value for $attr_name must be a single number for delay time in seconds or 3 space separated times in seconds for each modeAlarm individually (order: armaway armnight armhome), max. value is 99999";
       return $trans if ($attr_value !~ /^(\d{1,5})((\s\d{1,5})(\s\d{1,5}))?$/);
     }
-    elsif ($attr_name =~ /^(HomeTextAndAreIs|HomeTextTodayTomorrowAfterTomorrow)$/)
+    elsif ($attr_name =~ /^(HomeTextAndAreIs|HomeTextTodayTomorrowAfterTomorrow|HomeTextRisingConstantFalling)$/)
     {
       $trans = $HOMEMODE_de?
         "$attr_value für $attr_name muss eine Pipe separierte Liste mit 3 Werten sein!":
@@ -1556,16 +1686,16 @@ sub HOMEMODE_Attr(@)
         "$attr_value muss ein gültiges Gerät vom TYPE Weather sein!":
         "$attr_value must be a valid device of TYPE Weather!";
       return "$attr_value must be a valid device of TYPE UWZ!" if (!HOMEMODE_CheckIfIsValidDevspec("$attr_value:FILTER=TYPE=UWZ"));
-      HOMEMODE_updateInternals($hash,1) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
     }
     elsif ($attr_name eq "HomeSensorsLuminance" && $init_done)
     {
       my $read = AttrVal($name,"HomeSensorsLuminanceReading","luminance");
       $trans = $HOMEMODE_de?
         "$attr_value muss ein gültiges Gerät mit $read Reading sein!":
-        "$attr_name must be a valid device with a $read reading!";
+        "$attr_name must be a valid device with $read reading!";
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$read));
-      HOMEMODE_updateInternals($hash,1) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
     }
     elsif ($attr_name eq "HomeSensorsPowerEnergyReadings" && $init_done)
     {
@@ -1573,15 +1703,39 @@ sub HOMEMODE_Attr(@)
         "$attr_name müssen zwei gültige Readings für power und energy sein!":
         "$attr_name must be two valid readings for power and energy!";
       return $trans if ($attr_value !~ /^([\w\-\.]+)\s([\w\-\.]+)$/);
-      HOMEMODE_updateInternals($hash,1) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
     }
-    elsif ($attr_name eq "HomeSensorsLuminanceReading" && $init_done)
+    elsif ($attr_name =~ /^HomeSensorsLuminanceReading|HomeSensorsBatteryReading$/ && $init_done)
     {
       $trans = $HOMEMODE_de?
         "$attr_name muss ein einzelnes gültiges Reading sein!":
         "$attr_name must be a single valid reading!";
       return $trans if ($attr_value !~ /^([\w\-\.]+)$/);
-      HOMEMODE_updateInternals($hash,1) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
+    }
+    elsif ($attr_name =~ /^HomeSensorAirpressure|HomeSensorWindspeed$/ && $init_done)
+    {
+      $trans = $HOMEMODE_de?
+        "$attr_name muss ein einzelnes gültiges Gerät und Reading sein (Sensor:Reading)!":
+        "$attr_name must be a single valid device and reading (sensor:reading)!";
+      return $trans if ($attr_value !~ /^([\w\.]+):([\w\-\.]+)$/ || !HOMEMODE_CheckIfIsValidDevspec($1,$2));
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
+    }
+    elsif ($attr_name eq "HomeSensorsBattery" && $init_done)
+    {
+      my $read = AttrVal($name,"HomeSensorsBatteryReading","battery");
+      $trans = $HOMEMODE_de?
+        "$attr_value muss ein gültiges Gerät mit $read Reading sein!":
+        "$attr_name must be a valid device with $read reading!";
+      return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$read));
+      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
+    }
+    elsif ($attr_name eq "HomeSensorsBatteryLowPercentage")
+    {
+      $trans = $HOMEMODE_de?
+        "$attr_value muss ein Wert zwischen 0 und 99 sein!":
+        "$attr_name must be a value from 0 to 99!";
+      return $trans if ($attr_value !~ /^\d{1,2}$/);
     }
   }
   else
@@ -1591,8 +1745,13 @@ sub HOMEMODE_Attr(@)
     {
       HOMEMODE_GetUpdate($hash);
     }
-    elsif ($attr_name =~ /^(HomeAdvancedUserAttr|HomeAutoPresence|HomePresenceDeviceType|HomeEventsHolidayDevices)$/)
+    elsif ($attr_name eq "HomeLanguage")
     {
+      $HOMEMODE_de = AttrVal("global","language","DE") ? 1 : undef;
+    }
+    elsif ($attr_name =~ /^(HomeAdvancedUserAttr|HomeAutoPresence|HomePresenceDeviceType|HomeEventsHolidayDevices|HomeSensorAirpressure|HomeSensorWindspeed|HomeSensorsBattery|HomeSensorsBatteryReading)$/)
+    {
+      CommandDeleteReading(undef,"$name battery.*");
       HOMEMODE_updateInternals($hash,1);
     }
     elsif ($attr_name =~ /^(HomeSensorsContact|HomeSensorsMotion|HomeSensorsPowerEnergy)$/)
@@ -1602,7 +1761,7 @@ sub HOMEMODE_Attr(@)
       $read = "lastMotion|prevMotion|motions.*" if ($attr_name eq "HomeSensorsMotion");
       $read = "energy|power" if ($attr_name eq "HomeSensorsPowerEnergy");
       CommandDeleteReading(undef,"$name $read");
-      HOMEMODE_updateInternals($hash,1);
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name eq "HomePublicIpCheckInterval")
     {
@@ -1620,13 +1779,13 @@ sub HOMEMODE_Attr(@)
       {
         CommandDeleteReading(undef,"$name twilight|twilightEvent|light");
       }
-      HOMEMODE_updateInternals($hash,1);
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name =~ /^(HomeSensorTemperatureOutside|HomeSensorHumidityOutside)$/)
     {
       CommandDeleteReading(undef,"$name .*temperature.*") if (!$attr{$name}{HomeYahooWeatherDevice} && $attr_name eq "HomeSensorTemperatureOutside");
       CommandDeleteReading(undef,"$name .*humidity.*") if (!$attr{$name}{HomeYahooWeatherDevice} && $attr_name eq "HomeSensorHumidityOutside");
-      HOMEMODE_updateInternals($hash,1);
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name =~ /^(HomeDaytimes|HomeSeasons|HomeSpecialLocations|HomeSpecialModes)$/)
     {
@@ -1636,7 +1795,7 @@ sub HOMEMODE_Attr(@)
     {
       CommandDeleteReading(undef,"$name uwz.*") if ($attr_name eq "HomeUWZ");
       CommandDeleteReading(undef,"$name .*luminance.*") if ($attr_name eq "HomeSensorsLuminance");
-      HOMEMODE_updateInternals($hash,1);
+      HOMEMODE_updateInternals($hash);
     }
   }
   return;
@@ -1673,6 +1832,8 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $location = ReadingsVal($name,"location","");
   my $rlocation = ReadingsVal($resident,"location","");
   my $alarm = ReadingsVal($name,"alarmTriggered",0);
+  my $alarmc = ReadingsVal($name,"alarmTriggered_ct",0);
+  my $alarmhr = ReadingsVal($name,"alarmTriggered_hr",0);
   my $daytime = HOMEMODE_DayTime($hash);
   my $mode = ReadingsVal($name,"mode","");
   my $amode = ReadingsVal($name,"modeAlarm","");
@@ -1704,19 +1865,31 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $pmotion = ReadingsVal($name,"prevMotion","");
   my $contact = ReadingsVal($name,"lastContact","");
   my $pcontact = ReadingsVal($name,"prevContact","");
+  my $uwzc = ReadingsVal($name,"uwz_warnCount",0);
+  my $uwzs = HOMEMODE_uwzTXT($hash,$uwzc,undef);
+  my $uwzl = HOMEMODE_uwzTXT($hash,$uwzc,1);
+  my $lowBat = HOMEMODE_name2alias(ReadingsVal($name,"lastBatteryLow",""));
+  my $lowBatAll = ReadingsVal($name,"batteryLow_hr","");
+  my $lowBatCount = ReadingsVal($name,"batteryLow_ct",0);
+  my $sensorsbattery = $hash->{SENSORSBATTERY};
   my $sensorscontact = $hash->{SENSORSCONTACT};
   my $sensorsenergy = $hash->{SENSORSENERGY};
   my $sensorsmotion = $hash->{SENSORSMOTION};
   my $ure = $hash->{RESIDENTS};
   $ure =~ s/,/\|/g;
-  my $arrivers = HOMEMODE_makeHR($hash,devspec2array("$ure:FILTER=location=arrival"));
+  my $arrivers = HOMEMODE_makeHR($hash,0,devspec2array("$ure:FILTER=location=arrival"));
   $cmd =~ s/%ADDRESS%/$paddress/g;
   $cmd =~ s/%ALARM%/$alarm/g;
+  $cmd =~ s/%ALARMCT%/$alarmc/g;
+  $cmd =~ s/%ALARMHR%/$alarmhr/g;
   $cmd =~ s/%ALIAS%/$alias/g;
   $cmd =~ s/%AMODE%/$amode/g;
   $cmd =~ s/%AEAH%/$aeah/g;
   $cmd =~ s/%ARRIVERS%/$arrivers/g;
   $cmd =~ s/%AUDIO%/$audio/g;
+  $cmd =~ s/%BATTERYLOW%/$lowBat/g;
+  $cmd =~ s/%BATTERYLOWALL%/$lowBatAll/g;
+  $cmd =~ s/%BATTERYLOWCT%/$lowBatCount/g;
   $cmd =~ s/%CONDITION%/$condition/g;
   $cmd =~ s/%CONTACT%/$contact/g;
   $cmd =~ s/%DAYTIME%/$daytime/g;
@@ -1728,15 +1901,13 @@ sub HOMEMODE_replacePlaceholders($$;$)
   {
     foreach my $cal (split /,/,$attr{$name}{HomeEventsHolidayDevices})
     {
-      my $ph = "%$cal%";
       my $state = ReadingsVal($name,"event-$cal","") ne "none" ? ReadingsVal($name,"event-$cal","") : 0;
-      $cmd =~ s/$ph/$state/g;
+      $cmd =~ s/%$cal%/$state/g;
       my $events = HOMEMODE_HolidayEvents($cal);
       foreach my $evt (@{$events})
       {
-        my $eph = "%$cal-$evt%";
         my $val = $state eq $evt ? 1 : 0;
-        $cmd =~ s/$eph/$val/g;
+        $cmd =~ s/%$cal-$evt%/$val/g;
       }
     }
   }
@@ -1782,6 +1953,9 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%TOBE%/$conditionart/g;
   $cmd =~ s/%TWILIGHT%/$twilight/g;
   $cmd =~ s/%TWILIGHTEVENT%/$twilightevent/g;
+  $cmd =~ s/%UWZ%/$uwzc/g;
+  $cmd =~ s/%UWZLONG%/$uwzl/g;
+  $cmd =~ s/%UWZSHORT%/$uwzs/g;
   $cmd =~ s/%WEATHER%/$weathershort/g;
   $cmd =~ s/%WEATHERLONG%/$weatherlong/g;
   $cmd =~ s/%WIND%/$wind/g;
@@ -1822,9 +1996,10 @@ sub HOMEMODE_ReadingTrend($$;$)
   my $pval = ReadingsNum($name,".$read",undef);
   if (defined $pval && ReadingsAge($name,".$read",0) >= $time)
   {
-    my $trend = "constant";
-    $trend = "rising" if ($val > $pval);
-    $trend = "falling" if ($val < $pval);
+    my ($rising,$constant,$falling) = split /\|/,AttrVal($name,"HomeTextRisingConstantFalling","rising|constant|falling");
+    my $trend = $constant;
+    $trend = $rising if ($val > $pval);
+    $trend = $falling if ($val < $pval);
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,".$read",$val);
     readingsBulkUpdate($hash,$read."Trend",$trend);
@@ -1897,6 +2072,24 @@ sub HOMEMODE_ForecastTXT($;$)
   return $text;
 }
 
+sub HOMEMODE_uwzTXT($;$$)
+{
+  my ($hash,$count,$sl) = @_;
+  my $name = $hash->{NAME};
+  $count = defined $count ? $count : ReadingsVal($name,"uwz_warnCount",0);
+  $sl = $sl ? "LongText" : "ShortText";
+  my $text = "";
+  for (my $i = 0; $i < $count; $i++)
+  {
+    my $read = "Warn_$i";
+    my $ii = $i + 1;
+    $text .= " " if ($i > 0);
+    $text .= "$ii. " if ($count > 1);
+    $text .= ReadingsVal($attr{$name}{HomeUWZ},$read."_$sl","");
+  }
+  return $text;
+}
+
 sub HOMEMODE_CheckIfIsValidDevspec($;$)
 {
   my ($spec,$read) = @_;
@@ -1926,12 +2119,12 @@ sub HOMEMODE_execCMDs($$;$)
   my ($hash,$cmds,$resident) = @_;
   my $name = $hash->{NAME};
   my $cmd = HOMEMODE_replacePlaceholders($hash,$cmds,$resident);
-  my $error = AnalyzeCommandChain(undef,$cmd);
-  if ($error)
+  my $err = AnalyzeCommandChain(undef,$cmd);
+  if ($err)
   {
-    Log3 $name,3,"$name: error: $error";
+    Log3 $name,3,"$name: error: $err";
     Log3 $name,3,"$name: error in command: $cmd";
-    readingsSingleUpdate($hash,"lastCMDerror","error: >$error< in CMD: $cmd",1);
+    readingsSingleUpdate($hash,"lastCMDerror","error: >$err< in CMD: $cmd",1);
   }
   Log3 $name,4,"executed CMDs: $cmd";
   return;
@@ -2037,12 +2230,12 @@ sub HOMEMODE_hourMaker($)
     "keine gültigen Minuten übergeben":
     "no valid minutes given";
   return $trans if ($minutes !~ /^(\d{1,4})(\.\d{0,2})?$/ || $1 >= 6000 || $minutes < 0.01);
-  my $hours = int($minutes/60);
-  $hours = length "$hours" > 1 ? $hours : "0$hours";
-  my $min = $minutes%60;
-  $min = length "$min" > 1 ? $min : "0$min";
-  my $sec = int(($minutes-int($minutes))*60);
-  $sec = length "$sec" > 1 ? $sec : "0$sec";
+  my $hours = int($minutes / 60);
+  $hours = length $hours > 1 ? $hours : "0$hours";
+  my $min = $minutes % 60;
+  $min = length $min > 1 ? $min : "0$min";
+  my $sec = int(($minutes - int($minutes)) * 60);
+  $sec = length $sec > 1 ? $sec : "0$sec";
   return "$hours:$min:$sec";
 }
 
@@ -2246,37 +2439,37 @@ sub HOMEMODE_TriggerState($;$$$)
   {
     readingsBulkUpdateIfChanged($hash,"contactsDoorsInsideOpen",$openi);
     readingsBulkUpdateIfChanged($hash,"contactsDoorsInsideOpen_ct",@insideOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsDoorsInsideOpen_hr",HOMEMODE_makeHR($hash,@insideOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsDoorsInsideOpen_hr",HOMEMODE_makeHR($hash,0,@insideOpen));
     readingsBulkUpdateIfChanged($hash,"contactsDoorsOutsideOpen",$opendo);
     readingsBulkUpdateIfChanged($hash,"contactsDoorsOutsideOpen_ct",@doorsOOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsDoorsOutsideOpen_hr",HOMEMODE_makeHR($hash,@doorsOOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsDoorsOutsideOpen_hr",HOMEMODE_makeHR($hash,0,@doorsOOpen));
     readingsBulkUpdateIfChanged($hash,"contactsDoorsMainOpen",$opendm);
     readingsBulkUpdateIfChanged($hash,"contactsDoorsMainOpen_ct",@doorsMOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsDoorsMainOpen_hr",HOMEMODE_makeHR($hash,@doorsMOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsDoorsMainOpen_hr",HOMEMODE_makeHR($hash,0,@doorsMOpen));
     readingsBulkUpdateIfChanged($hash,"contactsOpen",$open);
     readingsBulkUpdateIfChanged($hash,"contactsOpen_ct",@contactsOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsOpen_hr",HOMEMODE_makeHR($hash,@contactsOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsOpen_hr",HOMEMODE_makeHR($hash,0,@contactsOpen));
     readingsBulkUpdateIfChanged($hash,"contactsOutsideOpen",$openo);
     readingsBulkUpdateIfChanged($hash,"contactsOutsideOpen_ct",@outsideOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsOutsideOpen_hr",HOMEMODE_makeHR($hash,@outsideOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsOutsideOpen_hr",HOMEMODE_makeHR($hash,0,@outsideOpen));
     readingsBulkUpdateIfChanged($hash,"contactsWindowsOpen",$openw);
     readingsBulkUpdateIfChanged($hash,"contactsWindowsOpen_ct",@windowsOpen);
-    readingsBulkUpdateIfChanged($hash,"contactsWindowsOpen_hr",HOMEMODE_makeHR($hash,@windowsOpen));
+    readingsBulkUpdateIfChanged($hash,"contactsWindowsOpen_hr",HOMEMODE_makeHR($hash,0,@windowsOpen));
   }
   readingsBulkUpdateIfChanged($hash,"sensorsTampered",$tamp);
   readingsBulkUpdateIfChanged($hash,"sensorsTampered_ct",@sensorsTampered);
-  readingsBulkUpdateIfChanged($hash,"sensorsTampered_hr",HOMEMODE_makeHR($hash,@sensorsTampered));
+  readingsBulkUpdateIfChanged($hash,"sensorsTampered_hr",HOMEMODE_makeHR($hash,0,@sensorsTampered));
   if ($motions)
   {
     readingsBulkUpdateIfChanged($hash,"motionsSensors",$openm);
     readingsBulkUpdateIfChanged($hash,"motionsSensors_ct",@motionsOpen);
-    readingsBulkUpdateIfChanged($hash,"motionsSensors_hr",HOMEMODE_makeHR($hash,@motionsOpen));
+    readingsBulkUpdateIfChanged($hash,"motionsSensors_hr",HOMEMODE_makeHR($hash,0,@motionsOpen));
     readingsBulkUpdateIfChanged($hash,"motionsInside",$openmi);
     readingsBulkUpdateIfChanged($hash,"motionsInside_ct",@motionsInsideOpen);
-    readingsBulkUpdateIfChanged($hash,"motionsInside_hr",HOMEMODE_makeHR($hash,@motionsInsideOpen));
+    readingsBulkUpdateIfChanged($hash,"motionsInside_hr",HOMEMODE_makeHR($hash,0,@motionsInsideOpen));
     readingsBulkUpdateIfChanged($hash,"motionsOutside",$openmo);
     readingsBulkUpdateIfChanged($hash,"motionsOutside_ct",@motionsOutsideOpen);
-    readingsBulkUpdateIfChanged($hash,"motionsOutside_hr",HOMEMODE_makeHR($hash,@motionsOutsideOpen));
+    readingsBulkUpdateIfChanged($hash,"motionsOutside_hr",HOMEMODE_makeHR($hash,0,@motionsOutsideOpen));
   }
   readingsEndUpdate($hash,1);
   HOMEMODE_alarmTampered($hash,@sensorsTampered) if (join(",",@sensorsTampered) ne $tampered);
@@ -2529,37 +2722,14 @@ sub HOMEMODE_UWZCommands($$)
   }
   if (defined $count)
   {
+    readingsSingleUpdate($hash,"uwz_warnCount",$count,1);
     if ($count != $prev)
     {
       my $se = $count > 0 ? "begin" : "end";
       my @cmds;
       push @cmds,$attr{$name}{"HomeCMDuwz-warn-$se"} if ($attr{$name}{"HomeCMDuwz-warn-$se"});
-      if (@cmds)
-      {
-        my $textShort;
-        my $textLong;
-        for (my $i = 0; $i < $count; $i++)
-        {
-          my $read = "Warn_$i";
-          my $ii = $i + 1;
-          $textShort .= " " if ($i > 0);
-          $textLong .= " " if ($i > 0);
-          $textShort .= $ii.". " if ($count > 1);
-          $textLong .= $ii.". " if ($count > 1);
-          $textShort .= ReadingsVal($uwz,$read."_ShortText","");
-          $textLong .= ReadingsVal($uwz,$read."_LongText","");
-        }
-        my @commands;
-        foreach my $cmd (@cmds)
-        {
-          $cmd =~ s/%UWZSHORT%/$textShort/gm;
-          $cmd =~ s/%UWZLONG%/$textLong/gm;
-          push @commands,$cmd;
-        }
-        HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands));
-      }
+      HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@cmds)) if (@cmds);
     }
-    readingsSingleUpdate($hash,"uwz_warnCount",$count,1);
   }
 }
 
@@ -2632,8 +2802,8 @@ sub HOMEMODE_Weather($$)
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"humidity",ReadingsVal($dev,"humidity",5)) if (!$hash->{helper}{externalHumidity});
   readingsBulkUpdate($hash,"temperature",ReadingsVal($dev,"temperature",5)) if (!$attr{$name}{HomeSensorTemperatureOutside});
-  readingsBulkUpdate($hash,"wind",ReadingsVal($dev,"wind",5));
-  readingsBulkUpdate($hash,"pressure",ReadingsVal($dev,"pressure",5));
+  readingsBulkUpdate($hash,"wind",ReadingsVal($dev,"wind",5)) if (!$attr{$name}{HomeSensorWindspeed});
+  readingsBulkUpdate($hash,"pressure",ReadingsVal($dev,"pressure",5)) if (!$attr{$name}{HomeSensorAirpressure});
   readingsBulkUpdate($hash,".be",$be);
   readingsEndUpdate($hash,1);
   HOMEMODE_ReadingTrend($hash,"humidity") if (!$hash->{helper}{externalHumidity});
@@ -2764,6 +2934,49 @@ sub HOMEMODE_checkIP($;$)
   return;
 }
 
+sub HOMEMODE_Details($$$)
+{
+  my ($FW_name,$name,$room) = @_;
+  return if ((AttrVal($name,"HomeAdvancedDetails","none") eq "none") || (!$room && AttrVal($name,"HomeAdvancedDetails","none") eq "room"));
+  my $hash = $defs{$name};
+  my $html = "<div>";
+  $html .= "<style>.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:20px;padding:3px 10px}</style>";
+  $html .= "<div class=\"homeinfopanel\" informid=\"\"></div>";
+  $html .= "<table class=\"wide\">";
+  if (AttrVal($name,"HomeYahooWeatherDevice",""))
+  {
+    $html .= "<tr>";
+    my $temp = $HOMEMODE_de ? "Temperatur" : "Temperature";
+    $html .= "<td class=\"tar\">$temp:</td>";
+    $html .= "<td class=\"dval\"><span informid=\"$name-temperature\">".ReadingsVal($name,"temperature","")."</span> °C</td>";
+    my $humi = $HOMEMODE_de ? "Luftfeuchte" : "Humidity";
+    $html .= "<td class=\"tar\">$humi:";
+    $html .= "<td class=\"dval\"><span informid=\"$name-humidity\">".ReadingsVal($name,"humidity","")."</span> %</td>";
+    my $pres = $HOMEMODE_de ? "Luftdruck" : "Air pressure";
+    $html .= "<td class=\"tar\">$pres:</td>";
+    $html .= "<td class=\"dval\"><span informid=\"$name-pressure\">".ReadingsVal($name,"pressure","")."</span> hPa</td>";
+    $html .= "</tr>";
+  }
+  if (AttrVal($name,"HomeSensorsContact",""))
+  {
+    $html .= "<tr>";
+    my $open = $HOMEMODE_de ? "Offen" : "Open";
+    $html .= "<td class=\"tar\">$open:</td>";
+    $html .= "<td class=\"dval homehover\"><span informid=\"$name-contactsOpen_ct\">".ReadingsVal($name,"contactsOpen_ct","")."</span><span class=\"homeinfo\" informid=\"$name-contactsOpen_hr\">".ReadingsVal($name,"contactsOpen_hr","")."</span></td>";
+    my $tamp = $HOMEMODE_de ? "Sabotiert" : "Tampered";
+    $html .= "<td class=\"tar\">$tamp:</td>";
+    $html .= "<td class=\"dval homehover\"><span informid=\"$name-sensorsTampered_ct\">".ReadingsVal($name,"sensorsTampered_ct","")."</span><span class=\"homeinfo\" informid=\"$name-sensorsTampered_hr\">".ReadingsVal($name,"sensorsTampered_hr","")."</span></td>";
+    my $alarms = $HOMEMODE_de ? "Alarme" : "Alarms";
+    $html .= "<td class=\"tar\">$alarms:</td>";
+    $html .= "<td class=\"dval homehover\"><span informid=\"$name-alarmTriggered_ct\">".ReadingsVal($name,"alarmTriggered_ct","")."</span><span class=\"homeinfo\" informid=\"$name-alarmTriggered_hr\">".ReadingsVal($name,"alarmTriggered_hr","")."</span></td>";
+    $html .= "</tr>";
+  }
+  $html .= "</table>";
+  $html .= "</div>";
+  $html .= "<script>\$(\".homehover\").unbind().mouseover(function(){var t=\$(this).find(\".homeinfo\").text();var id=\$(this).find(\".homeinfo\").attr(\"informid\");\$(\".homeinfopanel\").text(t).attr(\"informid\",id);});</script>";
+  return $html;
+}
+
 1;
 
 =pod
@@ -2869,7 +3082,7 @@ sub HOMEMODE_checkIP($;$)
       will force update all internals of the HOMEMODE device<br>
       use this if you just reload this module after an update or if you made changes on any HOMEMODE monitored device, e.g. after adding residents/guest or after adding new sensors with the same devspec as before
     </li>
-  </ul>  
+  </ul>
   <br>
   <a name="HOMEMODE_get"></a>
   <p><b>get &lt;required&gt; [optional]</b></p>
@@ -2908,16 +3121,17 @@ sub HOMEMODE_checkIP($;$)
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <b><i>disable</i></b><br>
-      disable HOMEMODE device and stop executing CMDs<br>
-      values 0 or 1<br>
-      default: 0
+      <b><i>HomeAdvancedDetails</i></b><br>
+      show more details depending on the monitored devices<br>
+      value detail will only show advanced details in detail view, value both will show advanced details also in room view, room will show advanced details only in room view<br>
+      values: none, detail, both, room<br>
+      default: none
     </li>
     <li>
       <b><i>HomeAdvancedUserAttr</i></b><br>
       more HomeCMD userattr will be provided<br>
       additional attributes for each resident and each calendar event<br>
-      values 0 or 1<br>
+      values: 0 or 1<br>
       default: 0
     </li>
     <li>
@@ -2988,6 +3202,10 @@ sub HOMEMODE_checkIP($;$)
     <li>
       <b><i>HomeCMDcontact</i></b><br>
       cmds to execute if any contact has been triggered (open/tilted/closed)
+    </li>
+    <li>
+      <b><i>HomeCMDbatteryLow</i></b><br>
+      cmds to execute if any battery sensor has low battery
     </li>
     <li>
       <b><i>HomeCMDcontactClosed</i></b><br>
@@ -3150,10 +3368,15 @@ sub HOMEMODE_checkIP($;$)
       default: 2 3
     </li>
     <li>
+      <b><i>HomeLanguage</i></b><br>
+      overwrite language from gloabl device<br>
+      default: EN (language setting from global device)
+    </li>
+    <li>
       <b><i>HomeModeAbsentBelatedTime</i></b><br>
       time in minutes after changing to absent to execute "HomeCMDmode-absent-belated"<br>
       if mode changes back (to home e.g.) in this time frame "HomeCMDmode-absent-belated" will not be executed<br>
-      default: 
+      default:
     </li>
     <li>
       <b><i>HomeModeAlarmArmDelay</i></b><br>
@@ -3194,14 +3417,28 @@ sub HOMEMODE_checkIP($;$)
       default: 01.01|spring 06.01|summer 09.01|autumn 12.01|winter
     </li>
     <li>
-      <b><i>HomeSensorHumidityOutside</i></b><br>
-      main outside humidity sensor<br>
-      if HomeSensorTemperatureOutside also has a humidity reading, you don't need to add the same sensor here
+      <b><i>HomeSensorAirpressure</i></b><br>
+      main outside airpressure sensor
     </li>
     <li>
-      <b><i>HomeSensorTemperatureOutside</i></b><br>
-      main outside temperature sensor<br>
-      if this sensor also has a humidity reading, you don't need to add the same sensor to HomeSensorHumidityOutside
+      <b><i>HomeSensorWindspeed</i></b><br>
+      main outside wind speed sensor
+    </li>
+    <li>
+      <b><i>HomeSensorsBattery</i></b><br>
+      devspec of battery sensors with a battery reading<br>
+      all sensors with a percentage battery value or a ok/low/nok battery value are applicable
+    </li>
+    <li>
+      <b><i>HomeSensorsBatteryLowPercentage</i></b><br>
+      percentage to recognize a sensors battery as low (only percentage based sensors)<br>
+      default: 50
+    </li>
+    <li>
+      <b><i>HomeSensorsBatteryReading</i></b><br>
+      a single word for the battery reading<br>
+      this is only here available as global setting for all devices<br>
+      default: battery
     </li>
     <li>
       <b><i>HomeSensorsContact</i></b><br>
@@ -3225,13 +3462,13 @@ sub HOMEMODE_checkIP($;$)
           specify the HOMEMODE mode(s)/state(s) by regex in which the contact sensor should not trigger open warnings<br>
           choose one or a combination of all available modes of the HOMEMODE device<br>
           if you don't want open warnings while sleeping a good choice would be: gotosleep|asleep<br>
-          default: 
+          default:
         </li>
         <li>
           <b><i>HomeOpenDontTriggerModesResidents</i></b><br>
           comma separated list of residents whose state should be the reference for HomeOpenDontTriggerModes instead of the mode of the HOMEMODE device<br>
           if one of the listed residents is in the state given by attribute HomeOpenDontTriggerModes, open warnings will not be triggered for this contact sensor<br>
-          default: 
+          default:
         </li>
         <li>
           <b><i>HomeOpenMaxTrigger</i></b><br>
@@ -3304,13 +3541,25 @@ sub HOMEMODE_checkIP($;$)
       default: 10
     </li>
     <li>
+      <b><i>HomeSensorHumidityOutside</i></b><br>
+      main outside humidity sensor<br>
+      if HomeSensorTemperatureOutside also has a humidity reading, you don't need to add the same sensor here
+    </li>
+    <li>
+      <b><i>HomeSensorTemperatureOutside</i></b><br>
+      main outside temperature sensor<br>
+      if this sensor also has a humidity reading, you don't need to add the same sensor to HomeSensorHumidityOutside
+    </li>
+    <li>
       <b><i>HomeSensorsLuminance</i></b><br>
       devspec of sensors with luminance measurement capabilities<br>
-      these devices will be used for total luminance calculations
+      these devices will be used for total luminance calculations<br>
+      please set the corresponding reading for luminance in attribute HomeSensorsLuminanceReading (if different to luminance) before applying snesors here
     </li>
     <li>
       <b><i>HomeSensorsLuminanceReading</i></b><br>
       a single word for the luminance reading<br>
+      this is only here available as global setting for all devices<br>
       default: luminance
     </li>
     <li>
@@ -3387,6 +3636,11 @@ sub HOMEMODE_checkIP($;$)
       default: closed|open
     </li>
     <li>
+      <b><i>HomeTextRisingConstantFalling</i></b><br>
+      pipe separated list of your local translation for "rising", "constant" and "falling"<br>
+      default: rising|constant|falling
+    </li>
+    <li>
       <b><i>HomeTextTodayTomorrowAfterTomorrow</i></b><br>
       pipe separated list of your local translations for "today", "tomorrow" and "day after tomorrow"<br>
       this is used by weather forecast<br>
@@ -3444,7 +3698,8 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>disable</i></b><br>
-      disable the HOMEMODE device
+      disable HOMEMODE device and stop executing CMDs<br>
+      values 0 or 1<br>
       default: 0
     </li>
     <li>
@@ -3459,11 +3714,15 @@ sub HOMEMODE_checkIP($;$)
   <ul>
     <li>
       <b><i>alarmTriggered</i></b><br>
-      (human reading) list of triggered alarm sensors (contact/motion sensors)
+      list of triggered alarm sensors (contact/motion sensors)
     </li>
     <li>
       <b><i>alarmTriggered_ct</i></b><br>
       count of triggered alarm sensors (contact/motion sensors)
+    </li>
+    <li>
+      <b><i>alarmTriggered_hr</i></b><br>
+      (human readable) list of triggered alarm sensors (contact/motion sensors)
     </li>
     <li>
       <b><i>anyoneElseAtHome</i></b><br>
@@ -3474,12 +3733,24 @@ sub HOMEMODE_checkIP($;$)
       list of names of open contact sensors of type doorinside
     </li>
     <li>
+      <b><i>batteryLow</i></b><br>
+      list of names of sensors with low battery
+    </li>
+    <li>
+      <b><i>batteryLow_ct</i></b><br>
+      count of sensors with low battery
+    </li>
+    <li>
+      <b><i>batteryLow_hr</i></b><br>
+      (human readable) list of sensors with low battery
+    </li>
+    <li>
       <b><i>contactsDoorsInsideOpen_ct</i></b><br>
       count of open contact sensors of type doorinside
     </li>
     <li>
       <b><i>contactsDoorsInsideOpen_hr</i></b><br>
-      (human reading) list of open contact sensors of type doorinside
+      (human readable) list of open contact sensors of type doorinside
     </li>
     <li>
       <b><i>contactsDoorsMainOpen</i></b><br>
@@ -3491,7 +3762,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>contactsDoorsMainOpen_hr</i></b><br>
-      (human reading) list of open contact sensors of type doormain
+      (human readable) list of open contact sensors of type doormain
     </li>
     <li>
       <b><i>contactsDoorsOutsideOpen</i></b><br>
@@ -3503,7 +3774,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>contactsDoorsOutsideOpen_hr</i></b><br>
-      (human reading) list of contact sensors of type dooroutside
+      (human readable) list of contact sensors of type dooroutside
     </li>
     <li>
       <b><i>contactsOpen</i></b><br>
@@ -3515,7 +3786,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>contactsOpen_hr</i></b><br>
-      (human reading) list of all open contact sensors
+      (human readable) list of all open contact sensors
     </li>
     <li>
       <b><i>contactsOutsideOpen</i></b><br>
@@ -3527,7 +3798,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>contactsOutsideOpen_hr</i></b><br>
-      (human reading) list of open contact sensors outside (sensor types: dooroutside,doormain,window)
+      (human readable) list of open contact sensors outside (sensor types: dooroutside,doormain,window)
     </li>
     <li>
       <b><i>contactsWindowsOpen</i></b><br>
@@ -3539,7 +3810,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>contactsWindowsOpen_hr</i></b><br>
-      (human reading) list of open contact sensors of type window
+      (human readable) list of open contact sensors of type window
     </li>
     <li>
       <b><i>daytime</i></b><br>
@@ -3594,6 +3865,10 @@ sub HOMEMODE_checkIP($;$)
     <li>
       <b><i>lastAwokenByResident</i></b><br>
       last resident who went awoken
+    </li>
+    <li>
+      <b><i>lastBatteryLow</i></b><br>
+      last sensor with low battery
     </li>
     <li>
       <b><i>lastCMDerror</i></b><br>
@@ -3666,7 +3941,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>motionsInside_hr</i></b><br>
-      (human reading) list of open motion sensors of type inside
+      (human readable) list of open motion sensors of type inside
     </li>
     <li>
       <b><i>motionsOutside</i></b><br>
@@ -3678,7 +3953,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>motionsOutside_hr</i></b><br>
-      (human reading) list of open motion sensors of type outside
+      (human readable) list of open motion sensors of type outside
     </li>
     <li>
       <b><i>motionsSensors</i></b><br>
@@ -3690,7 +3965,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>motionsSensors_hr</i></b><br>
-      (human reading) list of all open motion sensors
+      (human readable) list of all open motion sensors
     </li>
     <li>
       <b><i>power</i></b><br>
@@ -3758,7 +4033,7 @@ sub HOMEMODE_checkIP($;$)
     </li>
     <li>
       <b><i>sensorsTampered_hr</i></b><br>
-      (human reading) list of tampered sensors
+      (human readable) list of tampered sensors
     </li>
     <li>
       <b><i>state</i></b><br>
@@ -3805,7 +4080,16 @@ sub HOMEMODE_checkIP($;$)
     <li>
       <b><i>%ALARM%</i></b><br>
       value of the alarmTriggered reading of the HOMEMODE device<br>
-      will return 0 if no alarm is triggered or a list of triggered sensors if alarm is triggered<br>
+      will return 0 if no alarm is triggered or a list of triggered sensors if alarm is triggered
+    </li>
+    <li>
+      <b><i>%ALARMCT%</i></b><br>
+      value of the alarmTriggered_ct reading of the HOMEMODE device
+    </li>
+    <li>
+      <b><i>%ALARMHR%</i></b><br>
+      value of the alarmTriggered_hr reading of the HOMEMODE device<br>
+      will return 0 if no alarm is triggered or a (human readable) list of triggered sensors if alarm is triggered<br>
       can be used for sending msg e.g.
     </li>
     <li>
@@ -3832,6 +4116,18 @@ sub HOMEMODE_checkIP($;$)
       <b><i>%BE%</i></b><br>
       is or are of condition reading of monitored Yahoo weather device<br>
       can be used for weather (forecast) output
+    </li>
+    <li>
+      <b><i>%BATTERYLOW%</i></b><br>
+      alias (or name if alias is not set) of the last battery sensor which reported low battery
+    </li>
+    <li>
+      <b><i>%BATTERYLOWALL%</i></b><br>
+      list if aliases (or names if alias is not set) of all battery sensor which reported low battery currently
+    </li>
+    <li>
+      <b><i>%BATTERYLOWCT%</i></b><br>
+      number of battery sensors which reported low battery currently
     </li>
     <li>
       <b><i>%CONDITION%</i></b><br>
@@ -4020,6 +4316,10 @@ sub HOMEMODE_checkIP($;$)
       name of the HOMEMODE device itself
     </li>
     <li>
+      <b><i>%SENSORSBATTERY%</i></b><br>
+      all battery sensors from internal SENSORSBATTERY
+    </li>
+    <li>
       <b><i>%SENSORSCONTACT%</i></b><br>
       all contact sensors from internal SENSORSCONTACT
     </li>
@@ -4056,6 +4356,10 @@ sub HOMEMODE_checkIP($;$)
     <li>
       <b><i>%TWILIGHTEVENT%</i></b><br>
       current twilight event
+    </li>
+    <li>
+      <b><i>%UWZ%</i></b><br>
+      UWZ warnings count
     </li>
     <li>
       <b><i>%UWZLONG%</i></b><br>

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  22_HOMEMODE: v1.1.0 please change %ALARM% to %ALARMHR%
   - change:  93_DbRep: version 4.15.0, limitation of fetchrows result to 1000
                        adjustable by attr limit, performance increased in many 
                        cases, some bugfixes of PostgreSQL sumValue/averageValue
