@@ -119,6 +119,8 @@ sub alarmclock_Initialize($)
                         . " SnoozeRoutine"
                         . " HolidayDevice"
                         . " HolidayCheck:1,0"
+                        . " PresenceDevice"
+                        . " PresenceCheck:1,0"
                         . " RepRoutine1"
                         . " RepRoutine1WaitInSec"
                         . " RepRoutine1Repeats"
@@ -438,7 +440,7 @@ sub alarmclock_Attr(@)
         }   
     }
     
-###HolidayCheck###  
+###Holiday###  
 
     if($attr_name eq "HolidayCheck")
     {
@@ -475,42 +477,13 @@ sub alarmclock_createtimer($)
 if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME},"state","activated") ne "deactivated"))
 {
     
-### Check HolidayDevice ###
-    
-    if ((AttrVal($hash->{NAME}, "HolidayDevice", "NONE" ) ne "NONE" ) && (AttrVal($hash->{NAME}, "HolidayCheck", "1" ) ne "0" ))
+### Holiday ###   
+    if (alarmclock_holiday_check($hash))
     {
-        my @HolidayDevice = split(/:/, AttrVal($hash->{NAME},"HolidayDevice",""),3);
-        
-        if (scalar(@HolidayDevice) eq "1")
-        {
-            if (ReadingsVal($HolidayDevice[0],"state","none") ne "none")
-            {
-                $alarmtimetoday = $alarmday{8};
-                Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-            }
-        }   
-        elsif (scalar(@HolidayDevice) eq "2")   
-        {   
-            if (ReadingsVal($HolidayDevice[0],"state","NONE") eq $HolidayDevice[1])
-            {
-                $alarmtimetoday = $alarmday{8};
-                Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-            }
-        }   
-        elsif (scalar(@HolidayDevice) eq "3")
-        {   
-            my $HolidayEvent = $HolidayDevice[2];
-                $HolidayEvent =~ s/ //g;
-            if (ReadingsVal($HolidayDevice[0],$HolidayDevice[1],"NONE") eq $HolidayEvent)
-            {
-                $alarmtimetoday = $alarmday{8};
-                Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-            }
-        }
+        $alarmtimetoday = $alarmday{8};
     }
-    
-### Ende Holiday ###
 
+### End Holiday ###    
     
     if ((ReadingsVal($hash->{NAME},$alarmtimetoday,"NONE")) =~ /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     {
@@ -534,7 +507,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
                 Log3 $hash->{NAME}, 5, "alarmclock: $hash->{NAME} - alarm-timer created with $AlarmIn sec";
 
 
-### Check für Pre-Alarm ###
+### PreAlarm ###
     
                 if((AttrVal($hash->{NAME},"PreAlarmTimeInSec","NONE")) =~ /^([0-9]?[0-9]?[0-9]?[0-9])$/)
                 {
@@ -556,7 +529,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
                     Log3 $hash->{NAME}, 4, "alarmclock: $hash->{NAME} - no PreAlarmTimeInSec is set";
                 }   
                 
-### Ende Pre-Alarm ###
+### End PreAlarm ###
 
                 
             }
@@ -569,7 +542,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
     }
     
     
-### Check für OffDefaultTime ###    
+### OffDefaultTime ###    
     
     elsif((ReadingsVal($hash->{NAME},$alarmtimetoday,"NONE")) eq "off")
     {
@@ -604,7 +577,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
         }   
     }
 
-### Ende OffDefaultTime ### 
+### End OffDefaultTime ### 
     
     
     else 
@@ -619,7 +592,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 
 ########################################################################################
 #
-#   Zeit bis Mitternacht wird berrechnet und ein Timer bis Mitternacht + 5Sekunden wird gesetzt         
+#   Midnight-timer + 5 seconds         
 #
 ########################################################################################
 
@@ -645,7 +618,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 
 ########################################################################################
 #
-#   Alarm-Routine wird gestartet 
+#   Alarm-Routine start 
 #
 ########################################################################################
 
@@ -655,20 +628,25 @@ sub alarmclock_alarmroutine_start($)
     my ($hash) = @_;
     my $Mode = "Alarm";
     
-    fhem("".AttrVal($hash->{NAME},"AlarmRoutine",""));      
-    readingsSingleUpdate( $hash,"state", "Alarm is running", 1 );
-    alarmclock_hardalarm_timer($hash);
-    alarmclock_maxalarmduration_timer($hash);
-    alarmclock_reproutine($hash, $Mode);
-    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - AlarmRoutine started.";
-    
-        
+    if (alarmclock_presence_check($hash))
+    {
+        fhem("".AttrVal($hash->{NAME},"AlarmRoutine",""));      
+        readingsSingleUpdate( $hash,"state", "Alarm is running", 1 );
+        alarmclock_hardalarm_timer($hash);
+        alarmclock_maxalarmduration_timer($hash);
+        alarmclock_reproutine($hash, $Mode);
+        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - AlarmRoutine started.";
+    }
+    else
+    {
+        alarmclock_createtimer($hash);
+    }
 }
 
 
 ########################################################################################
 #
-#   Alarm-Routine wird gestoppt
+#   Alarm-Routine stop
 #
 ########################################################################################
 
@@ -689,7 +667,7 @@ sub alarmclock_alarmroutine_stop($)
 
 ########################################################################################
 #
-#   Pre-Alarm-Routine wird gestartet 
+#   Pre-Alarm-Routine start 
 #
 ########################################################################################
 
@@ -699,11 +677,13 @@ sub alarmclock_prealarmroutine_start($)
     my ($hash) = @_;
     my $Mode = "PreAlarm";
 
-    fhem("".AttrVal($hash->{NAME},"PreAlarmRoutine",""));
-    readingsSingleUpdate( $hash,"state", "PreAlarm is running", 1 );
-    alarmclock_reproutine($hash, $Mode);
-    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - PreAlarmRoutine started.";  
-
+    if (alarmclock_presence_check($hash))
+    {   
+        fhem("".AttrVal($hash->{NAME},"PreAlarmRoutine",""));
+        readingsSingleUpdate( $hash,"state", "PreAlarm is running", 1 );
+        alarmclock_reproutine($hash, $Mode);
+        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - PreAlarmRoutine started.";
+    }   
 }
 
 
@@ -807,7 +787,7 @@ sub alarmclock_maxalarmduration_timer($)
 
 ########################################################################################
 #
-#   HardAlarm wird gestartet
+#   HardAlarm start
 #
 ########################################################################################
 
@@ -886,7 +866,7 @@ sub alarmclock_reproutine_stop($$)
 
 ########################################################################################
 #
-#   RepRoutine1 wird gestartet
+#   RepRoutine1 start
 #
 ########################################################################################
 
@@ -904,7 +884,6 @@ sub alarmclock_reproutine1_start($)
         my $RNext = $RNow + 1;
         $hash->{helper}{Repeat1} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine1",""));
-        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep1: $hash->{helper}{Repeat1}";
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine1_start", $hash, 0);
     }   
 }
@@ -912,7 +891,7 @@ sub alarmclock_reproutine1_start($)
 
 ########################################################################################
 #
-#   RepRoutine2 wird gestartet
+#   RepRoutine2 start
 #
 ########################################################################################
 
@@ -930,7 +909,6 @@ sub alarmclock_reproutine2_start($)
         my $RNext = $RNow + 1;
         $hash->{helper}{Repeat2} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine2",""));
-        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep2: $hash->{helper}{Repeat2}";
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine2_start", $hash, 0);
     }   
 }
@@ -938,7 +916,7 @@ sub alarmclock_reproutine2_start($)
 
 ########################################################################################
 #
-#   RepRoutine3 wird gestartet
+#   RepRoutine3 start
 #
 ########################################################################################
 
@@ -956,9 +934,123 @@ sub alarmclock_reproutine3_start($)
         my $RNext = $RNow + 1;
         $hash->{helper}{Repeat3} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine3",""));
-        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - Rep3: $hash->{helper}{Repeat3}";
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine3_start", $hash, 0);
     }   
+}
+
+########################################################################################
+#
+#   Presence Check
+#
+########################################################################################
+
+sub alarmclock_presence_check($)
+{
+
+    my ($hash) = @_;
+
+    if ((AttrVal($hash->{NAME}, "PresenceDevice", "NONE" ) ne "NONE" ) && (AttrVal($hash->{NAME}, "PresenceCheck", "1" ) ne "0" ))
+    {
+        my @Presence = split(/\|/, AttrVal($hash->{NAME},"PresenceDevice",""));
+        
+        my $a = 0;
+        my $b = scalar(@Presence);
+        
+        while ($a < $b)
+        {
+        
+            my @PresenceDevice = split(/:/,$Presence[$a]);
+
+            if (scalar(@PresenceDevice) eq "1")
+            {
+                if (ReadingsVal($PresenceDevice[0],"state","present") ne "present")
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - absent";
+                    return 0;
+                }
+            }   
+            elsif (scalar(@PresenceDevice) eq "2")   
+            {   
+                if (ReadingsVal($PresenceDevice[0],"state","NONE") eq $PresenceDevice[1])
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - absent";
+                    return 0;
+                }
+            }   
+            elsif (scalar(@PresenceDevice) eq "3")
+            {   
+                my $PresenceEvent = $PresenceDevice[2];
+                    $PresenceEvent =~ s/ //g;
+                if (ReadingsVal($PresenceDevice[0],$PresenceDevice[1],"NONE") eq $PresenceEvent)
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - absent";
+                    return 0;
+                }
+            }
+            
+            $a ++;
+        
+        }
+    }
+    return 1;
+}
+
+
+########################################################################################
+#
+#   Holiday Check
+#
+########################################################################################
+
+sub alarmclock_holiday_check($)
+{
+
+    my ($hash) = @_;
+
+    if ((AttrVal($hash->{NAME}, "HolidayDevice", "NONE" ) ne "NONE" ) && (AttrVal($hash->{NAME}, "HolidayCheck", "1" ) ne "0" ))
+    {
+        my @Holiday = split(/\|/, AttrVal($hash->{NAME},"HolidayDevice",""));
+        
+        my $a = 0;
+        my $b = scalar(@Holiday);
+        
+        while ($a < $b)
+        {
+        
+            my @HolidayDevice = split(/:/,$Holiday[$a]);
+
+            if (scalar(@HolidayDevice) eq "1")
+            {
+                if (ReadingsVal($HolidayDevice[0],"state","none") ne "none")
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                    return 1;
+                }
+            }   
+            elsif (scalar(@HolidayDevice) eq "2")   
+            {   
+                if (ReadingsVal($HolidayDevice[0],"state","NONE") eq $HolidayDevice[1])
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                    return 1;
+                }
+            }   
+            elsif (scalar(@HolidayDevice) eq "3")
+            {   
+                my $HolidayEvent = $HolidayDevice[2];
+                    $HolidayEvent =~ s/ //g;
+                if (ReadingsVal($HolidayDevice[0],$HolidayDevice[1],"NONE") eq $HolidayEvent)
+                {
+                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                    return 1;
+                }
+            }
+            
+            $a ++;
+        
+        }
+    }
+    return 0;
 }
 
 
@@ -1146,6 +1238,22 @@ sub alarmclock_Notify($$)
             </li>
             <li><b>HolidayCheck</b> <br>
                 0 disables monitoring the holiday device<br>
+                1 activates monitoring
+            </li>
+                <li><b>PresenceDevice</b> <br>
+                Name of the presence device.<br>
+                There are 3 possibilities:<br>
+                1.presence device from Typ presence.<br>
+                &lt;devicename&gt; Example: attr &lt;name&gt; PresenceDevice Presence <br>
+                Alarmclock cancel alarm when state is absent <br>
+                2.On state of a device.For example a dummy <br>
+                &lt;devicename&gt;:&lt;value&gt; Example: attr &lt;name&gt; PresenceDevice MyDummy:absent <br>
+                Here the Alarmclock cancel alarm when the state of the dummy has the value absent <br>
+                3.On a reading of a device. <br>
+                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; Example: attr &lt;name&gt; PresenceDevice MyDummy:user:notathome <br>
+            </li>
+            <li><b>PresenceCheck</b> <br>
+                0 disables monitoring the presence device<br>
                 1 activates monitoring
             </li>
             <li><b>disable</b> <br>
