@@ -288,8 +288,8 @@ sub
 harmony_Set($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
-  my ($a, $h) = parseParams(\@params);
-  my ($param, $param2) = @{$a};
+  my ($param_a, $param_h) = parseParams(\@params);
+  my ($param, $param2) = @{$param_a};
   #$cmd = lc( $cmd );
 
   my $list = "";
@@ -404,7 +404,7 @@ harmony_Set($$@)
       return "unknown command $param2" if( !$action );
     }
 
-    my $duration = $h->{duration};
+    my $duration = $param_h->{duration};
     return "duration musst be numeric" if( defined($duration) && $duration !~ m/^([\d-.])+$/ );
     $duration = 0.1 if( !$duration || $duration < 0 );
     $duration = 5 if $duration > 5;
