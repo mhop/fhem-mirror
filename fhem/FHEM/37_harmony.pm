@@ -405,7 +405,7 @@ harmony_Set($$@)
     }
 
     my $duration = $param_h->{duration};
-    return "duration musst be numeric" if( defined($duration) && $duration !~ m/^([\d-.])+$/ );
+    return "duration musst be numeric" if( defined($duration) && $duration !~ m/^([\d.-])+$/ );
     $duration = 0.1 if( !$duration || $duration < 0 );
     $duration = 5 if $duration > 5;
 
