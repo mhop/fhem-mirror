@@ -882,7 +882,7 @@ sub addproperty($$) {
     return;
   }
   return unless($key);
-  #main::Debug "addproperty for key $key";
+  #main::Debug "addproperty for line $line gives key $key, parts is $parts, parameter os $parameter";
   
   # ignore some properties
   # commented out: it is faster to add the property than to do the check
@@ -913,7 +913,13 @@ sub addproperty($$) {
 sub parse($$) {
   my ($self,$ics)= @_;
   
-  my @ical= split /\R/, $ics;
+  # This is the proper way to do it, with \R corresponding to (?>\r\n|\n|\x0b|\f|\r|\x85|\x2028|\x2029)
+  #      my @ical= split /\R/, $ics;
+  # Tt does not treat some unicode emojis correctly, though. 
+  # We thus go for the the DOS/Windows/Unix/Mac classic variants.
+  # Suggested reading: 
+  # http://stackoverflow.com/questions/3219014/what-is-a-cross-platform-regex-for-removal-of-line-breaks
+  my @ical= split /(?>\r\n|[\r\n])/, $ics;
   return $self->parseSub(0, \@ical);
 }
 
@@ -924,6 +930,7 @@ sub parseSub($$$) {
   #main::Debug "ENTER @ $ln";
   while($ln< $len) {
     my $line= $$icalref[$ln];
+    main::Debug "parse line $line";
     $ln++;
     # check for and handle continuation lines (4.1 on page 12)
     while($ln< $len) {
