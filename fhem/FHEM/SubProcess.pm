@@ -125,7 +125,7 @@ sub wait() {
   if(defined($pid)) {
     main::Log3 $pid, 5, "Waiting for SubProcess $pid...";
     waitpid($pid, 0);
-    main::Log3 $pid, 5, "SubProcess $pid terminated...";
+    main::Log3 $pid, 5, "SubProcess $pid terminated.";
   }
 }
 
@@ -176,8 +176,6 @@ sub parent() {
 
 # this is a helper function for reading
 # returns 1 datagram or undef on error
-# this version does not handle split transmissions that result in short datagrams
-# Todo: buffer such datagrams
 sub readFrom() {
   my ($self, $fh) = @_;
 
@@ -209,15 +207,16 @@ sub readFrom() {
   }
 
   # Read datagram
-  my $size = unpack ('N', $header);	
-  my $bytes = sysread ($fh, $data, $size);
-  if (!defined ($bytes)) {
-    $self->{lasterror} = $!;
-    return undef;
-  }
-  elsif ($bytes != $size) {
-    $self->{lasterror} = "read: incomplete data";
-    return undef;
+  my $size = unpack ('N', $header);
+  my $buffer;
+  while($size> 0) {
+    my $bytes = sysread ($fh, $buffer, $size);
+    if (!defined ($bytes)) {
+      $self->{lasterror} = $!;
+      return undef;
+    }
+    $data.= $buffer;
+    $size-= $bytes;
   }
 
   return $data;
@@ -312,6 +311,7 @@ sub run() {
     # CHILD
     
     # run
+    main::Log3 undef, 5, "SubProcess $$ started.";
     my $onRun= $self->{onRun};
     if(defined($onRun)) {
       eval { &$onRun($self) };
@@ -325,7 +325,7 @@ sub run() {
       main::Log3 undef, 2, "SubProcess: onExit returned error: $@" if($@);
     }
     
-    #close(PARENT);
+    main::Log3 undef, 5, "SubProcess $$ ended.";
     POSIX::_exit(0);
     
   } else {

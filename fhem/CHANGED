@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: SubProcess.pm: buffer reads, messages amended
   - feature: 98_alarmclock: New feature PresenceDevice
   - change:  49_SSCam: version 2.2.1, last record playback possible as iFrame,
                        deviceoverview available,
