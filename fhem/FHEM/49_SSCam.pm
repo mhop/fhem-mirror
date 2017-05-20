@@ -27,6 +27,11 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 2.2.1  15.05.2017    avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on)
+# 2.2.0  10.05.2017    check if JSON module has been loaded successfully, DeviceOverview available, options of 
+#                      runView changed image->live_fw, link->live_link, link_open->live_open, lastrec ->lastrec_fw,
+#                      commandref revised
+# 2.1.4  08.05.2017    commandref changed
 # 2.1.3  05.05.2017    issue of operation error if CAMID is set and SID isn't valid, more login-errorcodes evaluation
 # 2.1.2  04.05.2017    default login retries increased to 3
 # 2.1.1  17.04.2017    runliveview routine changed, {HELPER}{SID_STRM} deleted
@@ -43,8 +48,7 @@
 # 1.35   17.09.2016    internal timer of start-routines optimized
 # 1.34   15.09.2016    simu_SVSversion changed, added 407 errorcode message, external recording changed 
 #                      for SVS 7.2
-# 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull
-#                      added
+# 1.33   21.08.2016    function get stmUrlPath added, fit to new commandref style, attribute showStmInfoFull added
 # 1.32.1 18.08.2016    empty event LastSnapId fixed
 # 1.32   17.08.2016    Logging of verbose 4 changed
 # 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
@@ -154,9 +158,9 @@
 #
 
 package main;
-
-use JSON qw( decode_json );                 # from CPAN, Debian: apt-get install libjson-perl 
-use Data::Dumper;                           # Perl Core module
+              
+eval "use JSON qw( decode_json );1" or my $SScamMMDBI = "JSON";   # Debian: apt-get install libjson-perl
+use Data::Dumper;                                                 # Perl Core module
 use strict;                           
 use warnings;
 use MIME::Base64;
@@ -164,7 +168,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.1.3";
+my $SSCamVersion = "2.2.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -218,8 +222,9 @@ sub SSCam_Initialize($) {
  $hash->{GetFn}        = "SSCam_Get";
  $hash->{AttrFn}       = "SSCam_Attr";
  # Aufrufe aus FHEMWEB
- $hash->{FW_summaryFn} = "SSCam_liveview";
- $hash->{FW_detailFn}  = "SSCam_liveview";
+ $hash->{FW_summaryFn} = "SSCam_FWview";
+ # $hash->{FW_detailFn}  = "SSCam_FWview";
+ $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} =
          "disable:1,0 ".
@@ -252,6 +257,8 @@ sub SSCam_Define {
   #
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
+  
+ return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
   
   my @a = split("[ \t][ \t]*", $def);
   
@@ -400,7 +407,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   "runView:image,lastrec,lastrec_open,link,link_open ".
+                   "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open ".
                    "stopView:noArg ".
                    "extevent:1,2,3,4,5,6,7,8,9,10 ".
                    ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
@@ -572,19 +579,35 @@ sub SSCam_Set {
             return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
-            if ($prop eq "link_open") {
-                $prop = "link";
+            if ($prop eq "live_open") {
                 if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
                 $hash->{HELPER}{OPENWINDOW} = 1;
-                $hash->{HELPER}{WLTYPE} = $prop;           
-            } elsif ($prop eq "lastrec_open") {
-                $prop = "lastrec";
-                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
-                $hash->{HELPER}{OPENWINDOW} = 1;
-                $hash->{HELPER}{WLTYPE} = $prop; 
-            } else {
+                $hash->{HELPER}{WLTYPE}     = "link";    
+				$hash->{HELPER}{ALIAS}      = "LiveView";
+				$hash->{HELPER}{RUNVIEW}    = "live_open";				
+            } elsif ($prop eq "live_link") {
                 $hash->{HELPER}{OPENWINDOW} = 0;
-                $hash->{HELPER}{WLTYPE} = $prop;
+                $hash->{HELPER}{WLTYPE}     = "link"; 
+				$hash->{HELPER}{ALIAS}      = "LiveView";
+				$hash->{HELPER}{RUNVIEW}    = "live_link";
+            } elsif ($prop eq "lastrec_open") {
+                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
+                $hash->{HELPER}{OPENWINDOW} = 1;
+                $hash->{HELPER}{WLTYPE}     = "link"; 
+				$hash->{HELPER}{ALIAS}      = "LastRecording";
+				$hash->{HELPER}{RUNVIEW}    = "lastrec_open";
+            }  elsif ($prop eq "lastrec_fw") {
+                $hash->{HELPER}{OPENWINDOW} = 0;
+                $hash->{HELPER}{WLTYPE}     = "iframe"; 
+				$hash->{HELPER}{ALIAS}      = " ";
+				$hash->{HELPER}{RUNVIEW}    = "lastrec";
+            } elsif ($prop eq "live_fw") {
+                $hash->{HELPER}{OPENWINDOW} = 0;
+                $hash->{HELPER}{WLTYPE}     = "image"; 
+				$hash->{HELPER}{ALIAS}      = " ";
+				$hash->{HELPER}{RUNVIEW}    = "live_fw";
+            } else {
+                return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open";
             }
             runliveview($hash); 
             
@@ -664,8 +687,10 @@ return;
 ######################################################################################
 #                         Kamera Liveview Anzeige in FHEMWEB
 ######################################################################################
-sub SSCam_liveview ($$$$) {
-  my ($FW_wname, $d, $room, $pageHash) = @_;            # pageHash für summaryFn in FHEMWEB
+# wird von FW aufgerufen. $FW_wname = aufrufende Webinstanz, $d = aufrufendes 
+# Device (z.B. CamCP1)
+sub SSCam_FWview ($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_;            # # pageHash is set for summaryFn in FHEMWEB
   my $hash          = $defs{$d};
   my $name          = $hash->{NAME};
   my $link          = $hash->{HELPER}{LINK};
@@ -675,25 +700,21 @@ sub SSCam_liveview ($$$$) {
     
   return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/ || IsDisabled($name));
   
+  Log3($name, 5, "$name - SSCam_FWview called by FW_wname: $FW_wname, device: $d, room: $room");
   my $attr = AttrVal($d, "htmlattr", "");
   
   if($wltype eq "image") {
-    $ret = "<img src=$link $attr><br>";
+    $ret = "<img src=$link $attr><br>" .weblink_FwDetail($d);
   
   } elsif($wltype eq "iframe") {
-    $ret = "<iframe src=$link $attr>Iframes disabled</iframe>";
+    $ret = "<iframe src=$link $attr>Iframes disabled</iframe>" .weblink_FwDetail($d);
            
   } elsif($wltype eq "link") {
-    # $alias = AttrVal($d, "alias", $d)."_liveview";
-    $alias = "LiveCam";
+    $alias = $hash->{HELPER}{ALIAS};
     $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
-  
-  } elsif($wltype eq "lastrec") {
-    $alias = "LastRecording";
-    $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
-  
+
   }
-  
+  # FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
 return $ret;
 }
 
@@ -1242,7 +1263,7 @@ sub stopliveview ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
-        # kurzer state-switch -> Browser aktualisieren
+		# kurzer state-switch -> Browser aktualisieren
         readingsSingleUpdate($hash,"state","stopview",1); 
         
         # Liveview stoppen
@@ -1262,6 +1283,7 @@ sub stopliveview ($) {
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
                 
+		# vorhandenen Aufnahmestatus wieder herstellen		
         if (ReadingsVal("$name", "Record", "") eq "Start") {
             readingsSingleUpdate( $hash,"state", "on", 1); 
         } else {
@@ -1272,7 +1294,7 @@ sub stopliveview ($) {
 		if ($attr{$name}{debugactivetoken}) {
             Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
         }
-			
+	
 	} else {
         RemoveInternalTimer($hash, "stopliveview");
         InternalTimer(gettimeofday()+0.5, "stopliveview", $hash, 0);
@@ -2561,7 +2583,7 @@ sub sscam_camop ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runliveview") {    
-      if ($hash->{HELPER}{WLTYPE} ne "lastrec") {
+      if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
           # externe URL
           $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
           $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
@@ -2574,7 +2596,7 @@ sub sscam_camop ($) {
           $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&_sid=$sid";   
       }
        
-      # Liveview-Link in Hash speichern -> Anzeige über SSCam_liveview, in Reading setzen für Linkversand
+      # Liveview-Link in Hash speichern -> Anzeige über SSCam_FWview, in Reading setzen für Linkversand
       $hash->{HELPER}{LINK} = $url;
          
       Log3($name, 4, "$name - Set Streaming-URL: $url");
@@ -3784,8 +3806,8 @@ sub experror {
 1;
 
 =pod
-=item summary    operate surveillance cameras which are defined in Synology Surveillance Station
-=item summary_DE steuert Kameras welche in der Synology Surveillance Station definiert sind
+=item summary    operates surveillance cameras defined in Synology Surveillance Station
+=item summary_DE steuert Kameras welche der Synology Surveillance Station
 =begin html
 
 <a name="SSCam"></a>
@@ -3933,6 +3955,7 @@ sub experror {
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - observer    </li></td></tr>      
@@ -3943,8 +3966,8 @@ sub experror {
     <a name="SSCam_HTTPTimeout"></a>
     <b>HTTP-Timeout Settings</b><br><br>
     
-    All functions of the SSCam-Module are using HTTP-Calls to the SVS Web API. <br>
-    The Default-Value of the HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">Attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
+    All functions of SSCam use HTTP-calls to SVS Web API. <br>
+    The default-value of HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
     
   </ul>
   <br><br><br>
@@ -3977,7 +4000,8 @@ sub experror {
   </table>
   <br><br>
   
-  <b>"set &lt;name&gt; [on] [off]"</b> <br><br>
+  <ul>
+  <li><b>set &lt;name&gt; [on] [off] </b></li> <br>
    
   The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
   With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
@@ -4013,11 +4037,11 @@ sub experror {
       <tr><td>set &lt;name&gt; on [rectime]  </td><td>starts a recording of camera &lt;name&gt;, stops automatically after [rectime] (default 15s or defined by <a href="#SSCamattr">attribute</a>) </td></tr>
       <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
   </table>
-  <br>
-  <br>
+  </ul>
+  <br><br>
 
-  
-  <b> "set &lt;name&gt; snap" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; snap </b></li> <br>
   
   A snapshot can be triggered with:
   <pre> 
@@ -4042,10 +4066,14 @@ sub experror {
   </pre>
 
   The ID and the filename of the last snapshot will be displayed as value of variable "LastSnapId" respectively "LastSnapFilename" in the device-Readings. <br><br>
+  </ul>
+  <br><br>
   
-  <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; [enable] [disable] </b></li> <br>
   
-  For <br>deactivating / activating</br> a list of cameras or all cameras using a Regex-expression, subsequent two examples using "at":
+  For <b>deactivating / activating</b> a list of cameras or all cameras by Regex-expression, subsequent two 
+  examples using "at":
   <pre>
      define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
      define a14 at 21:46 set Cam.* disable (enable)
@@ -4068,21 +4096,24 @@ sub experror {
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; expmode [day] [night] [auto]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; expmode [day] [night] [auto] </b></li> <br>
   
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
   Thereby, for example, the behavior of camera LED's will be suitable controlled. 
   The successful switch will be reported by the reading CamExposureMode (command "get ... caminfoall"). <br><br>
   
-  <b> Hint: </b> <br>
+  <b> Note: </b><br>
   The successfully execution of this function depends on if SVS supports that functionality of the connected camera.
   Is the field for the Day/Night-mode shown greyed in SVS -&gt; IP-camera -&gt; optimization -&gt; exposure mode, this function will be probably unsupported.  
+  </ul>
+  <br><br>
   
-  <br><br><br>
-  
-  <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; motdetsc [camera] [SVS] [disable] </b></li> <br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be done by camera / SVS without any parameters, the original camera motion detection settings are kept.
@@ -4125,12 +4156,13 @@ sub experror {
   
   Example:
   <pre>
-  CamMotDetSc    SVS, sensitivity: 76, threshold: 55
+   CamMotDetSc    SVS, sensitivity: 76, threshold: 55
   </pre>
-  
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
   
   Using this command you can move PTZ-cameras to a predefined position. <br>
   The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
@@ -4162,10 +4194,11 @@ sub experror {
    2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
    2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
   </pre>
-  
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; runPatrol &lt;Patrolname&gt;" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
   
   This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
   At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
@@ -4173,9 +4206,11 @@ sub experror {
   The import process can be repeated regular by camera polling. A long polling interval is recommendable in this case because of the patrols are only will be changed 
   if the user change it in the IP-camera setup itself. 
   Further informations for creating patrols you can get in the online-help of Surveillance Station.
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
   
   This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
   The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
@@ -4206,10 +4241,11 @@ sub experror {
 
   In this case the lense will be moved with largest possible increment into the given absolute position.
   Also in this case the procedure has to be repeated to bring the lense into the desired position if necessary. 
-
-  <br><br><br>
+  </ul>
+  <br><br>
   
-  <b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b></li> <br>
   
   With this command a continuous move of a PTZ-camera will be started. In addition to the four basic directions up/down/left/right is it possible to use angular dimensions 
   "dir_X". The grain size of graduation depends on properties of the camera and can be identified by the Reading "CapPTZDirections". <br><br>
@@ -4228,14 +4264,23 @@ sub experror {
     set &lt;name&gt; move dir_1 1.5   : moves PTZ 1,5 Sek. (plus processing time) to top-right 
     set &lt;name&gt; move dir_20 0.7  : moves PTZ 1,5 Sek. (plus processing time) to left-bottom ("CapPTZDirections = 32)"
   </pre>
+  </ul>
+  <br><br>
   
-  <br>
+  <ul>
+  <li><b> set &lt;name&gt; runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]  </b></li> <br>
   
-  <b> set &lt;name&gt; runView [ image | lastrec | lastrec_open | link | link_open &lt;room&gt; ] </b> <br><br>
+  With "live_fw, live_link, live_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image 
+  or as a generated link. <br>
+  The option "live_open" starts a new browser window. If the optional &lt;room&gt; was set, the window will only be
+  started if the specified room is currently opend in a browser session. <br><br> 
   
-  With "image, link, link_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image or as a generated link.
-  Access to the last recording of a camera can be done using "lastrec" respectively "lastrec_open". 
-  The behavior of livestream in FHEMWEB can be affected by statements in <a href="#SSCamattr">attribute</a> "htmlattr". <br><br>
+  Access to the last recording of a camera can be done using "lastrec_fw" respectively "lastrec_open".
+  The recording will be opened in iFrame. So there are some control elements available, e.g. to increase/descrease 
+  reproduce speed. <br>
+  
+  The art of windows in FHEMWEB can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr". 
+  <br><br>
   
   <b>Examples:</b><br>
   <pre>
@@ -4246,31 +4291,37 @@ sub experror {
   
   With these attribute values a streaming link will be opened (by click on) in a new browser tab or windows. If the stream will be started as an image, the size changes appropriately the
   values of width and hight. <br> 
-  The command <b>"set &lt;name&gt; runView link_open"</b> starts the stream immediately in a new browser window (longpoll=1 must be set for WEB). 
-  A browser window will be initiated to open for every FHEM session which is active. If you want to change this, 
-  you can use command <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b> what initiates to open a browser window in that FHEM session that has just opend the room &lt;room&gt;.
-  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrites the data for protocol, servername and port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
-  By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) can be modified and used for distribution and external 
-  access to SVS livestream. <br><br>
+  
+  The command <b>"set &lt;name&gt; runView live_open"</b> starts the stream immediately in a new browser window (longpoll=1 
+  must be set for WEB). 
+  A browser window will be initiated to open for every FHEM session which is active. If you want to change this behavior, 
+  you can use command <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b>. It initiates open a browser window in that 
+  FHEM session which has just opend the room &lt;room&gt;.
+  
+  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrites the data for protocol, servername and 
+  port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
+  By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) can 
+  be modified and used for distribution and external access to SVS livestream. <br><br>
   
   <b>Example:</b><br>
   <pre>
     attr &lt;name&gt; livestreamprefix https://&lt;Servername&gt;:&lt;Port&gt;
   </pre>
   
-  The livestream will be stopped again using command <b>"set &lt;name&gt; stopView"</b> .
-  
+  The livestream can be stopped again by command <b>"set &lt;name&gt; stopView"</b>.
+  </ul>
   <br><br>
   
-  <b> set &lt;name&gt; extevent [ 1-10 ] </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
   
   This command triggers an external event (1-10) in SVS. 
   The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
   In the message application of SVS you may select Email, SMS or Mobil (DS-Cam) messages to release if an external event has been triggerd.
   Further informations can be found in the online help of the actionrule editor.
   The used user needs to be a member of the admin-group and DSM-session is needed too.
-  
-  <br><br><br>
+  </ul>
+  <br><br>
   
  </ul>
 <br>
@@ -4279,10 +4330,11 @@ sub experror {
 <a name="SSCamget"></a>
 <b>Get</b>
  <ul>
-  With SSCam the properties of SVS and defined Cameras could be retrieved. Actually it could be done by using the following commands:
+  With SSCam the properties of SVS and defined Cameras could be retrieved. Actually it could be done by following commands:
   <pre>
       get &lt;name&gt; caminfoall
       get &lt;name&gt; eventlist
+      get &lt;name&gt; scanVirgin
       get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
@@ -4302,13 +4354,17 @@ sub experror {
   Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
   <br><br>
 
-  <b> get &lt;name&gt; scanVirgin </b> <br><br>
+  <ul>
+  <li><b> get &lt;name&gt; scanVirgin </b></li> <br>
   
   This command is similar to get caminfoall, informations relating to SVS and the camera will be retrieved. 
   In difference to caminfoall in either case a new session ID will be generated (do a new login), the camera ID will be
-  new identified and all necessary API-parameters will be new investigated.  <br><br> 
+  new identified and all necessary API-parameters will be new investigated.  
+  </ul>
+  <br><br> 
   
-  <b> get &lt;name&gt; stmUrlPath </b> <br><br>
+  <ul>
+  <li><b> get &lt;name&gt; stmUrlPath </b></li> <br>
   
   This command is to fetch the streamkey information and streamurl using that streamkey. The reading "StmKey" will be filled when this command will be executed and can be used 
   to send it and run by your own application like a browser (see example).
@@ -4317,7 +4373,7 @@ sub experror {
   The strUrlPath function will be included automatically if polling is used.
   <br><br>
   
-  Example to create an http-call to a livestream using the StmKey: <br>
+  Example to create an http-call to a livestream using StmKey: <br>
   
   <pre>
      http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
@@ -4325,15 +4381,15 @@ sub experror {
   
   cameraId (INTERNAL), StmKey has to be replaced by valid values. <br><br>
   
-  <b>Hint:</b> <br>
+  <b>Note:</b> <br>
   
   If you use the stream-call from external and replace hostname / port with valid values and open your router ip ports, please make shure that no
   unauthorized person could get this sensible data !  <br><br> 
-  
+  </ul>
   
   
   <b>Polling of Camera-Properties:</b><br><br>
-
+  <ul>
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
   As default that attribute "pollcaminfoall" isn't be set and the automatic polling isn't be active. <br>
   The value of that attribute determines the interval of property-retrieval in seconds. If that attribute isn't be set or &lt; 10 the automatic polling won't be started <br>
@@ -4354,7 +4410,7 @@ sub experror {
   </ul>
   <br>
   
-  The meaning of reading values is described under <a href="#SSCamreadings">Readings</a> . <br><br>
+  The readings are described <a href="#SSCamreadings">here</a>. <br><br>
 
   <b>Notes:</b> <br><br>
 
@@ -4366,11 +4422,14 @@ sub experror {
 
   If several Cameras are defined in SSCam, attribute "pollcaminfoall" of every Cameras shouldn't be set exactly to the same value to avoid processing bottlenecks <br>
   and thereby caused potential source of errors during request Synology Surveillance Station. <br>
-  A marginal difference between the polling intervals of the defined cameras, e.g. 1 second, can already be faced as sufficient value. <br><br> 
+  A marginal difference between the polling intervals of the defined cameras, e.g. 1 second, can already be faced as 
+  sufficient value. <br><br>
+  </ul>  
 </ul>
 
+
 <a name="SSCaminternals"></a>
-<b>Internals</b> <br>
+<b>Internals</b> <br><br>
  <ul>
  The meaning of used Internals is depicted in following list: <br><br>
   <ul>
@@ -4458,37 +4517,67 @@ sub experror {
   
   <ul>
   <ul>
-  <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li>
+  <li><b>debugactivetoken</b><br>
+    if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li><br>
   
-  <li><b>disable</b> - deactivates the module (device definition) </li>
+  <li><b>disable</b><br>
+    deactivates the module (device definition) </li><br>
   
-  <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
+  <li><b>httptimeout</b><br>
+    Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" 
+	or not set) </li><br>
   
-  <li><b>htmlattr</b> - additional specifications to livestream-Url to manipulate the behavior of stream, e.g. size of the image </li>
+  <li><b>htmlattr</b><br>
+    additional specifications to livestream-Url to manipulate the behavior of stream, e.g. size of the image </li><br>
+	
+	    <ul>
+		<b>Example:</b><br>
+        attr &lt;name&gt; htmlattr width=500 height=325 top=200 left=300
+        </ul>
+		<br>
+        </li>
   
-  <li><b>livestreamprefix</b> - overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li>
+  <li><b>livestreamprefix</b><br>
+    overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. 
+	as an link to external use. It has to be specified as "http(s)://&lt;servername&gt;:&lt;port&gt;"  </li><br>
 
-  <li><b>loginRetries</b> - set the amount of login-repetitions in case of failure (default = 1)   </li>  
+  <li><b>loginRetries</b><br>
+    set the amount of login-repetitions in case of failure (default = 1)   </li><br>
   
-  <li><b>noQuotesForSID</b> - this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login possible.  </li>
+  <li><b>noQuotesForSID</b><br>
+    this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login 
+	possible.  </li><br>
   
-  <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li>
+  <li><b>pollcaminfoall</b><br>
+    Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li><br>
 
-  <li><b>pollnologging</b> - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
+  <li><b>pollnologging</b><br>
+    "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li><br>
   
-  <li><b>rectime</b> - the determined recordtime when a recording starts. If rectime = 0 an endless recording will be started. If it isn't defined, the default recordtime of 15s is activated </li>
+  <li><b>rectime</b><br>
+   determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
+   it isn't defined, the default recordtime of 15s is activated </li><br>
   
-  <li><b>recextend</b> - "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be extended </li>
+  <li><b>recextend</b><br>
+    "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be 
+	extended </li><br>
   
-  <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li>
+  <li><b>session</b><br>
+    selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). 
+	"SurveillanceStation" -&gt; session will be established to SVS </li><br>
   
-  <li><b>simu_SVSversion</b>  - simulates another SVS version. (only a lower version than the installed one is possible !)  </li>
+  <li><b>simu_SVSversion</b><br>
+    simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
   
-  <li><b>showStmInfoFull</b>  - additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li>
+  <li><b>showStmInfoFull</b><br>
+    additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li><br>
   
-  <li><b>showPassInLog</b>  - if set the used password will be shown in logfile with verbose 4. (default = 0) </li>
+  <li><b>showPassInLog</b><br>
+    if set the used password will be shown in logfile with verbose 4. (default = 0) </li><br>
   
-  <li><b>videofolderMap</b> - replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original (SVS) </li>
+  <li><b>videofolderMap</b><br>
+    replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original 
+	(SVS) </li><br>
   
   <li><b>verbose</b></li><br>
   
@@ -4506,11 +4595,9 @@ sub experror {
      <tr><td> 5  </td><td>- all outputs will be logged for error-analyses. <b>Caution:</b> a lot of data could be written into logfile ! </td></tr>
    </table>
    </ul>     
-   <br><br>
-  
-   <b>further Attributes:</b><br><br>
-   
+   <br>   
    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+   
   </ul>  
   </ul>
   <br><br>
@@ -4665,6 +4752,7 @@ sub experror {
       <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -4705,14 +4793,14 @@ sub experror {
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
-      <tr><td>"runView [image | link | link_open | lastrec | lastrec_open | &lt;room&gt; ]":  </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
+      <tr><td>"runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]":  </td><td>startet einen Livestream als eingbettetes Image, IFrame bzw. Link  </td></tr>
       <tr><td>"stopView":                                          </td><td>stoppt einen Kamera-Livestream  </td></tr>
   </table>
   <br><br>
   
-  
-  <b> "set &lt;name&gt; [on] [off]" </b> <br><br>
-  
+  <ul>
+  <li><b> set &lt;name&gt; [on] [off] </b></li><br>
+
   Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
   Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
   Die Aufnahme stoppt automatisch nach Ablauf der Zeit "rectime".<br>
@@ -4729,7 +4817,7 @@ sub experror {
   </ul>
   <br>
 
-  <b>Attribut "recextend = 1" gesetzt:</b><br><br>
+  <b>Attribut "recextend = 1" gesetzt:</b><br>
   <ul>
   <li> eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
   den automatischen Stop auf den Wert "rectime" neu gesetzt wird. Dieser Vorgang wiederholt sich mit jedem Start-Befehl. Dadurch verlängert sich eine laufende 
@@ -4747,11 +4835,11 @@ sub experror {
       <tr><td>set &lt;name&gt; on [rectime]  </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben)</td></tr>
       <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
   </table>
-  <br>
-  <br>
+  </ul>
+  <br><br>
 
-  
-  <b> "set &lt;name&gt; snap" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; snap </b></li> <br>
   
   Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
   <pre> 
@@ -4775,8 +4863,11 @@ sub experror {
   </pre>
 
   Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den Readings der Kamera ausgegeben. <br><br>
+  </ul>
+  <br><br>
   
-  <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; [enable] [disable] </b></li> <br>
   
   Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
   <pre>
@@ -4800,9 +4891,11 @@ sub experror {
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; expmode [day] [night] [auto]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; expmode [day] [night] [auto] </b></li> <br>
   
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
   Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
@@ -4813,7 +4906,7 @@ sub experror {
   Funktion auszugehen. 
   <br><br><br>
   
-  <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
+  <b> set &lt;name&gt; motdetsc [camera] [SVS] [disable] </b> <br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
@@ -4842,6 +4935,7 @@ sub experror {
       <tr><td>set <name> motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
       </table>
   </ul>
+  </ul>
   <br><br>
 
   Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
@@ -4857,10 +4951,10 @@ sub experror {
   <pre>
   CamMotDetSc    SVS, sensitivity: 76, threshold: 55
   </pre>
-  
   <br><br>
   
-  <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
   
   Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
   Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
@@ -4891,10 +4985,11 @@ sub experror {
    2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
    2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
   </pre>
+  </ul>
+  <br><br>
   
-  <br>
-  
-  <b> "set &lt;name&gt; runPatrol &lt;Patrolname&gt;" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
   
   Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
   Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
@@ -4903,9 +4998,11 @@ sub experror {
   Der Einlesevorgang kann durch ein Kamerapolling regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die 
   Überwachungstouren nur im Fall der Neuanlage bzw. Änderung verändern werden.
   Nähere Informationen zur Anlage von Überwachungstouren sind in der Hilfe zur Surveillance Station enthalten. 
+  </ul>
   <br><br>
   
-  <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
   
   Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
   Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
@@ -4936,10 +5033,11 @@ sub experror {
 
   verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
   Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
+  </ul>
+  <br><br>
   
-  <br><br><br>
-  
-  <b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b></li> <br>
   
   Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
   Zwischenwinkelmaße "dir_X" zur Verfügung. Die Feinheit dieser Graduierung ist von der Kamera abhängig und kann dem Reading "CapPTZDirections" entnommen werden. <br><br>
@@ -4958,14 +5056,23 @@ sub experror {
     set &lt;name&gt; move dir_1 1.5   : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach rechts-oben 
     set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"
   </pre>
-
-  <br>
+  </ul>
+  <br><br>
   
-  <b> set &lt;name&gt; runView [ image | lastrec | lastrec_open | link | link_open &lt;room&gt; ] </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]  </b></li> <br>
   
-  Mit "image, link, link_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
-  Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Zusätze "lastrec" bzw. "lastrec_open" erfolgen. 
-  Das Verhalten des Livestreams im FHEMWEB kann durch Angaben im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
+  Mit "live_fw, live_link, live_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image 
+  oder als generierter Link, gestartet. <br>
+  Die Option "live_open" startet ein separates Browserfenster mit dem Lifestream. Wird dabei optional der Raum mit
+  angegeben, wird das Browserfenster nur gestartet wenn dieser Raum aktuell im Browser geöffnet ist. <br><br> 
+    
+  Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Optionen "lastrec_fw" bzw. "lastrec_open" erfolgen.
+  Bei Verwendung von "lastrec_fw" wird die letzte Aufnahme als eingebettetes iFrame-Objekt abgespielt. Es stehen entsprechende
+  Steuerungselemente zur Wiedergabegeschwindigkeit usw. zur Verfügung. <br>
+  Durch Angabe des optionalen Raumes bei "lastrec_open" erfolgt die gleiche Einschränkung wie bei "live_open". <br><br>
+  
+  Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
   
   <b>Beispiel:</b><br>
   <pre>
@@ -4974,13 +5081,16 @@ sub experror {
     attr &lt;name&gt; htmlattr width=700,height=525,top=200,left=300
   </pre>
   
-  Mit diesen Attributwerten öffnet der Link (mit Klick) als weiteres Fenster/Browsertab. Wird der Stream als Image gestartet, ändert sich die Größe entsprechend der 
-  Angaben von Width und Hight. <br>
-  Das Kommando <b>"set &lt;name&gt; runView link_open"</b> startet den Livestreamlink sofort in einem neuen Browserfenster (longpoll=1 muß für WEB gesetzt sein).
-  Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b>
-  verwendet werden um das Öffnen des Browserwindows in einem beliebigen, in einer FHEM-Session angezeigten Raum &lt;room&gt;, zu initiieren.<br>
-  Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" die Angaben für Protokoll, Servername und Port. 
-  Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff auf die SVS modifiziert werden. <br><br>
+  Mit diesen Attributwerten öffnet der Link (mit Klick) als weiteres Fenster/Browsertab. Wird der Stream als live_fw gestartet, 
+  ändert sich die Größe entsprechend der Angaben von Width und Hight. <br>
+  Das Kommando <b>"set &lt;name&gt; runView live_open"</b> startet den Livestreamlink sofort in einem neuen 
+  Browserfenster (longpoll=1 muß für WEB gesetzt sein). 
+  Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann 
+  <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b> verwendet werden um das Öffnen des Browserwindows in einem 
+  beliebigen, in einer FHEM-Session angezeigten Raum &lt;room&gt;, zu initiieren.<br>
+  Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" 
+  die Angaben für Protokoll, Servername und Port. Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff 
+  auf die SVS modifiziert werden. <br><br>
   
   <b>Beispiel:</b><br>
   <pre>
@@ -4988,18 +5098,19 @@ sub experror {
   </pre>
   
   Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet.
-  
+  </ul>
   <br><br>
   
-  <b> set &lt;name&gt; extevent [ 1-10 ] </b> <br><br>
+  <ul>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
   
   Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
   Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 1-10 zur Verfügung.
   In der Banchrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes Ereignis ausgelöst wurde.
   Nähere Informationen dazu sind in der Hilfe zum Aktionsregeleditor zu finden.
   Der verwendete User benötigt Admin-Rechte in einer DSM-Session.
-  
-  <br><br><br>
+  </ul>
+  <br><br>
 
 </ul>
   <br>
@@ -5043,13 +5154,17 @@ sub experror {
   Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
   <br><br>
   
-  <b> get &lt;name&gt; scanVirgin </b> <br><br>
+  <ul>
+  <li><b> get &lt;name&gt; scanVirgin </b></li> <br>
   
   Wie mit get caminfoall werden alle Informationen der SVS und Kamera abgerufen. Allerdings wird in jedem Fall eine 
   neue Session ID generiert (neues Login), die Kamera-ID neu ermittelt und es werden alle notwendigen API-Parameter neu 
-  eingelesen.  <br><br> 
+  eingelesen.  
+  </ul>
+  <br><br> 
   
-  <b> get &lt;name&gt; stmUrlPath </b> <br><br>
+  <ul>
+  <li><b> get &lt;name&gt; stmUrlPath </b></li> <br>
   
   Mit diesem Kommando wird der aktuelle Streamkey der Kamera abgerufen und das Reading mit dem Key-Wert gefüllt. 
   Dieser Streamkey kann verwendet werden um eigene Aufrufe eines Livestreams aufzubauen (siehe Beispiel).
@@ -5071,7 +5186,8 @@ sub experror {
   
   Falls der Stream-Aufruf versendet und von extern genutzt wird sowie hostname / port durch gültige Werte ersetzt und die Routerports entsprechend geöffnet
   werden, ist darauf zu achten dass diese sensiblen Daten nicht durch unauthorisierte Personen für den Zugriff genutzt werden können !  <br><br><br>
-  
+  </ul>
+  <br><br>
 
   <b>Polling der Kameraeigenschaften:</b><br><br>
 
@@ -5111,8 +5227,9 @@ sub experror {
   Ein geringfügiger Unterschied zwischen den Pollingintervallen der definierten Kameras von z.B. 1s kann bereits als ausreichend angesehen werden. <br><br> 
 </ul>
 
+
 <a name="SSCaminternals"></a>
-<b>Internals</b> <br>
+<b>Internals</b> <br><br>
  <ul>
  Die Bedeutung der verwendeten Internals stellt die nachfolgende Liste dar: <br><br>
   <ul>
@@ -5201,37 +5318,75 @@ sub experror {
   
   <ul>
   <ul>
-  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen ! </li>
+  <li><b>debugactivetoken</b><br> 
+    wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
+    normalen Betrieb benutzen ! </li><br>
   
-  <li><b>disable</b> - deaktiviert das Gerätemodul bzw. die Gerätedefinition </li>
+  <li><b>disable</b><br>
+    deaktiviert das Gerätemodul bzw. die Gerätedefinition </li><br>
   
-  <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
+  <li><b>httptimeout</b><br>
+    Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn 
+    httptimeout = "0" oder nicht gesetzt) </li><br>
   
-  <li><b>htmlattr</b> - ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen  </li>
+  <li><b>htmlattr</b><br>
+  ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen <br><br> 
   
-  <li><b>livestreamprefix</b> - überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der Livestreamadresse als z.B. externer Link. Anzugeben in der Form "http(s)://&lt;servername&gt;:&lt;port&gt;"   </li>
+        <ul>
+		<b>Beispiel:</b><br>
+        attr &lt;name&gt; htmlattr width=500 height=325 top=200 left=300
+        </ul>
+		<br>
+        </li>
   
-  <li><b>loginRetries</b> - setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 1)   </li>
+  <li><b>livestreamprefix</b><br>
+    überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der 
+    Livestreamadresse als z.B. externer Link. Anzugeben in der Form 
+	"http(s)://&lt;servername&gt;:&lt;port&gt;"   </li><br>
   
-  <li><b>noQuotesForSID</b> - dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" vermeiden und ein login ermöglichen.  </li>                           
+  <li><b>loginRetries</b><br>
+    setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 1)   </li><br>
   
-  <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
+  <li><b>noQuotesForSID</b><br>
+    dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" 
+    vermeiden und ein login ermöglichen.  </li><br>                      
+  
+  <li><b>pollcaminfoall</b><br>
+    Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein 
+    Polling, größer 10: Polling mit Intervall) </li><br>
 
-  <li><b>pollnologging</b> - "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging Gerätepolling inaktiv </li>
+  <li><b>pollnologging</b><br>
+    "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging 
+    Gerätepolling inaktiv </li><br>
   
-  <li><b>rectime</b> - festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s verwendet.</li>
+  <li><b>rectime</b><br>
+    festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine 
+    Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s 
+	verwendet.</li><br>
   
-  <li><b>recextend</b> - "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die Aufnahemzeit einer laufenden Aufnahme </li>
+  <li><b>recextend</b><br>
+    "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die 
+    Aufnahemzeit einer laufenden Aufnahme </li><br>
   
-  <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li>
+  <li><b>session</b><br>
+    Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut 
+    (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
   
-  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS Version möglich !) </li>
+  <li><b>simu_SVSversion</b><br>
+    simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
+    Version möglich !) </li><br>
   
-  <li><b>showStmInfoFull</b>  - zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden ausgegeben</li>
+  <li><b>showStmInfoFull</b><br>
+    zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden 
+    ausgegeben</li><br>
   
-  <li><b>showPassInLog</b>  - wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. (default = 0) </li>
+  <li><b>showPassInLog</b><br>
+    wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. 
+    (default = 0) </li><br>
   
-  <li><b>videofolderMap</b> - ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten Verzeichnissen </li>
+  <li><b>videofolderMap</b><br>
+    ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten 
+    Verzeichnissen </li><br>
   
   <li><b>verbose</b> </li><br>
   
@@ -5249,11 +5404,10 @@ sub experror {
       <tr><td> 5  </td><td>- alle Ausgaben zur Fehleranalyse werden geloggt. <b>ACHTUNG:</b> möglicherweise werden sehr viele Daten in das Logfile geschrieben! </td></tr>
     </table>
    </ul>     
-   <br><br>
-  
-   <b>weitere Attribute:</b><br><br>
+   <br>
    
    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  
   </ul>  
   </ul>
   <br><br>
