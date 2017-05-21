@@ -1131,19 +1131,18 @@ sub IsHoliday(;$) {
 # Get current stage of the daytime based on temporal hours
 # https://de.wikipedia.org/wiki/Temporale_Stunden
 sub GetDaytime(;$$$$) {
-    my ( $time, $totalTemporalHours, $lang, @srParams ) = @_;
+    my ( $time, $totalTemporalHours, $lang, $params ) = @_;
     $lang = (
           $main::attr{global}{language}
         ? $main::attr{global}{language}
         : "EN"
     ) unless ($lang);
 
-    my $ret = ref($time) eq "HASH" ? $time : _time( $time, $lang, 1 );
+    my $ret = ref($time) eq "HASH" ? $time : _time( $time, $lang, 1, $params );
     return undef unless ( ref($ret) eq "HASH" );
 
     $ret->{daytimeStages} = $totalTemporalHours
       && $totalTemporalHours =~ m/^\d+$/ ? $totalTemporalHours : 12;
-    $ret->{srParams} = $ret{srParams} ? $ret{srParams} : [];
 
     # TODO: consider srParams
     $ret->{sunrise}   = main::sunrise_abs_dat( $ret->{time_t} );
@@ -1166,7 +1165,7 @@ sub GetDaytime(;$$$$) {
     $ret->{daytimeStage_float} =
       $ret->{daytimeRel_s} / $ret->{daytimeStageLn_s};
     $ret->{daytimeStage} =
-      int( $ret->{daytimeRel_s} / $ret->{daytimeStageLn_s} + 1 );
+      int( ( ( $ret->{daytimeRel_s} + 1 ) / $ret->{daytimeStageLn_s} ) + 1 );
     $ret->{daytimeStage} = 0
       if ( $ret->{daytimeStage} < 1
         || $ret->{daytimeStage} > $ret->{daytimeStages} );
@@ -1178,11 +1177,15 @@ sub GetDaytime(;$$$$) {
 #$ret = GetSeasonSocial( $ret, $lang ); #TODO https://de.wikipedia.org/wiki/F%C3%BCnfte_Jahreszeit
 
     # change midnight event when season changes
+    $ret->{events}{ $ret->{midnight_t} }{VALUE} = 1
+      if ( $ret->{seasonMeteoChng} && $ret->{seasonMeteoChng} == 1 );
     $ret->{events}{ $ret->{midnight_t} }{DESC} .=
       ", Begin meteorological $ret->{seasonMeteo_long} season"
       if ( $ret->{seasonMeteoChng} && $ret->{seasonMeteoChng} == 1 );
+    $ret->{events}{ $ret->{midnight_t} }{VALUE} = 2
+      if ( $ret->{seasonAstroChng} && $ret->{seasonAstroChng} == 1 );
     $ret->{events}{ $ret->{midnight_t} }{DESC} .=
-      ", Begin astrological $ret->{seasonAstro_long} season"
+      ", Begin astronomical $ret->{seasonAstro_long} season"
       if ( $ret->{seasonAstroChng} && $ret->{seasonAstroChng} == 1 );
 
     # calculate daytime from daytimeStage, season and DST
@@ -1204,7 +1207,7 @@ sub GetDaytime(;$$$$) {
         # when no relation was found
         unless ( defined( $ret->{daytime} ) || $ds > -1 ) {
 
-            # assume evening after sunset
+            # assume midevening after sunset
             if ( $ret->{time_s} >= $ret->{sunset_s} ) {
                 $ret->{daytime} = 5;
             }
@@ -1240,15 +1243,15 @@ sub GetDaytime(;$$$$) {
     #
 
     # Midnight
+    $ret->{events}{ $ret->{midnight_t} }{TYPE} = "dayshift";
     $ret->{events}{ $ret->{midnight_t} }{TIME} =
       main::FmtDateTime( $ret->{midnight_t} );
     $ret->{events}{ $ret->{midnight_t} }{DESC} =
-      "Begin night time and new calendar day";
-    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} =
-      main::FmtDateTime( $ret->{1}{midnight_t} );
-    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} =~ s/00:00:00/24:00:00/;
+      "Begin of night time and new calendar day";
+    $ret->{events}{ $ret->{1}{midnight_t} }{TYPE} = "dayshift";
+    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} = $ret->{date} . " 24:00:00";
     $ret->{events}{ $ret->{1}{midnight_t} }{DESC} =
-      "End calendar day and begin night time";
+      "End of calendar day and begin night time";
 
     # Holidays
     $ret->{events}{ $ret->{midnight_t} }{DESC} .=
@@ -1262,15 +1265,16 @@ sub GetDaytime(;$$$$) {
     #FIXME TODO
     if ( $ret->{dstchange} && $ret->{dstchange} == 1 ) {
         my $t = $ret->{midnight_t} + 2 * 60 * 60;
-        $ret->{events}{$t}{TIME} = main::FmtDateTime($t);
-        $ret->{events}{$t}{DESC} = "Begin standard time (-1h)"
+        $ret->{events}{$t}{TYPE}  = "dstshift";
+        $ret->{events}{$t}{VALUE} = $ret->{isdst};
+        $ret->{events}{$t}{TIME}  = main::FmtDateTime($t);
+        $ret->{events}{$t}{DESC}  = "Begin of standard time (-1h)"
           unless ( $ret->{isdst} );
-        $ret->{events}{$t}{DESC} = "Begin daylight saving time (+1h)"
+        $ret->{events}{$t}{DESC} = "Begin of daylight saving time (+1h)"
           if ( $ret->{isdst} );
     }
 
     # daytime stage event forecast for today
-    #TODO add  daytime to desc when it changes
     my $i = 1;
     my $b = $ret->{sunrise_t};
     while ( $i <= $ret->{daytimeStages} + 1 ) {
@@ -1290,14 +1294,22 @@ sub GetDaytime(;$$$$) {
         my $t = int( $b + 0.5 );
         $ret->{events}{$t}{TIME} = main::FmtDateTime($t);
         if ( $i == $ret->{daytimeStages} + 1 ) {
-            $ret->{events}{$t}{DESC} = "Begin midevening time";
+            $ret->{events}{$t}{TYPE}  = "daytime";
+            $ret->{events}{$t}{VALUE} = "midevening";
+            $ret->{events}{$t}{DESC} =
+              "End of daytime";
         }
         else {
-            $ret->{events}{$t}{DESC} = "Begin daytime stage $i"
+            $ret->{events}{$t}{TYPE}  = "daytimeStage";
+            $ret->{events}{$t}{VALUE} = $i;
+            $ret->{events}{$t}{DESC}  = "Begin of daytime stage $i"
               unless ($daytime);
-            $ret->{events}{$t}{DESC} =
-              "Begin $daytimes{en}[$daytime] time and daytime stage $i"
-              if ( defined($daytime) );
+            if ( defined($daytime) ) {
+                $ret->{events}{$t}{TYPE}  = "daytime";
+                $ret->{events}{$t}{VALUE} = $daytimes{en}[$daytime];
+                $ret->{events}{$t}{DESC} =
+                  "Begin of $daytimes{en}[$daytime] time and daytime stage $i";
+            }
         }
         $i++;
         $b += $ret->{daytimeStageLn_s};
@@ -1607,8 +1619,8 @@ sub _round($;$) {
 
 sub _time(;$$$);
 
-sub _time(;$$$) {
-    my ( $time, $lang, $dayOffset ) = @_;
+sub _time(;$$$$) {
+    my ( $time, $lang, $dayOffset, $params ) = @_;
     $dayOffset = 1 if ( !defined($dayOffset) || $dayOffset !~ /^-?\d+$/ );
     $lang = (
           $main::attr{global}{language}
@@ -1622,6 +1634,7 @@ sub _time(;$$$) {
     my %ret;
     $ret{time_t} = $time if ($time);
     $ret{time_t} = time unless ($time);
+    $ret{params} = $params if ($params);
 
     my @t = localtime( $ret{time_t} );
     (

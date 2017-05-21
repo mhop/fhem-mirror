@@ -139,6 +139,7 @@ sub HOMESTATEtk_InitializeDev($) {
     my $langUc = uc($lang);
     my @error;
 
+    delete $hash->{NEXT_EVENT};
     RemoveInternalTimer($hash);
 
     no strict "refs";
@@ -254,6 +255,7 @@ sub HOMESTATEtk_Define($$$) {
 
     $hash->{MOD_INIT}  = 1;
     $hash->{NOTIFYDEV} = "global";
+    delete $hash->{NEXT_EVENT};
     RemoveInternalTimer($hash);
 
     # set default settings on first define
@@ -267,12 +269,12 @@ sub HOMESTATEtk_Define($$$) {
         $attr{$name}{icon} = "control_building_control"
           if ( $TYPE eq "HOMESTATE" );
         $attr{$name}{icon} = "control_building_eg"
-          if ( $TYPE eq "FLOORSTATE" );
+          if ( $TYPE eq "SECTIONSTATE" );
         $attr{$name}{icon} = "floor"
           if ( $TYPE eq "ROOMSTATE" );
 
         # find HOMESTATE device
-        if ( $TYPE eq "ROOMSTATE" || $TYPE eq "FLOORSTATE" ) {
+        if ( $TYPE eq "ROOMSTATE" || $TYPE eq "SECTIONSTATE" ) {
             my @homestates = devspec2array("TYPE=HOMESTATE");
             if ( scalar @homestates ) {
                 $attr{$name}{"HomestateDevices"} = $homestates[0];
@@ -308,7 +310,7 @@ sub HOMESTATEtk_Define($$$) {
         }
 
         # find ROOMSTATE device
-        if ( $TYPE eq "FLOORSTATE" ) {
+        if ( $TYPE eq "SECTIONSTATE" ) {
             my @roomstates = devspec2array("TYPE=ROOMSTATE");
             unless ( scalar @roomstates ) {
                 my $n = "Room";
@@ -359,12 +361,6 @@ sub HOMESTATEtk_Define($$$) {
                   "Auto-created by $TYPE module for use with HOMESTATE Toolkit";
                 $attr{$name}{"ResidentsDevices"} = $n;
                 $attr{$n}{room} = $attr{$name}{room};
-                $attr{$name}{"Lang"} = $attr{ $residents[0] }{rgr_lang}
-                  if ( $attr{ $residents[0] }
-                    && $attr{ $residents[0] }{rgr_lang} );
-                $attr{$name}{"Lang"} = $attr{ $residents[0] }{rr_lang}
-                  if ( $attr{ $residents[0] }
-                    && $attr{ $residents[0] }{rr_lang} );
 
                 HOMESTATEtk_Attr( "set", $name, "Lang", $attr{$name}{"Lang"} )
                   if $attr{$name}{"Lang"};
@@ -379,6 +375,7 @@ sub HOMESTATEtk_Define($$$) {
 
 sub HOMESTATEtk_Undefine($$) {
     my ( $hash, $name ) = @_;
+    delete $hash->{NEXT_EVENT};
     RemoveInternalTimer($hash);
     return undef;
 }
@@ -631,21 +628,24 @@ sub HOMESTATEtk_Get($$$) {
             return "invalid date format $date"
               unless ( !$date
                 || $date =~ m/^\d{4}\-\d{2}-\d{2}$/
-                || $date =~ m/^\d{2}-\d{2}$/ );
+                || $date =~ m/^\d{2}-\d{2}$/
+                || $date =~ m/^\d{10}$/ );
             return "invalid time format $time"
               unless ( !$time
                 || $time =~ m/^\d{2}:\d{2}(:\d{2})?$/ );
 
-            my ( $sec, $min, $hour, $mday, $mon, $year ) = UConv::_time();
-            $date = "$year-$date" if ( $date =~ m/^\d{2}-\d{2}$/ );
-            $time .= ":00" if ( $time && $time =~ m/^\d{2}:\d{2}$/ );
+            unless ( $date =~ m/^\d{10}$/ ) {
+                my ( $sec, $min, $hour, $mday, $mon, $year ) = UConv::_time();
+                $date = "$year-$date" if ( $date =~ m/^\d{2}-\d{2}$/ );
+                $time .= ":00" if ( $time && $time =~ m/^\d{2}:\d{2}$/ );
 
-            $date .= $time ? " $time" : " 00:00:00";
+                $date .= $time ? " $time" : " 00:00:00";
 
-            # ( $year, $mon, $mday, $hour, $min, $sec ) =
-            #   split( /[\s.:-]+/, $date );
-            # $date = timelocal( $sec, $min, $hour, $mday, $mon - 1, $year );
-            $date = time_str2num($date);
+               # ( $year, $mon, $mday, $hour, $min, $sec ) =
+               #   split( /[\s.:-]+/, $date );
+               # $date = timelocal( $sec, $min, $hour, $mday, $mon - 1, $year );
+                $date = time_str2num($date);
+            }
         }
 
         #TODO timelocal? 03-26 results in wrong timestamp
@@ -679,7 +679,7 @@ sub HOMESTATEtk_Attr(@) {
     my $security = ReadingsVal( $name, "security", "" );
 
     return
-      "Device is currently $security and attributes cannot be changed at this state"
+"Device is currently $security and attributes cannot be changed at this state"
       unless ( !$init_done || $security =~ m/^unlocked|locked$/ );
 
     if ( $attribute eq "HomestateDevices" ) {
@@ -696,8 +696,8 @@ sub HOMESTATEtk_Attr(@) {
           unless ( $cmd eq "del"
             || $value =~ m/^[A-Za-z\d._]+(?:,[A-Za-z\d._]*)*$/ );
 
-        delete $hash->{FLOORSTATES};
-        $hash->{FLOORSTATES} = $value unless ( $cmd eq "del" );
+        delete $hash->{SECTIONSTATES};
+        $hash->{SECTIONSTATES} = $value unless ( $cmd eq "del" );
     }
 
     elsif ( $attribute eq "RoomstateDevices" ) {
@@ -775,10 +775,10 @@ sub HOMESTATEtk_Attr(@) {
                   if ( !defined( $attr{$name}{group} )
                     || $attr{$name}{group} eq "Home State" );
             }
-            if ( $TYPE eq "FLOORSTATE" ) {
-                $attr{$name}{group} = "Flurstatus"
+            if ( $TYPE eq "SECTIONSTATE" ) {
+                $attr{$name}{group} = "Bereichstatus"
                   if ( !defined( $attr{$name}{group} )
-                    || $attr{$name}{group} eq "Floor State" );
+                    || $attr{$name}{group} eq "Section State" );
             }
             if ( $TYPE eq "ROOMSTATE" ) {
                 $attr{$name}{group} = "Raumstatus"
@@ -800,10 +800,10 @@ sub HOMESTATEtk_Attr(@) {
                   if ( !defined( $attr{$name}{group} )
                     || $attr{$name}{group} eq "Zuhause Status" );
             }
-            if ( $TYPE eq "FLOORSTATE" ) {
-                $attr{$name}{group} = "Floor State"
+            if ( $TYPE eq "SECTIONSTATE" ) {
+                $attr{$name}{group} = "Section State"
                   if ( !defined( $attr{$name}{group} )
-                    || $attr{$name}{group} eq "Flurstatus" );
+                    || $attr{$name}{group} eq "Bereichstatus" );
             }
             if ( $TYPE eq "ROOMSTATE" ) {
                 $attr{$name}{group} = "Room State"
@@ -891,10 +891,12 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
             # when own attributes were changed
             if ( $d eq $name ) {
                 if ( defined( &{'DoInitDev'} ) ) {
+                    delete $hash->{NEXT_EVENT};
                     RemoveInternalTimer($hash);
                     InternalTimer( gettimeofday() + 0.5, "DoInitDev", $hash );
                 }
                 else {
+                    delete $hash->{NEXT_EVENT};
                     RemoveInternalTimer($hash);
                     InternalTimer( gettimeofday() + 0.5,
                         "RESIDENTStk_DoInitDev", $hash );
@@ -912,7 +914,7 @@ m/^((?:DELETE)?ATTR)\s+([A-Za-z\d._]+)\s+([A-Za-z\d_\.\-\/]+)(?:\s+(.*)\s*)?$/
     # only when they hit HOMESTATE devices
     if (   $TYPE ne $devType
         && $devType =~
-        m/^HOMESTATE|FLOORSTATE|ROOMSTATE|RESIDENTS|ROOMMATE|GUEST$/ )
+        m/^HOMESTATE|SECTIONSTATE|ROOMSTATE|RESIDENTS|ROOMMATE|GUEST$/ )
     {
 
         my $events = deviceEvents( $dev, 1 );
@@ -971,31 +973,31 @@ sub HOMESTATEtk_findHomestateSlaves($;$) {
 
     if ( $hash->{TYPE} eq "HOMESTATE" ) {
 
-        my @FLOORSTATES;
-        foreach ( devspec2array("TYPE=FLOORSTATE") ) {
+        my @SECTIONSTATES;
+        foreach ( devspec2array("TYPE=SECTIONSTATE") ) {
             next
               unless (
-                defined( $defs{$_}{FLOORSTATES} )
+                defined( $defs{$_}{SECTIONSTATES} )
                 && grep { $hash->{NAME} eq $_ }
-                split( /,/, $defs{$_}{FLOORSTATES} )
+                split( /,/, $defs{$_}{SECTIONSTATES} )
               );
-            push @FLOORSTATES, $_;
+            push @SECTIONSTATES, $_;
         }
 
-        if ( scalar @FLOORSTATES ) {
-            $hash->{FLOORSTATES} = join( ",", @FLOORSTATES );
+        if ( scalar @SECTIONSTATES ) {
+            $hash->{SECTIONSTATES} = join( ",", @SECTIONSTATES );
         }
-        elsif ( $hash->{FLOORSTATES} ) {
-            delete $hash->{FLOORSTATES};
+        elsif ( $hash->{SECTIONSTATES} ) {
+            delete $hash->{SECTIONSTATES};
         }
 
-        if ( $hash->{FLOORSTATES} ) {
+        if ( $hash->{SECTIONSTATES} ) {
             $ret .= "," if ($ret);
-            $ret .= $hash->{FLOORSTATES};
+            $ret .= $hash->{SECTIONSTATES};
         }
     }
 
-    if ( $hash->{TYPE} eq "HOMESTATE" || $hash->{TYPE} eq "FLOORSTATE" ) {
+    if ( $hash->{TYPE} eq "HOMESTATE" || $hash->{TYPE} eq "SECTIONSTATE" ) {
 
         my @ROOMSTATES;
         foreach ( devspec2array("TYPE=ROOMSTATE") ) {
@@ -1007,9 +1009,9 @@ sub HOMESTATEtk_findHomestateSlaves($;$) {
                     split( /,/, $defs{$_}{HOMESTATES} )
                 )
                 || (
-                    defined( $defs{$_}{FLOORSTATES} )
+                    defined( $defs{$_}{SECTIONSTATES} )
                     && grep { $hash->{NAME} eq $_ }
-                    split( /,/, $defs{$_}{FLOORSTATES} )
+                    split( /,/, $defs{$_}{SECTIONSTATES} )
                 )
               );
             push @ROOMSTATES, $_;
@@ -1163,7 +1165,7 @@ sub HOMESTATEtk_UpdateReadings (@) {
     my $wayhome         = 0;
     my $wayhomeDelayed  = 0;
     my $wakeup          = 0;
-    foreach my $internal ( "RESIDENTS", "FLOORSTATES", "ROOMSTATES" ) {
+    foreach my $internal ( "RESIDENTS", "SECTIONSTATES", "ROOMSTATES" ) {
         next unless ( $hash->{$internal} );
         foreach my $presenceDev ( split( /,/, $hash->{$internal} ) ) {
             my $state = ReadingsVal( $presenceDev, "state", "gone" );
@@ -1184,7 +1186,7 @@ sub HOMESTATEtk_UpdateReadings (@) {
     }
     $state_home = 1
       unless ( $hash->{RESIDENTS}
-        || $hash->{FLOORSTATES}
+        || $hash->{SECTIONSTATES}
         || $hash->{ROOMSTATES} );
 
     # autoMode
