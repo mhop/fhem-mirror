@@ -41,6 +41,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 4.15.1       20.05.2017       correction of commandref
 # 4.15.0       17.05.2017       SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized
 # 4.14.2       16.05.2017       SQL-Statements optimized for Wildcard "%" usage if used, Wildcard "_" isn't supported
 #                               furthermore, "averageValue", "sumValue", "maxValue", "minValue", "countEntries" 
@@ -210,7 +211,7 @@ use Time::Local;
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "4.15.0";
+my $DbRepVersion = "4.15.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -4799,8 +4800,8 @@ return;
 							   
 							   <ul>
 							   <b>Example:</b> <br>
-                               attr <device> userExitFn UserExit UserExit .*:.* <br>
-                               # "UserExit" is the name of subroutine in 99_myUtils.pm.
+                               attr <device> userExitFn UserFunction .*:.* <br>
+                               # "UserFunction" is the name of subroutine in 99_myUtils.pm.
 							   </ul>
 							   <br>
 							   
@@ -5480,8 +5481,8 @@ return;
 							   
 							   <ul>
 							   <b>Beispiel:</b> <br>
-                               attr <device> userExitFn UserExit UserExit .*:.* <br>
-                               # "UserExit" ist die Subroutine in 99_myUtils.pm.
+                               attr <device> userExitFn UserFunction .*:.* <br>
+                               # "UserFunction" ist die Subroutine in 99_myUtils.pm.
 							   </ul>
 							   <br>
 							   
