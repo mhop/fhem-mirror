@@ -28,7 +28,7 @@ my %fhemInfo =();
 sub fheminfo2_Initialize($$) {
   my %hash = (
     Fn  => "CommandFheminfo2",
-    uri => "http://fhem.j65.de/stats/statistics.cgi",
+    uri => "http://fhem.j65.de/stats/statistics2.cgi",
     Hlp => "[send],show or send Fhem statistics",
   );
   $cmds{fheminfo2} = \%hash;
