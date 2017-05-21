@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules};
 
-my $HOMEMODE_version = "1.1.0";
+my $HOMEMODE_version = "1.1.1";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -338,7 +338,7 @@ sub HOMEMODE_Notify($$)
       foreach my $device (devspec2array("TYPE=$prestype:FILTER=presence=(maybe.)?(absent|present|appeared|disappeared)"))
       {
         next if (lc($device) !~ /$residentregex/);
-        push @presentdevicespresent,$device if (ReadingsVal($device,"presence","absent") =~ /^(present|appeared)$/);
+        push @presentdevicespresent,$device if (ReadingsVal($device,"presence","absent") =~ /^(present|appeared|maybe.absent)$/);
       }
       if (grep /^.*:\s(present|appeared)$/,@{$events})
       {
@@ -350,7 +350,7 @@ sub HOMEMODE_Notify($$)
         push @commands,$attr{$name}{"HomeCMDpresence-present-$resident-device"} if ($attr{$name}{"HomeCMDpresence-present-$resident-device"});
         push @commands,$attr{$name}{"HomeCMDpresence-present-$resident-$devname"} if ($attr{$name}{"HomeCMDpresence-present-$resident-$devname"});
         if (@presentdevicespresent >= AttrVal($name,"HomePresenceDevicePresentCount-$resident",1)
-          && ReadingsVal($resident,"state","") =~ /^(absent|gone|none)$/)
+          && ReadingsVal($resident,"state","") =~ /^(absent|[gn]one)$/)
         {
           CommandSet(undef,"$resident:FILTER=state!=home state home");
         }
@@ -2747,6 +2747,7 @@ sub HOMEMODE_HomebridgeMapping($)
   $mapping .= "\nContactSensorState=contactsOutsideOpen_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"contactsOutsideOpen_ct",undef));
   $mapping .= "\nStatusTampered=sensorsTampered_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"sensorsTampered_ct",undef));
   $mapping .= "\nMotionDetected=motionsInside_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"motionsInside_ct",undef));
+  $mapping .= "\nStatusLowBattery=batteryLow_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"batteryLow_ct",undef));
   $mapping .= "\nE863F10F-079E-48FF-8F27-9C2605A29F52=pressure,name=AirPressure,format=UINT16" if (defined ReadingsVal($name,"wind",undef));
   addToDevAttrList($name,"genericDeviceType") if (!grep /^genericDeviceType/,split(" ",$attr{"global"}{userattr}));
   addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",$attr{"global"}{userattr}));
@@ -2940,21 +2941,35 @@ sub HOMEMODE_Details($$$)
   return if ((AttrVal($name,"HomeAdvancedDetails","none") eq "none") || (!$room && AttrVal($name,"HomeAdvancedDetails","none") eq "room"));
   my $hash = $defs{$name};
   my $html = "<div>";
-  $html .= "<style>.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:20px;padding:3px 10px}</style>";
+  $html .= "<style>.homehover{cursor:pointer}.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:30px;padding:3px 10px}</style>";
   $html .= "<div class=\"homeinfopanel\" informid=\"\"></div>";
   $html .= "<table class=\"wide\">";
   if (AttrVal($name,"HomeYahooWeatherDevice",""))
   {
-    $html .= "<tr>";
+    $html .= "<tr class=\"homehover\">";
     my $temp = $HOMEMODE_de ? "Temperatur" : "Temperature";
     $html .= "<td class=\"tar\">$temp:</td>";
-    $html .= "<td class=\"dval\"><span informid=\"$name-temperature\">".ReadingsVal($name,"temperature","")."</span> °C</td>";
+    $html .= "<td class=\"dval\"><span informid=\"$name-temperature\">".ReadingsVal($name,"temperature","")."</span> °C<span class=\"homeinfo\" informid=\"\">".HOMEMODE_ForecastTXT($hash,1)."</span></td>";
     my $humi = $HOMEMODE_de ? "Luftfeuchte" : "Humidity";
     $html .= "<td class=\"tar\">$humi:";
     $html .= "<td class=\"dval\"><span informid=\"$name-humidity\">".ReadingsVal($name,"humidity","")."</span> %</td>";
     my $pres = $HOMEMODE_de ? "Luftdruck" : "Air pressure";
     $html .= "<td class=\"tar\">$pres:</td>";
     $html .= "<td class=\"dval\"><span informid=\"$name-pressure\">".ReadingsVal($name,"pressure","")."</span> hPa</td>";
+    $html .= "</tr>";
+  }
+  if (AttrVal($name,"HomeSensorsPowerEnergy","") && AttrVal($name,"HomeSensorsLuminance",""))
+  {
+    $html .= "<tr>";
+    my $power = $HOMEMODE_de ? "Leistung" : "Power";
+    $html .= "<td class=\"tar\">$power:</td>";
+    $html .= "<td class=\"dval\"><span informid=\"$name-power\">".ReadingsVal($name,"power","")."</span> W</td>";
+    my $energy = $HOMEMODE_de ? "Energie" : "Energy";
+    $html .= "<td class=\"tar\">$energy:";
+    $html .= "<td class=\"dval\"><span informid=\"$name-energy\">".ReadingsVal($name,"energy","")."</span> kWh</td>";
+    my $lum = $HOMEMODE_de ? "Licht" : "Luminance";
+    $html .= "<td class=\"tar\">$lum:</td>";
+    $html .= "<td class=\"dval\"><span informid=\"$name-luminance\">".ReadingsVal($name,"luminance","")."</span> lux</td>";
     $html .= "</tr>";
   }
   if (AttrVal($name,"HomeSensorsContact",""))
@@ -2973,7 +2988,7 @@ sub HOMEMODE_Details($$$)
   }
   $html .= "</table>";
   $html .= "</div>";
-  $html .= "<script>\$(\".homehover\").unbind().mouseover(function(){var t=\$(this).find(\".homeinfo\").text();var id=\$(this).find(\".homeinfo\").attr(\"informid\");\$(\".homeinfopanel\").text(t).attr(\"informid\",id);});</script>";
+  $html .= "<script>\$(\".homehover\").unbind().click(function(){var t=\$(this).find(\".homeinfo\").text();var id=\$(this).find(\".homeinfo\").attr(\"informid\");\$(\".homeinfopanel\").text(t).attr(\"informid\",id);});</script>";
   return $html;
 }
 
