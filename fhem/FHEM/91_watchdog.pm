@@ -149,7 +149,7 @@ watchdog_Trigger($)
   my ($watchdog) = @_;
   my $name = $watchdog->{NAME};
 
-  if(AttrVal($name, "disable", 0)) {
+  if(IsDisabled($name) || $watchdog->{STATE} eq "inactive") {
     $watchdog->{STATE} = "defined";
     return "";
   }
