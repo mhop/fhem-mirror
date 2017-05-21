@@ -1020,6 +1020,10 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,msgScPosA       =>1,msgScPosA       =>1
                          ,triggerMode     =>1
                          }
+ ,"HM-MOD-EM-8bit"    =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
+                         ,ledMode         =>1
+                         ,transmitTryMax  =>1,eventFilterTime =>1
+                         }
 
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
  ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1,language        =>1,localResDis     =>1}
