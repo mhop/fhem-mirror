@@ -196,9 +196,9 @@ sub _fi2_to_json {
         $val =~ s/([\0-\x1f\"\\])/sprintf "\\u%04x", ord $1/eg;
         return '"' . $val . '"';
     } elsif (ref $val eq 'ARRAY') {
-        return '[' . join(',', map to_json($_), @$val) . ']';
+        return '[' . join(',', map _fi2_to_json($_), @$val) . ']';
     } elsif (ref $val eq 'HASH') {
-        return '{' . join(',', map to_json($_) . ":" . to_json($val->{$_}), sort keys %$val) . '}';
+        return '{' . join(',', map _fi2_to_json($_) . ":" . _fi2_to_json($val->{$_}), sort keys %$val) . '}';
     } else {
         return "Cannot encode $val as JSON!\n";
     }
