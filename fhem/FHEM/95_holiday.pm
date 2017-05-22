@@ -45,7 +45,7 @@ holiday_refresh($;$)
 {
   my ($name, $fordate) = (@_);
   my $hash = $defs{$name};
-  my $internal;
+  my $fromTimer=0;
 
   return if(!$hash);           # Just deleted
 
@@ -53,7 +53,7 @@ holiday_refresh($;$)
   my @lt = localtime($nt);
   my @fd;
   if(!$fordate) {
-    $internal = 1;
+    $fromTimer = 1;
     $fordate = sprintf("%02d-%02d", $lt[4]+1, $lt[3]);
     @fd = @lt;
   } else {
@@ -61,7 +61,7 @@ holiday_refresh($;$)
     @fd = localtime(mktime(1,1,1,$d,$m-1,$lt[5],0,0,-1));
   }
 
-  Log3 $name, 5, "holiday_refresh $name called for $fordate";
+  Log3 $name, 5, "holiday_refresh $name called for $fordate ($fromTimer)";
 
   my $fname = $attr{global}{modpath} . "/FHEM/" . $hash->{NAME} . ".holiday";
   my ($err, @holidayfile) = FileRead($fname);
@@ -178,13 +178,13 @@ holiday_refresh($;$)
   push @foundList, "none" if(!int(@foundList));
   my $found = join(", ", @foundList);
 
-  RemoveInternalTimer($name);
-  $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]);         # Midnight
-  $nt += 86400 + 2;                              # Tomorrow
-  $hash->{TRIGGERTIME} = $nt;
-  InternalTimer($nt, "holiday_refresh", $name, 0);
+  if($fromTimer) {
+    RemoveInternalTimer($name);
+    $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]);         # Midnight
+    $nt += 86400 + 2;                              # Tomorrow
+    $hash->{TRIGGERTIME} = $nt;
+    InternalTimer($nt, "holiday_refresh", $name, 0);
 
-  if($internal) {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'state', $found);
     readingsBulkUpdate($hash, 'yesterday', CommandGet(undef,"$name yesterday"));
