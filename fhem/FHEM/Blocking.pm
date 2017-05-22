@@ -31,10 +31,17 @@ our %BC_hash;
 my $telnetClient;
 my $bc_pid = 0;
 
+use vars qw($BC_telnet); # set optionally by the user, Forum #68477
+
 sub
 BC_searchTelnet($)
 {
   my ($blockingFn) = @_;
+
+  if($BC_telnet) {
+    $BC_telnetDevice = $BC_telnet;
+    return;
+  }
 
   $BC_telnetDevice = undef;
   foreach my $d (sort keys %defs) { # 
