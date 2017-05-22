@@ -1013,8 +1013,10 @@ AnalyzeCommandChain($$;$)
   my @saveCmdList = @cmdList;   # Needed for recursive calls
   @cmdList = split(";", $cmd);
   my $subcmd;
+  my $localEvalSpecials = $evalSpecials;
   while(defined($subcmd = shift @cmdList)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
+    $evalSpecials = $localEvalSpecials;
     my $lret = AnalyzeCommand($c, $subcmd, "ACC");
     push(@ret, $lret) if(defined($lret));
   }
