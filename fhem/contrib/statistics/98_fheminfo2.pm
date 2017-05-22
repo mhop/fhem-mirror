@@ -40,9 +40,6 @@ sub CommandFheminfo2($$) {
   $args[0] = defined($args[0]) ? lc($args[0]) : "";
   my $doSend = ($args[0] eq 'send') ? 1 : 0;
 
-  eval("use JSON");
-  return "Please install perl module JSON to use fheminfo." if($@);
-
   return "Unknown argument $args[0], usage: fheminfo2 [send]"
     if($args[0] ne "send" && $args[0] ne "");
 
@@ -95,7 +92,8 @@ sub _fi2_Count() {
 }
 
 sub _fi2_Send() {
-   my $json = encode_json(\%fhemInfo);
+   my $json = _fi2_to_json(\%fhemInfo);
+
    Log3("fheminfo",4,"fheminfo: $json");
 
    my %hu_hash = ();
@@ -188,6 +186,22 @@ sub _fi2_Uptime() {
 sub _fi2_Div($$) {
   my ($p1,$p2) = @_;
   return (int($p1/$p2), $p1 % $p2);
+}
+
+sub _fi2_to_json {
+    my $val = shift;
+    if (not defined $val) {
+        return "null";
+    } elsif (not ref $val) {
+        $val =~ s/([\0-\x1f\"\\])/sprintf "\\u%04x", ord $1/eg;
+        return '"' . $val . '"';
+    } elsif (ref $val eq 'ARRAY') {
+        return '[' . join(',', map to_json($_), @$val) . ']';
+    } elsif (ref $val eq 'HASH') {
+        return '{' . join(',', map to_json($_) . ":" . to_json($val->{$_}), sort keys %$val) . '}';
+    } else {
+        return "Cannot encode $val as JSON!\n";
+    }
 }
 
 1;
