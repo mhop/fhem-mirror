@@ -92,7 +92,8 @@ sub _fi2_Count() {
 }
 
 sub _fi2_Send() {
-   my $json = _fi2_to_json(\%fhemInfo);
+#   my $json = _fi2_to_json(\%fhemInfo);
+   my $json = toJSON(\%fhemInfo);
 
    Log3("fheminfo",4,"fheminfo: $json");
 
@@ -186,22 +187,6 @@ sub _fi2_Uptime() {
 sub _fi2_Div($$) {
   my ($p1,$p2) = @_;
   return (int($p1/$p2), $p1 % $p2);
-}
-
-sub _fi2_to_json {
-    my $val = shift;
-    if (not defined $val) {
-        return "null";
-    } elsif (not ref $val) {
-        $val =~ s/([\0-\x1f\"\\])/sprintf "\\u%04x", ord $1/eg;
-        return '"' . $val . '"';
-    } elsif (ref $val eq 'ARRAY') {
-        return '[' . join(',', map _fi2_to_json($_), @$val) . ']';
-    } elsif (ref $val eq 'HASH') {
-        return '{' . join(',', map _fi2_to_json($_) . ":" . _fi2_to_json($val->{$_}), sort keys %$val) . '}';
-    } else {
-        return "Cannot encode $val as JSON!\n";
-    }
 }
 
 1;
