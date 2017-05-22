@@ -134,6 +134,7 @@ sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
+sub toJSON($);
 sub utf8ToLatin1($);
 
 sub CommandAttr($$);
@@ -4604,6 +4605,34 @@ sub escapeLogLine($) {
 }
 
 sub
+toJSON($)
+{
+  my $val = shift;
+
+  if(not defined $val) {
+    return "null";
+
+  } elsif (not ref $val) {
+    $val =~ s/([\x00-\x1f\x22\x5c\x7f])/sprintf '\u%04x', ord($1)/ge;
+
+    return '"' . $val . '"';
+
+  } elsif (ref $val eq 'ARRAY') {
+    return '[' . join(',', map toJSON($_), @$val) . ']';
+
+  } elsif (ref $val eq 'HASH') {
+      return '{' . join(',', 
+                   map { toJSON($_).":".toJSON($val->{$_}) } 
+                   sort keys %$val) . '}';
+
+  } else {
+      return toJSON("toJSON: Cannot encode $val");
+
+  }
+}
+
+
+sub
 Debug($) {
   my $msg= shift;
   Log 1, "DEBUG>" . $msg;
@@ -5055,5 +5084,6 @@ getPawList($)
   }
   return @dob;
 }
+
 
 1;
