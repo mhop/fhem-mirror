@@ -122,6 +122,9 @@ FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (de
 FHEM/21_OWTHERM.pm           pahenning            http://forum.fhem.de 1Wire
 FHEM/21_OWVAR.pm             pahenning            http://forum.fhem.de 1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           http://forum.fhem.de Multimedia
+FHEM/21_HEOSMaster	     CoolTux		  http://forum.fhem.de Multimedia
+FHEM/21_HEOSPlayer           CoolTux              http://forum.fhem.de Multimedia
+FHEM/21_HEOSGroup            CoolTux              http://forum.fhem.de Multimedia
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/22_HOMEMODE.pm          DeeSPe               http://forum.fhem.de Automatisierung
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
