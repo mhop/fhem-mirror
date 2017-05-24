@@ -1,4 +1,4 @@
-REV 14350
+REV 14352
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-05-22_07:45:02 198760 ./CHANGED
+UPD 2017-05-24_07:45:02 198828 ./CHANGED
 UPD 2017-05-16_07:45:02 36537 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-05-23_07:45:05 134695 ./fhem.pl
@@ -121,6 +121,9 @@ UPD 2016-10-29_07:45:14 14474 FHEM/20_N4HBUS.pm
 UPD 2015-07-28_14:05:31 10373 FHEM/20_OWFS.pm
 UPD 2017-04-30_07:45:02 32802 FHEM/20_ROOMMATE.pm
 UPD 2016-01-08_07:45:10 19616 FHEM/20_X10.pm
+UPD 2017-05-24_07:45:02 27650 FHEM/21_HEOSGroup.pm
+UPD 2017-05-24_07:45:02 56684 FHEM/21_HEOSMaster.pm
+UPD 2017-05-24_07:45:02 48511 FHEM/21_HEOSPlayer.pm
 UPD 2016-10-29_07:45:14 31382 FHEM/21_N4HMODULE.pm
 UPD 2017-03-09_07:45:02 62033 FHEM/21_OWAD.pm
 UPD 2017-03-11_07:45:02 77974 FHEM/21_OWCOUNT.pm
@@ -588,8 +591,8 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-05-22_07:45:04 2896330 docs/commandref.html
-UPD 2017-05-22_07:45:05 1681282 docs/commandref_DE.html
+UPD 2017-05-24_07:45:04 2906939 docs/commandref.html
+UPD 2017-05-24_07:45:05 1692987 docs/commandref_DE.html
 UPD 2017-04-08_07:45:02 71068 docs/commandref_frame.html
 UPD 2017-04-08_07:45:02 79660 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
