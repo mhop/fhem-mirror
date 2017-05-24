@@ -930,7 +930,7 @@ sub parseSub($$$) {
   #main::Debug "ENTER @ $ln";
   while($ln< $len) {
     my $line= $$icalref[$ln];
-    main::Debug "parse line $line";
+    #main::Debug "parse line $line";
     $ln++;
     # check for and handle continuation lines (4.1 on page 12)
     while($ln< $len) {
