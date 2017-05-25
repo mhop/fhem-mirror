@@ -3851,12 +3851,17 @@ FW_widgetOverride($$)
         <ul>
           define d1 dummy<br>
           attr d1 webCmd state<br>
-          attr d1 setList state:on,off<br>
+          attr d1 readingList state<br>
+          attr d1 setList state:on,off<br><br>
+
           define d2 dummy<br>
           attr d2 webCmd state<br>
-          attr d2 setList state:slider,0,1,10<br>
+          attr d2 readingList state<br>
+          attr d2 setList state:slider,0,1,10<br><br>
+
           define d3 dummy<br>
           attr d3 webCmd state<br>
+          attr d3 readingList state<br>
           attr d3 setList state:time<br>
         </ul>
         If the command is state, then the value will be used as a command.<br>

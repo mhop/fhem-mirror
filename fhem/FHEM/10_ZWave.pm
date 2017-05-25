@@ -383,6 +383,12 @@ my %zwave_class = (
                                ($1 eq "fe" ? "barrierState:opening" :
                                ($1 eq "ff" ? "barrierState:open" :
                                              "barrierState:".hex($1))))))'} },
+  NETWORK_MANAGEMENT_INSTALL=> { id => '67' },
+  ZIP_NAMING               => { id => '68' },
+  MAILBOX                  => { id => '69' },
+  WINDOW_COVERING          => { id => '6a' },
+  IRRIGATION               => { id => '6b' },
+  SUPERVISION              => { id => '6c' },
   ENTRY_CONTROL            => { id => '6f' },
   CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
@@ -561,6 +567,7 @@ my %zwave_class = (
       '"alarm_type_$2:level ".hex($3)." node ".hex($1)." seconds ".hex($4)'} },
   SILENCE_ALARM            => { id => '9d' },
   SENSOR_CONFIGURATION     => { id => '9e' },
+  SECURITY_S2              => { id => '9f' },
   MARK                     => { id => 'ef' },
   NON_INTEROPERABLE        => { id => 'f0' },
 );
