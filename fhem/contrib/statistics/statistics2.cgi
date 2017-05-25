@@ -12,6 +12,8 @@ use Data::Dumper;
 
 sub insertDB();
 sub getLocation();
+sub add2total();
+
 sub doAggregate();
 sub viewStatistics();
 
@@ -24,7 +26,7 @@ my %data  = Vars();
 
 # directory cointains databases
 my $datadir  = "./data";
-my $dbf      = "$datadir/fhem_statistics.sqlite";
+my $dbf      = "$datadir/fhem_statistics_2017.sqlite";
 my $dsn      = "dbi:SQLite:dbname=$dbf";
 my $dbh;
 my $sth;
@@ -55,6 +57,7 @@ sub insertDB() {
           die "Cannot connect: $DBI::errstr";
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
   $sth->execute($uniqueID,$geo,$json);
+  add2total();
   $dbh->disconnect();
 }
 
@@ -83,31 +86,55 @@ sub getLocation() {
   }
 }
 
+sub add2total() {
+   my $sql = "SELECT * from jsonNodes where uniqueID = 'databaseInfo'";
+   my $sth = $dbh->prepare( $sql );
+   $sth->execute();
+   my @dbInfo = $sth->fetchrow_array();
+   my $dbInfo = decode_json $dbInfo[3];
+   $dbInfo->{'submissionsTotal'}++;
+   my $new = encode_json $dbInfo;
+   
+   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,json) VALUES(?,?)});
+   $sth->execute("databaseInfo",$new);
+   $sth->finish();
+}
+
 # ---------- count everything for statistics ----------
 
 sub doAggregate() {
    $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
 
-   my $created = $dbh->selectrow_array("SELECT lastSeen from jsonNodes where uniqueID = 'databaseCreated'");
+   my ($sql,@dbInfo,%countAll,$decoded,$res);
 
-   my $sql = "SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseCreated'";
+# ($updated,$started,$nodesTotal,$nodes12,%countAll)   
+   $sql = "SELECT * from jsonNodes where uniqueID = 'databaseInfo'";
+   $sth = $dbh->prepare( $sql );
+   $sth->execute();
+   @dbInfo = $sth->fetchrow_array();
+
+   my $dbInfo     = decode_json $dbInfo[3];
+   my $updated    = $dbInfo[1];
+   my $started    = $dbInfo->{'submissionsSince'};
+   my $nodesTotal = $dbInfo->{'submissionsTotal'};
+   my $nodes12    = 0;
+
+   $sql = "SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseInfo'";
+#   $sql = "SELECT geo,json FROM jsonNodes WHERE uniqueID <> 'databaseInfo'";
    $sth = $dbh->prepare( $sql );
    $sth->execute();
 
-   my (%countAll,$decoded,$nodes,$res);
-   $nodes = 0;
-   
    while (my @line = $sth->fetchrow_array()) {
-      $nodes++;
+      $nodes12++;
       # process GeoIP data
       $decoded  = decode_json( $line[0] );
       $res      = $decoded->{'continentcode'};
-      $countAll{'geo'}{'continent'}{$res}++;
+      $countAll{'geo'}{'continent'}{$res}++ if $res;
       $res      = $decoded->{'countryname'};
-      $countAll{'geo'}{'countryname'}{$res}++;
+      $countAll{'geo'}{'countryname'}{$res}++ if $res;
       $res      = $decoded->{'regionname'};
-      $countAll{'geo'}{'regionname'}{$res}++;
+      $countAll{'geo'}{'regionname'}{$res}++ if $res;
       ($decoded,$res) = (undef,undef);
 
       # process system data
@@ -138,14 +165,14 @@ sub doAggregate() {
 
    $dbh->disconnect();
 
-   return ($created,$nodes,%countAll);
+   return ($updated,$started,$nodesTotal,$nodes12,%countAll);
 }
 
 # ---------- do the presentation ----------
 # ---------- reached by browser access ----------
 
 sub viewStatistics() {
-   my ($created,$count,%countAll) = doAggregate();
+   my ($updated,$started,$nodesTotal,$nodes12,%countAll) = doAggregate();
    my $countSystem  = $countAll{'system'};
    my $countGeo     = $countAll{'geo'};
    my $countModules = $countAll{'modules'};
@@ -161,13 +188,14 @@ sub viewStatistics() {
          $q->h2( "FHEM statistics 2017 (experimental)" ),
          $q->p( "graphics to be implemented..." ),
          $q->hr,
-         $q->p( "Statistics database created $created contains $count entries (last 12 months)\n"),
+         $q->p( "<b>Statistics database</b><br>created: $started, updated: $updated<br>".
+                "entries (total): $nodesTotal, entries (12 month): $nodes12<br>".
+                "Generation time: ".sprintf("%.3f",time()-$start)." seconds"),
+         $q->hr,
          $q->p( "System info <br>".            Dumper $countSystem ),
          $q->p( "GeoIP info <br>".             Dumper $countGeo ),
          $q->p( "Modules info <br>".           Dumper $countModules ),
          $q->p( "Models per module info <br>". Dumper $countModels ),
-         $q->hr,
-         $q->p( "Generation time: ".sprintf("%.3f",time()-$start)." seconds" ),
 
          $q->end_html;
 }
