@@ -327,8 +327,8 @@ my %zwave_class = (
   ASSOCIATION_GRP_INFO     => { id => '59',
     get   => { associationGroupName => "01%02x",
                associationGroupCmdList => "0500%02x" },
-    parse => { "..5902(..)(.*)"=> '"assocGroupName_".hex($1).":".pack("H*", $2)',
-               "..5906(..)..(.*)"=> '"assocGroupCmdList_".hex($1).":".$2' } },
+    parse => { "..5902(..)(.*)"=> '"assocGroupName_".hex($1).":".pack("H*",$2)',
+               "..5906(..)..(.*)"=> 'ZWave_assocGroupCmdList($1,$2)' } },
   DEVICE_RESET_LOCALLY     => { id => '5a',
     parse => { "025a01"    => "deviceResetLocally:yes" } },
   CENTRAL_SCENE            => { id => '5b',
@@ -1611,7 +1611,7 @@ ZWave_scheduleSet ($$)
 }
 
 sub
-ZWave_scheduleParse ($$)
+ZWave_scheduleParse($$)
 {
   my ($hash, $val) = @_;
   return if($val !~ m/^(..)(..)(..)(..)(..)(..)(..)(..)(....)(..)(..)(..)(.*)/);
@@ -1640,7 +1640,7 @@ ZWave_scheduleParse ($$)
 }
 
 sub
-ZWave_scheduleStateParse ($$)
+ZWave_scheduleStateParse($$)
 {
   my ($hash, $val) = @_;
   return if($val !~ m/^(..)(..)(..)(..)/);
@@ -1656,6 +1656,15 @@ ZWave_scheduleStateParse ($$)
   my $rt1 .= "scheduleState:$numSupportedIDs $override $numReports ".
     "$ID1 $ID2 $ID3 $IDN";
   return ($rt1);
+}
+
+sub
+ZWave_assocGroupCmdList($$)
+{
+  my ($grp, $txt) = @_;
+  $txt =~ s/(..)(..)/
+            ($zwave_id2class{$1} ? $zwave_id2class{$1}:"UNKNOWN_$1").":$2 "/ge;
+  return "assocGroupCmdList_$grp:$txt";
 }
 
 my %zwm_unit = (
@@ -6163,7 +6172,7 @@ s2Hex($)
 
   <br><br><b>Class ASSOCIATION_GRP_INFO</b>
   <li>assocGroupName_X:name</li>
-  <li>assocGroupCmdList_X:AABBCCDD...</li>
+  <li>assocGroupCmdList_X:Class1:Cmd1 Class2:Cmd ...</li>
 
   <br><br><b>Class BARRIER_OPERATOR</b>
   <li>barrierState:[ closed | [%] | closing | stopped | opening | open ]</li>
