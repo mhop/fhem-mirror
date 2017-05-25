@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules};
 
-my $HOMEMODE_version = "1.1.1";
+my $HOMEMODE_version = "1.1.2";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -338,7 +338,7 @@ sub HOMEMODE_Notify($$)
       foreach my $device (devspec2array("TYPE=$prestype:FILTER=presence=(maybe.)?(absent|present|appeared|disappeared)"))
       {
         next if (lc($device) !~ /$residentregex/);
-        push @presentdevicespresent,$device if (ReadingsVal($device,"presence","absent") =~ /^(present|appeared|maybe.absent)$/);
+        push @presentdevicespresent,$device if (ReadingsVal($device,"presence","") =~ /^(present|appeared|maybe.absent)$/);
       }
       if (grep /^.*:\s(present|appeared)$/,@{$events})
       {
@@ -1944,6 +1944,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%PREVMOTION%/$pmotion/g;
   $cmd =~ s/%SEASON%/$season/g;
   $cmd =~ s/%SELF%/$name/g;
+  $cmd =~ s/%SENSORSBATTERY%/$sensorsbattery/g;
   $cmd =~ s/%SENSORSCONTACT%/$sensorscontact/g;
   $cmd =~ s/%SENSORSENERGY%/$sensorsenergy/g;
   $cmd =~ s/%SENSORSMOTION%/$sensorsmotion/g;
@@ -2938,7 +2939,7 @@ sub HOMEMODE_checkIP($;$)
 sub HOMEMODE_Details($$$)
 {
   my ($FW_name,$name,$room) = @_;
-  return if ((AttrVal($name,"HomeAdvancedDetails","none") eq "none") || (!$room && AttrVal($name,"HomeAdvancedDetails","none") eq "room"));
+  return if (AttrVal($name,"HomeAdvancedDetails","none") eq "none" || (AttrVal($name,"HomeAdvancedDetails","") eq "room" && $FW_detail eq $name));
   my $hash = $defs{$name};
   my $html = "<div>";
   $html .= "<style>.homehover{cursor:pointer}.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:30px;padding:3px 10px}</style>";
