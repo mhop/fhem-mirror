@@ -208,16 +208,16 @@ sub Broadlink_send_data(@) {
 		push @broadlink_payload, unpack("C*", $val);
 	}
 	my $msg = "Try to send a command: " . $cmdname;
-    Log3 $hash->{NAME}, 5, $msg;
+    Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	my $response = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
 	if (length($response) > 0 && $response ne "xxx") {
 		readingsSingleUpdate ( $hash, "lastCommandSend", $cmdname, 1 );
 		my $msg = $cmdname ." send";
-		Log3 $hash->{NAME}, 5, $msg;
+		Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	} else {
 		readingsSingleUpdate ( $hash, "connectionErrorOn", "sendCommand: " . $cmdname, 1 );
 		my $msg = $cmdname . " command send failed - device not connected?";
-		Log3 $hash->{NAME}, 4, $msg;
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = $msg;
 	}
 }
@@ -227,14 +227,14 @@ sub Broadlink_check_data(@) {
 	my @broadlink_payload = ((0) x  16);
 	$broadlink_payload[0] = 4;
 	my $msg = "check for new command";
-	Log3 $hash->{NAME}, 5, $msg;
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
 	#length must be bigger than 0x38, if not, cant get substring with data
 	if (length($data) > 0x38 && $data ne "xxx") {
 		my $err = unpack("C*", substr($data, 0x22, 1)) | (unpack("C*", substr($data, 0x23, 1)) << 8);
 		if ($err == 0) {
 			my $msg = "new command found";
-			Log3 $hash->{NAME}, 5, $msg;
+			Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 			my $enc_payload = substr($data, 0x38);
 			my $cipher =  Broadlink_getCipher($hash);         
 			my $decodedData = $cipher->decrypt($enc_payload);
@@ -247,21 +247,21 @@ sub Broadlink_check_data(@) {
 			return substr($decodedData, 4);
 		} else {
 			my $msg = "Error receiving command";
-			Log3 $hash->{NAME}, 5, $msg;
+			Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 		}
 	} else {
 		my $msg = "no new command data found - data length: " . length($data);
-		Log3 $hash->{NAME}, 4, $msg;
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = $msg;
 	}
 	$hash->{'.broadlink_checkCommands'}++;
 	if ($hash->{'.broadlink_checkCommands'} < 15) {
 		my $msg = "no command recorded. retry count:" . $hash->{'.broadlink_checkCommands'};
-		Log3 $hash->{NAME}, 5, $msg;
+		Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 		InternalTimer(gettimeofday()+2, "Broadlink_check_data", $hash);
 	} else {
 		my $msg = "no command recorded even after a lot of retries. Try to learn again";
-		Log3 $hash->{NAME}, 3, $msg;
+		Log3 $hash->{NAME}, 3, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = $msg;
 		readingsSingleUpdate ( $hash, "lastFailedRecordedCommand", $hash->{'.newcommandname'}, 1 );
 	}	
@@ -273,14 +273,14 @@ sub Broadlink_sp3_getStatus(@) {
 	my @broadlink_payload = ((0) x  16);
 	$broadlink_payload[0] = 1;
 	my $msg = "sp3_status request";
-	Log3 $hash->{NAME}, 5, $msg;
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
 	#length must be bigger than 0x38, if not, cant get substring with data
 	if (length($data) > 0x38 && $data ne "xxx") {
 		my $err = unpack("C*", substr($data, 0x22, 1)) | (unpack("C*", substr($data, 0x23, 1)) << 8);
 		if ($err == 0) {
 			my $msg = "sp3 receiving status - data length: " . length($data);
-			Log3 $hash->{NAME}, 1, $msg;
+			Log3 $hash->{NAME}, 1, $hash->{NAME} . ": " . $msg;
 			my $enc_payload = substr($data, 0x38);
 			my $cipher =  Broadlink_getCipher($hash);         
 			my $decodedData = $cipher->decrypt($enc_payload);
@@ -291,13 +291,13 @@ sub Broadlink_sp3_getStatus(@) {
 			}
 		} else {
 			my $msg = "Error receiving status";
-			Log3 $hash->{NAME}, 4, $msg;
+			Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 			$hash->{STATE} = "unknown";
 			readingsSingleUpdate ( $hash, "connectionErrorOn", "geStatusWithData", 1 );
 		}
 	} else {
 		my $msg = "no new command data found - data length: " . length($data);
-		Log3 $hash->{NAME}, 4, $msg;
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = "unknown";
 		readingsSingleUpdate ( $hash, "connectionErrorOn", "geStatus", 1 );
 	}
@@ -314,7 +314,7 @@ sub Broadlink_sp3_setPower(@) {
 		$broadlink_payload[4] = 0;
 	}
 	my $msg = "sp3_status request";
-	Log3 $hash->{NAME}, 5, $msg;
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
 	if (length($data) > 0 && $data ne "xxx") {
 		if ($on == 1) {
@@ -325,7 +325,7 @@ sub Broadlink_sp3_setPower(@) {
 	} else {
 		readingsSingleUpdate ( $hash, "connectionErrorOn", "powerChange", 1 );
 		my $msg = "powerChange - device not connected?";
-		Log3 $hash->{NAME}, 4, $msg;
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = "unkown";
 	}
 }
@@ -335,18 +335,18 @@ sub Broadlink_enterLearning(@) {
 	my @broadlink_payload = ((0) x 16);
 	$broadlink_payload[0] = 3;
 	my $msg = "learn new commadn for " . $cmdname;
-	Log3 $hash->{NAME}, 5, $msg;
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
 	if (length($data) > 0 && $data ne "xxx") {
 		$hash->{'.broadlink_checkCommands'} = 0;
 		$hash->{'.newcommandname'} = $cmdname;
 		my $msg = "start polling for " . $cmdname;
-		Log3 $hash->{NAME}, 5, $msg;
+		Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 		InternalTimer(gettimeofday()+2, "Broadlink_check_data", $hash);
 	} else {
 		readingsSingleUpdate ( $hash, "connectionErrorOn", "enterLearning", 1 );
 		my $msg = "command learn failed - device not connected?";
-		Log3 $hash->{NAME}, 4, $msg;
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = $msg;
 	}
 }
@@ -382,7 +382,7 @@ sub Broadlink_auth(@) {
 		$broadlink_payload[0x36] = ord('1');
 		
 		my $msg = "try to authenticate";
-		Log3 $hash->{NAME}, 5, $msg;
+		Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
 		my $response = Broadlink_send_packet($hash, 0x65, @broadlink_payload);
 		if (length($response) > 0x38 && $response ne "xxx") {
 			my $enc_payload = substr($response, 0x38);
@@ -395,7 +395,7 @@ sub Broadlink_auth(@) {
 		} else {
 			readingsSingleUpdate ( $hash, "lastAuthenticationFailed", "", 1 );
 			my $msg = "authentication failed - device not connected? - response length: " . length($response);
-			Log3 $hash->{NAME}, 4, $msg;
+			Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 			$hash->{STATE} = $msg;
 		}
 	}
@@ -496,7 +496,7 @@ sub Broadlink_send_packet(@) {
 		ReuseAddr  => 1,
 		Timeout => $timeout,
         #Blocking => 0
-	  )  or Log3 $hash->{NAME}, 5, "Problem with socket";
+	  )  or Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . "Problem with socket";
 	  
 	  my $select = IO::Select->new($socket) if $socket;
 	  
@@ -507,15 +507,15 @@ sub Broadlink_send_packet(@) {
 	  if ($select->can_read($timeout)) {
 		$socket->recv($data, 1024);
 	  } else {
-		Log3 $hash->{NAME}, 5, "can't read"; 
+		Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . "can't read"; 
 	  }
 	  $socket->close();
 	  alarm 0; 
 	}; 
 	alarm 0; # race condition protection 
-	Log3 $hash->{NAME}, 3, 'Error Timout' if ( $@ && $@ =~ /Timed Out/ ); 
-	Log3 $hash->{NAME}, 3, "Error: Eval corrupted: $@" if $@; 
-	Log3 $hash->{NAME}, 5, length($data) . " bytes received from socket"; 
+	Log3 $hash->{NAME}, 3, $hash->{NAME} . ": " . 'Error Timout' if ( $@ && $@ =~ /Timed Out/ ); 
+	Log3 $hash->{NAME}, 3, $hash->{NAME} . ": " . "Error: Eval corrupted: $@" if $@; 
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . length($data) . " bytes received from socket"; 
 	return $data;
 }
 
@@ -554,7 +554,7 @@ sub Broadlink_Save(@) {
   } else {
 
     my $msg = "Broadlink_Save: Cannot open $statefile: $!";
-    Log3 $hash->{NAME}, 1, $msg;
+    Log3 $hash->{NAME}, 1, $hash->{NAME} . ": " . $msg;
   }
 
   return undef;
@@ -586,7 +586,7 @@ sub Broadlink_Load(@) {
     $hash->{commandList} = $decoded;
   } else {
     my $msg = "Broadlink_Load: Cannot open $statefile: $!";
-    Log3 $hash->{NAME}, 1, $msg;
+    Log3 $hash->{NAME}, 1, $hash->{NAME} . ": " . $msg;
   }
   return undef;
 }
