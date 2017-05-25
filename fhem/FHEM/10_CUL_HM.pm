@@ -2211,7 +2211,8 @@ sub CUL_HM_Parse($$) {#########################################################
                          : "Btn$mh{chn}";
 
       if($type eq "l"){# long press
-        $state .= ($mh{mFlgH} & 0x20 ? "Release" : "");
+        #$state .= ($mh{mFlgH} & 0x20 ? "Release" : "");# not sufficient
+        $state .= ((($mh{mFlgH} & 0x24) == 0x20) ? "Release" : "");
       }
 
       push @evtEt,[$mh{devH},1,"battery:$bat"];
@@ -3409,8 +3410,9 @@ sub CUL_HM_parseCommon(@){#####################################################
         $mhp->{cHash}{helper}{BNO}    = $cnt;
         $mhp->{cHash}{helper}{BNOCNT} = 0; # message counter reset
       }
-      $mhp->{cHash}{helper}{BNOCNT}+=1;
-      $state .= ($mhp->{mFlgH} & 0x20 ? "Release" : "")." $mhp->{cHash}{helper}{BNOCNT}_$cnt"
+      $mhp->{cHash}{helper}{BNOCNT} += 1;
+      #$state .= ($mhp->{mFlgH} & 0x20 ? "Release" : "")." $mhp->{cHash}{helper}{BNOCNT}_$cnt" # not sufficient
+      $state .= ((($mhp->{mFlgH} & 0x24) == 0x20) ? "Release" : "")." $mhp->{cHash}{helper}{BNOCNT}_$cnt"
             if($long eq "long");
 
       push @evtEt,[$mhp->{cHash},1,"trigger:".(ucfirst($long))."_$cnt"];
