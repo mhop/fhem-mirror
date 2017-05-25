@@ -58,7 +58,6 @@ sub CommandFheminfo2($$) {
 # tools
 #
 sub _fi2_Count() {
-
    my $uniqueID = getUniqueId();
    my $release  = "5.8";
    my $feature  = $featurelevel ? $featurelevel : $release;
@@ -85,8 +84,8 @@ sub _fi2_Count() {
          $model = AttrVal($name,'model',$model);
 #         $model = ReadingsVal($name,'type',$model);
          $model = ReadingsVal($name,'model',$model);
-
-      $fhemInfo{$type}{$model}++ unless defined($defs{$key}{'chanNo'}); # exclude Homematic channels
+      $fhemInfo{$type}{$model}++ 
+         unless (defined($defs{$key}{'chanNo'}) || $name =~ m/^unknown_/); # exclude Homematic specials
    }
 
    return;
