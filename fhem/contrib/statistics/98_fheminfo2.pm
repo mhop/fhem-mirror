@@ -87,6 +87,7 @@ sub _fi2_Count() {
          $model = ReadingsVal($name,'model',$model);
 my $debug = "Name: $name Model: $model chanNo: ";
 $debug .= $defs{$key}{'chanNo'} if(defined($defs{$key}{'chanNo'}));
+Debug $debug;
       $fhemInfo{$type}{$model}++ unless defined($defs{$key}{'chanNo'}); # exclude Homematic channels
    }
 
