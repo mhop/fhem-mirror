@@ -70,6 +70,8 @@
 #   allow double entries and correct handling
 # 0.3 2017-05-13 Menu / Sort und fixes 
 
+#   changed query data to prefix TBL_
+#   fhem-call get peerId is quiet
 #   
 #   
 #   
@@ -293,7 +295,7 @@ sub TBot_List_Set($@)
     }  
     
     if ( ! $ret ) {
-      $tpeer = fhem( "get $tbot peerId ".$args[1] );
+      $tpeer = fhem( "get $tbot peerId ".$args[1], 1 );
       $ret = "No peer found or specified :$tbot: ".$args[1] if ( ! $tpeer );
     }  
   
@@ -349,7 +351,7 @@ sub TBot_List_Get($@)
     my $tpeer;
     my $qdata = $args[3];
     
-    if ( $qdata =~ s/^(.*)%(.*)$/$2/ ) {
+    if ( $qdata =~ s/^TBL_(.*)%(.*)$/$2/ ) {
       my $qname = $1;
 
       if ( $qname eq $name ) {
@@ -693,6 +695,18 @@ sub TBot_List_handleEvents($$$)
 
 ##############################################
 ##############################################
+# create an inline key for the keyboard
+#  TBot_List_inlinekey( $hash, $entry, )
+sub TBot_List_inlinekey($$$)
+{
+  my ($hash, $entry, $keycmd ) = @_;
+  my $name = $hash->{NAME};
+  
+  return $entry.":TBL_".$name."\%".$keycmd;
+}
+
+##############################################
+##############################################
 # hash, cmd, bot, peer, opt: arg
 #
 sub TBot_List_handler($$$$;$)
@@ -775,20 +789,21 @@ sub TBot_List_handler($$$$;$)
       $entry =~ s/[\(\):]/_/g;
 
       if ( $double == 1 ) {
-        $inline .= "(".$entry.":".$name."\%"."list_idx-".$nre; 
+        $inline .= "(".TBot_List_inlinekey( $hash, $entry, "list_idx-".$nre ); 
         $double = 2;
       } elsif ( $double == 2 ) {
-        $inline .= "|".$entry.":".$name."\%"."list_idx-".$nre.") "; 
+        $inline .= "|".TBot_List_inlinekey( $hash, $entry, "list_idx-".$nre ) .") "; 
         $double = 1;
       } else {
-        $inline .= "(".$entry.":".$name."\%"."list_idx-".$nre.") "; 
+        $inline .= "(".TBot_List_inlinekey( $hash, $entry, "list_idx-".$nre ) .") "; 
       }
       $nre++;
     }
     
     $inline .= ") " if ( $double == 2 );
 
-    $inline .= "(ok:".$name."\%"."list_ok|ändern:".$name."\%"."list_menu|hinzu:".$name."\%"."list_askadd)";
+    $inline .= "(".TBot_List_inlinekey( $hash, "ok", "list_ok" )."|".TBot_List_inlinekey( $hash, "ändern", "list_menu" )."|".
+                  TBot_List_inlinekey( $hash, "hinzu", "list_askadd" ).")";
     
     my $textmsg = "Liste ".$lname;
     $textmsg .= " ist leer " if ( scalar(@list) == 0 );
@@ -836,7 +851,9 @@ sub TBot_List_handler($$$$;$)
         # show ask for removal
         my $textmsg = "Liste ".$lname."\nEintrag ".($no+1)." (".$list[$no].") ?";
         # show ask msg 
-        fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Entfernen:".$name."\%"."list_rem-$no|Aendern:".$name."\%"."list_askchg-$no) (Nach Oben:".$name."\%"."list_totop-$no|Zurueck:".$name."\%"."list_edit) $textmsg" );
+        my $inline = "(".TBot_List_inlinekey( $hash, "Entfernen", "list_rem-$no" )."|".TBot_List_inlinekey( $hash, "Aendern", "list_askchg-$no" )."|".
+            TBot_List_inlinekey( $hash, "Nach Oben", "list_totop-$no" )."|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+        fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
       } else {
         $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
       }
@@ -879,7 +896,8 @@ sub TBot_List_handler($$$$;$)
         # show ask for removal
         my $textmsg = "Liste ".$lname."\nSoll der Eintrag ".($no+1)." (".$list[$no].") entfernt werden?";
         # show ask msg 
-        fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Ja:".$name."\%"."list_remyes-$no) (Nein:".$name."\%"."list_edit) $textmsg" );
+        my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_remyes-$no" )."|".TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
+        fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
       } else {
         $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
       }
@@ -912,7 +930,9 @@ sub TBot_List_handler($$$$;$)
       # show menu
       my $textmsg = "Liste ".$lname." ?";
       # show menu msg 
-      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Sortieren:".$name."\%"."list_asksrt|Leeren:".$name."\%"."list_askclr|Zurück:".$name."\%"."list_edit) $textmsg" );
+      my $inline = "(".TBot_List_inlinekey( $hash, "Sortieren", "list_asksrt" )."|".TBot_List_inlinekey( $hash, "Leeren", "list_askclr" )."|".
+                TBot_List_inlinekey( $hash, "Zurück", "list_edit" ).")";
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
     } else {
       $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
     }
@@ -924,7 +944,9 @@ sub TBot_List_handler($$$$;$)
       # show ask for sort
       my $textmsg = "Liste ".$lname." sortieren ?";
       # show ask msg 
-      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Ja - von A-Z:".$name."\%"."list_srtyes1|Ja - von Z-A:".$name."\%"."list_srtyes2|Nein:".$name."\%"."list_edit) $textmsg" );
+      my $inline = "(".TBot_List_inlinekey( $hash, "Ja - von A-Z", "list_srtyes1" )."|".TBot_List_inlinekey( $hash, "Ja - von Z-A", "list_srtyes2" )."|".
+                TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
     } else {
       $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
     }
@@ -957,7 +979,8 @@ sub TBot_List_handler($$$$;$)
       # show ask for removal
       my $textmsg = "Liste ".$lname."\nSoll die gesamte Liste ".scalar(@list)." Einträge gelöscht werden?";
       # show ask msg 
-      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Ja - Liste löschen:".$name."\%"."list_clryes|Nein:".$name."\%"."list_edit) $textmsg" );
+      my $inline = "(".TBot_List_inlinekey( $hash, "Ja - Liste löschen", "list_clryes" )."|".TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
     } else {
       $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
     }
@@ -1078,7 +1101,8 @@ sub TBot_List_handler($$$$;$)
       # store text for adding 
       TBot_List_setMsgId( $hash, $tbot, $chatId, $arg, "expadd" );
 
-      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." (Ja:".$name."\%"."list_expaddyes) (Nein:".$name."\%"."list_edit) $textmsg" );
+      my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_expaddyes" )."|".TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
+      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
     } else {
       $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
     }
