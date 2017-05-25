@@ -49,9 +49,11 @@ my %alarmclock_sets =
     "AlarmTime6_Saturday"   => "10:00",
     "AlarmTime7_Sunday"     => "10:00",
     "AlarmTime8_Holiday"    => "10:00",
+    "AlarmTime9_Vacation"   => "10:00",
     "AlarmOff"              => "NONE",
     "AlarmTime_Weekdays"    => "09:00",
     "AlarmTime_Weekend"     => "09:00",
+    "skip"                  => "NONE",
     "save"                  => "NONE",
     "load"                  => "NONE",
     "disable"               => "0"
@@ -67,7 +69,8 @@ my %alarmday =
     "5"     => "AlarmTime5_Friday",
     "6"     => "AlarmTime6_Saturday",
     "0"     => "AlarmTime7_Sunday",
-    "8"     => "AlarmTime8_Holiday"
+    "8"     => "AlarmTime8_Holiday",
+    "9"     => "AlarmTime9_Vacation"
 );
 
 
@@ -119,6 +122,10 @@ sub alarmclock_Initialize($)
                         . " SnoozeRoutine"
                         . " HolidayDevice"
                         . " HolidayCheck:1,0"
+                        . " HolidayDays"
+                        . " VacationDevice"
+                        . " VacationCheck:1,0"
+                        . " VacationDays"
                         . " PresenceDevice"
                         . " PresenceCheck:1,0"
                         . " RepRoutine1"
@@ -208,9 +215,11 @@ sub alarmclock_Set($$)
                     ." AlarmTime6_Saturday"
                     ." AlarmTime7_Sunday"
                     ." AlarmTime8_Holiday"
-                    ." AlarmOff:1_Monday,2_Tuesday,3_Wednesday,4_Thursday,5_Friday,6_Saturday,7_Sunday,8_Holiday,Weekdays,Weekend,All"
+                    ." AlarmTime9_Vacation"
+                    ." AlarmOff:1_Monday,2_Tuesday,3_Wednesday,4_Thursday,5_Friday,6_Saturday,7_Sunday,8_Holiday,9_Vacation,Weekdays,Weekend,All"
                     ." AlarmTime_Weekdays"
                     ." AlarmTime_Weekend"
+                    ." skip:NextAlarm,None"
                     ." save:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
                     ." load:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
                     ." disable:1,0";                    
@@ -221,7 +230,7 @@ sub alarmclock_Set($$)
 
 ### AlarmTime ###   
     
-    if ($opt =~ /^AlarmTime(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday)/)
+    if ($opt =~ /^AlarmTime(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation)/)
     {
         if ($value =~ /^([0-9]|0[0-9]|1?[0-9]|2[0-3]):[0-5]?[0-9]$/)
         {
@@ -239,7 +248,7 @@ sub alarmclock_Set($$)
     
     if ($opt eq "AlarmOff") 
     {
-        if ($value =~ /^(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday)$/)
+        if ($value =~ /^(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation)$/)
         {
             readingsSingleUpdate( $hash, "AlarmTime$value", "off", 1 );
             alarmclock_createtimer($hash);
@@ -274,12 +283,13 @@ sub alarmclock_Set($$)
             readingsBulkUpdate( $hash, "AlarmTime6_Saturday", "off");
             readingsBulkUpdate( $hash, "AlarmTime7_Sunday", "off");
             readingsBulkUpdate( $hash, "AlarmTime8_Holiday", "off");
+            readingsBulkUpdate( $hash, "AlarmTime9_Vacation", "off");
             readingsEndUpdate($hash,1);
             alarmclock_createtimer($hash);
         }
-        elsif (!($value =~ /^(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|Weekdays|Weekend|All)$/))
+        elsif (!($value =~ /^(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation|Weekdays|Weekend|All)$/))
         {
-            return "Please Set $opt (1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|Weekdays|Weekend|All)";
+            return "Please Set $opt (1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation|Weekdays|Weekend|All)";
         }
     }
 
@@ -365,6 +375,25 @@ sub alarmclock_Set($$)
     
         }
 
+    } 
+
+### skip ###   
+    
+    if ($opt eq "skip") 
+    {
+        if ($value eq "NextAlarm")
+        {
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate( $hash, "state", "skip next Alarm");
+            readingsBulkUpdate( $hash, "skip", "next Alarm");
+            readingsEndUpdate($hash,1);
+            alarmclock_createtimer($hash);        
+        }
+        if ($value eq "None")
+        {
+            readingsSingleUpdate( $hash, "skip", "none", 1 );
+            alarmclock_createtimer($hash);        
+        }
     }   
 
 ### disable ###
@@ -448,7 +477,13 @@ sub alarmclock_Attr(@)
         InternalTimer(gettimeofday()+1, "alarmclock_createtimer", $hash, 0);
     }   
 
-    
+###Vacation###  
+
+    if($attr_name eq "VacationCheck")
+    {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+1, "alarmclock_createtimer", $hash, 0);
+    }     
 
     return undef;
 }   
@@ -476,14 +511,20 @@ sub alarmclock_createtimer($)
 
 if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME},"state","activated") ne "deactivated"))
 {
-    
+
+
+### Vacation ###   
+    if (alarmclock_vacation_check($hash))
+    {
+        $alarmtimetoday = $alarmday{9};
+    }
+   
 ### Holiday ###   
     if (alarmclock_holiday_check($hash))
     {
         $alarmtimetoday = $alarmday{8};
     }
 
-### End Holiday ###    
     
     if ((ReadingsVal($hash->{NAME},$alarmtimetoday,"NONE")) =~ /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     {
@@ -498,7 +539,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 
 
         
-            if($NowinSec < $AlarminSec)
+            if(($NowinSec < $AlarminSec) && (ReadingsVal($hash->{NAME},"skip","none") eq "none"))
             {
                 my $AlarmIn = $AlarminSec - $NowinSec;
                 RemoveInternalTimer($hash);
@@ -530,10 +571,20 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
                 }   
                 
 ### End PreAlarm ###
-
-                
+               
             }
+
+### skip next Alarmtime ###
             
+            elsif(($NowinSec < $AlarminSec) && (ReadingsVal($hash->{NAME},"skip","none") ne "none"))
+            {
+                my $AlarmIn2 = $AlarminSec - $NowinSec;
+                RemoveInternalTimer($hash);
+                InternalTimer(gettimeofday()+$AlarmIn2, "alarmclock_skip", $hash, 0);
+                Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - skip next Alarm";
+            }   
+### End skip next Alarmtime ###      
+     
             else
             {
                 alarmclock_midnight_timer($hash);
@@ -609,8 +660,15 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$SectoMidnight, "alarmclock_createtimer", $hash, 0);
-    readingsSingleUpdate( $hash,"state", "OK", 1 );
     Log3 $hash->{NAME}, 5, "alarmclock: $hash->{NAME} - midnight-timer created with $SectoMidnight sec.";
+    if (ReadingsVal($hash->{NAME},"skip","none") ne "none")
+    {
+        readingsSingleUpdate( $hash, "state", "skip next Alarm", 1);
+    }
+    else
+    {
+        readingsSingleUpdate( $hash,"state", "OK", 1 );
+    }
 }
     
 }
@@ -885,7 +943,8 @@ sub alarmclock_reproutine1_start($)
         $hash->{helper}{Repeat1} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine1",""));
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine1_start", $hash, 0);
-    }   
+    }
+    
 }
 
 
@@ -910,7 +969,8 @@ sub alarmclock_reproutine2_start($)
         $hash->{helper}{Repeat2} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine2",""));
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine2_start", $hash, 0);
-    }   
+    }
+    
 }
 
 
@@ -935,7 +995,8 @@ sub alarmclock_reproutine3_start($)
         $hash->{helper}{Repeat3} = $RNext;
         fhem("".AttrVal($hash->{NAME},"RepRoutine3",""));
         InternalTimer(gettimeofday()+$WaitTime, "alarmclock_reproutine3_start", $hash, 0);
-    }   
+    }
+    
 }
 
 ########################################################################################
@@ -993,6 +1054,7 @@ sub alarmclock_presence_check($)
         }
     }
     return 1;
+    
 }
 
 
@@ -1006,53 +1068,147 @@ sub alarmclock_holiday_check($)
 {
 
     my ($hash) = @_;
-
+    my ($SecNow, $MinNow, $HourNow, $DayNow, $MonthNow, $YearNow, $WDayNow, $YDNow, $SumTimeNow) = localtime(time);
+    
+    if ($WDayNow == 0)
+    {
+        $WDayNow = 7;
+    }   
+    
     if ((AttrVal($hash->{NAME}, "HolidayDevice", "NONE" ) ne "NONE" ) && (AttrVal($hash->{NAME}, "HolidayCheck", "1" ) ne "0" ))
     {
-        my @Holiday = split(/\|/, AttrVal($hash->{NAME},"HolidayDevice",""));
-        
-        my $a = 0;
-        my $b = scalar(@Holiday);
-        
-        while ($a < $b)
-        {
-        
-            my @HolidayDevice = split(/:/,$Holiday[$a]);
+        my @HolidayDays = split(/\|/, AttrVal($hash->{NAME},"HolidayDays","1|2|3|4|5|6|7"));
+        my $Day = grep {$_==$WDayNow;} @HolidayDays;
 
-            if (scalar(@HolidayDevice) eq "1")
-            {
-                if (ReadingsVal($HolidayDevice[0],"state","none") ne "none")
-                {
-                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-                    return 1;
-                }
-            }   
-            elsif (scalar(@HolidayDevice) eq "2")   
-            {   
-                if (ReadingsVal($HolidayDevice[0],"state","NONE") eq $HolidayDevice[1])
-                {
-                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-                    return 1;
-                }
-            }   
-            elsif (scalar(@HolidayDevice) eq "3")
-            {   
-                my $HolidayEvent = $HolidayDevice[2];
-                    $HolidayEvent =~ s/ //g;
-                if (ReadingsVal($HolidayDevice[0],$HolidayDevice[1],"NONE") eq $HolidayEvent)
-                {
-                    Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
-                    return 1;
-                }
-            }
-            
-            $a ++;
+        if ($Day == 1)
+        {
+            my @Holiday = split(/\|/, AttrVal($hash->{NAME},"HolidayDevice",""));
         
+            my $a = 0;
+            my $b = scalar(@Holiday);
+        
+            while ($a < $b)
+            {
+                my @HolidayDevice = split(/:/,$Holiday[$a]);
+
+                if (scalar(@HolidayDevice) eq "1")
+                {
+                    if (ReadingsVal($HolidayDevice[0],"state","none") ne "none")
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                        return 1;
+                    }
+                }   
+                elsif (scalar(@HolidayDevice) eq "2")   
+                {   
+                    if (ReadingsVal($HolidayDevice[0],"state","NONE") eq $HolidayDevice[1])
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                        return 1;
+                    }
+                }   
+                elsif (scalar(@HolidayDevice) eq "3")
+                {   
+                    my $HolidayEvent = $HolidayDevice[2];
+                        $HolidayEvent =~ s/ //g;
+                    if (ReadingsVal($HolidayDevice[0],$HolidayDevice[1],"NONE") eq $HolidayEvent)
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - holiday";
+                        return 1;
+                    }
+                }
+                $a ++;
+            }
         }
     }
     return 0;
+    
 }
 
+
+########################################################################################
+#
+#   Vacation Check
+#
+########################################################################################
+
+sub alarmclock_vacation_check($)
+{
+
+    my ($hash) = @_;
+    my ($SecNow, $MinNow, $HourNow, $DayNow, $MonthNow, $YearNow, $WDayNow, $YDNow, $SumTimeNow) = localtime(time);
+    
+    if ($WDayNow == 0)
+    {
+        $WDayNow = 7;
+    }   
+
+    if ((AttrVal($hash->{NAME}, "VacationDevice", "NONE" ) ne "NONE" ) && (AttrVal($hash->{NAME}, "VacationCheck", "1" ) ne "0" ))
+    {
+       
+        my @VacationDays = split(/\|/, AttrVal($hash->{NAME},"VacationDays","1|2|3|4|5|6|7"));
+        my $Day = grep {$_==$WDayNow;} @VacationDays;
+
+        if ($Day == 1)
+        {
+            my @Vacation = split(/\|/, AttrVal($hash->{NAME},"VacationDevice",""));
+   
+            my $a = 0;
+            my $b = scalar(@Vacation);
+        
+            while ($a < $b)
+            {
+                my @VacationDevice = split(/:/,$Vacation[$a]);
+
+                if (scalar(@VacationDevice) eq "1")
+                {
+                    if (ReadingsVal($VacationDevice[0],"state","none") ne "none")
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - vacation";
+                        return 1;
+                    }
+                }   
+                elsif (scalar(@VacationDevice) eq "2")   
+                {   
+                    if (ReadingsVal($VacationDevice[0],"state","NONE") eq $VacationDevice[1])
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - vacation";
+                        return 1;
+                    }
+                }   
+                elsif (scalar(@VacationDevice) eq "3")
+                {   
+                    my $VacationEvent = $VacationDevice[2];
+                        $VacationEvent =~ s/ //g;
+                    if (ReadingsVal($VacationDevice[0],$VacationDevice[1],"NONE") eq $VacationEvent)
+                    {
+                        Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - vacation";
+                        return 1;
+                    }
+                }
+             $a ++;
+            }
+        }   
+    }
+    return 0;
+    
+}
+
+
+########################################################################################
+#
+#   skip
+#
+########################################################################################
+
+sub alarmclock_skip($)
+{
+    my ($hash) = @_;
+
+    readingsSingleUpdate( $hash, "skip", "none", 1 );
+    alarmclock_createtimer($hash);
+    
+}
 
 ########################################################################################
 #
@@ -1137,7 +1293,7 @@ sub alarmclock_Notify($$)
     <a name="alarmclock_Set"></a>
     <b>Set</b><br>
     <ul>
-            <li><b>AlarmTime(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday)</b> HH:MM<br>
+            <li><b>AlarmTime(1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation)</b> HH:MM<br>
                 Sets a alarm time for each day.
             </li>
             <li><b>AlarmTime_Weekdays</b> HH:MM<br>
@@ -1146,7 +1302,7 @@ sub alarmclock_Notify($$)
             <li><b>AlarmTime_Weekend</b> HH:MM<br>
                 Sets the same alarm time for Saturday and Sunday.
             </li>
-            <li><b>AlarmOff</b> (1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|Weekdays|Weekend|All)<br>
+            <li><b>AlarmOff</b> (1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation|Weekdays|Weekend|All)<br>
                 Sets the alarm time of the respective day to off.
             </li>
             <li><b>save</b> (Weekprofile_1|Weekprofile_2|Weekprofile_3|Weekprofile_4|Weekprofile_5)<br>
@@ -1155,6 +1311,9 @@ sub alarmclock_Notify($$)
             <li><b>load</b> (Weekprofile_1|Weekprofile_2|Weekprofile_3|Weekprofile_4|Weekprofile_5)<br>
                 Load alarm times from profile.
             </li>
+            <li><b>skip</b> (NextAlarm|None)<br>
+                Skips the next alarm.
+            </li> 
             <li><b>disable</b> (1|0|)<br>
                 Deactivated/Activated the alarmclock.
             </li>           
@@ -1224,33 +1383,89 @@ sub alarmclock_Notify($$)
                 Duration in seconds to stop automatically the running alarm.<br>
                 Example: attr &lt;name&gt;  MaxAlarmDurationInSec 120
             </li>
+            <li><b>RepRoutine</b> <br>
+                A list separated by semicolon (;) which is to be repeated.<br>
+                Example: attr &lt;name&gt;  RepRoutine1 set Licht_Schlafzimmer dim 1
+            </li>
+            <li><b>RepRoutineWaitInSec</b> <br>
+                Time in seconds between the repetitions from RepRoutine.<br>
+                Example: attr &lt;name&gt;  RepRoutine1WaitInSec 20
+            </li>
+            <li><b>RepRoutineRepeats</b> <br>
+                Number of repetitions of RepRoutine.<br>
+                Example: attr &lt;name&gt;  RepRoutine1Repeats 15
+            </li>
+            <li><b>RepRoutineMode(Alarm|PreAlarm|off)</b> <br>
+                Alarm:Reproutine is started with the alarm.<br>
+                PreAlarm:Reproutine is started with the pre-alarm.<br>
+                off:Reproutine is deactivated.
+            </li>
+            <li><b>RepRoutineStop(Snooze|off)</b> <br>
+                Snooze:Reproutine is stopped with snooze.<br>
+                off:Reproutine is not stopped with snooze.
+            </li>
             <li><b>HolidayDevice</b> <br>
                 Name of the holiday device.<br>
                 There are 3 possibilities:<br>
                 1.holiday device from Typ holiday.<br>
-                &lt;devicename&gt; Example: attr &lt;name&gt; HolidayDevice Feiertage <br>
+                &lt;devicename&gt;<br>
+                Example: attr &lt;name&gt; HolidayDevice Feiertage <br>
                 AlarmTime 8_Holiday accesses when state is not none <br>
                 2.On state of a device.For example a dummy <br>
-                &lt;devicename&gt;:&lt;value&gt; Example: attr &lt;name&gt; HolidayDevice MyDummy:Holiday <br>
+                &lt;devicename&gt;:&lt;value&gt; <br>
+                Example: attr &lt;name&gt; HolidayDevice MyDummy:Holiday <br>
                 Here the AlarmTime 8_Holiday takes effect when the state of the dummy has the value Holiday <br>
                 3.On a reading of a device. <br>
-                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; Example: attr &lt;name&gt; HolidayDevice MyDummy:Today:Holiday <br>
+                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt;<br>
+                Example: attr &lt;name&gt; HolidayDevice MyDummy:Today:Holiday <br>
             </li>
             <li><b>HolidayCheck</b> <br>
                 0 disables monitoring the holiday device<br>
                 1 activates monitoring
             </li>
-                <li><b>PresenceDevice</b> <br>
+            <li><b>HolidayDays</b> <br>
+                List of days on which the alarmtime 8_Holiday may take effect<br>
+                Example: attr &lt;name&gt;  HolidayDays 1|2|3|4|5 <br>
+                Default: 1|2|3|4|5|6|7
+            </li>
+            <li><b>VacationDevice</b> <br>
+                Name of the vacation device.<br>
+                There are 3 possibilities:<br>
+                1.vacation device from Typ holiday.<br>
+                &lt;devicename&gt; <br>
+                Example: attr &lt;name&gt; VacationDevice Ferien <br>
+                AlarmTime 9_Vacation accesses when state is not none <br>
+                2.On state of a device.For example a dummy <br>
+                &lt;devicename&gt;:&lt;value&gt; <br>
+                Example: attr &lt;name&gt; VacationDevice MyDummy:Vacation <br>
+                Here the AlarmTime 9_Vacation takes effect when the state of the dummy has the value Vacation <br>
+                3.On a reading of a device. <br>
+                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; <br>
+                Example: attr &lt;name&gt; VacationDevice MyDummy:Today:Vacation <br>
+            </li>
+            <li><b>VacationCheck</b> <br>
+                0 disables monitoring the vacation device<br>
+                1 activates monitoring
+            </li>
+            <li><b>VacationDays</b> <br>
+                List of days on which the alarmtime 9_Vacation may take effect<br>
+                Example: attr &lt;name&gt;  VacationDays 1|2|3|4|5 <br>
+                Default: 1|2|3|4|5|6|7
+            </li>
+            <li><b>PresenceDevice</b> <br>
                 Name of the presence device.<br>
                 There are 3 possibilities:<br>
                 1.presence device from Typ presence.<br>
-                &lt;devicename&gt; Example: attr &lt;name&gt; PresenceDevice Presence <br>
+                &lt;devicename&gt; <br>
+                Example: attr &lt;name&gt; PresenceDevice Presence <br>
                 Alarmclock cancel alarm when state is absent <br>
                 2.On state of a device.For example a dummy <br>
-                &lt;devicename&gt;:&lt;value&gt; Example: attr &lt;name&gt; PresenceDevice MyDummy:absent <br>
+                &lt;devicename&gt;:&lt;value&gt; <br>
+                Example: attr &lt;name&gt; PresenceDevice MyDummy:absent <br>
                 Here the Alarmclock cancel alarm when the state of the dummy has the value absent <br>
                 3.On a reading of a device. <br>
-                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; Example: attr &lt;name&gt; PresenceDevice MyDummy:user:notathome <br>
+                &lt;devicename&gt;:&lt;readingname&gt;:&lt;value&gt; <br>
+                Example: attr &lt;name&gt; PresenceDevice MyDummy:user:notathome <br>
             </li>
             <li><b>PresenceCheck</b> <br>
                 0 disables monitoring the presence device<br>

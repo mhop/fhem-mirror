@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_alarmclock: New features AlarmTime9_Vacation, skip next Alarm
   - new      21_HEOS*: new modules to provide HEOS Multiroomsystem
   - bugfix   93_DbRep: commandref corrected
   - change:  SubProcess.pm: buffer reads, messages amended
