@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 use DBI;
+use lib "./lib";
 use Geo::IP;
 use JSON;
 use CGI qw(:standard Vars);
