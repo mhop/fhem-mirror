@@ -81,7 +81,7 @@ sub HMtemplate_Attr(@) {#######################################################
   my ($cmd,$name,$attrName,$attrVal) = @_;
   my @hashL;
   my $hash = $defs{$name};
-  return "$attrName  not an option in this state" if($modules{HMtemplate}{AttrList}!~ m/$attrName/);
+  #return "$attrName  not an option in this state" if($modules{HMtemplate}{AttrList}!~ m/$attrName/);
   if   ($attrName =~ m/^Reg_/){
     if (!$init_done){
       return "remove attr $attrName after restart - start again with template definition";
@@ -188,6 +188,10 @@ sub HMtemplate_Attr(@) {#######################################################
     if ($cmd eq "set"){
     }
   }
+  elsif($attrName eq "tpl_description"){# used with select option
+    if ($cmd eq "set"){
+    }
+  }
   return;
 }
 
@@ -243,6 +247,7 @@ sub HMtemplate_SetFn($@) {#####################################################
   $cmd = "?" if(!$cmd);# by default print options
   $cmd .=" " if ($cmd ne "?" && !(grep /$cmd/,@{$HtState{${$eSt}}{cmd}}));
 
+  HMtemplate_setUsageReading($hash);
   if    ($cmd eq "delete" )   {##actionImmediate: delete template--------------
     my ($tName) = @a;                               
     return "$tName is not defined" if (! defined $culHmTpl->{$tName});
@@ -338,8 +343,7 @@ sub HMtemplate_SetFn($@) {#####################################################
       }
     }
   }
-  elsif ($cmd eq "apply" )    {#  
-
+  elsif ($cmd eq "apply" )    {# 
     my @p = split(" ",$culHmTpl->{$hash->{tpl_Name}}{p});## get params in correct order
     $_ = $attr{$name}{"tpl_param_$_"} foreach (@p);
     return HMinfo_templateSet( $attr{$name}{tpl_entity}
@@ -348,7 +352,6 @@ sub HMtemplate_SetFn($@) {#####################################################
                                                     :$attr{$name}{tpl_ePeer}.":".AttrVal($name,"tpl_eType","both"))# type either long/short/both
                        ,@p
                         );
-    return;
   }
   elsif ($cmd eq "edit" )     {#
     my ($templ) = @a;                               
@@ -507,6 +510,21 @@ sub HMtemplate_sourceList($){
   return HMtemplate_noDup(@list);
 }
 
+sub HMtemplate_setUsageReading($){
+  my ($hash) = @_;  
+  delete $hash->{READINGS}{$_} foreach (grep /^usage_/,keys %{$hash->{READINGS}});
+  if (eval "defined(&HMinfo_templateUsg)" && $hash->{tpl_Name}){
+    my $tu = HMinfo_templateUsg("","",$hash->{tpl_Name});
+    $tu =~ s/\|$hash->{tpl_Name}//g;
+    $tu =~ s/.\|/|/g;
+    my $usgCnt = 1;
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"usage_".$usgCnt++,$_) foreach(split("\n",$tu));
+    readingsEndUpdate($hash,1);
+  }
+}
+
+
 1;
 =pod
 =item command
@@ -538,7 +556,7 @@ sub HMtemplate_sourceList($){
             </li>
             <li><B><a href="#HMtemplate_tpl_source">tpl_source</a></B>select the entity which will be used as master for the template 
             </li>
-            <li><B><a href="#HMtemplate_tpl_peer">tpl_peer</a></B>select the peer of the entity which will be used as master for the template. This is onle necessary for types that require peers.
+            <li><B><a href="#HMtemplate_tpl_peer">tpl_peer</a></B>select the peer of the entity which will be used as master for the template. This is only necessary for types that require peers.
             </li>
             <li><B><a href="#HMtemplate_tpl_params">tpl_params</a></B>if the template shall have parameter those need to be defined next. <br>
             parameter will allow to use one template with selected registers to be defined upon appling to the entity.
@@ -575,6 +593,8 @@ sub HMtemplate_sourceList($){
     
     
   </ul>
+=end html
+
 =begin html_DE
 
 <a name="HMtemplate"></a>
