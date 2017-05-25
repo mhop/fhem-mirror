@@ -33,6 +33,7 @@
 # ABU 20170501 changed verbose 3 to verbose 4
 # ABU 20170501 tuned documentation
 # ABU 20170516 removed useless print
+# ABU 20170525 bugfixed winterschlaf again
 
 
 package main;
@@ -520,7 +521,7 @@ sub Robonect_GetUpdate($)
 	#evaluate reading hybernate
 	my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
 	#supress sending, if hybernate is set
-	if (!defined ($hybernate) or ($hybernate =~ m/off/) or ($hybernate = 0))
+	if (!defined ($hybernate) or ($hybernate =~ m/[off]|[0]/))
 	{
 		#get status	
 		my @callAttr;
