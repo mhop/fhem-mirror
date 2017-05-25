@@ -1321,7 +1321,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   Der Befehl f&auml;hrt den Server herunter (nach dem sichern aller <a
   href="#statefile">Ger&auml;testati</a>). Er triggert das global:SHUTDOWN
   Ereignis.  Mit der optionalen Parameter restart startet FHEM danach neu.
-  exitValue ist bei bestimmten Start-programmen von n&oulm;ten.
+  exitValue ist bei bestimmten Start-programmen von n&ouml;ten.
   <br><br>
   Beispiel:
   <ul>
@@ -1352,7 +1352,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt; [quiet]</code>
+  <code>sleep &lt;sec&gt; [&lt;id&gt;] [quiet]</code>
   <br><br>
   sleep gefolgt von weiteren Befehlen ist vergleichbar mit einem namenlosen <a
   href="#at">at</a> Kommando, es f&uuml;hrt die nachfolgenden Befehle aus,
@@ -1360,7 +1360,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   Sekunde, Millisekunden genau, da man Nachkommastellen spezifizieren
   kann.<br><br>
 
-  Ein sleep mit einer &lt;id&lt; ersetzt ein sleep mit der gleichen &lt;id&lt;
+  Ein sleep mit einer &lt;id&gt; ersetzt ein sleep mit der gleichen &lt;id&gt;
   and can mit <a href="#cancel">cancel</a> entfernt werden.
 
   Falls sleep in at/notify/etc aufgerufen wurde, und die nachfolgenden
