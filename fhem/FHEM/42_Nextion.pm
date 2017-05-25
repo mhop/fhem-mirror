@@ -60,25 +60,29 @@
 #   _connect/Disconnect/isConnected subs
 #   init device after notify on initialized
 #   fix connection  - to work also if nextion is unavailable
+#
+#
+#   Extended log for read function
+#   remove leading ff
+#   fault tolerant command reader allow empty commands and missing \xff
+#   print filtered messages - with quoted chars
+#   changed log levels to 4 for verbose / 5 will print all messages
+#   fix replacesetmagic to ensure device hash is given
+# 2016-05-25    fault tolerance in reader / fixes 
+#   
+#   
 #   
 ##############################################
 ##############################################
 ### TODO
-#
-#
+#   
+#   
+#   rectextold1-5 --> #msg611695
 #   timeout with checkalive check?
 #   
 #   react on events with commands allowing values from FHEM
 #   remove wait for answer by attribute
-#   commands 
-#     set - page x
-#     set - text elem text
-#     set - val elem val
-#     picture setting
-#   init page from fhem might sent a magic starter and finisher something like get 4711 to recognize the init command results (can be filtered away)
 #   number of pages as define (std max 0-9)
-#   add 0x65 code
-#   progress bar 
 #
 ##############################################
 ##############################################
@@ -106,6 +110,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use Encode qw( decode encode );
+use Data::Dumper; 
 
 #########################
 # Forward declaration
@@ -270,7 +275,7 @@ Nextion_Set($@)
   }
 
   if ( ! defined( $ret ) ) {
-    Log3 $name, 5, "Nextion_Set $name: $type done succesful: ";
+    Log3 $name, 4, "Nextion_Set $name: $type done succesful: ";
   } else {
     Log3 $name, 1, "Nextion_Set $name: $type failed with :$ret: ";
   } 
@@ -283,14 +288,14 @@ sub Nextion_Attr(@) {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
 
-  Log3 $name, 5, "Nextion_Attr $name: called ";
+  Log3 $name, 4, "Nextion_Attr $name: called ";
 
   return "\"Nextion_Attr: \" $name does not exist" if (!defined($hash));
 
   if (defined($aVal)) {
-    Log3 $name, 5, "Nextion_Attr $name: $cmd  on $aName to $aVal";
+    Log3 $name, 4, "Nextion_Attr $name: $cmd  on $aName to $aVal";
   } else {
-    Log3 $name, 5, "Nextion_Attr $name: $cmd  on $aName to <undef>";
+    Log3 $name, 4, "Nextion_Attr $name: $cmd  on $aName to <undef>";
   }
   # $cmd can be "del" or "set"
   # $name is device name
@@ -348,7 +353,7 @@ sub Nextion_Disconnect($)
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "Nextion_Disconnect: $name";
+  Log3 $name, 4, "Nextion_Disconnect: $name";
   DevIo_CloseDev($hash);
 } 
 
@@ -454,7 +459,7 @@ Nextion_SendCommand($$$)
   Log3 $name, 4, "Nextion_SendCommand $name: send commands :".$msg.": ";
   
   # First replace any magics
-  my %dummy; 
+#  my %dummy; 
 #  my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $msg ) );
   
 #  if ( $err ) {
@@ -471,7 +476,7 @@ Nextion_SendCommand($$$)
   while(defined($singleMsg = shift @msgList)) {
     $singleMsg =~ s/SeMiCoLoN/;/g;
 
-    my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $singleMsg ) );
+    my ($err, @a) = ReplaceSetMagic($hash, 0, ( $singleMsg ) );
     if ( $err ) {
       Log3 $name, 1, "$name: Nextion_SendCommand failed on ReplaceSetmagic with :$err: on commands :$singleMsg:";
     } else {
@@ -549,9 +554,18 @@ Nextion_Read($@)
   
   while(length($data) > 0) {
 
-    if ( $data =~ /^([^\xff]*)\xff\xff\xff(.*)$/ ) {
+#    if ( $data =~ /^([^\xff]*)\xff\xff\xff(.*)$/ ) {
+    if ( $data =~ /^([^\xff]*)(\xff+)([^\xff].*)?$/ ) {
       my $rcvd = $1;
-      $data = $2;
+      my $ffpart = $2;
+      $data = $3;
+      $data = "" if ( ! defined($data) );
+      
+      if ( length($ffpart) != 3 ) {
+        Log3 $name, 4, "Nextion/RAW: shortened ffh end sequence (".length($ffpart).") ".Data::Dumper::qquote($rcvd) ;
+      } else {
+        Log3 $name, 5, "Nextion/RAW: message found ".Data::Dumper::qquote($rcvd) ;
+      }
       
       if ( length($rcvd) > 0 ) {
       
@@ -592,8 +606,19 @@ Nextion_Read($@)
 
         readingsEndUpdate($hash, 1);
 
+      } else {
+        Log3 $name, 5, "Nextion/RAW: match with zero length - command missing - ffh #".length($ffpart);
       }
     } else {
+      # not matching 
+#      if ( $data =~ /^\xff+([^\xff].*)/ ) {
+#        Log3 $name, 5, "Nextion/RAW: remove leading ff ";
+#        $data = $1;
+#      } elsif ( $data =~ /^[^\xff]*(\xff+)/ ) {
+#        Log3 $name, 5, "Nextion/RAW: not matching commands but contains ff :".length($1).":";
+#      } else {
+#        Log3 $name, 5, "Nextion/RAW: not matching commands no ff";
+#      }
       last;
     }
 
