@@ -1,5 +1,10 @@
 #!/usr/bin/perl -w
 # $Id$
+# ----------------------------------------
+# database insert provided by betateilchen
+# ----------------------------------------
+#
+
 use strict;
 use warnings;
 use Time::HiRes qw(time);
@@ -18,23 +23,24 @@ sub add2total();
 sub doAggregate();
 sub viewStatistics();
 
-my $start = time();
+my $start = time(); # used for generation time calculation
 
 my $ua    = $ENV{HTTP_USER_AGENT};
    $ua  //= "";
 my $geoip = $ENV{REMOTE_ADDR};
 my %data  = Vars();
 
-# directory cointains databases
+# database stuff
 my $datadir  = "./data";
 my $dbf      = "$datadir/fhem_statistics_2017.sqlite";
 my $dsn      = "dbi:SQLite:dbname=$dbf";
 my $dbh;
 my $sth;
-
-my $css    = "style.css";
 my $limit  = "datetime('now', '-12 months')";
-#my $limit = "datetime('now', '-2 hour')";
+
+
+# css stuff (to be changed for production use)
+my $css    = "style.css";
   
 # ---------- decide task ----------
 
