@@ -1,9 +1,13 @@
 #!/usr/bin/perl -w
-# $Id$
-# ----------------------------------------
-# database insert provided by betateilchen
-# ----------------------------------------
-#
+
+=for comment
+
+$Id$
+----------------------------------------
+database stuff provided by betateilchen
+----------------------------------------
+
+=cut
 
 use strict;
 use warnings;
@@ -19,7 +23,6 @@ use Data::Dumper;
 sub insertDB();
 sub getLocation();
 sub add2total();
-
 sub doAggregate();
 sub viewStatistics();
 
@@ -38,13 +41,12 @@ my $dbh;
 my $sth;
 my $limit  = "datetime('now', '-12 months')";
 
-
-# css stuff (to be changed for production use)
+# css stuff (to be changed for real use)
 my $css    = "style.css";
   
-# ---------- decide task ----------
+# ---------- decide target ----------
 
-if(index($ua,"FHEM") > -1) {
+if ($ua =~ m/FHEM/) {
   insertDB();
   print header("application/x-www-form-urlencoded");
   print "==> ok";
@@ -94,7 +96,7 @@ sub getLocation() {
 }
 
 sub add2total() {
-   my $sql = "SELECT * from jsonNodes where uniqueID = 'databaseInfo'";
+   my $sql = q(SELECT * from jsonNodes where uniqueID = 'databaseInfo');
    my $sth = $dbh->prepare( $sql );
    $sth->execute();
    my @dbInfo = $sth->fetchrow_array();
@@ -108,6 +110,7 @@ sub add2total() {
 }
 
 # ---------- count everything for statistics ----------
+# ---------- called by viewStatistics() ----------
 
 sub doAggregate() {
    $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
@@ -115,8 +118,7 @@ sub doAggregate() {
 
    my ($sql,@dbInfo,%countAll,$decoded,$res);
 
-# ($updated,$started,$nodesTotal,$nodes12,%countAll)   
-   $sql = "SELECT * from jsonNodes where uniqueID = 'databaseInfo'";
+   $sql = q(SELECT * from jsonNodes where uniqueID = 'databaseInfo');
    $sth = $dbh->prepare( $sql );
    $sth->execute();
    @dbInfo = $sth->fetchrow_array();
@@ -127,8 +129,7 @@ sub doAggregate() {
    my $nodesTotal = $dbInfo->{'submissionsTotal'};
    my $nodes12    = 0;
 
-   $sql = "SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseInfo'";
-#   $sql = "SELECT geo,json FROM jsonNodes WHERE uniqueID <> 'databaseInfo'";
+   $sql = qq(SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseInfo');
    $sth = $dbh->prepare( $sql );
    $sth->execute();
 
