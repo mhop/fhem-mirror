@@ -1664,7 +1664,7 @@ ZWave_assocGroupCmdList($$)
   my ($grp, $txt) = @_;
   $txt =~ s/(..)(..)/
             ($zwave_id2class{$1} ? $zwave_id2class{$1}:"UNKNOWN_$1").":$2 "/ge;
-  return "assocGroupCmdList_$grp:$txt";
+  return "assocGroupCmdList_".hex($grp).":$txt";
 }
 
 my %zwm_unit = (
