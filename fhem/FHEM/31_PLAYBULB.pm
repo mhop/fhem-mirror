@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.2";
+my $version = "1.2.4";
 
 
 
@@ -84,12 +84,12 @@ sub PLAYBULB_firstRun($);
 sub PLAYBULB_Set($$@);
 sub PLAYBULB_Run($$$);
 sub PLAYBULB_BlockingRun($);
-sub PLAYBULB_gattCharWrite($$$$$$$$$);
-sub PLAYBULB_gattCharRead($$$);
+sub PLAYBULB_gattCharWrite($$$$$$$$$$);
+sub PLAYBULB_gattCharRead($$$$);
 sub PLAYBULB_readBattery($$$);
 sub PLAYBULB_stateOnOff($$);
-sub PLAYBULB_readDevicename($$);
-sub PLAYBULB_writeDevicename($$$);
+sub PLAYBULB_readDevicename($$$);
+sub PLAYBULB_writeDevicename($$$$);
 sub PLAYBULB_forRun_encodeJSON($$$$$$$$$$$$$);
 sub PLAYBULB_forDone_encodeJSON($$$$$$$);
 sub PLAYBULB_BlockingDone($);
@@ -102,18 +102,19 @@ sub PLAYBULB_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}	    = "PLAYBULB_Set";
-    $hash->{DefFn}	    = "PLAYBULB_Define";
-    $hash->{UndefFn}	= "PLAYBULB_Undef";
-    $hash->{AttrFn}	    = "PLAYBULB_Attr";
-    $hash->{AttrList} 	= "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL400M_v37,BTL100C_v10 ".
+    $hash->{SetFn}      = "PLAYBULB_Set";
+    $hash->{DefFn}      = "PLAYBULB_Define";
+    $hash->{UndefFn}    = "PLAYBULB_Undef";
+    $hash->{AttrFn}     = "PLAYBULB_Attr";
+    $hash->{AttrList}   = "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL400M_v37,BTL100C_v10 ".
+                            "sshHost ".
                             $readingFnAttributes;
 
 
 
     foreach my $d(sort keys %{$modules{PLAYBULB}{defptr}}) {
         my $hash = $modules{PLAYBULB}{defptr}{$d};
-        $hash->{VERSION} 	= $version;
+        $hash->{VERSION}    = $version;
     }
 }
 
@@ -125,11 +126,11 @@ sub PLAYBULB_Define($$) {
     return "too few parameters: define <name> PLAYBULB <BTMAC>" if( @a != 3 );
     
 
-    my $name    	= $a[0];
-    my $mac     	= $a[2];
+    my $name            = $a[0];
+    my $mac             = $a[2];
     
-    $hash->{BTMAC} 	= $mac;
-    $hash->{VERSION} 	= $version;
+    $hash->{BTMAC}      = $mac;
+    $hash->{VERSION}    = $version;
     
     
     $modules{PLAYBULB}{defptr}{$hash->{BTMAC}} = $hash;
@@ -242,7 +243,7 @@ sub PLAYBULB_Set($$@) {
     
     } else {
         my $list = "on:noArg off:noArg rgb:colorpicker,RGB sat:slider,0,5,255 effect:Flash,Pulse,RainbowJump,RainbowFade,Candle,none speed:slider,170,50,20 color:on,off statusRequest:noArg ";
-        $list .= "deviceName " if( $attr{$name}{model} ne "BTL400M_v18" or $attr{$name}{model} ne "BTL100C_v10" or $attr{$name}{model} ne "BTL400M_v37" );
+        $list .= "deviceName " if( defined($attr{$name}{model}) and ($attr{$name}{model} ne "BTL400M_v18" or $attr{$name}{model} ne "BTL100C_v10" or $attr{$name}{model} ne "BTL400M_v37") );
         return SetExtensions($hash, $list, $name, $cmd, $arg);
     }
     
@@ -290,7 +291,7 @@ sub PLAYBULB_Run($$$) {
         
     my $response_encode = PLAYBULB_forRun_encodeJSON($cmd,$mac,$stateOnoff,$sat,$rgb,$effect,$speed,$stateEffect,$ac,$ae,$ab,$adname,$dname);
         
-    $hash->{helper}{RUNNING_PID} = BlockingCall("PLAYBULB_BlockingRun", $name."|".$response_encode, "PLAYBULB_BlockingDone", 5, "PLAYBULB_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    $hash->{helper}{RUNNING_PID} = BlockingCall("PLAYBULB_BlockingRun", $name."|".$response_encode, "PLAYBULB_BlockingDone", 10, "PLAYBULB_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     Log3 $name, 4, "(Sub PLAYBULB - $name) - Call BlockingRun";
 }
 
@@ -325,7 +326,7 @@ sub PLAYBULB_BlockingRun($) {
 
     ##### Abruf des aktuellen Status
     #### das c vor den bekannten Variablen steht für current
-    my ($ccc,$cec,$csat,$crgb,$ceffect,$cspeed)  = PLAYBULB_gattCharRead($mac,$ac,$ae);
+    my ($ccc,$cec,$csat,$crgb,$ceffect,$cspeed)  = PLAYBULB_gattCharRead($name,$mac,$ac,$ae);
 
     if( defined($ccc) and defined($cec) ) {
 
@@ -340,7 +341,7 @@ sub PLAYBULB_BlockingRun($) {
             $stateOnoff = PLAYBULB_stateOnOff($ccc,$cec);
             
             ###### Devicename ermitteln #######
-            my $dname = PLAYBULB_readDevicename($mac,$adname) if( $adname ne "none" );
+            my $dname = PLAYBULB_readDevicename($name,$mac,$adname) if( $adname ne "none" );
             
             
             Log3 $name, 4, "(Sub PLAYBULB_Run StatusRequest - $name) - Rückgabe an Auswertungsprogramm beginnt";
@@ -352,13 +353,13 @@ sub PLAYBULB_BlockingRun($) {
 
 
         ##### Schreiben der neuen Char values
-        PLAYBULB_gattCharWrite($sat,$rgb,$effect,$speed,$stateEffect,$stateOnoff,$mac,$ac,$ae) if( !defined($dname) );
-        PLAYBULB_writeDevicename($mac,$adname,$dname) if( defined($dname) );
+        PLAYBULB_gattCharWrite($name,$sat,$rgb,$effect,$speed,$stateEffect,$stateOnoff,$mac,$ac,$ae) if( !defined($dname) );
+        PLAYBULB_writeDevicename($name,$mac,$adname,$dname) if( defined($dname) );
         
     
         ##### Statusabruf nach dem schreiben der neuen Char Values
-        ($cc,$ec,$sat,$rgb,$effect,$speed)  = PLAYBULB_gattCharRead($mac,$ac,$ae) if( !defined($dname) );
-        $dname = PLAYBULB_readDevicename($mac,$adname) if( defined($dname) and $adname ne "none" );
+        ($cc,$ec,$sat,$rgb,$effect,$speed)  = PLAYBULB_gattCharRead($name,$mac,$ac,$ae) if( !defined($dname) );
+        $dname = PLAYBULB_readDevicename($name,$mac,$adname) if( defined($dname) and $adname ne "none" );
 
 
         $stateOnoff = PLAYBULB_stateOnOff($cc,$ec) if( !defined($dname) );
@@ -380,42 +381,86 @@ sub PLAYBULB_BlockingRun($) {
     unless( defined($cc) and defined($ec) );
 }
 
-sub PLAYBULB_gattCharWrite($$$$$$$$$) {
+sub PLAYBULB_gattCharWrite($$$$$$$$$$) {
 
-    my ($sat,$rgb,$effect,$speed,$stateEffect,$stateOnoff,$mac,$ac,$ae)  = @_;
+    my ($name,$sat,$rgb,$effect,$speed,$stateEffect,$stateOnoff,$mac,$ac,$ae)   = @_;
+    my $sshHost                                                                 = AttrVal($name,"sshHost","none");
     
     my $loop = 0;
-    while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
-        #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
-        sleep 0.5;
-        $loop++;
+    if( $sshHost ne 'none') {
+    
+        while ( (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop = 0) or (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop < 5) ) {
+            #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
+            sleep 0.5;
+            $loop++;
+        }
+    } else {
+    
+        while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
+            #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
+            sleep 0.5;
+            $loop++;
+        }
     }
     
     
     
     $speed = "01" if( $effect eq "Candle" );
     
-    if( $stateOnoff == 0 ) {
-        qx(gatttool -b $mac --char-write -a $ac -n 00000000);
+    if( $sshHost ne 'none') {
+    
+        if( $stateOnoff == 0 ) {
+            qx(ssh $sshHost 'gatttool -b $mac --char-write -a $ac -n 00000000');
+        } else {
+            qx(ssh $sshHost 'gatttool -b $mac --char-write -a $ac -n ${sat}${rgb}') if( $stateEffect eq "none" and $effect eq "none" );
+            qx(ssh $sshHost 'gatttool -b $mac --char-write -a $ae -n ${sat}${rgb}${effects{$effect}}00${speed}00') if( $stateEffect ne "none" or $effect ne "none" );
+        }
+        
     } else {
-        qx(gatttool -b $mac --char-write -a $ac -n ${sat}${rgb}) if( $stateEffect eq "none" and $effect eq "none" );
-        qx(gatttool -b $mac --char-write -a $ae -n ${sat}${rgb}${effects{$effect}}00${speed}00) if( $stateEffect ne "none" or $effect ne "none" );
+    
+        if( $stateOnoff == 0 ) {
+            qx(gatttool -b $mac --char-write -a $ac -n 00000000);
+        } else {
+            qx(gatttool -b $mac --char-write -a $ac -n ${sat}${rgb}) if( $stateEffect eq "none" and $effect eq "none" );
+            qx(gatttool -b $mac --char-write -a $ae -n ${sat}${rgb}${effects{$effect}}00${speed}00) if( $stateEffect ne "none" or $effect ne "none" );
+        }
     }
 }
 
-sub PLAYBULB_gattCharRead($$$) {
+sub PLAYBULB_gattCharRead($$$$) {
 
-    my ($mac,$ac,$ae)       = @_;
+    my ($name,$mac,$ac,$ae)     = @_;
+    my $sshHost                 = AttrVal($name,"sshHost","none");
 
     my $loop = 0;
-    while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
-        #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
-        sleep 0.5;
-        $loop++;
+    if( $sshHost ne 'none') {
+    
+        while ( (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop = 0) or (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop < 5) ) {
+            #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
+            sleep 0.5;
+            $loop++;
+        }
+    } else {
+    
+        while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
+            #printf "\n(Sub PLAYBULB_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
+            sleep 0.5;
+            $loop++;
+        }
     }
     
-    my @cc          = split(": ",qx(gatttool -b $mac --char-read -a $ac));
-    my @ec          = split(": ",qx(gatttool -b $mac --char-read -a $ae));
+    my @cc;
+    my @ec;
+    if( $sshHost ne 'none') {
+    
+        @cc          = split(": ",qx(ssh $sshHost 'gatttool -b $mac --char-read -a $ac'));
+        @ec          = split(": ",qx(ssh $sshHost 'gatttool -b $mac --char-read -a $ae'));
+        
+    } else {
+    
+        @cc          = split(": ",qx(gatttool -b $mac --char-read -a $ac));
+        @ec          = split(": ",qx(gatttool -b $mac --char-read -a $ae));
+    }
     
     return (undef,undef,undef,undef,undef,undef)
     unless( defined($cc[1]) and defined($ec[1]) );
@@ -440,10 +485,20 @@ sub PLAYBULB_gattCharRead($$$) {
 
 sub PLAYBULB_readBattery($$$) {
 
-    my ($name,$mac,$ab)   = @_;
+    my ($name,$mac,$ab) = @_;
+    my $sshHost         = AttrVal($name,"sshHost","none");
     my $blevel;
+    my @blevel;
     
-    chomp(my @blevel  = split(": ",qx(gatttool -b $mac --char-read -a $ab)));
+    
+    if( $sshHost ne 'none') {
+    
+        chomp(@blevel  = split(": ",qx(ssh $sshHost 'gatttool -b $mac --char-read -a $ab')));
+        
+    } else {
+    
+        chomp(@blevel  = split(": ",qx(gatttool -b $mac --char-read -a $ab)));
+    }
     
     ### Bei den Garden Bulbs gibt es noch den Status wird geladen oder wird nicht geladen
     ### Beispielausgabe "Characteristic value/descriptor: 51 01" in diesem Beispiel steht 01 für wird geladen
@@ -470,22 +525,41 @@ sub PLAYBULB_stateOnOff($$) {
     return $state;
 }
 
-sub PLAYBULB_readDevicename($$) {
+sub PLAYBULB_readDevicename($$$) {
 
-    my ($mac,$adname)       = @_;
+    my ($name,$mac,$adname) = @_;
+    my $sshHost             = AttrVal($name,"sshHost","none");
+    my @dname;
 
-    chomp(my @dname  = split(": ",qx(gatttool -b $mac --char-read -a $adname)));
+    
+    if( $sshHost ne 'none') {
+    
+        chomp(@dname  = split(": ",qx(ssh $sshHost 'gatttool -b $mac --char-read -a $adname')));
+        
+    } else {
+    
+        chomp(@dname  = split(": ",qx(gatttool -b $mac --char-read -a $adname)));
+    }
+    
     my $dname = join("",split(" ",$dname[1]));
     
     return pack('H*', $dname);
 }
 
-sub PLAYBULB_writeDevicename($$$) {
+sub PLAYBULB_writeDevicename($$$$) {
 
-    my ($mac,$adname,$dname)       = @_;
-
+    my ($name,$mac,$adname,$dname)  = @_;
+    my $sshHost                     = AttrVal($name,"sshHost","none");
     my $hexDname = unpack("H*", $dname);
-    qx(gatttool -b $mac --char-write-req -a $adname -n $hexDname);
+    
+    if( $sshHost ne 'none') {
+    
+        qx(ssh $sshHost 'gatttool -b $mac --char-write-req -a $adname -n $hexDname');
+        
+    } else {
+    
+        qx(gatttool -b $mac --char-write-req -a $adname -n $hexDname);
+    }
 }
 
 sub PLAYBULB_forRun_encodeJSON($$$$$$$$$$$$$) {
@@ -683,6 +757,7 @@ sub PLAYBULB_BlockingAborted($) {
 <ul>
 <ul>
 <li>model<br />BTL300_v5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Candle Firmware 5<br />BTL300_v6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Candle Firmware 6<br />BTL201_v2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Smart<br />BTL201M_V16&nbsp; # Smart (1/2017)<br />BTL505_v1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Stripe<br />BTL400M_v18&nbsp; # Garden<br />BTL100C_v10&nbsp; # Color LED</li>
+<li>sshHost - IP or FQDN for SSH remote control</li>
 </ul>
 </ul>
 </ul>
@@ -754,6 +829,7 @@ sub PLAYBULB_BlockingAborted($) {
 <ul>
 <ul>
 <li>model<br />BTL300_v5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Candle Firmware 5<br />BTL300_v6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Candle Firmware 6<br />BTL201_v2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Smart<br />BTL201M_V16&nbsp; # Smart (1/2017)<br />BTL505_v1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Stripe<br />BTL400M_v18&nbsp; # Garden<br />BTL100C_v10&nbsp; # Color LED</li>
+<li>sshHost - IP oder FQDN für SSH remote Kontrolle</li>
 </ul>
 </ul>
 </ul>
