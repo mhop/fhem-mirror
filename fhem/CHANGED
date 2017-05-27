@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature:  74_Unifi.pm: added get poeMode and set poeState commands
+                           added _utilization and _poePower readings
   - feature: 93_DbRep: v4.16.1, json as option of sqlResultFormat
   - feature: 31_PLAYBULB: add support for ssh remote control
   - change:  42_Nextion: fault tolerance in reader / fixes  
