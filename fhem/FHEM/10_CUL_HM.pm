@@ -6545,7 +6545,11 @@ sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
     $mHsh->{rspWait}{$f}=$d;
   }
   my $to = gettimeofday() + (($mHsh->{rspWait}{Pending})?rand(20)/10+4:
-                                                         rand(40)/10+1);
+                                                         rand(40)/10+2);
+  if ($mHsh->{rspWait}{cmd}) {
+    my (undef,$mFlg) = unpack 'A6A2',$mHsh->{rspWait}{cmd};
+    $to += 1 if($mFlg && (hex($mFlg) & 0x10)); # burst wakeup
+  }
   InternalTimer($to,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
 }
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
@@ -6612,8 +6616,13 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       # 
       if ($hash->{helper}{prt}{rspWait}){
         RemoveInternalTimer("respPend:$hash->{DEF}");
-        my $to = gettimeofday() + (($hash->{helper}{prt}{rspWait}{Pending})?rand(20)/10+4:
-                                                               rand(40)/10+1);
+        my $mHsh = $hash->{helper}{prt};
+        my $to = gettimeofday() + (($mHsh->{helper}{prt}{rspWait}{Pending})?rand(20)/10+4:
+                                                               rand(40)/10+2);
+        if ($mHsh->{rspWait}{cmd}) {
+          my (undef,$mFlg) = unpack 'A6A2',$mHsh->{rspWait}{cmd};
+          $to += 1 if($mFlg && (hex($mFlg) & 0x10)); # burst wakeup
+        }
         InternalTimer($to,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
       }
       else{
@@ -8788,7 +8797,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     foreach my $iom (@ios){
       if (  !$defs{$iom}
           || ReadingsVal($iom,"state","") eq "disconnected"
-          || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
+          || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB/TSCUL?
         next;
       }
       if (   $hash->{IODev} 
