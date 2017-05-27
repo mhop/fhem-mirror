@@ -2244,15 +2244,16 @@ sub HMinfo_templateChk_Get ($){ ###############################################
   }
   else{
     foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-      next if (!defined $defs{$dName}{helper}{tmpl});
-      foreach (keys %{$defs{$dName}{helper}{tmpl}}){
-        my ($p,$t)=split(">",$_);
-        $ret .= HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+      next if (!defined $defs{$dName}{helper}{tmpl} || ! $defs{$dName}{helper}{tmpl});
+      #$ret .= HMinfo_templateChk(@a);
+      foreach my $tmpl(keys %{$defs{$dName}{helper}{tmpl}}){
+        my ($p,$t)=split(">",$tmpl);
+        $ret .= HMinfo_templateChk($dName,$t,($p eq "none"?0:$p),split(" ",$defs{$dName}{helper}{tmpl}{$tmpl}));
       }
     }
   }    
   $ret = $ret ? $ret
-                :"templateChk: passed";
+               :"templateChk: passed";
   $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
   return "$id;$ret";
 }
@@ -2442,7 +2443,6 @@ sub HMinfo_templateUsg(@){#####################################################
           $para = join(" ",@param);
         }
         push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para) if(!$tFilter || $tFilter eq $t);
- 
       }
     }
   }
@@ -2454,9 +2454,9 @@ sub HMinfo_templateChk(@){#####################################################
   #       peer / peer:both = template for peer, not extending Long/short
   #       peer:short|long  = template for peerlong or short
 
-  return "template undefined $tmpl\n"                     if(!$HMConfig::culHmTpl{$tmpl});
-  return "aktor $aName unknown\n"                         if(!$defs{$aName});
-  return "give <peer>:[short|long|both] wrong:$pSet\n"    if($pSet && $pSet !~ m/:(short|long|both)$/);
+  return "aktor $aName - $tmpl:template undefined\n"                       if(!$HMConfig::culHmTpl{$tmpl});
+  return "aktor $aName unknown\n"                                          if(!$defs{$aName});
+  return "aktor $aName - $tmpl:give <peer>:[short|long|both] wrong:$pSet\n"if($pSet && $pSet !~ m/:(short|long|both)$/);
   $pSet = "0:0" if (!$pSet);
   
   my $repl = "";
