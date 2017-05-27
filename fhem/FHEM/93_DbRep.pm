@@ -41,6 +41,8 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 4.16.1       22.05.2017       encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z
+# 4.16.0       22.05.2017       format json as option of sqlResultFormat, state will never be deleted in "delread" 
 # 4.15.1       20.05.2017       correction of commandref
 # 4.15.0       17.05.2017       SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized
 # 4.14.2       16.05.2017       SQL-Statements optimized for Wildcard "%" usage if used, Wildcard "_" isn't supported
@@ -211,7 +213,7 @@ use Time::Local;
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "4.15.1";
+my $DbRepVersion = "4.16.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -250,7 +252,7 @@ sub DbRep_Initialize($) {
                        "showVariables ".
                        "showStatus ".
                        "showTableInfo ".
-					   "sqlResultFormat:separated,mline,sline,table ".
+					   "sqlResultFormat:separated,mline,sline,table,json ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
@@ -273,7 +275,7 @@ sub DbRep_Define($@) {
   my $name = $hash->{NAME};
   
  return "Error: Perl module ".$DbRepMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl" if($DbRepMMDBI);
-  
+ 
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 2) {
@@ -3580,6 +3582,21 @@ sub sqlCmd_ParseDone($) {
 	      my $fi = sprintf($formatstr, $i);
 		  ReadingsBulkUpdateValue ($hash, "SqlResultRow_".$fi, $row);
       }
+  } elsif ($srf eq "json") {
+      my %result = ();
+      my @rows = split( /§/, $rowstring );
+	  my $bigint = @rows;
+	  my $numd = ceil(log10($bigint));
+	  my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
+      my $i = 0;
+      foreach my $row ( @rows ) {
+          $i++;
+          $row =~ s/\|°escaped°\|/§/g;
+          my $fi = sprintf($formatstr, $i);		  
+		  $result{$fi} = $row;
+      }
+      my $json = toJSON(\%result);   # at least fhem.pl 14348 2017-05-22 20:25:06Z
+	  ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
@@ -3946,15 +3963,15 @@ return;
 sub delread($) {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  my ($hash) = @_;
- my $name   = $hash->{NAME}; 
+ my $name   = $hash->{NAME};
+ my @allrds = keys%{$defs{$name}{READINGS}}; 
  my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
  if (@rdpfdel) {
-     my @allrds = keys%{$defs{$name}{READINGS}};
      foreach my $key(@allrds) {
-         # Log3 ($name, 3, "DbRep $name - Reading Schlüssel: $key");
+         # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          my $dodel = 1;
          foreach my $rdpfdel(@rdpfdel) {
-             if($key =~ /$rdpfdel/) {
+             if($key =~ /$rdpfdel/ || $key eq "state") {
                  $dodel = 0;
              }
          }
@@ -3963,7 +3980,10 @@ sub delread($) {
          }
      }
  } else {
-     delete $defs{$name}{READINGS};
+     foreach my $key(@allrds) {
+         # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
+         delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+     }
  }
 return undef;
 }
@@ -4323,7 +4343,7 @@ return;
   Only the content of table "history" will be included (except command "sqlCmd"). <br><br>
   
   Overview which other Perl-modules DbRep is using: <br><br>
-    
+   
   POSIX           <br>
   Time::HiRes     <br>
   Time::Local     <br>
@@ -4608,11 +4628,10 @@ return;
                                  Example:  <br>
                                  get &lt;name&gt; tableinfo  <br>
                                  attr &lt;name&gt; showTableInfo current,history   <br>               
-                                 # Only informations related to tables "current" and "history" will be created
+                                 # Only informations related to tables "current" and "history" are going to be created
                                  </li> 
                                  <br><br>
-                                 </ul>                                                      
-                  a                                  
+                                 </ul>                                                                                   
   <br>
   </ul></ul>
   
@@ -4712,20 +4731,49 @@ return;
                                 </ul><br>  
 								
 
-  <li><b>sqlResultFormat </b> - determines the formatting of the "set ... sqlCmd" command result. </li> <br>
-  
-                                possible options are: <br>
-								<ul>
+  <li><b>sqlResultFormat </b> - determines the formatting of the "set ... sqlCmd" command result. possible options are: <br><br>
+                                <ul>
                                 <b>separated </b> - every line of the result will be generated sequentially in a single 
-								                    reading. (default) <br> 
+								                    reading. (default) <br><br>
                                 <b>mline </b>     - the result will be generated as multiline in 
 								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
-													Field separator is "|". <br>	
+													Field separator is "|". <br><br>	
                                 <b>sline </b>     - the result will be generated as singleline in 
 								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
-													Field separator is "|" and the dataset is separated by "]|[". <br>
+													Field separator is "|" and the dataset is separated by "]|[". <br><br>
                                 <b>table </b>     - the result will be generated as an table in 
-								                    <a href="#DbRepReadings">Reading</a> SqlResult. <br>													
+								                    <a href="#DbRepReadings">Reading</a> SqlResult. <br><br>
+                                <b>json </b>      - creates <a href="#DbRepReadings">Reading</a> SqlResult as a JSON 
+								                    coded hash. 
+								                    Every hash-element consists of the serial number of the dataset (key)
+													and its value. </li> <br><br> 
+													 
+        <ul>      
+        To process the result, you may use a userExitFn in 99_myUtils for example: <br>		
+		<pre>
+        sub resfromjson {
+          my ($name,$reading,$value) = @_;
+          my $hash   = $defs{$name};
+
+          if ($reading eq "SqlResult") {
+            # only reading SqlResult contains JSON encoded data
+            my $data = decode_json($value);
+	      
+		    foreach my $k (keys(%$data)) {
+		      
+			  # use your own processing from here for every hash-element 
+		      # e.g. output of every element that contains "Cam"
+		      my $ke = $data->{$k};
+		      if($ke =~ m/Cam/i) {
+		        my ($res1,$res2) = split("\\|", $ke);
+                Log3($name, 1, "$name - extract element $k by userExitFn: ".$res1." ".$res2);
+		      }
+	        }
+          }
+        return;
+        }
+  	    </pre> 
+		</ul>				    </ul>					
                                 </ul><br>  
                               
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
@@ -4787,7 +4835,7 @@ return;
           my ($name,$reading,$value) = @_;
           my $hash = $defs{$name};
           ...
-          # z.B. übergebene Daten loggen
+          # e.g. output transfered data
           Log3 $name, 1, "UserExitFn $name called - transfer parameter are Reading: $reading, Value: $value " ;
           ...
         return;
@@ -5392,18 +5440,47 @@ return;
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>  
                               
-  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses von "set ... sqlResult" fest.   </li> <br>
+  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses von "set ... sqlResult" fest. Mögliche Optionen sind: <br><br>
   
-                                mögliche Optionen sind: <br>
 								<ul>
                                 <b>separated </b> - die Ergebniszeilen werden als einzelne Readings fortlaufend 
-                                                    generiert. (default)<br> 
+                                                    generiert. (default)<br><br> 
                                 <b>mline </b>     - das Ergebnis wird als Mehrzeiler im <a href="#DbRepReadings">Reading</a>
-                                                    sqlCmd dargestellt. Feldtrenner ist "|". <br>	
+                                                    SqlResult dargestellt. Feldtrenner ist "|". <br><br>	
                                 <b>sline </b>     - das Ergebnis wird als Singleline im <a href="#DbRepReadings">Reading</a>
-                                                    sqlCmd dargestellt. Feldtrenner ist "|", Satztrenner ist"]|[". <br>
+                                                    SqlResult dargestellt. Feldtrenner ist "|", Satztrenner ist"]|[". <br><br>
                                 <b>table </b>     - das Ergebnis wird als Tabelle im <a href="#DbRepReadings">Reading</a>
-                                                    sqlCmd dargestellt. <br>													
+                                                    SqlResult dargestellt. <br><br>	
+                                <b>json </b>      - erzeugt das <a href="#DbRepReadings">Reading</a> SqlResult als
+								                    JSON-kodierten Hash.
+													Jedes Hash-Element (Ergebnissatz) setzt sich aus der laufenden Nummer
+													des Datensatzes (Key) und dessen Wert zusammen. </li><br><br>
+        <ul>
+		Die Weiterverarbeitung des Ergebnisses kann z.B. mit der folgenden userExitFn in 99_myUtils.pm erfolgen: <br>
+		<pre>
+        sub resfromjson {
+          my ($name,$reading,$value) = @_;
+          my $hash   = $defs{$name};
+
+          if ($reading eq "SqlResult") {
+            # nur Reading SqlResult enthält JSON-kodierte Daten
+            my $data = decode_json($value);
+	      
+		    foreach my $k (keys(%$data)) {
+		      
+			  # ab hier eigene Verarbeitung für jedes Hash-Element 
+		      # z.B. Ausgabe jedes Element welches "Cam" enthält
+		      my $ke = $data->{$k};
+		      if($ke =~ m/Cam/i) {
+		        my ($res1,$res2) = split("\\|", $ke);
+                Log3($name, 1, "$name - extract element $k by userExitFn: ".$res1." ".$res2);
+		      }
+	        }
+          }
+        return;
+        }
+  	    </pre>  	
+								</ul>					
                                 </ul><br>  
   
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
