@@ -1617,7 +1617,7 @@ sub _round($;$) {
     return sprintf( "%.${n}f", $val );
 }
 
-sub _time(;$$$);
+sub _time(;$$$$);
 
 sub _time(;$$$$) {
     my ( $time, $lang, $dayOffset, $params ) = @_;
