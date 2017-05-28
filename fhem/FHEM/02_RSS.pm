@@ -516,6 +516,8 @@ RSS_itemLine {
 sub
 RSS_itemRect {
   my ($S,$x1,$y1,$x2,$y2,$filled,%params)= @_;
+  $x2 = $x1 + $x2 if ($x2 =~ /^\+/);
+  $y2 = $y1 + $y2 if ($y2 =~ /^\+/);
   if($filled) {
     $S->filledRectangle($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));
   } else {
@@ -1178,7 +1180,7 @@ plotFromUrl(@)
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD.MM.YYYY format.</li><br>
     
     <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
-    <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.</li><br>
+    <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.<br>If x2 or y2 is preceeded with a + (plus sign) then the coordinate is relative to x1 or y1, or in other words, it is the width-1 or height-1 of the rectangle, respectively.</li><br>
     
     <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
