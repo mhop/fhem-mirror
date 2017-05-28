@@ -220,7 +220,7 @@ sub Wunderground_Define($$$) {
     return "Please install Perl JSON to use module Wunderground"
       if ($@);
 
-    if ( int(@$a) < 2 ) {
+    if ( int(@$a) < 4 ) {
         my $msg = "Wrong syntax: define <name> Wunderground <api-key> <pws-id>";
         Log3 $name, 4, $msg;
         return $msg;
@@ -446,7 +446,7 @@ sub Wunderground_ReceiveCommand($$$) {
                 return undef;
             }
             else {
-                Log3 $name, 5, "Wunderground $name: RES";
+                Log3 $name, 5, "Wunderground $name: RES\n$data";
             }
         }
 
@@ -484,8 +484,7 @@ sub Wunderground_Hash2Readings($$;$) {
     my ( $hash, $h, $r ) = @_;
     my $name = $hash->{NAME};
     my $lang = AttrVal( $name, "wu_lang", "en" );
-    my $loop = 0;
-    $loop = 1 if ( defined($r) );
+    my $loop = defined($r) ? 1 : 0;
 
     if ( ref($h) eq "HASH" ) {
         foreach my $k ( keys %{$h} ) {
@@ -530,6 +529,10 @@ sub Wunderground_Hash2Readings($$;$) {
                 || $cr eq "date"
                 || $cr eq "wind_dir" );
             next if ( $r && $r =~ /^display_location.*$/ );
+
+            next
+              if ( $k eq "wind_degrees"
+                && ( !looks_like_number( $h->{$k} ) || $h->{$k} < 0 ) );
 
             # observation_*
             if ( $cr =~ /^observation_.*$/ ) {
@@ -805,6 +808,8 @@ sub Wunderground_Hash2Readings($$;$) {
                     $reading . "wind_speed_max_mph",
                     $h->{maxwind}{mph}
                 );
+                
+                last;
             }
 
             # txt_forecast
@@ -832,21 +837,22 @@ sub Wunderground_Hash2Readings($$;$) {
                 }
 
                 $reading = "fc" . $period . "_";
+
                 my $symbol_c =
                   Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'C' );
                 my $symbol_f =
                   Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'F' );
                 my $symbol_pct = Encode::encode_utf8( chr(0x202F) . '%' );
-                my $symbol_kmh = Encode::encode_utf8( chr(0x00A0) . 'km/h' );
-                my $symbol_mph = Encode::encode_utf8( chr(0x00A0) . 'mph' );
-                $h->{fcttext_metric} =~ s/(\d)C/$1$symbol_c/g;
-                $h->{fcttext} =~ s/(\d)F/$1$symbol_f/g;
-                $h->{fcttext_metric} =~ s/(\d)\s*%/$1$symbol_pct/g;
-                $h->{fcttext} =~ s/(\d)\s*%/$1$symbol_pct/g;
-                $h->{fcttext_metric} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
-                $h->{fcttext} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
-                $h->{fcttext_metric} =~ s/(\d)\s*mph/$1$symbol_mph/g;
-                $h->{fcttext} =~ s/(\d)\s*mph/$1$symbol_mph/g;
+#                my $symbol_kmh = Encode::encode_utf8(chr(0x00A0) . 'km/h');
+#                my $symbol_mph = Encode::encode_utf8(chr(0x00A0) . 'mph');
+                $h->{fcttext_metric} =~ s/(\d+)C/$1$symbol_c/g;
+                $h->{fcttext} =~ s/(\d+)F/$1$symbol_f/g;
+                $h->{fcttext_metric} =~ s/(\d+)\s*%/$1$symbol_pct/g;
+                $h->{fcttext} =~ s/(\d+)\s*%/$1$symbol_pct/g;
+#                $h->{fcttext_metric} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
+#                $h->{fcttext} =~ s/(\d+)\s*km\/h/$1$symbol_kmh/g;
+#                $h->{fcttext_metric} =~ s/(\d)\s*mph/$1$symbol_mph/g;
+#                $h->{fcttext} =~ s/(\d+)\s*mph/$1$symbol_mph/g;
 
                 readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
@@ -863,6 +869,8 @@ sub Wunderground_Hash2Readings($$;$) {
                 $hash->{readingDesc}{"title$night"}{lang}  = $lang if ($lang);
                 $hash->{readingDesc}{"text$night"}{lang}   = $lang if ($lang);
                 $hash->{readingDesc}{"text_f$night"}{lang} = $lang if ($lang);
+                
+                last;
             }
 
             # almanac/temp_high
