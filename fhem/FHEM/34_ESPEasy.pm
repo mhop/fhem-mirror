@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.07;       # Version of this module
+my $module_version    = 1.11;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -273,8 +273,6 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
     if ($host ne "bridge" && !(defined $a[4]) && !(defined $a[5]));
   return "ERROR: too much arguments for a bridge: $usg"
     if ($host eq "bridge" && defined $a[4]);
-  return "ERROR: perl module JSON is not installed"
-    if (ESPEasy_isPmInstalled($hash,"JSON"));
 
   (ESPEasy_isIPv4($host) || ESPEasy_isFqdn($host) || $host eq "bridge")
     ? $hash->{HOST} = $host
@@ -291,10 +289,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   $hash->{IDENT}     = $ident if defined $ident;
   $hash->{VERSION}   = $module_version;
   $hash->{NOTIFYDEV} = "global";
-  
-  eval "use Encode qw(encode_utf8);";
-  $hash->{helper}{pmEncode} = $@ ? 0 : 1;
-  
+
   #--- BRIDGE -------------------------------------------------
   if ($hash->{HOST} eq "bridge") {
     $hash->{SUBTYPE} = "bridge";
@@ -309,17 +304,11 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
       CommandAttr(undef,"$name combineDevices 0");
       setKeyValue($type."_".$name."-firstrun","done");
     }
-    # only informational 
-    my $u = getKeyValue($type."_".$name."-user");
-    $hash->{USER} = (defined $u) ? $u : "not defined yet !!!";
-    my $p = getKeyValue($type."_".$name."-pass");
-    $hash->{PASS} = (defined $p) ? "*" x length($p) : "not defined yet !!!";
-
+    $hash->{".bau"} = getKeyValue($type."_".$name."-user");
+    $hash->{".bap"} = getKeyValue($type."_".$name."-pass");
+    # only informational
     $hash->{MAX_HTTP_SESSIONS} = $d_maxHttpSessions;
     $hash->{MAX_QUEUE_SIZE}    = $d_maxQueueSize;
-    
-    Log3 $name, 2, "$type $name: WARNING: Perl module Encode not installed. No utf-8 encoding available."
-      if !$hash->{helper}{pmEncode};
 
     ESPEasy_removeGit($hash);
   } 
@@ -328,14 +317,14 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   else {
     $hash->{INTERVAL} = $d_Interval;
     $hash->{SUBTYPE} = "device";
-    $modules{$type}{defptr}{$ident} = $hash;
-    AssignIoPort($hash,$iodev) if(not defined $hash->{IODev});
+    AssignIoPort($hash,$iodev) if !defined $hash->{IODev};
     InternalTimer(gettimeofday()+5+rand(5), "ESPEasy_statusRequest", $hash);
     readingsSingleUpdate($hash, 'state', 'opened',1);
     my $io = (defined($hash->{IODev}{NAME})) ? $hash->{IODev}{NAME} : "none";
     Log3 $hash->{NAME}, 4, "$type $name: Opened for $ident $host:$port using bridge $io";
   }
 
+  ESPEasy_loadRequiredModules($hash);
   return undef;
 }
 
@@ -356,9 +345,11 @@ sub ESPEasy_Get($@)
     }
     return $ret;
 
-  } elsif (lc $reading =~ m/^user|pass$/i && $hash->{SUBTYPE} eq "bridge") {
-    $ret .= getKeyValue($hash->{TYPE}."_".$hash->{NAME}."-".lc $reading);
-    return $ret;
+  } elsif ($reading =~ m/^user$/i && $hash->{SUBTYPE} eq "bridge") {
+    return $hash->{".bau"} ? $hash->{".bau"} : "username is not defined, yet.";
+
+  } elsif ($reading =~ m/^pass$/i && $hash->{SUBTYPE} eq "bridge") {
+    return $hash->{".bap"} ? $hash->{".bap"} : "password is not defined, yet.";
 
   } elsif (lc $reading =~ m/^queueSize$/i && $hash->{SUBTYPE} eq "bridge") {
     foreach (keys %{ $hash->{helper}{queue} }) {
@@ -393,7 +384,7 @@ sub ESPEasy_Set($$@)
 
   return if (IsDisabled $name);
 
-  Log3 $name, 3, "$type $name: set $name $cmd ".join(" ",@params) 
+  Log3 $name, 3, "$type: set $name $cmd ".join(" ",@params)
     if $cmd !~  m/^(\?|user|pass)$/;
 
   # ----- BRDIGE ----------------------------------------------
@@ -432,13 +423,7 @@ sub ESPEasy_Set($$@)
 
     elsif ($cmd =~ m/^user|pass$/ ) {
       setKeyValue($hash->{TYPE}."_".$hash->{NAME}."-".$cmd,$params[0]);
-      # only informational 
-      if (defined $params[0]) {
-        $hash->{uc($cmd)} = ($cmd eq "user") ? $params[0] 
-                                             : "*" x length($params[0]);
-      } else {
-        $hash->{uc($cmd)} = "not defined yet !!!";
-      }
+      $cmd eq "user" ? $hash->{".bau"} = $params[0] : $hash->{".bap"} = $params[0];
     }
   }
 
@@ -460,7 +445,6 @@ sub ESPEasy_Set($$@)
     if (defined AttrVal($name,"mapLightCmds",undef) && $cmd =~ m/^(ct|pct|rgb|on|off|toggle)$/i) {
       unshift @params, $cmd;
       $cmd = lc AttrVal($name,"mapLightCmds","");
-#      Log 1, "cmd: $cmd params: ".join(",",@params);
     }
     else {
       # enable ct|pct commands if attr wwcwGPIOs is set
@@ -637,13 +621,16 @@ sub ESPEasy_Read($) {
   my $json;
   if (defined $data[1] && $data[1] =~ m/"module":"ESPEasy"/) {
 
-    # use encode_utf8 if available else replace any disturbing chars
-    if ( $bhash->{helper}{pmEncode} ) {
-      eval { $json = decode_json( encode_utf8($data[1]) ); 1; } 
+    # perl module JSON not installed
+    if ( !$bhash->{helper}{pm}{JSON} ) {
+      Log3 $bname, 2, "$btype $bname: Perl module 'JSON' is not installed. Can't process received data from $peer.";
+      return;
     }
-    else { 
-      eval { $json = decode_json( $data[1] =~ s/[^\x20-\x7E]/_/gr ); 1; }
-    };
+
+    # use encode_utf8 if available else replace any disturbing chars
+    $bhash->{helper}{pm}{Encode}
+      ? ( eval { $json = decode_json( encode_utf8($data[1]) ); 1; } )
+      : ( eval { $json = decode_json( $data[1] =~ s/[^\x20-\x7E]/_/gr ); 1; } );
     if ($@) {
       Log3 $bname, 2, "$btype $name: WARNING: Invalid JSON received. "
                     . "Check your ESP configuration ($peer).\n$@";
@@ -673,15 +660,13 @@ sub ESPEasy_Read($) {
       ? $espName ne "" ? $espName : $peer
       : $espName.($espName ne "" && $espDevName ne "" ? "_" : "").$espDevName;
 
-    # push internals in @values (and in bridge helper for support reason, only)
+    # push internals in @values
     my @values;
     my @intVals = qw(unit sleep build build_git build_notes version node_type_id);
     foreach my $intVal (@intVals) {
       next if !defined $json->{data}{ESP}{$intVal};
       push(@values,"i||".$intVal."||".$json->{data}{ESP}{$intVal}."||0");
-      $bhash->{helper}{received}{$peer}{$intVal} = $json->{data}{ESP}{$intVal};
     }
-    $bhash->{helper}{received}{$peer}{espName} = $espName;
 
     # push sensor value in @values
     foreach my $vKey (keys %{$json->{data}{SENSOR}}) {
@@ -1377,12 +1362,15 @@ sub ESPEasy_httpReqParse($$$)
     if ($data =~ m/^{/) { #it could be json...
       my $res;
 
-      if ( $hash->{helper}{pmEncode} ) {
-        eval { $res = decode_json( encode_utf8($data) ); 1; };
+      if ( !$hash->{helper}{pm}{JSON} ) {
+        Log3 $name, 2, "$type $name: Perl module JSON missing, can't process data.";
+        return undef;
       }
-      else {
-        eval { $res = decode_json( $data =~ s/[^\x20-\x7E]/_/gr ); 1; };
-      }
+
+      # use encode_utf8 if available else replace any disturbing chars
+      $hash->{helper}{pm}{Encode}
+        ? ( eval { $res = decode_json( encode_utf8($data) ); 1; } )
+        : ( eval { $res = decode_json( $data =~ s/[^\x20-\x7E]/_/gr ); 1; } );
       if ($@) {
         Log3 $name, 2, "$type $name: WARNING: deformed JSON data received "
                       ."from $param->{host} requested by $param->{ident}.";
@@ -1542,7 +1530,6 @@ sub ESPEasy_resetTimer($;$)
   if ($init_done == 1) {
     #Log3 $name, 5, "$type $name: RemoveInternalTimer ESPEasy_statusRequest";
     RemoveInternalTimer($hash, "ESPEasy_statusRequest");
-    delete $hash->{helper}{intAt};
   }
   
   if ($sig eq "stop") {
@@ -1556,30 +1543,9 @@ sub ESPEasy_resetTimer($;$)
     my $ts = $s + gettimeofday();
     Log3 $name, 5, "$type $name: Start internalTimer +".int($s)." => ".FmtDateTime($ts);
     InternalTimer($ts, "ESPEasy_statusRequest", $hash);
-    ESPEasy_intAt2helper($hash);
   }
 
   return undef;
-}
-
-
-# ------------------------------------------------------------------------------
-sub ESPEasy_intAt2helper($) {
-  my ($hash) = @_;
-
-  my $i = 1;
-  delete $hash->{helper}{intAt};
-  foreach my $a (keys %intAt) {
-    my $arg = $intAt{$a}{ARG};
-    my $nam = (ref($arg) eq "HASH" ) ? $arg->{NAME} : "";
-    if (defined $nam && $nam eq $hash->{NAME}) {
-      $hash->{helper}{intAt}{$i}{TRIGGERTIME} = strftime('%d.%m.%Y %H:%M:%S',
-                                            localtime($intAt{$a}{TRIGGERTIME}));
-      $hash->{helper}{intAt}{$i}{INTERVAL} = round($intAt{$a}{TRIGGERTIME}-time(),0);
-      $hash->{helper}{intAt}{$i}{FN} = $intAt{$a}{FN};
-      $i++
-    }
-  }
 }
 
 
@@ -1624,8 +1590,8 @@ sub ESPEasy_isAuthenticated($$)
   my $bhash = $modules{ESPEasy}{defptr}{BRIDGE};
   my ($bname,$btype) = ($bhash->{NAME},$bhash->{TYPE});
 
-  my $u = getKeyValue($btype."_".$bname."-user");
-  my $p = getKeyValue($btype."_".$bname."-pass");
+  my $u = $bhash->{".bau"};
+  my $p = $bhash->{".bap"};
   my $attr = AttrVal($bname,"authentication",0);
 
   if (!defined $u || !defined $p || $attr == 0) {
@@ -2062,7 +2028,7 @@ sub ESPEasy_adjustValue($$$)
   my $a = AttrVal($name,"adjustValue",undef);
   return $v if !defined $a;
   
-  my ($VALUE,$READING,$NAME) = ($v,$r,$name); #capital vars für use in attribute
+  my ($VALUE,$READING,$NAME) = ($v,$r,$name); #capital vars for use in attribute
   my @a = split(" ",$a);
   foreach (@a) {
     my ($regex,$formula) = split(":",$_);
@@ -2130,15 +2096,23 @@ sub ESPEasy_urlEncodeDisplayText($$@)
 
 
 # ------------------------------------------------------------------------------
-sub ESPEasy_isPmInstalled($$)
+sub ESPEasy_loadRequiredModules($)
 {
-  my ($hash,$pm) = @_;
-  my ($name,$type) = ($hash->{NAME},$hash->{TYPE});
-  if (not eval "use $pm;1")
-  {
-    Log3 $name, 1, "$type $name: perl modul missing: $pm. Install it, please.";
-    $hash->{MISSING_MODULES} .= "$pm ";
-    return "failed: $pm";
+  my ($hash) = @_;
+  foreach ("JSON", "Encode") {
+    eval "use $_; 1;";
+    if (!$@) {
+      $hash->{helper}{pm}{$_} = 1;
+      }
+    else {
+      $hash->{helper}{pm}{$_} = 0;
+      if ($init_done || $hash->{SUBTYPE} eq "bridge") {
+        my ($name,$type) = ($hash->{NAME},$hash->{TYPE});
+  			Log3 $name, 1, "$type $name: WARNING: Perl module $_ is not installed. "
+  			             . "Reduced functionality!";
+        Log3 $name, 2, "$type $name: $@" if $init_done;
+      }
+    }
   }
   
   return undef;
