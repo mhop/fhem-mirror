@@ -1345,7 +1345,7 @@ sub PHTV_GetStatus($;$) {
       if ( IsDisabled($name) );
 
     # try to fetch only some information to check device availability
-    if ( !$update ) {
+    unless ($update) {
         PHTV_SendCommand( $hash, "audio/volume" ) if ( $presence eq "present" );
         PHTV_SendCommand( $hash, "system" )       if ( $presence eq "absent" );
 
@@ -1361,7 +1361,8 @@ sub PHTV_GetStatus($;$) {
 
         # Read device info every 15 minutes only
         if (
-            !$querySent
+              !$querySent
+            && $presence eq "present"
             && (
                 !defined( $hash->{helper}{lastFullUpdate} )
                 || (  !$update
@@ -1379,7 +1380,7 @@ sub PHTV_GetStatus($;$) {
         }
 
         # read audio volume
-        if ( !$querySent && $update ) {
+        if ( !$querySent && $update && $presence eq "absent" ) {
             PHTV_SendCommand( $hash, "audio/volume" );
             $querySent = 1 if $sequential;
             $hash->{helper}{sequentialQueryCounter}++ if $sequential;
