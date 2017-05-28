@@ -25,7 +25,7 @@ sub ONKYO_AVR_ZONE_Initialize($) {
 
     $hash->{AttrList} =
         "IODev disable:0,1 disabledForIntervals do_not_notify:1,0 "
-      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volumeMax:uzsu,slider,0,1,100 inputs wakeupCmd:textField "
+      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volumeMax:slider,0,1,100 inputs wakeupCmd:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{ONKYO_AVR_ZONE_SVG} = "ONKYO_AVR_ZONE_RClayout_SVG";

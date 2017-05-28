@@ -35,7 +35,7 @@ sub ONKYO_AVR_Initialize($) {
       do_not_notify:1,0
       disabledForIntervals
       volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
-      volumeMax:uzsu,slider,0,1,100
+      volumeMax:slider,0,1,100
       inputs
       disable:0,1
       model
