@@ -62,9 +62,13 @@ my $css    = "style.css";
 # ---------- decide target ----------
 
 if ($ua =~ m/FHEM/) {
-  insertDB();
+  my $result = insertDB();
   print header("application/x-www-form-urlencoded");
-  print "==> ok";
+  if $result {
+    print "==> ok"
+  } else {
+    print "==> error"
+  }
 } else {
   viewStatistics();
 }
@@ -80,9 +84,10 @@ sub insertDB() {
   $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
-  $sth->execute($uniqueID,$geo,$json);
-  add2total();
+  my $result = $sth->execute($uniqueID,$geo,$json);
+  add2total() if $result;
   $dbh->disconnect();
+  return $result;
 }
 
 sub getLocation() {
