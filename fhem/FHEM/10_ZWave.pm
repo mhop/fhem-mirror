@@ -657,7 +657,7 @@ our %zwave_deviceSpecial;
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
 my (%zwave_link, %zwave_img);
-my $zwave_helpSites = "alliance,pepper";
+my $zwave_helpSites = "alliance"; # was "alliance,pepper";
 
 # standard definitions for regular expression
 # naming scheme: p<number of returned groups>_name
