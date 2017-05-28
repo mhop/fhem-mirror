@@ -2282,7 +2282,7 @@ ZWave_mfsAddClasses($$)
   my $ci = $zwave_modelConfig{$cfgFile}{classInfo};
   foreach my $id (keys %{$ci}) {
     my $v = $ci->{$id};
-    if($v =~ m/setasreport="true"/ || $v =~ m/action="add"/) {
+    if($v =~ m/action="add"/) {
       $id = sprintf("%02x", $id);
       my $cn = $zwave_id2class{$id};
       next if($attr =~ m/$cn/);
