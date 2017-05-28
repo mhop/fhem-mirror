@@ -94,13 +94,12 @@ sub _fi2_Count() {
 }
 
 sub _fi2_Send() {
-#   my $json = _fi2_to_json(\%fhemInfo);
    my $json = toJSON(\%fhemInfo);
 
    Log3("fheminfo",4,"fheminfo: $json");
 
    my %hu_hash = ();
-   $hu_hash{url}      = $cmds{fheminfo2}{uri};
+   $hu_hash{url}      = $cmds{fheminfo}{uri};
    $hu_hash{data}     = "uniqueID=".$fhemInfo{'system'}{'uniqueID'}."&json=$json";
    $hu_hash{header}   = "User-Agent: FHEM/".$fhemInfo{'system'}{'release'};
    $hu_hash{callback} = sub($$$) {
