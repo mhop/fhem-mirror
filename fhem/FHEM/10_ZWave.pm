@@ -914,7 +914,6 @@ ZWave_Cmd($$@)
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
   foreach my $cl (split(" ", $classes)) {
-    last if($cl eq "MARK");
     my $ptr = ZWave_getHash($hash, $cl, $type);
     next if(!$ptr);
 
@@ -2286,7 +2285,7 @@ ZWave_mfsAddClasses($$)
       $id = sprintf("%02x", $id);
       my $cn = $zwave_id2class{$id};
       next if($attr =~ m/$cn/);
-      $attr = "$cn ".$attr;
+      $attr .= " $cn";
       $changed = 1;
     }
   }
