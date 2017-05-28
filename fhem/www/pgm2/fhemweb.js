@@ -1433,10 +1433,10 @@ FW_createMultiple(elName, devName, vArr, currVal, set, params, cmd)
     for(var i1=1; i1<vArr.length; i1++) {
       var v = vArr[i1];
       table += '<tr>'+ // funny stuff for ios6 style, forum #23561
-        '<td><div class="checkbox"><input name="'+v+'" type="checkbox"'+
-              (selObj[v] ? " checked" : "")+'/>'+
-                      '<label for="'+v+'"><span></span></label></div></td>'+
-        '<td><label for="' +v+'">'+v+'</label></td></tr>';
+        '<td><div class="checkbox">'+
+           '<input name="'+v+'" id="multiple_'+v+'" type="checkbox"'+
+              (selObj[v] ? " checked" : "")+'/>'+'</div></td>'+
+        '<td><label for="multiple_'+v+'">'+v+'</label></td></tr>';
       delete(selObj[v]);
     }
 
