@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 11 / 2017-04-14
+# Release 12 / 2017-05-29
 
 package main;
 
@@ -850,6 +850,25 @@ netatmo_parseConnection($$$)
 
   if( $err ) {
     Log3 $name, 1, "$name: connection check failed: $err";
+
+    if($err =~ /refused/ ){
+      RemoveInternalTimer($hash);
+      $hash->{status} = "banned";
+      $hash->{network} = "banned";
+    }
+    elsif($err =~ /Bad hostname/ || $err =~ /gethostbyname/){
+      $hash->{status} = "timeout";
+      $hash->{network} = "dns";
+    }
+    elsif($err =~ /timed out/){
+      $hash->{status} = "timeout";
+      $hash->{network} = "timeout";
+    }
+    elsif($err =~ /Can't connect/){
+      $hash->{status} = "timeout";
+      $hash->{network} = "disconnected";
+    }
+    
     return undef;
   } elsif( $data ) {
       $data =~ s/\n//g;
@@ -2226,14 +2245,14 @@ netatmo_poll($)
 
   if( $hash->{SUBTYPE} eq "ACCOUNT" &&  defined($hash->{network}) &&  $hash->{network} eq "timeout" ) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+120, "netatmo_poll", $hash);
+    InternalTimer(gettimeofday()+300, "netatmo_poll", $hash);
     $hash->{status} = "recovering timeout";
     netatmo_checkConnection($hash);
     readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
     return undef;
   } elsif( $hash->{SUBTYPE} eq "ACCOUNT" &&  defined($hash->{network}) &&  $hash->{network} ne "ok" ) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+120, "netatmo_poll", $hash);
+    InternalTimer(gettimeofday()+600, "netatmo_poll", $hash);
     $hash->{status} = "recovering network";
     netatmo_checkConnection($hash);
     readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
@@ -2241,9 +2260,9 @@ netatmo_poll($)
     return undef;
   } elsif( $hash->{SUBTYPE} ne "ACCOUNT" &&  defined($hash->{IODev}->{network}) && $hash->{IODev}->{network} ne "ok" ) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+120, "netatmo_poll", $hash);
+    InternalTimer(gettimeofday()+150, "netatmo_poll", $hash);
     $hash->{status} = "delayed update";
-    netatmo_checkConnection($hash->{IODev});
+    #netatmo_checkConnection($hash->{IODev});
     readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
     Log3 $name, 5, "$name: DEVICE network error: ".$hash->{IODev}->{network};
     return undef;
@@ -2323,9 +2342,9 @@ netatmo_dispatch($$$)
       $hash->{expires_at} = int(gettimeofday()) if($hash->{SUBTYPE} eq "ACCOUNT");
       $hash->{IODev}->{expires_at} = int(gettimeofday()) if($hash->{SUBTYPE} ne "ACCOUNT");
     }
-    elsif($err =~ /Bad hostname/){
+    elsif($err =~ /Bad hostname/ || $err =~ /gethostbyname/){
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+300, "netatmo_poll", $hash);
+      InternalTimer(gettimeofday()+600, "netatmo_poll", $hash);
       $hash->{status} = "timeout";
       $hash->{network} = "dns" if($hash->{SUBTYPE} eq "ACCOUNT");
     }
@@ -3093,10 +3112,9 @@ netatmo_parseReadings($$;$)
             Log3 $name, 3, "$name: next extended dynamic update ($requested) at ".FmtDateTime($nextdata);
           } else {
           Log3 $name, 2, "$name: invalid time for dynamic update ($requested): ".FmtDateTime($nextdata);
+          }
         }
       }
-      }
-  
     }
   }
   else

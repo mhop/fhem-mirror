@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: fixed blocking connection check on dns error
   - change:  02_RSS: height/width for rect layout directive
   - change:  34_ESPEasy: performance tuning, some fixes
   - feature:  74_Unifi.pm: added get poeMode and set poeState commands
