@@ -184,6 +184,7 @@ FHEM/36_Vallox.pm            Skjall               http://forum.fhem.de/index.php
 FHEM/36_WMBUS.pm             kaihs                http://forum.fhem.de Sonstige Systeme
 FHEM/37_SHC.pm               rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/37_SHCdev.pm            rr2000               http://forum.fhem.de Sonstige Systeme
+FHEM/37_Spotify.pm           neumann              http://forum.fhem.de Multimedia
 FHEM/37_dash_dhcp.pm         justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/37_fakeRoku.pm          justme1968           http://forum.fhem.de Multimedia
 FHEM/37_harmony.pm           justme1968           http://forum.fhem.de Multimedia
