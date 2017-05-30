@@ -636,6 +636,7 @@ sub Spotify_volumeStep($$$$) {
 	$step = 5 if(!defined $step);
 
 	my $nextVolume = min(100, max(0, $hash->{helper}{device_active}{volume_percent} + $step * $direction));
+	$hash->{helper}{device_active}{volume_percent} = $nextVolume;
 	Spotify_setVolume($hash, 0, $nextVolume, $device_id);
 
 	return undef;
