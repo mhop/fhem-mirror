@@ -587,7 +587,7 @@ sub Spotify_volumeFade($$$$$) { # fade the volume of a device
 	return 'wrong syntax: set <name> volumeFade <target_volume> [ <duration_s> <percent_per_step> ] [ <device_id> ]' if(!defined $targetVolume);
 
 	Spotify_updateDevices($hash, 1); # make sure devices are up to date (a valid start volume is required)
-	$device_id = $duration if($duration !~ /^[0-9]+$/);
+	$device_id = $duration if(defined $duration && $duration !~ /^[0-9]+$/);
 	my $startVolume = $hash->{helper}{device_active}{volume_percent};
 	return 'could not get start volume of active device' if(!defined $startVolume);
 	$step = 5 if(!defined $step); # fall back to default step if not specified
@@ -672,7 +672,7 @@ sub Spotify_getTransferTargetDeviceID($$) { # get target device id for transfer
 	return undef;
 }
 
-sub Spotify_volumeFadeStep($) { # do a single fading stemp
+sub Spotify_volumeFadeStep { # do a single fading stemp
 	my ($hash) = @_;
 	return if(!defined $hash->{helper}{fading});
 	my $iteration = $hash->{helper}{fading}{iteration};
@@ -913,7 +913,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
   The <i>Spotify</i> module enables you to control your Spotify (Connect) playback.<br>
   To be able to control your music, you need to authorize with the Spotify WEB API. To do that, a <a target="_blank" rel="nofollow" href="https://developer.spotify.com/my-applications/#!/applications/create">Spotify API application</a> is required.<br>
   While creating the app, enter any <i>redirect_uri</i>. By default the module will use https://oskar.pw/ as <i>redirect_uri</i> since the site outputs your temporary authentification code.<br>
-  It is safe to rely on this site because the code is useless without your client secret and only valid for a few minutes.<br>
+  It is safe to rely on this site because the code is useless without your client secret and only valid for a few minutes (important: you have to press the <b>add</b> and <b>save</b> button while adding the url).<br>
   If you want to use it, make sure to add it as <i>redirect_uri</i> to your app - however, you are free to use any other url and extract the code after signing in yourself.<br>
   <br>
   <a name="Spotify_define"></a>
@@ -990,7 +990,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
       seeks to the position <i>lt;position&gt;</i> (in seconds, supported formats: 01:20, 80, 00:20, 20)
     </li>
     <li>
-      <i>shuffle &lt;0,1&gt;</i><br>
+      <i>shuffle &lt;off,on&gt;</i><br>
       sets the shuffle mode: either <i>on</i> or <i>off</i>
     </li>
     <li>
@@ -1059,7 +1059,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
   Um die Wiedergabe zu steuern, wird die Spotify WEB API verwendet. Dafür wird eine eigene <a target="_blank" rel="nofollow" href="https://developer.spotify.com/my-applications/#!/applications/create">Spotify API application</a> benötigt.<br>
   Während der Erstellung muss eine <i>redirect_uri</i> angegeben - standardmäßig wird vom Modul https://oskar.pw/ verwendet, da diese Seite nach der Anmeldung den Code in leserlicher Form ausgibt.<br>
   Die Seite kann bedenkenlos verwendet werden, da der Code ohne <i>client_secret</i> nutzlos und nur wenige Minuten gültig ist.<br>
-  Wenn du diese verwenden willst, stelle sicher, diese bei der Erstellung anzugeben, ansonsten kann jede beliebige andere Seite verwendet werden und der Code aus der URL extrahiert werden.<br>
+  Wenn du diese verwenden willst, stelle sicher, diese bei der Erstellung anzugeben (wichtig: das Hinzufügen der URL muss mit <b>add</b> und <b>save</b> bestätigt werden), ansonsten kann jede beliebige andere Seite verwendet werden und der Code aus der URL extrahiert werden.<br>
   <br>
   <a name="Spotify_define"></a>
   <p><b>Define</b></p>
@@ -1135,7 +1135,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
       spult an die Position <i>lt;position&gt;</i> (in Sekunden, erlaubte Formate: 01:20, 80, 00:20, 20)
     </li>
     <li>
-      <i>shuffle &lt;0,1&gt;</i><br>
+      <i>shuffle &lt;off,on&gt;</i><br>
       setzt den Shuffle-Modus: entweder <i>on</i> oder <i>off</i>
     </li>
     <li>
