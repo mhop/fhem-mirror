@@ -213,7 +213,7 @@ CO20_Connect($)
         }
         Log3 $name, 4, "$name: claimed CO20 device on identify";
         my $buf;
-        $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
+        $hash->{DEV}->bulk_read(0x00000081, $buf, 16, 1000);
         Log3 $name, 4, "$name: read CO20 device on identify";
         my $currentid = CO20_identify($hash);
         if(!$currentid)
@@ -304,7 +304,7 @@ CO20_Connect($)
       Log3 $name, 4, "$name: polling CO20 device on identify";
 
       my $buf;
-      $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
+      $hash->{DEV}->bulk_read(0x00000081, $buf, 16, 1000);
 
     } else {
       Log3 $name, 3, "$name: failed to open CO20 device";
@@ -393,9 +393,10 @@ CO20_poll($)
 
     Log3 $name, 5, "$name: sent $buf / ".ord(substr($buf,0,1));
 
-    my $ret = $hash->{DEV}->interrupt_write(0x00000002, $buf, 0x0000010, $hash->{helper}{timeout});
+    my $ret = $hash->{DEV}->bulk_write(0x00000002, $buf, 16, $hash->{helper}{timeout});
     if( $ret != 16 ) {
-      my $ret2 = $hash->{DEV}->interrupt_write(0x00000002, "@@@@@@@@@@@@@@@@", 0x0000010, $hash->{helper}{timeout});
+      my $ret2 = 0;
+      $ret2 = $hash->{DEV}->bulk_write(0x00000002, "@@@@@@@@@@@@@@@@", 16, $hash->{helper}{timeout}) if( $ret != -19 );
       $hash->{FAIL} = $hash->{FAIL}+1;
       Log3 $name, 3, "$name: write error $ret/$ret2 ($hash->{FAIL})";
       RemoveInternalTimer($hash);
@@ -415,7 +416,7 @@ CO20_poll($)
 
     my $data="";
     for( $a = 1; $a <= 3; $a = $a + 1 ) {
-      $ret=$hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{helper}{timeout});
+      $ret=$hash->{DEV}->bulk_read(0x00000081, $buf, 16, $hash->{helper}{timeout});
       if( $ret != 16 and $ret != 0 ) {
         Log3 $name, 4, "$name: read error $ret";
       }
@@ -454,10 +455,13 @@ CO20_poll($)
       if (ord(substr($data,3,1)) < 128) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, "voc", $voc, 1 );
+        readingsBulkUpdate($hash, 'state', 'open', 1 );
+        if( AttrVal($name, "advanced", 0 ) == 1 ){
         readingsBulkUpdate( $hash, "debug", $dbg, 1 );
         readingsBulkUpdate( $hash, "pwm", $pwm, 1 );
         readingsBulkUpdate( $hash, "r_h", $rh/100, 1 );
         readingsBulkUpdate( $hash, "r_s", $rs, 1 );
+        }
         readingsEndUpdate($hash,1);
       }
 
@@ -526,7 +530,7 @@ CO20_dataread($$;$)
     $hash->{helper}{seq4} = ($hash->{helper}{seq4} +1) & 0xFFFF;
 
     my $buf = substr("@".$seq.$reqstr."\n@@@@@@@@@@@@@@@@",0,16);
-    my $ret = $hash->{DEV}->interrupt_write(0x00000002, $buf, 0x0000010, $hash->{helper}{timeout}) if(defined($hash->{DEV}));
+    my $ret = $hash->{DEV}->bulk_write(0x00000002, $buf, 16, $hash->{helper}{timeout}) if(defined($hash->{DEV}));
     Log3 $name, 4, "getdata write $ret" if($ret != 16);
 
 
@@ -534,7 +538,7 @@ CO20_dataread($$;$)
     my $intdata = "";
     if($ret == 16) {
       for( $a = 1; $a <= $retcount; $a = $a + 1 ){
-        $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{helper}{timeout});
+        $hash->{DEV}->bulk_read(0x00000081, $buf, 16, $hash->{helper}{timeout});
         $data.=$buf;
         Log3 $name, 5, "getdata read $ret" if($ret != 16);
         $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1)) if(length($buf) > 15);
@@ -662,23 +666,23 @@ CO20_dataset($$$)
     $buf .= "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
 
 
-    my $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,0,16), 0x0000010, $hash->{helper}{timeout});
+    my $ret = $hash->{DEV}->bulk_write(0x00000002, substr($buf,0,16), 16, $hash->{helper}{timeout});
     Log3 $name, 5, "setdata write $ret" if($ret != 16);
 
 
     if($ret == 16 and ($buflen > 16 or $cmd eq "reset_device")) {
-      $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,16,16), 0x0000010, $hash->{helper}{timeout});
+      $ret = $hash->{DEV}->bulk_write(0x00000002, substr($buf,16,16), 16, $hash->{helper}{timeout});
       Log3 $name, 5, "setdata write $ret" if($ret != 16);
     }
 
     if($ret == 16 and $buflen > 32) {
-      $ret = $hash->{DEV}->interrupt_write(0x00000002, substr($buf,32,16), 0x0000010, $hash->{helper}{timeout});
+      $ret = $hash->{DEV}->bulk_write(0x00000002, substr($buf,32,16), 16, $hash->{helper}{timeout});
       Log3 $name, 5, "setdata write $ret" if($ret != 16);
     }
 
 
     if($ret == 16 and $buflen > 15) {
-      $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{helper}{timeout});
+      $hash->{DEV}->bulk_read(0x00000081, $buf, 16, $hash->{helper}{timeout});
       $buflen = length($buf);
       Log3 $name, 5, "getdata read $ret";
       if($buflen > 15)
