@@ -801,7 +801,12 @@ sub Spotify_dispatch($$$) {
   			$index++;
   		}
   		readingsBulkUpdateIfChanged($hash, 'devices_cnt', $index-1, 1);
-  		Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0) if(!defined $hash->{helper}{device_active});
+  		$hash->{helper}{is_active} = defined $hash->{helper}{device_active};
+  		if(!$hash->{helper}{is_active}) {
+  			Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0);
+  			$hash->{STATE} = "connected";
+  			readingsBulkUpdateIfChanged($hash, 'is_playing', 0, 1);	
+  		}
   		readingsEndUpdate($hash, 1);
   	}
 
@@ -813,7 +818,8 @@ sub Spotify_dispatch($$$) {
   			return undef;
   		}
 
-  		$hash->{helper}{is_playing} = $json->{is_playing};
+  		$hash->{helper}{is_active} = defined $json->{device} && $json->{device}{is_active};
+  		$hash->{helper}{is_playing} = $json->{is_playing} && $hash->{helper}{is_active};
   		$hash->{helper}{repeat} = $json->{repeat_state} eq 'track' ? 'one' : ($json->{repeat_state} eq 'context' ? 'all' : 'off');
   		$hash->{helper}{shuffle} = $json->{shuffle_state};
   		$hash->{helper}{progress_ms} = $json->{progress_ms};
@@ -833,7 +839,7 @@ sub Spotify_dispatch($$$) {
 			CommandDeleteReading(undef, "$name track_.*");
 		}
 
-		if(defined $json->{device} && $json->{device}{is_active}) {
+		if($hash->{helper}{is_active}) {
 			my $device = $json->{device};
 			$hash->{helper}{device_active} = $device;
 			Spotify_saveDevice($hash, $device, "device_active", 0);
