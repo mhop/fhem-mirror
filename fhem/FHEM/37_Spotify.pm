@@ -26,7 +26,7 @@ sub Spotify_Initialize($) {
     $hash->{SetFn}    = 'Spotify_Set';
     $hash->{GetFn}    = 'Spotify_Get';
   #$hash->{AttrFn}   = "Spotify_Attr";
-    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval ';
+    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval updateIntervalWhilePlaying ';
     $hash->{AttrList} .= $readingFnAttributes;
     $hash->{NOTIFYDEV} = "global";
 }
