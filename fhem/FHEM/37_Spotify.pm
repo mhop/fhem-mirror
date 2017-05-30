@@ -211,9 +211,9 @@ sub Spotify_getToken($$) { # exchanging code for token
   	$hash->{STATE} = "connected";
 
   	Spotify_writeTokens($hash);
-
-  	Spotify_updateMe($hash, 0);
-  	Spotify_updateDevices($hash, 0);
+  	
+  	RemoveInternalTimer($hash);
+	Spotify_poll($hash);
 
 	return undef;
 }
