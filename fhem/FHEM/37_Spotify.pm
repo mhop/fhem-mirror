@@ -635,8 +635,22 @@ sub Spotify_volumeStep($$$$) {
 	$step = $attr{$name}{volumeStep} if(!defined $step || $step !~ /^[0-9]+$/);
 	$step = 5 if(!defined $step);
 
-	my $nextVolume = min(100, max(0, $hash->{helper}{device_active}{volume_percent} + $step * $direction));
-	$hash->{helper}{device_active}{volume_percent} = $nextVolume;
+	my $nextVolume = undef;
+	if(defined $device_id) {
+		my @devices = @{$hash->{helper}{devices}};
+		foreach my $device (@devices) {
+			if(defined $device->{id} && $device->{id} eq $device_id) {
+				$nextVolume = min(100, max(0, $device->{volume_percent} + $step * $direction));
+				$device->{volume_percent} = $nextVolume;
+			}
+		}
+	} else {
+		$nextVolume = min(100, max(0, $hash->{helper}{device_active}{volume_percent} + $step * $direction));
+		$hash->{helper}{device_active}{volume_percent} = $nextVolume;
+	}
+
+	return "could not find device" if(!defined $nextVolume);
+
 	Spotify_setVolume($hash, 0, $nextVolume, $device_id);
 
 	return undef;
