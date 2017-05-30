@@ -738,12 +738,12 @@ sub Spotify_dispatch($$$) {
   		$hash->{helper}{uri} = $json->{uri};
 
   		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'user_id', $json->{id});
-		readingsBulkUpdateIfChanged($hash, 'user_country', $json->{country});
-		readingsBulkUpdateIfChanged($hash, 'user_subscription', $json->{subscription});
-		readingsBulkUpdateIfChanged($hash, 'user_display_name', $json->{display_name});
-		readingsBulkUpdateIfChanged($hash, 'user_profile_pic_url', $json->{images}[0]{url}) if(defined $json->{images} && $json->{images} > 0);
-		readingsBulkUpdateIfChanged($hash, 'user_follower_cnt', $json->{followers}{total});
+		readingsBulkUpdateIfChanged($hash, 'user_id', $json->{id}, 1);
+		readingsBulkUpdateIfChanged($hash, 'user_country', $json->{country}, 1);
+		readingsBulkUpdateIfChanged($hash, 'user_subscription', $json->{subscription}, 1);
+		readingsBulkUpdateIfChanged($hash, 'user_display_name', $json->{display_name}, 1);
+		readingsBulkUpdateIfChanged($hash, 'user_profile_pic_url', $json->{images}[0]{url}, 1) if(defined $json->{images} && $json->{images} > 0);
+		readingsBulkUpdateIfChanged($hash, 'user_follower_cnt', $json->{followers}{total}, 1);
 		readingsEndUpdate($hash, 1);
   	}
 
@@ -772,10 +772,10 @@ sub Spotify_dispatch($$$) {
   		foreach my $device (@{$hash->{helper}{devices}}) {
   			foreach my $prefix (("device_". $index ."_", 'device_active_')) {
   				if($prefix ne 'device_active_' || $device->{is_active}) {
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'id', $device->{id});
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'name', $device->{name});
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'type', $device->{type});
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'volume', $device->{volume_percent});
+		  			readingsBulkUpdateIfChanged($hash, $prefix . 'id', $device->{id}, 1);
+		  			readingsBulkUpdateIfChanged($hash, $prefix . 'name', $device->{name}, 1);
+		  			readingsBulkUpdateIfChanged($hash, $prefix . 'type', $device->{type}, 1);
+		  			readingsBulkUpdateIfChanged($hash, $prefix . 'volume', $device->{volume_percent}, 1);
 	  			}
   			}
 
@@ -783,7 +783,7 @@ sub Spotify_dispatch($$$) {
   			$hash->{helper}{device_default} = $device if(defined $attr{$name}{defaultPlaybackDeviceID} && $device->{id} eq $attr{$name}{defaultPlaybackDeviceID}); # found users default device
   			$index++;
   		}
-  		readingsBulkUpdateIfChanged($hash, 'devices_cnt', $index-1);
+  		readingsBulkUpdateIfChanged($hash, 'devices_cnt', $index-1, 1);
   		readingsEndUpdate($hash, 1);
 
   		CommandDeleteReading(undef, "$name device_acitve_.*") if(!defined $hash->{helper}{device_active});
@@ -804,10 +804,10 @@ sub Spotify_dispatch($$$) {
   		$hash->{STATE} = $json->{is_playing} ? 'playing' : 'paused';
 
 		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'is_playing', $json->{is_playing} ne 'false' ? 1 : 0);
-		readingsBulkUpdateIfChanged($hash, 'shuffle', $json->{shuffle_state} ? 'on' : 'off');
-		readingsBulkUpdateIfChanged($hash, 'repeat', $hash->{helper}{repeat});
-		readingsBulkUpdateIfChanged($hash, 'progress_ms', $json->{progress_ms});
+		readingsBulkUpdateIfChanged($hash, 'is_playing', $json->{is_playing} ne 'false' ? 1 : 0, 1);
+		readingsBulkUpdateIfChanged($hash, 'shuffle', $json->{shuffle_state} ? 'on' : 'off', 1);
+		readingsBulkUpdateIfChanged($hash, 'repeat', $hash->{helper}{repeat}, 1);
+		readingsBulkUpdateIfChanged($hash, 'progress_ms', $json->{progress_ms}, 1);
 
 		if(defined $json->{item}) {
 			my $item = $json->{item};
@@ -820,10 +820,10 @@ sub Spotify_dispatch($$$) {
 		if(defined $json->{device} && $json->{device}{is_active}) {
 			my $device = $json->{device};
 			$hash->{helper}{device_active} = $device;
-			readingsBulkUpdateIfChanged($hash, 'device_active_id', $device->{id});
-			readingsBulkUpdateIfChanged($hash, 'device_active_name', $device->{name});
-			readingsBulkUpdateIfChanged($hash, 'device_active_volume', $device->{volume_percent});
-			readingsBulkUpdateIfChanged($hash, 'device_active_type', $device->{type});
+			readingsBulkUpdateIfChanged($hash, 'device_active_id', $device->{id}, 1);
+			readingsBulkUpdateIfChanged($hash, 'device_active_name', $device->{name}, 1);
+			readingsBulkUpdateIfChanged($hash, 'device_active_volume', $device->{volume_percent}, 1);
+			readingsBulkUpdateIfChanged($hash, 'device_active_type', $device->{type}, 1);
 		} else {
 			delete $hash->{helper}{device_active};
 			CommandDeleteReading(undef, "$name device_active_.*");
@@ -877,25 +877,25 @@ sub Spotify_update($$) {
 sub Spotify_saveTrack($$$$) { # save a track object to the readings
 	my ($hash, $track, $prefix, $beginUpdate) = @_;
 	readingsBeginUpdate($hash) if($beginUpdate);
-	readingsBulkUpdateIfChanged($hash, $prefix."_name", $track->{name});
-	readingsBulkUpdateIfChanged($hash, $prefix."_uri", $track->{uri});
-	readingsBulkUpdateIfChanged($hash, $prefix."_popularity", $track->{popularity});
-	readingsBulkUpdateIfChanged($hash, $prefix."_duration_ms", $track->{duration_ms});
-	readingsBulkUpdateIfChanged($hash, $prefix."_artist_name", $track->{artists}[0]{name});
-	readingsBulkUpdateIfChanged($hash, $prefix."_artist_uri", $track->{artists}[0]{uri});
-	readingsBulkUpdateIfChanged($hash, $prefix."_album_name", $track->{album}{name});
-	readingsBulkUpdateIfChanged($hash, $prefix."_album_uri", $track->{album}{uri});
+	readingsBulkUpdateIfChanged($hash, $prefix."_name", $track->{name}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_uri", $track->{uri}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_popularity", $track->{popularity}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_duration_ms", $track->{duration_ms}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_artist_name", $track->{artists}[0]{name}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_artist_uri", $track->{artists}[0]{uri}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_album_name", $track->{album}{name}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix."_album_uri", $track->{album}{uri}, 1);
 	readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 
 sub Spotify_saveArtist($$$$) { # save an artist object to the readings
 	my ($hash, $artist, $prefix, $beginUpdate) = @_;
 	readingsBeginUpdate($hash) if($beginUpdate);
-	readingsBulkUpdate($hash, $prefix."_name", $artist->{name});
-	readingsBulkUpdate($hash, $prefix."_uri", $artist->{uri});
-	readingsBulkUpdate($hash, $prefix."_popularity", $artist->{popularity});
-	readingsBulkUpdate($hash, $prefix."_follower_cnt", $artist->{followers}{total});
-	readingsBulkUpdate($hash, $prefix."_profile_pic_url", $artist->{images}[0]{url});
+	readingsBulkUpdate($hash, $prefix."_name", $artist->{name}, 1);
+	readingsBulkUpdate($hash, $prefix."_uri", $artist->{uri}, 1);
+	readingsBulkUpdate($hash, $prefix."_popularity", $artist->{popularity}, 1);
+	readingsBulkUpdate($hash, $prefix."_follower_cnt", $artist->{followers}{total}, 1);
+	readingsBulkUpdate($hash, $prefix."_profile_pic_url", $artist->{images}[0]{url}, 1);
 	readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 
