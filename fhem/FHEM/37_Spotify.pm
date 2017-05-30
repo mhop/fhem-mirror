@@ -420,7 +420,7 @@ sub Spotify_playContextByURI($$$$) { # play a context (playlist, album or artist
     my ($hash, $uri, $position, $device_id) = @_;
     my $name = $hash->{NAME};
     return 'wrong syntax: set <name> playContextByURI <album_uri / playlist_uri> [ <nr_of_first_track> ] [ <device_id> ]' if(!defined $uri);
-    $device_id = $position if(defined $position && $position !~ /^[0-9]+$/ && !defined $device_id);
+    $device_id = $position . (defined $device_id ? " ". $device_id : "") if(defined $position && $position !~ /^[0-9]+$/);
     $position = 1 if(!defined $position || $position !~ /^[0-9]+$/);
 
     return Spotify_play($hash, undef, $uri, $position, $device_id);
@@ -518,7 +518,7 @@ sub Spotify_playSavedTracks($$$) { # play users saved tracks
 	my ($hash, $first, $device_id) = @_;
 	my $name = $hash->{NAME};
 
-	$device_id = $first if($first !~ /^[0-9]+$/);
+	$device_id = $first . (defined $device_id ? " " . $device_id : "") if(defined $first && $first !~ /^[0-9]+$/);
 	$first = 1 if(!defined $first || !$first !~ /^[0-9]+$/);
 
 	Spotify_apiRequest($hash, 'me/tracks?limit=50'. ($first > 50 ? '&offset='. int($first/50)-1 : ''), undef, 'GET', 1); # getting saved tracks
@@ -542,7 +542,7 @@ sub Spotify_playRandomTrackFromPlaylistByURI($$$$) { # select a random track fro
 	my ($user_id, $playlist_id) = $uri =~ m/user:(.*):playlist:(.*)/;
 	return 'invalid playlist_uri' if(!defined $user_id || !defined $playlist_id);
 
-	$device_id = $limit if(!defined $device_id && $limit !~ /^[0-9]+$/);
+	$device_id = $limit . (defined $device_id ? " " . $device_id : "") if(defined $limit && $limit !~ /^[0-9]+$/);
 	$limit = undef if($limit !~ /^[0-9]+$/);
 
 	Spotify_apiRequest($hash, "users/$user_id/playlists/$playlist_id/tracks?fields=items(track(name,uri))". (defined $limit ? "&limit=$limit" : ""), undef, 'GET', 1);
@@ -585,7 +585,7 @@ sub Spotify_volumeFade($$$$$) { # fade the volume of a device
 	return 'wrong syntax: set <name> volumeFade <target_volume> [ <duration_s> <percent_per_step> ] [ <device_id> ]' if(!defined $targetVolume);
 
 	Spotify_updateDevices($hash, 1); # make sure devices are up to date (a valid start volume is required)
-	$device_id = $duration if(defined $duration && $duration !~ /^[0-9]+$/);
+	$device_id = $duration . (defined $device_id ? " " . $device_id : "") if(defined $duration && $duration !~ /^[0-9]+$/);
 	my $startVolume = $hash->{helper}{device_active}{volume_percent};
 	return 'could not get start volume of active device' if(!defined $startVolume);
 	$step = 5 if(!defined $step); # fall back to default step if not specified
@@ -828,7 +828,7 @@ sub Spotify_dispatch($$$) {
 			$hash->{STATE} = 'connected' if(!defined $json->{device});
 		}
 
-		if($json->{is_playing} ne 'false') {
+		if($hash->{helper}{is_playing}) {
 			if(!defined $hash->{helper}{updatePlaybackTimer_next} || $hash->{helper}{updatePlaybackTimer_next} <= gettimeofday()) { # start refresh timer if not already started
 				my $updateIntervalWhilePlaying = $attr{updateIntervalWhilePlaying};
 				$updateIntervalWhilePlaying = 10 if(!defined $updateIntervalWhilePlaying);
@@ -983,7 +983,7 @@ sub Spotify_isDisabled($) {
       plays an artist using its name (uses search)
     </li>
     <li>
-      <i>playContextByURI &lt;context_uri&gt; [ &lt;device_id / device_name&gt; ]</i><br>
+      <i>playContextByURI &lt;context_uri&gt; [ &lt;nr_of_start_track&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       plays a context (playlist, album or artist) using a Spotify URI
     </li>
     <li>
@@ -991,11 +991,11 @@ sub Spotify_isDisabled($) {
       plays any playlist by providing a name (uses search)
     </li>
     <li>
-      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id&gt; ]</i><br>
+      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       plays a random track from a playlist (only considering the first <i>&lt;limit&gt;</i> songs)
     </li>
     <li>
-      <i>playSavedTracks [ &lt;nr_of_start_track&gt; ] [ &lt;device_id&gt; ]</i><br>
+      <i>playSavedTracks [ &lt;nr_of_start_track&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       plays the saved tracks (beginning with track <i>&lt;nr_of_start_track&gt;</i>)
     </li>
     <li>
@@ -1138,7 +1138,7 @@ sub Spotify_isDisabled($) {
       sucht einen Künstler und spielt dessen Tracks ab
     </li>
     <li>
-      <i>playContextByURI &lt;context_uri&gt; [ &lt;device_id / device_name&gt; ]</i><br>
+      <i>playContextByURI &lt;context_uri&gt; [ &lt;nr_of_start_track&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       spielt einen Context (Playlist, Album oder Künstler) durch Angabe der URI ab
     </li>
     <li>
@@ -1146,11 +1146,11 @@ sub Spotify_isDisabled($) {
       sucht eine Playlist und spielt diese ab
     </li>
     <li>
-      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id&gt; ]</i><br>
+      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       spielt einen zufälligen Track aus einer Playlist ab (berücksichtigt nur die ersten <i>&lt;limit&gt;</i> Tracks der Playlist)
     </li>
     <li>
-      <i>playSavedTracks [ &lt;nr_of_start_track&gt; ] [ &lt;device_id&gt; ]</i><br>
+      <i>playSavedTracks [ &lt;nr_of_start_track&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       spielt die gespeicherten Tracks ab (beginnend mit Track Nummer <i>&lt;nr_of_start_track&gt;</i>)
     </li>
     <li>
