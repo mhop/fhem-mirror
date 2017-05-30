@@ -166,14 +166,9 @@ sub Spotify_loadInternals($) {
 		$hash->{STATE} = 'connected';
 		my $pollInterval = $attr{$name}{pollInterval};
 		$attr{$name}{webCmd} = 'toggle:next:prev' if(!defined $attr{$name}{webCmd});
-    	InternalTimer(gettimeofday()+(defined $pollInterval ? $pollInterval : 10*60), "Spotify_poll", $hash);
+    	
+    	Spotify_poll($hash) if(defined $hash->{helper}{refresh_token});
 	}
-
-	if(defined $hash->{helper}{refresh_token}) { 
-  		Spotify_updateMe($hash, 0);
-  		Spotify_updateDevices($hash, 0);
-  		Spotify_updatePlaybackStatus($hash, 0);
-  	}
 }
 
 sub Spotify_getToken($$) { # exchanging code for token
@@ -227,10 +222,10 @@ sub Spotify_writeTokens($) { # save gathered tokens
 	my ($hash) = @_;
 
 	readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, '.refresh_token', $hash->{helper}{refresh_token});
-  readingsBulkUpdateIfChanged($hash, '.access_token', $hash->{helper}{access_token});
-  readingsBulkUpdate($hash, '.expires', $hash->{helper}{expires});
-  readingsEndUpdate($hash, 1);
+  	readingsBulkUpdate($hash, '.refresh_token', $hash->{helper}{refresh_token});
+  	readingsBulkUpdateIfChanged($hash, '.access_token', $hash->{helper}{access_token});
+  	readingsBulkUpdate($hash, '.expires', $hash->{helper}{expires});
+  	readingsEndUpdate($hash, 1);
 }
 
 sub Spotify_refreshToken($) { # refresh the access token once it is expired
@@ -241,20 +236,20 @@ sub Spotify_refreshToken($) { # refresh the access token once it is expired
 
 	Log3 $name, 4, "$name: refreshing access code";
 	my ($err,$data) = HttpUtils_BlockingGet({
-  	url => "https://accounts.spotify.com/api/token",
-  	method => "POST",
-  	timeout => 5,
-  	noshutdown => 1,
-  	data => {client_id => $hash->{CLIENT_ID}, client_secret => $hash->{CLIENT_SECRET}, grant_type => 'refresh_token', refresh_token => $hash->{helper}{refresh_token}}
+	  	url => "https://accounts.spotify.com/api/token",
+	  	method => "POST",
+	  	timeout => 5,
+	  	noshutdown => 1,
+	  	data => {client_id => $hash->{CLIENT_ID}, client_secret => $hash->{CLIENT_SECRET}, grant_type => 'refresh_token', refresh_token => $hash->{helper}{refresh_token}}
 	});
 
 	my $json = eval { JSON->new->utf8(0)->decode($data) };
 	if(defined $json->{error}) {
 		if($json->{error} eq 'invalid_grant') {
-  		$hash->{helper}{refresh_token} = undef;
-  		$hash->{STATE} = 'invalid refresh token';
-  		$hash->{AUTHORIZATION_URL} = $hash->{helper}{authorization_url};
-  		CommandDeleteReading(undef, "$name .*");
+	  		$hash->{helper}{refresh_token} = undef;
+	  		$hash->{STATE} = 'invalid refresh token';
+	  		$hash->{AUTHORIZATION_URL} = $hash->{helper}{authorization_url};
+	  		CommandDeleteReading(undef, "$name .*");
 		}
 
 		my $msg = 'Failed to refresh access token: $json->{error_description}';
@@ -262,8 +257,7 @@ sub Spotify_refreshToken($) { # refresh the access token once it is expired
 		return $msg;
 	}
 
-	return "failed to refresh access token"
-	  if(!defined $json->{access_token});
+	return "failed to refresh access token" if(!defined $json->{access_token});
 
 	$hash->{helper}{access_token} = $json->{access_token};
 	$hash->{helper}{expires} = gettimeofday() + $json->{expires_in};
@@ -328,6 +322,7 @@ sub Spotify_pausePlayback($) { # pause playback
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	$hash->{helper}{is_playing} = 0;
+	readingsSingleUpdate($hash, 'is_playing', 0, 1);
 	Spotify_apiRequest($hash, 'me/player/pause', undef, 'PUT', 0);
 	Log3 $name, 3, "$name: pause";
 	return undef;
@@ -337,6 +332,7 @@ sub Spotify_resumePlayback($) { # resume playback
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	$hash->{helper}{is_playing} = 1;
+	readingsSingleUpdate($hash, 'is_playing', 1, 1);
 	Spotify_apiRequest($hash, 'me/player/play', undef, 'PUT', 0);
 	Log3 $name, 3, "$name: resume";
 	return undef;
@@ -412,8 +408,9 @@ sub Spotify_setShuffle($$) { # set the shuffle mode
 
 sub Spotify_transferPlayback($$) { # transfer the current playback to another device
 	my ($hash, $device_id) = @_;
-	$device_id = Spotify_getTransferTargetDeviceID($hash, $device_id);
 	return 'wrong syntax: set <name> transferPlayback [ <target_device_id / target_device_name> ]' if(!defined $device_id);
+	$device_id = Spotify_getTransferTargetDeviceID($hash, $device_id);
+	return 'device not found' if(!defined $device_id);
 	my @device_ids = ($device_id);
 	Spotify_apiRequest($hash, 'me/player', {device_ids => \@device_ids}, 'PUT', 0);
 	return undef;
@@ -724,7 +721,11 @@ sub Spotify_dispatch($$$) {
 
   	if(defined $json->{error}) {
   		Log3 $name, 3, "$name: request failed: $json->{error}{message}";
-  		Spotify_refreshToken($hash) if($json->{error} eq "invalid_grant" || $json->{error} eq "token_expired");
+  		return Spotify_refreshToken($hash) if($json->{error}{message} =~ /expired/);
+  		readingsBeginUpdate($hash);
+  		readingsBulkUpdate($hash, 'error_code', $json->{error}{status}, 1);
+		readingsBulkUpdate($hash, 'error_description', $json->{error}{message}, 1);
+		readingsEndUpdate($hash, 1);
   		return "request failed: $json->{error}{message}";
   	}
 
@@ -804,7 +805,7 @@ sub Spotify_dispatch($$$) {
   		$hash->{STATE} = $json->{is_playing} ? 'playing' : 'paused';
 
 		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'is_playing', $json->{is_playing} ne 'false' ? 1 : 0, 1);
+		readingsBulkUpdateIfChanged($hash, 'is_playing', $hash->{helper}{is_playing} ? 1 : 0, 1);
 		readingsBulkUpdateIfChanged($hash, 'shuffle', $json->{shuffle_state} ? 'on' : 'off', 1);
 		readingsBulkUpdateIfChanged($hash, 'repeat', $hash->{helper}{repeat}, 1);
 		readingsBulkUpdateIfChanged($hash, 'progress_ms', $json->{progress_ms}, 1);
@@ -827,11 +828,14 @@ sub Spotify_dispatch($$$) {
 		} else {
 			delete $hash->{helper}{device_active};
 			CommandDeleteReading(undef, "$name device_active_.*");
+			$hash->{STATE} = 'connected' if(!defined $json->{device});
 		}
 
 		if($json->{is_playing} ne 'false') {
 			if(!defined $hash->{helper}{updatePlaybackTimer_next} || $hash->{helper}{updatePlaybackTimer_next} <= gettimeofday()) { # start refresh timer if not already started
-				$hash->{helper}{updatePlaybackTimer_next} = gettimeofday()+15; # refresh playback status every 15 seconds if currently playing
+				my $updateIntervalWhilePlaying = $attr{updateIntervalWhilePlaying};
+				$updateIntervalWhilePlaying = 10 if(!defined $updateIntervalWhilePlaying);
+				$hash->{helper}{updatePlaybackTimer_next} = gettimeofday()+$updateIntervalWhilePlaying; # refresh playback status every 15 seconds if currently playing
 				InternalTimer($hash->{helper}{updatePlaybackTimer_next}, 'Spotify_updatePlaybackStatus', $hash);
 			}
 
@@ -840,6 +844,8 @@ sub Spotify_dispatch($$$) {
 				InternalTimer($hash->{helper}{nextSongTimer}, "Spotify_updatePlaybackStatus", $hash);
 			}
 		}
+
+		readingsEndUpdate($hash, 1);
 
 		return undef;
   	}
@@ -863,7 +869,7 @@ sub Spotify_poll($) {
 	my $name = $hash->{NAME};
 
 	my $pollInterval = $attr{$name}{updateInterval};
-    InternalTimer(gettimeofday()+(defined $pollInterval ? $pollInterval : 10*60), "Spotify_poll", $hash);
+    InternalTimer(gettimeofday()+(defined $pollInterval ? $pollInterval : 5*60), "Spotify_poll", $hash);
 	Spotify_update($hash, 0);
 }
 
@@ -871,7 +877,7 @@ sub Spotify_update($$) {
 	my ($hash, $full) = @_;
 	Spotify_updateMe($hash, 0) if($full);
 	Spotify_updateDevices($hash, 0);
-  Spotify_updatePlaybackStatus($hash, 0);
+  	Spotify_updatePlaybackStatus($hash, 0);
 }
 
 sub Spotify_saveTrack($$$$) { # save a track object to the readings
@@ -885,6 +891,10 @@ sub Spotify_saveTrack($$$$) { # save a track object to the readings
 	readingsBulkUpdateIfChanged($hash, $prefix."_artist_uri", $track->{artists}[0]{uri}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_name", $track->{album}{name}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_uri", $track->{album}{uri}, 1);
+	foreach my $image(@{$track->{album}{images}}) {
+		my $size = $image->{height} == 64 ? "small" : ($image->{height} == 300 ? "medium" : ($image->{height} == 640 ? "large" : $image->{height}));
+		readingsBulkUpdateIfChanged($hash, $prefix."_album_cover_". $size, $image->{url}, 1);
+	}
 	readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 
@@ -987,7 +997,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     </li>
     <li>
       <i>seekToPosition &lt;position&gt;</i><br>
-      seeks to the position <i>lt;position&gt;</i> (in seconds, supported formats: 01:20, 80, 00:20, 20)
+      seeks to the position <i>&lt;position&gt;</i> (in seconds, supported formats: 01:20, 80, 00:20, 20)
     </li>
     <li>
       <i>shuffle &lt;off,on&gt;</i><br>
@@ -1044,7 +1054,12 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     <li>
       <i>updateInterval</i><br>
       the interval to update your playback status while no music is running (in seconds)<br>
-      default: 600
+      default: 300
+    </li>
+    <li>
+      <i>updateIntervalWhilePlaying</i><br>
+      the interval to update your playback status while music is running (in seconds)<br>
+      default: 10
     </li>
   </ul>
 </ul>
@@ -1132,7 +1147,7 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     </li>
     <li>
       <i>seekToPosition &lt;position&gt;</i><br>
-      spult an die Position <i>lt;position&gt;</i> (in Sekunden, erlaubte Formate: 01:20, 80, 00:20, 20)
+      spult an die Position <i>&lt;position&gt;</i> (in Sekunden, erlaubte Formate: 01:20, 80, 00:20, 20)
     </li>
     <li>
       <i>shuffle &lt;off,on&gt;</i><br>
@@ -1189,7 +1204,12 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     <li>
       <i>updateInterval</i><br>
       Intervall in Sekunden, in dem der Status aktualisiert wird, wenn keine Musik läuft<br>
-      default: 600
+      default: 300
+    </li>
+    <li>
+      <i>updateIntervalWhilePlaying</i><br>
+      Intervall in Sekunden, in dem der Status aktualisiert wird, wenn Musik läuft<br>
+      default: 10
     </li>
   </ul>
 </ul>
