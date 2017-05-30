@@ -782,7 +782,7 @@ sub Spotify_dispatch($$$) {
   			$index++;
   		}
   		readingsBulkUpdateIfChanged($hash, 'devices_cnt', $index-1, 1);
-  		Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0);
+  		Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0) if(!defined $hash->{helper}{device_active});
   		readingsEndUpdate($hash, 1);
   	}
 
