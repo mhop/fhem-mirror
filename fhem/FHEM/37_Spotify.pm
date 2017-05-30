@@ -891,10 +891,15 @@ sub Spotify_saveTrack($$$$) { # save a track object to the readings
 	readingsBulkUpdateIfChanged($hash, $prefix."_artist_uri", $track->{artists}[0]{uri}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_name", $track->{album}{name}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_uri", $track->{album}{uri}, 1);
+
+	my @sizes = ("large", "medium", "small");
+	my $index = 0;
 	foreach my $image(@{$track->{album}{images}}) {
-		my $size = $image->{height} == 64 ? "small" : ($image->{height} == 300 ? "medium" : ($image->{height} == 640 ? "large" : $image->{height}));
-		readingsBulkUpdateIfChanged($hash, $prefix."_album_cover_". $size, $image->{url}, 1);
+		readingsBulkUpdateIfChanged($hash, $prefix."_album_cover_". $sizes[$index], $image->{url}, 1);
+		$index++;
+		last if($index >= 3);
 	}
+	
 	readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 
