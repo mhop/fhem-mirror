@@ -26,7 +26,7 @@ sub Spotify_Initialize($) {
     $hash->{SetFn}    = 'Spotify_Set';
     $hash->{GetFn}    = 'Spotify_Get';
   #$hash->{AttrFn}   = "Spotify_Attr";
-    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval updateIntervalWhilePlaying ';
+    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval updateIntervalWhilePlaying disable:0,1 ';
     $hash->{AttrList} .= $readingFnAttributes;
     $hash->{NOTIFYDEV} = "global";
 }
@@ -167,7 +167,7 @@ sub Spotify_loadInternals($) {
 		my $pollInterval = $attr{$name}{pollInterval};
 		$attr{$name}{webCmd} = 'toggle:next:prev' if(!defined $attr{$name}{webCmd});
     	
-    	Spotify_poll($hash) if(defined $hash->{helper}{refresh_token});
+    	Spotify_poll($hash) if(defined $hash->{helper}{refresh_token} && !Spotify_isDisabled($hash));
 	}
 }
 
@@ -324,7 +324,7 @@ sub Spotify_pausePlayback($) { # pause playback
 	$hash->{helper}{is_playing} = 0;
 	readingsSingleUpdate($hash, 'is_playing', 0, 1);
 	Spotify_apiRequest($hash, 'me/player/pause', undef, 'PUT', 0);
-	Log3 $name, 3, "$name: pause";
+	Log3 $name, 4, "$name: pause";
 	return undef;
 }
 
@@ -334,7 +334,7 @@ sub Spotify_resumePlayback($) { # resume playback
 	$hash->{helper}{is_playing} = 1;
 	readingsSingleUpdate($hash, 'is_playing', 1, 1);
 	Spotify_apiRequest($hash, 'me/player/play', undef, 'PUT', 0);
-	Log3 $name, 3, "$name: resume";
+	Log3 $name, 4, "$name: resume";
 	return undef;
 }
 
@@ -353,7 +353,7 @@ sub Spotify_setVolume($$$$) { # set the volume
 
 	$device_id = Spotify_getTargetDeviceID($hash, $device_id, 0); # resolve target device id
 	Spotify_apiRequest($hash, "me/player/volume?volume_percent=$volume". (defined $device_id ? "&device_id=$device_id" : ''), undef, 'PUT', $blocking);
-	Log3 $name, 3, "$name: volume $volume" if(!defined $hash->{helper}{fading});
+	Log3 $name, 4, "$name: volume $volume" if(!defined $hash->{helper}{fading});
 	return undef;
 }
 
@@ -361,7 +361,7 @@ sub Spotify_skipToNext($) { # skip to next track
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Spotify_apiRequest($hash, 'me/player/next', undef, 'POST', 0);
-	Log3 $name, 3, "$name: skipToNext";
+	Log3 $name, 4, "$name: skipToNext";
 	return undef;
 }
 
@@ -369,7 +369,7 @@ sub Spotify_skipToPrevious($) { # skip to previous track
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Spotify_apiRequest($hash, 'me/player/previous', undef, 'POST', 0);
-	Log3 $name, 3, "$name: skipToPrevious";
+	Log3 $name, 4, "$name: skipToPrevious";
 	return undef;
 }
 
@@ -391,7 +391,7 @@ sub Spotify_setRepeat($$) { # set the repeat mode
 	$mode = 'context' if($mode eq 'all');
 	my $device_id = Spotify_getTargetDeviceID($hash, undef, 0);
 	Spotify_apiRequest($hash, "me/player/repeat?state=$mode". (defined $device_id ? "&device_id=$device_id" : ""), undef, 'PUT', 0);
-	Log3 $name, 3, "$name: repeat $mode";
+	Log3 $name, 4, "$name: repeat $mode";
 	return undef;
 }
 
@@ -402,7 +402,7 @@ sub Spotify_setShuffle($$) { # set the shuffle mode
 	$mode = $mode eq 'on' ? 'true' : 'false';
 	my $device_id = Spotify_getTargetDeviceID($hash, undef, 0);
 	Spotify_apiRequest($hash, "me/player/shuffle?state=$mode". (defined $device_id ? "&device_id=$device_id" : ""), undef, 'PUT', 0);
-	Log3 $name, 3, "$name: shuffle $mode";
+	Log3 $name, 4, "$name: shuffle $mode";
 	return undef;
 }
 
@@ -429,7 +429,7 @@ sub Spotify_playTrackByURI($$$) { # play a track by its uri
     my ($hash, $uris, $device_id) = @_;
     my $name = $hash->{NAME};
     return 'wrong syntax: set <name> playTrackByURI <track_uri> ... [ <device_id> ]' if(@{$uris} < 1);
-    Log3 $name, 3, "$name: track". (@{$uris} > 1 ? "s" : "")." ". join(" ", @{$uris}) if(!defined $hash->{helper}{skipTrackLog});
+    Log3 $name, 4, "$name: track". (@{$uris} > 1 ? "s" : "")." ". join(" ", @{$uris}) if(!defined $hash->{helper}{skipTrackLog});
     delete $hash->{helper}{skipTrackLog} if(defined $hash->{helper}{skipTrackLog});
     return Spotify_play($hash, $uris, undef, undef, $device_id);
 }
@@ -495,7 +495,7 @@ sub Spotify_playArtistByName($$) { # play an artist by its name using search
 	return 'could not find artist' if(!defined $result);
 
 	Spotify_playContextByURI($hash, $result->{uri}, undef, $device_id);
-	Log3 $name, 3, "$name: artist $result->{uri} ($result->{name})";
+	Log3 $name, 4, "$name: artist $result->{uri} ($result->{name})";
 	return undef;
 }
 
@@ -509,7 +509,7 @@ sub Spotify_playPlaylistByName($$) { # play a playlist by its name
 	return 'could not find playlist' if(!defined $result);
 
 	Spotify_playContextByURI($hash, $result->{uri}, undef, undef);
-	Log3 $name, 3, "$name: $result->{uri} ($result->{name})";
+	Log3 $name, 4, "$name: $result->{uri} ($result->{name})";
 	return undef;
 }
 
@@ -528,7 +528,7 @@ sub Spotify_playSavedTracks($$$) { # play users saved tracks
 	shift @uris for 1..($first%50-1); # removing first elements users wants to skip
 	Spotify_playTrackByURI($hash, \@uris, $device_id); # play them
 
-	Log3 $name, 3, "$name: saved tracks";
+	Log3 $name, 4, "$name: saved tracks";
 
 	return undef;
 }
@@ -553,7 +553,7 @@ sub Spotify_playRandomTrackFromPlaylistByURI($$$$) { # select a random track fro
 	my @uris = ($selectedTrack->{uri});
 	$hash->{helper}{skipTrackLog} = 1;
 	Spotify_playTrackByURI($hash, \@uris, $device_id);
-	Log3 $name, 3, "$name: random track $selectedTrack->{uri} ($selectedTrack->{name}) from $uri";
+	Log3 $name, 4, "$name: random track $selectedTrack->{uri} ($selectedTrack->{name}) from $uri";
 	return undef;
 }
 
@@ -611,7 +611,7 @@ sub Spotify_volumeFade($$$$$) { # fade the volume of a device
 sub Spotify_togglePlayback($) { # toggle playback (pause if active, resume otherwise)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name, 3, "$name: togglePlayback";
+	Log3 $name, 4, "$name: togglePlayback";
 
 	if($hash->{helper}{is_playing}) {
 		Spotify_pausePlayback($hash);
@@ -629,7 +629,7 @@ sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
 	
 	if(defined $device_id) { # use device id given by user
 		foreach my $device (@{$hash->{helper}{devices}}) {
-			return $device->{id} if($device->{id} eq $device_id || lc($device->{name}) eq lc($device_id)); # resolve name to / verify device_id
+			return $device->{id} if((defined $device->{id} && $device->{id} eq $device_id) || (defined $device->{name} && lc($device->{name}) eq lc($device_id))); # resolve name to / verify device_id
 		}
 
 		# if not verified, continue to look for target device
@@ -771,23 +771,19 @@ sub Spotify_dispatch($$$) {
 
   		my $index = 1;
   		foreach my $device (@{$hash->{helper}{devices}}) {
-  			foreach my $prefix (("device_". $index ."_", 'device_active_')) {
-  				if($prefix ne 'device_active_' || $device->{is_active}) {
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'id', $device->{id}, 1);
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'name', $device->{name}, 1);
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'type', $device->{type}, 1);
-		  			readingsBulkUpdateIfChanged($hash, $prefix . 'volume', $device->{volume_percent}, 1);
-	  			}
-  			}
+  			Spotify_saveDevice($hash, $device, "device_". $index, 0);
 
-  			$hash->{helper}{device_active} = $device if($device->{is_active}); # found active device
+  			if($device->{is_active}) {
+  				Spotify_saveDevice($hash, $device, "device_active", 0);
+  				$hash->{helper}{device_active} = $device; # found active device
+  			}
+  			
   			$hash->{helper}{device_default} = $device if(defined $attr{$name}{defaultPlaybackDeviceID} && $device->{id} eq $attr{$name}{defaultPlaybackDeviceID}); # found users default device
   			$index++;
   		}
   		readingsBulkUpdateIfChanged($hash, 'devices_cnt', $index-1, 1);
+  		Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0);
   		readingsEndUpdate($hash, 1);
-
-  		CommandDeleteReading(undef, "$name device_acitve_.*") if(!defined $hash->{helper}{device_active});
   	}
 
   	if($path eq 'me/player') {
@@ -798,7 +794,7 @@ sub Spotify_dispatch($$$) {
   			return undef;
   		}
 
-  		$hash->{helper}{is_playing} = $json->{is_playing} ne 'false';
+  		$hash->{helper}{is_playing} = $json->{is_playing};
   		$hash->{helper}{repeat} = $json->{repeat_state} eq 'track' ? 'one' : ($json->{repeat_state} eq 'context' ? 'all' : 'off');
   		$hash->{helper}{shuffle} = $json->{shuffle_state};
   		$hash->{helper}{progress_ms} = $json->{progress_ms};
@@ -867,6 +863,7 @@ sub Spotify_dispatch($$$) {
 sub Spotify_poll($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	return if(Spotify_isDisabled($hash));
 
 	my $pollInterval = $attr{$name}{updateInterval};
     InternalTimer(gettimeofday()+(defined $pollInterval ? $pollInterval : 5*60), "Spotify_poll", $hash);
@@ -912,6 +909,22 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
 	readingsBulkUpdate($hash, $prefix."_follower_cnt", $artist->{followers}{total}, 1);
 	readingsBulkUpdate($hash, $prefix."_profile_pic_url", $artist->{images}[0]{url}, 1);
 	readingsEndUpdate($hash, 1) if($beginUpdate);
+}
+
+sub Spotify_saveDevice($$$$) {
+	my ($hash, $device, $prefix, $beginUpdate) = @_;
+	readingsBeginUpdate($hash) if($beginUpdate);
+	readingsBulkUpdateIfChanged($hash, $prefix . '_id', $device->{id}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix . '_name', $device->{name}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix . '_type', $device->{type}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix . '_volume', $device->{volume_percent}, 1);
+	readingsEndUpdate($hash, 1) if($beginUpdate);
+}
+
+sub Spotify_isDisabled($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	return defined $attr{$name}{disable};
 }
 
 1;
@@ -1055,6 +1068,11 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     <li>
       <i>defaultPlaybackDeviceID</i><br>
       the prefered device by its id<br>
+    </li>
+    <li>
+      <i>disable</i><br>
+      disables the device<br>
+      default: 0
     </li>
     <li>
       <i>updateInterval</i><br>
@@ -1205,6 +1223,11 @@ sub Spotify_saveArtist($$$$) { # save an artist object to the readings
     <li>
       <i>defaultPlaybackDeviceID</i><br>
       das Standard-Gerät nach ID<br>
+    </li>
+    <li>
+      <i>disable</i><br>
+      deaktiviert das Gerät<br>
+      default: 0
     </li>
     <li>
       <i>updateInterval</i><br>
