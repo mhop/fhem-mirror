@@ -1,4 +1,4 @@
-REV 14409
+REV 14412
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-05-29_07:45:02 199502 ./CHANGED
+UPD 2017-05-30_07:45:02 199611 ./CHANGED
 UPD 2017-05-16_07:45:02 36537 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-05-23_07:45:05 134695 ./fhem.pl
@@ -195,6 +195,7 @@ UPD 2017-05-15_07:45:02 46632 FHEM/36_Vallox.pm
 UPD 2016-11-09_07:45:12 22214 FHEM/36_WMBUS.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
+UPD 2017-05-30_07:45:02 48732 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
 UPD 2017-03-24_07:45:02 21952 FHEM/37_fakeRoku.pm
 UPD 2017-05-21_07:45:02 58848 FHEM/37_harmony.pm
@@ -202,7 +203,7 @@ UPD 2017-04-11_07:45:02 152390 FHEM/37_plex.pm
 UPD 2017-05-26_07:45:02 24326 FHEM/38_Broadlink.pm
 UPD 2017-05-13_07:45:02 28620 FHEM/38_CO20.pm
 UPD 2016-02-09_07:45:13 15879 FHEM/38_JawboneUp.pm
-UPD 2017-05-12_07:45:02 216942 FHEM/38_netatmo.pm
+UPD 2017-05-30_07:45:02 217476 FHEM/38_netatmo.pm
 UPD 2017-04-29_07:45:02 22437 FHEM/39_alexa.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
@@ -592,8 +593,8 @@ UPD 2016-07-21_07:45:27 20094 docs/HOWTO.html
 UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-05-29_07:45:04 2914349 docs/commandref.html
-UPD 2017-05-28_07:45:05 1696919 docs/commandref_DE.html
+UPD 2017-05-30_07:45:04 2919988 docs/commandref.html
+UPD 2017-05-30_07:45:05 1702879 docs/commandref_DE.html
 UPD 2017-05-26_07:45:02 71068 docs/commandref_frame.html
 UPD 2017-05-26_07:45:02 79673 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
