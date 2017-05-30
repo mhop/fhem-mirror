@@ -502,13 +502,17 @@ sub Spotify_playArtistByName($$) { # play an artist by its name using search
 sub Spotify_playPlaylistByName($$) { # play a playlist by its name
 	my ($hash, $playlistname) = @_;
 	my $name = $hash->{NAME};
-	return 'wrong syntax: set <name> playPlaylistByName <track_name>' if(!defined $playlistname);
+	return 'wrong syntax: set <name> playPlaylistByName <playlist_name>' if(!defined $playlistname);
+
+	my @parts = split(" ", $playlistname);
+	my $device_id = Spotify_getTargetDeviceID($hash, $parts[-1], 0) if(@parts > 1); # resolve device id (may be last part of the command)
+	$playlistname = substr($playlistname, 0, -length($parts[-1])-1) if(@parts > 1 && defined $device_id); # if last part was indeed the device id, remove it from the track name
 
 	Spotify_apiRequest($hash, 'search?limit=1&type=playlist&q='. urlEncode($playlistname), undef, 'GET', 1);
 	my $result = $hash->{helper}{dispatch}{json}{playlists}{items}[0];
 	return 'could not find playlist' if(!defined $result);
 
-	Spotify_playContextByURI($hash, $result->{uri}, undef, undef);
+	Spotify_playContextByURI($hash, $result->{uri}, undef, $device_id);
 	Log3 $name, 4, "$name: $result->{uri} ($result->{name})";
 	return undef;
 }
@@ -820,7 +824,7 @@ sub Spotify_dispatch($$$) {
 			Spotify_saveDevice($hash, $device, "device_active", 0);
 		} else {
 			delete $hash->{helper}{device_active};
-			Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0) if(!defined $hash->{helper}{device_active});
+			Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0);
 			$hash->{STATE} = 'connected' if(!defined $json->{device});
 		}
 
@@ -983,7 +987,7 @@ sub Spotify_isDisabled($) {
       plays a context (playlist, album or artist) using a Spotify URI
     </li>
     <li>
-      <i>playPlaylistByName &lt;playlist_name&gt;</i><br>
+      <i>playPlaylistByName &lt;playlist_name&gt; [ &lt;device_id&gt; ]</i><br>
       plays any playlist by providing a name (uses search)
     </li>
     <li>
@@ -1138,7 +1142,7 @@ sub Spotify_isDisabled($) {
       spielt einen Context (Playlist, Album oder Künstler) durch Angabe der URI ab
     </li>
     <li>
-      <i>playPlaylistByName &lt;playlist_name&gt;</i><br>
+      <i>playPlaylistByName &lt;playlist_name&gt; [ &lt;device_id&gt; ]</i><br>
       sucht eine Playlist und spielt diese ab
     </li>
     <li>
