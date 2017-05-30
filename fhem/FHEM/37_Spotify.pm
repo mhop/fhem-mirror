@@ -817,13 +817,10 @@ sub Spotify_dispatch($$$) {
 		if(defined $json->{device} && $json->{device}{is_active}) {
 			my $device = $json->{device};
 			$hash->{helper}{device_active} = $device;
-			readingsBulkUpdateIfChanged($hash, 'device_active_id', $device->{id}, 1);
-			readingsBulkUpdateIfChanged($hash, 'device_active_name', $device->{name}, 1);
-			readingsBulkUpdateIfChanged($hash, 'device_active_volume', $device->{volume_percent}, 1);
-			readingsBulkUpdateIfChanged($hash, 'device_active_type', $device->{type}, 1);
+			Spotify_saveDevice($hash, $device, "device_active", 0);
 		} else {
 			delete $hash->{helper}{device_active};
-			CommandDeleteReading(undef, "$name device_active_.*");
+			Spotify_saveDevice($hash, {id => "none", "name" => "none", "volume_percent" => -1, "type" => "none"}, 'device_active', 0) if(!defined $hash->{helper}{device_active});
 			$hash->{STATE} = 'connected' if(!defined $json->{device});
 		}
 
