@@ -26,7 +26,7 @@ sub Spotify_Initialize($) {
     $hash->{SetFn}    = 'Spotify_Set';
     $hash->{GetFn}    = 'Spotify_Get';
   #$hash->{AttrFn}   = "Spotify_Attr";
-    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval updateIntervalWhilePlaying disable:0,1 ';
+    $hash->{AttrList} = 'defaultPlaybackDeviceID alwaysStartOnDefaultDevice:0,1 updateInterval updateIntervalWhilePlaying disable:0,1 volumeStep ';
     $hash->{AttrList} .= $readingFnAttributes;
     $hash->{NOTIFYDEV} = "global";
 }
@@ -93,7 +93,7 @@ sub Spotify_Set($$@) {
   } else {
   	$list .= ' playTrackByURI playContextByURI pause:noArg resume:noArg volume:slider,0,1,100 update:noArg';
   	$list .= ' skipToNext:noArg skipToPrevious:noArg seekToPosition repeat:one,all,off shuffle:on,off transferPlayback volumeFade:slider,0,1,100 playTrackByName playPlaylistByName togglePlayback';
-  	$list .= ' playSavedTracks playRandomTrackFromPlaylistByURI findTrackByName findArtistByName playArtistByName';
+  	$list .= ' playSavedTracks playRandomTrackFromPlaylistByURI findTrackByName findArtistByName playArtistByName volumeUp volumeDown';
   }
 
   if($cmd eq 'code') {
@@ -124,6 +124,7 @@ sub Spotify_Set($$@) {
   return Spotify_findTrackByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'findTrackByName');
   return Spotify_findArtistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'findArtistByName');
   return Spotify_playArtistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'playArtistByName');
+  return Spotify_volumeStep($hash, $cmd eq 'volumeDown' ? -1 : 1, $args[0], defined $args[1] ? join(' ', @args[1..$#args]) : undef) if($cmd eq 'volumeUp' || $cmd eq 'volumeDown');
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -165,7 +166,7 @@ sub Spotify_loadInternals($) {
 	} else {
 		$hash->{STATE} = 'connected';
 		my $pollInterval = $attr{$name}{pollInterval};
-		$attr{$name}{webCmd} = 'toggle:next:prev' if(!defined $attr{$name}{webCmd});
+		$attr{$name}{webCmd} = 'toggle:next:prev:volumeUp:volumeDown' if(!defined $attr{$name}{webCmd});
     	
     	Spotify_poll($hash) if(defined $hash->{helper}{refresh_token} && !Spotify_isDisabled($hash));
 	}
@@ -626,6 +627,20 @@ sub Spotify_togglePlayback($) { # toggle playback (pause if active, resume other
 	return undef;
 }
 
+sub Spotify_volumeStep($$$$) {
+	my ($hash, $direction, $step, $device_id) = @_; 
+	my $name = $hash->{NAME};
+
+	$device_id = $step . (defined $device_id ? " ". $device_id : "") if(defined $step && $step !~ /^[0-9]+$/);
+	$step = $attr{$name}{volumeStep} if(!defined $step || $step !~ /^[0-9]+$/);
+	$step = 5 if(!defined $step);
+
+	my $nextVolume = min(100, max(0, $hash->{helper}{device_active}{volume_percent} + $step * $direction));
+	Spotify_setVolume($hash, 0, $nextVolume, $device_id);
+
+	return undef;
+}
+
 
 sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
 	my ($hash, $device_id, $newPlayback) = @_;
@@ -1047,8 +1062,16 @@ sub Spotify_isDisabled($) {
       sets the volume
     </li>
     <li>
+      <i>volumeDown [ &lt;step&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      decreases the volume by <i>step</i> (if not set it uses <i>volumeStep</i>)
+    </li>
+    <li>
       <i>volumeFade &lt;volume&gt; [ &lt;duration&gt; &lt;step&gt; ] [ &lt;device_id&gt; ]</i><br>
       fades the volume
+    </li>
+    <li>
+      <i>volumeDown [ &lt;step&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      increases the volume by <i>step</i> (if not set it uses <i>volumeStep</i>)
     </li>
   </ul>  
   <br>
@@ -1084,6 +1107,11 @@ sub Spotify_isDisabled($) {
       <i>updateIntervalWhilePlaying</i><br>
       the interval to update your playback status while music is running (in seconds)<br>
       default: 10
+    </li>
+    <li>
+      <i>volumeStep</i><br>
+      the value by which the volume is in-/decreased by default (in percent)<br>
+      default: 5
     </li>
   </ul>
 </ul>
@@ -1202,8 +1230,16 @@ sub Spotify_isDisabled($) {
       setzt die Lautstärke
     </li>
     <li>
+      <i>volumeDown [ &lt;step&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      verringert die Lautstärke um <i>step</i> (falls nicht gesetzt, um <i>volumeStep</i>)
+    </li>
+    <li>
       <i>volumeFade &lt;volume&gt; [ &lt;duration&gt; &lt;step&gt; ] [ &lt;device_id&gt; ]</i><br>
       setzt die Lautstärke schrittweise
+    </li>
+    <li>
+      <i>volumeUp [ &lt;step&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      erhöht die Lautstärke um <i>step</i> (falls nicht gesetzt, um <i>volumeStep</i>)
     </li>
   </ul>  
   <br>
@@ -1239,6 +1275,11 @@ sub Spotify_isDisabled($) {
       <i>updateIntervalWhilePlaying</i><br>
       Intervall in Sekunden, in dem der Status aktualisiert wird, wenn Musik läuft<br>
       default: 10
+    </li>
+    <li>
+      <i>volumeStep</i><br>
+      der Wert, um den die Lautstärke bei volumeUp/volumeDown standardmäßig verändert wird (in Prozent)<br>
+      default: 5
     </li>
   </ul>
 </ul>
