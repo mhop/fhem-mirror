@@ -116,7 +116,7 @@ sub Spotify_Set($$@) {
   return Spotify_playTrackByURI($hash, \@args, undef) if($cmd eq 'playTrackByURI');
   return Spotify_playTrackByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'playTrackByName');
   return Spotify_playPlaylistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'playPlaylistByName');
-  return Spotify_playContextByURI($hash, $args[0], $args[1], $args[2]) if($cmd eq 'playContextByURI');
+  return Spotify_playContextByURI($hash, $args[0], $args[1], defined $args[2] ? join(' ', @args[2..$#args]) : undef) if($cmd eq 'playContextByURI');
   return Spotify_volumeFade($hash, $args[0], $args[1], $args[2], defined $args[3] ? join(' ', @args[3..$#args]) : undef) if($cmd eq 'volumeFade');
   return Spotify_togglePlayback($hash) if($cmd eq 'toggle' || $cmd eq 'togglePlayback');
   return Spotify_playSavedTracks($hash, $args[0], defined $args[1] ? join(' ', @args[1..$#args]) : undef) if($cmd eq 'playSavedTracks');
@@ -420,6 +420,7 @@ sub Spotify_playContextByURI($$$$) { # play a context (playlist, album or artist
     my ($hash, $uri, $position, $device_id) = @_;
     my $name = $hash->{NAME};
     return 'wrong syntax: set <name> playContextByURI <album_uri / playlist_uri> [ <nr_of_first_track> ] [ <device_id> ]' if(!defined $uri);
+    $device_id = $position if(defined $position && $position !~ /^[0-9]+$/ && !defined $device_id);
     $position = 1 if(!defined $position || $position !~ /^[0-9]+$/);
 
     return Spotify_play($hash, undef, $uri, $position, $device_id);
@@ -517,7 +518,7 @@ sub Spotify_playSavedTracks($$$) { # play users saved tracks
 	my ($hash, $first, $device_id) = @_;
 	my $name = $hash->{NAME};
 
-	$device_id = $first if(!$first !~ /^[0-9]+$/);
+	$device_id = $first if($first !~ /^[0-9]+$/);
 	$first = 1 if(!defined $first || !$first !~ /^[0-9]+$/);
 
 	Spotify_apiRequest($hash, 'me/tracks?limit=50'. ($first > 50 ? '&offset='. int($first/50)-1 : ''), undef, 'GET', 1); # getting saved tracks
@@ -917,7 +918,7 @@ sub Spotify_saveDevice($$$$) {
 	readingsBulkUpdateIfChanged($hash, $prefix . '_id', $device->{id}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix . '_name', $device->{name}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix . '_type', $device->{type}, 1);
-	readingsBulkUpdateIfChanged($hash, $prefix . '_volume', $device->{volume_percent}, 1);
+	readingsBulkUpdateIfChanged($hash, $prefix . '_volume', $device->{volume_percent}, 1) if(defined $device->{volume_percent});
 	readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 
