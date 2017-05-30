@@ -408,7 +408,6 @@ sub Spotify_setShuffle($$) { # set the shuffle mode
 
 sub Spotify_transferPlayback($$) { # transfer the current playback to another device
 	my ($hash, $device_id) = @_;
-	return 'wrong syntax: set <name> transferPlayback [ <target_device_id / target_device_name> ]' if(!defined $device_id);
 	$device_id = Spotify_getTransferTargetDeviceID($hash, $device_id);
 	return 'device not found' if(!defined $device_id);
 	my @device_ids = ($device_id);
