@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-my $VERSION = "0.9.1.1";
+my $VERSION = "0.9.5";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -142,28 +142,35 @@ sub SMARTMON_Get($@)
   {
     if(@a<3) {return "$name: get list needs at least one parameter"; }
     my $subcmd=$a[2];
-    my $t;
+    my @t;
+    my $r;
     if($subcmd eq "info") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$tdev);
+      ($r, @t) = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$tdev);
     }
     if($subcmd eq "data") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$tdev);
+      ($r, @t) = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$tdev);
     }
     if($subcmd eq "health") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$tdev);
+      ($r, @t) = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$tdev);
     }
     if($subcmd eq "devices") {
-      $t = SMARTMON_execute($hash, "sudo smartctl --scan");
+      ($r, @t) = SMARTMON_execute($hash, "sudo smartctl --scan");
     }
     
-    if(!$t) {return "unknown parameter";}
-    return $t;
+    my $tt;
+    if(defined($t[0])) {
+      if(scalar(@t)>0) {
+        $tt = join('',@t);
+      }
+    }
+    if(!$tt) {return "unknown parameter";}
+    return $tt."\nreturn code: ".$r;
   }
   
   if($cmd eq "version")
@@ -265,6 +272,7 @@ sub SMARTMON_refreshReadings($) {
 
     foreach my $aName (keys %{$map}) {
       my $value = $map->{$aName};
+      #SMARTMON_Log($hash, 5, "Update: ".$value);
       # Nur aktualisieren, wenn ein gueltiges Value vorliegt
       if(defined $value) {
         readingsBulkUpdate($hash,$aName,$value);
@@ -297,12 +305,21 @@ sub SMARTMON_obtainParameters($) {
   # Health  
   my $param="";
   if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
-  my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$hash->{DEVICE}." | grep 'test result:'");
-  SMARTMON_Log($hash, 5, "health: $dev_health");
-  if($dev_health=~m/test\s+result:\s+(\S+).*/) {
-    $map->{"overall_health_test"} = $1;
-  } else {
-    delete $map->{"overall_health_test"};
+  my ($rcode, @adev_health) = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$hash->{DEVICE}." | grep 'test result:'");
+  my $dev_health;
+  my $tt;
+  if(defined($adev_health[0])) {
+    if(scalar(@adev_health)>0) {
+      $dev_health = join('',@adev_health);
+    }
+  }
+
+  delete $map->{"overall_health_test"};
+  if(defined($dev_health)) {
+    SMARTMON_Log($hash, 5, "health: $dev_health");
+    if($dev_health=~m/test\s+result:\s+(\S+).*/) {
+      $map->{"overall_health_test"} = $1;
+    }
   }
   
   $map = SMARTMON_getSmartDataReadings($hash, $map);
@@ -335,6 +352,7 @@ sub SMARTMON_getSmartDataReadings($$) {
   my $cnt_prefail=0;
   my $sr = AttrVal($name, "show_raw", "0");
   foreach my $id (sort keys %{$dmap}) {
+    if($id eq "RC") {next}
     # warnings zaehlen
     if($dmap->{$id}->{failed} ne "-") {
       if($dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
@@ -369,7 +387,7 @@ sub SMARTMON_readDeviceData($%) {
 
   my $param="";
   if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
-  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$hash->{DEVICE});
+  my ($r, @dev_data) = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$hash->{DEVICE});
   SMARTMON_Log($hash, 5, "device data: ".Dumper(@dev_data));
   if(defined($dev_data[0])) {
     while(scalar(@dev_data)>0) {
@@ -462,6 +480,11 @@ sub SMARTMON_interpretKnownData($$$) {
   
   # TODO
   
+  if($dmap->{"RC"}) {
+    $map->{last_exit_code} = $dmap->{"RC"}->{raw};
+    $known->{"RC"}=1;
+  }
+  
   return $known;
 }
 
@@ -481,8 +504,11 @@ sub SMARTMON_sec2Dauer($){
 sub SMARTMON_hour2Dauer($){
   my ($t) = @_;
   #return SMARTMON_sec2Dauer($t*3600);
-  my $d=int($t/24);
-  $t = $t-($d*24);
+  $t =~ /([0-9]*)/;
+  my $d=int($1/24);
+  $t = $1-($d*24);
+  #my $d=int($t/24);
+  #$t = $t-($d*24);
   my $y=int($d/365);
   $d = $d-($y*365);
   return sprintf("%d Jahre %d Tage %d Std.",$y,$d,$t);
@@ -499,8 +525,9 @@ sub SMARTMON_readSmartData($;$) {
 
   my $param="";
   if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
-  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$hash->{DEVICE});
+  my ($r, @dev_data) = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$hash->{DEVICE});
   SMARTMON_Log($hash, 5, "device SMART data: ".Dumper(@dev_data));
+  if(defined($r)) {$map->{"RC"}->{raw} = $r;}
   if(defined($dev_data[0])) {
     while(scalar(@dev_data)>0) {
       shift @dev_data;
@@ -540,12 +567,19 @@ sub SMARTMON_execute($$) {
   
   SMARTMON_Log($hash, 5, "Execute: $cmd");
   
-  return qx($cmd);
+  local $SIG{'CHLD'}='DEFAULT';
+  my @ret = qx($cmd);
+  my $rcode = $?>>8;
+  SMARTMON_Log($hash, 5, "Returncode: ".$rcode);
+  return ($rcode,@ret);
 }
 
 1;
 
 =pod
+=item device
+=item summary    provides some statistics about the S.M.A.R.T. capable drive
+=item summary_DE liefert einige Statistiken ueber S.M.A.R.T. kompatible Geräte
 =begin html
 
 <!-- ================================ -->
@@ -570,6 +604,9 @@ sub SMARTMON_execute($$) {
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>last_exit_code<br>
+        Exit code of smartctl.
+    </li>
     <li>overall_health_test<br>
         Specifies the general condition of the HDD (PASSED or FAILED).
     </li>
@@ -658,6 +695,10 @@ sub SMARTMON_execute($$) {
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>last_exit_code<br>
+        Gibt den Exitcode bei der letzten Ausf&uuml;hrung vom smartctl.
+    </li>
+    <br>
     <li>overall_health_test<br>
         Gibt den allgemeinen Zustand der Platte an. Kann PASSED oder FAILED sein.
     </li>
@@ -714,7 +755,7 @@ sub SMARTMON_execute($$) {
     </li>
     <br>
     <li>parameters<br>
-    Zusatzparameter f&uuml;r den AUfruf von smartctl.
+    Zusatzparameter f&uuml;r den Aufruf von smartctl.
     </li>
     <br>
     </ul><br>
