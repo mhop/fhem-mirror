@@ -862,7 +862,7 @@ sub aggregateRooms
     my ($hash) = @_;
 
     my $previous = "absence";
-
+    my %rssi_results = ();
     my @rooms;
     my $key;
 
@@ -914,13 +914,15 @@ sub aggregateRooms
                 elsif(@{$a} == 0 and keys(%{$h}) > 0) # new addon data style
                 {
                     # check rssi
-                    if($rssi_available and exists($h->{$rssi_addon_data_key}) and $h->{$rssi_addon_data_key} =~ /^-?(?:\d+\.)\d+$/)
+                    if(exists($h->{$rssi_addon_data_key}) and $h->{$rssi_addon_data_key} =~ /^-?(?:\d+\.)?\d+$/)
                     {
                         if(!defined($highest_value) or (defined($highest_value) and $h->{$rssi_addon_data_key} > $highest_value))
                         {
-                            $highest_value = $h->{rssi};
+                            $highest_value = $h->{$rssi_addon_data_key};
                             $highest_key = $key;
                         }
+
+			$rssi_results{$key} = $h->{$rssi_addon_data_key};
                     }
                     else
                     {
@@ -943,7 +945,10 @@ sub aggregateRooms
 
     if(@rooms > 0)
     {
-        return "present;rooms='".join(",",sort  @rooms).(defined($hash->{$rooms[0]}{data}) ? "';".$hash->{$rooms[0]}{data} : "");
+        my $rssi_data = join(";", map { "rssi_".$_."='".$rssi_results{$_}."'" } map { s/\s+/_/g } grep {$rssi_results{$_}} keys %rssi_results);
+        return "present;room='".join(",",sort  @rooms).
+                (defined($hash->{$rooms[0]}{data}) ? "';".$hash->{$rooms[0]}{data} : "").
+                (defined($rssi_data) ? ";".$rssi_data : "");
     }
     else
     {
