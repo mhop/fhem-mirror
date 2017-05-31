@@ -1000,7 +1000,8 @@ sub Spotify_isDisabled($) {
   <p><b>set &lt;required&gt; [ &lt;optional&gt; ]</b></p>
   Without a target device given, the active device (or default device if <i>alwaysStartOnDefaultDevice</i> is enabled) will be used.<br>
   You can also use the name of the target device instead of the id if it does not contain spaces - where it states <i>&lt;device_id / device_name&gt;</i> spaces are allowed.<br>
-  If no default device is defined and none is active, it will use the first available device.<br><br>
+  If no default device is defined and none is active, it will use the first available device.<br>
+  You can get a spotify uri by pressing the share button in the spotify (desktop) app on a track/playlist/album.<br><br>
   <ul>
   	<li>
       <i>findArtistByName</i><br>
@@ -1027,7 +1028,7 @@ sub Spotify_isDisabled($) {
       plays any playlist by providing a name (uses search)
     </li>
     <li>
-      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      <i>playRandomTrackFromPlaylistByURI &lt;playlist_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       plays a random track from a playlist (only considering the first <i>&lt;limit&gt;</i> songs)
     </li>
     <li>
@@ -1168,7 +1169,8 @@ sub Spotify_isDisabled($) {
   <p><b>set &lt;required&gt; [ &lt;optional&gt; ]</b></p>
   Wird kein Zielgerät angegeben, wird das aktive (oder das Standard-Gerät, wenn <i>alwaysStartOnDefaultDevice</i> aktiviert ist) verwendet.<br>
   An den Stellen, wo eine <i>&lt;device_id&gt;</i> verlangt wird, kann auch der Gerätename, sofern dieser keine Leerzeichen enthält, verwendet werden. Dort wo es <i>&lt;device_name&gt;</i> heißt, sind auch Leerzeichen im Namen zugelassen.
-  Wenn kein aktives oder Standard-Gerät vorhanden ist, wird das erste verfügbare Gerät verwendet.<br><br>
+  Wenn kein aktives oder Standard-Gerät vorhanden ist, wird das erste verfügbare Gerät verwendet.<br>
+  Die Spotify URI kann in der (Desktop) App ermittelt werden, wenn man den teilen Knopf bei einem Track/Playlist/Album drückt.<br><br>
   <ul>
   	<li>
       <i>findArtistByName</i><br>
@@ -1195,7 +1197,7 @@ sub Spotify_isDisabled($) {
       sucht eine Playlist und spielt diese ab
     </li>
     <li>
-      <i>playRandomTrackFromPlaylistByURI &lt;track_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
+      <i>playRandomTrackFromPlaylistByURI &lt;playlist_uri&gt; [ &lt;limit&gt; ] [ &lt;device_id / device_name&gt; ]</i><br>
       spielt einen zufälligen Track aus einer Playlist ab (berücksichtigt nur die ersten <i>&lt;limit&gt;</i> Tracks der Playlist)
     </li>
     <li>
