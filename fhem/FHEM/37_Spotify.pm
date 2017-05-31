@@ -574,7 +574,7 @@ sub Spotify_play($$$$$) { # any play command (colleciton or track)
 
         $data = {uris => $uris};
     } else {
-        $data = {context_uri => $context_uri, {offset => {position => $position-1}}};
+        $data = {context_uri => $context_uri, offset => {position => $position-1}};
     }
 
     $device_id = Spotify_getTargetDeviceID($hash, $device_id, 1);
