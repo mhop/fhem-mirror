@@ -1058,7 +1058,8 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
   if( $(newEl).find("[informId]").length == 0 && !$(newEl).attr("informId") ) {
     if(reading)
       $(newEl).attr("informId", devName+"-"+reading);
-    if(reading != "state")
+    var addTitle = $("body").attr("data-addHtmlTitle");
+    if(reading != "state" && addTitle==1)
       $(newEl).attr("title", reading);
   }
 

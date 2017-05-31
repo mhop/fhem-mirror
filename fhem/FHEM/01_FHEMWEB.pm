@@ -141,6 +141,7 @@ FHEMWEB_Initialize($)
     CssFiles
     JavaScripts
     SVGcache:1,0
+    addHtmlTitle:1,0
     addStateEvent
     csrfToken
     alarmTimeout
@@ -1010,8 +1011,9 @@ FW_answerCall($)
   $FW_id = $FW_chash->{NR} if( !$FW_id );
 
   my $dataAttr =
-    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
+    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete", 1)."' ".
     "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+    "data-addHtmlTitle='"  .AttrVal($FW_wname,"addHtmlTitle",  1)."' ".
     "data-webName='$FW_wname '";
   FW_pO "</head>\n<body name='$t' fw_id='$FW_id' $gen $lp $csrf $dataAttr>";
 
@@ -3289,6 +3291,14 @@ FW_widgetOverride($$)
   <a name="FHEMWEBattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="addHtmlTitle"></a>
+    <li>addHtmlTitle<br>
+      If set to 0, do not add a title Attribute to the set/get/attr detail
+      widgets. This might be necessary for some screenreaders. Default is 1.
+      </li><br>
+
+
+
     <li><a href="#addStateEvent">addStateEvent</a></li><br>
 
     <li>alias_&lt;RoomName&gt;<br>
@@ -4046,6 +4056,13 @@ FW_widgetOverride($$)
   <a name="FHEMWEBattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="addHtmlTitle"></a>
+    <li>addHtmlTitle<br>
+      Falls der Wert 0 ist, wird bei den set/get/attr Parametern in der
+      DetailAnsicht der Ger&auml;te kein title Attribut gesetzt. Das is bei
+      manchen Screenreadern erforderlich. Die Voreinstellung ist 1.
+      </li><br>
+
     <li><a href="#addStateEvent">addStateEvent</a></li><br>
 
     <li>alias_&lt;RoomName&gt;<br>
