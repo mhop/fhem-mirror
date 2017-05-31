@@ -44,7 +44,7 @@ sub DOIFtools_logWrapper($);
 sub DOIFtoolsCounterReset($);
 sub DOIFtoolsDeleteStatReadings;
 
-my @DOIFtools_we =();
+my @DOIFtools_we = [0,0,0,0,0,0,0,0];
 my $DOIFtoolsJSfuncEM = <<'EOF';
 <script type="text/javascript">
 //functions
@@ -569,7 +569,7 @@ sub DOIFtools_Notify($$) {
     my $b;
     for (my $i = 0; $i < 8; $i++) { 
       $DOIFtools_we[$i] = 0;
-      $val = CommandGet(undef,"get $sn days $i");
+      $val = CommandGet(undef,"$sn days $i");
       if($val) {
         ($a, $b) = ReplaceEventMap($sn, [$sn, $val], 0);
         $DOIFtools_we[$i] = 1 if($b ne "none");
@@ -739,6 +739,7 @@ sub DOIFtoolsNextTimer {
     }
     $ilook++;
   }
+  Log 1, "DOIFtoolsNextTimer: ".join(" ",@DOIFtools_we);
 }
 
 sub DOIFtoolsNxTimer {
