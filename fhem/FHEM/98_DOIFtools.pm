@@ -739,7 +739,7 @@ sub DOIFtoolsNextTimer {
     }
     $ilook++;
   }
-  Log 1, "DOIFtoolsNextTimer: ".join(" ",@DOIFtools_we);
+  return "no timer next 7 days";
 }
 
 sub DOIFtoolsNxTimer {
