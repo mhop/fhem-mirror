@@ -679,7 +679,7 @@ sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
 			)
 			|| !defined $hash->{helper}{device_active}{id}
 			)
-		&& $attr{$name}{defaultPlaybackDeviceID} ne $device_id
+		&& (!defined $device_id || $attr{$name}{defaultPlaybackDeviceID} ne $device_id)
 		);
 
 	# no default or active device available
