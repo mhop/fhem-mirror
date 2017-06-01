@@ -53,6 +53,7 @@ my %alarmclock_sets =
     "AlarmOff"              => "NONE",
     "AlarmTime_Weekdays"    => "09:00",
     "AlarmTime_Weekend"     => "09:00",
+	"stop"					=> "NONE",
     "skip"                  => "NONE",
     "save"                  => "NONE",
     "load"                  => "NONE",
@@ -219,6 +220,7 @@ sub alarmclock_Set($$)
                     ." AlarmOff:1_Monday,2_Tuesday,3_Wednesday,4_Thursday,5_Friday,6_Saturday,7_Sunday,8_Holiday,9_Vacation,Weekdays,Weekend,All"
                     ." AlarmTime_Weekdays"
                     ." AlarmTime_Weekend"
+					." stop:Alarm"
                     ." skip:NextAlarm,None"
                     ." save:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
                     ." load:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
@@ -331,6 +333,16 @@ sub alarmclock_Set($$)
         {
             return "Please Set $opt HH:MM" ;     
         }
+    }
+	
+### stop Alarm ###	
+
+	if ($opt eq "stop")
+    {
+		if (($value eq "Alarm") && ((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|Snooze for.*)/))
+		{
+			alarmclock_alarmroutine_stop($hash);
+		}
     }
     
 ### save Weekprofile ###    
@@ -1304,6 +1316,9 @@ sub alarmclock_Notify($$)
             </li>
             <li><b>AlarmOff</b> (1_Monday|2_Tuesday|3_Wednesday|4_Thursday|5_Friday|6_Saturday|7_Sunday|8_Holiday|9_Vacation|Weekdays|Weekend|All)<br>
                 Sets the alarm time of the respective day to off.
+            </li>
+			<li><b>stop</b> (Alarm)<br>
+                Stops a running alarm.
             </li>
             <li><b>save</b> (Weekprofile_1|Weekprofile_2|Weekprofile_3|Weekprofile_4|Weekprofile_5)<br>
                 Save alarm times in a profile.
