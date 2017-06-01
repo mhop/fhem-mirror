@@ -670,7 +670,7 @@ sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
 	}
 
 	# no specific device given by user for this command
-	return $attr{$name}{defaultPlaybackDeviceID} if(defined $attr{$name}{defaultPlaybackDeviceID} # use default device or active device
+	return Spotify_getTargetDeviceID($hash, $attr{$name}{defaultPlaybackDeviceID}, $newPlayback) if(defined $attr{$name}{defaultPlaybackDeviceID} # use default device or active device
 		&& (
 			(
 			defined $attr{$name}{alwaysStartOnDefaultDevice}
@@ -679,6 +679,7 @@ sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
 			)
 			|| !defined $hash->{helper}{device_active}{id}
 			)
+		&& $attr{$name}{defaultPlaybackDeviceID} ne $device_id
 		);
 
 	# no default or active device available
@@ -1113,7 +1114,7 @@ sub Spotify_isDisabled($) {
     </li>
     <li>
       <i>defaultPlaybackDeviceID</i><br>
-      the prefered device by its id<br>
+      the prefered device by its id or device name<br>
     </li>
     <li>
       <i>disable</i><br>
@@ -1282,7 +1283,7 @@ sub Spotify_isDisabled($) {
     </li>
     <li>
       <i>defaultPlaybackDeviceID</i><br>
-      das Standard-Gerät nach ID<br>
+      das Standard-Gerät durch Angabe der Geräte-ID oder des Geräte-Namens<br>
     </li>
     <li>
       <i>disable</i><br>
