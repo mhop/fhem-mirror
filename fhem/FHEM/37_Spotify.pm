@@ -118,6 +118,7 @@ sub Spotify_Set($$@) {
   return Spotify_playPlaylistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'playPlaylistByName');
   return Spotify_playContextByURI($hash, $args[0], $args[1], defined $args[2] ? join(' ', @args[2..$#args]) : undef) if($cmd eq 'playContextByURI');
   return Spotify_volumeFade($hash, $args[0], $args[1], $args[2], defined $args[3] ? join(' ', @args[3..$#args]) : undef) if($cmd eq 'volumeFade');
+  return Spotify_volumeFadeStep($hash) if($cmd eq 'volumeFadeStep');
   return Spotify_togglePlayback($hash) if($cmd eq 'toggle' || $cmd eq 'togglePlayback');
   return Spotify_playSavedTracks($hash, $args[0], defined $args[1] ? join(' ', @args[1..$#args]) : undef) if($cmd eq 'playSavedTracks');
   return Spotify_playRandomTrackFromPlaylistByURI($hash, $args[0], $args[1], defined $args[2] ? join(' ', @args[2..$#args]) : undef) if($cmd eq 'playRandomTrackFromPlaylistByURI');
@@ -595,7 +596,7 @@ sub Spotify_volumeFade($$$$$) { # fade the volume of a device
 	$step = 5 if(!defined $step); # fall back to default step if not specified
 	$duration = 5 if(!defined $duration || $duration !~ /^[0-9]+$/); # fallback to default value if duration is not specified or valid
 	my $delta = abs($targetVolume - $startVolume);
-	my $requiredSteps = $delta/$step;
+	my $requiredSteps = int($delta/$step);
 	return Spotify_setVolume($hash, 0, $targetVolume, $device_id) if($requiredSteps == 0); # no steps required, set volume and exit
 
 	#Log3 "spotify", 3, "fading volume start $startVolume target $targetVolume duration $duration step $step steps $requiredSteps";
@@ -707,12 +708,13 @@ sub Spotify_getTransferTargetDeviceID($$) { # get target device id for transfer
 sub Spotify_volumeFadeStep { # do a single fading stemp
 	my ($hash) = @_;
 	return if(!defined $hash->{helper}{fading});
+	my $name = $hash->{NAME};
 	my $iteration = $hash->{helper}{fading}{iteration};
 	my $requiredSteps = $hash->{helper}{fading}{requiredSteps};
 	my $startVolume = $hash->{helper}{fading}{startVolume};
 	my $targetVolume = $hash->{helper}{fading}{targetVolume};
 	my $step = $hash->{helper}{fading}{step};
-	my $isLastStep = $iteration+1 == $requiredSteps;
+	my $isLastStep = $iteration+1 >= $requiredSteps;
 	my $nextVolume = int($isLastStep ? $targetVolume : $startVolume + ($iteration+1)*$step*($targetVolume < $startVolume ? -1 : 1));
 	my $deltaBetweenSteps = ($hash->{helper}{fading}{duration}/$requiredSteps); # time in s between each step
 
@@ -724,12 +726,7 @@ sub Spotify_volumeFadeStep { # do a single fading stemp
 	Spotify_setVolume($hash, 0, $nextVolume, $hash->{helper}{fading}{device_id});
 
 	if(!$isLastStep) {
-		if($deltaBetweenSteps < 2) {
-			InternalTimer(gettimeofday()+$deltaBetweenSteps*($iteration+1), 'Spotify_volumeFadeStep', $hash);
-		} else {
-			select(undef, undef, undef, $deltaBetweenSteps);
-			Spotify_volumeFadeStep($hash);
-		}
+		InternalTimer(gettimeofday()+$deltaBetweenSteps*($iteration+1), 'Spotify_volumeFadeStep', $hash);
 	}
 	
 	delete $hash->{helper}{fading} if($isLastStep);
