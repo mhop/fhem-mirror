@@ -27,19 +27,19 @@
         <tr><td></td></tr>
         <tr><td><a href="#Description">Beschreibung</a></td></tr>
         <tr><td></td></tr>
-        <tr><td><a href="#Download">Download</a></td></tr>
-        <tr><td></td></tr>
-        <tr><td><a href="#Screenshots">Screenshots</a></td></tr>
-        <tr><td></td></tr>
         <tr><td><a href="#Features">Features</a></td></tr>
         <tr><td></td></tr>
         <tr><td><a href="#Protocols">Protokolle</a></td></tr>
         <tr><td></td></tr>
+        <tr><td><a href="#Screenshots">Screenshots</a></td></tr>
+        <tr><td></td></tr>
         <tr><td><a href="#Documentation">Dokumentation</a></td></tr>
         <tr><td></td></tr>
-        <tr><td><a href="#Links">Links</a></td></tr>
+        <tr><td><a href="#Download">Download</a></td></tr>
         <tr><td></td></tr>
         <tr><td><a href="#Installation">Installation</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Links">Links</a></td></tr>
         <tr><td></td></tr>
         <tr><td><a href="#License">Lizenz</a></td></tr>
         <tr><td></td></tr>
@@ -52,7 +52,7 @@
         <tr><td></td></tr>
         <tr><td><a href="https://wiki.fhem.de" target="_blank">Wiki</a></td></tr>
         <tr><td></td></tr>
-        <tr><td><a href="https://verein.fhem.de" target="_blank">Verein</a></td></tr>
+        <tr><td><a href="https://verein.fhem.de" target="_blank">FHEM e.V.</a></td></tr>
         <tr><td></td></tr>
         <tr><td></td></tr>
       </table>
@@ -73,9 +73,8 @@
       Heizung / usw.  schalten, oder Ereignisse wie Temperatur / Feuchtigkeit /
       Stromverbrauch protokollieren und visualisieren. F&uuml;r weitere Ideen
       siehe <a
-      href="https://groups.google.com/forum/?fromgroups=#!topic/fhem-users/kscnI-DAAaE">diesen</a>
+      href="https://forum.fhem.de/index.php/topic,9267.0.html">diesen</a>
       Link.
-
       <br><br>
 
       Das Programm l&auml;uft als Server, man kann es &uuml;ber WEB, dedizierte
@@ -84,13 +83,164 @@
       <br><br>
 
       Um es zu verwenden ben&ouml;tigt man einen 24/7 Rechner (NAS, RPi, PC,
-      MacMini, etc) mit einem perl Interpreter und angeschlossene
-      Hardware-Komponenten wie CUL, FHZ1300PC, etc. f&uuml;r einen Zugang zu
-      den Aktoren und Sensoren. Siehe den Hardware Abschnitt f&uuml;r mehr.
+      MacMini, etc) mit einem Perl Interpreter und angeschlossene
+      Hardware-Komponenten wie CUL-, EnOcean-, Z-Wave-USB-Stick, etc. f&uuml;r einen
+      Zugang zu den Aktoren und Sensoren. Siehe den Hardware Abschnitt f&uuml;r mehr.
 
       <br><br>
       Ausgesprochen wird es ohne h, wie bei feminin.
     </ul>
+
+
+    <a name="Features"></a>
+    <h3>Features</h3>
+    <ul>
+      <li>Unterst&uuml;tzung vieler in der Hausautomation &uuml;blicher
+          Protokolle, Fernseh- oder Audiogeräte, Wetterdienste,
+          Online-Kalender und mehr.</li>
+          <div class="dist"></div>
+
+          <li>Plug &amp; play: Bei vielen Protokollen werden die FHEM-Eintr&auml;ge
+          automatisch beim Empfang der Funktelegramme angelegt, zusammen mit
+          der Definition der Logdatei und etwaiger Visualisierung. Einfach FHEM
+          mit angeschlossenen USB-Hardware starten, und zusehen, wie die Plots
+          der Sensoren auf der Webseite nacheinander auftauchen.</li>
+          <div class="dist"></div>
+
+        <li>Ereignisse in Dateien oder Datenbanken loggen, optionale Filterung
+          mit regexp.  </li>
+          <div class="dist"></div>
+
+        <li>Beim Auftreten definierbarer Ereignisse externe Programme bzw.
+          Skripte starten.</li>
+          <div class="dist"></div>
+
+        <li>Zeitabh&auml;ngige Befehle (z.Bsp. die Lampe vom Sonnenuntergang bis
+          Mitternacht einschalten).</li>
+          <div class="dist"></div>
+
+        <li>Diverse Schnittstellen: ASCII, JSON, XML, jeweils &uuml;ber TCP/IP,
+          SSL, HTTP oder HTTPS.
+          <div class="dist"></div>
+
+        <li>Modulare Architektur mit &uuml;ber 430 Modulen f&uuml;r die
+          unterschiedlichen Ger&auml;te oder Hilfsdienste.</li>
+          <div class="dist"></div>
+
+        <li>Viele Frontends, damit jeder das Passende finden kann.</li>
+          <div class="dist"></div>
+      </ul>
+
+    <a name="Protocols"></a>
+    <h3>Unterst&uuml;tzte Protokolle (Auszug)</h3>
+    <ul>
+      <li>eQ3 spezifisch: HomeMatic, MAX!, FS20, EM1000, FHT80b, HMS, S300,
+          ESA2000</li>
+          <div class="dist"></div>
+      <li>KNX, ZWave, EnOcean, Philipps HUE, FRITZ!Dect, Intertechno, HomeEasy, 
+          X10</li>
+          <div class="dist"></div>
+      <li>1Wire, Firmata, webio, panStamp, LIRC, JeeLink, RFXCOM/RFXTRX, Wireless M-Bus</li>
+          <div class="dist"></div>
+      <li>Davis VantagePro2, Oregon Scientific, Allnet</li>
+          <div class="dist"></div>
+      <li>Fernseher von LG, Panasonic, Philips, Samsung, Sony</li>
+          <div class="dist"></div>
+      <li>Ger&auml;te von Bose, Sonos, Squeezebox</li>
+          <div class="dist"></div>
+      <li>Verst&auml;rker von Denon, Onkyo, Pioneer, YAMAHA</li>
+          <div class="dist"></div>
+      <li>iTunes/AppleTV, Enigma2, XBMC/Kodi, MediaPortal, Plex</li>
+          <div class="dist"></div>
+      <li>Alexa, HomeKit, HomeBridge</li>
+          <div class="dist"></div>
+      <br>
+      Eine detaillierte Beschreibung aller Ger&auml;te/Protokolle befindet
+      sich in dem <a href="commandref_DE.html">commandref</a> Dokument.
+
+
+    </ul>
+
+
+    <a name="Screenshots"></a>
+    <h3>Frontend Screenshots</h3>
+    <ul>
+      <li>Das eingebaute web frontend:
+        &Uuml;bersicht auf dem 
+        <a href="pgm2-1.png">Desktop</a> bzw.
+        <a href="pgm2-3.png">Smartphones</a>,
+        <a href="pgm2-2.png">SVG-plots</a>.</li>
+        <div class="dist"></div>
+
+      <li>Das FHEM FLOORPLAN Modul: 
+        <a href="tirreG.jpg">Beispiel1</a>,
+        <a href="Benji.png">Beispiel2</a>,
+        <a href="forum_22336.jpg">LCars</a>.</li>
+        <div class="dist"></div>
+
+      <li>Das <a href="InfoPanel.png">InfoPanel</a> Modul
+        </li><div class="dist"></div>
+        
+      <li>FHEM Tablet UI</a>: <a href="TabletUI_1.png">Beispiel1</a>,
+                            <a href="TabletUI_2.png">Beispiel2</a>
+          </li><div class="dist"></div>
+          
+      <li>smartVISU: <a href="SmartVisu.png">Beispiel</a>
+        </li><div class="dist"></div>
+
+      <li><a href="https://wiki.fhem.de/wiki/Neues_Charting_Frontend">
+            Charting Frontend</a> und
+          <a href="https://forum.fhem.de/index.php/topic,12629.0.html">YAF</a>
+            (Yet Another Frontend).
+        </li><div class="dist"></div>
+
+      <li>iPhone Frontends: 
+        <a href="itms://itunes.apple.com/us/app/fhemobile/id389951065?mt=8">
+                Fhemobile</a> (native app),
+        <a href="http://www.dhs-computertechnik.de/support-iphone.html">
+        dhs-computertechnik</a> or
+        <a href="http://code.google.com/p/phyfhem/">phyfhem</a></li>
+        <div class="dist"></div>
+
+      <li>Android Frontends:
+        <a href="http://andFHEM.klass.li">andFHEM</a> (natives App),
+        <a href="http://forum.fhem.de/index.php/topic,10628.0.html">
+          Fullscreen Browser App</a>,
+        <a href="http://forum.fhem.de/index.php/topic,12624.0.html">ORCA addition</a>
+        </li>
+        <div class="dist"></div>
+    </ul>
+
+
+    <a name="Documentation"></a>
+    <h3>Dokumentation</h3>
+    <ul>
+      <h4><div class="dist">Befehlsreferenz (commandref):</div></h4>
+      <div class="dist"><a href="commandref_DE.html">commandref_DE.html</a>
+      enth&auml;lt eine detaillierte Beschreibung aller Module und
+      Features. DIE offizielle von den Entwicklern gepflegte, tagesaktuelle Dokumentation.</div>
+      
+      <h4><div class="dist">Erg&auml;nzende Informationsquellen:</div></h4>
+      <div class="dist">Wiki: <a href="https://wiki.fhem.de">https://wiki.fhem.de</a>
+      </div>
+      
+      <div class="dist">Forum: <a
+      href="https://forum.fhem.de">https://forum.fhem.de</a></div>
+      
+      <h4><div class="dist">Nicht nur für den FHEM-Einstieg:</div></h4>
+      <div class="dist">Ein kleiner FHEM-Kurs (ben&ouml;tigt keine Hardware): <a 
+      href="https://wiki.fhem.de/wiki/Erste_Schritte_in_FHEM">
+      Erste Schritte in FHEM</a></div>
+      
+      <div class="dist">Das Einsteiger-PDF (Pflichtlekt&uuml;re): <a
+      href="Heimautomatisierung-mit-fhem.pdf">
+      Heimautomatisierung mit FHEM</a></div>
+
+      <div class="dist"><a href="HOWTO_DE.html">HOWTO_DE.html</a> f&uuml;r eine
+      kurze Installation/Konfiguration.</div> <div class="dist"></div>
+
+    </ul>
+
 
     <a name="Download"></a>
     <h3>Download</h3>
@@ -123,233 +273,15 @@
       </ul>
 
 
-    <a name="Screenshots"></a>
-    <h3>Frontend Screenshots</h3>
-    <ul>
-      <li>Das eingebaute web frontend:
-        &Uuml;bersicht auf dem 
-        <a href="pgm2-1.png">Desktop</a> bzw.
-        <a href="pgm2-3.png">Smartphones</a>,
-        <a href="pgm2-2.png">SVG-plots</a>.</li>
-        <div class="dist"></div>
-
-      <li>Das FHEM FLOORPLAN Modul: 
-        <a href="tirreG.jpg">Beispiel1</a>,
-        <a href="Benji.png">Beispiel2</a>,
-        <a href="forum_22336.jpg">LCars</a>.</li>
-        <div class="dist"></div>
-
-      <li>Das <a href="InfoPanel.png">InfoPanel</a> Modul,
-        FHEM Tablet UI</a>: <a href="TabletUI_1.png">Beispiel1</a>,
-                            <a href="TabletUI_2.png">Beispiel2</a>
-                            und <a href="SmartVisu.png">SmartVisu</a>
-        </li><div class="dist"></div>
-
-      <li><a href="https://wiki.fhem.de/wiki/Neues_Charting_Frontend">
-            Charting Frontend</a> und
-          <a href="https://forum.fhem.de/index.php/topic,12629.0.html">YAF</a>
-            (Yet Another Frontend).
-        </li><div class="dist"></div>
-
-      <li>myHCE: <a
-         href="http://www.fischer-net.de/hausautomation/myhce/screenshots.html">
-        Bilder-Galerie</a>,
-        HomeMini:
-        <a href="http://heimserver.nendzig.net/wiki/index.php/HomeMini">
-        Screenshot & Download</a>
-        </li><div class="dist"></div>
-
-      <li>iPhone Frontends: 
-        <a href="itms://itunes.apple.com/us/app/fhemobile/id389951065?mt=8">
-                Fhemobile</a> (native app),
-        <a href="http://www.dhs-computertechnik.de/support-iphone.html">
-        dhs-computertechnik</a> or
-        <a href="http://code.google.com/p/phyfhem/">phyfhem</a></li>
-        <div class="dist"></div>
-
-      <li>Android Frontends:
-        <a href="http://andFHEM.klass.li">andFHEM</a> (natives App),
-        <a href="http://forum.fhem.de/index.php/topic,10628.0.html">
-          Fullscreen Browser App</a>,
-        <a href="http://forum.fhem.de/index.php/topic,12624.0.html">ORCA addition</a>
-        </li>
-        <div class="dist"></div>
-    </ul>
-
-
-
-    <a name="Features"></a>
-    <h3>Features</h3>
-    <ul>
-      <li>Unterst&uuml;tzung vieler in der Hausautomation &uuml;blicher
-          Protokolle, Fernseh- oder Audiogeräte, Wetterdienste,
-          Online-Kalender, und mehr.</li>
-          <div class="dist"></div>
-
-      <li>Plug &amp; play: Bei vielen Protokollen werden die FHEM-Eintr&auml;ge
-          automatisch beim Empfang der Funktelegramme angelegt, zusammen mit
-          der Definition der Logdatei und etwaiger Visualisierung. Einfach FHEM
-          mit angeschlossenen USB-Hardware starten, und zusehen, wie die Plots
-          der Sensoren auf der Webseite nacheinander auftauchen.</li>
-          <div class="dist"></div>
-
-        <li>Ereignisse in Dateien oder Datenbanken loggen, optionale Filterung
-          mit regexp.  </li>
-          <div class="dist"></div>
-
-        <li>Beim Auftreten definierbarer Ereignisse externe Programme bzw.
-          Skripte starten.</li>
-          <div class="dist"></div>
-
-        <li>Zeitabh&auml;ngige Befehle (z.Bsp. die Lampe vom Sonnenuntergang bis
-          Mitternacht einschalten).</li>
-          <div class="dist"></div>
-
-        <li>Diverse Schnittstellen: ASCII, JSON, XML, jeweils &uuml;ber TCP/IP,
-          SSL, HTTP oder HTTPS.
-          <div class="dist"></div>
-
-        <li>Modulare Architektur mit &uuml;ber 150 Modulen f&uuml;r die
-          unterschiedlichen Ger&auml;te oder Hilfsdienste.</li>
-          <div class="dist"></div>
-
-        <li>Viele Frontends, damit jeder das Passende finden kann.</li>
-          <div class="dist"></div>
-      </ul>
-
-    <a name="Protocols"></a>
-    <h3>Unterst&uuml;tzte Protokolle (Auszug)</h3>
-    <ul>
-      <li>eQ3 spezifisch: FS20, HomeMatic, MAX!, EM1000, FHT80b, HMS, S300,
-          ESA2000</li>
-          <div class="dist"></div>
-      <li>KNX, ZWave, EnOcean, X10, FRITZ!Dect, Intertechno, HomeEasy,
-          Philipps HUE</li>
-          <div class="dist"></div>
-      <li>1Wire, Firmata, webio, panStamp, LIRC, JeeLink, RFXCOM/RFXTRX, TellStick</li>
-          <div class="dist"></div>
-      <li>Davis VantagePro2, Oregon Scientific, Allnet</li>
-          <div class="dist"></div>
-      <li>Fernseher von Samsung/Panasonic/LG/Philips, Ger&auml;te von Sonos/Squeezebox,
-          Verst&auml;rker von YAMAHA/Denon/Onkyo, iTunes/AppleTV, Enigma2, XBMC</li>
-          <div class="dist"></div>
-      <br>
-
-      Eine detaillierte Beschreibung aller Ger&auml;te/Protokolle befindet
-      sich in dem <a href="commandref_DE.html">commandref</a> Dokument.
-
-
-    </ul>
-
-    <a name="Documentation"></a>
-    <h3>Dokumentation</h3>
-    <ul>
-      <div class="dist"> <a href="Heimautomatisierung-mit-fhem.pdf">
-      Heimautomatisierung-mit-fhem.pdf</a></div>
-
-      <div class="dist"><a href="commandref_DE.html">commandref_DE.html</a>
-      enth&auml;lt eine detaillierte Beschreibung aller Module und
-      Features.</div>
-
-      <div class="dist">Unser Wiki ist erreichbar unter <a
-      href="https://wiki.fhem.de">https://wiki.fhem.de</a></div>
-
-      <div class="dist">Forum: <a
-      href="https://forum.fhem.de">https://forum.fhem.de</a>
-
-      <div class="dist"><a href="HOWTO_DE.html">HOWTO_DE.html</a> f&uuml;r eine
-      kurze Installation/Konfiguration.</div> <div class="dist"></div>
-
-      <div class="dist"><a href="http://meintechblog.de/category/fhem">
-        meintechblog.de</a>: Blog mit HOWTOs &uuml;ber FHEM-Themen</dist>
-        <div class="dist"></div>
-
-      <div class="dist">Das F.A.Q. <a href="faq.html">faq.html</a>
-      (englisch)</div>
-
-      <div class="dist"><a href="README.contrib">contrib/README</a> beschreibt
-      einige nicht aktiv gepflegte Module / Skripte.</div>
-
-    </ul>
-
-    <a name="Links"></a>
-    <h3>Links</h3>
-    <ul>
-      Homepage:  <a href="http://fhem.de/fhem_DE.html">
-        http://fhem.de/fhem_DE.html</a><br>
-      Quellen: <a href="https://svn.fhem.de">
-        https://svn.fhem.de</a><br>
-      <br>
-
-      Betriebsystem/Ger&auml;tspezifisch Dokumentation:<br>
-      <ul>
-        <li>Anweisungen f&uuml;r den <a href="fritzbox.html">FRITZ!Box</a> (englisch)</li>
-          <div class="dist"></div>
-
-        <li>Anweisungen f&uuml;r Nas/Router (NSLU2):
-          <a href="http://www.martin-haas.de/fhz/nslu2fhz">
-          http://www.martin-haas.de/fhz/nslu2fhz</a> (english)</li>
-          <div class="dist"></div>
-
-        <li>Anweisungen f&uuml;r Synology Diskstation / Rackstation:
-          <a href="http://www.fischer-net.de/hausautomation/fhem.html">
-          http://www.fischer-net.de/hausautomation/fhem.html</a></li>
-          <div class="dist"></div>
-
-        <li>Anweisungen f&uuml;r den Allnet all6250:
-          <a href="http://wiki.dungeon.de/all6250_opennas_mit_fhem">
-          http://wiki.dungeon.de/all6250_opennas_mit_fhem</a></li>
-          <div class="dist"></div>
-
-        <li>Raspberry PI mit <a href="http://www.enocean.com/fileadmin/redaktion/pdf/white_paper/wp_Raspberry_talks_EnOcean.pdf">EnOcean</a></li>
-
-        <li>Linux Treiber Installation :
-          <a href="http://fhem.de/linux.html">
-          http://fhem.de/linux.html</a>(nur im Problemfall, english)</li>
-          <div class="dist"></div>
-
-        <li>Diverse USB Probleme:
-          <a href="http://fhem.de/USB.html">
-          http://fhem.de/USB.html</a> (english)</li>
-          <div class="dist"></div>
-
-        <li>Russels Blog for Windows user:
-          <a href="http://russellallen.info/category/FHEM.aspx">
-          http://russellallen.info/category/FHEM.aspx</a> (english)<br>
-          <div class="dist"></div>
-
-        <li>Windows driver installation:
-          <a href="http://fhz4linux.info/tiki-index.php?page=Driver%20installation">
-          http://fhz4linux.info/tiki-index.php?page=Driver%20installation</a><br>
-           (english, use "Solution B", only COM1..COM9 is supported)</li>
-          <div class="dist"></div>
-      </ul>
-      <br>
-
-      Kommerzielle Produkte:
-      <ul>
-        <li><a href="http://www.dhs-computertechnik.de/">
-          http://www.dhs-computertechnik.de</a>
-          <br>
-        <li>CUL/CUNO/COC/EUL/TUL:
-          <a href=http://shop.busware.de/product_info.php?products_id=29">
-          Hardware shop</a>,
-          <a href="http://culfw.de/culfw.html">firmware homepage</a>,
-          <a href="http://groups.google.com/group/cul-fans">
-          CUL fans google group</a></li>
-      </ul>
-    </ul>
-
-
     <a name="Installation"></a>
     <h3>Installation</h3>
     
     <ul>
-    <h4>Debian/Ubuntu</h4>
+    <h4>Debian/Ubuntu/Raspbian</h4>
     <ul>
       <li><a href="http://fhem.de/fhem-=VERS=.deb">Dieses</a> FHEM Paket (.deb)
       installieren. F&uuml;r eine bessere Integration siehe <a
-      href="http://debian.fhem.de/">debian.fhem.de</a>.
+      href="https://debian.fhem.de/">debian.fhem.de</a>.
     </ul>
 
     <h4>Unix / OSX</h4>
@@ -372,8 +304,8 @@
 
     <h4>Windows</h4>
     <ul>
-      <li>Siehe <a href="HOWTO_Windows.html">HOWTO_Windows.html</a> f&uuml;r
-      eine detaillierte Beschreibung.</li>
+      <li>Siehe <a href="https://wiki.fhem.de/wiki/FHEM_Installation_Windows">HOWTO_Windows.html</a>
+      f&uuml;r eine detaillierte Beschreibung.</li>
 
       <li>Falls Sie FHEM unter cygwin installieren wollen, dann
       k&ouml;nnen Sie die Installationsanleitung f&uuml;r UNIX befolgen.</li>
@@ -383,20 +315,20 @@
     <h4>Fritz!Box</h4>
     <ul>
       Seit Fritz!OS 6.20 ist es <b>nicht mehr m&ouml;glich</b> "fremde"
-      Programme nach einem reboot <b>automatisch</b> zu starten, deswegen
+      Programme nach einem reboot <b>automatisch</b> zu starten. Deswegen
       empfehle ich den Einsatz dieser Ger&auml;te nicht f&uuml;r FHEM, siehe
       auch diesen <a
       href="http://forum.fhem.de/index.php?topic=25066.0">Beitrag</a> im Forum.
       F&uuml;r die, die es trotzdem versuchen wollen:<br><br>
 
-      <li>FB7390/FB7490: Folgenden FHEM
-         <a href="http://fhem.de/fhem-=VERS=-fb7390.image">Image</a>
-         <i>zus&auml;tzlich</i> zum normalen oder labor Image von AVM installieren.
+      <li>FB7390/FB7490: Folgendes FHEM
+         <a href="http://fhem.de/fhem-5.7-fb7390.image">Image</a>
+         <i>zus&auml;tzlich</i> zum normalen oder Labor Image von AVM installieren.
          Beide sind vollkommen unabh&auml;ngig und deswegen jeweils austauschbar.
       <li>FB7270: <a
-          href="http://fhem.de/fhem-=VERS=-fb7270.zip">Diese</a> zip Datei
-          auf dem USB-Disk auspacken, danach es ans FritzBox anschliessen, per
-          telnet anmelden, ins Verzeichnis wechseln, und FHEM von hier starten.
+          href="http://fhem.de/fhem-5.7-fb7270.zip">Diese</a> zip Datei
+          auf einem USB-Stick auspacken, danach diesen an die FritzBox anschliessen,
+          per telnet anmelden, ins Verzeichnis wechseln, und FHEM von hier starten.
       <li>Siehe auch die detaillierte Dokumentation <a href="fritzbox.html">hier</a>.
      </ul>
 
@@ -410,7 +342,26 @@
       perl fhem.pl fhem.cfg.demo
       </code></ul>
 
+      </ul>
+
+
+    <a name="Links"></a>
+    <h3>Links</h3>
+    <ul>
+      Forum: <a href="https://forum.fhem.de">
+        https://forum.fhem.de</a><br>
+      Quellen: <a href="https://svn.fhem.de">
+        https://svn.fhem.de</a><br>
+      Wiki: <a href="https://wiki.fhem.de">
+        https://wiki.fhem.de</a><br>
+      FHEM e.V.: <a href="https://verein.fhem.de">
+        https://verein.fhem.de</a><br>
+      <br><br>
+
+      CUL/CUNO/COC/EUL/TUL-Firmware Homepage:  <a href="http://culfw.de/culfw.html">
+        http://culfw.de</a>
     </ul>
+
 
     <a name="License"></a>
     <h3>Lizenz:</h3>
@@ -418,15 +369,13 @@
       Copyright:<br>
       <ul>
         <li>Rudolf Koenig (r punkt koenig at koeniglich punkt de). Achtung: Ich
-        leiste <b> kein</b> FHEM support &uuml;ber Email, bitte verwenden sie
-        das Forum f&uuml;r diesen Zweck.
+        leiste <b>keinen</b> FHEM Support &uuml;ber Email, bitte verwenden sie
+        das <a href="https://forum.fhem.de">Forum</a> f&uuml;r diesen Zweck.
         </li>
         <li><a href="MAINTAINER.txt">Zahlreiche weitere Entwickler, die jeweils
         zu FHEM beigetragen haben.</a></li>
       </ul>
       License: GPL (v2)<br>
-      <br>
-      Vielen Dank an TOSTi f&uuml;r die Inspiration.<br>
     </ul>  
 
   <footer><center><a href="Impressum.html">Impressum / Datenschutz</a></center></footer>

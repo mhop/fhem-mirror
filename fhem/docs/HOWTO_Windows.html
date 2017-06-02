@@ -33,10 +33,10 @@ a service, see below.
 
 <h3>Install FHEM:</h3>
 <ul>
-  Download the latest fhem-X.Y.tar.gz package from http://fhem.de#Download
-  (currently it is fhem-5.4.tar.gz), and unpack it into a directory where you
+  Download the latest fhem-X.Y.zip package from http://fhem.de#Download
+  (currently it is fhem-5.8.zip), and unpack it into a directory where you
   have at least 350MB+ free space. I will use F:\tmp for this purpose, after
-  unpacking the .tar.gz file we will have a new directory F:\tmp\fhem-5.4
+  unpacking the .zip file we will have a new directory F:\tmp\fhem-5.8
   </ul>
 
 
@@ -45,8 +45,8 @@ a service, see below.
   Download a Strawberry perl Portable-Edition (this version won't
   generate Registry-Entries, and can be installed on USB disks) from
   http://strawberryperl.com/releases.html, and extract it into the previously
-  created directory, in our case F:\tmp\fhem-5.4
-  My file was called strawberry-perl-5.16.2.1-32bit-portable.zip
+  created directory, in our case F:\tmp\fhem-5.8
+  My file was called strawberry-perl-no64-5.24.1.1-32bit-portable.zip
   </ul>
 
 
@@ -56,9 +56,9 @@ a service, see below.
   FHEM:
   <ul><code>
     C:> F:<br>
-    F:> cd \tmp\fhem-5.4<br>
-    F:\tmp\fhem-5.4> mkdir log<br>
-    F:\tmp\fhem-5.4> perl\bin\perl fhem.pl fhem.cfg<br>
+    F:> cd \tmp\fhem-5.8<br>
+    F:\tmp\fhem-5.8> mkdir log<br>
+    F:\tmp\fhem-5.8> perl\bin\perl fhem.pl fhem.cfg<br>
   </code></ul>
   Note:
   <ul>
@@ -83,10 +83,9 @@ a service, see below.
   but not mandatory):</h3>
 <ul>
   In the browser window, on the FHEMWEB page, in the command line (upper text
-  input field, right of the smiling house icon), type in the following 4
+  input field, right of the smiling house icon), type in the following 3
   commands one-by-one, confirming each one with Enter:
   <ul><code>
-     notice confirm update-20130127-001<br>
      attr global backup_before_update 0<br>
      save<br>
      update<br>
@@ -111,13 +110,13 @@ for this scenario):</h3>
   Terminate fhem by typing shutdown again in the FHEMWEB command line.
   Install the missing perl modules by typing in the command window:
   <ul><code>
-    F:\tmp\fhem-5.4> PATH=F:\tmp\fhem-5.4\c\bin;F:\tmp\fhem-5.4\perl\bin;%PATH%<br>
-    F:\tmp\fhem-5.4> perl\bin\cpan -i Win32::Daemon<br>
-    F:\tmp\fhem-5.4> perl\bin\cpan -i Win32::Console<br>
+    F:\tmp\fhem-5.8> PATH=F:\tmp\fhem-5.8\c\bin;F:\tmp\fhem-5.8\perl\bin;%PATH%<br>
+    F:\tmp\fhem-5.8> perl\bin\cpan -i Win32::Daemon<br>
+    F:\tmp\fhem-5.8> perl\bin\cpan -i Win32::Console<br>
   </ul></code>
   Install FHEM as a service
   <ul><code>
-    F:\tmp\fhem-5.4> perl\bin\perl fhem.pl fhem.cfg -i<br>
+    F:\tmp\fhem-5.8> perl\bin\perl fhem.pl fhem.cfg -i<br>
   </code></ul>
   </ul>
 </body>
