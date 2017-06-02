@@ -72,6 +72,24 @@ TcpServer_Accept($$)
                 inet_ntoa($iaddr);
 
   my $af = $attr{$name}{allowfrom};
+  if(!$af) {
+    my $re = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|".
+             "^(fe[89ab]|::1)";
+    if($caddr !~ m/$re/) {
+      my %empty;
+      $hash->{SNAME} = $hash->{NAME};
+      my $auth = Authenticate($hash, \%empty);
+      delete $hash->{SNAME};
+      if($auth == 0) {
+        Log3 $name, 1,
+             "Connection refused from the non-local address $caddr:$port, ".
+             "as there is no working allowed instance defined for it";
+        close($clientinfo[0]);
+        return undef;
+      }
+    }
+  }
+
   if($af) {
     if($caddr !~ m/$af/) {
       my $hostname = gethostbyaddr($iaddr, AF_INET);

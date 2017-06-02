@@ -1260,12 +1260,6 @@ FW_makeTable($$$@)
                 join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
                 "</div></td>";
 
-        } elsif ($n eq "webCmd"){
-          my $lc = "detail=$name&cmd.$name=set $name";
-          FW_pO "<td><div name=\"$name-$n\" $tattr>".
-                  join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
-                "</div></td>";
-
         } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){ #special for Floorplan
           FW_pH "detail=$1", $val,1;
 
