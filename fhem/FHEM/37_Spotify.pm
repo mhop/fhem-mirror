@@ -658,7 +658,7 @@ sub Spotify_volumeStep($$$$) {
 }
 
 
-sub Spotify_getTargetDeviceID($$$) { # resolve target device settings
+sub Spotify_getTargetDeviceID { # resolve target device settings
 	my ($hash, $device_id, $newPlayback) = @_;
 	my $name = $hash->{NAME};
 	
