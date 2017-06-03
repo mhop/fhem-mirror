@@ -41,53 +41,155 @@ sub S7_AWrite_Define($$) {
 	my ( $name, $area, $DB, $start, $datatype, $length );
 
 	$name     = $a[0];
-	$area     = lc $a[2];
-	$DB       = $a[3];
-	$start    = $a[4];
-	$datatype = lc $a[5];
+	
+	if ( uc $a[2] =~ m/^[NA](\d*)/ ) {
+		my $Offset;
+		$area = "db";
+		$DB   = 0;
+		my $startposition;
 
-	Log3 $name, 5, "$name S7_AWrite_Define called";
+		if ( uc $a[2] =~ m/^AI(\d*)/ ) {
+			$startposition = 2;
+			
+			if ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 926;
+			}
+			elsif ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1032;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
 
-	if (   $area ne "inputs"
-		&& $area ne "outputs"
-		&& $area ne "flags"
-		&& $area ne "db" )
-	{
-		my $msg =
-"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <start> {u8|s8|u16|s16|u32|s32|float}";
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
 
-		Log3 $name, 2, $msg;
-		return $msg;
+		}
+		elsif ( uc $a[2] =~ m/^AQ(\d*)/ ) {
+			$startposition = 2;
+			
+			if ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 944;
+			}
+			elsif ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1072;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+
+		}
+		elsif ( uc $a[2] =~ m/^AM(\d*)/ ) {
+			$startposition = 2;
+			
+			if ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 952;
+			}
+			elsif ( defined($hash->{IODev}{S7TYPE}) && $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1118;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+
+		elsif ( uc $a[2] =~ m/^NAI(\d*)/ ) {
+			$startposition = 3;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1262;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		elsif ( uc $a[2] =~ m/^NAQ(\d*)/ ) {
+			$startposition = 3;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1406;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		else {
+			my $msg =
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+
+			Log3 undef, 2, $msg;
+			return $msg;
+		}
+
+		$start = $Offset  + ((int( substr( $a[2], $startposition ) ) - 1)*2);
+		$datatype = "u16";
+
 	}
+	else {		
+	
+		$area     = lc $a[2];
+		$DB       = $a[3];
+		$start    = $a[4];
+		$datatype = lc $a[5];
 
-	if (   $datatype ne "u8"
-		&& $datatype ne "s8"
-		&& $datatype ne "u16"
-		&& $datatype ne "s16"
-		&& $datatype ne "u32"
-		&& $datatype ne "s32"
-		&& $datatype ne "float" )
-	{
-		my $msg =
-"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB>  <start> {u8|s8|u16|s16|u32|s32|float}";
+		Log3 $name, 5, "$name S7_AWrite_Define called";
 
-		Log3 $name, 2, $msg;
-		return $msg;
+		if (   $area ne "inputs"
+			&& $area ne "outputs"
+			&& $area ne "flags"
+			&& $area ne "db" )
+		{
+			my $msg =
+"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <start> {u8|s8|u16|s16|u32|s32|float}  \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
+
+			Log3 $name, 2, $msg;
+			return $msg;
+		}
+
+		if (   $datatype ne "u8"
+			&& $datatype ne "s8"
+			&& $datatype ne "u16"
+			&& $datatype ne "s16"
+			&& $datatype ne "u32"
+			&& $datatype ne "s32"
+			&& $datatype ne "float" )
+		{
+			my $msg =
+"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB>  <start> {u8|s8|u16|s16|u32|s32|float}  \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
+
+			Log3 $name, 2, $msg;
+			return $msg;
+		}
+
+
+		my $sname = $hash->{IODev}{NAME};
+
+		if ( $datatype eq "u16" || $datatype eq "s16" ) {
+			$length = 2;
+		}
+		elsif ( $datatype eq "u32" || $datatype eq "s32" || $datatype eq "float" ) {
+			$length = 4;
+		}
+		else {
+			$length = 1;
+		}
 	}
-
 	AssignIoPort($hash);    # logisches modul an physikalisches binden !!!
-
-	my $sname = $hash->{IODev}{NAME};
-
-	if ( $datatype eq "u16" || $datatype eq "s16" ) {
-		$length = 2;
-	}
-	elsif ( $datatype eq "u32" || $datatype eq "s32" || $datatype eq "float" ) {
-		$length = 4;
-	}
-	else {
-		$length = 1;
-	}
 
 	$hash->{AREA}     = $area;
 	$hash->{DB}       = $DB;
