@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.11;       # Version of this module
+my $module_version    = 1.12;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -51,6 +51,10 @@ my $d_resendFailedCmd = 0;          # resend failed http requests by default?
 
 my $d_displayTextEncode = 1;        # urlEncode Text for Displays
 my $d_displayTextWidth  = 0;        # display width, 0 => disable formating
+
+# IP ranges that are allowed to connect to ESPEasy without attr allowedIPs set.
+my $d_allowedIPs = "192.168.0.0/16,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,"
+                 . "fe80::/10,::1";
 
 # ------------------------------------------------------------------------------
 # "setCmds" => "min. number of parameters"
@@ -553,9 +557,11 @@ sub ESPEasy_Read($) {
   $Data::Dumper::Indent = 0;
   $Data::Dumper::Terse  = 1;
 
+  # Levering new TcpServerUtils security feature.
+  #$attr{$name}{allowfrom} = ".*" if !$attr{$name}{allowfrom};
   # Accept and create a child
   if( $hash->{SERVERSOCKET} ) {
-    my $aRet = TcpServer_Accept($hash,"ESPEasy");
+    my $aRet = ESPEasy_TcpServer_Accept($hash,"ESPEasy");
     return;
   }
 
@@ -572,13 +578,13 @@ sub ESPEasy_Read($) {
     return;
   }
 
-  $bhash->{SESSIONS} = scalar devspec2array("TYPE=$btype:FILTER=TEMPORARY=1")-1;
+  #$bhash->{SESSIONS} = scalar devspec2array("TYPE=$btype:FILTER=TEMPORARY=1")-1;
 
   # Check attr disabled
   return if (IsDisabled $bname);
 
   # Check allowed IPs
-  if ( !( ESPEasy_isPeerAllowed($peer,AttrVal($bname,"allowedIPs",1)) &&
+  if ( !( ESPEasy_isPeerAllowed($peer,AttrVal($bname,"allowedIPs", $d_allowedIPs)) &&
          !ESPEasy_isPeerAllowed($peer,AttrVal($bname,"deniedIPs",0)) ) ) {
     Log3 $bname, 2, "$btype $name: Peer address rejected";
     return;
@@ -1562,6 +1568,121 @@ sub ESPEasy_tcpServerOpen($) {
 
 
 # ------------------------------------------------------------------------------
+# Duplicated sub from TcpServerUtils as a workaround for new security feature:
+# https://forum.fhem.de/index.php/topic,72717.0.html
+sub ESPEasy_TcpServer_Accept($$)
+{
+  my ($hash, $type) = @_;
+
+  my $name = $hash->{NAME};
+  my @clientinfo = $hash->{SERVERSOCKET}->accept();
+  if(!@clientinfo) {
+    Log3 $name, 1, "Accept failed ($name: $!)" if($! != EAGAIN);
+    return undef;
+  }
+  $hash->{CONNECTS}++;
+
+  my ($port, $iaddr) = $hash->{IPV6} ? 
+      sockaddr_in6($clientinfo[1]) :
+      sockaddr_in($clientinfo[1]);
+  my $caddr = $hash->{IPV6} ?
+                inet_ntop(AF_INET6(), $iaddr) :
+                inet_ntoa($iaddr);
+
+# ------------------------------------------------------------------------------
+# Removed from sub because we have our own access control system that works in
+# a more readable and flexible way (network ranges with allow/deny vs regexp).
+# Our new allowed ranges default are also now:
+# 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fe80::/10,::1
+# ------------------------------------------------------------------------------
+#
+#  my $af = $attr{$name}{allowfrom};
+#  if(!$af) {
+#    my $re = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|".
+#             "^(fe[89ab]|::1)";
+#    if($caddr !~ m/$re/) {
+#      my %empty;
+#      $hash->{SNAME} = $hash->{NAME};
+#      my $auth = Authenticate($hash, \%empty);
+#      delete $hash->{SNAME};
+#      if($auth == 0) {
+#        Log3 $name, 1,
+#             "Connection refused from the non-local address $caddr:$port, ".
+#             "as there is no working allowed instance defined for it";
+#        close($clientinfo[0]);
+#        return undef;
+#      }
+#    }
+#  }
+#
+#  if($af) {
+#    if($caddr !~ m/$af/) {
+#      my $hostname = gethostbyaddr($iaddr, AF_INET);
+#      if(!$hostname || $hostname !~ m/$af/) {
+#        Log3 $name, 1, "Connection refused from $caddr:$port";
+#        close($clientinfo[0]);
+#        return undef;
+#      }
+#    }
+#  }
+
+  #$clientinfo[0]->blocking(0);  # Forum #24799
+
+  if($hash->{SSL}) {
+    # Forum #27565: SSLv23:!SSLv3:!SSLv2', #35004: TLSv12:!SSLv3
+    my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
+                     AttrVal("global", "sslVersion", "TLSv12:!SSLv3"));
+
+    # Certs directory must be in the modpath, i.e. at the same level as the
+    # FHEM directory
+    my $mp = AttrVal("global", "modpath", ".");
+    my $ret = IO::Socket::SSL->start_SSL($clientinfo[0], {
+      SSL_server    => 1, 
+      SSL_key_file  => "$mp/certs/server-key.pem",
+      SSL_cert_file => "$mp/certs/server-cert.pem",
+      SSL_version => $sslVersion,
+      SSL_cipher_list => 'HIGH:!RC4:!eNULL:!aNULL',
+      Timeout       => 4,
+      });
+    my $err = $!;
+    if( !$ret
+      && $err != EWOULDBLOCK
+      && $err ne "Socket is not connected") {
+      $err = "" if(!$err);
+      $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
+      Log3 $name, 1, "$type SSL/HTTPS error: $err"
+        if($err !~ m/error:00000000:lib.0.:func.0.:reason.0./); #Forum 56364
+      close($clientinfo[0]);
+      return undef;
+    }
+  }
+
+  my $cname = "${name}_${caddr}_${port}";
+  my %nhash;
+  $nhash{NR}    = $devcount++;
+  $nhash{NAME}  = $cname;
+  $nhash{PEER}  = $caddr;
+  $nhash{PORT}  = $port;
+  $nhash{FD}    = $clientinfo[0]->fileno();
+  $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
+  $nhash{TYPE}  = $type;
+  $nhash{SSL}   = $hash->{SSL};
+  $nhash{STATE} = "Connected";
+  $nhash{SNAME} = $name;
+  $nhash{TEMPORARY} = 1;              # Don't want to save it
+  $nhash{BUF}   = "";
+  $attr{$cname}{room} = "hidden";
+  $defs{$cname} = \%nhash;
+  $selectlist{$nhash{NAME}} = \%nhash;
+
+  my $ret = $clientinfo[0]->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
+
+  Log3 $name, 4, "Connection accepted from $nhash{NAME}";
+  return \%nhash;
+}
+
+
+# ------------------------------------------------------------------------------
 sub ESPEasy_header2Hash($) {
   my ($string) = @_;
   my %header = ();
@@ -2532,7 +2653,8 @@ sub ESPEasy_removeGit($)
       as bitmask or dotted decimal. Domain names for dns lookups are not
       supported.<br>
       Possible values: IPv64 address, IPv64/netmask<br>
-      Default: 0.0.0.0/0 (all IPs are allowed)<br>
+      Default: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fe80::/10,::1
+      <br>
       Eg. 10.68.30.147<br>
       Eg. 10.68.30.0/24,10.68.31.0/255.255.248.0<br>
       Eg. fe80::/10,2001:1a59:50a9::/48,2002:1a59:50a9::,2003:1a59:50a9:acdc::36

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  34_ESPEasy: adjustments due to changes in TcpServerUtils.pm
   - feature: 44_S7_ARead: supports for Logo7 and Logo8 short notations 
   - feature: 44_S7_AWrite: supports for Logo7 and Logo8 short notations
   - feature: 37_Spotify: specify default device by its name
