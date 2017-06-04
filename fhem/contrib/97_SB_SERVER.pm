@@ -69,9 +69,11 @@ use Time::HiRes qw(gettimeofday time);
 
 use constant { true => 1, false => 0 };
 use constant { TRUE => 1, FALSE => 0 };
-use constant SB_SERVER_VERSION => '0037';
+use constant SB_SERVER_VERSION => '0038';
 
 my $SB_SERVER_hasDataDumper = 1;        # CD 0024
+
+sub SB_SERVER_RemoveInternalTimers($);
 
 # ----------------------------------------------------------------------------
 #  Initialisation routine called upon start-up of FHEM
@@ -362,7 +364,8 @@ sub SB_SERVER_Define( $$ ) {
 
     $hash->{helper}{pingCounter}=0;     # CD 0004
     $hash->{helper}{lastPRESENCEstate}='?'; # CD 0023
-
+    $hash->{helper}{onAfterAliveCheck}=0;   # CD 0038
+    
     # CD 0009 set module version, needed for reload
     $hash->{helper}{SB_SERVER_VERSION}=SB_SERVER_VERSION;
 
@@ -371,6 +374,17 @@ sub SB_SERVER_Define( $$ ) {
         SB_SERVER_LoadServerStates($hash) if($SB_SERVER_hasDataDumper==1);
         SB_SERVER_FixSyncGroupNames($hash);  # CD 0027
         SB_SERVER_UpdateSgReadings($hash);  # CD 0027
+    } else {
+        # CD 0038
+        if( ReadingsVal($name, "state", "unknown") eq "opened" ) {
+            DevIo_SimpleWrite( $hash, "listen 0\n", 0 );
+        }
+        $hash->{helper}{disableReconnect}=1;
+        SB_SERVER_RemoveInternalTimers( $hash );
+        readingsSingleUpdate( $hash, "power", "off", 1 );
+        SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+        DevIo_Disconnected( $hash );
+        SB_SERVER_setStates($hash, "disconnected");
     }
 
     # open the IO device
@@ -380,13 +394,21 @@ sub SB_SERVER_Define( $$ ) {
     if ($init_done>0){
         delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});          # CD 0007 reconnect immediately after modify
         # CD 0016 start
-        if( $hash->{STATE} eq "opened" ) {
-            DevIo_CloseDev( $hash );
-            readingsSingleUpdate( $hash, "power", "?", 0 );
-            $hash->{STATE}="disconnected";
-        }
+        #if( ReadingsVal($name, "state", "unknown") eq "opened" ) {  # CD 0038 state statt STATE verwenden
+        #    DevIo_CloseDev( $hash );
+        #    readingsSingleUpdate( $hash, "power", "?", 0 );
+        #    #$hash->{STATE}="disconnected";
+        #}
         # CD 0016 end
-        $ret= DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" );
+        if (defined($hash->{OLDDEF})) {
+            InternalTimer( gettimeofday() + 1,
+               "SB_SERVER_tcb_Alive",
+               "SB_SERVER_Alive:$name",
+               0 );
+            $ret=undef;
+        } else {
+            $ret= DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" );
+        }
     }
 
     # do and update of the status
@@ -429,7 +451,7 @@ sub SB_SERVER_Undef( $$ ) {
     DevIo_CloseDev( $hash );
 
     # remove all timers we created
-    RemoveInternalTimer( $hash );
+    SB_SERVER_RemoveInternalTimers( $hash );
 
     return( undef );
 }
@@ -450,7 +472,7 @@ sub SB_SERVER_Shutdown( $$ ) {
     DevIo_CloseDev( $hash );
 
     # remove all timers we created
-    RemoveInternalTimer( $hash );
+    SB_SERVER_RemoveInternalTimers( $hash );
 
     return( undef );
 }
@@ -471,10 +493,10 @@ sub SB_SERVER_Ready( $ ) {
             if( ( $hash->{USERNAME} ne "?" ) &&
                 ( $hash->{PASSWORD} ne "?" ) ) {
                 $hash->{LASTANSWER}='invalid username or password ?';
-                Log( 1, "SB_SERVER($name): invalid username or password ?" );
+                Log( 1, "SB_SERVER_Ready($name): invalid username or password ?" );
             } else {
                 $hash->{LASTANSWER}='missing username and password ?';
-                Log( 1, "SB_SERVER($name): missing username and password ?" );
+                Log( 1, "SB_SERVER_Ready($name): missing username and password ?" );
             }
             $hash->{NEXT_OPEN}=time()+60;
         }
@@ -482,18 +504,20 @@ sub SB_SERVER_Ready( $ ) {
     }
 
     # we need to re-open the device
-    if( $hash->{STATE} eq "disconnected" ) {
+    if( ReadingsVal($name, "state", "unknown") eq "disconnected" ) {    # CD 0038 state statt STATE verwenden
         if( ( ReadingsVal( $name, "power", "on" ) eq "on" ) ||
             ( ReadingsVal( $name, "power", "on" ) eq "?" ) ) {
             # obviously the first we realize the Server is off
             # clean up first
-            RemoveInternalTimer( $hash );
-            readingsSingleUpdate( $hash, "power", "off", 1 );
+            if ($hash->{helper}{onAfterAliveCheck}==0) {    # CD 0038
+                SB_SERVER_RemoveInternalTimers( $hash );
+                readingsSingleUpdate( $hash, "power", "off", 1 );
 
-            $hash->{CLICONNECTION} = "off";                         # CD 0007
+                $hash->{CLICONNECTION} = "off";                         # CD 0007
 
-            # and signal to our clients
-            SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+                # and signal to our clients
+                SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+            }
         }
         # CD added init_done
         if ($init_done>0) {
@@ -515,7 +539,7 @@ sub SB_SERVER_Ready( $ ) {
             if( ReadingsVal( $hash->{PRESENCENAME}, "state", "present" ) eq "present" ) {
                 $reconnect=1;
             }
-            if ($reconnect==1) {
+            if (($reconnect==1)&&(!defined($hash->{helper}{disableReconnect}))) {
                 return( DevIo_OpenDev( $hash, 1, "SB_SERVER_DoInit") );
             } else {
                 return undef;
@@ -654,9 +678,38 @@ sub SB_SERVER_Set( $@ ) {
 
     } elsif( $cmd eq "renew" ) {
         Log3( $hash, 5, "SB_SERVER_Set: renew" );
-        DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
+        delete $hash->{helper}{disableReconnect} if (defined($hash->{helper}{disableReconnect}));   # CD 0038
+        if( ReadingsVal( $name, "state", "unknown" ) eq "opened" ) {    # CD 0038
+            if((defined($a[0])) && ($a[0] eq 'soft')) {
+                DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
+            } else {
+                DevIo_SimpleWrite( $hash, "listen 0\n", 0 );
+                $hash->{helper}{disableReconnect}=1;
+                SB_SERVER_RemoveInternalTimers( $hash );
+                readingsSingleUpdate( $hash, "power", "off", 1 );
+                SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+                DevIo_Disconnected( $hash );
+                InternalTimer( gettimeofday() + 5,
+                           "SB_SERVER_tcb_Alive",
+                           "SB_SERVER_Alive:$name",
+                           0 );
+            }
+        } else {
+            # CD 0038 force open
+            readingsSingleUpdate( $hash, "power", "off", 1 );
+            delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});
+            SB_SERVER_Alive($hash);
+        }
     } elsif( $cmd eq "abort" ) {
-        DevIo_SimpleWrite( $hash, "listen 0\n", 0 );
+        DevIo_SimpleWrite( $hash, "listen 0\n", 0 ) if( ReadingsVal( $name, "state", "unknown" ) eq "opened" );
+        if((defined($a[0])) && ($a[0] eq 'soft')) {
+        } else {
+            $hash->{helper}{disableReconnect}=1;
+            DevIo_Disconnected( $hash );
+            readingsSingleUpdate( $hash, "power", "off", 1 );
+            SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+            SB_SERVER_RemoveInternalTimers( $hash );
+        }
     } elsif( $cmd eq "statusRequest" ) {
         Log3( $hash, 5, "SB_SERVER_Set: statusRequest" );
         DevIo_SimpleWrite( $hash, "version ?\n", 0 );
@@ -1337,9 +1390,11 @@ sub SB_SERVER_DoInit( $ ) {
         DevIo_CloseDev( $hash );
     }
 
-    Log3( $hash, 3, "SB_SERVER_DoInit($name): STATE: " . $hash->{STATE} . " power: ". ReadingsVal( $name, "power", "X" ));    # CD 0009 level 2 -> 3
+    my $state=ReadingsVal($name, "state", "unknown");
+    
+    Log3( $hash, 3, "SB_SERVER_DoInit($name): state: " . $state . " power: ". ReadingsVal( $name, "power", "X" ));    # CD 0009 level 2 -> 3 # CD 0038 state statt STATE verwenden
 
-    if( $hash->{STATE} eq "disconnected" ) {
+    if( $state eq "disconnected" ) {    # CD 0038 state statt STATE verwenden
         # server is off after FHEM start, broadcast to clients
         if( ( ReadingsVal( $name, "power", "on" ) eq "on" ) ||
             ( ReadingsVal( $name, "power", "on" ) eq "?" ) ) {
@@ -1356,11 +1411,12 @@ sub SB_SERVER_DoInit( $ ) {
                      AttrVal( $name, "httpport", "9000" ) );
         }
         return( 1 );
-    } elsif( $hash->{STATE} eq "opened" ) {
+    } elsif( $state eq "opened" ) { # CD 0038 state statt STATE verwenden
         $hash->{ALIVECHECK} = "?";
         $hash->{CLICONNECTION} = "on";
         if( ( ReadingsVal( $name, "power", "on" ) eq "off" ) ||
-            ( ReadingsVal( $name, "power", "on" ) eq "?" ) ) {
+            ( ReadingsVal( $name, "power", "on" ) eq "?" ) ||
+            ($hash->{helper}{onAfterAliveCheck}==1)) {                       # CD 0038
             Log3( $hash, 3, "SB_SERVER_DoInit($name): " .                   # CD 0009 level 2 -> 3
               "SB-Server is back again." );
 
@@ -1920,6 +1976,8 @@ sub SB_SERVER_tcb_Alive($) {
     my $hash = $defs{$name};
 
     #Log 0,"SB_SERVER_tcb_Alive";
+    delete($hash->{helper}{disableReconnect}) if defined($hash->{helper}{disableReconnect});
+
     SB_SERVER_Alive($hash);
 }
 # CD 0020 end
@@ -1930,6 +1988,7 @@ sub SB_SERVER_tcb_Alive($) {
 sub SB_SERVER_Alive( $ ) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
+    my $state=ReadingsVal($name, "state", "unknown");   # CD 0038
 
     # CD 0004 set default to off
     #my $rccstatus = "on";
@@ -1971,7 +2030,7 @@ sub SB_SERVER_Alive( $ ) {
             # CD 0021 start
             my $ipp=AttrVal($name, "internalPingProtocol", "tcp" );
             if($ipp eq "none") {
-                if ($hash->{STATE} eq "disconnected") {
+                if ($state eq "disconnected") {     # CD 0038 state statt STATE verwenden
                     $pingstatus = "off";
                     $hash->{helper}{pingCounter}=3;
                 } else {
@@ -2018,7 +2077,7 @@ sub SB_SERVER_Alive( $ ) {
             Log3( $hash, 3, "SB_SERVER_Alive($name): " .    # CD 0004 changed log level from 5 to 2 # CD 0009 level 2->3
               "SB-Server is back again." );
             # first time we realized server is away
-            if( $hash->{STATE} eq "disconnected" ) {
+            if( $state eq "disconnected" ) {        # CD 0038 state statt STATE verwenden
                 delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});                  # CD 0007 remove delay for reconnect
                 DevIo_OpenDev( $hash, 1, "SB_SERVER_DoInit" );
             }
@@ -2027,6 +2086,7 @@ sub SB_SERVER_Alive( $ ) {
 
             $hash->{ALIVECHECK} = "?";
             $hash->{CLICONNECTION} = "off";
+            $hash->{helper}{onAfterAliveCheck}=1;   # CD 0038
 
             # quicker update to capture CLI connection faster
             $nexttime = gettimeofday() + 10;
@@ -2038,6 +2098,8 @@ sub SB_SERVER_Alive( $ ) {
                 Log3( $hash, 3, "SB_SERVER_Alive($name): overrun SB-Server dead." );    # CD 0004 changed log level from 5 to 2 # CD 0009 level 2->3
 
                 $hash->{CLICONNECTION} = "off";
+                
+                $hash->{helper}{onAfterAliveCheck}=0;   # CD 0038
 
                 # signal that to our clients
                 SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
@@ -2050,7 +2112,7 @@ sub SB_SERVER_Alive( $ ) {
 
                 # CD 0000 start - exit infinite loop after socket has been closed
                 $hash->{ALIVECHECK} = "?";
-                $hash->{STATE}="disconnected";
+                # CD 0038 $hash->{STATE}="disconnected";
                 # CD 0005 line above does not work (on Linux), fix:
                 # CD 0006 DevIo_setStates requires v7099 of DevIo.pm, replaced with SB_SERVER_setStates
                 SB_SERVER_setStates($hash, "disconnected");
@@ -2063,13 +2125,13 @@ sub SB_SERVER_Alive( $ ) {
                 # CD end
 
                 # remove all timers we created
-                RemoveInternalTimer( $hash );
+                SB_SERVER_RemoveInternalTimers( $hash );
             } else {
                 if( $hash->{CLICONNECTION} eq "off" ) {
                     # signal that to our clients
                     # to be revisited, should only be sent after CLI established
                     #SB_SERVER_Broadcast( $hash, "SERVER",  "ON" );             # CD 0007 disabled, wait for SB_SERVER_LMS_Status
-                    SB_SERVER_LMS_Status( $hash );
+                    SB_SERVER_LMS_Status( $hash ) if ($state eq 'opened');  # CD 0038 nur aufrufen wenn Verbindung aufgebaut ist
                 }
 
                 $hash->{CLICONNECTION} = "on";
@@ -2077,7 +2139,7 @@ sub SB_SERVER_Alive( $ ) {
                 # just send something to the SB-Server. It will echo it
                 # if we receive the echo, the server is still alive
                 $hash->{ALIVECHECK} = "waiting";
-                DevIo_SimpleWrite( $hash, "fhemalivecheck\n", 0 );
+                DevIo_SimpleWrite( $hash, "fhemalivecheck\n", 0 ) if ($state eq 'opened');  # CD 0038 nur aufrufen wenn Verbindung aufgebaut ist
             }
         }
     } elsif( ( $rccstatus eq "off" ) && ( $pingstatus eq "off" ) ) {
@@ -2100,12 +2162,12 @@ sub SB_SERVER_Alive( $ ) {
             DevIo_Disconnected( $hash );
             $hash->{helper}{pingCounter}=9999;                                 # CD 0007
             # CD 0004 set STATE, needed for reconnect
-            $hash->{STATE}="disconnected";
+            # CD 0038 $hash->{STATE}="disconnected";
             # CD 0005 line above does not work (on Linux), fix:
             # CD 0006 DevIo_setStates requires v7099 of DevIo.pm, replaced with SB_SERVER_setStates
             SB_SERVER_setStates($hash, "disconnected");
             # remove all timers we created
-            RemoveInternalTimer( $hash );
+            SB_SERVER_RemoveInternalTimers( $hash );
         }
     } else {
         # we shouldn't end up here
@@ -2116,10 +2178,12 @@ sub SB_SERVER_Alive( $ ) {
     # do an update of the status
     # CD 0020 SB_SERVER_tcb_Alive verwenden
     RemoveInternalTimer( "SB_SERVER_Alive:$name");
-    InternalTimer( $nexttime,
-           "SB_SERVER_tcb_Alive",
-           "SB_SERVER_Alive:$name",
-		   0 );
+    if( AttrVal( $name, "doalivecheck", "false" ) eq "true" ) {
+        InternalTimer( $nexttime,
+               "SB_SERVER_tcb_Alive",
+               "SB_SERVER_Alive:$name",
+               0 );
+    }
 }
 
 
@@ -3067,7 +3131,7 @@ sub SB_SERVER_CheckConnection($) {
     my(undef,$name) = split(':',$in);
     my $hash = $defs{$name};
 
-    Log3( $hash, 3, "SB_SERVER_CheckConnection($name): STATE: " . $hash->{STATE} . " power: ". ReadingsVal( $name, "power", "X" )); # CD 0009 level 2->3
+    Log3( $hash, 3, "SB_SERVER_CheckConnection($name): STATE: " . ReadingsVal($name, "state", "unknown") . " power: ". ReadingsVal( $name, "power", "X" )); # CD 0009 level 2->3 # CD 0038 state statt STATE verwenden
     if(ReadingsVal( $name, "power", "X" ) ne "on") {
         Log3( $hash, 3, "SB_SERVER_CheckConnection($name): forcing power on");      # CD 0009 level 2->3
 
@@ -3106,7 +3170,7 @@ sub SB_SERVER_Notify( $$ ) {
 
     # CD start
     if ($dev_hash->{NAME} eq "global" && grep (m/^INITIALIZED$|^REREADCFG$/,@{$dev_hash->{CHANGED}})){
-    DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" );
+        DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" ) unless defined($hash->{helper}{disableReconnect}); # CD 0038
     }
     # CD end
     #Log3( $hash, 4, "SB_SERVER_Notify($name): called" .
@@ -3122,11 +3186,11 @@ sub SB_SERVER_Notify( $$ ) {
     # CD 0008 start
     if($devName eq $name ) {
         if (grep (m/^DISCONNECTED$/,@{$dev_hash->{CHANGED}})) {
-            Log3( $hash, 3, "SB_SERVER_Notify($name): DISCONNECTED - STATE: " . $hash->{STATE} . " power: ". ReadingsVal( $name, "power", "X" ));   # CD 0009 level 2->3
+            Log3( $hash, 3, "SB_SERVER_Notify($name): DISCONNECTED - STATE: " . ReadingsVal($name, "state", "unknown") . " power: ". ReadingsVal( $name, "power", "X" ));   # CD 0009 level 2->3
             RemoveInternalTimer( "CheckConnection:$name");
         }
         if (grep (m/^CONNECTED$/,@{$dev_hash->{CHANGED}})) {
-            Log3( $hash, 3, "SB_SERVER_Notify($name): CONNECTED - STATE: " . $hash->{STATE} . " power: ". ReadingsVal( $name, "power", "X" ));      # CD 0009 level 2->3
+            Log3( $hash, 3, "SB_SERVER_Notify($name): CONNECTED - STATE: " . ReadingsVal($name, "state", "unknown") . " power: ". ReadingsVal( $name, "power", "X" ));      # CD 0009 level 2->3
             InternalTimer( gettimeofday() + 2,
                 "SB_SERVER_CheckConnection",
                 "CheckConnection:$name",
@@ -3137,9 +3201,8 @@ sub SB_SERVER_Notify( $$ ) {
 
     if( $devName eq $hash->{RCCNAME} ) {
         if( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "off" ) {
-            RemoveInternalTimer( $hash );
+            SB_SERVER_RemoveInternalTimers( $hash );
             # CD 0020 SB_SERVER_tcb_Alive verwenden
-            RemoveInternalTimer( "SB_SERVER_Alive:$name");
             InternalTimer( gettimeofday() + 10,
                        "SB_SERVER_tcb_Alive",
                        "SB_SERVER_Alive:$name",
@@ -3154,10 +3217,9 @@ sub SB_SERVER_Notify( $$ ) {
             # CD 0006 DevIo_setStates requires v7099 of DevIo.pm, replaced with SB_SERVER_setStates
             SB_SERVER_setStates($hash, "disconnected");
         } elsif( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "on" ) {
-            RemoveInternalTimer( $hash );
+            SB_SERVER_RemoveInternalTimers( $hash );
             # do an update of the status, but SB CLI must come up
             # CD 0020 SB_SERVER_tcb_Alive verwenden
-            RemoveInternalTimer( "SB_SERVER_Alive:$name");
             InternalTimer( gettimeofday() + 20,
                        "SB_SERVER_tcb_Alive",
                        "SB_SERVER_Alive:$name",
@@ -3179,10 +3241,9 @@ sub SB_SERVER_Notify( $$ ) {
             }
             $hash->{helper}{lastPRESENCEstate}=$dev_hash->{CHANGED}[0];
             # CD 0023 end
-            RemoveInternalTimer( $hash );
+            SB_SERVER_RemoveInternalTimers( $hash );
             # do an update of the status, but SB CLI must come up
             # CD 0020 SB_SERVER_tcb_Alive verwenden
-            RemoveInternalTimer( "SB_SERVER_Alive:$name");
             InternalTimer( gettimeofday() + 10,
                        "SB_SERVER_tcb_Alive",
                        "SB_SERVER_Alive:$name",
@@ -3245,6 +3306,25 @@ sub SB_SERVER_LMS_Status( $ ) {
 
     return( true );
 }
+
+# CD 0038 start
+sub SB_SERVER_RemoveInternalTimers($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    RemoveInternalTimer( $hash );
+    RemoveInternalTimer( "SB_SERVER_Alive:$name");
+    RemoveInternalTimer( "StartTalk:$name");
+    RemoveInternalTimer( "RecallAfterTalk:$name");
+    RemoveInternalTimer( "SB_SERVER_tcb_SendPlaylists:$name");
+    RemoveInternalTimer( "SB_SERVER_tcb_SendFavorites:$name");
+    RemoveInternalTimer( "SB_SERVER_tcb_SendSyncMasters:$name");
+    RemoveInternalTimer( "SB_SERVER_tcb_SendAlarmPlaylists:$name");
+    RemoveInternalTimer( "CheckConnection:$name");
+}
+# CD 0038 end
+
 
 # CD 0006 start - added
 # ----------------------------------------------------------------------------
