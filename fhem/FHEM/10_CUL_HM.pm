@@ -1178,11 +1178,6 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   
-
-
-
-
-
   #----------CUL aesCommReq handling---------
   my $aComReq = AttrVal($mh{devN},"aesCommReq",0);
   my $dRfMode = AttrVal($mh{devH}{IODev}{NAME},"rfmode","");
@@ -2479,7 +2474,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
         if($mh{devH}->{helper}{PONtest}){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] if ($mh{md} !~ m/HM-ES-PMSw1/);
           $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
