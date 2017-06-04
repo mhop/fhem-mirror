@@ -17,36 +17,36 @@ sub HMtemplate_noDup(@);
 use Blocking;
 use HMConfig;
 my %HtState =(
-  s0=>{name=>"init"   ,cmd=>["defTmpl","edit","delete","select"] ,info=>[ "delete to remove a template definition"
-                                                                         ,"defTmpl to greate a template"
-                                                                         ,"-       use an entity as default"
-                                                                         ,"edit to modify a template definition"
-                                                                         ,"select to apply a template to a entity"
-                                                                        ]}  
- ,s1=>{name=>"edit"   ,cmd=>["dismiss","save","saveAs"]          ,info=>[ "change attr Reg_ as desired"
-                                                                         ,"change attr tpl_params as desired"
-                                                                         ,"save    if finished"
-                                                                         ,"saveAs  to create a copy"
-                                                                         ,"dismiss will reset HMtemplate"
-                                                                        ]}  
- ,s2=>{name=>"defTmpl",cmd=>["dismiss","save","saveAs"]          ,info=>[ "1)set attr tpl_type"
-                                                                         ,"2)set attr tpl_source"
-                                                                         ,"3)set attr tpl_peer if peer required"
-                                                                         ,"4)set attr tpl_params if params are desired"
-                                                                         ,"5)set attr tpl_description for the template"
-                                                                        ]} 
- ,s3=>{name=>"defTmpl",cmd=>["defTmpl","edit","delete"]          ,info=>[ "delete"
-                                                                        ]}  
- ,s4=>{name=>"select" ,cmd=>["dismiss","apply"]                  ,info=>[ "apply the selected template to an entity"
-                                                                         ,"1) choose target entity"
-                                                                         ,"2) select a peer if required"
-                                                                         ,"3) select type if required"
-                                                                         ,"4) fill all attr tpl_param_"
-                                                                         ,"5) set apply to execute and write the register"
-                                                                        ]}  
- ,s5=>{name=>"defTmpl",cmd=>["defTmpl","edit","delete"]          ,info=>[ "s5 info1"
-                                                                         ,"s5 info2"
-                                                                        ]}
+  s0=>{name=>"init"   ,cmd=>["select" ,"defTmpl","delete","edit"]      ,info=>[ "delete to remove a template definition"
+                                                                               ,"defTmpl to greate a template"
+                                                                               ,"-       use an entity as default"
+                                                                               ,"edit to modify a template definition"
+                                                                               ,"select to apply a template to a entity"
+                                                                            ]}  
+ ,s1=>{name=>"edit"   ,cmd=>["dismiss","save"   ,"saveAs","importReg"] ,info=>[ "change attr Reg_ as desired"
+                                                                               ,"change attr tpl_params ':' separated"
+                                                                               ,"save    if finished"
+                                                                               ,"saveAs  to create a copy"
+                                                                               ,"dismiss will reset HMtemplate"
+                                                                            ]}  
+ ,s2=>{name=>"defTmpl",cmd=>["dismiss","save","saveAs"]                ,info=>[ "1)set attr tpl_type"
+                                                                               ,"2)set attr tpl_source"
+                                                                               ,"3)set attr tpl_peer if peer required"
+                                                                               ,"4)set attr tpl_params ':' separated"
+                                                                               ,"5)set attr tpl_description for the template"
+                                                                            ]} 
+ ,s3=>{name=>"defTmpl",cmd=>["defTmpl","edit"   ,"delete"]             ,info=>[ "delete"
+                                                                            ]}  
+ ,s4=>{name=>"select" ,cmd=>["dismiss","apply"  ,"select"]             ,info=>[ "apply the selected template to an entity"
+                                                                               ,"1) choose target entity"
+                                                                               ,"2) select a peer if required"
+                                                                               ,"3) select type if required"
+                                                                               ,"4) fill all attr tpl_param_"
+                                                                               ,"5) set apply to execute and write the register"
+                                                                            ]}  
+ ,s5=>{name=>"defTmpl",cmd=>["defTmpl","edit"   ,"delete"]             ,info=>[ "s5 info1"
+                                                                               ,"s5 info2"
+                                                                            ]}
 );
 
 sub HMtemplate_Initialize($$) {################################################
@@ -229,12 +229,23 @@ sub HMtemplate_GetFn($@) {#####################################################
             ." ".join(" ",map{$_.=":".$culHmTpl->{$tN}{reg}{$_}} keys %{$culHmTpl->{$tN}{reg}})
             ;
   }  
+  elsif($cmd eq "regInfo"){##print protocol-events-------------------------
+    my @regArr = map { $_ =~ s/Reg_//g; $_ } 
+              grep /^Reg_/,keys %{$attr{$name}};
+    if (InternalVal($name,"tpl_type","" =~ m/peer-(short|long)/)){
+      $_ = "lg".$_ foreach (@regArr);
+    }
+    return CUL_HM_getRegInfo(\@regArr,1,1); # 
+  }  
   else{
     my @cmdLst = ( "defineCmd"
+                  ,"regInfo"
                  );
 
     my $tList = ":".join(",",sort keys%{$culHmTpl});
     $_ .=$tList foreach(grep/^(defineCmd)$/,@cmdLst);
+    
+    $_ .=":noArg" foreach(grep/^(regInfo)$/,@cmdLst);# no arguments
            
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
@@ -267,7 +278,7 @@ sub HMtemplate_SetFn($@) {#####################################################
   }
   elsif ($cmd eq "defTmpl" )  {#
     my ($tName) = @a;  
-    return "spezify template name" if (!defined $tName); 
+    return "specify template name" if (!defined $tName); 
     return "$tName is already defined" if (defined $culHmTpl->{$tName}); 
     readingsSingleUpdate($hash,"state","define",0);
     ${$eSt}="s2";
@@ -353,6 +364,38 @@ sub HMtemplate_SetFn($@) {#####################################################
                        ,@p
                         );
   }
+  elsif ($cmd eq "importReg" ){#
+    my ($eName) = @a;
+
+    return "please enter a device to be used "if(!$eName);
+    my @fnd = grep /^$eName /, 
+              map {$hash->{READINGS}{$_}{VAL}}
+              grep /^usage_/,keys %{$hash->{READINGS}};
+    return "template not assigned to $eName" if (scalar(@fnd) != 1);
+
+    HMtemplate_import($name,$eName,InternalVal($name,"tpl_type",""),InternalVal($name,"tpl_peer",""));
+    
+    # my @fnd = map { $_ =~ s/ .*//g; $_ } 
+    #           map {$hash->{READINGS}{$_}{VAL}}
+    #           grep /^usage_/,keys %{$hash->{READINGS}};
+    # my @reg;
+    # my $first = 1;
+    # foreach my $d(@fnd){
+    #   my $dHash = CUL_HM_getDeviceHash($defs{$d});
+    #   my $st = AttrVal($dHash->{NAME},"subType","");
+    #   my $md = AttrVal($dHash->{NAME},"model","");
+    #   my @dr = (CUL_HM_getRegN($st,$md,"01"));
+    #   
+    #   if ($first){
+    #     @reg = @dr;
+    #     $first = 0;
+    #   }
+    #   else{
+    #     @reg = HMtemplate_intersection(\@reg,\@dr);
+    #   }
+    # }
+    # return join("\n",sort @reg);
+  }
   elsif ($cmd eq "edit" )     {#
     my ($templ) = @a;                               
     return "$templ is not defined" if (! defined $culHmTpl->{$templ});
@@ -414,10 +457,19 @@ sub HMtemplate_SetFn($@) {#####################################################
     return HMtemplate_save($name,$tName);
   }
   else{
+    #"select","edit","delete", "defTmpl","dismiss","save","saveAs","importReg","apply"]            
     my @cmdLst = @{$HtState{${$eSt}}{cmd}};
     my $tList = ":".join(",",sort keys%{$culHmTpl});
     $_ .=$tList foreach(grep/^(edit|delete|select)$/,@cmdLst);
-    
+    if (grep/^importReg$/,@cmdLst){
+      my @fnd = map { $_ =~ s/ .*//g; $_ } 
+                map {$hash->{READINGS}{$_}{VAL}}
+                grep /^usage_/,keys %{$hash->{READINGS}};
+      my $eList = ":".join(",",sort @fnd);
+      $_ .=$eList foreach(grep/^(importReg)$/,@cmdLst);
+    }
+    $_ .=":noArg" foreach(grep/^(save|dismiss|apply)$/,@cmdLst);# no arguments
+
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
   my $i = 0;
@@ -425,13 +477,19 @@ sub HMtemplate_SetFn($@) {#####################################################
   $hash->{"tpl_Info".$i++}= $_ foreach (@{$HtState{${$eSt}}{info}});
   return $ret;
 }
+sub HMtemplate_intersection($$) {#
+    my ($x, $y) = @_;
+    my %seen;
+    @seen{ @$x } = (1) x @$x;
+    return grep { $seen{ $_} } @$y;
+}
 
 sub HMtemplate_import(@){####################################################
   my ($name,$eName,$tType,$tPeer) = @_;
   my @regReads;
   my ($ty,$match) = ("","");
-  if ($tType eq "basic"){
-    @regReads = grep !/\-.*\-/ ,grep /\.?R-/,keys %{$defs{$eName}{READINGS}};
+  if    ($tType eq "basic"){
+    @regReads = grep !/\-.*\-/   ,grep /\.?R-/      ,keys %{$defs{$eName}{READINGS}};
   }
   elsif ($tType =~ m/peer-(Long|Short)/){
     $ty = $1 eq "Long" ? "lg" : "sh";
@@ -440,16 +498,18 @@ sub HMtemplate_import(@){####################################################
   }
   elsif ($tType eq "peer-both"){
     $match = ".*-";
-    @regReads = grep /\-.*\-/ ,grep /\.?R-$tPeer/,keys %{$defs{$eName}{READINGS}};
+    @regReads = grep /\-.*\-/    ,grep /\.?R-$tPeer/,keys %{$defs{$eName}{READINGS}};
   }
 
   foreach my $rR (@regReads){
     my $rN = $rR;
     $rN =~ s/\.?R-$match$ty//; 
-    $attr{$name}{"Reg_".$rN} = $defs{$eName}{READINGS}{$rR}{VAL};
-    $attr{$name}{"Reg_".$rN} =~ s/ .*//;# remove units which are in the readings
-    my $lits = ":".join(",",(sort (keys %{$culHmRegDef->{$ty.$rN}{lit}}))) if ($culHmRegDef->{$ty.$rN}{c} eq "lit");
-    $modules{HMtemplate}{AttrList} .= " Reg_".$rN.$lits;
+    if (!$attr{$name}{"Reg_".$rN}){ #dont overwrite existing
+      $attr{$name}{"Reg_".$rN} = $defs{$eName}{READINGS}{$rR}{VAL};
+      $attr{$name}{"Reg_".$rN} =~ s/ .*//;# remove units which are in the readings
+      my $lits = ":".join(",",(sort (keys %{$culHmRegDef->{$ty.$rN}{lit}}))) if ($culHmRegDef->{$ty.$rN}{c} eq "lit");
+      $modules{HMtemplate}{AttrList} .= " Reg_".$rN.$lits;
+    }
   }
 }
 
