@@ -1436,6 +1436,7 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($mh{md} =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ########################
     if($mh{mTp} eq "70") {
       my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$mh{p};
+      push @evtEt,[$mh{devH},1,"battery:". (($t & 0x8000)?"low"  :"ok"  )] if {$mh{md} eq "HM-WDS100-C6-O-2"}; #has no battery
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
@@ -1465,7 +1466,7 @@ sub CUL_HM_Parse($$) {#########################################################
       elsif ($lvlStr{st}{$mh{st}})                                             {$txt = $lvlStr{st}{$mh{st}}{$state}}
       else                                                                     {$txt = "unknown:$state"}
       push @evtEt,[$mh{cHash},1,"storm:$txt"];
-      push @evtEt,[$mh{devH},1,"trig_$mh{chnHx}:$mh{dstN}"];
+      push @evtEt,[$mh{devH} ,1,"trig_$mh{chnHx}:$mh{dstN}"];
       my $err = $chn & 0x80;
       push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )] if {$mh{md} eq "HM-WDS100-C6-O-2"}; #has no battery
     }
@@ -3804,7 +3805,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }       
   elsif($cmd eq "regList") {  #################################################
     my @regArr = CUL_HM_getRegN($st,$md,$chn);
-
+    return CUL_HM_getRegInfo(\@regArr,$roleD,$roleC) ;
     my @rI;
     foreach my $regName (@regArr){
       my $reg  = $culHmRegDefine->{$regName};
@@ -8048,6 +8049,35 @@ sub CUL_HM_time2min($) { # minutes -> time
   $m = 0 if($m < 0);
   $m = 47 if($m > 47);
   return $m;
+}
+
+sub CUL_HM_getRegInfo($$$) { # 
+  my ($regArr,$roleD,$roleC) = @_;
+  my @rI;
+  foreach my $regName (@$regArr){
+    my $reg  = $culHmRegDefine->{$regName};
+    my $help = $reg->{t};
+    my ($min,$max) = ($reg->{min},"to ".$reg->{max});
+    if ($reg->{c} eq "lit"){
+      $help .= " options:".join(",",keys%{$reg->{lit}});
+      $min = "";
+      $max = "literal";
+    }
+    elsif (defined($reg->{lit})){
+      $help .= " special:".join(",",keys%{$reg->{lit}});
+    }
+    push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
+            $reg->{l},$regName,$min,$max.$reg->{u},
+            ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
+            $help)
+          if (($roleD && $reg->{l} == 0)||
+              ($roleC && $reg->{l} != 0));
+  }
+
+  my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
+                   "register","range","peer","description");
+  foreach(sort(@rI)){$info .= $_;}
+  return $info;
 }
 
 sub CUL_HM_getRegN($$@){ # get list of register for a model
