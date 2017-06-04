@@ -62,6 +62,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 use constant { true => 1, false => 0 };
 
 sub SB_PLAYER_SonginfoHandleQueue($);   # CD 0075
+sub SB_PLAYER_RemoveInternalTimers($);  # CD 0078
 
 # the list of favorites
 # CD 0010 moved to $hash->{helper}{SB_PLAYER_Favs}, fixes problem on module reload
@@ -2017,7 +2018,7 @@ sub SB_PLAYER_Undef( $$$ ) {
 
     Log3( $hash, 5, "SB_PLAYER_Undef: called" );
 
-    RemoveInternalTimer( $hash );
+    SB_PLAYER_RemoveInternalTimers( $hash );
 
     # to be reviewed if that works.
     # check for uc()
@@ -2033,7 +2034,7 @@ sub SB_PLAYER_Undef( $$$ ) {
 sub SB_PLAYER_Shutdown( $$ ) {
     my ($hash, $dev) = @_;
 
-    RemoveInternalTimer( $hash );
+    SB_PLAYER_RemoveInternalTimers( $hash );
 
     Log3( $hash, 5, "SB_PLAYER_Shutdown: called" );
 
@@ -5063,6 +5064,27 @@ sub SB_PLAYER_tcb_SonginfoHandleQueue($) {
     SB_PLAYER_SonginfoHandleQueue($hash);
 }
 # CD 0072 end
+
+# CD 0078 start
+sub SB_PLAYER_RemoveInternalTimers($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    RemoveInternalTimer( "DelayAmplifier:$name");
+    RemoveInternalTimer( "QueryElapsedTime:$name");
+    RemoveInternalTimer( "SonginfoHandleQueue:$name");
+    RemoveInternalTimer( "StartTalk:$name");
+    RemoveInternalTimer( "TTSDelay:$name");
+    RemoveInternalTimer( "TTSRestore:$name");
+    RemoveInternalTimer( "TTSStartAfterPowerOn:$name");
+    RemoveInternalTimer( "TimeoutTTSWaitForPlay:$name");
+    RemoveInternalTimer( "TimeoutTTSWaitForPowerOn:$name");
+    RemoveInternalTimer( "TriggerPlaylistStop:$name");
+    RemoveInternalTimer( "TriggerTTSDone:$name");
+    RemoveInternalTimer( "recallPause:$name");
+    RemoveInternalTimer( $hash );
+}
+# CD 0078 end
 
 # ##############################################################################
 #  No PERL code beyond this line
