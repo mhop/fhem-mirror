@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.12;       # Version of this module
+my $module_version    = 1.13;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -271,8 +271,17 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   my $iodev = $a[4] if defined $a[4];
   my $ident = $a[5] if defined $a[5];
 
+  my $ipv = ($port =~ m/^IPV6:/i ? 6 : 4) if defined $port;
+  $hash->{IPV} = $ipv;
+  
+  if ($ipv == 6) {
+    use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
+    Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support."
+      if !HAS_AF_INET6;
+  }
+
   return "ERROR: only 1 ESPEasy bridge can be defined!"
-    if($host eq "bridge" && $modules{ESPEasy}{defptr}{BRIDGE});
+    if($host eq "bridge" && $modules{ESPEasy}{defptr}{BRIDGE}{$ipv});
   return "ERROR: missing arguments for subtype device: $usg"
     if ($host ne "bridge" && !(defined $a[4]) && !(defined $a[5]));
   return "ERROR: too much arguments for a bridge: $usg"
@@ -297,7 +306,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   #--- BRIDGE -------------------------------------------------
   if ($hash->{HOST} eq "bridge") {
     $hash->{SUBTYPE} = "bridge";
-    $modules{ESPEasy}{defptr}{BRIDGE} = $hash;
+    $modules{ESPEasy}{defptr}{BRIDGE}{$ipv} = $hash;
     Log3 $hash->{NAME}, 2, "$type $name: Opening bridge on port tcp/$port (v$module_version)";
     ESPEasy_tcpServerOpen($hash);
     if ($init_done && !defined($hash->{OLDDEF})) {
@@ -551,7 +560,8 @@ sub ESPEasy_Read($) {
 
   my ($hash) = @_;                             #hash of temporary child instance
   my $name   = $hash->{NAME};
-  my $bhash  = $modules{ESPEasy}{defptr}{BRIDGE};     #hash of original instance
+  my $ipv    = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $bhash  = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}; #hash of original instance
   my $bname  = $bhash->{NAME};
   my $btype  = $bhash->{TYPE};
   $Data::Dumper::Indent = 0;
@@ -986,7 +996,8 @@ sub ESPEasy_Undef($$)
 
   # close server and return if it is a child process for incoming http requests
   if (defined $hash->{TEMPORARY} && $hash->{TEMPORARY} == 1) {
-    my $bhash = $modules{ESPEasy}{defptr}{BRIDGE};
+    my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
+    my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
     Log3 $bhash->{NAME}, 4, "$type $name: Closing tcp session.";
     TcpServer_Close($hash);
     return undef
@@ -996,8 +1007,9 @@ sub ESPEasy_Undef($$)
   RemoveInternalTimer($hash);
 
   if($hash->{SUBTYPE} && $hash->{SUBTYPE} eq "bridge") {
-    delete $modules{ESPEasy}{defptr}{BRIDGE}
-      if(defined($modules{ESPEasy}{defptr}{BRIDGE}));
+    my $ipv = $hash->{IPV};
+    delete $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}
+      if(defined($modules{ESPEasy}{defptr}{BRIDGE}{$ipv}));
     TcpServer_Close( $hash );
     Log3 $name, 2, "$type $name: Socket on port tcp/$port closed";
   }
@@ -1045,7 +1057,8 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
   return if (IsDisabled $name);
 
   my $type = $hash->{TYPE};
-  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE};
+  my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
   my $bname = $bhash->{NAME};
 
   my $ui = 1; #can be removed later
@@ -1682,6 +1695,8 @@ sub ESPEasy_TcpServer_Accept($$)
 }
 
 
+
+
 # ------------------------------------------------------------------------------
 sub ESPEasy_header2Hash($) {
   my ($string) = @_;
@@ -1705,7 +1720,8 @@ sub ESPEasy_isAuthenticated($$)
   my ($hash,$ah) = @_;
   my ($name,$type) = ($hash->{NAME},$hash->{TYPE});
 
-  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE};
+  my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
   my ($bname,$btype) = ($bhash->{NAME},$bhash->{TYPE});
 
   my $u = $bhash->{".bau"};
@@ -1766,7 +1782,8 @@ sub ESPEasy_sendHttpClose($$$) {
   my ($hash,$code,$response) = @_;
   my ($name,$type,$con) = ($hash->{NAME},$hash->{TYPE},$hash->{CD});
 
-  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE};
+  my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
   my $bname = $bhash->{NAME};
 
   print $con "HTTP/1.1 ".$code."\r\n",
@@ -2550,6 +2567,9 @@ sub ESPEasy_removeGit($)
       Furthermore ESP controller IP must match FHEM's IP address. ESP controller
       port and the FHEM ESPEasy bridge port must be the same.
     </li>
+    <li>Max. 2 ESPEasy bridges can be defined at the same time: 1 for IPv4 and
+    1 for IPv6
+    </li>
     <br>
   </ul>
 
@@ -2573,7 +2593,7 @@ sub ESPEasy_removeGit($)
   <b>Define </b>(bridge)<br><br>
 
   <ul>
-    <code>define &lt;name&gt; ESPEasy bridge &lt;port&gt;</code><br><br>
+    <code>define &lt;name&gt; ESPEasy bridge &lt;[IPV6:]port&gt;</code><br><br>
 
     <li>
       <code>&lt;name&gt;</code><br>
@@ -2582,11 +2602,16 @@ sub ESPEasy_removeGit($)
 
     <li>
       <code>&lt;port&gt;</code><br>
-      Specifies tcp port for incoming http requests. This port must <u>not</u>
-      be used by any other application or daemon on your system and must be in
-      the range 1025..65535<br>
-      eg. <code>8383</code> (ESPEasy FHEM HTTP plugin default)</li><br>
-
+      Specifies TCP port for incoming ESPEasy http requests. This port must
+      <u>not</u> be used by any other application or daemon on your system and
+      must be in the range 1025..65535 unless you run your FHEM installation
+      with root permissions (not recommanded).<br>
+      If you want to define an IPv4 and an IPv6 bridge on the same TCP port
+      (recommanded) then it might be necessary on (some?) Linux
+      distributions to activate IPV6_V6ONLY socket option. Use <code>"echo
+      1>/proc/sys/net/ipv6/bindv6only"</code> or systemctl for that purpose.<br>
+      eg. <code>8383</code><br>
+      eg. <code>IPV6:8383</code></li><br>
     <li>
       Example:<br>
       <code>define ESPBridge ESPEasy bridge 8383</code></li><br>

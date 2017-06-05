@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: ESPEasy: improved dual ip stack support
   - change:  FHEMWEB/telnet needs password if directly(!) connected to the
              internet, see https://forum.fhem.de/index.php?topic=72717
   - change:  34_ESPEasy: adjustments due to changes in TcpServerUtils.pm
