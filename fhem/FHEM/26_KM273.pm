@@ -73,14 +73,19 @@
 #       0011    01.06.2016  mike3436            KM273_ReadElementList           negative min values corrected: value interpretation has to be as signed int64, XDHW_TIME+XDHW_STOP_TEMP added to KM273_gets
 #       0012    02.06.2016  mike3436            KM273_ReadElementList           byte nibbles in extid turned
 #       0013    07.01.2017  mike3436            KM273_gets                      HOLIDAY params added for get/set, cyclic read for some alarms and requests activated in KM273_elements_default
-#       0014    22.03.2017  mike3436            KM273_getsAdd                   add variables for 2nd heating circuit if Attribut HeatCircit2Active is set to 1
+#       0014    22.03.2017  mike3436            KM273_getsAdd                   add variables for 2nd heating circuit if Attribut HeatCircuit2Active is set to 1
+#       0015    26.05.2017  mike3436            KM273_Get                       no parameter in module view
+#       0015    26.05.2017  mike3436            KM273_Set                       allowed list or range selectable in module view
+#       0015    29.05.2017  mike3436            attr AddToGetSet                additional variables can be added to KM273_gets
+#       0015    29.05.2017  mike3436            attr AddToReadings              additional variables can be added to KM273_ReadElementList
+#       0015    05.06.2017  mike3436            KM273_Notify                    rebuild GetSet and Readings list on Attribut changes
 
 package main;
 use strict;
 use warnings;
 use Time::HiRes qw( time sleep );
 
-my %KM273_gets = (
+my %KM273_getsBase = (
     'XDHW_STOP_TEMP' => '',
     'XDHW_TIME' => '',
     'DHW_CALCULATED_SETPOINT_TEMP' => '',
@@ -116,6 +121,7 @@ my %KM273_gets = (
     'DHW_PROGRAM_2_2TUE' => '',
     'DHW_PROGRAM_2_3WED' => '',
     'DHW_PROGRAM_MODE' => '',
+    'HEATING_SEASON_MODE' => '',
     'PUMP_DHW_PROGRAM1_START_TIME' => '',
     'PUMP_DHW_PROGRAM1_STOP_TIME' => '',
     'PUMP_DHW_PROGRAM2_START_TIME' => '',
@@ -133,8 +139,9 @@ my %KM273_gets = (
     'HOLIDAY_STOP_YEAR' => ''
    );
 
-my %KM273_getsAdd = (
-    'MV_E12_EEPROM_TIME_PROGRAM'        => '',
+my %KM273_getsAddHC2 = (
+    'MV_E12_EEPROM_ROOM_PROGRAM_MODE'    => '',
+    'MV_E12_EEPROM_TIME_PROGRAM'         => '',
     'MV_E12_EEPROM_TIME_PROGRAM_5FRI'    => '',
     'MV_E12_EEPROM_TIME_PROGRAM_5FRI_2'  => '',
     'MV_E12_EEPROM_TIME_PROGRAM_1MON'    => '',
@@ -841,10 +848,10 @@ my %KM273_elements_default =
     '0CDB3FE0' => { 'rtr' => '04DB3FE0' , 'idx' =>  876 , 'extid' => '000CCD051004BC' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 1 , 'text' => 'HEATING_REQUEST_2' },
     '0CDB7FE0' => { 'rtr' => '04DB7FE0' , 'idx' =>  877 , 'extid' => 'E12D76FBC90331' , 'max' =>       15 , 'min' =>        1 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_REQUEST_BLOCK_AFTER_START_TIME' },
     '0CDBBFE0' => { 'rtr' => '04DBBFE0' , 'idx' =>  878 , 'extid' => 'E23409A4FD00C9' , 'max' =>      600 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_REQUEST_BLOCK_TIME' },
-    '0CDC3FE0' => { 'rtr' => '04DC3FE0' , 'idx' =>  880 , 'extid' => '002280F33400F4' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_ACTIVE' },
+    '0CDC3FE0' => { 'rtr' => '04DC3FE0' , 'idx' =>  880 , 'extid' => '002280F33400F4' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 1 , 'text' => 'HEATING_SEASON_ACTIVE' },
     '0CDC7FE0' => { 'rtr' => '04DC7FE0' , 'idx' =>  881 , 'extid' => 'E1E3B281D900F7' , 'max' =>       35 , 'min' =>        5 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_DELAYED_TEMP' },
     '0CDCBFE0' => { 'rtr' => '04DCBFE0' , 'idx' =>  882 , 'extid' => 'E1C800448B00F5' , 'max' =>       17 , 'min' =>        5 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_IMMEDIATE_TEMP' },
-    '0CDCFFE0' => { 'rtr' => '04DCFFE0' , 'idx' =>  883 , 'extid' => 'E1882248C90440' , 'max' =>        2 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_MODE' },
+    '0CDCFFE0' => { 'rtr' => '04DCFFE0' , 'idx' =>  883 , 'extid' => 'E1882248C90440' , 'max' =>        2 , 'min' =>        0 , 'format' => 'dp2' , 'read' => 1 , 'text' => 'HEATING_SEASON_MODE' },
     '0CDD3FE0' => { 'rtr' => '04DD3FE0' , 'idx' =>  884 , 'extid' => 'E1FF34393100F6' , 'max' =>       48 , 'min' =>        1 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_START_DELAY_TIME' },
     '0CDD7FE0' => { 'rtr' => '04DD7FE0' , 'idx' =>  885 , 'extid' => 'E17EE5BF2402F1' , 'max' =>       48 , 'min' =>        1 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SEASON_STOP_DELAY_TIME' },
     '0CDDBFE0' => { 'rtr' => '04DDBFE0' , 'idx' =>  886 , 'extid' => '0E7900A31300CA' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'HEATING_SETPOINT' },
@@ -1379,13 +1386,13 @@ my %KM273_elements_default =
     '0D993FE0' => { 'rtr' => '05993FE0' , 'idx' => 1636 , 'extid' => '8259B592700C1A' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_PID_MIN_VALUE' },
     '0D99BFE0' => { 'rtr' => '0599BFE0' , 'idx' => 1638 , 'extid' => '825A0105990C1B' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_P_VALUE' },
     '0D9A3FE0' => { 'rtr' => '059A3FE0' , 'idx' => 1640 , 'extid' => '8117E506360C2D' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_ROOMSENSOR_INFLUENCE_FACTOR' },
-    '0D9A7FE0' => { 'rtr' => '059A7FE0' , 'idx' => 1641 , 'extid' => '814A526F5B0BF5' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_ROOM_PROGRAM_MODE' },
+    '0D9A7FE0' => { 'rtr' => '059A7FE0' , 'idx' => 1641 , 'extid' => '814A526F5B0BF5' , 'max' =>        0 , 'min' =>        0 , 'format' => 'rp2' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_ROOM_PROGRAM_MODE' },
     '0D9ABFE0' => { 'rtr' => '059ABFE0' , 'idx' => 1642 , 'extid' => '8635FFD7B20C03' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_ROOM_SENSOR_ACTIVE' },
     '0D9B3FE0' => { 'rtr' => '059B3FE0' , 'idx' => 1644 , 'extid' => '858E6674D50C38' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_T1_KORRIGERING' },
     '0D9B7FE0' => { 'rtr' => '059B7FE0' , 'idx' => 1645 , 'extid' => '854EDF1E430C3E' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 0 , 'text' => 'MV_E12_EEPROM_T5_KORRIGERING' },
     '0D9BBFE0' => { 'rtr' => '059BBFE0' , 'idx' => 1646 , 'extid' => '86D947DA820C0B' , 'max' =>        0 , 'min' =>        0 , 'format' => 'tem' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_T5_SETPOINT' },
     '0D9C3FE0' => { 'rtr' => '059C3FE0' , 'idx' => 1648 , 'extid' => '86C7DACCE10C0E' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TEMP_TIMECONTROLLED' },
-    '0D9CBFE0' => { 'rtr' => '059CBFE0' , 'idx' => 1650 , 'extid' => '814713BEA40BDA' , 'max' =>        0 , 'min' =>        0 , 'format' => 'int' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TIME_PROGRAM' },
+    '0D9CBFE0' => { 'rtr' => '059CBFE0' , 'idx' => 1650 , 'extid' => '814713BEA40BDA' , 'max' =>        0 , 'min' =>        0 , 'format' => 'rp1' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TIME_PROGRAM' },
     '0D9CFFE0' => { 'rtr' => '059CFFE0' , 'idx' => 1651 , 'extid' => '82C52E3F910BE2' , 'max' =>        0 , 'min' =>        0 , 'format' => 'sw1' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TIME_PROGRAM_5FRI' },
     '0D9D7FE0' => { 'rtr' => '059D7FE0' , 'idx' => 1653 , 'extid' => '826A1151AC0BEA' , 'max' =>        0 , 'min' =>        0 , 'format' => 'sw1' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TIME_PROGRAM_5FRI_2' },
     '0D9DFFE0' => { 'rtr' => '059DFFE0' , 'idx' => 1655 , 'extid' => '82A87329CF0BDD' , 'max' =>        0 , 'min' =>        0 , 'format' => 'sw1' , 'read' => 2 , 'text' => 'MV_E12_EEPROM_TIME_PROGRAM_1MON' },
@@ -2002,12 +2009,12 @@ my %KM273_format = (
     'sw1' => { factor => 1      , unit => ''    },
     'sw2' => { factor => 1      , unit => ''    },
     'rp1' => { factor => 1      , unit => ''    , 'select' => [ '0:HP_Optimized', '1:Program_1', '2:Program_2', '3:Family', '4:Morning', '5:Evening', '6:Seniors' ] },
-    'rp2' => { factor => 1      , unit => ''    , 'select' => [ '0:Automatic', '1:Off', '2:Day', '3:Night' ] },
+    'rp2' => { factor => 1      , unit => ''    , 'select' => [ '0:Automatic', '1:Normal', '2:Exception', '3:HeatingOff' ] },
     'dp1' => { factor => 1      , unit => ''    , 'select' => [ '0:Always_On', '1:Program_1', '2:Program_2' ] },
     'dp2' => { factor => 1      , unit => ''    , 'select' => [ '0:Automatic', '1:Always_On', '2:Always_Off' ] },
 );
 
-
+my %KM273_gets = ();
 my %KM273_history = ();
 my @KM273_readingsRTR = ();
 my %KM273_writingsTXD = ();
@@ -2019,8 +2026,8 @@ my %KM273_ReadElementListElements = ();
 sub KM273_ClearElementLists($)
 {
   my ($hash) = @_;
-  my $name = $hash->{NAME} . ": KM273_ClearElementLists";
-  Log 3, "$name";
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name: KM273_ClearElementLists";
   
   %KM273_history = ();
   @KM273_readingsRTR = ();
@@ -2033,12 +2040,12 @@ sub KM273_ClearElementLists($)
 sub KM273_ReadElementList($)
 {
   my ($hash) = @_;
-  my $name = $hash->{NAME} . ": KM273_ReadElementList";
-  Log 3, "$name entry readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name: KM273_ReadElementList entry readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
   
   if (($KM273_ReadElementListStatus{readCounter} == 0) && ($KM273_ReadElementListStatus{KM200wait} == 0))
   {
-    Log 3, "$name send R01FD7FE00";
+    Log3 $name, 3, "$name: KM273_ReadElementList send R01FD7FE00";
     CAN_Write($hash,"R01FD7FE00");
     $KM273_ReadElementListStatus{KM200wait} = 20;
   }
@@ -2052,16 +2059,16 @@ sub KM273_ReadElementList($)
       $KM273_ReadElementListStatus{writeIndex} = 0;
       $KM273_ReadElementListStatus{readData} = "";
     }
-    Log 3, "$name KM200active=$KM273_ReadElementListStatus{KM200active} KM200wait=$KM273_ReadElementListStatus{KM200wait} readIndex=$KM273_ReadElementListStatus{readIndex}";
+    Log3 $name, 3, "$name: KM273_ReadElementList KM200active=$KM273_ReadElementListStatus{KM200active} KM200wait=$KM273_ReadElementListStatus{KM200wait} readIndex=$KM273_ReadElementListStatus{readIndex}";
   }
   elsif ($KM273_ReadElementListStatus{writeIndex} <= $KM273_ReadElementListStatus{readIndex})
   {
     my $sendTel = sprintf("T01FD3FE08%08x%08x",4096,$KM273_ReadElementListStatus{writeIndex});
     $KM273_ReadElementListStatus{writeIndex} += 4096;
     $KM273_ReadElementListStatus{wait} = 20;
-    Log 3, "$name send $sendTel";
+    Log3 $name, 3, "$name: KM273_ReadElementList send $sendTel";
     CAN_Write($hash,$sendTel);
-    Log 3, "$name send R01FDBFE00";
+    Log3 $name, 3, "$name: KM273_ReadElementList send R01FDBFE00";
     CAN_Write($hash,"R01FDBFE00");
   }
   elsif (--$KM273_ReadElementListStatus{wait} <= 0)
@@ -2098,13 +2105,13 @@ sub KM273_ReadElementList($)
           if (($KM273_ReadElementListStatus{readIndexLast} > 0) && ($KM273_ReadElementListStatus{readIndexLast} == $KM273_ReadElementListStatus{readIndex}))
           {
             #wenn readCounter auch beim 2. Lesen nicht erreicht wird, und gelesene Datenmenge gleich ist, dann readCounter = readIndex
-            Log 3, "$name readCounter $KM273_ReadElementListStatus{readCounter} changed to $KM273_ReadElementListStatus{readIndex}";
+            Log3 $name, 3, "$name: KM273_ReadElementList readCounter $KM273_ReadElementListStatus{readCounter} changed to $KM273_ReadElementListStatus{readIndex}";
             $KM273_ReadElementListStatus{readCounter} = $KM273_ReadElementListStatus{readIndex};
           }
           if (($KM273_ReadElementListStatus{readCounter} > 0) && ($KM273_ReadElementListStatus{readIndex} >= $KM273_ReadElementListStatus{readCounter}))
           {
             $KM273_ReadElementListStatus{done} = 1;
-            Log 3, "$name done, readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
+            Log3 $name, 3, "$name: KM273_ReadElementList done, readCounter=$KM273_ReadElementListStatus{readCounter} readIndex=$KM273_ReadElementListStatus{readIndex}";
 
             %KM273_ReadElementListElements = ();
             my $i1 = 0;
@@ -2122,11 +2129,11 @@ sub KM273_ReadElementList($)
                   my $element2 = substr($KM273_ReadElementListStatus{readData},$i1+18,$len2-1);
                   $i1 += 18+$len2;
                   $KM273_ReadElementListElements{$element2} = {'idx' => $idx, 'extid' => $extid, 'max' => $max2, 'min' => $min2 };
-                  Log 3, "$name done, idx=$idx extid=$extid max=$max2 min=$min2 element=$element2";
+                  Log3 $name, 3, "$name: KM273_ReadElementList done, idx=$idx extid=$extid max=$max2 min=$min2 element=$element2";
                 }
                 else
                 {
-                  Log 3, "$name error, idx=$idx extid=$extid max=$max2 min=$min2 len=$len2";
+                  Log3 $name, 3, "$name: KM273_ReadElementList error, idx=$idx extid=$extid max=$max2 min=$min2 len=$len2";
                   $KM273_ReadElementListStatus{done} = 0;
                   $KM273_ReadElementListStatus{KM200active} = 1;
                   $KM273_ReadElementListStatus{KM200wait} = 20;
@@ -2142,13 +2149,13 @@ sub KM273_ReadElementList($)
         {
           my $readCounter = ($value1 >> 24); # + 10; #+10=Test
           $KM273_ReadElementListStatus{readCounter} = $readCounter;
-          Log 3, "$name read T09FD7FE0 len=$len1 value=$value1 readCounter=$readCounter";
+          Log3 $name, 3, "$name: KM273_ReadElementList read T09FD7FE0 len=$len1 value=$value1 readCounter=$readCounter";
         }
         elsif (hex $canId == 0x01FD3FE0)
         {
           my $dataLen = $value1 >> 32;
           my $dataStart = $value1 & 0xffffffff;
-          Log 3, "$name KM200 read canId=$canId len=$len1 dataStart=$dataStart dataLen=$dataLen";
+          Log3 $name, 3, "$name: KM273_ReadElementList KM200 read canId=$canId len=$len1 dataStart=$dataStart dataLen=$dataLen";
           $KM273_ReadElementListStatus{KM200active} = 1;
           $KM273_ReadElementListStatus{KM200wait} = 20;
         }
@@ -2157,7 +2164,7 @@ sub KM273_ReadElementList($)
       {
         if ((hex $canId == 0x01FD7FE0) || (hex $canId == 0x01FDBFE0))
         {
-          Log 3, "$name KM200 read canId=$canId";
+          Log3 $name, 3, "$name: KM273_ReadElementList KM200 read canId=$canId";
           $KM273_ReadElementListStatus{KM200active} = 1;
           $KM273_ReadElementListStatus{KM200wait} = 20;
         }
@@ -2171,16 +2178,24 @@ sub KM273_ReadElementList($)
 sub KM273_UpdateElements($)
 {
     my ($hash) = @_;
-    my $name = $hash->{NAME} . ": KM273_UpdateElements";
-    my $name1 = $hash->{NAME};
-    Log 3, "$name";
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "$name: KM273_UpdateElements";
+    
+    my %AddToReadings = ();
+    my @AddToReadingsKey = ();
+    push @AddToReadingsKey, split(' ',($attr{$name}{AddToReadings})) if (defined($attr{$name}{AddToReadings}));
+    push @AddToReadingsKey, split(' ',($attr{$name}{AddToGetSet})) if (defined($attr{$name}{AddToGetSet}));
+    foreach my $elem (@AddToReadingsKey) { $AddToReadings{$elem} = '';}
 
+    %KM273_elements = ();
     foreach my $element (keys %KM273_elements_default)
     {
         my $text = $KM273_elements_default{$element}{text};
         my $read = $KM273_elements_default{$element}{read};
         my $elem1 = $KM273_ReadElementListElements{$text};
-        if ((!defined $elem1) && (($read == 1) || (($read == 2) && defined($attr{$name1}{HeatCircuit2Active}) && ($attr{$name1}{HeatCircuit2Active} == 1))))
+        $read = 1 if (defined($AddToReadings{$text}));
+        if (defined($AddToReadings{$text})) { Log3 $name, 3, "$name: KM273_UpdateElements AddToReadings $text"; };
+        if ((!defined $elem1) && (($read == 1) || (($read == 2) && defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1))))
         {
           my @days = ("1MON","2TUE","3WED","4THU","5FRI","6SAT","7SUN");
           foreach my $day (@days)
@@ -2190,7 +2205,7 @@ sub KM273_UpdateElements($)
             {
               my $text1 = (substr $text, 0, $pos) . (substr $text, $pos+1);
               $elem1 = $KM273_ReadElementListElements{$text1};
-              Log 3, "$name change $text1 to $text" if (defined $elem1);
+              Log3 $name, 3, "$name: KM273_UpdateElements change $text1 to $text" if (defined $elem1);
               last;
             }
             
@@ -2206,42 +2221,66 @@ sub KM273_UpdateElements($)
         }
         else
         {
-          Log 3, "$name $text not found" if ($read != 0)
+          Log3 $name, 3, "$name: KM273_UpdateElements $text not found" if ($read != 0)
         }
     }
     return undef;
 }
 
+sub KM273_CreateElementList($)
+{
+    #just for simulation, if reading of element list from heatpump 
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "$name: KM273_CreateElementList";
+    %KM273_ReadElementListElements = ();
+    foreach my $key (keys %KM273_elements_default)
+    {
+      my $text = $KM273_elements_default{$key}{text};
+      my $idx = $KM273_elements_default{$key}{idx};
+      my $extid = $KM273_elements_default{$key}{extid};
+      my $max = $KM273_elements_default{$key}{max};
+      my $min = $KM273_elements_default{$key}{min};
+      $KM273_ReadElementListElements{$text} = {'idx' => $idx, 'extid' => $extid, 'max' => $max, 'min' => $min };
+    }
+    $KM273_ReadElementListStatus{done} = 1;
+}
+
 sub KM273_CreatePollingList($)
 {
     my ($hash) = @_;
-    my $name = $hash->{NAME} . ": KM273_CreatePollingList";
-    my $name1 = $hash->{NAME};
-    Log 3, "$name";
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "$name: KM273_CreatePollingList";
 
     @KM273_readingsRTR = ();
     foreach my $element (keys %KM273_elements)
     {
         push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if $KM273_elements{$element}{read} == 1;
-        push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if ($KM273_elements{$element}{read} == 2) && defined($attr{$name1}{HeatCircuit2Active}) && ($attr{$name1}{HeatCircuit2Active} == 1);
+        push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if ($KM273_elements{$element}{read} == 2) && defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
     }
     foreach my $val (@KM273_readingsRTR)
     {
-        Log 3, "$name rtr $val";
+        Log3 $name, 3, "$name: KM273_CreatePollingList rtr $val";
     }
     $hash->{pollingIndex} = 0;
+
+    my @getElements = (keys %KM273_getsBase);
+    push @getElements, (keys %KM273_getsAddHC2) if (defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1));
+    push @getElements, split(' ',($attr{$name}{AddToGetSet})) if (defined($attr{$name}{AddToGetSet}));
+    %KM273_gets = ();
+    foreach my $elem (@getElements) { $KM273_gets{$elem} = '';}
 
     %KM273_writingsTXD = ();
     foreach my $element (keys %KM273_elements)
     {
-        foreach my $get (keys %KM273_gets)
+        foreach my $get (@getElements)
         {
             $KM273_writingsTXD{$get} = $KM273_elements{$element} if $KM273_elements{$element}{text} eq $get;
         }
     }
     foreach my $val (keys %KM273_writingsTXD)
     {
-        Log 3, "$name txd $val $KM273_writingsTXD{$val}{rtr}";
+        Log3 $name, 3, "$name: KM273_CreatePollingList txd $val $KM273_writingsTXD{$val}{rtr}";
     }
 
     return undef;
@@ -2260,6 +2299,8 @@ sub KM273_Initialize($)
     $hash->{AttrFn}     = 'KM273_Attr';
     $hash->{ReadFn}     = 'KM273_Read';
     $hash->{ReadyFn}    = 'KM273_Ready';
+    $hash->{NotifyFn}   = 'KM273_Notify';
+    $hash->{ShutdownFn} = 'KM273_Shutdown';
 
    $hash->{AttrList}    = "do_not_notify:1,0 " .
                           "loglevel:0,1,2,3,4,5,6 " .
@@ -2269,16 +2310,18 @@ sub KM273_Initialize($)
                           "DoNotPoll " .
                           "ReadBackDelay " .
                           "HeatCircuit2Active " .
+                          "AddToGetSet " .
+                          "AddToReadings " .
                           $readingFnAttributes;
 }
 
 sub KM273_Define($$)
 {
     my ($hash, $def) = @_;
-    my $name = $hash->{NAME} . ": KM273_Define";
-    Log 5, "$name";
+    my $name = $hash->{NAME};
+    Log3 $name, 5, "$name: KM273_Define";
 
-    $hash->{VERSION} = "0014";
+    $hash->{VERSION} = "0015";
     
     my @param = split('[ \t]+', $def);
 
@@ -2288,15 +2331,18 @@ sub KM273_Define($$)
 
     DevIo_CloseDev($hash);
     my $dev = $param[2];
-
-    if($dev eq "none") {
-    Log 1, "$name: KM273 device is none, commands will be echoed only";
-    return undef;
-    }
+    
+    $hash->{NOTIFYDEV} = "global";
 
     KM273_ClearElementLists($hash);
-    #KM273_CreatePollingList($hash);
-    #InternalTimer(gettimeofday()+10, "KM273_GetReadings", $hash, 0);
+    
+    if($dev eq "none") {
+      Log3 $name, 1, "$name: KM273_Define: KM273 device is none, commands will be echoed only";
+      KM273_CreateElementList($hash);
+      KM273_UpdateElements($hash);
+      KM273_CreatePollingList($hash);
+      return undef;
+    }
 
     $hash->{DeviceName} = $dev;
     my $ret = DevIo_OpenDev($hash, 0, "CAN_DoInit");
@@ -2305,15 +2351,49 @@ sub KM273_Define($$)
     return undef;
 }
 
+sub KM273_Notify($$)
+{
+  my ($own_hash, $dev_hash) = @_;
+	my $ownName = $own_hash->{NAME}; # own name / hash
+
+	return "" if(IsDisabled($ownName)); # Return without any further action if the module is disabled
+ 
+	my $devName = $dev_hash->{NAME}; # Device that created the events
+	my $events = deviceEvents($dev_hash, 1);
+
+  Log3 $ownName, 3, "$ownName: KM273_Notify ".join(',',@{$events});
+	if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$|^ATTR /, @{$events}))
+	{
+    if ($KM273_ReadElementListStatus{done})
+    {
+      RemoveInternalTimer($own_hash);
+      KM273_UpdateElements($own_hash);
+      KM273_CreatePollingList($own_hash);
+      InternalTimer(gettimeofday()+10, "KM273_GetReadings", $own_hash, 0);
+    }
+	}
+}
+
 sub KM273_Undef($$)
 {
-    my ($hash, $arg) = @_;
-    my $name = $hash->{NAME} . ": KM273_Undef";
-    Log 3, "$name";
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name: KM273_Undef";
 
-    RemoveInternalTimer($hash);
-    CAN_Close($hash);
-    return undef;
+  RemoveInternalTimer($hash);
+  CAN_Close($hash);
+  return undef;
+}
+
+sub KM273_Shutdown($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name: KM273_Shutdown";
+
+  RemoveInternalTimer($hash);
+  CAN_Close($hash);
+  return undef;
 }
 
 sub KM273_Get($@)
@@ -2326,8 +2406,9 @@ sub KM273_Get($@)
     my $opt = shift @param;
     if(!defined($KM273_gets{$opt})) {
         my @cList = keys %KM273_gets;
-        push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
-        return "Unknown argument $opt, choose one of " . join(" ", @cList);
+        #push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
+        #push @cList, split(' ',($attr{$name}{AddToGetSet})) if (defined($attr{$name}{AddToGetSet}));
+        return "Unknown argument $opt, choose one of " . join(":noArg ", @cList) . ":noArg";
     }
 
     if (defined($KM273_writingsTXD{$opt})) {
@@ -2358,7 +2439,72 @@ sub KM273_Set($@)
 
     if(!defined($KM273_gets{$opt}) && !defined($KM273_writingsTXD{$opt})) {
         my @cList = keys %KM273_gets;
-        push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
+        #push @cList, keys %KM273_getsAdd if defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
+        #push @cList, split(' ',($attr{$name}{AddToGetSet})) if (defined($attr{$name}{AddToGetSet}));
+        if (!defined($attr{$name}{FormatSetParameter}) || ($attr{$name}{FormatSetParameter} == 1))
+        {
+          for my $cElem ( @cList )
+          {
+            if (defined($KM273_writingsTXD{$cElem}))
+            {
+              my $range = "";
+              my $format = $KM273_writingsTXD{$cElem}{format};
+              my $max = $KM273_writingsTXD{$cElem}{max};
+              my $min = $KM273_writingsTXD{$cElem}{min};
+              if ($max >= 16777216)
+              {
+                $max /= 16777216;
+                $min /= 16777216;
+              }
+              if ($max <= $min)
+              {
+                if (!($format eq "sw1" || $format eq "sw2"))
+                {
+                  $range = ":noArg";
+                }
+              }
+              elsif (defined($KM273_format{$format}))
+              {
+                if(defined($KM273_format{$format}{'select'}))
+                {
+                  my @select = @{$KM273_format{$format}{'select'}};
+                  $range = ":" . join(",", @select);
+                }
+                else
+                {
+                  my $factor = $KM273_format{$format}{factor};
+                  if($factor != 1)
+                  {
+                    $max *= $factor;
+                    $min *= $factor;
+                    $range = ":slider,$min,$factor,$max,1";
+                  }
+                  else
+                  {
+                    if (($max - $min) <= 10)
+                    {
+                      $range = ":".$min;
+                      for my $idx ($min+1 .. $max) {$range .= ",".$idx}
+                    }
+                    elsif ($format ne "t15")
+                    {
+                      $range = ":slider,$min,$factor,$max";
+                    }
+                  }
+                }
+              }
+              else
+              {
+              }
+              $cElem .= $range;
+            }
+            else
+            {
+              $cElem .= ":noArg";
+            }
+            #Log3 $name, 5, "KM273_Set $opt $cElem";
+          }
+        }
         return "Unknown argument $opt, choose one of " . join(" ", @cList);
     }
 
@@ -2433,7 +2579,7 @@ sub KM273_Set($@)
         my $data = sprintf ("%04X",$value1);
         my $txdata = "T" . $canId . "2" . $data;
         CAN_Write($hash, $txdata);
-        Log 3, "$name: KM273_Set CAN_Write $txdata";
+        Log3 $name, 3, "$name: KM273_Set CAN_Write $txdata";
     }
 
     #$hash->{STATE} = $KM273_gets{$opt} = $value;
@@ -2443,26 +2589,39 @@ sub KM273_Set($@)
 
 sub KM273_Attr(@)
 {
-    my ($cmd,$name,$attr_name,$attr_value) = @_;
-    if($cmd eq "set") {
-        if($attr_name eq "formal") {
-            if($attr_value !~ /^yes|no$/) {
-                my $err = "Invalid argument $attr_value to $attr_name. Must be yes or no.";
-                Log 3, "KM273: ".$err;
-                return $err;
-            }
-        } else {
-           # return "Unknown attr $attr_name";
-        }
+  my ($cmd,$name,$attr_name,$attr_value) = @_;
+  if($cmd eq "set") {
+    if($attr_name eq "formal") {
+      if($attr_value !~ /^yes|no$/) {
+        my $err = "Invalid argument $attr_value to $attr_name. Must be yes or no.";
+        Log3 $name, 3, "KM273: ".$err;
+        return $err;
+      }
     }
-    return undef;
+    elsif(($attr_name eq "AddToReadings") || ($attr_name eq "AddToGetSet")) {
+      Log3 $name, 3, "$name: KM273_Attr $attr_name $attr_value";
+      if (!defined($KM273_ReadElementListElements{GT1_TEMP}))
+      {
+        Log3 $name, 3, "$name: KM273_Attr ReadElementListElements not ready for verify attribute";
+        return undef;
+      }
+      my @valuesIn = split(" ", $attr_value);
+      foreach my $valueIn (@valuesIn)
+      {
+        return "Unknown attr $attr_name value=$valueIn" if (!defined($KM273_ReadElementListElements{$valueIn}));
+      }
+    } else {
+       # return "Unknown attr $attr_name";
+    }
+  }
+  return undef;
 }
 
 sub KM273_Read($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: KM273_Read";
+    Log3 $name, 5, "$name: KM273_Read";
 
     if (!$KM273_ReadElementListStatus{done})
     {
@@ -2512,12 +2671,12 @@ sub KM273_Read($)
                 {
                     if (defined $KM273_format{$format}{'select'})
                     {
-                        #Log 3, "$name: KM273_Read: format=$format value=$value";
+                        #Log3 $name, 3, "$name: KM273_Read: format=$format value=$value";
                         my @list = @{$KM273_format{$format}{'select'}};
                         foreach my $elem (@list)
                         {
                             my $idx = index $elem, $value;
-                            #Log 3, "$name: KM273_Read: format=$format value=$value elem=$elem idx=$idx";
+                            #Log3 $name, 3, "$name: KM273_Read: format=$format value=$value elem=$elem idx=$idx";
                             if ($idx >= 0)
                             {
                                 $value = $elem;
@@ -2541,7 +2700,7 @@ sub KM273_Read($)
             }
             $value = 'DEAD' if ($value1 == -8531);
             if ($readingName1 eq 'DATE_SEC') { next; }
-            Log 5, "$name: KM273RAW $readingName1 $value";
+            Log3 $name, 5, "$name: KM273RAW $readingName1 $value";
 
             if (exists $KM273_history{$canId})
             {
@@ -2573,7 +2732,7 @@ sub KM273_GetNextValue($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: KM273_GetNextValue";
+    Log3 $name, 4, "$name: KM273_GetNextValue";
     
     return undef if defined($attr{$name}{DoNotPoll}) && ($attr{$name}{DoNotPoll} == 1);
 
@@ -2582,7 +2741,7 @@ sub KM273_GetNextValue($)
     {
         my $canId = $KM273_readingsRTR[$index];
         CAN_Write($hash, "R".$canId."0");
-        Log 5, "$name: KM273_GetNextValue $index Id $canId";
+        Log3 $name, 5, "$name: KM273_GetNextValue $index Id $canId";
         $hash->{pollingIndex}++;
     }
 }
@@ -2592,7 +2751,7 @@ sub KM273_GetReadings($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: KM273_GetReadings";
+    Log3 $name, 4, "$name: KM273_GetReadings";
 
     ### Stop the current timer
     RemoveInternalTimer($hash);
@@ -2616,7 +2775,7 @@ sub KM273_Ready($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log 3, "$name: KM273_Ready";
+  Log3 $name, 3, "$name: KM273_Ready";
 
   return DevIo_OpenDev($hash, 1, "CAN_DoInit") if($hash->{STATE} eq "disconnected");
 
@@ -2632,7 +2791,7 @@ sub CAN_Write($$)
 {
     my ($hash,$data) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: CAN_Write $data";
+    Log3 $name, 5, "$name: CAN_Write $data";
 
     DevIo_SimpleWrite($hash, $data."\r", 0);
 
@@ -2642,12 +2801,11 @@ sub CAN_Write($$)
 my @CAN_BufferIn = ();
 
 #####################################
-sub
-CAN_ReadBuffer($)
+sub CAN_ReadBuffer($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: CAN_ReadBuffer";
+    Log3 $name, 5, "$name: CAN_ReadBuffer";
 
     my $buf = DevIo_SimpleRead($hash);
     return undef if(!defined($buf));
@@ -2673,7 +2831,7 @@ sub CAN_Read($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 5, "$name: CAN_Read";
+    Log3 $name, 5, "$name: CAN_Read";
 
     while (@CAN_BufferIn > 0)
     {
@@ -2681,7 +2839,7 @@ sub CAN_Read($)
         my $recv = shift @CAN_BufferIn;
         my $dir = substr($recv,0,1);
 
-        Log 5, "$name: CAN_Read recv $recv";
+        Log3 $name, 5, "$name: CAN_Read recv $recv";
 
         if (($dir eq 'T') || ($dir eq 'R'))
         {
@@ -2693,7 +2851,7 @@ sub CAN_Read($)
                 {
                     $len = hex $len;
                     $data = hex substr($data,0,2*$len);
-                    Log 4, "$name: CAN_Read recv $dir $id $len $data";
+                    Log3 $name, 4, "$name: CAN_Read recv $dir $id $len $data";
                     return ($dir,$id,$len,$data);
                 }
             }
@@ -2713,7 +2871,7 @@ sub CAN_Read($)
                 {
                     $len = hex $len;
                     $data = hex substr($data,0,2*$len);
-                    Log 4, "$name: CAN_Read recv $dir $id $len $data";
+                    Log3 $name, 4, "$name: CAN_Read recv $dir $id $len $data";
                     return ($dir,$id,$len,$data) ;
                 }
             }
@@ -2726,11 +2884,11 @@ sub CAN_Read($)
 
         if ($dir eq 'Z')
         {
-            Log 5, "$name: CAN_Read recv Z";
+            Log3 $name, 5, "$name: CAN_Read recv Z";
         }
         elsif ($recv ne '') 
         {
-            Log 3, "$name: CAN_Read unknown data '$recv'";
+            Log3 $name, 3, "$name: CAN_Read unknown data '$recv'";
         }
     }
     return undef;
@@ -2741,9 +2899,9 @@ sub CAN_Close($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 3, "$name: CAN_Close";
+    Log3 $name, 3, "$name: CAN_Close";
 
-    DevIo_SimpleWrite($hash, "C\r", 0);
+    DevIo_SimpleWrite($hash, "C\rC\rC\r", 0);
     DevIo_CloseDev($hash);
     return undef;
 }
@@ -2753,7 +2911,7 @@ sub CAN_DoInit($)
 {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    Log 3, "$name: CAN_DoInit";
+    Log3 $name, 3, "$name: CAN_DoInit";
 
     DevIo_DoSimpleRead($hash);
     DevIo_SimpleWrite($hash, "C\rS4\rO\r", 0);
@@ -2802,6 +2960,8 @@ sub CAN_DoInit($)
                   select: '0' or 'Always_On', '1' or 'Program_1', '2' or 'Program_2'</li>
               <li><i>DHW_PROGRAM_MODE</i><br>
                   select: '0' or 'Automatic', '1' or 'Always_On', '2' or 'Always_Off'</li>
+              <li><i>HEATING_SEASON_MODE</i><br>
+                  select: '0' or 'Automatic', '1' or 'Always_On', '2' or 'Always_Off'</li>
               <li><i>DHW_PROGRAM_1_1MON .. ROOM_PROGRAM_1_7SUN</i><br>
                   value: 06:00 on 21:00 off </li>
               <li><i>DHW_PROGRAM_2_1MON .. ROOM_PROGRAM_2_7SUN</i><br>
@@ -2811,13 +2971,33 @@ sub CAN_DoInit($)
                   you can set 4 time ranges where the pump should be switched on
                   value: xx:xx</li>
               <li><i>ROOM_TIMEPROGRAM</i><br>
+                  time program for circuit 1<br>
                   select: '0' or 'HP_Optimized', '1' or 'Program_1', '2' or 'Program_2', '3' or 'Family', '4' or 'Morning', '5' or 'Evening', '6' or 'Seniors'</li>
               <li><i>ROOM_PROGRAM_MODE</i><br>
-                  select: '0' or 'Automatic', '1' or 'Off', '2' or 'Day', '3' or 'Night'</li>
+                  room program for circuit 1<br>
+                  select: '0' or 'Automatic', '1' or 'Normal', '2' or 'Exception', '3' or 'HeatingOff'</li>
               <li><i>ROOM_PROGRAM_1_1MON .. ROOM_PROGRAM_1_7SUN</i><br>
+                  times of Program_1 for circuit 1<br>
                   value: 06:00 on 21:00 off </li>
               <li><i>ROOM_PROGRAM_2_1MON .. ROOM_PROGRAM_2_7SUN</i><br>
+                  times of Program_2 for circuit 1<br>
                   value: 06:00 on 21:00 off </li>
+              <li><i>MV_E12_EEPROM_TIME_PROGRAM</i><br>
+                  time program for circuit 2<br>
+                  select: '0' or 'HP_Optimized', '1' or 'Program_1', '2' or 'Program_2', '3' or 'Family', '4' or 'Morning', '5' or 'Evening', '6' or 'Seniors'</li>
+              <li><i>MV_E12_EEPROM_ROOM_PROGRAM_MODE</i><br>
+                  room program for circuit 2<br>
+                  select: '0' or 'Automatic', '1' or 'Normal', '2' or 'Exception', '3' or 'HeatingOff'</li>
+              <li><i>MV_E12_EEPROM_TIME_PROGRAM_1_1MON .. MV_E12_EEPROM_TIME_PROGRAM_1_7SUN</i><br>
+                  times of Program_1 for circuit 2<br>
+                  value: 06:00 on 21:00 off </li>
+              <li><i>MV_E12_EEPROM_TIME_PROGRAM_2_1MON .. MV_E12_EEPROM_TIME_PROGRAM_2_7SUN</i><br>
+                  times of Program_2 for circuit 2<br>
+                  value: 06:00 on 21:00 off </li>
+              <li><i>XDHW_STOP_TEMP</i><br>
+                  extra hot water temperature</li>
+              <li><i>XDHW_TIME</i><br>
+                  hours for extra hot water</li>
         </ul>
     </ul>
     <br>
@@ -2845,10 +3025,18 @@ sub CAN_DoInit($)
         Attributes:
         <ul>
             <li><i>DoNotPoll</i> 0|1<br>
-                When you set DoNotPoll to "1", the module is only listening to the telegrams on CAN bus. Default is "0".
+                When you set DoNotPoll to "1", the module is only listening to the telegrams on CAN bus. Default is "0".<br>
             </li>
             <li><i>HeatCircuit2Active</i> 0|1<br>
-                When you set HeatCircuit2Active to "1", the module read and set also the values for the second heating circuit E12. Default is "0".
+                When you set HeatCircuit2Active to "1", the module read and set also the values for the second heating circuit E12. Default is "0".<br>
+            </li>
+            <li><i>AddToReadings</i> List of Variables<br>
+              additional variables, which are not polled by the module can by added here<br>
+              Example: attr myKM273 AddToReadings GT3_STATUS GT5_STATUS GT5_ANSLUTEN<br>
+            </li>
+            <li><i>AddToGetSet</i> List of Variables<br>
+              additional variables, which are not in get/set list definded by the module can by added here<br>
+              Example: attr myKM273 AddToGetSet ACCESS_LEVEL GT3_KORRIGERING GT5_KVITTERAD<br>
             </li>
         </ul>
     </ul>
