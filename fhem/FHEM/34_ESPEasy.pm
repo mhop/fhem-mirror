@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.13;       # Version of this module
+my $module_version    = 1.14;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -560,7 +560,7 @@ sub ESPEasy_Read($) {
 
   my ($hash) = @_;                             #hash of temporary child instance
   my $name   = $hash->{NAME};
-  my $ipv    = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $ipv = $hash->{IPV} ? $hash->{IPV} : ($hash->{PEER} =~ m/:/ ? 6 : 4);
   my $bhash  = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}; #hash of original instance
   my $bname  = $bhash->{NAME};
   my $btype  = $bhash->{TYPE};
@@ -606,6 +606,15 @@ sub ESPEasy_Read($) {
 
   # mask password in authorization header with ****
   my $logHeader = { %$header };
+
+	# public IPs
+  my $re = "^(127|193.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
+         . "^(fe[89ab]|::1)";
+  if (!defined $logHeader->{Authorization} && $peer !~ m/$re/) {
+    Log3 $bname, 2, "$btype $name: No basic auth set while using a public IP "
+                  . "address from peer $peer."
+  }
+
   $logHeader->{Authorization} =~ s/Basic\s.*\s/Basic ***** / if defined $logHeader->{Authorization};
   # Dump logHeader
   Log3 $bname, 5, "$btype $name: Received header: ".Dumper($logHeader) if defined $logHeader;
