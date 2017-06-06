@@ -4444,6 +4444,15 @@ ZWave_Parse($$@)
       return "";
     }
 
+    foreach my $h (keys %zwave_parseHook) {
+      if("$cmd:$arg" =~ m/$h/) {
+        my $fn = $zwave_parseHook{$h};
+        delete $zwave_parseHook{$h};
+        $fn->($arg);
+        return "";
+      }
+    }
+
     Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
   }
