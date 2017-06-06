@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.16.11    03.06.2017       execmemcache changed for SQLite avoid logging if deleteOldDaysNbl or reduceLogNbL is running 
 # 2.16.10    15.05.2017       commandref revised
 # 2.16.9.1   11.05.2017       set userCommand changed - 
 #                             Forum: https://forum.fhem.de/index.php/topic,71808.msg633607.html#msg633607
@@ -128,7 +129,7 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 
-my $DbLogVersion = "2.16.10";
+my $DbLogVersion = "2.16.11";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1533,7 +1534,7 @@ sub DbLog_execmemcache ($) {
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
-  my $state      = "connected";
+  my $dolog      = 1;
   my $error      = 0;  
   my (@row_array,$memcount,$dbh);
   
@@ -1548,12 +1549,34 @@ sub DbLog_execmemcache ($) {
   if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {
 	  return;
   }
-  
-  # tote PID löschen
+    
+  # tote PID's löschen
   if($hash->{HELPER}{RUNNING_PID} && $hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {
       delete $hash->{HELPER}{RUNNING_PID};
   }
-	  
+  if($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} =~ m/DEAD/) {
+      delete $hash->{HELPER}{REDUCELOG_PID};
+  }
+  if($hash->{HELPER}{DELDAYS_PID} && $hash->{HELPER}{DELDAYS_PID}{pid} =~ m/DEAD/) {
+      delete $hash->{HELPER}{DELDAYS_PID};
+  }
+  
+  # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
+  if($hash->{DBMODEL} eq "SQLITE") {
+      if($hash->{HELPER}{DELDAYS_PID}) {
+	      $error = "deleteOldDaysNbl is running - resync at NextSync";
+		  $dolog = 0;
+	  }
+      if($hash->{HELPER}{REDUCELOG_PID}) {
+	      $error = "reduceLogNbl is running - resync at NextSync";
+		  $dolog = 0;
+	  }
+	  if($hash->{HELPER}{RUNNING_PID}) {
+	      $error = "Commit already running - resync at NextSync";
+		  $dolog = 0;
+	  }
+  }
+  
   $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
   if($ce == 2) {
       readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
@@ -1561,7 +1584,7 @@ sub DbLog_execmemcache ($) {
       readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
   }
 	
-  if($memcount && !$hash->{HELPER}{RUNNING_PID}) {		
+  if($memcount && $dolog && !$hash->{HELPER}{RUNNING_PID}) {		
       Log3 $name, 5, "DbLog $name -> ################################################################";
       Log3 $name, 5, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
       Log3 $name, 5, "DbLog $name -> ################################################################";
@@ -1585,7 +1608,7 @@ sub DbLog_execmemcache ($) {
       Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
   } else {
       if($hash->{HELPER}{RUNNING_PID}) {
-	      $error = "Commit already running - resync at NextSync";
+	      $error = $error?$error:"Commit already running - resync at NextSync";
 	  }
   }
   
@@ -1602,8 +1625,13 @@ sub DbLog_execmemcache ($) {
   
   if($error) {
       readingsSingleUpdate($hash, "state", $error, 1);
+	  $hash->{HELPER}{OLDSTATE} = $error;
   } else {
-      readingsSingleUpdate($hash, "state", $state, 0);
+      if($hash->{HELPER}{OLDSTATE} && $hash->{HELPER}{OLDSTATE} ne "connected") {
+	      readingsSingleUpdate($hash, "state", "connected", 1);
+		  $hash->{HELPER}{OLDSTATE} = "connected";
+	  }
+      readingsSingleUpdate($hash, "state", "connected", 0);
   }
   
   InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
@@ -3509,7 +3537,7 @@ sub DbLog_deldaysNbl_done($) {
 	  readingsSingleUpdate($hash, "lastRowsDeleted", $rows ,1);
   }
   my $db = (split(/;|=/, $hash->{dbconn}))[1];
-  Log3 ($name, 3, "DbLog $name -> deleteOldDays finished. $rows entries of database $db deleted.");
+  Log3 ($name, 3, "DbLog $name -> deleteOldDaysNbl finished. $rows entries of database $db deleted.");
   delete $hash->{HELPER}{DELDAYS_PID};
   Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl_done finished");
 return;

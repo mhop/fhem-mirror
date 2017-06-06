@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog: V2.16.11, lock SQLite from logging if deleteOldDaysNbl 
+                       or reduceLogNbL is running in async mode
   - feature: ESPEasy: improved dual ip stack support
   - change:  FHEMWEB/telnet needs password if directly(!) connected to the
              internet, see https://forum.fhem.de/index.php?topic=72717
