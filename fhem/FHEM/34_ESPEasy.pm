@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.14;       # Version of this module
+my $module_version    = 1.15;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -54,7 +54,7 @@ my $d_displayTextWidth  = 0;        # display width, 0 => disable formating
 
 # IP ranges that are allowed to connect to ESPEasy without attr allowedIPs set.
 my $d_allowedIPs = "192.168.0.0/16,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,"
-                 . "fe80::/10,::1";
+                 . "fe80::/10,fc00::/7,::1";
 
 # ------------------------------------------------------------------------------
 # "setCmds" => "min. number of parameters"
@@ -274,6 +274,7 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   my $ipv = ($port =~ m/^IPV6:/i ? 6 : 4) if defined $port;
   $hash->{IPV} = $ipv;
   
+  # Check OS IPv6 support
   if ($ipv == 6) {
     use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
     Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support."
@@ -607,8 +608,8 @@ sub ESPEasy_Read($) {
   # mask password in authorization header with ****
   my $logHeader = { %$header };
 
-	# public IPs
-  my $re = "^(127|193.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
+  # public IPs
+  my $re = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
          . "^(fe[89ab]|::1)";
   if (!defined $logHeader->{Authorization} && $peer !~ m/$re/) {
     Log3 $bname, 2, "$btype $name: No basic auth set while using a public IP "
@@ -1702,8 +1703,6 @@ sub ESPEasy_TcpServer_Accept($$)
   Log3 $name, 4, "Connection accepted from $nhash{NAME}";
   return \%nhash;
 }
-
-
 
 
 # ------------------------------------------------------------------------------
