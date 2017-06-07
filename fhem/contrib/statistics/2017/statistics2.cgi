@@ -149,7 +149,7 @@ sub doAggregate() {
    my $nodesTotal = $dbInfo->{'submissionsTotal'};
    my $nodes12    = 0;
 
-   $sql = qq(SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseInfo');
+   $sql = q(SELECT geo,json FROM jsonNodes WHERE lastSeen > $limit AND uniqueID <> 'databaseInfo');
    $sth = $dbh->prepare( $sql );
    $sth->execute();
 
