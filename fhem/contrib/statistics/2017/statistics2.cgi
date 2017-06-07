@@ -64,7 +64,7 @@ my $css    = "style.css";
 if ($ua =~ m/FHEM/) {
   my $result = insertDB();
   print header("application/x-www-form-urlencoded");
-  if $result {
+  if ($result) {
     print "==> ok"
   } else {
     print "==> error"
@@ -219,11 +219,11 @@ sub viewStatistics() {
          $q->p( "<b>Statistics database</b><br>created: $started, updated: $updated<br>".
                 "entries (total): $nodesTotal, entries (12 month): $nodes12<br>".
                 "Generation time: ".sprintf("%.3f",time()-$start)." seconds"),
-         $q->hr,
-         $q->p( "System info <br>".            Dumper $countSystem ),
-         $q->p( "GeoIP info <br>".             Dumper $countGeo ),
-         $q->p( "Modules info <br>".           Dumper $countModules ),
-         $q->p( "Models per module info <br>". Dumper $countModels ),
+#         $q->hr,
+#         $q->p( "System info <br>".            Dumper $countSystem ),
+#         $q->p( "GeoIP info <br>".             Dumper $countGeo ),
+#         $q->p( "Modules info <br>".           Dumper $countModules ),
+#         $q->p( "Models per module info <br>". Dumper $countModels ),
 
          $q->end_html;
 }
