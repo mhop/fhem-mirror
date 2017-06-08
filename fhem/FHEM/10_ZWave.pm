@@ -657,7 +657,8 @@ our %zwave_deviceSpecial;
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
 my (%zwave_link, %zwave_img);
-my $zwave_helpSites = "alliance"; # was "alliance,pepper";
+my $zwave_activeHelpSites = "alliance"; # "pepper is dead";
+my $zwave_allHelpSites = "alliance,pepper";
 
 # standard definitions for regular expression
 # naming scheme: p<number of returned groups>_name
@@ -718,7 +719,7 @@ ZWave_Initialize($)
 
   ################
   # Read in the pepper/alliance translation table
-  for my $n (split(",", $zwave_helpSites)) {
+  for my $n (split(",", $zwave_allHelpSites)) {
     my $fn = $attr{global}{modpath}."/FHEM/lib/zwave_${n}links.csv.gz";
     my $gz = gzopen($fn, "rb");
     if($gz) {
@@ -4962,7 +4963,7 @@ ZWave_getPic($$)
 {
   my ($iodev, $model) = @_;
   
-  my $hs = AttrVal($iodev, "helpSites", $zwave_helpSites);
+  my $hs = AttrVal($iodev, "helpSites", $zwave_allHelpSites);
   for my $n (split(",", $hs)) {
     my $img = $zwave_img{$n}{$model};
     next if(!$img);
@@ -4993,7 +4994,7 @@ ZWave_fhemwebFn($$$$)
   return '' if (!$model);
 
   my $iodev = $defs{$d}{IODev}{NAME};
-  my $hs = AttrVal($iodev, "helpSites", $zwave_helpSites);
+  my $hs = AttrVal($iodev, "helpSites", $zwave_activeHelpSites);
   for my $n (split(",", $hs)) {
     my $link = $zwave_link{$n}{$model};
     next if(!$link);
