@@ -218,7 +218,7 @@ sub viewStatistics() {
          $q->p( "graphics to be implemented..." ),
          $q->hr,
          $q->p( "<b>Statistics database</b><br>created: $started, updated: $updated<br>".
-                "entries (total): $nodesTotal, entries (12 month): $nodes12<br>".
+                "entries (total): $nodesTotal, entries (12 months): $nodes12<br>".
                 "Generation time: ".sprintf("%.3f",time()-$start)." seconds"),
 #         $q->hr,
 #         $q->p( "System info <br>".            Dumper $countSystem ),
