@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules};
 
-my $HOMEMODE_version = "1.1.2";
+my $HOMEMODE_version = "1.1.3";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -1507,30 +1507,17 @@ sub HOMEMODE_Attr(@)
         "Invalid value $attr_value for attribute $attr_name. Must be a number from 1 to 99999 for interval in minutes!";
       return $trans if ($attr_value !~ /^\d{1,5}$/);
     }
-    elsif ($attr_name eq "HomeSensorsContact" && $init_done)
+    elsif ($attr_name =~ /^(HomeSensorsContact|HomeSensorsMotion)$/ && $init_done)
     {
       $trans = $HOMEMODE_de?
         "$attr_value muss ein gültiger Devspec sein!":
         "$attr_value must be a valid devspec!";
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value));
-      if ($attr_value_old ne $attr_value)
-      {
-        CommandDeleteReading(undef,"$name lastContact|prevContact|contacts.*");
-        HOMEMODE_updateInternals($hash);
-        HOMEMODE_addSensorsuserattr($hash,$attr_value,$attr_value_old);
-      }
-    }
-    elsif ($attr_name eq "HomeSensorsMotion" && $init_done)
-    {
-      $trans = $HOMEMODE_de?
-        "$attr_value muss ein gültiger Devspec sein!":
-        "$attr_value must be a valid devspec!";
-      return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value));
-      if ($attr_value_old ne $attr_value)
-      {
-        HOMEMODE_updateInternals($hash);
-        HOMEMODE_addSensorsuserattr($hash,$attr_value,$attr_value_old);
-      }
+      my $od = "";
+      $od = $hash->{SENSORSCONTACT} if ($hash->{SENSORSCONTACT} && $attr_name eq "HomeSensorsContact");
+      $od = $hash->{SENSORSMOTION} if ($hash->{SENSORSMOTION} && $attr_name eq "HomeSensorsMotion");
+      HOMEMODE_updateInternals($hash);
+      HOMEMODE_addSensorsuserattr($hash,$attr_value,$od);
     }
     elsif ($attr_name eq "HomeSensorsPowerEnergy" && $init_done)
     {
@@ -1539,10 +1526,7 @@ sub HOMEMODE_Attr(@)
         "$attr_value muss ein gültiger Devspec mit $p und $e Readings sein!":
         "$attr_value must be a valid devspec with $p and $e readings!";
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$p) || !HOMEMODE_CheckIfIsValidDevspec($attr_value,$e));
-      if ($attr_value_old ne $attr_value)
-      {
-        HOMEMODE_updateInternals($hash);
-      }
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name eq "HomeTwilightDevice" && $init_done)
     {
@@ -1695,7 +1679,7 @@ sub HOMEMODE_Attr(@)
         "$attr_value muss ein gültiges Gerät mit $read Reading sein!":
         "$attr_name must be a valid device with $read reading!";
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$read));
-      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name eq "HomeSensorsPowerEnergyReadings" && $init_done)
     {
@@ -1728,7 +1712,7 @@ sub HOMEMODE_Attr(@)
         "$attr_value muss ein gültiges Gerät mit $read Reading sein!":
         "$attr_name must be a valid device with $read reading!";
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec($attr_value,$read));
-      HOMEMODE_updateInternals($hash) if ($attr_value_old ne $attr_value);
+      HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name eq "HomeSensorsBatteryLowPercentage")
     {
@@ -2941,9 +2925,11 @@ sub HOMEMODE_Details($$$)
   my ($FW_name,$name,$room) = @_;
   return if (AttrVal($name,"HomeAdvancedDetails","none") eq "none" || (AttrVal($name,"HomeAdvancedDetails","") eq "room" && $FW_detail eq $name));
   my $hash = $defs{$name};
+  my $iid = ReadingsVal($name,"lastInfo","") ? ReadingsVal($name,"lastInfo","") : "";
+  my $info = ReadingsVal($name,$iid,"");
   my $html = "<div>";
   $html .= "<style>.homehover{cursor:pointer}.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:30px;max-width:480px;padding:3px 10px}</style>";
-  $html .= "<div class=\"homeinfopanel\" informid=\"\"></div>";
+  $html .= "<div class=\"homeinfopanel\" informid=\"$iid\">$info</div>";
   $html .= "<table class=\"wide\">";
   if (AttrVal($name,"HomeYahooWeatherDevice",""))
   {
@@ -2989,7 +2975,14 @@ sub HOMEMODE_Details($$$)
   }
   $html .= "</table>";
   $html .= "</div>";
-  $html .= "<script>\$(\".homehover\").unbind().click(function(){var t=\$(this).find(\".homeinfo\").text();var id=\$(this).find(\".homeinfo\").attr(\"informid\");\$(\".homeinfopanel\").text(t).attr(\"informid\",id);});</script>";
+  $html .= "<script>";
+  $html .= "\$(\".homehover\").unbind().click(function(){";
+  $html .= "var t=\$(this).find(\".homeinfo\").text();";
+  $html .= "var id=\$(this).find(\".homeinfo\").attr(\"informid\");";
+  $html .= "var r=id.split(\"-\")[1];";
+  $html .= "\$(\".homeinfopanel\").text(t).attr(\"informid\",id);";
+  $html .= "if(r){\$.post(window.location.pathname+\"?cmd=setreading%20$name%20lastInfo%20\"+r+\"$FW_CSRF\")};";
+  $html .= "});</script>";
   return $html;
 }
 
@@ -3905,6 +3898,10 @@ sub HOMEMODE_Details($$$)
     <li>
       <b><i>lastGotosleepByResident</i></b><br>
       last resident who went gotosleep
+    </li>
+    <li>
+      <b><i>lastInfo</i></b><br>
+      last shown item on infopanel (HomeAdvancedDetails)
     </li>
     <li>
       <b><i>lastMotion</i></b><br>
