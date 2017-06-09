@@ -807,6 +807,7 @@ sub Spotify_dispatch($$$) {
 
   			if($device->{is_active}) {
   				Spotify_saveDevice($hash, $device, "device_active", 0);
+  				readingsBulkUpdateIfChanged($hash, 'volume', $device->{volume_percent});
   				$hash->{helper}{device_active} = $device; # found active device
   			}
   			
@@ -855,6 +856,7 @@ sub Spotify_dispatch($$$) {
 		if($hash->{helper}{is_active}) {
 			my $device = $json->{device};
 			$hash->{helper}{device_active} = $device;
+			readingsBulkUpdateIfChanged($hash, 'volume', $device->{volume_percent});
 			Spotify_saveDevice($hash, $device, "device_active", 0);
 		} else {
 			delete $hash->{helper}{device_active};
