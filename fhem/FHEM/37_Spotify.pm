@@ -524,7 +524,7 @@ sub Spotify_playSavedTracks($$$) { # play users saved tracks
 	my $name = $hash->{NAME};
 
 	$device_id = $first . (defined $device_id ? " " . $device_id : "") if(defined $first && $first !~ /^[0-9]+$/);
-	$first = 1 if(!defined $first || !$first !~ /^[0-9]+$/);
+	$first = 1 if(!defined $first || $first !~ /^[0-9]+$/);
 
 	Spotify_apiRequest($hash, 'me/tracks?limit=50'. ($first > 50 ? '&offset='. int($first/50)-1 : ''), undef, 'GET', 1); # getting saved tracks
 	my $result = $hash->{helper}{dispatch}{json}{items};
