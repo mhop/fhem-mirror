@@ -117,7 +117,8 @@ sub _fi2_Send() {
 sub _fi2_TelnetTable($) {
   my ($doSend) = shift;
   my $upTime = _fi2_Uptime();
-  my $str =  "Following statistics data will be sent to server:\n(see Logfile for server response)\n\n" if($doSend == 1);
+  my $str;
+  $str .= "Following statistics data will be sent to server:\n(see Logfile for server response)\n\n" if($doSend == 1);
   $str .= "System Info\n";
   $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{'system'}{'release'});
   $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{'system'}{'feature'});
@@ -159,7 +160,8 @@ sub _fi2_HtmlTable($) {
    my @keys = keys %fhemInfo;
    foreach my $type (sort @keys)
    {
-      next if $type eq 'system';
+      next if ($type eq 'system');
+      next unless $type;
       $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{'noModel'}</td></tr>";
       while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
       { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq 'noModel'; }
