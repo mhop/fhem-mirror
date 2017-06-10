@@ -26,6 +26,8 @@
 #################################################################################################
 # Versions History done by DS_Starter
 #
+# 2.9.1    29.05.2017     DbLog_splitFn added, some function names adapted
+# 2.9.0    25.05.2017     own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION
 # 2.8.2    03.12.2016     Prefix SMAEMserialnumber for Reading "state" removed, commandref adapted
 # 2.8.1    02.12.2016     encode / decode $data 
 # 2.8      02.12.2016     plausibility check of measured differences, attr diffAccept, timeout
@@ -34,7 +36,7 @@
 # 2.6      01.12.2016     some improvements, better logging possibility
 # 2.5      30.11.2016     some improvements
 # 2.4      30.11.2016     some improvements, attributes disable, timeout for BlockingCall added
-# 2.3      30.11.2016     getsum, setsum changed
+# 2.3      30.11.2016     SMAEM_getsum, SMAEM_setsum changed
 # 2.2      29.11.2016     check error while writing values to file -> set state with error
 # 2.1      29.11.2016     move $hash->{GRIDin_SUM}, $hash->{GRIDOUT_SUM} calc to smaread_ParseDone,
 #                         some little improvements to logging process
@@ -46,8 +48,9 @@ use strict;
 use warnings;
 use bignum;
 use IO::Socket::Multicast;
-# use Scalar::Util qw(looks_like_number);
 use Blocking;
+
+my $SMAEMVersion = "2.9.1";
 
 ###############################################################
 #                  SMAEM Initialize
@@ -55,23 +58,20 @@ use Blocking;
 sub SMAEM_Initialize($) {
   my ($hash) = @_;
   
-  $hash->{ReadFn}     = "SMAEM_Read";
-  $hash->{DefFn}      = "SMAEM_Define";
-  $hash->{UndefFn}    = "SMAEM_Undef";
-  $hash->{DeleteFn}   = "SMAEM_Delete";
-  #$hash->{WriteFn} = "SMAEM_Write";
-  #$hash->{ReadyFn} = "SMAEM_Ready";
-  #$hash->{GetFn}   = "SMAEM_Get";
-  #$hash->{SetFn}   = "SMAEM_Set";
-  $hash->{AttrFn}     = "SMAEM_Attr";
-  $hash->{AttrList}   = "interval ".
-                        "disable:1,0 ".
-						"diffAccept ".
-                        "disableSernoInReading:1,0 ".
-                        "feedinPrice ".
-                        "powerCost ".
-                        "timeout ".						
-                        "$readingFnAttributes";
+  $hash->{ReadFn}        = "SMAEM_Read";
+  $hash->{DefFn}         = "SMAEM_Define";
+  $hash->{UndefFn}       = "SMAEM_Undef";
+  $hash->{DeleteFn}      = "SMAEM_Delete";
+  $hash->{DbLog_splitFn} = "SMAEM_DbLog_splitFn";
+  $hash->{AttrFn}        = "SMAEM_Attr";
+  $hash->{AttrList}      = "interval ".
+                           "disable:1,0 ".
+						   "diffAccept ".
+                           "disableSernoInReading:1,0 ".
+                           "feedinPrice ".
+                           "powerCost ".
+                           "timeout ".						
+                           "$readingFnAttributes";
 }
 
 ###############################################################
@@ -84,6 +84,7 @@ sub SMAEM_Define($$) {
   
   $hash->{INTERVAL}              = 60 ;
   $hash->{LASTUPDATE}            = 0;
+  $hash->{VERSION}               = $SMAEMVersion;
   $hash->{HELPER}{LASTUPDATE}    = 0;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
   $hash->{HELPER}{STARTTIME}     = time();
@@ -104,10 +105,10 @@ sub SMAEM_Define($$) {
   $selectlist{"$name"} = $hash;
   
   # gespeicherte Energiezählerwerte von File einlesen
-  my $retcode = getsum($hash);
+  my $retcode = SMAEM_getsum($hash);
   
   if ($retcode) {
-  	 $hash->{HELPER}{READFILEERROR} = $retcode;
+  	 $hash->{HELPER}{READFILEERROR} = $retcode if($retcode);
   }
   
 return undef;
@@ -221,11 +222,11 @@ sub SMAEM_Read($) {
       }
 
 	  # update time
-      lastupdate_set($hash);
+      SMAEM_setlastupdate($hash);
 	  
 	  my $dataenc = encode_base64($data,"");
       
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("smaemread_DoParse", "$name|$dataenc", "smaemread_ParseDone", $timeout, "smaemread_ParseAborted", $hash); 
+	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
       Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
   
   } else {
@@ -238,7 +239,7 @@ return undef;
 ###############################################################
 #          non-blocking Inverter Datenabruf
 ###############################################################
-sub smaemread_DoParse($) {
+sub SMAEM_DoParse($) {
  my ($string) = @_;
  my ($name, $dataenc) = split("\\|", $string);
  my $hash          = $defs{$name};
@@ -248,17 +249,17 @@ sub smaemread_DoParse($) {
  my @row_array;
  my @array;
  
- Log3 ($name, 4, "SMAEM $name -> Start BlockingCall smaemread_DoParse");
+ Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
  
  my $gridinsum  = $hash->{GRIDIN_SUM} ?sprintf("%.4f",$hash->{GRIDIN_SUM}):'';    
  my $gridoutsum = $hash->{GRIDOUT_SUM}?sprintf("%.4f",$hash->{GRIDOUT_SUM}):'';
  
- # check if uniqueID-file has been opened at module start and try again if not
+ # check if cacheSMAEM-file has been opened at module start and try again if not
  if($hash->{HELPER}{READFILEERROR}) {
-     my $retcode = getsum($hash);
+     my $retcode = SMAEM_getsum($hash);
 	 if ($retcode) {
 	     my $error = encode_base64($retcode,"");
-	     Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_DoParse finished");
+	     Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		 $discycles++;
          return "$name|''|''|''|$error|$discycles"; 
 	 } else {
@@ -319,7 +320,7 @@ sub smaemread_DoParse($) {
 			    my $errtxt = "cycle discarded due to allowed diff GRIDOUT exceeding";
 			    my $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
-		        Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_DoParse finished");
+		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
@@ -349,7 +350,7 @@ sub smaemread_DoParse($) {
 			    my $errtxt = "cycle discarded due to allowed diff GRIDIN exceeding";
 			    my $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
-		        Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_DoParse finished");
+		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 				$gridinsum = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
@@ -360,12 +361,12 @@ sub smaemread_DoParse($) {
     
     # write GRIDIN_SUM and GRIDOUT_SUM to file if plausibility check ok
 	Log3 ($name, 4, "SMAEM $name - plausibility check done: GRIDIN -> $plausibility_in, GRIDOUT -> $plausibility_out");
-    my $retcode = setsum($hash, $gridinsum, $gridoutsum) if($plausibility_in && $plausibility_out);
+    my $retcode = SMAEM_setsum($hash, $gridinsum, $gridoutsum) if($plausibility_in && $plausibility_out);
 	
 	# error while writing values to file
 	if ($retcode) {
 	    my $error = encode_base64($retcode,"");
-		Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_DoParse finished");
+		Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		$discycles++;
         return "$name|''|''|''|$error|$discycles"; 
 	}
@@ -520,7 +521,7 @@ sub smaemread_DoParse($) {
     my $rowlist = join('|', @row_array);
     $rowlist    = encode_base64($rowlist,"");
  
-    Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_DoParse finished");
+    Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
  
 return "$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles"; 
 }
@@ -528,7 +529,7 @@ return "$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles";
 ###############################################################
 #         Auswertung non-blocking Inverter Datenabruf
 ###############################################################
-sub smaemread_ParseDone ($) {
+sub SMAEM_ParseDone ($) {
  my ($string)   = @_;
  my @a          = split("\\|",$string);
  my $name       = $a[0];
@@ -539,16 +540,16 @@ sub smaemread_ParseDone ($) {
  my $error      = decode_base64($a[4]) if($a[4]);
  my $discycles  = $a[5];
  
- Log3 ($name, 4, "SMAEM $name -> Start BlockingCall smaemread_ParseDone");
+ Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_ParseDone");
  
  $hash->{HELPER}{FAULTEDCYCLES} = $discycles;
  
  # update time
- lastupdate_set($hash);
+ SMAEM_setlastupdate($hash);
  
  if ($error) {
      readingsSingleUpdate($hash, "state", $error, 1);
-	 Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_ParseDone finished");
+	 Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_ParseDone finished");
 	 delete($hash->{HELPER}{RUNNING_PID});
 	 return;
  }
@@ -574,7 +575,7 @@ sub smaemread_ParseDone ($) {
  readingsEndUpdate($hash, 1);
  
  delete($hash->{HELPER}{RUNNING_PID});
- Log3 ($name, 4, "SMAEM $name -> BlockingCall smaemread_ParseDone finished");
+ Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_ParseDone finished");
  
 return;
 }
@@ -582,7 +583,7 @@ return;
 ###############################################################
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
-sub smaemread_ParseAborted($) {
+sub SMAEM_ParseAborted($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
@@ -594,6 +595,45 @@ sub smaemread_ParseAborted($) {
   delete($hash->{HELPER}{RUNNING_PID});
 }
 
+###############################################################
+#                  DbLog_splitFn
+###############################################################
+sub SMAEM_DbLog_splitFn($) {
+  my ($event,$device) = @_;
+  my ($reading, $value, $unit) = "";
+
+  # Log3 ($device, 5, "SMAEM $device - splitFn splits event: ".$event);
+
+  my @parts = split(/ /,$event,3);
+  $reading = $parts[0];
+  $reading =~ tr/://d;
+  $value   = $parts[1];
+  
+  if($reading =~ m/.*leistung$/) {
+      $unit = 'W';
+  } elsif($reading =~ m/.*Spannung/) {
+      $unit = 'V';
+  } elsif($reading =~ m/.*leistung_Zaehler$/) {
+      $unit = 'kWh';
+  } elsif($reading =~ m/.*THD$/) {
+      $unit = '%';
+  } else {
+      if(!defined($parts[1])) {
+	      $reading = "state";
+	      $value   = $event;
+		  $unit    = 'W';
+	  } else {
+          $value = $parts[1];
+          $value = $value." ".$parts[2] if(defined($parts[2]));
+	  }
+  }
+
+  Log3 ($device, 5, "SMAEM $device - splitFn returns Reading: ".$reading.", Value: ".
+       defined($value)?$value:''.", Unit: ".defined($unit)?$unit:'');
+
+return ($reading, $value, $unit);
+}
+
 
 ###############################################################
 #                  Hilfsroutinen
@@ -602,7 +642,7 @@ sub smaemread_ParseAborted($) {
 ###############################################################
 ###  Summenwerte für GridIn, GridOut speichern
 
-sub setsum ($$$) {
+sub SMAEM_setsum ($$$) {
     my ($hash, $gridinsum, $gridoutsum) = @_;
     my $name     = $hash->{NAME};
     my $index;
@@ -613,7 +653,7 @@ sub setsum ($$$) {
     $sumstr = $gridinsum."_".$gridoutsum;
     
     $index = $hash->{TYPE}."_".$hash->{NAME}."_energysum";
-    $retcode = setKeyValue($index, $sumstr);
+    $retcode = SMAEM_setCacheValue($index, $sumstr);
     
     if ($retcode) { 
         Log3($name, 1, "SMAEM $name - ERROR while saving summary of energy values - $retcode");
@@ -626,7 +666,7 @@ return ($retcode);
 
 ###############################################################
 ###  Summenwerte für GridIn, GridOut abtufen
-sub getsum ($) {
+sub SMAEM_getsum ($) {
     my ($hash) = @_;
     my $name     = $hash->{NAME};
     my $index;
@@ -635,15 +675,16 @@ sub getsum ($) {
     my $modpath = AttrVal("global", "modpath", undef);
 	
     $index = $hash->{TYPE}."_".$hash->{NAME}."_energysum";
-    ($retcode, $sumstr) = getKeyValue($index);
+    ($retcode, $sumstr) = SMAEM_getCacheValue($index);
     
     if ($retcode) {
-        Log3($name, 1, "SMAEM $name - ERROR while reading saved energy values from $modpath/FHEM/FhemUtils/uniqueID:");
-        Log3($name, 1, "SMAEM $name - $retcode");
+        Log3($name, 3, "SMAEM $name - Create new cacheFile $modpath/FHEM/FhemUtils/cacheSMAEM");
+		$retcode = SMAEM_createCacheFile(); 
+        Log3($name, 1, "SMAEM $name - $retcode") if ($retcode);
     } else {
 	    if ($sumstr) {
             ($hash->{GRIDIN_SUM}, $hash->{GRIDOUT_SUM}) = split(/_/, $sumstr);
-            Log3 ($name, 3, "SMAEM $name - read saved energy values from $modpath/FHEM/FhemUtils/uniqueID:");
+            Log3 ($name, 3, "SMAEM $name - read saved energy values from $modpath/FHEM/FhemUtils/cacheSMAEM");
 			Log3 ($name, 3, "SMAEM $name - GRIDIN_SUM: $hash->{GRIDIN_SUM}, GRIDOUT_SUM: $hash->{GRIDOUT_SUM}");  
         }
 	}
@@ -651,8 +692,71 @@ return ($retcode);
 }
 
 ###############################################################
+###  Schreibroutine in eigenes Keyvalue-File
+sub SMAEM_setCacheValue($$) {
+  my ($key,$value) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my ($err, @old) = FileRead($param);
+  
+  if($err) {
+      SMAEM_createCacheFile(); 
+  }
+  
+  my @new;
+  my $fnd;
+  foreach my $l (@old) {
+    if($l =~ m/^$key:/) {
+      $fnd = 1;
+      push @new, "$key:$value" if(defined($value));
+    } else {
+      push @new, $l;
+    }
+  }
+  push @new, "$key:$value" if(!$fnd && defined($value));
+
+  return FileWrite($param, @new);
+}
+
+###############################################################
+###  Leseroutine in eigenes Keyvalue-File
+sub SMAEM_getCacheValue($) {
+  my ($key) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my ($err, @l) = FileRead($param);
+  return ($err, undef) if($err);
+  for my $l (@l) {
+    return (undef, $1) if($l =~ m/^$key:(.*)/);
+  }
+  return (undef, undef);
+}
+
+###############################################################
+###  Anlegen eigenes Keyvalue-File wenn nicht vorhanden
+sub SMAEM_createCacheFile {
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my @new;
+  push(@new, "# This file is auto generated from 77_SMAEM.",
+             "# Please do not modify, move or delete it.",
+             "");
+
+  return FileWrite($param, @new);
+}
+
+###############################################################
 ###  $update time of last update
-sub lastupdate_set ($) {
+sub SMAEM_setlastupdate ($) {
     my ($hash) = @_;
 	my $name     = $hash->{NAME};
 	
@@ -709,10 +813,29 @@ sub lastupdate_set ($) {
                                       straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
                                       Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
 									  tamper the result and the measure cycles will be discarded.  </li>
-  <li><b>powerCost</b>              : die individuelle Höhe der Stromkosten pro Kilowattstunde </li>
-  <li><b>timeout</b>                : Einstellung des timeout für die Wechselrichterabfrage (default 60s) </li> 
+  <li><b>powerCost</b>              : the individual amount of power cost per kWh </li>
+  <li><b>timeout</b>                : adjustment of timeout for inverter request (default 60s) </li> 
 </ul>
+<br>
 
+<a name="SMAEMreadings"></a>
+<b>Readings</b> <br><br>
+
+The created readings of SMAEM mostly are self-explanatory. 
+However there are readings what maybe need some explanation. <br>
+
+<ul>
+  <li><b>&lt;Phase&gt;_THD</b>  : (Total Harmonic Distortion) - Proportion or quota of total effective value 
+                                  of all harmonic component to effective value of fundamental component. 
+								  Total ratio of harmonic component and interference of pure sinusoidal wave 
+								  in %.
+								  It is a rate of interferences. d is 0, if sinusoidal voltage exists and a sinusoidal 
+								  current exists as well. As larger d, as more harmonic component are existing. 
+								  According EN 50160/1999 the value mustn't exceed 8 %. 
+								  If a current interference is so powerful that it is causing a voltage interference of 
+								  more than 5 % (THD), that points to an issue with electrical potential.  </li>
+</ul>
+<br>
 
 =end html
 
@@ -746,7 +869,6 @@ sub lastupdate_set ($) {
 	mittels <code>apt-get install libio-socket-multicast-perl</code> installiert werden. 
   </ul>  
   <br>
-  <br>
   
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
@@ -763,6 +885,27 @@ sub lastupdate_set ($) {
   <li><b>powerCost</b>              : die individuelle Höhe der Stromkosten pro Kilowattstunde </li>
   <li><b>timeout</b>                : Einstellung des timeout für die Wechselrichterabfrage (default 60s) </li> 
 </ul>
-  
+<br>
+
+<a name="SMAEMreadings"></a>
+<b>Readings</b> <br><br>
+
+Die meisten erzeugten Readings von SMAEM sind selbsterklärend. 
+Es gibt allerdings Readings die einer Erläuterung bedürfen. <br>
+
+<ul>
+  <li><b>&lt;Phase&gt;_THD</b>  : (Total Harmonic Distortion) - Verzerrungs- oder Gesamtklirrfaktor - Verhältnis oder 
+                                  Anteil des Gesamteffektivwert aller Oberschwingungen zum Effektivwert der 
+								  Grundschwingung. Gesamtanteil an Oberschwingungen und Störung der reinen Sinuswelle 
+								  in % bzw. Verhältnis vom nutzbaren Grundschwingungsstrom zu den 
+								  nicht nutzbaren Oberschwingungsströmen. Es ist ein Maß für Störungen. d ist 0, wenn bei 
+								  sinusförmiger Spannung ein sinusförmiger Strom fließt. Je größer d, um so mehr 
+								  Oberschwingungen sind vorhanden. Nach EN 50160/1999 z.B. darf der Wert 8 % nicht 
+								  überschreiten. Wenn eine Stromstörung so stark ist, dass sie eine Spannungsstörung 
+								  (THD) von über 5 % verursacht, deutet dies auf ein Potentialproblem hin.  </li>
+
+</ul>
+<br>
+
 =end html_DE
 
