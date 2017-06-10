@@ -519,18 +519,18 @@ sub alarmclock_createtimer($)
     my ($hash) = @_;
     
     my ($SecNow, $MinNow, $HourNow, $DayNow, $MonthNow, $YearNow, $WDayNow, $YDNow, $SumTimeNow) = localtime(time);
-	
-	$hash->{helper}{Today} = $WDayNow;
- 	
-	if ($WDayNow =~ /^(0|1|2|3|4|5)/)
-	{
-		$hash->{helper}{Tomorrow} = $WDayNow + 1;
-	}
-	else
-	{
-		$hash->{helper}{Tomorrow} = 0;
-	}	
-	
+    
+    $hash->{helper}{Today} = $WDayNow;
+    
+    if ($WDayNow =~ /^(0|1|2|3|4|5)/)
+    {
+        $hash->{helper}{Tomorrow} = $WDayNow + 1;
+    }
+    else
+    {
+        $hash->{helper}{Tomorrow} = 0;
+    }   
+    
     my $HourinSec = $HourNow * 3600;
     my $MininSec = $MinNow * 60;
     my $NowinSec = $HourinSec + $MininSec + $SecNow;
@@ -542,14 +542,14 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 
 
 ### Vacation ###   
-	alarmclock_vacation_check($hash);
+    alarmclock_vacation_check($hash);
    
 ### Holiday ###   
-	alarmclock_holiday_check($hash);
-	
-	my $alarmtimetoday = $alarmday{$hash->{helper}{Today}};
-	my $alarmtimetommorow = $alarmday{$hash->{helper}{Tomorrow}};
-	
+    alarmclock_holiday_check($hash);
+    
+    my $alarmtimetoday = $alarmday{$hash->{helper}{Today}};
+    my $alarmtimetommorow = $alarmday{$hash->{helper}{Tomorrow}};
+    
     
     if ((ReadingsVal($hash->{NAME},$alarmtimetoday,"NONE")) =~ /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     {
@@ -663,13 +663,13 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 
 ### Alarm Reading ###
 
-	my $AlarmToday = ReadingsVal($hash->{NAME},$alarmtimetoday," ");
-	my $AlarmTomorrow = ReadingsVal($hash->{NAME},$alarmtimetommorow," ");
+    my $AlarmToday = ReadingsVal($hash->{NAME},$alarmtimetoday," ");
+    my $AlarmTomorrow = ReadingsVal($hash->{NAME},$alarmtimetommorow," ");
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "AlarmToday", $AlarmToday);
     readingsBulkUpdate( $hash, "AlarmTomorrow", $AlarmTomorrow);
     readingsEndUpdate($hash,1);
-	
+    
 }
     
 }
@@ -1103,8 +1103,8 @@ sub alarmclock_holiday_check($)
 
     my ($hash) = @_;
     my ($SecNow, $MinNow, $HourNow, $DayNow, $MonthNow, $YearNow, $WDayNow, $YDNow, $SumTimeNow) = localtime(time);
-	my $WDayToday = $WDayNow;
-	my $WDayTomorrow = $WDayNow + 1;
+    my $WDayToday = $WDayNow;
+    my $WDayTomorrow = $WDayNow + 1;
     if ($WDayToday == 0)
     {
         $WDayToday = 7;
@@ -1114,7 +1114,7 @@ sub alarmclock_holiday_check($)
     {
         my @HolidayDays = split(/\|/, AttrVal($hash->{NAME},"HolidayDays","1|2|3|4|5|6|7"));
         my $DayToday = grep {$_==$WDayToday;} @HolidayDays;
-		my $DayTomorrow = grep {$_==$WDayTomorrow;} @HolidayDays;
+        my $DayTomorrow = grep {$_==$WDayTomorrow;} @HolidayDays;
         my @Holiday = split(/\|/, AttrVal($hash->{NAME},"HolidayDevice",""));
         my $a = 0;
         my $b = scalar(@Holiday);
@@ -1128,25 +1128,25 @@ sub alarmclock_holiday_check($)
                 if( IsDevice( $HolidayDevice[0], "holiday" ))
                 {
                     my $today = strftime("%2m-%2d", localtime(time));
-					my $tomorrow = strftime("%2m-%2d", localtime(time+86400));
+                    my $tomorrow = strftime("%2m-%2d", localtime(time+86400));
                     my $todayevent = holiday_refresh($HolidayDevice[0],$today);
                     if (($todayevent ne "none") && ($DayToday == 1))
                     {
                         Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - holiday => $HolidayDevice[0] - $todayevent";
-						$hash->{helper}{Today} = 8;
+                        $hash->{helper}{Today} = 8;
                     }
-					my $tomorrowevent = holiday_refresh($HolidayDevice[0],$tomorrow);
-					if (($tomorrowevent ne "none") && ($DayTomorrow == 1))
+                    my $tomorrowevent = holiday_refresh($HolidayDevice[0],$tomorrow);
+                    if (($tomorrowevent ne "none") && ($DayTomorrow == 1))
                     {
-						$hash->{helper}{Tomorrow} = 8;
+                        $hash->{helper}{Tomorrow} = 8;
                     }
                 }
-				elsif( IsDevice($HolidayDevice[0], "Calendar" ))
+                elsif( IsDevice($HolidayDevice[0], "Calendar" ))
                 {
                     my $stoday = strftime("%2d.%2m.%2y", localtime(time));
-					my $stomorrow = strftime("%2d.%2m.%2y", localtime(time+86400));
+                    my $stomorrow = strftime("%2d.%2m.%2y", localtime(time+86400));
                     my $line = Calendar_Get($defs{$HolidayDevice[0]},"get","text","mode=alarm|start|upcoming");
-					if ($line)
+                    if ($line)
                     {
                         chomp($line);
                         my @lines = split('\n',$line);
@@ -1158,22 +1158,22 @@ sub alarmclock_holiday_check($)
                             {
                                 my $todaydesc = substr($line,15);
                                 Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - holiday => $HolidayDevice[0] - $todaydesc";
-								$hash->{helper}{Today} = 8;
+                                $hash->{helper}{Today} = 8;
                             }
                             if (($date eq $stomorrow) && ($DayTomorrow == 1))
                             {
-								$hash->{helper}{Tomorrow} = 8;
+                                $hash->{helper}{Tomorrow} = 8;
                             }
                         }
                     }
-				}
+                }
             }       
             elsif (scalar(@HolidayDevice) eq "2")   
             {   
                 if ((ReadingsVal($HolidayDevice[0],"state","NONE") eq $HolidayDevice[1]) && ($DayToday == 1))
                 {
                     Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - holiday => $HolidayDevice[0] - $HolidayDevice[1]";
-					$hash->{helper}{Today} = 8;
+                    $hash->{helper}{Today} = 8;
                 }
             }   
             elsif (scalar(@HolidayDevice) eq "3")
@@ -1183,7 +1183,7 @@ sub alarmclock_holiday_check($)
                 if ((ReadingsVal($HolidayDevice[0],$HolidayDevice[1],"NONE") eq $HolidayEvent) && ($DayToday == 1))
                 {
                     Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - holiday => $HolidayDevice[0] - $HolidayDevice[1] - $HolidayEvent";
-					$hash->{helper}{Today} = 8;
+                    $hash->{helper}{Today} = 8;
                 }
             }
             $a ++;
@@ -1203,8 +1203,8 @@ sub alarmclock_vacation_check($)
 
     my ($hash) = @_;
     my ($SecNow, $MinNow, $HourNow, $DayNow, $MonthNow, $YearNow, $WDayNow, $YDNow, $SumTimeNow) = localtime(time);
-	my $WDayToday = $WDayNow;
-	my $WDayTomorrow = $WDayNow + 1;
+    my $WDayToday = $WDayNow;
+    my $WDayTomorrow = $WDayNow + 1;
     if ($WDayToday == 0)
     {
         $WDayToday = 7;
@@ -1215,7 +1215,7 @@ sub alarmclock_vacation_check($)
        
         my @VacationDays = split(/\|/, AttrVal($hash->{NAME},"VacationDays","1|2|3|4|5|6|7"));
         my $DayToday = grep {$_==$WDayToday;} @VacationDays;
-		my $DayTomorrow = grep {$_==$WDayTomorrow;} @VacationDays;
+        my $DayTomorrow = grep {$_==$WDayTomorrow;} @VacationDays;
         my @Vacation = split(/\|/, AttrVal($hash->{NAME},"VacationDevice",""));
         my $a = 0;
         my $b = scalar(@Vacation);
@@ -1229,25 +1229,25 @@ sub alarmclock_vacation_check($)
                 if( IsDevice( $VacationDevice[0], "holiday" ))
                 {
                     my $today = strftime("%2m-%2d", localtime(time));
-					my $tomorrow = strftime("%2m-%2d", localtime(time+86400));
+                    my $tomorrow = strftime("%2m-%2d", localtime(time+86400));
                     my $todayevent = holiday_refresh($VacationDevice[0],$today);
                     if (($todayevent ne "none") && ($DayToday == 1))
                     {
                         Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - vacation => $VacationDevice[0] - $todayevent";
                         $hash->{helper}{Today} = 9;
                     }
-					my $tomorrowevent = holiday_refresh($VacationDevice[0],$tomorrow);
-					if (($tomorrowevent ne "none") && ($DayTomorrow == 1))
+                    my $tomorrowevent = holiday_refresh($VacationDevice[0],$tomorrow);
+                    if (($tomorrowevent ne "none") && ($DayTomorrow == 1))
                     {
-						$hash->{helper}{Tomorrow} = 9;
+                        $hash->{helper}{Tomorrow} = 9;
                     }
                 }
                 elsif( IsDevice($VacationDevice[0], "Calendar" ))
                 {
                     my $stoday = strftime("%2d.%2m.%2y", localtime(time));
-					my $stomorrow = strftime("%2d.%2m.%2y", localtime(time+86400));
+                    my $stomorrow = strftime("%2d.%2m.%2y", localtime(time+86400));
                     my @tday = split('\.',$stoday);
-					my @tmor = split('\.',$stomorrow);
+                    my @tmor = split('\.',$stomorrow);
                     my $fline = Calendar_Get($defs{$VacationDevice[0]},"get","full","mode=alarm|start|upcoming");
                     my @lines = split('\n',$fline);
                     foreach $fline (@lines)
@@ -1264,7 +1264,7 @@ sub alarmclock_vacation_check($)
                             Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - vacation => $VacationDevice[0] - $todaydesc";
                             $hash->{helper}{Today} = 9;
                         }
-						$rets = ($sday[2]-$tmor[2]-2000)*365+($sday[1]-$tmor[1])*31+($sday[0]-$tmor[0]);
+                        $rets = ($sday[2]-$tmor[2]-2000)*365+($sday[1]-$tmor[1])*31+($sday[0]-$tmor[0]);
                         $rete = ($eday[2]-$tmor[2]-2000)*365+($eday[1]-$tmor[1])*31+($eday[0]-$tmor[0]);
                         if (($rete>=0) && ($rets<=0) && ($DayTomorrow == 1))
                         {
@@ -1276,7 +1276,7 @@ sub alarmclock_vacation_check($)
             elsif (scalar(@VacationDevice) eq "2")   
             {   
                 if ((ReadingsVal($VacationDevice[0],"state","NONE") eq $VacationDevice[1]) && ($DayToday == 1))
-				{
+                {
                     Log3 $hash->{NAME}, 1, "alarmclock: $hash->{NAME} - vacation => $VacationDevice[0] - $VacationDevice[1]";
                     $hash->{helper}{Today} = 9;
                 }
@@ -1343,16 +1343,16 @@ sub alarmclock_Notify($$)
   
     if((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|Snooze for.*)/)
     {
-		if(my @AlarmOffDevice = split(/\|/, AttrVal($hash->{NAME},"EventForAlarmOff","")))
-		{
-			foreach my $AlarmOffDevice(@AlarmOffDevice)
-			{
-				my @AlarmOffDevicePart = split(/:/, $AlarmOffDevice,2); 
-				if(($devName eq $AlarmOffDevicePart[0]) && (grep { $AlarmOffDevicePart[1] eq $_ } @{$events}))
-				{
-					alarmclock_alarmroutine_stop($hash);
-				}
-			}	
+        if(my @AlarmOffDevice = split(/\|/, AttrVal($hash->{NAME},"EventForAlarmOff","")))
+        {
+            foreach my $AlarmOffDevice(@AlarmOffDevice)
+            {
+                my @AlarmOffDevicePart = split(/:/, $AlarmOffDevice,2); 
+                if(($devName eq $AlarmOffDevicePart[0]) && (grep { $AlarmOffDevicePart[1] eq $_ } @{$events}))
+                {
+                    alarmclock_alarmroutine_stop($hash);
+                }
+            }   
         }
     }
     
@@ -1361,16 +1361,16 @@ sub alarmclock_Notify($$)
   
     if((ReadingsVal($hash->{NAME},"state",0)) eq "Alarm is running")
     {
-		if(my @SnoozeDevice = split(/\|/, AttrVal($hash->{NAME},"EventForSnooze","")))
-		{
-			foreach my $SnoozeDevice(@SnoozeDevice)
-			{
-				my @SnoozeDevicePart = split(/:/, $SnoozeDevice,2); 
-				if(($devName eq $SnoozeDevicePart[0]) && (grep { $SnoozeDevicePart[1] eq $_ } @{$events}))
-				{
-					alarmclock_snooze_start($hash);
-				}
-			}	
+        if(my @SnoozeDevice = split(/\|/, AttrVal($hash->{NAME},"EventForSnooze","")))
+        {
+            foreach my $SnoozeDevice(@SnoozeDevice)
+            {
+                my @SnoozeDevicePart = split(/:/, $SnoozeDevice,2); 
+                if(($devName eq $SnoozeDevicePart[0]) && (grep { $SnoozeDevicePart[1] eq $_ } @{$events}))
+                {
+                    alarmclock_snooze_start($hash);
+                }
+            }   
         }
     }   
   
