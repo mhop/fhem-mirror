@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.15;       # Version of this module
+my $module_version    = 1.16;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -55,6 +55,9 @@ my $d_displayTextWidth  = 0;        # display width, 0 => disable formating
 # IP ranges that are allowed to connect to ESPEasy without attr allowedIPs set.
 my $d_allowedIPs = "192.168.0.0/16,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,"
                  . "fe80::/10,fc00::/7,::1";
+
+my $d_localIPs = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
+               . "^(f(e[89ab]|[cd])|::1)";
 
 # ------------------------------------------------------------------------------
 # "setCmds" => "min. number of parameters"
@@ -609,11 +612,9 @@ sub ESPEasy_Read($) {
   my $logHeader = { %$header };
 
   # public IPs
-  my $re = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|"
-         . "^(fe[89ab]|::1)";
-  if (!defined $logHeader->{Authorization} && $peer !~ m/$re/) {
-    Log3 $bname, 2, "$btype $name: No basic auth set while using a public IP "
-                  . "address from peer $peer."
+  if (!defined $logHeader->{Authorization} && $peer !~ m/$d_localIPs/) {
+    Log3 $bname, 2, "$btype $name: No basic auth set while using public IP "
+                  . "address $peer";
   }
 
   $logHeader->{Authorization} =~ s/Basic\s.*\s/Basic ***** / if defined $logHeader->{Authorization};
@@ -917,8 +918,8 @@ sub ESPEasy_Attr(@)
       if $cmd eq "set" && !(ESPEasy_isAttrCombineDevices($aVal) || $aVal =~ m/^[01]$/ )}
 
   elsif ($aName =~ m/^(allowedIPs|deniedIPs)$/) {
-    $ret = "ip[/netmask][,ip[/netmask]][,...]"
-      if $cmd eq "set" && !ESPEasy_isIPv64Range($aVal)}
+    $ret = "[comma separated list of] ip[/netmask] or a regexp"
+      if $cmd eq "set" && !ESPEasy_isIPv64Range($aVal,"regexp")}
 
   elsif ($aName =~ m/^(pollGPIOs|rgbGPIOs|wwcwGPIOs)$/) {
     $ret = "GPIO_No[,GPIO_No][...]"
@@ -2312,12 +2313,13 @@ sub ESPEasy_isValidPeer($)
 # ------------------------------------------------------------------------------
 # check if given ip or ip range is guilty
 # argument can be:
-# - ipv4, ipv4/CIDR, ipv4/dotted, ipv6, ipv6/CIDR
+# - ipv4, ipv4/CIDR, ipv4/dotted, ipv6, ipv6/CIDR (or a regexp if opt. argument 
+#   $regexChk is set)
 # - space or comma separated list of above.
 # ------------------------------------------------------------------------------
-sub ESPEasy_isIPv64Range($)
+sub ESPEasy_isIPv64Range($;$)
 {
-  my ($addr) = @_;
+  my ($addr,$regexChk) = @_;
   return 0 if !defined $addr;
   my @ranges = split(/,| /,$addr);
   foreach (@ranges) {
@@ -2328,6 +2330,11 @@ sub ESPEasy_isIPv64Range($)
     }
     elsif (ESPEasy_isIPv6($ip)) {
       return 0 if defined $nm && !ESPEasy_isNmCIDRv6($nm);
+    }
+    elsif (defined $regexChk && !defined $nm) {
+      return 0 if $ip =~ m/^\*/ || $ip =~ m/^\d+\.\d+\.\d+\.\d+$/; # faulty regexp/ip
+      eval { "Hallo" =~ m/^$ip$/ };
+      return $@ ? 0 : 1;
     }
     else {
       return 0;
@@ -2347,10 +2354,10 @@ sub ESPEasy_isPeerAllowed($$)
   my ($peer,$allowed) = @_;
   return $allowed if $allowed =~ m/^[01]$/;
   #return 1 if $allowed =~ /^0.0.0.0\/0(.0.0.0)?$/; # not necessary but faster
-
   my $binPeer = ESPEasy_ip2bin($peer);
   my @a = split(/,| /,$allowed);
   foreach (@a) {
+    return 1 if $peer =~ m/^$_$/;                   # a regexp is been used
     next if !ESPEasy_isIPv64Range($_);              # needed for combinedDevices
     my ($addr,$ip,$mask) = ESPEasy_addrToCIDR($_);
     return 0 if !defined $ip || !defined $mask;   # return if ip or mask !guilty
@@ -2576,7 +2583,11 @@ sub ESPEasy_removeGit($)
       port and the FHEM ESPEasy bridge port must be the same.
     </li>
     <li>Max. 2 ESPEasy bridges can be defined at the same time: 1 for IPv4 and
-    1 for IPv6
+      1 for IPv6
+    </li>
+    <li>Further information about this module is available here:
+      <a href="https://forum.fhem.de/index.php/topic,55728.0.html">Forum #55728
+      </a>
     </li>
     <br>
   </ul>
@@ -2653,7 +2664,7 @@ sub ESPEasy_removeGit($)
   <ul>
     <li><a name="">help</a><br>
       Shows set command usage<br>
-      required values: <code>help|pass|user</code></li><br>
+      required values: <code>help|pass|user|clearQueue</code></li><br>
 
     <li><a name="">clearQueue</a><br>
       Used to erase all command queues.<br>
@@ -2682,15 +2693,47 @@ sub ESPEasy_removeGit($)
     <li><a name="ESPEasy_allowedIPs">allowedIPs</a><br>
       Used to limit IPs or IP ranges of ESPs which are allowed to commit data.
       <br>
-      Specify comma separated list of IPs or IP ranges. Netmask can be written
-      as bitmask or dotted decimal. Domain names for dns lookups are not
-      supported.<br>
-      Possible values: IPv64 address, IPv64/netmask<br>
-      Default: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fe80::/10,::1
-      <br>
-      Eg. 10.68.30.147<br>
-      Eg. 10.68.30.0/24,10.68.31.0/255.255.248.0<br>
-      Eg. fe80::/10,2001:1a59:50a9::/48,2002:1a59:50a9::,2003:1a59:50a9:acdc::36
+      Specify IP, IP/netmask, regexp or a comma separated list of these values.
+      Netmask can be written as bitmask or dotted decimal. Domain names for dns
+      lookups are not supported.<br>
+      Possible values: IPv64 address, IPv64/netmask, regexp<br>
+      Default: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+      fe80::/10, fc00::/7, ::1
+      <br><br>
+      Examles:<br>
+
+      <table><tr><td>
+      10.68.30.147
+      </td><td>
+        =&gt; IPv4 single address
+      </td></tr><tr><td>
+        10.68.30.0/25
+      </td><td>
+        =&gt; IPv4 CIDR network 192.168.30.0-127
+      </td></tr><tr><td>
+        10.68.30.8/255.255.248.0
+      </td><td>
+        =&gt; IPv4 CIDR network 192.168.30.8-15
+      </td></tr><tr><td>
+        192.168.30.1([0-4][0-9]|50)
+      </td><td>
+        =&gt; IPv4 range w/ regexp: 192.168.30.100-150
+      </td></tr><tr><td>
+        2001:1a59:50a9::aaaa
+      </td><td>
+        =&gt; IPv6 single address
+      </td></tr><tr><td>
+        2001:1a59:50a9::/48
+      </td><td>
+        =&gt; IPv6 network 2001:1a59:50a9::/48
+      </td></tr><tr><td>
+        2001:1a59:50a9::01[0-4][0-9]
+      </td><td>
+        =&gt; IPv6 range w/ regexp: 2001:1a59:50a9::0100-0149
+      </tr></td>
+      </table>
+      <span style="font-size:small;">Note that short IPv6 notation (::) must be
+      used in conjunction with regexps.</span>
       </li><br>
 
     <li><a name="ESPEasy_authentication">authentication</a><br>
@@ -2782,7 +2825,7 @@ sub ESPEasy_removeGit($)
     received by the bridge device and autocreate is not disabled. If you
     configured your ESP in a way that no data is send independently then you
     have to define logical devices. At least wifi rssi value could be defined
-    to use autocreate.<br><br>
+    to use autocreate and presence detection.<br><br>
 
     <code>define &lt;name&gt; ESPEasy &lt;ip|fqdn&gt; &lt;port&gt;
     &lt;IODev&gt; &lt;identifier&gt;</code><br><br>
@@ -3156,7 +3199,8 @@ sub ESPEasy_removeGit($)
       reading of a device is newer than <a href="#ESPEasy_Interval">interval</a>
       seconds then it is marked as being present. This kind of check works for
       ESP devices in deep sleep too but require at least 1 reading that is
-      updated regularly.<br>
+      updated regularly. Therefore the ESP must send the corresponding data
+      regularly (ESP device option "delay").<br>
       Possible values: 0,1<br>
       Default: 1 (enabled)</li><br>
 
@@ -3186,7 +3230,7 @@ sub ESPEasy_removeGit($)
       Specify a module command or comma separated list of commands as argument.
       Commands are case insensitive.<br>
       Only necessary if ESPEasy software plugins do not send their data
-      independently. Useful for commands line STATUS, PWM, ...<br>
+      independently. Useful for commands like STATUS, PWM, ...<br>
       Possible values: &lt;set cmd&gt;[,&lt;set cmd&gt;][,...]<br>
       Default: status<br>
       Eg. <code>attr ESPxx parseCmdResponse status,pwm</code></li><br>

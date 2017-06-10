@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  34_ESPEasy: add IPv6 ULA to local IPs, add regexps to ACLs
   - bugfix:  93_DbLog: V2.16.11, lock SQLite from logging if deleteOldDaysNbl 
                        or reduceLogNbL is running in async mode
   - feature: ESPEasy: improved dual ip stack support
