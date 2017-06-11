@@ -41,7 +41,8 @@ sub CommandFheminfo($$) {
   my @args = split("[ \t]+", $param);
   $args[0] = defined($args[0]) ? lc($args[0]) : "";
   my $doSend = ($args[0] eq 'send') ? 1 : 0;
-
+use Data::Dumper;
+Debug "cl: ".Dumper $cl;
   return "Unknown argument $args[0], usage: fheminfo [send]"
     if($args[0] ne "send" && $args[0] ne "");
 
@@ -51,6 +52,9 @@ sub CommandFheminfo($$) {
   _fi2_Count();
 
   _fi2_Send() if $args[0] eq 'send';
+
+# do not return statistics data if called from update
+  return "Statistics data sent to server. See Logfile (level 4) for details." unless defined($cl);
 
   return _fi2_TelnetTable($doSend) if ($cl && $cl->{TYPE} eq 'telnet');
   return _fi2_HtmlTable($doSend);
