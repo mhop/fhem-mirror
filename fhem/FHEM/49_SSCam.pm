@@ -7,7 +7,7 @@
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
-#       It's based on and it's using Synology Surveillance Station API 
+#       It's based on and uses Synology Surveillance Station API.
 # 
 #       This script is part of fhem.
 #
@@ -22,11 +22,13 @@
 #       GNU General Public License for more details.
 #
 #       You should have received a copy of the GNU General Public License
-#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.# 
+#       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #########################################################################################################################
 #  Versions History:
 #
+# 2.2.2  11.06.2017    bugfix sscam_login, sscam_login_return, 
+#                      Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701
 # 2.2.1  15.05.2017    avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on)
 # 2.2.0  10.05.2017    check if JSON module has been loaded successfully, DeviceOverview available, options of 
 #                      runView changed image->live_fw, link->live_link, link_open->live_open, lastrec ->lastrec_fw,
@@ -168,7 +170,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.2.1";
+my $SSCamVersion = "2.2.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -3484,7 +3486,7 @@ return;
 
 ####################################################################################  
 #   Login in SVS wenn kein oder ungültige Session-ID vorhanden ist
-sub sscam_login ($;$$) {
+sub sscam_login ($$) {
   my ($hash,$fret) = @_;
   my $name          = $hash->{NAME};
   my $serveraddr    = $hash->{SERVERADDR};
@@ -3562,7 +3564,7 @@ sub sscam_login_return ($) {
   my $name     = $hash->{NAME};
   my $username = $param->{user};
   my $fret     = $param->{funcret};
-  my $subref   = \&$fret if($fret);
+  my $subref   = \&$fret;
   my $success; 
 
   # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
@@ -3572,7 +3574,7 @@ sub sscam_login_return ($) {
         
       readingsSingleUpdate($hash, "Error", $err, 1);                               
         
-      return sscam_login($hash);
+      return sscam_login($hash,$fret);
    
    } elsif ($myjson ne "") {
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
@@ -3611,6 +3613,8 @@ sub sscam_login_return ($) {
        
             # Logausgabe
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
+			
+			return &$subref($hash);
         
 		} else {          
             # Errorcode aus JSON ermitteln
@@ -3628,11 +3632,10 @@ sub sscam_login_return ($) {
             # Logausgabe
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
-            return sscam_login($hash,$fret) if($fret);
-			return sscam_login($hash);
+            return sscam_login($hash,$fret);
        }
    }
-return &$subref($hash);
+return sscam_login($hash,$fret);
 }
 
 ###################################################################################  
