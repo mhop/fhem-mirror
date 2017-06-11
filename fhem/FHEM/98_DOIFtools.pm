@@ -325,7 +325,6 @@ sub DOIFtools_Initialize($)
   $hash->{NotifyFn} = "DOIFtools_Notify";
   
   $hash->{FW_detailFn} = "DOIFtools_fhemwebFn";
-
   $data{FWEXT}{"/DOIFtools_logWrapper"}{CONTENTFUNC} = "DOIFtools_logWrapper";
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
@@ -333,34 +332,46 @@ sub DOIFtools_Initialize($)
   $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 DOIFtoolsNoLookUp:1,0 DOIFtoolsNoLookUpInDOIF:1,0 DOIFtoolsLogDir disabledForIntervals ".$oldAttr;
 }
 
-sub DOIFtools_dO ($$$$){return "";}
+sub DOIFtools_dO ($$$$){
+return "";}
+
 # FW_detailFn for DOIF injecting event monitor
 sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my @dtn = devspec2array("TYPE=DOIFtools"); 
   my $ret = "";
-  $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
-  # Event Monitor
-  my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on";
-  my $lang = AttrVal("global","language","EN");
-  $ret .= "<div class=\"dval\"><br><span title=\"".($lang eq "DE" ? "toggle schaltet den Event-Monitor ein/aus" : "toggle switches event monitor on/off")."\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
-  $ret .= "</div>";
+  # call DOIF_detailFn
+  no strict "refs";
+  $ret .= &{ReadingsVal($dtn[0],".DOIF_detailFn","")}($FW_wname, $d, $room, $pageHash) if (ReadingsVal($dtn[0],".DOIF_detailFn",""));
+  use strict "refs";
+  if (!$room) {
+      # LookUp in probably associated with
+      $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($dtn[0],"DOIFtoolsNoLookUpInDOIF",""));
+      # Event Monitor
+      if (AttrVal($dtn[0],"DOIFtoolsEventMonitorInDOIF","")) {
+        my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on";
+        my $lang = AttrVal("global","language","EN");
+        $ret .= "<br>" if (ReadingsVal($dtn[0],".DOIF_detailFn",""));
+        $ret .= "<table class=\"block wide\"><tr><td><div class=\"dval\"><span title=\"".($lang eq "DE" ? "toggle schaltet den Event-Monitor ein/aus" : "toggle switches event monitor on/off")."\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
+        $ret .= "</div></td></tr></table>";
 
-  my $a = "";
-  if (ReadingsVal($d,".eM","off") eq "on") {
-    $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
-    my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
-    $ret .= "<div id='doiftoolscons'>";
-    my $embefore = AttrVal($dtn[0],"DOIFtoolsEMbeforeReadings","0") ? "1" : "";
-    $ret .= "<div id='doiftoolstype' devtype='doif' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'><br>";
-    $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
-          "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
-                "<input id='eventWithLog' type='checkbox'".
-                ($a && $a eq "log" ? " checked":"")."></span>".
-          "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, Definition ergänzen" : "&emsp;<b>Hint:</b> select event line, choose operand, modify definition")."</div>\n";
-    $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\" ></textarea>";
-    $ret .= "</div>";
-    $ret .= $DOIFtoolsJSfuncEM;
+        my $a = "";
+        if (ReadingsVal($d,".eM","off") eq "on") {
+          $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\"></script>";
+          my $filter = $a ? ($a eq "log" ? "global" : $a) : ".*";
+          $ret .= "<div id='doiftoolscons'>";
+          my $embefore = AttrVal($dtn[0],"DOIFtoolsEMbeforeReadings","0") ? "1" : "";
+          $ret .= "<div id='doiftoolstype' devtype='doif' embefore='".$embefore."' lang='".($lang eq "DE" ? 1 : 0)."'><br>";
+          $ret .= "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
+              "&nbsp;&nbsp;<span id=\"doiftoolsdel\" class='fhemlog'>FHEM log ".
+                    "<input id='eventWithLog' type='checkbox'".
+                    ($a && $a eq "log" ? " checked":"")."></span>".
+              "&nbsp;&nbsp;<button id='eventReset'>Reset</button>".($lang eq "DE" ? "&emsp;<b>Hinweis:</b> Eventzeile markieren, Operanden auswählen, Definition ergänzen" : "&emsp;<b>Hint:</b> select event line, choose operand, modify definition")."</div>\n";
+          $ret .= "<textarea id=\"console\" style=\"width:99%; top:.1em; bottom:1em; position:relative;\" readonly=\"readonly\" rows=\"25\" cols=\"60\" title=\"".($lang eq "DE" ? "Die Auswahl einer Event-Zeile zeigt Operanden für DOIF an, sie können im DEF-Editor eingefügt werden (Strg V)." : "Selecting an event line displays operands for DOIFs definition, they can be inserted to DEF-Editor (Ctrl V).")."\" ></textarea>";
+          $ret .= "</div>";
+          $ret .= $DOIFtoolsJSfuncEM;
+        }
+      }
   }
   return $ret;
 }
@@ -628,11 +639,14 @@ sub DOIFtools_Notify($$) {
       CommandDeleteAttr(undef,"$pn eventMonitorInDOIF") if (AttrVal($pn,"eventMonitorInDOIF",""));
       CommandSave(undef,undef);
     }
-    # Event monitor in DOIF
-    if ($modules{DOIF}{LOADED} and !defined $modules{DOIF}->{FW_detailFn} and $sn eq "global" and $event =~ "^INITIALIZED\$" and AttrVal($pn,"DOIFtoolsEventMonitorInDOIF","")) {
-      $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM" if (!defined $modules{DOIF}->{FW_detailFn});
-      readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
-      $modules{DOIF}->{FW_deviceOverview} = 1;
+    # Event monitor in DOIF FW_detailFn
+    if ($modules{DOIF}{LOADED} and $modules{DOIF}->{FW_detailFn} ne "DOIFtools_eM" and $sn eq "global" and $event =~ "^INITIALIZED\$" ) {
+        readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,".DOIF_detailFn",$modules{DOIF}->{FW_detailFn});
+          $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
+          readingsBulkUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview});
+          $modules{DOIF}->{FW_deviceOverview} = 1;
+        readingsEndUpdate($hash,0);
     }
     # Statistics event recording
     if (ReadingsVal($pn,"doStatistics","disabled") eq "enabled" and !IsDisabled($pn) and $sn ne "global" and (ReadingsVal($pn,"statisticHours",0) <= ReadingsVal($pn,"recording_target_duration",0) or !ReadingsVal($pn,"recording_target_duration",0)))  {
@@ -1022,14 +1036,14 @@ sub DOIFtools_Attr(@)
   my $hash = $defs{$pn};
   my $ret="";
   if ($init_done and $attr eq "DOIFtoolsEventMonitorInDOIF") {
-    if (!defined $modules{DOIF}->{FW_detailFn} and $cmd eq "set" and $value) {
-        $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
-        readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
-        $modules{DOIF}->{FW_deviceOverview} = "DOIFtools_dO";
-    } elsif ($modules{DOIF}->{FW_detailFn} eq "DOIFtools_eM" and ($cmd eq "del" or !$value)) {
-        delete $modules{DOIF}->{FW_detailFn};
-        $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,"DOIFtools_dO","");
-    }
+    # if (!defined $modules{DOIF}->{FW_detailFn} and $cmd eq "set" and $value) {
+        # $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
+        # readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
+        # $modules{DOIF}->{FW_deviceOverview} = 1;
+    # } elsif ($modules{DOIF}->{FW_detailFn} eq "DOIFtools_eM" and ($cmd eq "del" or !$value)) {
+        # delete $modules{DOIF}->{FW_detailFn};
+        # $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,".DOIFdO","");
+    # }
   } elsif ($init_done and $attr eq "DOIFtoolsMenuEntry") {
     if ($cmd eq "set" and $value) {
       if (!(AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,$FW_ME\?detail\=DOIFtools\,)/)) {
@@ -1073,8 +1087,8 @@ sub DOIFtools_Undef
   my ($hash, $pn) = @_;
   $hash->{DELETED} = 1;
   if (devspec2array("TYPE=DOIFtools") <=1 and defined($modules{DOIF}->{FW_detailFn}) and $modules{DOIF}->{FW_detailFn} eq "DOIFtools_eM") {
-      delete $modules{DOIF}->{FW_detailFn};
-      $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,"DOIFtools_dO","");
+      $modules{DOIF}->{FW_detailFn} = ReadingsVal($pn,".DOIF_detailFn","");
+      $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,".DOIFdO","");
   }
   if (AttrVal($pn,"DOIFtoolsMenuEntry","")) {
     CommandDeleteAttr(undef, "$pn DOIFtoolsMenuEntry");
@@ -1691,7 +1705,8 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <a href="#disabledForIntervals"><b>disabledForIntervals</b></a> pausiert die Statistikdatenerfassung.<br>
         <br>
     </ul>
-<a name="DOIFtoolsReadings"></a>
+
+    <a name="DOIFtoolsReadings"></a>
 <b>Readings</b>
 <br>
     <ul>
