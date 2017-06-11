@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.16;       # Version of this module
+my $module_version    = 1.17;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -90,7 +90,17 @@ my %ESPEasy_setCmds = (
   "lights"         => "1",
   "dots"           => "1",
   "tone"           => "3",
-  "rtttl"          => "1"
+  "rtttl"          => "1",
+  "dmx"            => "1",
+  "motorshieldcmd" => "5",
+  "candle"         => "0",  # params are splited by ":" not " "
+  "neopixel"       => "4",
+  "neopixelall"    => "3",
+  "neopixelline"   => "5",
+  "oledframedcmd"  => "1",
+  "serialsend"     => "1",  #_P020_Ser2Net.ino
+  "buzzer"         => "0",
+  "inputswitchstate" => "0" # _0P001_Switch.ini
 );
 
 # ------------------------------------------------------------------------------
@@ -114,8 +124,11 @@ my %ESPEasy_setCmdsUsage = (
   "status"         => "status <device> <pin>",
   #https://forum.fhem.de/index.php/topic,55728.msg480966.html#msg480966
   "pwmfade"        => "pwmfade <pin> <target> <duration>",
-  #https://forum.fhem.de/index.php/topic,55728.msg530220.html#msg530220
-  "irsend"         => "irsend <protocol> <code> <length>",
+  ##https://forum.fhem.de/index.php/topic,55728.msg530220.html#msg530220
+  #"irsend"         => "irsend <protocol> <code> <length>",
+  #https://github.com/letscontrolit/ESPEasy/blob/mega/src/_P035_IRTX.ino
+  "irsend"         => "irsend <RAW> <raw code> <frequenz> <pulse length> <blank length> "
+                    . "| irsend <NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC> <code> <bits>",
   "raw"            => "raw <esp_comannd> <...>",
   "reboot"         => "reboot",
   "erase"          => "erase",
@@ -127,6 +140,19 @@ my %ESPEasy_setCmdsUsage = (
   "dots"           => "dots <params>",
   "tone"           => "tone <pin> <freq> <duration>",
   "rtttl"          => "rtttl <RTTTL>",
+  "dmx"            => "dmx <ON|OFF|LOG|value|channel=value[,value][...]>",
+  "motorshieldcmd" => "motorshieldcmd <DCMotor|Stepper> <Motornumber> ".
+                      "<Forward|Backward|Release> <Speed|Steps> ".
+                      "<SINGLE|DOUBLE|INTERLEAVE|MICROSTEP>",
+  "candle"         => "CANDLE:<FlameType>:<Color>:<Brightness>",
+  "neopixel"       => "NeoPixel <led nr> <red 0-255> <green 0-255> <blue 0-255>",
+  "neopixelall"    => "NeoPixelAll <red 0-255> <green 0-255> <blue 0-255>",
+  "neopixelline"   => "NeoPixelLine <start led nr> <stop led nr> <red 0-255> ".
+                      "<green 0-255> <blue 0-255>",
+  "oledframedcmd"  => "oledframedcmd <on|off>",
+  "serialsend"     => "serialsend <string>",
+  "buzzer"         => "buzzer",
+  "inputswitchstate" => "inputswitchstate",
 
   #Lights
   "rgb"            => "rgb <rrggbb> [fading time]",
@@ -3028,11 +3054,14 @@ sub ESPEasy_removeGit($)
       the moment. As long as official documentation is missing you can find
       some details here:
       <a href="http://www.letscontrolit.com/forum/viewtopic.php?f=5&t=328">
-      IR Transmitter thread</a><br>
-      required arguments: <code>&lt;protocol&gt; &lt;hex code&gt; &lt;bit length
-      of hex code&gt;
+      IR Transmitter thread #1</a> and  
+      <a href="https://www.letscontrolit.com/forum/viewtopic.php?t=328&start=61">
+      IR Transmitter thread #61</a>.<br>
+      required arguments: <code>&lt;NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC&gt; &lt;hex code&gt; &lt;bit length&gt;</code><br>
+      required arguments: <code>&lt;RAW&gt; &lt;B32 raw&gt; &lt;frequenz&gt;  &lt;pulse&gt; &lt;blank length&gt;
       </code><br>
-      eg. <code>irsend NEC 7E81542B 32</code>
+      eg. <code>irsend NEC 7E81542B 32</code><br>
+      eg. <code>irsend RAW 3U0GGL8AGGK588A22K58ALALALAGL1A22LAK45ALALALALALALALALAL1AK5 38 512 256</code><br>
       </li><br>
 
     <li><a name="">tone</a><br>
@@ -3054,6 +3083,70 @@ sub ESPEasy_removeGit($)
       required values: <code>&lt;device&gt; &lt;pin&gt;</code><br>
       eg: <code>gpio 13</code>
       </li><br>
+
+    <li><a name="">dmx</a><br>
+      Send DMX commands to a device<br>
+      required values: <code>&lt;<on|off|log|value|channel=value[,value][...]>&gt;</code><br>
+      eg: <code>dmx 1=255</code>
+      </li><br>
+
+    <li><a name="">MotorShieldCMD</a><br>
+      Control a DC motor or stepper<br>
+      required values: <code>&lt;DCMotor|Stepper&gt; &lt;motornumber&gt;
+      &lt;forward|backward|release&gt; &lt;speed|steps&gt; 
+      &lt;single|double|interleave|microstep&gt;</code><br>
+      eg: <code>MotorShieldCMD DCMotor 1 forward 10</code><br>
+      eg: <code>MotorShieldCMD Stepper 1 backward 25 single</code>
+      </li><br>
+
+    <li><a name="">candle</a><br>
+      Control candle rgb plugin<br>
+      required values: <code>CANDLE:&lt;FlameType&gt;:&lt;Color&gt;:&lt;Brightness&gt;</code><br>
+      eg: <code>CANDLE:4:FF0000:200</code>
+      </li><br>
+
+    <li><a name="">neopixel</a><br>
+      Control neopixel plugin (single LED)<br>
+      required values: <code>&lt;led nr&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
+      eg: <code>neopixel 1 255 255 255</code>
+      </li><br>
+
+    <li><a name="">neopixelall</a><br>
+      Control neopixel plugin (all together)<br>
+      required values: <code>&lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
+      eg: <code>neopixelall 255 255 255</code>
+      </li><br>
+
+    <li><a name="">neopixelline</a><br>
+      Control neopixel plugin (line)<br>
+      required values: <code>&lt;start led no&gt; &lt;stop led no&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
+      eg: <code>neopixelline 1 5 0 127 255</code>
+      </li><br>
+
+    <li><a name="">oledframedcmd</a><br>
+      Switch oledframed on/off<br>
+      required values: <code>&lt;on|offxxx&gt;</code><br>
+      eg: <code>oledframedcmd on</code>
+      </li><br>
+
+    <li><a name="">serialsend</a><br>
+      Used for ser2net plugin<br>
+      required values: <code>&lt;string&gt;</code><br>
+      eg: <code>serialsend test</code>
+      </li><br>
+
+    <li><a name="">buzzer</a><br>
+      Beep a short time<br>
+      required values: <code>none</code><br>
+      eg: <code>buzzer</code>
+      </li><br>
+
+    <li><a name="">inputswitchstate</a><br>
+      inputswitchstate<br>
+      required values: <code>none</code><br>
+      eg: <code>inputswitchstate</code>
+      </li><br>
+
 
     <b>Administrative commands</b> (be careful):<br><br>
 
