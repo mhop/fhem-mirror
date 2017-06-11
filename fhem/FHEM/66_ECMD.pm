@@ -169,7 +169,7 @@ sub
 dq($) 
 {
   my ($s)= @_;
-  return defined($s) ? escapeLogLine($s) . " (" . oq($s) . ")" : "<nothing>";
+  return defined($s) ? ( $s eq "" ? "empty string" : escapeLogLine($s) . " (" . oq($s) . ")" ) : "<nothing>";
 }
 
 sub
