@@ -41,8 +41,7 @@ sub CommandFheminfo($$) {
   my @args = split("[ \t]+", $param);
   $args[0] = defined($args[0]) ? lc($args[0]) : "";
   my $doSend = ($args[0] eq 'send') ? 1 : 0;
-use Data::Dumper;
-Debug "cl: ".Dumper $cl;
+
   return "Unknown argument $args[0], usage: fheminfo [send]"
     if($args[0] ne "send" && $args[0] ne "");
 
