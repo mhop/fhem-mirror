@@ -25,6 +25,7 @@
 use strict;
 use warnings;
 use HttpUtils;
+use Storable qw(freeze thaw);
 
 
 ##############################################
@@ -882,7 +883,7 @@ sub addproperty($$) {
     return;
   }
   return unless($key);
-  #main::Debug "addproperty for line $line gives key $key, parts is $parts, parameter os $parameter";
+  #main::Debug "addproperty for key $key";
   
   # ignore some properties
   # commented out: it is faster to add the property than to do the check
@@ -930,7 +931,6 @@ sub parseSub($$$) {
   #main::Debug "ENTER @ $ln";
   while($ln< $len) {
     my $line= $$icalref[$ln];
-    #main::Debug "parse line $line";
     $ln++;
     # check for and handle continuation lines (4.1 on page 12)
     while($ln< $len) {
@@ -1567,7 +1567,7 @@ sub Calendar_Initialize($) {
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
   $hash->{NotifyFn}= "Calendar_Notify";
-  $hash->{AttrList}=  "hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
+  $hash->{AttrList}=  "update:sync,async,none hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
 }
 
 
@@ -1620,6 +1620,13 @@ sub Calendar_Undef($$) {
   my ($hash, $arg) = @_;
 
   Calendar_DisarmTimer($hash);
+
+  if(exists($hash->{".fhem"}{subprocess})) {
+    my $subprocess= $hash->{".fhem"}{subprocess};
+    $subprocess->terminate();
+    $subprocess->wait();
+  }
+  
   return undef;
 }
 
@@ -1640,6 +1647,10 @@ sub Calendar_Attr(@) {
     if($arg !~ m/^{.*}$/s) {
         return "$arg must be a perl command in curly brackets but you supplied $arg.";
     }
+  } elsif($a[0] eq "update") {
+    my @args= qw/none sync async/;
+    return "Argument for update must be one of " . join(" ", @args) . 
+      " instead of $arg." unless($arg ~~ @args);
   }
   
   return undef;
@@ -2089,6 +2100,14 @@ sub Calendar_GetUpdate($$$) {
   #main::Debug "Getting update now: " . $hash->{".fhem"}{lastUpdate};
   #main::Debug "Next Update is at : " . $hash->{".fhem"}{nextUpdate};
 
+  # If update is disable, shortcut to time checking and rearming timer.
+  # Why is this here and not in Calendar_Wakeup? Because the next update time needs to be set
+  if(AttrVal($hash->{NAME},"update","") eq "none") {
+    Calendar_CheckTimes($hash, $t);
+    Calendar_RearmTimer($hash, $t);
+    return;  
+  }
+
   Log3 $hash, 4, "Calendar $name: Updating...";
   my $type = $hash->{".fhem"}{type};
   my $url= $hash->{".fhem"}{url};
@@ -2164,6 +2183,15 @@ sub Calendar_ProcessUpdate($$$) {
   my $removeall = $param->{removeall};
   my $t= $param->{t};
   
+  if(exists($hash->{".fhem"}{subprocess})) {
+      Log3 $hash, 2, "Calendar $name: update in progress, process aborted.";
+      return 0;
+  }
+
+  # not for the developer:
+  # we must be sure that code that starts here ends with Calendar_CheckAndRearm()
+  # no matter what branch is taken in the following
+  
   delete($hash->{".fhem"}{iCalendar});
     
   if($errmsg) {
@@ -2176,40 +2204,119 @@ sub Calendar_ProcessUpdate($$$) {
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
     readingsSingleUpdate($hash, "state", "error (no or empty data)", 1);
+    Calendar_CheckAndRearm($hash, $t);
   } else {
-    Calendar_UpdateCalendar($hash, $t, $ics, $removeall);
+    $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar 
+    $hash->{".fhem"}{t}= $t;
+    $hash->{".fhem"}{removeall}= $removeall;
+    if(AttrVal($name, "update", "sync") eq "async") {
+      Calendar_AsynchronousUpdateCalendar($hash);
+    } else {
+      Calendar_SynchronousUpdateCalendar($hash);
+    }
   }
-  
-  #main::Debug "Calendar $name: iCalendar=\n$ics"; 
-  
-  Calendar_CheckTimes($hash, $t);
-  Calendar_RearmTimer($hash, $t);
   
 }
 
-###################################
-sub Calendar_UpdateCalendar($$$$) {
+sub Calendar_Cleanup($) {
+  my ($hash)= @_;
+  delete($hash->{".fhem"}{t});
+  delete($hash->{".fhem"}{removeall});
+  delete($hash->{".fhem"}{serialized});
+  delete($hash->{".fhem"}{subprocess});
 
-  my ($hash, $t, $ics, $removeall) = @_;
-
-  
-  # *********************
-  # *** Step 1 Parsing
-  # *********************
-  
-  #
-  # 1
-  #
-  
-  $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar 
-  
-  #
-  # 2 Parsing
-  #
-  
   my $name= $hash->{NAME};
-  Log3 $hash, 4, "Calendar $name: parsing data"; 
+  Log3 $hash, 4, "Calendar $name: process ended."; 
+}
+
+
+sub Calendar_CheckAndRearm($) {
+
+  my ($hash)= @_;
+  my $t= $hash->{".fhem"}{t};
+  Calendar_CheckTimes($hash, $t);
+  Calendar_RearmTimer($hash, $t);
+}  
+
+sub Calendar_SynchronousUpdateCalendar($) {
+  
+  my ($hash) = @_;
+  my $name= $hash->{NAME};
+  Log3 $hash, 4, "Calendar $name: parsing data synchronously"; 
+  my $ical= Calendar_ParseICS($hash->{".fhem"}{iCalendar});
+  Calendar_UpdateCalendar($hash, $ical);
+  Calendar_CheckAndRearm($hash);
+  Calendar_Cleanup($hash);
+}
+
+use constant POLLINTERVAL => 1;
+
+sub Calendar_AsynchronousUpdateCalendar($) {
+
+  require "SubProcess.pm";
+  
+  my ($hash) = @_;
+  my $name= $hash->{NAME};
+  
+  my $subprocess= SubProcess->new({ onRun => \&Calendar_OnRun });
+  $subprocess->{ics}= $hash->{".fhem"}{iCalendar};
+  my $pid= $subprocess->run();
+
+  if(!defined($pid)) {
+    Log3 $hash, 1, "Calendar $name: Cannot parse asynchronously";
+    Calendar_CheckAndRearm($hash);
+    Calendar_Cleanup($hash);
+    return undef;
+  }
+
+  Log3 $hash, 4, "Calendar $name: parsing data asynchronously (PID= $pid)"; 
+  $hash->{".fhem"}{subprocess}= $subprocess;
+  $hash->{".fhem"}{serialized}= "";
+  InternalTimer(gettimeofday()+POLLINTERVAL, "Calendar_PollChild", $hash, 0);
+  
+  # go and do your thing while the timer polls and waits for the child to terminate
+  Log3 $hash, 5, "Calendar $name: control passed back to main loop."; 
+  
+}
+
+sub Calendar_OnRun() {
+
+  # This routine runs in a process separate from the main process.
+  my $subprocess= shift;
+  my $ical= Calendar_ParseICS($subprocess->{ics});
+  my $serialized= freeze $ical;
+  $subprocess->writeToParent($serialized);
+}
+
+
+
+sub Calendar_PollChild($) {
+  
+  my ($hash)= @_;
+  my $name= $hash->{NAME};
+  my $subprocess= $hash->{".fhem"}{subprocess};
+  my $data= $subprocess->readFromChild();
+  if(!defined($data)) {
+    Log3 $name, 4, "Calendar $name: still waiting (". $subprocess->{lasterror} .").";
+    InternalTimer(gettimeofday()+POLLINTERVAL, "Calendar_PollChild", $hash, 0);
+    return;
+  } else {
+    Log3 $name, 4, "Calendar $name: got result from asynchronous parsing.";
+    $subprocess->wait();
+    Log3 $name, 4, "Calendar $name: asynchronous parsing finished.";
+    my $ical= thaw($data);
+    Calendar_UpdateCalendar($hash, $ical);
+    Calendar_CheckAndRearm($hash);
+    Calendar_Cleanup($hash);
+  }
+}
+
+
+sub Calendar_ParseICS($) {
+
   #main::Debug "Calendar $name: parsing data"; 
+  my ($ics)= @_;
+  my ($error, $state)= (undef, "");
 
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
@@ -2218,27 +2325,55 @@ sub Calendar_UpdateCalendar($$$$) {
   #main::Debug "*** Result:";
   #main::Debug $ical->asString();
 
-  my @entries= @{$ical->{entries}};
-  if($#entries<0) {
+  my $numentries= scalar @{$ical->{entries}};
+  if($numentries<= 0) {
     eval { require Compress::Zlib; };
     if($@) {
-      readingsSingleUpdate($hash, "state", 
-             "error (data not in ICal format or no Compress::Zlib)", 1);
-      Log3 $hash, 1, "Calendar $name: maybe gzip data, but cannot load Compress::Zlib";
+      $error= "data not in ICal format; maybe gzip data, but cannot load Compress::Zlib";
     }
     else {
-      Log3 $hash, 4, "Calendar $name: unzipping data"; 
       $ics = Compress::Zlib::memGunzip($ics);
       $ical->parse($ics);
-      @entries= @{$ical->{entries}};
+      $numentries= scalar @{$ical->{entries}};
+      if($numentries<= 0) {
+        $error= "data not in ICal format; even not gzip data";
+      } else {
+        $state= "parsed (gzip data)";
+      }
     }
+  } else {
+    $state= "parsed";
   };
-  if($#entries<0) {
-    Log3 $hash, 1, "Calendar $name: data not in ICal format";
-    readingsSingleUpdate($hash, "state", "error (data not in ICal format)", 1);
-    return 0;
-  };
+
+  $ical->{error}= $error;
+  $ical->{state}= $state;
+  return $ical;
+}
+
+###################################
+sub Calendar_UpdateCalendar($$) {
+
+  my ($hash, $ical)= @_;
   
+  # *******************************
+  # *** Step 1 Digest Parser Result 
+  # *******************************
+  
+  my $name= $hash->{NAME};
+  my $error= $ical->{error};
+  my $state= $ical->{state};
+  
+  if(defined($error)) {
+    Log3 $hash, 2, "Calendar $name: error ($error)";
+    readingsSingleUpdate($hash, "state", "error ($error)", 1);
+    return 0;
+  } else {
+    readingsSingleUpdate($hash, "state", $state, 1);
+  }
+  my $t= $hash->{".fhem"}{t};
+  my $removeall= $hash->{".fhem"}{removeall};
+  
+  my @entries= @{$ical->{entries}};
   my $root= @{$ical->{entries}}[0];
   my $calname= "?";
   if($root->{type} ne "VCALENDAR") {
@@ -2248,7 +2383,6 @@ sub Calendar_UpdateCalendar($$$$) {
   } else {
     $calname= $root->value("X-WR-CALNAME");
   }
-  
  
   # *********************
   # *** Step 2 Merging
@@ -2739,6 +2873,14 @@ sub CalendarAsHtml($;$) {
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li><code>update sync|async|none</code><br>
+        If this attribute is not set or if it is set to <code>sync</code>, the processing of
+        the calendar is done in the foreground. Large calendars will block FHEM on slow
+        systems. If this attribute is set to <code>async</code>, the processing is done in the
+        background and FHEM will not block during updates. If this attribute is set to 
+        <code>none</code>, the calendar will not be updated at all.
+        </li><p>
+  
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
         
@@ -3124,6 +3266,15 @@ sub CalendarAsHtml($;$) {
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li><code>update sync|async|none</code><br>
+        Wenn dieses Attribut nicht gesetzt ist oder wenn es auf <code>sync</code> gesetzt ist,
+        findet die Verarbeitung des Kalenders im Vordergrund statt. Gro&szlig;e Kalender werden FHEM
+        auf langsamen Systemen blockieren. Wenn das Attribut auf <code>async</code> gesetzt ist, 
+        findet die Verarbeitung im Hintergrund statt, und FHEM wird w&auml;hrend der Verarbeitung
+        nicht blockieren. Wenn dieses Attribut auf <code>none</code> gesetzt ist, wird der
+        Kalender &uuml;berhaupt nicht aktualisiert.
+        </li><p>
+  
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
         
