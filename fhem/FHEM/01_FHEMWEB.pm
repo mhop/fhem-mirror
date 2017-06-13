@@ -144,6 +144,7 @@ FHEMWEB_Initialize($)
     addHtmlTitle:1,0
     addStateEvent
     csrfToken
+    csrfTokenHTTPHeader:0,1
     alarmTimeout
     allowedCommands
     allowfrom
@@ -427,7 +428,8 @@ FW_Read($$)
               "Access-Control-Max-Age:86400\r\n".
               "Access-Control-Expose-Headers: X-FHEM-csrfToken\r\n": "");
    $FW_headerlines .= "X-FHEM-csrfToken: $defs{$FW_wname}{CSRFTOKEN}\r\n"
-        if(defined($defs{$FW_wname}{CSRFTOKEN}));
+        if(defined($defs{$FW_wname}{CSRFTOKEN}) &&
+           AttrVal($FW_wname, "csrfTokenHTTPHeader", 1));
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
@@ -3368,6 +3370,12 @@ FW_widgetOverride($$)
        none, no token is expected. Default is random for featurelevel 5.8 and
        greater, and none for featurelevel below 5.8 </li><br>
 
+    <a name="csrfTokenHTTPHeader"></a>
+    <li>csrfTokenHTTPHeader<br>
+       If set (default), FHEMWEB sends the token with the X-FHEM-csrfToken HTTP
+       header, which is used by some clients. Set it to 0 to switch it off, as
+       a measurre against shodan.io like FHEM-detection.</li><br>
+
     <a name="CssFiles"></a>
     <li>CssFiles<br>
        Space separated list of .css files to be included. The filenames
@@ -4147,6 +4155,13 @@ FW_widgetOverride($$)
         verlangt. Default ist random f&uuml;r featurelevel 5.8 und
         gr&ouml;&szlig;er, und none f&uuml;r featurelevel kleiner 5.8
         </li><br>
+
+    <a name="csrfTokenHTTPHeader"></a>
+    <li>csrfTokenHTTPHeader<br>
+       Falls gesetzt (Voreinstellung), FHEMWEB sendet im HTTP Header den
+       csrfToken als X-FHEM-csrfToken, das wird von manchen FHEM-Clients
+       benutzt. Mit 0 kann man das abstellen, um Sites wie shodan.io die
+       Erkennung von FHEM zu erschweren.</li><br>
 
      <a name="CssFiles"></a>
      <li>CssFiles<br>
