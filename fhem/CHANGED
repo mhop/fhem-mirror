@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: ESPEasy: command reference revised
   - bugfix:  49_SSCam: crash after FHEM-restart if answer from DS is empty
   - update:  98_DOIFtools: chaining DOIF's detailFn if present
   - feature: ESPEasy: added: dmx, motorshield, neopixel, candle, serialsend...

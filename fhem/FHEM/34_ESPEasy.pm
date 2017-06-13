@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.17;       # Version of this module
+my $module_version    = 1.18;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -2608,22 +2608,21 @@ sub ESPEasy_removeGit($)
       Furthermore ESP controller IP must match FHEM's IP address. ESP controller
       port and the FHEM ESPEasy bridge port must be the same.
     </li>
-    <li>Max. 2 ESPEasy bridges can be defined at the same time: 1 for IPv4 and
-      1 for IPv6
+    <li>
+      Max. 2 ESPEasy bridges can be defined at the same time: 1 for IPv4 and 1 for IPv6
     </li>
     <li>Further information about this module is available here:
-      <a href="https://forum.fhem.de/index.php/topic,55728.0.html">Forum #55728
-      </a>
+      <a href="https://forum.fhem.de/index.php/topic,55728.0.html">Forum #55728</a>
     </li>
     <br>
   </ul>
 
   Requirements:
   <ul>
-    <li>ESPEasy build &gt;= <a href="https://github.com/ESP8266nu/ESPEasy"
-    target="_new">R128</a> (self compiled) or an ESPEasy precompiled image &gt;=
-  <a href="http://www.letscontrolit.com/wiki/index.php/ESPEasy#Loading_firmware"
-     target="_new">R140_RC3</a><br>
+    <li>
+      ESPEasy build &gt;= <a href="https://github.com/ESP8266nu/ESPEasy"
+      target="_new">R128</a> (self compiled) or an ESPEasy precompiled image 
+      &gt;= <a href="http://www.letscontrolit.com/wiki/index.php/ESPEasy#Loading_firmware" target="_new">R140_RC3</a><br>
     </li>
     <li>perl module JSON<br>
       Use "cpan install JSON" or operating system's package manager to install
@@ -2634,19 +2633,20 @@ sub ESPEasy_removeGit($)
 
   <h3>ESPEasy Bridge</h3>
 
-  <a name="ESPEasydefine"></a>
+  <a name="ESPEasy_bridge_define"></a>
   <b>Define </b>(bridge)<br><br>
 
   <ul>
     <code>define &lt;name&gt; ESPEasy bridge &lt;[IPV6:]port&gt;</code><br><br>
 
     <li>
-      <code>&lt;name&gt;</code><br>
+      <a name=""><code>&lt;name&gt;</code></a><br>
       Specifies a device name of your choise.<br>
-      eg. <code>ESPBridge</code></li><br>
+      example: <code>ESPBridge</code>
+    </li><br>
 
     <li>
-      <code>&lt;port&gt;</code><br>
+      <a name=""><code>&lt;port&gt;</code></a><br>
       Specifies TCP port for incoming ESPEasy http requests. This port must
       <u>not</u> be used by any other application or daemon on your system and
       must be in the range 1025..65535 unless you run your FHEM installation
@@ -2656,67 +2656,66 @@ sub ESPEasy_removeGit($)
       distributions to activate IPV6_V6ONLY socket option. Use <code>"echo
       1>/proc/sys/net/ipv6/bindv6only"</code> or systemctl for that purpose.<br>
       eg. <code>8383</code><br>
-      eg. <code>IPV6:8383</code></li><br>
-    <li>
+      eg. <code>IPV6:8383</code><br>
       Example:<br>
       <code>define ESPBridge ESPEasy bridge 8383</code></li><br>
   </ul>
 
-  <br><a name="ESPEasyget"></a>
+  <br><a name="ESPEasy_bridge_get"></a>
   <b>Get </b>(bridge)<br><br>
 
   <ul>
-    <li><a name="">&lt;reading&gt;</a><br>
+    <li><a name="ESPEasy_bridge_get_reading">&lt;reading&gt;</a><br>
       returns the value of the specified reading</li>
       <br>
 
-    <li><a name="">queueSize</a><br>
+    <li><a name="ESPEasy_bridge_get_queueSize">queueSize</a><br>
       returns number of entries for each queue (&lt;ip&gt;:number
       [&lt;ip&gt;:number] [...]).
       </li><br>
 
-    <li><a name="">user</a><br>
+    <li><a name="ESPEasy_bridge_get_user">user</a><br>
       returns username used by basic authentication for incoming requests.
       </li><br>
 
-    <li><a name="">pass</a><br>
+    <li><a name="ESPEasy_bridge_get_pass">pass</a><br>
       returns password used by basic authentication for incoming requests.
       </li><br>
   </ul>
 
-  <br><a name="ESPEasyset"></a>
+  <br><a name="ESPEasy_bridge_set"></a>
   <b>Set </b>(bridge)<br><br>
 
   <ul>
-    <li><a name="">help</a><br>
+    <li><a name="ESPEasy_bridge_set_help">help</a><br>
       Shows set command usage<br>
       required values: <code>help|pass|user|clearQueue</code></li><br>
 
-    <li><a name="">clearQueue</a><br>
+    <li><a name="ESPEasy_bridge_set_clearqueue">clearQueue</a><br>
       Used to erase all command queues.<br>
       required value: <code>&lt;none&gt;</code><br>
       eg. : <code>set ESPBridge clearQueue</code></li><br>
 
-    <li><a name="">pass</a><br>
+    <li><a name="ESPEasy_bridge_set_pass">pass</a><br>
       Specifies password used by basic authentication for incoming requests.<br>
-      Note that attribute <a href="#ESPEasy_authentication">authentication</a>
+      Note that attribute <a href="#ESPEasy_bridge_attr_authentication">authentication</a>
       must be set to enable basic authentication, too.<br>
       required value: <code>&lt;password&gt;</code><br>
       eg. : <code>set ESPBridge pass secretpass</code></li><br>
 
-    <li><a name="">user</a><br>
+    <li><a name="ESPEasy_bridge_set_user">user</a><br>
       Specifies username used by basic authentication for incoming requests.<br>
-      Note that attribute <a href="#ESPEasy_authentication">authentication</a>
+      Note that attribute <a href="#ESPEasy_bridge_attr_authentication">authentication</a>
       must be set to enable basic authentication, too.<br>
       required value: <code>&lt;username&gt;</code><br>
       eg. : <code>set ESPBridge user itsme</code></li><br>
   </ul>
 
-  <br><a name="ESPEasyattr"></a>
+  <br><a name="ESPEasy_bridge_attr"></a>
   <b>Attributes </b>(bridge)<br><br>
 
   <ul>
-    <li><a name="ESPEasy_allowedIPs">allowedIPs</a><br>
+    <li><a name="ESPEasy_bridge_attr_allowedips">allowedIPs</a><br>
       Used to limit IPs or IP ranges of ESPs which are allowed to commit data.
       <br>
       Specify IP, IP/netmask, regexp or a comma separated list of these values.
@@ -2762,28 +2761,28 @@ sub ESPEasy_removeGit($)
       used in conjunction with regexps.</span>
       </li><br>
 
-    <li><a name="ESPEasy_authentication">authentication</a><br>
+    <li><a name="ESPEasy_bridge_attr_authentication">authentication</a><br>
       Used to enable basic authentication for incoming requests.<br>
       Note that user, pass and authentication attribute must be set to activate
       basic authentication<br>
       Possible values: 0,1<br>
       Default: 0</li><br>
 
-    <li><a name="">autocreate</a><br>
+    <li><a name="ESPEasy_bridge_attr_autocreate">autocreate</a><br>
       Used to overwrite global autocreate setting.<br>
       Global autocreate setting will be detected by global attribut
       'autoload_undefined_devices'<br>
       Possible values: 0,1<br>
       Default: 0 (disabled)</li><br>
 
-    <li><a name="">autosave</a><br>
+    <li><a name="ESPEasy_bridge_attr_autosave">autosave</a><br>
       Used to overwrite global autosave setting.<br>
       Global autosave setting will be detected by global attribut 'autosave'.
       <br>
       Possible values: 0,1<br>
       Default: 0 (disabled)</li><br>
 
-    <li><a name="ESPEasy_combineDevices">combineDevices</a><br>
+    <li><a name="ESPEasy_bridge_attr_combinedevices">combineDevices</a><br>
       Used to gather all ESP devices of a single ESP into 1 FHEM device even if
       different ESP devices names are used.<br>
       Possible values: 0, 1, IPv64 address, IPv64/netmask, ESPname or a comma
@@ -2795,25 +2794,25 @@ sub ESPEasy_removeGit($)
       Eg. ESP01,ESP02<br>
       Eg. 10.68.30.1,10.69.0.0/16,ESP01,2002:1a59:50a9::/48</li><br>
 
-    <li><a name="">deniedIPs</a><br>
+    <li><a name="ESPEasy_bridge_attr_deniedips">deniedIPs</a><br>
       Used to define IPs or IP ranges of ESPs which are denied to commit data.
       <br>
-      Syntax see <a href="#ESPEasy_allowedIPs">allowedIPs</a>.<br>
+      Syntax see <a href="#ESPEasy_bridge_attr_allowedips">allowedIPs</a>.<br>
       This attribute will overwrite any IP or range defined by
-      <a href="#ESPEasy_allowedIPs">allowedIPs</a>.<br>
+      <a href="#ESPEasy_bridge_attr_allowedips">allowedIPs</a>.<br>
       Default: none (no IPs are denied)</li><br>
 
-    <li><a name="">disable</a><br>
+    <li><a name="ESPEasy_bridge_attr_disable">disable</a><br>
       Used to disable device.<br>
       Possible values: 0,1<br>
       Default: 0 (eanble)</li><br>
 
-    <li><a name="">httpReqTimeout</a><br>
+    <li><a name="ESPEasy_bridge_attr_httpreqtimeout">httpReqTimeout</a><br>
       Specifies seconds to wait for a http answer from ESP8266 device.<br>
       Possible values: 4..60<br>
       Default: 10 seconds</li><br>
 
-    <li><a name="">maxHttpSessions</a><br>
+    <li><a name="ESPEasy_bridge_attr_maxhttpsessions">maxHttpSessions</a><br>
       Limit maximal concurrent outgoing http sessions to a single ESP.<br>
       Set to 0 to disable this feature. At the moment (ESPEasy R147) it seems
       to be possible to send 5 "concurrent" requests if nothing else keeps the
@@ -2821,7 +2820,7 @@ sub ESPEasy_removeGit($)
       Possible values: 0..9<br>
       Default: 3</li><br>
 
-    <li><a name="">maxQueueSize</a><br>
+    <li><a name="ESPEasy_bridge_attr_maxqueuesize">maxQueueSize</a><br>
       Limit maximal queue size (number of commands in queue) for outgoing http
       requests.<br>
       If command queue size is reached (eg. ESP is offline) any further
@@ -2829,12 +2828,12 @@ sub ESPEasy_removeGit($)
       Possible values: >10<br>
       Default: 250</li><br>
 
-    <li><a name="">resendFailedCmd</a><br>
+    <li><a name="ESPEasy_bridge_attr_resendfailedcmd">resendFailedCmd</a><br>
       Used to resend commands when http request returned an error<br>
       Possible values: 0,1<br>
       Default: 0 (disabled)</li><br>
 
-    <li><a name="ESPEasy_uniqIDs">uniqIDs</a><br>
+    <li><a name="ESPEasy_bridge_attr_uniqids">uniqIDs</a><br>
       This attribute has been removed.</li><br>
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
@@ -2843,7 +2842,7 @@ sub ESPEasy_removeGit($)
 
   <h3>ESPEasy Device</h3>
 
-  <a name="ESPEasydefineLogical"></a>
+  <a name="ESPEasy_device_define"></a>
   <b>Define </b>(logical device)<br><br>
 
   <ul>
@@ -2853,355 +2852,531 @@ sub ESPEasy_removeGit($)
     have to define logical devices. At least wifi rssi value could be defined
     to use autocreate and presence detection.<br><br>
 
-    <code>define &lt;name&gt; ESPEasy &lt;ip|fqdn&gt; &lt;port&gt;
-    &lt;IODev&gt; &lt;identifier&gt;</code><br><br>
+    <code>define &lt;name&gt; ESPEasy &lt;ip|fqdn&gt; &lt;port&gt; &lt;IODev&gt; &lt;identifier&gt;</code><br><br>
 
     <li>
-      <code>&lt;name&gt;</code><br>
+      <a name=""><code>&lt;name&gt;</code></a><br>
       Specifies a device name of your choise.<br>
-      eg. <code>ESPxx</code></li><br>
+      example: <code>ESPxx</code>
+    </li><br>
 
     <li>
-      <code>&lt;ip|fqdn&gt;</code><br>
+      <a name=""><code>&lt;ip|fqdn&gt;</code></a><br>
       Specifies ESP IP address or hostname.<br>
-      eg. <code>172.16.4.100</code><br>
-      eg. <code>espxx.your.domain.net</code></li><br>
+      example: <code>172.16.4.100</code><br>
+      example: <code>espxx.your.domain.net</code>
+    </li><br>
 
     <li>
-      <code>&lt;port&gt;</code><br>
-      Specifies http port to be used for outgoing request to your ESP. Should
-      be: 80<br>
-      eg. <code>80</code></li><br>
+      <a name=""><code>&lt;port&gt;</code></a><br>
+      Specifies http port to be used for outgoing request to your ESP. Should be 80<br>
+      example: <code>80</code>
+    </li><br>
 
     <li>
-      <code>&lt;IODev&gt;</code><br>
+      <a name=""><code>&lt;IODev&gt;</code></a><br>
       Specifies your ESP bridge device. See above.<br>
-      eg. <code>ESPBridge</code></li><br>
+      example: <code>ESPBridge</code>
+    </li><br>
 
     <li>
-      <code>&lt;identifier&gt;</code><br>
+      <a name=""><code>&lt;identifier&gt;</code></a><br>
       Specifies an identifier that will bind your ESP to this device.<br>
-      This identifier must be specified in this form:
-      &lt;esp name&gt;_&lt;esp device name&gt;.<br> If attribute
-      <a href="#ESPEasy_combineDevices">combineDevices</a> is used then
-      &lt;esp name&gt; is used, only.<br>
+      This identifier must be specified in this form:<br>
+      &lt;esp name&gt;_&lt;esp device name&gt;.<br>
+      If bridge attribute <a href="#ESPEasy_bridge_attr_combinedevices">combineDevices</a> is used then &lt;esp name&gt; is used, only.<br>
       ESP name and device name can be found here:<br>
-      &lt;esp name&gt;: =&gt; ESP GUI =&gt; Config =&gt; Main Settings =&gt;
-      Name<br>
-      &lt;esp device name&gt;: =&gt; ESP GUI =&gt; Devices =&gt; Edit =&gt;
-      Task Settings =&gt; Name<br>
-      eg. <code>ESPxx_DHT22</code><br>
-      eg. <code>ESPxx</code></li><br>
+      &lt;esp name&gt;: =&gt; ESP GUI =&gt; Config =&gt; Main Settings =&gt; Name<br>
+      &lt;esp device name&gt;: =&gt; ESP GUI =&gt; Devices =&gt; Edit =&gt; Task Settings =&gt; Name<br>
+      example: <code>ESPxx_DHT22</code><br>
+      example: <code>ESPxx</code>
+    </li><br>
 
-    <li>  Example:<br>
+    <li>Example:<br>
       <code>define ESPxx ESPEasy 172.16.4.100 80 ESPBridge EspXX_SensorXX</code>
-      </li><br>
+    </li><br>
+
   </ul>
 
-  <br><a name="ESPEasygetLogical"></a>
+
+  <br><a name="ESPEasy_device_get"></a>
   <b>Get </b>(logical device)<br><br>
 
   <ul>
-    <li><a name="">&lt;reading&gt;</a><br>
-      returns the value of the specified reading</li><br>
+    <li><a name="ESPEasy_device_get_reading">&lt;reading&gt;</a><br>
+      returns the value of the specified reading
+    </li><br>
 
-    <li><a name="ESPEasy_pinMap">pinMap</a><br>
-      returns possible alternative pin names that can be used in commands</li>
-      <br>
+    <li><a name="ESPEasy_bridge_get_pinmap">pinMap</a><br>
+      returns possible alternative pin names that can be used in commands
+    </li><br>
   </ul>
 
-  <br><a name="ESPEasysetLogical"></a>
-  <b>Set </b>(logical device)<br><br>
+
+  <br><a name="ESPEasy_device_set"></a>
+  <b>Set </b>(logical device)
+  <br><br>
 
   <ul>
     Notes:<br>
     - Commands are case insensitive.<br>
     - Users of Wemos D1 mini or NodeMCU can use Arduino pin names instead of
-    GPIO numbers:<br>
+    GPIO numbers.<br>
     &nbsp;&nbsp;D1 =&gt; GPIO5, D2 =&gt; GPIO4, ...,TX =&gt; GPIO1 (see: get
-    <a href="#ESPEasy_pinMap">pinMap</a>)<br>
+    <a href="#ESPEasy_bridge_get_pinmap">pinMap</a>)<br>
     - low/high state can be written as 0/1 or on/off
-    <br><br>
+    <br>
+    <br>
 
-    <li><a name="">clearReadings</a><br>
+    <li><a name="ESPEasy_device_set_clearreadings">clearReadings</a><br>
       Delete all readings that are auto created by received sensor values
       since last FHEM restart.<br>
-      required values: <code>&lt;none&gt;</code></li><br>
+      <ul>
+        <li>arguments: <code>none</code></li>
+        <li>example: set &lt;esp&gt; clearReadings</li>
+      </ul>
+    </li><br>
 
-    <li><a name="">help</a><br>
+    <li><a name="ESPEasy_device_set_help">help</a><br>
       Shows set command usage.<br>
-      required values: <code>a valid set command</code></li><br>
+      <ul>
+        <li>arguments: <code>a valid set command</code></li>
+        <li>example: <code>set &lt;esp&gt; help gpio</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">raw</a><br>
+    <li><a name="ESPEasy_device_set_raw">raw</a><br>
       Can be used for own ESP plugins or new ESPEasy commands that are not
       considered by this module at the moment. Any argument will be sent
-      directly to the ESP.<br>
-      Usage: raw &lt;cmd&gt; &lt;param1&gt; &lt;param2&gt; &lt;...&gt;<br>
-      eg: raw myCommand 3 1 2</li><br>
+      directly to the ESP.
+      <ul>
+        <li>arguments: raw &lt;cmd&gt; [&lt;arg1&gt;] [&lt;arg2&gt;] [&lt;...&gt;]</li>
+        <li>example: set &lt;esp&gt; raw myCommand p1 p2 p3</li>
+      </ul>
+    </li><br>
 
-    <li><a name="">statusRequest</a><br>
+    <li><a name="ESPEasy_device_set_statusrequest">statusRequest</a><br>
       Trigger a statusRequest for configured GPIOs (see attribut pollGPIOs)
       and do a presence check<br>
-      required values: <code>&lt;none&gt;</code></li><br>
+      <ul>
+        <li>arguments: <code>n/a</code></li>
+        <li>example: <code>set &lt;esp&gt; statusRequest</code></li>
+      </ul><br>
+    </li><br>
 
-    <br>
-    <b>Note:</b> The following commands are built-in ESPEasy Software commands
-    that are send directly to the ESP after passing a syntax check. A detailed
-    description can be found here:
- <a href="http://www.letscontrolit.com/wiki/index.php/ESPEasy_Command_Reference"
-    target="_NEW">ESPEasy Command Reference</a><br><br>
+	</ul>
+  <i><b>Note:</b> The following commands are built-in ESPEasy Software commands
+  that are send directly to the ESP after passing a syntax check. A detailed
+  description can be found here:
+  <a href="http://www.letscontrolit.com/wiki/index.php/ESPEasy_Command_Reference"
+  target="_NEW">ESPEasy Command Reference</a></i><br><br>
+  <ul>
 
-    <li><a name="">Event</a><br>
-      Create an event. Such events can be used in ESP rules.<br>
-      required value: <code>&lt;string&gt;</code></li><br>
+    </ul>
+  <u>Generic IO ESPEasy commands:</u><br><br>
+    <ul>
 
-    <li><a name="">GPIO</a><br>
-      Direct control of output pins (on/off)<br>
-      required arguments: <code>&lt;pin&gt; &lt;0,1&gt;</code><br>
-      </li><br>
+    <li><a name="ESPEasy_device_set_gpio">GPIO</a><br>
+      Switch output pins to high/low<br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; gpio 14 on</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">PWM</a><br>
+    <li><a name="ESPEasy_device_set_pwm">PWM</a><br>
       Direct PWM control of output pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;level&gt;</code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;level&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; pwm 14 512</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">PWMFADE</a><br>
-      PWMFADE control of output pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;target&gt; &lt;duration&gt;
-      </code><br>
-      pin: 0-3 (0=r,1=g,2=b,3=w), target: 0-1023, duration: 1-30 seconds.
-      </li><br>
+    <li><a name="ESPEasy_device_set_pwmfade">PWMFADE</a><br>
+      Fade output pins to a pwm value<br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;target pwm&gt; &lt;duration 1-30s&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; pwmfade 14 1023 10</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">Lights</a> (plugin can be found <a
-      href="https://github.com/ddtlabs/ESPEasy-Plugin-Lights">here</a>)<br>
-      Control a rgb or ct light<br>
-      required arguments: <code>&lt;cmd&gt; &lt;color&gt; &lt;fading time&gt;
-      </code><br>
-      cmd: rgb, ct, pct, on, off, toggle<br>
-      color: rrggbb (if rgb) or color temperature in Kelvin (if ct)<br>
-      fading time: time in seconds<br>
-      eg. <code>set &lt;esp&gt; lights rgb aa00aa</code><br>
-      eg. <code>set &lt;esp&gt; lights ct 3200</code><br>
-      eg. <code>set &lt;esp&gt; lights pct 50</code><br>
-      eg. <code>set &lt;esp&gt; lights on</code><br>
-      eg. <code>set &lt;esp&gt; lights off</code><br>
-      eg. <code>set &lt;esp&gt; lights toggle</code><br>
-      </li><br>
-
-    <li><a name="">Pulse</a><br>
+    <li><a name="ESPEasy_device_set_pulse">Pulse</a><br>
       Direct pulse control of output pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;0,1&gt; &lt;duration&gt;</code>
-      <br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; pulse 14 on 10</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">LongPulse</a><br>
+    <li><a name="ESPEasy_device_set_logpulse">LongPulse</a><br>
       Direct pulse control of output pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;0,1&gt; &lt;duration&gt;</code>
-      <br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; longpulse 14 on 10</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">Servo</a><br>
+    <li><a name="ESPEasy_device_set_pcfgpio">PCFGpio</a><br>
+      Control PCF8574 (8-bit I/O expander for I2C-bus)<br>
+      <ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; PCFGpio 128 on</code></li>
+      </ul>
+			Port numbering see:
+			<a href="https://www.letscontrolit.com/wiki/index.php/PCF8574#Input">
+			ESPEasy Wiki PCF8574</a>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_pcfpulse">PCFPulse</a><br>
+      Control PCF8574 (8-bit I/O expander for I2C-bus)
+      <ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; PCFPulse 128 on 10</code></li>
+      </ul>
+			Port numbering see:
+			<a href="https://www.letscontrolit.com/wiki/index.php/PCF8574#Input">
+			ESPEasy Wiki PCF8574</a>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_pcflongpulse">PCFLongPulse</a><br>
+      Control on PCF8574 (8-bit I/O expander for I2C-bus)
+      <ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; PCFLongPulse 128 on 10</code></li>
+      </ul>
+			Port numbering see:
+			<a href="https://www.letscontrolit.com/wiki/index.php/PCF8574#Input">
+			ESPEasy Wiki PCF8574</a>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_mcpgpio">mcpgpio</a><br>
+      Control MCP23017 output pins (16-Bit I/O Expander with Serial Interface)<br>
+			<ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; mcpgpio 48 on</code></li>
+      </ul>
+			Port numbering see:
+			<a href="https://www.letscontrolit.com/wiki/index.php/MCP23017#Input">
+			ESPEasy Wiki MCP23017</a>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_pcapwm">pcapwm</a><br>
+      Control PCA9685 (16-channel / 12-bit PWM I2C-bus controller)<br>
+      <ul>
+        <li>arguments: <code>&lt;pin 0-15&gt; &lt;level 0-4095&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; pcapwm 15 4095</code></li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>Motor control ESPEasy commands:</u><br><br>
+    <ul>
+
+    <li><a name="ESPEasy_device_set_servo">Servo</a><br>
       Direct control of servo motors<br>
-      required arguments: <code>&lt;servoNo&gt; &lt;pin&gt; &lt;position&gt;
-      </code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;servoNo&gt; &lt;pin&gt; &lt;position&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; servo 1 14 100</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">lcd</a><br>
+    <li><a name="ESPEasy_device_set_motorshieldcmd">MotorShieldCMD</a><br>
+      Control a DC motor or stepper<br>
+      <ul>
+        <li>
+          arguments: <code>DCMotor &lt;motornumber&gt; &lt;forward|backward|release&gt; &lt;speed&gt;</code><br>
+          arguments: <code>Stepper &lt;motornumber&gt; &lt;forward|backward|release&gt; &lt;steps&gt; &lt;single|double|interleave|microstep&gt;</code>
+        </li>
+        <li>
+          example: <code>set &lt;esp&gt; MotorShieldCMD DCMotor 1 forward 10</code><br>
+          example: <code>set &lt;esp&gt; MotorShieldCMD Stepper 1 backward 25 single</code>
+        </li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>Display related ESPEasy commands:</u><br>
+    <ul><br>
+
+    <li><a name="ESPEasy_device_set_lcd">lcd</a><br>
       Write text messages to LCD screen<br>
-      required arguments: <code>&lt;row&gt; &lt;col&gt; &lt;text&gt;</code><br>
-      </li><br>
+      Pay attention to attributes
+      <a href="#ESPEasy_device_attr_displaytextencode">displayTextEncode</a> and 
+      <a href="#ESPEasy_device_attr_displaytextwidth">displayTextWidth</a>.<br>
+      <ul>
+        <li>arguments: <code>&lt;row&gt; &lt;col&gt; &lt;text&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; lcd 1 1 Test a b c</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">lcdcmd</a><br>
+    <li><a name="ESPEasy_device_set_lcdcmd">lcdcmd</a><br>
       Control LCD screen<br>
-      required arguments: <code>&lt;on|off|clear&gt;</code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;on|off|clear&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; lcdcmd clear</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">mcpgpio</a><br>
-      Control MCP23017 output pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;0,1&gt;</code><br>
-      </li><br>
-
-    <li><a name="">oled</a><br>
+    <li><a name="ESPEasy_device_set_oled">oled</a><br>
       Write text messages to OLED screen<br>
-      required arguments: <code>&lt;row&gt; &lt;col&gt; &lt;text&gt;</code><br>
-      </li><br>
+      Pay attention to attributes
+      <a href="#ESPEasy_device_attr_displaytextencode">displayTextEncode</a> and 
+      <a href="#ESPEasy_device_attr_displaytextwidth">displayTextWidth</a>.<br>
+      <ul>
+        <li>arguments: <code>&lt;row&gt; &lt;col&gt; &lt;text&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; oled 1 1 Test a b c</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">oledcmd</a><br>
+    <li><a name="ESPEasy_device_set_oledcmd">oledcmd</a><br>
       Control OLED screen<br>
-      required arguments: <code>&lt;on|off|clear&gt;</code><br>
+      <ul>
+        <li>arguments: <code>&lt;on|off|clear&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; oledcmd clear</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_oledframedcmd">oledframedcmd</a><br>
+      Switch oledframed on/off<br>
+      <ul>
+        <li>arguments: <code>&lt;on|off&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; oledframedcmd on</code></li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>DMX related ESPEasy commands:</u>
+    <ul><br>
+
+    <li><a name="ESPEasy_device_set_dmx">dmx</a><br>
+      Send DMX commands to a device<br>
+      <ul>
+        <li>arguments: <code>&lt;on|off|log|value|channel=value[,value][...]&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; dmx 1=255,2=127</code></li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>LED/Lights related ESPEasy commands:</u>
+    <ul><br>
+
+    <li><a name="ESPEasy_device_set_lights">Lights</a> (plugin can be found <a
+      href="https://github.com/ddtlabs/ESPEasy-Plugin-Lights target="_NEW">here</a>)<br>
+      Control a rgb or ct light<br>
+      <ul>
+        <li>arguments: <code>&lt;rgb|ct|pct|on|off|toggle&gt; [&lt;hex-rgb|color-temp|pct-value&gt;] [&lt;fading time&gt;]</code></li>
+        <li>examples:<br>
+          <code>set &lt;esp&gt; lights rgb aa00aa</code><br>
+          <code>set &lt;esp&gt; lights rgb aa00aa 10</code><br>
+          <code>set &lt;esp&gt; lights ct 3200</code><br>
+          <code>set &lt;esp&gt; lights ct 3200 10</code><br>
+          <code>set &lt;esp&gt; lights pct 50</code><br>
+          <code>set &lt;esp&gt; lights on</code><br>
+          <code>set &lt;esp&gt; lights off</code><br>
+          <code>set &lt;esp&gt; lights toggle</code><br>
+        </li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_candle">candle</a><br>
+      Control candle rgb plugin<br>
+      <ul>
+      <li>arguments:
+        <code>CANDLE:&lt;FlameType&gt;:&lt;Color&gt;:&lt;Brightness&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; CANDLE:4:FF0000:200</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_neopixel">neopixel</a><br>
+      Control neopixel plugin (single LED)<br>
+      <ul>
+        <li>arguments: <code>&lt;led nr&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; neopixel 1 255 255 255</code></li>
+      </ul>
       </li><br>
 
-    <li><a name="">pcapwm</a><br>
-      Control PCA9685 pwm pins<br>
-      required arguments: <code>&lt;pin&gt; &lt;level&gt;</code><br>
-      </li><br>
+    <li><a name="ESPEasy_device_set_neopixelall">neopixelall</a><br>
+      Control neopixel plugin (all together)<br>
+      <ul>
+        <li>arguments: <code>&lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; neopixelall 255 255 255</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">PCFLongPulse</a><br>
-      Long pulse control on PCF8574 output pins<br>
-      </li><br>
+    <li><a name="ESPEasy_device_set_neopixelline">neopixelline</a><br>
+      Control neopixel plugin (line)<br>
+      <ul>
+        <li>arguments: <code>&lt;start led no&gt; &lt;stop led no&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; neopixelline 1 5 0 127 255</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">PCFPulse</a><br>
-      Pulse control on PCF8574 output pins<br>
-      </li><br>
 
-    <li><a name="">pcfgpio</a><br>
-      Control PCF8574 output pins<br>
-      </li><br>
+    </ul>
+  <u>Sound related ESPEasy commands:</u>
+    <ul><br>
 
-    <li><a name="">irsend</a><br>
+    <li><a name="ESPEasy_device_set_tone">tone</a><br>
+      Play a tone on a pin via a speaker or piezo element (ESPEasy &gt;=
+      2.0.0-dev6)
+      <br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;freq Hz&gt; &lt;duration s&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; tone 14 4000 1</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_rtttl">rtttl</a><br>
+      Play melodies via <a target="_NEW"
+      href="https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language#Technical_specification">RTTTL</a>
+      (ESPEasy &gt;= 2.0.0-dev6)
+      <br>
+      <ul>
+        <li>arguments: &lt;rtttl&gt; &lt;pin&gt;:&lt;rtttl codes&gt;</li>
+        <li>example: <code>set &lt;esp&gt; rtttl 14:d=10,o=6,b=180,c,e,g</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_buzzer">buzzer</a><br>
+      Beep a short time<br>
+      <ul>
+        <li>arguments: <code>none</code></li>
+        <li>example: <code>set &lt;esp&gt; buzzer</code></li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>Miscellaneous ESPEasy commands:</u>
+    <ul><br>
+
+    <li><a name="ESPEasy_device_set_event">Event</a><br>
+      Trigger an ESP event. Such events can be used in ESP Easy rules.<br>
+      <ul>
+        <li>arguments: <code>&lt;string&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; event testevent</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_irsend">irsend</a><br>
       Send ir codes via "Infrared Transmit" Plugin<br>
       Supported protocols are: NEC, JVC, RC5, RC6, SAMSUNG, SONY, PANASONIC at
       the moment. As long as official documentation is missing you can find
       some details here:
-      <a href="http://www.letscontrolit.com/forum/viewtopic.php?f=5&t=328">
+      <a href="http://www.letscontrolit.com/forum/viewtopic.php?f=5&t=328" target="_NEW">
       IR Transmitter thread #1</a> and  
-      <a href="https://www.letscontrolit.com/forum/viewtopic.php?t=328&start=61">
+      <a 
+      href="https://www.letscontrolit.com/forum/viewtopic.php?t=328&start=61" target="_NEW">
       IR Transmitter thread #61</a>.<br>
-      required arguments: <code>&lt;NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC&gt; &lt;hex code&gt; &lt;bit length&gt;</code><br>
-      required arguments: <code>&lt;RAW&gt; &lt;B32 raw&gt; &lt;frequenz&gt;  &lt;pulse&gt; &lt;blank length&gt;
-      </code><br>
-      eg. <code>irsend NEC 7E81542B 32</code><br>
-      eg. <code>irsend RAW 3U0GGL8AGGK588A22K58ALALALAGL1A22LAK45ALALALALALALALALAL1AK5 38 512 256</code><br>
-      </li><br>
+      <ul>
+        <li>
+          arguments: <code>&lt;NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC&gt; &lt;hex code&gt; &lt;bit length&gt;</code><br>
+          arguments: <code>&lt;RAW&gt; &lt;B32 raw&gt; &lt;frequenz&gt; &lt;pulse length&gt; &lt;blank length&gt;</code>
+        </li>
+        <li>
+          example: <code>set &lt;esp&gt; irsend NEC 7E81542B 32</code><br>
+          example: <code>set &lt;esp&gt; irsend RAW 3U0GGL8AGGK588A22K58ALALALAGL1A22LAK45ALALALALALALALALAL1AK5 38 512 256</code>
+        </li>
+      </ul>
+    </li><br>
 
-    <li><a name="">tone</a><br>
-      Play a tone on a pin via a speaker or piezo element (ESPEasy &gt;=
-      2.0.0-dev6)
-      <br>
-      required arguments: &lt;pin&gt; &lt;freq&gt; &lt;duration&gt;
-      </li><br>
-
-    <li><a name="">rtttl</a><br>
-      Play melodies via <a target="_NEW" href="https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language#Technical_specification">RTTTL</a>
-      (ESPEasy &gt;= 2.0.0-dev6)
-      <br>
-      required arguments: &lt;rtttl&gt;
-      </li><br>
-
-    <li><a name="">status</a><br>
-      Request esp device status (eg. gpio)<br>
-      required values: <code>&lt;device&gt; &lt;pin&gt;</code><br>
-      eg: <code>gpio 13</code>
-      </li><br>
-
-    <li><a name="">dmx</a><br>
-      Send DMX commands to a device<br>
-      required values: <code>&lt;<on|off|log|value|channel=value[,value][...]>&gt;</code><br>
-      eg: <code>dmx 1=255</code>
-      </li><br>
-
-    <li><a name="">MotorShieldCMD</a><br>
-      Control a DC motor or stepper<br>
-      required values: <code>&lt;DCMotor|Stepper&gt; &lt;motornumber&gt;
-      &lt;forward|backward|release&gt; &lt;speed|steps&gt; 
-      &lt;single|double|interleave|microstep&gt;</code><br>
-      eg: <code>MotorShieldCMD DCMotor 1 forward 10</code><br>
-      eg: <code>MotorShieldCMD Stepper 1 backward 25 single</code>
-      </li><br>
-
-    <li><a name="">candle</a><br>
-      Control candle rgb plugin<br>
-      required values: <code>CANDLE:&lt;FlameType&gt;:&lt;Color&gt;:&lt;Brightness&gt;</code><br>
-      eg: <code>CANDLE:4:FF0000:200</code>
-      </li><br>
-
-    <li><a name="">neopixel</a><br>
-      Control neopixel plugin (single LED)<br>
-      required values: <code>&lt;led nr&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
-      eg: <code>neopixel 1 255 255 255</code>
-      </li><br>
-
-    <li><a name="">neopixelall</a><br>
-      Control neopixel plugin (all together)<br>
-      required values: <code>&lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
-      eg: <code>neopixelall 255 255 255</code>
-      </li><br>
-
-    <li><a name="">neopixelline</a><br>
-      Control neopixel plugin (line)<br>
-      required values: <code>&lt;start led no&gt; &lt;stop led no&gt; &lt;red 0-255&gt; &lt;green 0-255&gt; &lt;blue 0-255&gt;</code><br>
-      eg: <code>neopixelline 1 5 0 127 255</code>
-      </li><br>
-
-    <li><a name="">oledframedcmd</a><br>
-      Switch oledframed on/off<br>
-      required values: <code>&lt;on|offxxx&gt;</code><br>
-      eg: <code>oledframedcmd on</code>
-      </li><br>
-
-    <li><a name="">serialsend</a><br>
+    <li><a name="ESPEasy_device_set_serialsend">serialsend</a><br>
       Used for ser2net plugin<br>
-      required values: <code>&lt;string&gt;</code><br>
-      eg: <code>serialsend test</code>
-      </li><br>
-
-    <li><a name="">buzzer</a><br>
-      Beep a short time<br>
-      required values: <code>none</code><br>
-      eg: <code>buzzer</code>
-      </li><br>
-
-    <li><a name="">inputswitchstate</a><br>
-      inputswitchstate<br>
-      required values: <code>none</code><br>
-      eg: <code>inputswitchstate</code>
-      </li><br>
+      <ul>
+        <li>arguments: <code>&lt;string&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; serialsend test</code></li>
+      </ul>
+    </li><br>
 
 
-    <b>Administrative commands</b> (be careful):<br><br>
+    </ul>
+  <u>Administrative ESPEasy commands</u> (be careful !!!):
+    <ul><br>
 
-    <li><a name="">erase</a><br>
+    <li><a name="ESPEasy_device_set_erase">erase</a><br>
       Wipe out ESP flash memory<br>
-      required values: <code>none</code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>none</code></li>
+        <li>example: <code>set &lt;esp&gt; erase</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">reboot</a><br>
+    <li><a name="ESPEasy_device_set_reboot">reboot</a><br>
       Used to reboot your ESP<br>
-      required values: <code>none</code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>none</code></li>
+        <li>example: <code>set &lt;esp&gt; reboot</code></li>
+      </ul>
+    </li><br>
 
-    <li><a name="">reset</a><br>
+    <li><a name="ESPEasy_device_set_reset">reset</a><br>
       Do a factory reset on the ESP<br>
-      required values: <code>none</code><br>
-      </li><br>
+      <ul>
+        <li>arguments: <code>none</code></li>
+        <li>example: <code>set &lt;esp&gt; reset</code></li>
+      </ul>
+    </li><br>
 
-    <b>Experimental commands</b> (The following commands can be changed or
-      removed at any time):<br><br>
 
-    <li><a name="ESPEasy_set_rgb">rgb</a><br>
-      EXPERIMENTAL, may be removed in later versions if a usable rgb plugin is
-      available.<br>
-      Used to control a rgb light.<br>
-      You have to set attribute <a href="#ESPEasy_rgbGPIOs">rgbGPIOs</a> to enable this feature. Default
-      colorpicker mode is HSVp but can be adjusted with help of attribute
-      <a href="#ESPEasy_colorpicker">colorpicker</a> to HSV or RGB. Set
-      attribute <a href="#webCmd">webCmd</a> to rgb to display a colorpicker
-      in FHEMWEB room view and on detail page.<br>
-      required argument: <code>&lt;rrggbb&gt;|on|off|toggle</code>
-      <br>
-      eg. rgb 00FF00<br>
-      eg. rgb on<br>
-      eg. rgb off<br>
-      eg. rgb toggle<br>
-      <br>
-      <u>Full featured example:</u><br>
-      attr &lt;ESP&gt; colorpicker HSVp<br>
-      attr &lt;ESP&gt; devStateIcon { ESPEasy_devStateIcon($name) }<br>
-      attr &lt;ESP&gt; Interval 30<br>
-      attr &lt;ESP&gt; parseCmdResponse status,pwm<br>
-      attr &lt;ESP&gt; pollGPIOs D6,D7,D8<br>
-      attr &lt;ESP&gt; rgbGPIOs D6,D7,D8<br>
-      attr &lt;ESP&gt; webCmd rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off
-      <br>
-      </li><br>
+    </ul>
+  <u>Experimental ESPEasy commands:</u> (The following commands can be changed or removed at any time)
+    <ul><br>
+
+    <li><a name="ESPEasy_device_set_rgb">rgb</a><br>
+      Used to control a rgb light wo/ an ESPEasy plugin.<br>
+      You have to set attribute <a href="#ESPEasy_device_attr_rgbgpios">rgbGPIOs</a> to
+      enable this feature. Default colorpicker mode is HSVp but can be adjusted
+      with help of attribute <a href="#ESPEasy_device_attr_colorpicker">colorpicker</a>
+      to HSV or RGB. Set attribute <a href="#webCmd">webCmd</a> to rgb to
+      display a colorpicker in FHEMWEB room view and on detail page.<br>
+      <ul>
+        <li>
+          arguments: <code>&lt;rrggbb&gt;|on|off|toggle</code>
+        </li>
+        <li>
+          examples:<br>
+          <code>set &lt;esp&gt; rgb 00FF00</code><br>
+          <code>set &lt;esp&gt; rgb on</code><br>
+          <code>set &lt;esp&gt; rgb off</code><br>
+          <code>set &lt;esp&gt; rgb toggle</code><br>
+        </li>
+        <li>Full featured example:<br>
+          attr &lt;ESP&gt; colorpicker HSVp<br>
+          attr &lt;ESP&gt; devStateIcon { ESPEasy_devStateIcon($name) }<br>
+          attr &lt;ESP&gt; Interval 30<br>
+          attr &lt;ESP&gt; parseCmdResponse status,pwm<br>
+          attr &lt;ESP&gt; pollGPIOs D6,D7,D8<br>
+          attr &lt;ESP&gt; rgbGPIOs D6,D7,D8<br>
+          attr &lt;ESP&gt; webCmd rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off
+        </li>
+      </ul>
+    </li><br>
+
+
+    </ul>
+  <u>Deprecated ESPEasy commands:</u> (will be removed in a later version)
+    <ul><br>
+
+    <li><a name="">ESPEasy_device_set_status</a><br>
+      Request esp device status (eg. gpio)<br>
+      See attributes: parseCmdResponse, readingPrefixGPIO, readingSuffixGPIOState
+      <ul>
+        <li>arguments: <code>&lt;pin&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; status 14</code></li>
+      </ul>
+    </li><br>
+
 
   </ul>
-
-  <br><a name="ESPEasyattrLogical"></a>
-  <b>Attributes</b> (logical device)<br><br>
-
+    <br><a name="ESPEasy_device_attr"></a>
+    <b>Attributes</b> (logical device)<br><br>
   <ul>
-    <li><a name="">adjustValue</a><br>
+
+    <li><a name="ESPEasy_device_attr_adjustvalue">adjustValue</a><br>
       Used to adjust sensor values<br>
       Must be a space separated list of &lt;reading&gt;:&lt;formula&gt;.
       Reading can be a regexp. Formula can be an arithmetic expression like
@@ -3226,99 +3401,111 @@ sub ESPEasy_removeGit($)
       <br>
       Sample function to ignore negative values:<br>
       <code>
-      sub my_OwnFunction($$$) {<br>
-        &nbsp;&nbsp;my ($name,$reading,$value) = @_;<br>
-        &nbsp;&nbsp;return ($value < 0) ? undef : $value;<br>
-      }<br>
-      </code></li><br>
+        sub my_OwnFunction($$$) {<br>
+          &nbsp;&nbsp;my ($name,$reading,$value) = @_;<br>
+          &nbsp;&nbsp;return ($value < 0) ? undef : $value;<br>
+        }<br>
+      </code>
+    </li><br>
 
-    <li><a name="ESPEasy_colorpicker">colorpicker</a><br>
+    <li><a name="ESPEasy_device_attr_colorpicker">colorpicker</a><br>
       Used to select colorpicker mode<br>
       Possible values: RGB,HSV,HSVp<br>
-      Default: HSVp</li><br>
+      Default: HSVp
+    </li><br>
 
-    <li><a name="ESPEasy_colorpickerCTcw">colorpickerCTcw</a><br>
+    <li><a name="ESPEasy_device_attr_colorpickerctcw">colorpickerCTcw</a><br>
       Used to select ct colorpicker's cold white color temperature in Kelvin<br>
       Possible values: &gt; colorpickerCTww<br>
-      Default: 6000</li><br>
+      Default: 6000
+    </li><br>
 
-    <li><a name="ESPEasy_colorpickerCTww">colorpickerCTww</a><br>
+    <li><a name="ESPEasy_device_attr_colorpickerctww">colorpickerCTww</a><br>
       Used to select ct colorpicker's warm white color temperature in Kelvin<br>
       Possible values: &lt; colorpickerCTcw<br>
-      Default: 2000</li><br>
+      Default: 2000
+    </li><br>
 
-    <li><a name="">disable</a><br>
+    <li><a name="ESPEasy_device_attr_disable">disable</a><br>
       Used to disable device<br>
       Possible values: 0,1<br>
-      Default: 0</li><br>
+      Default: 0
+    </li><br>
 
-    <li><a name="ESPEasy_displayTextEncode">displayTextEncode</a><br>
+    <li><a name="ESPEasy_device_attr_displaytextencode">displayTextEncode</a><br>
       Used to disable url encoding for text that is send to oled/lcd displays.
       Useful if you want to encode the text by yourself.<br>
       Possible values: 0,1<br>
-      Default: 1 (enabled)</li><br>
+      Default: 1 (enabled)
+    </li><br>
 
-    <li><a name="ESPEasy_displayTextWidth">displayTextWidth</a><br>
+    <li><a name="ESPEasy_device_attr_displaytextwidth">displayTextWidth</a><br>
       Used to specify number of characters per display line.<br>
       If set then all characters before and after the text on the same line will
       be overwritten with spaces. Attribute
-      <a href="#ESPEasy_displayTextEncode">displayTextEncode</a> must not be
+      <a href="#ESPEasy_device_attr_displaytextencode">displayTextEncode</a> must not be
       disabled to use this feature. A 128x64px display has 16 characters per
       line if you are using a 8px font.<br>
       Possible values: integer<br>
-      Default: 0 (disabled)</li><br>
+      Default: 0 (disabled)
+    </li><br>
 
-    <li><a name="ESPEasy_Interval">Interval</a><br>
+    <li><a name="ESPEasy_device_attr_interval">Interval</a><br>
       Used to set polling interval for presence check and GPIOs polling in
       seconds. 0 will disable this feature.<br>
       Possible values: secs &gt; 10.<br>
-      Default: 300</li><br>
+      Default: 300
+    </li><br>
 
     <li><a href="#IODev">IODev</a><br>
       Used to select I/O device (ESPEasy Bridge).
-      </li><br>
+    </li><br>
 
-    <li><a name="">mapLightCmds</a><br>
+    <li><a name="ESPEasy_device_attr_maplightscmds">mapLightCmds</a><br>
       Enable the following commands and map them to the specified ESPEasy
       command: rgb, ct, pct, on, off, toggle<br>
       Needed if you want to use FHEM's colorpickers to control a rgb/ct ESPEasy
       plugin.<br>
       required values: <code>a valid set command</code><br>
-      eg. <code>attr &lt;esp&gt; mapLightCmds Lights</code></li><br>
+      eg. <code>attr &lt;esp&gt; mapLightCmds Lights</code>
+    </li><br>
 
-    <li><a name="">presenceCheck</a><br>
+    <li><a name="ESPEasy_device_attr_presencecheck">presenceCheck</a><br>
       Used to enable/disable presence check for ESPs<br>
       Presence check determines the presence of a device by readings age. If any
-      reading of a device is newer than <a href="#ESPEasy_Interval">interval</a>
+      reading of a device is newer than <a href="#ESPEasy_device_attr_interval">interval</a>
       seconds then it is marked as being present. This kind of check works for
       ESP devices in deep sleep too but require at least 1 reading that is
       updated regularly. Therefore the ESP must send the corresponding data
       regularly (ESP device option "delay").<br>
       Possible values: 0,1<br>
-      Default: 1 (enabled)</li><br>
+      Default: 1 (enabled)
+    </li><br>
 
-    <li><a name="">readingSwitchText</a><br>
+    <li><a name="ESPEasy_device_attr_readingswitchtext">readingSwitchText</a><br>
       Use on,off instead of 1,0 for readings if ESP device is a switch.<br>
       Possible values: 0,1<br>
-      Default: 1 (enabled)</li><br>
+      Default: 1 (enabled)
+    </li><br>
 
-    <li><a name="">setState</a><br>
+    <li><a name="ESPEasy_device_attr_setstate">setState</a><br>
       Summarize received values in state reading.<br>
       A positive number determines the number of characters used for abbreviated
       reading names. Only readings with an age less than
-      <a href="#ESPEasy_Interval">interval</a> will be considered. If your are
+      <a href="#ESPEasy_device_attr_interval">interval</a> will be considered. If your are
       not satisfied with format or behavior of setState then disable this
       attribute (set to 0) and use global attributes userReadings and/or
       stateFormat to get what you want.<br>
       Possible values: integer &gt;=0<br>
-      Default: 3 (enabled with 3 characters abbreviation)</li><br>
+      Default: 3 (enabled with 3 characters abbreviation)
+    </li><br>
 
       The following two attributes should only be use in cases where ESPEasy
       software do not send data on status changes and no rule/dummy can be used
       to do that. Useful for commands like PWM, STATUS, ...
       <br><br>
 
-    <li><a name="ESPEasy_parseCmdResponse">parseCmdResponse</a><br>
+    <li><a name="ESPEasy_device_attr_parsecmdresponse">parseCmdResponse</a><br>
       Used to parse response of commands like GPIO, PWM, STATUS, ...<br>
       Specify a module command or comma separated list of commands as argument.
       Commands are case insensitive.<br>
@@ -3326,49 +3513,56 @@ sub ESPEasy_removeGit($)
       independently. Useful for commands like STATUS, PWM, ...<br>
       Possible values: &lt;set cmd&gt;[,&lt;set cmd&gt;][,...]<br>
       Default: status<br>
-      Eg. <code>attr ESPxx parseCmdResponse status,pwm</code></li><br>
+      Eg. <code>attr ESPxx parseCmdResponse status,pwm</code>
+    </li><br>
 
-    <li><a name="ESPEasy_pollGPIOs">pollGPIOs</a><br>
+    <li><a name="ESPEasy_device_attr_pollgpios">pollGPIOs</a><br>
       Used to enable polling for GPIOs status. This polling will do same as
       command 'set ESPxx status &lt;device&gt; &lt;pin&gt;'<br>
       Possible values: GPIO number or comma separated GPIO number list<br>
       Default: none<br>
-      Eg. <code>attr ESPxx pollGPIOs 13,D7,D2</code></li><br>
+      Eg. <code>attr ESPxx pollGPIOs 13,D7,D2</code>
+    </li>
 
+			<br>
       The following two attributes control naming of readings that are
       generated by help of parseCmdResponse and pollGPIOs (see above)
       <br><br>
 
-    <li><a name="">readingPrefixGPIO</a><br>
+    <li><a name="ESPEasy_device_attr_readingprefixgpio">readingPrefixGPIO</a><br>
       Specifies a prefix for readings based on GPIO numbers. For example:
       "set ESPxx pwm 13 512" will switch GPIO13 into pwm mode and set pwm to
       512. If attribute readingPrefixGPIO is set to PIN and attribut
-      <a href="#ESPEasy_parseCmdResponse">parseCmdResponse</a> contains pwm
+      <a href="#ESPEasy_device_attr_parsecmdresponse">parseCmdResponse</a> contains pwm
       command then the reading name will be PIN13.<br>
       Possible Values: <code>string</code><br>
-      Default: GPIO</li><br>
+      Default: GPIO
+    </li><br>
 
-    <li><a name="">readingSuffixGPIOState</a><br>
+    <li><a name="ESPEasy_device_attr_readingsuffixgpiostate">readingSuffixGPIOState</a><br>
       Specifies a suffix for the state-reading of GPIOs (see Attribute
-      <a href="#ESPEasy_pollGPIOs">pollGPIOs</a>)<br>
+      <a href="#ESPEasy_device_attr_pollgpios">pollGPIOs</a>)<br>
       Possible Values: <code>string</code><br>
       Default: no suffix<br>
-      Eg. attr ESPxx readingSuffixGPIOState _state</li><br>
+      Eg. attr ESPxx readingSuffixGPIOState _state
+    </li><br>
 
-    <li><a href="#readingFnAttributes">readingFnAttributes</a>
-      </li><br>
+    <li>
+      <a href="#readingFnAttributes">readingFnAttributes</a>
+    </li><br>
 
     <b>Experimental</b> (The following attributes can be changed or removed at
        any time):<br><br>
 
-    <li><a name="ESPEasy_rgbGPIOs">rgbGPIOs</a><br>
+    <li><a name="ESPEasy_device_attr_rgbgpios">rgbGPIOs</a><br>
       Use to define GPIOs your lamp is conneted to. Must be set to be able to
-      use <a href="#ESPEasy_set_rgb">rgb</a> set command.<br>
+      use <a href="#ESPEasy_device_set_rgb">rgb</a> set command.<br>
       Possible values: Comma separated tripple of ESP pin numbers or arduino pin
       names<br>
       Eg: 12,13,15<br>
       Eg: D6,D7,D8<br>
-      Default: none</li><br>
+      Default: none
+    </li><br>
 
   </ul>
 </ul>
