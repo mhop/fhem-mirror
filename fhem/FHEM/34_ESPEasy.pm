@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.18;       # Version of this module
+my $module_version    = 1.19;       # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -3361,7 +3361,7 @@ sub ESPEasy_removeGit($)
   <u>Deprecated ESPEasy commands:</u> (will be removed in a later version)
     <ul><br>
 
-    <li><a name="">ESPEasy_device_set_status</a><br>
+    <li><a name="ESPEasy_device_set_status">status</a><br>
       Request esp device status (eg. gpio)<br>
       See attributes: parseCmdResponse, readingPrefixGPIO, readingSuffixGPIOState
       <ul>
