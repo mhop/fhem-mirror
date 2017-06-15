@@ -83,7 +83,7 @@ sub Set($$$@) {
   my ($hash,$name,$command,@values) = @_;
   return "Need at least one parameters" unless defined $command;
   return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
-    if(!defined($hash->{sets}->{$command}));
+    if(!defined($hash->{sets}->{$command}) && @values);
   my $msgid;
   if (@values) {
     my $value = join " ",@values;
