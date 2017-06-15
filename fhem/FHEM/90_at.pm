@@ -354,7 +354,8 @@ at_fhemwebFn($$$$)
         Use perl function for timespec <input type="checkbox" id="aw_ip"></td>
   </tr><tr class="even"><td><input type="text" name="aw_pts"></td>
   </tr><tr class="even"><td><input type="text" name="aw_ts"></td>
-  </tr><tr class="odd"><td><input type="button" id="aw_md" value="Modify"></td>
+  </tr><tr class="odd"><td><input type="button" id="aw_md"
+        value="Modify timespec"></td>
   </tr>
 EOF
 
