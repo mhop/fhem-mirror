@@ -43,7 +43,8 @@ structure_Initialize($)
   $hash->{AttrFn}    = "structure_Attr";
   $hash->{AttrList}  = "async_delay clientstate_priority ".
                  "clientstate_behavior:relative,relativeKnown,absolute,last ".
-                 "disable disabledForIntervals $readingFnAttributes";
+                 "disable disabledForIntervals evaluateSetResult:1,0 ".
+                 $readingFnAttributes;
 
   my %ahash = ( Fn=>"CommandAddStruct",
                 Hlp=>"<structure> <devspec>,add <devspec> to <structure>" );
@@ -185,7 +186,7 @@ structure_Notify($$)
   my @structPrio = attrSplit($attr{$me}{clientstate_priority})
         if($attr{$me}{clientstate_priority});
 
-  return "" if($hash->{INSET}); # Do not trigger for our own set
+  return "" if($hash->{INSET} && !AttrVal($me, "evaluateSetResult", 0));
   return "" if(@{$hash->{".asyncQueue"}}); # Do not trigger during async set 
 
   if($hash->{INNTFY}) {
@@ -667,6 +668,14 @@ structure_Attr($@)
         </ul>
         </li>
 
+    <a name="evaluateSetResult"></a>
+    <li>evaluateSetResult<br>
+      if a set command sets the state of the structure members to something
+      different from the set command (like set statusRequest), then you have to
+      set this attribute to 1 in order to enable the structure instance to
+      compute the new status.
+      </li>
+
     <a name="structexclude"></a>
     <li>structexclude<br>
         exclude the device from set/notify or attribute operations. For the set
@@ -857,6 +866,15 @@ structure_Attr($@)
         <li>attr tuer2 struct_kitchen_map A</li>
       </ul>
       </li>
+
+    <a name="evaluateSetResult"></a>
+    <li>evaluateSetResult<br>
+      Falls ein set Befehl den Status der Struktur-Mitglieder auf was
+      unterschiedliches setzt (wie z.Bsp. beim set statusRequest), dann muss
+      dieses Attribut auf 1 gesetzt werden, wenn die Struktur Instanz diesen
+      neuen Status auswerten soll.
+      </li>
+
 
     <li>structexclude<br>
       Bei gesetztem Attribut wird set, attr/deleteattr ignoriert.  Dies
