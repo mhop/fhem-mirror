@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: ESPEasy: improved defineFn if bridge port is missing, docu update
   - feature: 37_Spotify: resume on target
   - feature: 93_DbRep: V5.1.0, create dumps of MySQL on client- or serverside, 
                        column UNIT is added to the result of fetchrows-command

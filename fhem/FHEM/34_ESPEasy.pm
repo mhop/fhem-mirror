@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = 1.19;       # Version of this module
+my $module_version    = "1.20";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -52,7 +52,10 @@ my $d_resendFailedCmd = 0;          # resend failed http requests by default?
 my $d_displayTextEncode = 1;        # urlEncode Text for Displays
 my $d_displayTextWidth  = 0;        # display width, 0 => disable formating
 
+my $d_bridgePort        = 8383;
+
 # IP ranges that are allowed to connect to ESPEasy without attr allowedIPs set.
+# defined as regexp beause it's quicker than check against IP ranges...
 my $d_allowedIPs = "192.168.0.0/16,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,"
                  . "fe80::/10,fc00::/7,::1";
 
@@ -124,10 +127,9 @@ my %ESPEasy_setCmdsUsage = (
   "status"         => "status <device> <pin>",
   #https://forum.fhem.de/index.php/topic,55728.msg480966.html#msg480966
   "pwmfade"        => "pwmfade <pin> <target> <duration>",
-  ##https://forum.fhem.de/index.php/topic,55728.msg530220.html#msg530220
-  #"irsend"         => "irsend <protocol> <code> <length>",
+  #https://forum.fhem.de/index.php/topic,55728.msg530220.html#msg530220
   #https://github.com/letscontrolit/ESPEasy/blob/mega/src/_P035_IRTX.ino
-  "irsend"         => "irsend <RAW> <raw code> <frequenz> <pulse length> <blank length> "
+  "irsend"         => "irsend <RAW> <B32 raw code> <frequenz> <pulse length> <blank length> "
                     . "| irsend <NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC> <code> <bits>",
   "raw"            => "raw <esp_comannd> <...>",
   "reboot"         => "reboot",
@@ -136,14 +138,14 @@ my %ESPEasy_setCmdsUsage = (
   "statusrequest"  => "statusRequest",
   "clearreadings"  => "clearReadings",
   "help"           => "help <".join("|", sort keys %ESPEasy_setCmds).">",
-  "lights"         => "light <rgb|ct|pct|on|off|toggle> [color] [fading time] [pct]",
+  "lights"         => "lights <rgb|ct|pct|on|off|toggle> [color] [fading time] [pct]",
   "dots"           => "dots <params>",
   "tone"           => "tone <pin> <freq> <duration>",
   "rtttl"          => "rtttl <RTTTL>",
   "dmx"            => "dmx <ON|OFF|LOG|value|channel=value[,value][...]>",
-  "motorshieldcmd" => "motorshieldcmd <DCMotor|Stepper> <Motornumber> ".
-                      "<Forward|Backward|Release> <Speed|Steps> ".
-                      "<SINGLE|DOUBLE|INTERLEAVE|MICROSTEP>",
+  "motorshieldcmd" => "motorshieldcmd <DCMotor|Stepper> <Motornumber> "
+                    . "<Forward|Backward|Release> <Speed|Steps> "
+                    . "<SINGLE|DOUBLE|INTERLEAVE|MICROSTEP>",
   "candle"         => "CANDLE:<FlameType>:<Color>:<Brightness>",
   "neopixel"       => "NeoPixel <led nr> <red 0-255> <green 0-255> <blue 0-255>",
   "neopixelall"    => "NeoPixelAll <red 0-255> <green 0-255> <blue 0-255>",
@@ -296,20 +298,13 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   my $name  = $a[0];
   my $type  = $a[1];
   my $host  = $a[2];
-  my $port  = $a[3] if defined $a[3];
+  my $port;
+  $port = $a[3] if defined $a[3];
+  $port = 8383  if !defined $port && $host eq "bridge";
   my $iodev = $a[4] if defined $a[4];
   my $ident = $a[5] if defined $a[5];
-
-  my $ipv = ($port =~ m/^IPV6:/i ? 6 : 4) if defined $port;
-  $hash->{IPV} = $ipv;
+  my $ipv = $port =~ m/^IPV6:/ ? 6 : 4;
   
-  # Check OS IPv6 support
-  if ($ipv == 6) {
-    use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
-    Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support."
-      if !HAS_AF_INET6;
-  }
-
   return "ERROR: only 1 ESPEasy bridge can be defined!"
     if($host eq "bridge" && $modules{ESPEasy}{defptr}{BRIDGE}{$ipv});
   return "ERROR: missing arguments for subtype device: $usg"
@@ -336,8 +331,9 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
   #--- BRIDGE -------------------------------------------------
   if ($hash->{HOST} eq "bridge") {
     $hash->{SUBTYPE} = "bridge";
+    $hash->{IPV} = $ipv;
     $modules{ESPEasy}{defptr}{BRIDGE}{$ipv} = $hash;
-    Log3 $hash->{NAME}, 2, "$type $name: Opening bridge on port tcp/$port (v$module_version)";
+    Log3 $hash->{NAME}, 2, "$type $name: Opening bridge port tcp/$port (v$module_version)";
     ESPEasy_tcpServerOpen($hash);
     if ($init_done && !defined($hash->{OLDDEF})) {
     #if (not defined getKeyValue($type."_".$name."-firstrun")) {
@@ -353,6 +349,14 @@ sub ESPEasy_Define($$)  # only called when defined, not on reload.
     $hash->{MAX_HTTP_SESSIONS} = $d_maxHttpSessions;
     $hash->{MAX_QUEUE_SIZE}    = $d_maxQueueSize;
 
+    # Check OS IPv6 support
+    if ($ipv == 6) {
+      use constant HAS_AF_INET6 => defined eval { Socket::AF_INET6() };
+      Log3 $name, 2, "$type $name: WARNING: Your system seems to have no IPv6 support."
+        if !HAS_AF_INET6;
+    }
+
+    # Check that GIT repository is not activated
     ESPEasy_removeGit($hash);
   }
 
@@ -1641,9 +1645,9 @@ sub ESPEasy_TcpServer_Accept($$)
 
 # ------------------------------------------------------------------------------
 # Removed from sub because we have our own access control system that works in
-# a more readable and flexible way (network ranges with allow/deny vs regexp).
+# a more readable and flexible way (network ranges with allow/deny and regexps).
 # Our new allowed ranges default are also now:
-# 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fe80::/10,::1
+# 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,fe80::/10,::1
 # ------------------------------------------------------------------------------
 #
 #  my $af = $attr{$name}{allowfrom};
@@ -2241,7 +2245,7 @@ sub ESPEasy_urlEncodeDisplayText($$@)
 
     # collect all texts parameters
     for (my $i=$pp-1; $i<$c; $i++) {
-      $params[$i] =~ s/,/./g;  # comma is http url parameter splitter
+      $params[$i] =~ s/,/./g;  # comma is ESPEasy parameter splitter, can't be used
       push @t, $params[$i];
     }
     my $text = join(" ", @t);
@@ -2293,7 +2297,7 @@ sub ESPEasy_isAttrCombineDevices($)
   my @ranges = split(/,| /,$_[0]);
   foreach (@ranges) {
     if (!($_ =~ m/^([A-Za-z0-9_\.]|[A-Za-z0-9_\.][A-Za-z0-9_\.]*[A-Za-z0-9\._])$/
-    || ESPEasy_isIPv64Range($_)))
+       || ESPEasy_isIPv64Range($_)))
     {
       return 0
     }
@@ -2973,7 +2977,7 @@ sub ESPEasy_removeGit($)
   <ul>
 
     </ul>
-  <u>Generic IO ESPEasy commands:</u><br><br>
+  <u>ESPEasy generic I/O commands:</u><br><br>
     <ul>
 
     <li><a name="ESPEasy_device_set_gpio">GPIO</a><br>
@@ -3070,7 +3074,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Motor control ESPEasy commands:</u><br><br>
+  <u>ESPEasy motor control commands:</u><br><br>
     <ul>
 
     <li><a name="ESPEasy_device_set_servo">Servo</a><br>
@@ -3097,7 +3101,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Display related ESPEasy commands:</u><br>
+  <u>ESPEasy display related commands:</u><br>
     <ul><br>
 
     <li><a name="ESPEasy_device_set_lcd">lcd</a><br>
@@ -3148,7 +3152,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>DMX related ESPEasy commands:</u>
+  <u>ESPEasy DMX related commands:</u>
     <ul><br>
 
     <li><a name="ESPEasy_device_set_dmx">dmx</a><br>
@@ -3161,7 +3165,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>LED/Lights related ESPEasy commands:</u>
+  <u>ESPEasy LED/Lights related commands:</u>
     <ul><br>
 
     <li><a name="ESPEasy_device_set_lights">Lights</a> (plugin can be found <a
@@ -3217,7 +3221,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Sound related ESPEasy commands:</u>
+  <u>ESPEasy sound related commands:</u>
     <ul><br>
 
     <li><a name="ESPEasy_device_set_tone">tone</a><br>
@@ -3251,7 +3255,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Miscellaneous ESPEasy commands:</u>
+  <u>ESPEasy miscellaneous commands:</u>
     <ul><br>
 
     <li><a name="ESPEasy_device_set_event">Event</a><br>
@@ -3294,7 +3298,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Administrative ESPEasy commands</u> (be careful !!!):
+  <u>ESPEasy administrative commands</u> (be careful !!!):
     <ul><br>
 
     <li><a name="ESPEasy_device_set_erase">erase</a><br>
@@ -3323,7 +3327,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Experimental ESPEasy commands:</u> (The following commands can be changed or removed at any time)
+  <u>ESPEasy experimental commands:</u> (The following commands can be changed or removed at any time)
     <ul><br>
 
     <li><a name="ESPEasy_device_set_rgb">rgb</a><br>
@@ -3358,7 +3362,7 @@ sub ESPEasy_removeGit($)
 
 
     </ul>
-  <u>Deprecated ESPEasy commands:</u> (will be removed in a later version)
+  <u>ESPEasy deprecated commands:</u> (will be removed in a later version)
     <ul><br>
 
     <li><a name="ESPEasy_device_set_status">status</a><br>
