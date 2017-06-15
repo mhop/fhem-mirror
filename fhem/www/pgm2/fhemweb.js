@@ -17,6 +17,7 @@ var embedLoadRetry = 100;
 // - activateFn, which is called after the HTML element is part of the DOM.
 var FW_widgets = {
   select:            { createFn:FW_createSelect    },
+  selectnumbers:     { createFn:FW_createSelectNumbers, },
   slider:            { createFn:FW_createSlider    },
   time:              { createFn:FW_createTime      },
   noArg:             { createFn:FW_createNoArg     },
@@ -1180,6 +1181,73 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
   }
   if(currVal)
     $(newEl).val(currVal);
+  if(elName)
+    $(newEl).attr('name', elName);
+  if(cmd)
+    $(newEl).change(function(arg) { cmd($(newEl).val()) });
+  newEl.setValueFn = function(arg) { if(vHash[arg]) $(newEl).val(arg); };
+  return newEl;
+}
+
+/*************** selectNumbers **************/
+// Syntax: selectnumbers,<min value>,<step|step of exponent>,<max value>,<number of digits after decimal point>,lin|log10
+
+function
+FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
+{
+  if(vArr.length < 6 || vArr[0] != "selectnumbers" || (params && params.length))
+    return undefined;
+
+  var min = parseFloat(vArr[1]);
+  var stp = parseFloat(vArr[2]);
+  var max = parseFloat(vArr[3]);
+  var dp  = parseFloat(vArr[4]); // decimal points
+  var fun = vArr[5]; // function
+
+  if(currVal != undefined)
+    currVal = currVal.replace(/[^\d.\-]/g, "");
+    currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
+  if(max==min)
+    return undefined;
+  if(!(fun == "lin" || fun == "log10"))
+    return undefined;
+      
+  if(currVal < min) 
+    currVal = min;
+  if(currVal > max) 
+    currVal = max;
+
+  var newEl = document.createElement('select');
+  var vHash = {};
+  var k = 0;
+  var v = 0;
+  if (fun == "lin") {
+    for(var j=min; j <= max; j+=stp) {
+      var o = document.createElement('option');
+      o.text = o.value = j.toFixed(dp);
+      vHash[j.toString()] = 1;
+      newEl.options[k] = o;
+      k++;
+    }
+  } else if (fun == "log10") {
+    if(min <= 0 || max <= 0)
+      return undefined;
+    for(var j=Math.log10(min); j <= Math.log10(max)+stp; j+=stp) {
+      var o = document.createElement('option');
+      var w = Math.pow(10, j)
+      if (w > max)
+        w = max;
+      if (v == w.toFixed(dp))
+        continue;
+      v = w.toFixed(dp);
+      o.text = o.value = v;
+      vHash[v] = 1;
+      newEl.options[k] = o;
+      k++;
+    }
+  }
+  if(currVal)
+    $(newEl).val(currVal.toFixed(dp));
   if(elName)
     $(newEl).attr('name', elName);
   if(cmd)

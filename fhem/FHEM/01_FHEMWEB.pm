@@ -3965,6 +3965,15 @@ FW_widgetOverride($$)
             given to select the switching value. see examples below.
             the result is a space separeted list of uzsuTimerEntry results.</li>
 
+          <li>if the modifier is of the form
+            ":selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+            digits after decimal point&gt;,lin|log10",a select widget is
+            generated with values from min to max with step.<br>
+            lin generates a constantly increasing series.  log10 generates an
+            exponentially increasing series to base 10, step is related to the
+            exponent, e.g. 0.0625.
+          </li>
+
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If this attribute is specified for a FHEMWEB instance, then it is
@@ -4756,6 +4765,17 @@ FW_widgetOverride($$)
             Das Ergebiss ist eine durch leerzeichen getrennte Liste von
             uzsuTimerEntry Ergebnissen.</li>
             
+          <li>Ist der Modifier in der Form
+            ":selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+            digits after decimal point&gt;,lin|log10", so wird ein in
+            Select-Widget mit einer Zahlenreihe vom Wert min bis Wert max mit
+            Schritten von step angezeigt.<br>
+
+            Die Angabe lin erzeugt eine konstant ansteigende Reihe.  Die Angabe
+            log10 erzeugt eine exponentiell ansteigende Reihe zur Basis 10,
+            step bezieht sich auf den Exponenten, z.B. 0.0625.
+          </li>
+
           <li>In allen anderen F&auml;llen (oder falls der Modifier explizit
             mit :select anfaegt) erscheint ein HTML select mit allen Modifier
             Werten.</li>
