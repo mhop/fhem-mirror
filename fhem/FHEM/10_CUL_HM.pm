@@ -1088,7 +1088,6 @@ sub CUL_HM_Parse($$) {#########################################################
                                    $mh{dst}));
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    Log 1,"General ###111### CUL_HM Unknown device $sname is now defined";
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
     $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
@@ -3126,13 +3125,10 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
 
   elsif($mhp->{mTp} eq "00"){######################################
-    Log 1,"General ############parseme";
     if ($devHlpr->{supp_Pair_Rep}){# repeated  # Change noansi, don`t let the user press pair button forever if first pair try failed
       $devHlpr->{supp_Pair_Rep} = 0; # noansi: reset flag, suppress only once not to lockup if device answer is not received
-    Log 1,"General ############parseme no more";
       return "done";  # suppress handling of a repeated pair request
     }
-    Log 1,"General ############parseme 2";
     $devHlpr->{supp_Pair_Rep} = 1; # noansi: suppress next handling of a repeated pair request (if nothing else arrives in between from device)
 
     my $paired = 0; #internal flag
@@ -3143,7 +3139,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $ioOwn = InternalVal($ioN,"owner_CCU","");
     my $hmPair = InternalVal($ioN,"hmPair"      ,InternalVal($ioOwn,"hmPair"      ,0 ));
     my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",""));
-    Log 1,"General ############parseme 3 :$ioOwn:$hmPair:$hmPser";
     if ( $hmPair ){# pairing is active
       if (!$hmPser || $hmPser eq ReadingsVal($mhp->{devN},"D-serialNr","")){
 
@@ -3151,10 +3146,6 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $ioId = CUL_HM_h2IoId($ioHash);
         # pair now
         Log3 $mhp->{devH},3, "CUL_HM pair: $mhp->{devN} "
-                      ."$attr{$mhp->{devN}}{subType}, "
-                      ."model $attr{$mhp->{devN}}{model} "
-                      ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
-        Log 1,"General######CUL_HM pair: $mhp->{devN} "
                       ."$attr{$mhp->{devN}}{subType}, "
                       ."model $attr{$mhp->{devN}}{model} "
                       ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
