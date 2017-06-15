@@ -101,7 +101,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0013" => {name=>"HM-LC-DIM1L-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
  ,"0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"0016" => {name=>"HM-LC-DIM2L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
+ ,"0016" => {name=>"HM-LC-DIM2L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2",}
  ,"0018" => {name=>"CMM"                     ,st=>'remote'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
  ,"0019" => {name=>"HM-SEC-KEY"              ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",}
  ,"001A" => {name=>"HM-RC-P1"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}
@@ -119,7 +119,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"002B" => {name=>"HM-WS550Tech"            ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",}
  ,"002C" => {name=>"KS550TECH"               ,alias=>"HM-WDS100-C6-O"}
  ,"002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
+ ,"002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2",}
  ,"002F" => {name=>"HM-SEC-SC"               ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",} # remove wakeup - need retest
  ,"0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",} # remove wakeup - need retest
  ,"0031" => {name=>"HM-WS550LCB"             ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",} 
@@ -174,20 +174,20 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0064" => {name=>"DORMA_atent"             ,st=>''                  ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:3",} # DORMA Remote 3 buttons
  ,"0065" => {name=>"DORMA_BRC-H"             ,st=>'singleButton'      ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:4",} # Dorma Remote 4 single buttons
  ,"0066" => {name=>"HM-LC-SW4-WM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
  ,"006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",}
  ,"006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'p,1'          ,chn=>"Led:1:16",}
- ,"006E" => {name=>"HM-LC-Dim1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"006F" => {name=>"HM-LC-Dim1L-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"0070" => {name=>"HM-LC-Dim2L-SM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
- ,"0071" => {name=>"HM-LC-Dim1T-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"0072" => {name=>"HM-LC-Dim1T-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"0073" => {name=>"HM-LC-Dim1T-FM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
+ ,"006E" => {name=>"HM-LC-Dim1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"006F" => {name=>"HM-LC-Dim1L-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0070" => {name=>"HM-LC-Dim2L-SM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}#
+ ,"0071" => {name=>"HM-LC-Dim1T-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0072" => {name=>"HM-LC-Dim1T-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0073" => {name=>"HM-LC-Dim1T-FM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim_V:3:4,Dim2_V:5:6",}#
  ,"0075" => {name=>"HM-OU-CFM-PL"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
  ,"0076" => {name=>"HM-Sys-sRP-Pl"           ,st=>'repeater'          ,cyc=>''      ,rxt=>''       ,lst=>'p,2'          ,chn=>"",} # repeater
  ,"0078" => {name=>"HM-Dis-TD-T"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",} #
@@ -207,7 +207,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0087" => {name=>"Schueco_263-147"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled blind actuator 1-channel (flush-mount)
  ,"0088" => {name=>"Schueco_263-132"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer L (ceiling voids)
  ,"0089" => {name=>"Schueco_263-134"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer T (ceiling voids)
- ,"008A" => {name=>"Schueco_263-133"         ,alias=>"HM-LC-Dim1TPBU-FM"}                                                            # 1 channel dimmer TPBU (flush mount)
+ ,"008A" => {name=>"Schueco_263-133"         ,alias=>"HM-LC-Dim1TPBU-FM"}                                                           # 1 channel dimmer TPBU (flush mount)
  ,"008B" => {name=>"Schueco_263-130"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
  ,"008C" => {name=>"Schueco_263-131"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
  ,"008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}  # HM Push Button 2
@@ -243,14 +243,14 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
  ,"00B1" => {name=>"HM-SEC-SC-2"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00B2" => {name=>"HM-SEC-WDS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}
- ,"00B3" => {name=>"HM-LC-Dim1L-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"00B4" => {name=>"HM-LC-Dim1T-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"00B3" => {name=>"HM-LC-Dim1L-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"00B4" => {name=>"HM-LC-Dim1T-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"00B5" => {name=>"HM-LC-Dim1PWM-CV-2"      ,alias=>"HM-LC-Dim1PWM-CV"}
  ,"00B6" => {name=>"HM-LC-Dim1TPBU-FM-2"     ,alias=>"HM-LC-Dim1TPBU-FM"}
- ,"00B7" => {name=>"HM-LC-Dim1L-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"00B8" => {name=>"HM-LC-Dim2L-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
- ,"00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"00B7" => {name=>"HM-LC-Dim1L-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"00B8" => {name=>"HM-LC-Dim2L-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}#
+ ,"00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
  ,"00BC" => {name=>"HM-WDS40-TH-I-2"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",} #:w  todo should be wakeup, does not react
  ,"00BD" => {name=>"HM-CC-RT-DN-BoM"         ,alias=>"HM-CC-RT-DN"}
@@ -317,10 +317,13 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0101" => {name=>"HM-LC-Sw2PBU-FM"         ,alias=>"HM-LC-Sw2-FM-2"}
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
  ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw1-Pl-3" }
- ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim1_V:2:3"}
- ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"0104" => {name=>"HM-LC-AO-SM"             ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
+ ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0106" => {name=>"HM-MOD-EM-8Bit"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
  ,"0107" => {name=>"HM-LC-Ja1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"0108" => {name=>"HM-DW"                   ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Bright:1:1,Col:2:2,Bright_V1:3:3,Col_V2:4:4,Bright_V2:5:5,Col_V2:6:6",}
+ ,"0109" => {name=>"HM-DW-WM"                ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
+ ,"010A" => {name=>"HM-Sen-MDIR-O-3"         ,alias=>"HM-Sen-MDIR-O-2" }
 
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
@@ -580,6 +583,9 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0    ,max=>15.5  ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"             ,lit=>{unused=>0}},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0    ,max=>7     ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{linear=>0,square=>1}},
+  charactLvlLimit =>{a=> 88.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{halfConst=>0,max=>1}},
+  charactColAssign=>{a=> 88.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{warm=>0,cold=>1}},
+  charactBase     =>{a=> 88.4,s=>0.4,l=>1,min=>0    ,max=>2     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{crossfade=>0,dim2warm=>1,dim2hot=>2}},
   logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0    ,max=>16    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
 #SCD                                                
   msgScdPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A"               ,lit=>{noMsg=>0,lvlNormal=>1}},
@@ -640,8 +646,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                             ,lit=>{off=>0,on=>1}},
   cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
   cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
-  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
-  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycBelow"},
+  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"decission level for cndTxCycAbove"},
+  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"decission level for cndTxCycBelow"},
                                                                  
   txThrHiPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680   ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
   txThrLoPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680   ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
@@ -1121,7 +1127,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 );
 
 #clones - - - - - - - - - - - - - - -
-
 $culHmRegModel{"HM-LC-SW1-PL2"}         = 
 $culHmRegModel{"HM-LC-SW1-SM"}          = 
 $culHmRegModel{"HM-LC-SW2-SM"}          = 
@@ -1173,6 +1178,8 @@ $culHmRegModel{"HM-RC-Key4-2"}          = $culHmRegModel{"HM-RC-4-2"};
 
 $culHmRegModel{"Schueco_263-131"}       =                                   #rf_s_1conf_644
 $culHmRegModel{"HM-LC-Bl1PBU-FM"}       = $culHmRegModel{"HM-LC-Sw1PBU-FM"};
+
+$culHmRegModel{"HM-DW-WM"}              = $culHmRegModel{"HM-LC-Dim1PWM-CV-2"};
 
 $culHmRegModel{"HM-SEC-WDS-2"}          = $culHmRegModel{"HM-SEC-WDS"};
 $culHmRegModel{"Roto_ZEL-STG-RM-FDK"}   = $culHmRegModel{"HM-SEC-RHS"};
@@ -1321,10 +1328,60 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,dInProp0        =>1,dInProp1        =>1,dInProp2        =>1,dInProp3        =>1
                          ,dInProp4        =>1,dInProp5        =>1,dInProp6        =>1,dInProp7        =>1
                         }
+ ,"HM-DW01"           =>{ intKeyVisib     =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1
+                         ,DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         ,confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,characteristic  =>1,localResDis     =>1
+                         ,logicCombination=>1,speedMultiply   =>1
+                         ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+                         ,DimElsActionType=>1
+                         ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+                         ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
+                        }
+ ,"HM-DW02"           =>{ characteristic  =>1,charactLvlLimit =>1,charactColAssign=>1,charactBase     =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1
+                         ,DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         ,confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,characteristic  =>1,localResDis     =>1
+                         ,logicCombination=>1,speedMultiply   =>1
+                         ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+                         ,DimElsActionType=>1
+                         ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+                         ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
+                        }
  );
  
 
 #clones - - - - - - - - - - - - - - -
+
+$culHmRegChan{"HM-DW03"}                = 
+$culHmRegChan{"HM-DW05"}                = $culHmRegChan{"HM-DW01"};
+$culHmRegChan{"HM-DW04"}                = 
+$culHmRegChan{"HM-DW06"}                = $culHmRegChan{"HM-DW02"};
 
 $culHmRegChan{"HM-Dis-EP-WM5502"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
 $culHmRegChan{"HM-Sec-Sir-WM02"}        = 
