@@ -105,7 +105,7 @@ sub Spotify_Set($$@) {
 
   return Spotify_update($hash, 1) if($cmd eq 'update');
   return Spotify_pausePlayback($hash) if($cmd eq 'pause');
-  return Spotify_resumePlayback($hash) if($cmd eq 'resume');
+  return Spotify_resumePlayback($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'resume');
   return Spotify_setVolume($hash, 1, $args[0], defined $args[1] ? join(' ', @args[1..$#args]) : undef) if ($cmd eq 'volume');
   return Spotify_skipToNext($hash) if ($cmd eq 'skipToNext' || $cmd eq 'skip' || $cmd eq 'next');
   return Spotify_skipToPrevious($hash) if ($cmd eq 'skipToPrevious' || $cmd eq 'previous' || $cmd eq 'prev');
@@ -330,12 +330,13 @@ sub Spotify_pausePlayback($) { # pause playback
 	return undef;
 }
 
-sub Spotify_resumePlayback($) { # resume playback
-	my ($hash) = @_;
+sub Spotify_resumePlayback($$) { # resume playback
+	my ($hash, $device_id) = @_;
 	my $name = $hash->{NAME};
+	$device_id = Spotify_getTargetDeviceID($hash, $device_id, 0); # resolve target device id
 	$hash->{helper}{is_playing} = 1;
 	readingsSingleUpdate($hash, 'is_playing', 1, 1);
-	Spotify_apiRequest($hash, 'me/player/play', undef, 'PUT', 0);
+	Spotify_apiRequest($hash, 'me/player/play' . (defined $device_id ? "?device_id=$device_id" : ''), undef, 'PUT', 0);
 	Log3 $name, 4, "$name: resume";
 	return undef;
 }
@@ -623,7 +624,7 @@ sub Spotify_togglePlayback($) { # toggle playback (pause if active, resume other
 	if($hash->{helper}{is_playing}) {
 		Spotify_pausePlayback($hash);
 	} else {
-		Spotify_resumePlayback($hash);
+		Spotify_resumePlayback($hash, undef);
 	}
 
 	return undef;
@@ -1049,8 +1050,8 @@ sub Spotify_isDisabled($) {
       sets the repeat mode: either <i>one</i>, <i>all</i> (meaning playlist or album) or <i>off</i>
     </li>
     <li>
-      <i>resume</i><br>
-      resumes playback
+      <i>resume [ &lt;device_id / device_name&gt; ]</i><br>
+      resumes playback (on a device)
     </li>
     <li>
       <i>seekToPosition &lt;position&gt;</i><br>
@@ -1218,8 +1219,8 @@ sub Spotify_isDisabled($) {
       setzt den Wiederholungsmodus: entweder <i>one</i>, <i>all</i> (Playlist, Album, Künstler) oder <i>off</i>
     </li>
     <li>
-      <i>resume</i><br>
-      fährt mit der Wiedergabe fort
+      <i>resume [ &lt;device_id / device_name&gt; ]</i><br>
+      fährt mit der Wiedergabe (auf einem Gerät) fort
     </li>
     <li>
       <i>seekToPosition &lt;position&gt;</i><br>
