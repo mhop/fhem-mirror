@@ -1,4 +1,7 @@
+
 # $Id$
+#
+# TODO:
 
 package main;
 
@@ -119,7 +122,10 @@ Level_Parse($$)
 {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
-
+  
+  ###$DB::single = 1;
+  
+  
   my( @bytes, $addr, $type, $distance, $temperature, $voltage );
   if( $msg =~ m/^OK LS/ ) {
     @bytes = split( ' ', substr($msg, 5) );
@@ -140,11 +146,8 @@ Level_Parse($$)
   my $rname = $rhash?$rhash->{NAME}:$raddr;
   
   if( !$modules{Level}{defptr}{$raddr} ) {    
-    Log3 $name, 3, "Level Unknown device $rname, please define it";
-
-    my $iohash = $rhash->{IODev};
-
-    return undef;
+    Log3 $name, 4, "Level: Unknown device $rname, please define it";
+    return "";
   }
 
   my @list;
