@@ -77,7 +77,7 @@
 #   cleaned up done list
 #   ATTENTION: store api key in setkey value see patch from msg576714
 #   put values in chat/chatId even if no group involved (peer will be set)
-# 2.2 2016-02-26  msgChatId with peer / api key secured / communication with TBot_List
+# 2.2 2017-02-26  msgChatId with peer / api key secured / communication with TBot_List
 
 #   cmdSend to send the result of a command as message (used for sending SVGs)
 #   add utf8Special attribute for encoding before send
@@ -96,7 +96,7 @@
 #   reduce utf8 handling
 #   add favorite hidden zusatz
 #   favorite keyboard 2 column #msg609128
-# 2.3 2016-03-27  utf8Special for unicode issues / favorite handling / hidden favorites
+# 2.3 2017-03-27  utf8Special for unicode issues / favorite handling / hidden favorites
 
 #   doc: favorites2Col for 2 columns favorites keyboard
 #   fix: aliasExec can be undefined - avoid error
@@ -109,13 +109,13 @@
 #   remove old inline favorites dialog on execution of commands
 #   allow execution of hidden favorites from inline menu
 #   Debug/log cleanup
-# 2.4 2016-05-25  favorites rework - inline / allow : in inline 
+# 2.4 2017-05-25  favorites rework - inline / allow : in inline 
 
 #   fix: options remove in sendit corrected: #msg641797
-  
-  
-#   
-#   
+#   DOCFIX: Double semicolon for multiple commands in favorites
+#   FIX: non-local $_ - see #msg647071
+# 2.4.1 2017-06-16  minor fixes - #msg641797 / #msg647071
+
 #   
 #   
 #   
@@ -3240,6 +3240,7 @@ sub TelegramBot_MsgForLog($;$) {
 #  
 sub TelegramBot_BinaryFileRead($$) {
   my ($hash, $fileName) = @_;
+  my $_;
 
   return '' if ( ! (-e $fileName) );
   
@@ -3484,7 +3485,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
     NOTE: It is advised to set cmdRestrictedPeer for restricting access to this feature!<br>
         Example: If this attribute is set to a value of <code>favorite</code> a message of <code>favorite</code> to the bot will return a list of defined favorite commands and their index number. In the same case the message <code>favorite &lt;n&gt;</code> (with n being a number) would execute the command that is the n-th command in the favorites list. The result of the command will be returned as in other command executions. 
     </li> 
-    <li><code>favorites &lt;list of commands&gt;</code><br>Specify a list of favorite commands for Fhem (without cmdKeyword). Multiple commands are separated by semicolon (;). This also means that only simple commands (without embedded semicolon) can be defined. <br>
+    <li><code>favorites &lt;list of commands&gt;</code><br>Specify a list of favorite commands for Fhem (without cmdKeyword). Multiple favorites  are separated by a single semicolon (;). A double semicolon can be used to specify multiple commands for a single favorite <br>
     <br>
     Favorite commands are fhem commands with an optional alias for the command given. The alias can be sent as message (instead of the favoriteCmd) to execute the command. Before the favorite command also an alias (other shortcut for the favorite) or/and a descriptive text (enclosed in []) can be specifed. If alias or description is specified this needs to be prefixed with a '/' and the alias if given needs to be specified first.
     <br>
