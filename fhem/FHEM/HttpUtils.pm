@@ -9,6 +9,7 @@ use MIME::Base64;
 use Digest::MD5 qw(md5_hex);
 use vars qw($SSL_ERROR);
 
+# Note: video does not work for every browser (Forum #73214)
 my %ext2MIMEType= qw{
   bmp   image/bmp
   css   text/css
@@ -17,6 +18,7 @@ my %ext2MIMEType= qw{
   ico   image/x-icon
   jpg   image/jpeg
   js    text/javascript
+  mp4   video/mp4
   pdf   application/pdf
   png   image/png
   svg   image/svg+xml
