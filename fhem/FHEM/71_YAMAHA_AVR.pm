@@ -1115,17 +1115,19 @@ YAMAHA_AVR_Undefine($$)
 # following option values can be used to control the execution of the command:
 #
 #   {
-#      unless_in_queue => don't insert the command if an equivalent command already exists in the queue. (flag: 0,1 - default: 0)
-#      priority        => integer value of priority. lower values will be executed before higher values in the appropriate order. (integer value - default value: 3)
-#      at_first        => insert the command at the beginning of the queue, not at the end. (flag: 0,1 - default: 0)
-#      not_before      => don't execute the command before the given Unix timestamp is reached (integer/float value)
-#      can_fail        => the request can return an error. If this flag is set, don't treat this as an communication error, ignore it instead. (flag: 0,1 - default: 0)
-#      no_playinfo     => (only relevant for "statusRequest basicStatus") - don't retrieve extended playback information, after receiving a successful response (flag: 0,1 - default: 0)
-#      init            => (only relevant for navigateListMenu) - marks the initial request to obtain the current menu level (flag: 0,1 - default: 0)
-#      last_layer      => (only relevant for navigateListMenu) - the menu layer that was reached within the last request (integer value)
-#      item_selected   => (only relevant for navigateListMenu) - is set, when the final item is going to be selected with the current request. (flag: 0,1 - default: 0)
-#      volume_target   => (only relevant for volume) - the target volume, that should be reached by smoothing. (float value)
-#      volume_diff     => (only relevant for volume) - the volume difference between each step to reach the target volume (float value)
+#      unless_in_queue     => don't insert the command if an equivalent command already exists in the queue. (flag: 0,1 - default: 0)
+#      priority            => integer value of priority. lower values will be executed before higher values in the appropriate order. (integer value - default value: 3)
+#      at_first            => insert the command at the beginning of the queue, not at the end. (flag: 0,1 - default: 0)
+#      not_before          => don't execute the command before the given Unix timestamp is reached (integer/float value)
+#      wait_after_response => wait the given number of seconds before processing further queue commands (integer/float value)
+#      can_fail            => the request can return an error. If this flag is set, don't treat this as an communication error, ignore it instead. (flag: 0,1 - default: 0)
+#      no_playinfo         => (only relevant for "statusRequest basicStatus") - don't retrieve extended playback information, after receiving a successful response (flag: 0,1 - default: 0)
+#      init                => (only relevant for navigateListMenu) - marks the initial request to obtain the current menu level (flag: 0,1 - default: 0)
+#      last_layer          => (only relevant for navigateListMenu) - the menu layer that was reached within the last request (integer value)
+#      item_selected       => (only relevant for navigateListMenu) - is set, when the final item is going to be selected with the current request. (flag: 0,1 - default: 0)
+#      volume_target       => (only relevant for volume) - the target volume, that should be reached by smoothing. (float value)
+#      volume_diff         => (only relevant for volume) - the volume difference between each step to reach the target volume (float value)
+#      input_tag           => (only relevant for "statusRequest playInfo") - contains the input tag name when requesting playInfo
 #   }
 #
 
@@ -2392,13 +2394,13 @@ sub YAMAHA_AVR_generateSurroundDecoderList($)
 
 
 #############################
-# Check if amp is one of these models: DSP-Z7, DSP-Z9, DSP-Z11, RX-Z7, RX-Z9, RX-Z11, RX-V3900, DSP-AX3900
+# Check if amp is one of these models: DSP-Z7, DSP-Z9, DSP-Z11, RX-Z7, RX-Z9, RX-Z11, RX-V2065, RX-V3900, DSP-AX3900
 # Tested models: DSP-Z7
 sub YAMAHA_AVR_isModel_DSP($)
 {
     my($hash) = @_;
     
-    if(exists($hash->{MODEL}) && (($hash->{MODEL} =~ /DSP-Z/) || ($hash->{MODEL} =~ /RX-Z/) || ($hash->{MODEL} =~ /RX-V3900/) || ($hash->{MODEL} =~ /DSP-AX3900/)))
+    if(exists($hash->{MODEL}) && (($hash->{MODEL} =~ /DSP-Z/) || ($hash->{MODEL} =~ /RX-Z/) || ($hash->{MODEL} =~ /RX-V2065/) || ($hash->{MODEL} =~ /RX-V3900/) || ($hash->{MODEL} =~ /DSP-AX3900/)))
     {
         return 1;
     }
