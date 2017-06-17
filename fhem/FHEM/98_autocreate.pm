@@ -493,7 +493,7 @@ my @usbtable = (
 
     { NAME      => "ZWDongle",
       matchList => ["cu.PL2303-0000(.*)", "cu.usbmodem(.*)",
-                    "ttyUSB(.*)", "ttyACM(.*)" ],
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)" ],
       DeviceName=> "DEVICE\@115200",
       request   => pack("H*", "01030020dc06"),   # GetStatus +ACK
       response  => "^\x06.*",
