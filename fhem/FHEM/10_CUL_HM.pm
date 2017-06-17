@@ -40,6 +40,22 @@ my $culHmBits             =\%HMConfig::culHmBits;
 my $culHmCmdFlags         =\@HMConfig::culHmCmdFlags;
 my $K_actDetID            ="000000";
 
+my %activeCmds = ( "valvePos"         => 1,"up"               => 1,"unlock"           => 1,"toggleDir"        => 1
+                  ,"toggle"           => 1 
+                  ,"tempListWed"      => 1,"tempListTue"      => 1,"tempListThu"      => 1,"tempListSun"      => 1
+                  ,"tempListSat"      => 1,"tempListMon"      => 1,"tempListFri"      => 1
+                  ,"stop"             => 1,"setRepeat"        => 1 
+                  ,"reset"            => 1,"regSet"           => 1,"regBulk"          => 1
+                  ,"press"            => 1,"postEvent"        => 1,"playTone"         => 1
+                  ,"peerIODev"        => 1,"peerChan"         => 1,"peerBulk"         => 1
+                  ,"pctSlat"          => 1,"pctLvlSlat"       => 1,"pct"              => 1,"pair"             => 1
+                  ,"open"             => 1,"on"               => 1,"old"              => 1,"off"              => 1
+                  ,"lock"             => 1,"level"            => 1,"led"              => 1
+                  ,"keydef"           => 1,"fwUpdate"         => 1,"down"             => 1
+                  ,"controlParty"     => 1,"controlManu"      => 1 
+                  ,"color"            => 1,"colProgram"       => 1,"brightCol"        => 1,"brightAuto"       => 1
+                  ,"on-till"          => 1,"on-for-timer"     => 1,"desired-temp"   => 1
+                  );
 ############################################################
 
 sub CUL_HM_Initialize($);
@@ -167,6 +183,7 @@ sub CUL_HM_Initialize($) {
                        ."rawToReadable unit "#"KFM-Sensor" only
                        ."expert:0_defReg,1_allReg,2_defReg+raw,3_allReg+raw,4_off,8_templ+default,12_templOnly,251_anything "
                        ."param "
+                       ."readOnly:0,1 "                       
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
                        ;
@@ -626,6 +643,11 @@ sub CUL_HM_Attr(@) {#################################
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
     CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
+  }
+  elsif($attrName eq "readOnly"){#[0,1]
+    if ($cmd eq "set"){
+      return "$attrName: $attrVal not allowed. Should be one of 0,1" if (int($attrVal) > 1);
+    }
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
     if ($cmd eq "set"){
@@ -4156,7 +4178,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                  $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
-
+  return "device on readonly. $cmd disabled" 
+        if($activeCmds{$cmd} && CUL_HM_getAttrInt($name,"readOnly") );
+  
   if   ($cmd eq "raw") {  #####################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
     $state = "";
@@ -10496,6 +10520,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           extert takes benefit of the implementation.
           Nevertheless  - by definition - showInternalValues overrules expert.
           </li>
+      <li><a name="#CUL_HMreadOnly">readOnly</a><br>
+          restircts commands to read od observ only.
+          </li>
       <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
           can be given to devices and shall point to a virtual CCU. As a consequence the
           CCU will take care of the assignment to the best suitable IO. It is necessary that a
@@ -11843,6 +11870,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         "expert" macht sich diese Implementierung zu Nutze.
         Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
         </li>
+      <li><a name="#CUL_HMreadOnly">readOnly</a><br>
+          beschränkt kommandos auf Lesen und Beobachten.
+          </li>
       <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
         kann an Devices vergeben werden udn zeigt auf eine virtuelle ccu. Danach wird die ccu
         beim Senden das passende IO für das Device auswählen. Es ist notwendig, dass die virtuelle ccu
@@ -12190,4 +12220,3 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 =end html_DE
 
 =cut
-
