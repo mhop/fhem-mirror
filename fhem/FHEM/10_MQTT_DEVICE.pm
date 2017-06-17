@@ -82,16 +82,22 @@ sub Define() {
 sub Set($$$@) {
   my ($hash,$name,$command,@values) = @_;
   return "Need at least one parameters" unless defined $command;
-  return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
-    if(!defined($hash->{sets}->{$command}) && @values);
   my $msgid;
-  if (@values) {
-    my $value = join " ",@values;
-    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos}, retain => $hash->{retain});
-    readingsSingleUpdate($hash,$command,$value,1);
-  } else {
-    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos}, retain => $hash->{retain});
-    readingsSingleUpdate($hash,"state",$command,1);
+  my $mark=0;
+  if($command ne '?') {
+    if(defined($hash->{publishSets}->{$command})) {
+      my $value = join " ",@values;
+      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos}, retain => $hash->{retain});
+      readingsSingleUpdate($hash,$command,$value,1);
+      $mark=1;
+    } elsif(defined($hash->{publishSets}->{""})) {
+      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos}, retain => $hash->{retain});
+      readingsSingleUpdate($hash,"state",$command,1);
+      $mark=1;
+    }
+  }
+  if(!$mark) {
+    return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
   }
   $hash->{message_ids}->{$msgid}++ if defined $msgid;
   readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
@@ -151,8 +157,19 @@ sub Attr($$$$) {
           topic    => $topic,
         };
         if ($2 eq "") {
-          foreach my $set (@values) {
-            $hash->{sets}->{$set}="";
+          if(@values) {
+            foreach my $set (@values) {
+              $hash->{sets}->{$set}="";
+              my($setname,@restvalues) = split(":",$set);
+              if(@restvalues) {
+                $hash->{publishSets}->{$setname} = {
+                  'values' => \@restvalues,
+                  topic    => $topic,
+                };
+              }
+            }
+          } else {
+            $hash->{sets}->{""}="";
           }
         } else {
           $hash->{sets}->{$2}=join(",",@values);

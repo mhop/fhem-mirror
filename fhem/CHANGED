@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 10_MQTT_DEVICE.pm: publishSet patch (Forum #msg648963)
   - feature: 10_MQTT_DEVICE.pm: publishSet patch (Forum #msg648596)
   - feature: 01_FHEMWEB.pm: selectnumbers widget modifier (Forum #73188)
   - feature: 98_structure.pm: add evaluateSetResult attribute (Forum #73113)
