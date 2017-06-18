@@ -50,7 +50,7 @@ sub RandomTimer_Initialize($)
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}    = "RandomTimer_Attr";
-  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond runonce:0,1 keepDeviceAlive ".
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond runonce:0,1 keepDeviceAlive forceStoptimeSameDay ".
                        $readingFnAttributes;
 }
 ########################################################################
@@ -385,8 +385,11 @@ sub RandomTimer_stopZeitErmitteln  ($$) {
    } else {
       $stopTime = RandomTimer_zeitBerechnen($now, $hour, $min, $sec);
    }
-   if ($hash->{helper}{startTime} > $stopTime) {
-      $stopTime  = RandomTimer_addDays($stopTime, 1);
+   
+   if (!AttrVal($hash->{NAME}, "forceStoptimeSameDay", 0)) {
+      if ($hash->{helper}{startTime} > $stopTime) {
+         $stopTime  = RandomTimer_addDays($stopTime, 1);
+      }
    }
    $hash->{helper}{stopTime} = $stopTime;
    $hash->{helper}{STOPTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($stopTime));
