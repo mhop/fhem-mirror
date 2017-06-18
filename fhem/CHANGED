@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  ESPEasy: added missing event command (Forum #73291)
   - bugfix:  YAMAHA_AVR: use DSP-based commands for RX-V2065
   - bugfix: 10_MQTT_DEVICE.pm: publishSet patch (Forum #msg648963)
   - feature: 10_MQTT_DEVICE.pm: publishSet patch (Forum #msg648596)

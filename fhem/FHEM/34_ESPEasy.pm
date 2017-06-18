@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.20";     # Version of this module
+my $module_version    = "1.21";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -81,7 +81,7 @@ my %ESPEasy_setCmds = (
   "pcfgpio"        => "2",
   "pcfpulse"       => "3",
   "pcflongpulse"   => "3",
-  "irsend"         => "3",
+  "irsend"         => "3",  #_P035_IRTX.ino
   "status"         => "2",
   "raw"            => "1",
   "reboot"         => "0",
@@ -103,7 +103,8 @@ my %ESPEasy_setCmds = (
   "oledframedcmd"  => "1",
   "serialsend"     => "1",  #_P020_Ser2Net.ino
   "buzzer"         => "0",
-  "inputswitchstate" => "0" # _0P001_Switch.ini
+  "inputswitchstate" => "0", # _0P001_Switch.ini
+  "event"          => "1"
 );
 
 # ------------------------------------------------------------------------------
@@ -125,10 +126,7 @@ my %ESPEasy_setCmdsUsage = (
   "pcfpulse"       => "pcfpulse <pin> <0|1|off|on> <duration>",    #missing docu
   "pcflongpulse"   => "pcflongPulse <pin> <0|1|off|on> <duration>",#missing docu
   "status"         => "status <device> <pin>",
-  #https://forum.fhem.de/index.php/topic,55728.msg480966.html#msg480966
-  "pwmfade"        => "pwmfade <pin> <target> <duration>",
-  #https://forum.fhem.de/index.php/topic,55728.msg530220.html#msg530220
-  #https://github.com/letscontrolit/ESPEasy/blob/mega/src/_P035_IRTX.ino
+  "pwmfade"        => "pwmfade <pin> <target> <duration>", #Forum #55728.msg530220
   "irsend"         => "irsend <RAW> <B32 raw code> <frequenz> <pulse length> <blank length> "
                     . "| irsend <NEC|JVC|RC5|RC6|SAMSUNG|SONY|PANASONIC> <code> <bits>",
   "raw"            => "raw <esp_comannd> <...>",
@@ -155,6 +153,7 @@ my %ESPEasy_setCmdsUsage = (
   "serialsend"     => "serialsend <string>",
   "buzzer"         => "buzzer",
   "inputswitchstate" => "inputswitchstate",
+  "event"          => "event <string>", #Forum #73291
 
   #Lights
   "rgb"            => "rgb <rrggbb> [fading time]",
