@@ -52,6 +52,7 @@ sub MQTT_Initialize($) {
   # Consumer
   $hash->{DefFn}    = "MQTT::Define";
   $hash->{UndefFn}  = "MQTT::Undef";
+  $hash->{DeleteFn} = "MQTT::Delete";
   $hash->{SetFn}    = "MQTT::Set";
   $hash->{NotifyFn} = "MQTT::Notify";
 
@@ -118,10 +119,14 @@ sub Define($$) {
   }
 }
 
-sub Undef($) {
-  my $hash = shift;
+sub Undef($$) {
+  my ($hash, $name) = @_;
   Stop($hash);
-  my $name = $hash->{NAME};
+  return undef;
+}
+
+sub Delete($$) {
+  my ($hash, $name) = @_;
   setKeyValue($name."_user",undef);
   setKeyValue($name."_pass",undef);
   return undef;
