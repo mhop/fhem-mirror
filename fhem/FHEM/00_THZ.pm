@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2017
-my $thzversion = "0.159";
+my $thzversion = "0.160";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -287,9 +287,10 @@ my %parsinghash = (
 
 my %sets439technician =(
 #  "zResetLast10errors"			=> {cmd2=>"D1",     argMin =>   "0", argMax =>  "0",	type =>"0clean",  unit =>""},
+#  "zPassiveCoolingtrigger"	=> {cmd2=>"0A0597", argMin =>   "0", argMax =>  "50",	type =>"1clean",  unit =>""},
   "zPumpHC"				=> {cmd2=>"0A0052", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""},  
-  "zPumpDHW"				=> {cmd2=>"0A0056", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""}  
-);
+  "zPumpDHW"				=> {cmd2=>"0A0056", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""}
+ );
 
 
 
@@ -969,7 +970,7 @@ sub THZ_Set($@){
   $cmdHex2=THZ_encodecommand($msg,"set");
   ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
   #$err=undef;
-  if (defined($err))  { return ($cmdHex2 . "-". $msg ."--" . $err);}
+  if (defined($err))  {  Log3 $hash->{NAME}, 3, "THZ_Set: Error msg:  $err -- $cmdHex2 -> $msg"; return($cmdHex2 . "-". $msg ."--" . $err);}
   else {
 	select(undef, undef, undef, 0.25);
 	$msg=THZ_Get($hash, $name, $cmd);
@@ -1061,10 +1062,10 @@ sub THZ_Get($@){
   else { 
       my $cmdHex2 = $cmdhash->{cmd2};
       if(defined($cmdHex2) ) {
-          $cmdHex2=THZ_encodecommand($cmdHex2,"get");
-          ($err, $msg2) = THZ_Get_Comunication($hash,  $cmdHex2);
+          #empty
+          ($err, $msg2) = THZ_Get_Comunication($hash, THZ_encodecommand($cmdHex2,"get") );
           if (defined($err))     {
-             Log3 $hash->{NAME}, 5, "THZ_Get: Error msg2: '$err'";
+             Log3 $hash->{NAME}, 3, "THZ_Get: Error msg2:  $err -- $cmdHex2 -> $msg2";
              return ($msg2 ."\n msg2 " . $err);
           }
           $msg2 = THZ_Parse1($hash,$msg2);
@@ -1073,10 +1074,10 @@ sub THZ_Get($@){
       my $cmdHex3 = $cmdhash->{cmd3};
       if(defined($cmdHex3)) {
           my $msg3= " ";
-          $cmdHex3=THZ_encodecommand($cmdHex3,"get");
-          ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
+          #empty 
+          ($err, $msg3) = THZ_Get_Comunication($hash,  THZ_encodecommand($cmdHex3,"get"));
            if (defined($err))     {
-                 Log3 $hash->{NAME}, 5, "THZ_Get: Error msg3: '$err'";
+                Log3 $hash->{NAME}, 3, "THZ_Get: Error msg3:  $err -- $cmdHex3 -> $msg3";
                  return ($msg3 ."\n msg3 " . $err);
           }
           $msg2 = THZ_Parse1($hash,$msg3) * 1000 + $msg2  ;
@@ -1115,24 +1116,28 @@ sub THZ_Get_Comunication($$) {
   select(undef, undef, undef, 0.001);
   THZ_Write($hash,  "02"); 			# step1 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
-						#Expectedanswer1    is  "10"  DLE data link escape
-  if ($msg eq "10") 	{
+
+#Expectedanswer1    is  "10"  DLE data link escape
+
+  if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
+  else  {
      THZ_Write($hash,  $cmdHex); 		# step2 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
      ($err, $msg) = THZ_ReadAnswer($hash);
   }
-  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; select(undef, undef, undef, 0.5);}
-  if ((defined($err)))  { $err .=  " error found at step1"; select(undef, undef, undef, 0.1); return($err, $msg) ;}
-						# Expectedanswer2     is "1002",		DLE data link escape -- STX start of text    
+  
+  if ((defined($err)))  { $err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
+
+# Expectedanswer2     is "1002",		DLE data link escape -- STX start of text    
 
   if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
-  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; select(undef, undef, undef, 0.5); return($err, $msg) ;}
+  elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
   if ($msg eq "1002" || $msg eq "02") {
     THZ_Write($hash,  "10"); 		    	# step3 --> DLE data link escape  // ack datatranfer
     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
     THZ_Write($hash,  "10");  
   }
   
-  if ((defined($err)))  { $err .= " error found at step2";} 
+  if ((defined($err)))  { $err .= " THZ_Get_Com: error found at step2"; select(undef, undef, undef, 0.1);} 
   else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
   return($err, $msg) ;
 }
@@ -1155,11 +1160,11 @@ sub THZ_ReadAnswer($)
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
-	$buf = DevIo_SimpleReadWithTimeout($hash, 0.1) if(!defined($buf)) ; #added for Karl Antwort msg468515
+	my $buf = DevIo_SimpleReadWithTimeout($hash, 0.25); 
+	$buf = DevIo_SimpleReadWithTimeout($hash, 0.25) if(!defined($buf)) ; #added for Karl Antwort msg468515
 	if(!defined($buf)) {
-	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
-	  return ("InterfaceNotRespondig", "");
+	  #Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
+	  return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "");
 	}
 	
 	my $data =  uc(unpack('H*', $buf));
@@ -1178,7 +1183,7 @@ sub THZ_ReadAnswer($)
 	    }
 	  else{ $count += 5; }
 	}
-	return ("WInterface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
+	return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
@@ -1347,7 +1352,7 @@ sub THZ_decode($) {
   
   #Check if answer is NAK
   if (length($message_orig) == 2 && $message_orig eq "15") {
-    return("NAK received from device",$message_orig);
+    return("decode: NAK received from device",$message_orig);
   }
   
   #check header and if ok 0100, check checksum and return the decoded msg
@@ -1359,26 +1364,26 @@ sub THZ_decode($) {
       my $message = $1;
       return (undef, $message);
     }
-    else {return (THZ_checksum($message_orig) . "crc_error in answer", $message_orig)};
+    else {return(THZ_checksum($message_orig) . "decode: crc_error in answer", $message_orig)};
   }
   if ($header eq "0103")
   {
-    return ("command not known", $message_orig);
+    return ("decode: command not known", $message_orig);
   }
   if ($header eq "0102")
   {
-    return ("CRC error in request", $message_orig);
+    return("decode: CRC error in request", $message_orig);
   }
   if ($header eq "0104")
   {
-    return ("UNKNOWN REQUEST", $message_orig);
+    return("decode: UNKNOWN REQUEST", $message_orig);
   }
    if ($header eq "0180")
   {
-    return (undef, $message_orig);
+    return(undef, $message_orig);
   }
   
-  return ("new unknown answer " , $message_orig);
+  return("decode: new unknown answer " , $message_orig);
 }
 
 
@@ -1493,13 +1498,13 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
-  my @numbers=('0A0027', '0B011B', '0C011B', '0A02CB', '0A02CC');
+  my @numbers=('0A000C', '0A000D', '0A000E', '0A000F', '0A0014', '0A0016', '0A0125', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
   #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
   #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
  # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
-  #my @numbers = (1..3179);
+ # my @numbers = (1..3179);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
