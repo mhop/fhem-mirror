@@ -41,6 +41,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
 # 5.0.6        13.06.2017       add Aria engine to optimise_tables
 # 5.0.5        12.06.2017       bugfixes in DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
@@ -219,11 +220,12 @@ eval "use DBI;1" or my $DbRepMMDBI = "DBI";
 use DBI::Const::GetInfoType;
 use Blocking;
 use Time::Local;
+use Encode qw(encode_utf8);
 # no if $] >= 5.017011, warnings => 'experimental';  
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.1.0";
+my $DbRepVersion = "5.2.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -310,6 +312,7 @@ sub DbRep_Define($@) {
   
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
+  $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
   
   RemoveInternalTimer($hash);
   InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
@@ -2738,6 +2741,7 @@ sub insert_Push($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($err,$sth);
  
  # Background-Startzeit
@@ -2746,7 +2750,7 @@ sub insert_Push($) {
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Push");
  
  my $dbh;
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
@@ -3032,6 +3036,7 @@ sub fetchrows_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $limit      = AttrVal($name, "limit", 1000);
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($err,$dbh,$sth,$sql,$rowlist,$nrows);
  
  # Background-Startzeit
@@ -3039,14 +3044,14 @@ sub fetchrows_DoParse($) {
 
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_DoParse");
 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
      return "$name|''|''|$err|''";
  }
- 
+
  # SQL zusammenstellen für DB-Abfrage
  $sql = createSelectSql("DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP LIMIT ".($limit+1));
  
@@ -3071,8 +3076,13 @@ sub fetchrows_DoParse($) {
  my @row_array = map { $_ -> [0]." ".$_ -> [1]." ".$_ -> [2]." ".$_ -> [3]." ".$_ -> [4]."\n" } @{$sth->fetchall_arrayref()};
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
  pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
- $rowlist = join('|', @row_array);
- Log3 ($name, 5, "DbRep $name -> row_array:  @row_array");
+ 
+ if ($utf8) {
+     $rowlist = Encode::encode_utf8(join('|', @row_array));
+ } else {
+     $rowlist = join('|', @row_array);
+ }
+ Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
@@ -3172,6 +3182,7 @@ sub expfile_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($dbh,$sth,$sql);
  my $err=0;
 
@@ -3180,7 +3191,7 @@ sub expfile_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_DoParse");
 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
@@ -3190,8 +3201,8 @@ sub expfile_DoParse($) {
  }
  
  my $outfile = AttrVal($name, "expimpfile", undef);
- if (open(FH, ">$outfile")) {
-     binmode (FH);
+ if (open(FH, ">:utf8", "$outfile")) {
+     binmode (FH) if(!$utf8);
  } else {
      $err = encode_base64("could not open ".$outfile.": ".$!,"");
      return "$name|''|''|$err";
@@ -3249,7 +3260,6 @@ sub expfile_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Funktion expfile
 ####################################################################################################
-
 sub expfile_ParseDone($) {
   my ($string) = @_;
   my @a          = split("\\|",$string);
@@ -3298,7 +3308,6 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Funktion impfile
 ####################################################################################################
-
 sub impfile_Push($) {
  my ($name) = @_;
  my $hash       = $defs{$name};
@@ -3308,6 +3317,7 @@ sub impfile_Push($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbmodel    = $hash->{dbloghash}{DBMODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $err=0;
  my $sth;
 
@@ -3317,7 +3327,7 @@ sub impfile_Push($) {
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_Push");
 
  my $dbh;
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
@@ -3330,8 +3340,8 @@ sub impfile_Push($) {
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
  
  my $infile = AttrVal($name, "expimpfile", undef);
- if (open(FH, "$infile")) {
-     binmode (FH);
+ if (open(FH, "<:utf8", "$infile")) {
+     binmode (FH) if(!$utf8);
  } else {
      $err = encode_base64("could not open ".$infile.": ".$!,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
@@ -3730,6 +3740,7 @@ sub dbmeta_DoParse($) {
  my $dblogname   = $dbloghash->{NAME};
  my $dbpassword  = $attr{"sec$dblogname"}{secret};
  my $dbmodel     = $dbloghash->{DBMODEL};
+ my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($dbh,$sth,$sql);
  my $err;
 
@@ -3738,7 +3749,7 @@ sub dbmeta_DoParse($) {
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_DoParse");
  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
@@ -3874,6 +3885,9 @@ sub dbmeta_DoParse($) {
              Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
          } else {
+		     if($utf8) {
+                 $info = Encode::encode_utf8($info) if($info);
+			 }
              push(@row_array, $key." ".$info) if($key =~ m/($param)/i);
          }
      }
