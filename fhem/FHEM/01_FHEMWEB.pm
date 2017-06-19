@@ -1864,7 +1864,7 @@ FW_parseColumns($)
   foreach my $roomgroup (split("[ \t\r\n]+", AttrVal($FW_wname,"column",""))) {
     my ($room, $groupcolumn)=split(":",$roomgroup,2);
     $room =~ s/%20/ /g; # Space
-    next if(!defined($groupcolumn) || $FW_room !~ m/$room/);
+    next if(!defined($groupcolumn) || $FW_room !~ m/^$room$/);
     $colNo = 1;
     my @grouplist = keys %$aGroup;
     my %handled;
