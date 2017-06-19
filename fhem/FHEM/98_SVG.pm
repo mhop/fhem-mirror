@@ -68,6 +68,7 @@ SVG_Initialize($)
     nrAxis
     plotWeekStartDay:0,1,2,3,4,5,6
     plotfunction
+    plotmode
     plotsize
     plotReplace:textField-long
     startDate
