@@ -334,7 +334,7 @@ doUpdate($$$$)
    
       my $isExcl;
       foreach my $ex (@excl) {
-        $isExcl = 1 if($fName =~ m/$ex/);
+        $isExcl = 1 if($fName =~ m/$ex/ || "$src:$fName" =~ m/$ex/);
       }
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
@@ -733,6 +733,9 @@ upd_initRestoreDirs($)
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm FS20.off.png
         </ul>
+        The regexp is checked against the filename and the source:filename
+        combination. To exclude the updates for FILE.pm from fhem.de, as you are
+        updating it from another source, specify fhem.de.*:FILE.pm
         </li><br>
 
     <a name="restoreDirs"></a>
@@ -841,6 +844,11 @@ upd_initRestoreDirs($)
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot 
         </ul>
+        Der Regexp wird gegen den Dateinamen und gegen Quelle:Dateiname
+        gepr&uuml;ft. Um die Datei FILE.pm von updates von fhem.de
+        auszuschlie&szlig;en, weil sie von einer anderen Quelle bezogen wird,
+        kann man fhem.de.*:FILE.pm spezifizieren.
+
         </li><br>
 
     <li><a href="#restoreDirs">restoreDirs</a>
