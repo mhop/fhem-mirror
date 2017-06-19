@@ -18,7 +18,7 @@ FB_doCheckPW($$$)
   my $data = GetFileFromURL("http://$host/login_sid.lua", undef, undef, 1);
   return undef if(!$data);
 
-  my $chl;
+  my $chl="";
   $chl = $1 if($data =~ /<Challenge>(\w+)<\/Challenge>/i);
   my $chlAnsw .= "$chl-$pw";
   $chlAnsw =~ s/(.)/$1.chr(0)/eg; # works probably only with ascii
