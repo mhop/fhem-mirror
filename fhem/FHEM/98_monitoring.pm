@@ -268,6 +268,8 @@ sub monitoring_Notify($$) {
 
   my $events = deviceEvents($dev_hash, AttrVal($SELF, "addStateEvent", 0));
 
+  return unless($events);
+
   if($name eq "global" && "INITIALIZED" =~ m/@{$events}/){
     monitoring_setActive($hash);
 
@@ -297,6 +299,8 @@ sub monitoring_Notify($$) {
   return if(@whitelist && !(grep(/$name/, @whitelist)));
 
   foreach my $event (@{$events}){
+    next unless($event);
+
     my $addMatch = "$name:$event" =~ $addRegex;
     my $removeMatch = $removeRegex ? "$name:$event" =~ $removeRegex : 0;
 
