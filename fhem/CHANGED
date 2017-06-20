@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: new set commands / readings to control HDMI outputs
+             (only for models with two HDMI outputs)
   - featere: exclude_from_update can check the source too (Forum #73275)
   - change:  93_DbRep: V5.2.0, preparation for UTF-8 support by DbLog 
   - bugfix:  36_Vallox: Changed read. Added attributes. Changed DeviceID.

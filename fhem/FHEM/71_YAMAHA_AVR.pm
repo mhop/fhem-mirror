@@ -241,6 +241,12 @@ YAMAHA_AVR_GetStatus($;$)
         }
     }
     
+    # check hdmi output state, if supported
+    if($hash->{ACTIVE_ZONE} eq "mainzone" and $hash->{helper}{SUPPORT_HDMI_OUT})
+    {
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Sound_Video><HDMI><Output><OUT_1>GetParam</OUT_1></Output></HDMI></Sound_Video></System></YAMAHA_AV>", "statusRequest", "hdmiOut1", {options => {can_fail => 1}});
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Sound_Video><HDMI><Output><OUT_2>GetParam</OUT_2></Output></HDMI></Sound_Video></System></YAMAHA_AV>", "statusRequest", "hdmiOut2", {options => {can_fail => 1}});
+    }
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
@@ -324,7 +330,8 @@ YAMAHA_AVR_Set($@)
                                                             (exists($hash->{helper}{SURROUND_DECODERS}) ? "surroundDecoder:".$decoders_comma." " : "").
                                                             ($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} ? "displayBrightness:slider,-4,1,0 " : "").
                                                             (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "").
-                                                            "enhancer:on,off "
+                                                            "enhancer:on,off ".
+                                                            ($hash->{helper}{SUPPORT_HDMI_OUT} ? "hdmiOut1:on,off hdmiOut2:on,off " : "")
                                                           :"").
                                                           (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? 
                                                             "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
@@ -339,6 +346,7 @@ YAMAHA_AVR_Set($@)
                                                           ($hash->{helper}{SUPPORT_PARTY_MODE} ? "partyMode:on,off " : "").
                                                           ($hash->{helper}{SUPPORT_EXTRA_BASS} ? "extraBass:off,auto " : "").
                                                           ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? "ypaoVolume:off,auto " : "").
+                                                          
                                                           "tunerFrequency ".
                                                           "displayBrightness:slider,-4,1,0 ".
                                                           "statusRequest:noArg";
@@ -996,35 +1004,64 @@ YAMAHA_AVR_Set($@)
     }
     elsif($what eq "ypaoVolume" and defined($a[2]))
     {
-         if($a[2] eq "auto")
-         {
-             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><YPAO_Volume>Auto</YPAO_Volume></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
-         }
-         elsif($a[2] eq "off")
-         {
-             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><YPAO_Volume>Off</YPAO_Volume></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
-         }
-         else
-         {
-             return $usage;
-         }
+        if($a[2] eq "auto")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><YPAO_Volume>Auto</YPAO_Volume></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><YPAO_Volume>Off</YPAO_Volume></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
     }
     elsif($what eq "extraBass" and defined($a[2]))
     {
-         if($a[2] eq "auto")
-         {
-             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Extra_Bass>Auto</Extra_Bass></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
-         }
-         elsif($a[2] eq "off")
-         {
-             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Extra_Bass>Off</Extra_Bass></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
-         }
-         else
-         {
-             return $usage;
-         }
+        if($a[2] eq "auto")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Extra_Bass>Auto</Extra_Bass></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Extra_Bass>Off</Extra_Bass></Sound_Video></$zone></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
     }
-    
+    elsif($what eq "hdmiOut1" and defined($a[2]))
+    {
+        if($a[2] eq "on")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Sound_Video><HDMI><Output><OUT_1>On</OUT_1></Output></HDMI></Sound_Video></System></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Sound_Video><HDMI><Output><OUT_1>Off</OUT_1></Output></HDMI></Sound_Video></System></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
+    }
+    elsif($what eq "hdmiOut2" and defined($a[2]))
+    {
+        if($a[2] eq "on")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Sound_Video><HDMI><Output><OUT_2>On</OUT_2></Output></HDMI></Sound_Video></System></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Sound_Video><HDMI><Output><OUT_2>Off</OUT_2></Output></HDMI></Sound_Video></System></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
+    }
     elsif($what eq "statusRequest")
     {
         YAMAHA_AVR_GetStatus($hash, 1);
@@ -1387,6 +1424,10 @@ YAMAHA_AVR_ParseResponse($$$)
             elsif($arg eq "displayBrightness")
             {
                 $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} = 0;
+            }
+            elsif($arg eq "hdmiOut1" or $arg eq "hdmiOut2")
+            {
+                $hash->{helper}{SUPPORT_HDMI_OUT} = 0;
             }
         }
     }
@@ -1802,6 +1843,10 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
                 }
+                elsif($data =~ /<Meta_Info>.*?<Track>(.+?)<\/Track>.*?<\/Meta_Info>/)
+                {
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                }
                 elsif($data =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<\/Meta_Info>/)    
                 {        
                     my $tmp = $1;
@@ -1908,6 +1953,28 @@ YAMAHA_AVR_ParseResponse($$$)
                 elsif($data =~ /RC="2"/) # is not supported by this specific model
                 {
                     $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} = 0;
+                }
+            }
+            elsif($arg eq "hdmiOut1")
+            {
+                if($data =~ /<OUT_1>(.+?)<\/OUT_1>/)
+                {
+                    readingsBulkUpdate($hash, "hdmiOut1", lc($1));
+                }
+                elsif($data =~ /RC="2"/) # is not supported by this specific model
+                {
+                    $hash->{helper}{SUPPORT_HDMI_OUT} = 0;
+                }
+            }
+            elsif($arg eq "hdmiOut2")
+            {
+                if($data =~ /<OUT_2>(.+?)<\/OUT_2>/)
+                {
+                    readingsBulkUpdate($hash, "hdmiOut2", lc($1));
+                }
+                elsif($data =~ /RC="2"/) # is not supported by this specific model
+                {
+                    $hash->{helper}{SUPPORT_HDMI_OUT} = 0;
                 }
             }
         }
@@ -2067,7 +2134,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam</Play_Info></Tuner></YAMAHA_AV>", "statusRequest", "tunerFrequency");
             }
         }
-        
+       
         readingsEndUpdate($hash, 1);  
         
         YAMAHA_AVR_GetStatus($hash, 1) unless($cmd =~ /^statusRequest|navigateListMenu|volume|input|tuner.+$/);
@@ -2244,6 +2311,10 @@ YAMAHA_AVR_ParseXML($$$)
                                             "Surround Decoder";
         }
     }
+    
+
+    # check for hdmi output command
+    $hash->{helper}{SUPPORT_HDMI_OUT} = ($data =~ /<Menu Func_Ex="HDMI_Out" Title_1="HDMI OUT">/ ? 1 : 0);
     
     # uncomment line for zone detection testing
     #
@@ -2504,6 +2575,8 @@ sub YAMAHA_AVR_isModel_DSP($)
 <li><b>volumeStraight</b> -80...15 [direct] &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in decibel. If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
 <li><b>volumeUp</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute volumeSteps (optional the increasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
 <li><b>volumeDown</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute volumeSteps (optional the decreasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
+<li><b>hdmiOut1</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the HDMI output 1</li>
+<li><b>hdmiOut2</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the HDMI output 2</li>
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
 <li><b>bass</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set bass tone level in decibel</li>
 <li><b>treble</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set treble tone level in decibel</li>
@@ -2671,6 +2744,8 @@ So here are some examples:
   <li><b>extraBass</b> - The status of the extra bass (can be "auto" or "off", only available if supported by the device)</li>
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
   <li><b>inputName</b> - The input description as seen on the receiver display</li>
+  <li><b>hdmiOut1</b> - The status of the HDMI output 1 (can be "on" or "off")</li>
+  <li><b>hdmiOut2</b> - The status of the HDMI output 2 (can be "on" or "off")</li>
   <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
   <li><b>newFirmware</b> - indicates if a firmware update is available (can be "available" or "unavailable"; only available for RX-Vx71, RX-Vx73, RX-Ax10 or RX-Ax20)</li>
   <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
@@ -2802,6 +2877,8 @@ So here are some examples:
 <li><b>presetDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt das vorherige Preset f&uuml;r den aktuellen Eingang aus.</li>
 <li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
+<li><b>hdmiOut1</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Ausgabe via HDMI Ausgang 1</li>
+<li><b>hdmiOut2</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Ausgabe via HDMI Ausgang 2</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>surroundDecoder</b> dolbypl,... &nbsp;&nbsp;-&nbsp;&nbsp; Setzt den Surround Decoder, welcher genutzt werden soll sofern der DSP Modus "Surround Decoder" aktiv ist.</li>
 <li><b>volume</b> 0...100  [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
@@ -2961,6 +3038,8 @@ Ein paar Beispiele:
   <li><b>extraBass</b> - Der Status des Extra Bass ("auto" =&gt; an, "off" =&gt; aus)</li>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
   <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
+  <li><b>hdmiOut1</b> - Der Status des HDMI Ausgang 1 ("on" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>hdmiOut2</b> - Der Status des HDMI Ausgang 2 ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>mute</b> - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
   <li><b>newFirmware</b> - Zeigt an, ob eine neue Firmware zum installieren bereit liegt ("available" =&gt; neue Firmware verf&uuml;gbar, "unavailable" =&gt; keine neue Firmware verf&uuml;gbar; Event wird nur generiert f&uuml;r RX-Vx71, RX-Vx73, RX-Ax10 oder RX-Ax20)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" =&gt; an, "off" =&gt; aus)</li>
