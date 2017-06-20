@@ -67,7 +67,7 @@ sub new {
 	$reuseport = 0 if (!defined($reuseport));
 
 	# Create the socket on which search requests go out
-    $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp', LocalPort => $searchPort) || croak("Error creating search socket: $!\n");
+    $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp', LocalPort => $searchPort) || carp("Error creating search socket: $!\n");
 	setsockopt($self->{_searchSocket}, 
 			   IP_LEVEL,
 			   IP_MULTICAST_TTL,
@@ -76,7 +76,7 @@ sub new {
 
 	# Create the socket on which we'll listen for events to which we are
 	# subscribed.
-    $self->{_subscriptionSocket} = HTTP::Daemon->new(LocalPort => $subscriptionPort, Reuse=>1, Listen=>20) || croak("Error creating subscription socket: $!\n");
+    $self->{_subscriptionSocket} = HTTP::Daemon->new(LocalPort => $subscriptionPort, Reuse=>1, Listen=>20) || carp("Error creating subscription socket: $!\n");
 	$self->{_subscriptionURL} = $args{SubscriptionURL} || DEFAULT_SUBSCRIPTION_URL;
 	$self->{_subscriptionPort} = $self->{_subscriptionSocket}->sockport();;
 
@@ -88,18 +88,19 @@ sub new {
 														 Reuse => 1,
 														 ReusePort => $reuseport,
 														 LocalPort => SSDP_PORT) ||
-		carp("Error creating SSDP multicast listen socket: $!\n");
+		croak("Error creating SSDP multicast listen socket: $!\n");
 	};
 	if ($@ =~ /Your vendor has not defined Socket macro SO_REUSEPORT/i) {
 		$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
 														 Proto => 'udp',
 														 Reuse => 1,
 														 LocalPort => SSDP_PORT) ||
-		carp("Error creating SSDP multicast listen socket: $!\n");
-	} else {
+		croak("Error creating SSDP multicast listen socket: $!\n");
+	} elsif($@) {
 		# Weiterwerfen...
-		carp($@);
+		croak($@);
 	}
+	
 	my $ip_mreq = inet_aton(SSDP_IP) . INADDR_ANY;
 	setsockopt($self->{_ssdpMulticastSocket}, 
 			   IP_LEVEL,
@@ -768,7 +769,7 @@ sub unsubscribe {
 	}
 	else {
 		if ($response->code != 412) {
-			croak("Unsubscription request failed with error: " . 
+			carp("Unsubscription request failed with error: " . 
 				 $response->code . " " . $response->message);
 		}
 	}
@@ -1070,7 +1071,7 @@ sub renew {
 		$self->{_startTime} = Time::HiRes::time();
 	}
 	else {
-		croak("Renewal of subscription failed with error: " . 
+		carp("Renewal of subscription failed with error: " . 
 			 $response->code . " " . $response->message);
 	}
 	

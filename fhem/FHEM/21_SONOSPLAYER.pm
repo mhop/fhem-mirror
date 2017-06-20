@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, Mai 2017
+# SONOSPLAYER.pm (c) by Reiner Leins, Juni 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -348,11 +348,20 @@ sub SONOSPLAYER_Notify($$) {
 	my $events = deviceEvents($notifyhash, 1);
 	return if(!$events);
 	
+	my $triggerCoverTitle = 0;
+	
 	foreach my $event (@{$events}) {
 		next if(!defined($event));
 		
+		# Wenn ein CoverTitle-Trigger gesendet werden muss...
+		if ($event =~ m/^(currentAlbumArtURL|currentTrackProviderIconRoundURL|currentTrackDuration|currentTrack|numberOfTracks|currentTitle|currentArtist|currentAlbum|nextAlbumArtURL|nextTrackProviderIconRoundURL|nextTitle|nextArtist|nextAlbum|currentSender|currentSenderInfo|currentSenderCurrent|transportState):/is) {
+			SONOSPLAYER_Log $hash->{NAME}, 5, 'Notify-CoverTitle: '.$event;
+			$triggerCoverTitle = 1;
+		}
+		
+		# Wenn die Positionssimulation betroffen ist...
 		if ($event =~ m/transportState: (.+)/i) {
-			SONOSPLAYER_Log $hash->{NAME}, 5, 'Notify: '.$event;
+			SONOSPLAYER_Log $hash->{NAME}, 5, 'Notify-TransportState: '.$event;
 			if ($1 eq 'PLAYING') {
 				$hash->{helper}->{simulateCurrentTrackPosition} = AttrVal($hash->{NAME}, 'simulateCurrentTrackPosition', 0);
 				
@@ -362,10 +371,28 @@ sub SONOSPLAYER_Notify($$) {
 				$hash->{helper}->{simulateCurrentTrackPosition} = 0;
 				
 				# Einmal noch etwas später aktualisieren...
-				InternalTimer(gettimeofday() + 0.1, 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
+				InternalTimer(gettimeofday() + 1, 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
 			}
 		}
 	}
+	
+	if ($triggerCoverTitle) {
+		InternalTimer(gettimeofday(), 'SONOSPLAYER_TriggerCoverTitleLater', $notifyhash, 0);
+	}
+	
+	return undef;
+}
+
+########################################################################################
+#
+# SONOSPLAYER_TriggerCoverTitleLater - Refreshs the CoverTitle-Element later via DoTrigger
+# 
+########################################################################################
+sub SONOSPLAYER_TriggerCoverTitleLater($) {
+	my ($hash) = @_;
+	
+	my $html = SONOSPLAYER_Detail('', $hash->{NAME}, '', 0);
+	DoTrigger($hash->{NAME}, 'display_covertitle: '.$html, 1);
 	
 	return undef;
 }
@@ -383,7 +410,13 @@ sub SONOSPLAYER_SimulateCurrentTrackPosition() {
 	readingsBeginUpdate($hash);
 	
 	my $trackDurationSec = SONOS_GetTimeSeconds(ReadingsVal($hash->{NAME}, 'currentTrackDuration', 0)) - 1;
-	my $trackPositionSec = time - SONOS_GetTimeFromString(ReadingsTimestamp($hash->{NAME}, 'currentTrackPositionSec', 0)) + ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
+	
+	my $trackPositionSec = 0;
+	if (ReadingsVal($hash->{NAME}, 'transportState', 'STOPPED') eq 'PLAYING') {
+		$trackPositionSec = time - SONOS_GetTimeFromString(ReadingsTimestamp($hash->{NAME}, 'currentTrackPositionSec', 0)) + ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
+	} else {
+		$trackPositionSec = ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
+	}
 	readingsBulkUpdate($hash, 'currentTrackPositionSimulated', SONOS_ConvertSecondsToTime($trackPositionSec));
 	readingsBulkUpdate($hash, 'currentTrackPositionSimulatedSec', $trackPositionSec);
 	
