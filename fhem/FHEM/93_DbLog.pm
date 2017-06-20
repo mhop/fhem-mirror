@@ -10,12 +10,14 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-# redesigned 2017 by DS_Starter with credits by
+# redesigned 2016/2017 by DS_Starter with credits by
 # JoeAllb, DeeSpe
 #
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.17.1     17.06.2017       fix log-entries "utf8 enabled" if SVG's called, commandref revised, enable UTF8 for DbLog_get
+# 2.17.0     15.06.2017       enable UTF8 for MySQL (entry in configuration file necessary)
 # 2.16.11    03.06.2017       execmemcache changed for SQLite avoid logging if deleteOldDaysNbl or reduceLogNbL is running 
 # 2.16.10    15.05.2017       commandref revised
 # 2.16.9.1   11.05.2017       set userCommand changed - 
@@ -128,8 +130,9 @@ eval "use DBI;1" or my $DbLogMMDBI = "DBI";
 use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
+use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.16.11";
+my $DbLogVersion = "2.17.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -230,7 +233,7 @@ sub DbLog_Define($@)
   $hash->{cache}{index} = 0;
 
   # read configuration data
-  my $ret = _DbLog_readCfg($hash);
+  my $ret = DbLog_readCfg($hash);
   return $ret if ($ret); # return on error while reading configuration
   
   # set used COLUMNS
@@ -490,7 +493,7 @@ sub DbLog_Set($@) {
             $dbh->commit() if(!$dbh->{AutoCommit});
             $dbh->disconnect();
         }
-        $ret = _DbLog_readCfg($hash);
+        $ret = DbLog_readCfg($hash);
         return $ret if $ret;
         DbLog_ConnectPush($hash);
         $ret = "Rereadcfg executed.";
@@ -1653,6 +1656,7 @@ sub DbLog_PushAsync(@) {
   my $dbpassword  = $attr{"sec$name"}{secret};
   my $DbLogType   = AttrVal($name, "DbLogType", "History");
   my $supk        = AttrVal($name, "noSupportPK", 0);
+  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $errorh      = 0;
   my $errorc      = 0;
   my $error       = 0;
@@ -1666,7 +1670,7 @@ sub DbLog_PushAsync(@) {
   # Background-Startzeit
   my $bst = [gettimeofday];
   
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
   
   if ($@) {
       $error = encode_base64($@,"");
@@ -2049,7 +2053,7 @@ sub DbLog_implode_datetime($$$$$$) {
 ###################################################################################
 #                            Verbindungen zur DB aufbauen
 ###################################################################################
-sub _DbLog_readCfg($){
+sub DbLog_readCfg($){
   my ($hash)= @_;
   my $name = $hash->{NAME};
 
@@ -2082,6 +2086,11 @@ sub _DbLog_readCfg($){
     Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
     Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
   }
+    
+  if($hash->{DBMODEL} eq "MYSQL") {
+	$hash->{UTF8} = defined($dbconfig{utf8})?$dbconfig{utf8}:0;
+  }
+	
 	return;
 }
 
@@ -2092,9 +2101,10 @@ sub DbLog_ConnectPush($;$$) {
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   
   Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
-  my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
+  my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 });
   
   if(!$dbhp) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
@@ -2106,6 +2116,7 @@ sub DbLog_ConnectPush($;$$) {
   }
 
   Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created" if(!$get);
+  Log3 $hash->{NAME}, 3, "DbLog $name: UTF8 support enabled" if($utf8 && $hash->{DBMODEL} eq "MYSQL" && !$get);
   readingsSingleUpdate($hash, 'state', 'connected', 1) if(!$get);
 
   $hash->{DBHP}= $dbhp;
@@ -2127,9 +2138,10 @@ sub DbLog_ConnectNewDBH($) {
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $dbh;
  
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 }); };
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 }); };
   
   if($@) {
     Log3($name, 2, "DbLog $name: - $@");
@@ -2191,11 +2203,10 @@ sub DbLog_ExecSQL1($$$)
 # outfile: [-|ALL|INT|WEBCHART]
 #
 ################################################################
-sub
-DbLog_Get($@)
-{
+sub DbLog_Get($@) {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
+  my $utf8 = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $dbh;
   
   return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
@@ -2701,6 +2712,8 @@ DbLog_Get($@)
     return @ReturnArray;
   
   } else {
+    $retval = Encode::encode_utf8($retval) if($utf8);
+    # Log3 $name, 5, "DbLog $name -> Result of get:\n$retval";
     return $retval;
   }
 }
@@ -4035,8 +4048,50 @@ sub checkUsePK ($$){
     <br><br>
 
     Log events to a database. The database connection is defined in
-    <code>&lt;configfilename&gt;</code> (see sample configuration file
-    <code>contrib/dblog/db.conf</code>). The configuration is stored in a separate file
+    <code>&lt;configfilename&gt;</code> 
+	
+	In <code>contrib/dblog</code> an example configuration and scripts to create needed tables in the 
+    different databases are provided. <br><br>
+	
+	The <b>configuration file</b> should be copied e.g. to /opt/fhem and has the following structure you have to customize 
+    suitable to your conditions (decomment the appropriate raws and adjust it): <br><br>
+
+	<pre>
+    ####################################################################################
+    # database configuration file                                    
+    #                                                                
+    ## for MySQL                                                     
+    ####################################################################################
+    #%dbconfig= (                                                    
+    #    connection => "mysql:database=fhem;host=db;port=3306",       
+    #    user => "fhemuser",                                          
+    #    password => "fhempassword",
+    #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
+    #    utf8 => 1,   
+    #);                                                              
+    ####################################################################################
+    #                                                                
+    ## for PostgreSQL                                                
+    ####################################################################################
+    #%dbconfig= (                                                   
+    #    connection => "Pg:database=fhem;host=localhost",        
+    #    user => "fhemuser",                                     
+    #    password => "fhempassword"                              
+    #);                                                              
+    ####################################################################################
+    #                                                                
+    ## for SQLite (username and password stay empty for SQLite)      
+    ####################################################################################
+    #%dbconfig= (                                                   
+    #    connection => "SQLite:dbname=/opt/fhem/fhem.db",        
+    #    user => "",                                             
+    #    password => ""                                          
+    #);                                                              
+    ####################################################################################
+	</pre>
+	<br>
+	
+	The configuration is stored in a separate file
     to avoid storing the password in the main configuration file and to have it
     visible in the output of the <a href="../docs/commandref.html#list">list</a> command.
     <br><br>
@@ -4303,7 +4358,7 @@ sub checkUsePK ($$){
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
             you will get all actual readings "temperature" from all logged devices. 
-            Be carful by using "history" as inputfile because a long execution time will be expected!
+            Be careful by using "history" as inputfile because a long execution time will be expected!
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            like from 10am until 08pm at 10.11.2012</li>
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
@@ -4766,9 +4821,50 @@ sub checkUsePK ($$){
     <br><br>
 
     Speichert Events in eine Datenbank. Die Datenbankverbindungsparameter werden
-    definiert in <code>&lt;configfilename&gt;</code>. (Vergleiche
-    Beipspielkonfigurationsdatei in <code>contrib/dblog/db.conf</code>).<br>
-    Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort
+    definiert in <code>&lt;configfilename&gt;</code>. <br>
+	
+	In <code>contrib/dblog</code> sind eine Beispielkonfiguation und Scripts zum Anlegen der benötigten Tabellen
+	der verschiedenen Datenbanktypen bereitgestellt. <br><br>
+	
+	Die <b>Konfigurationsdatei</b> wird z.B. nach /opt/fhem kopiert und hat folgenden Aufbau, den man an seine Umgebung 
+    anpassen muß (entsprechende Zeilen entkommentieren und anpassen): <br><br>
+
+	<pre>
+    ####################################################################################
+    # database configuration file                                    
+    #                                                                
+    ## for MySQL                                                     
+    ####################################################################################
+    #%dbconfig= (                                                    
+    #    connection => "mysql:database=fhem;host=db;port=3306",       
+    #    user => "fhemuser",                                          
+    #    password => "fhempassword",
+    #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
+    #    utf8 => 1,   
+    #);                                                              
+    ####################################################################################
+    #                                                                
+    ## for PostgreSQL                                                
+    ####################################################################################
+    #%dbconfig= (                                                   
+    #    connection => "Pg:database=fhem;host=localhost",        
+    #    user => "fhemuser",                                     
+    #    password => "fhempassword"                              
+    #);                                                              
+    ####################################################################################
+    #                                                                
+    ## for SQLite (username and password stay empty for SQLite)      
+    ####################################################################################
+    #%dbconfig= (                                                   
+    #    connection => "SQLite:dbname=/opt/fhem/fhem.db",        
+    #    user => "",                                             
+    #    password => ""                                          
+    #);                                                              
+    ####################################################################################
+	</pre>
+	<br>
+    
+	Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort
     nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
     Ansonsten wäre es mittels des <a href="../docs/commandref.html#list">list</a>
     Befehls einfach auslesbar.
@@ -4967,7 +5063,7 @@ sub checkUsePK ($$){
           &lt;to&gt; &lt;column_spec&gt; </code>
     <br><br>
     Liesst Daten aus der Datenbank. Wird durch die Frontends benutzt um Plots
-    zu generieren ohne selbst auf die Datenank zugreifen zu m&ouml;ssen.
+    zu generieren ohne selbst auf die Datenank zugreifen zu müssen.
     <br>
     <ul>
       <li>&lt;in&gt;<br>
@@ -5040,19 +5136,21 @@ sub checkUsePK ($$){
               </li>
             </ul></li>
             <li>&lt;regexp&gt;<br>
-              Diese Zeichenkette wird als Perl Befehl ausgewertet. Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgef&ouml;hrt.
+              Diese Zeichenkette wird als Perl Befehl ausgewertet. 
+			  Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgeführt.
               <br>
               Bitte zur Beachtung: Diese Zeichenkette darf keine Leerzeichen
               enthalten da diese sonst als &lt;column_spec&gt; Trennung
               interpretiert werden und alles nach dem Leerzeichen als neue
               &lt;column_spec&gt; gesehen wird.<br>
-              <b>Schlüsselw&ouml;rter</b>
+			  
+              <b>Schlüsselwörter</b>
               <li>$val ist der aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.</li>
               <li>$ts ist der aktuelle Timestamp des Logeintrages.</li>
               <li>Wird als $val das Schlüsselwort "hide" zurückgegeben, so wird dieser Logeintrag nicht
-                  ausgegeben, trotzdem aber f&ouml;r die Zeitraumberechnung verwendet.</li>
+                  ausgegeben, trotzdem aber für die Zeitraumberechnung verwendet.</li>
               <li>Wird als $val das Schlüsselwort "ignore" zurückgegeben, so wird dieser Logeintrag
-                  nicht f&ouml;r eine Folgeberechnung verwendet.</li>
+                  nicht für eine Folgeberechnung verwendet.</li>
             </li>
         </ul></li>
 		
@@ -5061,22 +5159,29 @@ sub checkUsePK ($$){
     <b>Beispiele:</b>
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
-        <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
+        
+		<li><code>get myDbLog current ALL - - %:temperature</code></li><br>
             Damit erhält man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
             Achtung: bei Nutzung von Jokerzeichen auf die history-Tabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
-        <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
+        
+		<li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012</li>
-        <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-           gibt 1 zur&ouml;ck f&ouml;r alle Ausprägungen von on* (on|on-for-timer etc) und 0 f&ouml;r alle off*</li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
+        
+		<li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
+        
+		<li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
+        
+		<li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
+           gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*</li>
+        
+		<li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
            und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
-        <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
-           Realisierung eines Betriebsstundenzählers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
-           einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
-           entsprechen w&ouml;rden.</li>
+        
+		<li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
+           Realisierung eines Betriebsstundenzählers. Durch delta-ts wird die Zeit in Sek zwischen den Log-
+           Einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
+           entsprechen würden.</li>
       </ul>
     <br><br>
   </ul>
@@ -5092,20 +5197,25 @@ sub checkUsePK ($$){
     <ul>
       <li>&lt;name&gt;<br>
         Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.</li>
-      <li>&lt;in&gt;<br>
+      
+	  <li>&lt;in&gt;<br>
         Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist immer auf <code>-</code> zu setzen.</li>
-      <li>&lt;out&gt;<br>
+      
+	  <li>&lt;out&gt;<br>
         Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen. 
         Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
       </li>
-      <li>&lt;from&gt; / &lt;to&gt;<br>
+      
+	  <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat zu benutzen:<br>
         <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
-      <li>&lt;device&gt;<br>
+      
+	  <li>&lt;device&gt;<br>
         Ein String, der das abzufragende Device darstellt.</li>
-      <li>&lt;querytype&gt;<br>
+      
+	  <li>&lt;querytype&gt;<br>
         Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterstützte Werte sind: <br>
           <code>getreadings</code> um für ein bestimmtes device alle Readings zu erhalten<br>
           <code>getdevices</code> um alle verfügbaren devices zu erhalten<br>
@@ -5120,17 +5230,23 @@ sub checkUsePK ($$){
           <code>monthstats</code> um Statistiken für einen Wert (yaxis) für einen Monat abzufragen.<br>
           <code>yearstats</code> um Statistiken für einen Wert (yaxis) für ein Jahr abzufragen.<br>
       </li>
-      <li>&lt;xaxis&gt;<br>
+      
+	  <li>&lt;xaxis&gt;<br>
         Ein String, der die X-Achse repräsentiert</li>
-      <li>&lt;yaxis&gt;<br>
+      
+	  <li>&lt;yaxis&gt;<br>
          Ein String, der die Y-Achse repräsentiert</li>
-      <li>&lt;savename&gt;<br>
+      
+	  <li>&lt;savename&gt;<br>
          Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
-      <li>&lt;chartconfig&gt;<br>
+      
+	  <li>&lt;chartconfig&gt;<br>
          Ein jsonstring der den zu speichernden Chart repräsentiert</li>
-      <li>&lt;pagingstart&gt;<br>
+      
+	  <li>&lt;pagingstart&gt;<br>
          Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen</li>
-      <li>&lt;paginglimit&gt;<br>
+      
+	  <li>&lt;paginglimit&gt;<br>
          Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen</li>
       </ul>
     <br><br>
@@ -5138,16 +5254,21 @@ sub checkUsePK ($$){
       <ul>
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
             Liefert alle gespeicherten Charts aus der Datenbank</li>
-        <li><code>get logdb - webchart "" "" "" getdevices</code><br>
+        
+		<li><code>get logdb - webchart "" "" "" getdevices</code><br>
             Liefert alle verfügbaren Devices aus der Datenbank</li>
-        <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
+        
+		<li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
             Liefert alle verfügbaren Readings aus der Datenbank unter Angabe eines Gerätes</li>
-        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
+        
+		<li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
             Liefert Chart-Daten, die auf folgenden Parametern basieren: 'xaxis', 'yaxis', 'device', 'to' und 'from'<br>
             Die Ausgabe erfolgt als JSON, z.B.: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
-        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
+        
+		<li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
             Speichert einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration</li>
-        <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
+        
+		<li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
             Löscht einen zuvor gespeicherten Chart unter Angabe einer id</li>
       </ul>
     <br><br>

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbLog: V2.17.1, optional UTF-8 support for MySQL database
+             (additional parameter in db.conf neccesary for activation)
   - feature: YAMAHA_AVR: new set commands / readings to control HDMI outputs
              (only for models with two HDMI outputs)
   - featere: exclude_from_update can check the source too (Forum #73275)
