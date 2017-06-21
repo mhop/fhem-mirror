@@ -34,6 +34,7 @@
 # ABU 20170501 tuned documentation
 # ABU 20170516 removed useless print
 # ABU 20170525 bugfixed winterschlaf again
+# ABU 20170613 added Maehauftrag
 
 
 package main;
@@ -48,6 +49,7 @@ my $EOD = "feierabend";
 my $HOME = "home";
 my $AUTO = "auto";
 my $MANUAL = "manuell";
+my $JOB = "maehauftrag";
 my $START = "start";
 my $STOP = "stop";
 my $OFFLINE = "offline";
@@ -66,6 +68,7 @@ my %sets = (
 	$HOME => "noArg",
 	$AUTO => "noArg",
 	$MANUAL => "noArg",
+	$JOB => "noArg",
 	$START => "noArg",
 	$STOP => "noArg",
 	$HYBERNATE => "on,off",
@@ -75,7 +78,7 @@ my %sets = (
 
 my %commands = (
 	GET_STATUS	=> "cmd=status",
-	SET_MODE	=> {$HOME=>"cmd=mode&mode=home", $MANUAL=>"cmd=mode&mode=man", $AUTO=>"cmd=mode&mode=auto", $EOD=>"cmd=mode&mode=eod", $STOP=>"cmd=stop", $START=>"cmd=start"}	
+	SET_MODE	=> {$HOME=>"cmd=mode&mode=home", $MANUAL=>"cmd=mode&mode=man", $JOB=>"cmd=mode&mode=job", $AUTO=>"cmd=mode&mode=auto", $EOD=>"cmd=mode&mode=eod", $STOP=>"cmd=stop", $START=>"cmd=start"}	
 );
 
 #set to 1 for debug
