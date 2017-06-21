@@ -270,7 +270,7 @@ sub monitoring_Notify($$) {
 
   return unless($events);
 
-  if($name eq "global" && "INITIALIZED" =~ m/@{$events}/){
+  if($name eq "global" && "INITIALIZED" =~ m/\Q@{$events}\E/){
     monitoring_setActive($hash);
 
     return;
