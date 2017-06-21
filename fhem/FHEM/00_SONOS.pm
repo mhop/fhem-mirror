@@ -51,7 +51,9 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
-# .06.2017
+# 21.06.2017
+#	Bei der ersten Verbindung war das Reading für die letzte SubProzess-Antwort eventuell bereits veraltet. Das wird nun durch ein Datum in der Zukunft verhindert.
+# 20.06.2017
 #	Die Verarbeitung des Notify-Events für die Anzeigeaktualisierung ist in das SONOSPLAYER-Modul umgezogen (wo es auch logisch hingehört).
 #	Die Zeitkonvertierung hatte einen Sekundenfehler.
 #	Durch eine fehlerhafte IF-Verschachtelung in der ControlPoint.pm gab es komische Log-Augaben.
@@ -93,10 +95,6 @@
 #	Durch ein mittlerweile verändertes Notify-Event-Handling in Fhem wurden die Bookmarks nicht immer zusammen mit dem globalen Save-Befehl gespeichert.
 #	Die Cover-/Titelanzeige wird nun intern vom Modul durchgeführt. Deshalb ist keine zusätzliche ReadingsGroup für die Anzeige und Aktualisierung mehr notwendig. In der Raumansicht kann man das Verhalten für alle Sonosplayer einheitlich mit dem Attribut "deviceRoomView" beeinflussen. Es kann die Zustände "Both" und "DeviceLineOnly" annehmen.
 #	Die Steuermöglichkeiten werden nun intern vom Modul dargestellt. Dazu muss die Cover-/Titelanzeige aktiviert sein. Will man die Steuerung ausblenden, kann man das Attribut "suppressControlButtons" für Sonosplayer einzeln setzen setzen.
-# 09.04.2017
-#	Beim Maskieren der Anzeigelisten für Playlisten, Radios oder Favoriten werden Klammern und andere Sonderzeichen für reguläre Ausdrücke nun auch in Punkte umgewandelt, da diese sonst den regulären Such-Ausdruck stören.
-#	Beim Starten/Laden von Playlisten, Radios oder Favoriten werden, vor der eigentlichen Suche im Sonossystem, einfache Anführungszeichen (') in die HTML-Schreibweise (&apos;) übersetzt, da diese so auch von Sonos verwendet werden.
-#	Radiocover werden nun in höherer Auflösung von einer TuneIn-API-Schnittstelle geladen (von dort wo auch der Controller selbst die Cover lädt).
 #
 ########################################################################################
 #
@@ -1903,6 +1901,7 @@ sub SONOS_InitClientProcess($) {
 	DevIo_SimpleWrite($hash, "StartThread\n", 0);
 	
 	# Interner Timer für die Überprüfung der Verbindung zum Client (nicht verwechseln mit dem IsAlive-Timer, der die Existenz eines Sonosplayers überprüft)
+	readingsSingleUpdate($hash, 'LastProcessAnswer', '2100-01-01 00:00:00', 0);
 	InternalTimer(gettimeofday() + ($hash->{INTERVAL} * 2), 'SONOS_IsSubprocessAliveChecker', $hash, 0);
 	
 	return undef;
@@ -1918,7 +1917,7 @@ sub SONOS_IsSubprocessAliveChecker() {
 	
 	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
 	
-	my $lastProcessAnswer = SONOS_GetTimeFromString(ReadingsVal(SONOS_getSonosPlayerByName()->{NAME}, 'LastProcessAnswer', '2000-01-01 00:00:00'));
+	my $lastProcessAnswer = SONOS_GetTimeFromString(ReadingsVal(SONOS_getSonosPlayerByName()->{NAME}, 'LastProcessAnswer', '2100-01-01 00:00:00'));
 	
 	# Wenn länger nichts passiert ist, dann eine Aktualisierung anfordern...
 	SONOS_DoWork('undef', 'refreshProcessAnswer') if ($lastProcessAnswer < gettimeofday() - $hash->{INTERVAL});
@@ -1941,7 +1940,7 @@ sub SONOS_IsSubprocessAliveChecker() {
 		InternalTimer(gettimeofday() + 1, 'SONOS_StopSubProcess', $hash, 0);
 		
 		# Starten...
-		InternalTimer(gettimeofday() + 10, 'SONOS_DelayStart', $hash, 0);
+		InternalTimer(gettimeofday() + 30, 'SONOS_DelayStart', $hash, 0);
 	} else {
 		RemoveInternalTimer($hash, 'SONOS_IsSubprocessAliveChecker');
 		InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
