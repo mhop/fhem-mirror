@@ -1449,6 +1449,12 @@ sub SB_PLAYER_Parse( $$ ) {
             # CD 0031 end
         } elsif( $args[ 0 ] eq "reconnect" ) {
             IOWrite( $hash, "$hash->{PLAYERMAC} status 0 500 tags:Kcu\n" );         # CD 0030 u added to tags
+            # CD 0079 nach reconnect Status abfragen
+            delete($hash->{helper}{disableGetStatus}) if defined($hash->{helper}{disableGetStatus});
+            InternalTimer( gettimeofday() + 5,
+                           "SB_PLAYER_GetStatus",
+                           $hash,
+                           0 );
         } else {
         }
 
@@ -2873,6 +2879,7 @@ sub SB_PLAYER_Set( $@ ) {
     # CD 0014 end
     } elsif( $cmd eq "statusRequest" ) {
         RemoveInternalTimer( $hash );
+        delete($hash->{helper}{disableGetStatus}) if defined($hash->{helper}{disableGetStatus});    # CD 0079
         SB_PLAYER_GetStatus( $hash );
 
     } elsif( $cmd eq "sync" ) {
@@ -3672,6 +3679,8 @@ sub SB_PLAYER_GetStatus( $ ) {
 
     Log3( $hash, 5, "SB_PLAYER_GetStatus: called" );
 
+    return if(defined($hash->{helper}{disableGetStatus}));
+
     # CD 0014 start - Anzahl Anfragen begrenzen
     if(!defined($hash->{helper}{lastGetStatus})||($hash->{helper}{lastGetStatus}<gettimeofday()-0.5)) {
         #Log 0,"Querying status, last: $hash->{helper}{lastGetStatus}, now: ".gettimeofday();
@@ -3734,6 +3743,11 @@ sub SB_PLAYER_GetStatus( $ ) {
 
     my $iv=AttrVal($name, "statusRequestInterval", 300);  # CD 0037
 
+    if(ReadingsVal($name,"presence","x") eq "absent") {   # CD 0079
+        $iv=0;
+        $hash->{helper}{disableGetStatus}=1;
+    }
+    
     InternalTimer( gettimeofday() + $iv,
                    "SB_PLAYER_GetStatus",
                    $hash,
@@ -4506,18 +4520,20 @@ sub SB_PLAYER_ParsePlayerStatus( $$ ) {
 
         } elsif( $cur =~ /^(power:)([0-9\.]*)/ ) {
             if( $2 eq "1" ) {
-                readingsBulkUpdate( $hash, "state", "on" ); # CD 0041 hinzugefügt
-                readingsBulkUpdate( $hash, "power", "on" );
-                SB_PLAYER_Amplifier( $hash );
-                # CD 0042 start
-                if($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON) {
-                    RemoveInternalTimer( "TTSStartAfterPowerOn:$name");
-                    InternalTimer( gettimeofday() + 0.01,
-                       "SB_PLAYER_tcb_TTSStartAfterPowerOn",
-                       "TTSStartAfterPowerOn:$name",
-                       0 );
+                if(ReadingsVal($name,'presence','absent') eq 'present') {   # CD 0079 power nur auf 1 setzen wenn Player verbunden ist
+                    readingsBulkUpdate( $hash, "state", "on" ); # CD 0041 hinzugefügt
+                    readingsBulkUpdate( $hash, "power", "on" );
+                    SB_PLAYER_Amplifier( $hash );
+                    # CD 0042 start
+                    if($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON) {
+                        RemoveInternalTimer( "TTSStartAfterPowerOn:$name");
+                        InternalTimer( gettimeofday() + 0.01,
+                           "SB_PLAYER_tcb_TTSStartAfterPowerOn",
+                           "TTSStartAfterPowerOn:$name",
+                           0 );
+                    }
+                    # CD 0042 end
                 }
-                # CD 0042 end
             } else {
                 # CD 0042 start
                 if(($hash->{helper}{playerStatusOK}==0) && ($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON)) {
