@@ -34,6 +34,7 @@
 # ABU 20170503 changed regex for all dpt9
 # ABU 20170507 changed regex for all dpt9
 # ABU 20170517 added useSetExtensions
+# ABU 20170622 finetuned doku
 
 package main;
 
@@ -1637,14 +1638,15 @@ sub KNX_getCmdList ($$$)
       define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
 
-	One hint regarding dpt1 (binary): all the sub-types have to be used with keyword value. Received telegrams are already encoded to their representation.
-	Having the on/off button (for send values) without keyword value is an absolutely special use-case and only valid for dpt1 (not the subs).<br>
+	One hint regarding dpt1 (binary): all the sub-types have to be used with keyword value. Received telegrams are already encoded to their representation. This mechanism does not work for send-telegrams.
+	Here on/off has to be supplied.<br>
+	Having the on/off button (for send values) without keyword value is an absolutely special use-case and only valid for dpt1 and its sub-types.<br>
 	
     <p>Example:</p>
       <pre>
       define rollo KNX 0/10/12:dpt1.008
-	  set rollo value up
-	  set rollo value down
+	  set rollo value off
+	  set rollo value on
       </pre>
 	
   </ul>
@@ -1905,13 +1907,14 @@ sub KNX_getCmdList ($$$)
       </pre>
 	  
 	Ein Hinweis bezüglich dem binären Datentyp dpt1: alle Untertypen müssen über das Schlüsselwort value gesetzt werden. Empfangene Telegramme werden entsprechend ihrer Definition automatisch
-	umbenannt. Die zur Verfügung stehenden on/off Schaltflächen ohne den Schlüssel value sind ein absoluter Sonderfall und gelten nur für den dpt1 selbst (nicht die Untertypen).
+	umbenannt. Zu sendende Telegramme sind immer min on/off zu belegen!<br>
+	Die zur Verfügung stehenden on/off Schaltflächen ohne den Schlüssel value sind ein absoluter Sonderfall und gelten für den dpt1 und alle Untertypen.
 	
     <p>Example:</p>
       <pre>
       define rollo KNX 0/10/12:dpt1.008
-	  set rollo value up
-	  set rollo value down
+	  set rollo value off
+	  set rollo value on
       </pre>
 	  
   </ul>
