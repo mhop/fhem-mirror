@@ -2030,7 +2030,8 @@ DOIF_SetSleepTimer($$$$$$$)
   }
 
   if ($timerNr >= 0 and !AttrVal($pn,"timerWithWait","")) {#Timer
-    if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"repeatsame","")) {
+    if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame","")) {
+
       return 1;
     } else {
       return 0;
