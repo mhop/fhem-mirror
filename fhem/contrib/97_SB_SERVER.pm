@@ -69,7 +69,7 @@ use Time::HiRes qw(gettimeofday time);
 
 use constant { true => 1, false => 0 };
 use constant { TRUE => 1, FALSE => 0 };
-use constant SB_SERVER_VERSION => '0038';
+use constant SB_SERVER_VERSION => '0040';
 
 my $SB_SERVER_hasDataDumper = 1;        # CD 0024
 
@@ -1856,7 +1856,43 @@ sub SB_SERVER_ParseCmds( $$ ) {
             DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
             DevIo_SimpleWrite( $hash, "alarm playlists 0 300\n", 0 );
             # CD 0036 end
+            # CD 0039 start
+            readingsBeginUpdate( $hash );
+            readingsBulkUpdate( $hash, "scanning", "no");
+            readingsBulkUpdate( $hash, "scanprogressdone", "0" );
+            readingsBulkUpdate( $hash, "scanprogresstotal", "0" );
+            readingsBulkUpdate( $hash, "scandb", "?" );
+            # CD 0040 start
+            if(defined $hash->{helper}{scanstart}) {
+                readingsBulkUpdate( $hash, "scanduration", int(time()-$hash->{helper}{scanstart}));
+                delete $hash->{helper}{scanstart};
+            }
+            # CD 0040 end
+            readingsEndUpdate( $hash, 1 );
+        } else {
+            readingsSingleUpdate( $hash, "scanning", "yes", 1 );
+            $hash->{helper}{scanstart}=time();                      # CD 0040
+            readingsSingleUpdate( $hash, "scanduration", 0, 1 );    # CD 0040
         }
+    } elsif( $cmd eq "scanner" ) {
+        if((defined $args[0]) && ($args[0] eq 'notify')) {
+            if((defined $args[1]) && (substr($args[1],0,8) eq 'progress')) {
+                my @params=split '\|\|',$args[1];
+                if((defined $params[1]) && ($params[1] eq 'importer')) {
+                    readingsBeginUpdate( $hash );
+                    readingsBulkUpdate( $hash, "scanprogressdone", $params[3] ) if defined $params[3];
+                    readingsBulkUpdate( $hash, "scanprogresstotal", $params[4] ) if defined $params[4];
+                    readingsBulkUpdate( $hash, "scandb", $params[2] ) if defined $params[2];
+                    # CD 0040 start
+                    if(defined $hash->{helper}{scanstart}) {
+                        readingsBulkUpdate( $hash, "scanduration", int(time()-$hash->{helper}{scanstart}));
+                    }
+                    # CD 0040 end
+                    readingsEndUpdate( $hash, 1 );
+                }
+            }
+        }
+        # CD 0039 end
     # CD 0016 end
     # CD 0030 start
     } elsif( $cmd eq "artists" ) {
@@ -2272,13 +2308,6 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
     # the rest of the array should now have the data, we're interested in
     readingsBeginUpdate( $hash );
 
-    # set default values for stuff not always send
-    readingsBulkUpdate( $hash, "scanning", "no" );
-    readingsBulkUpdate( $hash, "scandb", "?" );
-    readingsBulkUpdate( $hash, "scanprogressdone", "0" );
-    readingsBulkUpdate( $hash, "scanprogresstotal", "0" );
-    readingsBulkUpdate( $hash, "scanlastfailed", "none" );
-
     my $addplayers = true;
     my %players;
     my $currentplayerid = "none";
@@ -2292,6 +2321,7 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
     my $ee = "$e$e";
 
     my $nameactive=0;
+    my $rescanactive=0;
 
     foreach( @data1 ) {
 	if( $_ =~ /^(lastscan:)([0-9]*)/ ) {
@@ -2301,15 +2331,24 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
 	    $year = $year + 1900;
 	    readingsBulkUpdate( $hash, "scan_last", "$mday-".($mon+1)."-$year " .   # CD 0016 Monat korrigiert
 				"$hour:$min:$sec" );
+	    #readingsBulkUpdate( $hash, "scanlast", strftime("%Y-%m-%d %H:%M:%S", localtime($2)));  # CD 0040
 	    next;
 	} elsif( $_ =~ /^(scanning:)([0-9]*)/ ) {
 	    readingsBulkUpdate( $hash, "scanning", $2 );
 	    next;
 	} elsif( $_ =~ /^(rescan:)([0-9]*)/ ) {
 	    if( $2 eq "1" ) {
-		readingsBulkUpdate( $hash, "scanning", "yes" );
+            readingsBulkUpdate( $hash, "scanning", "yes" );
+            $rescanactive=1;
+            $hash->{helper}{scanstart}=time() unless defined($hash->{helper}{scanstart});   # CD 0040
 	    } else {
-		readingsBulkUpdate( $hash, "scanning", "no" );
+            readingsBulkUpdate( $hash, "scanning", "no" );
+            # CD 0040 start
+            if(defined $hash->{helper}{scanstart}) {
+                readingsBulkUpdate( $hash, "scanduration", int(time()-$hash->{helper}{scanstart}));
+                delete $hash->{helper}{scanstart};
+            }
+            # CD 0040 end
 	    }
 	    next;
 	} elsif( $_ =~ /^(version:)([0-9\.]*)/ ) {
@@ -2447,6 +2486,14 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
 	}
     }
 
+    if ($rescanactive==0) {
+        # set default values for stuff not always send
+        readingsBulkUpdate( $hash, "scanning", "no" );
+        readingsBulkUpdate( $hash, "scandb", "?" );
+        readingsBulkUpdate( $hash, "scanprogressdone", "0" );
+        readingsBulkUpdate( $hash, "scanprogresstotal", "0" );
+        readingsBulkUpdate( $hash, "scanlastfailed", "none" );
+    }
     readingsEndUpdate( $hash, 1 );
 
     my @ignoredIPs=split(',',AttrVal($name,'ignoredIPs',''));   # CD 0017
