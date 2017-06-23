@@ -1105,13 +1105,6 @@ SVG_doShowLog($$$$;$)
     my $tmpfile = "/tmp/file.$$";
     my $errfile = "/tmp/gnuplot.err";
     
-    my $xrange;
-
-    if(!$SVG_devs{$d}{from}) {
-      $xrange = "\n";        #We don't have a range, but need the new line
-    } else {
-      $xrange = "set xrange [\"$f\":\"$t\"]\n";
-    }
     my $da = SVG_getData($wl, $f, $t, $srcDesc, 0); # substcfg needs it(!)
 
     my $tmpstring = "";
@@ -1133,10 +1126,11 @@ SVG_doShowLog($$$$;$)
     $plot =~ s/\".*?using 1:[^ ]+ /"\"$tmpfile\" i " . $i++ . " using 1:2 "/gse;
 
     my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
+    $gplot_script =~ s/<TMPFILE>/$tmpfile/g;
 
     $plot =~ s/ls \w+//g;
     open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-    print FH $gplot_script, $xrange, $plot;
+    print FH $gplot_script;
     close(FH);
     unlink($tmpfile);
 
