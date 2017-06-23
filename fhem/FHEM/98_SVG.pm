@@ -1125,6 +1125,7 @@ SVG_doShowLog($$$$;$)
     my $i = 0;
     $plot =~ s/\".*?using 1:[^ ]+ /"\"$tmpfile\" i " . $i++ . " using 1:2 "/gse;
 
+    $plot = "set xrange [\"$f\":\"$t\"]\n\n$plot" if($SVG_devs{$d}{from});
     my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
     $gplot_script =~ s/<TMPFILE>/$tmpfile/g;
 
