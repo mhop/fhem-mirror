@@ -41,6 +41,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8)
 # 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
 # 5.0.6        13.06.2017       add Aria engine to optimise_tables
@@ -225,7 +226,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.2.0";
+my $DbRepVersion = "5.2.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3520,6 +3521,7 @@ sub sqlCmd_DoParse($) {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $err;
 
   # Background-Startzeit
@@ -3528,7 +3530,7 @@ sub sqlCmd_DoParse($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_DoParse");
 
   my $dbh;
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
   if ($@) {
      $err = encode_base64($@,"");
@@ -3552,10 +3554,10 @@ sub sqlCmd_DoParse($) {
   # SQL-Startzeit
   my $st = [gettimeofday];
   
-  my $sth;
+  my ($sth,$r);
   
   eval {$sth = $dbh->prepare($sql);
-        $sth->execute();
+        $r = $sth->execute();
        }; 
   
   if ($@) {
@@ -3569,7 +3571,7 @@ sub sqlCmd_DoParse($) {
  
   my @rows;
   my $nrows = 0;
-  if($sql =~ m/^\s*select/is) {
+  if($sql =~ m/^\s*(select|pragma)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
       my $row = join("|", @line);
@@ -3592,7 +3594,7 @@ sub sqlCmd_DoParse($) {
          return "$name|''|$opt|$sql|''|''|$err";       
      }
 	 
-	 push(@rows, " ");
+	 push(@rows, $r);
 	 my $com = (split(" ",$sql, 2))[0];
 	 Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");  
   }
