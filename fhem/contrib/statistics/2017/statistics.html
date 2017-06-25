@@ -1,0 +1,80 @@
+<!DOCTYPE html
+	PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+<title>FHEM statistics</title>
+<meta name="keywords" content="fhem homeautomation statistics" />
+<link rel="stylesheet" type="text/css" href="css/statistics.css" />
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css" />
+<link rel="stylesheet" type="text/css" href="css/jquery.dataTables.min.css" />
+<link rel="stylesheet" type="text/css" href="css/style.css" />
+
+<script src="js/jquery.min.js" type="text/javascript"></script>
+<script src="js/jquery-ui.min.js" type="text/javascript"></script>
+<script src="js/jquery.dataTables.min.js" type="text/javascript"></script>
+<script src="https://www.google.com/jsapi" type="text/javascript"></script>
+<script src="js/statistics.js" type="text/javascript"></script>
+
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+</head>
+<body>
+<div id="menuScrollArea">
+    <div id="logo"></div>
+    <div id="menu"><br><br>
+    <a href="https://fhem.de">back to mainpage</a>
+    </div>
+</div>
+<div id="right">
+
+<h2>FHEM statistics</h2>
+<div id="loading">
+&nbsp;
+</div>
+<div id="content" style="display:none;">
+<div id="overview"></div>
+<h3>Geographical distribution</h3>
+<div id="maptab" class="tabs">
+  <ul>
+    <li><a href="#maptab-germany">Germany</a></li>
+    <li><a href="#maptab-europe">Europe</a></li>
+    <li><a href="#maptab-world">World</a></li>
+  </ul>
+  <div id="maptab-germany">
+    
+  </div>
+  <div id="maptab-europe">
+    
+  </div>
+  <div id="maptab-world">
+   </div>
+</div>
+
+
+<h3>Used versions</h3>
+<div id="maptab" class="tabs">
+  <ul>
+    <li><a href="#versiontab-FHEM">FHEM</a></li>
+    <li><a href="#versiontab-perl">Perl</a></li>
+    <li><a href="#versiontab-os">OS</a></li>
+  </ul>
+  <div id="versiontab-FHEM">
+    
+  </div>
+  <div id="versiontab-perl">
+    
+  </div>
+  <div id="versiontab-os">
+   </div>
+</div>
+
+<h3>Used FHEM moduls</h3>
+<br>
+<b>Notice:</b> Only modules used in more than one FHEM installation, will be shown.<br><br>
+<table class="block compact" id="module-table">
+<thead><tr><th class='dt-head-left'>Module name</th><th># of FHEM installations</th><th># of definitions</th><th># of registered models</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</body>
+</html>

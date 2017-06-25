@@ -1,0 +1,25 @@
+
+
+div.googlemap {
+    width: 800px;
+    height: 500px;
+}
+
+div.model-overview {
+    
+  display: block !important;
+ 
+  overflow: auto;/* Or scroll, depending on your needs*/
+}
+
+div#loading {
+    position:absolute;
+    left: 0px;
+    top: 0px;
+    right:0px;
+    bottom:0px;
+    background-image:url(../images/ajax-loader.gif);
+     background-position: center; 
+     background-repeat: no-repeat;
+     background-attachment: fixed;
+}

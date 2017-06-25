@@ -21,6 +21,7 @@ GNU General Public License for more details.
 --------------------------------------------------------------------------------
 
 database stuff provided by betateilchen
+visualisation provided by markusbloch
 
 =cut
 
@@ -43,9 +44,12 @@ sub viewStatistics();
 
 my $start = time(); # used for generation time calculation
 
-my $ua    = $ENV{HTTP_USER_AGENT};
-   $ua  //= "";
-my $geoip = $ENV{REMOTE_ADDR};
+my $ua   = $ENV{HTTP_USER_AGENT};
+   $ua //= "";
+   
+my $geoip   = $ENV{HTTP_X_FORWARDED_FOR};
+   $geoip //= $ENV{REMOTE_ADDR};
+   
 my %data  = Vars();
 
 # database stuff
@@ -56,8 +60,6 @@ my $dbh;
 my $sth;
 my $limit  = "datetime('now', '-12 months')";
 
-# css stuff (to be changed for real use)
-my $css    = "style.css";
   
 # ---------- decide target ----------
 
@@ -158,36 +160,39 @@ sub doAggregate() {
       $nodes12++;
       # process GeoIP data
       $decoded  = decode_json( $line[0] );
-      $res      = $decoded->{'continentcode'};
-      $countAll{'geo'}{'continent'}{$res}++ if $res;
-      $res      = $decoded->{'countryname'};
-      $countAll{'geo'}{'countryname'}{$res}++ if $res;
-      $res      = $decoded->{'regionname'};
-      $countAll{'geo'}{'regionname'}{$res}++ if $res;
+
+      $res      = $decoded->{'regionname'} ;
+      if($decoded->{'countrycode'} && $decoded->{'countrycode'} eq "DE") {
+        $countAll{'geo'}{'regionname'}{$decoded->{'countrycode'}}{$res}++ if $res;
+      }
+      $res      = $decoded->{'countrycode'};
+      $countAll{'geo'}{'countrycode'}{$res}{count}++ if $res;
+      $countAll{'geo'}{'countrycode'}{$res}{name} = $decoded->{'countryname'} if $res;
       ($decoded,$res) = (undef,undef);
 
       # process system data
       $decoded  = decode_json( $line[1] );
       $res      = $decoded->{'system'}{'os'};
       $countAll{'system'}{'os'}{$res}++;
-      $res      = $decoded->{'system'}{'arch'};
-      $countAll{'system'}{'arch'}{$res}++;
       $res      = $decoded->{'system'}{'perl'};
       $countAll{'system'}{'perl'}{$res}++;
       $res      = $decoded->{'system'}{'release'};
       $countAll{'system'}{'release'}{$res}++;
-      ($decoded,$res) = (undef,undef);
+      ($res) = (undef);
       
       # process modules and model data
-      $decoded  = decode_json( $line[1] );
       my @keys = keys %{$decoded};
 
       foreach my $type (sort @keys) {
          next if $type eq 'system';
-         $countAll{'modules'}{$type} += $decoded->{$type}{'noModel'} ? $decoded->{$type}{'noModel'} : 0;
-         while ( my ($model, $count) = each(%{$decoded->{$type}}) ) { 
-            $countAll{'modules'}{$type}         += $count unless $model eq 'noModel';
-            $countAll{'models'}{$type}{$model}  += $count unless $model eq 'noModel';
+         $countAll{'modules'}{$type}{'definitions'} += $decoded->{$type}{'noModel'} ? $decoded->{$type}{'noModel'} : 0;
+         $countAll{'modules'}{$type}{'installations'} += 1;
+         while ( my ($model, $count) = each( %{$decoded->{$type}}) ) { 
+            next if($model eq "noModel");
+            $countAll{'modules'}{$type}{'definitions'}         += $count; 
+            next if($model eq "migratedData");
+            $countAll{'models'}{$type}{$model}{'definitions'} += $count;
+            $countAll{'models'}{$type}{$model}{'installations'}+= 1;
          }
       }
    }
@@ -201,34 +206,25 @@ sub doAggregate() {
 # ---------- reached by browser access ----------
 
 sub viewStatistics() {
-   my ($updated,$started,$nodesTotal,$nodes12,%countAll) = doAggregate();
-   my $countSystem  = $countAll{'system'};
-   my $countGeo     = $countAll{'geo'};
-   my $countModules = $countAll{'modules'};
-   my $countModels  = $countAll{'models'};
-
-   my $q = new CGI;
-   print $q->header( "text/html" ),
-         $q->start_html( -title   => "FHEM statistics 2017", 
-                         -style   => {-src => $css}, 
-                         -meta    => {'keywords' => 'fhem homeautomation statistics'},
-         ),
-
-         $q->h2( "FHEM statistics 2017 (experimental)" ),
-         $q->p( "graphics to be implemented..." ),
-         $q->hr,
-         $q->p( "<b>Statistics database</b><br>created: $started, updated: $updated<br>".
-                "entries (total): $nodesTotal, entries (12 months): $nodes12<br>".
-                "Generation time: ".sprintf("%.3f",time()-$start)." seconds"),
-#         $q->hr,
-#         $q->p( "System info <br>".            Dumper $countSystem ),
-#         $q->p( "GeoIP info <br>".             Dumper $countGeo ),
-#         $q->p( "Modules info <br>".           Dumper $countModules ),
-#         $q->p( "Models per module info <br>". Dumper $countModels ),
-
-         $q->end_html;
+   my $q = new CGI; 
+   $q->charset('utf-8'); 
+   if($data{type} && $data{type} eq "json") { # return result als JSON object
+     my ($updated,$started,$nodesTotal,$nodes12,%countAll) = doAggregate();
+    
+     my $json = encode_json({updated    => $updated,
+                             generated  => time()-$start,
+                             started    => $started,
+                             nodesTotal => $nodesTotal,
+                             nodes12    => $nodes12,
+                             data       => \%countAll
+                       });
+      print $q->header( -type => "application/json",
+                        -Content_length => length($json)); # for gzip/deflate
+      print $json;
+   }
+   else {
+      print $q->redirect('statistics.html'); # redirect to HTML file
+   }   
 }
 
-1;
 
-#
