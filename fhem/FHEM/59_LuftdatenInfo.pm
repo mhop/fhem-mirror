@@ -247,8 +247,10 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     readingsSingleUpdate($hash, "state", "error", 1);
   }
   elsif($data eq "[]"){
-    if(   index($param->{url}, $hash->{SENSORID2}) > -1
-       && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
+    if(
+      InternalVal($SELF, "SENSORID2", undef)
+      && index($param->{url}, $hash->{SENSORID2}) > -1
+      && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
     ){
       delete($hash->{SENSORID2});
 
