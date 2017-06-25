@@ -41,7 +41,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
-# 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8)
+# 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW)
 # 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
 # 5.0.6        13.06.2017       add Aria engine to optimise_tables
@@ -3571,7 +3571,7 @@ sub sqlCmd_DoParse($) {
  
   my @rows;
   my $nrows = 0;
-  if($sql =~ m/^\s*(select|pragma)/is) {
+  if($sql =~ m/^\s*(select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
       my $row = join("|", @line);
