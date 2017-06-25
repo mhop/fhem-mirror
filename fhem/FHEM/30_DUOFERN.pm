@@ -420,6 +420,7 @@ my %setsThermostat = (
                         
 my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
 my $duoCommand            = "0Dccnnnnnnnnnnnnnnnnnnnn000000zzzzzzyyyyyy00";
+my $duoCommand2           = "0Dccnnnnnnnnnnnnnnnnnnnn000000000000yyyyyy01";
 my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
 my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
 my $duoSetTime            = "0D0110800001mmmmmmmmnnnnnn0000000000yyyyyy00";
@@ -665,8 +666,14 @@ DUOFERN_Set($@)
     my $argV = "00";
     my $argW = "0000";
     my $timer ="00";
-    my $buf = $duoCommand;
+    my $buf;
     my $command;
+    
+    if ($cmd eq "remotePair") {
+      $buf = $duoCommand2;
+    } else {
+      $buf = $duoCommand;
+    }
     
     $chanNo = $hash->{chanNo} if ($hash->{chanNo});
     
