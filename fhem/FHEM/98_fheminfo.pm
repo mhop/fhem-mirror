@@ -121,7 +121,7 @@ sub _fi2_TelnetTable($) {
   my ($doSend) = shift;
   my $upTime = _fi2_Uptime();
   my $str;
-  $str .= "Following statistics data will be sent to server:\n(see Logfile for server response)\n\n" if($doSend == 1);
+  $str .= "Following statistics data will be sent to server:\n(see Logfile level 4 for server response)\n\n" if($doSend == 1);
   $str .= "System Info\n";
   $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{'system'}{'release'});
   $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{'system'}{'feature'});
@@ -149,7 +149,7 @@ sub _fi2_HtmlTable($) {
    my ($doSend) = shift;
    my $upTime = _fi2_Uptime();
    my $result  = "<html><table>";
-      $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile for server response)</td></tr>" if($doSend == 1);
+      $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile level 4 for server response)</td></tr>" if($doSend == 1);
       $result .= "<tr><td>System Info</td></tr>";
       $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{'system'}{'release'}</td></tr>";
       $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{'system'}{'feature'}</td></tr>";
