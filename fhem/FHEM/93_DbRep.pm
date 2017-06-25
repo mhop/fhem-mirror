@@ -4868,7 +4868,7 @@ sub optimise_tables {
   
   foreach $tablename (@tablenames) {
       #optimize table if engine supports optimization
-      $engine = uc($db_tables->{$tablename}{Engine});
+      $engine = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
 
 	  if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/) {
 	      Log3($name, 3, "DbRep $name - Optimizing table `$tablename` ($engine). It will take a while.");
