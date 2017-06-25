@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 03 / 2017-04-14
+# Release 04 / 2017-06-25
 
 package main;
 
@@ -372,8 +372,8 @@ sub withings_Define($$) {
 
     $hash->{helper}{username} = $username;
     $hash->{helper}{password} = $password;
-    $hash->{helper}{appliver} = undef;
-    $hash->{helper}{csrf_token} = undef;
+    $hash->{helper}{appliver} = '9855c478';
+    $hash->{helper}{csrf_token} = '9855c478';
   } else {
     return "Usage: define <name> withings ACCOUNT <login> <password>"  if(@a < 3 || @a > 5);
   }
@@ -519,7 +519,9 @@ sub withings_getSessionKey($) {
 
   return if( $hash->{SUBTYPE} ne "ACCOUNT" );
 
-  my $resolve = inet_aton("healthmate.withings.com");
+  return if( $hash->{SessionKey} && $hash->{SessionTimestamp} && gettimeofday() - $hash->{SessionTimestamp} < (60*60*24*7-3600) );
+
+  my $resolve = inet_aton("account.health.nokia.com");
   if(!defined($resolve))
   {
     $hash->{SessionTimestamp} = 0;
@@ -527,47 +529,45 @@ sub withings_getSessionKey($) {
     return undef;
   }
 
-  return if( $hash->{SessionKey} && $hash->{SessionTimestamp} && gettimeofday() - $hash->{SessionTimestamp} < (60*60*24*7-3600) );
-
   $hash->{'.https'} = "https" if(!defined($hash->{'.https'}));
 
-  my $data1;
-  if( !defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}))
-  {
-    my($err0,$data0) = HttpUtils_BlockingGet({
-      url => $hash->{'.https'}."://healthmate.withings.com/",
-      timeout => 10,
-      noshutdown => 1,
-    });
-    if($err0 || !defined($data0))
-    {
-      Log3 "withings", 1, "$name: appliver call failed! ".$err0;
-      return undef;
-    }
-    $data1 = $data0;
-    $data0 =~ /appliver=([^.*]+)\&/;
-    $hash->{helper}{appliver} = $1;
-    if(!defined($hash->{helper}{appliver})) {
-      Log3 "withings", 1, "$name: APPLIVER ERROR ";
-      $hash->{STATE} = "APPLIVER error";
-      return undef;
-    }
-    Log3 "withings", 4, "$name: appliver ".$hash->{helper}{appliver};
+  # my $data1;
+  # if( !defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}) || !defined($hash->{SessionTimestamp}) || gettimeofday() - $hash->{SessionTimestamp} > (30*60) )#!defined($hash->{helper}{appliver}) || !defined($hash->{helper}{csrf_token}))
+  # {
+  #   my($err0,$data0) = HttpUtils_BlockingGet({
+  #     url => $hash->{'.https'}."://healthmate.withings.com/",
+  #     timeout => 10,
+  #     noshutdown => 1,
+  #   });
+  #   if($err0 || !defined($data0))
+  #   {
+  #     Log3 "withings", 1, "$name: appliver call failed! ".$err0;
+  #     return undef;
+  #   }
+  #   $data1 = $data0;
+  #   $data0 =~ /appliver=([^.*]+)\&/;
+  #   $hash->{helper}{appliver} = $1;
+  #   if(!defined($hash->{helper}{appliver})) {
+  #     Log3 "withings", 1, "$name: APPLIVER ERROR ";
+  #     $hash->{STATE} = "APPLIVER error";
+  #     return undef;
+  #   }
+  #   Log3 "withings", 4, "$name: appliver ".$hash->{helper}{appliver};
+  # #}
+  # 
+  # 
+  # #if( !defined($hash->{helper}{csrf_token}) )
+  # #{
+  #   $data1 =~ /csrf_token" value="(.*)"/;
+  #   $hash->{helper}{csrf_token} = $1;
+  #   
+  #   if(!defined($hash->{helper}{csrf_token})) {
+  #     Log3 "withings", 1, "$name: CSRF ERROR ";
+  #     $hash->{STATE} = "CSRF error";
+  #     return undef;
+  #   }
+  #   Log3 "withings", 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
   #}
-
-
-  #if( !defined($hash->{helper}{csrf_token}) )
-  #{
-    $data1 =~ /csrf_token" value="(.*)"/;
-    $hash->{helper}{csrf_token} = $1;
-    
-    if(!defined($hash->{helper}{csrf_token})) {
-      Log3 "withings", 1, "$name: CSRF ERROR ";
-      $hash->{STATE} = "CSRF error";
-      return undef;
-    }
-    Log3 "withings", 4, "$name: csrf_token ".$hash->{helper}{csrf_token};
-  }
 
     #my $ua = LWP::UserAgent->new;
     #my $request = HTTP::Request->new(POST => $hash->{'.https'}.'://account.withings.com/connectionuser/account_login?appname=my2&appliver='.$hash->{helper}{appliver}.'&r=https%3A%2F%2Fhealthmate.withings.com%2F',[email => withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => '',]);
@@ -575,19 +575,19 @@ sub withings_getSessionKey($) {
     #$request->content($get_data);
     #my $response = $ua->request($request);
 
-    $resolve = inet_aton("account.withings.com");
-    if(!defined($resolve))
-    {
-      Log3 "withings", 1, "$name: DNS error on getSessionKey.";
-      return undef;
-    }
+    # $resolve = inet_aton("account.health.nokia.com");
+    # if(!defined($resolve))
+    # {
+    #   Log3 "withings", 1, "$name: DNS error on getSessionKey.";
+    #   return undef;
+    # }
 
   my $datahash = {
-    url => $hash->{'.https'}."://account.withings.com/connectionuser/account_login?appname=my2&appliver=".$hash->{helper}{appliver}."&r=https%3A%2F%2Fhealthmate.withings.com%2F",
+      url => $hash->{'.https'}."://account.health.nokia.com/connectionwou/account_login?r=https://dashboard.health.nokia.com/",
     timeout => 10,
     noshutdown => 1,
     ignoreredirects => 1,
-    data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => '', csrf_token => $hash->{helper}{csrf_token} },
+      data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => '' },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
@@ -612,8 +612,8 @@ sub withings_getSessionKey($) {
     {
       $hash->{STATE} = "Cookie error";
       Log3 "withings", 1, "$name: COOKIE ERROR ";
-      $hash->{helper}{appliver} = undef;
-      $hash->{helper}{csrf_token} = undef;
+      $hash->{helper}{appliver} = '9855c478';
+      $hash->{helper}{csrf_token} = '9855c478';
       return undef;
     }
   }
