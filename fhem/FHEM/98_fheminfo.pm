@@ -87,8 +87,8 @@ sub _fi2_Count() {
          $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
          $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
          $model = AttrVal($name,'model',$model);
-#         $model = ReadingsVal($name,'type',$model);
          $model = ReadingsVal($name,'model',$model);
+      next if ( ($model =~ /^unkno.*/i) || ($model eq '?') );
       $fhemInfo{$type}{$model}++ 
          unless (defined($defs{$key}{'chanNo'}) || $name =~ m/^unknown_/); # exclude Homematic specials
    }
