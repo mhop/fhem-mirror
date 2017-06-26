@@ -32,6 +32,8 @@ sub PIONEERAVRZONE_Set($@);
 sub PIONEERAVRZONE_Attr($@);
 sub PIONEERAVRZONE_Define($$);
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 ###################################
 sub
 PIONEERAVRZONE_Initialize($)
@@ -557,6 +559,9 @@ PIONEERAVRZONE_Define($$)
 1;
 
 =pod
+=item device
+=item summary control for the zones of a PIONEER AV receivers via network or serial connection
+=item summary_DE Steuerung der Zonen eines PIONEER AV Receiver per Netzwerk oder seriell
 =begin html
 
 <a name="PIONEERAVRZONE"></a>
