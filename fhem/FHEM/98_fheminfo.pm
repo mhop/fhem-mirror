@@ -78,6 +78,7 @@ sub _fi2_Count() {
    $fhemInfo{'system'}{'os'}       = $os;
    $fhemInfo{'system'}{'arch'}     = $arch;
    $fhemInfo{'system'}{'perl'}     = $perl;
+   $fhemInfo{'system'}{'revision'} = _fi2_findRev();
 
    foreach my $key ( keys %defs )
    {
@@ -125,6 +126,7 @@ sub _fi2_TelnetTable($) {
   $str .= "System Info\n";
   $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{'system'}{'release'});
   $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{'system'}{'feature'});
+  $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{'system'}{'revision'});
   $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{'system'}{'os'});
   $str .= sprintf("  Arch%*s: %s\n",9," ",$fhemInfo{'system'}{'arch'});
   $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{'system'}{'perl'});
@@ -153,6 +155,7 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td>System Info</td></tr>";
       $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{'system'}{'release'}</td></tr>";
       $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{'system'}{'feature'}</td></tr>";
+      $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{'system'}{'revision'}</td></tr>";
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{'system'}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{'system'}{'arch'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{'system'}{'perl'}</td></tr>";
@@ -193,6 +196,13 @@ sub _fi2_Uptime() {
 sub _fi2_Div($$) {
   my ($p1,$p2) = @_;
   return (int($p1/$p2), $p1 % $p2);
+}
+
+sub _fi2_findRev {
+   my ($err, @content) = FileRead({FileName => './controls_fhem.txt', ForceType => "file"});
+   return if $err;
+   my (undef,$rev) = split (/ /,$content[0]);
+   return $rev;
 }
 
 1;
