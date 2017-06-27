@@ -114,7 +114,7 @@ sub PIONEERAVR_Initialize($) {
       volumeLimitStraight
       disable:0,1
       connectionCheck:off,30,45,60,75,90,105,120
-      timeout:1,2,3,4,5
+      timeout:1,2,3,4,5,7,10,15
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
@@ -155,232 +155,238 @@ sub PIONEERAVR_Initialize($) {
 sub PIONEERAVR_Define($$) {
     my ( $hash, $a, $h ) = @_;
     my $name  = $hash->{NAME};
-#    my $infix = "PIONEERAVR";
 
     Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_Define()";
 
+    my $protocol = @$a[2];
 
-#   my ( $hash, $def) = @_;
-#  my @a = split("[ \t]+", $def);
-#  my $name = $hash->{NAME};
-  my $protocol = @$a[2];
+    Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_Define()";
 
-  Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_Define()";
+    if( int(@$a) != 4 || (($protocol ne "telnet") && ($protocol ne "serial"))) {
+        my $msg = "Wrong syntax: define <name> PIONEERAVR telnet <ipaddress[:port]> or define <name> PIONEERAVR serial <devicename[\@baudrate]>";
+        Log3 $name, 3, "PIONEERAVR $name: " . $msg;
+        return $msg;
+    }
 
-  if( int(@$a) != 4 || (($protocol ne "telnet") && ($protocol ne "serial"))) {
-    my $msg = "Wrong syntax: define <name> PIONEERAVR telnet <ipaddress[:port]> or define <name> PIONEERAVR serial <devicename[\@baudrate]>";
-    Log3 $name, 3, "PIONEERAVR $name: " . $msg;
-    return $msg;
-  }
-#  $hash->{TYPE} = "PIONEERAVR";
+    RemoveInternalTimer( $hash);
+    DevIo_CloseDev( $hash);
+    delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
 
-  RemoveInternalTimer( $hash);
-  DevIo_CloseDev( $hash);
-  delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
+    # set default attributes
+    if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
+        fhem 'attr ' . $name . ' stateFormat stateAV';
+        fhem 'attr ' . $name
+          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
+        fhem 'attr ' . $name . ' webCmd volume:mute:input';
+        fhem 'attr ' . $name
+          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED:reopen playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
+    }
 
-  # set default attributes
-  if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
-    fhem 'attr ' . $name . ' stateFormat stateAV';
-    fhem 'attr ' . $name
-      . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
-    fhem 'attr ' . $name . ' webCmd volume:mute:input';
-    fhem 'attr ' . $name
-      . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED:reopen playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
-  }
+	# $hash->{DeviceName} is needed for DevIo_OpenDev()
+	$hash->{Protocol}= $protocol;
+	my $devicename= @$a[3];
+	$hash->{DeviceName} = $devicename;
 
-  # $hash->{DeviceName} is needed for DevIo_OpenDev()
-  $hash->{Protocol}= $protocol;
-  my $devicename= @$a[3];
-  $hash->{DeviceName} = $devicename;
+	# connect using serial connection (old blocking style)
+	if ( $hash->{Protocol} eq "serial" )
+	{
+	    my $ret = DevIo_OpenDev( $hash, 0, undef);
+	    return $ret;
+	}
 
-  # connect using serial connection (old blocking style)
-  if ( $hash->{Protocol} eq "serial" )
-  {
-    my $ret = DevIo_OpenDev( $hash, 0, undef);
-    return $ret;
-  }
+	# connect using TCP connection (non-blocking style)
+	else {
+    	# add missing port if required
+	    $hash->{DeviceName} = $hash->{DeviceName} . ":8102"
+	      if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
 
-  # connect using TCP connection (non-blocking style)
-  else {
-    # add missing port if required
-    $hash->{DeviceName} = $hash->{DeviceName} . ":8102"
-      if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
+		DevIo_OpenDev(
+			$hash, 0,
+			"PIONEERAVR_DevInit",
+			sub() {
+			  my ( $hash, $err ) = @_;
+			  Log3 $name, 4, "PIONEERAVR $name: devName: $devicename HashDevName $hash->{DeviceName}";
+			}
+		);
+	}
 
-    DevIo_OpenDev(
-        $hash, 0,
-        "PIONEERAVR_DevInit",
-        sub() {
-          my ( $hash, $err ) = @_;
-          Log3 $name, 4, "PIONEERAVR $name: devName: $devicename HashDevName $hash->{DeviceName}";
-        }
-    );
-  }
+	$hash->{helper}{receiver} = undef;
 
-  $hash->{helper}{receiver} = undef;
+	unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
+	{
+    	$hash->{helper}{AVAILABLE} = 1;
+	    readingsSingleUpdate( $hash, "presence", "present", 1 );
+	}
 
-  unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
-  {
-    $hash->{helper}{AVAILABLE} = 1;
-    readingsSingleUpdate( $hash, "presence", "present", 1 );
-  }
-
-  # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
-  # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
-  # So this list is just a fall back if the module can't read the names ...
-  # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
-  # Additionally this module tries to get information from the Pioneer AVR
-  #  - about the input level adjust
-  #  - to which connector each input is connected.
-  #    There are 3 groups of connectors:
-  #     - Audio connectors (possible values are: ANALOG, COAX 1...3, OPT 1...3)
-  #     - Component connectors (anaolog video, possible values: COMPONENT 1...3)
-  #     - HDMI connectors (possible values are hdmi 1 ... hdmi 8)
-  $hash->{helper}{INPUTNAMES} = {
-    "00" => {"name" => "phono",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0", "audioTerminal" => "No Assign", "componentTerminal" => "No Assign", "hdmiTerminal" => "No Assign", "inputLevelAdjust" => 1},
-    "01" => {"name" => "cd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "02" => {"name" => "tuner",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "03" => {"name" => "cdrTape",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "04" => {"name" => "dvd",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "05" => {"name" => "tvSat",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "06" => {"name" => "cblSat",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "10" => {"name" => "video1",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "12" => {"name" => "multiChIn",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "13" => {"name" => "usbDac",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "14" => {"name" => "video2",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "15" => {"name" => "dvrBdr",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "17" => {"name" => "iPodUsb",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "18" => {"name" => "xmRadio",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "19" => {"name" => "hdmi1",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "20" => {"name" => "hdmi2",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "21" => {"name" => "hdmi3",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "22" => {"name" => "hdmi4",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "23" => {"name" => "hdmi5",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "24" => {"name" => "hdmi6",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "25" => {"name" => "bd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "26" => {"name" => "homeMediaGallery",  "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "27" => {"name" => "sirius",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "31" => {"name" => "hdmiCyclic",        "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "33" => {"name" => "adapterPort",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "34" => {"name" => "hdmi7",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "35" => {"name" => "hdmi8",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-    "38" => {"name" => "internetRadio",     "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "41" => {"name" => "pandora",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-    "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
-    };
+	# $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
+	# This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
+	# So this list is just a fall back if the module can't read the names ...
+	# InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
+	# Additionally this module tries to get information from the Pioneer AVR
+	#  - about the input level adjust
+	#  - to which connector each input is connected.
+	#    There are 3 groups of connectors:
+	#     - Audio connectors (possible values are: ANALOG, COAX 1...3, OPT 1...3)
+	#     - Component connectors (anaolog video, possible values: COMPONENT 1...3)
+	#     - HDMI connectors (possible values are hdmi 1 ... hdmi 8)
+	$hash->{helper}{INPUTNAMES} = {
+		"00" => {"name" => "phono",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0", "audioTerminal" => "No Assign", "componentTerminal" => "No Assign", "hdmiTerminal" => "No Assign", "inputLevelAdjust" => 1},
+		"01" => {"name" => "cd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"02" => {"name" => "tuner",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"03" => {"name" => "cdrTape",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"04" => {"name" => "dvd",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"05" => {"name" => "tvSat",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"06" => {"name" => "cblSat",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"10" => {"name" => "video1",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"12" => {"name" => "multiChIn",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"13" => {"name" => "usbDac",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"14" => {"name" => "video2",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"15" => {"name" => "dvrBdr",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"17" => {"name" => "iPodUsb",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"18" => {"name" => "xmRadio",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"19" => {"name" => "hdmi1",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"20" => {"name" => "hdmi2",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"21" => {"name" => "hdmi3",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"22" => {"name" => "hdmi4",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"23" => {"name" => "hdmi5",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"24" => {"name" => "hdmi6",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"25" => {"name" => "bd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"26" => {"name" => "homeMediaGallery",  "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"27" => {"name" => "sirius",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"31" => {"name" => "hdmiCyclic",        "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"33" => {"name" => "adapterPort",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"34" => {"name" => "hdmi7",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"35" => {"name" => "hdmi8",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+		"38" => {"name" => "internetRadio",     "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"41" => {"name" => "pandora",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+		"53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
+	};
   # ----------------Human Readable command mapping table for "set" commands-----------------------
   $hash->{helper}{SETS} = {
     'main' => {
-        'on'                 => 'PO',
-        'off'                => 'PF',
-        'toggle'             => 'PZ',
-        'volumeUp'           => 'VU',
-        'volumeDown'         => 'VD',
-        'volume'             => 'VL',
-        'muteOn'             => 'MO',
-        'muteOff'            => 'MF',
-        'muteToggle'         => 'MZ',
-        'bassUp'             => 'BI',
-        'bassDown'           => 'BD',
-        'trebleUp'           => 'TI',
-        'trebleDown'         => 'TD',
-        'input'              => 'FN',
-        'inputUp'            => 'FU',
-        'inputDown'          => 'FD',
-        'channelUp'          => 'TPI',
-        'channelDown'        => 'TPD',
-        '0Network'           => '00NW',
-        '1Network'           => '01NW',
-        '2Network'           => '02NW',
-        '3Network'           => '03NW',
-        '4Network'           => '04NW',
-        '5Network'           => '05NW',
-        '6Network'           => '06NW',
-        '7Network'           => '07NW',
-        '8Network'           => '08NW',
-        '9Network'           => '09NW',
-        'prevNetwork'        => '12NW',
-        'nextNetwork'        => '13NW',
-        'revNetwork'         => '14NW',
-        'fwdNetwork'         => '15NW',
-        'upNetwork'          => '26NW',
-        'downNetwork'        => '27NW',
-        'rightNetwork'       => '28NW',
-        'leftNetwork'        => '29NW',
-        'enterNetwork'       => '30NW',
-        'returnNetwork'      => '31NW',
-        'menuNetwork'        => '36NW',
-        'playNetwork'        => '10NW',
-        'pauseNetwork'       => '11NW',
-        'stopNetwork'        => '20NW',
-        'repeatNetwork'      => '34NW',
-        'shuffleNetwork'     => '35NW',
-        'selectLine01'       => '01GFH',
-        'selectLine02'       => '02GFH',
-        'selectLine03'       => '03GFH',
-        'selectLine04'       => '04GFH',
-        'selectLine05'       => '05GFH',
-        'selectLine06'       => '06GFH',
-        'selectLine07'       => '07GFH',
-        'selectLine08'       => '08GFH',
-        'playIpod'           => '00IP',
-        'pauseIpod'          => '01IP',
-        'stopIpod'           => '02IP',
-        'repeatIpod'         => '07IP',
-        'shuffleIpod'        => '08IP',
-        'prevIpod'           => '03IP',
-        'nextIpod'           => '04IP',
-        'revIpod'            => '05IP',
-        'fwdIpod'            => '06IP',
-        'upIpod'             => '13IP',
-        'downIpod'           => '14IP',
-        'rightIpod'          => '15IP',
-        'leftIpod'           => '16IP',
-        'enterIpod'          => '17IP',
-        'returnIpod'         => '18IP',
-        'menuIpod'           => '19IP',
-        'playAdapterPort'    => '10BT',
-        'pauseAdapterPort'   => '11BT',
-        'stopAdapterPort'    => '12BT',
-        'repeatAdapterPort'  => '17BT',
-        'shuffleAdapterPort' => '18BT',
-        'prevAdapterPort'    => '13BT',
-        'nextAdapterPort'    => '14BT',
-        'revAdapterPort'     => '15BT',
-        'fwdAdapterPort'     => '16BT',
-        'upAdapterPort'      => '21BT',
-        'downAdapterPort'    => '22BT',
-        'rightAdapterPort'   => '23BT',
-        'leftAdapterPort'    => '24BT',
-        'enterAdapterPort'   => '25BT',
-        'returnAdapterPort'  => '26BT',
-        'menuAdapterPort'    => '27BT',
-        'playMhl'            => '23MHL',
-        'pauseMhl'           => '25MHL',
-        'stopMhl'            => '24MHL',
-        '0Mhl'               => '07MHL',
-        '1Mhl'               => '08MHL',
-        '2Mhl'               => '09MHL',
-        '3Mhl'               => '10MHL',
-        '4Mhl'               => '11MHL',
-        '5Mhl'               => '12MHL',
-        '6Mhl'               => '13MHL',
-        '7Mhl'               => '14MHL',
-        '8Mhl'               => '15MHL',
-        '9Mhl'               => '16MHL',
-        'prevMhl'            => '31MHL',
-        'nextMhl'            => '30MHL',
-        'revMhl'             => '27MHL',
-        'fwdMhl'             => '28MHL',
-        'upMhl'              => '01MHL',
-        'downMhl'            => '02MHL',
-        'rightMhl'           => '04MHL',
-        'leftMhl'            => '03MHL',
-        'enterMhl'           => '17MHL',
-        'returnMhl'          => '06MHL',
-        'menuMhl'            => '05MHL'
+        'on'                     => 'PO',
+        'off'                    => 'PF',
+        'toggle'                 => 'PZ',
+        'volumeUp'               => 'VU',
+        'volumeDown'             => 'VD',
+        'volume'                 => 'VL',
+        'muteOn'                 => 'MO',
+        'muteOff'                => 'MF',
+        'muteToggle'             => 'MZ',
+        'bassUp'                 => 'BI',
+        'bassDown'               => 'BD',
+        'trebleUp'               => 'TI',
+        'trebleDown'             => 'TD',
+        'input'                  => 'FN',
+        'inputUp'                => 'FU',
+        'inputDown'              => 'FD',
+        'channelUp'              => 'TPI',
+        'channelDown'            => 'TPD',
+        '0Network'               => '00NW',
+        '1Network'               => '01NW',
+        '2Network'               => '02NW',
+        '3Network'               => '03NW',
+        '4Network'               => '04NW',
+        '5Network'               => '05NW',
+        '6Network'               => '06NW',
+        '7Network'               => '07NW',
+        '8Network'               => '08NW',
+        '9Network'               => '09NW',
+        'prevNetwork'            => '12NW',
+        'nextNetwork'            => '13NW',
+        'revNetwork'             => '14NW',
+        'fwdNetwork'             => '15NW',
+        'upNetwork'              => '26NW',
+        'downNetwork'            => '27NW',
+        'rightNetwork'           => '28NW',
+        'leftNetwork'            => '29NW',
+        'enterNetwork'           => '30NW',
+        'returnNetwork'          => '31NW',
+        'menuNetwork'            => '36NW',
+        'playNetwork'            => '10NW',
+        'pauseNetwork'           => '11NW',
+        'stopNetwork'            => '20NW',
+        'repeatNetwork'          => '34NW',
+        'shuffleNetwork'         => '35NW',
+		'updateScreenNetwork'    => '?GAH',
+        'selectLine01Network'    => '01GFH',
+        'selectLine02Network'    => '02GFH',
+        'selectLine03Network'    => '03GFH',
+        'selectLine04Network'    => '04GFH',
+        'selectLine05Network'    => '05GFH',
+        'selectLine06Network'    => '06GFH',
+        'selectLine07Network'    => '07GFH',
+        'selectLine08Network'    => '08GFH',
+        'selectScreenPageNetwork'=> 'GGH',
+        'playIpod'               => '00IP',
+        'pauseIpod'              => '01IP',
+        'stopIpod'               => '02IP',
+        'repeatIpod'             => '07IP',
+        'shuffleIpod'            => '08IP',
+        'prevIpod'               => '03IP',
+        'nextIpod'               => '04IP',
+        'revIpod'                => '05IP',
+        'fwdIpod'                => '06IP',
+        'upIpod'                 => '13IP',
+        'downIpod'               => '14IP',
+        'rightIpod'              => '15IP',
+        'leftIpod'               => '16IP',
+        'enterIpod'              => '17IP',
+        'returnIpod'             => '18IP',
+        'menuIpod'               => '19IP',
+		'updateScreenIpod'       => '?GAI',
+        'selectLine01Ipod'       => '01GFI',
+        'selectLine02Ipod'       => '02GFI',
+        'selectLine03Ipod'       => '03GFI',
+        'selectLine04Ipod'       => '04GFI',
+        'selectLine05Ipod'       => '05GFI',
+        'selectLine06Ipod'       => '06GFI',
+        'selectLine07Ipod'       => '07GFI',
+        'selectLine08Ipod'       => '08GFI',
+        'selectScreenPageIpod'   => 'GGI',
+        'playAdapterPort'        => '10BT',
+        'pauseAdapterPort'       => '11BT',
+        'stopAdapterPort'        => '12BT',
+        'repeatAdapterPort'      => '17BT',
+        'shuffleAdapterPort'     => '18BT',
+        'prevAdapterPort'        => '13BT',
+        'nextAdapterPort'        => '14BT',
+        'revAdapterPort'         => '15BT',
+        'fwdAdapterPort'         => '16BT',
+        'upAdapterPort'          => '21BT',
+        'downAdapterPort'        => '22BT',
+        'rightAdapterPort'       => '23BT',
+        'leftAdapterPort'        => '24BT',
+        'enterAdapterPort'       => '25BT',
+        'returnAdapterPort'      => '26BT',
+        'menuAdapterPort'        => '27BT',
+        'playMhl'                => '23MHL',
+        'pauseMhl'               => '25MHL',
+        'stopMhl'                => '24MHL',
+        '0Mhl'                   => '07MHL',
+        '1Mhl'                   => '08MHL',
+        '2Mhl'                   => '09MHL',
+        '3Mhl'                   => '10MHL',
+        '4Mhl'                   => '11MHL',
+        '5Mhl'                   => '12MHL',
+        '6Mhl'                   => '13MHL',
+        '7Mhl'                   => '14MHL',
+        '8Mhl'                   => '15MHL',
+        '9Mhl'                   => '16MHL',
+        'prevMhl'                => '31MHL',
+        'nextMhl'                => '30MHL',
+        'revMhl'                 => '27MHL',
+        'fwdMhl'                 => '28MHL',
+        'upMhl'                  => '01MHL',
+        'downMhl'                => '02MHL',
+        'rightMhl'               => '04MHL',
+        'leftMhl'                => '03MHL',
+        'enterMhl'               => '17MHL',
+        'returnMhl'              => '06MHL',
+        'menuMhl'                => '05MHL'
     },
     'zone2' => {
         'on'                 => 'APO',
@@ -952,16 +958,7 @@ sub PIONEERAVR_Define($$) {
     "31"=>"buffer",
     "33"=>"station"
   };
-  $hash->{helper}{SCREENTYPES} = {
-    "00"=>"Message",
-    "01"=>"List",
-    "02"=>"Playing(Play)",
-    "03"=>"Playing(Pause)",
-    "04"=>"Playing(Fwd)",
-    "05"=>"Playing(Rev)",
-    "06"=>"Playing(Stop)",
-    "99"=>"Drawing invalid"
-  };
+  
  # indicates what the source of the screen information is
  $hash->{helper}{SOURCEINFO} = {
     "00"=>"Internet Radio",
@@ -1263,8 +1260,17 @@ sub PIONEERAVR_Define($$) {
     "23"=>"screenName",
     "24"=>"screenHierarchy",
     "25"=>"screenTopMenuKey",
-    "26"=>"screenIpodKey",
-    "27"=>"screenReturnKey"
+    "26"=>"screenToolsKey",
+    "27"=>"screenReturnKey",
+	"28"=>"playStatus",
+	"29"=>"sourceInfo",
+	"30"=>"currentAlbum",
+    "31"=>"currentArtist",
+    "32"=>"currentTitle",
+    "33"=>"channel",
+    "34"=>"channelName",
+    "35"=>"channelStraight",
+    "36"=>"tunerFrequency"	
     };
 
   ### initialize timer
@@ -1438,7 +1444,7 @@ sub PIONEERAVR_Notify($$) {
             readingsBulkUpdate( $hash, "stateAV", $stateAV )
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
-            PIONEERAVR_Write( $hash, "?P\n\r?M\n\r?V\n\r\F\n\r" );
+            PIONEERAVR_Write( $hash, "?P\n\r?M\n\r?V\n\r\?F\n\r" );
 
             # send to slaves
             if ( $definedZones > 1 ) {
@@ -1513,7 +1519,17 @@ PIONEERAVR_Set($@)
 						  "left",
 						  "enter",
 						  "return",
-						  "menu");        # available commands for certain inputs (@playerInputNr)
+						  "menu",
+						  "updateScreen",
+						  "selectLine01",
+						  "selectLine02",
+						  "selectLine03",
+						  "selectLine04",
+						  "selectLine05",
+						  "selectLine06",
+						  "selectLine07",
+						  "selectLine08",
+						  "selectScreenPage");        # available commands for certain inputs (@playerInputNr)
 	my @playerInputNr  = ("13","17","18","26","27","33","38","41","44","45","48","53");  # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
 	my @setsTuner      = ("channelUp",
 	                      "channelDown",
@@ -1527,15 +1543,7 @@ PIONEERAVR_Set($@)
 						  "muteOff",
 						  "muteToggle",
 						  "inputUp",
-						  "inputDown",
-						  "selectLine01",
-						  "selectLine02",
-						  "selectLine03",
-						  "selectLine04",
-						  "selectLine05",
-						  "selectLine06",
-						  "selectLine07",
-						  "selectLine08" ); # set commands without arguments
+						  "inputDown" ); # set commands without arguments
 	my $playerCmd      = "";
 	my $inputNr        = "";
 
@@ -1597,7 +1605,7 @@ PIONEERAVR_Set($@)
 	if ( $inputNr ~~ @playerInputNr ) {
 		$list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg prev:noArg next:noArg rev:noArg fwd:noArg up:noArg down:noArg";
 		$list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
-		$list .= " selectLine01:noArg selectLine02:noArg selectLine03:noArg selectLine04:noArg selectLine05:noArg selectLine06:noArg selectLine07:noArg selectLine08:noArg";
+		$list .= " updateScreen:noArg selectLine01:noArg selectLine02:noArg selectLine03:noArg selectLine04:noArg selectLine05:noArg selectLine06:noArg selectLine07:noArg selectLine08:noArg selectScreenPage ";
 	}
 	
 	$list .= " networkStandby:on,off";
@@ -1661,14 +1669,50 @@ PIONEERAVR_Set($@)
 		} elsif ($cmd  ~~ @setsPlayer) {
 			Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command)";
 			if ($inputNr eq "17") {
-				$playerCmd= $cmd."Ipod";
-			} elsif ($inputNr eq "33") {
+				if ( $cmd eq "selectScreenPage" ) {
+					my $setCmd    = sprintf "%05dGGI", $arg;
+					PIONEERAVR_Write( $hash, $setCmd);
+					return undef;					
+				} else {
+					$playerCmd = $cmd."Ipod";
+				}
+
+			} elsif ($inputNr eq "33" 
+						&& ( $cmd ne "updateScreen" ) 
+						&& ( $cmd ne "selectLine01" ) 
+						&& ( $cmd ne "selectLine02" ) 
+						&& ( $cmd ne "selectLine03" ) 
+						&& ( $cmd ne "selectLine04" ) 
+						&& ( $cmd ne "selectLine05" ) 
+						&& ( $cmd ne "selectLine06" ) 
+						&& ( $cmd ne "selectLine07" ) 
+						&& ( $cmd ne "selectLine08" )  
+						&& ( $cmd ne "selectScreenPage") ) {
 				$playerCmd= $cmd."AdapterPort";
 			#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
 			} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
-				$playerCmd= $cmd."Network";
+				if ( $cmd eq "selectScreenPage" ) {
+					my $setCmd = sprintf "%05dGGH", $arg;
+					PIONEERAVR_Write( $hash, $setCmd);
+					return undef;					
+				} else {
+    				$playerCmd= $cmd."Network";
+				}
+
 			#### 'random' and 'repeat' are not available on input mhl
-			} elsif (($inputNr eq "48") && ( $cmd ne "repeat") && ( $cmd ne "random")) {
+			} elsif (($inputNr eq "48") 
+			            && ( $cmd ne "repeat") 
+					    && ( $cmd ne "random")
+						&& ( $cmd ne "updateScreen" ) 
+						&& ( $cmd ne "selectLine01" ) 
+						&& ( $cmd ne "selectLine02" ) 
+						&& ( $cmd ne "selectLine03" ) 
+						&& ( $cmd ne "selectLine04" ) 
+						&& ( $cmd ne "selectLine05" ) 
+						&& ( $cmd ne "selectLine06" ) 
+						&& ( $cmd ne "selectLine07" ) 
+						&& ( $cmd ne "selectLine08" )  
+						&& ( $cmd ne "selectScreenPage" ) ) {
 				$playerCmd= $cmd."Mhl";
 			} else {
 				my $err= "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
@@ -1952,7 +1996,7 @@ PIONEERAVR_Set($@)
 	}
 }
 #####################################
-sub PIONEERAVR_Get($$$) {
+sub PIONEERAVR_Get($@) {
 	my ( $hash, $a, $h )  = @_;
 	my $name             = $hash->{NAME};
 	my $cmd              = @$a[1];
@@ -2022,7 +2066,7 @@ sub PIONEERAVR_Read($)
 
     # reset connectionCheck timer
     my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
-    RemoveInternalTimer( $hash);
+    RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
     if ( $checkInterval ne "off" ) {
         my $next = gettimeofday() + $checkInterval;
         $hash->{helper}{nextConnectionCheck} = $next;
@@ -2673,7 +2717,7 @@ sub PIONEERAVR_Read($)
 			#   $4: Top menu key flag
 			#     0:Invalidity
 			#     1:Effectiveness
-			#   $5: iPod Control Key Information
+			#   $5: Tools (menu, edit,iPod Control) Key Information
 			#     0:Invalidity
 			#     1:Effectiveness
 			#   $6: Return Key Information
@@ -2688,9 +2732,27 @@ sub PIONEERAVR_Read($)
 			readingsBulkUpdate( $hash, "screenName", $8 );
 			readingsBulkUpdate( $hash, "screenHierarchy", $3 );
 			readingsBulkUpdate( $hash, "screenTopMenuKey", $4 );
-			readingsBulkUpdate( $hash, "screenIpodKey", $5 );
+			readingsBulkUpdate( $hash, "screenToolsKey", $5 );
 			readingsBulkUpdate( $hash, "screenReturnKey", $6 );
 
+			# to update the OSD/screen while playing from iPad/network a command has to be sent regulary
+			if ($2 eq "02" ) {
+				# reset screenUpdate timer -> again in 5s
+				my $checkInterval = 5;
+				my $next = gettimeofday() + $checkInterval;
+				$hash->{helper}{nextScreenUpdate} = $next;
+				InternalTimer( $next, "PIONEERAVR_screenUpdate", $hash, 0 );
+				readingsBulkUpdate( $hash, "playStatus", "playing" );
+			} elsif ( $2 eq "03" ) {
+				readingsBulkUpdate( $hash, "playStatus", "paused" );			
+			} elsif ( $2 eq "04" ) {
+				readingsBulkUpdate( $hash, "playStatus", "fast-forward" );			
+			} elsif ( $2 eq "05" ) {
+				readingsBulkUpdate( $hash, "playStatus", "fast-rewind" );			
+			} elsif ( $2 eq "06" ) {
+				readingsBulkUpdate( $hash, "playStatus", "stopped" );			
+			}
+				
 		# Source information
 		} elsif ( $line =~ m/^(GHH)(\d{2})$/ ) {
 			my $sourceInfo = $hash->{helper}{SOURCEINFO}{$2};
@@ -2994,18 +3056,18 @@ sub PIONEERAVR_Write($$) {
   DevIo_SimpleWrite( $hash, $msg, 0 );
 
     # do connection check latest after TIMEOUT
-    my $next = gettimeofday() + AttrVal( $name, "timeout", "3" );
+    my $next = gettimeofday() + AttrVal( $name, "timeout", "5" );
     if ( !defined( $hash->{helper}{nextConnectionCheck} )
         || $hash->{helper}{nextConnectionCheck} > $next )
     {
         $hash->{helper}{nextConnectionCheck} = $next;
-        RemoveInternalTimer( $hash);
+        RemoveInternalTimer($hash, "PIONEERAVR_connectionCheck");
         InternalTimer( $next, "PIONEERAVR_connectionCheck", $hash, 0 );
     }
 }
 
 ######################################################################################
-# PIONEERAVR_checkConnection is called if PIONEERAVR received no data for 120s
+# PIONEERAVR_connectionCheck is called if PIONEERAVR received no data for 120s
 #   we send a "new line" and expect (if the connection is up) to receive "R"
 #   DevIo_Expect() is used for this
 #   DevIO_Expect() sends a command (just a "new line") and waits up to 5s for a reply
@@ -3023,7 +3085,7 @@ sub PIONEERAVR_connectionCheck ($) {
     my $name = $hash->{NAME};
     my $verbose = AttrVal( $name, "verbose", "" );
 
-    RemoveInternalTimer( $hash );
+    RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
 
     $hash->{STATE} = "opened";    # assume we have an open connection
     $attr{$name}{verbose} = 0 if ( $verbose eq "" || $verbose < 4 );
@@ -3031,7 +3093,7 @@ sub PIONEERAVR_connectionCheck ($) {
     my $connState =
       DevIo_Expect( $hash,
         "\r\n",
-        AttrVal( $name, "timeout", "3" ) );
+        AttrVal( $name, "timeout", "5" ) );
 
     # successful connection
     if ( defined($connState) ) {
@@ -3045,20 +3107,47 @@ sub PIONEERAVR_connectionCheck ($) {
         }
 
 		if ($connState =~ m/^R\r?\n?$/) {
-			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- connstate=R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
+			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate=R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
 		} else {
 			$hash->{PARTIAL} .= $connState;
-			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- connstate<>R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
+			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate<>R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
 		}
     }	  
     $attr{$name}{verbose} = $verbose if ( $verbose ne "" );
     delete $attr{$name}{verbose} if ( $verbose eq "" );
 }
 
+sub PIONEERAVR_screenUpdate($) {
+	my ($hash)    = @_;
+	my $name      = $hash->{NAME};
+	my $cmd       = "updateScreen";
+	my $playerCmd = "";
+	
+	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate()";
+
+	if ( defined( $hash->{helper}{main}{CURINPUTNR} ) ) {
+		my $inputNr = $hash->{helper}{main}{CURINPUTNR};
+
+		if ($inputNr eq "17") {
+			$playerCmd = $cmd."Ipod";
+		#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
+		} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
+			$playerCmd = $cmd."Network";
+		} else {
+			my $err = "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
+			Log3 $name, 3, $err;
+			return $err;
+		}
+		my $setCmd = $hash->{helper}{SETS}{main}{$playerCmd};
+		PIONEERAVR_Write( $hash, $setCmd);
+	} else {
+		Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate(): can't find the inputNr";
+	}
+}
 
 #########################################################
 sub PIONEERAVR_statusUpdate($) {
-	my ( $hash) = @_;
+	my ($hash) = @_;
 	my $name    = $hash->{NAME};
 
 	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_statusUpdate()";
@@ -3079,8 +3168,8 @@ sub PIONEERAVR_askForInputNames($$) {
     my $now120            = gettimeofday()+120;
 	my $delay             = 0.1;
 
-    RemoveInternalTimer( $hash);
-    InternalTimer($now120, "PIONEERAVR_checkConnection", $hash, 0);
+    RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
+    InternalTimer( $now120, "PIONEERAVR_connectionCheck", $hash, 0 );
 
     # we ask for the inputs 1 to 59 if an input name exists (command: ?RGB00 ... ?RGB59)
     #   and if the input is disabled (command: ?SSC0003 ... ?SSC5903)
@@ -3120,7 +3209,6 @@ sub PIONEERAVR_askForInputNames($$) {
 sub PIONEERAVR_GetStateAV($) {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
-    my $iNr    = ReadingsVal( $name, "inputNr", "1" );
 
     if ( ReadingsVal( $name, "presence", "absent" ) eq "absent" ) {
         return "absent";
@@ -3128,12 +3216,18 @@ sub PIONEERAVR_GetStateAV($) {
         return "off";
     } elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
         return "muted";
-    } elsif ( $hash->{helper}{INPUTNAMES}->{$iNr}{playerCommands} eq "1"
-        && ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
-    {
-        return ReadingsVal( $name, "playStatus", "stopped" );
-    } else {
-        return ReadingsVal( $name, "power", "off" );
+		
+    } elsif (defined( $hash->{helper}{main}{CURINPUTNR})) {
+		my $iNr = $hash->{helper}{main}{CURINPUTNR};
+		if ( $hash->{helper}{INPUTNAMES}->{$iNr}{playerCommands} eq "1"
+			&& ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
+		{
+			return ReadingsVal( $name, "playStatus", "stopped" );
+		} else {
+			return ReadingsVal( $name, "power", "off" );
+		}
+	} else {
+		return ReadingsVal( $name, "power", "off" );
     }
 }
 
@@ -3370,7 +3464,7 @@ sub RC_layout_PioneerAVR() {
 	   <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pings the Pioneer AVR every X seconds to verify connection status. Defaults to 60 seconds.
 	</li>
 	<li>
-		<b>timeout</b> &nbsp;&nbsp;1,2,3,4,5&nbsp;&nbsp; Max time in seconds till the Pioneer AVR replies to a ping. Defaults to 3 seconds.
+		<b>timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp; Max time in seconds till the Pioneer AVR replies to a ping. Defaults to 3 seconds.
 	</li>
     <li><b>checkStatusStart &lt;enable|disable&gt;</b> - Enables/disables the status update (read all values from the Pioneer AV receiver, can take up to one minute) when the module is loaded.(Default: enable)</li>
     <li><b>checkStatusReconnect &lt;enable|disable&gt;</b> - Enables/disables the status update (read all values from the Pioneer AV receiver, can take up to one minute) when the connection to the Pioneer AV receiver is reestablished.(Default: enable)</li>
@@ -3417,8 +3511,9 @@ sub RC_layout_PioneerAVR() {
         <li><b>screenLineNumbers</b> - How many lines has the OSD</li>
         <li><b>screenLineType01...08</b> - Which type has line 01...08? E.g. "directory", "Now playing", "current Artist",...</li>
         <li><b>screenName</b> - Name of the OSD</li>
-        <li><b>screenReturnKey</b> - Is the "Return-Key" in this ODS available?</li>
-        <li><b>screenTopMenuKey</b> - Is the "Menu-Key" in this ODS available?</li>
+        <li><b>screenReturnKey</b> - Is the "Return-Key" in this OSD available?</li>
+        <li><b>screenTopMenuKey</b> - Is the "Menu-Key" in this OSD available?</li>
+        <li><b>screenToolsKey</b> - Is the "Tools-Key" (Menu, edit, ipod control) in this OSD available?</li>
         <li><b>screenType</b> - Type of the OSD, e.g. "message", "List", "playing(play)",...</li>
         <li><b>speakerSystem</b> - Shows how the rear surround speaker connectors and the B-speaker connectors are used</li>
         <li><b>speakers</b> - Which speaker output connectors are active?</li>
@@ -3644,7 +3739,7 @@ sub RC_layout_PioneerAVR() {
 		<b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pingt den Pioneer AV Receiver alle X Sekunden um den Datenverbindungsstatus zu überprüfen. Standard: 60 Sekunden.
 	</li>
 	<li>
-		<b>	timeout</b> &nbsp;&nbsp;1,2,3,4,5&nbsp;&nbsp;Zeit in Sekunden, innerhalb der der Pioneer AV Receiver auf einen Ping antwortet. Standard: 3 Sekunden.
+		<b>	timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp;Zeit in Sekunden, innerhalb der der Pioneer AV Receiver auf einen Ping antwortet. Standard: 3 Sekunden.
 	</li>
 	<li>
 		<b>statusUpdateStart &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) beim Start des Moduls. 
@@ -3697,6 +3792,7 @@ sub RC_layout_PioneerAVR() {
         <li><b>screenName</b> - Name des OSD</li>
         <li><b>screenReturnKey</b> - Steht die "Return-Taste" in diesem OSD zur Verfügung?</li>
         <li><b>screenTopMenuKey</b> - Steht die "Menu-Taste" in diesem OSD zur Verfügung?</li>
+        <li><b>screenToolsKey</b> - Steht die "Tools-Taste" (Menu, Edit, iPod control) in diesem OSD zur Verfügung?</li>
         <li><b>screenType</b> - Typ des OSD, z.B. "message", "List", "playing(play)",...</li>
         <li><b>speakerSystem</b> - Zeigt, wie die hinteren Surround-Lautsprecheranschlüsse und die B-Lautsprecheranschlüsse verwendet werden</li>
         <li><b>speakers</b> - Welche Lautsprecheranschlüsse sind aktiviert?</li>
