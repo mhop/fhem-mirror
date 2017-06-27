@@ -155,7 +155,8 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td>System Info</td></tr>";
       $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{'system'}{'release'}</td></tr>";
       $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{'system'}{'feature'}</td></tr>";
-      $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{'system'}{'revision'}</td></tr>";
+      $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{'system'}{'revision'}</td></tr>" 
+                  if (defined($fhemInfo{'system'}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{'system'}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{'system'}{'arch'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{'system'}{'perl'}</td></tr>";
@@ -167,7 +168,7 @@ sub _fi2_HtmlTable($) {
    foreach my $type (sort @keys)
    {
       next if ($type eq 'system');
-      next unless $type;
+      next unless (defined($type) && $type);
       $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{'noModel'}</td></tr>";
       while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
       { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq 'noModel'; }
