@@ -698,6 +698,8 @@ sub SB_PLAYER_Define( $$ ) {
                    $hash,
                    0 );
 
+    notifyRegexpChanged($hash, "global"); # CD 0080
+
     return( undef );
 }
 
@@ -1823,6 +1825,9 @@ sub SB_PLAYER_Parse( $$ ) {
                     $hash->{helper}{playlistInfo}{$_}{artist}=~s/\"//g;
                     $hash->{helper}{playlistInfo}{$_}{title}=~s/\"//g;
                     $hash->{helper}{playlistInfo}{$_}{album}=~s/\"//g;
+                    $hash->{helper}{playlistInfo}{$_}{artist} =~ s{\\}{\\\\}g;  # CD 0081
+                    $hash->{helper}{playlistInfo}{$_}{title} =~ s{\\}{\\\\}g;   # CD 0081
+                    $hash->{helper}{playlistInfo}{$_}{album} =~ s{\\}{\\\\}g;   # CD 0081
                     $ftuimedialist.="{\"Artist\":\"".$hash->{helper}{playlistInfo}{$_}{artist}."\",";
                     $ftuimedialist.="\"Title\":\"".$hash->{helper}{playlistInfo}{$_}{title}."\",";
                     $ftuimedialist.="\"Album\":\"".$hash->{helper}{playlistInfo}{$_}{album}."\",";
