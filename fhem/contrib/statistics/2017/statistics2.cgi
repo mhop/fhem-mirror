@@ -27,14 +27,15 @@ visualisation provided by markusbloch
 
 use strict;
 use warnings;
-use Time::HiRes qw(time);
 use DBI;
+use CGI qw(:standard Vars);
+#use Data::Dumper;
+use JSON;
+use POSIX qw(mktime);
+use Time::HiRes qw(time);
+
 use lib "./lib";
 use Geo::IP;
-use JSON;
-use CGI qw(:standard Vars);
-
-use Data::Dumper;
 
 sub insertDB();
 sub getLocation();
@@ -52,7 +53,7 @@ my $geoip   = $ENV{HTTP_X_FORWARDED_FOR};
    
 my %data  = Vars();
 
-# database stuff
+# database stuff for statistics
 my $datadir  = "./data";
 my $dbf      = "$datadir/fhem_statistics_2017.sqlite";
 my $dsn      = "dbi:SQLite:dbname=$dbf";
@@ -60,6 +61,8 @@ my $dbh;
 my $sth;
 my $limit  = "datetime('now', '-12 months')";
 
+# path to working copy 
+my $fhemPathSvn = '/opt/fhem';
   
 # ---------- decide target ----------
 
@@ -85,6 +88,17 @@ sub insertDB() {
 
   $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
+
+  my $decoded  = decode_json($json);
+  if (defined($decoded->{'system'}{'revision'})) {
+     # replace revision number with revision date
+     my $rev      = $decoded->{'system'}{'revision'};
+     my $d = (split(/ /,qx(svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+     my ($year,$mon,$mday) = split(/-/,$d);
+     $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
+     $json = encode_json $decoded;
+  }
+  
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
   my $result = $sth->execute($uniqueID,$geo,$json);
   add2total() if $result;
@@ -147,7 +161,7 @@ sub doAggregate() {
 
    my $dbInfo     = decode_json $dbInfo[3];
    my $updated    = $dbInfo[1];
-   my $started    = $dbInfo->{'submissionsSince'};
+   my $started    = substr($dbInfo->{'submissionsSince'},0,10);
    my $nodesTotal = $dbInfo->{'submissionsTotal'};
    my $nodes12    = 0;
 
@@ -172,13 +186,30 @@ sub doAggregate() {
 
       # process system data
       $decoded  = decode_json( $line[1] );
+
       $res      = $decoded->{'system'}{'os'};
       $countAll{'system'}{'os'}{$res}++;
+
       $res      = $decoded->{'system'}{'perl'};
+      $res     =~ s/^v//;
       $countAll{'system'}{'perl'}{$res}++;
+
       $res      = $decoded->{'system'}{'release'};
       $countAll{'system'}{'release'}{$res}++;
-      ($res) = (undef);
+
+      if (defined($decoded->{'system'}{'revdate'})){
+         $res = $decoded->{'system'}{'revdate'};
+         my $age = sprintf("%.0f",(time - $res)/86400);
+         $countAll{'system'}{'age'}{'0'}++   if ($age <= 1);
+         $countAll{'system'}{'age'}{'7'}++   if ($age > 1  && $age <= 7);
+         $countAll{'system'}{'age'}{'30'}++  if ($age > 7  && $age <= 30);
+         $countAll{'system'}{'age'}{'180'}++ if ($age > 30 && $age <= 180);
+         $countAll{'system'}{'age'}{'365'}++ if ($age > 180);
+      } else {
+         $countAll{'system'}{'age'}{'unknown'}++;
+      }
+      
+      $res = undef;
       
       # process modules and model data
       my @keys = keys %{$decoded};
@@ -196,7 +227,7 @@ sub doAggregate() {
          }
       }
    }
-
+   
    $dbh->disconnect();
 
    return ($updated,$started,$nodesTotal,$nodes12,%countAll);
@@ -221,10 +252,9 @@ sub viewStatistics() {
       print $q->header( -type => "application/json",
                         -Content_length => length($json)); # for gzip/deflate
       print $json;
-   }
-   else {
+   } else {
       print $q->redirect('statistics.html'); # redirect to HTML file
-   }   
+   }
 }
 
 
