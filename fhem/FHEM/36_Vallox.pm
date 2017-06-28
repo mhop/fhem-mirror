@@ -5,7 +5,7 @@
 #
 # @Author Skjall
 # @Created 21.07.2016 10:18:23
-# @Version 1.3.0
+# @Version 1.4.0
 #
 #  The modul reads and writes parameters via RS485 from and to a Vallox
 #  ventilation bus.
@@ -42,10 +42,13 @@ use warnings;
 # Global Variables
 ##############################################
 
+my %Vallox_datatypes;
+my %Vallox_datatypesReverse;
+
 ##################################
 # List of Datatyps of the Vallox bus
 ##################################
-my %Vallox_datatypes = (
+my %Vallox_datatypes_base = (
     "06" => "FanSpeed-Relays",
     "07" => "MultiPurpose1",
     "08" => "MultiPurpose2",
@@ -66,7 +69,7 @@ my %Vallox_datatypes = (
     "34" => "TempInside",
     "35" => "TempIncoming",
     "36" => "LastSystemFault",
-
+	
     "55" => "PostHeatingOnCounter",
     "56" => "PostHeatingOffTime",
     "57" => "PostHeatingTargetValue",
@@ -92,9 +95,9 @@ my %Vallox_datatypes = (
     "A9" => "FanSpeedMin",
     "AA" => "Program",
     "AB" => "MaintencanceCountdownMonths",
-           
     "AE" => "BasicHumidityLevel",
     "AF" => "HeatRecoveryCellBypassSetpointTemperature",
+
     "B0" => "DCFanInputAdjustment",
     "B1" => "DCFanOutputAdjustment",
     "B2" => "CellDefrostingSetpointTemperature",
@@ -108,12 +111,26 @@ my %Vallox_datatypes = (
     "C8" => "Initial4",
     "C9" => "Initial5",
 );
- my %Vallox_datatypesReverse = reverse %Vallox_datatypes;
+my %Vallox_datatypesReverse_base = reverse %Vallox_datatypes_base;
+
+
+my %Vallox_datatypes_legacy1 = (
+	"49" => "Legacy49",		# Unknown legacy Reading
+	"4A" => "Legacy4A",		# Unknown legacy Reading
+	"4C" => "Legacy4C",		# Unknown legacy Reading
+	"53" => "Legacy53",		# Unknown legacy Reading
+	"54" => "Legacy54",		# Unknown legacy Reading
+	"58" => "Legacy58",		# Unknown legacy Reading
+	"5A" => "Legacy5A",		# Unknown legacy Reading
+	"5B" => "Legacy5B",		# Unknown legacy Reading
+	"5C" => "Legacy5C",		# Unknown legacy Reading
+);
+my %Vallox_datatypesReverse_legacy1 = reverse %Vallox_datatypes_legacy1;
 
 ##################################
 # Mapping of the fan speeds
 ##################################
-my %Vallox_fanSpeedTable = (
+my %Vallox_levelTable = (
 "01" => "1",
 "03" => "2",
 "07" => "3",
@@ -123,7 +140,7 @@ my %Vallox_fanSpeedTable = (
 "7F" => "7",
 "FF" => "8",
 );
-my %Vallox_fanSpeedTableReverse = reverse %Vallox_fanSpeedTable;
+my %Vallox_levelTableReverse = reverse %Vallox_levelTable;
 
 ##################################
 # Mapping of the temperatures
@@ -366,12 +383,392 @@ sub Vallox_ReplaceBit ($@) {
 ##############################################
 # Update reading bulk for binary reading
 ##############################################
-sub Vallox_readingsBulkUpdateMultiReading($@) {
+sub Vallox_ReadingsBulkUpdateMultiReading($@) {
 	my ($hash, $rawReadingType, $readingname, $bitnumber,) = @_;
 	
 	readingsBulkUpdate($hash, $readingname, substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1)); # if (ReadingsVal($hash->{NAME},$readingname,"unknown") ne substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},8-$bitnumber-1,1));
 	return;
 	
+}
+
+##############################################
+# Interpret datagram and handle it
+##############################################
+sub Vallox_InterpretAndUpdate(@) {
+	
+	my ($hash,$datagram) = @_;
+	
+    my $name = $hash->{NAME};
+	
+    my $rawReadingType;
+    my $rawReadingValue;
+    my $rawReadingChecksum;
+    my $singlereading = 1;
+    my $fineReadingValue = 1;
+	
+	$datagram = uc($datagram);
+	
+	# get the type of the datagram
+	$rawReadingType = substr($datagram,6,2);
+	
+	# get the value of the datagram
+	$rawReadingValue = substr($datagram,8,2);
+	
+	# get the value of the datagram
+	$rawReadingChecksum = substr($datagram,10,2);
+
+	if ($rawReadingType ne "00") {
+
+		# Decoding for the final readings. 
+		# - rawReading... is the original information from the datagram
+		# - fineReading... is the human readable information
+		
+		# Starting with the "One information in one datagram"-Section
+		
+		# Convert FanSpeeds by the Vallox_levelTable
+		if ($rawReadingType eq "29" || $rawReadingType eq "A5" || $rawReadingType eq "A9") {
+			$fineReadingValue = $Vallox_levelTable{$rawReadingValue};
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed): $datagram (Level $fineReadingValue)");
+			
+		# Convert Temperatures by the Vallox_temperatureTable
+		} elsif ($rawReadingType eq "32" || $rawReadingType eq "33" || $rawReadingType eq "34" || $rawReadingType eq "35" || $rawReadingType eq "A4" ||  $rawReadingType eq "A7" ||  $rawReadingType eq "A8" || $rawReadingType eq "AF") {
+			
+			if ( $rawReadingType eq "A4" && $hash->{BusVersion} eq "1") {
+				$fineReadingValue = $Vallox_levelTable{$rawReadingValue};
+				
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (HeatingSetPoint): $datagram (Level $fineReadingValue)");
+				return;
+			} else {
+				$fineReadingValue = $Vallox_temperatureTable{$rawReadingValue};
+			}
+			
+			if (($rawReadingType eq "32" || $rawReadingType eq "33" || $rawReadingType eq "34" || $rawReadingType eq "35") && $fineReadingValue < -40) {
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Temperature) invalid: $datagram ($fineReadingValue deg.)");
+				return;
+			}
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Temperature): $datagram ($fineReadingValue deg.)");
+		
+		# Convert Percentages by the Vallox_percentageTable
+		} elsif ($rawReadingType eq "AE") {
+			$fineReadingValue = $Vallox_percentageTable{$rawReadingValue};
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Percentage): $datagram ($fineReadingValue pct.)");
+		
+		# Convert Faults by the Vallox_faultTable
+		} elsif ($rawReadingType eq "36") {
+			$fineReadingValue = $Vallox_faultTable{$rawReadingValue};
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Fault): $datagram ($fineReadingValue)");
+		
+		# Convert Decimal Values
+		} elsif ($rawReadingType eq "2B" || $rawReadingType eq "2C" || $rawReadingType eq "2E" || $rawReadingType eq "57" || $rawReadingType eq "A6"  || $rawReadingType eq "79" || $rawReadingType eq "8F" || $rawReadingType eq "91" || $rawReadingType eq "AB" || $rawReadingType eq "B0" || $rawReadingType eq "B1" || $rawReadingType eq "B3"  || $rawReadingType eq "B4") {
+			$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue);
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Decimal): $datagram ($fineReadingValue)");
+			
+		# Convert PostHeating Time Values
+		} elsif ($rawReadingType eq "55" || $rawReadingType eq "56") {
+			$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue)/2.5;
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (PostHeatingCounter): $datagram ($fineReadingValue)");
+			
+		# Convert CellDefrostingSetpointTemperature Values
+		} elsif ($rawReadingType eq "B2") {
+			$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue)/3;
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (CellDefrostingSetpointTemperature): $datagram ($fineReadingValue)");
+			
+		# Convert measured humidity by formula (if it is negative then you don't have a humidity sensor)
+		} elsif ($rawReadingType eq "2A" || $rawReadingType eq "2F" || $rawReadingType eq "30") {
+			$fineReadingValue = (sprintf("%d", hex "0x".$rawReadingValue)-51)/2.04;
+			
+			# Negative Humidity impossible: No Sensor attatched
+			if ($fineReadingValue < 0) {
+				Log3 ($name, 4, "Vallox: Incoming Status-Info (Humidity) invalid: $datagram ($fineReadingValue Perc. rH)");
+				return;
+			}
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Humidity): $datagram ($fineReadingValue pct. rH)");
+		
+		# Starting with the "Up to eight informations in one datagram"-Section
+		# Disabled lines are unused.
+		
+		# FanSpeed-Relays 
+		} elsif ($rawReadingType eq "06") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+							
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed1", 0); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed2", 1); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed3", 2); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed4", 3); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed5", 4); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed6", 5); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed7", 6); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed8", 7); #RO
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed-Relays): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+			
+		# MultiPurpose1
+		} elsif ($rawReadingType eq "07") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "PostHeating", 5); # RO
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose1): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		#MultiPurpose2
+		} elsif ($rawReadingType eq "08") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "DamperMotorPosition", 1); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultSignalRelay", 2); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "SupplyFan", 3);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeating", 4); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "ExhaustFan", 5);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBooster", 6); #RO
+			readingsEndUpdate($hash, 1);
+							
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		#MachineInstalledCO2Sensor 
+		} elsif ($rawReadingType eq "2D") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor1", 1); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor2", 2); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor3", 3); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor4", 4); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor5", 5); #RO
+			readingsEndUpdate($hash, 1);
+							
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+			
+		#Flags2
+		} elsif ($rawReadingType eq "6D") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2HigherSpeedRequest", 0);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2LowerRatePublicInvitation", 1);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "HumidityLowerRatePublicInvitation", 2);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "SwitchLowerSpeedRequest", 3);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Alarm", 6);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmSensor", 7);
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		#Flags4
+		} elsif ($rawReadingType eq "6F") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmWaterRadiator", 4);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "MasterSlaveSelection", 7);
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags4): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		#Flags5
+		} elsif ($rawReadingType eq "70") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeatingStatus", 7);
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags5): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+					
+		#Flags6
+		} elsif ($rawReadingType eq "71") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "RemoteMonitoringControl", 4); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceSwitchActivation", 5);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBoosterStatus", 6); #RO
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags6): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		# Select
+		} elsif ($rawReadingType eq "A3") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "PowerState", 0);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2AdjustState", 1);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "RHAdjustState", 2);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingState", 3);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FilterGuardIndicator", 4); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingIndicator", 5); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultIndicator", 6); #RO
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "ServiceReminderIndicator", 7);
+			
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Select): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+			
+		# Program
+		} elsif ($rawReadingType eq "AA") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			# ----xxxx - Nibble is one value // # TODO: Adopt Function
+			readingsBulkUpdate($hash, "HumidityCO2AdjustmentInterval", oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4))) if (ReadingsVal($name,"HumidityCO2AdjustmentInterval","unknown") ne oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4)));
+
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "AutomaticHumidityBasicLevelSeekerState", 4);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "BoostSwitchMode", 5);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "RadiatorType", 6);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "CascadeAdjust", 7);
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Program): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+				
+		# Program2
+		} elsif ($rawReadingType eq "B5") {
+			
+			$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			$singlereading = 0;
+			readingsBeginUpdate($hash);
+			Vallox_ReadingsBulkUpdateMultiReading($hash, $rawReadingType, "MaxSpeedLimitFunction", 0);
+			readingsEndUpdate($hash, 1);
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Program2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
+		
+		# Convert Unused Binarys to bits (Just not to have Hex Readings)
+		} elsif ($rawReadingType eq "6C" || $rawReadingType eq "6E") {
+			
+			$fineReadingValue = sprintf('%08b', hex("0x".$rawReadingValue));
+			
+			Log3 ($name, 4, "Vallox: Incoming Status-Info (Unused Binary): $datagram (Bits $fineReadingValue)");
+		
+		
+		# Everything else
+		# All Readings shall be handled before
+		} else {
+			$fineReadingValue = $rawReadingValue;
+			$singlereading = 1;
+			
+			Log3 ($name, 2, "Vallox: Incoming unhandled datagram: $datagram");
+		}
+		
+		if($Vallox_datatypes{$rawReadingType}) {
+			if ($singlereading == 1) {
+				Log3 ($name, 5, "Vallox: Update Reading: $fineReadingValue");
+				
+				readingsSingleUpdate($hash,$Vallox_datatypes{$rawReadingType}, $fineReadingValue, 1);
+				
+				# Efficiency Calculation
+				# Is this Reading a Temp?
+				if (substr($Vallox_datatypes{$rawReadingType},0,4) eq "Temp") {
+					
+					# If HRC is in Bypass - Efficiency is 0
+					if (ReadingsVal($name,"DamperMotorPosition",1) == 1) {
+						readingsSingleUpdate($hash,"EfficiencyIn", 0, 1);
+						readingsSingleUpdate($hash,"EfficiencyOut", 0, 1);
+						readingsSingleUpdate($hash,"EfficiencyAverage", 0, 1);
+						Log3 ($name, 5, "Vallox: Efficiency Override: HRC Bypass");
+						
+					} else {
+					
+						my ($EfficiencyIn,$EfficiencyOut,$TempIncoming,$TempOutside,$TempInside,$TempExhaust) = 0;
+					
+						# Efficiency on Keep Temp Inside
+						# Do we have all nessecary Readings?
+						if (ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
+							ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
+							ReadingsVal($name,"TempInside","unknown") ne "unknown") {
+							
+							
+							$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
+							$TempOutside = ReadingsVal($name,"TempOutside",-100);
+							$TempInside = ReadingsVal($name,"TempInside",-100);
+							
+							
+							# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
+							if ($TempInside-$TempOutside != 0) {
+								$EfficiencyIn = ($TempIncoming-$TempOutside)/($TempInside-$TempOutside)*100;
+								
+								$EfficiencyIn = 100 if ($EfficiencyIn > 100);
+								
+								Log3 ($name, 5, "Vallox: Efficiency Inside: (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = ".$EfficiencyIn);
+								readingsSingleUpdate($hash,"EfficiencyIn", $EfficiencyIn, 1);
+							} else {
+								Log3 ($name, 5, "Vallox: Efficiency Inside (DIV/0 Prevention): (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = 100");
+								readingsSingleUpdate($hash,"EfficiencyIn", 100, 1);
+							}
+						}
+						
+						# Efficiency on Keep Temp Outside
+						# Do we have all nessecary Readings?
+						if (ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
+							ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
+							ReadingsVal($name,"TempExhaust","unknown") ne "unknown") {
+							
+							$TempOutside = ReadingsVal($name,"TempOutside",-100);
+							$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
+							$TempExhaust = ReadingsVal($name,"TempExhaust",-100);
+							
+							# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
+							if ($TempOutside-$TempIncoming != 0) {
+								$EfficiencyOut = ($TempExhaust-$TempIncoming)/($TempOutside-$TempIncoming)*100;
+								$EfficiencyOut = 100 if ($EfficiencyOut > 100);
+								Log3 ($name, 5, "Vallox: Efficiency Outside: (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = ".$EfficiencyOut);
+								readingsSingleUpdate($hash,"EfficiencyOut", $EfficiencyOut, 1);
+							} else {
+								Log3 ($name, 5, "Vallox: Efficiency Outside (DIV/0 Protection): (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = 100");
+								readingsSingleUpdate($hash,"EfficiencyOut", 100, 1);
+							}
+						}
+						
+						# Average Efficiency
+						if (ReadingsVal($name,"EfficiencyIn","unknown") ne "unknown" &&
+							ReadingsVal($name,"EfficiencyOut","unknown") ne "unknown") {
+							$EfficiencyIn = ReadingsVal($name,"EfficiencyIn",-100);
+							$EfficiencyOut = ReadingsVal($name,"EfficiencyOut",-100);
+							
+							my $EfficiencyAverage = ($EfficiencyIn+$EfficiencyOut) / 2; 
+							Log3 ($name, 5, "Vallox: Efficiency Average: (".$EfficiencyIn."+".$EfficiencyOut.")/2 = ".$EfficiencyAverage);
+
+							readingsSingleUpdate($hash,"EfficiencyAverage", $EfficiencyAverage, 1);
+						} else {
+							Log3 ($name, 5, "Vallox: Efficiency Average unknown: (".ReadingsVal($name,"EfficiencyIn","unknown")."+".ReadingsVal($name,"EfficiencyOut","unknown").")/2");
+						}
+					}
+				}
+			}
+			
+		} else {
+			Log3 ($name, 4, "Vallox: Datagram not in Datatypes-Table: ".$datagram);
+		}
+	} else {
+		Log3 ($name, 5, "Vallox: Incoming Status-Request: $datagram");
+	}
+
 }
 
 ##############################################
@@ -397,7 +794,8 @@ Vallox_Initialize($)
 #   $hash->{ReadyFn}    = "Vallox_Ready";
     $hash->{ShutdownFn} = "Vallox_Shutdown";
 	
-	$hash->{AttrList}   = "ValloxBufferDebug:0,1 ValloxForceBroadcast:0,1 ValloxIDDomain ValloxIDFHEM ValloxIDCentral ".$readingFnAttributes;
+	$hash->{AttrList}   = "ValloxBufferDebug:0,1 ValloxForceBroadcast:0,1 ValloxProcessOwnCommands:0,1 ValloxIDDomain ValloxIDFHEM ValloxIDCentral ".$readingFnAttributes;
+	
 
 }
 
@@ -406,17 +804,35 @@ sub Vallox_Define($) {
     
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
-    if(@a != 3) {
-        my $msg = "wrong syntax: define <name> Vallox devicename[\@baudrate] ";
+    if(@a != 3 && @a != 4) {
+        my $msg = "wrong syntax: define <name> Vallox devicename[\@baudrate] [busversion]";
         Log3 undef, 2, "Vallox: ".$msg;
         return $msg;
     }
     DevIo_CloseDev($hash);
     my $name = $a[0];
     my $dev = $a[2];
-    
+	$hash-> {BusVersion} = "2";
+	
+	
     $dev .= "\@9600" if( $dev !~ m/\@/ && $def !~ m/:/ );
     $hash-> {DeviceName} = $dev;
+	
+	if(@a == 4) {
+		$hash-> {BusVersion} = $a[3];
+    }
+	
+	
+	if ($hash->{BusVersion} eq "1") {
+
+		%Vallox_datatypes = (%Vallox_datatypes_legacy1, %Vallox_datatypes_base);
+		%Vallox_datatypesReverse = (%Vallox_datatypesReverse_legacy1, %Vallox_datatypesReverse_base);
+	} else {
+
+		%Vallox_datatypes = %Vallox_datatypes_base;
+		%Vallox_datatypesReverse = %Vallox_datatypesReverse_base;
+	}
+	
 	
     my $ret = DevIo_OpenDev($hash, 0, undef);
     return $ret;
@@ -533,7 +949,7 @@ sub Vallox_Set($@)
 	}
 	
 	# MR: Prepare Values and Command for datagram
-	if (exists($Vallox_multiReadingTable_realcmd{$cmd})) {
+	if (exists($Vallox_multiReadingTable_realcmd{$cmd}) && exists($hash->{"MR_".$cmd})) {
 		# TODO: Integrate get before set;
 		return "Vallox: Internal ".$Vallox_multiReadingTable_realcmd{$cmd}." empty (".$hash->{"MR_".$cmd}."). Read ".$Vallox_multiReadingTable_realcmd{$cmd}." first!" if ($hash->{"MR_".$Vallox_multiReadingTable_realcmd{$cmd}} eq "");
 		
@@ -547,7 +963,7 @@ sub Vallox_Set($@)
         $datatype = hex "0x".$Vallox_datatypesReverse{$cmd};
 		
 		if ($datatype == 0x29) {
-			$datavalue = hex "0x".$Vallox_fanSpeedTableReverse{$arg};
+			$datavalue = hex "0x".$Vallox_levelTableReverse{$arg};
 		} elsif ($datatype == 0xae) {
 			$datavalue = hex "0x".$Vallox_percentageTableReverse{$arg};
 		} elsif ($datatype == 0xaf) {
@@ -571,19 +987,25 @@ sub Vallox_Set($@)
 
     DevIo_SimpleWrite ($hash,$msg,1);
 	Log3 ($name, 3, "Vallox: Command ".$msg." has been sent.");
+		
+	if (AttrVal($hash->{NAME}, "ValloxProcessOwnCommands", "0") == 1 || $hash->{BusVersion} eq "1") {
+
+		Vallox_InterpretAndUpdate($hash,$msg);
+		Log3 ($name, 3, "Vallox: Command ".$msg." has been internal processed.");
 	
-	if (AttrVal($hash->{NAME}, "ValloxForceBroadcast", "0") == 1) {
+	}
+	if (AttrVal($hash->{NAME}, "ValloxForceBroadcast", "0") == 1 || $hash->{BusVersion} eq "1") {
 		$checksum = ($domain + $sender + 0x10 + $datatype + $datavalue) % 0x100;
 		$msg = lc(sprintf("%02x", $domain).sprintf("%02x", $sender). 10 .sprintf("%02x", $datatype).sprintf("%02x", $datavalue).sprintf("%02x", $checksum));
-
 		DevIo_SimpleWrite ($hash,$msg,1);
 		Log3 ($name, 3, "Vallox: Broadcast-Command ".$msg." has been sent.");
+
 		$checksum = ($domain + $sender + 0x20 + $datatype + $datavalue) % 0x100;
 		$msg = lc(sprintf("%02x", $domain).sprintf("%02x", $sender). 20 .sprintf("%02x", $datatype).sprintf("%02x", $datavalue).sprintf("%02x", $checksum));
-
 		DevIo_SimpleWrite ($hash,$msg,1);
 		Log3 ($name, 3, "Vallox: Broadcast-Command ".$msg." has been sent.");
 	}
+
 	
     return undef;
     
@@ -606,6 +1028,7 @@ sub Vallox_Attr(@)
 	}
 	return undef;
 }
+
 
 sub Vallox_Read($)
 {
@@ -643,7 +1066,12 @@ sub Vallox_Read($)
 		
 			$bufferRead .= substr($bufferDevIO,0,$bufferReadSpace);
 			
-			$bufferDevIO = substr($bufferDevIO,$bufferReadSpace);
+			# If the bufferDevIO buffer is shorter than the filling, set it to empty to avoid error
+			if (length($bufferDevIO) >= $bufferReadSpace) {
+				$bufferDevIO = substr($bufferDevIO,$bufferReadSpace);
+			} else {
+				$bufferDevIO = "";
+			}
 		}
 		
 		#$hash->{"BufferDevIOLength"} = length($bufferDevIO);
@@ -658,358 +1086,9 @@ sub Vallox_Read($)
 			if (Vallox_ValidateStream($hash) == 1) {	
 				Log3 ($name, 5, "Vallox: Buffer: ".$bufferRead);
 				my $datagram = uc($bufferRead);
-					
-				# get the type of the datagram
-				$rawReadingType = substr($datagram,6,2);
 				
-				# get the value of the datagram
-				$rawReadingValue = substr($datagram,8,2);
+				Vallox_InterpretAndUpdate($hash,$datagram);
 				
-				# get the value of the datagram
-				$rawReadingChecksum = substr($datagram,10,2);
-
-				if ($rawReadingType ne "00") {
-
-					# Decoding for the final readings. 
-					# - rawReading... is the original information from the datagram
-					# - fineReading... is the human readable information
-					
-					# Starting with the "One information in one datagram"-Section
-					
-					# Convert FanSpeeds by the Vallox_fanSpeedTable
-					if ($rawReadingType eq "29" || $rawReadingType eq "A5" || $rawReadingType eq "A9") {
-						$fineReadingValue = $Vallox_fanSpeedTable{$rawReadingValue};
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed): $datagram (Level $fineReadingValue)");
-						
-					# Convert Temperatures by the Vallox_temperatureTable
-					} elsif ($rawReadingType eq "32" || $rawReadingType eq "33" || $rawReadingType eq "34" || $rawReadingType eq "35" || $rawReadingType eq "A4" ||  $rawReadingType eq "A7" ||  $rawReadingType eq "A8" || $rawReadingType eq "AF") {
-						$fineReadingValue = $Vallox_temperatureTable{$rawReadingValue};
-						if (($rawReadingType eq "32" || $rawReadingType eq "33" || $rawReadingType eq "34" || $rawReadingType eq "35") && $fineReadingValue < -40) {
-							Log3 ($name, 4, "Vallox: Incoming Status-Info (Temperature) invalid: $datagram ($fineReadingValue deg.)");
-							return;
-						}
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Temperature): $datagram ($fineReadingValue deg.)");
-					
-					# Convert Percentages by the Vallox_percentageTable
-					} elsif ($rawReadingType eq "AE") {
-						$fineReadingValue = $Vallox_percentageTable{$rawReadingValue};
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Percentage): $datagram ($fineReadingValue pct.)");
-					
-					# Convert Faults by the Vallox_faultTable
-					} elsif ($rawReadingType eq "36") {
-						$fineReadingValue = $Vallox_faultTable{$rawReadingValue};
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Fault): $datagram ($fineReadingValue)");
-					
-					# Convert Decimal Values
-					} elsif ($rawReadingType eq "2B" || $rawReadingType eq "2C" || $rawReadingType eq "2E" || $rawReadingType eq "57" || $rawReadingType eq "A6"  || $rawReadingType eq "79" || $rawReadingType eq "8F" || $rawReadingType eq "91" || $rawReadingType eq "AB" || $rawReadingType eq "B0" || $rawReadingType eq "B1" || $rawReadingType eq "B3"  || $rawReadingType eq "B4") {
-						$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue);
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Decimal): $datagram ($fineReadingValue)");
-						
-					# Convert PostHeating Time Values
-					} elsif ($rawReadingType eq "55" || $rawReadingType eq "56") {
-						$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue)/2.5;
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (PostHeatingCounter): $datagram ($fineReadingValue)");
-						
-					# Convert CellDefrostingSetpointTemperature Values
-					} elsif ($rawReadingType eq "B2") {
-						$fineReadingValue = sprintf("%d", hex "0x".$rawReadingValue)/3;
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (CellDefrostingSetpointTemperature): $datagram ($fineReadingValue)");
-						
-					# Convert measured humidity by formula (if it is negative then you don't have a humidity sensor)
-					} elsif ($rawReadingType eq "2A" || $rawReadingType eq "2F" || $rawReadingType eq "30") {
-						$fineReadingValue = (sprintf("%d", hex "0x".$rawReadingValue)-51)/2.04;
-						
-						# Negative Humidity impossible: No Sensor attatched
-						if ($fineReadingValue < 0) {
-							Log3 ($name, 4, "Vallox: Incoming Status-Info (Humidity) invalid: $datagram ($fineReadingValue Perc. rH)");
-							return;
-						}
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Humidity): $datagram ($fineReadingValue pct. rH)");
-					
-					# Starting with the "Up to eight informations in one datagram"-Section
-					# Disabled lines are unused.
-					
-					# FanSpeed-Relays 
-					} elsif ($rawReadingType eq "06") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-										
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed1", 0); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed2", 1); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed3", 2); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed4", 3); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed5", 4); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed6", 5); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed7", 6); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "Speed8", 7); #RO
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (FanSpeed-Relays): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-						
-					# MultiPurpose1
-					} elsif ($rawReadingType eq "07") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PostHeating", 5); # RO
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose1): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					#MultiPurpose2
-					} elsif ($rawReadingType eq "08") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "DamperMotorPosition", 1); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultSignalRelay", 2); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "SupplyFan", 3);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeating", 4); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "ExhaustFan", 5);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBooster", 6); #RO
-						readingsEndUpdate($hash, 1);
-										
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					#MachineInstalledCO2Sensor 
-					} elsif ($rawReadingType eq "2D") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor1", 1); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor2", 2); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor3", 3); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor4", 4); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Sensor5", 5); #RO
-						readingsEndUpdate($hash, 1);
-										
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (MultiPurpose2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-						
-					#Flags2
-					} elsif ($rawReadingType eq "6D") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2HigherSpeedRequest", 0);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2LowerRatePublicInvitation", 1);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HumidityLowerRatePublicInvitation", 2);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "SwitchLowerSpeedRequest", 3);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2Alarm", 6);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmSensor", 7);
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					#Flags4
-					} elsif ($rawReadingType eq "6F") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FrostAlarmWaterRadiator", 4);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "MasterSlaveSelection", 7);
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags4): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					#Flags5
-					} elsif ($rawReadingType eq "70") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PreHeatingStatus", 7);
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags5): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-								
-					#Flags6
-					} elsif ($rawReadingType eq "71") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RemoteMonitoringControl", 4); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceSwitchActivation", 5);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FireplaceBoosterStatus", 6); #RO
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Flags6): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					# Select
-					} elsif ($rawReadingType eq "A3") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "PowerState", 0);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CO2AdjustState", 1);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RHAdjustState", 2);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingState", 3);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FilterGuardIndicator", 4); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "HeatingIndicator", 5); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "FaultIndicator", 6); #RO
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "ServiceReminderIndicator", 7);
-						
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Select): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-						
-					# Program
-					} elsif ($rawReadingType eq "AA") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						# ----xxxx - Nibble is one value // # TODO: Adopt Function
-						readingsBulkUpdate($hash, "HumidityCO2AdjustmentInterval", oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4))) if (ReadingsVal($name,"HumidityCO2AdjustmentInterval","unknown") ne oct("0b"."0000".substr($hash->{"MR_".$Vallox_datatypes{$rawReadingType}},4,4)));
-
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "AutomaticHumidityBasicLevelSeekerState", 4);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "BoostSwitchMode", 5);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "RadiatorType", 6);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "CascadeAdjust", 7);
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Program): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-							
-					# Program2
-					} elsif ($rawReadingType eq "B5") {
-						
-						$hash->{"MR_".$Vallox_datatypes{$rawReadingType}} = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						$singlereading = 0;
-						readingsBeginUpdate($hash);
-						Vallox_readingsBulkUpdateMultiReading($hash, $rawReadingType, "MaxSpeedLimitFunction", 0);
-						readingsEndUpdate($hash, 1);
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Program2): $datagram (Bits ".$hash->{"MR_".$Vallox_datatypes{$rawReadingType}}.")");
-					
-					# Convert Unused Binarys to bits (Just not to have Hex Readings)
-					} elsif ($rawReadingType eq "6C" || $rawReadingType eq "6E") {
-						
-						$fineReadingValue = sprintf('%08b', hex("0x".$rawReadingValue));
-						
-						Log3 ($name, 4, "Vallox: Incoming Status-Info (Unused Binary): $datagram (Bits $fineReadingValue)");
-					
-					
-					# Everything else
-					# All Readings shall be handled before
-					} else {
-						$fineReadingValue = $rawReadingValue;
-						$singlereading = 1;
-						
-						Log3 ($name, 2, "Vallox: Incoming unhandled datagram: $datagram");
-					}
-					
-					if($Vallox_datatypes{$rawReadingType}) {
-						if ($singlereading == 1) {
-							Log3 ($name, 5, "Vallox: Update Reading: $fineReadingValue");
-							
-							readingsSingleUpdate($hash,$Vallox_datatypes{$rawReadingType}, $fineReadingValue, 1);
-							
-							# Efficiency Calculation
-							# Is this Reading a Temp?
-							if (substr($Vallox_datatypes{$rawReadingType},0,4) eq "Temp") {
-								
-								# If HRC is in Bypass - Efficiency is 0
-								if (ReadingsVal($name,"DamperMotorPosition",1) == 1) {
-									readingsSingleUpdate($hash,"EfficiencyIn", 0, 1);
-									readingsSingleUpdate($hash,"EfficiencyOut", 0, 1);
-									readingsSingleUpdate($hash,"EfficiencyAverage", 0, 1);
-									Log3 ($name, 5, "Vallox: Efficiency Override: HRC Bypass");
-									
-								} else {
-								
-									my ($EfficiencyIn,$EfficiencyOut,$TempIncoming,$TempOutside,$TempInside,$TempExhaust) = 0;
-								
-									# Efficiency on Keep Temp Inside
-									# Do we have all nessecary Readings?
-									if (ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
-										ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
-										ReadingsVal($name,"TempInside","unknown") ne "unknown") {
-										
-										
-										$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
-										$TempOutside = ReadingsVal($name,"TempOutside",-100);
-										$TempInside = ReadingsVal($name,"TempInside",-100);
-										
-										
-										# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
-										if ($TempInside-$TempOutside != 0) {
-											$EfficiencyIn = ($TempIncoming-$TempOutside)/($TempInside-$TempOutside)*100;
-											
-											$EfficiencyIn = 100 if ($EfficiencyIn > 100);
-											
-											Log3 ($name, 5, "Vallox: Efficiency Inside: (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = ".$EfficiencyIn);
-											readingsSingleUpdate($hash,"EfficiencyIn", $EfficiencyIn, 1);
-										} else {
-											Log3 ($name, 5, "Vallox: Efficiency Inside (DIV/0 Prevention): (".$TempIncoming."-".$TempIncoming.")/(".$TempInside."-".$TempOutside.")*100 = 100");
-											readingsSingleUpdate($hash,"EfficiencyIn", 100, 1);
-										}
-									}
-									
-									# Efficiency on Keep Temp Outside
-									# Do we have all nessecary Readings?
-									if (ReadingsVal($name,"TempOutside","unknown") ne "unknown" &&
-										ReadingsVal($name,"TempIncoming","unknown") ne "unknown" &&
-										ReadingsVal($name,"TempExhaust","unknown") ne "unknown") {
-										
-										$TempOutside = ReadingsVal($name,"TempOutside",-100);
-										$TempIncoming = ReadingsVal($name,"TempIncoming",-100);
-										$TempExhaust = ReadingsVal($name,"TempExhaust",-100);
-										
-										# Prevent DIV/0 (if Inside=Outside the HRC does nothing = 100% Efficient)
-										if ($TempOutside-$TempIncoming != 0) {
-											$EfficiencyOut = ($TempExhaust-$TempIncoming)/($TempOutside-$TempIncoming)*100;
-											$EfficiencyOut = 100 if ($EfficiencyOut > 100);
-											Log3 ($name, 5, "Vallox: Efficiency Outside: (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = ".$EfficiencyOut);
-											readingsSingleUpdate($hash,"EfficiencyOut", $EfficiencyOut, 1);
-										} else {
-											Log3 ($name, 5, "Vallox: Efficiency Outside (DIV/0 Protection): (".$TempExhaust."-".$TempIncoming.")/(".$TempOutside."-".$TempIncoming.")*100 = 100");
-											readingsSingleUpdate($hash,"EfficiencyOut", 100, 1);
-										}
-									}
-									
-									# Average Efficiency
-									if (ReadingsVal($name,"EfficiencyIn","unknown") ne "unknown" &&
-										ReadingsVal($name,"EfficiencyOut","unknown") ne "unknown") {
-										$EfficiencyIn = ReadingsVal($name,"EfficiencyIn",-100);
-										$EfficiencyOut = ReadingsVal($name,"EfficiencyOut",-100);
-										
-										my $EfficiencyAverage = ($EfficiencyIn+$EfficiencyOut) / 2; 
-										Log3 ($name, 5, "Vallox: Efficiency Average: (".$EfficiencyIn."+".$EfficiencyOut.")/2 = ".$EfficiencyAverage);
-
-										readingsSingleUpdate($hash,"EfficiencyAverage", $EfficiencyAverage, 1);
-									} else {
-										Log3 ($name, 5, "Vallox: Efficiency Average unknown: (".ReadingsVal($name,"EfficiencyIn","unknown")."+".ReadingsVal($name,"EfficiencyOut","unknown").")/2");
-									}
-								}
-							}
-						}
-						
-					} else {
-						Log3 ($name, 4, "Vallox: Datagram not in Datatypes-Table: ".$datagram);
-					}
-				} else {
-					Log3 ($name, 5, "Vallox: Incoming Status-Request: $datagram");
-				}
 			} elsif (Vallox_ValidateStream($hash) == 2) {
 				Log3 ($name, 4, "Vallox: Invalid Status-Request: $bufferRead");
 			} 
@@ -1051,8 +1130,9 @@ sub Vallox_Shutdown($)
   <a name="Valloxdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Vallox &lt;RS485-Device[@baud]&gt;</code><br>
-    If the baudrate is omitted, it is set to 9600 (default Vallox baudrate).
+    <code>define &lt;name&gt; Vallox &lt;RS485-Device[@baud]&gt; [BusVersion]</code><br>
+    If the baudrate is omitted, it is set to 9600 (default Vallox baudrate).<br>
+    The BusVersion can be set to 1 for older systems. (Default: 2).<br>
     <br>
     Example: <code>define Ventilation Vallox /dev/ttyUSB1</code>
   </ul>
@@ -1122,7 +1202,11 @@ sub Vallox_Shutdown($)
       </li><br>
 	  <li><code>ValloxForceBroadcast &lt; 0/1 &gt;</code>
          <br>
-         When 1, modul sends commands not only to the central ventilation unit (11) but to all possible addresses by broadcast (10/20). This is sometimes nessecary for older systems. (0 by default).
+         When 1, modul sends commands not only to the central ventilation unit (11) but to all possible addresses by broadcast (10/20). This is sometimes nessecary for older systems. (0 by default; Function always on on BusVersion 1).
+      </li><br>
+	  <li><code>ValloxProcessOwnCommands &lt; 0/1 &gt;</code>
+         <br>
+         When 1, modul sends commands not only to the bus but processes it as a received reading. This is sometimes nessecary for older systems. (0 by default; Function always on on BusVersion 1).
       </li><br>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1149,8 +1233,9 @@ sub Vallox_Shutdown($)
   <a name="Valloxdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Vallox &lt;RS485-Device[@baud]&gt;</code><br>
-    Wird die Baudrate weggelassen wird mit 9600 baud kommuniziert. (Standardrate des Vallox-Busses).
+    <code>define &lt;name&gt; Vallox &lt;RS485-Device[@baud]&gt; [BusVersion]</code><br>
+    Wird die Baudrate weggelassen wird mit 9600 baud kommuniziert. (Standardrate des Vallox-Busses).<br>
+    Die BusVersion kann bei &auml;lteren Anlagen auf 1 gesetzt werden. (Standard: 2).<br>
     <br>
     Beispiel: <code>define Ventilation Vallox /dev/ttyUSB1</code>
   </ul>
@@ -1221,7 +1306,11 @@ sub Vallox_Shutdown($)
       </li><br>
 	  <li><code>ValloxForceBroadcast &lt; 0/1 &gt;</code>
          <br>
-         Wenn 1, sendet das Modul die Befehle nicht nur an die zentrale Ventilationseinheit (11), sondern auch an alle Broadcast-Adressen (10/20). Dies ist manchmal bei &auml;lteren Anlagen notwendig, wenn sich die Anzeige auf den Kontrollterminals nicht mit aktualisiert. (Standard: 0).
+         Wenn 1, sendet das Modul die Befehle nicht nur an die zentrale Ventilationseinheit (11), sondern auch an alle Broadcast-Adressen (10/20). Dies ist manchmal bei &auml;lteren Anlagen notwendig, wenn sich die Anzeige auf den Kontrollterminals nicht mit aktualisiert. (Standard: 0; Funktion immer an bei BusVersion 1).
+      </li><br>
+	  <li><code>ValloxProcessOwnCommands &lt; 0/1 &gt;</code>
+         <br>
+         Wenn 1, behandelt das Modul die eigenen Befehle auch als Empfangene Befehle und verarbeitet sie intern weiter. Dies ist manchmal bei &auml;lteren Anlagen notwendig. (Standard: 0; Funktion immer an bei BusVersion 1).
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
