@@ -26,6 +26,8 @@
 #
 ##############################################################################
 # Changelog
+# 28.06.2017
+#	Zwei neue Register hinzugefügt: "Wasser_Zirkulationspumpe" und das entsprechende Ebenen-Bit "Wasser_Zirkulationspumpe_EBN" dazu.
 # 14.03.2016 
 #	Initial Release
 #
@@ -211,6 +213,18 @@ my %Trovis5576ParseInfo = (
 				poll => 1,
 				set => 1
 			},
+	'c60' => {	reading => 'Wasser_Zirkulationspumpe',
+				name => 'BinärausgBA5',
+				map => '0:Aus, 1:An',
+				poll => 1,
+				set => 1
+			},
+	'c99' => {	reading => 'Wasser_Zirkulationspumpe_EBN',
+				name => 'EBNBinärBA5',
+				map => '0:GLT, 1:Autark',
+				poll => 1,
+				set => 1
+			},
 	'c1837' => {reading => 'Wasser_ThermischeDesinfektion',
 				name => 'FB14ThermDes',
 				map => '0:Aus, 1:An',
@@ -292,6 +306,8 @@ sub ModbusTrovis5576_Initialize($) {
 1;
 
 =pod
+=item summary    Module to work with Heatung Control System Samson Trovis 5576
+=item summary_DE Modul für Heizungssteuerungen vom Typ Samson Trovis 5576.
 =begin html
 
 <a name="ModbusTrovis5576"></a>
@@ -359,13 +375,15 @@ sub ModbusTrovis5576_Initialize($) {
 	    	<li><b>Wasser_Betriebsart_EBN</b>: The Ebenen-Bit according to the Operating Mode. Possible values are GLT or Autark.</li>
 	    	<li><b>Wasser_Speicherladepumpe</b>: The on/off state of the reservoir loading pump. Possible values are An or Aus.</li>
 	    	<li><b>Wasser_Speicherladepumpe_EBN</b>: The Ebenen-Bit according to the Speicherladepumpe. Possible values are GLT or Autark.</li>
+	    	<li><b>Wasser_Zirkulationspumpe</b>: The on/off state of the circular pump. Possible values are An or Aus.</li>
+	    	<li><b>Wasser_Zirkulationspumpe_EBN</b>: The Ebenen-Bit according to the circular pump. Possible values are GLT or Autark.</li>
 	    	<li><b>Wasser_ThermischeDesinfektion</b>: On/off state of the thermal disinfection. Possible values are An or Aus.</li>
 	    	<li><b>Wasser_Temp_Soll</b>: The desired temperature for the drinkabke water reservoir.</li>
-	    	<li><b>Wasser_Temp_Minimum</b>: The lowest temperature for the drinkabke water reservoir.</li>
+	    	<li><b>Wasser_Temp_Minimum</b>: The lowest temperature for the drinkable water reservoir.</li>
 	    	<li><b>Wasser_Temp_Desinfektion</b>: The desired temperature of the thermal disinfection system.</li>
 	    </ul></li>
     </ul><br />
-    All other Readings (along with there Meanings) which can only be read:<br />
+    All other Readings (along with their Meanings) which can only be read:<br />
     <ul>
     	<li>Common Data:<ul>
 	    	<li><b>Modellnummer</b>: Shows the modelnumber. Should be "5576".</li>
@@ -479,6 +497,8 @@ sub ModbusTrovis5576_Initialize($) {
 	    	<li><b>Wasser_Betriebsart_EBN</b>: Das Ebenen-Bit zur Betriebsart. Kann GLT oder Autark sein, und gibt an, ob die Heizungssteuerung Autark läuft, oder übersteuert wurde.</li>
 	    	<li><b>Wasser_Speicherladepumpe</b>: Der Zustand der Speicherladepumpe. Kann An oder Aus sein.</li>
 	    	<li><b>Wasser_Speicherladepumpe_EBN</b>: Das Ebenen-Bit zur Speicherladepumpe. Kann GLT oder Autark sein, und gibt an, ob die Pumpe Autark läuft, oder übersteuert wurde.</li>
+	    	<li><b>Wasser_Zirkulationspumpe</b>: Der Zustand der Zirkulationspumpe. Kann An oder Aus sein.</li>
+	    	<li><b>Wasser_Zirkulationspumpe_EBN</b>: Das Ebenen-Bit zur Zirkulationspumpe. Kann GLT oder Autark sein, und gibt an, ob die Pumpe Autark läuft, oder übersteuert wurde.</li>
 	    	<li><b>Wasser_ThermischeDesinfektion</b>: Gibt an, ob gerade eine thermische Desinfektion läuft (=An) oder nicht (=Aus). </li>
 	    	<li><b>Wasser_Temp_Soll</b>: Die Solltemperatur des Trinkwasserspeichers.</li>
 	    	<li><b>Wasser_Temp_Minimum</b>: Die Minimaltemperatur des Trinkwasserspeichers.</li>
