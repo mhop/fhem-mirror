@@ -73,8 +73,8 @@ TcpServer_Accept($$)
 
   my $af = $attr{$name}{allowfrom};
   if(!$af) {
-    my $re = "^(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|".
-             "^(fe[89ab]|::1)";
+    my $re ="^(::ffff:)?(127|192.168|172.(1[6-9]|2[0-9]|3[01])|10|169.254)\\.|".
+            "^(f[cde]|::1)";
     if($caddr !~ m/$re/) {
       my %empty;
       $hash->{SNAME} = $hash->{NAME};
