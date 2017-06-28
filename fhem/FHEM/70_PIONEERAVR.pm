@@ -55,7 +55,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 #########################
 # Forward declaration
 sub PIONEERAVR_Set($@);
-sub PIONEERAVR_Get($@);
+sub PIONEERAVR_Get($$$);
 sub PIONEERAVR_Define($$);
 sub PIONEERAVR_Undef($$);
 sub PIONEERAVR_Read($);
@@ -1996,7 +1996,7 @@ PIONEERAVR_Set($@)
 	}
 }
 #####################################
-sub PIONEERAVR_Get($@) {
+sub PIONEERAVR_Get($$$) {
 	my ( $hash, $a, $h )  = @_;
 	my $name             = $hash->{NAME};
 	my $cmd              = @$a[1];
