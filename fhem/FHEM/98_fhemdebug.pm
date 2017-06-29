@@ -37,8 +37,11 @@ fhemdebug_Fn($$)
   } elsif($param eq "status") {
     return "fhemdebug is ".($fhemdebug_enabled ? "enabled":"disabled");
 
+  } elsif($param =~ m/^memusage/) {
+    return fhemdebug_memusage($param);
+
   } else {
-    return "Usage: fhemdebug {enable|disable|status}";
+    return "Usage: fhemdebug {enable|disable|status|memusage}";
   }
 }
 
@@ -96,6 +99,63 @@ fhemdebug_CallFn(@)
   }
 }
 
+
+sub
+fhemdebug_memusage($)
+{
+  my ($param) = @_;
+  eval "use Devel::Size";
+  return $@ if($@);
+
+  $Devel::Size::warn = 0;
+  my @param = split(" ", $param);
+  my $max = 50;
+  my $re;
+  $max = pop(@param) if(@param > 1 && $param[$#param] =~ m/^\d+$/);
+  $re  = pop(@param) if(@param > 1);
+
+  my %ts;
+  my $collectSize = sub($$$)
+  {
+    my ($fn, $h, $mname) = @_;
+    return if($h->{__IN__CS__}); # save us from endless recursion
+    $h->{__IN__CS__} = 1;
+    eval {
+      foreach my $n (keys %$h) {
+        next if(!$n || $n =~ m/^[^A-Za-z]$/);
+        if($n =~ m/::$/) {
+          $fn->($fn, $h->{$n}, "$mname$n");
+          next;
+        }
+        next if(main->can("$mname$n"));
+
+        if($mname eq "main::" && 
+          ($n eq "modules" || $n eq "defs" || $n eq "readyfnlist")) {
+          for my $mn (keys %{$main::{$n}}) {
+            $ts{"$mname$n::$mn"} = Devel::Size::total_size($main::{$n}{$mn});
+          }
+          
+        } else {
+          $ts{"$mname$n"} = Devel::Size::total_size($h->{$n});
+
+        }
+      }
+    };
+    delete $h->{__IN__CS__};
+    Log 1, "collectSize $mname: $@" if($@);
+  };
+  $collectSize->($collectSize, \%main::, "main::");
+
+  my @sts = sort { $ts{$b} <=> $ts{$a} } keys %ts;
+  my @ret;
+  for(my $i=0; $i < int(@sts); $i++) {
+    next if($re && $sts[$i] !~ m/$re/);
+    push @ret, sprintf("%4d. %-30s %8d", $i+1,substr($sts[$i],6),$ts{$sts[$i]});
+    last if(@ret >= $max);
+  }
+  return join("\n", @ret);
+}
+
 1;
 
 =pod
@@ -107,17 +167,36 @@ fhemdebug_CallFn(@)
 <a name="fhemdebug"></a>
 <h3>fhemdebug</h3>
 <ul>
-  <code>fhemdebug {enable|disable|status}</code><br>
+  <code>fhemdebug {enable|disable|status|}</code><br>
   <br>
-  fhemdebug produces debug information in the FHEM Log to help localize
-  certain error messages. Currently following errors are examined:
   <ul>
-  - Error: &gt;...&lt; has no TYPE, but following keys: &gt;...&lt;<br>
+    <li>enable/disable/status<br>
+      fhemdebug produces debug information in the FHEM Log to help localize
+      certain error messages. Currently following errors are examined:
+      <ul>
+      - Error: &gt;...&lt; has no TYPE, but following keys: &gt;...&lt;<br>
+      </ul>
+      As it frequently examines internal data-structures, it uses a lot of CPU,
+      it is not recommended to enable it all the time. A FHEM restart after
+      disabling it is not necessary.<br>
+      </li>
+    <li>memusage [regexp] [nr]<br>
+      Dump the name of the first nr datastructures with the largest memory
+      footprint. Filter the names by regexp, if specified.<br>
+      <b>Notes</b>:
+      <ul>
+      <li>this function depends on the Devel::Size module, so this must be
+        installed first.</li>
+      <li>The used function Devel::Size::total_size crashes perl (and FHEM) for
+        functions and some other data structures. memusage tries to avoid to
+        call it for such data structures, but as the problem is not identified,
+        it may crash your currently running instance. It works for me, but make
+        sure you saved your fhem.cfg before coalling it.</li>
+      <li>The known data structures modules and defs are reported in more
+        detail.</li>
+      </ul>
+    </li>
   </ul>
-  As it frequently examines internal data-structures, it uses a lot of CPU,
-  it is not recommended to enable it all the time. A FHEM restart after
-  disabling it is not necessary.<br>
-
 </ul>
 
 =end html
