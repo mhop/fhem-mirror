@@ -182,88 +182,88 @@ sub PIONEERAVR_Define($$) {
           . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED:reopen playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
     }
 
-	# $hash->{DeviceName} is needed for DevIo_OpenDev()
-	$hash->{Protocol}= $protocol;
-	my $devicename= @$a[3];
-	$hash->{DeviceName} = $devicename;
+    # $hash->{DeviceName} is needed for DevIo_OpenDev()
+    $hash->{Protocol}= $protocol;
+    my $devicename= @$a[3];
+    $hash->{DeviceName} = $devicename;
 
-	# connect using serial connection (old blocking style)
-	if ( $hash->{Protocol} eq "serial" )
-	{
-	    my $ret = DevIo_OpenDev( $hash, 0, undef);
-	    return $ret;
-	}
+    # connect using serial connection (old blocking style)
+    if ( $hash->{Protocol} eq "serial" )
+    {
+        my $ret = DevIo_OpenDev( $hash, 0, undef);
+        return $ret;
+    }
 
-	# connect using TCP connection (non-blocking style)
-	else {
-    	# add missing port if required
-	    $hash->{DeviceName} = $hash->{DeviceName} . ":8102"
-	      if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
+    # connect using TCP connection (non-blocking style)
+    else {
+        # add missing port if required
+        $hash->{DeviceName} = $hash->{DeviceName} . ":8102"
+          if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
 
-		DevIo_OpenDev(
-			$hash, 0,
-			"PIONEERAVR_DevInit",
-			sub() {
-			  my ( $hash, $err ) = @_;
-			  Log3 $name, 4, "PIONEERAVR $name: devName: $devicename HashDevName $hash->{DeviceName}";
-			}
-		);
-	}
+        DevIo_OpenDev(
+            $hash, 0,
+            "PIONEERAVR_DevInit",
+            sub() {
+              my ( $hash, $err ) = @_;
+              Log3 $name, 4, "PIONEERAVR $name: devName: $devicename HashDevName $hash->{DeviceName}";
+            }
+        );
+    }
 
-	$hash->{helper}{receiver} = undef;
+    $hash->{helper}{receiver} = undef;
 
-	unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
-	{
-    	$hash->{helper}{AVAILABLE} = 1;
-	    readingsSingleUpdate( $hash, "presence", "present", 1 );
-	}
+    unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
+    {
+        $hash->{helper}{AVAILABLE} = 1;
+        readingsSingleUpdate( $hash, "presence", "present", 1 );
+    }
 
-	# $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
-	# This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
-	# So this list is just a fall back if the module can't read the names ...
-	# InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
-	# Additionally this module tries to get information from the Pioneer AVR
-	#  - about the input level adjust
-	#  - to which connector each input is connected.
-	#    There are 3 groups of connectors:
-	#     - Audio connectors (possible values are: ANALOG, COAX 1...3, OPT 1...3)
-	#     - Component connectors (anaolog video, possible values: COMPONENT 1...3)
-	#     - HDMI connectors (possible values are hdmi 1 ... hdmi 8)
-	$hash->{helper}{INPUTNAMES} = {
-		"00" => {"name" => "phono",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0", "audioTerminal" => "No Assign", "componentTerminal" => "No Assign", "hdmiTerminal" => "No Assign", "inputLevelAdjust" => 1},
-		"01" => {"name" => "cd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"02" => {"name" => "tuner",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"03" => {"name" => "cdrTape",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"04" => {"name" => "dvd",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"05" => {"name" => "tvSat",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"06" => {"name" => "cblSat",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"10" => {"name" => "video1",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"12" => {"name" => "multiChIn",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"13" => {"name" => "usbDac",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"14" => {"name" => "video2",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"15" => {"name" => "dvrBdr",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"17" => {"name" => "iPodUsb",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"18" => {"name" => "xmRadio",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"19" => {"name" => "hdmi1",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"20" => {"name" => "hdmi2",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"21" => {"name" => "hdmi3",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"22" => {"name" => "hdmi4",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"23" => {"name" => "hdmi5",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"24" => {"name" => "hdmi6",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"25" => {"name" => "bd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"26" => {"name" => "homeMediaGallery",  "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"27" => {"name" => "sirius",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"31" => {"name" => "hdmiCyclic",        "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"33" => {"name" => "adapterPort",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"34" => {"name" => "hdmi7",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"35" => {"name" => "hdmi8",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
-		"38" => {"name" => "internetRadio",     "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"41" => {"name" => "pandora",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
-		"53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
-	};
+    # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
+    # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
+    # So this list is just a fall back if the module can't read the names ...
+    # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
+    # Additionally this module tries to get information from the Pioneer AVR
+    #  - about the input level adjust
+    #  - to which connector each input is connected.
+    #    There are 3 groups of connectors:
+    #     - Audio connectors (possible values are: ANALOG, COAX 1...3, OPT 1...3)
+    #     - Component connectors (anaolog video, possible values: COMPONENT 1...3)
+    #     - HDMI connectors (possible values are hdmi 1 ... hdmi 8)
+    $hash->{helper}{INPUTNAMES} = {
+        "00" => {"name" => "phono",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0", "audioTerminal" => "No Assign", "componentTerminal" => "No Assign", "hdmiTerminal" => "No Assign", "inputLevelAdjust" => 1},
+        "01" => {"name" => "cd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "02" => {"name" => "tuner",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "03" => {"name" => "cdrTape",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "04" => {"name" => "dvd",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "05" => {"name" => "tvSat",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "06" => {"name" => "cblSat",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "10" => {"name" => "video1",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "12" => {"name" => "multiChIn",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "13" => {"name" => "usbDac",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "14" => {"name" => "video2",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "15" => {"name" => "dvrBdr",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "17" => {"name" => "iPodUsb",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "18" => {"name" => "xmRadio",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "19" => {"name" => "hdmi1",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "20" => {"name" => "hdmi2",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "21" => {"name" => "hdmi3",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "22" => {"name" => "hdmi4",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "23" => {"name" => "hdmi5",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "24" => {"name" => "hdmi6",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "25" => {"name" => "bd",                "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "26" => {"name" => "homeMediaGallery",  "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "27" => {"name" => "sirius",            "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "31" => {"name" => "hdmiCyclic",        "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "33" => {"name" => "adapterPort",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "34" => {"name" => "hdmi7",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "35" => {"name" => "hdmi8",             "aliasName" => "",  "enabled" => "1", "playerCommands" => "0"},
+        "38" => {"name" => "internetRadio",     "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "41" => {"name" => "pandora",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
+    };
   # ----------------Human Readable command mapping table for "set" commands-----------------------
   $hash->{helper}{SETS} = {
     'main' => {
@@ -311,7 +311,7 @@ sub PIONEERAVR_Define($$) {
         'stopNetwork'            => '20NW',
         'repeatNetwork'          => '34NW',
         'shuffleNetwork'         => '35NW',
-		'updateScreenNetwork'    => '?GAH',
+        'updateScreenNetwork'    => '?GAH',
         'selectLine01Network'    => '01GFH',
         'selectLine02Network'    => '02GFH',
         'selectLine03Network'    => '03GFH',
@@ -337,7 +337,7 @@ sub PIONEERAVR_Define($$) {
         'enterIpod'              => '17IP',
         'returnIpod'             => '18IP',
         'menuIpod'               => '19IP',
-		'updateScreenIpod'       => '?GAI',
+        'updateScreenIpod'       => '?GAI',
         'selectLine01Ipod'       => '01GFI',
         'selectLine02Ipod'       => '02GFI',
         'selectLine03Ipod'       => '03GFI',
@@ -1262,15 +1262,15 @@ sub PIONEERAVR_Define($$) {
     "25"=>"screenTopMenuKey",
     "26"=>"screenToolsKey",
     "27"=>"screenReturnKey",
-	"28"=>"playStatus",
-	"29"=>"sourceInfo",
-	"30"=>"currentAlbum",
+    "28"=>"playStatus",
+    "29"=>"sourceInfo",
+    "30"=>"currentAlbum",
     "31"=>"currentArtist",
     "32"=>"currentTitle",
     "33"=>"channel",
     "34"=>"channelName",
     "35"=>"channelStraight",
-    "36"=>"tunerFrequency"	
+    "36"=>"tunerFrequency"  
     };
 
   ### initialize timer
@@ -1375,7 +1375,7 @@ sub PIONEERAVR_Notify($$) {
                 }
                 else {
                     DoTrigger( $name, "DISCONNECTED" );
-                }	
+                }   
             } 
             # unknown event
             else {
@@ -1498,514 +1498,523 @@ PIONEERAVR_Clear($)
 sub
 PIONEERAVR_Set($@)
 {
-	my ($hash, $a, $h) = @_;
-	my $name           = $hash->{NAME};
-	my $cmd            = @$a[1];
-	my $arg            = (@$a[2] ? @$a[2] : "");
-	my $presence       = ReadingsVal( $name, "presence", "absent" );
-	my @args           = @$a; shift @args; shift @args;
-	my @setsPlayer     = ("play",
-	                      "pause",
-						  "stop",
-						  "repeat",
-						  "shuffle",
-						  "prev",
-						  "next",
-						  "rev",
-						  "fwd",
-						  "up",
-						  "down",
-						  "right",
-						  "left",
-						  "enter",
-						  "return",
-						  "menu",
-						  "updateScreen",
-						  "selectLine01",
-						  "selectLine02",
-						  "selectLine03",
-						  "selectLine04",
-						  "selectLine05",
-						  "selectLine06",
-						  "selectLine07",
-						  "selectLine08",
-						  "selectScreenPage");        # available commands for certain inputs (@playerInputNr)
-	my @playerInputNr  = ("13","17","18","26","27","33","38","41","44","45","48","53");  # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
-	my @setsTuner      = ("channelUp",
-	                      "channelDown",
-						  "channelStraight",
-						  "channel");     # available commands for input tuner
-	my @setsWithoutArg = ("off",
-						  "toggle",
-						  "volumeUp",
-						  "volumeDown",
-						  "muteOn",
-						  "muteOff",
-						  "muteToggle",
-						  "inputUp",
-						  "inputDown" ); # set commands without arguments
-	my $playerCmd      = "";
-	my $inputNr        = "";
+    my ($hash, $a, $h) = @_;
+    my $name           = $hash->{NAME};
+    my $cmd            = @$a[1];
+    my $arg            = (@$a[2] ? @$a[2] : "");
+    my $presence       = ReadingsVal( $name, "presence", "absent" );
+    my @args           = @$a; shift @args; shift @args;
+    my @setsPlayer     = ("play",
+                          "pause",
+                          "stop",
+                          "repeat",
+                          "shuffle",
+                          "prev",
+                          "next",
+                          "rev",
+                          "fwd",
+                          "up",
+                          "down",
+                          "right",
+                          "left",
+                          "enter",
+                          "return",
+                          "menu",
+                          "updateScreen",
+                          "selectLine01",
+                          "selectLine02",
+                          "selectLine03",
+                          "selectLine04",
+                          "selectLine05",
+                          "selectLine06",
+                          "selectLine07",
+                          "selectLine08",
+                          "selectScreenPage" );        # available commands for certain inputs (@playerInputNr)
+    my @playerInputNr  = ("13","17","18","26","27","33","38","41","44","45","48","53");  # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
+    my @setsTuner      = ("channelUp",
+                          "channelDown",
+                          "channelStraight",
+                          "channel");     # available commands for input tuner
+    my @setsWithoutArg = ("off",
+                          "toggle",
+                          "volumeUp",
+                          "volumeDown",
+                          "muteOn",
+                          "muteOff",
+                          "muteToggle",
+                          "inputUp",
+                          "inputDown" ); # set commands without arguments
+    my $playerCmd      = "";
+    my $inputNr        = "";
 
-	Log3 $name, 5, "PIONEERAVR $name: Processing PIONEERAVR_Set( $cmd )";
+    Log3 $name, 5, "PIONEERAVR $name: Processing PIONEERAVR_Set( $cmd )";
   
     return "Argument is missing" if ( int(@$a) < 1 );
-	
-	return "Device is offline and cannot be controlled at that stage."
+    
+    return "Device is offline and cannot be controlled at that stage."
       if ( $presence eq "absent"
         && lc( $cmd ) ne "on"
         && lc( $cmd ) ne "?"
-		&& lc( $cmd ) ne "reopen"
+        && lc( $cmd ) ne "reopen"
         && lc( $cmd ) ne "help" );
   
-	# get all input names (preferable the aliasName) of the enabled inputs for the drop down list of "set <device> input xxx"
-	my @listInputNames = ();
-	foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
-		if (defined( $hash->{helper}{INPUTNAMES}->{$key}{enabled})) {
-			if ( $hash->{helper}{INPUTNAMES}->{$key}{enabled} eq "1" ) {
-				if ( $hash->{helper}{INPUTNAMES}{$key}{aliasName}) {
-					push(@listInputNames,$hash->{helper}{INPUTNAMES}{$key}{aliasName});
-				} elsif ( $hash->{helper}{INPUTNAMES}{$key}{name}) {
-					push(@listInputNames,$hash->{helper}{INPUTNAMES}{$key}{name});
-				}
-			}
-		}
-	}
-	
-	my $inputsList=join(':', sort @listInputNames);
-	readingsSingleUpdate( $hash, "inputsList", $inputsList, 0 );
+    # get all input names (preferable the aliasName) of the enabled inputs for the drop down list of "set <device> input xxx"
+    my @listInputNames = ();
+    foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
+        if (defined( $hash->{helper}{INPUTNAMES}->{$key}{enabled})) {
+            if ( $hash->{helper}{INPUTNAMES}->{$key}{enabled} eq "1" ) {
+                if ( $hash->{helper}{INPUTNAMES}{$key}{aliasName}) {
+                    push(@listInputNames,$hash->{helper}{INPUTNAMES}{$key}{aliasName});
+                } elsif ( $hash->{helper}{INPUTNAMES}{$key}{name}) {
+                    push(@listInputNames,$hash->{helper}{INPUTNAMES}{$key}{name});
+                }
+            }
+        }
+    }
+    
+    my $inputsList=join(':', sort @listInputNames);
+    readingsSingleUpdate( $hash, "inputsList", $inputsList, 0 );
  
-	my $list = "reopen:noArg on:noArg off:noArg toggle:noArg input:"
-		. join(',', sort @listInputNames)
-		. " hdmiOut:"
-		. join(',', sort values (%{$hash->{helper}{HDMIOUT}}))
-		. " inputUp:noArg inputDown:noArg"
-		. " channelUp:noArg channelDown:noArg channelStraight"
-		#   . join(',', sort values ( $hash->{helper}{TUNERCHANNELNAMES}))
-		. " channel:1,2,3,4,5,6,7,8,9"
-		. " listeningMode:"
-		. join(',', sort values (%{$hash->{helper}{LISTENINGMODES}}))
-		. " volumeUp:noArg volumeDown:noArg mute:on,off,toggle tone:on,bypass bass:slider,-6,1,6"
-		. " treble:slider,-6,1,6 statusRequest:noArg volume:slider,0,1," . AttrVal($name, "volumeLimit", (AttrVal($name, "volumeLimitStraight", 12)+80)/0.92)
-		. " volumeStraight:slider,-80,1," . AttrVal($name, "volumeLimitStraight", (AttrVal($name, "volumeLimit", 100)*0.92-80))
-		. " signalSelect:auto,analog,digital,hdmi,cycle"
-		. " speakers:off,A,B,A+B raw"
-		. " mcaccMemory:1,2,3,4,5,6 eq:on,off standingWave:on,off"
-		. " remoteControl:"
-		. join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
+    my $list = "reopen:noArg on:noArg off:noArg toggle:noArg input:"
+        . join(',', sort @listInputNames)
+        . " hdmiOut:"
+        . join(',', sort values (%{$hash->{helper}{HDMIOUT}}))
+        . " inputUp:noArg inputDown:noArg"
+        . " channelUp:noArg channelDown:noArg channelStraight"
+        #   . join(',', sort values ( $hash->{helper}{TUNERCHANNELNAMES}))
+        . " channel:1,2,3,4,5,6,7,8,9"
+        . " listeningMode:"
+        . join(',', sort values (%{$hash->{helper}{LISTENINGMODES}}))
+        . " volumeUp:noArg volumeDown:noArg mute:on,off,toggle tone:on,bypass bass:slider,-6,1,6"
+        . " treble:slider,-6,1,6 statusRequest:noArg volume:slider,0,1," . AttrVal($name, "volumeLimit", (AttrVal($name, "volumeLimitStraight", 12)+80)/0.92)
+        . " volumeStraight:slider,-80,1," . AttrVal($name, "volumeLimitStraight", (AttrVal($name, "volumeLimit", 100)*0.92-80))
+        . " signalSelect:auto,analog,digital,hdmi,cycle"
+        . " speakers:off,A,B,A+B raw"
+        . " mcaccMemory:1,2,3,4,5,6 eq:on,off standingWave:on,off"
+        . " remoteControl:"
+        . join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
 
-	my $currentInput= ReadingsVal($name,"input","");
+    my $currentInput= ReadingsVal($name,"input","");
 
-	if (defined( $hash->{helper}{main}{CURINPUTNR})) {
-		$inputNr = $hash->{helper}{main}{CURINPUTNR};
-	}
-	#return "Can't find the current input - you might want to try 'get $name loadInputNames" if ($inputNr eq "");
+    if (defined( $hash->{helper}{main}{CURINPUTNR})) {
+        $inputNr = $hash->{helper}{main}{CURINPUTNR};
+    }
+    #return "Can't find the current input - you might want to try 'get $name loadInputNames" if ($inputNr eq "");
 
-	# some input have more set commands ...
-	if ( $inputNr ~~ @playerInputNr ) {
-		$list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg prev:noArg next:noArg rev:noArg fwd:noArg up:noArg down:noArg";
-		$list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
-		$list .= " updateScreen:noArg selectLine01:noArg selectLine02:noArg selectLine03:noArg selectLine04:noArg selectLine05:noArg selectLine06:noArg selectLine07:noArg selectLine08:noArg selectScreenPage ";
-	}
-	
-	$list .= " networkStandby:on,off";
+    # some input have more set commands ...
+    if ( $inputNr ~~ @playerInputNr ) {
+        $list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg prev:noArg next:noArg rev:noArg fwd:noArg up:noArg down:noArg";
+        $list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
+        $list .= " updateScreen:noArg selectLine01:noArg selectLine02:noArg selectLine03:noArg selectLine04:noArg selectLine05:noArg selectLine06:noArg selectLine07:noArg selectLine08:noArg selectScreenPage ";
+    }
+    
+    $list .= " networkStandby:on,off";
 
-	if ( $cmd eq "?" ) {
-		return SetExtensions( $hash, $list, $name, $cmd, @args);
+    if ( $cmd eq "?" ) {
+        return SetExtensions( $hash, $list, $name, $cmd, @args);
 
-		# set <name> blink is part of the setextensions
-		# but blink does not make sense for an PioneerAVR so we disable it here
-	} elsif ( $cmd eq "blink" ) {
-		return "blink does not make too much sense with an PIONEER AV receiver isn't it?";
-	}
+        # set <name> blink is part of the setextensions
+        # but blink does not make sense for an PioneerAVR so we disable it here
+    } elsif ( $cmd eq "blink" ) {
+        return "blink does not make too much sense with an PIONEER AV receiver isn't it?";
+    }
 
-	# process set <name> command (without further argument(s))
-	if(@$a == 2) {
-		Log3 $name, 5, "PIONEERAVR $name: Set $cmd (no arguments)";
-		# if the data connection between the PioneerAVR and Fhem is lost, we can try to reopen the data connection manually
-		if( $cmd eq "reopen" ) {
-			return PIONEERAVR_Reopen( $hash);
-		### Power on
-		### Command: PO
-		### according to "Elite & Pioneer FY14AVR IP & RS-232 7-31-13.xlsx" (notice) we need to send <cr> and
-		### wait 100ms before the first command is accepted by the Pioneer AV receiver
-		} elsif ( $cmd  eq "on" ) {
-			Log3 $name, 5, "PIONEERAVR $name: Set $cmd -> 2x newline + 2x PO with 100ms break in between";
-			my $setCmd= "";
-			PIONEERAVR_Write( $hash, $setCmd);
-			select(undef, undef, undef, 0.1);
-			PIONEERAVR_Write( $hash, $setCmd);
-			select(undef, undef, undef, 0.1);
-			$setCmd= "\n\rPO";
-			PIONEERAVR_Write( $hash, $setCmd);
-			select(undef, undef, undef, 0.2);
-			PIONEERAVR_Write( $hash, $setCmd);
-			
-			if (ReadingsVal($name,"networkStandby","") eq "off") {
-				return "NetworkStandby for the Pioneer AV receiver is off. If Fhem should be able to turn the AV Receiver on from standby enable networkStandby on the Pioneer AV Receiver (e.g. set $name networkStandby on )!";
-			} else {
-				return undef;
-			}
-		#### simple set commands without attributes
-		#### we just "translate" the human readable command to the PioneerAvr command
-		#### lookup in $hash->{helper}{SETS} if the command exists and what to write to PioneerAvr
-		} elsif ( $cmd  ~~ @setsWithoutArg ) {
-			my $setCmd= $hash->{helper}{SETS}{main}{$cmd};
-			my $v= PIONEERAVR_Write( $hash, $setCmd);
-			Log3 $name, 5, "PIONEERAVR $name: Set $cmd (setsWithoutArg): ". $cmd ." -> $setCmd";
-			return undef;
+    # process set <name> command (without further argument(s))
+    if(@$a == 2) {
+        Log3 $name, 5, "PIONEERAVR $name: Set $cmd (no arguments)";
+        # if the data connection between the PioneerAVR and Fhem is lost, we can try to reopen the data connection manually
+        if( $cmd eq "reopen" ) {
+            return PIONEERAVR_Reopen( $hash);
+        ### Power on
+        ### Command: PO
+        ### according to "Elite & Pioneer FY14AVR IP & RS-232 7-31-13.xlsx" (notice) we need to send <cr> and
+        ### wait 100ms before the first command is accepted by the Pioneer AV receiver
+        } elsif ( $cmd  eq "on" ) {
+            Log3 $name, 5, "PIONEERAVR $name: Set $cmd -> 2x newline + 2x PO with 100ms break in between";
+            my $setCmd= "";
+            PIONEERAVR_Write( $hash, $setCmd);
+            select(undef, undef, undef, 0.1);
+            PIONEERAVR_Write( $hash, $setCmd);
+            select(undef, undef, undef, 0.1);
+            $setCmd= "\n\rPO";
+            PIONEERAVR_Write( $hash, $setCmd);
+            select(undef, undef, undef, 0.2);
+            PIONEERAVR_Write( $hash, $setCmd);
+            
+            if (ReadingsVal($name,"networkStandby","") eq "off") {
+                return "NetworkStandby for the Pioneer AV receiver is off. If Fhem should be able to turn the AV Receiver on from standby enable networkStandby on the Pioneer AV Receiver (e.g. set $name networkStandby on )!";
+            } else {
+                return undef;
+            }
+        #### simple set commands without attributes
+        #### we just "translate" the human readable command to the PioneerAvr command
+        #### lookup in $hash->{helper}{SETS} if the command exists and what to write to PioneerAvr
+        } elsif ( $cmd  ~~ @setsWithoutArg ) {
+            my $setCmd= $hash->{helper}{SETS}{main}{$cmd};
+            my $v= PIONEERAVR_Write( $hash, $setCmd);
+            Log3 $name, 5, "PIONEERAVR $name: Set $cmd (setsWithoutArg): ". $cmd ." -> $setCmd";
+            return undef;
 
-		# statusRequest: execute all "get" commands to update the readings
-		} elsif ( $cmd eq "statusRequest") {
-			Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
-			PIONEERAVR_statusUpdate( $hash);
-			return undef;
-			
-		#### play, pause, stop, random, repeat,prev,next,rev,fwd,up,down,right,left,enter,return,menu
-		#### Only available if the input is one of:
-		####    ipod, internetRadio, mediaServer, favorites, adapterPort, mhl
-		#### we need to send different commands to the Pioneer AV receiver
-		####    depending on that input
-		} elsif ($cmd  ~~ @setsPlayer) {
-			Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command)";
-			if ($inputNr eq "17") {
-				if ( $cmd eq "selectScreenPage" ) {
-					my $setCmd    = sprintf "%05dGGI", $arg;
-					PIONEERAVR_Write( $hash, $setCmd);
-					return undef;					
-				} else {
-					$playerCmd = $cmd."Ipod";
-				}
+        # statusRequest: execute all "get" commands to update the readings
+        } elsif ( $cmd eq "statusRequest") {
+            Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
+            PIONEERAVR_statusUpdate( $hash);
+            return undef;
+            
+        #### play, pause, stop, random, repeat,prev,next,rev,fwd,up,down,right,left,enter,return,menu
+        #### Only available if the input is one of:
+        ####    ipod, internetRadio, mediaServer, favorites, adapterPort, mhl
+        #### we need to send different commands to the Pioneer AV receiver
+        ####    depending on that input
+        } elsif ($cmd  ~~ @setsPlayer) {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command)";
+            if ($inputNr eq "17") {
+                    $playerCmd = $cmd."Ipod";
 
-			} elsif ($inputNr eq "33" 
-						&& ( $cmd ne "updateScreen" ) 
-						&& ( $cmd ne "selectLine01" ) 
-						&& ( $cmd ne "selectLine02" ) 
-						&& ( $cmd ne "selectLine03" ) 
-						&& ( $cmd ne "selectLine04" ) 
-						&& ( $cmd ne "selectLine05" ) 
-						&& ( $cmd ne "selectLine06" ) 
-						&& ( $cmd ne "selectLine07" ) 
-						&& ( $cmd ne "selectLine08" )  
-						&& ( $cmd ne "selectScreenPage") ) {
-				$playerCmd= $cmd."AdapterPort";
-			#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
-			} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
-				if ( $cmd eq "selectScreenPage" ) {
-					my $setCmd = sprintf "%05dGGH", $arg;
-					PIONEERAVR_Write( $hash, $setCmd);
-					return undef;					
-				} else {
-    				$playerCmd= $cmd."Network";
-				}
+            } elsif ( $inputNr eq "33" 
+                    && ( $cmd ne "updateScreen" ) 
+                    && ( $cmd ne "selectLine01" ) 
+                    && ( $cmd ne "selectLine02" ) 
+                    && ( $cmd ne "selectLine03" ) 
+                    && ( $cmd ne "selectLine04" ) 
+                    && ( $cmd ne "selectLine05" ) 
+                    && ( $cmd ne "selectLine06" ) 
+                    && ( $cmd ne "selectLine07" ) 
+                    && ( $cmd ne "selectLine08" ) ) 
+            {
+                $playerCmd= $cmd."AdapterPort";
+            #### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
+            } elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
+                $playerCmd= $cmd."Network";
 
-			#### 'random' and 'repeat' are not available on input mhl
-			} elsif (($inputNr eq "48") 
-			            && ( $cmd ne "repeat") 
-					    && ( $cmd ne "random")
-						&& ( $cmd ne "updateScreen" ) 
-						&& ( $cmd ne "selectLine01" ) 
-						&& ( $cmd ne "selectLine02" ) 
-						&& ( $cmd ne "selectLine03" ) 
-						&& ( $cmd ne "selectLine04" ) 
-						&& ( $cmd ne "selectLine05" ) 
-						&& ( $cmd ne "selectLine06" ) 
-						&& ( $cmd ne "selectLine07" ) 
-						&& ( $cmd ne "selectLine08" )  
-						&& ( $cmd ne "selectScreenPage" ) ) {
-				$playerCmd= $cmd."Mhl";
-			} else {
-				my $err= "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
-				Log3 $name, 3, $err;
-				return $err;
-			}
-			my $setCmd= $hash->{helper}{SETS}{main}{$playerCmd};
-			PIONEERAVR_Write( $hash, $setCmd);
-			return undef;
-		#### channelUp, channelDown
-		#### Only available if the input is 02 (tuner)
-		} elsif ($cmd  ~~ @setsTuner) {
-			Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (tuner command)";
-			if ($inputNr eq "02") {
-				my $setCmd= $hash->{helper}{SETS}{main}{$cmd};
-				PIONEERAVR_Write( $hash, $setCmd);
-			} else {
-				my $err= "PIONEERAVR $name: The tuner command $cmd for input nr. $inputNr is not possible!";
-				Log3 $name, 3, $err;
-				return $err;
-			}
-			return undef;
-		}
-	  #### commands with argument(s)
-	  } elsif(@$a > 2) {
-		####Raw
-		#### sends $arg to the PioneerAVR
-		if($cmd eq "raw") {
-			my $allArgs= join " ", @args;
-			Log3 $name, 5, "PIONEERAVR $name: sending raw command ".dq($allArgs);
-			PIONEERAVR_Write( $hash, $allArgs);
-			return undef;
+            #### 'random' and 'repeat' are not available on input mhl
+            } elsif (( $inputNr eq "48" ) 
+                    && ( $cmd ne "repeat") 
+                    && ( $cmd ne "random")
+                    && ( $cmd ne "updateScreen" ) 
+                    && ( $cmd ne "selectLine01" ) 
+                    && ( $cmd ne "selectLine02" ) 
+                    && ( $cmd ne "selectLine03" ) 
+                    && ( $cmd ne "selectLine04" ) 
+                    && ( $cmd ne "selectLine05" ) 
+                    && ( $cmd ne "selectLine06" ) 
+                    && ( $cmd ne "selectLine07" ) 
+                    && ( $cmd ne "selectLine08" ) ) {
+                $playerCmd= $cmd."Mhl";
+            } else {
+                my $err= "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
+                Log3 $name, 3, $err;
+                return $err;
+            }
+            my $setCmd= $hash->{helper}{SETS}{main}{$playerCmd};
+            PIONEERAVR_Write( $hash, $setCmd);
+            return undef;
+        #### channelUp, channelDown
+        #### Only available if the input is 02 (tuner)
+        } elsif ($cmd  ~~ @setsTuner) {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (tuner command)";
+            if ($inputNr eq "02") {
+                my $setCmd= $hash->{helper}{SETS}{main}{$cmd};
+                PIONEERAVR_Write( $hash, $setCmd);
+            } else {
+                my $err= "PIONEERAVR $name: The tuner command $cmd for input nr. $inputNr is not possible!";
+                Log3 $name, 3, $err;
+                return $err;
+            }
+            return undef;
+        }
+      #### commands with argument(s)
+      } elsif(@$a > 2) {
+        ####Raw
+        #### sends $arg to the PioneerAVR
+        if($cmd eq "raw") {
+            my $allArgs= join " ", @args;
+            Log3 $name, 5, "PIONEERAVR $name: sending raw command ".dq($allArgs);
+            PIONEERAVR_Write( $hash, $allArgs);
+            return undef;
 
-		####Input (all available Inputs of the Pioneer AV receiver -> see 'get $name loadInputNames')
-		#### according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-		#### first try the aliasName (only if this fails try the default input name)
-		} elsif ( $cmd eq "input" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
-			if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
-				PIONEERAVR_Write( $hash, sprintf "%02dFN", $key );
-			} elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
-				PIONEERAVR_Write( $hash, sprintf "%02dFN", $key );
-			}
-		}
-		return undef;
+        ####Input (all available Inputs of the Pioneer AV receiver -> see 'get $name loadInputNames')
+        #### according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+        #### first try the aliasName (only if this fails try the default input name)
+        } elsif ( $cmd eq "input" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+        foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
+            if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
+                PIONEERAVR_Write( $hash, sprintf "%02dFN", $key );
+            } elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
+                PIONEERAVR_Write( $hash, sprintf "%02dFN", $key );
+            }
+        }
+        return undef;
 
-		####hdmiOut
-		} elsif ( $cmd eq "hdmiOut" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		foreach my $key ( keys %{$hash->{helper}{HDMIOUT}} ) {
-			if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
-				Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg)." -> found nr: ".$key." for HDMIOut ".dq($arg);
-				PIONEERAVR_Write( $hash, sprintf "%dHO", $key);
-				return undef;
-			}
-		}
-		my $err= "PIONEERAVR $name: Error: unknown HDMI Out $cmd --- $arg !";
-		Log3 $name, 3, $err;
-		return $err;
+        ####hdmiOut
+        } elsif ( $cmd eq "hdmiOut" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+        foreach my $key ( keys %{$hash->{helper}{HDMIOUT}} ) {
+            if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
+                Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg)." -> found nr: ".$key." for HDMIOut ".dq($arg);
+                PIONEERAVR_Write( $hash, sprintf "%dHO", $key);
+                return undef;
+            }
+        }
+        my $err= "PIONEERAVR $name: Error: unknown HDMI Out $cmd --- $arg !";
+        Log3 $name, 3, $err;
+        return $err;
 
-		####ListeningMode
-		} elsif ( $cmd eq "listeningMode" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		foreach my $key ( keys %{$hash->{helper}{LISTENINGMODES}} ) {
-			if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
-				Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg)." -> found nr: ".$key." for listeningMode ".dq($arg);
-				PIONEERAVR_Write( $hash, sprintf "%04dSR", $key);
-				return undef;
-			}
-		}
-		my $err= "PIONEERAVR $name: Error: unknown listeningMode $cmd --- $arg !";
-		Log3 $name, 3, $err;
-		return $err;
+        ####ListeningMode
+        } elsif ( $cmd eq "listeningMode" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+        foreach my $key ( keys %{$hash->{helper}{LISTENINGMODES}} ) {
+            if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
+                Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg)." -> found nr: ".$key." for listeningMode ".dq($arg);
+                PIONEERAVR_Write( $hash, sprintf "%04dSR", $key);
+                return undef;
+            }
+        }
+        my $err= "PIONEERAVR $name: Error: unknown listeningMode $cmd --- $arg !";
+        Log3 $name, 3, $err;
+        return $err;
 
-		#####VolumeStraight (-80.5 - 12) in dB
-		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-		# PioneerAVR expects values between 000 - 185
-		} elsif ( $cmd eq "volumeStraight" ) {
-		  if (AttrVal($name, "volumeLimitStraight", 12) < $arg ) {
-			$arg = AttrVal($name, "volumeLimitStraight", 12);
-		  }
-		  Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		  my $pioneerVol = (80.5 + $arg)*2;
-		  PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
-		  return undef;
-		  ####Volume (0 - 100) in %
-		  ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-		  # PioneerAVR expects values between 000 - 185
-		} elsif ( $cmd eq "volume" ) {
-		  if (AttrVal($name, "volumeLimit", 100) < $arg ) {
-			  $arg = AttrVal($name, "volumeLimit", 100);
-		  }
-		  Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		  my $pioneerVol = sprintf "%d", $arg * 1.85;
-		  PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
-		  return undef;
-		####tone (on|bypass)
-		} elsif ( $cmd eq "tone" ) {
-		if ($arg eq "on") {
-			PIONEERAVR_Write( $hash, "1TO");
-		}
-		elsif ($arg eq "bypass") {
-			PIONEERAVR_Write( $hash, "0TO");
-		} else {
-			my $err= "PIONEERAVR $name: Error: unknown set ... tone argument: $arg !";
-			Log3 $name, 3, $err;
-			return $err;
-		}
-		return undef;
-		####bass (-6 - 6) in dB
-		} elsif ( $cmd eq "bass" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		my $zahl = sprintf "%d", ($arg * (-1)) + 6;
-		PIONEERAVR_Write( $hash, sprintf "%02dBA", $zahl);
-		return undef;
-		####treble (-6 - 6) in dB
-		} elsif ( $cmd eq "treble" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
-		my $zahl = sprintf "%d", ($arg * (-1)) + 6;
-		PIONEERAVR_Write( $hash, sprintf "%02dTR", $zahl);
-		return undef;
-		####Mute (on|off|toggle)
-		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-		} elsif ( $cmd eq "mute" ) {
-		if ($arg eq "on") {
-			PIONEERAVR_Write( $hash, "MO");
-			readingsSingleUpdate( $hash, "mute", "on", 1 );
-		}
-		elsif ($arg eq "off") {
-			PIONEERAVR_Write( $hash, "MF");
-			readingsSingleUpdate( $hash, "mute", "off", 1 );
-		}
-		elsif ($arg eq "toggle") {
-			PIONEERAVR_Write( $hash, "MZ");
-		} else {
-			my $err= "PIONEERAVR $name: Error: unknown set ... mute argument: $arg !";
-			Log3 $name, 3, $err;
-			return $err;
-		}
-		return undef;
-		#### channelStraight
-		#### set tuner preset in Pioneer preset format (A1...G9)
-		#### Only available if the input is 02 (tuner)
-		#### X0YPR -> X = tuner preset class (A...G), Y = tuner preset number (1...9)
-		} elsif ($cmd  eq "channelStraight" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr $arg (tuner command only available for 02)";
-		if (($inputNr eq "02") && $arg =~ m/([A-G])([1-9])/ ) {
-			my $setCmd= $1."0".$2."PR";
-			PIONEERAVR_Write( $hash,$setCmd);
-		} else {
-			my $err= "PIONEERAVR $name: Error: set ... channelStraight only available for input 02 (tuner) - not for $inputNr !";
-			Log3 $name, 3, $err;
-			return $err;
-		}
-		return undef;
-		#### channel
-		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-		#### set tuner preset numeric (1...9)
-		#### Only available if the input is 02 (tuner)
-		#### XTP -> X = tuner preset number (1...9)
-		} elsif ($cmd  eq "channel" ) {
-		Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr $arg (tuner command)";
-		if (($inputNr eq "02") && $arg =~ m/([1-9])/ ) {
-			my $setCmd= $1."TP";
-			PIONEERAVR_Write( $hash,$setCmd);
-		} else {
-			my $err= "PIONEERAVR $name: Error: set ... channel only available for input 02 (tuner) - not for $inputNr !";
-			Log3 $name, 3, $err;
-			return $err;
-		}
-		return undef;
-		####Speakers (off|A|B|A+B)
-		} elsif ( $cmd eq "speakers" ) {
-			Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
-			if ($arg eq "off") {
-				PIONEERAVR_Write( $hash, "0SPK");
-			} elsif ($arg eq "A") {
-				PIONEERAVR_Write( $hash, "1SPK");
-			} elsif ($arg eq "B") {
-				PIONEERAVR_Write( $hash, "2SPK");
-			} elsif ($arg eq "A+B") {
-				PIONEERAVR_Write( $hash, "3SPK");
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... speakers. Must be one of off, A, B, A+B  !";
-				Log3 $name, 5, $err;
-				return $err;
-			}
-			return undef;
+        #####VolumeStraight (-80.5 - 12) in dB
+        ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+        # PioneerAVR expects values between 000 - 185
+        } elsif ( $cmd eq "volumeStraight" ) {
+          if (AttrVal($name, "volumeLimitStraight", 12) < $arg ) {
+            $arg = AttrVal($name, "volumeLimitStraight", 12);
+          }
+          Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+          my $pioneerVol = (80.5 + $arg)*2;
+          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+          return undef;
+          ####Volume (0 - 100) in %
+          ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+          # PioneerAVR expects values between 000 - 185
+        } elsif ( $cmd eq "volume" ) {
+          if (AttrVal($name, "volumeLimit", 100) < $arg ) {
+              $arg = AttrVal($name, "volumeLimit", 100);
+          }
+          Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+          my $pioneerVol = sprintf "%d", $arg * 1.85;
+          PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+          return undef;
+        ####tone (on|bypass)
+        } elsif ( $cmd eq "tone" ) {
+        if ($arg eq "on") {
+            PIONEERAVR_Write( $hash, "1TO");
+        }
+        elsif ($arg eq "bypass") {
+            PIONEERAVR_Write( $hash, "0TO");
+        } else {
+            my $err= "PIONEERAVR $name: Error: unknown set ... tone argument: $arg !";
+            Log3 $name, 3, $err;
+            return $err;
+        }
+        return undef;
+        ####bass (-6 - 6) in dB
+        } elsif ( $cmd eq "bass" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+        my $zahl = sprintf "%d", ($arg * (-1)) + 6;
+        PIONEERAVR_Write( $hash, sprintf "%02dBA", $zahl);
+        return undef;
+        ####treble (-6 - 6) in dB
+        } elsif ( $cmd eq "treble" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+        my $zahl = sprintf "%d", ($arg * (-1)) + 6;
+        PIONEERAVR_Write( $hash, sprintf "%02dTR", $zahl);
+        return undef;
+        ####Mute (on|off|toggle)
+        ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+        } elsif ( $cmd eq "mute" ) {
+        if ($arg eq "on") {
+            PIONEERAVR_Write( $hash, "MO");
+            readingsSingleUpdate( $hash, "mute", "on", 1 );
+        }
+        elsif ($arg eq "off") {
+            PIONEERAVR_Write( $hash, "MF");
+            readingsSingleUpdate( $hash, "mute", "off", 1 );
+        }
+        elsif ($arg eq "toggle") {
+            PIONEERAVR_Write( $hash, "MZ");
+        } else {
+            my $err= "PIONEERAVR $name: Error: unknown set ... mute argument: $arg !";
+            Log3 $name, 3, $err;
+            return $err;
+        }
+        return undef;
+        #### channelStraight
+        #### set tuner preset in Pioneer preset format (A1...G9)
+        #### Only available if the input is 02 (tuner)
+        #### X0YPR -> X = tuner preset class (A...G), Y = tuner preset number (1...9)
+        } elsif ($cmd  eq "channelStraight" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr $arg (tuner command only available for 02)";
+        if (($inputNr eq "02") && $arg =~ m/([A-G])([1-9])/ ) {
+            my $setCmd= $1."0".$2."PR";
+            PIONEERAVR_Write( $hash,$setCmd);
+        } else {
+            my $err= "PIONEERAVR $name: Error: set ... channelStraight only available for input 02 (tuner) - not for $inputNr !";
+            Log3 $name, 3, $err;
+            return $err;
+        }
+        return undef;
+        #### channel
+        ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+        #### set tuner preset numeric (1...9)
+        #### Only available if the input is 02 (tuner)
+        #### XTP -> X = tuner preset number (1...9)
+        } elsif ($cmd  eq "channel" ) {
+        Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr $arg (tuner command)";
+        if (($inputNr eq "02") && $arg =~ m/([1-9])/ ) {
+            my $setCmd= $1."TP";
+            PIONEERAVR_Write( $hash,$setCmd);
+        } else {
+            my $err= "PIONEERAVR $name: Error: set ... channel only available for input 02 (tuner) - not for $inputNr !";
+            Log3 $name, 3, $err;
+            return $err;
+        }
+        return undef;
+        ####Speakers (off|A|B|A+B)
+        } elsif ( $cmd eq "speakers" ) {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+            if ($arg eq "off") {
+                PIONEERAVR_Write( $hash, "0SPK");
+            } elsif ($arg eq "A") {
+                PIONEERAVR_Write( $hash, "1SPK");
+            } elsif ($arg eq "B") {
+                PIONEERAVR_Write( $hash, "2SPK");
+            } elsif ($arg eq "A+B") {
+                PIONEERAVR_Write( $hash, "3SPK");
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... speakers. Must be one of off, A, B, A+B  !";
+                Log3 $name, 5, $err;
+                return $err;
+            }
+            return undef;
 
-		####Signal select (auto|analog|digital|hdmi|cycle)
-		} elsif ( $cmd eq "signalSelect" ) {
-			Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
-			if ($arg eq "auto") {
-				PIONEERAVR_Write( $hash, "0SDA");
-			} elsif ($arg eq "analog") {
-				PIONEERAVR_Write( $hash, "1SDA");
-			} elsif ($arg eq "digital") {
-				PIONEERAVR_Write( $hash, "2SDA");
-			} elsif ($arg eq "hdmi") {
-				PIONEERAVR_Write( $hash, "3SDA");
-			} elsif ($arg eq "cycle") {
-				PIONEERAVR_Write( $hash, "9SDA");
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... signalSelect. Must be one of auto|analog|digital|hdmi|cycle !";
-				Log3 $name, 5, $err;
-				return $err;
-			}
-			return undef;
+        ####Signal select (auto|analog|digital|hdmi|cycle)
+        } elsif ( $cmd eq "signalSelect" ) {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+            if ($arg eq "auto") {
+                PIONEERAVR_Write( $hash, "0SDA");
+            } elsif ($arg eq "analog") {
+                PIONEERAVR_Write( $hash, "1SDA");
+            } elsif ($arg eq "digital") {
+                PIONEERAVR_Write( $hash, "2SDA");
+            } elsif ($arg eq "hdmi") {
+                PIONEERAVR_Write( $hash, "3SDA");
+            } elsif ($arg eq "cycle") {
+                PIONEERAVR_Write( $hash, "9SDA");
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... signalSelect. Must be one of auto|analog|digital|hdmi|cycle !";
+                Log3 $name, 5, $err;
+                return $err;
+            }
+            return undef;
 
-		#mcacc memory
-		} elsif ($cmd eq "mcaccMemory") {
-			if ($arg > 0 and $arg < 7) {
-			  my $setCmd = $arg."MC";
-			  Log3 $name, 5, "PIONEERAVR $name: setting MCACC memory to ".dq($arg);
-			  PIONEERAVR_Write( $hash, $setCmd);
-			  return undef;
-			} else {
-			my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... mcaccMemory!";
-				Log3 $name, 5, $err;
-				return $err;
-			}
+        #mcacc memory
+        } elsif ($cmd eq "mcaccMemory") {
+            if ($arg > 0 and $arg < 7) {
+              my $setCmd = $arg."MC";
+              Log3 $name, 5, "PIONEERAVR $name: setting MCACC memory to ".dq($arg);
+              PIONEERAVR_Write( $hash, $setCmd);
+              return undef;
+            } else {
+            my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... mcaccMemory!";
+                Log3 $name, 5, $err;
+                return $err;
+            }
 
-		# eq on/off/toggle
-		} elsif ( $cmd eq "eq" ) {
-			if ($arg eq "on") {
-				PIONEERAVR_Write( $hash, "1ATC");
-			}
-			elsif ($arg eq "off") {
-				PIONEERAVR_Write( $hash, "0ATC");
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown set ... eq argument: $arg !";
-				Log3 $name, 3, $err;
-				return $err;
-			}
+        # eq on/off/toggle
+        } elsif ( $cmd eq "eq" ) {
+            if ($arg eq "on") {
+                PIONEERAVR_Write( $hash, "1ATC");
+            }
+            elsif ($arg eq "off") {
+                PIONEERAVR_Write( $hash, "0ATC");
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown set ... eq argument: $arg !";
+                Log3 $name, 3, $err;
+                return $err;
+            }
 
-		# standingWave on/off/toggle
-		} elsif ( $cmd eq "standingWave" ) {
-			if ( $arg eq "on" ) {
-				PIONEERAVR_Write( $hash, "1ATD" );
-			} elsif ( $arg eq "off" ) {
-				PIONEERAVR_Write( $hash, "0ATD" );
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown set ... standingWave argument: $arg !";
-				Log3 $name, 3, $err;
-				return $err;
-			}
+        # standingWave on/off/toggle
+        } elsif ( $cmd eq "standingWave" ) {
+            if ( $arg eq "on" ) {
+                PIONEERAVR_Write( $hash, "1ATD" );
+            } elsif ( $arg eq "off" ) {
+                PIONEERAVR_Write( $hash, "0ATD" );
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown set ... standingWave argument: $arg !";
+                Log3 $name, 3, $err;
+                return $err;
+            }
 
-		# Network standby (on|off)
-		# needs to be "on" to turn on the Pioneer AVR via this module
-		} elsif ( $cmd eq "networkStandby" ) {
-			if ( $arg eq "on" ) {
-				PIONEERAVR_Write( $hash, "1STJ");
-			}
-			elsif ( $arg eq "off" ) {
-				PIONEERAVR_Write( $hash, "0STJ" );
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown set ... networkStandby argument: $arg !";
-				Log3 $name, 3, $err;
-				return $err;
-			}
-			return undef;
+        # Network standby (on|off)
+        # needs to be "on" to turn on the Pioneer AVR via this module
+        } elsif ( $cmd eq "networkStandby" ) {
+            if ( $arg eq "on" ) {
+                PIONEERAVR_Write( $hash, "1STJ");
+            }
+            elsif ( $arg eq "off" ) {
+                PIONEERAVR_Write( $hash, "0STJ" );
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown set ... networkStandby argument: $arg !";
+                Log3 $name, 3, $err;
+                return $err;
+            }
+            return undef;
 
-		####remoteControl
-		} elsif ( $cmd eq "remoteControl" ) {
-			Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
-			if (exists $hash->{helper}{REMOTECONTROL}{$arg}) {
-				my $setCmd= $hash->{helper}{REMOTECONTROL}{$arg};
-				my $v= PIONEERAVR_Write( $hash, $setCmd);
-			} else {
-				my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... remoteControl!";
-				Log3 $name, 5, $err;
-				return $err;
-			}
-			return undef;
-		} else {
-			return SetExtensions( $hash, $list, $name, $cmd, @args);
-		}
-	} else {
-		return SetExtensions( $hash, $list, $name, $cmd, @args);
-	}
+        # selectScreenPage (player command) 
+        } elsif ($cmd  eq "selectScreenPage") {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command) argument: $arg !";
+            if ($inputNr eq "17") {
+                    my $setCmd    = sprintf "%05dGGI", $arg;
+                    PIONEERAVR_Write( $hash, $setCmd);
+                    return undef;                   
+
+            #### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
+            } elsif ( ( $inputNr eq "26")  
+                    || ( $inputNr eq "27" )
+                    || ( $inputNr eq "38" )
+                    || ( $inputNr eq "41" )
+                    || ( $inputNr eq "44" )
+                    || ( $inputNr eq "45" )
+                    || ( $inputNr eq "53" ) ) 
+            {
+                my $setCmd = sprintf "%05dGGH", $arg;
+                PIONEERAVR_Write( $hash, $setCmd);
+                return undef;                   
+            }
+            
+        ####remoteControl
+        } elsif ( $cmd eq "remoteControl" ) {
+            Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+            if (exists $hash->{helper}{REMOTECONTROL}{$arg}) {
+                my $setCmd= $hash->{helper}{REMOTECONTROL}{$arg};
+                my $v= PIONEERAVR_Write( $hash, $setCmd);
+            } else {
+                my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... remoteControl!";
+                Log3 $name, 5, $err;
+                return $err;
+            }
+            return undef;
+        } else {
+            return SetExtensions( $hash, $list, $name, $cmd, @args);
+        }
+    } else {
+        return SetExtensions( $hash, $list, $name, $cmd, @args);
+    }
 }
 #####################################
 sub PIONEERAVR_Get($$$) {
-	my ( $hash, $a, $h )  = @_;
-	my $name             = $hash->{NAME};
-	my $cmd              = @$a[1];
-	my $presence         = ReadingsVal( $name, "presence", "absent" );
+    my ( $hash, $a, $h )  = @_;
+    my $name             = $hash->{NAME};
+    my $cmd              = @$a[1];
+    my $presence         = ReadingsVal( $name, "presence", "absent" );
 
-	Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_AVR_Get()";
+    Log3 $name, 5, "PIONEERAVR $name: called function PIONEERAVR_AVR_Get()";
 
     return "get $name needs at least one parameter" if ( int(@$a) < 1 );
-	  
+      
     # readings
     return $hash->{READINGS}{ @$a[1] }{VAL}
       if ( defined( $hash->{READINGS}{ @$a[1] } ) );
@@ -2013,25 +2022,25 @@ sub PIONEERAVR_Get($$$) {
     return "Device is offline and cannot be controlled at that stage."
       if ( $presence eq "absent" );
 
-	####loadInputNames
-	if ( $cmd eq "loadInputNames" ) {
-		Log3 $name, 5, "PIONEERAVR $name: processing get loadInputNames";
-		PIONEERAVR_askForInputNames( $hash, 5);
-		return "updating input names - this may take up to one minute.";
+    ####loadInputNames
+    if ( $cmd eq "loadInputNames" ) {
+        Log3 $name, 5, "PIONEERAVR $name: processing get loadInputNames";
+        PIONEERAVR_askForInputNames( $hash, 5);
+        return "updating input names - this may take up to one minute.";
 
-	} elsif ( !defined( $hash->{helper}{GETS}{main}{$cmd})) {
-		my $gets= "";
-		foreach my $key ( keys %{$hash->{helper}{GETS}{main}} ) {
-			$gets.= $key.":noArg ";
-			}
-		return "$name error: unknown argument $cmd, choose one of loadInputNames:noArg " . $gets;
-		####get commands for the main zone without arguments
-		#### Fhem commands are translated to PioneerAVR commands as defined in PIONEERAVR_Define -> {helper}{GETS}{main}
-	} elsif ( defined( $hash->{helper}{GETS}{main}{$cmd} ) ) {
-		my $pioneerCmd = $hash->{helper}{GETS}{main}{$cmd};
-		my $v          = PIONEERAVR_Write( $hash, $pioneerCmd);
-		return "updating $cmd .";
-	}
+    } elsif ( !defined( $hash->{helper}{GETS}{main}{$cmd})) {
+        my $gets= "";
+        foreach my $key ( keys %{$hash->{helper}{GETS}{main}} ) {
+            $gets.= $key.":noArg ";
+            }
+        return "$name error: unknown argument $cmd, choose one of loadInputNames:noArg " . $gets;
+        ####get commands for the main zone without arguments
+        #### Fhem commands are translated to PioneerAVR commands as defined in PIONEERAVR_Define -> {helper}{GETS}{main}
+    } elsif ( defined( $hash->{helper}{GETS}{main}{$cmd} ) ) {
+        my $pioneerCmd = $hash->{helper}{GETS}{main}{$cmd};
+        my $v          = PIONEERAVR_Write( $hash, $pioneerCmd);
+        return "updating $cmd .";
+    }
 }
 
 #####################################
@@ -2041,28 +2050,28 @@ sub PIONEERAVR_Get($$$) {
 # as the main zone is handled here
 sub PIONEERAVR_Read($)
 {
-	my ( $hash)     = @_;
-	my $name       = $hash->{NAME};
-	my $state      = '';
-	my $msgForZone = "";
-	my $buf        = '';
+    my ( $hash)     = @_;
+    my $name       = $hash->{NAME};
+    my $state      = '';
+    my $msgForZone = "";
+    my $buf        = '';
 
-	#include previous partial message
-	if ( defined( $hash->{PARTIAL} ) && $hash->{PARTIAL} ) {
-		$buf = $hash->{PARTIAL} . DevIo_SimpleRead( $hash);
-	} else {
-		$buf = DevIo_SimpleRead( $hash);
-	}
-	return if(!defined($buf));
+    #include previous partial message
+    if ( defined( $hash->{PARTIAL} ) && $hash->{PARTIAL} ) {
+        $buf = $hash->{PARTIAL} . DevIo_SimpleRead( $hash);
+    } else {
+        $buf = DevIo_SimpleRead( $hash);
+    }
+    return if(!defined($buf));
   
-	my $logMsg = "Spontaneously received " . dq($buf);
-	PIONEERAVR_Log( $hash, undef, $logMsg);
+    my $logMsg = "Spontaneously received " . dq($buf);
+    PIONEERAVR_Log( $hash, undef, $logMsg);
 
-	# Connection still up!
-	# We received something from the Pioneer AV receiver (otherwise we would not be here)
-	# So we can assume that the connection is up.
-	# We delete the current "inactivity timer" and set a new timer
-	#   to check if the connection to the Pioneer AV receiver is still working in 120s
+    # Connection still up!
+    # We received something from the Pioneer AV receiver (otherwise we would not be here)
+    # So we can assume that the connection is up.
+    # We delete the current "inactivity timer" and set a new timer
+    #   to check if the connection to the Pioneer AV receiver is still working in 120s
 
     # reset connectionCheck timer
     my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
@@ -2082,900 +2091,908 @@ sub PIONEERAVR_Read($)
   #    all listening modules otherwise we process it here
   readingsBeginUpdate( $hash);
   
-	while($buf =~ m/^(.*?)\r\n(.*)\Z/s ) {
-		my $line = $1;
-		$buf = $2;
-		Log3 $name, 5, "PIONEERAVR $name: processing ". dq( $line ) ." received from PIONEERAVR";
-		Log3 $name, 5, "PIONEERAVR $name: line to do soon: " . dq($buf) unless ($buf eq "");
-		if ( ( $line eq "R" ) || ( $line eq "" ) ) {
-			Log3 $hash, 5, "PIONEERAVR $name: Supressing received " . dq( $line );
+    while($buf =~ m/^(.*?)\r\n(.*)\Z/s ) {
+        my $line = $1;
+        $buf = $2;
+        Log3 $name, 5, "PIONEERAVR $name: processing ". dq( $line ) ." received from PIONEERAVR";
+        Log3 $name, 5, "PIONEERAVR $name: line to do soon: " . dq($buf) unless ($buf eq "");
+        if ( ( $line eq "R" ) || ( $line eq "" ) ) {
+            Log3 $hash, 5, "PIONEERAVR $name: Supressing received " . dq( $line );
 
-		# Main zone volume
-		} elsif ( substr($line,0,3) eq "VOL" ) {
-			my $volume    = substr( $line,3,3 );
-			my $volume_st = $volume/2 - 80.5;
-			my $volume_vl = $volume/1.85;
-			readingsBulkUpdate( $hash, "volumeStraight", $volume_st);
-			readingsBulkUpdate( $hash, "volume", sprintf "%d", $volume_vl);
-			Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New volume = ".$volume . " (raw volume data).";
-		# correct volume if it is over the limit
-			if ( AttrVal( $name, "volumeLimitStraight", 12 ) < $volume_st or AttrVal( $name, "volumeLimit", 100 ) < $volume_vl ) {
-				my $limit_st  = AttrVal( $name, "volumeLimitStraight", 12 );
-				my $limit_vl  = AttrVal( $name, "volumeLimit", 100 );
-				$limit_st      = $limit_vl*0.92-80 if ($limit_vl*0.92-80 < $limit_st);
-				my $pioneerVol = ( 80.5 + $limit_st )*2;
-				PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
-			}
-		# Main zone tone (0 = bypass, 1 = on)
-		} elsif ( $line =~ m/^TO([0|1])$/) {
-			if ($1 == "1") {
-				readingsBulkUpdate( $hash, "tone", "on" );
-				Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - tone on ";
-			}
-			else {
-				readingsBulkUpdate( $hash, "tone", "bypass" );
-				Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - tone bypass ";
-			}
-		# Main zone bass (-6 to +6 dB)
-		# works only if tone=on
-		} elsif ( $line =~ m/^BA(\d\d)$/ ) {
-			readingsBulkUpdate( $hash, "bass", ( $1 *(-1) ) + 6 );
-			Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New bass = ".$1 . " (raw bass data).";
+        # Main zone volume
+        } elsif ( substr($line,0,3) eq "VOL" ) {
+            my $volume    = substr( $line,3,3 );
+            my $volume_st = $volume/2 - 80.5;
+            my $volume_vl = $volume/1.85;
+            readingsBulkUpdate( $hash, "volumeStraight", $volume_st);
+            readingsBulkUpdate( $hash, "volume", sprintf "%d", $volume_vl);
+            Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New volume = ".$volume . " (raw volume data).";
+        # correct volume if it is over the limit
+            if ( AttrVal( $name, "volumeLimitStraight", 12 ) < $volume_st or AttrVal( $name, "volumeLimit", 100 ) < $volume_vl ) {
+                my $limit_st  = AttrVal( $name, "volumeLimitStraight", 12 );
+                my $limit_vl  = AttrVal( $name, "volumeLimit", 100 );
+                $limit_st      = $limit_vl*0.92-80 if ($limit_vl*0.92-80 < $limit_st);
+                my $pioneerVol = ( 80.5 + $limit_st )*2;
+                PIONEERAVR_Write( $hash, sprintf "%03dVL", $pioneerVol);
+            }
+        # Main zone tone (0 = bypass, 1 = on)
+        } elsif ( $line =~ m/^TO([0|1])$/) {
+            if ($1 == "1") {
+                readingsBulkUpdate( $hash, "tone", "on" );
+                Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - tone on ";
+            }
+            else {
+                readingsBulkUpdate( $hash, "tone", "bypass" );
+                Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - tone bypass ";
+            }
+        # Main zone bass (-6 to +6 dB)
+        # works only if tone=on
+        } elsif ( $line =~ m/^BA(\d\d)$/ ) {
+            readingsBulkUpdate( $hash, "bass", ( $1 *(-1) ) + 6 );
+            Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New bass = ".$1 . " (raw bass data).";
 
-		# Main zone treble (-6 to +6 dB)
-		# works only if tone=on
-		} elsif ( $line =~ m/^TR(\d\d)$/ ) {
-			readingsBulkUpdate( $hash, "treble", ( $1 *(-1) ) + 6 );
-			Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New treble = ".$1 . " (raw treble data).";
+        # Main zone treble (-6 to +6 dB)
+        # works only if tone=on
+        } elsif ( $line =~ m/^TR(\d\d)$/ ) {
+            readingsBulkUpdate( $hash, "treble", ( $1 *(-1) ) + 6 );
+            Log3 $name, 5, "PIONEERAVR $name: ". dq( $line ) ." interpreted as: Main Zone - New treble = ".$1 . " (raw treble data).";
 
-		# Main zone Mute
-		} elsif ( substr( $line,0,3 ) eq "MUT" ) {
-			my $mute = substr( $line, 3, 1 );
-			if ($mute == "1") {
-				readingsBulkUpdate( $hash, "mute", "off" );
-				Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Mute off ";
-			}
-			else {
-				readingsBulkUpdate( $hash, "mute", "on" );
-				Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Mute on ";
-			}
+        # Main zone Mute
+        } elsif ( substr( $line,0,3 ) eq "MUT" ) {
+            my $mute = substr( $line, 3, 1 );
+            if ($mute == "1") {
+                readingsBulkUpdate( $hash, "mute", "off" );
+                Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Mute off ";
+            }
+            else {
+                readingsBulkUpdate( $hash, "mute", "on" );
+                Log3 $name, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Mute on ";
+            }
 
-		} elsif ( $line =~ m/^AST(\d{2})(\d{2})(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d*)$/ ) {
-			# Audio information parameters
-			#  data1-data2:Audio Input Signal
-			#  data3-data4:Audio Input Frequency
-			#  data5-data20 (for some models data5-data25):Audio Input Channel Format
-			if ( defined ( $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} ) ) {
-				readingsBulkUpdate( $hash, "audioInputSignal", $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input signal: ". dq( $1 );
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio input signal: ". dq( $1 );
-			}
-			if ( defined ( $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2}) ) {
-				readingsBulkUpdate( $hash, "audioInputFrequency", $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input frequency: ". dq( $2 );
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio input frequency: ". dq( $2 );
-			}
-			readingsBulkUpdate( $hash, "audioInputFormatL", $3 );
-			readingsBulkUpdate( $hash, "audioInputFormatC", $4 );
-			readingsBulkUpdate( $hash, "audioInputFormatR", $5 );
-			readingsBulkUpdate( $hash, "audioInputFormatSL", $6 );
-			readingsBulkUpdate( $hash, "audioInputFormatSR", $7 );
-			readingsBulkUpdate( $hash, "audioInputFormatSLB", $8 );
-			readingsBulkUpdate( $hash, "audioInputFormatS", $9 );
-			readingsBulkUpdate( $hash, "audioInputFormatSBR", $10 );
-			readingsBulkUpdate( $hash, "audioInputFormatLFE", $11 );
-			readingsBulkUpdate( $hash, "audioInputFormatFHL", $12 );
-			readingsBulkUpdate( $hash, "audioInputFormatFHR", $13 );
-			readingsBulkUpdate( $hash, "audioInputFormatFWL", $14 );
-			readingsBulkUpdate( $hash, "audioInputFormatFWR", $15 );
-			readingsBulkUpdate( $hash, "audioInputFormatXL", $16 );
-			readingsBulkUpdate( $hash, "audioInputFormatXC", $17 );
-			readingsBulkUpdate( $hash, "audioInputFormatXR", $18 );
-			if ( $19=~ m/^(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d{2})(\d{2})(\d{4})(\d)(\d{2})(\d)$/ ) {
-			#  Some Pioneer AVR models (e.g. VSX-921) return less then 55 data bytes - the first 20 bytes can still be used
-			#  here are the bytes 21-55 processed ... e.g. for VSX-923
-			#  data26-data43:Audio Output Channel
-			#  data44-data45:Audio Output Frequency
-			#  data46-data47:Audio Output bit
-			#  data48-data51:Reserved
-			#  data52:Working PQLS
-			#  data53-data54:Working Auto Phase Control Plus (in ms)(ignored)
-			#  data55:Working Auto Phase Control Plus (Reverse Phase) (0... no revers phase, 1...reverse phase)
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." AST with 55 data bytes ";
+        } elsif ( $line =~ m/^AST(\d{2})(\d{2})(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d*)$/ ) {
+            # Audio information parameters
+            #  data1-data2:Audio Input Signal
+            #  data3-data4:Audio Input Frequency
+            #  data5-data20 (for some models data5-data25):Audio Input Channel Format
+            if ( defined ( $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} ) ) {
+                readingsBulkUpdate( $hash, "audioInputSignal", $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input signal: ". dq( $1 );
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio input signal: ". dq( $1 );
+            }
+            if ( defined ( $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2}) ) {
+                readingsBulkUpdate( $hash, "audioInputFrequency", $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input frequency: ". dq( $2 );
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio input frequency: ". dq( $2 );
+            }
+            readingsBulkUpdate( $hash, "audioInputFormatL", $3 );
+            readingsBulkUpdate( $hash, "audioInputFormatC", $4 );
+            readingsBulkUpdate( $hash, "audioInputFormatR", $5 );
+            readingsBulkUpdate( $hash, "audioInputFormatSL", $6 );
+            readingsBulkUpdate( $hash, "audioInputFormatSR", $7 );
+            readingsBulkUpdate( $hash, "audioInputFormatSLB", $8 );
+            readingsBulkUpdate( $hash, "audioInputFormatS", $9 );
+            readingsBulkUpdate( $hash, "audioInputFormatSBR", $10 );
+            readingsBulkUpdate( $hash, "audioInputFormatLFE", $11 );
+            readingsBulkUpdate( $hash, "audioInputFormatFHL", $12 );
+            readingsBulkUpdate( $hash, "audioInputFormatFHR", $13 );
+            readingsBulkUpdate( $hash, "audioInputFormatFWL", $14 );
+            readingsBulkUpdate( $hash, "audioInputFormatFWR", $15 );
+            readingsBulkUpdate( $hash, "audioInputFormatXL", $16 );
+            readingsBulkUpdate( $hash, "audioInputFormatXC", $17 );
+            readingsBulkUpdate( $hash, "audioInputFormatXR", $18 );
+            if ( $19=~ m/^(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d{2})(\d{2})(\d{4})(\d)(\d{2})(\d)$/ ) {
+            #  Some Pioneer AVR models (e.g. VSX-921) return less then 55 data bytes - the first 20 bytes can still be used
+            #  here are the bytes 21-55 processed ... e.g. for VSX-923
+            #  data26-data43:Audio Output Channel
+            #  data44-data45:Audio Output Frequency
+            #  data46-data47:Audio Output bit
+            #  data48-data51:Reserved
+            #  data52:Working PQLS
+            #  data53-data54:Working Auto Phase Control Plus (in ms)(ignored)
+            #  data55:Working Auto Phase Control Plus (Reverse Phase) (0... no revers phase, 1...reverse phase)
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." AST with 55 data bytes ";
 
-				#readingsBulkUpdate( $hash, "audioInputFormatReserved1", $1);
-				#readingsBulkUpdate( $hash, "audioInputFormatReserved2", $2);
-				#readingsBulkUpdate( $hash, "audioInputFormatReserved3", $3);
-				#readingsBulkUpdate( $hash, "audioInputFormatReserved4", $4);
-				#readingsBulkUpdate( $hash, "audioInputFormatReserved5", $5);
-				readingsBulkUpdate( $hash, "audioOutputFormatL", $6 );
-				readingsBulkUpdate( $hash, "audioOutputFormatC", $7 );
-				readingsBulkUpdate( $hash, "audioOutputFormatR", $8 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSL", $9 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSR", $10 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSBL", $11 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSB", $12 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSBR", $13 );
-				readingsBulkUpdate( $hash, "audioOutputFormatSW", $14 );
-				readingsBulkUpdate( $hash, "audioOutputFormatFHL", $15);
-				readingsBulkUpdate( $hash, "audioOutputFormatFHR", $16 );
-				readingsBulkUpdate( $hash, "audioOutputFormatFWL", $17 );
-				readingsBulkUpdate( $hash, "audioOutputFormatFWR", $18 );
-		#       readingsBulkUpdate( $hash, "audioOutputFormatReserved1", $19);
-		#       readingsBulkUpdate( $hash, "audioOutputFormatReserved2", $20);
-		#       readingsBulkUpdate( $hash, "audioOutputFormatReserved3", $21);
-		#       readingsBulkUpdate( $hash, "audioOutputFormatReserved4", $22);
-		#       readingsBulkUpdate( $hash, "audioOutputFormatReserved5", $23);
+                #readingsBulkUpdate( $hash, "audioInputFormatReserved1", $1);
+                #readingsBulkUpdate( $hash, "audioInputFormatReserved2", $2);
+                #readingsBulkUpdate( $hash, "audioInputFormatReserved3", $3);
+                #readingsBulkUpdate( $hash, "audioInputFormatReserved4", $4);
+                #readingsBulkUpdate( $hash, "audioInputFormatReserved5", $5);
+                readingsBulkUpdate( $hash, "audioOutputFormatL", $6 );
+                readingsBulkUpdate( $hash, "audioOutputFormatC", $7 );
+                readingsBulkUpdate( $hash, "audioOutputFormatR", $8 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSL", $9 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSR", $10 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSBL", $11 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSB", $12 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSBR", $13 );
+                readingsBulkUpdate( $hash, "audioOutputFormatSW", $14 );
+                readingsBulkUpdate( $hash, "audioOutputFormatFHL", $15);
+                readingsBulkUpdate( $hash, "audioOutputFormatFHR", $16 );
+                readingsBulkUpdate( $hash, "audioOutputFormatFWL", $17 );
+                readingsBulkUpdate( $hash, "audioOutputFormatFWR", $18 );
+        #       readingsBulkUpdate( $hash, "audioOutputFormatReserved1", $19);
+        #       readingsBulkUpdate( $hash, "audioOutputFormatReserved2", $20);
+        #       readingsBulkUpdate( $hash, "audioOutputFormatReserved3", $21);
+        #       readingsBulkUpdate( $hash, "audioOutputFormatReserved4", $22);
+        #       readingsBulkUpdate( $hash, "audioOutputFormatReserved5", $23);
 
-				if ( defined ( $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24}) ) {
-					readingsBulkUpdate( $hash, "audioOutputFrequency", $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24} );
-					Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio output frequency: ". dq( $24 );
-				} else {
-					Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio output frequency: ". dq( $24 );
-				}
-				readingsBulkUpdate( $hash, "audioOutputBit", $25 );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input bit: ". dq( $25 );
-				if ( defined ( $hash->{helper}{PQLSWORKING}->{$27} ) ) {
-					readingsBulkUpdate( $hash, "pqlsWorking", $hash->{helper}{PQLSWORKING}->{$27} );
-					Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working PQLS: ". dq( $27 );
-				} else {
-					Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown working PQLS: ". dq( $27 );
-				}
-				readingsBulkUpdate( $hash, "audioAutoPhaseControlMS", $28 );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working audio auto phase control plus (in ms): ". dq( $28 );
-				readingsBulkUpdate( $hash, "audioAutoPhaseControlRevPhase", $29);
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working audio auto phase control plus reverse phase: ". dq( $29 );
-			} else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." AST with NOT 55 data bytes ... some audio parameters like audioOutputFormatXXX could not be set";
-			}
-			# Main zone Input
-		} elsif ( $line =~ m/^FN(\d\d)$/ ) {
-			my $inputNr = $1;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Input is set to inputNr: $inputNr ";
-			if ( $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} ) {
-				readingsBulkUpdate( $hash, "input", $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName} );
-				Log3 $hash, 5, "PIONEERAVR $name: Main Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
-			} elsif ( defined ( $hash->{helper}{INPUTNAMES}{$inputNr}{name}) ) {
-				readingsBulkUpdate( $hash, "input", $hash->{helper}{INPUTNAMES}{$inputNr}{name} );
-				Log3 $hash, 5, "PIONEERAVR $name: Main Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
-			} else {
-				readingsBulkUpdate( $hash, "input", $line );
-				Log3 $hash, 3, "PIONEERAVR $name: Main InputName: can't find Name for input $inputNr";
-			}
-			$hash->{helper}{main}{CURINPUTNR} = $inputNr;
+                if ( defined ( $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24}) ) {
+                    readingsBulkUpdate( $hash, "audioOutputFrequency", $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24} );
+                    Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio output frequency: ". dq( $24 );
+                } else {
+                    Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown audio output frequency: ". dq( $24 );
+                }
+                readingsBulkUpdate( $hash, "audioOutputBit", $25 );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: audio input bit: ". dq( $25 );
+                if ( defined ( $hash->{helper}{PQLSWORKING}->{$27} ) ) {
+                    readingsBulkUpdate( $hash, "pqlsWorking", $hash->{helper}{PQLSWORKING}->{$27} );
+                    Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working PQLS: ". dq( $27 );
+                } else {
+                    Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown working PQLS: ". dq( $27 );
+                }
+                readingsBulkUpdate( $hash, "audioAutoPhaseControlMS", $28 );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working audio auto phase control plus (in ms): ". dq( $28 );
+                readingsBulkUpdate( $hash, "audioAutoPhaseControlRevPhase", $29);
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: working audio auto phase control plus reverse phase: ". dq( $29 );
+            } else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." AST with NOT 55 data bytes ... some audio parameters like audioOutputFormatXXX could not be set";
+            }
+            # Main zone Input
+        } elsif ( $line =~ m/^FN(\d\d)$/ ) {
+            my $inputNr = $1;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Main Zone - Input is set to inputNr: $inputNr ";
+            if ( $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} ) {
+                readingsBulkUpdate( $hash, "input", $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName} );
+                Log3 $hash, 5, "PIONEERAVR $name: Main Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
+            } elsif ( defined ( $hash->{helper}{INPUTNAMES}{$inputNr}{name}) ) {
+                readingsBulkUpdate( $hash, "input", $hash->{helper}{INPUTNAMES}{$inputNr}{name} );
+                Log3 $hash, 5, "PIONEERAVR $name: Main Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
+            } else {
+                readingsBulkUpdate( $hash, "input", $line );
+                Log3 $hash, 3, "PIONEERAVR $name: Main InputName: can't find Name for input $inputNr";
+            }
+            $hash->{helper}{main}{CURINPUTNR} = $inputNr;
 
-	#       if($inputNr != "17" and $inputNr != "44" and $inputNr != "45"){
-			# clear screen information on input change...
-			foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
-				readingsBulkUpdate( $hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "" );
-				Log3 $hash, 5, "PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
-			}
-			foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
-				readingsBulkUpdate( $hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "" );
-				Log3 $hash, 5, "PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
-			}
+    #       if($inputNr != "17" and $inputNr != "44" and $inputNr != "45"){
+            # clear screen information on input change...
+            foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
+                readingsBulkUpdate( $hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "" );
+                Log3 $hash, 5, "PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
+            }
+            foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
+                readingsBulkUpdate( $hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "" );
+                Log3 $hash, 5, "PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
+            }
 
-			# input names
-			# RGBXXY(14char)
-			# XX -> input number
-			# Y -> 1: aliasName; 0: Standard (predefined) name
-			# 14char -> name of the input
-		} elsif ( $line=~ m/^RGB(\d\d)(\d)(.*)/ ) {
-			my $inputNr = $1;
-			my $isAlias = $2; #1: aliasName; 0: Standard (predefined) name
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Name for InputNr: $inputNr is ".dq( $3 );
-			# remove non alnum
-			$line =~ s/[^a-zA-Z 0-9]/ /g;
-			# uc first
-			$line =~ s/([\w']+)/\u\L$1/g;
-			# remove whitespace
-			$line =~ s/\s//g;
-			# lc first
-			if ( $isAlias ) {
-				$hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = lcfirst( substr( $line,6 ) );
-			} else {
-				$hash->{helper}{INPUTNAMES}->{$inputNr}{name} = lcfirst( substr( $line,6 ) );
-			}
-			
-			$hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = 1 
-				if ( !defined( $hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} ) );
-			
-			$hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = "" 
-				if ( !defined( $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}));
-			Log3 $hash, 5, "$name: Input name for input $inputNr is " . lcfirst( substr( $line,6 ) );
+            # input names
+            # RGBXXY(14char)
+            # XX -> input number
+            # Y -> 1: aliasName; 0: Standard (predefined) name
+            # 14char -> name of the input
+        } elsif ( $line=~ m/^RGB(\d\d)(\d)(.*)/ ) {
+            my $inputNr = $1;
+            my $isAlias = $2; #1: aliasName; 0: Standard (predefined) name
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Name for InputNr: $inputNr is ".dq( $3 );
+            # remove non alnum
+            $line =~ s/[^a-zA-Z 0-9]/ /g;
+            # uc first
+            $line =~ s/([\w']+)/\u\L$1/g;
+            # remove whitespace
+            $line =~ s/\s//g;
+            # lc first
+            if ( $isAlias ) {
+                $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = lcfirst( substr( $line,6 ) );
+            } else {
+                $hash->{helper}{INPUTNAMES}->{$inputNr}{name} = lcfirst( substr( $line,6 ) );
+            }
+            
+            $hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} = 1 
+                if ( !defined( $hash->{helper}{INPUTNAMES}->{$inputNr}{enabled} ) );
+            
+            $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} = "" 
+                if ( !defined( $hash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}));
+            Log3 $hash, 5, "$name: Input name for input $inputNr is " . lcfirst( substr( $line,6 ) );
 
-		# audio input terminal
-		} elsif ( $line=~ m/^SSC(\d{2})00(\d{2})$/ ) {
+        # audio input terminal
+        } elsif ( $line=~ m/^SSC(\d{2})00(\d{2})$/ ) {
 
-			# check for audio input terminal information
-			# format: ?SSC<2 digit input function nr>00
-			# response: SSC<2 digit input function nr>00
-			#    00:No Assign
-			#    01:COAX 1
-			#    02:COAX 2
-			#    03:COAX 3
-			#    04:OPT 1
-			#    05:OPT 2
-			#    06:OPT 3
-			#    10:ANALOG"
-			# response: E06: inappropriate parameter (input function nr not available on that device)
-			# we can not trust "E06" as it is not sure that it is the reply for the current input nr
+            # check for audio input terminal information
+            # format: ?SSC<2 digit input function nr>00
+            # response: SSC<2 digit input function nr>00
+            #    00:No Assign
+            #    01:COAX 1
+            #    02:COAX 2
+            #    03:COAX 3
+            #    04:OPT 1
+            #    05:OPT 2
+            #    06:OPT 3
+            #    10:ANALOG"
+            # response: E06: inappropriate parameter (input function nr not available on that device)
+            # we can not trust "E06" as it is not sure that it is the reply for the current input nr
 
-			if ( $2 == 00) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "No Assign";
-			} elsif ( $2 == 01) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 1";
-			} elsif ( $2 == 02) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 2";
-			} elsif ( $2 == 03) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 3";
-			} elsif ( $2 == 04) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 1";
-			} elsif ( $2 == 05) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 2";
-			} elsif ( $2 == 06) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 3";
-			} elsif ( $2 == 10) {
-				$hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "ANALOG";
-			}
+            if ( $2 == 00) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "No Assign";
+            } elsif ( $2 == 01) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 1";
+            } elsif ( $2 == 02) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 2";
+            } elsif ( $2 == 03) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "COAX 3";
+            } elsif ( $2 == 04) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 1";
+            } elsif ( $2 == 05) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 2";
+            } elsif ( $2 == 06) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "OPT 3";
+            } elsif ( $2 == 10) {
+                $hash->{helper}{INPUTNAMES}->{$1}{audioTerminal} = "ANALOG";
+            }
 
-		# HDMI input terminal
-		} elsif ( $line=~ m/^SSC(\d{2})010(\d)$/ ) {
+        # HDMI input terminal
+        } elsif ( $line=~ m/^SSC(\d{2})010(\d)$/ ) {
 
-			# check for hdmi input terminal information
-			# format: ?SSC<2 digit input function nr>010
-			# response: SSC<2 digit input function nr>010
-			#    0:No Assign
-			#    1:hdmi 1
-			#    2:hdmi 2
-			#    3:hdmi 3
-			#    4:hdmi 4
-			#    5:hdmi 5
-			#    6:hdmi 6
-			#    7:hdmi 7
-			#    8:hdmi 8
-			# response: E06: inappropriate parameter (input function nr not available on that device)
-			# we can not trust "E06" as it is not sure that it is the reply for the current input nr
+            # check for hdmi input terminal information
+            # format: ?SSC<2 digit input function nr>010
+            # response: SSC<2 digit input function nr>010
+            #    0:No Assign
+            #    1:hdmi 1
+            #    2:hdmi 2
+            #    3:hdmi 3
+            #    4:hdmi 4
+            #    5:hdmi 5
+            #    6:hdmi 6
+            #    7:hdmi 7
+            #    8:hdmi 8
+            # response: E06: inappropriate parameter (input function nr not available on that device)
+            # we can not trust "E06" as it is not sure that it is the reply for the current input nr
 
-			if ( $2 == 0 ) {
-				$hash->{helper}{INPUTNAMES}->{$1}{hdmiTerminal} = "No Assign ";
-			} else {
-				$hash->{helper}{INPUTNAMES}->{$1}{hdmiTerminal} = "hdmi ".$2;
-			}
-		# component video input terminal
-		} elsif ( $line=~ m/^SSC(\d{2})020(\d)$/ ) {
+            if ( $2 == 0 ) {
+                $hash->{helper}{INPUTNAMES}->{$1}{hdmiTerminal} = "No Assign ";
+            } else {
+                $hash->{helper}{INPUTNAMES}->{$1}{hdmiTerminal} = "hdmi ".$2;
+            }
+        # component video input terminal
+        } elsif ( $line=~ m/^SSC(\d{2})020(\d)$/ ) {
 
-			# check for component video input terminal information
-			# format: ?SSC<2 digit input function nr>020
-			# response: SSC<2 digit input function nr>020
-			#    00:No Assign
-			#    01:Component 1
-			#    02:Component 2
-			#    03:Component 3
-			# response: E06: inappropriate parameter (input function nr not available on that device)
-			# we can not trust "E06" as it is not sure that it is the reply for the current input nr
+            # check for component video input terminal information
+            # format: ?SSC<2 digit input function nr>020
+            # response: SSC<2 digit input function nr>020
+            #    00:No Assign
+            #    01:Component 1
+            #    02:Component 2
+            #    03:Component 3
+            # response: E06: inappropriate parameter (input function nr not available on that device)
+            # we can not trust "E06" as it is not sure that it is the reply for the current input nr
 
-			if ( $2 == 0 ) {
-				$hash->{helper}{INPUTNAMES}->{$1}{componentTerminal} = "No Assign ";
-			} else {
-				$hash->{helper}{INPUTNAMES}->{$1}{componentTerminal} = "component ".$2;
-			}
+            if ( $2 == 0 ) {
+                $hash->{helper}{INPUTNAMES}->{$1}{componentTerminal} = "No Assign ";
+            } else {
+                $hash->{helper}{INPUTNAMES}->{$1}{componentTerminal} = "component ".$2;
+            }
 
-		# input enabled
-		} elsif ( $line=~ m/^SSC(\d\d)030(1|0)$/ ) {
+        # input enabled
+        } elsif ( $line=~ m/^SSC(\d\d)030(1|0)$/ ) {
 
-			#       select(undef, undef, undef, 0.001);
-			# check for input skip information
-			# format: ?SSC<2 digit input function nr>03
-			# response: SSC<2 digit input function nr>0300: use
-			# response: SSC<2 digit input function nr>0301: skip
-			# response: E06: inappropriate parameter (input function nr not available on that device)
-			# we can not trust "E06" as it is not sure that it is the reply for the current input nr
+            #       select(undef, undef, undef, 0.001);
+            # check for input skip information
+            # format: ?SSC<2 digit input function nr>03
+            # response: SSC<2 digit input function nr>0300: use
+            # response: SSC<2 digit input function nr>0301: skip
+            # response: E06: inappropriate parameter (input function nr not available on that device)
+            # we can not trust "E06" as it is not sure that it is the reply for the current input nr
 
-			if ( $2 == 1 ) {
-				$hash->{helper}{INPUTNAMES}->{$1}{enabled} = 0;
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is disabled";
-			} elsif ( $2 == 0) {
-				$hash->{helper}{INPUTNAMES}->{$1}{enabled} = 1;
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is enabled";
-			}
+            if ( $2 == 1 ) {
+                $hash->{helper}{INPUTNAMES}->{$1}{enabled} = 0;
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is disabled";
+            } elsif ( $2 == 0) {
+                $hash->{helper}{INPUTNAMES}->{$1}{enabled} = 1;
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputNr: $1 is enabled";
+            }
 
-		# input level adjust
-		} elsif ( $line=~ m/^ILA(\d{2})(\d{2})$/ ) {
-			# 74:+12dB
-			# 50: 0dB
-			# 26: -12dB
-			my $inputLevelAdjust = $2/2 - 25;
-			$hash->{helper}{INPUTNAMES}->{$1}{inputLevelAdjust} = $inputLevelAdjust;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputLevelAdjust of InputNr: $1 is $inputLevelAdjust ";
+        # input level adjust
+        } elsif ( $line=~ m/^ILA(\d{2})(\d{2})$/ ) {
+            # 74:+12dB
+            # 50: 0dB
+            # 26: -12dB
+            my $inputLevelAdjust = $2/2 - 25;
+            $hash->{helper}{INPUTNAMES}->{$1}{inputLevelAdjust} = $inputLevelAdjust;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: InputLevelAdjust of InputNr: $1 is $inputLevelAdjust ";
 
-		# Signal Select
-		} elsif ( substr( $line, 0, 3 ) eq "SDA" ) {
-			my $signalSelect = substr( $line,3,1 );
-			if ( $signalSelect == "0" ) {
-				readingsBulkUpdate( $hash, "signalSelect", "auto" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: auto";
-			} elsif ( $signalSelect == "1" ) {
-				readingsBulkUpdate( $hash, "signalSelect", "analog" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: analog";
-			} elsif ( $signalSelect == "2" ) {
-				readingsBulkUpdate( $hash, "signalSelect", "digital" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: digital";
-			} elsif ( $signalSelect == "3" ) {
-				readingsBulkUpdate( $hash, "signalSelect", "hdmi" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: hdmi";
-			} elsif ( $signalSelect == "9" ) {
-				readingsBulkUpdate( $hash, "signalSelect", "cyclic" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: cycle";
-			} else {
-				readingsBulkUpdate( $hash, "signalSelect", $signalSelect );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: ". dq( $signalSelect );
-			}
-		# HDMI output
-		# 0:HDMI OUT 1+2 ON
-		# 1:HDMI OUT 1 ON
-		# 2:HDMI OUT 2 ON
-		# 3:HDMI OUT 1/2 OFF
-			# Listening Mode
-		} elsif ( $line =~ m/^(HO)(\d)$/ ) {
-			if ( defined ( $hash->{helper}{HDMIOUT}->{$2} ) ) {
-				readingsBulkUpdate( $hash, "hdmiOut", $hash->{helper}{HDMIOUT}->{$2} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI Out: ". dq( $2 );
-			} else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown hdmiOut: ". dq( $2 );
-			}
+        # Signal Select
+        } elsif ( substr( $line, 0, 3 ) eq "SDA" ) {
+            my $signalSelect = substr( $line,3,1 );
+            if ( $signalSelect == "0" ) {
+                readingsBulkUpdate( $hash, "signalSelect", "auto" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: auto";
+            } elsif ( $signalSelect == "1" ) {
+                readingsBulkUpdate( $hash, "signalSelect", "analog" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: analog";
+            } elsif ( $signalSelect == "2" ) {
+                readingsBulkUpdate( $hash, "signalSelect", "digital" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: digital";
+            } elsif ( $signalSelect == "3" ) {
+                readingsBulkUpdate( $hash, "signalSelect", "hdmi" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: hdmi";
+            } elsif ( $signalSelect == "9" ) {
+                readingsBulkUpdate( $hash, "signalSelect", "cyclic" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: cycle";
+            } else {
+                readingsBulkUpdate( $hash, "signalSelect", $signalSelect );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: ". dq( $signalSelect );
+            }
+        # HDMI output
+        # 0:HDMI OUT 1+2 ON
+        # 1:HDMI OUT 1 ON
+        # 2:HDMI OUT 2 ON
+        # 3:HDMI OUT 1/2 OFF
+            # Listening Mode
+        } elsif ( $line =~ m/^(HO)(\d)$/ ) {
+            if ( defined ( $hash->{helper}{HDMIOUT}->{$2} ) ) {
+                readingsBulkUpdate( $hash, "hdmiOut", $hash->{helper}{HDMIOUT}->{$2} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI Out: ". dq( $2 );
+            } else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown hdmiOut: ". dq( $2 );
+            }
 
-		} elsif ( $line=~ m/^VST(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d{2})(\d)(\d)(\d*)$/ ) {
-			# Video information parameters
-			#  data1:Video Input Signal
-			#  data2-data3:Video Input Resolution
-			#  data4:Video Input aspect ratio
-			#  data5:Video input colour format (HDMI only)
-			#  data6:Video input bit rate (HDMI only) VIDEOCOLOURDEPTH
-			#  data7:Input extend color space(HDMI only)
-			#  data8-9:Output Resolution
-			#  data10:Output aspect
-			#  data11:Output color format(HDMI only)
-			#  data12:Output bit(HDMI only)
-			#  data13:Output extend color space(HDMI only)
-			#  data14-15:HDMI 1 Monitor Recommend Resolution Information
-			#  data16:HDMI 1 Monitor DeepColor
-			#  data17-21:HDMI 1 Monitor Extend Color Space
-			#  data22-23:HDMI 2 Monitor Recommend Resolution Information
-			#  data24:HDMI 2 Monitor DeepColor
-			#  data25-29:HDMI 2 Monitor Extend Color Space
-			#  data30-49: HDMI3 & HDMI4 (not used)
-			if ( defined ( $hash->{helper}{VIDEOINPUTTERMINAL}->{$1}) ) {
-				readingsBulkUpdate( $hash, "videoInputTerminal", $hash->{helper}{VIDEOINPUTTERMINAL}->{$1} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input terminal: ". dq($1);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown video input terminal: ". dq($1);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$2}) ) {
-				readingsBulkUpdate( $hash, "videoInputResolution", $hash->{helper}{VIDEORESOLUTION}->{$2} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input resolution: ". dq($2);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input resolution: ". dq($2);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$3}) ) {
-				readingsBulkUpdate( $hash, "videoInputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$3} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input aspect ratio: ". dq($3);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input aspect ratio: ". dq($3);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$4}) ) {
-				readingsBulkUpdate( $hash, "videoInputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$4} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour format: ". dq($4);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour format: ". dq($4);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$5}) ) {
-				readingsBulkUpdate( $hash, "videoInputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$5} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour depth: ". dq($5);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour depth: ". dq($5);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$6}) ) {
-				readingsBulkUpdate( $hash, "videoInputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$6} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour space: ". dq($6);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour space: ". dq($6);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$7}) ) {
-				readingsBulkUpdate( $hash, "videoOutputResolution", $hash->{helper}{VIDEORESOLUTION}->{$7} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output resolution: ". dq($7);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output resolution: ". dq($7);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$8}) ) {
-				readingsBulkUpdate( $hash, "videoOutputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$8} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output aspect ratio: ". dq($8);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output aspect ratio: ". dq($8);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$9}) ) {
-				readingsBulkUpdate( $hash, "videoOutputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$9} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour format: ". dq($9);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour format: ". dq($9);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$10}) ) {
-				readingsBulkUpdate( $hash, "videoOutputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$10} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour depth: ". dq($10);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour depth: ". dq($10);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$11}) ) {
-				readingsBulkUpdate( $hash, "videoOutputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$11} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour space: ". dq($11);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour space: ". dq($11);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$12}) ) {
-				readingsBulkUpdate( $hash, "hdmi1RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$12} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$13}) ) {
-				readingsBulkUpdate( $hash, "hdmi1ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$13} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 colour depth: ". dq($13);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 output colour depth: ". dq($13);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$14}) ) {
-				readingsBulkUpdate( $hash, "hdmi1ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$14} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 colour space: ". dq($14);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 output colour space: ". dq($14);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$15}) ) {
-				readingsBulkUpdate( $hash, "hdmi2RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$15} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$16}) ) {
-				readingsBulkUpdate( $hash, "hdmi2ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$16} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 colour depth: ". dq($16);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 output colour depth: ". dq($16);
-			}
-			
-			if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$17}) ) {
-				readingsBulkUpdate( $hash, "hdmi2ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$17} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 colour space: ". dq($17);
-			}
-			else {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 output colour space: ". dq($17);
-			}
+        } elsif ( $line=~ m/^VST(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d{2})(\d)(\d)(\d*)$/ ) {
+            # Video information parameters
+            #  data1:Video Input Signal
+            #  data2-data3:Video Input Resolution
+            #  data4:Video Input aspect ratio
+            #  data5:Video input colour format (HDMI only)
+            #  data6:Video input bit rate (HDMI only) VIDEOCOLOURDEPTH
+            #  data7:Input extend color space(HDMI only)
+            #  data8-9:Output Resolution
+            #  data10:Output aspect
+            #  data11:Output color format(HDMI only)
+            #  data12:Output bit(HDMI only)
+            #  data13:Output extend color space(HDMI only)
+            #  data14-15:HDMI 1 Monitor Recommend Resolution Information
+            #  data16:HDMI 1 Monitor DeepColor
+            #  data17-21:HDMI 1 Monitor Extend Color Space
+            #  data22-23:HDMI 2 Monitor Recommend Resolution Information
+            #  data24:HDMI 2 Monitor DeepColor
+            #  data25-29:HDMI 2 Monitor Extend Color Space
+            #  data30-49: HDMI3 & HDMI4 (not used)
+            if ( defined ( $hash->{helper}{VIDEOINPUTTERMINAL}->{$1}) ) {
+                readingsBulkUpdate( $hash, "videoInputTerminal", $hash->{helper}{VIDEOINPUTTERMINAL}->{$1} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input terminal: ". dq($1);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown video input terminal: ". dq($1);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$2}) ) {
+                readingsBulkUpdate( $hash, "videoInputResolution", $hash->{helper}{VIDEORESOLUTION}->{$2} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input resolution: ". dq($2);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input resolution: ". dq($2);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$3}) ) {
+                readingsBulkUpdate( $hash, "videoInputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$3} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input aspect ratio: ". dq($3);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input aspect ratio: ". dq($3);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$4}) ) {
+                readingsBulkUpdate( $hash, "videoInputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$4} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour format: ". dq($4);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour format: ". dq($4);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$5}) ) {
+                readingsBulkUpdate( $hash, "videoInputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$5} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour depth: ". dq($5);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour depth: ". dq($5);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$6}) ) {
+                readingsBulkUpdate( $hash, "videoInputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$6} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour space: ". dq($6);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video input colour space: ". dq($6);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$7}) ) {
+                readingsBulkUpdate( $hash, "videoOutputResolution", $hash->{helper}{VIDEORESOLUTION}->{$7} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output resolution: ". dq($7);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output resolution: ". dq($7);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$8}) ) {
+                readingsBulkUpdate( $hash, "videoOutputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$8} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output aspect ratio: ". dq($8);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output aspect ratio: ". dq($8);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$9}) ) {
+                readingsBulkUpdate( $hash, "videoOutputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$9} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour format: ". dq($9);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour format: ". dq($9);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$10}) ) {
+                readingsBulkUpdate( $hash, "videoOutputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$10} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour depth: ". dq($10);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour depth: ". dq($10);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$11}) ) {
+                readingsBulkUpdate( $hash, "videoOutputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$11} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour space: ". dq($11);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: video output colour space: ". dq($11);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$12}) ) {
+                readingsBulkUpdate( $hash, "hdmi1RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$12} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$13}) ) {
+                readingsBulkUpdate( $hash, "hdmi1ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$13} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 colour depth: ". dq($13);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 output colour depth: ". dq($13);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$14}) ) {
+                readingsBulkUpdate( $hash, "hdmi1ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$14} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 colour space: ". dq($14);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi1 output colour space: ". dq($14);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$15}) ) {
+                readingsBulkUpdate( $hash, "hdmi2RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$15} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$16}) ) {
+                readingsBulkUpdate( $hash, "hdmi2ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$16} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 colour depth: ". dq($16);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 output colour depth: ". dq($16);
+            }
+            
+            if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$17}) ) {
+                readingsBulkUpdate( $hash, "hdmi2ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$17} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 colour space: ". dq($17);
+            }
+            else {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: hdmi2 output colour space: ". dq($17);
+            }
 
-		# Speaker
-		} elsif ( substr($line,0,3) eq "SPK" ) {
-			my $speakers = substr($line,3,1);
-			
-			if ( $speakers == "0" ) {
-				readingsBulkUpdate( $hash, "speakers", "off" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: off";
-			} elsif ( $speakers == "1" ) {
-				readingsBulkUpdate( $hash, "speakers", "A" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: A";
-			} elsif ($speakers == "2") {
-				readingsBulkUpdate( $hash, "speakers", "B" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: B";
-			} elsif ($speakers == "3") {
-				readingsBulkUpdate( $hash, "speakers", "A+B" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: A+B";
-			} else {
-				readingsBulkUpdate( $hash, "speakers", $speakers );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: ". dq( $speakers );
-			}
-			
-		# Speaker System
-		# do we have Zone 2 speakers?
-		} elsif ( substr( $line,0,3 ) eq "SSF" ) {
-			if ( defined ( $hash->{helper}{SPEAKERSYSTEMS}->{substr( $line, 3, 2)} ) ) {
-				readingsBulkUpdate( $hash, "speakerSystem", $hash->{helper}{SPEAKERSYSTEMS}->{substr( $line, 3, 2)} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: SpeakerSystem: ". dq( substr( $line, 3, 2) );
-			} else {
-				readingsBulkUpdate( $hash, "speakerSystem", $line );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Unknown SpeakerSystem " . dq( substr( $line, 3, 2 ) );
-			}
-		# Listening Mode
-		} elsif ( substr($line,0,2) eq "SR" ) {
-			if ( defined ( $hash->{helper}{LISTENINGMODES}->{substr($line,2)}) ) {
-				readingsBulkUpdate( $hash, "listeningMode", $hash->{helper}{LISTENINGMODES}->{substr($line,2)} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: listeningMode: ". dq(substr($line,2));
-			} else {
-				readingsBulkUpdate( $hash, "listeningMode", $line );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown listeningMode: ". dq(substr( $line, 2 ) );
-			}
-		# Listening Mode Playing (for Display)
-		} elsif ( substr( $line, 0, 2 ) eq "LM" ) {
-			if ( defined ( $hash->{helper}{LISTENINGMODESPLAYING}->{substr( $line, 2, 4)} ) ) {
-				readingsBulkUpdate( $hash, "listeningModePlaying", $hash->{helper}{LISTENINGMODESPLAYING}->{substr( $line, 2, 4 )} );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: listeningModePlaying: ". dq( substr( $line, 2, 4 ) );
-			} else {
-				readingsBulkUpdate( $hash, "listeningModePlaying", $line );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown listeningModePlaying: ". dq( substr( $line, 2, 4 ) );
-			}
-		# Main zone Power
-		} elsif ( substr( $line, 0, 3 ) eq "PWR" ) {
-			my $power = substr( $line, 3, 1);
-			if ( $power == "0" ) {
-				readingsBulkUpdate( $hash, "power", "on" )
-					if ( ReadingsVal( $name, "power", "-" ) ne "on" );
+        # Speaker
+        } elsif ( substr($line,0,3) eq "SPK" ) {
+            my $speakers = substr($line,3,1);
+            
+            if ( $speakers == "0" ) {
+                readingsBulkUpdate( $hash, "speakers", "off" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: off";
+            } elsif ( $speakers == "1" ) {
+                readingsBulkUpdate( $hash, "speakers", "A" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: A";
+            } elsif ($speakers == "2") {
+                readingsBulkUpdate( $hash, "speakers", "B" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: B";
+            } elsif ($speakers == "3") {
+                readingsBulkUpdate( $hash, "speakers", "A+B" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: A+B";
+            } else {
+                readingsBulkUpdate( $hash, "speakers", $speakers );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: speakers: ". dq( $speakers );
+            }
+            
+        # Speaker System
+        # do we have Zone 2 speakers?
+        } elsif ( substr( $line,0,3 ) eq "SSF" ) {
+            if ( defined ( $hash->{helper}{SPEAKERSYSTEMS}->{substr( $line, 3, 2)} ) ) {
+                readingsBulkUpdate( $hash, "speakerSystem", $hash->{helper}{SPEAKERSYSTEMS}->{substr( $line, 3, 2)} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: SpeakerSystem: ". dq( substr( $line, 3, 2) );
+            } else {
+                readingsBulkUpdate( $hash, "speakerSystem", $line );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Unknown SpeakerSystem " . dq( substr( $line, 3, 2 ) );
+            }
+        # Listening Mode
+        } elsif ( substr($line,0,2) eq "SR" ) {
+            if ( defined ( $hash->{helper}{LISTENINGMODES}->{substr($line,2)}) ) {
+                readingsBulkUpdate( $hash, "listeningMode", $hash->{helper}{LISTENINGMODES}->{substr($line,2)} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: listeningMode: ". dq(substr($line,2));
+            } else {
+                readingsBulkUpdate( $hash, "listeningMode", $line );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown listeningMode: ". dq(substr( $line, 2 ) );
+            }
+        # Listening Mode Playing (for Display)
+        } elsif ( substr( $line, 0, 2 ) eq "LM" ) {
+            if ( defined ( $hash->{helper}{LISTENINGMODESPLAYING}->{substr( $line, 2, 4)} ) ) {
+                readingsBulkUpdate( $hash, "listeningModePlaying", $hash->{helper}{LISTENINGMODESPLAYING}->{substr( $line, 2, 4 )} );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: listeningModePlaying: ". dq( substr( $line, 2, 4 ) );
+            } else {
+                readingsBulkUpdate( $hash, "listeningModePlaying", $line );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: unknown listeningModePlaying: ". dq( substr( $line, 2, 4 ) );
+            }
+        # Main zone Power
+        } elsif ( substr( $line, 0, 3 ) eq "PWR" ) {
+            my $power = substr( $line, 3, 1);
+            if ( $power == "0" ) {
+                readingsBulkUpdate( $hash, "power", "on" )
+                    if ( ReadingsVal( $name, "power", "-" ) ne "on" );
 
-				$state = "on";
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Power: on";
-			} else {
-	            readingsBulkUpdate( $hash, "power", "off" )
-					if ( ReadingsVal( $name, "power", "-" ) ne "off" );
+                $state = "on";
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Power: on";
+            } else {
+                readingsBulkUpdate( $hash, "power", "off" )
+                    if ( ReadingsVal( $name, "power", "-" ) ne "off" );
 
-				$state = "off";
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Power: off";
-			}
-			# Set STATE
-			# devIO.pm sets hash->STATE accordingly to the connection state (opened, CONNECTED, DISCONNECTED)
-			# we want that hash->STATE represents the state of the device (absent, off, on)
-			
+                $state = "off";
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Power: off";
+            }
+            # Set STATE
+            # devIO.pm sets hash->STATE accordingly to the connection state (opened, CONNECTED, DISCONNECTED)
+            # we want that hash->STATE represents the state of the device (absent, off, on)
+            
             # stateAV
             my $stateAV = PIONEERAVR_GetStateAV($hash);
             readingsBulkUpdate( $hash, "stateAV", $stateAV )
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
-			
-		# MCACC memory
-		} elsif ( $line =~ m/^(MC)(\d)$/ ) {
-			readingsBulkUpdate( $hash, "mcaccMemory", $2 );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: MCACC memory: selected memory is: $2";
+            
+        # MCACC memory
+        } elsif ( $line =~ m/^(MC)(\d)$/ ) {
+            readingsBulkUpdate( $hash, "mcaccMemory", $2 );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: MCACC memory: selected memory is: $2";
 
-		# Display updates
-		# uses a translation table for each letter (char) to display the letters properly
-		} elsif ( substr( $line, 0, 2 ) eq "FL" ) {
-			my $hex = substr( $line, 4, 28);
-			my @a = map $hash->{helper}{CHARS}->{$_}, $hex =~ /(..)/g;
-			my $display = join('',@a);
-			readingsBulkUpdate( $hash, "displayPrevious", ReadingsVal( $name, "display","" ) );
-			readingsBulkUpdate( $hash, "display", $display );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Display update to: $display";
+        # Display updates
+        # uses a translation table for each letter (char) to display the letters properly
+        } elsif ( substr( $line, 0, 2 ) eq "FL" ) {
+            my $hex = substr( $line, 4, 28);
+            my @a = map $hash->{helper}{CHARS}->{$_}, $hex =~ /(..)/g;
+            my $display = join('',@a);
+            readingsBulkUpdate( $hash, "displayPrevious", ReadingsVal( $name, "display","" ) );
+            readingsBulkUpdate( $hash, "display", $display );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Display update to: $display";
 
-		# eq
-		} elsif ( $line =~ m/^ATC([0|1])/ ) {
-			if ( $1 == "1" ) {
-				readingsBulkUpdate( $hash, "eq", "on" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: eq is on";
-			}
-			else {
-				readingsBulkUpdate( $hash, "eq", "off" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: eq is off";
-			}
+        # eq
+        } elsif ( $line =~ m/^ATC([0|1])/ ) {
+            if ( $1 == "1" ) {
+                readingsBulkUpdate( $hash, "eq", "on" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: eq is on";
+            }
+            else {
+                readingsBulkUpdate( $hash, "eq", "off" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: eq is off";
+            }
 
-		# standing wave
-		} elsif ( $line =~ m/^ATD([0|1])/ ) {
-			if ( $1 == "1" ) {
-				readingsBulkUpdate( $hash, "standingWave", "on" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: standingWave is on";
-			}
-			else {
-				readingsBulkUpdate( $hash, "standingWave", "off" );
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: standingWave is off";
-			}
+        # standing wave
+        } elsif ( $line =~ m/^ATD([0|1])/ ) {
+            if ( $1 == "1" ) {
+                readingsBulkUpdate( $hash, "standingWave", "on" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: standingWave is on";
+            }
+            else {
+                readingsBulkUpdate( $hash, "standingWave", "off" );
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: standingWave is off";
+            }
 
-		# key received
-		} elsif ( $line =~ m/^NXA$/ ) {
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Network player: Key pressed";
+        # key received
+        } elsif ( $line =~ m/^NXA$/ ) {
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Network player: Key pressed";
 
-		# screen type and screen name
-		} elsif ( $line =~ m/^(GCH|GCI)(\d{2})(\d)(\d)(\d)(\d)(\d)\"(.*)\"$/ ) {
-			# Format:
-			#   $2: screen type
-			#     00:Message
-			#     01:List
-			#     02:Playing(Play)
-			#     03:Playing(Pause)
-			#     04:Playing(Fwd)
-			#     05:Playing(Rev)
-			#     06:Playing(Stop)
-			#     99:Drawing invalid
+        # screen type and screen name
+        } elsif ( $line =~ m/^(GCH|GCI)(\d{2})(\d)(\d)(\d)(\d)(\d)\"(.*)\"$/ ) {
+            # Format:
+            #   $2: screen type
+            #     00:Message
+            #     01:List
+            #     02:Playing(Play)
+            #     03:Playing(Pause)
+            #     04:Playing(Fwd)
+            #     05:Playing(Rev)
+            #     06:Playing(Stop)
+            #     99:Drawing invalid
 
-			#   $3: 0:Same hierarchy 1:Updated hierarchy (Next or Previous list)
-			#   $4: Top menu key flag
-			#     0:Invalidity
-			#     1:Effectiveness
-			#   $5: Tools (menu, edit,iPod Control) Key Information
-			#     0:Invalidity
-			#     1:Effectiveness
-			#   $6: Return Key Information
-			#     0:Invalidity
-			#     1:Effectiveness
-			#   $7: always 0
+            #   $3: 0:Same hierarchy 1:Updated hierarchy (Next or Previous list)
+            #   $4: Top menu key flag
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $5: Tools (menu, edit,iPod Control) Key Information
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $6: Return Key Information
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $7: always 0
 
-			#   $8: Screen name (UTF8) max. 128 byte
-			my $screenType = $hash->{helper}{SCREENTYPES}{$2};
+            #   $8: Screen name (UTF8) max. 128 byte
+            my $screenType = $hash->{helper}{SCREENTYPES}{$2};
 
-			readingsBulkUpdate( $hash, "screenType", $screenType );
-			readingsBulkUpdate( $hash, "screenName", $8 );
-			readingsBulkUpdate( $hash, "screenHierarchy", $3 );
-			readingsBulkUpdate( $hash, "screenTopMenuKey", $4 );
-			readingsBulkUpdate( $hash, "screenToolsKey", $5 );
-			readingsBulkUpdate( $hash, "screenReturnKey", $6 );
+            readingsBulkUpdate( $hash, "screenType", $screenType );
+            readingsBulkUpdate( $hash, "screenName", $8 );
+            readingsBulkUpdate( $hash, "screenHierarchy", $3 );
+            readingsBulkUpdate( $hash, "screenTopMenuKey", $4 );
+            readingsBulkUpdate( $hash, "screenToolsKey", $5 );
+            readingsBulkUpdate( $hash, "screenReturnKey", $6 );
 
-			# to update the OSD/screen while playing from iPad/network a command has to be sent regulary
-			if ($2 eq "02" ) {
-				# reset screenUpdate timer -> again in 5s
-				my $checkInterval = 5;
-				my $next = gettimeofday() + $checkInterval;
-				$hash->{helper}{nextScreenUpdate} = $next;
-				InternalTimer( $next, "PIONEERAVR_screenUpdate", $hash, 0 );
-				readingsBulkUpdate( $hash, "playStatus", "playing" );
-			} elsif ( $2 eq "03" ) {
-				readingsBulkUpdate( $hash, "playStatus", "paused" );			
-			} elsif ( $2 eq "04" ) {
-				readingsBulkUpdate( $hash, "playStatus", "fast-forward" );			
-			} elsif ( $2 eq "05" ) {
-				readingsBulkUpdate( $hash, "playStatus", "fast-rewind" );			
-			} elsif ( $2 eq "06" ) {
-				readingsBulkUpdate( $hash, "playStatus", "stopped" );			
-			}
-				
-		# Source information
-		} elsif ( $line =~ m/^(GHH)(\d{2})$/ ) {
-			my $sourceInfo = $hash->{helper}{SOURCEINFO}{$2};
-			readingsBulkUpdate( $hash, "sourceInfo", $sourceInfo );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen source information: $2 $sourceInfo";
+            # to update the OSD/screen while playing from iPad/network a command has to be sent regulary
+            if ($2 eq "02" ) {
+                # reset screenUpdate timer -> again in 5s
+                my $checkInterval = 5;
+                my $next = gettimeofday() + $checkInterval;
+                $hash->{helper}{nextScreenUpdate} = $next;
+                InternalTimer( $next, "PIONEERAVR_screenUpdate", $hash, 0 );
+                readingsBulkUpdate( $hash, "playStatus", "playing" );
+            } elsif ( $2 eq "03" ) {
+                readingsBulkUpdate( $hash, "playStatus", "paused" );            
+            } elsif ( $2 eq "04" ) {
+                readingsBulkUpdate( $hash, "playStatus", "fast-forward" );          
+            } elsif ( $2 eq "05" ) {
+                readingsBulkUpdate( $hash, "playStatus", "fast-rewind" );           
+            } elsif ( $2 eq "06" ) {
+                readingsBulkUpdate( $hash, "playStatus", "stopped" );           
+            }
+            
+            # stateAV
+            if ( $2 eq "02" || $2 eq "03" || $2 eq "04" || $2 eq "05" || $2 eq "06" ) {
+            
+                my $stateAV = PIONEERAVR_GetStateAV($hash);
+                readingsBulkUpdate( $hash, "stateAV", $stateAV )
+                    if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+            }
+        # Source information
+        } elsif ( $line =~ m/^(GHH)(\d{2})$/ ) {
+            my $sourceInfo = $hash->{helper}{SOURCEINFO}{$2};
+            readingsBulkUpdate( $hash, "sourceInfo", $sourceInfo );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen source information: $2 $sourceInfo";
 
-		# total screen lines
-		} elsif ( $line =~ m/^(GDH)(\d{5})(\d{5})(\d{5})$/ ) {
-			readingsBulkUpdate( $hash, "screenLineNumberFirst", $2 + 0 );
-			readingsBulkUpdate( $hash, "screenLineNumberLast", $3 + 0 );
-			readingsBulkUpdate( $hash, "screenLineNumbersTotal", $4 + 0 );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen Item number of line 1(5byte): $2, Item number of last line(5byte): $3, Total number of items List(5byte): $4 ";
+        # total screen lines
+        } elsif ( $line =~ m/^(GDH)(\d{5})(\d{5})(\d{5})$/ ) {
+            readingsBulkUpdate( $hash, "screenLineNumberFirst", $2 + 0 );
+            readingsBulkUpdate( $hash, "screenLineNumberLast", $3 + 0 );
+            readingsBulkUpdate( $hash, "screenLineNumbersTotal", $4 + 0 );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen Item number of line 1(5byte): $2, Item number of last line(5byte): $3, Total number of items List(5byte): $4 ";
 
-		# Screen line numbers
-		} elsif ( $line =~ m/^(GBH|GBI)(\d{2})$/ ) {
-			readingsBulkUpdate( $hash, "screenLineNumbers", $2 + 0 );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen line numbers = $2";
+        # Screen line numbers
+        } elsif ( $line =~ m/^(GBH|GBI)(\d{2})$/ ) {
+            readingsBulkUpdate( $hash, "screenLineNumbers", $2 + 0 );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen line numbers = $2";
 
-		# screenInformation
-		} elsif ( $line =~ m/^(GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
-			# Format:
-			#   $2: Line number
-			#   $3: Focus (yes(1)/no(0)/greyed out(9)
-			#   $4: Line data type:
-			#     00:Normal(no mark type)
-			#     01:Directory
-			#     02:Music
-			#     03:Photo
-			#     04:Video
-			#     05:Now Playing
-			#     20:Track
-			#     21:Artist
-			#     22:Album
-			#     23:Time
-			#     24:Genre
-			#     25:Chapter number
-			#     26:Format
-			#     27:Bit Per Sample
-			#     28:Sampling Rate
-			#     29:Bitrate
-			#     31:Buffer
-			#     32:Channel
-			#     33:Station
-			#   $5: Display line information (UTF8)
-			my $lineDataType = $hash->{helper}{LINEDATATYPES}{$4};
+        # screenInformation
+        } elsif ( $line =~ m/^(GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
+            # Format:
+            #   $2: Line number
+            #   $3: Focus (yes(1)/no(0)/greyed out(9)
+            #   $4: Line data type:
+            #     00:Normal(no mark type)
+            #     01:Directory
+            #     02:Music
+            #     03:Photo
+            #     04:Video
+            #     05:Now Playing
+            #     20:Track
+            #     21:Artist
+            #     22:Album
+            #     23:Time
+            #     24:Genre
+            #     25:Chapter number
+            #     26:Format
+            #     27:Bit Per Sample
+            #     28:Sampling Rate
+            #     29:Bitrate
+            #     31:Buffer
+            #     32:Channel
+            #     33:Station
+            #   $5: Display line information (UTF8)
+            my $lineDataType = $hash->{helper}{LINEDATATYPES}{$4};
 
-			# screen lines
-			my $screenLine     = "screenLine".$2;
-			my $screenLineType = "screenLineType".$2;
-			readingsBulkUpdate( $hash, $screenLine, $5 );
-			readingsBulkUpdate( $hash, $screenLineType, $lineDataType );
-			if ( $3 == 1 ) {
-			  readingsBulkUpdate( $hash, "screenLineHasFocus", $2 );
-			}
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: screen line $2 ($screenLine) type: $lineDataType: " . dq( $5 );
+            # screen lines
+            my $screenLine     = "screenLine".$2;
+            my $screenLineType = "screenLineType".$2;
+            readingsBulkUpdate( $hash, $screenLine, $5 );
+            readingsBulkUpdate( $hash, $screenLineType, $lineDataType );
+            if ( $3 == 1 ) {
+              readingsBulkUpdate( $hash, "screenLineHasFocus", $2 );
+            }
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: screen line $2 ($screenLine) type: $lineDataType: " . dq( $5 );
 
-			# for being coherent with http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
-			if ( $4 eq "20" or $4 eq "21" or $4 eq "22" ) {
-			  readingsBulkUpdate( $hash, $lineDataType, $5);
-			  Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: reading update for displayDataType $lineDataType: " . dq( $5 );
-			}
+            # for being coherent with http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+            if ( $4 eq "20" or $4 eq "21" or $4 eq "22" ) {
+              readingsBulkUpdate( $hash, $lineDataType, $5);
+              Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: reading update for displayDataType $lineDataType: " . dq( $5 );
+            }
 
-		# Tuner channel names
-		} elsif ( $line =~ m/^TQ(\w\d)\"(.{8})\"$/ ) {
-			$hash->{helper}{TUNERCHANNELNAMES}{$1} = $2;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: tunerChannel: $1 has the name: " .dq($2);
-		# Tuner channel
-		} elsif ( $line =~ m/^PR(\w)0(\d)$/ ) {
-			readingsBulkUpdate( $hash, "channelStraight", $1.$2 );
-			readingsBulkUpdate( $hash, "channelName", $hash->{helper}{TUNERCHANNELNAMES}{$1.$2} );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Current tunerChannel: " . $1.$2;
-			if ( $1 eq "A" ) {
-				readingsBulkUpdate( $hash, "channel", $2 );
-			} else {
-				readingsBulkUpdate( $hash, "channel", "-" );
-			}
-		# Tuner frequency
-		# FRFXXXYY -> XXX.YY Mhz
-		} elsif ( $line =~ m/^FRF([0|1])([0-9]{2})([0-9]{2})$/ ) {
-				my $tunerFrequency = $2.".".$3;
-				if ( $1 == 1 ) {
-					$tunerFrequency = $1.$tunerFrequency;
-				}
-				readingsBulkUpdate( $hash, "tunerFrequency", $tunerFrequency );
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: tunerFrequency: " . $tunerFrequency;
+        # Tuner channel names
+        } elsif ( $line =~ m/^TQ(\w\d)\"(.{8})\"$/ ) {
+            $hash->{helper}{TUNERCHANNELNAMES}{$1} = $2;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: tunerChannel: $1 has the name: " .dq($2);
+        # Tuner channel
+        } elsif ( $line =~ m/^PR(\w)0(\d)$/ ) {
+            readingsBulkUpdate( $hash, "channelStraight", $1.$2 );
+            readingsBulkUpdate( $hash, "channelName", $hash->{helper}{TUNERCHANNELNAMES}{$1.$2} );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Current tunerChannel: " . $1.$2;
+            if ( $1 eq "A" ) {
+                readingsBulkUpdate( $hash, "channel", $2 );
+            } else {
+                readingsBulkUpdate( $hash, "channel", "-" );
+            }
+        # Tuner frequency
+        # FRFXXXYY -> XXX.YY Mhz
+        } elsif ( $line =~ m/^FRF([0|1])([0-9]{2})([0-9]{2})$/ ) {
+                my $tunerFrequency = $2.".".$3;
+                if ( $1 == 1 ) {
+                    $tunerFrequency = $1.$tunerFrequency;
+                }
+                readingsBulkUpdate( $hash, "tunerFrequency", $tunerFrequency );
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: tunerFrequency: " . $tunerFrequency;
 
-		# all network settings
-		} elsif ( $line =~ m/^SUL(\d)(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d)(\".*\")(\d{5})$/ ) {
-			#readingsBulkUpdate( $hash, "macAddress", $1.":".$2.":".$3.":".$4.":".$5.":".$6);
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Network settings is " . $1;
-			if ( $1 == 0 ) {
-				$hash->{dhcp}= "off";
-			} else {
-				$hash->{dhcp}= "on";
-			}
-			$hash->{ipAddress}      = sprintf( "%d.%d.%d.%d",$2 ,$3 ,$4 ,$5 );
-			$hash->{netmask}        = sprintf( "%d.%d.%d.%d",$6,$7,$8,$9 );
-			$hash->{defaultGateway} = sprintf( "%d.%d.%d.%d",$10,$11,$12,$13 );
-			$hash->{dns1}           = sprintf( "%d.%d.%d.%d",$14,$15,$16,$17 );
-			$hash->{dns2}           = sprintf( "%d.%d.%d.%d",$18,$19,$20,$21 );
-			if ( $22 == 0 ) {
-				$hash->{proxy}     = "off";
-			} else {
-				$hash->{proxy}     = "on";
-				$hash->{proxyName} = $23;
-				$hash->{proxyPort} = 0 + $24;
-			}
-		# network ports 1-4
-		} elsif ( $line =~ m/^SUM(\d{5})(\d{5})(\d{5})(\d{5})$/ ) {
-		# network port1
-			if ( $1 == 99999 ) {
-				$hash->{networkPort1} = "disabled";
-			} else {
-				$hash->{networkPort1} = 0 + $1;
-			}
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort1 is " . $1;
-		# network port2
-			if ( $2 == 99999 ) {
-				$hash->{networkPort2} = "disabled";
-			} else {
-				$hash->{networkPort2} = 0 + $2;
-			}
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort2 is " . $2;
-		# network port3
-			if ( $3 == 99999 ) {
-				$hash->{networkPort3} = "disabled";
-			} else {
-				$hash->{networkPort3} = 0 + $3;
-			}
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort3 is " . $3;
-		# network port4
-			if ( $4 == 99999 ) {
-				$hash->{networkPort4} = "disabled";
-			} else {
-				$hash->{networkPort4} = 0 + $4;
-			}
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort4 is " . $4;
+        # all network settings
+        } elsif ( $line =~ m/^SUL(\d)(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d)(\".*\")(\d{5})$/ ) {
+            #readingsBulkUpdate( $hash, "macAddress", $1.":".$2.":".$3.":".$4.":".$5.":".$6);
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Network settings is " . $1;
+            if ( $1 == 0 ) {
+                $hash->{dhcp}= "off";
+            } else {
+                $hash->{dhcp}= "on";
+            }
+            $hash->{ipAddress}      = sprintf( "%d.%d.%d.%d",$2 ,$3 ,$4 ,$5 );
+            $hash->{netmask}        = sprintf( "%d.%d.%d.%d",$6,$7,$8,$9 );
+            $hash->{defaultGateway} = sprintf( "%d.%d.%d.%d",$10,$11,$12,$13 );
+            $hash->{dns1}           = sprintf( "%d.%d.%d.%d",$14,$15,$16,$17 );
+            $hash->{dns2}           = sprintf( "%d.%d.%d.%d",$18,$19,$20,$21 );
+            if ( $22 == 0 ) {
+                $hash->{proxy}     = "off";
+            } else {
+                $hash->{proxy}     = "on";
+                $hash->{proxyName} = $23;
+                $hash->{proxyPort} = 0 + $24;
+            }
+        # network ports 1-4
+        } elsif ( $line =~ m/^SUM(\d{5})(\d{5})(\d{5})(\d{5})$/ ) {
+        # network port1
+            if ( $1 == 99999 ) {
+                $hash->{networkPort1} = "disabled";
+            } else {
+                $hash->{networkPort1} = 0 + $1;
+            }
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort1 is " . $1;
+        # network port2
+            if ( $2 == 99999 ) {
+                $hash->{networkPort2} = "disabled";
+            } else {
+                $hash->{networkPort2} = 0 + $2;
+            }
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort2 is " . $2;
+        # network port3
+            if ( $3 == 99999 ) {
+                $hash->{networkPort3} = "disabled";
+            } else {
+                $hash->{networkPort3} = 0 + $3;
+            }
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort3 is " . $3;
+        # network port4
+            if ( $4 == 99999 ) {
+                $hash->{networkPort4} = "disabled";
+            } else {
+                $hash->{networkPort4} = 0 + $4;
+            }
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort4 is " . $4;
 
-		# MAC address
-		} elsif ( $line =~ m/^SVB(.{2})(.{2})(.{2})(.{2})(.{2})(.{2})$/ ) {
-			$hash->{macAddress} = $1.":".$2.":".$3.":".$4.":".$5.":".$6;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort1 is " . $1;
+        # MAC address
+        } elsif ( $line =~ m/^SVB(.{2})(.{2})(.{2})(.{2})(.{2})(.{2})$/ ) {
+            $hash->{macAddress} = $1.":".$2.":".$3.":".$4.":".$5.":".$6;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: NetworkPort1 is " . $1;
 
-		# avrModel
-		} elsif ( $line =~ m/^RGD<\d{3}><(.*)\/(.*)>$/ ) {
-			$hash->{avrModel} = $1;
-			$hash->{avrSoftwareType} = $2;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: avrModel is " . $1;
+        # avrModel
+        } elsif ( $line =~ m/^RGD<\d{3}><(.*)\/(.*)>$/ ) {
+            $hash->{avrModel} = $1;
+            $hash->{avrSoftwareType} = $2;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: avrModel is " . $1;
 
-		# Software version
-		} elsif ( $line =~ m/^SSI\"(.*)\"$/ ) {
-			$hash->{softwareVersion} = $1;
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: softwareVersion is " . $1;
+        # Software version
+        } elsif ( $line =~ m/^SSI\"(.*)\"$/ ) {
+            $hash->{softwareVersion} = $1;
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: softwareVersion is " . $1;
 
-		# ERROR MESSAGES
-		#   E02<CR+LF>  NOT AVAILABLE NOW   Detected the Command line which could not work now.
-		#   E03<CR+LF>  INVALID COMMAND Detected an invalid Command with this model.
-		#   E04<CR+LF>  COMMAND ERROR   "Detected inappropriate Command line.
-		#               Detected IP-only Commands on RS232C (GIA,GIC,FCA,FCB,GIH and GII)."
-		#   E06<CR+LF>  PARAMETER ERROR Detected inappropriate Parameter.
-		#   B00<CR+LF>  BUSY    Now AV Receiver is Busy. Please wait few seconds.
+        # ERROR MESSAGES
+        #   E02<CR+LF>  NOT AVAILABLE NOW   Detected the Command line which could not work now.
+        #   E03<CR+LF>  INVALID COMMAND Detected an invalid Command with this model.
+        #   E04<CR+LF>  COMMAND ERROR   "Detected inappropriate Command line.
+        #               Detected IP-only Commands on RS232C (GIA,GIC,FCA,FCB,GIH and GII)."
+        #   E06<CR+LF>  PARAMETER ERROR Detected inappropriate Parameter.
+        #   B00<CR+LF>  BUSY    Now AV Receiver is Busy. Please wait few seconds.
 
-		} elsif ( $line =~ m/^E0(\d)$/ ) {
-			my $errorMessage ="PIONEERAVR $name: Received Error code from PioneerAVR: $line";
-			if ( $1 == 2 ) {
-				$errorMessage .= " (NOT AVAILABLE NOW - Detected the Command line which could not work now.)";
-			} elsif ( $1 == 3 ) {
-				$errorMessage .= " (INVALID COMMAND - Detected an invalid Command with this model.)";
-			} elsif ( $1 == 4 ) {
-				$errorMessage .= " (COMMAND ERROR - Detected inappropriate Command line.)";
-			} elsif ( $1 == 6 ) {
-				$errorMessage .= " (PARAMETER ERROR - Detected inappropriate Parameter.)";
-			}
-			Log3 $hash, 5, $errorMessage;
-		} elsif ( $line =~ m/^B00$/ ) {
-			Log3 $hash, 5,"PIONEERAVR $name: Error nr $line received (BUSY  Now AV Receiver is Busy. Please wait few seconds.)";
-		# network standby
-		# STJ1 -> on  -> Pioneer AV receiver can be switched on from standby
-		# STJ0 -> off -> Pioneer AV receiver cannot be switched on from standby
-		} elsif ( $line =~ m/^STJ([0|1])/) {
-			if ( $1 == "1" ) {
-				$hash->{networkStandby} = "on";
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: networkStandby is on";
-			} else {
-				$hash->{networkStandby} = "off";
-				Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: networkStandby is off";
-			}
-		# commands for other zones (Volume, mute, power)
-		# Zone 2 command
-		} elsif ( $line =~ m/^ZV(\d\d)$|^Z2MUT(\d)$|^Z2F(\d\d)$|^APR(0|1)$/ ) {
-			$msgForZone = "zone2";
-			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone2!";
-		# Zone 3 command
-		} elsif ( $line =~ m/^YV(\d\d)$|^Z3MUT(\d)$|^Z3F(\d\d)$|^BPR(0|1)$/ ) {
-			$msgForZone = "zone3";
-			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone3!";
-		# hdZone command
-		} elsif ( $line =~ m/^ZEA(\d\d)$|^ZEP(0|1)$/ ) {
-			$msgForZone = "hdZone";
-			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for hdZone!";
-		} else { 
-			Log3 $hash, 5, "PIONEERAVR $name: received $line - don't know what this means - help me!";
-		}
+        } elsif ( $line =~ m/^E0(\d)$/ ) {
+            my $errorMessage ="PIONEERAVR $name: Received Error code from PioneerAVR: $line";
+            if ( $1 == 2 ) {
+                $errorMessage .= " (NOT AVAILABLE NOW - Detected the Command line which could not work now.)";
+            } elsif ( $1 == 3 ) {
+                $errorMessage .= " (INVALID COMMAND - Detected an invalid Command with this model.)";
+            } elsif ( $1 == 4 ) {
+                $errorMessage .= " (COMMAND ERROR - Detected inappropriate Command line.)";
+            } elsif ( $1 == 6 ) {
+                $errorMessage .= " (PARAMETER ERROR - Detected inappropriate Parameter.)";
+            }
+            Log3 $hash, 5, $errorMessage;
+        } elsif ( $line =~ m/^B00$/ ) {
+            Log3 $hash, 5,"PIONEERAVR $name: Error nr $line received (BUSY  Now AV Receiver is Busy. Please wait few seconds.)";
+        # network standby
+        # STJ1 -> on  -> Pioneer AV receiver can be switched on from standby
+        # STJ0 -> off -> Pioneer AV receiver cannot be switched on from standby
+        } elsif ( $line =~ m/^STJ([0|1])/) {
+            if ( $1 == "1" ) {
+                $hash->{networkStandby} = "on";
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: networkStandby is on";
+            } else {
+                $hash->{networkStandby} = "off";
+                Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: networkStandby is off";
+            }
+        # commands for other zones (Volume, mute, power)
+        # Zone 2 command
+        } elsif ( $line =~ m/^ZV(\d\d)$|^Z2MUT(\d)$|^Z2F(\d\d)$|^APR(0|1)$/ ) {
+            $msgForZone = "zone2";
+            Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone2!";
+        # Zone 3 command
+        } elsif ( $line =~ m/^YV(\d\d)$|^Z3MUT(\d)$|^Z3F(\d\d)$|^BPR(0|1)$/ ) {
+            $msgForZone = "zone3";
+            Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone3!";
+        # hdZone command
+        } elsif ( $line =~ m/^ZEA(\d\d)$|^ZEP(0|1)$/ ) {
+            $msgForZone = "hdZone";
+            Log3 $hash, 5, "PIONEERAVR $name: received $line - message for hdZone!";
+        } else { 
+            Log3 $hash, 5, "PIONEERAVR $name: received $line - don't know what this means - help me!";
+        }
 
-		# if PIONEERAVRZONE device exists for that zone, dispatch the command
-		# otherwise try to autocreate the device
-		unless( $msgForZone eq "" ) {
-			my $hashZone = $modules{PIONEERAVRZONE}{defptr}{$msgForZone};
-			Log3 $hash, 5, "PIONEERAVR $name: received message for Zone: ".$msgForZone;
-			if( !$hashZone ) {
-				my $ret = "UNDEFINED PIONEERAVRZONE_$msgForZone PIONEERAVRZONE $msgForZone";
-				Log3 $name, 3, "PIONEERAVR $name: $ret, please define it";
-				DoTrigger( "global", $ret );
-			}
-			# dispatch "zone" - commands to other zones
-			Dispatch( $hash, $line, undef );  # dispatch result to PIONEERAVRZONEs
-			Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: not for the Main zone -> dispatch to PIONEERAVRZONEs zone: $msgForZone";
-			$msgForZone = "";
-		}
-	}
+        # if PIONEERAVRZONE device exists for that zone, dispatch the command
+        # otherwise try to autocreate the device
+        unless( $msgForZone eq "" ) {
+            my $hashZone = $modules{PIONEERAVRZONE}{defptr}{$msgForZone};
+            Log3 $hash, 5, "PIONEERAVR $name: received message for Zone: ".$msgForZone;
+            if( !$hashZone ) {
+                my $ret = "UNDEFINED PIONEERAVRZONE_$msgForZone PIONEERAVRZONE $msgForZone";
+                Log3 $name, 3, "PIONEERAVR $name: $ret, please define it";
+                DoTrigger( "global", $ret );
+            }
+            # dispatch "zone" - commands to other zones
+            Dispatch( $hash, $line, undef );  # dispatch result to PIONEERAVRZONEs
+            Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: not for the Main zone -> dispatch to PIONEERAVRZONEs zone: $msgForZone";
+            $msgForZone = "";
+        }
+    }
 
-	readingsEndUpdate( $hash, 1);
-	$hash->{PARTIAL} = $buf;
+    readingsEndUpdate( $hash, 1);
+
+    $hash->{PARTIAL} = $buf;
 }
 
 #####################################
@@ -3022,25 +3039,25 @@ sub PIONEERAVR_DevInit($) {
 
 #####################################
 sub PIONEERAVR_Reopen($) {
-	my ( $hash ) = @_;
-	my $name     = $hash->{NAME};
+    my ( $hash ) = @_;
+    my $name     = $hash->{NAME};
 
-	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen()";
+    Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen()";
 
-	DevIo_CloseDev( $hash );
-	my $ret = DevIo_OpenDev( $hash, 1, undef );
+    DevIo_CloseDev( $hash );
+    my $ret = DevIo_OpenDev( $hash, 1, undef );
 
-	if ( $hash->{STATE} eq "opened" ) {
-		Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen() -> now opened";
+    if ( $hash->{STATE} eq "opened" ) {
+        Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen() -> now opened";
 
-		if ( AttrVal( $name, "statusUpdateReconnect", "enable" ) eq "enable" ) {
-			PIONEERAVR_statusUpdate( $hash );
-		} else {
-			# update state by requesting power on/off status from the Pioneer AVR
-			PIONEERAVR_Write( $hash, "?P" );
-		}
-	}
-	return $ret;
+        if ( AttrVal( $name, "statusUpdateReconnect", "enable" ) eq "enable" ) {
+            PIONEERAVR_statusUpdate( $hash );
+        } else {
+            # update state by requesting power on/off status from the Pioneer AVR
+            PIONEERAVR_Write( $hash, "?P" );
+        }
+    }
+    return $ret;
 }
 #####################################
 # writing to the Pioneer AV receiver
@@ -3106,59 +3123,59 @@ sub PIONEERAVR_connectionCheck ($) {
             InternalTimer( $next, "PIONEERAVR_connectionCheck", $hash, 0 );
         }
 
-		if ($connState =~ m/^R\r?\n?$/) {
-			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate=R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
-		} else {
-			$hash->{PARTIAL} .= $connState;
-			Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate<>R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
-		}
-    }	  
+        if ($connState =~ m/^R\r?\n?$/) {
+            Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate=R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
+        } else {
+            $hash->{PARTIAL} .= $connState;
+            Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate<>R -> do nothing: ".dq($connState)." PARTIAL: ".dq( $hash->{PARTIAL});
+        }
+    }     
     $attr{$name}{verbose} = $verbose if ( $verbose ne "" );
     delete $attr{$name}{verbose} if ( $verbose eq "" );
 }
 
 sub PIONEERAVR_screenUpdate($) {
-	my ($hash)    = @_;
-	my $name      = $hash->{NAME};
-	my $cmd       = "updateScreen";
-	my $playerCmd = "";
-	
-	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate()";
+    my ($hash)    = @_;
+    my $name      = $hash->{NAME};
+    my $cmd       = "updateScreen";
+    my $playerCmd = "";
+    
+    Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate()";
 
-	if ( defined( $hash->{helper}{main}{CURINPUTNR} ) ) {
-		my $inputNr = $hash->{helper}{main}{CURINPUTNR};
+    if ( defined( $hash->{helper}{main}{CURINPUTNR} ) ) {
+        my $inputNr = $hash->{helper}{main}{CURINPUTNR};
 
-		if ($inputNr eq "17") {
-			$playerCmd = $cmd."Ipod";
-		#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
-		} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
-			$playerCmd = $cmd."Network";
-		} else {
-			my $err = "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
-			Log3 $name, 3, $err;
-			return $err;
-		}
-		my $setCmd = $hash->{helper}{SETS}{main}{$playerCmd};
-		PIONEERAVR_Write( $hash, $setCmd);
-	} else {
-		Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate(): can't find the inputNr";
-	}
+        if ($inputNr eq "17") {
+            $playerCmd = $cmd."Ipod";
+        #### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
+        } elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
+            $playerCmd = $cmd."Network";
+        } else {
+            my $err = "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
+            Log3 $name, 3, $err;
+            return $err;
+        }
+        my $setCmd = $hash->{helper}{SETS}{main}{$playerCmd};
+        PIONEERAVR_Write( $hash, $setCmd);
+    } else {
+        Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_screenUpdate(): can't find the inputNr";
+    }
 }
 
 #########################################################
 sub PIONEERAVR_statusUpdate($) {
-	my ($hash) = @_;
-	my $name    = $hash->{NAME};
+    my ($hash) = @_;
+    my $name    = $hash->{NAME};
 
-	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_statusUpdate()";
+    Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_statusUpdate()";
 
-	foreach my $zone ( keys %{$hash->{helper}{GETS}} ) {
-		foreach my $key ( keys %{$hash->{helper}{GETS}{$zone}} ) {
-			PIONEERAVR_Write( $hash, $hash->{helper}{GETS}->{$zone}->{$key});
-			select(undef, undef, undef, 0.1);
-		}
-	}
-	PIONEERAVR_askForInputNames( $hash,5);
+    foreach my $zone ( keys %{$hash->{helper}{GETS}} ) {
+        foreach my $key ( keys %{$hash->{helper}{GETS}{$zone}} ) {
+            PIONEERAVR_Write( $hash, $hash->{helper}{GETS}->{$zone}->{$key});
+            select(undef, undef, undef, 0.1);
+        }
+    }
+    PIONEERAVR_askForInputNames( $hash,5);
 }
 #########################################################
 sub PIONEERAVR_askForInputNames($$) {
@@ -3166,19 +3183,19 @@ sub PIONEERAVR_askForInputNames($$) {
     my $name              = $hash->{NAME};
     my $comstr            = '';
     my $now120            = gettimeofday()+120;
-	my $delay             = 0.1;
+    my $delay             = 0.1;
 
     RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
     InternalTimer( $now120, "PIONEERAVR_connectionCheck", $hash, 0 );
 
     # we ask for the inputs 1 to 59 if an input name exists (command: ?RGB00 ... ?RGB59)
     #   and if the input is disabled (command: ?SSC0003 ... ?SSC5903)
-	# at least the model VSX-923 needs a break of 0.1s between each command, otherwise it closes the tcp port 
+    # at least the model VSX-923 needs a break of 0.1s between each command, otherwise it closes the tcp port 
     for ( my $i=0; $i<60; $i++ ) {
         #select( undef, undef, undef, 0.1 );
         $comstr = sprintf '?RGB%02d', $i;
         PIONEERAVR_Write( $hash,$comstr );
-		select( undef, undef, undef, $delay );
+        select( undef, undef, undef, $delay );
 
         #digital(audio) input terminal (coax, optical, analog)
         $comstr = sprintf '?SSC%02d00',$i;
@@ -3190,17 +3207,17 @@ sub PIONEERAVR_askForInputNames($$) {
         PIONEERAVR_Write( $hash,$comstr );
         select( undef, undef, undef, $delay );
         
-		#component video input terminal ?
+        #component video input terminal ?
         $comstr = sprintf '?SSC%02d02',$i;
         PIONEERAVR_Write( $hash,$comstr );
         select( undef, undef, undef, $delay );
         
-		#input enabled/disabled?
+        #input enabled/disabled?
         $comstr = sprintf '?SSC%02d03',$i;
         PIONEERAVR_Write( $hash,$comstr );
-        select( undef, undef, undef, $delay	 );
+        select( undef, undef, undef, $delay  );
         
-		#inputLevelAdjust (-12dB ... +12dB)
+        #inputLevelAdjust (-12dB ... +12dB)
         $comstr = sprintf '?ILA%02d',$i;
         PIONEERAVR_Write( $hash,$comstr );
     }
@@ -3216,49 +3233,53 @@ sub PIONEERAVR_GetStateAV($) {
         return "off";
     } elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
         return "muted";
-		
+        
     } elsif (defined( $hash->{helper}{main}{CURINPUTNR})) {
-		my $iNr = $hash->{helper}{main}{CURINPUTNR};
-		if ( $hash->{helper}{INPUTNAMES}->{$iNr}{playerCommands} eq "1"
-			&& ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
-		{
-			return ReadingsVal( $name, "playStatus", "stopped" );
-		} else {
-			return ReadingsVal( $name, "power", "off" );
-		}
-	} else {
-		return ReadingsVal( $name, "power", "off" );
+        my $iNr = $hash->{helper}{main}{CURINPUTNR};
+        if ( $hash->{helper}{INPUTNAMES}->{$iNr}{playerCommands} eq "1")
+        {
+            if ( ReadingsVal( $name, "playStatus", "" ) ne "" )
+            {
+                return ReadingsVal( $name, "playStatus", "stopped" );
+            } else {
+                return ReadingsVal( $name, "power", "off" );
+            } 
+        } else {
+            return ReadingsVal( $name, "power", "off" );
+        }
+    } else {
+        return ReadingsVal( $name, "power", "off" );
     }
 }
 
 #####################################
 # Callback from 95_remotecontrol for command makenotify.
 sub PIONEERAVR_RCmakenotify($$) {
-	my ($nam, $ndev) = @_;
-	my $nname        = "notify_$nam";
+    my ($nam, $ndev) = @_;
+    my $nname        = "notify_$nam";
 
-	fhem( "define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
-	Log3 undef, 2, "PIONEERAVR [remotecontrol:PIONEERAVR] Notify created: $nname";
-	return "Notify created by PIONEERAVR: $nname";
+    fhem( "define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
+    Log3 undef, 2, "PIONEERAVR [remotecontrol:PIONEERAVR] Notify created: $nname";
+    return "Notify created by PIONEERAVR: $nname";
 }
 
 #####################################
 # Default-remote control layout for PIONEERAVR
 sub RC_layout_PioneerAVR() {
-	my $ret;
-	my @row;
-	$row[0] = "toggle:POWEROFF";
-	$row[1] = "volumeUp:UP,mute toggle:MUTE,inputUp:CHUP";
-	$row[2] = ":VOL,:blank,:PROG";
-	$row[3] = "volumeDown:DOWN,:blank,inputDown:CHDOWN";
-	$row[4] = "remoteControl audioParameter:AUDIO,remoteControl cursorUp:UP,remoteControl videoParameter:VIDEO";
-	$row[5] = "remoteControl cursorLeft:LEFT,remoteControl cursorEnter:ENTER,remoteControl cursorRight:RIGHT";
-	$row[6] = "remoteControl homeMenu:HOMEsym,remoteControl cursorDown:DOWN,remoteControl cursorReturn:RETURN";
-	$row[7] = "attr rc_iconpath icons/remotecontrol";
-	$row[8] = "attr rc_iconprefix black_btn_";
+    my $ret;
+    my @row;
+    $row[0] = "toggle:POWEROFF";
+    $row[1] = "volumeUp:UP,mute toggle:MUTE,inputUp:CHUP";
+    $row[2] = ":VOL,:blank,:PROG";
+    $row[3] = "volumeDown:DOWN,:blank,inputDown:CHDOWN";
+    $row[4] = "remoteControl audioParameter:AUDIO,remoteControl cursorUp:UP,remoteControl videoParameter:VIDEO";
+    $row[5] = "remoteControl cursorLeft:LEFT,remoteControl cursorEnter:ENTER,remoteControl cursorRight:RIGHT";
+    $row[6] = "remoteControl homeMenu:HOMEsym,remoteControl cursorDown:DOWN,remoteControl cursorReturn:RETURN";
+    $row[7] = "attr rc_iconpath icons/remotecontrol";
+    $row[8] = "attr rc_iconprefix black_btn_";
 
-	# unused available commands
-	return @row;
+    # unused available commands
+    return @row;
 }
 #####################################
 
@@ -3460,12 +3481,12 @@ sub RC_layout_PioneerAVR() {
   <b>Attributes</b>
   <br><br>
   <ul>
-	<li>
-	   <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pings the Pioneer AVR every X seconds to verify connection status. Defaults to 60 seconds.
-	</li>
-	<li>
-		<b>timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp; Max time in seconds till the Pioneer AVR replies to a ping. Defaults to 3 seconds.
-	</li>
+    <li>
+       <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pings the Pioneer AVR every X seconds to verify connection status. Defaults to 60 seconds.
+    </li>
+    <li>
+        <b>timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp; Max time in seconds till the Pioneer AVR replies to a ping. Defaults to 3 seconds.
+    </li>
     <li><b>checkStatusStart &lt;enable|disable&gt;</b> - Enables/disables the status update (read all values from the Pioneer AV receiver, can take up to one minute) when the module is loaded.(Default: enable)</li>
     <li><b>checkStatusReconnect &lt;enable|disable&gt;</b> - Enables/disables the status update (read all values from the Pioneer AV receiver, can take up to one minute) when the connection to the Pioneer AV receiver is reestablished.(Default: enable)</li>
     <li><b>logTraffic &lt;loglevel&gt;</b> - Enables logging of sent and received datagrams with the given loglevel.
@@ -3519,12 +3540,12 @@ sub RC_layout_PioneerAVR() {
         <li><b>speakers</b> - Which speaker output connectors are active?</li>
         <li><b>standingWave</b> - Standing wave</li>
         <li>
-			<b>state</b> - Is set while connecting from fhem to the  Pioneer AV Receiver (disconnected|innitialized|off|on|opened)
-		</li>
+            <b>state</b> - Is set while connecting from fhem to the  Pioneer AV Receiver (disconnected|innitialized|off|on|opened)
+        </li>
         <li>
           <b>stateAV</b> - Status from user perspective combining readings presence, power, mute and playStatus to a useful overall status (on|off|absent|stopped|playing|paused|fast-forward|fast-rewind).
         </li>
-		<li><b>tone</b> - Is the tone control turned on?</li>
+        <li><b>tone</b> - Is the tone control turned on?</li>
         <li><b>treble</b> - Current value of treble</li>
         <li><b>tunerFrequency</b> - Tuner frequency</li>
         <li><b>volume</b> - Current value of volume (0%-100%)</li>
@@ -3735,16 +3756,16 @@ sub RC_layout_PioneerAVR() {
   <b>Attribute</b>
   <br><br>
     <ul>
-	<li>
-		<b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pingt den Pioneer AV Receiver alle X Sekunden um den Datenverbindungsstatus zu überprüfen. Standard: 60 Sekunden.
-	</li>
-	<li>
-		<b>	timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp;Zeit in Sekunden, innerhalb der der Pioneer AV Receiver auf einen Ping antwortet. Standard: 3 Sekunden.
-	</li>
-	<li>
-		<b>statusUpdateStart &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) beim Start des Moduls. 
-		   Mit "disable" lässt sich das Status Update abschalten, FHEM startet schneller, das Pioneer Modul zeigt eventuell nicht korrekte readings.
-	</li>
+    <li>
+        <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pingt den Pioneer AV Receiver alle X Sekunden um den Datenverbindungsstatus zu überprüfen. Standard: 60 Sekunden.
+    </li>
+    <li>
+        <b> timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp;Zeit in Sekunden, innerhalb der der Pioneer AV Receiver auf einen Ping antwortet. Standard: 3 Sekunden.
+    </li>
+    <li>
+        <b>statusUpdateStart &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) beim Start des Moduls. 
+           Mit "disable" lässt sich das Status Update abschalten, FHEM startet schneller, das Pioneer Modul zeigt eventuell nicht korrekte readings.
+    </li>
     <li><b>statusUpdateReconnect &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) nach dem Wiederherstellen der Datenverbindung zum Pioneer AV Receiver.
     Mit "disable" lässt sich das Status Update abschalten, FHEM bleibt reaktiver beim reconnect, das Pioneer Modul zeigt eventuell nicht korrekte readings.</li>
     <li><b>logTraffic &lt;loglevel&gt;</b> - Ermöglicht das Protokollieren ("Loggen") der Datenkommunikation vom/zum Pioneer AV Receiver.
@@ -3798,8 +3819,8 @@ sub RC_layout_PioneerAVR() {
         <li><b>speakers</b> - Welche Lautsprecheranschlüsse sind aktiviert?</li>
         <li><b>standingWave</b> - Einstellung der Steuerung stark resonanter tiefer Frequenzen im Hörraum</li>
         <li>
-		  <b>state</b> - Wird beim Verbindungsaufbau von Fhem mit dem Pioneer AV Receiver gesetzt. Mögliche Werte sind disconnected, innitialized, off, on, opened
-		</li>
+          <b>state</b> - Wird beim Verbindungsaufbau von Fhem mit dem Pioneer AV Receiver gesetzt. Mögliche Werte sind disconnected, innitialized, off, on, opened
+        </li>
         <li>
           <b>stateAV</b> - Status aus der Sicht des USers: Kombiniert die readings presence, power, mute und playStatus zu einem Status (on|off|absent|stopped|playing|paused|fast-forward|fast-rewind).
         </li>
