@@ -41,10 +41,12 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.3.1        28.06.2017       vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised
+# 5.3.0        26.06.2017       change of mysql_optimize_tables, new command optimizeTables
 # 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW)
 # 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
-# 5.0.6        13.06.2017       add Aria engine to optimise_tables
+# 5.0.6        13.06.2017       add Aria engine to mysql_optimize_tables
 # 5.0.5        12.06.2017       bugfixes in DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
 #                               mysql_DoDumpServerSide, new reading DumpFileCreatedSize
 # 5.0.4        09.06.2017       some improvements and changes of mysql_DoDump, commandref revised, new attributes 
@@ -226,7 +228,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.2.1";
+my $DbRepVersion = "5.3.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -352,7 +354,9 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
 				(($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel eq "MYSQL" )?"dumpMySQL:clientSide,serverSide ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:noArg ":"");
   
   return if(IsDisabled($name));
@@ -362,7 +366,7 @@ sub DbRep_Set($@) {
 	
 	   if ($prop eq "serverSide") {
            Log3 ($name, 3, "DbRep $name - ################################################################");
-           Log3 ($name, 3, "DbRep $name - ###          New database serverSide dump                    ###");
+           Log3 ($name, 3, "DbRep $name - ###             New database serverSide dump                 ###");
            Log3 ($name, 3, "DbRep $name - ################################################################");
 	   } else {
            Log3 ($name, 3, "DbRep $name - ################################################################");
@@ -384,6 +388,17 @@ sub DbRep_Set($@) {
        }
 	   
 	   DbRep_Main($hash,$opt,$prop);
+       return undef;
+  }
+  
+  if ($opt =~ /optimizeTables|vacuum/ && $hash->{ROLE} ne "Agent") {
+       $hash->{LASTCMD} = "$opt";
+	
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+       Log3 ($name, 3, "DbRep $name - ###          New optimize table / vacuum execution           ###");
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+	   
+	   DbRep_Main($hash,$opt);
        return undef;
   }
   
@@ -829,6 +844,7 @@ sub DbRep_Undef($$) {
  BlockingKill($hash->{HELPER}{RUNNING_PID}) if (exists($hash->{HELPER}{RUNNING_PID}));
  BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
  BlockingKill($hash->{HELPER}{RUNNING_BACKUP_SERVER}) if (exists($hash->{HELPER}{RUNNING_BACKUP_SERVER})); 
+ BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
     
 return undef;
 }
@@ -915,7 +931,8 @@ sub DbRep_Main($$;$) {
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
  
- return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT} || $hash->{HELPER}{RUNNING_BACKUP_SERVER}) && $opt ne "dumpMySQL" );
+ return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT} || 
+             $hash->{HELPER}{RUNNING_BACKUP_SERVER}) && $opt ne "dumpMySQL" );
  
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  delread($hash);
@@ -923,6 +940,7 @@ sub DbRep_Main($$;$) {
  if ($opt eq "dumpMySQL") {	   
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_SERVER}) if (exists($hash->{HELPER}{RUNNING_BACKUP_SERVER}));
+	 BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      
 	 if ($cmd eq "serverSide") {
 	     $hash->{HELPER}{RUNNING_BACKUP_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
@@ -931,6 +949,12 @@ sub DbRep_Main($$;$) {
 	     $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
 		 ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
 	 }
+     return;
+ }
+ if ($opt =~ /optimizeTables|vacuum/) {	
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE})); 
+     $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "OptimizeDone", $to, "OptimizeAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
      return;
  }
  
@@ -3973,6 +3997,257 @@ return;
 }
 
 ####################################################################################################
+#                             optimize Tables MySQL 
+####################################################################################################
+sub DbRep_optimizeTables($) {
+ my ($name)        = @_;
+ my $hash          = $defs{$name};
+ my $dbloghash     = $hash->{dbloghash};
+ my $dbconn        = $dbloghash->{dbconn};
+ my $dbuser        = $dbloghash->{dbuser};
+ my $dblogname     = $dbloghash->{NAME};
+ my $dbmodel       = $dbloghash->{DBMODEL};
+ my $dbpassword    = $attr{"sec$dblogname"}{secret};
+ my $dbname        = $hash->{DATABASE};
+ my $value         = 0;
+ my ($dbh,$sth,$query,$err,$r,$db_MB_start,$db_MB_end);
+ my (%db_tables,@tablenames);
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall DbRep_optimizeTables");
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ # Verbindung mit DB
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ if ($@) {
+	 $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+     return "$name|''|$err|''|''";
+ }
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ if ($dbmodel =~ /MYSQL/) {
+     # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
+     $query = "SHOW TABLE STATUS FROM `$dbname`";
+ 
+     Log3 ($name, 5, "DbRep $name - current query: $query ");
+     Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
+    
+     eval { $sth = $dbh->prepare($query);
+            $sth->execute;
+	      };
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+		 $sth->finish;
+		 $dbh->disconnect;
+         return "$name|''|$err|''|''";
+     }
+    
+     while ( $value = $sth->fetchrow_hashref()) {
+	     # verbose 5 logging
+	     Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
+         foreach my $tk (sort(keys(%$value))) {
+             Log3 ($name, 5, "DbRep $name - $tk: $value->{$tk}") if(defined($value->{$tk}) && $tk ne "Rows");
+         }
+	     Log3 ($name, 5, "DbRep $name - ......... Table definition END ............");
+	 
+         # check for old MySQL3-Syntax Type=xxx   
+	     if (defined $value->{Type}) {
+             # port old index type to index engine, so we can use the index Engine in the rest of the script
+             $value->{Engine} = $value->{Type}; 
+         }
+         $db_tables{$value->{Name}} = $value;
+    
+     }
+
+     @tablenames = sort(keys(%db_tables));
+ 
+     if (@tablenames < 1) {
+         $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
+	     Log3 ($name, 2, "DbRep $name - $err");
+	     $err = encode_base64($@,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+		 $sth->finish;
+		 $dbh->disconnect;
+         return "$name|''|$err|''|''";
+     }
+
+     # Tabellen optimieren 
+	 $hash->{HELPER}{DBTABLES} = \%db_tables;
+     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+	 if ($err) {
+	     $err = encode_base64($err,"");
+		 return "$name|''|$err|''|''";
+	 }
+ }
+ 
+ if ($dbmodel =~ /SQLITE/) {
+	 # Anfangsgröße ermitteln
+     $db_MB_start = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+     $query  ="VACUUM";
+	 Log3 ($name, 5, "DbRep $name - current query: $query ");
+ 
+     Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
+     eval {$sth = $dbh->prepare($query);
+           $r = $sth->execute();
+          }; 
+	 if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! SQLite-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+		 $sth->finish;
+		 $dbh->disconnect;
+         return "$name|''|$err|''|''";
+	 }
+	 
+	 # Endgröße ermitteln
+	 $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+	 Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+ }
+  
+ if ($dbmodel =~ /POSTGRESQL/) {
+     # Anfangsgröße ermitteln
+     $query = "SELECT pg_size_pretty(pg_database_size('fhemtest'))"; 
+     Log3 ($name, 5, "DbRep $name - current query: $query ");
+     eval { $sth = $dbh->prepare($query);
+            $sth->execute;
+	      };
+     if ($@) {
+	     $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+	     $sth->finish;
+	     $dbh->disconnect;
+         return "$name|''|$err|''|''";
+     }
+     
+	 $value = $sth->fetchrow();
+	 $value =~ tr/MB//d;
+     $db_MB_start = sprintf("%.2f",$value);
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+     
+     Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
+     
+	 $query = "vacuum history";
+	 
+	 Log3 ($name, 5, "DbRep $name - current query: $query ");
+ 
+     eval {$sth = $dbh->prepare($query);
+           $sth->execute();
+          }; 
+	 if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+		 $sth->finish;
+		 $dbh->disconnect;
+         return "$name|''|$err|''|''";
+	 }
+	 
+	 # Endgröße ermitteln
+     $query = "SELECT pg_size_pretty(pg_database_size('fhemtest'))"; 
+     Log3 ($name, 5, "DbRep $name - current query: $query ");
+     eval { $sth = $dbh->prepare($query);
+            $sth->execute;
+	      };
+     if ($@) {
+	     $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+	     $sth->finish;
+	     $dbh->disconnect;
+         return "$name|''|$err|''|''";
+     }
+     
+	 $value = $sth->fetchrow();
+	 $value =~ tr/MB//d;
+	 $db_MB_end = sprintf("%.2f",$value);
+	 Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+ }
+  
+ $sth->finish;
+ $dbh->disconnect;
+  
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished, total time used: ".sprintf("%.0f",$brt)." sec.");
+
+ Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+ 
+return "$name|$rt|''|$db_MB_start|$db_MB_end";
+}
+
+####################################################################################################
+#             Auswertungsroutine optimze tables
+####################################################################################################
+sub OptimizeDone($) {
+  my ($string)     = @_;
+  my @a            = split("\\|",$string);
+  my $hash         = $defs{$a[0]};
+  my $bt           = $a[1];
+  my ($rt,$brt)    = split(",", $bt);
+  my $err          = $a[2]?decode_base64($a[2]):undef;
+  my $db_MB_start  = $a[3];
+  my $db_MB_end    = $a[4];
+  my $name         = $hash->{NAME};
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall OptimizeDone");
+  
+  delete($hash->{HELPER}{RUNNING_OPTIMIZE});
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      Log3 ($name, 4, "DbRep $name -> BlockingCall OptimizeDone finished");
+      return;
+  } 
+ 
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+    
+  my $state = "optimize tables finished";
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue($hash, "SizeDbBegin_MB", $db_MB_start);
+  ReadingsBulkUpdateValue($hash, "SizeDbEnd_MB", $db_MB_end);
+  ReadingsBulkUpdateTimeState($hash,$brt,undef,$state);
+  readingsEndUpdate($hash, 1);
+
+  Log3 ($name, 3, "DbRep $name - Optimize tables finished successfully. ");
+
+  Log3 ($name, 4, "DbRep $name -> BlockingCall OptimizeDone finished");
+  
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Timeout DB-Abfrage
+####################################################################################################
+sub OptimizeAborted($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dbh  = $hash->{DBH}; 
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} timed out");
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", "timeout", 1);
+  delete($hash->{HELPER}{RUNNING_OPTIMIZE});
+  
+return;
+}
+
+####################################################################################################
 # nicht blockierende Dump-Routine für MySQL (clientSide)
 ####################################################################################################
 sub mysql_DoDumpClientSide($) {
@@ -4000,7 +4275,7 @@ sub mysql_DoDumpClientSide($) {
  my $sql_file                   = '';
  my $dbpraefix                  = "";
  my ($dbh,$sth,$tablename,$sql_create,$rct,$insert,$first_insert,$backupfile,$drc,$drh,
-     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end,$err);
+     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end,$err,$db_MB_start,$db_MB_end);
  my (@ar,@tablerecords,@tablenames,@tables,@ergebnis);
  my (%db_tables);
  
@@ -4047,6 +4322,7 @@ sub mysql_DoDumpClientSide($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''";
  }
   
@@ -4100,6 +4376,7 @@ sub mysql_DoDumpClientSide($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''";
  }
     
@@ -4164,13 +4441,18 @@ sub mysql_DoDumpClientSide($) {
 	 Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''";
  }
 
  if($optimize_tables_beforedump) {
      # Tabellen optimieren vor dem Dump
 	 $hash->{HELPER}{DBTABLES} = \%db_tables;
-     optimise_tables($hash,$dbh,@tablenames);
+     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+	 if ($err) {
+	     $err = encode_base64($err,"");
+		 return "$name|''|$err|''|''|''|''";
+	 }
  }
     
  # Tabelleneigenschaften für SQL-File ermitteln
@@ -4197,6 +4479,7 @@ sub mysql_DoDumpClientSide($) {
              Log3 ($name, 2, "DbRep $name - $err");
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+			 $dbh->disconnect;
              return "$name|''|$err|''|''|''|''";
          }
 	     $db_tables{$tablename}{Rows} = $sth->fetchrow;
@@ -4210,7 +4493,7 @@ sub mysql_DoDumpClientSide($) {
              $db_tables{$tablename}{Update_time} = 0;
          }
             
-         $st_e.=$mysql_commentstring."TABLE: $db_tables{$tablename}{Name} | Rows: $db_tables{$tablename}{Rows} | Length: ".($db_tables{$tablename}{Data_length}+$db_tables{$tablename}{Index_length})." | Engine: $db_tables{$tablename}{Engine}\n";
+         $st_e .= $mysql_commentstring."TABLE: $db_tables{$tablename}{Name} | Rows: $db_tables{$tablename}{Rows} | Length: ".($db_tables{$tablename}{Data_length}+$db_tables{$tablename}{Index_length})." | Engine: $db_tables{$tablename}{Engine}\n";
          if($db_tables{$tablename}{Name} eq "current") {
 		     $drc = $db_tables{$tablename}{Rows};
 		 }
@@ -4274,6 +4557,7 @@ sub mysql_DoDumpClientSide($) {
              Log3 ($name, 2, "DbRep $name - $err");
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+			 $dbh->disconnect;
              return "$name|''|$err|''|''|''|''";
          }
          
@@ -4310,6 +4594,7 @@ sub mysql_DoDumpClientSide($) {
                  Log3 ($name, 2, "DbRep $name - $err");
 				 $err = encode_base64($@,"");
                  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+				 $dbh->disconnect;
                  return "$name|''|$err|''|''|''|''";
              }
              
@@ -4345,6 +4630,7 @@ sub mysql_DoDumpClientSide($) {
                      Log3 ($name, 2, "DbRep $name - $err");
 					 $err = encode_base64($@,"");
                      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+					 $dbh->disconnect;
                      return "$name|''|$err|''|''|''|''";
                  }
                     
@@ -4428,7 +4714,7 @@ sub mysql_DoDumpServerSide($) {
  my $ebd                        = AttrVal($name, "executeBeforeDump", undef);
  my $ead                        = AttrVal($name, "executeAfterDump", undef);
  my $table                      = "history";
- my ($dbh,$sth,$err);
+ my ($dbh,$sth,$err,$db_MB_start,$db_MB_end);
  my (%db_tables,@tablenames);
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_DoDumpServerSide");
@@ -4460,6 +4746,7 @@ sub mysql_DoDumpServerSide($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''";
  }
     
@@ -4488,13 +4775,18 @@ sub mysql_DoDumpServerSide($) {
 	 Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''";
  }
  
  if($optimize_tables_beforedump) {
      # Tabellen optimieren vor dem Dump
 	 $hash->{HELPER}{DBTABLES} = \%db_tables;
-     optimise_tables($hash,$dbh,@tablenames);
+     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+	 if ($err) {
+	     $err = encode_base64($err,"");
+		 return "$name|''|$err|''|''|''|''";
+	 }
  }
  
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'.");
@@ -4523,6 +4815,7 @@ sub mysql_DoDumpServerSide($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
+	 $dbh->disconnect;
      return "$name|''|$err|''|''|''";     
   }
   
@@ -4854,20 +5147,40 @@ return $ret;
 }
 
 ####################################################################################################
-#             Tabellenoptimierung vor MySQL-Dump
+#             Tabellenoptimierung MySQL
 ####################################################################################################
-sub optimise_tables {
+sub mysql_optimize_tables {
   my ($hash,$dbh,@tablenames) = @_;
-  my $name = $hash->{NAME};
-  my $engine = '';
+  my $name   = $hash->{NAME};
+  my $dbname = $hash->{DATABASE};
   my $ret    = 0;
   my $opttbl = 0;
-  my $tablename;
   my $db_tables = $hash->{HELPER}{DBTABLES};
+  my ($engine,$tablename,$query,$sth,$value,$db_MB_start,$db_MB_end);
+
+  # Anfangsgröße ermitteln
+  $query = "SELECT sum( data_length + index_length ) / 1024 / 1024 FROM information_schema.TABLES where table_schema='$dbname' "; 
+  Log3 ($name, 5, "DbRep $name - current query: $query ");
+  eval { $sth = $dbh->prepare($query);
+         $sth->execute;
+	   };
+  if ($@) {
+      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
+      Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+	  $sth->finish;
+	  $dbh->disconnect;
+      return ($@,undef,undef);
+  }
+  $value = $sth->fetchrow();
+	 
+  $db_MB_start = sprintf("%.2f",$value);
+  Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+     
   Log3($name, 3, "DbRep $name - Optimizing tables");
   
   foreach $tablename (@tablenames) {
       #optimize table if engine supports optimization
+	  $engine = '';
       $engine = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
 
 	  if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/) {
@@ -4885,8 +5198,24 @@ sub optimise_tables {
   }
 
   Log3($name, 3, "DbRep $name - $opttbl tables have been optimized.") if($opttbl > 0);
+	 
+  # Endgröße ermitteln
+  eval { $sth->execute; };
+  if ($@) {
+      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
+      Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
+	  $sth->finish;
+	  $dbh->disconnect;
+      return ($@,undef,undef);
+  }
   
-return;
+  $value = $sth->fetchrow();
+  $db_MB_end = sprintf("%.2f",$value);
+  Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+	 
+  $sth->finish;
+  
+return (undef,$db_MB_start,$db_MB_end);
 }
 
 ####################################################################################################
@@ -5260,6 +5589,7 @@ return;
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
 	 <li> creation of backups non-blocking (MySQL) </li>
+	 <li> optimize the connected database </li>
      </ul></ul>
      <br>
      
@@ -5467,7 +5797,7 @@ return;
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv <br><br>
 								 
-								 </li><br><br>
+								 </li><br>
 								 
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
@@ -5517,6 +5847,15 @@ return;
                                  The reading to evaluate must be defined using attribute "reading". 
                                  The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum value within the given period.  </li> <br>    
 
+	<li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br><br>
+								 
+								 <ul>
+								 <b>Note:</b> <br>
+                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+                                 is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br>           
+								 </li><br>
+                                 </ul>   
+								 
     <li><b> readingRename </b> - renames the reading name of a device inside the connected database (see Internal DATABASE).
                                  The readingname will allways be changed in the <b>entire</b> database. Possibly set time limits or restrictions by 
                                  <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
@@ -5573,7 +5912,16 @@ return;
 	                             <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or 
 								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
 								 "reading". Using this function is mostly reasonable if value-differences of readings 
-								 are written to the database. </li> <br>  
+								 are written to the database. </li> <br> 
+
+	<li><b> vacuum </b>       - optimize tables in the connected database (SQLite, PostgreSQL). <br><br>
+								 
+								<ul>
+								<b>Note:</b> <br>
+                                Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+                                is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br>           
+								</li>
+                                </ul><br>							 
                
   <br>
   </ul></ul>
@@ -6118,6 +6466,7 @@ sub bdump {
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
 	 <li> Backups der FHEM-Datenbank erstellen (MySQL) </li>
+	 <li> Optimierung der angeschlossenen Datenbank </li>
      
 	 </ul></ul>
      <br>
@@ -6332,7 +6681,7 @@ sub bdump {
 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv <br><br>
 								 
-								 </li><br><br><br>	
+								 </li><br>
                                  
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
@@ -6404,6 +6753,15 @@ sub bdump {
 								 Aggregation bzw. Zeitgrenzen.  
                                  Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben 
 								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+								 
+	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br><br>
+								 
+								<ul>
+								<b>Hinweis:</b> <br>
+                                Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
+                                im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
+								</li>
+                                </ul><br>
                                                          				 
     <li><b> readingRename </b> - benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
                                  Der Readingname wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell 
@@ -6465,6 +6823,15 @@ sub bdump {
                                  Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
 								 Readings in die Datenbank geschrieben werden.  </li> <br>
+								 
+	<li><b> vacuum </b>      - optimiert die Tabellen in der angeschlossenen Datenbank (SQLite, PostgreSQL). <br><br>
+								 
+								<ul>
+								<b>Hinweis:</b> <br>
+                                Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
+                                im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
+								</li>
+                                </ul><br>
 								                              
   <br>
   </ul></ul>

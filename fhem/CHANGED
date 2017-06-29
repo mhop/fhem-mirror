@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V5.3.1, new commands optimizeTables (MySQL) and vacuum
+                               (SQLite, PostgreSQL) to optimize database
   - bugfix:  36_Vallox: Added Bus Version Handling. Misc Bugfixes.
   - bugfix:  32_withings: temporary fix of login function before rewrite
   - bugfix:  93_DbRep: V5.2.1, bugfix in sqlCmd to support PRAGMA, UTF8
