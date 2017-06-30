@@ -171,9 +171,9 @@ TcpServer_SetSSL($)
 
 
 sub
-TcpServer_Close($)
+TcpServer_Close($@)
 {
-  my ($hash) = @_;
+  my ($hash, $dodel) = @_;
   my $name = $hash->{NAME};
 
   if(defined($hash->{CD})) { # Clients
@@ -181,8 +181,8 @@ TcpServer_Close($)
     delete($hash->{CD}); 
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
-    delete $attr{$name};
-    delete $defs{$name};
+    delete $attr{$name} if($dodel);
+    delete $defs{$name} if($dodel);
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
