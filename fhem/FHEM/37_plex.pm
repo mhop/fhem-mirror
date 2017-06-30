@@ -828,7 +828,7 @@ plex_Set($$@)
       if( $hash->{'myPlex-servers'}{Server} ) {
         foreach my $entry (@{$hash->{'myPlex-servers'}{Server}}) {
           if( $entry->{localAddresses} eq $params[0] || $entry->{machineIdentifier} eq $params[0] ) {
-            Log 1, Dumper $entry;
+            #Log 1, Dumper $entry;
 
             my $define = "$entry->{machineIdentifier} plex $entry->{address}";
 
@@ -1246,9 +1246,9 @@ plex_makeImage($$$$)
 
 
 sub
-plex_mediaList2($$$$)
+plex_mediaList2($$$$;$)
 {
-  my ($hash, $type, $xml, $items) = @_;
+  my ($hash, $type, $xml, $items, $cmd) = @_;
 
   if( $items ) {
     if( 0 && !$xml->{sortAsc} ) {
@@ -1264,6 +1264,7 @@ plex_mediaList2($$$$)
 
   my $ret;
   if( $type eq 'Directory' ) {
+#Log 1, Dumper $items;
     $ret .= "\n" if( $ret );
     $ret .= "$type\n";
     $ret .= sprintf( "%-35s %-10s %s\n", 'key', 'type', 'title' );
@@ -1302,12 +1303,16 @@ plex_mediaList2($$$$)
         #$ret .= "  ($item->{year})" if( $item->{year} );
         $ret .= sprintf(": S%02iE%02i",$item->{parentIndex}, $item->{index} ) if( $item->{parentIndex} );
         $ret .= ")" if( $item->{grandparentTitle} );
-        $ret .= "\n";
       } else {
-        $ret .= plex_makeLink($hash,'detail',  $xml->{parentSection}, $item->{key}, sprintf( "%-35s %-10s     %s\n", $item->{key}, $item->{type}, $item->{title} ) );
+        $ret .= plex_makeLink($hash,'detail',  $xml->{parentSection}, $item->{key}, sprintf( "%-35s %-10s     %s", $item->{key}, $item->{type}, $item->{title} ) );
       }
-    }
 
+      if( $cmd && $cmd eq 'files'
+          && $item->{Media} && $item->{Media}[0]{Part}  ) {
+        $ret .= " ($item->{Media}[0]{Part}[0]{file})";
+      }
+      $ret .= "\n";
+    }
   }
 
   if( $type eq 'Track' ) {
@@ -1324,9 +1329,9 @@ plex_mediaList2($$$$)
 }
 
 sub
-plex_mediaList($$$)
+plex_mediaList($$$;$)
 {
-  my ($hash, $server, $xml) = @_;
+  my ($hash, $server, $xml, $cmd) = @_;
 
 #Log 1, Dumper $xml;
   return $xml if( ref($xml) ne 'HASH' );
@@ -1349,7 +1354,7 @@ plex_mediaList($$$)
 
   $ret .= plex_mediaList2( $hash, 'Directory', $xml, $xml->{Directory} ) if( $xml->{Directory} );
   $ret .= plex_mediaList2( $hash, 'Playlist', $xml, $xml->{Playlist} ) if( $xml->{Playlist} );
-  $ret .= plex_mediaList2( $hash, 'Video', $xml, $xml->{Video} ) if( $xml->{Video} );
+  $ret .= plex_mediaList2( $hash, 'Video', $xml, $xml->{Video}, $cmd ) if( $xml->{Video} );
   $ret .= plex_mediaList2( $hash, 'Track', $xml, $xml->{Track} ) if( $xml->{Track} );
 
   if( !$xml->{Directory} && !$xml->{Playlist} && !$xml->{Video} && !$xml->{Track} ) {
@@ -1572,17 +1577,17 @@ plex_Get($$@)
       $param = '';
     }
 
-    if( $cmd eq 'sections' || $cmd eq 'ls' ) {
+    if( $cmd eq 'sections' || $cmd eq 'ls' || $cmd eq 'files' ) {
       $param = "/$param" if( $param && $param !~ '^/' );
       my $ret;
       if( $param =~ m'/playlists' ) {
         $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", 'sections', $hash->{CL} || 1, $entry->{accessToken} );
 
       } elsif( $param =~ m'^/library' ) {
-        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", "sections:$param", $hash->{CL} || 1, $entry->{accessToken} );
+        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}$param", "sections:$param $cmd", $hash->{CL} || 1, $entry->{accessToken} );
 
       } else {
-        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/library/sections$param", "sections:$param", $hash->{CL} || 1, $entry->{accessToken} );
+        $ret = plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/library/sections$param", "sections:$param $cmd", $hash->{CL} || 1, $entry->{accessToken} );
       }
 
       return $ret;
@@ -1647,7 +1652,7 @@ plex_Get($$@)
 
     }
 
-    $list .= 'identity:noArg ls search sessions:noArg detail onDeck:noArg recentlyAdded:noArg playlists:noArg ';
+    $list .= 'identity:noArg ls files search sessions:noArg detail onDeck:noArg recentlyAdded:noArg playlists:noArg ';
     $list .= 'servers:noArg pin:noArg ' if( $list !~ m/\bservers\b/ );
 
   }
@@ -2216,7 +2221,7 @@ plex_serverOf($$;$)
 
   if( !$entry && $only ) {
     if( my $mhash = $modules{plex}{defptr}{MASTER} ) {
-Log 1, Dumper $mhash;
+#Log 1, Dumper $mhash;
       my @keys = keys(%{$modules{plex}{defptr}{MASTER}{servers}});
       if( @keys == 1 ) {
         $entry = $modules{plex}{defptr}{MASTER}{servers}{$keys[0]};
@@ -3702,12 +3707,13 @@ plex_parseHttpAnswer($$$)
            || $param->{key} eq 'playlists'
            || $param->{key} eq 'recentlyAdded'
            || $param->{key} eq 'search'
-           || $param->{key} =~ m'sections(:(.*))?' ) {
+           || $param->{key} =~ m'sections(:(\S*))?( (.*))?' ) {
     $handled = 1;
+    my $cmd = $4;
 
     $xml->{parentSection} = $2;
     my $server = plex_entryOfIP($hash, 'server', $param->{address});
-    my $ret = plex_mediaList( $hash, $server, $xml );
+    my $ret = plex_mediaList( $hash, $server, $xml, $cmd );
     if( $param->{cl} && $param->{cl}->{TYPE} eq 'FHEMWEB' ) {
       $ret =~ s/&/&amp;/g;
       $ret =~ s/'/&apos;/g;
@@ -4057,8 +4063,12 @@ Log 1, "!!!!!!!!!!";
 
         my $data = substr($hash->{buf}, $i, $len);
         $hash->{buf} = substr($hash->{buf},$i+$len);
+#Log 1, ">>>$data<<<";
 
-        if( $op == 0x01 ) {
+        if( $data eq '?' ) {
+          #ignore keepalive
+
+        } elsif( $op == 0x01 ) {
           my $obj = eval { decode_json($data) };
 
           if( $obj ) {
