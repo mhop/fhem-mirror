@@ -4,8 +4,7 @@ function loadGoogleApi(success) {
     if(window.google)
     {
         // Load the Visualization API library
-        google.setOnLoadCallback(success);
-        google.load('visualization', '1.0', {'packages':['corechart','geochart','table'], callback: success} ); 
+        google.charts.load('current', {'packages':['corechart','geochart','table'], callback: success} ); 
     }
     else
     {
@@ -57,8 +56,10 @@ function drawGooglePieChart(data, el) {
     var options = {   is3D: true,
                       chartArea : { height:'80%',width:'95%' },
                       tooltip: { trigger: 'selection' },
-                      width: 390,
-                      height: 300,
+                      width: 450,
+                      legend: {position: 'right'},
+                      pieSliceText: 'none',
+                      height: 350,
                   };
    
     var chart = new google.visualization.PieChart(document.getElementById(id));
@@ -135,7 +136,7 @@ function drawGoogleGermanyMap(data, el) {
                     resolution: "provinces",
                     backgroundColor : 'lightblue',
                     tooltip: {isHtml: true},
-                    width:700
+                    width:800
                   };
    
     var chart = new google.visualization.GeoChart(document.getElementById(id));
@@ -165,11 +166,11 @@ function drawGoogleWorldMap(data, el) {
    array.addRows(result);
    
    var options = {
-                    colorAxis: {colors: ['#A7E7A7', '#278727']},
+                    colorAxis: {colors: ['#A7E7A7', '#A7E7A7']},
                     backgroundColor : 'lightblue',
                      tooltip: {isHtml: true},
                     legend: 'none',
-                    width:700
+                    width: 800
                  };
    
    var chart = new google.visualization.GeoChart(document.getElementById(id));
@@ -198,10 +199,10 @@ function drawGoogleEuroMap(data, el) {
    
    var options = {  
                     region: '150',
-                    colorAxis: {colors: ['#A7E7A7', '#278727']},
+                    colorAxis: {colors: ['#A7E7A7', '#A7E7A7']},
                     backgroundColor : 'lightblue',
                     legend: 'none',
-                    width:700
+                    width:800
                  };
    
    var chart = new google.visualization.GeoChart(document.getElementById(id));
@@ -306,7 +307,7 @@ function onSuccess(data, textStatus, jqXHR) {
    
     div.append("last updated: " + data.updated + " UTC<br><br>");
     div.append("number of installations (last 12 months): " + data.nodes12 + "<br>");
-    div.append("number of submissions (since : " + data.started + " UTC): "+data.nodesTotal+"<br>");
+    div.append("number of submissions (since : " + data.started + "): "+data.nodesTotal+"<br>");
     div.append("created in: " + data.generated.toFixed(3) + " seconds<br>");
 
     $("div.tabs").tabs();
