@@ -47,6 +47,7 @@
 # 88 readingFnAttributes
 # 89 add LD316A
 # 90 Sunricher poc
+# 91 milight colorcast fixed, more robust tcp re-connect
 
 # verbose level
 # 0: quit
@@ -1015,6 +1016,7 @@ WifiLight_Attr(@)
     WifiLight_RGB_ColorConverter($ledDevice, @a) if ($ledDevice->{CONNECTION} eq 'LW12');
     WifiLight_RGB_ColorConverter($ledDevice, @a) if ($ledDevice->{CONNECTION} eq 'LW12HX');
     WifiLight_RGB_ColorConverter($ledDevice, @a) if ($ledDevice->{CONNECTION} eq 'LW12FC');
+    WifiLight_Milight_ColorConverter($ledDevice, @a) if ($ledDevice->{CONNECTION} =~ 'bridge-V[2|3]');
     WifiLight_RGB_ColorConverter($ledDevice, @a) if (($ledDevice->{LEDTYPE} =~ /^RGB.?$/) && ($ledDevice->{CONNECTION} =~ /^SUNRICHER.?$/));
     if ($init_done && !(@{$ledDevice->{helper}->{hlCmdQueue}}))
     {
@@ -3345,9 +3347,9 @@ WifiLight_HSV_Transition(@)
   }
   else
   {
-    $hueFrom = $ledDevice->{READINGS}->{hue}->{VAL};
-    $satFrom = $ledDevice->{READINGS}->{saturation}->{VAL};
-    $valFrom = $ledDevice->{READINGS}->{brightness}->{VAL};
+    $hueFrom = $ledDevice->{READINGS}->{hue}->{VAL} || 0;
+    $satFrom = $ledDevice->{READINGS}->{saturation}->{VAL} || 0;
+    $valFrom = $ledDevice->{READINGS}->{brightness}->{VAL} || 0;
     $timeFrom = gettimeofday();
     Log3 ($ledDevice, 5, "$ledDevice->{NAME} prepare start hsv transition (is actual) hsv $hueFrom, $satFrom, $valFrom, $timeFrom");
   }
@@ -3566,36 +3568,34 @@ WifiLight_HSV2fourChannel(@)
 sub
 WifiLight_Milight_ColorConverter(@)
 {
-  my ($ledDevice) = @_;
+  my ($ledDevice, $cr, $cy, $cg, $cc, $cb, $cm) = @_;
+  #my ($ledDevice) = @_;
 
   my @colorMap;
   
-  my $hueRed = 0;
-  my $adjRed = $hueRed;
+  #my $hueRed = 0;
+  my $adjRed = 0 - ($cr || 0);
+  #my $hueYellow = 60;
+  my $adjYellow = 60 - ($cy || 0);
+  #my $hueGreen = 120;
+  my $adjGreen = 120 - ($cg || 0);
+  #my $hueCyan = 180;
+  my $adjCyan = 180 - ($cc || 0);
+  #my $hueBlue = 240;
+  my $adjBlue = 240 - ($cb || 0);
+  #my $hueLilac = 300;
+  my $adjLilac = 300 - ($cm || 0);
 
-  my $hueYellow = 60;
-  my $adjYellow = $hueYellow;
-
-  my $hueGreen = 120;
-  my $adjGreen = $hueGreen;
-
-  my $hueCyan = 180;
-  my $adjCyan = $hueCyan;
-
-  my $hueBlue = 240;
-  my $adjBlue = $hueBlue;
-
-  my $hueLilac = 300;
-  my $adjLilac = $hueLilac;
-
-  my $devRed = 176;
-  #my $devYellow = 128;
-  my $devYellow = 144;
-  my $devGreen = 96;
+  #st34
+  my $devRed = 168;
+  #my $devRed = 176;
+  my $devYellow = 134;
+  #my $devYellow = 144;
+  my $devGreen = 88;
   #my $devCyan = 48;
   my $devCyan = 56;
-  my $devBlue = 16;
-  my $devLilac = 224;
+  my $devBlue = 8;
+  my $devLilac = 208; #224
 
   my $i= 360;
 
@@ -3934,11 +3934,14 @@ WifiLight_LowLevelCmdQueue_Send(@)
   # TCP
   if ($ledDevice->{PROTO})
   {
-    if (!$ledDevice->{helper}->{SOCKET} || ($ledDevice->{helper}->{SELECT}->can_read(0.0001) && !$ledDevice->{helper}->{SOCKET}->recv(my $data, 512)))
+    if (!$ledDevice->{helper}->{SOCKET} || ($ledDevice->{helper}->{SELECT}->can_read(0) && !$ledDevice->{helper}->{SOCKET}->recv(my $data, 512)))
     {
       Log3 ($ledDevice, 4, "$ledDevice->{NAME} low level cmd queue send $dbgStr, qlen ".@{$ledDevice->{helper}->{llCmdQueue}}." connection refused: trying to reconnect");
 
-      $ledDevice->{helper}->{SOCKET}->close() if $ledDevice->{helper}->{SOCKET};
+      if ($ledDevice->{helper}->{SOCKET}) {
+        $ledDevice->{helper}->{SOCKET}->shutdown(2);
+        $ledDevice->{helper}->{SOCKET}->close();
+      }
 
       $ledDevice->{helper}->{SOCKET} = IO::Socket::INET-> new (
         PeerPort => $ledDevice->{PORT},
@@ -3964,6 +3967,10 @@ WifiLight_LowLevelCmdQueue_Send(@)
 
 1;
 
+=pod
+=item device
+=item summary controls a large number of different LED types
+=item summary_DE steuert eine gro&szlig;e Anzahl unterschiedlicher LED Typen
 =begin html
 
 <a name="WifiLight"></a>
