@@ -521,8 +521,8 @@ FW_Read($$)
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
       my $pid = fhemFork();
       if($pid) { # success, parent
-	use constant PRIO_PROCESS => 0;
-	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf)
+        use constant PRIO_PROCESS => 0;
+        setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf)
           if($^O !~ m/Win/);
         # a) while child writes a new request might arrive if client uses
         # pipelining or
@@ -530,14 +530,15 @@ FW_Read($$)
         # to socket
         # -> have to close socket in parent... so that its only used in this
         # child.
-	TcpServer_Disown( $hash );
-	delete($defs{$name});
+        TcpServer_Disown( $hash );
+        delete($defs{$name});
+        delete($attr{$name});
         FW_Read($hash, 1) if($hash->{BUF});
-	return;
+        return;
 
       } elsif(defined($pid)){ # child
         delete $hash->{BUF};
-	$hash->{isChild} = 1;
+        $hash->{isChild} = 1;
 
       } # fork failed and continue in parent
     }
@@ -580,7 +581,6 @@ FW_Read($$)
       if(!$hash->{isChild});
     TcpServer_Close( $hash );
     FW_closeConn($hash);
-    delete($defs{$name});
   } 
 }
 
@@ -706,7 +706,6 @@ FW_closeConn($)
                         $FW_userAgent && $FW_userAgent=~m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
       TcpServer_Close($hash);
-      delete($defs{$hash->{NAME}});
     }
   }
 
@@ -2786,7 +2785,6 @@ FW_logInform($$)
   if(!FW_addToWritebuffer($ntfy, "<div class='fhemlog'>$msg</div>") ){
     TcpServer_Close($ntfy);
     delete $logInform{$me};
-    delete $defs{$me};
   }
 }
 
@@ -2910,7 +2908,6 @@ FW_Notify($$)
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
       TcpServer_Close($ntfy);
-      delete($defs{$name});
     }
   }
 
@@ -2938,7 +2935,6 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
       TcpServer_Close($ntfy);
-      delete($defs{$name});
     }
   }
 }
@@ -3127,6 +3123,7 @@ FW_closeInactiveClients()
     Log3 $FW_wname, 4, "Closing inactive connection $dev";
     FW_Undef($defs{$dev}, "");
     delete $defs{$dev};
+    delete $attr{$dev};
   }
   InternalTimer($now+60, "FW_closeInactiveClients", 0, 0);
 }

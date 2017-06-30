@@ -181,6 +181,8 @@ TcpServer_Close($)
     delete($hash->{CD}); 
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
+    delete $attr{$name};
+    delete $defs{$name};
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
