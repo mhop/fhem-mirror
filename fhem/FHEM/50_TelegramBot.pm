@@ -116,7 +116,8 @@
 #   FIX: non-local $_ - see #msg647071
 # 2.4.1 2017-06-16  minor fixes - #msg641797 / #msg647071
 
-#   
+#   FIX: make fileread work for both old and new perl versions
+# 2.4.2 2017-07-01  rewrite read file function due to $_ warning - #msg651947
 #   
 #   
 ##############################################################################
@@ -3240,7 +3241,6 @@ sub TelegramBot_MsgForLog($;$) {
 #  
 sub TelegramBot_BinaryFileRead($$) {
   my ($hash, $fileName) = @_;
-  my $_;
 
   return '' if ( ! (-e $fileName) );
   
@@ -3248,8 +3248,8 @@ sub TelegramBot_BinaryFileRead($$) {
     
   open TGB_BINFILE, '<'.$fileName;
   binmode TGB_BINFILE;
-  while (<TGB_BINFILE>){
-    $fileData .= $_;
+  while (my $line = <TGB_BINFILE>){
+    $fileData .= $line;
   }
   close TGB_BINFILE;
   
