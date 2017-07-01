@@ -93,10 +93,12 @@ sub insertDB() {
   if (defined($decoded->{'system'}{'revision'})) {
      # replace revision number with revision date
      my $rev      = $decoded->{'system'}{'revision'};
-     my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
-     my ($year,$mon,$mday) = split(/-/,$d);
-     $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
-     $json = encode_json $decoded;
+     if($rev =~ /^\d+$/) {
+       my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+       my ($year,$mon,$mday) = split(/-/,$d);
+       $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
+       $json = encode_json $decoded;
+     }
   }
   
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
