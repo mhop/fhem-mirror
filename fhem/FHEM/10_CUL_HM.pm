@@ -1180,10 +1180,7 @@ sub CUL_HM_Parse($$) {#########################################################
     return (CUL_HM_pushEvnts(),$mh{devN},@entities);
   }
 
-
-
-
-   #----------CUL aesCommReq handling---------
+  #----------CUL aesCommReq handling---------
   if (   AttrVal($mh{devN},"aesCommReq",0) #aesCommReq enabled for device
       && $mh{devH}{IODev}{NAME} ne $mh{ioName} #message not received on assigned IO
       && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
@@ -3787,7 +3784,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       my $regHeader = "list:peer\tregister         :value\n";
       foreach my $regName (@regArr){
         my $regL  = $culHmRegDefine->{$regName}->{l};
-        my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
+        my @peerExe = (grep (/$regL/,@listWp)) ? @peers : ("00000000");
         foreach my $peer(@peerExe){
           next if($peer eq "");
           my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
@@ -7770,7 +7767,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
     my $reg = $rdEntry;
     my $p = "";
     $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
-    $reg =~ s/\.?R-(.*?-)?//;
+    $reg =~ s/^\.?R-(.*?-)?//;
     next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
     $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
@@ -7782,7 +7779,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
     my $reg = $rdEntry;
     my $p = "";
     $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
-    $reg =~ s/\.?R-(.*-)?//;
+    $reg =~ s/^\.?R-(.*-)?//;
     next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
     $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
@@ -7792,7 +7789,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
   else{                              ($nTag,$grp) = (".","RegL_")}
   foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
     my $reg = $rdEntry;
-    $reg =~ s/\.//;
+    $reg =~ s/^\.//;
     $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
   }
