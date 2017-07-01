@@ -102,8 +102,8 @@ sub HMtemplate_Attr(@) {#######################################################
         return "value $attrVal not numeric for $rN"  if ($attrVal !~/^\d+?\.?\d?$/);
         return "value $attrVal out of range for $rN :"
               .$culHmRegDef->{$ty.$rN}{min} ."..."
-              .$culHmRegDef->{$ty.$rN}{max}              if ($culHmRegDef->{$ty.$rN}{min} < $attrVal 
-                                                      || $culHmRegDef->{$ty.$rN}{max} > $attrVal);
+              .$culHmRegDef->{$ty.$rN}{max}          if ($culHmRegDef->{$ty.$rN}{min} > $attrVal 
+                                                      || $culHmRegDef->{$ty.$rN}{max} < $attrVal);
       }
     }
     else{# delete is ok anyhow
@@ -121,7 +121,7 @@ sub HMtemplate_Attr(@) {#######################################################
         return "still $paramCnt in use. Remove those from template first" if($1 > ($paramCnt - 1));
       }
       foreach my $rN (keys %{$culHmTpl->{$hash->{tpl_Name}}{reg}}){#now we need to rename all readings if parameter are in use
-        next if ($culHmTpl->{$hash->{tpl_Name}}{reg}{$rN} !~ m/^p(.)/);
+        next if ($culHmTpl->{$hash->{tpl_Name}}{reg}{$rN} !~ m/^p(.)$/);
         my $no = $1;
         $attr{$name}{"Reg_".$rN} = $param[$no];
       }
@@ -232,7 +232,7 @@ sub HMtemplate_GetFn($@) {#####################################################
   elsif($cmd eq "regInfo"){##print protocol-events-------------------------
     my @regArr = map { $_ =~ s/Reg_//g; $_ } 
               grep /^Reg_/,keys %{$attr{$name}};
-    if (InternalVal($name,"tpl_type","" =~ m/peer-(short|long)/)){
+    if (InternalVal($name,"tpl_type","") =~ m/peer-(short|long)/){
       $_ = "lg".$_ foreach (@regArr);
     }
     return CUL_HM_getRegInfo(\@regArr,1,1); # 
@@ -404,8 +404,8 @@ sub HMtemplate_SetFn($@) {#####################################################
     ${$eSt}="s1";
 
     my $tType = "";
-    $attr{$name}{tpl_params}      = $culHmTpl->{$templ}{p}?$culHmTpl->{$templ}{p}:"";
-    $attr{$name}{tpl_description} = $culHmTpl->{$templ}{t}?$culHmTpl->{$templ}{t}:"";
+    $attr{$name}{tpl_params}      = $culHmTpl->{$templ}{p} ? $culHmTpl->{$templ}{p} : "";
+    $attr{$name}{tpl_description} = $culHmTpl->{$templ}{t} ? $culHmTpl->{$templ}{t} : "";
     my @param = split(" ",$culHmTpl->{$templ}{p});
     my $paramS = join(",",@param);# whatchout: dont change order, may be replaced!
     
@@ -525,7 +525,7 @@ sub HMtemplate_save($$)  {#
     my @params = split(" ",AttrVal($name,"tpl_params",""));
     my $i = 0;
     foreach my $p (@params){
-      $_ =~ s/$p/p$i/ foreach(@regs) ;
+      $_ =~ s/(.*:)$p$/$1p$i/ foreach(@regs) ;
       $i++;
       }
     HMinfo_templateDef( $tName
