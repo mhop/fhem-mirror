@@ -25,10 +25,13 @@ use warnings;
 use Config;
 use HttpUtils;
 
-my %fhemInfo =();
-
 my $c_system  = 'system';
 my $c_noModel = 'noModel';
+
+my %fhemInfo =();
+
+my @ignoreList = qw(Global);
+my @countOnce  = qw(telnet FHEMWEB);
 
 sub fheminfo_Initialize($$) {
   my %hash = (
@@ -52,6 +55,8 @@ sub CommandFheminfo($$) {
     if($doSend &&  lc(AttrVal("global","sendStatistics","")) eq "never");
 
   _fi2_Count();
+
+  return toJSON(\%fhemInfo) if (defined($args[1]) && $args[1] eq 'debug');
 
   _fi2_Send() if $args[0] eq 'send';
 
@@ -91,15 +96,31 @@ sub _fi2_Count() {
       my $model = $c_noModel;
          $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
          $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
-         $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model;
+         # special for DbLog
+         $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model
+                  if ($type eq 'DbLog');
          $model = AttrVal($name,'model',$model);
          $model = ReadingsVal($name,'model',$model);
+         # special for ZWave
+         $model = ReadingsVal($name,'modelId',$model) 
+                  if ($type eq 'ZWave');
          $model = $c_noModel if (ref $model);
       next if ( ($model =~ /^unkno.*/i) || ($model =~ /virtual.*/i) || ($model eq '?') || ($model eq '1') || 
                 (defined($defs{$key}{'chanNo'})) || ($name =~ m/^unknown_/) );
       $fhemInfo{$type}{$model}++ ;
    }
+
+# now do some special handlings
+
+# add model info for configDB if used
    eval { $fhemInfo{'configDB'}{_cfgDB_type()}++ if configDBUsed(); };
+
+# correct some entries for special devices; count once per installation
+   foreach my $i (@countOnce) { $fhemInfo{$i}{$c_noModel} = 1; }
+   
+# delete all modules listed in ignoreList
+   foreach my $i (@ignoreList) { delete $fhemInfo{$i}; }
+
    return;
 }
 
@@ -175,6 +196,7 @@ sub _fi2_HtmlTable($) {
    foreach my $type (sort @keys)
    {
       next if ($type eq $c_system);
+      $fhemInfo{$type}{$c_noModel} //= '';
       $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{$c_noModel}</td></tr>";
       while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
       { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq $c_noModel; }
