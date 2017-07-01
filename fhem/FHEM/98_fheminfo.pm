@@ -90,7 +90,7 @@ sub _fi2_Count() {
 
    foreach my $key ( keys %defs )
    {
-      next if (defined($defs{$key}{'TEMPORARY'} || defined($defs{$key}{'VOLATILE'}); 
+      next if (defined($defs{$key}{'TEMPORARY'}) || defined($defs{$key}{'VOLATILE'})); 
       my $name  = $defs{$key}{NAME};
       my $type  = $defs{$key}{TYPE};
       my $model = $c_noModel;
