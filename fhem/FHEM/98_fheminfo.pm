@@ -27,6 +27,9 @@ use HttpUtils;
 
 my %fhemInfo =();
 
+my $c_system  = 'system';
+my $c_noModel = 'noModel';
+
 sub fheminfo_Initialize($$) {
   my %hash = (
     Fn  => "CommandFheminfo",
@@ -72,28 +75,31 @@ sub _fi2_Count() {
 
    %fhemInfo = ();
 
-   $fhemInfo{'system'}{'uniqueID'} = $uniqueID;
-   $fhemInfo{'system'}{'release'}  = $release;
-   $fhemInfo{'system'}{'feature'}  = $feature;
-   $fhemInfo{'system'}{'os'}       = $os;
-   $fhemInfo{'system'}{'arch'}     = $arch;
-   $fhemInfo{'system'}{'perl'}     = $perl;
-   $fhemInfo{'system'}{'revision'} = _fi2_findRev();
+   $fhemInfo{$c_system}{'uniqueID'}   = $uniqueID;
+   $fhemInfo{$c_system}{'release'}    = $release;
+   $fhemInfo{$c_system}{'feature'}    = $feature;
+   $fhemInfo{$c_system}{'os'}         = $os;
+   $fhemInfo{$c_system}{'arch'}       = $arch;
+   $fhemInfo{$c_system}{'perl'}       = $perl;
+   $fhemInfo{$c_system}{'revision'}   = _fi2_findRev();
+   $fhemInfo{$c_system}{'configType'} = configDBUsed() ? 'configDB' : 'configFile';
 
    foreach my $key ( keys %defs )
    {
       my $name  = $defs{$key}{NAME};
       my $type  = $defs{$key}{TYPE};
-      my $model = 'noModel';
+      my $model = $c_noModel;
          $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
          $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
+         $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model;
          $model = AttrVal($name,'model',$model);
          $model = ReadingsVal($name,'model',$model);
+         $model = $c_noModel if (ref $model);
       next if ( ($model =~ /^unkno.*/i) || ($model =~ /virtual.*/i) || ($model eq '?') || ($model eq '1') || 
                 (defined($defs{$key}{'chanNo'})) || ($name =~ m/^unknown_/) );
       $fhemInfo{$type}{$model}++ ;
    }
-
+   eval { $fhemInfo{'configDB'}{_cfgDB_type()}++ if configDBUsed(); };
    return;
 }
 
@@ -104,8 +110,8 @@ sub _fi2_Send() {
 
    my %hu_hash = ();
    $hu_hash{url}      = $cmds{fheminfo}{uri};
-   $hu_hash{data}     = "uniqueID=".$fhemInfo{'system'}{'uniqueID'}."&json=$json";
-   $hu_hash{header}   = "User-Agent: FHEM/".$fhemInfo{'system'}{'release'};
+   $hu_hash{data}     = "uniqueID=".$fhemInfo{$c_system}{'uniqueID'}."&json=$json";
+   $hu_hash{header}   = "User-Agent: FHEM/".$fhemInfo{$c_system}{'release'};
    $hu_hash{callback} = sub($$$) {
         my ($hash, $err, $data) = @_;
         if($err) {
@@ -124,24 +130,24 @@ sub _fi2_TelnetTable($) {
   my $str;
   $str .= "Following statistics data will be sent to server:\n(see Logfile level 4 for server response)\n\n" if($doSend == 1);
   $str .= "System Info\n";
-  $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{'system'}{'release'});
-  $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{'system'}{'feature'});
-  $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{'system'}{'revision'});
-  $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{'system'}{'os'});
-  $str .= sprintf("  Arch%*s: %s\n",9," ",$fhemInfo{'system'}{'arch'});
-  $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{'system'}{'perl'});
-  $str .= sprintf("  uniqueID%*s: %s\n",5," ",$fhemInfo{'system'}{'uniqueID'});
+  $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{$c_system}{'release'});
+  $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{$c_system}{'feature'});
+  $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{$c_system}{'revision'});
+  $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{$c_system}{'os'});
+  $str .= sprintf("  Arch%*s: %s\n",9," ",$fhemInfo{$c_system}{'arch'});
+  $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{$c_system}{'perl'});
+  $str .= sprintf("  uniqueID%*s: %s\n",5," ",$fhemInfo{$c_system}{'uniqueID'});
   $str .= sprintf("  upTime%*s: %s\n",7,"  ",$upTime); 
 
    my @keys = keys %fhemInfo;
    foreach my $type (sort @keys)
    {
-      next if $type eq 'system';
+      next if $type eq $c_system;
       $str .= "\nType: $type ";
-      $str .= "Count: ".$fhemInfo{$type}{'noModel'} if defined $fhemInfo{$type}{'noModel'};
+      $str .= "Count: ".$fhemInfo{$type}{$c_noModel} if defined $fhemInfo{$type}{$c_noModel};
       $str .= "\n";
       while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
-      { $str .= "     $model = $fhemInfo{$type}{$model}\n" unless $model eq 'noModel'; }
+      { $str .= "     $model = $fhemInfo{$type}{$model}\n" unless $model eq $c_noModel; }
    }
 
   return $str;
@@ -153,25 +159,25 @@ sub _fi2_HtmlTable($) {
    my $result  = "<html><table>";
       $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile level 4 for server response)</td></tr>" if($doSend == 1);
       $result .= "<tr><td>System Info</td></tr>";
-      $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{'system'}{'release'}</td></tr>";
-      $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{'system'}{'feature'}</td></tr>";
-      $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{'system'}{'revision'}</td></tr>" 
-                  if (defined($fhemInfo{'system'}{'revision'}));
-      $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{'system'}{'os'}</td></tr>";
-      $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{'system'}{'arch'}</td></tr>";
-      $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{'system'}{'perl'}</td></tr>";
-      $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{'system'}{'uniqueID'}</td></tr>";
+      $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{$c_system}{'release'}</td></tr>";
+      $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{$c_system}{'feature'}</td></tr>";
+      $result .= "<tr><td> </td><td>ConfigType:</td><td>$fhemInfo{$c_system}{'configType'}</td></tr>";
+            $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{$c_system}{'revision'}</td></tr>" 
+                  if (defined($fhemInfo{$c_system}{'revision'}));
+      $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
+      $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{$c_system}{'arch'}</td></tr>";
+      $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
+      $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{$c_system}{'uniqueID'}</td></tr>";
       $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
       $result .= "<tr><td>Modules</td><td>Model</td><td>Count</td></tr>";
 
    my @keys = keys %fhemInfo;
    foreach my $type (sort @keys)
    {
-      next if ($type eq 'system');
-      next unless (defined($type) && $type);
-      $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{'noModel'}</td></tr>";
+      next if ($type eq $c_system);
+      $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{$c_noModel}</td></tr>";
       while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
-      { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq 'noModel'; }
+      { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq $c_noModel; }
    }  
 
    $result .= "</table></html>";
@@ -200,7 +206,9 @@ sub _fi2_Div($$) {
 }
 
 sub _fi2_findRev {
-   my ($err, @content) = FileRead({FileName => './controls_fhem.txt', ForceType => "file"});
+   my $cf = 'controls_fhem.txt';
+   my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
+   my ($err, @content) = FileRead({FileName => $cf, ForceType => "file"});
    return if $err;
    my (undef,$rev) = split (/ /,$content[0]);
    return $rev;

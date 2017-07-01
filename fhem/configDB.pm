@@ -167,7 +167,6 @@ sub _cfgDB_Filedelete($);
 sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
 sub _cfgDB_Info();
-sub _cfgDB_typeInfo();
 sub _cfgDB_Migrate();
 sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
@@ -1071,6 +1070,10 @@ sub _cfgDB_findDef($;$) {
 	}
 
 	return @ret;
+}
+
+sub _cfgDB_type() { 
+   return $cfgDB_dbtype; 
 }
 
 ##################################################
