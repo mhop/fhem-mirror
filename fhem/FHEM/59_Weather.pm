@@ -51,6 +51,8 @@ my %wdays_txt_nl = ('Mon' => 'Maa', 'Tue' => 'Din', 'Wed'=> 'Woe', 'Thu' => 'Don
 my %wdays_txt_fr= ('Mon' => 'Lun', 'Tue' => 'Mar', 'Wed'=> 'Mer', 'Thu' => 'Jeu', 'Fri' => 'Ven', 'Sat' => 'Sam', 'Sun' => 'Dim');
 my %wdays_txt_pl = ('Mon' => 'Pon', 'Tue' => 'Wt', 'Wed'=> 'Śr', 'Thu' => 'Czw', 'Fri' => 'Pt', 'Sat' => 'Sob', 'Sun' => 'Nie');
 
+my %wind_txt = ( 'en' => 'Wind', 'de' => 'Wind', 'nl' => 'Wind', 'fr' => 'Vent', 'pl' => 'Wiatr' );
+
 my @iconlist = (
        'storm', 'storm', 'storm', 'thunderstorm', 'thunderstorm', 'rainsnow',
        'sleet', 'snow', 'drizzle', 'drizzle', 'icy' ,'chance_of_rain',
@@ -176,6 +178,7 @@ sub Weather_RetrieveDataFinished($$$) {
     my %wdays_txt_i18n;
     my @directions_txt_i18n;
     my %pressure_trend_txt_i18n;
+    my $wind_txt_i18n = %wind_txt{$lang};
 
     if($lang eq "de") {
         %wdays_txt_i18n= %wdays_txt_de;
@@ -197,6 +200,7 @@ sub Weather_RetrieveDataFinished($$$) {
         %wdays_txt_i18n= %wdays_txt_en;
         @directions_txt_i18n= @directions_txt_en;
         %pressure_trend_txt_i18n= %pressure_trend_txt_en;
+        $wind_txt_i18n = @wind_txt{'en'};
     }
     my @YahooCodes_i18n= YahooWeatherAPI_getYahooCodes($lang);
 
@@ -243,7 +247,7 @@ sub Weather_RetrieveDataFinished($$$) {
     my $winddir= $data->{wind}{direction};
     readingsBulkUpdate($hash, "wind_direction", $winddir);
     my $wdir= degrees_to_direction($winddir, @directions_txt_i18n);
-    readingsBulkUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h");
+    readingsBulkUpdate($hash, "wind_condition", "$wind_txt_i18n: $wdir $windspeed km/h");
     
     # atmosphere
     my $humidity= $data->{atmosphere}{humidity}; 
