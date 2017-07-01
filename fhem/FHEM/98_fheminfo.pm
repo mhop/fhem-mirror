@@ -31,7 +31,6 @@ my $c_noModel = 'noModel';
 my %fhemInfo =();
 
 my @ignoreList = qw(Global);
-my @countOnce  = qw(telnet FHEMWEB);
 
 sub fheminfo_Initialize($$) {
   my %hash = (
@@ -91,6 +90,7 @@ sub _fi2_Count() {
 
    foreach my $key ( keys %defs )
    {
+      next if (defined($defs{$key}{'TEMPORARY'} || defined($defs{$key}{'VOLATILE'}); 
       my $name  = $defs{$key}{NAME};
       my $type  = $defs{$key}{TYPE};
       my $model = $c_noModel;
@@ -115,9 +115,6 @@ sub _fi2_Count() {
 # add model info for configDB if used
    eval { $fhemInfo{'configDB'}{_cfgDB_type()}++ if configDBUsed(); };
 
-# correct some entries for special devices; count once per installation
-   foreach my $i (@countOnce) { $fhemInfo{$i}{$c_noModel} = 1; }
-   
 # delete all modules listed in ignoreList
    foreach my $i (@ignoreList) { delete $fhemInfo{$i}; }
 
