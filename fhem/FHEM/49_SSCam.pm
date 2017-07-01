@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 2.2.3  30.06.2017    fix if SVSversion small "0", create events for "snap"
 # 2.2.2  11.06.2017    bugfix sscam_login, sscam_login_return, 
 #                      Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701
 # 2.2.1  15.05.2017    avoid FW_detailFn because of FW_deviceOverview is active (double streams in detailview if on)
@@ -170,7 +171,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.2.2";
+my $SSCamVersion = "2.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -2442,7 +2443,7 @@ sub sscam_camop ($) {
    } elsif ($OpMode eq "Snap") {
       # ein Schnappschuß wird ausgelöst
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
-      readingsSingleUpdate($hash,"state", "snap", 0); 
+      readingsSingleUpdate($hash,"state", "snap", 1); 
       readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
    } elsif ($OpMode eq "getsnapfilename") {
@@ -2992,7 +2993,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"SVScustomPortHttps",$data->{'data'}{'customizedPortHttps'});
                 readingsBulkUpdate($hash,"SVSlicenseNumber",$data->{'data'}{'liscenseNumber'});
                 readingsBulkUpdate($hash,"SVSuserPriv",$userPriv);
-				if($version{"SMALL"}) {
+				if(defined($version{"SMALL"})) {
 				    readingsBulkUpdate($hash,"SVSversion",$version{"MAJOR"}.".".$version{"MINOR"}.".".$version{"SMALL"}."-".$version{"BUILD"});
 				} else {
 				    readingsBulkUpdate($hash,"SVSversion",$version{"MAJOR"}.".".$version{"MINOR"}."-".$version{"BUILD"});
