@@ -1660,7 +1660,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"clear"    #:msgStat,msgEvents,all,rssi,register,trigger,readings"  
             ,"clearG:msgEvents,msgErrors,msgStat,readings,register,oldRegs,rssi,trigger,attack,all"
             ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
-            ,"update"
+            ,"update:noArg"
             ,"cpRegs"
             ,"tempList"
             ,"tempListG:verify,status,save,restore,genPlot"
@@ -2396,6 +2396,7 @@ sub HMinfo_templateDel(@){#####################################################
   return if (!defined $defs{$aName});
   delete $defs{$aName}{helper}{tmpl}{"$pSet>$tmpl"};
   $tmplUsgChange = 1; # mark change
+
   $defs{$aName}{helper}{tmplChg} = 1;
   CUL_HM_setTmplDisp($defs{$aName});#set readings if desired
   return;
