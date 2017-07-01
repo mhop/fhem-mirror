@@ -111,7 +111,7 @@ my @YahooCodes_fr = (
        'agréable', #day
        'pluie et grêle',
        'chaud', 'orages isolés', 'tempêtes éparses', 'orages épars', 'averses éparses', 'tempête de neige',
-       'chûtes de neiges éparses', 'tempêtes de neige', 'partielement nuageux', 'averses orageuses', 'chûte de neige', 'chûtes de neige isolées');
+       'chûtes de neiges éparses', 'tempêtes de neige', 'partiellement nuageux', 'averses orageuses', 'chûte de neige', 'chûtes de neige isolées');
 
 my @YahooCodes_pl = (
        'tornado', 'burza tropikalna', 'huragan', 'porywiste burze', 'burze', 'deszcz ze śniegiem',
